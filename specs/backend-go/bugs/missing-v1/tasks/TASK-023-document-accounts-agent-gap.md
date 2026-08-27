@@ -5,7 +5,7 @@
 **Service:** `agent` (DONE this session) / `api-gateway` (DONE this session — `accounts.subscribe`) / `frontend` (still blocked — see below, narrower reason post-BUG-005)
 **File:** `agent/src/relay/accounts-handler.ts` (+`getAccountsSnapshot`/`handleAccountsGetSnapshot`), `agent/src/relay/accounts-handler.test.ts`, `agent/src/relay/agent-rpc-dispatch.ts` (registers `accounts.getSnapshot`), `backend-go/services/api-gateway/internal/adapter/wscompat/channels_accounts.go` (+`registerAccountsSubscribeChannel`), `channels_accounts_test.go` — no `frontend/` diff, see "Update (post-BUG-005)" below for why
 **Depends on:** TASK-021
-**Status:** `[partial]` — **agent-side gap is now genuinely CLOSED**: `accounts.selectClaude`/`selectCodex`/`removeClaude`/`removeCodex`/`getSnapshot` are real, tested JSON-RPC methods on the Dev Server Agent's dispatcher (`agent-rpc-dispatch.ts`), `accounts.subscribe` is now a real, registered `StreamHandler` in `wscompat` (`channels_accounts.go`, polling `accounts.getSnapshot`) — see "Update (post-BUG-005)" below. **Frontend-side is still blocked, but the blocker has narrowed**: BUG-005's dialect bridge means `wscompat` now has a real, working transport path for the `WebSessionClient` (session-cookie multi-user web) build target specifically — the original "just thread `connectionId`" framing is still not a complete fix on its own, but it is now the ONLY remaining piece for that one transport, not a fundamentally wrong direction. No `frontend/` code was changed — see below for why.
+**Status:** `[x]` DONE — **agent-side gap CLOSED** (unchanged from prior session): `accounts.selectClaude`/`selectCodex`/`removeClaude`/`removeCodex`/`getSnapshot` are real, tested JSON-RPC methods on the Dev Server Agent's dispatcher (`agent-rpc-dispatch.ts`), `accounts.subscribe` is a real, registered `StreamHandler` in `wscompat` (`channels_accounts.go`, polling `accounts.getSnapshot`). **Frontend `connectionId` prerequisite is now CLOSED too** (see "Update (2026-08-27, picker + connectionId threading)" below): a real dev-server picker exists in `AccountsPane.tsx`, and `runtime-provider-accounts-client.ts`'s 5 `environment`-target call sites (4 mutations + `accounts.subscribe`) resolve the user's picked dev server to a live `connectionId` via a new `accounts.resolveDevServerConnection` `wscompat` channel before every call, failing fast with a clear error instead of ever sending a request `wscompat` would reject with `ACCOUNTS_NO_CONNECTION`. This closes the loop end-to-end for the transport that actually reaches `wscompat` today (`WebSessionClient`, session-cookie multi-user web — see "Update (post-BUG-005)" below); it does not and cannot touch `WebRuntimeClient`/desktop's separate pairing-protocol transport, which remains a distinct, pre-existing, out-of-scope architecture gap this task never owned (unchanged — see the "Frontend dispatch-model finding" section above).
 
 ---
 
@@ -218,8 +218,84 @@ Agent-side (done): `cd agent && npx vitest run src/relay/accounts-handler.test.t
 `accounts-handler.ts` or the `agent-rpc-dispatch.ts` registration (pre-existing,
 unrelated errors elsewhere in `agent/` are untouched by this change).
 
-Frontend-side (still open): N/A — no code produced, by design (see "Frontend
-dispatch-model finding" above). "Done" for this half means a tracking issue
-exists per item 2 above, so the real (architecture-level) blocker is
-discoverable instead of a future pass silently re-attempting the
-already-disproven "just add `connectionId`" fix.
+Frontend-side (was open, now closed — see below): the tracking-issue framing
+below predates the "Update (2026-08-27, picker + connectionId threading)"
+section; superseded, kept for history.
+
+---
+
+## Update (2026-08-27, picker + connectionId threading) — frontend prerequisite CLOSED
+
+Implemented the resolution path this task's "Open prerequisite" section
+flagged as a real design decision needing explicit product input: the user
+now picks which dev server owns the `connectionId` `accounts.*` relays
+against, rather than `wscompat` guessing.
+
+**`backend-go` (api-gateway/wscompat):** `channels_accounts.go` gains
+`accounts.resolveDevServerConnection` — given `{devServerId}`, calls
+`client.ResolveConnection(ctx, &infrafleetv1.ResolveConnectionRequest{DevServerId: devServerId})`
+(the same RPC `registerBrowserRelay`/`channels_browser.go` already uses for
+its `worktree_id` variant — no new proto/infra-fleet-service work) and
+returns `{connected, connectionId}`. `Connected: false` is a normal,
+non-error result (a picker needs to display "not connected right now", not
+throw). 4 new tests in `channels_accounts_test.go`
+(`TestAccountsResolveDevServerConnection_Connected` / `_NotConnected_NotAnError`
+/ `_MissingDevServerID_FailsFastWithoutCallingResolve` /
+`_UnknownDevServerID_ResolveErrorPassesThrough`), following the file's
+existing `fakeAccountsRelayClient` pattern (extended with a
+`resolveConnectionFunc` field, mirroring `channels_browser_test.go`'s
+`fakeBrowserRelayClient`).
+
+**`frontend`:** new `runtime/accounts-dev-server-connection.ts` owns (a) the
+picked-`devServerId` preference — a plain localStorage read/write scoped per
+`environmentId` (`orca.accountsDevServer.<environmentId>`), following
+`landing-preflight-dismissal.ts`'s existing "module of plain functions
+wrapping try/catch'd localStorage" convention (no new persistence mechanism,
+no `GlobalSettings`/backend-go table — this is a local UI convenience, not
+server-authoritative state), and (b) `resolveAccountsDevServerConnection`,
+a thin `callRuntimeRpc` wrapper around the new channel. Resolution is
+deliberately NOT cached: accounts.* mutations are infrequent, user-initiated
+clicks, so a fresh resolve-per-call is the honest baseline — caching live
+connection state invites staleness bugs for marginal benefit here.
+`requireAccountsDevServerConnectionId` composes both steps and throws a
+clear `Error` (no dev server picked / not connected) BEFORE any `accounts.*`
+RPC is attempted.
+
+`runtime-provider-accounts-client.ts`'s 4 mutation functions and
+`watchProviderAccounts`'s remote branch all call
+`requireAccountsDevServerConnectionId(target)` first and thread the
+resolved `connectionId` into the RPC params (`{accountId, connectionId}` for
+mutations, `{connectionId}` for `accounts.subscribe`, sent via `subscribe`'s
+existing `params` field). A new `AccountsDevServerPicker.tsx` component
+(rendered as the first section in `AccountsPane.tsx`, unconditionally
+whenever `isRemoteAccountScope`, not gated by the settings search filter
+since it determines whether every other remote account action even runs)
+lists dev servers via the already-existing `devServer.list` channel (reusing
+the exact `callRuntimeRpc(target, 'devServer.list', null)` call shape already
+used by `CreateProjectDialog.tsx` — no new backend channel needed for
+listing), persists the pick, and shows explicit "no dev servers available" /
+"not currently connected" states. Its `onReadyChange` callback widens
+`AccountsPane`'s existing `accountRuntimeUnavailable` flag — already the
+single condition every select/remove button's `disabled` prop checks — so
+picking no dev server (or an unconnected one) disables every account
+mutation control via that one existing choke point, without threading a
+second condition through each of the ~8 button call sites individually.
+`StatusBar.tsx`'s account-switching UI needed no changes: it calls the same
+`runtime-provider-accounts-client.ts` functions, so it inherits the same
+fail-fast behavior and shares the same localStorage preference the
+`AccountsPane` picker sets.
+
+**Verify (this update):**
+- `cd backend-go/services/api-gateway && go build ./... && go vet ./... && go test ./...` — clean (all packages `ok`).
+- `cd frontend && npx vitest run src/renderer/src/runtime/runtime-provider-accounts-client.test.ts src/renderer/src/components/settings/AccountsPane.test.tsx src/renderer/src/components/settings/AccountsDevServerPicker.test.tsx` — 27/27 passing.
+- `cd frontend && npx tsc --noEmit -p tsconfig.json` — zero new errors in any file this update touched (verified by diffing the touched-file set against the full pre-existing error list, which has ~70 unrelated pre-existing errors across the codebase).
+- `cd frontend && npx vitest run src/renderer/src/runtime/ src/renderer/src/components/settings/` — 968 passing / 3 pre-existing failures in `settings-setup-guide-progress-hook.test.tsx` (confirmed via `git stash` to fail identically on the unmodified branch tip — unrelated to this change, a stale `9` vs `8` setup-step count).
+
+**What remains genuinely open (unchanged, out of this task's scope):**
+`WebRuntimeClient` (E2EE pair-code mode) and desktop's Electron-IPC pairing
+transport still have no bridge into `wscompat` at all — `accounts.*` calls
+made over those transports still never reach `api-gateway`. This is the
+same structurally-separate-protocol gap the "Frontend dispatch-model
+finding" section above already identified and explicitly scoped out; nothing
+in this update changes that, and it was never this task's prerequisite to
+fix.
