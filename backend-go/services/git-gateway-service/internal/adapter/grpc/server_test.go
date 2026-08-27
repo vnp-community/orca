@@ -124,7 +124,10 @@ func (fakeExecutor) ReadFilePreview(context.Context, string, string, int64) ([]b
 }
 
 func (fakeExecutor) ReadDir(context.Context, string, string) ([]domain.DirEntry, error) {
-	return []domain.DirEntry{{Name: "a.txt"}}, nil
+	return []domain.DirEntry{
+		{Name: "a.txt", SizeBytes: 42},
+		{Name: "sub", IsDirectory: true},
+	}, nil
 }
 
 func (fakeExecutor) WriteFile(context.Context, string, string, []byte, bool) (int64, error) {
@@ -259,6 +262,39 @@ func (fakeExecutor) BulkDiscard(context.Context, string, []string) (domain.BulkD
 	return domain.BulkDiscardResult{Success: true}, nil
 }
 
+func (fakeExecutor) MergeIntoBranch(context.Context, string, string, bool) (domain.MergeOutcome, error) {
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+func (fakeExecutor) StashPush(context.Context, string, string, bool) (domain.SimpleResult, error) {
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (fakeExecutor) StashPop(context.Context, string, string) (domain.MergeOutcome, error) {
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+func (fakeExecutor) CreateBranch(context.Context, string, string, string, bool) (string, error) {
+	return "feature", nil
+}
+
+func (fakeExecutor) DeleteBranch(context.Context, string, string) error {
+	return nil
+}
+
+// PushStream/PullStream (TASK-PW-03-08, SOL-PW-03) — fakeExecutor also
+// stands in for usecase.StreamingGitExecutor: one final success frame is
+// enough for this file's Server-adapter-layer tests, which only exercise
+// the wire<->usecase translation, not streaming content (that's
+// push_stream_test.go/pull_stream_test.go's job).
+func (fakeExecutor) PushStream(ctx context.Context, repoPath, remote, branch string, sink func(domain.GitProgressLine) error) error {
+	return sink(domain.GitProgressLine{IsFinal: true, Success: true})
+}
+
+func (fakeExecutor) PullStream(ctx context.Context, repoPath string, sink func(domain.GitProgressLine) error) error {
+	return sink(domain.GitProgressLine{IsFinal: true, Success: true})
+}
+
 // fakeProjectClient/fakeSCMClient are minimal stubs for exercising the
 // worktree usecases' wire<->usecase translation — none of this file's
 // tests exercise the saga/compensation logic itself (that's
@@ -376,6 +412,8 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewCommit(resolver, exec, exec),
 		usecase.NewPush(resolver, exec, exec),
 		usecase.NewPull(resolver, exec, exec),
+		usecase.NewPushStream(resolver, exec, exec),
+		usecase.NewPullStream(resolver, exec, exec),
 		usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, historyUC, completer),
 		usecase.NewStage(resolver, exec, exec),
 		usecase.NewUnstage(resolver, exec, exec),
@@ -436,6 +474,11 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewCheckWorktreeDeleteSafety(resolver, exec, exec, fakeTerminalSessionLister{}),
 		usecase.NewCompareWorktrees(resolver, projects, exec, exec),
 		usecase.NewMergeWorktreeIntoBase(resolver, projects, exec, exec),
+		usecase.NewMergeBranch(resolver, exec, exec),
+		usecase.NewStashPush(resolver, exec, exec),
+		usecase.NewStashPop(resolver, exec, exec),
+		usecase.NewCreateBranch(resolver, exec, exec),
+		usecase.NewDeleteBranch(resolver, exec, exec),
 	)
 }
 
@@ -658,6 +701,79 @@ func TestServer_WriteFile_TranslatesResult(t *testing.T) {
 	}
 	if resp.GetBytesWritten() != 7 {
 		t.Errorf("unexpected bytes written: %d", resp.GetBytesWritten())
+	}
+}
+
+func TestReadDir_TranslatesSizeBytes(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.ReadDir(context.Background(), &gitgatewayv1.ReadDirRequest{WorktreeId: "wt-1", Path: "."})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	entries := resp.GetEntries()
+	if len(entries) != 2 {
+		t.Fatalf("unexpected entries: %+v", entries)
+	}
+	if entries[0].GetName() != "a.txt" || entries[0].GetIsDirectory() || entries[0].GetSizeBytes() != 42 {
+		t.Errorf("unexpected file entry: %+v", entries[0])
+	}
+	if entries[1].GetName() != "sub" || !entries[1].GetIsDirectory() || entries[1].GetSizeBytes() != 0 {
+		t.Errorf("unexpected directory entry: %+v", entries[1])
+	}
+}
+
+func TestMergeIntoBranch_Server_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.MergeIntoBranch(context.Background(), &gitgatewayv1.MergeIntoBranchRequest{WorktreeId: "wt-1", Branch: "feature", NoFf: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() || resp.GetHadConflicts() {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func TestStashPush_Server_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.StashPush(context.Background(), &gitgatewayv1.StashPushRequest{WorktreeId: "wt-1", Message: "wip"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func TestStashPop_Server_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.StashPop(context.Background(), &gitgatewayv1.StashPopRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func TestCreateBranch_Server_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.CreateBranch(context.Background(), &gitgatewayv1.CreateBranchRequest{WorktreeId: "wt-1", Branch: "feature", Checkout: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetBranch() != "feature" {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func TestDeleteBranch_Server_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.DeleteBranch(context.Background(), &gitgatewayv1.DeleteBranchRequest{WorktreeId: "wt-1", Branch: "feature"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected response: %+v", resp)
 	}
 }
 

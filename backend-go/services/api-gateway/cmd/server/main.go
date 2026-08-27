@@ -20,6 +20,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -294,6 +295,30 @@ func run() error {
 	// request/response ChannelHandlers, see channels_push.go's doc comment.
 	clientEventBus := wscompat.NewClientEventBus()
 	wscompat.RegisterPushChannels(wsCompatRegistry, wscompat.NotificationStreamOpener(notificationStreamOpener), clientEventBus, infraFleetClient)
+
+	// workspace.subscribe (TASK-PW-04-07, SOL-PW-04): bridges task-service's
+	// orca.task.task.statuschanged and workflow-service's
+	// orca.workflow.execution.completed/.failed outbox events to connected
+	// WS sessions — see wscompat/workspace_events.go's doc comment.
+	// Graceful-degradation posture matches every other eventbus consumer in
+	// this codebase (notification-service's own eventbus.Connect call):
+	// NATS unavailable at startup logs a warning, does not fail service
+	// startup.
+	workspaceEventBus := wscompat.NewWorkspaceEventBus()
+	wscompat.RegisterWorkspaceSubscribeChannel(wsCompatRegistry, workspaceEventBus)
+	var workspaceBridgeWG sync.WaitGroup
+	_, workspaceEventConsumer, closeWorkspaceEventBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "workspace event bridge: eventbus unavailable, continuing without event consumption", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeWorkspaceEventBus() }()
+		workspaceBridgeWG.Add(1)
+		go func() {
+			defer workspaceBridgeWG.Done()
+			wscompat.RunWorkspaceEventBridge(ctx, workspaceEventConsumer, workspaceEventBus, logger)
+		}()
+	}
+
 	wsCompatHandler := wscompat.New(logger, sessionValidator, wsCompatRegistry)
 
 	// agentProxyHandler raw-proxies the Dev Server Agent's /agent (WS) and
@@ -390,6 +415,12 @@ func run() error {
 	defer cancel()
 	_ = publicServer.Shutdown(shutdownCtx)
 	_ = healthServer.Shutdown(shutdownCtx)
+
+	// Wait for the workspace-event bridge's background goroutine to observe
+	// ctx cancellation and return, so it doesn't outlive the rest of the
+	// server on shutdown — same pattern as notification-service's
+	// consumerWG.Wait().
+	workspaceBridgeWG.Wait()
 
 	return nil
 }

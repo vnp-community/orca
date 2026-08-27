@@ -48,6 +48,7 @@ type Server struct {
 	addComment            *usecase.AddComment
 	listComments          *usecase.ListComments
 	reportExecutionResult *usecase.ReportTaskExecutionResult
+	findTaskByNumber      *usecase.FindTaskByNumber
 }
 
 func New(
@@ -75,6 +76,7 @@ func New(
 	addComment *usecase.AddComment,
 	listComments *usecase.ListComments,
 	reportExecutionResult *usecase.ReportTaskExecutionResult,
+	findTaskByNumber *usecase.FindTaskByNumber,
 ) *Server {
 	return &Server{
 		createTask:            createTask,
@@ -101,6 +103,7 @@ func New(
 		addComment:            addComment,
 		listComments:          listComments,
 		reportExecutionResult: reportExecutionResult,
+		findTaskByNumber:      findTaskByNumber,
 	}
 }
 
@@ -294,6 +297,14 @@ func (s *Server) UpdateTask(ctx context.Context, req *taskv1.UpdateTaskRequest) 
 		v := req.GetStatus().GetValue()
 		in.Status = &v
 	}
+	if req.GetPrUrl() != nil {
+		v := req.GetPrUrl().GetValue()
+		in.PRURL = &v
+	}
+	if req.GetWorktreeId() != nil {
+		v := req.GetWorktreeId().GetValue()
+		in.WorktreeID = &v
+	}
 	task, err := s.updateTask.Execute(ctx, in)
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -485,11 +496,24 @@ func toProtoGrantLevel(l domain.GrantLevel) taskv1.GrantLevel {
 
 func toProtoTask(t domain.Task) *taskv1.Task {
 	return &taskv1.Task{
-		Id:        t.ID,
-		TenantId:  t.TenantID,
-		Title:     t.Title,
-		Status:    t.Status,
-		ParentId:  t.ParentID,
-		ProjectId: t.ProjectID,
+		Id:         t.ID,
+		TenantId:   t.TenantID,
+		Title:      t.Title,
+		Status:     t.Status,
+		ParentId:   t.ParentID,
+		ProjectId:  t.ProjectID,
+		TaskNumber: t.TaskNumber,
+		WorktreeId: t.WorktreeID,
+		PrUrl:      t.PRURL,
 	}
+}
+
+func (s *Server) FindTaskByNumber(ctx context.Context, req *taskv1.FindTaskByNumberRequest) (*taskv1.FindTaskByNumberResponse, error) {
+	task, err := s.findTaskByNumber.Execute(ctx, usecase.FindTaskByNumberInput{
+		ProjectID: req.GetProjectId(), TaskNumber: req.GetTaskNumber(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.FindTaskByNumberResponse{Task: toProtoTask(task)}, nil
 }

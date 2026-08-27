@@ -31,6 +31,7 @@ const (
 	TaskService_UpdateTask_FullMethodName                = "/orca.task.v1.TaskService/UpdateTask"
 	TaskService_DeleteTask_FullMethodName                = "/orca.task.v1.TaskService/DeleteTask"
 	TaskService_GetDependencies_FullMethodName           = "/orca.task.v1.TaskService/GetDependencies"
+	TaskService_FindTaskByNumber_FullMethodName          = "/orca.task.v1.TaskService/FindTaskByNumber"
 	TaskService_AIDecompose_FullMethodName               = "/orca.task.v1.TaskService/AIDecompose"
 	TaskService_AIApply_FullMethodName                   = "/orca.task.v1.TaskService/AIApply"
 	TaskService_GetSubtree_FullMethodName                = "/orca.task.v1.TaskService/GetSubtree"
@@ -73,6 +74,7 @@ type TaskServiceClient interface {
 	UpdateTask(ctx context.Context, in *UpdateTaskRequest, opts ...grpc.CallOption) (*UpdateTaskResponse, error)
 	DeleteTask(ctx context.Context, in *DeleteTaskRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetDependencies(ctx context.Context, in *GetDependenciesRequest, opts ...grpc.CallOption) (*GetDependenciesResponse, error)
+	FindTaskByNumber(ctx context.Context, in *FindTaskByNumberRequest, opts ...grpc.CallOption) (*FindTaskByNumberResponse, error)
 	// AIDecompose relays to the Dev Server Agent's ai.complete method (via
 	// infra-fleet-service's Relay RPC) to propose a subtask breakdown for
 	// task_id — review-before-commit: proposals are not written to
@@ -212,6 +214,16 @@ func (c *taskServiceClient) GetDependencies(ctx context.Context, in *GetDependen
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetDependenciesResponse)
 	err := c.cc.Invoke(ctx, TaskService_GetDependencies_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) FindTaskByNumber(ctx context.Context, in *FindTaskByNumberRequest, opts ...grpc.CallOption) (*FindTaskByNumberResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FindTaskByNumberResponse)
+	err := c.cc.Invoke(ctx, TaskService_FindTaskByNumber_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -375,6 +387,7 @@ type TaskServiceServer interface {
 	UpdateTask(context.Context, *UpdateTaskRequest) (*UpdateTaskResponse, error)
 	DeleteTask(context.Context, *DeleteTaskRequest) (*emptypb.Empty, error)
 	GetDependencies(context.Context, *GetDependenciesRequest) (*GetDependenciesResponse, error)
+	FindTaskByNumber(context.Context, *FindTaskByNumberRequest) (*FindTaskByNumberResponse, error)
 	// AIDecompose relays to the Dev Server Agent's ai.complete method (via
 	// infra-fleet-service's Relay RPC) to propose a subtask breakdown for
 	// task_id — review-before-commit: proposals are not written to
@@ -442,6 +455,9 @@ func (UnimplementedTaskServiceServer) DeleteTask(context.Context, *DeleteTaskReq
 }
 func (UnimplementedTaskServiceServer) GetDependencies(context.Context, *GetDependenciesRequest) (*GetDependenciesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDependencies not implemented")
+}
+func (UnimplementedTaskServiceServer) FindTaskByNumber(context.Context, *FindTaskByNumberRequest) (*FindTaskByNumberResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FindTaskByNumber not implemented")
 }
 func (UnimplementedTaskServiceServer) AIDecompose(context.Context, *AIDecomposeRequest) (*AIDecomposeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AIDecompose not implemented")
@@ -697,6 +713,24 @@ func _TaskService_GetDependencies_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TaskServiceServer).GetDependencies(ctx, req.(*GetDependenciesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_FindTaskByNumber_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FindTaskByNumberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).FindTaskByNumber(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_FindTaskByNumber_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).FindTaskByNumber(ctx, req.(*FindTaskByNumberRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -985,6 +1019,10 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetDependencies",
 			Handler:    _TaskService_GetDependencies_Handler,
+		},
+		{
+			MethodName: "FindTaskByNumber",
+			Handler:    _TaskService_FindTaskByNumber_Handler,
 		},
 		{
 			MethodName: "AIDecompose",

@@ -51,6 +51,10 @@ type Config struct {
 	// see usecase.OPAChecker's doc comment (BUG-WF-03's publish-approval
 	// gate).
 	AuthServiceAddr string
+	// NATSURL is where the outbox relay (SOL-PW-04, TASK-PW-04-06)
+	// publishes workflow.* domain events — same env var name/default as
+	// usage-service's identical field.
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -68,6 +72,7 @@ func Load() (Config, error) {
 		TenantServiceAddr:     commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
 		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 		AuthServiceAddr:       commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
+		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }
 

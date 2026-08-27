@@ -449,3 +449,74 @@ func TestClientStreamPty_ContextCancellationClosesOutputChannel(t *testing.T) {
 		t.Fatal("timed out waiting for events channel to close after ctx cancellation")
 	}
 }
+
+// TestClientExecStream_DeliversFramesInOrderThenCloses is TASK-PW-03-08's
+// regression guard on Client.ExecStream: multiple response frames replying
+// to the SAME request id (git.execStream's real wire shape, unlike
+// StreamPty's out-of-band notification demux) must arrive in order and the
+// output channel must close once the stream.end-typed terminal frame is
+// observed.
+func TestClientExecStream_DeliversFramesInOrderThenCloses(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, streamResults: map[string][]any{
+		"git.execStream": {
+			map[string]any{"type": "stream.chunk", "line": "Enumerating objects: 3, done.", "source": "stderr"},
+			map[string]any{"type": "stream.chunk", "line": "Writing objects: 100% (3/3)", "source": "stderr"},
+			map[string]any{"type": "stream.end", "exitCode": 0},
+		},
+	}}
+	host, port := startFakeAgent(t, agent)
+
+	client := newTestClientWithToken(port, fakeAgentToken)
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-execstream", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	frames, unsubscribe, err := client.ExecStream(context.Background(), devServer, "git.execStream", map[string]any{"args": []string{"push"}})
+	if err != nil {
+		t.Fatalf("ExecStream: %v", err)
+	}
+	defer unsubscribe()
+
+	var got []map[string]any
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case frame, ok := <-frames:
+			if !ok {
+				if len(got) != 3 {
+					t.Fatalf("channel closed after %d frames, want 3: %+v", len(got), got)
+				}
+				if got[0]["line"] != "Enumerating objects: 3, done." {
+					t.Errorf("unexpected first frame: %+v", got[0])
+				}
+				if got[2]["type"] != "stream.end" {
+					t.Errorf("expected last frame to be the stream.end terminator, got %+v", got[2])
+				}
+				return
+			}
+			got = append(got, frame)
+		case <-deadline:
+			t.Fatalf("timed out waiting for the frames channel to close (got %d frames so far: %+v)", len(got), got)
+		}
+	}
+}
+
+// TestClientExecStream_RelaySSHModeErrors mirrors StreamPty's own
+// relay-ssh restriction — no persistent session exists to stream over.
+func TestClientExecStream_RelaySSHModeErrors(t *testing.T) {
+	client := newTestClientWithToken(0, fakeAgentToken)
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-ssh", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "target-1", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	_, _, err = client.ExecStream(context.Background(), devServer, "git.execStream", nil)
+	if err == nil {
+		t.Fatal("expected an error for relay-ssh mode")
+	}
+}

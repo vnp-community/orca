@@ -43,6 +43,7 @@ type SubjectBinding struct {
 // domain.TranslateEvent's fallback rule), not subject-exhaustive.
 var Subjects = []SubjectBinding{
 	{StreamName: "TASK", Subject: "orca.task.task.completed"},
+	{StreamName: "TASK", Subject: "orca.task.task.statuschanged"}, // added SOL-PW-04
 	{StreamName: "WORKFLOW", Subject: "orca.workflow.execution.completed"},
 	{StreamName: "WORKFLOW", Subject: "orca.workflow.execution.failed"},
 	{StreamName: "AUTOMATION", Subject: "orca.automation.run.completed"},

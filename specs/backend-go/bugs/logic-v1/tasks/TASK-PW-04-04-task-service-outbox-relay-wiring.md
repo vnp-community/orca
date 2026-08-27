@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/cmd/server/main.go`
 **Depends on:** TASK-PW-04-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — cmd/server/main.go wires eventbus.Connect + EnsureStream("TASK", ["orca.task.>"]) + outbox.Relay with graceful NATS-down degradation and relayWG shutdown wait, mirroring usage-service exactly; go build clean
 
 ---
 

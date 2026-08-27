@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/domain/file.go`, `backend-go/services/git-gateway-service/internal/adapter/localfs/executor.go`
 **Depends on:** TASK-PW-02-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain.DirEntry.SizeBytes added; localfs.Executor.ReadDir populates it via entry.Info(); TestReadDir_ReportsSizeBytes passes
 
 ---
 

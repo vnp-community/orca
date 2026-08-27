@@ -40,6 +40,21 @@ var ErrForceDeleteBranchUnsupported = errors.New("git-gateway-service: relay tar
 // errors.Is) can import it without an import cycle.
 var ErrConflictResolveUnsupportedOverRelay = errors.New("git-gateway-service: relay target does not support per-file conflict resolution")
 
+// ErrGitOpUnsupportedOverSSHRelay is returned when a merge/stash/branch-
+// write or push/pull-progress-stream operation is attempted against a
+// relay-ssh-mode connection — the real agent's git.exec whitelist for Part
+// B (the surface RelayExecutor's SSH-relay calls reach) explicitly
+// excludes merge/rebase/stash and has no execStream equivalent at all
+// (specs/agent/api/agent-rpc-catalog-git-fs.md's "Not allowed at all"
+// list). Same operational-fallback shape as ErrForceDeleteBranchUnsupported
+// above — lives in domain so both grpcclient (which returns it) and
+// usecase (which checks it via errors.Is) can import it without an import
+// cycle.
+var ErrGitOpUnsupportedOverSSHRelay = errors.New(
+	"git-gateway-service: this operation requires a relay-websocket or " +
+		"direct-websocket connection; relay-ssh's git.exec whitelist does " +
+		"not permit merge/stash/branch-write subcommands")
+
 // FileState enumerates the file-status values git-gateway-service's wire
 // protocol carries (mirrors the generated proto's FileStatus.state string
 // per gitgateway.proto's comment: "modified/added/deleted/untracked/conflicted").
@@ -111,11 +126,40 @@ type PullResult struct {
 	HadConflicts bool
 }
 
+// GitProgressLine is one streamed line of push/pull progress output
+// (TASK-PW-03-08, SOL-PW-03) — mirrors gitgateway.proto's GitProgressEvent
+// 1:1 and the agent's git.execStream frame shape
+// (specs/agent/api/agent-rpc-catalog-git-fs.md: {type:'stream.chunk',
+// line,source?} / {type:'stream.end',exitCode}). IsFinal=true carries the
+// unary-equivalent outcome in Success/HadConflicts (mirroring PushResult/
+// PullResult's own shape) rather than a separate terminal message type.
+type GitProgressLine struct {
+	Line         string
+	Source       string // "stdout" | "stderr"; empty for the final line
+	IsFinal      bool
+	ExitCode     int32
+	Success      bool // only meaningful when IsFinal
+	HadConflicts bool // only meaningful when IsFinal (pull's had_conflicts shape)
+}
+
 // SimpleResult is the bare-success-flag shape shared by Stage/Unstage
 // (TASK-208) and Fetch — any operation with no richer result than
 // "did it work".
 type SimpleResult struct {
 	Success bool
+}
+
+// MergeOutcome reflects whether a MergeIntoBranch (or StashPop, which
+// reuses this shape) operation succeeded, and whether it left the worktree
+// with unresolved conflicts — same Success/HadConflicts shape as
+// PullResult/RebaseResult, since a merge conflict is a real domain outcome,
+// not a Go error. Named distinctly from MergeResult (below), which is
+// SOL-WT-05's MergeBranch worktree-into-base outcome — the two ops merge
+// different things and were built by separate batches, so the names must
+// not collide.
+type MergeOutcome struct {
+	Success      bool
+	HadConflicts bool
 }
 
 // CommitRef is one commit's metadata, returned by History. Mirrors

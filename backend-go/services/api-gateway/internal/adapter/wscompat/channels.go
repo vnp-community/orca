@@ -261,10 +261,11 @@ func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServi
 	})
 }
 
-// ── task.* (subset: create/get — the DAG/grant channels backing
-// task-service's real BFS/cycle-detection logic; execute/AI-decompose are
-// not wired since they depend on infra-fleet-service/orchestration-service,
-// still stubs — see task-service's own README) ─────────────────────────
+// ── task.* (subset: create/get/hasActiveExecutions — the DAG/grant
+// channels backing task-service's real BFS/cycle-detection logic;
+// execute/AI-decompose are not wired since they depend on
+// infra-fleet-service/orchestration-service, still stubs — see
+// task-service's own README) ─────────────────────────
 
 func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 	r.Register("task.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -355,6 +356,21 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 	// them here too: Registry.Register silently last-writer-wins on a
 	// duplicate channel name, so a second registration here would just be
 	// dead, confusing code shadowing the real one.
+
+	r.Register("task.hasActiveExecutions", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type hasActiveArgs struct {
+			ProjectID string `json:"projectId"`
+		}
+		in, err := decodeArg[hasActiveArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.HasActiveExecutions(ctx, &taskv1.HasActiveExecutionsRequest{ProjectId: in.ProjectID})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]bool{"hasActiveExecutions": resp.GetHasActive()}, nil
+	})
 }
 
 // ── git.* (subset: status/diff — the two ops git-gateway-service

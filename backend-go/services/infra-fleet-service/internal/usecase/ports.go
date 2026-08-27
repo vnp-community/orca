@@ -338,6 +338,18 @@ type DevServerAgentClient interface {
 	// devserveragent/methods.go's InspectProcess doc comment.
 	InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (InspectProcessResult, error)
 
+	// ExecStream dispatches one streaming JSON-RPC method call (currently
+	// only "git.execStream", TASK-PW-03-08/SOL-PW-03) — usecase.RelayStream's
+	// only caller — whose result arrives as multiple frames instead of one.
+	// Unlike StreamPty (an out-of-band notification demux keyed by pty id),
+	// these are ordinary JSON-RPC response frames sharing one request id;
+	// see devserveragent/session.go's callStream doc comment for the wire
+	// mechanics. The returned channel closes once the agent's terminal
+	// frame is observed, the session disconnects, or ctx is cancelled;
+	// unsubscribe MUST still be called exactly once (typically via defer)
+	// to release the pending-call slot on an early return.
+	ExecStream(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (<-chan map[string]any, func(), error)
+
 	// CancelReconnect stops devServerID's in-flight background-reconnect
 	// loop (relay-websocket's backgroundReconnect or relay-ssh's
 	// relaySSHReconnect) immediately — TeardownConnection's "Cancel" action

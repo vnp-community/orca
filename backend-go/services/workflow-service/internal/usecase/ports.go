@@ -169,8 +169,13 @@ type ExecutionRepository interface {
 	// matching row exists for tenantID/id.
 	GetExecution(ctx context.Context, tenantID, id string) (domain.WorkflowExecution, error)
 	// UpdateExecution persists an execution's mutable fields (status,
-	// paused_at) — called after Pause/Resume transitions.
-	UpdateExecution(ctx context.Context, exec domain.WorkflowExecution) error
+	// paused_at) and, when event is non-nil, an outbox row — in the SAME
+	// transaction, matching task-service.TaskRepository.Update's identical
+	// extension (TASK-PW-04-02/03/05). Called after Pause/Resume
+	// transitions and terminal-status writes; event is nil except at the
+	// terminal-status call site (Execute.runToCompletion / recover
+	// completion).
+	UpdateExecution(ctx context.Context, exec domain.WorkflowExecution, event *domain.OutboxEvent) error
 	// HasActiveExecutions reports whether tenantID/projectID has any
 	// execution in a non-terminal status — see usecase.HasActiveExecutions.
 	HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error)

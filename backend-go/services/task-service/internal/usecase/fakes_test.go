@@ -35,6 +35,12 @@ type fakeTaskRepository struct {
 	batchUpdateProgressCalls []map[string]int
 	completeExecutionCalls   []completeExecutionCall
 	completeExecutionErr     error
+	findByNumberErr          error
+	// lastUpdateEvents records the events slice passed to the most recent
+	// Update call — SOL-PW-04's regression guard for "a status-changing
+	// update enqueues exactly one/two events; a title-only update enqueues
+	// none".
+	lastUpdateEvents []domain.OutboxEvent
 }
 
 // completeExecutionCall records one CompleteExecution invocation — used by
@@ -158,7 +164,8 @@ func (f *fakeTaskRepository) List(ctx context.Context, tenantID, projectID, page
 	return out, "", nil
 }
 
-func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task) error {
+func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task, events []domain.OutboxEvent) error {
+	f.lastUpdateEvents = events
 	if f.updateErr != nil {
 		return f.updateErr
 	}
@@ -168,6 +175,18 @@ func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task d
 	}
 	f.tasks[task.ID] = task
 	return nil
+}
+
+func (f *fakeTaskRepository) FindByNumber(ctx context.Context, tenantID, projectID string, taskNumber int64) (domain.Task, error) {
+	if f.findByNumberErr != nil {
+		return domain.Task{}, f.findByNumberErr
+	}
+	for _, t := range f.tasks {
+		if t.TenantID == tenantID && t.ProjectID == projectID && t.TaskNumber == taskNumber {
+			return t, nil
+		}
+	}
+	return domain.Task{}, errNotFound
 }
 
 func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) error {

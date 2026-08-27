@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,9 +20,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/workflow-service/internal/config"
@@ -239,6 +242,43 @@ func run() error {
 		return pool.Ping(ctx)
 	})
 
+	// Transactional-outbox relay (SOL-PW-04, TASK-PW-04-06): Execute's
+	// runToCompletion/RecoverExecutions' finish durably enqueue an outbox
+	// row in the SAME Postgres transaction as the execution's terminal
+	// status write (internal/adapter/postgres.Repository.UpdateExecution)
+	// — this relay is what actually gets those rows to NATS. Matches
+	// usage-service's/task-service's identical graceful-degradation
+	// posture: NATS unavailable at startup does not fail service startup,
+	// outbox rows queue durably in Postgres and drain on a future restart
+	// once NATS is reachable.
+	var relay *outbox.Relay
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		// Stream name "WORKFLOW" matches notification-service's
+		// ALREADY-WIRED SubjectBinding{StreamName: "WORKFLOW", ...} —
+		// verified present in
+		// services/notification-service/internal/adapter/eventbus/consumer.go
+		// before picking this name; do not rename it.
+		if err := pub.EnsureStream(ctx, "WORKFLOW", []string{"orca.workflow.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure WORKFLOW stream", slog.Any("error", err))
+		} else {
+			relay = outbox.NewRelay(repo, pub, outbox.DefaultConfig, logger)
+			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
+		}
+	}
+
+	var relayWG sync.WaitGroup
+	if relay != nil {
+		relayWG.Add(1)
+		go func() {
+			defer relayWG.Done()
+			relay.Run(ctx)
+		}()
+	}
+
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
 		Handler: healthSrv.Handler(),
@@ -279,6 +319,12 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+
+	// Wait for the outbox relay goroutine (if started) to observe ctx
+	// cancellation and return, so it doesn't outlive the rest of the
+	// server on shutdown — same pattern usage-service's/task-service's
+	// main.go use for their own outbox relay goroutines.
+	relayWG.Wait()
 
 	return nil
 }

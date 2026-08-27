@@ -499,6 +499,68 @@ func (c *Client) StreamPty(ctx context.Context, devServer domain.DevServer, ptyI
 	return out, unsubscribe, nil
 }
 
+// ExecStream dispatches one streaming JSON-RPC method call (currently only
+// "git.execStream", TASK-PW-03-08/SOL-PW-03) whose result arrives as
+// multiple response frames replying to the original request id instead of
+// one — see session.go's callStream/isTerminalStreamResponse for the wire
+// mechanics, distinct from StreamPty's out-of-band notification demux
+// above (routeNotification keyed by pty id): these are ordinary JSON-RPC
+// response frames sharing one request id, not notifications.
+//
+// relay-ssh mode has no persistent session (same restriction as StreamPty)
+// so this always errors for it — usecase.RelayStream's caller
+// (git-gateway-service's PushStream/PullStream) is expected to have
+// already rejected relay-ssh before ever reaching here (SOL-PW-03's
+// domain.ErrGitOpUnsupportedOverSSHRelay check), so this is a defense in
+// depth, not the primary guard.
+//
+// The returned channel is closed once the agent's terminal frame is
+// observed, the session disconnects, or ctx is cancelled — every caller
+// MUST still call the returned unsubscribe func (typically via defer) to
+// release the pending-call slot on an early return.
+func (c *Client) ExecStream(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (<-chan map[string]any, func(), error) {
+	if devServer.Mode == domain.ConnectionModeRelaySSH {
+		return nil, nil, fmt.Errorf("%w: relay-ssh mode has no streaming JSON-RPC surface (no relay.js deployed)", ErrConnectionModeNotImplemented)
+	}
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	raw, unsubscribe, err := sess.callStream(ctx, method, params)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	out := make(chan map[string]any, 64)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case resp, ok := <-raw:
+				if !ok {
+					return
+				}
+				if resp.Error != nil {
+					out <- map[string]any{"type": "stream.end", "error": resp.Error.Error()}
+					return
+				}
+				var frame map[string]any
+				if err := json.Unmarshal(resp.Result, &frame); err != nil {
+					continue // malformed frame — skip rather than abort the whole stream
+				}
+				out <- frame
+				if t, _ := frame["type"].(string); t == "stream.end" {
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+	return out, unsubscribe, nil
+}
+
 // Close tears down every open session — call on service shutdown.
 func (c *Client) Close() {
 	c.mu.Lock()

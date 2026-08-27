@@ -1284,3 +1284,82 @@ func (e *Executor) Fetch(ctx context.Context, repoPath string, pushTarget *domai
 	}
 	return domain.SimpleResult{Success: true}, nil
 }
+
+// ── SOL-PW-03 — merge/stash/branch-write. Host-local case — always
+// supported, no connection-mode gate applies here (that gate lives in the
+// usecase layer). All five subcommands are baseline-compatible per
+// docs/reference/git-compatibility.md's Git 2.25 floor. ───────────────────
+
+// MergeIntoBranch runs `git merge [--no-ff] <branch>`. A merge conflict is a
+// real domain outcome (git exits non-zero, but the working tree is left in
+// a legitimate conflicted state) rather than an operational error, so the
+// error path folds into MergeOutcome{HadConflicts:true} instead of
+// propagating err. Named MergeIntoBranch, not MergeBranch — that name is
+// already taken by the worktree-into-base MergeBranch method above.
+func (e *Executor) MergeIntoBranch(ctx context.Context, repoPath, branch string, noFF bool) (domain.MergeOutcome, error) {
+	args := []string{"merge"}
+	if noFF {
+		args = append(args, "--no-ff")
+	}
+	args = append(args, branch)
+	out, err := e.run(ctx, repoPath, args...)
+	if err != nil {
+		return domain.MergeOutcome{Success: false, HadConflicts: strings.Contains(out, "CONFLICT")}, nil
+	}
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+// StashPush runs `git stash push [-u] [-m <message>]`.
+func (e *Executor) StashPush(ctx context.Context, repoPath, message string, includeUntracked bool) (domain.SimpleResult, error) {
+	args := []string{"stash", "push"}
+	if includeUntracked {
+		args = append(args, "-u")
+	}
+	if message != "" {
+		args = append(args, "-m", message)
+	}
+	if _, err := e.run(ctx, repoPath, args...); err != nil {
+		return domain.SimpleResult{}, err
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+// StashPop runs `git stash pop [<stashRef>]` — a pop-time conflict is a
+// real domain outcome, same MergeOutcome shape as MergeIntoBranch above.
+func (e *Executor) StashPop(ctx context.Context, repoPath, stashRef string) (domain.MergeOutcome, error) {
+	args := []string{"stash", "pop"}
+	if stashRef != "" {
+		args = append(args, stashRef)
+	}
+	out, err := e.run(ctx, repoPath, args...)
+	if err != nil {
+		return domain.MergeOutcome{Success: false, HadConflicts: strings.Contains(out, "CONFLICT")}, nil
+	}
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+// CreateBranch runs `git branch <branch> [<baseRef>]`, then optionally
+// `git checkout <branch>`.
+func (e *Executor) CreateBranch(ctx context.Context, repoPath, branch, baseRef string, checkout bool) (string, error) {
+	args := []string{"branch", branch}
+	if baseRef != "" {
+		args = append(args, baseRef)
+	}
+	if _, err := e.run(ctx, repoPath, args...); err != nil {
+		return "", err
+	}
+	if checkout {
+		if _, err := e.run(ctx, repoPath, "checkout", branch); err != nil {
+			return "", err
+		}
+	}
+	return branch, nil
+}
+
+// DeleteBranch runs `git branch -d <branch>` — the soft-delete path, which
+// git itself refuses on an unmerged branch (unlike ForceDeleteBranch's -D
+// above).
+func (e *Executor) DeleteBranch(ctx context.Context, repoPath, branch string) error {
+	_, err := e.run(ctx, repoPath, "branch", "-d", branch)
+	return err
+}

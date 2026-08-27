@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/usecase/execute.go`, `backend-go/services/workflow-service/cmd/server/main.go`
 **Depends on:** TASK-PW-04-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Execute.runToCompletion + RecoverExecutions.finish both enqueue orca.workflow.execution.completed/.failed; main.go wires EnsureStream("WORKFLOW", ...) + outbox.Relay; TestExecute_DispatchesWavesAndMarksExecutionCompleted/_WaveFailureMarksExecutionFailed assert the enqueued subject
 
 ---
 

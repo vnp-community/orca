@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 )
 
@@ -450,10 +451,21 @@ func (r *Repository) HasActiveExecutions(ctx context.Context, tenantID, projectI
 }
 
 // UpdateExecution persists an execution's mutable fields — status and
-// paused_at, set by Pause/Resume transitions. root_trace_id and
-// template_id are immutable after creation and not touched here.
-func (r *Repository) UpdateExecution(ctx context.Context, exec domain.WorkflowExecution) error {
-	tag, err := r.pool.Exec(ctx, `
+// paused_at, set by Pause/Resume transitions and terminal-status writes —
+// and, when event is non-nil, an outbox row, ALL in one Postgres
+// transaction (SOL-PW-04, TASK-PW-04-05). root_trace_id and template_id
+// are immutable after creation and not touched here. Follows
+// usage-service.Repository.SaveSession's exact transaction shape (begin ->
+// exec execution update -> exec outbox insert if event != nil -> commit;
+// defer tx.Rollback for the error path).
+func (r *Repository) UpdateExecution(ctx context.Context, exec domain.WorkflowExecution, event *domain.OutboxEvent) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("postgres: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE workflow.executions
 		SET status = $1, paused_at = $2, updated_at = now()
 		WHERE tenant_id = $3 AND id = $4
@@ -463,6 +475,60 @@ func (r *Repository) UpdateExecution(ctx context.Context, exec domain.WorkflowEx
 	}
 	if tag.RowsAffected() == 0 {
 		return domain.ErrExecutionNotFound
+	}
+
+	if event != nil {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO workflow.outbox_events (id, tenant_id, subject, occurred_at, version, payload)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, event.ID, exec.TenantID, event.Subject, event.OccurredAt, 1, event.PayloadJSON)
+		if err != nil {
+			return fmt.Errorf("postgres: insert outbox event: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
+}
+
+// FetchUnpublished and MarkPublished implement common/outbox.Store — see
+// cmd/server/main.go for where the relay is wired. Identical query/scan
+// shape to usage-service's FetchUnpublished/MarkPublished, against
+// workflow.outbox_events.
+func (r *Repository) FetchUnpublished(ctx context.Context, limit int) ([]outbox.Record, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, subject, occurred_at, version, payload
+		FROM workflow.outbox_events
+		WHERE published_at IS NULL
+		ORDER BY created_at
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query unpublished outbox events: %w", err)
+	}
+	defer rows.Close()
+
+	var out []outbox.Record
+	for rows.Next() {
+		var rec outbox.Record
+		if err := rows.Scan(&rec.ID, &rec.Event.TenantID, &rec.Subject, &rec.Event.OccurredAt, &rec.Event.Version, &rec.Event.Payload); err != nil {
+			return nil, fmt.Errorf("postgres: scan outbox event row: %w", err)
+		}
+		rec.Event.ID = rec.ID
+		out = append(out, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate outbox event rows: %w", err)
+	}
+	return out, nil
+}
+
+func (r *Repository) MarkPublished(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx, `UPDATE workflow.outbox_events SET published_at = now() WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return fmt.Errorf("postgres: mark outbox events published: %w", err)
 	}
 	return nil
 }

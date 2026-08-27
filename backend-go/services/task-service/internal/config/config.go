@@ -44,9 +44,9 @@ type Config struct {
 	// dials orchestration-service's StartCoordinatorRun RPC — the complex
 	// (subtree-dispatch) execution path.
 	OrchestrationServiceAddr string
-	// NATSURL is where the transactional-outbox relay (TASK-TG-03-07)
-	// publishes grant audit events — mirrors usage-service's identical
-	// config field.
+	// NATSURL is where the transactional-outbox relay (TASK-TG-03-07,
+	// TASK-PW-04-04) publishes both grant audit events and task.* domain
+	// events — mirrors usage-service's identical config field.
 	NATSURL string
 }
 

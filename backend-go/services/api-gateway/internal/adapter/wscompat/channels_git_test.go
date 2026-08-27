@@ -3,9 +3,14 @@ package wscompat
 import (
 	"context"
 	"errors"
+	"io"
+	"sync"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
@@ -65,6 +70,15 @@ type fakeGitGatewayClient struct {
 	branchDiffFunc      func(ctx context.Context, in *gitgatewayv1.BranchDiffRequest) (*gitgatewayv1.FileDiffResponse, error)
 	submoduleStatusFunc func(ctx context.Context, in *gitgatewayv1.SubmoduleStatusRequest) (*gitgatewayv1.GetStatusResponse, error)
 	fetchFunc           func(ctx context.Context, in *gitgatewayv1.FetchRequest) (*gitgatewayv1.FetchResponse, error)
+
+	mergeIntoBranchFunc func(ctx context.Context, in *gitgatewayv1.MergeIntoBranchRequest) (*gitgatewayv1.MergeIntoBranchResponse, error)
+	stashPushFunc       func(ctx context.Context, in *gitgatewayv1.StashPushRequest) (*gitgatewayv1.StashPushResponse, error)
+	stashPopFunc        func(ctx context.Context, in *gitgatewayv1.StashPopRequest) (*gitgatewayv1.StashPopResponse, error)
+	createBranchFunc    func(ctx context.Context, in *gitgatewayv1.CreateBranchRequest) (*gitgatewayv1.CreateBranchResponse, error)
+	deleteBranchFunc    func(ctx context.Context, in *gitgatewayv1.DeleteBranchRequest) (*gitgatewayv1.DeleteBranchResponse, error)
+
+	pushStreamFunc func(ctx context.Context, in *gitgatewayv1.PushRequest) (gitgatewayv1.GitGatewayService_PushStreamClient, error)
+	pullStreamFunc func(ctx context.Context, in *gitgatewayv1.PullRequest) (gitgatewayv1.GitGatewayService_PullStreamClient, error)
 }
 
 func (f *fakeGitGatewayClient) CommitCompare(ctx context.Context, in *gitgatewayv1.CommitCompareRequest, _ ...grpc.CallOption) (*gitgatewayv1.CommitCompareResponse, error) {
@@ -202,6 +216,53 @@ func (f *fakeGitGatewayClient) Discard(ctx context.Context, in *gitgatewayv1.Dis
 }
 func (f *fakeGitGatewayClient) BulkDiscard(ctx context.Context, in *gitgatewayv1.BulkDiscardRequest, _ ...grpc.CallOption) (*gitgatewayv1.BulkDiscardResponse, error) {
 	return f.bulkDiscardFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) MergeIntoBranch(ctx context.Context, in *gitgatewayv1.MergeIntoBranchRequest, _ ...grpc.CallOption) (*gitgatewayv1.MergeIntoBranchResponse, error) {
+	return f.mergeIntoBranchFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) StashPush(ctx context.Context, in *gitgatewayv1.StashPushRequest, _ ...grpc.CallOption) (*gitgatewayv1.StashPushResponse, error) {
+	return f.stashPushFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) StashPop(ctx context.Context, in *gitgatewayv1.StashPopRequest, _ ...grpc.CallOption) (*gitgatewayv1.StashPopResponse, error) {
+	return f.stashPopFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) CreateBranch(ctx context.Context, in *gitgatewayv1.CreateBranchRequest, _ ...grpc.CallOption) (*gitgatewayv1.CreateBranchResponse, error) {
+	return f.createBranchFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) DeleteBranch(ctx context.Context, in *gitgatewayv1.DeleteBranchRequest, _ ...grpc.CallOption) (*gitgatewayv1.DeleteBranchResponse, error) {
+	return f.deleteBranchFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) PushStream(ctx context.Context, in *gitgatewayv1.PushRequest, _ ...grpc.CallOption) (gitgatewayv1.GitGatewayService_PushStreamClient, error) {
+	return f.pushStreamFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) PullStream(ctx context.Context, in *gitgatewayv1.PullRequest, _ ...grpc.CallOption) (gitgatewayv1.GitGatewayService_PullStreamClient, error) {
+	return f.pullStreamFunc(ctx, in)
+}
+
+// fakeGitProgressStream is a minimal
+// gitgatewayv1.GitGatewayService_PushStreamClient/_PullStreamClient test
+// double — same "embed the nil grpc.ClientStream, override only Recv"
+// pattern as fakeNotificationStream (channels_push_test.go).
+type fakeGitProgressStream struct {
+	grpc.ClientStream
+
+	mu     sync.Mutex
+	events []*gitgatewayv1.GitProgressEvent
+	err    error
+}
+
+func (f *fakeGitProgressStream) Recv() (*gitgatewayv1.GitProgressEvent, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if len(f.events) > 0 {
+		ev := f.events[0]
+		f.events = f.events[1:]
+		return ev, nil
+	}
+	if f.err != nil {
+		return nil, f.err
+	}
+	return nil, io.EOF
 }
 
 func TestGitDiffChannel_ThreadsFilePathThrough(t *testing.T) {
@@ -1076,7 +1137,7 @@ func TestFilesReadDirChannel_ReturnsUnwrappedEntries(t *testing.T) {
 			if in.GetWorktreeId() != "wt-1" || in.GetPath() != "dir" {
 				t.Errorf("unexpected request: %+v", in)
 			}
-			return &gitgatewayv1.ReadDirResponse{Entries: []*gitgatewayv1.DirEntry{{Name: "a.txt"}}}, nil
+			return &gitgatewayv1.ReadDirResponse{Entries: []*gitgatewayv1.DirEntry{{Name: "a.txt", SizeBytes: 42}}}, nil
 		},
 	}
 	r := NewRegistry()
@@ -1088,8 +1149,8 @@ func TestFilesReadDirChannel_ReturnsUnwrappedEntries(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	entries, ok := result.([]*gitgatewayv1.DirEntry)
-	if !ok || len(entries) != 1 || entries[0].GetName() != "a.txt" {
-		t.Errorf("expected unwrapped entries slice, got %+v", result)
+	if !ok || len(entries) != 1 || entries[0].GetName() != "a.txt" || entries[0].GetSizeBytes() != 42 {
+		t.Errorf("expected unwrapped entries slice with sizeBytes, got %+v", result)
 	}
 }
 
@@ -1382,5 +1443,351 @@ func TestFilesCopyChannel_KnownGapErrorPassesThrough(t *testing.T) {
 		argsJSON(t, map[string]any{"worktreeId": "wt-1", "fromPath": "a.txt", "toPath": "b.txt"}))
 	if err == nil {
 		t.Fatal("expected the known-gap error to surface as-is, not be swallowed")
+	}
+}
+
+// ── TASK-PW-03-07: git.merge/git.stash.push/git.stash.pop/
+// git.branch.create/git.branch.delete ────────────────────────────────────
+
+func TestGitMergeChannel_Success(t *testing.T) {
+	var got *gitgatewayv1.MergeIntoBranchRequest
+	fake := &fakeGitGatewayClient{
+		mergeIntoBranchFunc: func(ctx context.Context, in *gitgatewayv1.MergeIntoBranchRequest) (*gitgatewayv1.MergeIntoBranchResponse, error) {
+			got = in
+			return &gitgatewayv1.MergeIntoBranchResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.merge",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature", "noFf": true}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" || got.GetBranch() != "feature" || !got.GetNoFf() {
+		t.Errorf("unexpected request: %+v", got)
+	}
+	resp, ok := result.(*gitgatewayv1.MergeIntoBranchResponse)
+	if !ok || !resp.GetSuccess() {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitMergeChannel_FailedPreconditionSurfacesUnmodified(t *testing.T) {
+	wantErr := status.Error(codes.FailedPrecondition, "GITGATEWAY_MERGE_UNSUPPORTED_SSH_RELAY: merge is not supported over an SSH-relay connection")
+	fake := &fakeGitGatewayClient{
+		mergeIntoBranchFunc: func(ctx context.Context, in *gitgatewayv1.MergeIntoBranchRequest) (*gitgatewayv1.MergeIntoBranchResponse, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.merge",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature"}))
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.FailedPrecondition {
+		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
+	}
+}
+
+func TestGitStashPushChannel_Success(t *testing.T) {
+	var got *gitgatewayv1.StashPushRequest
+	fake := &fakeGitGatewayClient{
+		stashPushFunc: func(ctx context.Context, in *gitgatewayv1.StashPushRequest) (*gitgatewayv1.StashPushResponse, error) {
+			got = in
+			return &gitgatewayv1.StashPushResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.stash.push",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "message": "wip", "includeUntracked": true}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" || got.GetMessage() != "wip" || !got.GetIncludeUntracked() {
+		t.Errorf("unexpected request: %+v", got)
+	}
+	resp, ok := result.(*gitgatewayv1.StashPushResponse)
+	if !ok || !resp.GetSuccess() {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitStashPushChannel_FailedPreconditionSurfacesUnmodified(t *testing.T) {
+	wantErr := status.Error(codes.FailedPrecondition, "GITGATEWAY_STASH_PUSH_UNSUPPORTED_SSH_RELAY")
+	fake := &fakeGitGatewayClient{
+		stashPushFunc: func(ctx context.Context, in *gitgatewayv1.StashPushRequest) (*gitgatewayv1.StashPushResponse, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.stash.push",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.FailedPrecondition {
+		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
+	}
+}
+
+func TestGitStashPopChannel_Success(t *testing.T) {
+	var got *gitgatewayv1.StashPopRequest
+	fake := &fakeGitGatewayClient{
+		stashPopFunc: func(ctx context.Context, in *gitgatewayv1.StashPopRequest) (*gitgatewayv1.StashPopResponse, error) {
+			got = in
+			return &gitgatewayv1.StashPopResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.stash.pop",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "stashRef": "stash@{0}"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" || got.GetStashRef() != "stash@{0}" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+	resp, ok := result.(*gitgatewayv1.StashPopResponse)
+	if !ok || !resp.GetSuccess() {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitStashPopChannel_FailedPreconditionSurfacesUnmodified(t *testing.T) {
+	wantErr := status.Error(codes.FailedPrecondition, "GITGATEWAY_STASH_POP_UNSUPPORTED_SSH_RELAY")
+	fake := &fakeGitGatewayClient{
+		stashPopFunc: func(ctx context.Context, in *gitgatewayv1.StashPopRequest) (*gitgatewayv1.StashPopResponse, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.stash.pop",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.FailedPrecondition {
+		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
+	}
+}
+
+func TestGitBranchCreateChannel_Success(t *testing.T) {
+	var got *gitgatewayv1.CreateBranchRequest
+	fake := &fakeGitGatewayClient{
+		createBranchFunc: func(ctx context.Context, in *gitgatewayv1.CreateBranchRequest) (*gitgatewayv1.CreateBranchResponse, error) {
+			got = in
+			return &gitgatewayv1.CreateBranchResponse{Branch: in.GetBranch()}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branch.create",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature", "baseRef": "main", "checkout": true}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" || got.GetBranch() != "feature" || got.GetBaseRef() != "main" || !got.GetCheckout() {
+		t.Errorf("unexpected request: %+v", got)
+	}
+	resp, ok := result.(*gitgatewayv1.CreateBranchResponse)
+	if !ok || resp.GetBranch() != "feature" {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitBranchCreateChannel_FailedPreconditionSurfacesUnmodified(t *testing.T) {
+	wantErr := status.Error(codes.FailedPrecondition, "GITGATEWAY_CREATE_BRANCH_ALREADY_EXISTS")
+	fake := &fakeGitGatewayClient{
+		createBranchFunc: func(ctx context.Context, in *gitgatewayv1.CreateBranchRequest) (*gitgatewayv1.CreateBranchResponse, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branch.create",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature"}))
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.FailedPrecondition {
+		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
+	}
+}
+
+func TestGitBranchDeleteChannel_Success(t *testing.T) {
+	var got *gitgatewayv1.DeleteBranchRequest
+	fake := &fakeGitGatewayClient{
+		deleteBranchFunc: func(ctx context.Context, in *gitgatewayv1.DeleteBranchRequest) (*gitgatewayv1.DeleteBranchResponse, error) {
+			got = in
+			return &gitgatewayv1.DeleteBranchResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branch.delete",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" || got.GetBranch() != "feature" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+	resp, ok := result.(*gitgatewayv1.DeleteBranchResponse)
+	if !ok || !resp.GetSuccess() {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestGitBranchDeleteChannel_FailedPreconditionSurfacesUnmodified(t *testing.T) {
+	wantErr := status.Error(codes.FailedPrecondition, "GITGATEWAY_DELETE_BRANCH_CURRENT_BRANCH")
+	fake := &fakeGitGatewayClient{
+		deleteBranchFunc: func(ctx context.Context, in *gitgatewayv1.DeleteBranchRequest) (*gitgatewayv1.DeleteBranchResponse, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branch.delete",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature"}))
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.FailedPrecondition {
+		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
+	}
+}
+
+// ── TASK-PW-03-08: git.push.progress/git.pull.progress ───────────────────
+
+func TestGitPushProgressChannel_DeliversFramesAndFinalOutcome(t *testing.T) {
+	stream := &fakeGitProgressStream{events: []*gitgatewayv1.GitProgressEvent{
+		{Line: "Enumerating objects: 3, done.", Source: "stderr"},
+		{IsFinal: true, ExitCode: 0},
+	}}
+	var got *gitgatewayv1.PushRequest
+	fake := &fakeGitGatewayClient{
+		pushStreamFunc: func(ctx context.Context, in *gitgatewayv1.PushRequest) (gitgatewayv1.GitGatewayService_PushStreamClient, error) {
+			got = in
+			return stream, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	sh, ok := r.StreamHandlerFor("git.push.progress")
+	if !ok {
+		t.Fatal("expected git.push.progress to be registered")
+	}
+	events, err := sh(context.Background(), Identity{TenantID: "t1"},
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "remote": "origin", "branch": "main"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" || got.GetRemote() != "origin" || got.GetBranch() != "main" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+
+	var frames []PushEvent
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				if len(frames) != 2 {
+					t.Fatalf("want 2 push frames, got %d: %+v", len(frames), frames)
+				}
+				first, ok := frames[0].Args[0].(map[string]any)
+				if !ok || first["line"] != "Enumerating objects: 3, done." {
+					t.Errorf("unexpected first frame: %+v", frames[0])
+				}
+				final, ok := frames[1].Args[0].(map[string]any)
+				if !ok || final["isFinal"] != true || final["success"] != true {
+					t.Errorf("unexpected final frame: %+v", frames[1])
+				}
+				return
+			}
+			if ev.Channel != "git.push.progress" {
+				t.Fatalf("unexpected channel: %q", ev.Channel)
+			}
+			frames = append(frames, ev)
+		case <-deadline:
+			t.Fatalf("timed out waiting for the events channel to close (got %d frames: %+v)", len(frames), frames)
+		}
+	}
+}
+
+func TestGitPushProgressChannel_OpenErrorSurfacesUnmodified(t *testing.T) {
+	wantErr := status.Error(codes.FailedPrecondition, "GITGATEWAY_PUSH_STREAM_UNSUPPORTED_SSH_RELAY")
+	fake := &fakeGitGatewayClient{
+		pushStreamFunc: func(ctx context.Context, in *gitgatewayv1.PushRequest) (gitgatewayv1.GitGatewayService_PushStreamClient, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	sh, ok := r.StreamHandlerFor("git.push.progress")
+	if !ok {
+		t.Fatal("expected git.push.progress to be registered")
+	}
+	_, err := sh(context.Background(), Identity{TenantID: "t1"}, argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	st, ok := status.FromError(err)
+	if !ok || st.Code() != codes.FailedPrecondition {
+		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
+	}
+}
+
+func TestGitPullProgressChannel_DeliversFramesAndFinalOutcome(t *testing.T) {
+	stream := &fakeGitProgressStream{events: []*gitgatewayv1.GitProgressEvent{
+		{Line: "Updating a1b2c3..d4e5f6", Source: "stdout"},
+		{IsFinal: true, ExitCode: 0},
+	}}
+	var got *gitgatewayv1.PullRequest
+	fake := &fakeGitGatewayClient{
+		pullStreamFunc: func(ctx context.Context, in *gitgatewayv1.PullRequest) (gitgatewayv1.GitGatewayService_PullStreamClient, error) {
+			got = in
+			return stream, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	sh, ok := r.StreamHandlerFor("git.pull.progress")
+	if !ok {
+		t.Fatal("expected git.pull.progress to be registered")
+	}
+	events, err := sh(context.Background(), Identity{TenantID: "t1"}, argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+
+	var frames []PushEvent
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				if len(frames) != 2 {
+					t.Fatalf("want 2 pull frames, got %d: %+v", len(frames), frames)
+				}
+				return
+			}
+			if ev.Channel != "git.pull.progress" {
+				t.Fatalf("unexpected channel: %q", ev.Channel)
+			}
+			frames = append(frames, ev)
+		case <-deadline:
+			t.Fatalf("timed out waiting for the events channel to close (got %d frames: %+v)", len(frames), frames)
+		}
 	}
 }

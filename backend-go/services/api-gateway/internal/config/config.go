@@ -46,13 +46,15 @@ type Config struct {
 	// an empty host.
 	InfraFleetHTTPAddr string
 
-	// NATSURL is where agent.subscribeStatus (TASK-AG-05-06) opens its
-	// per-WebSocket-connection commoneventbus.Consumer to forward
-	// infra-fleet-service's agent.statusChanged/agent.rateLimited events to
-	// the renderer — same env var convention as tenant-service/usage-service's
-	// NATSURL. Empty/unreachable degrades agent.subscribeStatus to a
-	// closed-immediately channel (see channels_agent.go's doc comment)
-	// rather than crashing api-gateway startup.
+	// NATSURL is the shared eventbus connection string — dialed by both
+	// agent.subscribeStatus (TASK-AG-05-06, forwards infra-fleet-service's
+	// agent.statusChanged/agent.rateLimited events to the renderer) and the
+	// workspace-event bridge (TASK-PW-04-07/SOL-PW-04, forwards task/
+	// workflow-service outbox events). Same env var / default as
+	// notification-service's own NATS_URL, since all three dial the same
+	// NATS cluster. Empty/unreachable degrades each consumer independently
+	// (closed-immediately channel for agent.subscribeStatus, a startup
+	// warning for the workspace bridge) rather than crashing api-gateway.
 	NATSURL string
 
 	// RateLimitRPS/RateLimitBurst configure the per-tenant in-memory

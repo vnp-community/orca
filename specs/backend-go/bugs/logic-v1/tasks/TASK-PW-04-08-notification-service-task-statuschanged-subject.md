@@ -5,7 +5,7 @@
 **Service:** `notification-service`
 **File:** `backend-go/services/notification-service/internal/adapter/eventbus/consumer.go`, `backend-go/services/notification-service/internal/domain/notification_event.go`
 **Depends on:** TASK-PW-04-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added TASK-stream binding + WS-only/SeverityInfo subjectRules entry for orca.task.task.statuschanged; TestTranslateEvent_TaskStatusChanged passes; existing subject tests unaffected
 
 ---
 

@@ -84,7 +84,7 @@ type Task struct {
 	AIContext      string
 	AIPlanJSON     string // see SOL-TG-02
 	Visibility     string
-	WorktreeID     string // see SOL-TG-04
+	WorktreeID     string // see SOL-TG-04; also mirrors project-service's Worktree.TaskID (SOL-PW-04)
 	AgentSessionID string // see SOL-TG-04
 	// ActiveExecutionID is the complex path's ComplexExecutor.Execute
 	// return value (an orchestration-service coordinator_run id) — set
@@ -102,6 +102,13 @@ type Task struct {
 	// against an EARLIER wave's completed dependency.
 	LastExecutionOutput string
 	ProgressPercent     int
+	// TaskNumber is a per-project sequential number (immutable, assigned
+	// once at Create) so a commit message can reference "#TG-42" without
+	// embedding a UUID — added SOL-PW-04.
+	TaskNumber int64
+	// PRURL is set by the PR-creation write-back saga — empty until a PR
+	// referencing this task's #TG-N is created. Added SOL-PW-04.
+	PRURL string
 }
 
 func validStatus(s string) bool {

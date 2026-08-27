@@ -83,6 +83,15 @@ type fakeDevServerAgentClient struct {
 
 	streamAgentHooksEvents chan AgentHookEvent
 	streamAgentHooksErr    error
+
+	// execStreamFrames/execStreamErr drive ExecStream's fake answer
+	// (TASK-PW-03-08) — same "test owns writing to (and closing) it" shape
+	// as streamPtyEvents above. execStreamUnsubscribed records whether the
+	// returned unsubscribe func was called.
+	execStreamFrames       chan map[string]any
+	execStreamErr          error
+	execStreamCalls        []string // methods called with, for assertions
+	execStreamUnsubscribed bool
 }
 
 // LastHandshakeInfo implements usecase.DevServerAgentClient.LastHandshakeInfo.
@@ -222,6 +231,25 @@ func (f *fakeDevServerAgentClient) StreamAgentHooks(ctx context.Context, devServ
 		events = make(chan AgentHookEvent)
 	}
 	return events, func() {}, nil
+}
+
+func (f *fakeDevServerAgentClient) ExecStream(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (<-chan map[string]any, func(), error) {
+	f.mu.Lock()
+	f.execStreamCalls = append(f.execStreamCalls, method)
+	f.mu.Unlock()
+	if f.execStreamErr != nil {
+		return nil, nil, f.execStreamErr
+	}
+	frames := f.execStreamFrames
+	if frames == nil {
+		frames = make(chan map[string]any)
+	}
+	unsubscribe := func() {
+		f.mu.Lock()
+		f.execStreamUnsubscribed = true
+		f.mu.Unlock()
+	}
+	return frames, unsubscribe, nil
 }
 
 func TestScanWorkspacePorts_RequiresTenantContext(t *testing.T) {

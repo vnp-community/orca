@@ -31,7 +31,8 @@ const fakeAgentToken = "test-token-123"
 type fakeAgent struct {
 	t               *testing.T
 	requireToken    string
-	results         map[string]any // method -> result to reply with
+	results         map[string]any   // method -> result to reply with
+	streamResults   map[string][]any // method -> ordered sequence of results, each sent as its own response frame replying to the same request id (TASK-PW-03-08's git.execStream shape) — takes priority over results for a matching method
 	rejectHandshake bool
 
 	// pushNotifications, if set, are sent (no id, matching a real
@@ -157,6 +158,18 @@ func (f *fakeAgent) handler(w http.ResponseWriter, r *http.Request) {
 		}
 		f.receivedParams[req.Method] = req.Params
 		f.paramsMu.Unlock()
+
+		if frames, isStream := f.streamResults[req.Method]; isStream {
+			for i, frameResult := range frames {
+				encoded, _ := json.Marshal(frameResult)
+				resp := JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: encoded}
+				frame, _ := EncodeJSONRPCFrame(resp, uint32(10+i), decoded.ID)
+				if err := conn.Write(ctx, websocket.MessageBinary, frame); err != nil {
+					return
+				}
+			}
+			continue
+		}
 
 		result, known := f.results[req.Method]
 		if !known {

@@ -2,8 +2,9 @@ package domain
 
 import "time"
 
-// OutboxEvent is a pre-built event EventPublisher asks the postgres adapter
-// to durably enqueue — the transactional-outbox pattern from
+// OutboxEvent is a pre-built event EventPublisher/UpdateTask ask the
+// postgres adapter to durably enqueue in the SAME transaction as the
+// domain row it describes — the transactional-outbox pattern from
 // specs/backend-go/architecture/05-data-architecture.md, mirroring
 // usage-service/internal/domain/outbox.go's identical shape. Lives in
 // domain/, not common/eventbus.Event, so usecase/ can build one without

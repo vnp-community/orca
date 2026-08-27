@@ -15,6 +15,7 @@ package usecase
 import (
 	"context"
 
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
 
@@ -34,6 +35,12 @@ type ResolvedConnection struct {
 	Connected    bool
 	ConnectionID string
 	RepoPath     string
+	// Mode is empty when Connected is false (host-local — the distinction
+	// doesn't apply). Populated from infra-fleet-service's
+	// ResolveConnectionResponse.dev_server.mode. Added SOL-PW-03 to gate
+	// the merge/stash/branch-write/push-stream operations Part B
+	// (relay-ssh) genuinely does not support.
+	Mode infrafleetv1.ConnectionMode
 }
 
 // ConnectionResolver resolves which host owns a worktree, by calling
@@ -246,6 +253,41 @@ type GitExecutor interface {
 	ResolveConflict(ctx context.Context, repoPath, path, operation string) (domain.SimpleResult, error)
 	Discard(ctx context.Context, repoPath, path string) (domain.SimpleResult, error)
 	BulkDiscard(ctx context.Context, repoPath string, paths []string) (domain.BulkDiscardResult, error)
+
+	// ── SOL-PW-03 — merge/stash/branch-write. Only reachable when the
+	// usecase layer's ConnectionResolver check confirms the target is not
+	// a relay-ssh connection; RelayExecutor's implementations do not
+	// re-check mode themselves. ─────────────────────────────────────────
+	// MergeIntoBranch — named distinctly from MergeBranch above (SOL-WT-05's
+	// worktree-into-base merge): this merges an arbitrary branch INTO the
+	// current branch, a different operation with a different result shape.
+	MergeIntoBranch(ctx context.Context, repoPath, branch string, noFF bool) (domain.MergeOutcome, error)
+	StashPush(ctx context.Context, repoPath, message string, includeUntracked bool) (domain.SimpleResult, error)
+	StashPop(ctx context.Context, repoPath, stashRef string) (domain.MergeOutcome, error) // reuses MergeOutcome's had_conflicts shape
+	CreateBranch(ctx context.Context, repoPath, branch, baseRef string, checkout bool) (string, error)
+	DeleteBranch(ctx context.Context, repoPath, branch string) error // soft; ForceDeleteBranch (existing) stays the -D path
+}
+
+// StreamingGitExecutor performs push/pull with incremental progress
+// (TASK-PW-03-08, SOL-PW-03) — a separate port from GitExecutor rather than
+// two more methods bolted onto that already-large interface, since only
+// PushStream/PullStream need it and only two of GitExecutor's two
+// implementations have a real streaming story:
+//   - internal/adapter/localgit: os/exec's Stdout/Stderr piped line-by-line
+//     as they arrive, via a real `git push`/`git pull` subprocess.
+//   - internal/adapter/grpcclient: relays to infra-fleet-service's
+//     RelayStream RPC, which relays to the agent's git.execStream — see
+//     usecase.PushStream/PullStream's doc comments for the relay-ssh
+//     restriction this port's callers must check BEFORE calling either
+//     method below (RelayStream itself does not re-check connection mode).
+//
+// sink is called once per line, in order; the final call always has
+// IsFinal=true and carries the unary-equivalent outcome. Returning a
+// non-nil error from sink aborts the operation (mirrors
+// usecase.RelayStream.Execute's own sink-abort contract).
+type StreamingGitExecutor interface {
+	PushStream(ctx context.Context, repoPath, remote, branch string, sink func(domain.GitProgressLine) error) error
+	PullStream(ctx context.Context, repoPath string, sink func(domain.GitProgressLine) error) error
 }
 
 // DevServerReachability resolves whether devServerID is a live,

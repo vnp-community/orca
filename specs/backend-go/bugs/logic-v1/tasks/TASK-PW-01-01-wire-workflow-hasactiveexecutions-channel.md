@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_workflow.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `workflow.hasActiveExecutions` channel wired in channels_workflow.go; TestRegisterWorkflowChannels_HasActiveExecutions passes.
 
 ---
 

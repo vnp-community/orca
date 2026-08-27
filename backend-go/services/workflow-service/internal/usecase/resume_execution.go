@@ -47,7 +47,7 @@ func (uc *ResumeExecution) Execute(ctx context.Context, in ResumeExecutionInput)
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindFailedPrecondition, "WORKFLOW_CANNOT_RESUME", err.Error(), err)
 	}
 
-	if err := uc.executions.UpdateExecution(ctx, exec); err != nil {
+	if err := uc.executions.UpdateExecution(ctx, exec, nil); err != nil {
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_EXECUTION_UPDATE_FAILED", "failed to persist resumed execution", err)
 	}
 

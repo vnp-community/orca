@@ -252,13 +252,14 @@ func run() error {
 	// server.go's ReportTaskExecutionResult doc comment for the flagged
 	// (unresolved) service-identity check this handler is missing.
 	reportExecutionResultUC := usecase.NewReportTaskExecutionResult(repo)
+	findTaskByNumberUC := usecase.NewFindTaskByNumber(repo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
 		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
 		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC, generateAgentPromptUC,
 		revokeGrantUC, listGrantsUC, createPublicLinkUC, revokePublicLinkUC, resolvePublicLinkUC,
-		getSubtreeUC, recalculateProgressUC, addCommentUC, listCommentsUC, reportExecutionResultUC,
+		getSubtreeUC, recalculateProgressUC, addCommentUC, listCommentsUC, reportExecutionResultUC, findTaskByNumberUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -268,6 +269,14 @@ func run() error {
 		defer cancel()
 		return pool.Ping(ctx)
 	})
+	// outboxRelay (TASK-TG-03-07/SOL-PW-04) is already running by this point
+	// — see its wiring above, right after opaClient. Both grant-audit events
+	// (Grant/RevokeGrant) and task.* domain events (UpdateTask, SOL-PW-04)
+	// flow through the SAME relay/table, so there is exactly one to report
+	// health for here.
+	if outboxRelay != nil {
+		healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
+	}
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
@@ -312,7 +321,8 @@ func run() error {
 
 	// Wait for the outbox relay goroutine (if started) to observe ctx
 	// cancellation and return, so it doesn't outlive the rest of the
-	// server on shutdown — same pattern usage-service's main.go uses.
+	// server on shutdown — same pattern usage-service's main.go uses for
+	// its own outbox relay goroutine.
 	relayWG.Wait()
 
 	return nil

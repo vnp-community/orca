@@ -83,6 +83,9 @@ func (f *scriptedAgent) SendAgentInput(ctx context.Context, devServer domain.Dev
 func (f *scriptedAgent) StreamAgentHooks(ctx context.Context, devServer domain.DevServer) (<-chan AgentHookEvent, func(), error) {
 	return nil, nil, errors.New("not used")
 }
+func (f *scriptedAgent) ExecStream(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (<-chan map[string]any, func(), error) {
+	return nil, nil, errors.New("not used")
+}
 
 // fakePortAllocator hands out sequential fake ports — no real net.Listen.
 type fakePortAllocator struct {

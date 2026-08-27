@@ -72,12 +72,14 @@ func (r *Repository) RunInTx(ctx context.Context, fn func(ctx context.Context, t
 // added. Nullable/optional columns come back through COALESCE (or, for
 // due_date/estimated_hours/actual_hours, scanned directly into pointer
 // fields — pgx scans SQL NULL into a nil *time.Time/*float64 natively).
+// task_number/pr_url added SOL-PW-04 (worktree_id predates them, see above).
 const taskColumns = `
 	id, tenant_id, title, status, COALESCE(parent_id::text, ''), COALESCE(project_id::text, ''),
 	COALESCE(description, ''), task_type, priority, COALESCE(assignee_id::text, ''), COALESCE(owner_id::text, ''),
 	due_date, estimated_hours, actual_hours, COALESCE(prompt_template, ''), COALESCE(ai_context, ''),
 	COALESCE(ai_plan_json::text, ''), visibility, COALESCE(worktree_id::text, ''), COALESCE(agent_session_id, ''),
-	progress_percent, COALESCE(active_execution_id, ''), COALESCE(last_execution_output, '')
+	progress_percent, COALESCE(active_execution_id, ''), COALESCE(last_execution_output, ''),
+	COALESCE(task_number, 0), COALESCE(pr_url, '')
 `
 
 // rowScanner abstracts over pgx.Row/pgx.Rows — both satisfy Scan(...any)
@@ -94,7 +96,8 @@ func scanTask(row rowScanner) (domain.Task, error) {
 	err := row.Scan(&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID,
 		&t.Description, &t.Type, &t.Priority, &t.AssigneeID, &t.OwnerID,
 		&t.DueDate, &t.EstimatedHours, &t.ActualHours, &t.PromptTemplate, &t.AIContext,
-		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent, &t.ActiveExecutionID, &t.LastExecutionOutput)
+		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent, &t.ActiveExecutionID, &t.LastExecutionOutput,
+		&t.TaskNumber, &t.PRURL)
 	return t, err
 }
 
@@ -107,7 +110,8 @@ func scanTaskAndTrailing(row rowScanner, extra ...any) (domain.Task, error) {
 	dest := []any{&t.ID, &t.TenantID, &t.Title, &t.Status, &t.ParentID, &t.ProjectID,
 		&t.Description, &t.Type, &t.Priority, &t.AssigneeID, &t.OwnerID,
 		&t.DueDate, &t.EstimatedHours, &t.ActualHours, &t.PromptTemplate, &t.AIContext,
-		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent, &t.ActiveExecutionID, &t.LastExecutionOutput}
+		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent, &t.ActiveExecutionID, &t.LastExecutionOutput,
+		&t.TaskNumber, &t.PRURL}
 	dest = append(dest, extra...)
 	err := row.Scan(dest...)
 	return t, err
@@ -123,22 +127,28 @@ func prefixedTaskColumns(alias string) string {
 	COALESCE(` + alias + `.description, ''), ` + alias + `.task_type, ` + alias + `.priority, COALESCE(` + alias + `.assignee_id::text, ''), COALESCE(` + alias + `.owner_id::text, ''),
 	` + alias + `.due_date, ` + alias + `.estimated_hours, ` + alias + `.actual_hours, COALESCE(` + alias + `.prompt_template, ''), COALESCE(` + alias + `.ai_context, ''),
 	COALESCE(` + alias + `.ai_plan_json::text, ''), ` + alias + `.visibility, COALESCE(` + alias + `.worktree_id::text, ''), COALESCE(` + alias + `.agent_session_id, ''),
-	` + alias + `.progress_percent, COALESCE(` + alias + `.active_execution_id, ''), COALESCE(` + alias + `.last_execution_output, '')
+	` + alias + `.progress_percent, COALESCE(` + alias + `.active_execution_id, ''), COALESCE(` + alias + `.last_execution_output, ''),
+	COALESCE(` + alias + `.task_number, 0), COALESCE(` + alias + `.pr_url, '')
 `
 }
 
+// Create inserts a task and assigns its task_number from the shared
+// per-service sequence (nextval('task.task_number_seq')), returning it via
+// RETURNING so the caller's response carries the real assigned value —
+// SOL-PW-04 (TASK-PW-04-03).
 func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
-	_, err := r.db.Exec(ctx, `
+	row := r.db.QueryRow(ctx, `
 		INSERT INTO task.tasks (
 			id, tenant_id, title, status, parent_id, project_id,
 			description, task_type, priority, assignee_id, owner_id, due_date,
-			estimated_hours, prompt_template, ai_context, visibility
+			estimated_hours, prompt_template, ai_context, visibility, task_number
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,nextval('task.task_number_seq'))
+		RETURNING task_number
 	`, task.ID, task.TenantID, task.Title, task.Status, nullableUUID(task.ParentID), nullableUUID(task.ProjectID),
 		task.Description, orDefault(task.Type, "task"), orDefault(task.Priority, "medium"), nullableUUID(task.AssigneeID),
 		nullableUUID(task.OwnerID), task.DueDate, task.EstimatedHours, task.PromptTemplate, task.AIContext, orDefault(task.Visibility, "team"))
-	if err != nil {
+	if err := row.Scan(&task.TaskNumber); err != nil {
 		return domain.Task{}, fmt.Errorf("postgres: insert task: %w", err)
 	}
 	return task, nil
@@ -161,6 +171,25 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Task,
 	return t, nil
 }
 
+// FindByNumber resolves a project-scoped "#TG-N" reference to a task via
+// idx_tasks_project_task_number — added SOL-PW-04.
+func (r *Repository) FindByNumber(ctx context.Context, tenantID, projectID string, taskNumber int64) (domain.Task, error) {
+	row := r.db.QueryRow(ctx, `
+		SELECT `+taskColumns+`
+		FROM task.tasks
+		WHERE tenant_id = $1 AND project_id = $2 AND task_number = $3
+	`, tenantID, projectID, taskNumber)
+
+	t, err := scanTask(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.Task{}, fmt.Errorf("postgres: no task with number %d in project %s: %w", taskNumber, projectID, err)
+		}
+		return domain.Task{}, fmt.Errorf("postgres: query task by number: %w", err)
+	}
+	return t, nil
+}
+
 // GetAncestors walks tasks.parent_id from id up to the root via one
 // WITH RECURSIVE query, per task-service.md §6's query-shape note and §8's
 // max-depth guard (bounded by the depth column in the recursive term, not
@@ -175,7 +204,8 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 			SELECT id, tenant_id, title, status, parent_id, project_id,
 				description, task_type, priority, assignee_id, owner_id,
 				due_date, estimated_hours, actual_hours, prompt_template, ai_context,
-				ai_plan_json, visibility, worktree_id, agent_session_id, progress_percent, active_execution_id, last_execution_output, 0 AS depth
+				ai_plan_json, visibility, worktree_id, agent_session_id, progress_percent, active_execution_id, last_execution_output,
+				task_number, pr_url, 0 AS depth
 			FROM task.tasks
 			WHERE tenant_id = $1 AND id = $2
 
@@ -184,7 +214,8 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 			SELECT t.id, t.tenant_id, t.title, t.status, t.parent_id, t.project_id,
 				t.description, t.task_type, t.priority, t.assignee_id, t.owner_id,
 				t.due_date, t.estimated_hours, t.actual_hours, t.prompt_template, t.ai_context,
-				t.ai_plan_json, t.visibility, t.worktree_id, t.agent_session_id, t.progress_percent, t.active_execution_id, t.last_execution_output, a.depth + 1
+				t.ai_plan_json, t.visibility, t.worktree_id, t.agent_session_id, t.progress_percent, t.active_execution_id, t.last_execution_output,
+				t.task_number, t.pr_url, a.depth + 1
 			FROM task.tasks t
 			JOIN ancestors a ON t.id = a.parent_id
 			WHERE a.depth + 1 < $3
@@ -193,7 +224,8 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 			COALESCE(description, ''), task_type, priority, COALESCE(assignee_id::text, ''), COALESCE(owner_id::text, ''),
 			due_date, estimated_hours, actual_hours, COALESCE(prompt_template, ''), COALESCE(ai_context, ''),
 			COALESCE(ai_plan_json::text, ''), visibility, COALESCE(worktree_id::text, ''), COALESCE(agent_session_id, ''),
-			progress_percent, COALESCE(active_execution_id, ''), COALESCE(last_execution_output, '')
+			progress_percent, COALESCE(active_execution_id, ''), COALESCE(last_execution_output, ''),
+			COALESCE(task_number, 0), COALESCE(pr_url, '')
 		FROM ancestors
 		ORDER BY depth
 	`, tenantID, id, maxDepth)
@@ -285,26 +317,57 @@ func (r *Repository) List(ctx context.Context, tenantID, projectID, pageToken st
 	return out, nextToken, nil
 }
 
-// Update persists a partial (title/status) field update — the status guard
-// itself runs at the domain layer (domain.Task.SetStatus) before this is
-// ever called; this is a plain UPDATE of both columns unconditionally.
-func (r *Repository) Update(ctx context.Context, tenantID string, t domain.Task) error {
-	tag, err := r.db.Exec(ctx, `
+// Update persists a partial (title/status/description/task_type/priority/
+// assignee_id/due_date/estimated_hours/prompt_template/ai_context/
+// visibility/worktree_id/pr_url) field update and, when events is
+// non-empty, one outbox row per event — ALL in one Postgres transaction, so
+// a status transition and its published fact(s) are never observed
+// inconsistently. Follows usage-service.Repository.SaveSession's exact
+// transaction shape (begin -> exec task update -> exec outbox insert(s) ->
+// commit; defer tx.Rollback for the error path). The status guard itself
+// runs at the domain layer (domain.Task.SetStatus) before this is ever
+// called. SOL-PW-04 (TASK-PW-04-02/03).
+func (r *Repository) Update(ctx context.Context, tenantID string, t domain.Task, events []domain.OutboxEvent) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("postgres: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE task.tasks SET
 			title = $3, status = $4, description = $5, task_type = $6, priority = $7,
 			assignee_id = $8, due_date = $9, estimated_hours = $10, prompt_template = $11,
-			ai_context = $12, visibility = $13, updated_at = now()
+			ai_context = $12, visibility = $13, worktree_id = $14, pr_url = $15, updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, t.ID, t.Title, t.Status, t.Description, orDefault(t.Type, "task"), orDefault(t.Priority, "medium"),
-		nullableUUID(t.AssigneeID), t.DueDate, t.EstimatedHours, t.PromptTemplate, t.AIContext, orDefault(t.Visibility, "team"))
+		nullableUUID(t.AssigneeID), t.DueDate, t.EstimatedHours, t.PromptTemplate, t.AIContext, orDefault(t.Visibility, "team"),
+		nullableUUID(t.WorktreeID), nullableString(t.PRURL))
 	if err != nil {
 		return fmt.Errorf("postgres: update task: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("postgres: task %s not found for tenant %s", t.ID, tenantID)
 	}
-	return nil
+
+	for _, event := range events {
+		_, err = tx.Exec(ctx, `
+			INSERT INTO task.outbox_events (id, tenant_id, subject, occurred_at, version, payload)
+			VALUES ($1, $2, $3, $4, $5, $6)
+		`, event.ID, tenantID, event.Subject, event.OccurredAt, 1, event.PayloadJSON)
+		if err != nil {
+			return fmt.Errorf("postgres: insert outbox event: %w", err)
+		}
+	}
+
+	return tx.Commit(ctx)
 }
+
+// FetchUnpublished and MarkPublished implement common/outbox.Store — see
+// outbox.go (TASK-TG-03-07's grant-audit outbox, reused here for
+// SOL-PW-04's task.* domain events; both write to the same
+// task.outbox_events table, see migrations/0005_outbox.up.sql and
+// 0008_task_outbox_and_number.up.sql's doc comments).
 
 // UpdateWorktreeID persists the provisioned worktree a task's execution is
 // running in — see SOL-TG-04.
@@ -414,6 +477,13 @@ func nullableUUID(id string) any {
 func orDefault(s, fallback string) string {
 	if s == "" {
 		return fallback
+	}
+	return s
+}
+
+func nullableString(s string) any {
+	if s == "" {
+		return nil
 	}
 	return s
 }

@@ -50,11 +50,18 @@ type TaskRepository interface {
 	// List returns tasks for tenantID, optionally filtered by projectID
 	// (empty = no filter), cursor-paginated by page_size/page_token.
 	List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error)
-	// Update persists a partial field update (title/status). Status
-	// transitions into StatusInProgress are rejected at the domain layer
+	// Update persists a partial field update (title/status/worktree_id/
+	// pr_url) and, when events is non-empty, one or more outbox rows — in
+	// the SAME transaction, so a status transition and its published
+	// fact(s) are never observed inconsistently. Status transitions into
+	// StatusInProgress are rejected at the domain layer
 	// (domain.Task.SetStatus) before this is ever called — see TASK-223's
-	// Context note.
-	Update(ctx context.Context, tenantID string, task domain.Task) error
+	// Context note. Added SOL-PW-04 (TASK-PW-04-02/03).
+	Update(ctx context.Context, tenantID string, task domain.Task, events []domain.OutboxEvent) error
+	// FindByNumber resolves a project-scoped "#TG-N" reference
+	// (idx_tasks_project_task_number) to a task — added SOL-PW-04 for the
+	// commit-message-closes-task saga.
+	FindByNumber(ctx context.Context, tenantID, projectID string, taskNumber int64) (domain.Task, error)
 	// Delete removes a task. task_edges/task_grants reference tasks(id)
 	// with ON DELETE CASCADE (migrations/0001_init.up.sql) — no explicit
 	// edge/grant cleanup needed.

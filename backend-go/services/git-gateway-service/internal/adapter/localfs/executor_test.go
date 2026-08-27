@@ -83,6 +83,45 @@ func TestStat_ExistingFile_ReportsSize(t *testing.T) {
 	}
 }
 
+func TestReadDir_ReportsSizeBytes(t *testing.T) {
+	dir := t.TempDir()
+	e := New()
+	ctx := context.Background()
+
+	if _, err := e.WriteFile(ctx, dir, "a.txt", []byte("hello"), false); err != nil {
+		t.Fatalf("WriteFile: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "sub"), 0o755); err != nil {
+		t.Fatalf("Mkdir: %v", err)
+	}
+
+	entries, err := e.ReadDir(ctx, dir, "")
+	if err != nil {
+		t.Fatalf("ReadDir: %v", err)
+	}
+
+	byName := make(map[string]domain.DirEntry, len(entries))
+	for _, ent := range entries {
+		byName[ent.Name] = ent
+	}
+
+	file, ok := byName["a.txt"]
+	if !ok {
+		t.Fatalf("expected entry %q, got %+v", "a.txt", entries)
+	}
+	if file.IsDirectory || file.SizeBytes != 5 {
+		t.Errorf("expected file entry with SizeBytes=5, got %+v", file)
+	}
+
+	subDir, ok := byName["sub"]
+	if !ok {
+		t.Fatalf("expected entry %q, got %+v", "sub", entries)
+	}
+	if !subDir.IsDirectory || subDir.SizeBytes != 0 {
+		t.Errorf("expected directory entry with SizeBytes=0, got %+v", subDir)
+	}
+}
+
 func TestRename_MovesFile(t *testing.T) {
 	dir := t.TempDir()
 	e := New()

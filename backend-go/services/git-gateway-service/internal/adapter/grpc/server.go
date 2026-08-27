@@ -29,6 +29,8 @@ type Server struct {
 	commit                *usecase.Commit
 	push                  *usecase.Push
 	pull                  *usecase.Pull
+	pushStream            *usecase.PushStream
+	pullStream            *usecase.PullStream
 	generateCommitMessage *usecase.GenerateCommitMessage
 
 	stage   *usecase.Stage
@@ -101,6 +103,13 @@ type Server struct {
 	checkWorktreeDeleteSafety *usecase.CheckWorktreeDeleteSafety
 	compareWorktrees          *usecase.CompareWorktrees
 	mergeWorktreeIntoBase     *usecase.MergeWorktreeIntoBase
+
+	// SOL-PW-03 — merge/stash/branch-write
+	mergeIntoBranch *usecase.MergeBranch
+	stashPush       *usecase.StashPush
+	stashPop        *usecase.StashPop
+	createBranch    *usecase.CreateBranch
+	deleteBranch    *usecase.DeleteBranch
 }
 
 // New wires every usecase this server dispatches to. Parameter order
@@ -112,6 +121,8 @@ func New(
 	commit *usecase.Commit,
 	push *usecase.Push,
 	pull *usecase.Pull,
+	pushStream *usecase.PushStream,
+	pullStream *usecase.PullStream,
 	generateCommitMessage *usecase.GenerateCommitMessage,
 	stage *usecase.Stage,
 	unstage *usecase.Unstage,
@@ -172,6 +183,11 @@ func New(
 	checkWorktreeDeleteSafety *usecase.CheckWorktreeDeleteSafety,
 	compareWorktrees *usecase.CompareWorktrees,
 	mergeWorktreeIntoBase *usecase.MergeWorktreeIntoBase,
+	mergeIntoBranch *usecase.MergeBranch,
+	stashPush *usecase.StashPush,
+	stashPop *usecase.StashPop,
+	createBranch *usecase.CreateBranch,
+	deleteBranch *usecase.DeleteBranch,
 ) *Server {
 	return &Server{
 		getStatus:                   getStatus,
@@ -179,6 +195,8 @@ func New(
 		commit:                      commit,
 		push:                        push,
 		pull:                        pull,
+		pushStream:                  pushStream,
+		pullStream:                  pullStream,
 		generateCommitMessage:       generateCommitMessage,
 		stage:                       stage,
 		unstage:                     unstage,
@@ -243,6 +261,12 @@ func New(
 		checkWorktreeDeleteSafety: checkWorktreeDeleteSafety,
 		compareWorktrees:          compareWorktrees,
 		mergeWorktreeIntoBase:     mergeWorktreeIntoBase,
+
+		mergeIntoBranch: mergeIntoBranch,
+		stashPush:       stashPush,
+		stashPop:        stashPop,
+		createBranch:    createBranch,
+		deleteBranch:    deleteBranch,
 	}
 }
 
@@ -297,6 +321,48 @@ func (s *Server) Pull(ctx context.Context, req *gitgatewayv1.PullRequest) (*gitg
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.PullResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
+}
+
+// PushStream is Push's incremental-progress counterpart (TASK-PW-03-08,
+// SOL-PW-03) — forwards usecase.PushStream's sink callback frames via
+// stream.Send, one GitProgressEvent per domain.GitProgressLine.
+func (s *Server) PushStream(req *gitgatewayv1.PushRequest, stream gitgatewayv1.GitGatewayService_PushStreamServer) error {
+	err := s.pushStream.Execute(stream.Context(), usecase.PushInputStream{
+		WorktreeID: req.GetWorktreeId(),
+		Remote:     req.GetRemote(),
+		Branch:     req.GetBranch(),
+	}, func(line domain.GitProgressLine) error {
+		return stream.Send(toProtoGitProgressEvent(line))
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	return nil
+}
+
+// PullStream is Pull's incremental-progress counterpart — see PushStream's
+// doc comment.
+func (s *Server) PullStream(req *gitgatewayv1.PullRequest, stream gitgatewayv1.GitGatewayService_PullStreamServer) error {
+	err := s.pullStream.Execute(stream.Context(), usecase.PullInputStream{
+		WorktreeID: req.GetWorktreeId(),
+	}, func(line domain.GitProgressLine) error {
+		return stream.Send(toProtoGitProgressEvent(line))
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	return nil
+}
+
+// toProtoGitProgressEvent mirrors domain.GitProgressLine 1:1 onto
+// gitgatewayv1.GitProgressEvent.
+func toProtoGitProgressEvent(line domain.GitProgressLine) *gitgatewayv1.GitProgressEvent {
+	return &gitgatewayv1.GitProgressEvent{
+		Line:     line.Line,
+		Source:   line.Source,
+		IsFinal:  line.IsFinal,
+		ExitCode: line.ExitCode,
+	}
 }
 
 // GenerateCommitMessage relays the worktree's staged diff to the Dev Server
@@ -548,7 +614,7 @@ func (s *Server) ReadDir(ctx context.Context, req *gitgatewayv1.ReadDirRequest) 
 	}
 	out := make([]*gitgatewayv1.DirEntry, 0, len(entries))
 	for _, e := range entries {
-		out = append(out, &gitgatewayv1.DirEntry{Name: e.Name, IsDirectory: e.IsDirectory})
+		out = append(out, &gitgatewayv1.DirEntry{Name: e.Name, IsDirectory: e.IsDirectory, SizeBytes: e.SizeBytes})
 	}
 	return &gitgatewayv1.ReadDirResponse{Entries: out}, nil
 }
@@ -923,6 +989,58 @@ func (s *Server) BulkDiscard(ctx context.Context, req *gitgatewayv1.BulkDiscardR
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.BulkDiscardResponse{Success: result.Success, FailedPaths: result.FailedPaths}, nil
+}
+
+// ── SOL-PW-03 — merge/stash/branch-write ────────────────────────────────
+
+func (s *Server) MergeIntoBranch(ctx context.Context, req *gitgatewayv1.MergeIntoBranchRequest) (*gitgatewayv1.MergeIntoBranchResponse, error) {
+	result, err := s.mergeIntoBranch.Execute(ctx, usecase.MergeBranchInput{
+		WorktreeID: req.GetWorktreeId(), Branch: req.GetBranch(), NoFF: req.GetNoFf(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.MergeIntoBranchResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
+}
+
+func (s *Server) StashPush(ctx context.Context, req *gitgatewayv1.StashPushRequest) (*gitgatewayv1.StashPushResponse, error) {
+	result, err := s.stashPush.Execute(ctx, usecase.StashPushInput{
+		WorktreeID: req.GetWorktreeId(), Message: req.GetMessage(), IncludeUntracked: req.GetIncludeUntracked(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.StashPushResponse{Success: result.Success}, nil
+}
+
+func (s *Server) StashPop(ctx context.Context, req *gitgatewayv1.StashPopRequest) (*gitgatewayv1.StashPopResponse, error) {
+	result, err := s.stashPop.Execute(ctx, usecase.StashPopInput{
+		WorktreeID: req.GetWorktreeId(), StashRef: req.GetStashRef(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.StashPopResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
+}
+
+func (s *Server) CreateBranch(ctx context.Context, req *gitgatewayv1.CreateBranchRequest) (*gitgatewayv1.CreateBranchResponse, error) {
+	branch, err := s.createBranch.Execute(ctx, usecase.CreateBranchInput{
+		WorktreeID: req.GetWorktreeId(), Branch: req.GetBranch(), BaseRef: req.GetBaseRef(), Checkout: req.GetCheckout(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CreateBranchResponse{Branch: branch}, nil
+}
+
+func (s *Server) DeleteBranch(ctx context.Context, req *gitgatewayv1.DeleteBranchRequest) (*gitgatewayv1.DeleteBranchResponse, error) {
+	result, err := s.deleteBranch.Execute(ctx, usecase.DeleteBranchInput{
+		WorktreeID: req.GetWorktreeId(), Branch: req.GetBranch(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.DeleteBranchResponse{Success: result.Success}, nil
 }
 
 func toProtoBranches(branches []domain.BranchInfo) []*gitgatewayv1.BranchInfo {

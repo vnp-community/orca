@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/ports.go`, `backend-go/services/git-gateway-service/internal/adapter/grpcclient/resolver.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ResolvedConnection.Mode field added, ConnectionResolver.ResolveConnection forwards resp.GetDevServer().GetMode(); TestConnectionResolver_ResolveConnection_Connected/_NotConnected_ModeLeftAtZeroValue pass
 
 ---
 

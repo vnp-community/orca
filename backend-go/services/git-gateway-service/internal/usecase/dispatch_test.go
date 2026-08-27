@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
 
@@ -101,6 +102,22 @@ type fakeGitExecutor struct {
 	resolveConflictErr       error
 	discardErr               error
 	bulkDiscardErr           error
+
+	// SOL-PW-03 — merge/stash/branch-write
+	calledMergeIntoBranch bool
+	calledStashPush       bool
+	calledStashPop        bool
+	calledCreateBranch    bool
+	calledDeleteBranch    bool
+	mergeIntoBranchResult domain.MergeOutcome
+	mergeIntoBranchErr    error
+	stashPushResult       domain.SimpleResult
+	stashPushErr          error
+	stashPopResult        domain.MergeOutcome
+	stashPopErr           error
+	createBranchResult    string
+	createBranchErr       error
+	deleteBranchErr       error
 
 	gotRepoPath string
 	gotFilePath string
@@ -566,6 +583,62 @@ func (f *fakeGitExecutor) BulkDiscard(ctx context.Context, repoPath string, path
 		return domain.BulkDiscardResult{}, f.bulkDiscardErr
 	}
 	return domain.BulkDiscardResult{Success: true}, nil
+}
+
+// ── SOL-PW-03 — merge/stash/branch-write ─────────────────────────────────
+
+func (f *fakeGitExecutor) MergeIntoBranch(ctx context.Context, repoPath, branch string, noFF bool) (domain.MergeOutcome, error) {
+	f.calledMergeIntoBranch = true
+	f.gotRepoPath = repoPath
+	if f.mergeIntoBranchErr != nil {
+		return domain.MergeOutcome{}, f.mergeIntoBranchErr
+	}
+	if f.mergeIntoBranchResult != (domain.MergeOutcome{}) {
+		return f.mergeIntoBranchResult, nil
+	}
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) StashPush(ctx context.Context, repoPath, message string, includeUntracked bool) (domain.SimpleResult, error) {
+	f.calledStashPush = true
+	f.gotRepoPath = repoPath
+	if f.stashPushErr != nil {
+		return domain.SimpleResult{}, f.stashPushErr
+	}
+	if f.stashPushResult != (domain.SimpleResult{}) {
+		return f.stashPushResult, nil
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) StashPop(ctx context.Context, repoPath, stashRef string) (domain.MergeOutcome, error) {
+	f.calledStashPop = true
+	f.gotRepoPath = repoPath
+	if f.stashPopErr != nil {
+		return domain.MergeOutcome{}, f.stashPopErr
+	}
+	if f.stashPopResult != (domain.MergeOutcome{}) {
+		return f.stashPopResult, nil
+	}
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) CreateBranch(ctx context.Context, repoPath, branch, baseRef string, checkout bool) (string, error) {
+	f.calledCreateBranch = true
+	f.gotRepoPath = repoPath
+	if f.createBranchErr != nil {
+		return "", f.createBranchErr
+	}
+	if f.createBranchResult != "" {
+		return f.createBranchResult, nil
+	}
+	return branch, nil
+}
+
+func (f *fakeGitExecutor) DeleteBranch(ctx context.Context, repoPath, branch string) error {
+	f.calledDeleteBranch = true
+	f.gotRepoPath = repoPath
+	return f.deleteBranchErr
 }
 
 func TestGetStatus_NotConnected_RoutesToLocalExecutor(t *testing.T) {
@@ -1500,5 +1573,184 @@ func TestUpstreamStatus_ForwardsPushTarget(t *testing.T) {
 	}
 	if local.gotUpstreamPushTarget != pushTarget {
 		t.Errorf("expected pushTarget to be forwarded, got %+v", local.gotUpstreamPushTarget)
+	}
+}
+
+// ── SOL-PW-03 — merge/stash/branch-write (TASK-PW-03-06) ─────────────────
+//
+// Each of these five usecases calls resolver.ResolveConnection inline
+// (not dispatchExecutor) so it can fail closed on relay-ssh BEFORE ever
+// attempting the relay call — the zero-call assertions below are the
+// regression guard for that.
+
+func TestMergeBranch_LocalDispatch_CallsLocalExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewMergeBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), MergeBranchInput{WorktreeID: "wt1", Branch: "feature", NoFF: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledMergeIntoBranch || relay.calledMergeIntoBranch {
+		t.Error("expected MergeBranch to route to local when Connected=false")
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestMergeBranch_RelayWebsocketDispatch_CallsRelayExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewMergeBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_WEBSOCKET}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), MergeBranchInput{WorktreeID: "wt1", Branch: "feature"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if local.calledMergeIntoBranch || !relay.calledMergeIntoBranch {
+		t.Error("expected MergeBranch to route to relay when Connected=true over relay-websocket")
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestMergeBranch_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewMergeBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_SSH}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), MergeBranchInput{WorktreeID: "wt1", Branch: "feature"})
+	if !errors.Is(err, domain.ErrGitOpUnsupportedOverSSHRelay) {
+		t.Fatalf("expected ErrGitOpUnsupportedOverSSHRelay, got %v", err)
+	}
+	if local.calledMergeIntoBranch || relay.calledMergeIntoBranch {
+		t.Error("expected zero calls to either executor when relay-ssh is rejected")
+	}
+}
+
+func TestStashPush_LocalDispatch_CallsLocalExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewStashPush(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), StashPushInput{WorktreeID: "wt1", Message: "wip", IncludeUntracked: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledStashPush || relay.calledStashPush {
+		t.Error("expected StashPush to route to local when Connected=false")
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestStashPush_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewStashPush(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_SSH}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), StashPushInput{WorktreeID: "wt1"})
+	if !errors.Is(err, domain.ErrGitOpUnsupportedOverSSHRelay) {
+		t.Fatalf("expected ErrGitOpUnsupportedOverSSHRelay, got %v", err)
+	}
+	if local.calledStashPush || relay.calledStashPush {
+		t.Error("expected zero calls to either executor when relay-ssh is rejected")
+	}
+}
+
+func TestStashPop_RelayWebsocketDispatch_CallsRelayExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewStashPop(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_DIRECT_WEBSOCKET}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), StashPopInput{WorktreeID: "wt1", StashRef: "stash@{0}"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if local.calledStashPop || !relay.calledStashPop {
+		t.Error("expected StashPop to route to relay when Connected=true over direct-websocket")
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestStashPop_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewStashPop(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_SSH}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), StashPopInput{WorktreeID: "wt1"})
+	if !errors.Is(err, domain.ErrGitOpUnsupportedOverSSHRelay) {
+		t.Fatalf("expected ErrGitOpUnsupportedOverSSHRelay, got %v", err)
+	}
+	if local.calledStashPop || relay.calledStashPop {
+		t.Error("expected zero calls to either executor when relay-ssh is rejected")
+	}
+}
+
+func TestCreateBranch_LocalDispatch_CallsLocalExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewCreateBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), CreateBranchInput{WorktreeID: "wt1", Branch: "feature", Checkout: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledCreateBranch || relay.calledCreateBranch {
+		t.Error("expected CreateBranch to route to local when Connected=false")
+	}
+	if got != "feature" {
+		t.Errorf("unexpected result: %q", got)
+	}
+}
+
+func TestCreateBranch_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewCreateBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_SSH}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), CreateBranchInput{WorktreeID: "wt1", Branch: "feature"})
+	if !errors.Is(err, domain.ErrGitOpUnsupportedOverSSHRelay) {
+		t.Fatalf("expected ErrGitOpUnsupportedOverSSHRelay, got %v", err)
+	}
+	if local.calledCreateBranch || relay.calledCreateBranch {
+		t.Error("expected zero calls to either executor when relay-ssh is rejected")
+	}
+}
+
+func TestDeleteBranch_LocalDispatch_CallsLocalExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewDeleteBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), DeleteBranchInput{WorktreeID: "wt1", Branch: "feature"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledDeleteBranch || relay.calledDeleteBranch {
+		t.Error("expected DeleteBranch to route to local when Connected=false")
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestDeleteBranch_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewDeleteBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_SSH}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), DeleteBranchInput{WorktreeID: "wt1", Branch: "feature"})
+	if !errors.Is(err, domain.ErrGitOpUnsupportedOverSSHRelay) {
+		t.Fatalf("expected ErrGitOpUnsupportedOverSSHRelay, got %v", err)
+	}
+	if local.calledDeleteBranch || relay.calledDeleteBranch {
+		t.Error("expected zero calls to either executor when relay-ssh is rejected")
 	}
 }

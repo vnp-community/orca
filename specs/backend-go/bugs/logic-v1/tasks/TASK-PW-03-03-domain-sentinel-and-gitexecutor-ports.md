@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/domain/domain.go`, `backend-go/services/git-gateway-service/internal/usecase/ports.go`
 **Depends on:** TASK-PW-03-01, TASK-PW-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ErrGitOpUnsupportedOverSSHRelay + domain.MergeResult added; GitExecutor interface extended with the 5 new methods; domain package builds clean (usecase compiles once 03-04/05 land, as expected)
 
 ---
 

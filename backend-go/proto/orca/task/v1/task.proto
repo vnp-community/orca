@@ -33,6 +33,7 @@ service TaskService {
   rpc UpdateTask(UpdateTaskRequest) returns (UpdateTaskResponse);
   rpc DeleteTask(DeleteTaskRequest) returns (google.protobuf.Empty);
   rpc GetDependencies(GetDependenciesRequest) returns (GetDependenciesResponse);
+  rpc FindTaskByNumber(FindTaskByNumberRequest) returns (FindTaskByNumberResponse);
 
   // AIDecompose relays to the Dev Server Agent's ai.complete method (via
   // infra-fleet-service's Relay RPC) to propose a subtask breakdown for
@@ -89,6 +90,15 @@ message Task {
   string worktree_id = 19;                       // see SOL-TG-04
   string agent_session_id = 20;                   // see SOL-TG-04
   int32 progress_percent = 21;
+  // Added SOL-PW-04: a per-project sequential number so a commit message
+  // can reference "#TG-42" without embedding a UUID. Assigned once at
+  // CreateTask, immutable, backed by a per-project sequence — never
+  // reused even if the task is deleted, matching GitHub/Jira issue-number
+  // semantics.
+  int64 task_number = 22;
+  // Set by the PR-creation write-back saga — empty until a PR
+  // referencing this task's #TG-N is created.
+  string pr_url = 23;
 }
 
 message CreateTaskRequest {
@@ -216,9 +226,23 @@ message UpdateTaskRequest {
   google.protobuf.StringValue prompt_template = 10;
   google.protobuf.StringValue ai_context = 11;
   google.protobuf.StringValue visibility = 12;
+  google.protobuf.StringValue pr_url = 13;
+  google.protobuf.StringValue worktree_id = 14;
 }
 message UpdateTaskResponse {
   Task task = 1;
+}
+
+// FindTaskByNumber resolves a project-scoped "#TG-N" reference to a task
+// id. Project-scoped, not tenant-wide: two different projects can each
+// have their own #TG-42, matching how GitHub/Jira issue numbers are
+// repo/project-scoped, not org-wide.
+message FindTaskByNumberRequest {
+  string project_id = 1;
+  int64 task_number = 2;
+}
+message FindTaskByNumberResponse {
+  Task task = 1; // empty/NOT_FOUND if no task in project_id has this number
 }
 
 message DeleteTaskRequest {

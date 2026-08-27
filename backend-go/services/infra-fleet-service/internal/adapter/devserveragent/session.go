@@ -59,8 +59,17 @@ type HandshakeInfo struct {
 }
 
 // pendingCall is one in-flight JSON-RPC request awaiting its response.
+// Exactly one of resultCh/streamCh is set: resultCh for an ordinary call()
+// (exactly one response frame, then removed from session.pending by
+// readLoop itself); streamCh for a callStream() call (TASK-PW-03-08) —
+// every response frame sharing this request id is forwarded there until a
+// terminal frame is observed (isTerminalStreamResponse), at which point
+// readLoop removes the pending entry AND closes streamCh. readLoop is the
+// only goroutine that ever writes to or closes streamCh — see callStream's
+// doc comment for why the unsubscribe side deliberately never closes it.
 type pendingCall struct {
 	resultCh chan JSONRPCResponse
+	streamCh chan JSONRPCResponse
 }
 
 // session is one persistent connection to a single dev server's agent —
@@ -285,6 +294,21 @@ func (s *session) readLoop(t Transport) {
 		if err == nil && ok {
 			s.mu.Lock()
 			call := s.pending[resp.ID]
+			if call != nil && call.streamCh != nil {
+				terminal := isTerminalStreamResponse(resp)
+				if terminal {
+					delete(s.pending, resp.ID)
+				}
+				s.mu.Unlock()
+				select {
+				case call.streamCh <- resp:
+				default: // slow/gone consumer — drop rather than block the read loop
+				}
+				if terminal {
+					close(call.streamCh)
+				}
+				continue
+			}
 			delete(s.pending, resp.ID)
 			s.mu.Unlock()
 			if call != nil {
@@ -542,8 +566,23 @@ func (s *session) handleDisconnect(t Transport, cause error) {
 	s.pending = make(map[uint32]*pendingCall)
 	s.mu.Unlock()
 
+	lostErr := JSONRPCResponse{Error: &JSONRPCError{Code: -32000, Message: fmt.Sprintf("devserveragent: connection lost: %v", cause)}}
 	for _, call := range pending {
-		call.resultCh <- JSONRPCResponse{Error: &JSONRPCError{Code: -32000, Message: fmt.Sprintf("devserveragent: connection lost: %v", cause)}}
+		if call.streamCh != nil {
+			// callStream callers select on ctx.Done() alongside reading this
+			// channel (see devserveragent.Client.ExecStream) — a non-blocking
+			// send-then-close here mirrors routeNotification's "never block
+			// the read loop on a consumer" discipline, and this is the
+			// terminal frame for this stream: readLoop won't observe another
+			// one on a torn-down transport.
+			select {
+			case call.streamCh <- lostErr:
+			default:
+			}
+			close(call.streamCh)
+			continue
+		}
+		call.resultCh <- lostErr
 	}
 
 	go s.backgroundReconnect()
@@ -764,6 +803,86 @@ func (s *session) call(ctx context.Context, method string, params any) (json.Raw
 		s.dropPending(reqID)
 		return nil, fmt.Errorf("devserveragent: request %q timed out: %w", method, callCtx.Err())
 	}
+}
+
+// callStream sends one JSON-RPC request the same way call() does, but
+// registers a streamCh instead of a resultCh so every response frame
+// sharing this request id — not just the first — is forwarded to the
+// returned channel (TASK-PW-03-08's ExecStream/git.execStream support; see
+// specs/agent/api/agent-rpc-catalog-git-fs.md's "git.execStream streaming
+// shape" section: multiple frames replying to one request id, terminated
+// by a stream.end-typed frame).
+//
+// Unlike call(), this has no per-call RequestTimeout — a git push/pull can
+// run arbitrarily long — so the caller's ctx is the only cancellation path
+// (only used to size the initial WriteFrame's deadline via the transport;
+// the returned channel keeps delivering frames until readLoop observes the
+// terminal frame or the session itself closes).
+//
+// The returned unsubscribe func only removes the pending-map entry (so a
+// caller that loses interest early stops being routed future frames); it
+// deliberately does NOT close the returned channel itself — only readLoop
+// (session.go's single reader/writer of streamCh) ever closes it, avoiding
+// the send-on-closed-channel race a consumer-side close would risk.
+func (s *session) callStream(ctx context.Context, method string, params any) (<-chan JSONRPCResponse, func(), error) {
+	s.mu.Lock()
+	if s.transport == nil || !s.handshaked {
+		s.mu.Unlock()
+		return nil, nil, fmt.Errorf("devserveragent: not connected")
+	}
+	t := s.transport
+	reqID := s.nextRequestID
+	s.nextRequestID++
+	frameID := s.nextFrameID
+	s.nextFrameID++
+	ack := s.highestPeerSeq
+	call := &pendingCall{streamCh: make(chan JSONRPCResponse, 256)}
+	s.pending[reqID] = call
+	s.mu.Unlock()
+
+	var paramsRaw json.RawMessage
+	if params != nil {
+		encoded, err := json.Marshal(params)
+		if err != nil {
+			s.dropPending(reqID)
+			return nil, nil, err
+		}
+		paramsRaw = encoded
+	}
+	req := JSONRPCRequest{JSONRPC: "2.0", ID: reqID, Method: method, Params: paramsRaw}
+	frame, err := EncodeJSONRPCFrame(req, frameID, ack)
+	if err != nil {
+		s.dropPending(reqID)
+		return nil, nil, err
+	}
+
+	if err := t.WriteFrame(ctx, frame); err != nil {
+		s.dropPending(reqID)
+		return nil, nil, fmt.Errorf("devserveragent: sending %q: %w", method, err)
+	}
+
+	unsubscribe := func() { s.dropPending(reqID) }
+	return call.streamCh, unsubscribe, nil
+}
+
+// isTerminalStreamResponse decides whether resp ends a callStream() call —
+// either an agent-level JSON-RPC error, or a decoded result whose "type"
+// field is "stream.end" (git.execStream's own terminator, per
+// specs/agent/api/agent-rpc-catalog-git-fs.md). FLAGGED: this "type" probe
+// is this adapter's best-effort reading of the doc's
+// {type:'stream.chunk',...}/{type:'stream.end',...} shape, same
+// unconfirmed-against-a-real-build caveat as ptyNotificationParams above.
+func isTerminalStreamResponse(resp JSONRPCResponse) bool {
+	if resp.Error != nil {
+		return true
+	}
+	var probe struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(resp.Result, &probe); err != nil {
+		return false
+	}
+	return probe.Type == "stream.end"
 }
 
 func (s *session) dropPending(id uint32) {

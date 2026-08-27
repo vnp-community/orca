@@ -145,6 +145,8 @@ func run() error {
 	pushUC := usecase.NewPush(resolver, local, relay)
 	pullUC := usecase.NewPull(resolver, local, relay)
 	historyUC := usecase.NewHistory(resolver, local, relay)
+	pushStreamUC := usecase.NewPushStream(resolver, local, relay)
+	pullStreamUC := usecase.NewPullStream(resolver, local, relay)
 	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, historyUC, relay)
 
 	stageUC := usecase.NewStage(resolver, local, relay)
@@ -227,9 +229,19 @@ func run() error {
 	discardUC := usecase.NewDiscard(resolver, local, relay)
 	bulkDiscardUC := usecase.NewBulkDiscard(resolver, local, relay)
 
+	// SOL-PW-03 — merge/stash/branch-write. Mode-gated inline (each
+	// usecase calls resolver.ResolveConnection directly rather than going
+	// through dispatchExecutor) so a relay-ssh connection fails closed
+	// before ever attempting the relay call.
+	mergeIntoBranchUC := usecase.NewMergeBranch(resolver, local, relay)
+	stashPushUC := usecase.NewStashPush(resolver, local, relay)
+	stashPopUC := usecase.NewStashPop(resolver, local, relay)
+	createBranchUC := usecase.NewCreateBranch(resolver, local, relay)
+	deleteBranchUC := usecase.NewDeleteBranch(resolver, local, relay)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
-		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, generateCommitMessageUC,
+		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, pushStreamUC, pullStreamUC, generateCommitMessageUC,
 		stageUC, unstageUC,
 		historyUC, checkIgnoredUC, forkSyncUC, upstreamStatusUC,
 		commitCompareUC, branchCompareUC, commitDiffUC, branchDiffUC, submoduleStatusUC,
@@ -246,6 +258,7 @@ func run() error {
 		abortRebaseUC, abortMergeUC, conflictOperationUC, resolveConflictUC,
 		discardUC, bulkDiscardUC,
 		checkWorktreeDeleteSafetyUC, compareWorktreesUC, mergeWorktreeIntoBaseUC,
+		mergeIntoBranchUC, stashPushUC, stashPopUC, createBranchUC, deleteBranchUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
