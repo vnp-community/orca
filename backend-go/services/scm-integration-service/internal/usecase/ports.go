@@ -432,3 +432,31 @@ type GitLabMergeRequestProvider interface {
 type OutboxEnqueuer interface {
 	Enqueue(ctx context.Context, tenantID string, event domain.OutboxEvent) error
 }
+
+// ── ReceiveWebhook (BUG-PI-03/SOL-PI-03/TASK-PI-03-06) ──────────────────
+
+// WebhookVerifier verifies a provider's webhook signature — GitHub's
+// X-Hub-Signature-256 (HMAC-SHA256 over raw_body), GitLab's X-Gitlab-Token
+// (constant-time string compare).
+//
+// KNOWN GAP: this signature carries no tenant_id, so today's
+// implementation (internal/adapter/webhookverify) checks against ONE
+// shared secret per provider (from service config), not a real per-tenant
+// secret via CredentialResolver's per-tenant lookup — there is no
+// per-tenant webhook URL/secret registration surface anywhere in this
+// service yet (mirrors CredentialResolver's own STUB precedent: see that
+// interface's doc comment for the same "typed, documented gap, not
+// fabricated behavior" posture). Tightening this to real per-tenant
+// secrets is a follow-up once that registration surface exists.
+type WebhookVerifier interface {
+	Verify(ctx context.Context, provider domain.ScmProvider, rawBody []byte, signatureHeader string) bool
+}
+
+// WebhookDeliveryStore implements idempotent delivery tracking against
+// scm.webhook_delivery_log's existing (provider, delivery_id) uniqueness
+// constraint (migrations/0001_init.up.sql). No schema change; this is only
+// that table's first writer (BUG-PI-03).
+type WebhookDeliveryStore interface {
+	Exists(ctx context.Context, provider domain.ScmProvider, deliveryID string) (bool, error)
+	Record(ctx context.Context, provider domain.ScmProvider, deliveryID, status string) error
+}

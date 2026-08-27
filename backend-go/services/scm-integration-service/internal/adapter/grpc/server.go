@@ -74,6 +74,9 @@ type Server struct {
 	listIssueCommentsBySlug       *usecase.ListIssueCommentsBySlug
 	getLinkedPullRequestsForIssue *usecase.GetLinkedPullRequestsForIssue
 	submitReview                  *usecase.SubmitReview
+
+	// BUG-PI-03/SOL-PI-03 (TASK-PI-03-06).
+	receiveWebhook *usecase.ReceiveWebhook
 }
 
 func New(
@@ -118,6 +121,7 @@ func New(
 	listIssueCommentsBySlug *usecase.ListIssueCommentsBySlug,
 	getLinkedPullRequestsForIssue *usecase.GetLinkedPullRequestsForIssue,
 	submitReview *usecase.SubmitReview,
+	receiveWebhook *usecase.ReceiveWebhook,
 ) *Server {
 	return &Server{
 		listIssues:         listIssues,
@@ -166,6 +170,8 @@ func New(
 		listIssueCommentsBySlug:       listIssueCommentsBySlug,
 		getLinkedPullRequestsForIssue: getLinkedPullRequestsForIssue,
 		submitReview:                  submitReview,
+
+		receiveWebhook: receiveWebhook,
 	}
 }
 
@@ -243,6 +249,22 @@ func (s *Server) SubmitReview(ctx context.Context, req *scmintegrationv1.SubmitR
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return toProtoReview(review), nil
+}
+
+// ReceiveWebhook — BUG-PI-03/SOL-PI-03. provider arrives as a plain string
+// (not the ScmProvider enum every other RPC uses) since api-gateway derives
+// it straight from the /v1/scm/webhooks/{provider} path segment — its
+// literal values ("github", "gitlab", ...) already match domain.ScmProvider's
+// own string values 1:1, so no enum-parsing helper is needed here.
+func (s *Server) ReceiveWebhook(ctx context.Context, req *scmintegrationv1.ReceiveWebhookRequest) (*scmintegrationv1.ReceiveWebhookResponse, error) {
+	out, err := s.receiveWebhook.Execute(ctx, usecase.ReceiveWebhookInput{
+		Provider: domain.ScmProvider(req.GetProvider()), RawBody: req.GetRawBody(),
+		SignatureHeader: req.GetSignatureHeader(), DeliveryIDHeader: req.GetDeliveryIdHeader(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &scmintegrationv1.ReceiveWebhookResponse{Accepted: out.Accepted, Duplicate: out.Duplicate}, nil
 }
 
 func toDomainReviewType(t scmintegrationv1.ReviewType) domain.ReviewType {

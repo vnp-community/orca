@@ -43,6 +43,7 @@ import (
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/oauthstate"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/providerregistry"
+	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/webhookverify"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/usecase"
 
@@ -79,9 +80,8 @@ func run() error {
 
 	// scm.rate_limit_cache (migrations/0001_init.up.sql) as of Phase 3
 	// (docs/execution-plan.md §3) — this service's first real database
-	// connection. webhook_delivery_log lives in the same migration but has
-	// no writer yet (schema-only — see README "Known gaps"); no repository
-	// is wired for it here for that reason, not by oversight.
+	// connection. webhook_delivery_log lives in the same migration; its own
+	// repository (webhookDeliveries, below) was wired in TASK-PI-03-06.
 	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
 	if err != nil {
 		return fmt.Errorf("resolving database credentials: %w", err)
@@ -97,6 +97,10 @@ func run() error {
 	issueListCache := postgres.NewIssueListCache(pool)
 	backoffExecutor := scmbackoff.New(3, 0, 0) // BR-PI-03: 3 attempts, default base/max delay
 	outboxRepo := postgres.NewOutboxRepository(pool)
+	// webhook_delivery_log (migrations/0001) — BUG-PI-03/TASK-PI-03-06's
+	// first writer for this table.
+	webhookDeliveries := postgres.NewWebhookDeliveryRepository(pool)
+	webhookVerifier := webhookverify.New(cfg.GitHubWebhookSecret, cfg.GitLabWebhookToken)
 
 	// githubProjectsAdapter/gitlabMRAdapter are the SAME instances registered
 	// below in registry's map — one GitHub adapter satisfying both
@@ -238,6 +242,11 @@ func run() error {
 	getLinkedPullRequestsForIssueUC := usecase.NewGetLinkedPullRequestsForIssue(credentials, registry)
 	submitReviewUC := usecase.NewSubmitReview(credentials, registry)
 
+	// BUG-PI-03/SOL-PI-03 (TASK-PI-03-06). outboxRepo is the SAME instance
+	// createPullRequestUC/mergePullRequestUC already enqueue to above — one
+	// outbox table, multiple publishers, per SOL-PI-03's design.
+	receiveWebhookUC := usecase.NewReceiveWebhook(webhookVerifier, webhookDeliveries, outboxRepo)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	scmintegrationv1.RegisterScmIntegrationServiceServer(grpcServer, scmgrpc.New(
 		listIssuesUC, createPullRequestUC, listPullRequestsUC, getRateLimitStatusUC,
@@ -253,6 +262,7 @@ func run() error {
 		checkHostedReviewEligibilityUC,
 		setIntegrationCredentialUC, getIntegrationCredentialStatusUC, listIntegrationCredentialsUC,
 		listIssueCommentsBySlugUC, getLinkedPullRequestsForIssueUC, submitReviewUC,
+		receiveWebhookUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
