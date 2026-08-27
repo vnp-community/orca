@@ -9,7 +9,8 @@
 #   --user <ssh-user>     SSH user (default: ubuntu)
 #   --key  <ssh-key>      SSH identity file (default: ~/.ssh/id_ed25519)
 #   --orca-url <url>      Orca WS URL (default: wss://b15.openledger.vn/agent)
-#   --token-api <url>     Token API (default: http://172.20.2.39:6769/api/agent-token)
+#   --token-api <url>     Token API (default: http://172.20.2.39:6768/api/agent-token —
+#                         api-gateway's public port per deploy/dev/.env)
 #   --api-secret <secret> Bearer secret for POST /api/agent-token — must match
 #                         ORCA_AGENT_API_SECRET on the Orca Server (default:
 #                         $ORCA_AGENT_API_SECRET env var, e.g. from deploy/agent/.env)
@@ -32,8 +33,15 @@ shift 2 2>/dev/null || true
 
 SSH_USER="ubuntu"
 SSH_KEY="$HOME/.ssh/id_ed25519"
-ORCA_WS_URL="wss://b15.openledger.vn/agent"
-ORCA_TOKEN_API="http://172.20.2.39:6769/api/agent-token"
+# Why AGENT_ORCA_URL fallback: this used to be hardcoded, silently ignoring
+# `source deploy/agent/.env`'s AGENT_ORCA_URL (e.g. a LAN-direct URL for a
+# dev server co-located with the Orca Server) unless --orca-url was passed
+# explicitly on every single invocation -- easy to forget and revert a
+# deliberate LAN-direct setup back to the public domain on the next deploy.
+ORCA_WS_URL="${AGENT_ORCA_URL:-wss://b15.openledger.vn/agent}"
+# 6768 = backend-go api-gateway's public port (deploy/dev/.env
+# API_GATEWAY_PUBLIC_PORT) — NOT 6769, which is the frontend/nginx port.
+ORCA_TOKEN_API="http://172.20.2.39:6768/api/agent-token"
 # Why: POST /api/agent-token requires `Authorization: Bearer <secret>` matching
 # ORCA_AGENT_API_SECRET on the Orca Server (see backend/src/server/agent-token-routes.ts).
 # Defaulting to the env var lets `source deploy/agent/.env` supply it without

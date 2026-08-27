@@ -5892,6 +5892,81 @@ describe('connectPanePty', () => {
     expect(deps.updateTabPtyId).toHaveBeenCalledWith('tab-1', 'fresh-ssh-pty')
   })
 
+  it('retries a fresh (non-reattach) spawn once when a mirrored host attach reports session-expired', async () => {
+    // Why (BUG-FE-PTY-001): for a host-session-mirrored tab, the initial
+    // (no-sessionId) transport.connect() call routes into
+    // attachHostSessionMirror(), which can find its published handle already
+    // dead (grace elapsed / agent WS reconnect race). The bounded single
+    // retry (mirroredHostAttachRetried) must clear the stale id and
+    // respawn instead of leaving the pane on a dead-end toast — and must
+    // not loop forever on a genuinely-gone handle.
+    const { connectPanePty } = await import('./pty-connection')
+    const pane = createPane(1)
+    const transport = createMockTransport('stale-mirror-pty')
+    let connectCallCount = 0
+    transport.connect.mockImplementation(
+      async (opts: { sessionId?: string; callbacks?: ConnectCallbacks }) => {
+        connectCallCount += 1
+        if (connectCallCount === 1) {
+          opts.callbacks?.onError?.('SSH_SESSION_EXPIRED: mirror-gone')
+          return undefined
+        }
+        const onPtySpawn = createdTransportOptions[0]?.onPtySpawn as
+          | ((ptyId: string) => void)
+          | undefined
+        onPtySpawn?.('fresh-pty')
+        return 'fresh-pty'
+      }
+    )
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: null }] },
+      ptyIdsByTabId: { 'tab-1': [] }
+    } as StoreState
+    const manager = createManager(1)
+    const deps = createDeps()
+
+    connectPanePty(pane as never, manager as never, deps as never)
+    await flushAsyncTicks(10)
+
+    expect(transport.connect).toHaveBeenCalledTimes(2)
+    expect(transport.connect).not.toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: expect.any(String) })
+    )
+    expect(deps.clearTabPtyId).toHaveBeenCalledWith('tab-1', 'stale-mirror-pty')
+    expect(deps.onPtyErrorRef.current).not.toHaveBeenCalled()
+    expect(deps.updateTabPtyId).toHaveBeenCalledWith('tab-1', 'fresh-pty')
+  })
+
+  it('surfaces the error instead of retrying again when a retried mirrored host attach also expires', async () => {
+    // Why: mirroredHostAttachRetried bounds the retry to a single attempt so
+    // a genuinely-gone handle still surfaces its error instead of looping.
+    const { connectPanePty } = await import('./pty-connection')
+    const pane = createPane(1)
+    const transport = createMockTransport('stale-mirror-pty')
+    transport.connect.mockImplementation(
+      async (opts: { sessionId?: string; callbacks?: ConnectCallbacks }) => {
+        opts.callbacks?.onError?.('SSH_SESSION_EXPIRED: mirror-gone-again')
+        return undefined
+      }
+    )
+    transportFactoryQueue.push(transport)
+    mockStoreState = {
+      ...mockStoreState,
+      tabsByWorktree: { 'wt-1': [{ id: 'tab-1', ptyId: null }] },
+      ptyIdsByTabId: { 'tab-1': [] }
+    } as StoreState
+    const manager = createManager(1)
+    const deps = createDeps()
+
+    connectPanePty(pane as never, manager as never, deps as never)
+    await flushAsyncTicks(10)
+
+    expect(transport.connect).toHaveBeenCalledTimes(2)
+    expect(deps.onPtyErrorRef.current).toHaveBeenCalled()
+  })
+
   it('submits a cold-restore resume command after SSH expired-session fallback', async () => {
     const pendingTimeouts: (() => void)[] = []
     const originalSetTimeout = globalThis.setTimeout
@@ -13707,7 +13782,10 @@ describe('connectPanePty', () => {
 
       connectPanePty(pane as never, manager as never, deps as never)
 
-      expect(createRemoteRuntimePtyTransport).toHaveBeenCalledWith('session-auth', expect.any(Object))
+      expect(createRemoteRuntimePtyTransport).toHaveBeenCalledWith(
+        'session-auth',
+        expect.any(Object)
+      )
       expect(createIpcPtyTransport).not.toHaveBeenCalled()
     } finally {
       ;(globalThis.window as unknown as { __orca_platform?: string }).__orca_platform =

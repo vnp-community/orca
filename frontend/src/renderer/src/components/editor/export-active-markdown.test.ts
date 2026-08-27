@@ -28,8 +28,8 @@ describe('exportActiveMarkdownToPdf', () => {
     Object.defineProperty(window, 'api', {
       configurable: true,
       value: {
-        export: {
-          htmlToPdf: vi.fn()
+        runtime: {
+          call: vi.fn()
         }
       }
     })
@@ -46,7 +46,7 @@ describe('exportActiveMarkdownToPdf', () => {
     })
 
     expect(toast.loading).toHaveBeenCalledWith('Exporting PDF...')
-    expect(window.api.export.htmlToPdf).not.toHaveBeenCalled()
+    expect(window.api.runtime.call).not.toHaveBeenCalled()
     expect(toast.error).toHaveBeenCalledWith(
       'Failed to inline image for PDF export: Unable to fetch blob image',
       { id: 'toast-id' }

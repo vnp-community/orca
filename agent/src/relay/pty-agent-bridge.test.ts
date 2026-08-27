@@ -6,6 +6,7 @@ import { registerTraceSink, type TraceEvent } from '../shared/trace'
 // Each spawn() call returns a fresh fake IPty whose onData/onExit callbacks
 // are captured so tests can drive output/exit deterministically.
 type FakePty = {
+  pid: number
   onData: (cb: (data: string) => void) => void
   onExit: (cb: (e: { exitCode: number; signal?: number }) => void) => void
   write: ReturnType<typeof vi.fn>
@@ -15,10 +16,12 @@ type FakePty = {
   emitExit: (exitCode: number, signal?: number) => void
 }
 
+let nextFakePid = 1000
 function makeFakePty(): FakePty {
   let dataCb: ((data: string) => void) | null = null
   let exitCb: ((e: { exitCode: number; signal?: number }) => void) | null = null
   return {
+    pid: nextFakePid++,
     onData: (cb) => { dataCb = cb },
     onExit: (cb) => { exitCb = cb },
     write: vi.fn(),
@@ -298,6 +301,22 @@ describe('pty-agent-bridge — terminal:* tracing (CR-TRACE-003)', () => {
     expect(events.filter((e) => e.flow === 'terminal:destroy')).toHaveLength(0)
   })
 
+  // Locks in the {id,cwd,title,pid} shape backend-go's
+  // devserveragent/methods.go decodes — pid was added so InspectProcess can
+  // report a real pid instead of always 0 (see infra-fleet-service TASK-183).
+  it('handlePtyListProcesses includes the real pty pid alongside id/cwd/title', async () => {
+    const { handlePtyCreate, handlePtyListProcesses } = await import('./pty-agent-bridge')
+    const created = (await handlePtyCreate(1, {}, log, vi.fn())) as { result: { id: string; cwd: string } }
+    const spawnedPid = lastSpawnedPty?.pid
+    expect(spawnedPid).toBeDefined()
+
+    const listed = (await handlePtyListProcesses(2, {}, log)) as { result: Array<{ id: string; cwd: string; title: string; pid: number }> }
+    const entry = listed.result.find((p) => p.id === created.result.id)
+    expect(entry).toBeDefined()
+    expect(entry?.pid).toBe(spawnedPid)
+    expect(entry?.cwd).toBe(created.result.cwd)
+  })
+
   it('handlePtyWrite does NOT emit any trace span regardless of call count', async () => {
     const { handlePtyCreate, handlePtyWrite } = await import('./pty-agent-bridge')
     const created = (await handlePtyCreate(1, {}, log, vi.fn())) as { result: { id: string } }
@@ -331,5 +350,92 @@ describe('pty-agent-bridge — terminal:* tracing (CR-TRACE-003)', () => {
     const start = events.find((e) => e.flow === 'terminal:resize' && e.level === 'start')
     expect(start?.id).toBeTruthy()
     expect(start?.id).not.toBe('resumed-1')
+  })
+})
+
+// Why: gh/glab auth-login PTYs (and any other commandDelivery:'provider'
+// caller — see dev-server-pty-provider.ts) have no renderer terminal pane to
+// type the command into; the agent must submit it. Previously unimplemented
+// — see specs/agent/api/gaps-and-findings.md #5.
+describe('pty-agent-bridge — provider-delivered startup command', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    lastSpawnedPty = null
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('writes the command to the PTY shortly after spawn when commandDelivery is provider', async () => {
+    const { handlePtyCreate } = await import('./pty-agent-bridge')
+    await handlePtyCreate(
+      1,
+      { command: 'gh auth login', commandDelivery: 'provider' },
+      log,
+      vi.fn()
+    )
+    expect(lastSpawnedPty!.write).not.toHaveBeenCalled()
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    expect(lastSpawnedPty!.write).toHaveBeenCalledOnce()
+    const written = lastSpawnedPty!.write.mock.calls[0]![0] as string
+    expect(written).toContain('gh auth login')
+  })
+
+  it('does not write a command when commandDelivery is the default (renderer)', async () => {
+    const { handlePtyCreate } = await import('./pty-agent-bridge')
+    await handlePtyCreate(1, { command: 'gh auth login' }, log, vi.fn())
+
+    await vi.advanceTimersByTimeAsync(200)
+
+    expect(lastSpawnedPty!.write).not.toHaveBeenCalled()
+  })
+
+  it('does not throw when the PTY exits before the delivery timer fires', async () => {
+    const { handlePtyCreate } = await import('./pty-agent-bridge')
+    const created = (await handlePtyCreate(
+      1,
+      { command: 'gh auth login', commandDelivery: 'provider' },
+      log,
+      vi.fn()
+    )) as { result: { id: string } }
+    lastSpawnedPty!.emitExit(0)
+
+    await vi.advanceTimersByTimeAsync(50)
+
+    expect(lastSpawnedPty!.write).not.toHaveBeenCalled()
+    expect(created.result.id).toMatch(/^agent-pty-/)
+  })
+
+  // Why: BUG-BE-HLD-005 parity fix — this isolation previously only existed
+  // on the SSH relay (pty-handler.ts); Part A had no gh/glab auth-login
+  // support at all before this fix, so there was nothing to isolate.
+  it('isolates GH_CONFIG_DIR per user for a provider-delivered gh command', async () => {
+    const { handlePtyCreate } = await import('./pty-agent-bridge')
+    await handlePtyCreate(
+      1,
+      { command: 'gh auth login', commandDelivery: 'provider', userId: 'user-42' },
+      log,
+      vi.fn()
+    )
+
+    const spawnEnv = spawnMock.mock.calls[0]?.[2]?.env as Record<string, string>
+    expect(spawnEnv.GH_CONFIG_DIR).toContain('/user-42/')
+  })
+
+  it('does not isolate GH_CONFIG_DIR when userId is absent', async () => {
+    const { handlePtyCreate } = await import('./pty-agent-bridge')
+    await handlePtyCreate(
+      1,
+      { command: 'gh auth login', commandDelivery: 'provider' },
+      log,
+      vi.fn()
+    )
+
+    const spawnEnv = spawnMock.mock.calls[0]?.[2]?.env as Record<string, string>
+    expect(spawnEnv.GH_CONFIG_DIR).toBeUndefined()
   })
 })

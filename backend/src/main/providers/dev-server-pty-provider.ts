@@ -4,8 +4,8 @@
  *
  * The dev-server agent's PTY surface (src/relay/pty-agent-bridge.ts) is
  * narrower than the SSH relay daemon's, but it does support reattach
- * (2026-08): pty.create/write/resize/destroy/scrollback/sendSignal/attach,
- * plus real-time pty.data/pty.exit/pty.replay push notifications
+ * (2026-08): pty.create/write/resize/destroy/scrollback/sendSignal/attach/
+ * listProcesses, plus real-time pty.data/pty.exit/pty.replay push notifications
  * (src/relay/agent-rpc-dispatch.ts's makeNotifier). A dropped WebSocket does
  * not kill the shell — the agent arms a grace-period timer and only kills it
  * if no attach arrives in time (see scheduleGracePeriodCleanup). There is
@@ -124,7 +124,16 @@ export class DevServerPtyProvider implements IPtyProvider {
         rows: opts.rows,
         ...(opts.cwd ? { cwd: opts.cwd } : {}),
         ...(opts.env ? { env: opts.env } : {}),
+        ...(opts.envToDelete?.length ? { envToDelete: opts.envToDelete } : {}),
         ...(opts.shellOverride ? { shellOverride: opts.shellOverride } : {}),
+        // Why: previously dropped silently — any commandDelivery:'provider'
+        // caller (AI-agent terminal launches, pane splits, and gh/glab
+        // auth-login PTYs) got a bare shell with no command typed in on
+        // direct-websocket/relay-websocket dev servers. See
+        // specs/agent/api/gaps-and-findings.md #5.
+        ...(opts.command ? { command: opts.command } : {}),
+        ...(opts.commandDelivery ? { commandDelivery: opts.commandDelivery } : {}),
+        ...(opts.userId ? { userId: opts.userId } : {}),
         ...(opts.paneKey ? { paneKey: opts.paneKey } : {}),
         ...(opts.tabId ? { tabId: opts.tabId } : {})
       }
@@ -150,6 +159,12 @@ export class DevServerPtyProvider implements IPtyProvider {
   }
 
   async shutdown(id: string, opts: { immediate?: boolean; keepHistory?: boolean }): Promise<void> {
+    // TEMP DIAG BUG-FE-PTY-001: capture the caller for the "created then
+    // immediately destroyed" repro — stack trace pinpoints which orca-runtime
+    // path decided to tear this PTY down seconds after spawn.
+    console.error(
+      `[DIAG BUG-FE-PTY-001] DevServerPtyProvider.shutdown() called id=${id} immediate=${opts.immediate} keepHistory=${opts.keepHistory}\n${new Error('shutdown call site').stack}`
+    )
     const relayId = this.toRelayPtyId(id)
     await this.relay.call('pty.destroy', { id: relayId, graceful: !opts.immediate })
     this.initialCwdByRelayId.delete(relayId)
@@ -198,8 +213,25 @@ export class DevServerPtyProvider implements IPtyProvider {
   }
 
   async listProcesses(): Promise<PtyProcessInfo[]> {
-    // Why: no agent-wide PTY enumeration RPC exists yet.
-    return []
+    // Why: mirrors SshPtyProvider.listProcesses() — lets the backend's
+    // liveness sweep (refreshPtyWorktreeRecordsFromController) detect a
+    // Dev-Server-hosted PTY that died on its own, instead of leaving
+    // session-tabs bookkeeping stuck reporting a dead ptyId as "ready"
+    // forever (BUG-FE-PTY-001). A relay failure here must not be read as
+    // "no PTYs exist" — surface it as a liveness-unknown empty result the
+    // same way withTimeoutResult's !ok path already does for the caller.
+    try {
+      const result = await this.relay.call<{ id: string; cwd: string; title: string }[]>(
+        'pty.listProcesses',
+        {}
+      )
+      return result.map((session) => ({
+        ...session,
+        id: this.toAppPtyId(session.id)
+      }))
+    } catch {
+      return []
+    }
   }
 
   async getDefaultShell(): Promise<string> {

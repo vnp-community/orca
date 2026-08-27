@@ -161,9 +161,18 @@ export async function startHttpServer(
       }
     }
 
-    // 3. /auth/* or /admin/api/* → Express app
-    if (path.startsWith('/auth') || path.startsWith('/admin')) {
+    // 3. /auth/* or /admin/api/* → Express app (data/admin API — keep as-is)
+    if (path.startsWith('/auth') || path.startsWith('/admin/api')) {
       app(req, res)
+      return
+    }
+
+    // 3b. /admin or /admin-index.html → Admin SPA shell, served as a static file.
+    // No Express route serves the HTML shell itself (only /admin/api/* is mounted above),
+    // so this must go through the static-file fallback like web-index.html does.
+    const adminPathOnly = path.split('?')[0]
+    if (adminPathOnly === '/admin' || adminPathOnly === '/admin-index.html') {
+      handleStaticRequest(req, res, normalizedRoot, 'admin-index.html')
       return
     }
 
@@ -191,7 +200,10 @@ export async function startHttpServer(
 function handleStaticRequest(
   req: import('node:http').IncomingMessage,
   res: import('node:http').ServerResponse,
-  webRoot: string
+  webRoot: string,
+  // SPA shell to fall back to for extension-less paths ('/', '/admin', deep-linked routes).
+  // Defaults to the main app; admin routes pass 'admin-index.html' so they get their own bundle.
+  indexFile = 'web-index.html'
 ): void {
   const rawUrl = req.url ?? '/'
 
@@ -204,7 +216,7 @@ function handleStaticRequest(
     return
   }
 
-  const normalizedPath = decodedPath === '/' ? '/web-index.html' : decodedPath
+  const normalizedPath = decodedPath === '/' ? `/${indexFile}` : decodedPath
   const filePath = join(webRoot, normalizedPath)
 
   if (!filePath.startsWith(`${webRoot  }/`) && filePath !== webRoot) {
@@ -226,12 +238,12 @@ function handleStaticRequest(
       res.end('Not Found')
       return
     }
-    const indexPath = join(webRoot, 'web-index.html')
+    const indexPath = join(webRoot, indexFile)
     if (existsSync(indexPath)) {
       serveFile(res, indexPath)
     } else {
       res.writeHead(404, { 'Content-Type': 'text/plain' })
-      res.end(`Not Found: web-index.html missing from ${  webRoot}`)
+      res.end(`Not Found: ${indexFile} missing from ${  webRoot}`)
     }
     return
   }

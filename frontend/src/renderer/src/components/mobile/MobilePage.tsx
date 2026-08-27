@@ -18,6 +18,9 @@ import { useMobilePageEscape } from './use-mobile-page-escape'
 import { MobilePageContent } from './MobilePageContent'
 import { useMobileInstallQr } from './use-mobile-install-qr'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
+import { listRuntimeNetworkInterfaces } from '@/runtime/runtime-mobile-client'
 export default function MobilePage(): React.JSX.Element {
   const [stage, setStage] = useState<FlowStage | null>(null)
   const [stepIdx, setStepIdx] = useState<StepIndex>(0)
@@ -212,7 +215,7 @@ export default function MobilePage(): React.JSX.Element {
       setRefreshingNetworkInterfaces(true)
     }
     try {
-      const result = await window.api.mobile.listNetworkInterfaces()
+      const result = await listRuntimeNetworkInterfaces()
       if (mountedRef.current) {
         setNetworkInterfaces(result.interfaces)
       }
@@ -274,7 +277,7 @@ export default function MobilePage(): React.JSX.Element {
       return
     }
     try {
-      await window.api.ui.writeClipboardText(pairingUrl)
+      await uiWriteClipboardText(pairingUrl)
       if (mountedRef.current) {
         toast.success(
           translate('auto.components.mobile.MobilePage.3c1f7168bb', 'Pairing code copied')
@@ -355,12 +358,12 @@ export default function MobilePage(): React.JSX.Element {
   }
 
   const openInstallUrl = (): void => {
-    void window.api.shell.openUrl(getInstallCopy(platform, iosChannel).url)
+    void shellOpenUrl(getInstallCopy(platform, iosChannel).url)
   }
 
   const copyInstallUrl = async (): Promise<void> => {
     try {
-      await window.api.ui.writeClipboardText(getInstallCopy(platform, iosChannel).url)
+      await uiWriteClipboardText(getInstallCopy(platform, iosChannel).url)
       if (mountedRef.current) {
         toast.success(
           translate('auto.components.mobile.MobilePage.fad833de8d', 'Install link copied')

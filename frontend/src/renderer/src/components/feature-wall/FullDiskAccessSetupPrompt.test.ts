@@ -14,6 +14,10 @@ import {
   isFullDiskAccessSetupVisible
 } from './FullDiskAccessSetupPrompt'
 import { toast } from 'sonner'
+import {
+  getRuntimeDeveloperPermissionStatus,
+  requestRuntimeDeveloperPermission
+} from '@/runtime/runtime-developer-permissions-client'
 
 vi.mock('sonner', () => ({
   toast: {
@@ -21,6 +25,11 @@ vi.mock('sonner', () => ({
     message: vi.fn(),
     success: vi.fn()
   }
+}))
+
+vi.mock('@/runtime/runtime-developer-permissions-client', () => ({
+  getRuntimeDeveloperPermissionStatus: vi.fn(),
+  requestRuntimeDeveloperPermission: vi.fn()
 }))
 
 function setUserAgent(userAgent: string): void {
@@ -34,21 +43,15 @@ function installDeveloperPermissionsApi(args: {
   getStatus: () => Promise<DeveloperPermissionState[]>
   request?: () => Promise<DeveloperPermissionRequestResult>
 }): void {
-  Object.assign(window, {
-    api: {
-      developerPermissions: {
-        getStatus: vi.fn(args.getStatus),
-        request: vi.fn(
-          args.request ??
-            (async () => ({
-              id: 'full-disk-access',
-              status: 'unknown',
-              openedSystemSettings: true
-            }))
-        )
-      }
-    }
-  })
+  vi.mocked(getRuntimeDeveloperPermissionStatus).mockImplementation(args.getStatus)
+  vi.mocked(requestRuntimeDeveloperPermission).mockImplementation(
+    args.request ??
+      (async () => ({
+        id: 'full-disk-access',
+        status: 'unknown',
+        openedSystemSettings: true
+      }))
+  )
 }
 
 async function renderPrompt(): Promise<{ container: HTMLDivElement; root: Root }> {
@@ -150,7 +153,7 @@ describe('FullDiskAccessSetupPrompt state helpers', () => {
 
     expect(container.textContent).not.toContain('Full Disk Access')
     expect(getStatus).not.toHaveBeenCalled()
-    expect(window.api.developerPermissions.request).not.toHaveBeenCalled()
+    expect(requestRuntimeDeveloperPermission).not.toHaveBeenCalled()
     root.unmount()
   })
 
@@ -174,9 +177,7 @@ describe('FullDiskAccessSetupPrompt state helpers', () => {
       await Promise.resolve()
     })
 
-    expect(window.api.developerPermissions.request).toHaveBeenCalledWith({
-      id: 'full-disk-access'
-    })
+    expect(requestRuntimeDeveloperPermission).toHaveBeenCalledWith('full-disk-access')
     expect(toast.message).toHaveBeenCalledWith('Opened macOS Privacy & Security')
     root.unmount()
   })

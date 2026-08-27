@@ -118,6 +118,7 @@ import { launchWorkItemDirect } from './launch-work-item-direct'
 import { pasteDraftWhenAgentReady } from '@/lib/agent-paste-draft'
 import { buildAgentDraftLaunchPlan, buildAgentStartupPlan } from '@/lib/tui-agent-startup'
 import { pickTuiAgent } from '../../../shared/tui-agent-selection'
+import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 
 const mockApi = {
   worktrees: {
@@ -514,11 +515,16 @@ describe('launchWorkItemDirect', () => {
 
     expect(mocks.store.ensureDetectedAgents).not.toHaveBeenCalled()
     expect(mocks.store.ensureRemoteDetectedAgents).toHaveBeenCalledWith('ssh-1')
-    expect(mockApi.agentTrust.markTrusted).toHaveBeenCalledWith({
-      preset: 'cursor',
-      workspacePath: '/home/orca/repo-worktrees/issue-77',
-      connectionId: 'ssh-1'
-    })
+    expect(callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'local' },
+      'agentTrust.markTrusted',
+      {
+        preset: 'cursor',
+        workspacePath: '/home/orca/repo-worktrees/issue-77',
+        connectionId: 'ssh-1'
+      },
+      { timeoutMs: 15_000 }
+    )
     expect(buildAgentDraftLaunchPlan).toHaveBeenCalledWith({
       agent: 'cursor',
       draft: 'https://github.com/acme/repo/issues/77',

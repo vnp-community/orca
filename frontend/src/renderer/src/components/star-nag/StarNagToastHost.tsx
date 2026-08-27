@@ -4,6 +4,15 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
+import {
+  deferRuntimeStarNag,
+  dismissRuntimeStarNag,
+  openWebRuntimeStarNag,
+  starRuntimeOrcaFromNag,
+  subscribeToRuntimeStarNagVisibility
+} from '../../runtime/runtime-star-nag-client'
+import { useAppStore } from '../../store'
 const ORCA_REPO_URL = 'https://github.com/stablyai/orca'
 type StarNagMode = 'gh' | 'web'
 type StarNagToastStatus = 'idle' | 'busy' | 'starred' | 'opened'
@@ -24,6 +33,7 @@ function StarNagToast({
   const [mode, setMode] = useState(initialMode)
   const [status, setStatus] = useState<StarNagToastStatus>('idle')
   const busy = status === 'busy'
+  const settings = useAppStore((s) => s.settings)
 
   const close = (): void => {
     if (busy) {
@@ -37,7 +47,7 @@ function StarNagToast({
       return
     }
     markResolved()
-    void window.api.starNag.later()
+    void deferRuntimeStarNag(settings)
     toast.dismiss(id)
   }
 
@@ -49,8 +59,8 @@ function StarNagToast({
     setDismissSuppressed(true)
     if (mode === 'web') {
       try {
-        await window.api.shell.openUrl(ORCA_REPO_URL)
-        await window.api.starNag.openWeb()
+        await shellOpenUrl(ORCA_REPO_URL)
+        await openWebRuntimeStarNag(settings)
         markResolved()
         setStatus('opened')
       } catch {
@@ -61,7 +71,7 @@ function StarNagToast({
     }
     let ok = false
     try {
-      ok = await window.api.starNag.starOrca()
+      ok = await starRuntimeOrcaFromNag(settings)
     } catch {
       ok = false
     }
@@ -171,6 +181,7 @@ function StarNagToast({
 export function StarNagToastHost(): null {
   const activeToastIdRef = useRef<string | number | null>(null)
   const activeToastResolvedRef = useRef<(() => void) | null>(null)
+  const settings = useAppStore((s) => s.settings)
 
   useEffect(() => {
     const dismissActiveToast = (): void => {
@@ -180,59 +191,57 @@ export function StarNagToastHost(): null {
       activeToastResolvedRef.current?.()
       toast.dismiss(activeToastIdRef.current)
     }
-    const unsubscribeShow = window.api.starNag.onShow((payload) => {
-      if (payload?.surface !== 'toast') {
-        return
-      }
-      dismissActiveToast()
-      let resolved = false
-      let dismissSuppressed = false
-      const markResolved = (): void => {
-        resolved = true
-      }
-      const setDismissSuppressed = (suppressed: boolean): void => {
-        dismissSuppressed = suppressed
-      }
-      activeToastResolvedRef.current = markResolved
-      const id = toast.custom(
-        (toastId) => (
-          <StarNagToast
-            id={toastId}
-            mode={payload.mode === 'web' ? 'web' : 'gh'}
-            markResolved={markResolved}
-            setDismissSuppressed={setDismissSuppressed}
-          />
-        ),
-        {
-          duration: Infinity,
-          closeButton: false,
-          dismissible: false,
-          unstyled: true,
-          onDismiss: () => {
-            if (activeToastIdRef.current === id) {
-              activeToastIdRef.current = null
-              activeToastResolvedRef.current = null
-            }
-            if (!resolved && !dismissSuppressed) {
-              void window.api.starNag.dismiss()
-            }
-          },
-          onAutoClose: () => {
-            if (activeToastIdRef.current === id) {
-              activeToastIdRef.current = null
-              activeToastResolvedRef.current = null
+    return subscribeToRuntimeStarNagVisibility(settings, {
+      onShow: (payload) => {
+        if (payload?.surface !== 'toast') {
+          return
+        }
+        dismissActiveToast()
+        let resolved = false
+        let dismissSuppressed = false
+        const markResolved = (): void => {
+          resolved = true
+        }
+        const setDismissSuppressed = (suppressed: boolean): void => {
+          dismissSuppressed = suppressed
+        }
+        activeToastResolvedRef.current = markResolved
+        const id = toast.custom(
+          (toastId) => (
+            <StarNagToast
+              id={toastId}
+              mode={payload.mode === 'web' ? 'web' : 'gh'}
+              markResolved={markResolved}
+              setDismissSuppressed={setDismissSuppressed}
+            />
+          ),
+          {
+            duration: Infinity,
+            closeButton: false,
+            dismissible: false,
+            unstyled: true,
+            onDismiss: () => {
+              if (activeToastIdRef.current === id) {
+                activeToastIdRef.current = null
+                activeToastResolvedRef.current = null
+              }
+              if (!resolved && !dismissSuppressed) {
+                void dismissRuntimeStarNag(settings)
+              }
+            },
+            onAutoClose: () => {
+              if (activeToastIdRef.current === id) {
+                activeToastIdRef.current = null
+                activeToastResolvedRef.current = null
+              }
             }
           }
-        }
-      )
-      activeToastIdRef.current = id
+        )
+        activeToastIdRef.current = id
+      },
+      onHide: dismissActiveToast
     })
-    const unsubscribeHide = window.api.starNag.onHide(dismissActiveToast)
-    return () => {
-      unsubscribeShow()
-      unsubscribeHide()
-    }
-  }, [])
+  }, [settings])
 
   return null
 }

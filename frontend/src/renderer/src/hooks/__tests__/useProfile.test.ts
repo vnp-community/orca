@@ -61,7 +61,7 @@ describe('useProfile', () => {
   it('fetches userProfile and resolvedProfile on mount', async () => {
     vi.mocked(callRuntimeRpc).mockImplementation(async (_, method) => {
       if (method === 'profile.getResolved') {return { security: { approvedModels: ['gpt-4'] } }}
-      if (method === 'profile.getUser') {return { agent: { preferredModel: 'gpt-3' } }}
+      if (method === 'profile.getUserProfile') {return { agent: { preferredModel: 'gpt-3' } }}
       return {}
     })
 
@@ -78,7 +78,7 @@ describe('useProfile', () => {
   it('starts ui:profile.resolve span on mount and marks ok with hasSecurityLock', async () => {
     vi.mocked(callRuntimeRpc).mockImplementation(async (_, method) => {
       if (method === 'profile.getResolved') {return { security: { approvedModels: ['gpt-4'] } }}
-      if (method === 'profile.getUser') {return { agent: { preferredModel: 'gpt-3' } }}
+      if (method === 'profile.getUserProfile') {return { agent: { preferredModel: 'gpt-3' } }}
       return {}
     })
 
@@ -106,7 +106,7 @@ describe('useProfile', () => {
     expect(resolveSpan.ok).not.toHaveBeenCalled()
   })
 
-  it('forwards the same span traceId into both profile.getResolved and profile.getUser', async () => {
+  it('forwards the same span traceId into both profile.getResolved and profile.getUserProfile', async () => {
     renderHook(() => useProfile())
 
     await waitFor(() => {
@@ -117,7 +117,7 @@ describe('useProfile', () => {
       )
       expect(callRuntimeRpc).toHaveBeenCalledWith(
         expect.anything(),
-        'profile.getUser',
+        'profile.getUserProfile',
         { traceId: 'resolve-span-id' }
       )
     })

@@ -4,6 +4,8 @@ import { cn } from '../lib/utils'
 import { useAppStore } from '../store'
 import { isGitRepoKind } from '../../../shared/repo-kind'
 import type { Repo } from '../../../shared/types'
+import { checkRuntimeOrcaStarred, starRuntimeOrca } from '../runtime/runtime-github-client'
+import { completeRuntimeStarNag } from '../runtime/runtime-star-nag-client'
 import {
   dismissPreflightIssue,
   githubProjectKeys,
@@ -20,6 +22,7 @@ import {
   type PreflightIssue
 } from './landing-preflight-issues'
 
+import { shellOpenUrl } from '../runtime/runtime-shell-client'
 type ShortcutItem = {
   id: string
   shortcut: ShortcutKeyComboDetails
@@ -35,10 +38,11 @@ function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Elemen
   const [menuOpen, setMenuOpen] = useState(false)
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const mountedRef = useMountedRef()
+  const settings = useAppStore((s) => s.settings)
 
   useEffect(() => {
     let cancelled = false
-    void window.api.gh.checkOrcaStarred().then((result) => {
+    void checkRuntimeOrcaStarred(settings).then((result) => {
       if (cancelled) {
         return
       }
@@ -72,14 +76,14 @@ function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Elemen
       return
     }
     if (state === 'web-fallback') {
-      await window.api.shell.openUrl(ORCA_STARGAZERS_URL)
+      await shellOpenUrl(ORCA_STARGAZERS_URL)
       return
     }
     if (state !== 'not-starred') {
       return
     }
     setState('starred') // optimistic
-    const ok = await window.api.gh.starOrca('landing')
+    const ok = await starRuntimeOrca(settings, 'landing')
     if (!ok) {
       if (mountedRef.current) {
         setState('web-fallback')
@@ -89,7 +93,7 @@ function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Elemen
     // Why: starring from any entry point mutes the threshold-based nag.
     // Without this the background notification could still fire on the next
     // threshold crossing, which would feel like a bug to the user.
-    await window.api.starNag.complete()
+    await completeRuntimeStarNag(settings)
   }
 
   // Hide once the user has already starred and added a repo.
@@ -206,7 +210,7 @@ function PreflightBanner({
             <p className="text-xs leading-snug text-muted-foreground">{issue.description}</p>
             <button
               className="mt-1 inline-flex items-center gap-1 text-xs font-medium text-primary underline-offset-4 hover:underline cursor-pointer"
-              onClick={() => window.api.shell.openUrl(issue.fixUrl)}
+              onClick={() => shellOpenUrl(issue.fixUrl)}
             >
               {issue.fixLabel}
               <ExternalLink className="size-3" />

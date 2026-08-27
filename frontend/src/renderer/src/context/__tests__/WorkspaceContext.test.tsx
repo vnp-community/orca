@@ -34,7 +34,7 @@ describe('WorkspaceContext', () => {
     vi.mocked(callRuntimeRpc).mockImplementation(async (_, method) => {
       if (method === 'project.get') {return { id: 'p1', name: 'Proj 1' }}
       if (method === 'git.status') {return { branch: 'main' }}
-      if (method === 'workspace.listFiles') {return { name: 'root', children: [] }}
+      if (method === 'workspace.refreshFileTree') {return []}
       if (method === 'profile.getResolved') {return { security: {} }}
       return {}
     })
@@ -52,7 +52,10 @@ describe('WorkspaceContext', () => {
 
     expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'project.get', { projectId: 'p1' })
     expect(ctxValue.project).toEqual({ id: 'p1', name: 'Proj 1' })
-    expect(ctxValue.gitStatus).toEqual({ branch: 'main' })
+    // git.status is worktree-scoped, not project-scoped — no worktree is selected yet
+    // right after switchProject(), so gitStatus stays null until setCurrentWorktree().
+    expect(ctxValue.gitStatus).toBeNull()
+    expect(callRuntimeRpc).not.toHaveBeenCalledWith(expect.anything(), 'git.status', expect.anything())
   })
 
   it('switchProject() sets isOffline=true on DEV_SERVER_UNREACHABLE error', async () => {
@@ -67,38 +70,80 @@ describe('WorkspaceContext', () => {
     expect(ctxValue.isOffline).toBe(true)
   })
 
-  it('refreshGitStatus() calls git.status and updates gitStatus', async () => {
+  it('refreshGitStatus() is a no-op without a selected worktree', async () => {
     let ctxValue: any
     renderContext(val => { ctxValue = val })
 
     await act(async () => {
       await ctxValue.switchProject('p1')
     })
-    
-    vi.mocked(callRuntimeRpc).mockResolvedValue({ branch: 'feature' })
+
     await act(async () => {
       await ctxValue.refreshGitStatus()
     })
 
-    expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'git.status', { projectId: 'p1' })
-    expect(ctxValue.gitStatus).toEqual({ branch: 'feature' })
+    expect(callRuntimeRpc).not.toHaveBeenCalledWith(expect.anything(), 'git.status', expect.anything())
+    expect(ctxValue.gitStatus).toBeNull()
   })
 
-  it('refreshFileTree() calls workspace.listFiles and updates fileTree', async () => {
+  it('setCurrentWorktree() fetches git.status with the worktree selector and updates gitStatus', async () => {
     let ctxValue: any
     renderContext(val => { ctxValue = val })
 
     await act(async () => {
       await ctxValue.switchProject('p1')
     })
-    
-    vi.mocked(callRuntimeRpc).mockResolvedValue({ name: 'updated' })
+
+    vi.mocked(callRuntimeRpc).mockResolvedValue({ branch: 'feature' })
+    await act(async () => {
+      ctxValue.setCurrentWorktree({ id: 'repo1::/wt', repoId: 'repo1', projectId: 'p1', hostId: 'local', isMainWorktree: true })
+    })
+
+    expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'git.status', { worktree: 'id:repo1::/wt' })
+    expect(ctxValue.gitStatus).toEqual({ branch: 'feature' })
+  })
+
+  it('clearing currentWorktree resets gitStatus to null', async () => {
+    let ctxValue: any
+    renderContext(val => { ctxValue = val })
+
+    await act(async () => {
+      await ctxValue.switchProject('p1')
+    })
+    vi.mocked(callRuntimeRpc).mockResolvedValue({ branch: 'feature' })
+    await act(async () => {
+      ctxValue.setCurrentWorktree({ id: 'repo1::/wt', repoId: 'repo1', projectId: 'p1', hostId: 'local', isMainWorktree: true })
+    })
+    expect(ctxValue.gitStatus).toEqual({ branch: 'feature' })
+
+    await act(async () => {
+      ctxValue.setCurrentWorktree(null)
+    })
+    expect(ctxValue.gitStatus).toBeNull()
+  })
+
+  it('refreshFileTree() calls workspace.refreshFileTree and maps the flat entry list into a rooted fileTree', async () => {
+    let ctxValue: any
+    renderContext(val => { ctxValue = val })
+
+    await act(async () => {
+      await ctxValue.switchProject('p1')
+    })
+
+    vi.mocked(callRuntimeRpc).mockResolvedValue([
+      { name: 'updated.txt', path: 'updated.txt', isDir: false }
+    ])
     await act(async () => {
       await ctxValue.refreshFileTree()
     })
 
-    expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'workspace.listFiles', { projectId: 'p1', dirPath: '.' })
-    expect(ctxValue.fileTree).toEqual({ name: 'updated' })
+    expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'workspace.refreshFileTree', { projectId: 'p1', path: '.' })
+    expect(ctxValue.fileTree).toEqual({
+      name: '.',
+      path: '.',
+      type: 'directory',
+      children: [{ name: 'updated.txt', path: 'updated.txt', type: 'file', children: undefined }]
+    })
   })
 
   it('emit(event, data) + on(event, handler) delivers data to handler', () => {

@@ -22,6 +22,7 @@
 
 import { randomUUID } from 'node:crypto'
 import type { IConnectionPool } from '../db/pool'
+import type { BindValue } from '../db/types'
 import type { TaskDAGValidator } from './TaskDAGValidator'
 import type {
   OrcaTask,
@@ -31,80 +32,8 @@ import type {
 } from '../../shared/task-types'
 import { TASK_STATUS_PROGRESS } from '../../shared/task-types'
 import { Tracers } from '../../shared/trace/tracers'
-
-// ── DB row type ────────────────────────────────────────────────────────────────
-
-type TaskRow = {
-  id: string
-  projectId: string | null
-  parentId: string | null
-  title: string
-  description: string | null
-  type: string
-  status: string
-  priority: string
-  labels: string      // JSON
-  visibility: string
-  reporterId: string | null
-  assigneeId: string | null
-  estimatedHours: number | null
-  progressPercent: number
-  aiContext: string | null
-  promptTemplate: string | null
-  dueDate: number | null
-  createdAt: number
-  updatedAt: number
-}
-
-type EdgeRow = {
-  fromTaskId: string
-  toTaskId: string
-  edgeType: string
-  createdAt: number | null
-}
-
-// ── Helpers ────────────────────────────────────────────────────────────────────
-
-function rowToTask(r: TaskRow): OrcaTask {
-  return {
-    id: r.id,
-    projectId: r.projectId ?? undefined,
-    parentId: r.parentId ?? undefined,
-    title: r.title,
-    description: r.description ?? undefined,
-    type: r.type as OrcaTask['type'],
-    status: r.status as TaskStatus,
-    priority: r.priority as OrcaTask['priority'],
-    labels: JSON.parse(r.labels) as string[],
-    visibility: r.visibility as OrcaTask['visibility'],
-    reporterId: r.reporterId ?? undefined,
-    assigneeId: r.assigneeId ?? undefined,
-    estimatedHours: r.estimatedHours ?? undefined,
-    progressPercent: r.progressPercent,
-    aiContext: r.aiContext ?? undefined,
-    promptTemplate: r.promptTemplate ?? undefined,
-    dueDate: r.dueDate ? new Date(r.dueDate) : undefined,
-    createdAt: new Date(r.createdAt),
-    updatedAt: new Date(r.updatedAt),
-  }
-}
-
-const TASK_SELECT = `
-  SELECT id,
-         project_id       as projectId,
-         parent_id        as parentId,
-         title, description, type, status, priority, labels, visibility,
-         reporter_id      as reporterId,
-         assignee_id      as assigneeId,
-         estimated_hours  as estimatedHours,
-         progress_percent as progressPercent,
-         ai_context       as aiContext,
-         prompt_template  as promptTemplate,
-         due_date         as dueDate,
-         created_at       as createdAt,
-         updated_at       as updatedAt
-  FROM orca_tasks
-`
+import type { TaskRow, EdgeRow } from './task-row-mapping'
+import { rowToTask, TASK_SELECT } from './task-row-mapping'
 
 export type ListTasksFilter = {
   projectId?: string
@@ -168,7 +97,7 @@ export class TaskService {
 
   async update(taskId: string, patch: Partial<Omit<OrcaTask, 'id' | 'createdAt'>>): Promise<void> {
     const sets: string[] = ['updated_at = ?']
-    const values: unknown[] = [Date.now()]
+    const values: BindValue[] = [Date.now()]
 
     if (patch.title !== undefined) { sets.push('title = ?'); values.push(patch.title) }
     if (patch.description !== undefined) { sets.push('description = ?'); values.push(patch.description) }
@@ -181,6 +110,8 @@ export class TaskService {
     if (patch.aiContext !== undefined) { sets.push('ai_context = ?'); values.push(patch.aiContext) }
     if (patch.visibility !== undefined) { sets.push('visibility = ?'); values.push(patch.visibility) }
     if (patch.dueDate !== undefined) { sets.push('due_date = ?'); values.push(patch.dueDate?.getTime() ?? null) }
+    if (patch.activeExecutionTaskId !== undefined) { sets.push('active_execution_task_id = ?'); values.push(patch.activeExecutionTaskId) }
+    if (patch.agentSessionId !== undefined) { sets.push('agent_session_id = ?'); values.push(patch.agentSessionId) }
 
     values.push(taskId)
     await this.pool.withConnection((db) =>
@@ -266,7 +197,7 @@ export class TaskService {
   async getDependencies(taskId: string): Promise<{ task: OrcaTask; edgeType: TaskEdgeType }[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<EdgeRow>(
-        `SELECT from_task_id as fromTaskId, to_task_id as toTaskId, edge_type as edgeType, created_at as createdAt
+        `SELECT from_task_id as "fromTaskId", to_task_id as "toTaskId", edge_type as "edgeType", created_at as "createdAt"
          FROM orca_task_edges WHERE from_task_id = ?`,
         [taskId]
       )
@@ -282,7 +213,7 @@ export class TaskService {
   async getDependents(taskId: string): Promise<{ task: OrcaTask; edgeType: TaskEdgeType }[]> {
     const rows = await this.pool.withConnection((db) =>
       db.query<EdgeRow>(
-        `SELECT from_task_id as fromTaskId, to_task_id as toTaskId, edge_type as edgeType, created_at as createdAt
+        `SELECT from_task_id as "fromTaskId", to_task_id as "toTaskId", edge_type as "edgeType", created_at as "createdAt"
          FROM orca_task_edges WHERE to_task_id = ?`,
         [taskId]
       )
@@ -325,7 +256,7 @@ export class TaskService {
 
   async list(filters: ListTasksFilter = {}): Promise<OrcaTask[]> {
     const clauses: string[] = []
-    const params: unknown[] = []
+    const params: BindValue[] = []
 
     if (filters.projectId) { clauses.push('project_id = ?'); params.push(filters.projectId) }
     if (filters.parentId !== undefined) { clauses.push('parent_id = ?'); params.push(filters.parentId) }

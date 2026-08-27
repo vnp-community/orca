@@ -125,6 +125,10 @@ vi.mock('@/lib/worktree-activation', () => ({
   activateAndRevealWorktree: vi.fn()
 }))
 
+vi.mock('@/context/WorkspaceContext', () => ({
+  useWorkspace: () => ({ setCurrentWorktree: vi.fn() })
+}))
+
 vi.mock('@/runtime/runtime-rpc-client', () => ({
   getActiveRuntimeTarget: () => ({ kind: 'local' }),
   callRuntimeRpc: vi.fn()

@@ -4,6 +4,7 @@ import { Button } from '../ui/button'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
 import { translate } from '@/i18n/i18n'
 
+import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 const EXAMPLE_PROMPTS: string[] = [
   'Using Orca CLI, open https://github.com/notifications and click the first unread pull request.',
   "Take a screenshot of my open Linear board with the Orca CLI and tell me what's blocked.",
@@ -12,7 +13,7 @@ const EXAMPLE_PROMPTS: string[] = [
 
 async function handleCopyText(text: string, label: string): Promise<void> {
   try {
-    await window.api.ui.writeClipboardText(text)
+    await uiWriteClipboardText(text)
     toast.success(
       translate('auto.components.settings.BrowserUseExamples.a602d43069', 'Copied {{value0}}.', {
         value0: label

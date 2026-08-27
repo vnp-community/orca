@@ -16,6 +16,27 @@ vi.mock('sonner', () => ({
   }
 }))
 
+function stubRuntimeCli(
+  getInstallStatus: () => Promise<CliInstallStatus>,
+  install: () => Promise<CliInstallStatus>
+) {
+  return {
+    api: {
+      runtime: {
+        call: vi.fn(async ({ method }: { method: string }) => {
+          if (method === 'cli.getInstallStatus') {
+            return { ok: true, result: await getInstallStatus() }
+          }
+          if (method === 'cli.install') {
+            return { ok: true, result: await install() }
+          }
+          throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
+        })
+      }
+    }
+  }
+}
+
 function cliStatus(overrides: Partial<CliInstallStatus> = {}): CliInstallStatus {
   return {
     platform: 'darwin',
@@ -59,14 +80,7 @@ describe('ensureOrcaCliAvailableForAgentSkillTerminal', () => {
     const install = vi.fn().mockResolvedValue(installed)
     const onStatusChange = vi.fn()
 
-    vi.stubGlobal('window', {
-      api: {
-        cli: {
-          getInstallStatus,
-          install
-        }
-      }
-    })
+    vi.stubGlobal('window', stubRuntimeCli(getInstallStatus, install))
 
     await expect(
       ensureOrcaCliAvailableForAgentSkillTerminal({
@@ -90,15 +104,7 @@ describe('ensureOrcaCliAvailableForAgentSkillTerminal', () => {
     const getInstallStatus = vi.fn().mockResolvedValue(initial)
     const install = vi.fn().mockResolvedValue(installed)
 
-    vi.stubGlobal('window', {
-      setTimeout,
-      api: {
-        cli: {
-          getInstallStatus,
-          install
-        }
-      }
-    })
+    vi.stubGlobal('window', { setTimeout, ...stubRuntimeCli(getInstallStatus, install) })
 
     const pending = ensureOrcaCliAvailableForAgentSkillTerminal({ registrationPromptDelayMs: 700 })
     await vi.waitFor(() => {

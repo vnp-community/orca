@@ -54,6 +54,12 @@ import {
   type PRCommentsListSelectionClearRequest
 } from './pr-comments-list-selection'
 import { ENTRY_REFRESH_GRACE_MS, shouldEntryRefresh } from './checks-entry-refresh'
+import {
+  deleteRuntimeGitHubIssueCommentBySlug,
+  updateRuntimeGitHubIssueCommentBySlug,
+  updateRuntimeGitHubPRTitle
+} from '@/runtime/runtime-github-client'
+import { updateRuntimeGitLabMR } from '@/runtime/runtime-gitlab-client'
 import type {
   GitLabDiscussionResolveResult,
   GitLabWorkItemDetails,
@@ -175,6 +181,7 @@ import {
   type PullRequestGenerationFields
 } from '@/store/slices/pull-request-generation'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 const RUNTIME_SSH_STATUS_REFRESH_MS = 3000
 const GIT_STATUS_FAILURE_RETRY_MS = 3000
 
@@ -2411,7 +2418,7 @@ export default function ChecksPanel(): React.JSX.Element {
     setTitleSaving(true)
     try {
       if (activeReview.provider === 'gitlab') {
-        const result = await window.api.gl.updateMR({
+        const result = await updateRuntimeGitLabMR(useAppStore.getState().settings, {
           repoPath: repo.path,
           repoId: repo.id,
           iid: activeReview.number,
@@ -2426,7 +2433,7 @@ export default function ChecksPanel(): React.JSX.Element {
         if (!pr) {
           return
         }
-        const ok = await window.api.gh.updatePRTitle({
+        const ok = await updateRuntimeGitHubPRTitle(useAppStore.getState().settings, {
           repoPath: repo.path,
           repoId: repo.id,
           prNumber: pr.number,
@@ -2628,7 +2635,7 @@ export default function ChecksPanel(): React.JSX.Element {
       if (!pr?.prRepo || !isMutablePRConversationComment(comment)) {
         return false
       }
-      const result = await window.api.gh.updateIssueCommentBySlug({
+      const result = await updateRuntimeGitHubIssueCommentBySlug(useAppStore.getState().settings, {
         owner: pr.prRepo.owner,
         repo: pr.prRepo.repo,
         commentId: comment.id,
@@ -2663,7 +2670,7 @@ export default function ChecksPanel(): React.JSX.Element {
       if (!confirmed) {
         return
       }
-      const result = await window.api.gh.deleteIssueCommentBySlug({
+      const result = await deleteRuntimeGitHubIssueCommentBySlug(useAppStore.getState().settings, {
         owner: pr.prRepo.owner,
         repo: pr.prRepo.repo,
         commentId: comment.id
@@ -3449,7 +3456,7 @@ export default function ChecksPanel(): React.JSX.Element {
                 'Open on {{value0}}',
                 { value0: hostedReviewCreateCopy.providerName }
               ),
-              onClick: () => window.api.shell.openUrl(result.existingReview!.url)
+              onClick: () => shellOpenUrl(result.existingReview!.url)
             }
           }
         )

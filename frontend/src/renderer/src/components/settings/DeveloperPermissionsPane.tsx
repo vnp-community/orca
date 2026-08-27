@@ -21,6 +21,10 @@ import type {
 } from '../../../../shared/developer-permissions-types'
 import { Button } from '../ui/button'
 import { translate } from '@/i18n/i18n'
+import {
+  getRuntimeDeveloperPermissionStatus,
+  requestRuntimeDeveloperPermission
+} from '@/runtime/runtime-developer-permissions-client'
 export { getDeveloperPermissionsPaneSearchEntries } from './developer-permissions-search'
 
 type PermissionDefinition = {
@@ -230,7 +234,10 @@ export function DeveloperPermissionsPane(): React.JSX.Element {
     refreshSequenceRef.current = refreshId
     setLoading(true)
     try {
-      const nextStates = await window.api.developerPermissions.getStatus()
+      // Why: the wrapper returns null on web (gated to desktop), but web's own
+      // preload stub always resolves an empty array -- normalize back to that
+      // shape so this pane's behavior is unchanged on both platforms.
+      const nextStates = (await getRuntimeDeveloperPermissionStatus()) ?? []
       if (mountedRef.current && refreshId === refreshSequenceRef.current) {
         setStates(nextStates)
       }
@@ -269,7 +276,13 @@ export function DeveloperPermissionsPane(): React.JSX.Element {
   const request = async (id: DeveloperPermissionId): Promise<void> => {
     setPendingId(id)
     try {
-      const result = await window.api.developerPermissions.request({ id })
+      // Why: mirror web's own "unsupported" preload stub result when the wrapper
+      // no-ops to null (web is gated out of the desktop-only RPC path).
+      const result = (await requestRuntimeDeveloperPermission(id)) ?? {
+        id,
+        status: 'unsupported' as const,
+        openedSystemSettings: false
+      }
       if (!mountedRef.current) {
         return
       }

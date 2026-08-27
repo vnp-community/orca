@@ -41,7 +41,7 @@ export function MemberManager({ projectId }: { projectId: string }) {
       const target = getActiveRuntimeTarget(useAppStore.getState().settings)
       const result = await callRuntimeRpc<ProjectMember[]>(
         target,
-        'projects.listMembers',
+        'project.getMembers',
         { projectId }
       )
       setMembers(result)
@@ -56,14 +56,14 @@ export function MemberManager({ projectId }: { projectId: string }) {
 
   const updateRole = async (userId: string, role: ProjectRole) => {
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    await callRuntimeRpc(target, 'projects.updateMemberRole', { projectId, userId, role })
+    await callRuntimeRpc(target, 'project.updateMemberRole', { projectId, userId, role })
     setMembers(prev => prev.map(m => m.userId === userId ? { ...m, role } : m))
     toast.success('Role updated')
   }
 
   const removeMember = async (userId: string) => {
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    await callRuntimeRpc(target, 'projects.removeMember', { projectId, userId })
+    await callRuntimeRpc(target, 'project.removeMember', { projectId, userId })
     setMembers(prev => prev.filter(m => m.userId !== userId))
     toast.success('Member removed')
   }

@@ -45,6 +45,8 @@ export type SecurityProfileSection = {
   requireReviewBeforeCommit?: boolean
   /** Max agent session hours — company admin only */
   maxSessionHours?: number
+  /** Require 2FA for agent sessions — company admin only */
+  require2FA?: boolean
 }
 
 export type OrcaProfile = {
@@ -58,10 +60,17 @@ export type OrcaProfile = {
   envVars?: Record<string, string>
 }
 
-/** Profile after 3-layer merge */
+/**
+ * Which layer provided a merged field. Team is per-membership — carries the
+ * winning team's id so audit can tell exactly which Team overrode a field
+ * (docs/guides/user-profile-team-department-rbac.md §5.2).
+ */
+export type ProfileSourceLayer = 'company' | 'dept' | 'user' | `team:${string}`
+
+/** Profile after cascade merge (Company → Department → Team → User) */
 export type ResolvedProfile = {
   /** Which layer provided each field */
-  _sources: Record<string, 'company' | 'dept' | 'user'>
+  _sources: Record<string, ProfileSourceLayer>
   /** Unix timestamp of resolution */
   _resolvedAt: number
 } & OrcaProfile

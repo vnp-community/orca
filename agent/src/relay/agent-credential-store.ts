@@ -253,6 +253,23 @@ export async function handleHealthCheck(
   }
 }
 
+// Called by AIProviderService.ts (relay.call('ai.provider.testConnection', { accountId }))
+// for both the Settings "Test connection" action and shadow-credential
+// rotation verification. Previously unimplemented agent-side
+// (specs/agent/api/gaps-and-findings.md #1). Same credential-exists +
+// reachability check as ai.provider.healthCheck — the two RPC names cover
+// the same underlying question ("is this stored credential usable right
+// now?") for two different callers, so this is a thin alias rather than a
+// second implementation to keep in sync.
+export async function handleTestConnection(
+  id: string | number | null,
+  params: Record<string, unknown>,
+  config: AgentConfig,
+  log: AgentLogger
+): Promise<object> {
+  return handleHealthCheck(id, params, config, log)
+}
+
 // AIP-001: Structured reachability check — returns ok, note, and optional HTTP statusCode
 const PROVIDER_HEALTH_URLS: Record<string, string> = {
   anthropic: 'https://api.anthropic.com',

@@ -22,6 +22,14 @@ import type { WsHandshakeInfo } from './ws-handshake'
 import { AGENT_WS_PATH, AGENT_CONNECT_TIMEOUT_MS } from '../../shared/agent-wire-protocol'
 import { Tracers } from '../../shared/trace/tracers'
 
+// Mirrors src/server/index.ts's rpcPort/httpPort derivation — this file has no
+// access to that module's local consts, and the two must never drift apart
+// since agents are told to connect to whichever port this computes.
+function agentWsPort(): number {
+  const rpcPort = Number.parseInt(process.env.ORCA_PORT ?? '6768', 10)
+  return Number.parseInt(process.env.ORCA_HTTP_PORT ?? String(rpcPort + 1), 10)
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type AgentConnectedInfo = WsHandshakeInfo
@@ -100,7 +108,9 @@ export class AgentWebSocketServer {
       onExpired(
         `direct-websocket: Agent did not connect within ${AGENT_CONNECT_TIMEOUT_MS / 1000}s. ` +
           `Configure your agent with:\n` +
-          `  ORCA_URL=ws://<orca-host>:6768${AGENT_WS_PATH}\n` +
+          // Agent WS listens on httpPort (rpcPort+1, default 6769 — see header comment),
+          // not rpcPort (6768, the browser/RPC WS) — matches src/server/index.ts's split.
+          `  ORCA_URL=ws://<orca-host>:${agentWsPort()}${AGENT_WS_PATH}\n` +
           `  AGENT_TOKEN=${agentToken}`
       )
     }, AGENT_CONNECT_TIMEOUT_MS)
@@ -167,6 +177,29 @@ export class AgentWebSocketServer {
           platform: info.platform ?? 'unknown',
           node: info.nodeVersion ?? 'unknown'
         })
+
+        // TEMP DIAG BUG-FE-PTY-001: tcpdump + agent-side instrumentation both
+        // point at the BACKEND initiating the close (agent's ws library
+        // auto-echoes a received CLOSE frame via Receiver.receiverOnConclude)
+        // — but no explicit ws.close() call site was found anywhere in this
+        // file, dev-server-relay-bridge.ts, or ssh-channel-multiplexer.ts
+        // that fires outside a reactive/handshake-time path. Wrap this
+        // session's own ws.close()/terminate() to catch it at the source.
+        const diagDevServerId = info.devServerId ?? 'unknown'
+        const diagOrigClose = ws.close.bind(ws)
+        const diagOrigTerminate = ws.terminate.bind(ws)
+        ;(ws as unknown as { close: typeof ws.close }).close = ((...args: Parameters<typeof diagOrigClose>) => {
+          console.error(
+            `[DIAG BUG-FE-PTY-001] backend ws.close() called devServerId=${diagDevServerId} args=${JSON.stringify(args)} readyState=${ws.readyState}\n${new Error('close call site').stack}`
+          )
+          return diagOrigClose(...args)
+        }) as typeof ws.close
+        ;(ws as unknown as { terminate: typeof ws.terminate }).terminate = (() => {
+          console.error(
+            `[DIAG BUG-FE-PTY-001] backend ws.terminate() called devServerId=${diagDevServerId} readyState=${ws.readyState}\n${new Error('terminate call site').stack}`
+          )
+          return diagOrigTerminate()
+        }) as typeof ws.terminate
 
         // Wire multiplexer and hand off to DevServerRelayBridge via callback
         // Why: agents connect via WebSocket (not SSH), so use a non-SSH error

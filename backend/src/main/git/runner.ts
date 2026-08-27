@@ -28,7 +28,7 @@ import {
   isGhRateLimitProbe,
   notifyGhPrimaryRateLimit
 } from './gh-rate-limit-breaker'
-import { getDefaultWslDistro, parseWslPath, toWindowsWslPath, type WslPathInfo } from '../wsl'
+import { parseWslPath, toWindowsWslPath, type WslPathInfo } from '../wsl'
 import { getSpawnArgsForWindows, isWindowsBatchScript, resolveWindowsCommand } from '../win32-utils'
 import {
   buildWslLoginShellCommand,
@@ -37,6 +37,11 @@ import {
 } from '../../shared/wsl-login-shell-command'
 import { UNTRANSLATED_GIT_OUTPUT_ENV } from '../../shared/git-output-locale'
 import { endSubprocessStdin } from '../../shared/subprocess-stdin-write'
+import {
+  getRemoteGithubCliProvider,
+  getRemoteGitlabCliProvider
+} from '../providers/hosted-cli-dispatch'
+import type { IHostedCliProvider } from '../providers/types'
 
 // ─── Core resolution ────────────────────────────────────────────────
 
@@ -85,92 +90,6 @@ function translateArgForWsl(arg: string): string {
   }
 
   return arg
-}
-
-function hasExplicitRepoArg(args: string[]): boolean {
-  for (let i = 0; i < args.length; i++) {
-    if (
-      (args[i] === '--repo' || args[i] === '-R') &&
-      typeof args[i + 1] === 'string' &&
-      args[i + 1].trim()
-    ) {
-      return true
-    }
-    if (args[i].startsWith('--repo=') || args[i].startsWith('-R=')) {
-      return args[i].slice(args[i].indexOf('=') + 1).trim().length > 0
-    }
-    if (args[i].startsWith('-R') && args[i].length > 2) {
-      return args[i].slice(2).trim().length > 0
-    }
-  }
-  return false
-}
-
-function argsUseGhApiPlaceholders(args: string[]): boolean {
-  return args.some(
-    (arg) => arg.includes('{owner}') || arg.includes('{repo}') || arg.includes('{branch}')
-  )
-}
-
-function canRunGitHubCliWithoutRepoCwd(args: string[]): boolean {
-  if (hasExplicitRepoArg(args)) {
-    return true
-  }
-  if (args[0] === 'api') {
-    return !argsUseGhApiPlaceholders(args)
-  }
-  return args[0] === 'auth'
-}
-
-function isMissingCommandInWsl(stderr: string, command: string): boolean {
-  const s = stderr.toLowerCase()
-  const c = command.toLowerCase()
-  return s.includes(`${c}: command not found`) || s.includes(`${c}: not found`)
-}
-
-function canFallBackToHostGitHubCli(
-  command: 'gh',
-  args: string[],
-  resolved: ResolvedCommand,
-  stderr: string
-): boolean {
-  return (
-    process.platform === 'win32' &&
-    resolved.wsl !== null &&
-    isMissingCommandInWsl(stderr, command) &&
-    canRunGitHubCliWithoutRepoCwd(args)
-  )
-}
-
-function resolveHostGitHubCli(command: 'gh', args: string[]): ResolvedCommand {
-  return {
-    binary: command,
-    args,
-    // Why: host gh cannot use a WSL UNC cwd reliably. We only fall back
-    // for commands with explicit repo/API context, so no repo cwd is required.
-    cwd: undefined,
-    wsl: null
-  }
-}
-
-function resolveDefaultWslCli(command: 'gh' | 'glab', args: string[]): ResolvedCommand | null {
-  const distro = getDefaultWslDistro()
-  return distro ? resolveCommand(command, args, undefined, distro) : null
-}
-
-function isHostCommandMissing(err: unknown, command: 'gh' | 'glab'): boolean {
-  if (!err || typeof err !== 'object') {
-    return false
-  }
-  const e = err as { code?: unknown; message?: unknown; syscall?: unknown; path?: unknown }
-  if (e.code === 'ENOENT') {
-    return true
-  }
-  const message = typeof e.message === 'string' ? e.message.toLowerCase() : ''
-  return (
-    message.includes('enoent') &&
-    (message.includes(command) || e.path === command || e.syscall === 'spawn')
-  )
 }
 
 /**
@@ -1132,6 +1051,15 @@ type GhExecOptions = Omit<GitExecOptions, 'cwd'> & {
   cwd?: string
   wslDistro?: string
   idempotent?: boolean
+  /** Which dev-server/SSH connection's agent should run this — see
+   *  requireHostedCliProvider. No connectionId → no provider → throws. */
+  connectionId?: string
+  /** Per-user GH_CONFIG_DIR isolation on the agent — see buildGhEnv()
+   *  (agent/src/relay/external-api-connector.ts). Threading a real userId
+   *  through every backend/src/main/github/*.ts call site is tracked as a
+   *  follow-up (see specs/agent/api/gaps-and-findings.md); omitted today
+   *  means the agent isolates under an empty-string bucket. */
+  userId?: string
 }
 
 const NON_IDEMPOTENT_METHODS = new Set(['POST', 'PATCH', 'PUT', 'DELETE'])
@@ -1387,42 +1315,53 @@ function defaultGhExecTimeoutMs(env: NodeJS.ProcessEnv = process.env): number {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_GH_EXEC_TIMEOUT_MS
 }
 
-function nonInteractiveGhEnv(env: NodeJS.ProcessEnv = process.env): NodeJS.ProcessEnv {
-  return {
-    ...env,
-    GH_PROMPT_DISABLED: env.GH_PROMPT_DISABLED ?? '1'
-  }
-}
-
-// Why: in Web Server multi-user mode, gh/glab CLI must run on the Dev Server
-// (per-user GH_CONFIG_DIR isolation, see external-api-connector.ts on the
-// Agent side) — never on the shared Orca Server host. Executing here would
-// silently share one gh/glab auth context across every user. See BUG-BE-HLD-004.
-function assertLocalGhCliAllowed(cli: 'gh' | 'glab'): void {
-  if (process.env['ORCA_MULTI_USER'] === '1') {
+// ADR-018: backend must never execute gh/glab itself — every call now routes
+// through the connection's agent (github.exec/gitlab.exec RPC) via the
+// provider registered in hosted-cli-dispatch.ts, with NO local-exec fallback
+// (not even when the repo has no dev-server connection at all — per an
+// explicit product decision this session, that repo simply can't run gh/glab
+// operations until it's attached to one). Previously this only threw under
+// ORCA_MULTI_USER=1 (assertLocalGhCliAllowed/BUG-BE-HLD-004); the class of
+// gap that guard was hardening against is now structurally impossible. See
+// specs/agent/api/gaps-and-findings.md /
+// specs/agent/api/compliance-audit-2026-08-15.md.
+function requireHostedCliProvider(
+  cli: 'gh' | 'glab',
+  connectionId: string | undefined
+): IHostedCliProvider {
+  const provider = connectionId
+    ? (cli === 'gh' ? getRemoteGithubCliProvider(connectionId) : getRemoteGitlabCliProvider(connectionId))
+    : undefined
+  if (!provider) {
     throw new Error(
-      `MULTI_USER_GH_CLI_NOT_SUPPORTED: '${cli}' cannot run locally on the Orca ` +
-      `Server host while ORCA_MULTI_USER=1. ${cli === 'gh' ? 'GitHub' : 'GitLab'} ` +
-      'operations must be relayed to the Dev Server Agent for per-user credential ' +
-      'isolation. This call site needs to be migrated to relay.call(...) — see ' +
-      'specs/backend/bugs/hld-v1/BUG-BE-HLD-004-github-gitlab-cli-runs-on-backend-not-relayed.md.'
+      `${cli.toUpperCase()}_CLI_NO_DEV_SERVER_CONNECTION: '${cli}' must run via a connected ` +
+      'Dev Server/SSH agent (ADR-018 — backend never executes dev-server work itself). ' +
+      (connectionId
+        ? `Connection '${connectionId}' has no registered ${cli} provider (not connected?).`
+        : 'This repo has no dev-server connection configured.')
     )
   }
+  return provider
 }
 
 /**
- * Async gh CLI execution. Drop-in replacement for
- * `execFileAsync('gh', args, { cwd, encoding, ... })`.
+ * gh CLI execution, routed through the connection's agent (github.exec RPC)
+ * — see requireHostedCliProvider's comment. Drop-in replacement for the old
+ * local-exec `ghExecFileAsync('gh', args, { cwd, ... })` signature; local-
+ * only options (encoding/maxBuffer/wslDistro/signal/stdin) are accepted for
+ * source compatibility with existing call sites but no longer act on
+ * anything — the agent controls its own subprocess spawn shape.
  *
  * Retries transient 5xx / 429 (without Retry-After) / network-reset failures
- * with exponential backoff. Non-transient errors (auth, 404, rate-limit 403,
- * validation, 429-with-Retry-After) fail fast on the first attempt.
+ * with exponential backoff (in addition to the agent's own retry layer for
+ * the actual gh invocation — see external-api-connector.ts's execGhCaptured).
+ * Non-transient errors (auth, 404, rate-limit 403, validation,
+ * 429-with-Retry-After) fail fast on the first attempt.
  */
 export async function ghExecFileAsync(
   args: string[],
   options: GhExecOptions = {}
 ): Promise<{ stdout: string; stderr: string }> {
-  assertLocalGhCliAllowed('gh')
   // Why: while a bucket's primary rate limit is exhausted, every spawn would
   // return the same 403 — fail fast without paying the subprocess cost. The
   // rate_limit probe itself is exempt so the breaker can learn the reset time.
@@ -1433,51 +1372,21 @@ export async function ghExecFileAsync(
       throw createGhRateLimitBlockedError(rateLimitBucket, blockedUntilMs)
     }
   }
-  let resolved = resolveCommand('gh', args, options.cwd, options.wslDistro)
+  const provider = requireHostedCliProvider('gh', options.connectionId)
   let lastError: unknown
-  let attemptedHostFallback = false
-  let attemptedDefaultWslFallback = false
   for (let attempt = 0; attempt <= GH_RETRY_DELAYS_MS.length; attempt++) {
     try {
-      const { stdout, stderr } = await execFileCapture(resolved.binary, resolved.args, {
-        cwd: resolved.cwd,
-        encoding: (options.encoding ?? 'utf-8') as BufferEncoding,
-        maxBuffer: options.maxBuffer,
-        // Why: GitHub detail IPC powers PR cards, Tasks, and URL worktree
-        // creation; one stuck gh child must fail visibly, not wedge every lane.
-        timeout: options.timeout ?? defaultGhExecTimeoutMs(options.env),
-        env: nonInteractiveGhEnv(options.env)
+      // Why: GitHub detail IPC powers PR cards, Tasks, and URL worktree
+      // creation; one stuck gh child must fail visibly, not wedge every lane.
+      return await provider.exec(args, options.cwd, options.userId, {
+        timeoutMs: options.timeout ?? defaultGhExecTimeoutMs(options.env),
+        idempotent: options.idempotent
       })
-      return { stdout: stdout as string, stderr: stderr as string }
     } catch (err) {
       lastError = err
       const { stderr } = extractExecError(err)
       if (isGhPrimaryRateLimitStderr(stderr)) {
         notifyGhPrimaryRateLimit(rateLimitBucket)
-      }
-      if (
-        process.platform === 'win32' &&
-        !attemptedDefaultWslFallback &&
-        resolved.wsl === null &&
-        !options.cwd &&
-        !options.wslDistro &&
-        isHostCommandMissing(err, 'gh')
-      ) {
-        const wslResolved = resolveDefaultWslCli('gh', args)
-        if (wslResolved) {
-          // Why: WSL-only Windows installs have no gh.exe on the host PATH, but
-          // global calls like rate_limit/auth do not carry a repo cwd to route by.
-          resolved = wslResolved
-          attemptedDefaultWslFallback = true
-          attempt = -1
-          continue
-        }
-      }
-      if (!attemptedHostFallback && canFallBackToHostGitHubCli('gh', args, resolved, stderr)) {
-        resolved = resolveHostGitHubCli('gh', args)
-        attemptedHostFallback = true
-        attempt = -1
-        continue
       }
       const isLastAttempt = attempt >= GH_RETRY_DELAYS_MS.length
       // Why: only retry idempotent calls. A 5xx/socket reset can arrive
@@ -1525,14 +1434,12 @@ type GlabExecOptions = Omit<GitExecOptions, 'cwd'> & {
   wslDistro?: string
   idempotent?: boolean
   allowDefaultWslFallback?: boolean
+  /** See GhExecOptions.connectionId. */
+  connectionId?: string
+  /** See GhExecOptions.userId. */
+  userId?: string
 }
 
-/**
- * Async glab CLI execution. Drop-in replacement for
- * `execFileAsync('glab', args, { cwd, encoding, ... })`.
- *
- * Retry policy mirrors ghExecFileAsync.
- */
 /**
  * glab's `--hostname` flag rejects a host that carries a port
  * ("error parsing --hostname: invalid hostname"). A self-hosted GitLab on a
@@ -1541,6 +1448,13 @@ type GlabExecOptions = Omit<GitExecOptions, 'cwd'> & {
  * `--hostname host:port` pair into `GITLAB_HOST` so every call site (`api`,
  * `auth status`, …) works against ported self-hosted instances. Port-less
  * `--hostname` values are left untouched.
+ *
+ * Why options.env stays a minimal `{GITLAB_HOST}` override (not spread onto
+ * the full process.env, as the pre-ADR-018 local-exec version did): this
+ * value is one of the few env fields actually forwarded over the
+ * gitlab.exec RPC wire (see forwardableGlabEnv below) — shipping the whole
+ * backend host's process.env to the agent would be wasteful and could
+ * collide with the agent's own PATH/HOME.
  *
  * @internal exported for tests.
  */
@@ -1558,50 +1472,46 @@ export function redirectPortedHostnameToEnv(
   }
   return {
     args: [...args.slice(0, i), ...args.slice(i + 2)],
-    options: { ...options, env: { ...(options.env ?? process.env), GITLAB_HOST: host } }
+    options: { ...options, env: { ...options.env, GITLAB_HOST: host } }
   }
 }
 
+// Only these keys are ever forwarded to the agent's gitlab.exec RPC — see
+// redirectPortedHostnameToEnv's comment. Everything else in options.env
+// (usually just GH_PROMPT_DISABLED-style local-exec leftovers) is already
+// redundant with buildGlabEnv()'s agent-side defaults.
+const FORWARDABLE_GLAB_ENV_KEYS = ['GITLAB_HOST'] as const
+function forwardableGlabEnv(env?: NodeJS.ProcessEnv): Record<string, string> | undefined {
+  if (!env) {return undefined}
+  const picked: Record<string, string> = {}
+  for (const key of FORWARDABLE_GLAB_ENV_KEYS) {
+    const value = env[key]
+    if (typeof value === 'string') {picked[key] = value}
+  }
+  return Object.keys(picked).length > 0 ? picked : undefined
+}
+
+/**
+ * glab CLI execution, routed through the connection's agent (gitlab.exec
+ * RPC) — mirrors ghExecFileAsync. See its comment for the ADR-018 rationale.
+ */
 export async function glabExecFileAsync(
   args: string[],
   options: GlabExecOptions = {}
 ): Promise<{ stdout: string; stderr: string }> {
-  assertLocalGhCliAllowed('glab')
   ;({ args, options } = redirectPortedHostnameToEnv(args, options))
-  let resolved = resolveCommand('glab', args, options.cwd, options.wslDistro)
+  const provider = requireHostedCliProvider('glab', options.connectionId)
   let lastError: unknown
-  let attemptedDefaultWslFallback = false
   for (let attempt = 0; attempt <= GH_RETRY_DELAYS_MS.length; attempt++) {
     try {
-      const { stdout, stderr } = await execFileCapture(resolved.binary, resolved.args, {
-        cwd: resolved.cwd,
-        encoding: (options.encoding ?? 'utf-8') as BufferEncoding,
-        maxBuffer: options.maxBuffer,
-        timeout: options.timeout,
-        env: options.env
+      return await provider.exec(args, options.cwd, options.userId, {
+        timeoutMs: options.timeout,
+        idempotent: options.idempotent,
+        env: forwardableGlabEnv(options.env)
       })
-      return { stdout: stdout as string, stderr: stderr as string }
     } catch (err) {
       lastError = err
       const { stderr } = extractExecError(err)
-      if (
-        process.platform === 'win32' &&
-        !attemptedDefaultWslFallback &&
-        resolved.wsl === null &&
-        !options.cwd &&
-        !options.wslDistro &&
-        options.allowDefaultWslFallback !== false &&
-        isHostCommandMissing(err, 'glab')
-      ) {
-        const wslResolved = resolveDefaultWslCli('glab', args)
-        if (wslResolved) {
-          // Why: mirror gh's WSL-only fallback for global GitLab project/auth calls.
-          resolved = wslResolved
-          attemptedDefaultWslFallback = true
-          attempt = -1
-          continue
-        }
-      }
       const isLastAttempt = attempt >= GH_RETRY_DELAYS_MS.length
       // Why: mirror gh's write-safety gate. A transient error after GitLab
       // applies a POST/PATCH/PUT/DELETE must not create duplicate comments,

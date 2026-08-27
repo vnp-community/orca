@@ -3,11 +3,13 @@
  *
  * Execution flow:
  * 1. Check permission: resolvePermission(userId, taskId) — need 'execute' or 'manage'
- * 2. Get task → build prompt (from promptTemplate or auto-generated)
- * 3. Update status → 'in_progress'
- * 4. Spawn agent via agentSpawner.spawn({ projectId, userId, command: prompt })
- * 5. On success: update status → 'review', add 'activity' comment
- * 6. On error: update status → 'blocked', add error comment
+ * 2. Get task, then route (docs/guides/task-automation-orchestration-integration.md §9.2):
+ *    (a) no subtasks and no dependency edges → single-agent spawn (below)
+ *    (b) has subtasks and/or dependency edges → dispatchToOrchestration() (TaskOrchestrationBridge)
+ * 3a. Build prompt (from promptTemplate or auto-generated) → update status → 'in_progress'
+ * 4a. Spawn agent via agentSpawner.spawn({ projectId, userId, command: prompt })
+ * 5a. On success: update status → 'review', persist agentSessionId, add 'activity' comment
+ * 6a. On error: update status → 'blocked', add error comment
  *
  * @module main/task/TaskAgentExecutor
  */
@@ -18,6 +20,9 @@ import type { TaskGrantService } from './TaskGrantService'
 import type { OrcaTask } from '../../shared/task-types'
 import { TASK_PERMISSION_ORDER } from '../../shared/task-types'
 import { Tracers } from '../../shared/trace/tracers'
+import { buildTaskAgentPrompt } from './task-agent-prompt'
+import { recordAgentSessionCompletion } from './task-execution-result-listener'
+import type { TaskOrchestrationBridge } from './TaskOrchestrationBridge'
 
 /** Minimum permission required to execute an agent on a task */
 const MIN_EXECUTE_LEVEL = TASK_PERMISSION_ORDER['execute'] // 4
@@ -34,7 +39,11 @@ export class TaskAgentExecutor {
   constructor(
     private readonly taskService: TaskService,
     private readonly agentSpawner: ProfileAwareAgentSpawner,
-    private readonly grantService: TaskGrantService
+    private readonly grantService: TaskGrantService,
+    // Why: optional so existing 3-arg call sites (server-bootstrap.ts) keep
+    // compiling until the orchestration runtime is wired in — see
+    // dispatchToOrchestration()'s guard below.
+    private readonly orchestrationBridge?: TaskOrchestrationBridge
   ) {}
 
   /**
@@ -72,6 +81,25 @@ export class TaskAgentExecutor {
         throw new Error(`TASK_NOT_FOUND: ${taskId}`)
       }
 
+      // 2b. Route (a) single-agent spawn vs (b) multi-agent orchestration —
+      // §9.2: a task with subtasks or dependency edges needs coordinated
+      // multi-step execution, which only the orchestration coordinator provides.
+      const children = await this.taskService.getChildren(taskId)
+      const deps = await this.taskService.getDependencies(taskId)
+      const isComplex = children.length > 0 || deps.length > 0
+
+      if (isComplex) {
+        span.step('orchestration-dispatch', { childCount: children.length, depCount: deps.length })
+        try {
+          await this.dispatchToOrchestration(taskId, worktreePath)
+          span.ok({ status: 'dispatched', mode: 'orchestration' })
+        } catch (err) {
+          span.fail(err, { mode: 'orchestration' })
+          throw err
+        }
+        return
+      }
+
       // 3. Build prompt — in-memory transform, no dedicated step (CR-TRACE-000 §5)
       const prompt = this.buildPrompt(task)
 
@@ -104,10 +132,14 @@ export class TaskAgentExecutor {
           extraEnv: params.accountId ? { ORCA_ACCOUNT_ID: params.accountId } : undefined,
           traceId: span.id,
         }
-        await this.agentSpawner.spawn(spawnOptions)
+        const spawnResult = await this.agentSpawner.spawn(spawnOptions)
 
-        // 6. Success: update status → review
-        await this.taskService.update(taskId, { status: 'review' })
+        // 6. Success: update status → review, persist the agent session id
+        // this task ran under (migration 0016 — Source→Plan→Execute linkage)
+        await recordAgentSessionCompletion(this.taskService, taskId, {
+          status: 'review',
+          agentSessionId: spawnResult.sessionId,
+        })
         await this.taskService.addComment(
           taskId,
           userId,
@@ -118,7 +150,7 @@ export class TaskAgentExecutor {
       } catch (err) {
         // 6. Error: update status → blocked
         const errMsg = err instanceof Error ? err.message : String(err)
-        await this.taskService.update(taskId, { status: 'blocked' }).catch(() => {})
+        await recordAgentSessionCompletion(this.taskService, taskId, { status: 'blocked' }).catch(() => {})
         await this.taskService.addComment(
           taskId,
           userId,
@@ -141,21 +173,22 @@ export class TaskAgentExecutor {
    * otherwise auto-generates from title + description + aiContext.
    */
   buildPrompt(task: OrcaTask): string {
-    if (task.promptTemplate) {
-      return task.promptTemplate.replace(/\$\{task\.([^}]+)\}/g, (_, key: string) => {
-        const val = (task as unknown as Record<string, unknown>)[key]
-        return val !== undefined ? String(val) : `\${task.${key}}`
-      })
-    }
+    return buildTaskAgentPrompt(task)
+  }
 
-    // Auto-generated prompt
-    const lines: string[] = [`# Task: ${task.title}`]
-    if (task.description) {lines.push(`\n## Description\n${task.description}`)}
-    if (task.aiContext) {lines.push(`\n## AI Context\n${task.aiContext}`)}
-    lines.push(`\n## Instructions`)
-    lines.push(
-      `Complete the task described above. When finished, the task status will be moved to "review".`
-    )
-    return lines.join('\n')
+  /**
+   * (b) Complex-task path: dispatch to the multi-agent orchestration
+   * coordinator instead of a single spawn(). Seeding + write-back wiring
+   * lives in TaskOrchestrationBridge (kept out of this file per AGENTS.md's
+   * "Do Not Disable Max Lines" rule — see that file's header).
+   */
+  async dispatchToOrchestration(taskId: string, worktreePath: string): Promise<void> {
+    if (!this.orchestrationBridge) {
+      throw new Error(
+        `TASK_ORCHESTRATION_UNAVAILABLE: no orchestration runtime wired for task "${taskId}" — ` +
+          `TaskAgentExecutor needs a TaskOrchestrationBridge (see TaskOrchestrationBridge.ts) to run the complex-task path`
+      )
+    }
+    await this.orchestrationBridge.dispatch(taskId, { worktree: worktreePath })
   }
 }

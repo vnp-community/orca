@@ -14,42 +14,41 @@ vi.mock('../../../../hooks/useGit', () => ({
   useGit: vi.fn()
 }))
 
-vi.mock('@/runtime/runtime-rpc-client', () => ({
-  callRuntimeRpc: vi.fn(),
-  getActiveRuntimeTarget: vi.fn().mockReturnValue('mock-target')
-}))
-
-vi.mock('@/store', () => ({
-  useAppStore: Object.assign(
-    vi.fn(selector => selector({ settings: {} })),
-    { getState: () => ({ settings: {} }) }
-  )
-}))
-
 // Mock child components
 vi.mock('../StagingArea', () => ({ StagingArea: () => <div data-testid="staging-area" /> }))
 vi.mock('../CommitForm', () => ({ CommitForm: () => <div data-testid="commit-form" /> }))
 vi.mock('../DiffViewer', () => ({ DiffViewer: () => <div data-testid="diff-viewer" /> }))
 vi.mock('../GitHistory', () => ({ GitHistory: () => <div data-testid="git-history" /> }))
 vi.mock('../BranchManager', () => ({ BranchManager: () => <div data-testid="branch-manager" /> }))
-vi.mock('../PullRequestList', () => ({ PullRequestList: () => <div data-testid="pull-request-list" /> }))
+vi.mock('../PullRequestList', () => ({
+  PullRequestList: () => <div data-testid="pull-request-list" />
+}))
 
 describe('GitPanel', () => {
-  const refreshGitStatus = vi.fn()
   const emit = vi.fn()
+  const push = vi.fn().mockResolvedValue(undefined)
+  const getDiff = vi.fn()
 
   beforeEach(() => {
     cleanup()
     vi.clearAllMocks()
+    push.mockResolvedValue(undefined)
     vi.mocked(useWorkspace).mockReturnValue({
       project: { id: 'p1' },
+      currentWorktree: {
+        id: 'repo1::/repo/worktree',
+        path: '/repo/worktree',
+        branch: 'feat/test',
+        isMain: false
+      },
       gitStatus: { branch: 'feat/test', aheadBy: 2, behindBy: 0 },
-      refreshGitStatus,
-      emit,
-    } as any)
+      emit
+    } as unknown as ReturnType<typeof useWorkspace>)
     vi.mocked(useGit).mockReturnValue({
-      getDiff: vi.fn(),
-    } as any)
+      getDiff,
+      push,
+      isPushing: false
+    } as unknown as ReturnType<typeof useGit>)
   })
 
   it('renders 4 tabs: changes, history, branches, pullrequests', () => {
@@ -71,32 +70,29 @@ describe('GitPanel', () => {
     expect(screen.getByTestId('sync-button')).toBeInTheDocument()
   })
 
-  it('clicking Sync calls git.push RPC', async () => {
-    const { callRuntimeRpc } = await import('@/runtime/runtime-rpc-client')
-    vi.mocked(callRuntimeRpc).mockResolvedValueOnce({})
+  // Why (crash reported by user): GitPanel used to build its own broken
+  // callRuntimeRpc('git.push', {projectId, branch, remote}) call — it now
+  // reuses useGit().push(), which sends the real {worktree, pushTarget}
+  // request (FIX BUG-FE-HLD-002). This test asserts the reuse, not a raw RPC shape.
+  it('clicking Sync calls useGit().push with the current branch', async () => {
     render(<GitPanel />)
     fireEvent.click(screen.getByTestId('sync-button'))
-    
-    expect(callRuntimeRpc).toHaveBeenCalledWith('mock-target', 'git.push', {
-      projectId: 'p1',
-      branch: 'feat/test',
-      remote: 'origin'
-    })
-    
+
+    expect(push).toHaveBeenCalledWith('feat/test')
+
     await waitFor(() => {
-      expect(refreshGitStatus).toHaveBeenCalled()
       expect(emit).toHaveBeenCalledWith('git.push', { branch: 'feat/test' })
     })
   })
 
-  it('isPushing=true shows Loader2 on sync button', async () => {
-    const { callRuntimeRpc } = await import('@/runtime/runtime-rpc-client')
-    // Make the RPC hang so it stays in isPushing=true state
-    vi.mocked(callRuntimeRpc).mockReturnValue(new Promise(() => {}))
+  it('isPushing=true shows Loader2 on sync button and disables it', () => {
+    vi.mocked(useGit).mockReturnValue({
+      getDiff,
+      push,
+      isPushing: true
+    } as unknown as ReturnType<typeof useGit>)
     render(<GitPanel />)
     const btn = screen.getByTestId('sync-button')
-    fireEvent.click(btn)
-    // After click, it should be disabled and show the spinner
     expect(btn).toBeDisabled()
     expect(btn.querySelector('.animate-spin')).toBeInTheDocument()
   })

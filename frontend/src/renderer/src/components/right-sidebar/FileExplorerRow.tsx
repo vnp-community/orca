@@ -53,6 +53,7 @@ import { extractIpcErrorMessage } from '@/lib/ipc-error'
 import { CLOSE_ALL_CONTEXT_MENUS_EVENT } from '@/components/tab-bar/SortableTab'
 import { downloadRuntimeFile, type RuntimeFileOperationArgs } from '@/runtime/runtime-file-client'
 
+import { shellOpenPath } from '../../runtime/runtime-shell-client'
 const isMac = navigator.userAgent.includes('Mac')
 const isLinux = navigator.userAgent.includes('Linux')
 
@@ -368,7 +369,7 @@ export async function downloadRemoteFile(
         action: {
           label: translate('auto.components.right.sidebar.FileExplorerRow.1a3df04ae1', 'Open'),
           onClick: () => {
-            void window.api.shell.openPath(result.destinationPath)
+            void shellOpenPath(result.destinationPath)
           }
         }
       }
@@ -795,7 +796,7 @@ export function FileExplorerRow({
               showLocalPathOpenBlockedToast()
               return
             }
-            window.api.shell.openPath(node.path)
+            shellOpenPath(node.path)
           }}
         >
           <ExternalLink />

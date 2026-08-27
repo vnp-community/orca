@@ -71,6 +71,7 @@ import {
   type IpynbOutputItem
 } from './ipynb-parse'
 import { translate } from '@/i18n/i18n'
+import { isWebClientLocation } from '@/lib/web-client-location'
 
 type IpynbViewerProps = {
   content: string
@@ -842,6 +843,20 @@ export default function IpynbViewer({
     }
     setRunError(null)
     setRunningCellIndex(index)
+    // Why: notebook cell execution is a local Node child-process spawn with
+    // no runtime RPC equivalent — the web build's window.api.notebook has no
+    // real implementation, so check this explicitly rather than relying on
+    // the silent fallback proxy.
+    if (isWebClientLocation()) {
+      setRunError(
+        translate(
+          'auto.components.editor.IpynbViewer.webUnavailable',
+          'Running notebook cells is unavailable in the web client.'
+        )
+      )
+      setRunningCellIndex(null)
+      return
+    }
     try {
       await onSave(latestContent)
       const result = await window.api.notebook.runPythonCell({

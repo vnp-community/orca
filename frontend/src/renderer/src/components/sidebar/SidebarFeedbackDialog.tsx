@@ -14,8 +14,10 @@ import {
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { cn } from '@/lib/utils'
 import type { GitHubViewer } from '../../../../shared/types'
+import { submitRuntimeFeedback } from '@/runtime/runtime-feedback-client'
 import { translate } from '@/i18n/i18n'
 
+import { shellOpenUrl } from '../../runtime/runtime-shell-client'
 const GITHUB_ISSUES_URL = 'https://github.com/stablyai/orca/issues/'
 const DISCORD_URL = 'https://discord.gg/fzjDKHxv8Q'
 const X_URL = 'https://x.com/orca_build'
@@ -31,7 +33,7 @@ type SidebarFeedbackDialogProps = {
 }
 
 function openExternalUrl(url: string): void {
-  void window.api.shell.openUrl(url)
+  void shellOpenUrl(url)
 }
 
 function getSubmitIdentity(viewer: GitHubViewer | null, anonymous: boolean): SubmitIdentity {
@@ -111,7 +113,7 @@ export function SidebarFeedbackDialog({
       // cross-origin fetch() fail CORS preflight. Electron's net module in
       // the main process has no CORS restrictions and works uniformly in dev
       // and prod.
-      const result = await window.api.feedback.submit({
+      const result = await submitRuntimeFeedback({
         feedback: trimmed,
         submitAnonymously,
         githubLogin: identity.githubLogin,
