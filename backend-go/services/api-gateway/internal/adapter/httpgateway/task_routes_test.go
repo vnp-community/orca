@@ -44,6 +44,20 @@ type fakeTaskServiceClient struct {
 
 	hasActiveExecutionsResp *taskv1.HasActiveExecutionsResponse
 	hasActiveExecutionsErr  error
+
+	getSubtreeResp *taskv1.GetSubtreeResponse
+	getSubtreeErr  error
+
+	recalculateProgressResp *taskv1.RecalculateProgressResponse
+	recalculateProgressErr  error
+
+	addCommentResp *taskv1.AddCommentResponse
+	addCommentErr  error
+	addCommentReq  *taskv1.AddCommentRequest // captures the last request for assertions
+
+	listCommentsResp *taskv1.ListCommentsResponse
+	listCommentsErr  error
+	listCommentsReq  *taskv1.ListCommentsRequest // captures the last request for assertions
 }
 
 func (f *fakeTaskServiceClient) CreateTask(_ context.Context, in *taskv1.CreateTaskRequest, _ ...grpc.CallOption) (*taskv1.CreateTaskResponse, error) {
@@ -94,6 +108,36 @@ func (f *fakeTaskServiceClient) HasActiveExecutions(_ context.Context, _ *taskv1
 		return nil, f.hasActiveExecutionsErr
 	}
 	return f.hasActiveExecutionsResp, nil
+}
+
+func (f *fakeTaskServiceClient) GetSubtree(_ context.Context, _ *taskv1.GetSubtreeRequest, _ ...grpc.CallOption) (*taskv1.GetSubtreeResponse, error) {
+	if f.getSubtreeErr != nil {
+		return nil, f.getSubtreeErr
+	}
+	return f.getSubtreeResp, nil
+}
+
+func (f *fakeTaskServiceClient) RecalculateProgress(_ context.Context, _ *taskv1.RecalculateProgressRequest, _ ...grpc.CallOption) (*taskv1.RecalculateProgressResponse, error) {
+	if f.recalculateProgressErr != nil {
+		return nil, f.recalculateProgressErr
+	}
+	return f.recalculateProgressResp, nil
+}
+
+func (f *fakeTaskServiceClient) AddComment(_ context.Context, in *taskv1.AddCommentRequest, _ ...grpc.CallOption) (*taskv1.AddCommentResponse, error) {
+	f.addCommentReq = in
+	if f.addCommentErr != nil {
+		return nil, f.addCommentErr
+	}
+	return f.addCommentResp, nil
+}
+
+func (f *fakeTaskServiceClient) ListComments(_ context.Context, in *taskv1.ListCommentsRequest, _ ...grpc.CallOption) (*taskv1.ListCommentsResponse, error) {
+	f.listCommentsReq = in
+	if f.listCommentsErr != nil {
+		return nil, f.listCommentsErr
+	}
+	return f.listCommentsResp, nil
 }
 
 // taskTestRouter mounts mountTaskRoutes standalone (router.go isn't
@@ -244,5 +288,109 @@ func TestHandleHasActiveExecutions_SuccessRoundTrip(t *testing.T) {
 	}
 	if !got.HasActive {
 		t.Fatal("has_active = false, want true")
+	}
+}
+
+// TASK-TG-01-08: GetSubtree/RecalculateProgress/AddComment/ListComments
+// REST route tests.
+
+func TestTaskRoutes_GetSubtree(t *testing.T) {
+	fake := &fakeTaskServiceClient{
+		getSubtreeResp: &taskv1.GetSubtreeResponse{
+			Tasks: []*taskv1.Task{{Id: "root"}, {Id: "child"}},
+		},
+	}
+	router := taskTestRouter(fake)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/tasks/root/subtree", nil)
+	req = withTestIdentity(req, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var got taskv1.GetSubtreeResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("response body is not the expected shape: %v; body=%s", err, rec.Body.String())
+	}
+	if len(got.GetTasks()) != 2 {
+		t.Fatalf("expected 2 tasks, got %d", len(got.GetTasks()))
+	}
+}
+
+func TestTaskRoutes_RecalculateProgress(t *testing.T) {
+	fake := &fakeTaskServiceClient{
+		recalculateProgressResp: &taskv1.RecalculateProgressResponse{ProgressPercent: 75},
+	}
+	router := taskTestRouter(fake)
+
+	req := httptest.NewRequest(http.MethodPost, "/v1/tasks/root/progress:recalculate", nil)
+	req = withTestIdentity(req, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	var got recalculateProgressResponseBody
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("response body is not the expected shape: %v; body=%s", err, rec.Body.String())
+	}
+	if got.ProgressPercent != 75 {
+		t.Fatalf("progress_percent = %d, want 75", got.ProgressPercent)
+	}
+}
+
+func TestTaskRoutes_AddComment(t *testing.T) {
+	fake := &fakeTaskServiceClient{
+		addCommentResp: &taskv1.AddCommentResponse{Id: "c1", Content: "hello"},
+	}
+	router := taskTestRouter(fake)
+
+	body, _ := json.Marshal(addCommentRequestBody{Content: "hello"})
+	req := httptest.NewRequest(http.MethodPost, "/v1/tasks/t1/comments", bytes.NewReader(body))
+	req = withTestIdentity(req, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+	if fake.addCommentReq == nil || fake.addCommentReq.GetTaskId() != "t1" || fake.addCommentReq.GetContent() != "hello" {
+		t.Fatalf("unexpected upstream request: %+v", fake.addCommentReq)
+	}
+}
+
+func TestTaskRoutes_ListComments(t *testing.T) {
+	fake := &fakeTaskServiceClient{
+		listCommentsResp: &taskv1.ListCommentsResponse{
+			Comments:      []*taskv1.AddCommentResponse{{Id: "c1", Content: "hi"}},
+			NextPageToken: "next",
+		},
+	}
+	router := taskTestRouter(fake)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/tasks/t1/comments?page_token=p&page_size=5", nil)
+	req = withTestIdentity(req, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if fake.listCommentsReq == nil || fake.listCommentsReq.GetTaskId() != "t1" || fake.listCommentsReq.GetPageToken() != "p" || fake.listCommentsReq.GetPageSize() != 5 {
+		t.Fatalf("unexpected upstream request: %+v", fake.listCommentsReq)
+	}
+	var got taskv1.ListCommentsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("response body is not the expected shape: %v; body=%s", err, rec.Body.String())
+	}
+	if len(got.GetComments()) != 1 || got.GetNextPageToken() != "next" {
+		t.Fatalf("unexpected response: %+v", &got)
 	}
 }

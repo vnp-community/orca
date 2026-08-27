@@ -256,6 +256,62 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 		}
 		return resp.GetTask(), nil
 	})
+
+	r.Register("task.getSubtree", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type getSubtreeArgs struct {
+			RootID string `json:"rootId"`
+		}
+		in, err := decodeArg[getSubtreeArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		return client.GetSubtree(ctx, &taskv1.GetSubtreeRequest{RootId: in.RootID})
+	})
+
+	r.Register("task.recalculateProgress", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type recalcArgs struct {
+			RootID string `json:"rootId"`
+		}
+		in, err := decodeArg[recalcArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		return client.RecalculateProgress(ctx, &taskv1.RecalculateProgressRequest{RootId: in.RootID})
+	})
+
+	r.Register("task.addComment", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type addCommentArgs struct {
+			TaskID  string `json:"taskId"`
+			Content string `json:"content"`
+		}
+		in, err := decodeArg[addCommentArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		return client.AddComment(ctx, &taskv1.AddCommentRequest{TaskId: in.TaskID, Content: in.Content})
+	})
+
+	r.Register("task.listComments", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type listCommentsArgs struct {
+			TaskID    string `json:"taskId"`
+			PageToken string `json:"pageToken"`
+			PageSize  int32  `json:"pageSize"`
+		}
+		in, err := decodeArg[listCommentsArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		return client.ListComments(ctx, &taskv1.ListCommentsRequest{TaskId: in.TaskID, PageToken: in.PageToken, PageSize: in.PageSize})
+	})
+
+	// BUG-034's WS-wiring gap for task.list/update/delete/getDependencies
+	// (plus execute/aiDecompose/aiApply) is ALREADY closed —
+	// channels_automation_task.go's registerTaskCRUDChannels (called from
+	// this file's RegisterRealChannels via registerAutomationTaskChannels)
+	// registers all of them against the same client. Do NOT re-register
+	// them here too: Registry.Register silently last-writer-wins on a
+	// duplicate channel name, so a second registration here would just be
+	// dead, confusing code shadowing the real one.
 }
 
 // ── git.* (subset: status/diff — the two ops git-gateway-service

@@ -168,14 +168,83 @@ func (f *fakeTaskRepository) UpdateAIPlanJSON(ctx context.Context, tenantID, id,
 	f.tasks[id] = t
 	return nil
 }
+
+// GetSubtree walks ParentID pointers DOWNWARD from rootID within the fake's
+// map — a permissive stand-in for the real WITH RECURSIVE query, enough to
+// exercise this file's wiring/contract tests.
 func (f *fakeTaskRepository) GetSubtree(ctx context.Context, tenantID, rootID string, maxDepth int) ([]domain.Task, []domain.TaskEdge, error) {
-	return nil, nil, errors.New("not implemented")
+	root, ok := f.tasks[rootID]
+	if !ok || root.TenantID != tenantID {
+		return nil, nil, errors.New("not found")
+	}
+	var out []domain.Task
+	frontier := []domain.Task{root}
+	for len(frontier) > 0 {
+		out = append(out, frontier...)
+		var next []domain.Task
+		for _, parent := range frontier {
+			for _, t := range f.tasks {
+				if t.TenantID == tenantID && t.ParentID == parent.ID {
+					next = append(next, t)
+				}
+			}
+		}
+		frontier = next
+	}
+	return out, nil, nil
 }
+
 func (f *fakeTaskRepository) GetSubtreeWithChildPercents(ctx context.Context, tenantID, rootID string) ([]usecase.SubtreeProgressNode, error) {
-	return nil, errors.New("not implemented")
+	nodes, _, err := f.GetSubtree(ctx, tenantID, rootID, 0)
+	if err != nil {
+		return nil, err
+	}
+	// GetSubtree returns BFS (level) order — root, then its children, then
+	// grandchildren, ... — so parents always precede their children.
+	// Reversing that gives every node AFTER all of its descendants, which
+	// is exactly what usecase.RecalculateProgress's bottom-up walk needs
+	// ("already ordered deepest-first by the repository query"); it builds
+	// its own childPercentsByParent map as it walks rather than reading
+	// SubtreeProgressNode.ChildPercents, so that field is left unset here.
+	out := make([]usecase.SubtreeProgressNode, len(nodes))
+	for i, n := range nodes {
+		out[len(nodes)-1-i] = usecase.SubtreeProgressNode{Task: n}
+	}
+	return out, nil
 }
+
 func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error {
-	return errors.New("not implemented")
+	for id, p := range updates {
+		if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+			t.ProgressPercent = p
+			f.tasks[id] = t
+		}
+	}
+	return nil
+}
+
+// fakeCommentRepository backs AddComment/ListComments' wiring/contract
+// tests without a database.
+type fakeCommentRepository struct {
+	comments []domain.TaskComment
+	nextID   int
+}
+
+func (f *fakeCommentRepository) AddComment(ctx context.Context, tenantID string, c domain.TaskComment) (domain.TaskComment, error) {
+	f.nextID++
+	c.ID = fmt.Sprintf("comment-%d", f.nextID)
+	f.comments = append(f.comments, c)
+	return c, nil
+}
+
+func (f *fakeCommentRepository) ListComments(ctx context.Context, tenantID, taskID, pageToken string, pageSize int32) ([]domain.TaskComment, string, error) {
+	var out []domain.TaskComment
+	for _, c := range f.comments {
+		if c.TaskID == taskID {
+			out = append(out, c)
+		}
+	}
+	return out, "", nil
 }
 
 // fakeEdgeRepository is a minimal usecase.EdgeRepository for this file's
@@ -293,6 +362,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 	// ResolvePermission RPC wiring below.
 	resolvePermissionUC := usecase.NewResolvePermission(tasks, tasks, stubTeams{}, stubOPA{})
 	shareLinks := newFakeShareLinkRepository()
+	comments := &fakeCommentRepository{}
 	return New(
 		createTaskUC,
 		usecase.NewGetTask(tasks),
@@ -317,6 +387,10 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		usecase.NewCreatePublicLink(shareLinks, resolvePermissionUC),
 		usecase.NewRevokePublicLink(shareLinks, resolvePermissionUC, tasks),
 		usecase.NewResolvePublicLink(shareLinks),
+		usecase.NewGetSubtree(tasks, tasks, stubTeams{}),
+		usecase.NewRecalculateProgress(tasks),
+		usecase.NewAddComment(comments),
+		usecase.NewListComments(comments),
 	)
 }
 
@@ -672,5 +746,73 @@ func TestServer_ResolvePermission_ThreadsRealActionToOPA(t *testing.T) {
 	}
 	if opa.gotAction != "manage" {
 		t.Errorf("expected the real wire action %q to reach OPA, got %q", "manage", opa.gotAction)
+	}
+}
+
+// TASK-TG-01-08: GetSubtree/RecalculateProgress/AddComment/ListComments
+// gRPC handler wiring tests.
+
+func TestServer_GetSubtree(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["root"] = domain.Task{ID: "root", TenantID: "tenant-1"}
+	tasks.tasks["child"] = domain.Task{ID: "child", TenantID: "tenant-1", ParentID: "root"}
+	// A grant on root so ResolveGrant makes both nodes visible to the
+	// caller (an owner grant, applying to the whole tree).
+	tasks.grants = append(tasks.grants, domain.Grant{ID: "g1", TaskID: "root", SubjectID: "user-1", Level: domain.GrantLevelOwner, ApplyTree: true})
+	s := newTestServer(tasks, &fakeEdgeRepository{})
+
+	ctx := tenant.WithUserID(ctxWithTenant(t), "user-1")
+	resp, err := s.GetSubtree(ctx, &taskv1.GetSubtreeRequest{RootId: "root"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(resp.GetTasks()) != 2 {
+		t.Errorf("expected 2 visible tasks, got %d", len(resp.GetTasks()))
+	}
+}
+
+func TestServer_RecalculateProgress(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	// A single leaf task (no children) — fakeTaskRepository's
+	// GetSubtreeWithChildPercents doc comment flags it doesn't track true
+	// deepest-first ordering across multiple levels, so this handler-wiring
+	// test sticks to the single-level case it does support correctly.
+	tasks.tasks["root"] = domain.Task{ID: "root", TenantID: "tenant-1", Status: domain.StatusDone}
+	s := newTestServer(tasks, &fakeEdgeRepository{})
+
+	resp, err := s.RecalculateProgress(ctxWithTenant(t), &taskv1.RecalculateProgressRequest{RootId: "root"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetProgressPercent() != 100 {
+		t.Errorf("expected root progress_percent=100 (root itself is done, no children), got %d", resp.GetProgressPercent())
+	}
+}
+
+func TestServer_AddComment_And_ListComments(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1"}
+	s := newTestServer(tasks, &fakeEdgeRepository{})
+
+	addResp, err := s.AddComment(ctxWithTenant(t), &taskv1.AddCommentRequest{TaskId: "t1", Content: "hello"})
+	if err != nil {
+		t.Fatalf("unexpected error adding comment: %v", err)
+	}
+	if addResp.GetId() == "" {
+		t.Error("expected a non-empty comment id")
+	}
+	if addResp.GetContent() != "hello" {
+		t.Errorf("expected content=hello, got %q", addResp.GetContent())
+	}
+
+	listResp, err := s.ListComments(ctxWithTenant(t), &taskv1.ListCommentsRequest{TaskId: "t1"})
+	if err != nil {
+		t.Fatalf("unexpected error listing comments: %v", err)
+	}
+	if len(listResp.GetComments()) != 1 {
+		t.Fatalf("expected 1 comment, got %d", len(listResp.GetComments()))
+	}
+	if listResp.GetComments()[0].GetContent() != "hello" {
+		t.Errorf("expected listed comment content=hello, got %q", listResp.GetComments()[0].GetContent())
 	}
 }

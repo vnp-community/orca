@@ -214,12 +214,20 @@ func run() error {
 	createPublicLinkUC := usecase.NewCreatePublicLink(shareLinkStore, resolvePermissionUC)
 	revokePublicLinkUC := usecase.NewRevokePublicLink(shareLinkStore, resolvePermissionUC, repo)
 	resolvePublicLinkUC := usecase.NewResolvePublicLink(shareLinkStore)
+	// TASK-TG-01-08: subtree/progress/comments RPCs. repo also implements
+	// usecase.GrantRepository (ListGrantsForAncestors) for GetSubtree's
+	// per-node visibility filter.
+	getSubtreeUC := usecase.NewGetSubtree(repo, repo, teamScopeResolver)
+	recalculateProgressUC := usecase.NewRecalculateProgress(repo)
+	addCommentUC := usecase.NewAddComment(repo)
+	listCommentsUC := usecase.NewListComments(repo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
 		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
 		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC, generateAgentPromptUC,
 		revokeGrantUC, listGrantsUC, createPublicLinkUC, revokePublicLinkUC, resolvePublicLinkUC,
+		getSubtreeUC, recalculateProgressUC, addCommentUC, listCommentsUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

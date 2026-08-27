@@ -6,6 +6,7 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -42,6 +43,10 @@ type Server struct {
 	createPublicLink    *usecase.CreatePublicLink
 	revokePublicLink    *usecase.RevokePublicLink
 	resolvePublicLink   *usecase.ResolvePublicLink
+	getSubtree          *usecase.GetSubtree
+	recalculateProgress *usecase.RecalculateProgress
+	addComment          *usecase.AddComment
+	listComments        *usecase.ListComments
 }
 
 func New(
@@ -64,6 +69,10 @@ func New(
 	createPublicLink *usecase.CreatePublicLink,
 	revokePublicLink *usecase.RevokePublicLink,
 	resolvePublicLink *usecase.ResolvePublicLink,
+	getSubtree *usecase.GetSubtree,
+	recalculateProgress *usecase.RecalculateProgress,
+	addComment *usecase.AddComment,
+	listComments *usecase.ListComments,
 ) *Server {
 	return &Server{
 		createTask:          createTask,
@@ -85,6 +94,10 @@ func New(
 		createPublicLink:    createPublicLink,
 		revokePublicLink:    revokePublicLink,
 		resolvePublicLink:   resolvePublicLink,
+		getSubtree:          getSubtree,
+		recalculateProgress: recalculateProgress,
+		addComment:          addComment,
+		listComments:        listComments,
 	}
 }
 
@@ -313,6 +326,50 @@ func (s *Server) AIApply(ctx context.Context, req *taskv1.AIApplyRequest) (*task
 		out = append(out, toProtoTask(t))
 	}
 	return &taskv1.AIApplyResponse{CreatedSubtasks: out}, nil
+}
+
+func (s *Server) GetSubtree(ctx context.Context, req *taskv1.GetSubtreeRequest) (*taskv1.GetSubtreeResponse, error) {
+	result, err := s.getSubtree.Execute(ctx, usecase.GetSubtreeInput{RootID: req.GetRootId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.Task, 0, len(result.Tasks))
+	for _, t := range result.Tasks {
+		out = append(out, toProtoTask(t))
+	}
+	edges := make([]*taskv1.AddEdgeRequest, 0, len(result.DependsOnEdges))
+	for _, e := range result.DependsOnEdges {
+		edges = append(edges, &taskv1.AddEdgeRequest{FromTaskId: e.FromTaskID, ToTaskId: e.ToTaskID, Type: taskv1.EdgeType_EDGE_TYPE_DEPENDS_ON})
+	}
+	return &taskv1.GetSubtreeResponse{Tasks: out, DependsOnEdges: edges}, nil
+}
+
+func (s *Server) RecalculateProgress(ctx context.Context, req *taskv1.RecalculateProgressRequest) (*taskv1.RecalculateProgressResponse, error) {
+	p, err := s.recalculateProgress.Execute(ctx, req.GetRootId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.RecalculateProgressResponse{ProgressPercent: int32(p)}, nil
+}
+
+func (s *Server) AddComment(ctx context.Context, req *taskv1.AddCommentRequest) (*taskv1.AddCommentResponse, error) {
+	c, err := s.addComment.Execute(ctx, req.GetTaskId(), req.GetContent())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.AddCommentResponse{Id: c.ID, AuthorId: c.AuthorID, Content: c.Content, CreatedAt: c.CreatedAt.Format(time.RFC3339)}, nil
+}
+
+func (s *Server) ListComments(ctx context.Context, req *taskv1.ListCommentsRequest) (*taskv1.ListCommentsResponse, error) {
+	comments, next, err := s.listComments.Execute(ctx, req.GetTaskId(), req.GetPageToken(), req.GetPageSize())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.AddCommentResponse, 0, len(comments))
+	for _, c := range comments {
+		out = append(out, &taskv1.AddCommentResponse{Id: c.ID, AuthorId: c.AuthorID, Content: c.Content, CreatedAt: c.CreatedAt.Format(time.RFC3339)})
+	}
+	return &taskv1.ListCommentsResponse{Comments: out, NextPageToken: next}, nil
 }
 
 func toProtoSubtaskProposals(proposals []domain.SubtaskProposal) []*taskv1.SubtaskProposal {
