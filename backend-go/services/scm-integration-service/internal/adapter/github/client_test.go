@@ -195,3 +195,76 @@ func TestCreatePullRequest_NonCreatedStatusIsAnError(t *testing.T) {
 		t.Fatal("expected an error for a non-201 response")
 	}
 }
+
+// TestCreatePullRequest_DraftSerializesIntoPayload asserts Draft: true
+// serializes into the "draft" JSON field — BR-CR-20.
+func TestCreatePullRequest_DraftSerializesIntoPayload(t *testing.T) {
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"number": 9, "title": "wip", "state": "open",
+			"html_url": "https://github.com/octocat/hello-world/pull/9", "draft": true,
+		})
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	pr, err := client.CreatePullRequest(context.Background(), usecase.Credential{Token: "tok"}, "a/b", usecase.CreatePullRequestInput{Title: "t", HeadBranch: "h", BaseBranch: "b", Draft: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if draft, ok := gotBody["draft"].(bool); !ok || !draft {
+		t.Errorf("expected draft:true in the request payload, got %v", gotBody["draft"])
+	}
+	if !pr.Draft {
+		t.Error("expected the echoed PullRequest.Draft to be true")
+	}
+}
+
+func TestGetRepoFileContent_Found(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("* @alice\n"))
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	content, found, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found || content != "* @alice\n" {
+		t.Errorf("expected found=true content=%q, got found=%v content=%q", "* @alice\n", found, content)
+	}
+}
+
+func TestGetRepoFileContent_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, found, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err != nil {
+		t.Fatalf("expected no error on 404, got %v", err)
+	}
+	if found {
+		t.Error("expected found=false on 404")
+	}
+}
+
+func TestGetRepoFileContent_NonOKNonNotFoundIsAnError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, _, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err == nil {
+		t.Fatal("expected an error for a non-200/404 response")
+	}
+}

@@ -31,6 +31,7 @@ type fakeScmIntegrationClient struct {
 	resolveMergeRequestDiscussionFunc func(ctx context.Context, in *scmintegrationv1.ResolveMergeRequestDiscussionRequest) (*scmintegrationv1.MergeRequestDiscussion, error)
 	getWorkItemDetailsFunc            func(ctx context.Context, in *scmintegrationv1.GetWorkItemDetailsRequest) (*scmintegrationv1.WorkItemDetailsGitLab, error)
 	createPullRequestFunc             func(ctx context.Context, in *scmintegrationv1.CreatePullRequestRequest) (*scmintegrationv1.CreatePullRequestResponse, error)
+	suggestPullRequestReviewersFunc   func(ctx context.Context, in *scmintegrationv1.SuggestPullRequestReviewersRequest) (*scmintegrationv1.SuggestPullRequestReviewersResponse, error)
 	checkHostedReviewEligibilityFunc  func(ctx context.Context, in *scmintegrationv1.CheckHostedReviewEligibilityRequest) (*scmintegrationv1.HostedReviewEligibility, error)
 	removePullRequestReviewersFunc    func(ctx context.Context, in *scmintegrationv1.RemovePullRequestReviewersRequest) (*scmintegrationv1.PullRequest, error)
 	setPullRequestAutoMergeFunc       func(ctx context.Context, in *scmintegrationv1.SetPullRequestAutoMergeRequest) (*scmintegrationv1.PullRequest, error)
@@ -106,6 +107,10 @@ func (f *fakeScmIntegrationClient) GetWorkItemDetails(ctx context.Context, in *s
 
 func (f *fakeScmIntegrationClient) CreatePullRequest(ctx context.Context, in *scmintegrationv1.CreatePullRequestRequest, _ ...grpc.CallOption) (*scmintegrationv1.CreatePullRequestResponse, error) {
 	return f.createPullRequestFunc(ctx, in)
+}
+
+func (f *fakeScmIntegrationClient) SuggestPullRequestReviewers(ctx context.Context, in *scmintegrationv1.SuggestPullRequestReviewersRequest, _ ...grpc.CallOption) (*scmintegrationv1.SuggestPullRequestReviewersResponse, error) {
+	return f.suggestPullRequestReviewersFunc(ctx, in)
 }
 
 func (f *fakeScmIntegrationClient) CheckHostedReviewEligibility(ctx context.Context, in *scmintegrationv1.CheckHostedReviewEligibilityRequest, _ ...grpc.CallOption) (*scmintegrationv1.HostedReviewEligibility, error) {
@@ -1040,12 +1045,125 @@ func TestHostedReviewCreateChannel_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	pr, ok := result.(*scmintegrationv1.PullRequest)
-	if !ok || pr.GetId() != "1" {
-		t.Fatalf("expected the unwrapped PullRequest, got %+v", result)
+	resp, ok := result.(*scmintegrationv1.CreatePullRequestResponse)
+	if !ok || resp.GetPullRequest().GetId() != "1" {
+		t.Fatalf("expected the whole CreatePullRequestResponse, got %+v", result)
 	}
 	if gotReq.GetProvider() != scmintegrationv1.ScmProvider_SCM_PROVIDER_GITLAB {
 		t.Errorf("expected SCM_PROVIDER_GITLAB from parseWSProvider(\"gitlab\"), got %v", gotReq.GetProvider())
+	}
+}
+
+// TestHostedReviewCreateChannel_ForwardsDraftAndLinkedIssueNumber covers
+// BR-CR-20 (draft) and BR-CR-19 (linked issue) — both new fields must
+// reach CreatePullRequestRequest.
+func TestHostedReviewCreateChannel_ForwardsDraftAndLinkedIssueNumber(t *testing.T) {
+	var gotReq *scmintegrationv1.CreatePullRequestRequest
+	fake := &fakeScmIntegrationClient{
+		createPullRequestFunc: func(ctx context.Context, in *scmintegrationv1.CreatePullRequestRequest) (*scmintegrationv1.CreatePullRequestResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.CreatePullRequestResponse{PullRequest: &scmintegrationv1.PullRequest{Id: "1"}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "hostedReview.create",
+		argsJSON(t, map[string]any{
+			"provider": "github", "repo": "o/r", "title": "t", "headBranch": "h", "baseBranch": "b",
+			"draft": true, "linkedIssueNumber": 42,
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !gotReq.GetDraft() {
+		t.Error("expected Draft=true forwarded")
+	}
+	if gotReq.LinkedIssueNumber == nil || *gotReq.LinkedIssueNumber != 42 {
+		t.Errorf("expected LinkedIssueNumber=42, got %v", gotReq.LinkedIssueNumber)
+	}
+}
+
+// TestHostedReviewCreateChannel_OmittedLinkedIssueNumberStaysUnset verifies
+// a caller that never sends linkedIssueNumber round-trips as unset (nil),
+// not a 0 sentinel — the proto field is `optional int32`.
+func TestHostedReviewCreateChannel_OmittedLinkedIssueNumberStaysUnset(t *testing.T) {
+	var gotReq *scmintegrationv1.CreatePullRequestRequest
+	fake := &fakeScmIntegrationClient{
+		createPullRequestFunc: func(ctx context.Context, in *scmintegrationv1.CreatePullRequestRequest) (*scmintegrationv1.CreatePullRequestResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.CreatePullRequestResponse{PullRequest: &scmintegrationv1.PullRequest{Id: "1"}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "hostedReview.create",
+		argsJSON(t, map[string]any{"provider": "github", "repo": "o/r", "title": "t", "headBranch": "h", "baseBranch": "b"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.LinkedIssueNumber != nil {
+		t.Errorf("expected LinkedIssueNumber to stay unset (nil), got %v", *gotReq.LinkedIssueNumber)
+	}
+}
+
+// TestHostedReviewCreateChannel_ReturnsLinkedIssueUpdateError verifies
+// BR-CR-19's non-rollback failure mode (PR created, issue-link update
+// failed) reaches the client: the channel must return the whole response,
+// not just the unwrapped PullRequest.
+func TestHostedReviewCreateChannel_ReturnsLinkedIssueUpdateError(t *testing.T) {
+	fake := &fakeScmIntegrationClient{
+		createPullRequestFunc: func(ctx context.Context, in *scmintegrationv1.CreatePullRequestRequest) (*scmintegrationv1.CreatePullRequestResponse, error) {
+			return &scmintegrationv1.CreatePullRequestResponse{
+				PullRequest:            &scmintegrationv1.PullRequest{Id: "1"},
+				LinkedIssueUpdateError: "issue #42 not found",
+			}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "hostedReview.create",
+		argsJSON(t, map[string]any{"provider": "github", "repo": "o/r", "title": "t", "headBranch": "h", "baseBranch": "b", "linkedIssueNumber": 42}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resp, ok := result.(*scmintegrationv1.CreatePullRequestResponse)
+	if !ok || resp.GetLinkedIssueUpdateError() != "issue #42 not found" {
+		t.Fatalf("expected linked_issue_update_error surfaced, got %+v", result)
+	}
+}
+
+// ── hostedReview.suggestReviewers ────────────────────────────────────────
+
+func TestHostedReviewSuggestReviewersChannel_ForwardsChangedFiles(t *testing.T) {
+	var gotReq *scmintegrationv1.SuggestPullRequestReviewersRequest
+	fake := &fakeScmIntegrationClient{
+		suggestPullRequestReviewersFunc: func(ctx context.Context, in *scmintegrationv1.SuggestPullRequestReviewersRequest) (*scmintegrationv1.SuggestPullRequestReviewersResponse, error) {
+			gotReq = in
+			return &scmintegrationv1.SuggestPullRequestReviewersResponse{
+				ReviewerLogins: []string{"alice", "bob"}, CodeownersFound: true,
+			}, nil
+		},
+	}
+	r := NewRegistry()
+	registerSCMChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "hostedReview.suggestReviewers",
+		argsJSON(t, map[string]any{
+			"provider": "github", "repo": "o/r", "baseRef": "main",
+			"changedFiles": []string{"src/auth.ts", "src/api/routes.ts"},
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(gotReq.GetChangedFiles()) != 2 || gotReq.GetChangedFiles()[0] != "src/auth.ts" {
+		t.Errorf("expected changedFiles forwarded, got %v", gotReq.GetChangedFiles())
+	}
+	resp, ok := result.(*scmintegrationv1.SuggestPullRequestReviewersResponse)
+	if !ok || len(resp.GetReviewerLogins()) != 2 {
+		t.Fatalf("unexpected result: %+v", result)
 	}
 }
 

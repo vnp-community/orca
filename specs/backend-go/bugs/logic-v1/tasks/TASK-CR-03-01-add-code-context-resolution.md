@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_annotation_send.go` (new)
 **Depends on:** none (requires SOL-CR-02's `side`/`original_code`/`worktree_id` fields, i.e. TASK-CR-02-01/02/04, to have landed first — see BLOCKED note below)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — resolveCodeContext/normalizeRelativePath/sliceLinesAround added in channels_annotation_send.go; go build/vet clean, covered by channels_annotation_send_test.go.
 
 ---
 

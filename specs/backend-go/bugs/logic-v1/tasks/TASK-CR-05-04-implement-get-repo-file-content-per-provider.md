@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/adapter/github/client.go`, `.../gitlab/client.go`, `.../gitea/client.go`, `.../azuredevops/client.go`, `.../bitbucket/client.go`
 **Depends on:** TASK-CR-05-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — GetRepoFileContent implemented on all 5 adapters (github/gitlab/gitea/azuredevops/bitbucket); go build ./... passes, per-adapter found/not-found/error tests added and passing
 
 ---
 

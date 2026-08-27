@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/create_pull_request.go`, `backend-go/services/scm-integration-service/internal/adapter/grpc/server.go`, `backend-go/services/scm-integration-service/cmd/server/main.go`
 **Depends on:** TASK-CR-05-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — CreatePullRequest rewritten with BR-CR-17 BranchExists precondition, BR-CR-20 Draft + ErrCapabilityUnsupported mapping, BR-CR-19 best-effort linked-issue update; grpc server.go + main.go updated; 4 new regression tests plus existing dispatch test passing
 
 ---
 

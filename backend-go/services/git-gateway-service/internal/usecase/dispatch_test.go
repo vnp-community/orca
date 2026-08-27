@@ -106,6 +106,7 @@ type fakeGitExecutor struct {
 	gotFilePath string
 
 	statusErr                 error
+	statusResult              domain.GitStatus
 	diffErr                   error
 	commitErr                 error
 	pushErr                   error
@@ -151,6 +152,12 @@ func (f *fakeGitExecutor) GetStatus(ctx context.Context, repoPath string) (domai
 	f.gotRepoPath = repoPath
 	if f.statusErr != nil {
 		return domain.GitStatus{}, f.statusErr
+	}
+	// statusResult, when its Files is non-nil, overrides the default
+	// single-file status below — lets a test control status.Files' count
+	// (e.g. BR-CR-15's >50-file threshold) without a bespoke fake.
+	if f.statusResult.Files != nil {
+		return f.statusResult, nil
 	}
 	// One changed file so gatherFullDiff (used by GenerateCommitMessage /
 	// GeneratePullRequestFields) actually calls GetDiff below.
@@ -697,8 +704,9 @@ func TestGenerateCommitMessage_Connected_RelaysDiffAndReturnsMessage(t *testing.
 	relay := &fakeGitExecutor{name: "relay"}
 	getStatus := NewGetStatus(resolver, local, relay)
 	getDiff := NewGetDiff(resolver, local, relay)
+	history := NewHistory(resolver, local, relay)
 	completer := &fakeAICompleter{message: "feat: add widget"}
-	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, completer)
+	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, history, completer)
 
 	got, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
 	if err != nil {
@@ -725,8 +733,9 @@ func TestGenerateCommitMessage_NotConnected_ReturnsFailedPrecondition(t *testing
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo/wt1"}}
 	getStatus := NewGetStatus(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	getDiff := NewGetDiff(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
+	history := NewHistory(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	completer := &fakeAICompleter{message: "should not be called"}
-	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, completer)
+	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, history, completer)
 
 	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
 	if err == nil {
@@ -745,8 +754,9 @@ func TestGenerateCommitMessage_RelayFailure_Propagates(t *testing.T) {
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo/wt1"}}
 	getStatus := NewGetStatus(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	getDiff := NewGetDiff(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
+	history := NewHistory(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	completer := &fakeAICompleter{err: errors.New("dev server agent unreachable")}
-	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, completer)
+	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, history, completer)
 
 	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
 	if err == nil {
@@ -760,7 +770,7 @@ func TestGenerateCommitMessage_RelayFailure_Propagates(t *testing.T) {
 
 func TestGenerateCommitMessage_MissingWorktreeID_ReturnsError(t *testing.T) {
 	emptyResolver := &fakeConnectionResolver{}
-	uc := NewGenerateCommitMessage(emptyResolver, NewGetStatus(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), NewGetDiff(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), &fakeAICompleter{})
+	uc := NewGenerateCommitMessage(emptyResolver, NewGetStatus(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), NewGetDiff(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), NewHistory(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), &fakeAICompleter{})
 	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{})
 	if err == nil {
 		t.Fatal("expected error for missing worktree_id")

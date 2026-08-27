@@ -128,12 +128,13 @@ func run() error {
 	commitUC := usecase.NewCommit(resolver, local, relay)
 	pushUC := usecase.NewPush(resolver, local, relay)
 	pullUC := usecase.NewPull(resolver, local, relay)
-	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, relay)
+	historyUC := usecase.NewHistory(resolver, local, relay)
+	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, historyUC, relay)
 
 	stageUC := usecase.NewStage(resolver, local, relay)
 	unstageUC := usecase.NewUnstage(resolver, local, relay)
 
-	historyUC := usecase.NewHistory(resolver, local, relay)
+
 	checkIgnoredUC := usecase.NewCheckIgnored(resolver, local, relay)
 	forkSyncUC := usecase.NewForkSync(resolver, local, relay)
 	upstreamStatusUC := usecase.NewUpstreamStatus(resolver, local, relay)

@@ -323,16 +323,17 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 	scm := fakeSCMClient{}
 	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
 	completer := fakeAICompleter{message: "generated message"}
+	historyUC := usecase.NewHistory(resolver, exec, exec)
 	return New(
 		getStatusUC,
 		getDiffUC,
 		usecase.NewCommit(resolver, exec, exec),
 		usecase.NewPush(resolver, exec, exec),
 		usecase.NewPull(resolver, exec, exec),
-		usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, completer),
+		usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, historyUC, completer),
 		usecase.NewStage(resolver, exec, exec),
 		usecase.NewUnstage(resolver, exec, exec),
-		usecase.NewHistory(resolver, exec, exec),
+		historyUC,
 		usecase.NewCheckIgnored(resolver, exec, exec),
 		usecase.NewForkSync(resolver, exec, exec),
 		usecase.NewUpstreamStatus(resolver, exec, exec),

@@ -22,6 +22,7 @@ const _ = grpc.SupportPackageIsVersion9
 const (
 	ScmIntegrationService_ListIssues_FullMethodName                     = "/orca.scmintegration.v1.ScmIntegrationService/ListIssues"
 	ScmIntegrationService_CreatePullRequest_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/CreatePullRequest"
+	ScmIntegrationService_SuggestPullRequestReviewers_FullMethodName    = "/orca.scmintegration.v1.ScmIntegrationService/SuggestPullRequestReviewers"
 	ScmIntegrationService_ListPullRequests_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/ListPullRequests"
 	ScmIntegrationService_GetRateLimitStatus_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/GetRateLimitStatus"
 	ScmIntegrationService_GetAuthStatus_FullMethodName                  = "/orca.scmintegration.v1.ScmIntegrationService/GetAuthStatus"
@@ -70,6 +71,7 @@ const (
 type ScmIntegrationServiceClient interface {
 	ListIssues(ctx context.Context, in *ListIssuesRequest, opts ...grpc.CallOption) (*ListIssuesResponse, error)
 	CreatePullRequest(ctx context.Context, in *CreatePullRequestRequest, opts ...grpc.CallOption) (*CreatePullRequestResponse, error)
+	SuggestPullRequestReviewers(ctx context.Context, in *SuggestPullRequestReviewersRequest, opts ...grpc.CallOption) (*SuggestPullRequestReviewersResponse, error)
 	ListPullRequests(ctx context.Context, in *ListPullRequestsRequest, opts ...grpc.CallOption) (*ListPullRequestsResponse, error)
 	GetRateLimitStatus(ctx context.Context, in *GetRateLimitStatusRequest, opts ...grpc.CallOption) (*GetRateLimitStatusResponse, error)
 	// Auth — the §9.1 decision: a standard OAuth 2.0 authorization-code web
@@ -162,6 +164,16 @@ func (c *scmIntegrationServiceClient) CreatePullRequest(ctx context.Context, in 
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreatePullRequestResponse)
 	err := c.cc.Invoke(ctx, ScmIntegrationService_CreatePullRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) SuggestPullRequestReviewers(ctx context.Context, in *SuggestPullRequestReviewersRequest, opts ...grpc.CallOption) (*SuggestPullRequestReviewersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SuggestPullRequestReviewersResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_SuggestPullRequestReviewers_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -538,6 +550,7 @@ func (c *scmIntegrationServiceClient) ListIntegrationCredentials(ctx context.Con
 type ScmIntegrationServiceServer interface {
 	ListIssues(context.Context, *ListIssuesRequest) (*ListIssuesResponse, error)
 	CreatePullRequest(context.Context, *CreatePullRequestRequest) (*CreatePullRequestResponse, error)
+	SuggestPullRequestReviewers(context.Context, *SuggestPullRequestReviewersRequest) (*SuggestPullRequestReviewersResponse, error)
 	ListPullRequests(context.Context, *ListPullRequestsRequest) (*ListPullRequestsResponse, error)
 	GetRateLimitStatus(context.Context, *GetRateLimitStatusRequest) (*GetRateLimitStatusResponse, error)
 	// Auth — the §9.1 decision: a standard OAuth 2.0 authorization-code web
@@ -621,6 +634,9 @@ func (UnimplementedScmIntegrationServiceServer) ListIssues(context.Context, *Lis
 }
 func (UnimplementedScmIntegrationServiceServer) CreatePullRequest(context.Context, *CreatePullRequestRequest) (*CreatePullRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreatePullRequest not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) SuggestPullRequestReviewers(context.Context, *SuggestPullRequestReviewersRequest) (*SuggestPullRequestReviewersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SuggestPullRequestReviewers not implemented")
 }
 func (UnimplementedScmIntegrationServiceServer) ListPullRequests(context.Context, *ListPullRequestsRequest) (*ListPullRequestsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListPullRequests not implemented")
@@ -783,6 +799,24 @@ func _ScmIntegrationService_CreatePullRequest_Handler(srv interface{}, ctx conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ScmIntegrationServiceServer).CreatePullRequest(ctx, req.(*CreatePullRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_SuggestPullRequestReviewers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SuggestPullRequestReviewersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).SuggestPullRequestReviewers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_SuggestPullRequestReviewers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).SuggestPullRequestReviewers(ctx, req.(*SuggestPullRequestReviewersRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1449,6 +1483,10 @@ var ScmIntegrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreatePullRequest",
 			Handler:    _ScmIntegrationService_CreatePullRequest_Handler,
+		},
+		{
+			MethodName: "SuggestPullRequestReviewers",
+			Handler:    _ScmIntegrationService_SuggestPullRequestReviewers_Handler,
 		},
 		{
 			MethodName: "ListPullRequests",

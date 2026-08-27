@@ -1,28 +1,3 @@
-# TASK-CR-04-01: Add pure commit-message prompt helpers (issue-ref extraction, prompt composition, stats fallback)
-
-**From Solution:** SOL-CR-04
-**Priority:** P1
-**Service:** `git-gateway-service`
-**File:** `backend-go/services/git-gateway-service/internal/usecase/commit_message_prompt.go` (new), `backend-go/services/git-gateway-service/internal/usecase/commit_message_prompt_test.go` (new)
-**Depends on:** none
-**Status:** `[x]` DONE — commit_message_prompt.go created (extractIssueRef, buildCommitMessagePrompt, statsOnlySummary, maxFullDiffFiles); commit_message_prompt_test.go passing
-
----
-
-## Context
-
-The one genuinely new piece of logic in BUG-CR-04 — extracting an
-issue/ticket id from a branch name (BR-CR-16) — is pure string parsing with
-no port dependency. Splitting it into its own file (rather than inlining
-into `Execute`) makes it unit-testable without any of
-`GenerateCommitMessage`'s five ports, per
-`03-clean-architecture-guidelines.md`'s domain-purity goal.
-
-## Changes to make
-
-Create `backend-go/services/git-gateway-service/internal/usecase/commit_message_prompt.go`:
-
-```go
 package usecase
 
 import (
@@ -113,29 +88,3 @@ func statsOnlySummary(files []domain.FileStatus) string {
 	}
 	return b.String()
 }
-```
-
-`generate_commit_message.go` currently defines its own
-`commitMessagePromptPrefix` const — TASK-CR-04-03 removes that duplicate
-when it wires this file in.
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go/services/git-gateway-service
-go build ./internal/usecase/...
-go test ./internal/usecase/... -run TestExtractIssueRef -v
-go test ./internal/usecase/... -run TestBuildCommitMessagePrompt -v
-go test ./internal/usecase/... -run TestStatsOnlySummary -v
-```
-
-Create `commit_message_prompt_test.go` with cases:
-- `extractIssueRef("fix/ORCA-123-foo")` → `"ORCA-123"`;
-  `extractIssueRef("feature/456-thing")` → `"#456"`;
-  `extractIssueRef("main")` → `""`.
-- `buildCommitMessagePrompt` output contains the recent-commit block, the
-  branch line, and the issue-reference instruction line when present;
-  omits each section cleanly when its input is empty (no dangling
-  headers).
-- `statsOnlySummary` renders one line per file, includes the file count in
-  the header line.

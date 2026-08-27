@@ -5,7 +5,7 @@
 **Service:** `annotation-service`
 **File:** `backend-go/services/annotation-service/internal/usecase/mark_annotations_sent.go` (new), `backend-go/services/annotation-service/internal/usecase/ports.go`, `backend-go/services/annotation-service/internal/adapter/postgres/repository.go`, `backend-go/services/annotation-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-CR-02-02, TASK-CR-02-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — MarkAnnotationsSent usecase + Repository.MarkSent (postgres) + gRPC handler + main.go wiring added; usecase and postgres integration tests passing
 
 ---
 

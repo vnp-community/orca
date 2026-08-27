@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/suggest_pull_request_reviewers.go` (new), `backend-go/services/scm-integration-service/internal/adapter/grpc/server.go`, `backend-go/services/scm-integration-service/cmd/server/main.go`
 **Depends on:** TASK-CR-05-04, TASK-CR-05-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — SuggestPullRequestReviewers usecase + gRPC handler + main.go wiring added; suggest_pull_request_reviewers_test.go covers stop-at-first-found and all-paths-tried-when-none-found, passing
 
 ---
 

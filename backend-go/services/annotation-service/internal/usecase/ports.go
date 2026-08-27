@@ -6,6 +6,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/stablyai/orca-go/services/annotation-service/internal/domain"
 )
@@ -34,6 +35,13 @@ type Repository interface {
 	// requestID), for CreateAnnotation's idempotency check — mirrors
 	// automation-service's AutomationRunRepository.FindByRequestID pattern.
 	FindByRequestID(ctx context.Context, tenantID, requestID string) (domain.Annotation, bool, error)
+	// MarkSent transitions every annotation in ids (scoped to tenantID) to
+	// SentToAgent=true/SentAt=sentAt in one statement. Any id not found for
+	// the tenant is silently skipped, not a hard failure — SOL-CR-03 calls
+	// this after PTY injection already succeeded, so a partial id mismatch
+	// (e.g. a concurrently-deleted annotation) must not turn a successful
+	// send into an error response.
+	MarkSent(ctx context.Context, tenantID string, ids []string, sentAt time.Time) ([]domain.Annotation, error)
 }
 
 // OPAClient is the authorization port UpdateAnnotation/DeleteAnnotation use
