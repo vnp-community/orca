@@ -27,34 +27,71 @@ service AutomationService {
   rpc ListAutomations(ListAutomationsRequest) returns (ListAutomationsResponse);
   rpc UpdateAutomation(UpdateAutomationRequest) returns (UpdateAutomationResponse);
   rpc DeleteAutomation(DeleteAutomationRequest) returns (google.protobuf.Empty);
+
+  // WriteCleanupReport records one row per worktree per cleanup run —
+  // workflow-service.CleanupWorktreesStepExecutor calls this (a
+  // workflow-service -> automation-service call, the reverse of this
+  // service's usual direction) since automation-service already owns run
+  // bookkeeping. See BR-AT-14.
+  rpc WriteCleanupReport(WriteCleanupReportRequest) returns (google.protobuf.Empty);
 }
 
 message Automation {
   string id = 1;
   string tenant_id = 2;
+  string project_id = 9; // NEW — logical FK -> project-service.projects; empty = unscoped (back-compat)
   string name = 3;
   string rrule = 4;
-  string step_config_json = 5;
-  // step_type promotes what used to live only inside a "step_type" JSON key
-  // in step_config_json (domain.ParseStepType) to a first-class field —
-  // closes the Phase 2 execution-plan item. Reuses workflow-service's own
-  // StepType enum rather than defining a duplicate one, since automation's
-  // step_type must already match what ExecuteAdHocStepRequest.step_type
-  // expects on dispatch.
-  orca.workflow.v1.StepType step_type = 6;
+  // step_type/step_config_json (fields 5/6) are DEPRECATED but left on the
+  // wire for one release: UpdateAutomation on a pre-migration row without
+  // `actions` set still round-trips through them. New/updated automations
+  // populate `actions` instead — see AutomationAction below.
+  string step_config_json = 5 [deprecated = true];
+  orca.workflow.v1.StepType step_type = 6 [deprecated = true];
   bool enabled = 7;
   string dtstart = 8; // RFC3339; empty = defaults to created_at at creation time
-  string timezone = 9; // IANA tz name (e.g. "Asia/Ho_Chi_Minh"); empty = UTC
+  string timezone = 10; // renumbered from 9 to make room for project_id above; IANA tz name (e.g. "Asia/Ho_Chi_Minh"); empty = UTC
+  repeated AutomationAction actions = 11; // NEW — ordered chain, BR-AT-01's schema
+  TriggerType trigger_type = 12;      // NEW
+  string trigger_event = 13;          // NEW — one of the 5 event names below; empty unless trigger_type=EVENT
+  string trigger_filter_json = 14;    // NEW — BR-AT-09, e.g. {"agent":"claude"}; empty = no filter (always matches)
+}
+
+enum TriggerType {
+  TRIGGER_TYPE_UNSPECIFIED = 0; // = CRON, for back-compat with existing rrule-only rows
+  TRIGGER_TYPE_CRON = 1;
+  TRIGGER_TYPE_MANUAL = 2;      // rrule/dtstart still stored but next_run_at never advances — RunNow-only
+  TRIGGER_TYPE_EVENT = 3;
+}
+
+// AutomationAction is one step in an automation's ordered action chain.
+message AutomationAction {
+  orca.workflow.v1.StepType step_type = 1;
+  string step_config_json = 2;
+  // on_failure controls whether RunNow's action loop continues to the next
+  // action or stops the run. Default (unspecified) = STOP.
+  OnFailurePolicy on_failure = 3;
+}
+
+enum OnFailurePolicy {
+  ON_FAILURE_POLICY_UNSPECIFIED = 0; // = STOP
+  ON_FAILURE_POLICY_STOP = 1;
+  ON_FAILURE_POLICY_CONTINUE = 2;
 }
 
 message CreateAutomationRequest {
   string tenant_id = 1;
   string name = 2;
   string rrule = 3;
-  string step_config_json = 4;
-  orca.workflow.v1.StepType step_type = 5;
+  string step_config_json = 4 [deprecated = true];
+  orca.workflow.v1.StepType step_type = 5 [deprecated = true];
   string dtstart = 6; // optional; empty = defaults to now at creation time
   string timezone = 7; // optional; empty = UTC
+  string project_id = 8; // NEW — logical FK -> project-service.projects; empty = unscoped (back-compat)
+  repeated AutomationAction actions = 9; // NEW — ordered chain, BR-AT-01's schema
+  TriggerType trigger_type = 10;      // NEW
+  string trigger_event = 11;          // NEW
+  string trigger_filter_json = 12;    // NEW
 }
 
 message CreateAutomationResponse {
@@ -117,11 +154,16 @@ message UpdateAutomationRequest {
   string tenant_id = 2;
   google.protobuf.StringValue name = 3;
   google.protobuf.StringValue rrule = 4;
-  google.protobuf.StringValue step_config_json = 5;
-  orca.workflow.v1.StepType step_type = 6; // 0 (unspecified) = no change
+  google.protobuf.StringValue step_config_json = 5 [deprecated = true];
+  orca.workflow.v1.StepType step_type = 6 [deprecated = true]; // 0 (unspecified) = no change
   google.protobuf.BoolValue enabled = 7;
   google.protobuf.StringValue dtstart = 8;
   google.protobuf.StringValue timezone = 9;
+  google.protobuf.StringValue project_id = 10; // NEW
+  repeated AutomationAction actions = 11; // NEW — empty = no change
+  TriggerType trigger_type = 12; // NEW — 0 (unspecified) = no change
+  google.protobuf.StringValue trigger_event = 13; // NEW
+  google.protobuf.StringValue trigger_filter_json = 14; // NEW
 }
 message UpdateAutomationResponse {
   Automation automation = 1;
@@ -130,4 +172,14 @@ message UpdateAutomationResponse {
 message DeleteAutomationRequest {
   string id = 1;
   string tenant_id = 2;
+}
+
+message WriteCleanupReportRequest {
+  string run_id = 1;
+  repeated CleanupLogEntry entries = 2;
+}
+message CleanupLogEntry {
+  string worktree_id = 1;
+  string action = 2; // "deleted" | "skipped" | "would_delete"
+  string reason = 3;
 }

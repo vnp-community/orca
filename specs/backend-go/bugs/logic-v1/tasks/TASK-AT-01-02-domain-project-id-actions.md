@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/domain/automation_action.go` (new), `backend-go/services/automation-service/internal/domain/automation.go`
 **Depends on:** TASK-AT-01-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain/automation_action.go added; NewAutomation (now NewAutomationParams-based) validates Actions non-empty, normalizes legacy StepType/StepConfigJSON; domain tests pass.
 
 ---
 

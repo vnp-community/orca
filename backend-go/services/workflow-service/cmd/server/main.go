@@ -31,10 +31,14 @@ import (
 	workflowgrpc "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/infrafleetclient"
 	workflowpostgres "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/postgres"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serviceclients"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/stepexecutors"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 
+	automationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1"
+	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 )
 
@@ -97,6 +101,33 @@ func run() error {
 	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient))
 	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient))
 	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient))
+
+	// STEP_TYPE_CLEANUP_WORKTREES (BL-AT-04, TASK-AT-04-05) — a sixth
+	// StepExecutor, in-process like Condition/Webhook (no execution-plane
+	// relay needed), but with its own three new outbound dependency edges:
+	// project-service (candidate worktrees), git-gateway-service (the
+	// actual delete, with BR-AT-11/BR-AT-12 enforced server-side), and
+	// automation-service (BR-AT-14's audit report).
+	projectConn, err := serviceclients.Dial(cfg.ProjectServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing project-service: %w", err)
+	}
+	defer func() { _ = projectConn.Close() }()
+	gitGatewayConn, err := serviceclients.Dial(cfg.GitGatewayServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing git-gateway-service: %w", err)
+	}
+	defer func() { _ = gitGatewayConn.Close() }()
+	automationConn, err := serviceclients.Dial(cfg.AutomationServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing automation-service: %w", err)
+	}
+	defer func() { _ = automationConn.Close() }()
+
+	projectClient := serviceclients.NewProjectClient(projectv1.NewProjectServiceClient(projectConn))
+	gitGatewayClient := serviceclients.NewGitGatewayClient(gitgatewayv1.NewGitGatewayServiceClient(gitGatewayConn))
+	cleanupAuditClient := serviceclients.NewCleanupAuditClient(automationv1.NewAutomationServiceClient(automationConn))
+	registry.Register(domain.StepTypeCleanupWorktrees, usecase.NewCleanupWorktreesStepExecutor(projectClient, gitGatewayClient, cleanupAuditClient))
 
 	createTemplateUC := usecase.NewCreateTemplate(repo)
 	executeUC := usecase.NewExecute(repo, repo, repo, registry)

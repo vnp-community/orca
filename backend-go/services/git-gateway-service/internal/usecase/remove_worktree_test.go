@@ -6,16 +6,23 @@ import (
 	"testing"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
+
+func withTenantCtx() context.Context {
+	return tenant.WithTenantID(context.Background(), "tenant-1")
+}
 
 func TestRemoveWorktree_HappyPath(t *testing.T) {
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo-feature"}}
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
-	uc := NewRemoveWorktree(resolver, projects, local, relay)
+	scm := &fakeSCMClient{}
+	uc := NewRemoveWorktree(resolver, projects, scm, local, relay)
 
-	err := uc.Execute(context.Background(), "wt-1", true)
+	err := uc.Execute(withTenantCtx(), "wt-1", true, false)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -35,9 +42,10 @@ func TestRemoveWorktree_BookkeepingFails_NoCompensatingGitOperation(t *testing.T
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{recordRemovedErr: errors.New("project-service unreachable")}
-	uc := NewRemoveWorktree(resolver, projects, local, relay)
+	scm := &fakeSCMClient{}
+	uc := NewRemoveWorktree(resolver, projects, scm, local, relay)
 
-	err := uc.Execute(context.Background(), "wt-1", true)
+	err := uc.Execute(withTenantCtx(), "wt-1", true, false)
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -62,9 +70,13 @@ func TestRemoveWorktree_GitRemoveFails_BookkeepingNeverCalled(t *testing.T) {
 	local := &fakeGitExecutor{removeWorktreeErr: errors.New("git worktree remove failed: dirty worktree")}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
-	uc := NewRemoveWorktree(resolver, projects, local, relay)
+	scm := &fakeSCMClient{}
+	uc := NewRemoveWorktree(resolver, projects, scm, local, relay)
 
-	err := uc.Execute(context.Background(), "wt-1", false)
+	// force=true — this test exercises the RemoveWorktree-itself-fails
+	// path, not BR-AT-11's uncommitted-changes check (fakeGitExecutor's
+	// default GetStatus reports one modified file).
+	err := uc.Execute(withTenantCtx(), "wt-1", true, false)
 	if err == nil {
 		t.Fatal("expected an error")
 	}
@@ -74,5 +86,109 @@ func TestRemoveWorktree_GitRemoveFails_BookkeepingNeverCalled(t *testing.T) {
 	}
 	if projects.calledRecordRemoved {
 		t.Error("expected RecordWorktreeRemoved NOT to be called when git worktree remove itself fails")
+	}
+}
+
+// BR-AT-11: uncommitted changes block removal unless force=true.
+func TestRemoveWorktree_UncommittedChanges_BlocksWithoutForce(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo-feature"}}
+	// Default fakeGitExecutor.GetStatus reports one modified file.
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{}
+	scm := &fakeSCMClient{}
+	uc := NewRemoveWorktree(resolver, projects, scm, local, relay)
+
+	err := uc.Execute(withTenantCtx(), "wt-1", false, false)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "WORKTREE_HAS_UNCOMMITTED_CHANGES" {
+		t.Fatalf("expected WORKTREE_HAS_UNCOMMITTED_CHANGES, got %v", err)
+	}
+	if local.removeWorktreeCallCount != 0 {
+		t.Errorf("expected RemoveWorktree to never be called, got %d", local.removeWorktreeCallCount)
+	}
+}
+
+func TestRemoveWorktree_UncommittedChanges_ProceedsWithForce(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo-feature"}}
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{}
+	scm := &fakeSCMClient{}
+	uc := NewRemoveWorktree(resolver, projects, scm, local, relay)
+
+	if err := uc.Execute(withTenantCtx(), "wt-1", true, false); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if local.removeWorktreeCallCount != 1 {
+		t.Errorf("expected RemoveWorktree to be called, got %d", local.removeWorktreeCallCount)
+	}
+}
+
+// BR-AT-12: an open PR blocks removal unless allow_open_pr=true — an
+// INDEPENDENT override from force.
+func TestRemoveWorktree_OpenPR_BlocksWithoutAllowOpenPR(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo-feature"}}
+	local := &fakeGitExecutor{statusErr: nil}
+	// No uncommitted changes, so we reach the PR check — override the
+	// default fake's dirty-file status.
+	local.getStatusResult = &domain.GitStatus{Branch: "feature-1"}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{}
+	scm := &fakeSCMClient{prForBranch: PullRequestInfo{State: "open", Number: 42}, prForBranchFound: true}
+	uc := NewRemoveWorktree(resolver, projects, scm, local, relay)
+
+	err := uc.Execute(withTenantCtx(), "wt-1", true, false)
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "WORKTREE_HAS_OPEN_PR" {
+		t.Fatalf("expected WORKTREE_HAS_OPEN_PR, got %v", err)
+	}
+	if local.removeWorktreeCallCount != 0 {
+		t.Errorf("expected RemoveWorktree to never be called, got %d", local.removeWorktreeCallCount)
+	}
+	if !scm.calledGetPRForBranch {
+		t.Error("expected GetPullRequestForBranch to be called")
+	}
+}
+
+func TestRemoveWorktree_OpenPR_ProceedsWithAllowOpenPR(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo-feature"}}
+	local := &fakeGitExecutor{}
+	local.getStatusResult = &domain.GitStatus{Branch: "feature-1"}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{}
+	scm := &fakeSCMClient{prForBranch: PullRequestInfo{State: "open", Number: 42}, prForBranchFound: true}
+	uc := NewRemoveWorktree(resolver, projects, scm, local, relay)
+
+	if err := uc.Execute(withTenantCtx(), "wt-1", true, true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if local.removeWorktreeCallCount != 1 {
+		t.Errorf("expected RemoveWorktree to be called, got %d", local.removeWorktreeCallCount)
+	}
+}
+
+// A SCMClient lookup error (e.g. no SCM integration configured) fails OPEN
+// — deletion proceeds rather than becoming permanently blocked.
+func TestRemoveWorktree_SCMClientError_FailsOpenAndProceeds(t *testing.T) {
+	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo-feature"}}
+	local := &fakeGitExecutor{}
+	local.getStatusResult = &domain.GitStatus{Branch: "feature-1"}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{}
+	scm := &fakeSCMClient{prForBranchErr: errors.New("no SCM integration configured for this repo")}
+	uc := NewRemoveWorktree(resolver, projects, scm, local, relay)
+
+	if err := uc.Execute(withTenantCtx(), "wt-1", true, false); err != nil {
+		t.Fatalf("expected the SCM lookup failure to fail open (no error), got %v", err)
+	}
+	if local.removeWorktreeCallCount != 1 {
+		t.Errorf("expected RemoveWorktree to be called despite the SCM lookup failure, got %d", local.removeWorktreeCallCount)
 	}
 }

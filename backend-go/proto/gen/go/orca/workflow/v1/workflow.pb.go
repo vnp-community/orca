@@ -24,12 +24,13 @@ const (
 type StepType int32
 
 const (
-	StepType_STEP_TYPE_UNSPECIFIED  StepType = 0
-	StepType_STEP_TYPE_AGENT        StepType = 1
-	StepType_STEP_TYPE_SHELL        StepType = 2
-	StepType_STEP_TYPE_NOTIFICATION StepType = 3
-	StepType_STEP_TYPE_WEBHOOK      StepType = 4
-	StepType_STEP_TYPE_CONDITION    StepType = 5
+	StepType_STEP_TYPE_UNSPECIFIED       StepType = 0
+	StepType_STEP_TYPE_AGENT             StepType = 1
+	StepType_STEP_TYPE_SHELL             StepType = 2
+	StepType_STEP_TYPE_NOTIFICATION      StepType = 3
+	StepType_STEP_TYPE_WEBHOOK           StepType = 4
+	StepType_STEP_TYPE_CONDITION         StepType = 5
+	StepType_STEP_TYPE_CLEANUP_WORKTREES StepType = 6 // NEW — BL-AT-04
 )
 
 // Enum value maps for StepType.
@@ -41,14 +42,16 @@ var (
 		3: "STEP_TYPE_NOTIFICATION",
 		4: "STEP_TYPE_WEBHOOK",
 		5: "STEP_TYPE_CONDITION",
+		6: "STEP_TYPE_CLEANUP_WORKTREES",
 	}
 	StepType_value = map[string]int32{
-		"STEP_TYPE_UNSPECIFIED":  0,
-		"STEP_TYPE_AGENT":        1,
-		"STEP_TYPE_SHELL":        2,
-		"STEP_TYPE_NOTIFICATION": 3,
-		"STEP_TYPE_WEBHOOK":      4,
-		"STEP_TYPE_CONDITION":    5,
+		"STEP_TYPE_UNSPECIFIED":       0,
+		"STEP_TYPE_AGENT":             1,
+		"STEP_TYPE_SHELL":             2,
+		"STEP_TYPE_NOTIFICATION":      3,
+		"STEP_TYPE_WEBHOOK":           4,
+		"STEP_TYPE_CONDITION":         5,
+		"STEP_TYPE_CLEANUP_WORKTREES": 6,
 	}
 )
 
@@ -1533,14 +1536,15 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\x12parent_template_id\x18\x05 \x01(\tR\x10parentTemplateId\x12)\n" +
 	"\x10expected_version\x18\x06 \x01(\x05R\x0fexpectedVersion\"X\n" +
 	"\x16UpdateTemplateResponse\x12>\n" +
-	"\btemplate\x18\x01 \x01(\v2\".orca.workflow.v1.WorkflowTemplateR\btemplate*\x9b\x01\n" +
+	"\btemplate\x18\x01 \x01(\v2\".orca.workflow.v1.WorkflowTemplateR\btemplate*\xbc\x01\n" +
 	"\bStepType\x12\x19\n" +
 	"\x15STEP_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fSTEP_TYPE_AGENT\x10\x01\x12\x13\n" +
 	"\x0fSTEP_TYPE_SHELL\x10\x02\x12\x1a\n" +
 	"\x16STEP_TYPE_NOTIFICATION\x10\x03\x12\x15\n" +
 	"\x11STEP_TYPE_WEBHOOK\x10\x04\x12\x17\n" +
-	"\x13STEP_TYPE_CONDITION\x10\x052\xe8\b\n" +
+	"\x13STEP_TYPE_CONDITION\x10\x05\x12\x1f\n" +
+	"\x1bSTEP_TYPE_CLEANUP_WORKTREES\x10\x062\xe8\b\n" +
 	"\x0fWorkflowService\x12c\n" +
 	"\x0eCreateTemplate\x12'.orca.workflow.v1.CreateTemplateRequest\x1a(.orca.workflow.v1.CreateTemplateResponse\x12c\n" +
 	"\x0eUpdateTemplate\x12'.orca.workflow.v1.UpdateTemplateRequest\x1a(.orca.workflow.v1.UpdateTemplateResponse\x12N\n" +

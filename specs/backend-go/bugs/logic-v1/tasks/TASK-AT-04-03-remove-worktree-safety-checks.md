@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/remove_worktree.go`, `backend-go/services/git-gateway-service/internal/usecase/ports.go`
 **Depends on:** TASK-AT-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — RemoveWorktree.Execute now enforces BR-AT-11 (GetStatus dirty-check) and BR-AT-12 (SCMClient.GetPullRequestForBranch, fail-open) before removal; allow_open_pr threaded through grpc server + WS worktree.rm; unit-tested (7 cases incl. fail-open).
 
 ---
 

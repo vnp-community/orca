@@ -284,6 +284,10 @@ func (fakeSCMClient) GetMergeRequestBase(context.Context, string, int32) (string
 	return "main", "basesha", nil
 }
 
+func (fakeSCMClient) GetPullRequestForBranch(context.Context, string, string) (usecase.PullRequestInfo, bool, error) {
+	return usecase.PullRequestInfo{}, false, nil
+}
+
 // fakeAICompleter is a usecase.AICompleter stub for exercising
 // GenerateCommitMessage's wire<->usecase translation.
 type fakeAICompleter struct{ message string }
@@ -354,7 +358,7 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewWriteIssueCommand(resolver, exec, exec),
 		usecase.NewScanSetupScriptImports(resolver, exec, exec),
 		usecase.NewCreateWorktree(resolver, projects, exec, exec),
-		usecase.NewRemoveWorktree(resolver, projects, exec, exec),
+		usecase.NewRemoveWorktree(resolver, projects, scm, exec, exec),
 		usecase.NewForceDeleteBranch(resolver, exec, exec),
 		usecase.NewDetectWorktrees(resolver, projects, exec, exec),
 		usecase.NewPrefetchCreateBase(resolver, projects, exec, exec),

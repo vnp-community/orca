@@ -5076,7 +5076,8 @@ func (x *CreateWorktreeResponse) GetHeadSha() string {
 type RemoveWorktreeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
-	Force         bool                   `protobuf:"varint,2,opt,name=force,proto3" json:"force,omitempty"` // maps to `git worktree remove --force` (uncommitted changes present)
+	Force         bool                   `protobuf:"varint,2,opt,name=force,proto3" json:"force,omitempty"`                                  // maps to `git worktree remove --force` (uncommitted changes present); BR-AT-11
+	AllowOpenPr   bool                   `protobuf:"varint,3,opt,name=allow_open_pr,json=allowOpenPr,proto3" json:"allow_open_pr,omitempty"` // NEW — separate, explicit override for BR-AT-12; NEVER set true by the cleanup_worktrees path
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -5121,6 +5122,13 @@ func (x *RemoveWorktreeRequest) GetWorktreeId() string {
 func (x *RemoveWorktreeRequest) GetForce() bool {
 	if x != nil {
 		return x.Force
+	}
+	return false
+}
+
+func (x *RemoveWorktreeRequest) GetAllowOpenPr() bool {
+	if x != nil {
+		return x.AllowOpenPr
 	}
 	return false
 }
@@ -7057,11 +7065,12 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x12\n" +
 	"\x04path\x18\x02 \x01(\tR\x04path\x12\x19\n" +
-	"\bhead_sha\x18\x03 \x01(\tR\aheadSha\"N\n" +
+	"\bhead_sha\x18\x03 \x01(\tR\aheadSha\"r\n" +
 	"\x15RemoveWorktreeRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x14\n" +
-	"\x05force\x18\x02 \x01(\bR\x05force\"S\n" +
+	"\x05force\x18\x02 \x01(\bR\x05force\x12\"\n" +
+	"\rallow_open_pr\x18\x03 \x01(\bR\vallowOpenPr\"S\n" +
 	"\x18ForceDeleteBranchRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x16\n" +

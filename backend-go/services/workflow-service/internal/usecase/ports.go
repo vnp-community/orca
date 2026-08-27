@@ -7,6 +7,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 )
@@ -97,4 +98,57 @@ var ErrStepExecutorNotRegistered = errors.New("usecase: no step executor registe
 // workflow-service.md §4 and this service's README).
 type StepExecutorRegistry interface {
 	Resolve(stepType domain.StepType) (domain.StepExecutor, error)
+}
+
+// WorktreeInfo is the minimal worktree shape
+// CleanupWorktreesStepExecutor needs from project-service's ListWorktrees —
+// see ProjectClient.
+type WorktreeInfo struct {
+	ID     string
+	Branch string
+}
+
+// ProjectClient wraps project-service's filtered ListWorktrees RPC — a new
+// outbound dependency edge (BL-AT-04's cleanup_worktrees step candidate
+// query, TASK-AT-04-02).
+type ProjectClient interface {
+	ListWorktrees(ctx context.Context, projectID string, statusIn []string, olderThan time.Time) ([]WorktreeInfo, error)
+}
+
+// GitGatewayClient wraps git-gateway-service's RemoveWorktree RPC — the ONE
+// call site CleanupWorktreesStepExecutor uses for the actual delete
+// (TASK-AT-04-03's BR-AT-11/BR-AT-12 safety checks live server-side, in
+// git-gateway-service, so every caller — manual worktree.rm AND this
+// automated bulk path — gets them for free).
+type GitGatewayClient interface {
+	RemoveWorktree(ctx context.Context, worktreeID string, force, allowOpenPR bool) error
+}
+
+// ErrWorktreeRemovalBlocked is returned (wrapped) by GitGatewayClient.
+// RemoveWorktree when git-gateway-service rejected the removal on a safety
+// check (BR-AT-11 uncommitted changes / BR-AT-12 open PR) — the adapter
+// translates the gRPC FailedPrecondition status into this transport-agnostic
+// sentinel so CleanupWorktreesStepExecutor can distinguish "expected skip"
+// from a genuine removal failure without importing grpc codes into usecase/.
+var ErrWorktreeRemovalBlocked = errors.New("usecase: worktree removal blocked by a safety check")
+
+// CleanupEntry is one worktree's outcome in a cleanup run — mirrors
+// automation-service's domain.CleanupLogEntry (kept as a separate type here
+// per architecture/03's rule that domain/ packages don't share types
+// across service boundaries).
+type CleanupEntry struct {
+	WorktreeID string
+	Action     string // "deleted" | "skipped" | "would_delete"
+	Reason     string
+}
+
+// CleanupAuditWriter wraps automation-service's WriteCleanupReport RPC —
+// BR-AT-14's per-worktree audit trail (TASK-AT-04-04). runID identifies the
+// automation_runs row this cleanup dispatch belongs to; a caller with no
+// such ID (e.g. a manually-triggered cleanup outside RunNow's action loop)
+// should pass "" — WriteCleanupReport's own FK requires a real row, so the
+// implementation treats a failed/empty-runID write as best-effort, never
+// failing the step itself.
+type CleanupAuditWriter interface {
+	WriteCleanupReport(ctx context.Context, runID string, entries []CleanupEntry) error
 }

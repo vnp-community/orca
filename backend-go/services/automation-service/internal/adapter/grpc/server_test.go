@@ -69,18 +69,53 @@ func (f *fakeAutomationRepository) Delete(ctx context.Context, tenantID, id stri
 	return nil
 }
 
+func (f *fakeAutomationRepository) CountByProject(ctx context.Context, tenantID, projectID string) (int, error) {
+	count := 0
+	for _, a := range f.byID {
+		if a.TenantID == tenantID && a.ProjectID == projectID {
+			count++
+		}
+	}
+	return count, nil
+}
+
+func (f *fakeAutomationRepository) ListByTrigger(ctx context.Context, tenantID string, eventName domain.EventName) ([]domain.Automation, error) {
+	var out []domain.Automation
+	for _, a := range f.byID {
+		if a.TenantID == tenantID && a.TriggerType == domain.TriggerTypeEvent && a.TriggerEvent == eventName && a.Enabled {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeAutomationRepository) ListEventTriggered(ctx context.Context, tenantID string) ([]domain.Automation, error) {
+	var out []domain.Automation
+	for _, a := range f.byID {
+		if a.TenantID == tenantID && a.TriggerType == domain.TriggerTypeEvent {
+			out = append(out, a)
+		}
+	}
+	return out, nil
+}
+
 func newServerForListUpdateDelete(repo *fakeAutomationRepository) *Server {
 	return New(nil, nil, nil, nil,
 		usecase.NewListAutomations(repo),
 		usecase.NewUpdateAutomation(repo),
 		usecase.NewDeleteAutomation(repo),
+		nil,
 	)
 }
 
 func seedGRPCAutomation(t *testing.T, repo *fakeAutomationRepository, tenantID, id string) domain.Automation {
 	t.Helper()
 	now := time.Date(2026, 1, 1, 0, 0, 0, 0, time.UTC)
-	a, err := domain.NewAutomation(id, tenantID, "nightly-report", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{"prompt":"summarize"}`, now, "UTC", true, now)
+	a, err := domain.NewAutomation(domain.NewAutomationParams{
+		ID: id, TenantID: tenantID, Name: "nightly-report", RRule: "FREQ=DAILY;INTERVAL=1",
+		StepType: domain.StepTypeAgent, StepConfigJSON: `{"prompt":"summarize"}`,
+		DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+	})
 	if err != nil {
 		t.Fatalf("building automation: %v", err)
 	}

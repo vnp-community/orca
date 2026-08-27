@@ -249,6 +249,7 @@ message Worktree {
   string path = 4;
   string branch = 5;
   bool active = 6;
+  string status = 7; // NEW — "active" | "completed" | "error" | "stopped"; orthogonal to activation_state (the `active` field above)
 }
 
 message RecordWorktreeCreatedRequest {
@@ -270,6 +271,8 @@ message RecordWorktreeRemovedResponse {}
 
 message ListWorktreesRequest {
   string project_id = 1;
+  repeated string status_in = 2;             // NEW — optional; unset = no filtering
+  google.protobuf.Timestamp older_than = 3;  // NEW — optional; created_at cutoff
 }
 
 message ListWorktreesResponse {

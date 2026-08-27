@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -366,6 +367,12 @@ func (f *fakeRepoRepository) RemoveRepo(ctx context.Context, repoID string) erro
 // fakeWorktreeRepository is an in-memory WorktreeRepository.
 type fakeWorktreeRepository struct {
 	worktrees map[string]domain.Worktree
+	// createdAt backs the ListWorktrees olderThan filter — domain.Worktree
+	// itself carries no CreatedAt field (the real Postgres repository
+	// filters server-side against its own created_at column, never
+	// round-tripping it into the Go struct), so this fake tracks it
+	// separately for tests that need to exercise the filter.
+	createdAt map[string]time.Time
 
 	recordCreatedErr error
 	recordRemovedErr error
@@ -375,7 +382,7 @@ type fakeWorktreeRepository struct {
 }
 
 func newFakeWorktreeRepository() *fakeWorktreeRepository {
-	return &fakeWorktreeRepository{worktrees: map[string]domain.Worktree{}}
+	return &fakeWorktreeRepository{worktrees: map[string]domain.Worktree{}, createdAt: map[string]time.Time{}}
 }
 
 func (f *fakeWorktreeRepository) RecordWorktreeCreated(ctx context.Context, wt domain.Worktree) (domain.Worktree, error) {
@@ -397,15 +404,28 @@ func (f *fakeWorktreeRepository) RecordWorktreeRemoved(ctx context.Context, work
 	return nil
 }
 
-func (f *fakeWorktreeRepository) ListWorktrees(ctx context.Context, projectID string) ([]domain.Worktree, error) {
+func (f *fakeWorktreeRepository) ListWorktrees(ctx context.Context, projectID string, statusIn []string, olderThan *time.Time) ([]domain.Worktree, error) {
 	if f.listErr != nil {
 		return nil, f.listErr
 	}
+	statusSet := make(map[string]bool, len(statusIn))
+	for _, s := range statusIn {
+		statusSet[s] = true
+	}
 	var out []domain.Worktree
 	for _, wt := range f.worktrees {
-		if wt.ProjectID == projectID {
-			out = append(out, wt)
+		if wt.ProjectID != projectID {
+			continue
 		}
+		if len(statusSet) > 0 && !statusSet[string(wt.Status)] {
+			continue
+		}
+		if olderThan != nil {
+			if createdAt, ok := f.createdAt[wt.ID]; !ok || !createdAt.Before(*olderThan) {
+				continue
+			}
+		}
+		out = append(out, wt)
 	}
 	return out, nil
 }

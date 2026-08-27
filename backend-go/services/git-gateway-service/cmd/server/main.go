@@ -179,7 +179,7 @@ func run() error {
 	scanSetupScriptImportsUC := usecase.NewScanSetupScriptImports(resolver, local, relay)
 
 	createWorktreeUC := usecase.NewCreateWorktree(resolver, projectClient, local, relay)
-	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, local, relay)
+	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, scmClient, local, relay)
 	forceDeleteBranchUC := usecase.NewForceDeleteBranch(resolver, local, relay)
 	detectWorktreesUC := usecase.NewDetectWorktrees(resolver, projectClient, local, relay)
 	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(resolver, projectClient, local, relay)

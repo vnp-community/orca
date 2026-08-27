@@ -361,6 +361,21 @@ type ProjectClient interface {
 type SCMClient interface {
 	GetPullRequestBase(ctx context.Context, repoID string, prNumber int32) (baseBranch, baseSHA string, err error)
 	GetMergeRequestBase(ctx context.Context, repoID string, mrNumber int32) (baseBranch, baseSHA string, err error)
+	// GetPullRequestForBranch looks up the open pull/merge request (if any)
+	// for branch — BR-AT-12's open-PR safety check. found=false (not an
+	// error) means no PR exists for branch; a non-nil err means the lookup
+	// itself failed (e.g. no SCM integration configured for this repo) —
+	// callers fail OPEN on err, per RemoveWorktree.Execute's doc comment.
+	GetPullRequestForBranch(ctx context.Context, tenantID, branch string) (PullRequestInfo, bool, error)
+}
+
+// PullRequestInfo is the minimal PR/MR shape BR-AT-12's open-PR check
+// needs — State is compared against "open" (case-sensitive, matching
+// scm-integration-service's PullRequest.state wire value).
+type PullRequestInfo struct {
+	URL    string
+	State  string
+	Number int32
 }
 
 // dispatchExecutor is the resolve-and-dispatch logic every RPC-shaped

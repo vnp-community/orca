@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/config/config.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — defaultSchedulerInterval changed to 30*time.Second in config.go; no stale 1-minute assertions existed.
 
 ---
 

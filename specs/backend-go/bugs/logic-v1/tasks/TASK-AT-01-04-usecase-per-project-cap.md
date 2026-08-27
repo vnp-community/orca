@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/usecase/create_automation.go`
 **Depends on:** TASK-AT-01-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — CreateAutomation.Execute enforces maxAutomationsPerProject=20 via CountByProject before NewAutomation; ProjectID=="" skips the cap.
 
 ---
 

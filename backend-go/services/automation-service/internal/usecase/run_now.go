@@ -2,6 +2,9 @@ package usecase
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/google/uuid"
@@ -11,34 +14,51 @@ import (
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
 )
 
-// RunNowInput mirrors RunNowRequest (proto/orca/automation/v1/automation.proto),
-// plus Trigger — not on the wire message itself, set by each caller: the
-// gRPC RunNow handler passes RunTriggerManual, internal/adapter/scheduler
-// passes RunTriggerScheduled, HandleExternalTrigger passes
-// RunTriggerExternal. Left empty, it defaults to RunTriggerManual (see
-// Execute) so existing manual-only callers don't need to change.
-type RunNowInput struct {
-	AutomationID string
-	RequestID    string // idempotency key — see automation-service.md §8
-	Trigger      domain.RunTrigger
-}
+// runTimeout is the outer deadline bounding an entire dispatched run's
+// action loop — BR-AT-06. Distinct from workflow-service's own per-step
+// 30-minute deadline: this bounds the WHOLE chain. Package-level var (not
+// const) so RunNow.timeout can default to it while still being overridable
+// per-instance for tests.
+var runTimeout = 2 * time.Hour
+
+// keepRuns is BR-AT-07's retention cap — the most recent N automation_runs
+// rows are kept per automation, older ones pruned best-effort after every
+// dispatch.
+const keepRuns = 30
 
 // RunNow is THE core interactor of this service — see
 // specs/backend-go/services/automation-service.md §2/§6. It is the only
-// code path (scheduler ticks and direct RunNow calls both funnel through
-// it) that dispatches a step, and it does so by calling out to
-// workflow-service.ExecuteAdHocStep over real gRPC (WorkflowStepExecutor),
-// never by executing anything locally. This closes TS Gap 3: TS's
-// automation.runNow had no working dispatcher and every triggered run
-// resolved skipped_unavailable.
+// code path (scheduler ticks, direct RunNow calls, and event-triggered
+// dispatches all funnel through it) that dispatches a step, and it does so
+// by calling out to workflow-service.ExecuteAdHocStep over real gRPC
+// (WorkflowStepExecutor), never by executing anything locally. This closes
+// TS Gap 3: TS's automation.runNow had no working dispatcher and every
+// triggered run resolved skipped_unavailable.
 type RunNow struct {
 	automations AutomationRepository
 	runs        AutomationRunRepository
 	executor    WorkflowStepExecutor
+	logger      *slog.Logger
+	// timeout defaults to runTimeout — same-package tests shorten it
+	// directly (uc.timeout = ...) rather than waiting 2 real hours.
+	timeout time.Duration
 }
 
 func NewRunNow(automations AutomationRepository, runs AutomationRunRepository, executor WorkflowStepExecutor) *RunNow {
-	return &RunNow{automations: automations, runs: runs, executor: executor}
+	return &RunNow{automations: automations, runs: runs, executor: executor, logger: slog.Default(), timeout: runTimeout}
+}
+
+// RunNowInput mirrors RunNowRequest (proto/orca/automation/v1/automation.proto),
+// plus Trigger — not on the wire message itself, set by each caller: the
+// gRPC RunNow handler passes RunTriggerManual, internal/adapter/scheduler
+// passes RunTriggerScheduled, HandleEventTrigger passes RunTriggerEvent,
+// HandleExternalTrigger passes RunTriggerExternal. Left empty, it defaults
+// to RunTriggerManual (see Execute) so existing manual-only callers don't
+// need to change.
+type RunNowInput struct {
+	AutomationID string
+	RequestID    string // idempotency key — see automation-service.md §8
+	Trigger      domain.RunTrigger
 }
 
 func (uc *RunNow) Execute(ctx context.Context, in RunNowInput) (domain.AutomationRun, error) {
@@ -64,12 +84,9 @@ func (uc *RunNow) Execute(ctx context.Context, in RunNowInput) (domain.Automatio
 		return existing, nil
 	}
 
-	// step_type is now a first-class stored column on Automation (migration
-	// 0002) rather than a key inside step_config_json — see
-	// domain.NewAutomation's doc comment. It's already guaranteed valid
-	// (NewAutomation defaults StepTypeUnspecified to StepTypeAgent at
-	// creation time), but default again defensively here in case a row
-	// predates that migration and still has an empty step_type.
+	// step_type/step_config_json mirror Actions[0] (see
+	// domain.NewAutomation) — kept for AutomationRun's own back-compat
+	// top-level fields.
 	stepType := automation.StepType
 	if !stepType.Valid() {
 		stepType = domain.StepTypeAgent
@@ -103,45 +120,137 @@ func (uc *RunNow) Execute(ctx context.Context, in RunNowInput) (domain.Automatio
 		return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_TRANSITION_FAILED", "failed to transition run to running", err)
 	}
 	if err := uc.runs.UpdateStatus(ctx, running); err != nil {
+		// BR-AT-08: a concurrent dispatch (manual RunNow racing the
+		// scheduler ticker, or two replicas' ticks) already claimed the
+		// 'running' slot for this automation — return the winner's run
+		// instead of treating this as a real failure.
+		if errors.Is(err, ErrConcurrentRunActive) {
+			if existing, found, ferr := uc.runs.FindRunning(ctx, tenantID, automation.ID); ferr == nil && found {
+				return existing, nil
+			}
+		}
 		return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_UPDATE_FAILED", "failed to persist run status", err)
 	}
 
+	timeout := uc.timeout
+	if timeout <= 0 {
+		timeout = runTimeout
+	}
+	runCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
 	// THE cross-service call this whole service exists for: delegate step
-	// execution to workflow-service, never execute it here.
-	result, execErr := uc.executor.ExecuteAdHocStep(ctx, ExecuteAdHocStepInput{
-		TenantID:       tenantID,
-		StepType:       stepType,
-		StepConfigJSON: automation.StepConfigJSON,
-		RequestID:      in.RequestID,
-	})
-	if execErr != nil {
+	// execution to workflow-service, never execute it here. Dispatches
+	// automation.Actions in order (BR-AT-01), honoring each action's
+	// OnFailure policy.
+	var results []domain.ActionResult
+	runFailed := false
+	timedOut := false
+	// lastTransportErr is set only by a technical dispatch failure (the
+	// executor call itself erroring — workflow-service unreachable, etc.),
+	// never by a business-level step failure (result.Status == "failed").
+	// RunNow fails closed (returns an error to its caller) only for the
+	// former, per automation-service.md §8 — a business-level step failure
+	// is recorded on the run but is not itself a RunNow error.
+	var lastTransportErr error
+	for i, action := range automation.Actions {
+		result, execErr := uc.executor.ExecuteAdHocStep(runCtx, ExecuteAdHocStepInput{
+			TenantID:       tenantID,
+			StepType:       action.StepType,
+			StepConfigJSON: action.StepConfigJSON,
+			RequestID:      fmt.Sprintf("%s:%d", in.RequestID, i), // per-action idempotency suffix
+		})
+
+		if errors.Is(runCtx.Err(), context.DeadlineExceeded) {
+			timedOut = true
+			runFailed = true
+			ar := domain.ActionResult{Index: i, Status: "failed", ErrorMessage: "automation run exceeded 2h timeout"}
+			results = append(results, ar)
+			break
+		}
+
+		ar := domain.ActionResult{Index: i}
+		switch {
+		case execErr != nil:
+			ar.Status = "failed"
+			ar.ErrorMessage = execErr.Error()
+			lastTransportErr = execErr
+		case result.Status == "failed":
+			ar.Status = "failed"
+			ar.ErrorMessage = result.OutputJSON
+			ar.OutputJSON = result.OutputJSON
+			lastTransportErr = nil
+		default:
+			ar.Status = "succeeded"
+			ar.OutputJSON = result.OutputJSON
+			lastTransportErr = nil
+		}
+		results = append(results, ar)
+
+		if ar.Status == "failed" {
+			policy := action.OnFailure
+			if policy == "" {
+				policy = domain.OnFailureStop
+			}
+			if policy == domain.OnFailureStop {
+				runFailed = true
+				break
+			}
+		}
+	}
+
+	completedAt := time.Now().UTC()
+	last := domain.ActionResult{}
+	if len(results) > 0 {
+		last = results[len(results)-1]
+	}
+
+	var final domain.AutomationRun
+	if runFailed {
+		reason := last.ErrorMessage
+		if timedOut {
+			reason = "automation run exceeded 2h timeout"
+		}
+		failed, ferr := running.MarkFailed(completedAt, reason)
+		if ferr != nil {
+			return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_TRANSITION_FAILED", "failed to transition run to failed", ferr)
+		}
+		failed.OutputJSON = last.OutputJSON
+		failed.ActionResults = results
+		final = failed
+	} else {
+		succeeded, serr := running.MarkSucceeded(completedAt, last.OutputJSON)
+		if serr != nil {
+			return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_TRANSITION_FAILED", "failed to transition run to succeeded", serr)
+		}
+		succeeded.ActionResults = results
+		final = succeeded
+	}
+
+	// ctx, not runCtx — runCtx may already be expired on a timeout, and
+	// persisting the terminal status must still succeed.
+	if err := uc.runs.UpdateStatus(ctx, final); err != nil {
+		return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_UPDATE_FAILED", "failed to persist run status", err)
+	}
+
+	// BR-AT-07 — best-effort retention prune, never fails the run itself.
+	if err := uc.runs.PruneOldRuns(ctx, tenantID, automation.ID, keepRuns); err != nil {
+		uc.logger.Warn("failed to prune old automation runs", "error", err, "automation_id", automation.ID)
+	}
+
+	switch {
+	case timedOut:
+		return final, apperrors.New(apperrors.KindDeadlineExceeded, "AUTOMATION_RUN_TIMEOUT", "run exceeded 2h timeout", runCtx.Err())
+	case runFailed && lastTransportErr != nil:
 		// Fail closed, per automation-service.md §8 — availability of
 		// CRUD/list stays independent of workflow-service, but a run that
 		// couldn't be dispatched is recorded Failed, never silently
 		// swallowed the way TS's skipped_unavailable was.
-		if failed, ferr := running.MarkFailed(time.Now().UTC(), execErr.Error()); ferr == nil {
-			_ = uc.runs.UpdateStatus(ctx, failed) // best-effort; the transport error below is still returned either way
-		}
-		return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_WORKFLOW_UNAVAILABLE", "workflow-service call failed", execErr)
+		return final, apperrors.New(apperrors.KindInternal, "AUTOMATION_WORKFLOW_UNAVAILABLE", "workflow-service call failed", lastTransportErr)
+	default:
+		// Either succeeded, or failed at the business level (the executor
+		// itself was reachable and reported result.Status == "failed") —
+		// not a RunNow error.
+		return final, nil
 	}
-
-	if result.Status == "failed" {
-		failed, err := running.MarkFailed(time.Now().UTC(), result.OutputJSON)
-		if err != nil {
-			return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_TRANSITION_FAILED", "failed to transition run to failed", err)
-		}
-		if err := uc.runs.UpdateStatus(ctx, failed); err != nil {
-			return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_UPDATE_FAILED", "failed to persist run status", err)
-		}
-		return failed, nil
-	}
-
-	succeeded, err := running.MarkSucceeded(time.Now().UTC(), result.OutputJSON)
-	if err != nil {
-		return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_TRANSITION_FAILED", "failed to transition run to succeeded", err)
-	}
-	if err := uc.runs.UpdateStatus(ctx, succeeded); err != nil {
-		return domain.AutomationRun{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_RUN_UPDATE_FAILED", "failed to persist run status", err)
-	}
-	return succeeded, nil
 }
