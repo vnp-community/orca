@@ -188,10 +188,11 @@ type DevServerAgentClient interface {
 
 // SpawnPtyInput carries pty.create's request fields.
 type SpawnPtyInput struct {
-	Cwd   string
-	Shell string
-	Cols  int32
-	Rows  int32
+	Cwd              string
+	Shell            string
+	Cols             int32
+	Rows             int32
+	ShellIntegration bool // BR-TM-13 — forwarded to the agent's pty.create, never inspected here
 }
 
 // SpawnPtyResult carries pty.create's response fields — Cols/Rows/Cwd/Shell
@@ -262,3 +263,36 @@ type TerminalSessionRepository interface {
 	// a duplicate/racing close request never fails the caller.
 	Close(ctx context.Context, tenantID, ptyID string, closedAt time.Time) error
 }
+
+// TerminalScrollbackSnapshotRepository is the persistence port for
+// infra.terminal_scrollback_snapshots (migrations/0007) — parallel in shape
+// to TerminalSessionRepository, tenantID threaded explicitly on every
+// method for the same reason that port's doc comment gives: an explicit
+// parameter makes the tenant join impossible to forget at any
+// implementation's call site.
+type TerminalScrollbackSnapshotRepository interface {
+	// Upsert writes or replaces the (tenantID, worktreeID, paneKey) row.
+	Upsert(ctx context.Context, snap domain.TerminalScrollbackSnapshot) error
+	// Get returns found=false, nil error when no snapshot exists yet for
+	// this pane — mirrors ConnectionResolver's found-bool convention.
+	Get(ctx context.Context, tenantID, worktreeID, paneKey string) (found bool, snap domain.TerminalScrollbackSnapshot, err error)
+	// SumUncompressedBytes returns the current total across every pane for
+	// worktreeID, EXCLUDING paneKey itself (the row Upsert is about to
+	// replace) — backs BR-TM-10's per-worktree cap check.
+	SumUncompressedBytes(ctx context.Context, tenantID, worktreeID, excludePaneKey string) (int64, error)
+	// DeleteByWorktree removes every pane's snapshot for worktreeID — backs
+	// git-gateway-service's RemoveWorktree cleanup hook.
+	DeleteByWorktree(ctx context.Context, tenantID, worktreeID string) error
+	// DeleteExpired removes every row with updated_at older than
+	// domain.ScrollbackSnapshotTTL — backs BR-TM-12's sweep, called from a
+	// scheduled job the same way fleet_health_samples' retention prune is.
+	DeleteExpired(ctx context.Context, olderThan time.Time) (deletedCount int, err error)
+}
+
+// Clock abstracts time.Now for deterministic tests.
+type Clock interface{ Now() time.Time }
+
+// RealClock is the real Clock, wired in cmd/server/main.go.
+type RealClock struct{}
+
+func (RealClock) Now() time.Time { return time.Now().UTC() }

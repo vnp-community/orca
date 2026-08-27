@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/get_terminal_scrollback_snapshot.go` (+ `delete_terminal_scrollback_snapshots.go`, `expire_terminal_scrollback_snapshots.go`)
 **Depends on:** TASK-TM-03-04 (repository port), TASK-TM-03-05 (gzip helpers)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Get/Delete/Expire usecases + tests added; `go test -run "TestGetTerminalScrollbackSnapshot|TestDeleteTerminalScrollbackSnapshots|TestExpireTerminalScrollbackSnapshots"` — 5/5 pass.
 
 ---
 

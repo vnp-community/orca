@@ -136,7 +136,7 @@ func (fakeExecutor) WriteFileChunk(context.Context, string, string, int64, []byt
 }
 
 func (fakeExecutor) CreateDir(context.Context, string, string, bool, bool) error { return nil }
-func (fakeExecutor) Delete(context.Context, string, string, bool) error         { return nil }
+func (fakeExecutor) Delete(context.Context, string, string, bool) error          { return nil }
 
 func (fakeExecutor) Stat(context.Context, string, string) (domain.FileStat, error) {
 	return domain.FileStat{Exists: true, SizeBytes: 7}, nil
@@ -274,6 +274,17 @@ func (fakeProjectClient) RecordWorktreeRemoved(context.Context, string) error {
 	return nil
 }
 
+// fakeScrollbackCleaner is a usecase.ScrollbackCleaner stub — this file's
+// tests exercise the gRPC wire<->usecase translation, not RemoveWorktree's
+// best-effort cleanup call itself (that's internal/usecase's own test
+// suite); this just needs to satisfy NewRemoveWorktree's constructor
+// signature with something that succeeds.
+type fakeScrollbackCleaner struct{}
+
+func (fakeScrollbackCleaner) DeleteTerminalScrollbackSnapshots(context.Context, string) error {
+	return nil
+}
+
 type fakeSCMClient struct{}
 
 func (fakeSCMClient) GetPullRequestBase(context.Context, string, int32) (string, string, error) {
@@ -354,7 +365,7 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewWriteIssueCommand(resolver, exec, exec),
 		usecase.NewScanSetupScriptImports(resolver, exec, exec),
 		usecase.NewCreateWorktree(resolver, projects, exec, exec),
-		usecase.NewRemoveWorktree(resolver, projects, exec, exec),
+		usecase.NewRemoveWorktree(resolver, projects, fakeScrollbackCleaner{}, exec, exec),
 		usecase.NewForceDeleteBranch(resolver, exec, exec),
 		usecase.NewDetectWorktrees(resolver, projects, exec, exec),
 		usecase.NewPrefetchCreateBase(resolver, projects, exec, exec),

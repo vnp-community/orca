@@ -54,6 +54,11 @@ type Server struct {
 	createBrowserProfile   *usecase.CreateBrowserProfile
 	deleteBrowserProfile   *usecase.DeleteBrowserProfile
 
+	// --- Terminal scrollback persistence (SOL-TM-03) ---
+	saveTerminalScrollbackSnapshot    *usecase.SaveTerminalScrollbackSnapshot
+	getTerminalScrollbackSnapshot     *usecase.GetTerminalScrollbackSnapshot
+	deleteTerminalScrollbackSnapshots *usecase.DeleteTerminalScrollbackSnapshots
+
 	// --- Emulator relay (TASK-048) / host capabilities relay (TASK-070) ---
 	// Shipped-but-honestly-inert until agent/ gains device.*/host.capabilities
 	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
@@ -89,6 +94,9 @@ func New(
 	deleteBrowserProfile *usecase.DeleteBrowserProfile,
 	emulatorRelay *usecase.EmulatorRelay,
 	getHostCapabilities *usecase.GetHostCapabilities,
+	saveTerminalScrollbackSnapshot *usecase.SaveTerminalScrollbackSnapshot,
+	getTerminalScrollbackSnapshot *usecase.GetTerminalScrollbackSnapshot,
+	deleteTerminalScrollbackSnapshots *usecase.DeleteTerminalScrollbackSnapshots,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -118,6 +126,10 @@ func New(
 		deleteBrowserProfile:   deleteBrowserProfile,
 		emulatorRelay:          emulatorRelay,
 		getHostCapabilities:    getHostCapabilities,
+
+		saveTerminalScrollbackSnapshot:    saveTerminalScrollbackSnapshot,
+		getTerminalScrollbackSnapshot:     getTerminalScrollbackSnapshot,
+		deleteTerminalScrollbackSnapshots: deleteTerminalScrollbackSnapshots,
 	}
 }
 
@@ -373,11 +385,12 @@ func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 
 func (s *Server) SpawnTerminalSession(ctx context.Context, req *infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
 	session, err := s.spawnTerminalSession.Execute(ctx, usecase.SpawnTerminalSessionInput{
-		ConnectionID: req.GetConnectionId(),
-		Cwd:          req.GetCwd(),
-		Shell:        req.GetShell(),
-		Cols:         req.GetCols(),
-		Rows:         req.GetRows(),
+		ConnectionID:     req.GetConnectionId(),
+		Cwd:              req.GetCwd(),
+		Shell:            req.GetShell(),
+		Cols:             req.GetCols(),
+		Rows:             req.GetRows(),
+		ShellIntegration: req.GetShellIntegration(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -456,6 +469,37 @@ func (s *Server) InspectTerminalProcess(ctx context.Context, req *infrafleetv1.I
 		Command: result.Command,
 		Cwd:     result.Cwd,
 	}, nil
+}
+
+// --- Terminal scrollback persistence (SOL-TM-03) ---
+
+func (s *Server) SaveTerminalScrollbackSnapshot(ctx context.Context, req *infrafleetv1.SaveTerminalScrollbackSnapshotRequest) (*emptypb.Empty, error) {
+	err := s.saveTerminalScrollbackSnapshot.Execute(ctx, usecase.SaveTerminalScrollbackSnapshotInput{
+		WorktreeID: req.GetWorktreeId(), PaneKey: req.GetPaneKey(),
+		Cols: req.GetCols(), Rows: req.GetRows(), Data: req.GetData(), LastTitle: req.GetLastTitle(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) GetTerminalScrollbackSnapshot(ctx context.Context, req *infrafleetv1.GetTerminalScrollbackSnapshotRequest) (*infrafleetv1.GetTerminalScrollbackSnapshotResponse, error) {
+	result, err := s.getTerminalScrollbackSnapshot.Execute(ctx, req.GetWorktreeId(), req.GetPaneKey())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.GetTerminalScrollbackSnapshotResponse{
+		Found: result.Found, Cols: result.Cols, Rows: result.Rows, Data: result.Data,
+		LastTitle: result.LastTitle, UpdatedAtUnixMs: result.UpdatedAt.UnixMilli(),
+	}, nil
+}
+
+func (s *Server) DeleteTerminalScrollbackSnapshots(ctx context.Context, req *infrafleetv1.DeleteTerminalScrollbackSnapshotsRequest) (*emptypb.Empty, error) {
+	if err := s.deleteTerminalScrollbackSnapshots.Execute(ctx, req.GetWorktreeId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 // AttachPty implements the bidirectional streaming RPC: pumps

@@ -5,7 +5,7 @@
 **Service:** agent/ (Dev Server Agent)
 **File:** `agent/src/relay/pty-handler.ts`
 **Depends on:** TASK-TM-04-02 (`getRelayShellLaunchConfig` accepts the option)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — pty-handler.ts's spawn() reads params.shellIntegration (default false) and threads it through; agent-rpc-dispatch.ts doc comment updated. `npx vitest run src/relay/pty-handler.test.ts -t shellIntegration` — 2/2 new pass. Pre-existing unrelated failure in the same file ("spawns a PTY and returns an id" — return-shape drift, untouched by this change) confirmed present before and unaffected by this diff.
 
 ---
 

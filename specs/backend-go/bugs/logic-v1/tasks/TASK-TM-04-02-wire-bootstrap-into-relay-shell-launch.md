@@ -5,7 +5,7 @@
 **Service:** agent/ (Dev Server Agent)
 **File:** `agent/src/relay/pty-shell-launch.ts`
 **Depends on:** TASK-TM-04-01 (bootstrap export)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — windowsShellArgs + getRelayShellLaunchConfig now accept shellIntegration (default-false, opt-in); `npx vitest run src/relay/pty-shell-launch.test.ts` — 16/16 pass (5 new cases covering true/false/omitted, cmd/wsl unaffected, POSIX unaffected).
 
 ---
 

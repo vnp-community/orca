@@ -82,6 +82,57 @@ func TestSpawnTerminalSession_ResolvedConnection_SpawnsAndPersists(t *testing.T)
 	}
 }
 
+// TestSpawnTerminalSession_ShellIntegration_ReachesSpawnPtyInputUnmodified is
+// TASK-TM-04-06's regression guard: coordination decides whether (the
+// boolean), execution decides how — this usecase must forward
+// ShellIntegration unexamined.
+func TestSpawnTerminalSession_ShellIntegration_ReachesSpawnPtyInputUnmodified(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
+	agent := &fakeDevServerAgentClient{spawnPtyResult: SpawnPtyResult{PtyID: "pty-abc"}}
+	sessions := &fakeTerminalSessionRepository{}
+	uc := NewSpawnTerminalSession(resolver, agent, sessions, false)
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	if _, err := uc.Execute(ctx, SpawnTerminalSessionInput{ConnectionID: "conn-1", ShellIntegration: true}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(agent.spawnPtyCalls) != 1 {
+		t.Fatalf("expected exactly one SpawnPty call, got %d", len(agent.spawnPtyCalls))
+	}
+	if !agent.spawnPtyCalls[0].ShellIntegration {
+		t.Error("expected ShellIntegration=true to reach SpawnPtyInput unmodified")
+	}
+}
+
+// TestSpawnTerminalSession_ShellIntegration_DefaultsFalse confirms existing
+// callers that never set ShellIntegration keep seeing false — no behavior
+// change for callers unaware of BR-TM-13.
+func TestSpawnTerminalSession_ShellIntegration_DefaultsFalse(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
+	agent := &fakeDevServerAgentClient{spawnPtyResult: SpawnPtyResult{PtyID: "pty-abc"}}
+	sessions := &fakeTerminalSessionRepository{}
+	uc := NewSpawnTerminalSession(resolver, agent, sessions, false)
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	if _, err := uc.Execute(ctx, SpawnTerminalSessionInput{ConnectionID: "conn-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(agent.spawnPtyCalls) != 1 {
+		t.Fatalf("expected exactly one SpawnPty call, got %d", len(agent.spawnPtyCalls))
+	}
+	if agent.spawnPtyCalls[0].ShellIntegration {
+		t.Error("expected ShellIntegration to default to false when unset")
+	}
+}
+
 func TestSpawnTerminalSession_AgentFailurePropagates(t *testing.T) {
 	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
 	if err != nil {

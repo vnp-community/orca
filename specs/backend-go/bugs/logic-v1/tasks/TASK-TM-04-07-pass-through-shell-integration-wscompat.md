@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_terminal.go`
 **Depends on:** TASK-TM-04-05 (proto field), TASK-TM-04-06 (infra-fleet-service accepts it)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `terminalCreateArgs.ShellIntegration` forwarded to `SpawnTerminalSessionRequest`; `go build ./services/api-gateway/...` clean, `TestTerminalCreate*` (incl. new ShellIntegration pass-through + omitted-defaults-false regression cases) pass.
 
 ---
 
