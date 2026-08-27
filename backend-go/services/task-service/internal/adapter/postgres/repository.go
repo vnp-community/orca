@@ -131,13 +131,13 @@ func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task,
 	_, err := r.db.Exec(ctx, `
 		INSERT INTO task.tasks (
 			id, tenant_id, title, status, parent_id, project_id,
-			description, task_type, priority, assignee_id, due_date,
+			description, task_type, priority, assignee_id, owner_id, due_date,
 			estimated_hours, prompt_template, ai_context, visibility
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)
 	`, task.ID, task.TenantID, task.Title, task.Status, nullableUUID(task.ParentID), nullableUUID(task.ProjectID),
 		task.Description, orDefault(task.Type, "task"), orDefault(task.Priority, "medium"), nullableUUID(task.AssigneeID),
-		task.DueDate, task.EstimatedHours, task.PromptTemplate, task.AIContext, orDefault(task.Visibility, "team"))
+		nullableUUID(task.OwnerID), task.DueDate, task.EstimatedHours, task.PromptTemplate, task.AIContext, orDefault(task.Visibility, "team"))
 	if err != nil {
 		return domain.Task{}, fmt.Errorf("postgres: insert task: %w", err)
 	}

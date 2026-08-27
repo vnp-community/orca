@@ -68,6 +68,23 @@ func (uc *ResolvePermission) Execute(ctx context.Context, in ResolvePermissionIn
 		return domain.GrantLevelUnspecified, apperrors.New(apperrors.KindInternal, "TASK_GRANT_LIST_FAILED", "failed to list grants for ancestor chain", err)
 	}
 
+	// Owner-intrinsic short-circuit: synthesize an Owner-level grant at the
+	// target task, ApplyTree=true, so an owner behaves identically to a
+	// real owner grant for the whole subtree they'd expect to manage —
+	// without a stored row. ancestors[0] is the target task itself (same
+	// convention GetAncestors always returns). Pulled forward from
+	// TASK-TG-03-06 into this task (TASK-TG-03-01) — without it, Grant's
+	// new manage-access check would lock every new task's creator out of
+	// granting anyone else access, since CreateTask sets Task.OwnerID but a
+	// brand-new task otherwise has no grant rows at all yet. TASK-TG-03-06
+	// extends this same block with expiry/now handling once
+	// domain.Grant.ExpiresAt exists.
+	if len(ancestors) > 0 && in.UserID != "" && ancestors[0].OwnerID == in.UserID {
+		grantsByTask[ancestors[0].ID] = append(grantsByTask[ancestors[0].ID], domain.Grant{
+			TaskID: ancestors[0].ID, SubjectID: in.UserID, Level: domain.GrantLevelOwner, ApplyTree: true,
+		})
+	}
+
 	teamIDs, err := uc.teams.ResolveTeams(ctx, tenantID, in.UserID)
 	if err != nil {
 		return domain.GrantLevelUnspecified, apperrors.New(apperrors.KindInternal, "TASK_TEAM_RESOLVE_FAILED", "failed to resolve caller's team membership", err)

@@ -60,6 +60,15 @@ func (uc *CreateTask) Execute(ctx context.Context, in CreateTaskInput) (domain.T
 	if err != nil {
 		return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_INVALID", err.Error(), err)
 	}
+	// OwnerID = the creating user — see TASK-TG-03-01's "first-caller
+	// bootstrap" note: without this, Grant's new manage-access check
+	// (grant.go) would lock every new task's creator out of granting
+	// anyone else access, since a brand-new task has no grant rows at all
+	// yet. ResolvePermission's owner-intrinsic short-circuit
+	// (resolve_permission.go) treats this field as an implicit Owner grant
+	// with zero stored rows.
+	callerID, _ := tenant.UserID(ctx)
+	task.OwnerID = callerID
 	// Widened fields are set directly (not part of NewTask's signature,
 	// which stays backward compatible per TASK-TG-01-03) — every one of
 	// them is optional, zero-value-valid.

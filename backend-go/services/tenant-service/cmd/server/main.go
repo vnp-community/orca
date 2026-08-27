@@ -129,6 +129,7 @@ func run() error {
 	createTeamUC := usecase.NewCreateTeam(companies, teams)
 	addTeamMemberUC := usecase.NewAddTeamMember(teams, profileCache, invalidationPublisher)
 	listTeamMembersUC := usecase.NewListTeamMembers(teams)
+	listTeamsForUserUC := usecase.NewListTeamsForUser(teams)
 	getUserProfileUC := usecase.NewGetUserProfile(profiles)
 	listDepartmentsUC := usecase.NewListDepartments(departments)
 	updateCompanyUC := usecase.NewUpdateCompany(companies, profiles, profileCache, invalidationPublisher)
@@ -147,6 +148,7 @@ func run() error {
 		createTeamUC,
 		addTeamMemberUC,
 		listTeamMembersUC,
+		listTeamsForUserUC,
 		getUserProfileUC,
 		listDepartmentsUC,
 		updateCompanyUC,

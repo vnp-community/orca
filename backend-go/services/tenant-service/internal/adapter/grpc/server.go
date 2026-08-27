@@ -37,6 +37,7 @@ type Server struct {
 	createTeam         *usecase.CreateTeam
 	addTeamMember      *usecase.AddTeamMember
 	listTeamMembers    *usecase.ListTeamMembers
+	listTeamsForUser   *usecase.ListTeamsForUser
 	getUserProfile     *usecase.GetUserProfile
 	listDepartments    *usecase.ListDepartments
 	updateCompany      *usecase.UpdateCompany
@@ -55,6 +56,7 @@ func New(
 	createTeam *usecase.CreateTeam,
 	addTeamMember *usecase.AddTeamMember,
 	listTeamMembers *usecase.ListTeamMembers,
+	listTeamsForUser *usecase.ListTeamsForUser,
 	getUserProfile *usecase.GetUserProfile,
 	listDepartments *usecase.ListDepartments,
 	updateCompany *usecase.UpdateCompany,
@@ -72,6 +74,7 @@ func New(
 		createTeam:         createTeam,
 		addTeamMember:      addTeamMember,
 		listTeamMembers:    listTeamMembers,
+		listTeamsForUser:   listTeamsForUser,
 		getUserProfile:     getUserProfile,
 		listDepartments:    listDepartments,
 		updateCompany:      updateCompany,
@@ -182,6 +185,14 @@ func (s *Server) ListTeamMembers(ctx context.Context, req *tenantv1.ListTeamMemb
 		out = append(out, &tenantv1.TeamMember{UserId: m.UserID, Priority: m.Priority})
 	}
 	return &tenantv1.ListTeamMembersResponse{Members: out}, nil
+}
+
+func (s *Server) ListTeamsForUser(ctx context.Context, req *tenantv1.ListTeamsForUserRequest) (*tenantv1.ListTeamsForUserResponse, error) {
+	teamIDs, err := s.listTeamsForUser.Execute(ctx, req.GetTenantId(), req.GetUserId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.ListTeamsForUserResponse{TeamIds: teamIDs}, nil
 }
 
 func (s *Server) GetUserProfile(ctx context.Context, req *tenantv1.GetUserProfileRequest) (*tenantv1.GetUserProfileResponse, error) {

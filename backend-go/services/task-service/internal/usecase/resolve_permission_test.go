@@ -143,6 +143,58 @@ func TestResolvePermission_DeniesWhenOPADecisionIsFalse(t *testing.T) {
 	}
 }
 
+// TestResolvePermission_OwnerIntrinsicShortCircuit_ZeroGrantRows locks in
+// TASK-TG-03-01's bootstrap fix: a caller whose ID matches Task.OwnerID
+// resolves GrantLevelOwner with ZERO rows in grantsByTask — no stored grant
+// needed at all.
+func TestResolvePermission_OwnerIntrinsicShortCircuit_ZeroGrantRows(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	task, err := domain.NewTask("task-1", "tenant-1", "task-1", domain.StatusOpen, "", "")
+	if err != nil {
+		t.Fatalf("building task: %v", err)
+	}
+	task.OwnerID = "user-1"
+	tasks.tasks["task-1"] = task
+
+	opa := &fakeOPAClient{allow: true}
+	uc := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, opa)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	level, err := uc.Execute(ctx, ResolvePermissionInput{TaskID: "task-1", UserID: "user-1", Action: "manage"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if level != domain.GrantLevelOwner {
+		t.Errorf("expected the owner-intrinsic short-circuit to resolve GrantLevelOwner, got %v", level)
+	}
+}
+
+// TestResolvePermission_NonOwnerWithRealGrant_ResolvesThatGrantNotOwner
+// confirms the short-circuit only fires for the actual owner — a non-owner
+// with a real GrantLevelUser grant resolves THAT grant, not Owner.
+func TestResolvePermission_NonOwnerWithRealGrant_ResolvesThatGrantNotOwner(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	task, err := domain.NewTask("task-1", "tenant-1", "task-1", domain.StatusOpen, "", "")
+	if err != nil {
+		t.Fatalf("building task: %v", err)
+	}
+	task.OwnerID = "someone-else"
+	tasks.tasks["task-1"] = task
+	grants := &fakeGrantRepository{grants: []domain.Grant{
+		{TaskID: "task-1", SubjectID: "user-1", Level: domain.GrantLevelUser, ApplyTree: false},
+	}}
+	uc := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	level, err := uc.Execute(ctx, ResolvePermissionInput{TaskID: "task-1", UserID: "user-1", Action: "read"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if level != domain.GrantLevelUser {
+		t.Errorf("expected GrantLevelUser (not Owner) for a non-owner caller, got %v", level)
+	}
+}
+
 func TestResolvePermission_FailsClosedOnOPAEvaluationError(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	setupChain(t, tasks, "tenant-1", "task-1")

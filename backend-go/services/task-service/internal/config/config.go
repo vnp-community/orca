@@ -33,6 +33,9 @@ type Config struct {
 	// ProjectServiceAddr is where ProjectContextResolver (TASK-TG-02-04)
 	// dials project-service's GetProject/ListRepos RPCs.
 	ProjectServiceAddr string
+	// TenantServiceAddr is where TeamScopeResolver (TASK-TG-03-03) dials
+	// tenant-service's ListTeamsForUser RPC (TASK-TG-03-02).
+	TenantServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -47,5 +50,6 @@ func Load() (Config, error) {
 		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 		GitGatewayServiceAddr: commonconfig.StringEnv("GIT_GATEWAY_SERVICE_ADDR", "git-gateway-service:9090"),
 		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
+		TenantServiceAddr:     commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
 	}, nil
 }

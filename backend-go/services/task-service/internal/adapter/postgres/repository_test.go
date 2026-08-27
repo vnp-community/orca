@@ -46,6 +46,54 @@ func setupRepository(t *testing.T) *Repository {
 	return New(pool)
 }
 
+// TestRepository_Create_PersistsAllFields round-trips every widened
+// column (TASK-TG-01-04) through a real Postgres — Create's INSERT and
+// Get's SELECT must agree on taskColumns' order.
+func TestRepository_Create_PersistsAllFields(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+	dueDate := time.Now().Truncate(time.Second).UTC()
+	estimatedHours := 4.5
+
+	task := domain.Task{
+		ID: uuid.NewString(), TenantID: tenantID, Title: "Widened task", Status: domain.StatusOpen,
+		Description: "a description", Type: "bug", Priority: "high", AssigneeID: uuid.NewString(),
+		OwnerID: uuid.NewString(), DueDate: &dueDate, EstimatedHours: &estimatedHours,
+		PromptTemplate: "do the thing", AIContext: "extra context", Visibility: "private",
+	}
+	created, err := repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+	if created.ID != task.ID {
+		t.Fatalf("expected Create to return the task as given, got %+v", created)
+	}
+
+	got, err := repo.Get(ctx, tenantID, task.ID)
+	if err != nil {
+		t.Fatalf("get: %v", err)
+	}
+	if got.Description != task.Description || got.Type != task.Type || got.Priority != task.Priority {
+		t.Errorf("unexpected description/type/priority: %+v", got)
+	}
+	if got.AssigneeID != task.AssigneeID || got.OwnerID != task.OwnerID {
+		t.Errorf("unexpected assignee/owner: %+v", got)
+	}
+	if got.PromptTemplate != task.PromptTemplate || got.AIContext != task.AIContext || got.Visibility != task.Visibility {
+		t.Errorf("unexpected prompt_template/ai_context/visibility: %+v", got)
+	}
+	if got.DueDate == nil || !got.DueDate.Equal(dueDate) {
+		t.Errorf("expected DueDate=%v, got %v", dueDate, got.DueDate)
+	}
+	if got.EstimatedHours == nil || *got.EstimatedHours != estimatedHours {
+		t.Errorf("expected EstimatedHours=%v, got %v", estimatedHours, got.EstimatedHours)
+	}
+	if got.ProgressPercent != 0 {
+		t.Errorf("expected default ProgressPercent=0, got %d", got.ProgressPercent)
+	}
+}
+
 func TestRepository_GetAncestors_WalksParentChainToRoot(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()

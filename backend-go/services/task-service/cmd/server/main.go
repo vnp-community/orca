@@ -38,6 +38,7 @@ import (
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
+	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -80,13 +81,20 @@ func run() error {
 
 	repo := taskpostgres.New(pool)
 
-	// team-scope resolution and complex (orchestration-service) execution
-	// dispatch are still STUBS — see internal/adapter/grpcclient's doc
-	// comments and this service's README. simple execution dispatch and
-	// the AI-relay path are real as of TASK-224, dialed against
-	// infra-fleet-service and ai-provider-service below.
-	teamScopeResolver := taskgrpcclient.NewStubTeamScopeResolver()
+	// Complex (orchestration-service) execution dispatch is still a STUB —
+	// see internal/adapter/grpcclient's doc comment and this service's
+	// README. Simple execution dispatch, the AI-relay path, and (as of
+	// TASK-TG-03-03) team-scope resolution are real, dialed against
+	// infra-fleet-service, ai-provider-service, and tenant-service below.
 	complexExecutor := taskgrpcclient.NewStubComplexExecutor()
+
+	tenantConn, err := taskgrpcclient.Dial(cfg.TenantServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing tenant-service: %w", err)
+	}
+	defer func() { _ = tenantConn.Close() }()
+	tenantClient := tenantv1.NewTenantServiceClient(tenantConn)
+	teamScopeResolver := taskgrpcclient.NewTeamScopeResolver(tenantClient)
 
 	infraFleetConn, err := taskgrpcclient.Dial(cfg.InfraFleetServiceAddr)
 	if err != nil {
@@ -138,8 +146,11 @@ func run() error {
 	createTaskUC := usecase.NewCreateTask(repo)
 	getTaskUC := usecase.NewGetTask(repo)
 	addEdgeUC := usecase.NewAddEdge(repo)
-	grantUC := usecase.NewGrant(repo)
+	// resolvePermissionUC must be constructed before grantUC — Grant now
+	// requires 'manage' access to a task before writing a new grant on it,
+	// closing a live authorization gap (TASK-TG-03-01).
 	resolvePermissionUC := usecase.NewResolvePermission(repo, repo, teamScopeResolver, opaClient)
+	grantUC := usecase.NewGrant(repo, resolvePermissionUC)
 	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor)
 	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
 	listTasksUC := usecase.NewListTasks(repo)

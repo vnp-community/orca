@@ -17,6 +17,7 @@ service TenantService {
   rpc CreateTeam(CreateTeamRequest) returns (CreateTeamResponse);
   rpc AddTeamMember(AddTeamMemberRequest) returns (AddTeamMemberResponse);
   rpc ListTeamMembers(ListTeamMembersRequest) returns (ListTeamMembersResponse);
+  rpc ListTeamsForUser(ListTeamsForUserRequest) returns (ListTeamsForUserResponse);
 
   // ── profile.* surface (tenant-service.md §3) ──────────────────────────
   rpc GetUserProfile(GetUserProfileRequest) returns (GetUserProfileResponse);
@@ -122,6 +123,14 @@ message TeamMember {
 
 message ListTeamMembersResponse {
   repeated TeamMember members = 1;
+}
+
+message ListTeamsForUserRequest {
+  string tenant_id = 1;
+  string user_id = 2;
+}
+message ListTeamsForUserResponse {
+  repeated string team_ids = 1;
 }
 
 // UserProfile is the wire shape of tenant.user_profiles — mirrors

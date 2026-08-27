@@ -252,12 +252,16 @@ func (f fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context, 
 func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server {
 	createTaskUC := usecase.NewCreateTask(tasks)
 	addEdgeUC := usecase.NewAddEdge(fakeTxRunner{tasks: tasks, edges: edges})
+	// resolvePermissionUC is shared: Grant now requires it internally
+	// (TASK-TG-03-01's manage-access check) in addition to the standalone
+	// ResolvePermission RPC wiring below.
+	resolvePermissionUC := usecase.NewResolvePermission(tasks, tasks, stubTeams{}, stubOPA{})
 	return New(
 		createTaskUC,
 		usecase.NewGetTask(tasks),
 		addEdgeUC,
-		usecase.NewGrant(tasks),
-		usecase.NewResolvePermission(tasks, tasks, stubTeams{}, stubOPA{}),
+		usecase.NewGrant(tasks, resolvePermissionUC),
+		resolvePermissionUC,
 		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}),
 		usecase.NewHasActiveExecutions(tasks),
 		usecase.NewListTasks(tasks),
