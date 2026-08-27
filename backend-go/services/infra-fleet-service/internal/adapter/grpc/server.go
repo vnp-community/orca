@@ -61,6 +61,7 @@ type Server struct {
 	getHostCapabilities *usecase.GetHostCapabilities
 
 	importFleetInventory *usecase.ImportFleetInventory
+	bulkProvisionFleet   *usecase.BulkProvisionFleet
 }
 
 func New(
@@ -92,6 +93,7 @@ func New(
 	emulatorRelay *usecase.EmulatorRelay,
 	getHostCapabilities *usecase.GetHostCapabilities,
 	importFleetInventory *usecase.ImportFleetInventory,
+	bulkProvisionFleet *usecase.BulkProvisionFleet,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -122,6 +124,7 @@ func New(
 		emulatorRelay:          emulatorRelay,
 		getHostCapabilities:    getHostCapabilities,
 		importFleetInventory:   importFleetInventory,
+		bulkProvisionFleet:     bulkProvisionFleet,
 	}
 }
 
@@ -285,6 +288,26 @@ func (s *Server) ImportFleetInventory(ctx context.Context, req *infrafleetv1.Imp
 	return resp, nil
 }
 
+// BulkProvisionFleet is BL-FLEET-02's fan-out batch-provision entry point —
+// see usecase.BulkProvisionFleet's doc comment.
+func (s *Server) BulkProvisionFleet(ctx context.Context, req *infrafleetv1.BulkProvisionFleetRequest) (*infrafleetv1.BulkProvisionFleetResponse, error) {
+	result, err := s.bulkProvisionFleet.Execute(ctx, usecase.BulkProvisionFleetInput{
+		Project: req.GetProject(), Concurrency: int(req.GetConcurrency()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.BulkProvisionFleetResponse{
+		Success: int32(result.Success), Failed: int32(result.Failed), Skipped: int32(result.Skipped),
+	}
+	for _, o := range result.Outcomes {
+		resp.Outcomes = append(resp.Outcomes, &infrafleetv1.ProvisionOutcome{
+			DevServerId: o.DevServerID, Host: o.Host, Status: o.Status, Error: o.Error,
+		})
+	}
+	return resp, nil
+}
+
 func (s *Server) GetSshState(ctx context.Context, req *infrafleetv1.GetSshStateRequest) (*infrafleetv1.GetSshStateResponse, error) {
 	state, err := s.getSshState.Execute(ctx, usecase.SshStateInput{SshTargetID: req.GetSshTargetId()})
 	if err != nil {
@@ -393,6 +416,7 @@ func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 		Host:        ds.Host,
 		Mode:        toProtoConnectionMode(ds.Mode),
 		SshTargetId: ds.SSHTargetID,
+		Status:      string(ds.Status),
 	}
 }
 

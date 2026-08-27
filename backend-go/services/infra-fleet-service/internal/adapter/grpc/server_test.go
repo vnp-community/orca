@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -21,6 +22,7 @@ import (
 type fakeSshTargetRepo struct {
 	upsertErr error
 	updated   bool
+	targets   []domain.SshTarget
 }
 
 func (f *fakeSshTargetRepo) Create(ctx context.Context, target domain.SshTarget) (domain.SshTarget, error) {
@@ -30,7 +32,7 @@ func (f *fakeSshTargetRepo) Get(ctx context.Context, tenantID, id string) (domai
 	return domain.SshTarget{}, nil
 }
 func (f *fakeSshTargetRepo) List(ctx context.Context, tenantID string) ([]domain.SshTarget, error) {
-	return nil, nil
+	return f.targets, nil
 }
 func (f *fakeSshTargetRepo) Upsert(ctx context.Context, target domain.SshTarget) (domain.SshTarget, bool, error) {
 	if f.upsertErr != nil {
@@ -97,5 +99,67 @@ func TestServer_ImportFleetInventory_UpsertErrorSurfacesAsSkipped(t *testing.T) 
 	}
 	if resp.GetSkipped() != 1 || len(resp.GetErrors()) != 1 {
 		t.Errorf("expected skipped=1 with 1 error, got %+v", resp)
+	}
+}
+
+// fakeDevServerRepo is a minimal usecase.DevServerRepository fake for
+// BulkProvisionFleet's gRPC-level marshaling test.
+type fakeDevServerRepo struct{}
+
+func (f *fakeDevServerRepo) Register(ctx context.Context, ds domain.DevServer) (domain.DevServer, error) {
+	return ds, nil
+}
+func (f *fakeDevServerRepo) Get(ctx context.Context, tenantID, id string) (domain.DevServer, error) {
+	return domain.DevServer{}, nil
+}
+func (f *fakeDevServerRepo) List(ctx context.Context, tenantID string) ([]domain.DevServer, error) {
+	return nil, nil
+}
+func (f *fakeDevServerRepo) FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (domain.DevServer, bool, error) {
+	return domain.DevServer{}, false, nil
+}
+func (f *fakeDevServerRepo) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info usecase.HandshakeInfo, provisionedAt time.Time) error {
+	return nil
+}
+
+// fakeBulkProvisioner is a minimal usecase.Provisioner fake.
+type fakeBulkProvisioner struct{}
+
+func (f *fakeBulkProvisioner) Provision(ctx context.Context, devServer domain.DevServer) (usecase.HandshakeInfo, bool, error) {
+	return usecase.HandshakeInfo{Platform: "linux"}, true, nil
+}
+
+func TestServer_BulkProvisionFleet_RequestToResponseMarshaling(t *testing.T) {
+	sshRepo := &fakeSshTargetRepo{targets: []domain.SshTarget{
+		{ID: "ssht-1", TenantID: "t1", Host: "h1.example.com", UserName: "deploy"},
+	}}
+	s := &Server{bulkProvisionFleet: usecase.NewBulkProvisionFleet(sshRepo, &fakeDevServerRepo{}, &fakeBulkProvisioner{})}
+
+	ctx := tenant.WithTenantID(context.Background(), "t1")
+	resp, err := s.BulkProvisionFleet(ctx, &infrafleetv1.BulkProvisionFleetRequest{Concurrency: 2})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetSuccess() != 1 || len(resp.GetOutcomes()) != 1 {
+		t.Errorf("expected success=1 with 1 outcome, got %+v", resp)
+	}
+	if resp.GetOutcomes()[0].GetHost() != "h1.example.com" || resp.GetOutcomes()[0].GetStatus() != string(domain.DevServerStatusHealthy) {
+		t.Errorf("unexpected outcome: %+v", resp.GetOutcomes()[0])
+	}
+}
+
+func TestServer_BulkProvisionFleet_UsecaseErrorMapsToGRPCStatus(t *testing.T) {
+	s := &Server{bulkProvisionFleet: usecase.NewBulkProvisionFleet(&fakeSshTargetRepo{}, &fakeDevServerRepo{}, &fakeBulkProvisioner{})}
+
+	_, err := s.BulkProvisionFleet(context.Background(), &infrafleetv1.BulkProvisionFleetRequest{})
+	if err == nil {
+		t.Fatal("expected an error when no tenant is present in the request context")
+	}
+	st, ok := status.FromError(err)
+	if !ok {
+		t.Fatalf("expected a gRPC status error, got %v", err)
+	}
+	if st.Code() != codes.Unauthenticated {
+		t.Errorf("expected codes.Unauthenticated, got %v", st.Code())
 	}
 }

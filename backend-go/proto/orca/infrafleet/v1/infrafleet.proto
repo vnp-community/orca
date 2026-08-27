@@ -105,6 +105,13 @@ service InfraFleetService {
   // — upserts SshTargets by (tenant_id, host, user), see
   // usecase.ImportFleetInventory's doc comment.
   rpc ImportFleetInventory(ImportFleetInventoryRequest) returns (ImportFleetInventoryResponse);
+
+  // BulkProvisionFleet fans out provisioning across a tenant's SSH targets
+  // — unary (not streaming): bulk provisioning is N-servers-in-parallel,
+  // not one server's steps in sequence, and BL-FLEET-02's own contract is
+  // a single terminal summary object. See usecase.BulkProvisionFleet's doc
+  // comment.
+  rpc BulkProvisionFleet(BulkProvisionFleetRequest) returns (BulkProvisionFleetResponse);
 }
 
 enum ConnectionMode {
@@ -125,6 +132,9 @@ message DevServer {
   // "DevServer<->SshTarget linkage the domain model doesn't have yet" gap
   // this service's README flagged (Epic A third pass).
   string ssh_target_id = 5;
+  // status is domain.DevServerStatus verbatim: pending|healthy|degraded|
+  // unhealthy — see BulkProvisionFleet's doc comment (SOL-FLEET-02).
+  string status = 6;
 }
 
 message RegisterDevServerRequest {
@@ -500,4 +510,16 @@ message ImportFleetInventoryResponse {
   int32 updated = 2;
   int32 skipped = 3;
   repeated ImportFleetInventoryError errors = 4;
+}
+
+// --- Bulk fleet provisioning (BL-FLEET-02) ---------------------------------
+
+message BulkProvisionFleetRequest {
+  string project = 1; // "" = all
+  int32 concurrency = 2; // 0 = default 5
+}
+message ProvisionOutcome { string dev_server_id = 1; string host = 2; string status = 3; string error = 4; }
+message BulkProvisionFleetResponse {
+  int32 success = 1; int32 failed = 2; int32 skipped = 3;
+  repeated ProvisionOutcome outcomes = 4;
 }

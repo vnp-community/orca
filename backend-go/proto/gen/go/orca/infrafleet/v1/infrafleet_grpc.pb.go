@@ -55,6 +55,7 @@ const (
 	InfraFleetService_ShutdownEmulator_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/ShutdownEmulator"
 	InfraFleetService_GetHostCapabilities_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetHostCapabilities"
 	InfraFleetService_ImportFleetInventory_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/ImportFleetInventory"
+	InfraFleetService_BulkProvisionFleet_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/BulkProvisionFleet"
 )
 
 // InfraFleetServiceClient is the client API for InfraFleetService service.
@@ -153,6 +154,12 @@ type InfraFleetServiceClient interface {
 	// — upserts SshTargets by (tenant_id, host, user), see
 	// usecase.ImportFleetInventory's doc comment.
 	ImportFleetInventory(ctx context.Context, in *ImportFleetInventoryRequest, opts ...grpc.CallOption) (*ImportFleetInventoryResponse, error)
+	// BulkProvisionFleet fans out provisioning across a tenant's SSH targets
+	// — unary (not streaming): bulk provisioning is N-servers-in-parallel,
+	// not one server's steps in sequence, and BL-FLEET-02's own contract is
+	// a single terminal summary object. See usecase.BulkProvisionFleet's doc
+	// comment.
+	BulkProvisionFleet(ctx context.Context, in *BulkProvisionFleetRequest, opts ...grpc.CallOption) (*BulkProvisionFleetResponse, error)
 }
 
 type infraFleetServiceClient struct {
@@ -516,6 +523,16 @@ func (c *infraFleetServiceClient) ImportFleetInventory(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) BulkProvisionFleet(ctx context.Context, in *BulkProvisionFleetRequest, opts ...grpc.CallOption) (*BulkProvisionFleetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BulkProvisionFleetResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_BulkProvisionFleet_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InfraFleetServiceServer is the server API for InfraFleetService service.
 // All implementations must embed UnimplementedInfraFleetServiceServer
 // for forward compatibility.
@@ -612,6 +629,12 @@ type InfraFleetServiceServer interface {
 	// — upserts SshTargets by (tenant_id, host, user), see
 	// usecase.ImportFleetInventory's doc comment.
 	ImportFleetInventory(context.Context, *ImportFleetInventoryRequest) (*ImportFleetInventoryResponse, error)
+	// BulkProvisionFleet fans out provisioning across a tenant's SSH targets
+	// — unary (not streaming): bulk provisioning is N-servers-in-parallel,
+	// not one server's steps in sequence, and BL-FLEET-02's own contract is
+	// a single terminal summary object. See usecase.BulkProvisionFleet's doc
+	// comment.
+	BulkProvisionFleet(context.Context, *BulkProvisionFleetRequest) (*BulkProvisionFleetResponse, error)
 	mustEmbedUnimplementedInfraFleetServiceServer()
 }
 
@@ -726,6 +749,9 @@ func (UnimplementedInfraFleetServiceServer) GetHostCapabilities(context.Context,
 }
 func (UnimplementedInfraFleetServiceServer) ImportFleetInventory(context.Context, *ImportFleetInventoryRequest) (*ImportFleetInventoryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ImportFleetInventory not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) BulkProvisionFleet(context.Context, *BulkProvisionFleetRequest) (*BulkProvisionFleetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BulkProvisionFleet not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) mustEmbedUnimplementedInfraFleetServiceServer() {}
 func (UnimplementedInfraFleetServiceServer) testEmbeddedByValue()                           {}
@@ -1367,6 +1393,24 @@ func _InfraFleetService_ImportFleetInventory_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_BulkProvisionFleet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BulkProvisionFleetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).BulkProvisionFleet(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_BulkProvisionFleet_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).BulkProvisionFleet(ctx, req.(*BulkProvisionFleetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InfraFleetService_ServiceDesc is the grpc.ServiceDesc for InfraFleetService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1509,6 +1553,10 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ImportFleetInventory",
 			Handler:    _InfraFleetService_ImportFleetInventory_Handler,
+		},
+		{
+			MethodName: "BulkProvisionFleet",
+			Handler:    _InfraFleetService_BulkProvisionFleet_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

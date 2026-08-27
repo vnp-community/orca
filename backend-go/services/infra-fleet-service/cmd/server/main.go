@@ -34,6 +34,7 @@ import (
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
 	infrasshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 	infrasshrelay "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -105,6 +106,10 @@ func run() error {
 	// even if deploy will fail until an operator sets the bundle path.
 	agentCfg := infradevserveragent.LoadConfigFromEnv()
 	var agentOpts []infradevserveragent.Option
+	// sshProvisioner is also BulkProvisionFleet's provisioning port
+	// (wrapped below) — hoisted out of the if/else so both wiring sites
+	// share the one instance instead of dialing SSH twice.
+	var sshProvisioner *infrasshrelay.Provisioner
 	vaultClient, err := secrets.NewClient()
 	if err != nil {
 		logger.Warn("failed to construct Vault client — relay-ssh mode will report ErrConnectionModeNotImplemented", slog.Any("error", err))
@@ -114,12 +119,24 @@ func run() error {
 		if sshRelayCfg.BundlePath == "" {
 			logger.Warn("ORCA_RELAY_BUNDLE_PATH is not set — relay-ssh dev servers will fail to provision until it points at a built agent/out/agent.js")
 		}
-		provisioner := infrasshrelay.NewProvisioner(sshConnector, sshTargetStore, sshRelayCfg)
-		agentOpts = append(agentOpts, infradevserveragent.WithRelaySSH(provisioner))
+		sshProvisioner = infrasshrelay.NewProvisioner(sshConnector, sshTargetStore, sshRelayCfg)
+		agentOpts = append(agentOpts, infradevserveragent.WithRelaySSH(sshProvisioner))
 	}
 
 	agentClient := infradevserveragent.New(agentCfg, logger, agentOpts...)
 	defer agentClient.Close()
+
+	// bulkProvisioner degrades the same way relay-ssh mode itself does when
+	// Vault isn't configured (see the warning above) — BulkProvisionFleet
+	// still constructs and serves, every call just fails with a typed,
+	// permanent error instead of the service crash-looping over one
+	// optional mode's dependency.
+	var bulkProvisioner usecase.Provisioner
+	if sshProvisioner != nil {
+		bulkProvisioner = infrasshrelay.NewBulkProvisioner(sshProvisioner)
+	} else {
+		bulkProvisioner = unavailableBulkProvisioner{}
+	}
 
 	registerDevServerUC := usecase.NewRegisterDevServer(repo)
 	resolveConnectionUC := usecase.NewResolveConnection(repo)
@@ -158,6 +175,7 @@ func run() error {
 	getHostCapabilitiesUC := usecase.NewGetHostCapabilities(repo, agentClient)
 
 	importFleetInventoryUC := usecase.NewImportFleetInventory(sshTargetStore)
+	bulkProvisionFleetUC := usecase.NewBulkProvisionFleet(sshTargetStore, repo, bulkProvisioner)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
@@ -189,6 +207,7 @@ func run() error {
 		emulatorRelayUC,
 		getHostCapabilitiesUC,
 		importFleetInventoryUC,
+		bulkProvisionFleetUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -261,4 +280,15 @@ func run() error {
 	_ = httpServer.Shutdown(shutdownCtx)
 
 	return nil
+}
+
+// unavailableBulkProvisioner implements usecase.Provisioner with a
+// permanent, typed failure — wired in when Vault (and therefore relay-ssh
+// mode entirely) isn't configured, matching relay-ssh's own
+// ErrConnectionModeNotImplemented degrade-not-crash convention (see
+// devserveragent.Client.getOrProvisionSession).
+type unavailableBulkProvisioner struct{}
+
+func (unavailableBulkProvisioner) Provision(ctx context.Context, devServer domain.DevServer) (usecase.HandshakeInfo, bool, error) {
+	return usecase.HandshakeInfo{}, false, fmt.Errorf("%w: relay-ssh support was not enabled (see WithRelaySSH)", infradevserveragent.ErrConnectionModeNotImplemented)
 }
