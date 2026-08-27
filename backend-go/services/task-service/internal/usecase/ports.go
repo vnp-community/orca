@@ -254,6 +254,14 @@ type ProjectExecutionResolver interface {
 	ResolveConnection(ctx context.Context, tenantID, projectID string) (connectionID, worktreePath, worktreeID string, connected bool, err error)
 }
 
+// WorktreeProvisioner implements Execute's "reuse or create" worktree step
+// (SOL-TG-04) — a task with an existing WorktreeID reuses it; otherwise a
+// new one is created via git-gateway-service's existing CreateWorktree
+// saga.
+type WorktreeProvisioner interface {
+	EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (worktreeID, path string, err error)
+}
+
 // ProjectContextResolver resolves a project's name/repo URL via
 // project-service — task-service never reads project-service's tables
 // directly.
