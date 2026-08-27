@@ -120,7 +120,7 @@ func run() error {
 	defer func() { _ = infraFleetConn.Close() }()
 	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
 	projectExecutionResolver := taskgrpcclient.NewProjectExecutionResolver(infraFleetClient)
-	simpleExecutor := taskgrpcclient.NewSimpleExecutor(repo, projectExecutionResolver, infraFleetClient)
+	simpleExecutor := taskgrpcclient.NewSimpleExecutor(repo, repo, projectExecutionResolver, infraFleetClient)
 	aiCompleter := taskgrpcclient.NewAICompleter(infraFleetClient)
 
 	aiProviderConn, err := taskgrpcclient.Dial(cfg.AIProviderServiceAddr)

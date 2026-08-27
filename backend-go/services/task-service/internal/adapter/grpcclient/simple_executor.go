@@ -205,13 +205,37 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	return fmt.Sprintf("task-exec:%s:%s", taskID, requestID), nil
 }
 
-// buildExecutePrompt assembles the agent.execPrompt prompt from task — see
-// this file's doc comment for why this follows ai_decompose.go's
-// buildDecomposePrompt plain-text convention rather than a new one.
-func buildExecutePrompt(task domain.Task) string {
+// buildExecutePrompt assembles the agent.execPrompt prompt from task,
+// parent (nil if task is a root task), and completedDeps (this task's
+// depends_on targets currently Status == StatusDone) — see this file's doc
+// comment for why this follows ai_decompose.go's buildDecomposePrompt
+// plain-text convention rather than a new one. Uses task.PromptTemplate
+// verbatim when set — a task with an AI-generated or user-edited prompt
+// template should use it as-is (SOL-TG-01/SOL-TG-02) — falling back to the
+// generic "Complete the following task" opener only when empty.
+func buildExecutePrompt(task domain.Task, parent *domain.Task, completedDeps []domain.Task) string {
 	var b strings.Builder
-	b.WriteString("Complete the following task.\n\n")
-	b.WriteString("Task: ")
-	b.WriteString(task.Title)
+	if task.PromptTemplate != "" {
+		b.WriteString(task.PromptTemplate)
+		b.WriteString("\n\n")
+	} else {
+		b.WriteString("Complete the following task.\n\n")
+	}
+	fmt.Fprintf(&b, "Task: %s\n", task.Title)
+	if task.Description != "" {
+		fmt.Fprintf(&b, "Description: %s\n", task.Description)
+	}
+	if task.AIContext != "" {
+		fmt.Fprintf(&b, "Context: %s\n", task.AIContext)
+	}
+	if parent != nil {
+		fmt.Fprintf(&b, "\nParent task: %s\n%s\n", parent.Title, parent.Description)
+	}
+	if len(completedDeps) > 0 {
+		b.WriteString("\nCompleted dependencies:\n")
+		for _, d := range completedDeps {
+			fmt.Fprintf(&b, "- %s: %s\n", d.Title, d.Description)
+		}
+	}
 	return b.String()
 }
