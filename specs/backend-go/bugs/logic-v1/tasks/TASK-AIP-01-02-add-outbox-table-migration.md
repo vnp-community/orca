@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/migrations/0004_outbox.up.sql` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — 0004_outbox up/down migrations added, matches usage.outbox_events column shape; verified via TestRepository_Outbox_EnqueueFetchMarkPublished.`
 
 ---
 

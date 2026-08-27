@@ -1,30 +1,3 @@
-# TASK-AIP-02-02: Add `model_provider_map.go` (`detectProviderFromModel`)
-
-**From Solution:** SOL-AIP-02
-**Priority:** P0 — correctness bug
-**Service:** `ai-provider-service`
-**File:** `backend-go/services/ai-provider-service/internal/usecase/model_provider_map.go` (new)
-**Depends on:** none
-**Status:** `[x] DONE — model_provider_map.go added; TestDetectProviderFromModel passes (5 cases).`
-
----
-
-## Context
-
-`ai-provider-service.md` §4 requires the resolution cascade to be
-"filtered to accounts of *that* provider," two-pass:
-"model-hint-filtered first, then unfiltered" (`ai-provider-service.md:113-116`).
-BUG-AIP-02's own finding: "no such table or function exists... anywhere
-in backend-go." This is the Go equivalent of the TS resolver's
-`MODEL_PROVIDER_MAP` — an in-process static table, zero cross-service
-calls, matching §7/§8's "no cross-service call from `Resolve`" / p99 <
-20ms budget exactly.
-
-## Changes to make
-
-Create `backend-go/services/ai-provider-service/internal/usecase/model_provider_map.go`:
-
-```go
 package usecase
 
 import (
@@ -67,16 +40,3 @@ func detectProviderFromModel(model string) (domain.ProviderType, bool) {
 	}
 	return "", false
 }
-```
-
-## Verify
-
-```bash
-cd /opt/repos/orca/backend-go
-go build ./services/ai-provider-service/...
-go test ./services/ai-provider-service/internal/usecase/... -run TestDetectProviderFromModel
-```
-
-Add `TestDetectProviderFromModel` (table-driven): `"claude-3-5-sonnet"` →
-Anthropic/true; `"gpt-4o"` → OpenAI/true; `"o1-preview"` → OpenAI/true;
-`"gemini-1.5-pro"` → Google/true; `"llama-3-70b"` → `""`/false.

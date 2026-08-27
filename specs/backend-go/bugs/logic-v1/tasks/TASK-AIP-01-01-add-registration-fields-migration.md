@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/migrations/0003_account_registration_fields.up.sql` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — 0003_account_registration_fields up/down migrations added, verified via go build + integration round-trip in repository_test.go.`
 
 ---
 

@@ -103,6 +103,12 @@ func (f *fakeAIProviderServiceClient) TestConnection(context.Context, *aiprovide
 	return nil, status.Error(codes.Unimplemented, "not used by ai_provider_routes_test.go")
 }
 
+// RecordTokenUsage is service-to-service only (TASK-AIP-03-08) — never
+// routed through api-gateway, so this fake never expects a call either.
+func (f *fakeAIProviderServiceClient) RecordTokenUsage(context.Context, *aiproviderv1.RecordTokenUsageRequest, ...grpc.CallOption) (*aiproviderv1.RecordTokenUsageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by ai_provider_routes_test.go")
+}
+
 // testAIProviderRouter mounts mountAIProviderRoutes alone on a fresh chi
 // router — no auth middleware — since these tests inject identity directly
 // into the request context, the same way authMiddleware would have (see
@@ -152,6 +158,47 @@ func TestHandleCreateAccount_SuccessRoundTrip(t *testing.T) {
 	}
 	if client.lastCreateAccountReq.Type != aiproviderv1.ProviderType_PROVIDER_TYPE_ANTHROPIC {
 		t.Fatalf("Type = %v, want PROVIDER_TYPE_ANTHROPIC", client.lastCreateAccountReq.Type)
+	}
+}
+
+// TestHandleCreateAccount_NewFieldsRoundTrip asserts the registration
+// fields added by TASK-AIP-01-04/-06 (dev_server_id, label, model_hint,
+// base_url, quota_limit_day, models, is_default) thread unmodified from the
+// REST body into the gRPC CreateAccountRequest.
+func TestHandleCreateAccount_NewFieldsRoundTrip(t *testing.T) {
+	client := &fakeAIProviderServiceClient{
+		createAccountResp: &aiproviderv1.CreateAccountResponse{
+			Account: &aiproviderv1.ProviderAccount{Id: "acct-4"},
+		},
+	}
+	router := testAIProviderRouter(client)
+
+	body, _ := json.Marshal(createAccountRequestBody{
+		Type:          "anthropic",
+		DevServerID:   "ds-1",
+		Label:         "My Key",
+		ModelHint:     "claude-opus",
+		BaseURL:       "http://localhost:11434",
+		QuotaLimitDay: 100,
+		Models:        []string{"claude-opus", "claude-sonnet"},
+		IsDefault:     true,
+	})
+	req := requestWithIdentity(http.MethodPost, "/v1/ai-providers/accounts", body, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusCreated, rec.Body.String())
+	}
+
+	got := client.lastCreateAccountReq
+	if got == nil {
+		t.Fatal("expected CreateAccount to be called")
+	}
+	if got.GetDevServerId() != "ds-1" || got.GetLabel() != "My Key" || got.GetModelHint() != "claude-opus" ||
+		got.GetBaseUrl() != "http://localhost:11434" || got.GetQuotaLimitDay() != 100 ||
+		len(got.GetModels()) != 2 || !got.GetIsDefault() {
+		t.Fatalf("unexpected CreateAccountRequest: %+v", got)
 	}
 }
 
@@ -239,6 +286,46 @@ func TestHandleResolveProvider_ResponseNeverLeaksSecretBeyondProto(t *testing.T)
 	}
 	if client.lastResolveProviderReq.TenantId != "tenant-1" || client.lastResolveProviderReq.UserId != "user-1" || client.lastResolveProviderReq.ProjectId != "proj-1" {
 		t.Fatalf("unexpected ResolveProvider request: %+v", client.lastResolveProviderReq)
+	}
+}
+
+// TestHandleResolveProvider_NewFieldsRoundTrip asserts dev_server_id,
+// model_hint, account_id, scoped_ref reach ResolveProviderInput unmodified
+// (TASK-AIP-02-07) — without this wiring the filtering fix in
+// TASK-AIP-02-05 is unreachable from any real caller.
+func TestHandleResolveProvider_NewFieldsRoundTrip(t *testing.T) {
+	client := &fakeAIProviderServiceClient{
+		resolveProviderResp: &aiproviderv1.ResolveProviderResponse{
+			Account: &aiproviderv1.ProviderAccount{Id: "acct-5"},
+		},
+	}
+	router := testAIProviderRouter(client)
+
+	req := requestWithIdentity(http.MethodGet,
+		"/v1/ai-providers/resolve?project_id=proj-1&dev_server_id=ds-1&model_hint=claude-opus&account_id=acct-9&scoped_ref=server:ds-1:acct-9",
+		nil, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+
+	got := client.lastResolveProviderReq
+	if got == nil {
+		t.Fatal("expected ResolveProvider to be called")
+	}
+	if got.GetDevServerId() != "ds-1" {
+		t.Errorf("DevServerId = %q, want ds-1", got.GetDevServerId())
+	}
+	if got.GetModelHint() != "claude-opus" {
+		t.Errorf("ModelHint = %q, want claude-opus", got.GetModelHint())
+	}
+	if got.GetAccountId() != "acct-9" {
+		t.Errorf("AccountId = %q, want acct-9", got.GetAccountId())
+	}
+	if got.GetScopedRef() != "server:ds-1:acct-9" {
+		t.Errorf("ScopedRef = %q, want server:ds-1:acct-9", got.GetScopedRef())
 	}
 }
 

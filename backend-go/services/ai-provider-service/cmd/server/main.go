@@ -21,9 +21,11 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/ai-provider-service/internal/config"
@@ -31,6 +33,7 @@ import (
 	aiprovidergrpc "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/grpc"
 	aiprovidergrpcclient "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/grpcclient"
 	aiproviderpostgres "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/postgres"
+	aiproviderscheduler "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/scheduler"
 	"github.com/stablyai/orca-go/services/ai-provider-service/internal/usecase"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
@@ -100,7 +103,7 @@ func run() error {
 	defer func() { _ = infraFleetConn.Close() }()
 	infraFleet := aiprovidergrpcclient.NewInfraFleetClient(infraFleetConn)
 
-	createAccountUC := usecase.NewCreateAccount(repo, broker, uuid.NewString, nil)
+	createAccountUC := usecase.NewCreateAccount(repo, broker, infraFleet, uuid.NewString, nil)
 	resolveProviderUC := usecase.NewResolveProvider(repo)
 	rotateKeyUC := usecase.NewRotateKey(repo, broker)
 	getUsageTodayUC := usecase.NewGetUsageToday(repo, nil)
@@ -109,13 +112,22 @@ func run() error {
 	deleteAccountUC := usecase.NewDeleteAccount(repo)
 	writeCredentialUC := usecase.NewWriteCredential(repo, broker)
 	testConnectionUC := usecase.NewTestConnection(repo, infraFleet)
+	reconcileHealthUC := usecase.NewReconcileProviderHealth(repo, infraFleet, repo, nil)
+	recordTokenUsageUC := usecase.NewRecordTokenUsage(repo, repo, repo, nil)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	aiproviderv1.RegisterAiProviderServiceServer(grpcServer, aiprovidergrpc.New(
 		createAccountUC, resolveProviderUC, rotateKeyUC, getUsageTodayUC,
 		listAccountsUC, updateAccountUC, deleteAccountUC, writeCredentialUC, testConnectionUC,
+		recordTokenUsageUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
+
+	// Health-check ticker (ai-provider-service.md §8) — every replica runs
+	// one; no leader election needed, ClaimDue's FOR UPDATE SKIP LOCKED is
+	// what prevents double-firing across replicas.
+	healthCheckTicker := aiproviderscheduler.New(reconcileHealthUC, 15*time.Minute, 50, logger)
+	go healthCheckTicker.Run(ctx)
 
 	healthSrv := health.New()
 	healthSrv.Register("postgres", func() error {
@@ -123,6 +135,29 @@ func run() error {
 		defer cancel()
 		return pool.Ping(ctx)
 	})
+
+	// Transactional-outbox relay (mirrors usage-service's cmd/server/main.go
+	// wiring): CreateAccount durably enqueues an outbox row in the SAME
+	// Postgres transaction as the account insert (internal/adapter/postgres.
+	// Repository.Create) — this relay is what actually gets those rows to
+	// NATS. If NATS is unreachable at startup, rows still get written
+	// durably; they just queue up unpublished until an operator restarts
+	// this process once NATS recovers.
+	var relay *outbox.Relay
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "AI_PROVIDER", []string{"orca.ai_provider.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			relay = outbox.NewRelay(repo, pub, outbox.DefaultConfig, logger)
+		}
+	}
+	if relay != nil {
+		go relay.Run(ctx)
+	}
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),

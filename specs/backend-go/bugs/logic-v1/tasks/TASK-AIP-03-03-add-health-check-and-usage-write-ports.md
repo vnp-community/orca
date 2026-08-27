@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/ports.go`
 **Depends on:** TASK-AIP-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — DueHealthCheckClaimer/ClaimedHealthCheckBatch/OutboxEnqueuer + UsageRepository.IncrementUsage + ProviderAccountRepository.MarkQuotaWarningSent added; go build/vet clean (implementers land in 03-06).`
 
 ---
 

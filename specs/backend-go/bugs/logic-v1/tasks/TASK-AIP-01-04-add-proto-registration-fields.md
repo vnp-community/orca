@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service` proto
 **File:** `backend-go/proto/orca/aiprovider/v1/aiprovider.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — proto fields added, buf generate clean, go build ./proto/... clean (buf breaking couldn't run in this git-worktree sandbox; change is additive-only by inspection).`
 
 ---
 

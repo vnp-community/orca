@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/resolve_provider.go`
 **Depends on:** TASK-AIP-02-02, TASK-AIP-02-03, TASK-AIP-02-04
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — DevServerID/ModelHint threaded through all 3 cascade tiers; regression guards (cross-provider at user/project/server tiers with reversed created_at, dev-server scoping) all pass.`
 
 ---
 

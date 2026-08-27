@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/domain/provider_account.go`
 **Depends on:** TASK-AIP-01-01
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — ProviderAccount + NewProviderAccount extended, ErrQuotaLimitTooLow added; TestNewProviderAccount_QuotaLimitTooLow passes.`
 
 ---
 

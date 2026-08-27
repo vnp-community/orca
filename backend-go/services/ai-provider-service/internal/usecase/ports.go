@@ -22,10 +22,11 @@ import (
 // when Scope == ScopeProject, ignored when Scope == ScopeServer. Leaving
 // Scope at its zero value lists every scope for the tenant.
 type ListAccountsFilter struct {
-	TenantID    string
-	Scope       domain.AccountScope // zero value = any scope
-	ScopeRefID  string
-	DevServerID string // optional — empty means no filter
+	TenantID     string
+	Scope        domain.AccountScope // zero value = any scope
+	ScopeRefID   string
+	DevServerID  string              // optional — empty means no filter
+	ProviderType domain.ProviderType // zero value = any provider, matches DevServerID's "empty = no filter" convention
 }
 
 // UpdateFields is UpdateAccount's usecase input — only the 3 fields
@@ -49,7 +50,8 @@ type UpdateStatusInput struct {
 	TenantID           string
 	AccountID          string
 	Status             domain.AccountStatus
-	CredentialRef      string // empty = unchanged
+	HealthDetail       *string // nil = leave unchanged
+	CredentialRef      string  // empty = unchanged
 	RotationGraceUntil *time.Time
 }
 
@@ -71,6 +73,10 @@ type ProviderAccountRepository interface {
 	// Delete soft-deletes: sets status='revoked' and deleted_at=now(), never
 	// a hard DELETE — preserves the row for audit and usage_daily's FK.
 	Delete(ctx context.Context, tenantID, accountID string) error
+	// MarkQuotaWarningSent implements the 80%-warning idempotency guard —
+	// see migrations/0005_health_and_usage_writes.up.sql's
+	// quota_warning_sent_date column.
+	MarkQuotaWarningSent(ctx context.Context, tenantID, accountID string, day time.Time) error
 }
 
 // UsageRepository is the persistence port for the daily quota/spend rollup
@@ -80,6 +86,36 @@ type ProviderAccountRepository interface {
 // touching account CRUD.
 type UsageRepository interface {
 	GetToday(ctx context.Context, tenantID, accountID string, day time.Time) (domain.QuotaState, error)
+	// IncrementUsage upserts today's rollup row (tokens/requests/cost added
+	// to whatever's already there) and returns the POST-increment state, so
+	// the caller can immediately compare against quota without a second read.
+	IncrementUsage(ctx context.Context, tenantID, accountID string, day time.Time, tokensUsed int64, requestCount int64, costUSD float64) (domain.QuotaState, error)
+}
+
+// ClaimedHealthCheckBatch mirrors automation-service's ClaimedBatch — the
+// claim transaction stays open across dispatch (at-least-once: a crash
+// mid-batch must not silently skip the next tick's retry).
+type ClaimedHealthCheckBatch interface {
+	Accounts() []domain.ProviderAccount
+	// RecordResult persists one account's classification within the SAME
+	// transaction the claim lock is held in.
+	RecordResult(ctx context.Context, accountID string, status domain.AccountStatus, healthDetail *string, latencyMs *int, checkedAt time.Time) error
+	Commit(ctx context.Context) error
+	Rollback(ctx context.Context) error
+}
+
+// DueHealthCheckClaimer — same SELECT...FOR UPDATE SKIP LOCKED shape as
+// automation-service's DueAutomationClaimer.
+type DueHealthCheckClaimer interface {
+	ClaimDue(ctx context.Context, now time.Time, staleness time.Duration, limit int32) (ClaimedHealthCheckBatch, error)
+}
+
+// OutboxEnqueuer is the narrow write port both ReconcileProviderHealth and
+// RecordTokenUsage use to write into ai_provider.outbox within their own
+// already-open transaction — same table SOL-AIP-01's CreateAccount writes
+// its registration event into (TASK-AIP-01-07).
+type OutboxEnqueuer interface {
+	Enqueue(ctx context.Context, subject string, tenantID string, payload map[string]any) error
 }
 
 // CredentialRef is what CredentialBrokerClient returns — an opaque pointer
@@ -141,6 +177,10 @@ type CredentialBrokerClient interface {
 	// resolving to plaintext only ever happens on the execution plane
 	// (ai-provider-service.md §9), which this service is not.
 	ResolveCredential(ctx context.Context, credentialRef string) (CredentialRef, error)
+	// RevokeCredential — needed for CreateAccount's test-before-save
+	// rollback path (TASK-AIP-01-06). Mirrors credential-broker-service.md
+	// §3's RevokeCredential RPC (RevokeCredentialRequest -> Empty).
+	RevokeCredential(ctx context.Context, credentialRef string) error
 }
 
 // ConnectionTestResult is TestConnection's usecase-level result — mirrors

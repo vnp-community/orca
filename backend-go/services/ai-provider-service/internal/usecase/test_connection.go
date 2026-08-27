@@ -36,18 +36,11 @@ func (uc *TestConnection) Execute(ctx context.Context, in TestConnectionInput) (
 	if account.DevServerID == "" {
 		return ConnectionTestResult{}, apperrors.New(apperrors.KindFailedPrecondition, "AIPROVIDER_NO_DEV_SERVER", "account has no dev server bound yet — push a credential first", nil)
 	}
-
-	// Relays a new agent-side JSON-RPC method (ai.testProviderConnection) —
-	// see TASK-028's Context section: out of scope for backend-go, this
-	// call is inert until the agent implements it.
-	result, err := uc.infra.Relay(ctx, account.DevServerID, "ai.testProviderConnection", map[string]any{
-		"credentialRef": account.CredentialRef,
-		"providerType":  string(account.ProviderType),
-	})
+	result, err := verifyConnection(ctx, uc.infra, account.DevServerID, account.CredentialRef, account.ProviderType)
 	if err != nil {
 		return ConnectionTestResult{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_TEST_CONNECTION_FAILED", "failed to relay connection test to dev server agent", err)
 	}
-	return parseConnectionTestResult(result), nil
+	return result, nil
 }
 
 // parseConnectionTestResult maps the agent's generic map[string]any result

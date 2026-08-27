@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/verify_connection.go` (new)
 **Depends on:** TASK-AIP-SHARED-01
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — verify_connection.go extracted, RevokeCredential added to CredentialBrokerClient port + grpcclient stub; test_connection_test.go passes unmodified.`
 
 ---
 

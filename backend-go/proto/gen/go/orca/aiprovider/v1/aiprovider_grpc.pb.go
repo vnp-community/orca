@@ -20,15 +20,16 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AiProviderService_CreateAccount_FullMethodName   = "/orca.aiprovider.v1.AiProviderService/CreateAccount"
-	AiProviderService_ResolveProvider_FullMethodName = "/orca.aiprovider.v1.AiProviderService/ResolveProvider"
-	AiProviderService_RotateKey_FullMethodName       = "/orca.aiprovider.v1.AiProviderService/RotateKey"
-	AiProviderService_GetUsageToday_FullMethodName   = "/orca.aiprovider.v1.AiProviderService/GetUsageToday"
-	AiProviderService_ListAccounts_FullMethodName    = "/orca.aiprovider.v1.AiProviderService/ListAccounts"
-	AiProviderService_UpdateAccount_FullMethodName   = "/orca.aiprovider.v1.AiProviderService/UpdateAccount"
-	AiProviderService_DeleteAccount_FullMethodName   = "/orca.aiprovider.v1.AiProviderService/DeleteAccount"
-	AiProviderService_WriteCredential_FullMethodName = "/orca.aiprovider.v1.AiProviderService/WriteCredential"
-	AiProviderService_TestConnection_FullMethodName  = "/orca.aiprovider.v1.AiProviderService/TestConnection"
+	AiProviderService_CreateAccount_FullMethodName    = "/orca.aiprovider.v1.AiProviderService/CreateAccount"
+	AiProviderService_ResolveProvider_FullMethodName  = "/orca.aiprovider.v1.AiProviderService/ResolveProvider"
+	AiProviderService_RotateKey_FullMethodName        = "/orca.aiprovider.v1.AiProviderService/RotateKey"
+	AiProviderService_GetUsageToday_FullMethodName    = "/orca.aiprovider.v1.AiProviderService/GetUsageToday"
+	AiProviderService_ListAccounts_FullMethodName     = "/orca.aiprovider.v1.AiProviderService/ListAccounts"
+	AiProviderService_UpdateAccount_FullMethodName    = "/orca.aiprovider.v1.AiProviderService/UpdateAccount"
+	AiProviderService_DeleteAccount_FullMethodName    = "/orca.aiprovider.v1.AiProviderService/DeleteAccount"
+	AiProviderService_WriteCredential_FullMethodName  = "/orca.aiprovider.v1.AiProviderService/WriteCredential"
+	AiProviderService_TestConnection_FullMethodName   = "/orca.aiprovider.v1.AiProviderService/TestConnection"
+	AiProviderService_RecordTokenUsage_FullMethodName = "/orca.aiprovider.v1.AiProviderService/RecordTokenUsage"
 )
 
 // AiProviderServiceClient is the client API for AiProviderService service.
@@ -57,6 +58,11 @@ type AiProviderServiceClient interface {
 	// relays to the account's dev server via infra-fleet-service; see
 	// TASK-028. Never returns plaintext key material.
 	TestConnection(ctx context.Context, in *TestConnectionRequest, opts ...grpc.CallOption) (*TestConnectionResponse, error)
+	// RecordTokenUsage is service-to-service only (task-service/
+	// workflow-service, right after a spawn completes per §7's "Called by"
+	// table) — deliberately no httpgateway/wscompat route, see
+	// TASK-AIP-03-08.
+	RecordTokenUsage(ctx context.Context, in *RecordTokenUsageRequest, opts ...grpc.CallOption) (*RecordTokenUsageResponse, error)
 }
 
 type aiProviderServiceClient struct {
@@ -157,6 +163,16 @@ func (c *aiProviderServiceClient) TestConnection(ctx context.Context, in *TestCo
 	return out, nil
 }
 
+func (c *aiProviderServiceClient) RecordTokenUsage(ctx context.Context, in *RecordTokenUsageRequest, opts ...grpc.CallOption) (*RecordTokenUsageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecordTokenUsageResponse)
+	err := c.cc.Invoke(ctx, AiProviderService_RecordTokenUsage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AiProviderServiceServer is the server API for AiProviderService service.
 // All implementations must embed UnimplementedAiProviderServiceServer
 // for forward compatibility.
@@ -183,6 +199,11 @@ type AiProviderServiceServer interface {
 	// relays to the account's dev server via infra-fleet-service; see
 	// TASK-028. Never returns plaintext key material.
 	TestConnection(context.Context, *TestConnectionRequest) (*TestConnectionResponse, error)
+	// RecordTokenUsage is service-to-service only (task-service/
+	// workflow-service, right after a spawn completes per §7's "Called by"
+	// table) — deliberately no httpgateway/wscompat route, see
+	// TASK-AIP-03-08.
+	RecordTokenUsage(context.Context, *RecordTokenUsageRequest) (*RecordTokenUsageResponse, error)
 	mustEmbedUnimplementedAiProviderServiceServer()
 }
 
@@ -219,6 +240,9 @@ func (UnimplementedAiProviderServiceServer) WriteCredential(context.Context, *Wr
 }
 func (UnimplementedAiProviderServiceServer) TestConnection(context.Context, *TestConnectionRequest) (*TestConnectionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method TestConnection not implemented")
+}
+func (UnimplementedAiProviderServiceServer) RecordTokenUsage(context.Context, *RecordTokenUsageRequest) (*RecordTokenUsageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecordTokenUsage not implemented")
 }
 func (UnimplementedAiProviderServiceServer) mustEmbedUnimplementedAiProviderServiceServer() {}
 func (UnimplementedAiProviderServiceServer) testEmbeddedByValue()                           {}
@@ -403,6 +427,24 @@ func _AiProviderService_TestConnection_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AiProviderService_RecordTokenUsage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecordTokenUsageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AiProviderServiceServer).RecordTokenUsage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AiProviderService_RecordTokenUsage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AiProviderServiceServer).RecordTokenUsage(ctx, req.(*RecordTokenUsageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AiProviderService_ServiceDesc is the grpc.ServiceDesc for AiProviderService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -445,6 +487,10 @@ var AiProviderService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "TestConnection",
 			Handler:    _AiProviderService_TestConnection_Handler,
+		},
+		{
+			MethodName: "RecordTokenUsage",
+			Handler:    _AiProviderService_RecordTokenUsage_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

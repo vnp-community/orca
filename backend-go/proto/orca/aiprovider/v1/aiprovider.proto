@@ -31,6 +31,12 @@ service AiProviderService {
   // relays to the account's dev server via infra-fleet-service; see
   // TASK-028. Never returns plaintext key material.
   rpc TestConnection(TestConnectionRequest) returns (TestConnectionResponse);
+
+  // RecordTokenUsage is service-to-service only (task-service/
+  // workflow-service, right after a spawn completes per §7's "Called by"
+  // table) — deliberately no httpgateway/wscompat route, see
+  // TASK-AIP-03-08.
+  rpc RecordTokenUsage(RecordTokenUsageRequest) returns (RecordTokenUsageResponse);
 }
 
 enum ProviderType {
@@ -55,11 +61,28 @@ message ProviderAccount {
   // by TestConnection (TASK-028) to know where to relay. Empty for
   // accounts that have never had a credential pushed to a dev server yet.
   string dev_server_id = 6;
+  // NEW fields below — see TASK-AIP-01-03's domain additions.
+  string label = 7;
+  string model_hint = 8;
+  string base_url = 9;
+  int32 quota_limit_day = 10;
+  repeated string models = 11;
+  bool is_default = 12;
+  string last_health_check_at = 13; // RFC3339, empty = never checked
+  string created_by = 14;
 }
 
 message CreateAccountRequest {
   string tenant_id = 1;
   ProviderType type = 2;
+  // NEW fields below.
+  string dev_server_id = 3;
+  string label = 4;
+  string model_hint = 5;
+  string base_url = 6;
+  int32 quota_limit_day = 7;
+  repeated string models = 8;
+  bool is_default = 9;
 }
 
 message CreateAccountResponse {
@@ -74,6 +97,17 @@ message ResolveProviderRequest {
   string tenant_id = 1;
   string user_id = 2;
   string project_id = 3;
+  string dev_server_id = 4;  // NEW — matches ai-provider-service.md §3's ResolveRequest field-for-field
+  optional string model_hint = 5;  // NEW — same
+
+  // NEW — extensions beyond §3's sketch (SOL-AIP-02's rationale). Zero
+  // value on both means "run the normal cascade"; setting account_id
+  // short-circuits it entirely (Case 1); setting scoped_ref parses and
+  // resolves directly (Case 2). Not a oneof, to keep wire compatibility
+  // trivial for existing callers that only ever set tenant_id/user_id/
+  // project_id today.
+  string account_id = 6;
+  string scoped_ref = 7;
 }
 
 message ResolveProviderResponse {
@@ -137,4 +171,16 @@ message TestConnectionRequest {
 message TestConnectionResponse {
   bool success = 1;
   string message = 2; // human-readable result/error detail from the agent's live check, never a secret
+}
+
+message RecordTokenUsageRequest {
+  string account_id    = 1;
+  int64  tokens_used   = 2;
+  int64  request_count = 3;
+  double cost_usd      = 4;
+}
+message RecordTokenUsageResponse {
+  int64  tokens_used   = 1;
+  double cost_usd      = 2;
+  int64  request_count = 3;
 }

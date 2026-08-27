@@ -726,6 +726,20 @@ async function route(
       }
     }
 
+    // ── ai.testProviderConnection ────────────────────────────────────────────
+    // Distinct from ai.provider.testConnection above — see
+    // specs/backend-go/bugs/logic-v1/tasks/TASK-AIP-SHARED-01-add-agent-test-connection-rpc.md.
+    // Called by ai-provider-service (backend-go) via infra-fleet-service's Relay.
+    case 'ai.testProviderConnection': {
+      try {
+        const { handleTestProviderConnection } = await import('./agent-credential-store')
+        return (await handleTestProviderConnection(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `ai.testProviderConnection unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: preflight.check ────────────────────────────────────────────────
     case 'preflight.check': {
       try {
