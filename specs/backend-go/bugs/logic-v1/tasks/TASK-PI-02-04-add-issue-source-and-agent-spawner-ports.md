@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/domain/domain.go`, `backend-go/services/git-gateway-service/internal/usecase/ports.go`, `backend-go/services/git-gateway-service/internal/adapter/grpcclient/scm_client.go` (new), `backend-go/services/git-gateway-service/internal/adapter/grpcclient/issuetracking_client.go` (new), `backend-go/services/git-gateway-service/internal/adapter/grpcclient/infrafleet_client.go` (new)
 **Depends on:** TASK-PI-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — WorktreeLineageCapture/IssueRef/Issue domain types + IssueSourceClient/AgentSpawner ports; scm_client.go/issuetracking_client.go/infrafleet_client.go adapters added.`
 
 ---
 

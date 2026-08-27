@@ -47,6 +47,13 @@ type fakeProvider struct {
 	branchExists    bool
 	branchExistsErr error
 
+	linkedPRs          []domain.PullRequest
+	linkedPRsSupported bool
+	linkedPRsErr       error
+
+	review    domain.Review
+	reviewErr error
+
 	lastCred Credential
 	lastRepo string
 	calls    int
@@ -122,6 +129,24 @@ func (f *fakeProvider) BranchExists(ctx context.Context, cred Credential, repo, 
 		return false, f.branchExistsErr
 	}
 	return f.branchExists, nil
+}
+
+func (f *fakeProvider) GetLinkedPullRequestsForIssue(ctx context.Context, cred Credential, repo string, issueNumber int32) ([]domain.PullRequest, bool, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.linkedPRsErr != nil {
+		return nil, false, f.linkedPRsErr
+	}
+	return f.linkedPRs, f.linkedPRsSupported, nil
+}
+
+func (f *fakeProvider) SubmitReview(ctx context.Context, cred Credential, repo string, prNumber int32, in domain.ReviewInput) (domain.Review, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.reviewErr != nil {
+		return domain.Review{}, f.reviewErr
+	}
+	return f.review, nil
 }
 
 func (f *fakeProvider) ListIssues(ctx context.Context, cred Credential, repo string, filter IssueFilter) ([]domain.Issue, error) {
@@ -239,6 +264,9 @@ type fakeGitHubProjects struct {
 
 	comment    ProjectComment
 	commentErr error
+
+	comments    []ProjectComment
+	commentsErr error
 
 	deleteErr error
 
@@ -381,6 +409,15 @@ func (f *fakeGitHubProjects) DeleteIssueCommentBySlug(ctx context.Context, cred 
 	return f.deleteErr
 }
 
+func (f *fakeGitHubProjects) ListIssueCommentsBySlug(ctx context.Context, cred Credential, itemSlug string) ([]ProjectComment, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.commentsErr != nil {
+		return nil, f.commentsErr
+	}
+	return f.comments, nil
+}
+
 // fakeGitLabMergeRequestProvider is an in-memory GitLabMergeRequestProvider
 // — mirrors fakeProvider's recording-fields pattern.
 type fakeGitLabMergeRequestProvider struct {
@@ -439,14 +476,14 @@ func TestListIssues_DispatchesToResolvedProviderWithCredential(t *testing.T) {
 	}}
 	creds := &fakeCredentialResolver{token: "tok-123"}
 
-	uc := NewListIssues(creds, registry)
+	uc := NewListIssues(creds, registry, nil, nil)
 	got, err := uc.Execute(context.Background(), ListIssuesInput{
 		TenantID: "tenant-1", Provider: domain.ScmProviderGitHub, Repo: "octocat/hello-world",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(got) != 1 || got[0].ID != "1" {
+	if len(got.Issues) != 1 || got.Issues[0].ID != "1" {
 		t.Fatalf("expected the github fake's issue back, got %+v", got)
 	}
 	if github.calls != 1 || gitlab.calls != 0 {
@@ -461,7 +498,7 @@ func TestListIssues_DispatchesToResolvedProviderWithCredential(t *testing.T) {
 }
 
 func TestListIssues_RequiresTenantAndRepo(t *testing.T) {
-	uc := NewListIssues(&fakeCredentialResolver{}, &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{}})
+	uc := NewListIssues(&fakeCredentialResolver{}, &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{}}, nil, nil)
 
 	if _, err := uc.Execute(context.Background(), ListIssuesInput{Repo: "a/b"}); err == nil {
 		t.Error("expected error when tenant_id is missing")
@@ -474,7 +511,7 @@ func TestListIssues_RequiresTenantAndRepo(t *testing.T) {
 func TestListIssues_PropagatesCredentialResolutionFailure(t *testing.T) {
 	creds := &fakeCredentialResolver{err: errors.New("broker unavailable")}
 	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: &fakeProvider{}}}
-	uc := NewListIssues(creds, registry)
+	uc := NewListIssues(creds, registry, nil, nil)
 
 	_, err := uc.Execute(context.Background(), ListIssuesInput{TenantID: "t1", Provider: domain.ScmProviderGitHub, Repo: "a/b"})
 	if err == nil {
@@ -483,7 +520,7 @@ func TestListIssues_PropagatesCredentialResolutionFailure(t *testing.T) {
 }
 
 func TestListIssues_UnregisteredProviderFails(t *testing.T) {
-	uc := NewListIssues(&fakeCredentialResolver{token: "tok"}, &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{}})
+	uc := NewListIssues(&fakeCredentialResolver{token: "tok"}, &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{}}, nil, nil)
 
 	_, err := uc.Execute(context.Background(), ListIssuesInput{TenantID: "t1", Provider: domain.ScmProviderBitbucket, Repo: "a/b"})
 	if err == nil {
@@ -504,7 +541,7 @@ func TestCreatePullRequest_DispatchesToResolvedProviderWithCredential(t *testing
 	}}
 	creds := &fakeCredentialResolver{token: "tok-456"}
 
-	uc := NewCreatePullRequest(creds, registry)
+	uc := NewCreatePullRequest(creds, registry, nil, nil)
 	got, err := uc.Execute(context.Background(), CreatePullRequestParams{
 		TenantID: "tenant-1", Provider: domain.ScmProviderGitLab, Repo: "group/project",
 		Title: "feature", HeadBranch: "feature", BaseBranch: "main",
@@ -525,7 +562,7 @@ func TestCreatePullRequest_DispatchesToResolvedProviderWithCredential(t *testing
 
 func TestCreatePullRequest_RequiresTitle(t *testing.T) {
 	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: &fakeProvider{}}}
-	uc := NewCreatePullRequest(&fakeCredentialResolver{}, registry)
+	uc := NewCreatePullRequest(&fakeCredentialResolver{}, registry, nil, nil)
 
 	_, err := uc.Execute(context.Background(), CreatePullRequestParams{TenantID: "t1", Provider: domain.ScmProviderGitHub, Repo: "a/b"})
 	if err == nil {

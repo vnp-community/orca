@@ -26,6 +26,9 @@ type Config struct {
 	// own OPABundlePath, for identical override behavior in every
 	// deployment environment.
 	OPABundlePath string
+	// NATSURL is the transactional-outbox relay's NATS JetStream target
+	// (SOL-PI-03) — mirrors issue-tracking-service's own NATSURL field.
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -39,5 +42,6 @@ func Load() (Config, error) {
 		TaskServiceAddr:       commonconfig.StringEnv("TASK_SERVICE_ADDR", "task-service:9090"),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

@@ -59,6 +59,10 @@ type Config struct {
 	// OAuthRegistry — see internal/adapter/providerregistry.OAuthRegistry's
 	// doc comment.
 	OAuth OAuthProvidersConfig
+
+	// NATSURL is the transactional-outbox relay's NATS JetStream target
+	// (SOL-PI-03) — mirrors issue-tracking-service's own NATSURL field.
+	NATSURL string
 }
 
 // OAuthProviderConfig is one provider's OAuth 2.0 app registration.
@@ -96,6 +100,7 @@ func Load() (Config, error) {
 		CredentialBrokerAddr:    commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
 		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 		OAuthStateSecret:        commonconfig.StringEnv("OAUTH_STATE_SECRET", "dev-only-insecure-oauth-state-secret"),
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		OAuth: OAuthProvidersConfig{
 			GitHub: OAuthProviderConfig{
 				AuthorizeURL: commonconfig.StringEnv("GITHUB_OAUTH_AUTHORIZE_URL", "https://github.com/login/oauth/authorize"),

@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/migrations/0003_outbox_events.up.sql` (new), `backend-go/services/scm-integration-service/internal/adapter/eventbus/publisher.go` (new), `backend-go/services/scm-integration-service/internal/adapter/postgres/outbox_repository.go` (new), `backend-go/services/scm-integration-service/cmd/server/main.go`
 **Depends on:** TASK-PI-01-04 (this task's migration number follows `0002_issue_list_cache`)
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — migrations/0003_outbox_events, domain.OutboxEvent, OutboxRepository, OutboxEnqueuer port, relay wired in main.go.`
 
 ---
 

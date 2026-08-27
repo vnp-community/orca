@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
@@ -89,10 +90,7 @@ type gitlabIssue struct {
 // that token exists, built directly into the auth header immediately before
 // dispatch, never stored on the Client or logged.
 func (c *Client) ListIssues(ctx context.Context, cred usecase.Credential, repo string, filter usecase.IssueFilter) ([]domain.Issue, error) {
-	reqURL := fmt.Sprintf("%s/projects/%s/issues", c.baseURL, projectPath(repo))
-	if filter.State != "" {
-		reqURL += "?state=" + url.QueryEscape(filter.State)
-	}
+	reqURL := fmt.Sprintf("%s/projects/%s/issues%s", c.baseURL, projectPath(repo), issueFilterQuery(filter))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
 	if err != nil {
 		return nil, fmt.Errorf("gitlab: build list issues request: %w", err)
@@ -124,6 +122,38 @@ func (c *Client) ListIssues(ctx context.Context, cred usecase.Credential, repo s
 		issues = append(issues, issue)
 	}
 	return issues, nil
+}
+
+// issueFilterQuery builds GET /projects/:id/issues' query string from
+// usecase.IssueFilter (BUG-PI-01). GitLab's state values are "opened"/
+// "closed" (not GitHub's "open"/"closed"/"all") — "open" is mapped to
+// "opened", and "all"/"" both omit the param entirely, which is GitLab's
+// own way of requesting every state.
+func issueFilterQuery(filter usecase.IssueFilter) string {
+	q := make(url.Values)
+	switch filter.State {
+	case "open":
+		q.Set("state", "opened")
+	case "closed":
+		q.Set("state", "closed")
+	case "", "all":
+		// no state param — GitLab returns every state
+	default:
+		q.Set("state", filter.State)
+	}
+	if filter.Assignee != "" {
+		q.Set("assignee_username", filter.Assignee)
+	}
+	if len(filter.Labels) > 0 {
+		q.Set("labels", strings.Join(filter.Labels, ","))
+	}
+	if filter.Milestone != "" {
+		q.Set("milestone", filter.Milestone)
+	}
+	if len(q) == 0 {
+		return ""
+	}
+	return "?" + q.Encode()
 }
 
 // gitlabMergeRequest mirrors the fields this adapter needs from GitLab's
@@ -326,6 +356,184 @@ func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo
 	default:
 		return false, fmt.Errorf("gitlab: branch exists: unexpected status %d", resp.StatusCode)
 	}
+}
+
+// gitlabIssueIID resolves a repo's own issue IID needed by
+// related_merge_requests — GitLab's issue endpoints are addressed by
+// project-scoped iid, same as merge requests, matching this file's
+// existing project-path convention.
+type gitlabRelatedMergeRequest struct {
+	ID           int    `json:"id"`
+	IID          int    `json:"iid"`
+	Title        string `json:"title"`
+	State        string `json:"state"`
+	WebURL       string `json:"web_url"`
+	SourceBranch string `json:"source_branch"`
+	TargetBranch string `json:"target_branch"`
+}
+
+// GetLinkedPullRequestsForIssue calls GitLab's REST API: GET
+// /projects/:id/issues/:iid/related_merge_requests.
+func (c *Client) GetLinkedPullRequestsForIssue(ctx context.Context, cred usecase.Credential, repo string, issueNumber int32) ([]domain.PullRequest, bool, error) {
+	reqURL := fmt.Sprintf("%s/projects/%s/issues/%d/related_merge_requests", c.baseURL, projectPath(repo), issueNumber)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, false, fmt.Errorf("gitlab: build get linked pull requests request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, false, fmt.Errorf("gitlab: get linked pull requests request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, false, fmt.Errorf("gitlab: get linked pull requests: unexpected status %d", resp.StatusCode)
+	}
+	var raw []gitlabRelatedMergeRequest
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, false, fmt.Errorf("gitlab: decode related merge requests response: %w", err)
+	}
+	prs := make([]domain.PullRequest, 0, len(raw))
+	for _, mr := range raw {
+		pr, err := domain.NewPullRequest(strconv.Itoa(mr.IID), domain.ScmProviderGitLab, repo, mr.Title, mr.State, mr.WebURL, mr.SourceBranch, mr.TargetBranch)
+		if err != nil {
+			continue // malformed entry; skip rather than fail the whole call
+		}
+		prs = append(prs, pr)
+	}
+	return prs, true, nil
+}
+
+// SubmitReview composes GitLab's discussions API (one per comment) plus a
+// separate approve/note call — GitLab has no single atomic review endpoint
+// like GitHub's. A failure on any discussion call stops immediately and
+// does NOT proceed to approve/note — partial failure is a real outcome
+// here, not swallowed.
+func (c *Client) SubmitReview(ctx context.Context, cred usecase.Credential, repo string, prNumber int32, in domain.ReviewInput) (domain.Review, error) {
+	for _, comment := range in.Comments {
+		if err := c.createDiscussion(ctx, cred, repo, prNumber, comment); err != nil {
+			return domain.Review{}, fmt.Errorf("gitlab: create discussion for %s:%d: %w", comment.Path, comment.Line, err)
+		}
+	}
+	switch in.Type {
+	case domain.ReviewTypeApprove:
+		return c.approveMR(ctx, cred, repo, prNumber, in.Summary, in.Comments)
+	case domain.ReviewTypeRequestChanges, domain.ReviewTypeComment:
+		// GitLab has no native "request changes" state — recorded as a
+		// summary note, a documented divergence from GitHub's semantics.
+		return c.noteMR(ctx, cred, repo, prNumber, in.Summary, in.Type, in.Comments)
+	default:
+		return domain.Review{}, ErrCapabilityUnsupported
+	}
+}
+
+// createDiscussion — POST /projects/:id/merge_requests/:iid/discussions.
+// GitLab's diff-position addressing needs base/head/start SHAs this call
+// doesn't have (only reachable from the MR's own diff_refs); this posts a
+// plain (non-positioned) discussion body prefixed with the file:line
+// instead of a true inline-positioned comment — a documented simplification
+// until this adapter also fetches the MR's diff_refs first.
+func (c *Client) createDiscussion(ctx context.Context, cred usecase.Credential, repo string, mrIID int32, comment domain.ReviewComment) error {
+	body := fmt.Sprintf("**%s:%d**\n\n%s", comment.Path, comment.Line, comment.Body)
+	reqBody, err := json.Marshal(struct {
+		Body string `json:"body"`
+	}{Body: body})
+	if err != nil {
+		return fmt.Errorf("encode create discussion body: %w", err)
+	}
+	reqURL := fmt.Sprintf("%s/projects/%s/merge_requests/%d/discussions", c.baseURL, projectPath(repo), mrIID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(reqBody))
+	if err != nil {
+		return fmt.Errorf("build create discussion request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("create discussion request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusCreated {
+		return fmt.Errorf("create discussion: unexpected status %d", resp.StatusCode)
+	}
+	return nil
+}
+
+// approveMR — POST /projects/:id/merge_requests/:iid/approve.
+func (c *Client) approveMR(ctx context.Context, cred usecase.Credential, repo string, mrIID int32, summary string, comments []domain.ReviewComment) (domain.Review, error) {
+	reqURL := fmt.Sprintf("%s/projects/%s/merge_requests/%d/approve", c.baseURL, projectPath(repo), mrIID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, nil)
+	if err != nil {
+		return domain.Review{}, fmt.Errorf("gitlab: build approve mr request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return domain.Review{}, fmt.Errorf("gitlab: approve mr request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return domain.Review{}, fmt.Errorf("gitlab: approve mr: unexpected status %d", resp.StatusCode)
+	}
+	var raw struct {
+		User struct {
+			Username string `json:"username"`
+		} `json:"user"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&raw) // best-effort; approve's response shape carries no url/id we need beyond this
+	if summary != "" {
+		_, _ = c.noteMR(ctx, cred, repo, mrIID, summary, domain.ReviewTypeApprove, nil)
+	}
+	return domain.Review{
+		ReviewerID: raw.User.Username, State: domain.ReviewTypeApprove,
+		SubmittedAt: time.Now().UTC().Format(time.RFC3339), Comments: comments,
+	}, nil
+}
+
+// noteMR — POST /projects/:id/merge_requests/:iid/notes with summary as the
+// note body; State reflects the caller's requested type (Comment or
+// RequestChanges) even though GitLab has no matching native state.
+func (c *Client) noteMR(ctx context.Context, cred usecase.Credential, repo string, mrIID int32, summary string, reviewType domain.ReviewType, comments []domain.ReviewComment) (domain.Review, error) {
+	reqBody, err := json.Marshal(struct {
+		Body string `json:"body"`
+	}{Body: summary})
+	if err != nil {
+		return domain.Review{}, fmt.Errorf("gitlab: encode note body: %w", err)
+	}
+	reqURL := fmt.Sprintf("%s/projects/%s/merge_requests/%d/notes", c.baseURL, projectPath(repo), mrIID)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(reqBody))
+	if err != nil {
+		return domain.Review{}, fmt.Errorf("gitlab: build note request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/json")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return domain.Review{}, fmt.Errorf("gitlab: note request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusCreated {
+		return domain.Review{}, fmt.Errorf("gitlab: note: unexpected status %d", resp.StatusCode)
+	}
+	var raw struct {
+		ID     int `json:"id"`
+		Author struct {
+			Username string `json:"username"`
+		} `json:"author"`
+		CreatedAt string `json:"created_at"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return domain.Review{}, fmt.Errorf("gitlab: decode note response: %w", err)
+	}
+	return domain.Review{
+		ID: strconv.Itoa(raw.ID), ReviewerID: raw.Author.Username, State: reviewType,
+		SubmittedAt: raw.CreatedAt, Comments: comments,
+	}, nil
 }
 
 var _ usecase.GitLabMergeRequestProvider = (*Client)(nil)

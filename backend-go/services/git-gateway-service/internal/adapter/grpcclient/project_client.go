@@ -45,14 +45,21 @@ func (p *ProjectClient) GetRepo(ctx context.Context, repoID string) (domain.Repo
 		"project-service has no RPC to fetch a single repo by id yet (only ListRepos(project_id)); see project_client.go's GetRepo doc comment", nil)
 }
 
-func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error) {
+func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
 	ctx, err := withTenantMetadata(ctx)
 	if err != nil {
 		return domain.WorktreeRecord{}, err
 	}
-	resp, err := p.client.RecordWorktreeCreated(ctx, &projectv1.RecordWorktreeCreatedRequest{
+	req := &projectv1.RecordWorktreeCreatedRequest{
 		ProjectId: projectID, RepoId: repoID, Path: path, Branch: branch,
-	})
+	}
+	if lineage.LinkedIssueProvider != "" {
+		req.LinkedIssueProvider = &lineage.LinkedIssueProvider
+	}
+	if lineage.LinkedIssueRef != "" {
+		req.LinkedIssueRef = &lineage.LinkedIssueRef
+	}
+	resp, err := p.client.RecordWorktreeCreated(ctx, req)
 	if err != nil {
 		return domain.WorktreeRecord{}, err
 	}
@@ -67,4 +74,18 @@ func (p *ProjectClient) RecordWorktreeRemoved(ctx context.Context, worktreeID st
 	}
 	_, err = p.client.RecordWorktreeRemoved(ctx, &projectv1.RecordWorktreeRemovedRequest{WorktreeId: worktreeID})
 	return err
+}
+
+// IsIssueStatusSyncEnabled reads project-service's per-project
+// issue_status_sync_enabled flag (BR-PI-06/TASK-PI-02-06) via GetProject.
+func (p *ProjectClient) IsIssueStatusSyncEnabled(ctx context.Context, projectID string) (bool, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return false, err
+	}
+	resp, err := p.client.GetProject(ctx, &projectv1.GetProjectRequest{Id: projectID})
+	if err != nil {
+		return false, err
+	}
+	return resp.GetProject().GetIssueStatusSyncEnabled(), nil
 }

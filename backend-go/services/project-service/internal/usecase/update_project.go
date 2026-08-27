@@ -20,6 +20,9 @@ type UpdateProjectInput struct {
 	Description   string
 	DefaultBranch string
 	Visibility    string
+	// IssueStatusSyncEnabled is presence-based (nil = no change) — see
+	// domain.ProjectUpdatePatch's doc comment.
+	IssueStatusSyncEnabled *bool
 }
 
 type UpdateProject struct {
@@ -49,10 +52,11 @@ func (uc *UpdateProject) Execute(ctx context.Context, in UpdateProjectInput) (do
 	}
 
 	patch := domain.ProjectUpdatePatch{
-		Name:          in.Name,
-		Description:   in.Description,
-		DefaultBranch: in.DefaultBranch,
-		Visibility:    in.Visibility,
+		Name:                   in.Name,
+		Description:            in.Description,
+		DefaultBranch:          in.DefaultBranch,
+		Visibility:             in.Visibility,
+		IssueStatusSyncEnabled: in.IssueStatusSyncEnabled,
 	}
 
 	updated, err := uc.repo.UpdateProject(ctx, tenantID, in.ProjectID, patch)

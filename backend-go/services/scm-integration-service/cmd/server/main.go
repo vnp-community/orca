@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,15 +21,18 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/scm-integration-service/internal/config"
 
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/azuredevops"
+	scmbackoff "github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/backoff"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/bitbucket"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/credentialbroker"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/gitea"
@@ -88,6 +92,11 @@ func run() error {
 	}
 	defer pool.Close()
 	rateLimitCache := postgres.New(pool)
+	// issue_list_cache (migrations/0002) — BR-PI-01's 5-minute cache in
+	// front of ListIssues, sibling of rateLimitCache above.
+	issueListCache := postgres.NewIssueListCache(pool)
+	backoffExecutor := scmbackoff.New(3, 0, 0) // BR-PI-03: 3 attempts, default base/max delay
+	outboxRepo := postgres.NewOutboxRepository(pool)
 
 	// githubProjectsAdapter/gitlabMRAdapter are the SAME instances registered
 	// below in registry's map — one GitHub adapter satisfying both
@@ -143,8 +152,33 @@ func run() error {
 	defer func() { _ = brokerConn.Close() }()
 	credentials := credentialbroker.New(brokerConn)
 
-	listIssuesUC := usecase.NewListIssues(credentials, registry)
-	createPullRequestUC := usecase.NewCreatePullRequest(credentials, registry)
+	// Transactional-outbox relay (SOL-PI-03) — CreatePullRequest/
+	// MergePullRequest durably enqueue via outboxRepo.Enqueue; this relay is
+	// what actually gets those rows to NATS. Mirrors
+	// issue-tracking-service/cmd/server/main.go's own wiring exactly.
+	var relay *outbox.Relay
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "SCM", []string{"orca.scm.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			relay = outbox.NewRelay(outboxRepo, pub, outbox.DefaultConfig, logger)
+		}
+	}
+	var relayWG sync.WaitGroup
+	if relay != nil {
+		relayWG.Add(1)
+		go func() {
+			defer relayWG.Done()
+			relay.Run(ctx)
+		}()
+	}
+
+	listIssuesUC := usecase.NewListIssues(credentials, registry, issueListCache, backoffExecutor)
+	createPullRequestUC := usecase.NewCreatePullRequest(credentials, registry, outboxRepo, logger)
 	listPullRequestsUC := usecase.NewListPullRequests(credentials, registry)
 	getRateLimitStatusUC := usecase.NewGetRateLimitStatus(credentials, registry, rateLimitCache)
 	getAuthStatusUC := usecase.NewGetAuthStatus(credentials)
@@ -159,7 +193,7 @@ func run() error {
 	// (TASK-076). registry already fans out per-provider; these usecases
 	// resolve the concrete adapter the same way every other usecase above
 	// does.
-	mergePullRequestUC := usecase.NewMergePullRequest(credentials, registry)
+	mergePullRequestUC := usecase.NewMergePullRequest(credentials, registry, outboxRepo, logger)
 	requestPullRequestReviewersUC := usecase.NewRequestPullRequestReviewers(credentials, registry)
 	removePullRequestReviewersUC := usecase.NewRemovePullRequestReviewers(credentials, registry)
 	setPullRequestAutoMergeUC := usecase.NewSetPullRequestAutoMerge(credentials, registry)
@@ -187,6 +221,7 @@ func run() error {
 	addIssueCommentBySlugUC := usecase.NewAddIssueCommentBySlug(credentials, githubProjectsAdapter)
 	updateIssueCommentBySlugUC := usecase.NewUpdateIssueCommentBySlug(credentials, githubProjectsAdapter)
 	deleteIssueCommentBySlugUC := usecase.NewDeleteIssueCommentBySlug(credentials, githubProjectsAdapter)
+	listIssueCommentsBySlugUC := usecase.NewListIssueCommentsBySlug(credentials, githubProjectsAdapter)
 
 	// SOL-013 — GitLab-specific (TASK-084). gitlabMRAdapter is the SAME
 	// *gitlab.Client instance registered in registry's map below.
@@ -197,6 +232,11 @@ func run() error {
 	// SOL-014 — hostedReview.getCreationEligibility (TASK-088). Reuses the
 	// same getAuthStatusUC instance the GetAuthStatus RPC already uses.
 	checkHostedReviewEligibilityUC := usecase.NewCheckHostedReviewEligibility(credentials, registry, getAuthStatusUC)
+
+	// BUG-PI-01/SOL-PI-01 (TASK-PI-01-06) and BUG-PI-04/SOL-PI-04
+	// (TASK-PI-04-02) additions.
+	getLinkedPullRequestsForIssueUC := usecase.NewGetLinkedPullRequestsForIssue(credentials, registry)
+	submitReviewUC := usecase.NewSubmitReview(credentials, registry)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	scmintegrationv1.RegisterScmIntegrationServiceServer(grpcServer, scmgrpc.New(
@@ -212,6 +252,7 @@ func run() error {
 		listMergeRequestsUC, resolveMergeRequestDiscussionUC, getWorkItemDetailsUC,
 		checkHostedReviewEligibilityUC,
 		setIntegrationCredentialUC, getIntegrationCredentialStatusUC, listIntegrationCredentialsUC,
+		listIssueCommentsBySlugUC, getLinkedPullRequestsForIssueUC, submitReviewUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -262,6 +303,8 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+
+	relayWG.Wait()
 
 	return nil
 }

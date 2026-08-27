@@ -21,6 +21,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	ScmIntegrationService_ListIssues_FullMethodName                     = "/orca.scmintegration.v1.ScmIntegrationService/ListIssues"
+	ScmIntegrationService_ListIssueCommentsBySlug_FullMethodName        = "/orca.scmintegration.v1.ScmIntegrationService/ListIssueCommentsBySlug"
+	ScmIntegrationService_GetLinkedPullRequestsForIssue_FullMethodName  = "/orca.scmintegration.v1.ScmIntegrationService/GetLinkedPullRequestsForIssue"
 	ScmIntegrationService_CreatePullRequest_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/CreatePullRequest"
 	ScmIntegrationService_ListPullRequests_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/ListPullRequests"
 	ScmIntegrationService_GetRateLimitStatus_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/GetRateLimitStatus"
@@ -58,6 +60,8 @@ const (
 	ScmIntegrationService_SetIntegrationCredential_FullMethodName       = "/orca.scmintegration.v1.ScmIntegrationService/SetIntegrationCredential"
 	ScmIntegrationService_GetIntegrationCredentialStatus_FullMethodName = "/orca.scmintegration.v1.ScmIntegrationService/GetIntegrationCredentialStatus"
 	ScmIntegrationService_ListIntegrationCredentials_FullMethodName     = "/orca.scmintegration.v1.ScmIntegrationService/ListIntegrationCredentials"
+	ScmIntegrationService_ReceiveWebhook_FullMethodName                 = "/orca.scmintegration.v1.ScmIntegrationService/ReceiveWebhook"
+	ScmIntegrationService_SubmitReview_FullMethodName                   = "/orca.scmintegration.v1.ScmIntegrationService/SubmitReview"
 )
 
 // ScmIntegrationServiceClient is the client API for ScmIntegrationService service.
@@ -69,6 +73,8 @@ const (
 // See specs/backend-go/services/scm-integration-service.md.
 type ScmIntegrationServiceClient interface {
 	ListIssues(ctx context.Context, in *ListIssuesRequest, opts ...grpc.CallOption) (*ListIssuesResponse, error)
+	ListIssueCommentsBySlug(ctx context.Context, in *ListIssueCommentsBySlugRequest, opts ...grpc.CallOption) (*ListIssueCommentsBySlugResponse, error)
+	GetLinkedPullRequestsForIssue(ctx context.Context, in *GetLinkedPullRequestsForIssueRequest, opts ...grpc.CallOption) (*GetLinkedPullRequestsForIssueResponse, error)
 	CreatePullRequest(ctx context.Context, in *CreatePullRequestRequest, opts ...grpc.CallOption) (*CreatePullRequestResponse, error)
 	ListPullRequests(ctx context.Context, in *ListPullRequestsRequest, opts ...grpc.CallOption) (*ListPullRequestsResponse, error)
 	GetRateLimitStatus(ctx context.Context, in *GetRateLimitStatusRequest, opts ...grpc.CallOption) (*GetRateLimitStatusResponse, error)
@@ -138,6 +144,14 @@ type ScmIntegrationServiceClient interface {
 	SetIntegrationCredential(ctx context.Context, in *SetIntegrationCredentialRequest, opts ...grpc.CallOption) (*SetIntegrationCredentialResponse, error)
 	GetIntegrationCredentialStatus(ctx context.Context, in *GetIntegrationCredentialStatusRequest, opts ...grpc.CallOption) (*GetIntegrationCredentialStatusResponse, error)
 	ListIntegrationCredentials(ctx context.Context, in *ListIntegrationCredentialsRequest, opts ...grpc.CallOption) (*ListIntegrationCredentialsResponse, error)
+	// ReceiveWebhook — plain HTTP via api-gateway at
+	// /v1/scm/webhooks/{provider}, forwarded to this RPC. Deliberate exception
+	// to gRPC-for-sync: the caller is GitHub/GitLab's own servers, which
+	// cannot be given an Orca JWT.
+	ReceiveWebhook(ctx context.Context, in *ReceiveWebhookRequest, opts ...grpc.CallOption) (*ReceiveWebhookResponse, error)
+	// SubmitReview — scm-integration-service.md §3's "Reviewers & reviews"
+	// sketch, implemented here (BUG-PI-04).
+	SubmitReview(ctx context.Context, in *SubmitReviewRequest, opts ...grpc.CallOption) (*Review, error)
 }
 
 type scmIntegrationServiceClient struct {
@@ -152,6 +166,26 @@ func (c *scmIntegrationServiceClient) ListIssues(ctx context.Context, in *ListIs
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListIssuesResponse)
 	err := c.cc.Invoke(ctx, ScmIntegrationService_ListIssues_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ListIssueCommentsBySlug(ctx context.Context, in *ListIssueCommentsBySlugRequest, opts ...grpc.CallOption) (*ListIssueCommentsBySlugResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListIssueCommentsBySlugResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ListIssueCommentsBySlug_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) GetLinkedPullRequestsForIssue(ctx context.Context, in *GetLinkedPullRequestsForIssueRequest, opts ...grpc.CallOption) (*GetLinkedPullRequestsForIssueResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetLinkedPullRequestsForIssueResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_GetLinkedPullRequestsForIssue_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -528,6 +562,26 @@ func (c *scmIntegrationServiceClient) ListIntegrationCredentials(ctx context.Con
 	return out, nil
 }
 
+func (c *scmIntegrationServiceClient) ReceiveWebhook(ctx context.Context, in *ReceiveWebhookRequest, opts ...grpc.CallOption) (*ReceiveWebhookResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReceiveWebhookResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ReceiveWebhook_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) SubmitReview(ctx context.Context, in *SubmitReviewRequest, opts ...grpc.CallOption) (*Review, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Review)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_SubmitReview_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ScmIntegrationServiceServer is the server API for ScmIntegrationService service.
 // All implementations must embed UnimplementedScmIntegrationServiceServer
 // for forward compatibility.
@@ -537,6 +591,8 @@ func (c *scmIntegrationServiceClient) ListIntegrationCredentials(ctx context.Con
 // See specs/backend-go/services/scm-integration-service.md.
 type ScmIntegrationServiceServer interface {
 	ListIssues(context.Context, *ListIssuesRequest) (*ListIssuesResponse, error)
+	ListIssueCommentsBySlug(context.Context, *ListIssueCommentsBySlugRequest) (*ListIssueCommentsBySlugResponse, error)
+	GetLinkedPullRequestsForIssue(context.Context, *GetLinkedPullRequestsForIssueRequest) (*GetLinkedPullRequestsForIssueResponse, error)
 	CreatePullRequest(context.Context, *CreatePullRequestRequest) (*CreatePullRequestResponse, error)
 	ListPullRequests(context.Context, *ListPullRequestsRequest) (*ListPullRequestsResponse, error)
 	GetRateLimitStatus(context.Context, *GetRateLimitStatusRequest) (*GetRateLimitStatusResponse, error)
@@ -606,6 +662,14 @@ type ScmIntegrationServiceServer interface {
 	SetIntegrationCredential(context.Context, *SetIntegrationCredentialRequest) (*SetIntegrationCredentialResponse, error)
 	GetIntegrationCredentialStatus(context.Context, *GetIntegrationCredentialStatusRequest) (*GetIntegrationCredentialStatusResponse, error)
 	ListIntegrationCredentials(context.Context, *ListIntegrationCredentialsRequest) (*ListIntegrationCredentialsResponse, error)
+	// ReceiveWebhook — plain HTTP via api-gateway at
+	// /v1/scm/webhooks/{provider}, forwarded to this RPC. Deliberate exception
+	// to gRPC-for-sync: the caller is GitHub/GitLab's own servers, which
+	// cannot be given an Orca JWT.
+	ReceiveWebhook(context.Context, *ReceiveWebhookRequest) (*ReceiveWebhookResponse, error)
+	// SubmitReview — scm-integration-service.md §3's "Reviewers & reviews"
+	// sketch, implemented here (BUG-PI-04).
+	SubmitReview(context.Context, *SubmitReviewRequest) (*Review, error)
 	mustEmbedUnimplementedScmIntegrationServiceServer()
 }
 
@@ -618,6 +682,12 @@ type UnimplementedScmIntegrationServiceServer struct{}
 
 func (UnimplementedScmIntegrationServiceServer) ListIssues(context.Context, *ListIssuesRequest) (*ListIssuesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListIssues not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ListIssueCommentsBySlug(context.Context, *ListIssueCommentsBySlugRequest) (*ListIssueCommentsBySlugResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListIssueCommentsBySlug not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) GetLinkedPullRequestsForIssue(context.Context, *GetLinkedPullRequestsForIssueRequest) (*GetLinkedPullRequestsForIssueResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetLinkedPullRequestsForIssue not implemented")
 }
 func (UnimplementedScmIntegrationServiceServer) CreatePullRequest(context.Context, *CreatePullRequestRequest) (*CreatePullRequestResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreatePullRequest not implemented")
@@ -730,6 +800,12 @@ func (UnimplementedScmIntegrationServiceServer) GetIntegrationCredentialStatus(c
 func (UnimplementedScmIntegrationServiceServer) ListIntegrationCredentials(context.Context, *ListIntegrationCredentialsRequest) (*ListIntegrationCredentialsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListIntegrationCredentials not implemented")
 }
+func (UnimplementedScmIntegrationServiceServer) ReceiveWebhook(context.Context, *ReceiveWebhookRequest) (*ReceiveWebhookResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReceiveWebhook not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) SubmitReview(context.Context, *SubmitReviewRequest) (*Review, error) {
+	return nil, status.Error(codes.Unimplemented, "method SubmitReview not implemented")
+}
 func (UnimplementedScmIntegrationServiceServer) mustEmbedUnimplementedScmIntegrationServiceServer() {}
 func (UnimplementedScmIntegrationServiceServer) testEmbeddedByValue()                               {}
 
@@ -765,6 +841,42 @@ func _ScmIntegrationService_ListIssues_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ScmIntegrationServiceServer).ListIssues(ctx, req.(*ListIssuesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ListIssueCommentsBySlug_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListIssueCommentsBySlugRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ListIssueCommentsBySlug(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ListIssueCommentsBySlug_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ListIssueCommentsBySlug(ctx, req.(*ListIssueCommentsBySlugRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_GetLinkedPullRequestsForIssue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetLinkedPullRequestsForIssueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).GetLinkedPullRequestsForIssue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_GetLinkedPullRequestsForIssue_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).GetLinkedPullRequestsForIssue(ctx, req.(*GetLinkedPullRequestsForIssueRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1435,6 +1547,42 @@ func _ScmIntegrationService_ListIntegrationCredentials_Handler(srv interface{}, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ScmIntegrationService_ReceiveWebhook_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReceiveWebhookRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ReceiveWebhook(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ReceiveWebhook_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ReceiveWebhook(ctx, req.(*ReceiveWebhookRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_SubmitReview_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SubmitReviewRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).SubmitReview(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_SubmitReview_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).SubmitReview(ctx, req.(*SubmitReviewRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ScmIntegrationService_ServiceDesc is the grpc.ServiceDesc for ScmIntegrationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1445,6 +1593,14 @@ var ScmIntegrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListIssues",
 			Handler:    _ScmIntegrationService_ListIssues_Handler,
+		},
+		{
+			MethodName: "ListIssueCommentsBySlug",
+			Handler:    _ScmIntegrationService_ListIssueCommentsBySlug_Handler,
+		},
+		{
+			MethodName: "GetLinkedPullRequestsForIssue",
+			Handler:    _ScmIntegrationService_GetLinkedPullRequestsForIssue_Handler,
 		},
 		{
 			MethodName: "CreatePullRequest",
@@ -1593,6 +1749,14 @@ var ScmIntegrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListIntegrationCredentials",
 			Handler:    _ScmIntegrationService_ListIntegrationCredentials_Handler,
+		},
+		{
+			MethodName: "ReceiveWebhook",
+			Handler:    _ScmIntegrationService_ReceiveWebhook_Handler,
+		},
+		{
+			MethodName: "SubmitReview",
+			Handler:    _ScmIntegrationService_SubmitReview_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

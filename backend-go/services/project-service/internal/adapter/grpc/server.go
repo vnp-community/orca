@@ -52,9 +52,9 @@ type Server struct {
 	listProjectGroups  *usecase.ListProjectGroups
 
 	folderWorkspaces *usecase.FolderWorkspaceUseCase
-	moveProject        *usecase.MoveProject
-	scanNested         *usecase.ScanNested
-	importNested       *usecase.ImportNested
+	moveProject      *usecase.MoveProject
+	scanNested       *usecase.ScanNested
+	importNested     *usecase.ImportNested
 
 	createHostSetup     *usecase.CreateHostSetup
 	listHostSetups      *usecase.ListHostSetups
@@ -97,9 +97,9 @@ type Deps struct {
 	ListProjectGroups  *usecase.ListProjectGroups
 
 	FolderWorkspaces *usecase.FolderWorkspaceUseCase
-	MoveProject        *usecase.MoveProject
-	ScanNested         *usecase.ScanNested
-	ImportNested       *usecase.ImportNested
+	MoveProject      *usecase.MoveProject
+	ScanNested       *usecase.ScanNested
+	ImportNested     *usecase.ImportNested
 
 	CreateHostSetup     *usecase.CreateHostSetup
 	ListHostSetups      *usecase.ListHostSetups
@@ -140,9 +140,9 @@ func New(deps Deps) *Server {
 		listProjectGroups:  deps.ListProjectGroups,
 
 		folderWorkspaces: deps.FolderWorkspaces,
-		moveProject:        deps.MoveProject,
-		scanNested:         deps.ScanNested,
-		importNested:       deps.ImportNested,
+		moveProject:      deps.MoveProject,
+		scanNested:       deps.ScanNested,
+		importNested:     deps.ImportNested,
 
 		createHostSetup:     deps.CreateHostSetup,
 		listHostSetups:      deps.ListHostSetups,
@@ -253,11 +253,12 @@ func (s *Server) RebindDevServer(ctx context.Context, req *projectv1.RebindDevSe
 
 func (s *Server) UpdateProject(ctx context.Context, req *projectv1.UpdateProjectRequest) (*projectv1.UpdateProjectResponse, error) {
 	project, err := s.updateProject.Execute(ctx, usecase.UpdateProjectInput{
-		ProjectID:     req.GetProjectId(),
-		Name:          req.GetName(),
-		Description:   req.GetDescription(),
-		DefaultBranch: req.GetDefaultBranch(),
-		Visibility:    req.GetVisibility(),
+		ProjectID:              req.GetProjectId(),
+		Name:                   req.GetName(),
+		Description:            req.GetDescription(),
+		DefaultBranch:          req.GetDefaultBranch(),
+		Visibility:             req.GetVisibility(),
+		IssueStatusSyncEnabled: req.IssueStatusSyncEnabled,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -327,10 +328,12 @@ func (s *Server) UpdateRepo(ctx context.Context, req *projectv1.UpdateRepoReques
 
 func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.RecordWorktreeCreatedRequest) (*projectv1.RecordWorktreeCreatedResponse, error) {
 	wt, err := s.recordWorktreeCreated.Execute(ctx, usecase.RecordWorktreeCreatedInput{
-		ProjectID: req.GetProjectId(),
-		RepoID:    req.GetRepoId(),
-		Path:      req.GetPath(),
-		Branch:    req.GetBranch(),
+		ProjectID:           req.GetProjectId(),
+		RepoID:              req.GetRepoId(),
+		Path:                req.GetPath(),
+		Branch:              req.GetBranch(),
+		LinkedIssueProvider: req.GetLinkedIssueProvider(),
+		LinkedIssueRef:      req.GetLinkedIssueRef(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -548,14 +551,15 @@ func toProtoRole(r domain.ProjectRole) projectv1.ProjectRole {
 
 func toProtoProject(p domain.Project) *projectv1.Project {
 	out := &projectv1.Project{
-		Id:            p.ID,
-		TenantId:      p.TenantID,
-		Name:          p.Name,
-		DevServerId:   p.DevServerID,
-		Description:   p.Description,
-		DefaultBranch: p.DefaultBranch,
-		Visibility:    p.Visibility,
-		CreatedBy:     p.CreatedBy,
+		Id:                     p.ID,
+		TenantId:               p.TenantID,
+		Name:                   p.Name,
+		DevServerId:            p.DevServerID,
+		Description:            p.Description,
+		DefaultBranch:          p.DefaultBranch,
+		Visibility:             p.Visibility,
+		CreatedBy:              p.CreatedBy,
+		IssueStatusSyncEnabled: p.IssueStatusSyncEnabled,
 	}
 	if !p.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(p.CreatedAt)
@@ -577,7 +581,7 @@ func toProtoRepo(r domain.Repo) *projectv1.Repo {
 }
 
 func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
-	return &projectv1.Worktree{
+	out := &projectv1.Worktree{
 		Id:        wt.ID,
 		ProjectId: wt.ProjectID,
 		RepoId:    wt.RepoID,
@@ -585,6 +589,13 @@ func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
 		Branch:    wt.Branch,
 		Active:    wt.Active,
 	}
+	if wt.LinkedIssueProvider != "" {
+		out.LinkedIssueProvider = &wt.LinkedIssueProvider
+	}
+	if wt.LinkedIssueRef != "" {
+		out.LinkedIssueRef = &wt.LinkedIssueRef
+	}
+	return out
 }
 
 func toProtoProjectGroup(g domain.ProjectGroup) *projectv1.ProjectGroup {

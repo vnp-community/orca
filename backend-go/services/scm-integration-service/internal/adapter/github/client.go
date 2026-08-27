@@ -79,8 +79,8 @@ type githubIssue struct {
 // scm-integration-service.md §9, this is the only place that token exists,
 // built directly into the auth header immediately before dispatch, never
 // stored on the Client or logged.
-func (c *Client) ListIssues(ctx context.Context, cred usecase.Credential, repo string, _ usecase.IssueFilter) ([]domain.Issue, error) {
-	url := fmt.Sprintf("%s/repos/%s/issues", c.baseURL, repo)
+func (c *Client) ListIssues(ctx context.Context, cred usecase.Credential, repo string, filter usecase.IssueFilter) ([]domain.Issue, error) {
+	url := fmt.Sprintf("%s/repos/%s/issues%s", c.baseURL, repo, issueFilterQuery(filter))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return nil, fmt.Errorf("github: build list issues request: %w", err)
@@ -116,6 +116,177 @@ func (c *Client) ListIssues(ctx context.Context, cred usecase.Credential, repo s
 		issues = append(issues, issue)
 	}
 	return issues, nil
+}
+
+// issueFilterQuery builds GET /repos/{repo}/issues' query string from
+// usecase.IssueFilter (BUG-PI-01's fix: this filter now actually reaches
+// the provider call). Empty fields are omitted — GitHub's own default for
+// an absent "state" is "open", matching IssueFilter.State's documented
+// default.
+func issueFilterQuery(filter usecase.IssueFilter) string {
+	q := make(url.Values)
+	if filter.State != "" {
+		q.Set("state", filter.State)
+	}
+	if filter.Assignee != "" {
+		q.Set("assignee", filter.Assignee)
+	}
+	if len(filter.Labels) > 0 {
+		q.Set("labels", strings.Join(filter.Labels, ","))
+	}
+	if filter.Milestone != "" {
+		q.Set("milestone", filter.Milestone)
+	}
+	if len(q) == 0 {
+		return ""
+	}
+	return "?" + q.Encode()
+}
+
+// githubTimelineEvent is the subset of GitHub's issue-timeline event shape
+// (https://docs.github.com/en/rest/issues/timeline) this adapter needs —
+// only "cross-referenced" events carry a source.issue, which is
+// issue-shaped even when the cross-reference is actually a pull request
+// (githubIssue.PullRequest is the same non-nil-marker ListIssues already
+// uses to tell the two apart).
+type githubTimelineEvent struct {
+	Event  string `json:"event"`
+	Source struct {
+		Issue *githubIssue `json:"issue"`
+	} `json:"source"`
+}
+
+// GetLinkedPullRequestsForIssue — GET /repos/{repo}/issues/{number}/timeline,
+// filtered to "cross-referenced" events whose source is a pull request.
+func (c *Client) GetLinkedPullRequestsForIssue(ctx context.Context, cred usecase.Credential, repo string, issueNumber int32) ([]domain.PullRequest, bool, error) {
+	reqURL := fmt.Sprintf("%s/repos/%s/issues/%d/timeline", c.baseURL, repo, issueNumber)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, false, fmt.Errorf("github: build get linked pull requests request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, false, fmt.Errorf("github: get linked pull requests request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, false, fmt.Errorf("github: get linked pull requests: unexpected status %d", resp.StatusCode)
+	}
+	var raw []githubTimelineEvent
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, false, fmt.Errorf("github: decode timeline response: %w", err)
+	}
+
+	var prs []domain.PullRequest
+	for _, ev := range raw {
+		if ev.Event != "cross-referenced" || ev.Source.Issue == nil || ev.Source.Issue.PullRequest == nil {
+			continue // not a cross-reference, or references a plain issue rather than a PR
+		}
+		src := ev.Source.Issue
+		pr, err := domain.NewPullRequest(strconv.Itoa(src.Number), domain.ScmProviderGitHub, repo, src.Title, src.State, src.HTMLURL, "", "")
+		if err != nil {
+			continue // malformed cross-reference entry; skip rather than fail the whole call
+		}
+		prs = append(prs, pr)
+	}
+	return prs, true, nil
+}
+
+// githubReviewComment/githubReviewPayload mirror POST
+// /repos/{repo}/pulls/{prNumber}/reviews' request body
+// (https://docs.github.com/en/rest/pulls/reviews#create-a-review-for-a-pull-request).
+type githubReviewComment struct {
+	Path string `json:"path"`
+	Line int32  `json:"line"`
+	Body string `json:"body"`
+}
+type githubReviewPayload struct {
+	Body     string                `json:"body,omitempty"`
+	Event    string                `json:"event"` // COMMENT | APPROVE | REQUEST_CHANGES
+	Comments []githubReviewComment `json:"comments,omitempty"`
+}
+
+func reviewTypeToGitHubEvent(t domain.ReviewType) string {
+	switch t {
+	case domain.ReviewTypeApprove:
+		return "APPROVE"
+	case domain.ReviewTypeRequestChanges:
+		return "REQUEST_CHANGES"
+	default:
+		return "COMMENT"
+	}
+}
+
+func githubEventToReviewType(event string) domain.ReviewType {
+	switch event {
+	case "APPROVED":
+		return domain.ReviewTypeApprove
+	case "CHANGES_REQUESTED":
+		return domain.ReviewTypeRequestChanges
+	default:
+		return domain.ReviewTypeComment
+	}
+}
+
+// SubmitReview — POST /repos/{repo}/pulls/{prNumber}/reviews. GitHub's
+// Reviews API natively supports Comment/Approve/Request-Changes with
+// per-line comments in one call, unlike GitLab's composed approach (see
+// gitlab.Client.SubmitReview's doc comment).
+func (c *Client) SubmitReview(ctx context.Context, cred usecase.Credential, repo string, prNumber int32, in domain.ReviewInput) (domain.Review, error) {
+	comments := make([]githubReviewComment, 0, len(in.Comments))
+	for _, cm := range in.Comments {
+		comments = append(comments, githubReviewComment{Path: cm.Path, Line: cm.Line, Body: cm.Body})
+	}
+	payload := githubReviewPayload{Body: in.Summary, Event: reviewTypeToGitHubEvent(in.Type), Comments: comments}
+	reqBody, err := json.Marshal(payload)
+	if err != nil {
+		return domain.Review{}, fmt.Errorf("github: encode submit review body: %w", err)
+	}
+
+	reqURL := fmt.Sprintf("%s/repos/%s/pulls/%d/reviews", c.baseURL, repo, prNumber)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, reqURL, bytes.NewReader(reqBody))
+	if err != nil {
+		return domain.Review{}, fmt.Errorf("github: build submit review request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return domain.Review{}, fmt.Errorf("github: submit review request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+		return domain.Review{}, fmt.Errorf("github: submit review: unexpected status %d", resp.StatusCode)
+	}
+
+	var raw struct {
+		ID   int64 `json:"id"`
+		User struct {
+			Login string `json:"login"`
+		} `json:"user"`
+		State       string `json:"state"`
+		SubmittedAt string `json:"submitted_at"`
+		HTMLURL     string `json:"html_url"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return domain.Review{}, fmt.Errorf("github: decode submit review response: %w", err)
+	}
+
+	state := in.Type
+	if raw.State != "" {
+		state = githubEventToReviewType(raw.State)
+	}
+	return domain.Review{
+		ID: strconv.FormatInt(raw.ID, 10), ReviewerID: raw.User.Login,
+		State: state, SubmittedAt: raw.SubmittedAt, Comments: in.Comments, URL: raw.HTMLURL,
+	}, nil
 }
 
 // githubPullRequest mirrors the fields this adapter needs from GitHub's

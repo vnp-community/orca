@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/create_pull_request.go`, `backend-go/services/scm-integration-service/internal/usecase/merge_pull_request.go`
 **Depends on:** TASK-PI-03-01, TASK-PI-03-04
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — CreatePullRequest/MergePullRequest enqueue pr.created/pr.merged (merged==true only); enqueue failure logged, never fails RPC.`
 
 ---
 

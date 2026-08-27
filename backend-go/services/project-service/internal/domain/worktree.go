@@ -29,6 +29,11 @@ type Worktree struct {
 	Path      string
 	Branch    string
 	Active    bool
+	// LinkedIssueProvider/LinkedIssueRef carry BR-PI-06's linked-issue
+	// reference through to the worktree.created/worktree.deleted outbox
+	// events (SOL-PI-03) — empty means "no linked issue".
+	LinkedIssueProvider string
+	LinkedIssueRef      string
 }
 
 // NewWorktree constructs a Worktree, enforcing the invariants a metadata

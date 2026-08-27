@@ -5,7 +5,7 @@
 **Service:** `project-service`, `scm-integration-service`
 **File:** `backend-go/proto/orca/project/v1/project.proto`, `backend-go/proto/orca/scmintegration/v1/scmintegration.proto`
 **Depends on:** TASK-PI-02-02 (uses `Worktree.linked_issue_provider`/`linked_issue_ref` added there)
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — WorktreeLifecycleEvent (project.proto), PullRequestLifecycleEvent/ReceiveWebhook/SubmitReview messages (scmintegration.proto) added, buf generate clean.`
 
 ---
 

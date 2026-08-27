@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/ports.go`, `backend-go/services/scm-integration-service/internal/usecase/submit_review.go` (new), `backend-go/services/scm-integration-service/internal/domain/scm.go`
 **Depends on:** TASK-PI-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — domain ReviewType/ReviewComment/ReviewInput/Review + ScmProvider.SubmitReview port + submit_review.go usecase (BR-PI-10/BR-PI-11 re-validated) + grpc handler.`
 
 ---
 

@@ -160,3 +160,35 @@ type WorkItemDetailsGitLab struct {
 	URL      string
 	Labels   []string
 }
+
+// ── SubmitReview (BUG-PI-04/SOL-PI-04) ──────────────────────────────────
+
+type ReviewType string
+
+const (
+	ReviewTypeUnspecified    ReviewType = ""
+	ReviewTypeComment        ReviewType = "comment"
+	ReviewTypeApprove        ReviewType = "approve"
+	ReviewTypeRequestChanges ReviewType = "request_changes"
+)
+
+type ReviewComment struct {
+	Path string
+	Line int32
+	Body string
+}
+
+type ReviewInput struct {
+	Type     ReviewType
+	Summary  string
+	Comments []ReviewComment
+}
+
+type Review struct {
+	ID          string
+	ReviewerID  string
+	State       ReviewType
+	SubmittedAt string
+	Comments    []ReviewComment
+	URL         string
+}

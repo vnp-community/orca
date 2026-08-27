@@ -23,10 +23,14 @@ type fakeProjectClient struct {
 	gotRecordCreatedRepo    string
 	gotRecordCreatedPath    string
 	gotRecordCreatedBranch  string
+	gotRecordCreatedLineage domain.WorktreeLineageCapture
 
 	recordRemovedErr    error
 	calledRecordRemoved bool
 	gotRecordRemovedID  string
+
+	issueStatusSyncEnabled    bool
+	issueStatusSyncEnabledErr error
 }
 
 func (f *fakeProjectClient) GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error) {
@@ -41,12 +45,13 @@ func (f *fakeProjectClient) GetRepo(ctx context.Context, repoID string) (domain.
 	return domain.RepoInfo{ID: repoID}, nil
 }
 
-func (f *fakeProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error) {
+func (f *fakeProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
 	f.calledRecordCreated = true
 	f.gotRecordCreatedProject = projectID
 	f.gotRecordCreatedRepo = repoID
 	f.gotRecordCreatedPath = path
 	f.gotRecordCreatedBranch = branch
+	f.gotRecordCreatedLineage = lineage
 	if f.recordCreatedErr != nil {
 		return domain.WorktreeRecord{}, f.recordCreatedErr
 	}
@@ -57,6 +62,13 @@ func (f *fakeProjectClient) RecordWorktreeRemoved(ctx context.Context, worktreeI
 	f.calledRecordRemoved = true
 	f.gotRecordRemovedID = worktreeID
 	return f.recordRemovedErr
+}
+
+func (f *fakeProjectClient) IsIssueStatusSyncEnabled(ctx context.Context, projectID string) (bool, error) {
+	if f.issueStatusSyncEnabledErr != nil {
+		return false, f.issueStatusSyncEnabledErr
+	}
+	return f.issueStatusSyncEnabled, nil
 }
 
 // fakeSCMClient is an in-memory SCMClient — shared by resolve_pr_base_test.go

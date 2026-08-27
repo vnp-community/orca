@@ -80,6 +80,58 @@ func (ScmProvider) EnumDescriptor() ([]byte, []int) {
 	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{0}
 }
 
+type ReviewType int32
+
+const (
+	ReviewType_REVIEW_TYPE_UNSPECIFIED     ReviewType = 0
+	ReviewType_REVIEW_TYPE_COMMENT         ReviewType = 1
+	ReviewType_REVIEW_TYPE_APPROVE         ReviewType = 2
+	ReviewType_REVIEW_TYPE_REQUEST_CHANGES ReviewType = 3
+)
+
+// Enum value maps for ReviewType.
+var (
+	ReviewType_name = map[int32]string{
+		0: "REVIEW_TYPE_UNSPECIFIED",
+		1: "REVIEW_TYPE_COMMENT",
+		2: "REVIEW_TYPE_APPROVE",
+		3: "REVIEW_TYPE_REQUEST_CHANGES",
+	}
+	ReviewType_value = map[string]int32{
+		"REVIEW_TYPE_UNSPECIFIED":     0,
+		"REVIEW_TYPE_COMMENT":         1,
+		"REVIEW_TYPE_APPROVE":         2,
+		"REVIEW_TYPE_REQUEST_CHANGES": 3,
+	}
+)
+
+func (x ReviewType) Enum() *ReviewType {
+	p := new(ReviewType)
+	*p = x
+	return p
+}
+
+func (x ReviewType) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (ReviewType) Descriptor() protoreflect.EnumDescriptor {
+	return file_orca_scmintegration_v1_scmintegration_proto_enumTypes[1].Descriptor()
+}
+
+func (ReviewType) Type() protoreflect.EnumType {
+	return &file_orca_scmintegration_v1_scmintegration_proto_enumTypes[1]
+}
+
+func (x ReviewType) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use ReviewType.Descriptor instead.
+func (ReviewType) EnumDescriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{1}
+}
+
 type Issue struct {
 	state protoimpl.MessageState `protogen:"open.v1"`
 	Id    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -159,18 +211,88 @@ func (x *Issue) GetNumber() int32 {
 	return 0
 }
 
+type IssueFilter struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	State         string                 `protobuf:"bytes,1,opt,name=state,proto3" json:"state,omitempty"`       // "open" | "closed" | "all" — default "open"
+	Assignee      string                 `protobuf:"bytes,2,opt,name=assignee,proto3" json:"assignee,omitempty"` // GitHub login / GitLab username; "" = unfiltered
+	Labels        []string               `protobuf:"bytes,3,rep,name=labels,proto3" json:"labels,omitempty"`
+	Milestone     string                 `protobuf:"bytes,4,opt,name=milestone,proto3" json:"milestone,omitempty"` // milestone title or number-as-string
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *IssueFilter) Reset() {
+	*x = IssueFilter{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *IssueFilter) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*IssueFilter) ProtoMessage() {}
+
+func (x *IssueFilter) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use IssueFilter.ProtoReflect.Descriptor instead.
+func (*IssueFilter) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *IssueFilter) GetState() string {
+	if x != nil {
+		return x.State
+	}
+	return ""
+}
+
+func (x *IssueFilter) GetAssignee() string {
+	if x != nil {
+		return x.Assignee
+	}
+	return ""
+}
+
+func (x *IssueFilter) GetLabels() []string {
+	if x != nil {
+		return x.Labels
+	}
+	return nil
+}
+
+func (x *IssueFilter) GetMilestone() string {
+	if x != nil {
+		return x.Milestone
+	}
+	return ""
+}
+
 type ListIssuesRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	Provider      ScmProvider            `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.scmintegration.v1.ScmProvider" json:"provider,omitempty"`
 	Repo          string                 `protobuf:"bytes,3,opt,name=repo,proto3" json:"repo,omitempty"`
+	Filter        *IssueFilter           `protobuf:"bytes,4,opt,name=filter,proto3" json:"filter,omitempty"`                                  // NEW — was previously absent
+	ForceRefresh  bool                   `protobuf:"varint,5,opt,name=force_refresh,json=forceRefresh,proto3" json:"force_refresh,omitempty"` // NEW — bypasses the 5-minute cache
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ListIssuesRequest) Reset() {
 	*x = ListIssuesRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[1]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -182,7 +304,7 @@ func (x *ListIssuesRequest) String() string {
 func (*ListIssuesRequest) ProtoMessage() {}
 
 func (x *ListIssuesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[1]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -195,7 +317,7 @@ func (x *ListIssuesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIssuesRequest.ProtoReflect.Descriptor instead.
 func (*ListIssuesRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{1}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *ListIssuesRequest) GetTenantId() string {
@@ -219,16 +341,32 @@ func (x *ListIssuesRequest) GetRepo() string {
 	return ""
 }
 
+func (x *ListIssuesRequest) GetFilter() *IssueFilter {
+	if x != nil {
+		return x.Filter
+	}
+	return nil
+}
+
+func (x *ListIssuesRequest) GetForceRefresh() bool {
+	if x != nil {
+		return x.ForceRefresh
+	}
+	return false
+}
+
 type ListIssuesResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Issues        []*Issue               `protobuf:"bytes,1,rep,name=issues,proto3" json:"issues,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Issues         []*Issue               `protobuf:"bytes,1,rep,name=issues,proto3" json:"issues,omitempty"`
+	FromCache      bool                   `protobuf:"varint,2,opt,name=from_cache,json=fromCache,proto3" json:"from_cache,omitempty"`                    // NEW
+	CachedAtUnixMs int64                  `protobuf:"varint,3,opt,name=cached_at_unix_ms,json=cachedAtUnixMs,proto3" json:"cached_at_unix_ms,omitempty"` // NEW
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *ListIssuesResponse) Reset() {
 	*x = ListIssuesResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[2]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -240,7 +378,7 @@ func (x *ListIssuesResponse) String() string {
 func (*ListIssuesResponse) ProtoMessage() {}
 
 func (x *ListIssuesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[2]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -253,7 +391,7 @@ func (x *ListIssuesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIssuesResponse.ProtoReflect.Descriptor instead.
 func (*ListIssuesResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{2}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *ListIssuesResponse) GetIssues() []*Issue {
@@ -261,6 +399,243 @@ func (x *ListIssuesResponse) GetIssues() []*Issue {
 		return x.Issues
 	}
 	return nil
+}
+
+func (x *ListIssuesResponse) GetFromCache() bool {
+	if x != nil {
+		return x.FromCache
+	}
+	return false
+}
+
+func (x *ListIssuesResponse) GetCachedAtUnixMs() int64 {
+	if x != nil {
+		return x.CachedAtUnixMs
+	}
+	return 0
+}
+
+// ListIssueCommentsBySlug completes the *BySlug comment RPC group —
+// AddIssueCommentBySlug/UpdateIssueCommentBySlug/DeleteIssueCommentBySlug
+// already exist with no way to read the thread back.
+type ListIssueCommentsBySlugRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	ItemSlug      string                 `protobuf:"bytes,2,opt,name=item_slug,json=itemSlug,proto3" json:"item_slug,omitempty"` // matches every other *BySlug request's field name
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListIssueCommentsBySlugRequest) Reset() {
+	*x = ListIssueCommentsBySlugRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIssueCommentsBySlugRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIssueCommentsBySlugRequest) ProtoMessage() {}
+
+func (x *ListIssueCommentsBySlugRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIssueCommentsBySlugRequest.ProtoReflect.Descriptor instead.
+func (*ListIssueCommentsBySlugRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *ListIssueCommentsBySlugRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *ListIssueCommentsBySlugRequest) GetItemSlug() string {
+	if x != nil {
+		return x.ItemSlug
+	}
+	return ""
+}
+
+type ListIssueCommentsBySlugResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Comments      []*ProjectComment      `protobuf:"bytes,1,rep,name=comments,proto3" json:"comments,omitempty"` // reuses AddIssueCommentBySlug's existing comment shape
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListIssueCommentsBySlugResponse) Reset() {
+	*x = ListIssueCommentsBySlugResponse{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListIssueCommentsBySlugResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListIssueCommentsBySlugResponse) ProtoMessage() {}
+
+func (x *ListIssueCommentsBySlugResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListIssueCommentsBySlugResponse.ProtoReflect.Descriptor instead.
+func (*ListIssueCommentsBySlugResponse) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *ListIssueCommentsBySlugResponse) GetComments() []*ProjectComment {
+	if x != nil {
+		return x.Comments
+	}
+	return nil
+}
+
+// GetLinkedPullRequestsForIssue has no *BySlug precedent — provider-generic
+// like ListIssues. A provider with no cheap "linked PRs" query sets
+// capability_unsupported=true and returns an empty list, never an RPC error
+// (same degrade pattern as GetBoardView's ErrCapabilityUnsupported).
+type GetLinkedPullRequestsForIssueRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      ScmProvider            `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.scmintegration.v1.ScmProvider" json:"provider,omitempty"`
+	Repo          string                 `protobuf:"bytes,3,opt,name=repo,proto3" json:"repo,omitempty"`
+	IssueNumber   int32                  `protobuf:"varint,4,opt,name=issue_number,json=issueNumber,proto3" json:"issue_number,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetLinkedPullRequestsForIssueRequest) Reset() {
+	*x = GetLinkedPullRequestsForIssueRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetLinkedPullRequestsForIssueRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLinkedPullRequestsForIssueRequest) ProtoMessage() {}
+
+func (x *GetLinkedPullRequestsForIssueRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLinkedPullRequestsForIssueRequest.ProtoReflect.Descriptor instead.
+func (*GetLinkedPullRequestsForIssueRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *GetLinkedPullRequestsForIssueRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *GetLinkedPullRequestsForIssueRequest) GetProvider() ScmProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return ScmProvider_SCM_PROVIDER_UNSPECIFIED
+}
+
+func (x *GetLinkedPullRequestsForIssueRequest) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *GetLinkedPullRequestsForIssueRequest) GetIssueNumber() int32 {
+	if x != nil {
+		return x.IssueNumber
+	}
+	return 0
+}
+
+type GetLinkedPullRequestsForIssueResponse struct {
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	PullRequests          []*PullRequest         `protobuf:"bytes,1,rep,name=pull_requests,json=pullRequests,proto3" json:"pull_requests,omitempty"`
+	CapabilityUnsupported bool                   `protobuf:"varint,2,opt,name=capability_unsupported,json=capabilityUnsupported,proto3" json:"capability_unsupported,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
+}
+
+func (x *GetLinkedPullRequestsForIssueResponse) Reset() {
+	*x = GetLinkedPullRequestsForIssueResponse{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetLinkedPullRequestsForIssueResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetLinkedPullRequestsForIssueResponse) ProtoMessage() {}
+
+func (x *GetLinkedPullRequestsForIssueResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetLinkedPullRequestsForIssueResponse.ProtoReflect.Descriptor instead.
+func (*GetLinkedPullRequestsForIssueResponse) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *GetLinkedPullRequestsForIssueResponse) GetPullRequests() []*PullRequest {
+	if x != nil {
+		return x.PullRequests
+	}
+	return nil
+}
+
+func (x *GetLinkedPullRequestsForIssueResponse) GetCapabilityUnsupported() bool {
+	if x != nil {
+		return x.CapabilityUnsupported
+	}
+	return false
 }
 
 type CreatePullRequestRequest struct {
@@ -279,7 +654,7 @@ type CreatePullRequestRequest struct {
 
 func (x *CreatePullRequestRequest) Reset() {
 	*x = CreatePullRequestRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[3]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -291,7 +666,7 @@ func (x *CreatePullRequestRequest) String() string {
 func (*CreatePullRequestRequest) ProtoMessage() {}
 
 func (x *CreatePullRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[3]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -304,7 +679,7 @@ func (x *CreatePullRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreatePullRequestRequest.ProtoReflect.Descriptor instead.
 func (*CreatePullRequestRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{3}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *CreatePullRequestRequest) GetTenantId() string {
@@ -377,7 +752,7 @@ type PullRequest struct {
 
 func (x *PullRequest) Reset() {
 	*x = PullRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[4]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -389,7 +764,7 @@ func (x *PullRequest) String() string {
 func (*PullRequest) ProtoMessage() {}
 
 func (x *PullRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[4]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -402,7 +777,7 @@ func (x *PullRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PullRequest.ProtoReflect.Descriptor instead.
 func (*PullRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{4}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *PullRequest) GetId() string {
@@ -442,7 +817,7 @@ type CreatePullRequestResponse struct {
 
 func (x *CreatePullRequestResponse) Reset() {
 	*x = CreatePullRequestResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[5]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -454,7 +829,7 @@ func (x *CreatePullRequestResponse) String() string {
 func (*CreatePullRequestResponse) ProtoMessage() {}
 
 func (x *CreatePullRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[5]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -467,7 +842,7 @@ func (x *CreatePullRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreatePullRequestResponse.ProtoReflect.Descriptor instead.
 func (*CreatePullRequestResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{5}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *CreatePullRequestResponse) GetPullRequest() *PullRequest {
@@ -488,7 +863,7 @@ type ListPullRequestsRequest struct {
 
 func (x *ListPullRequestsRequest) Reset() {
 	*x = ListPullRequestsRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[6]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -500,7 +875,7 @@ func (x *ListPullRequestsRequest) String() string {
 func (*ListPullRequestsRequest) ProtoMessage() {}
 
 func (x *ListPullRequestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[6]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -513,7 +888,7 @@ func (x *ListPullRequestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPullRequestsRequest.ProtoReflect.Descriptor instead.
 func (*ListPullRequestsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{6}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *ListPullRequestsRequest) GetTenantId() string {
@@ -546,7 +921,7 @@ type ListPullRequestsResponse struct {
 
 func (x *ListPullRequestsResponse) Reset() {
 	*x = ListPullRequestsResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[7]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -558,7 +933,7 @@ func (x *ListPullRequestsResponse) String() string {
 func (*ListPullRequestsResponse) ProtoMessage() {}
 
 func (x *ListPullRequestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[7]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -571,7 +946,7 @@ func (x *ListPullRequestsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPullRequestsResponse.ProtoReflect.Descriptor instead.
 func (*ListPullRequestsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{7}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *ListPullRequestsResponse) GetPullRequests() []*PullRequest {
@@ -591,7 +966,7 @@ type GetRateLimitStatusRequest struct {
 
 func (x *GetRateLimitStatusRequest) Reset() {
 	*x = GetRateLimitStatusRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[8]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -603,7 +978,7 @@ func (x *GetRateLimitStatusRequest) String() string {
 func (*GetRateLimitStatusRequest) ProtoMessage() {}
 
 func (x *GetRateLimitStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[8]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -616,7 +991,7 @@ func (x *GetRateLimitStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRateLimitStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetRateLimitStatusRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{8}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{13}
 }
 
 func (x *GetRateLimitStatusRequest) GetTenantId() string {
@@ -644,7 +1019,7 @@ type GetRateLimitStatusResponse struct {
 
 func (x *GetRateLimitStatusResponse) Reset() {
 	*x = GetRateLimitStatusResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[9]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -656,7 +1031,7 @@ func (x *GetRateLimitStatusResponse) String() string {
 func (*GetRateLimitStatusResponse) ProtoMessage() {}
 
 func (x *GetRateLimitStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[9]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -669,7 +1044,7 @@ func (x *GetRateLimitStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetRateLimitStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetRateLimitStatusResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{9}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *GetRateLimitStatusResponse) GetRemaining() int32 {
@@ -707,7 +1082,7 @@ type GetAuthStatusRequest struct {
 
 func (x *GetAuthStatusRequest) Reset() {
 	*x = GetAuthStatusRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[10]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -719,7 +1094,7 @@ func (x *GetAuthStatusRequest) String() string {
 func (*GetAuthStatusRequest) ProtoMessage() {}
 
 func (x *GetAuthStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[10]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -732,7 +1107,7 @@ func (x *GetAuthStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAuthStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetAuthStatusRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{10}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *GetAuthStatusRequest) GetTenantId() string {
@@ -758,7 +1133,7 @@ type GetAuthStatusResponse struct {
 
 func (x *GetAuthStatusResponse) Reset() {
 	*x = GetAuthStatusResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[11]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -770,7 +1145,7 @@ func (x *GetAuthStatusResponse) String() string {
 func (*GetAuthStatusResponse) ProtoMessage() {}
 
 func (x *GetAuthStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[11]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -783,7 +1158,7 @@ func (x *GetAuthStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetAuthStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetAuthStatusResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{11}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *GetAuthStatusResponse) GetConnected() bool {
@@ -813,7 +1188,7 @@ type StartOAuthFlowRequest struct {
 
 func (x *StartOAuthFlowRequest) Reset() {
 	*x = StartOAuthFlowRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[12]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -825,7 +1200,7 @@ func (x *StartOAuthFlowRequest) String() string {
 func (*StartOAuthFlowRequest) ProtoMessage() {}
 
 func (x *StartOAuthFlowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[12]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -838,7 +1213,7 @@ func (x *StartOAuthFlowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartOAuthFlowRequest.ProtoReflect.Descriptor instead.
 func (*StartOAuthFlowRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{12}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *StartOAuthFlowRequest) GetTenantId() string {
@@ -881,7 +1256,7 @@ type StartOAuthFlowResponse struct {
 
 func (x *StartOAuthFlowResponse) Reset() {
 	*x = StartOAuthFlowResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[13]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -893,7 +1268,7 @@ func (x *StartOAuthFlowResponse) String() string {
 func (*StartOAuthFlowResponse) ProtoMessage() {}
 
 func (x *StartOAuthFlowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[13]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -906,7 +1281,7 @@ func (x *StartOAuthFlowResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartOAuthFlowResponse.ProtoReflect.Descriptor instead.
 func (*StartOAuthFlowResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{13}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{18}
 }
 
 func (x *StartOAuthFlowResponse) GetAuthorizationUrl() string {
@@ -945,7 +1320,7 @@ type CompleteOAuthFlowRequest struct {
 
 func (x *CompleteOAuthFlowRequest) Reset() {
 	*x = CompleteOAuthFlowRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[14]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -957,7 +1332,7 @@ func (x *CompleteOAuthFlowRequest) String() string {
 func (*CompleteOAuthFlowRequest) ProtoMessage() {}
 
 func (x *CompleteOAuthFlowRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[14]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -970,7 +1345,7 @@ func (x *CompleteOAuthFlowRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteOAuthFlowRequest.ProtoReflect.Descriptor instead.
 func (*CompleteOAuthFlowRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{14}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{19}
 }
 
 func (x *CompleteOAuthFlowRequest) GetTenantId() string {
@@ -1024,7 +1399,7 @@ type CompleteOAuthFlowResponse struct {
 
 func (x *CompleteOAuthFlowResponse) Reset() {
 	*x = CompleteOAuthFlowResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[15]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[20]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1036,7 +1411,7 @@ func (x *CompleteOAuthFlowResponse) String() string {
 func (*CompleteOAuthFlowResponse) ProtoMessage() {}
 
 func (x *CompleteOAuthFlowResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[15]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[20]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1049,7 +1424,7 @@ func (x *CompleteOAuthFlowResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CompleteOAuthFlowResponse.ProtoReflect.Descriptor instead.
 func (*CompleteOAuthFlowResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{15}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{20}
 }
 
 func (x *CompleteOAuthFlowResponse) GetConnected() bool {
@@ -1070,7 +1445,7 @@ type RevokeAuthRequest struct {
 
 func (x *RevokeAuthRequest) Reset() {
 	*x = RevokeAuthRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[16]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1082,7 +1457,7 @@ func (x *RevokeAuthRequest) String() string {
 func (*RevokeAuthRequest) ProtoMessage() {}
 
 func (x *RevokeAuthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[16]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1095,7 +1470,7 @@ func (x *RevokeAuthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeAuthRequest.ProtoReflect.Descriptor instead.
 func (*RevokeAuthRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{16}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *RevokeAuthRequest) GetTenantId() string {
@@ -1120,7 +1495,7 @@ type RevokeAuthResponse struct {
 
 func (x *RevokeAuthResponse) Reset() {
 	*x = RevokeAuthResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[17]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1132,7 +1507,7 @@ func (x *RevokeAuthResponse) String() string {
 func (*RevokeAuthResponse) ProtoMessage() {}
 
 func (x *RevokeAuthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[17]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1145,7 +1520,7 @@ func (x *RevokeAuthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RevokeAuthResponse.ProtoReflect.Descriptor instead.
 func (*RevokeAuthResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{17}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{22}
 }
 
 type MergePullRequestRequest struct {
@@ -1163,7 +1538,7 @@ type MergePullRequestRequest struct {
 
 func (x *MergePullRequestRequest) Reset() {
 	*x = MergePullRequestRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[18]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1175,7 +1550,7 @@ func (x *MergePullRequestRequest) String() string {
 func (*MergePullRequestRequest) ProtoMessage() {}
 
 func (x *MergePullRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[18]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1188,7 +1563,7 @@ func (x *MergePullRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergePullRequestRequest.ProtoReflect.Descriptor instead.
 func (*MergePullRequestRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{18}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *MergePullRequestRequest) GetTenantId() string {
@@ -1251,7 +1626,7 @@ type MergePullRequestResponse struct {
 
 func (x *MergePullRequestResponse) Reset() {
 	*x = MergePullRequestResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[19]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1263,7 +1638,7 @@ func (x *MergePullRequestResponse) String() string {
 func (*MergePullRequestResponse) ProtoMessage() {}
 
 func (x *MergePullRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[19]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1276,7 +1651,7 @@ func (x *MergePullRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergePullRequestResponse.ProtoReflect.Descriptor instead.
 func (*MergePullRequestResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{19}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *MergePullRequestResponse) GetPullRequest() *PullRequest {
@@ -1314,7 +1689,7 @@ type RequestPullRequestReviewersRequest struct {
 
 func (x *RequestPullRequestReviewersRequest) Reset() {
 	*x = RequestPullRequestReviewersRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[20]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1326,7 +1701,7 @@ func (x *RequestPullRequestReviewersRequest) String() string {
 func (*RequestPullRequestReviewersRequest) ProtoMessage() {}
 
 func (x *RequestPullRequestReviewersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[20]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1339,7 +1714,7 @@ func (x *RequestPullRequestReviewersRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use RequestPullRequestReviewersRequest.ProtoReflect.Descriptor instead.
 func (*RequestPullRequestReviewersRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{20}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *RequestPullRequestReviewersRequest) GetTenantId() string {
@@ -1397,7 +1772,7 @@ type RemovePullRequestReviewersRequest struct {
 
 func (x *RemovePullRequestReviewersRequest) Reset() {
 	*x = RemovePullRequestReviewersRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[21]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1409,7 +1784,7 @@ func (x *RemovePullRequestReviewersRequest) String() string {
 func (*RemovePullRequestReviewersRequest) ProtoMessage() {}
 
 func (x *RemovePullRequestReviewersRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[21]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1422,7 +1797,7 @@ func (x *RemovePullRequestReviewersRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use RemovePullRequestReviewersRequest.ProtoReflect.Descriptor instead.
 func (*RemovePullRequestReviewersRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{21}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *RemovePullRequestReviewersRequest) GetTenantId() string {
@@ -1474,7 +1849,7 @@ type SetPullRequestAutoMergeRequest struct {
 
 func (x *SetPullRequestAutoMergeRequest) Reset() {
 	*x = SetPullRequestAutoMergeRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[22]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1486,7 +1861,7 @@ func (x *SetPullRequestAutoMergeRequest) String() string {
 func (*SetPullRequestAutoMergeRequest) ProtoMessage() {}
 
 func (x *SetPullRequestAutoMergeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[22]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1499,7 +1874,7 @@ func (x *SetPullRequestAutoMergeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetPullRequestAutoMergeRequest.ProtoReflect.Descriptor instead.
 func (*SetPullRequestAutoMergeRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{22}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *SetPullRequestAutoMergeRequest) GetTenantId() string {
@@ -1562,7 +1937,7 @@ type UpdateIssueRequest struct {
 
 func (x *UpdateIssueRequest) Reset() {
 	*x = UpdateIssueRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[23]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1574,7 +1949,7 @@ func (x *UpdateIssueRequest) String() string {
 func (*UpdateIssueRequest) ProtoMessage() {}
 
 func (x *UpdateIssueRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[23]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1587,7 +1962,7 @@ func (x *UpdateIssueRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIssueRequest.ProtoReflect.Descriptor instead.
 func (*UpdateIssueRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{23}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *UpdateIssueRequest) GetTenantId() string {
@@ -1672,7 +2047,7 @@ type GetPullRequestForBranchRequest struct {
 
 func (x *GetPullRequestForBranchRequest) Reset() {
 	*x = GetPullRequestForBranchRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[24]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1684,7 +2059,7 @@ func (x *GetPullRequestForBranchRequest) String() string {
 func (*GetPullRequestForBranchRequest) ProtoMessage() {}
 
 func (x *GetPullRequestForBranchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[24]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1697,7 +2072,7 @@ func (x *GetPullRequestForBranchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestForBranchRequest.ProtoReflect.Descriptor instead.
 func (*GetPullRequestForBranchRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{24}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *GetPullRequestForBranchRequest) GetTenantId() string {
@@ -1738,7 +2113,7 @@ type GetPullRequestForBranchResponse struct {
 
 func (x *GetPullRequestForBranchResponse) Reset() {
 	*x = GetPullRequestForBranchResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[25]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1750,7 +2125,7 @@ func (x *GetPullRequestForBranchResponse) String() string {
 func (*GetPullRequestForBranchResponse) ProtoMessage() {}
 
 func (x *GetPullRequestForBranchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[25]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1763,7 +2138,7 @@ func (x *GetPullRequestForBranchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetPullRequestForBranchResponse.ProtoReflect.Descriptor instead.
 func (*GetPullRequestForBranchResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{25}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{30}
 }
 
 func (x *GetPullRequestForBranchResponse) GetPullRequest() *PullRequest {
@@ -1791,7 +2166,7 @@ type ResolveRepoSlugRequest struct {
 
 func (x *ResolveRepoSlugRequest) Reset() {
 	*x = ResolveRepoSlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[26]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1803,7 +2178,7 @@ func (x *ResolveRepoSlugRequest) String() string {
 func (*ResolveRepoSlugRequest) ProtoMessage() {}
 
 func (x *ResolveRepoSlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[26]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1816,7 +2191,7 @@ func (x *ResolveRepoSlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveRepoSlugRequest.ProtoReflect.Descriptor instead.
 func (*ResolveRepoSlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{26}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ResolveRepoSlugRequest) GetTenantId() string {
@@ -1851,7 +2226,7 @@ type ResolveRepoSlugResponse struct {
 
 func (x *ResolveRepoSlugResponse) Reset() {
 	*x = ResolveRepoSlugResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[27]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1863,7 +2238,7 @@ func (x *ResolveRepoSlugResponse) String() string {
 func (*ResolveRepoSlugResponse) ProtoMessage() {}
 
 func (x *ResolveRepoSlugResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[27]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1876,7 +2251,7 @@ func (x *ResolveRepoSlugResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveRepoSlugResponse.ProtoReflect.Descriptor instead.
 func (*ResolveRepoSlugResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{27}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *ResolveRepoSlugResponse) GetOwner() string {
@@ -1916,7 +2291,7 @@ type ProjectFieldValue struct {
 
 func (x *ProjectFieldValue) Reset() {
 	*x = ProjectFieldValue{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[28]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1928,7 +2303,7 @@ func (x *ProjectFieldValue) String() string {
 func (*ProjectFieldValue) ProtoMessage() {}
 
 func (x *ProjectFieldValue) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[28]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1941,7 +2316,7 @@ func (x *ProjectFieldValue) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectFieldValue.ProtoReflect.Descriptor instead.
 func (*ProjectFieldValue) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{28}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *ProjectFieldValue) GetFieldId() string {
@@ -1978,7 +2353,7 @@ type ProjectItem struct {
 
 func (x *ProjectItem) Reset() {
 	*x = ProjectItem{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[29]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1990,7 +2365,7 @@ func (x *ProjectItem) String() string {
 func (*ProjectItem) ProtoMessage() {}
 
 func (x *ProjectItem) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[29]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2003,7 +2378,7 @@ func (x *ProjectItem) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectItem.ProtoReflect.Descriptor instead.
 func (*ProjectItem) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{29}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *ProjectItem) GetId() string {
@@ -2055,7 +2430,7 @@ type Project struct {
 
 func (x *Project) Reset() {
 	*x = Project{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[30]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2067,7 +2442,7 @@ func (x *Project) String() string {
 func (*Project) ProtoMessage() {}
 
 func (x *Project) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[30]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2080,7 +2455,7 @@ func (x *Project) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Project.ProtoReflect.Descriptor instead.
 func (*Project) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{30}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *Project) GetId() string {
@@ -2136,7 +2511,7 @@ type ProjectView struct {
 
 func (x *ProjectView) Reset() {
 	*x = ProjectView{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[31]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2148,7 +2523,7 @@ func (x *ProjectView) String() string {
 func (*ProjectView) ProtoMessage() {}
 
 func (x *ProjectView) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[31]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2161,7 +2536,7 @@ func (x *ProjectView) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectView.ProtoReflect.Descriptor instead.
 func (*ProjectView) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{31}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{36}
 }
 
 func (x *ProjectView) GetId() string {
@@ -2196,7 +2571,7 @@ type IssueType struct {
 
 func (x *IssueType) Reset() {
 	*x = IssueType{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[32]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2208,7 +2583,7 @@ func (x *IssueType) String() string {
 func (*IssueType) ProtoMessage() {}
 
 func (x *IssueType) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[32]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2221,7 +2596,7 @@ func (x *IssueType) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IssueType.ProtoReflect.Descriptor instead.
 func (*IssueType) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{32}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *IssueType) GetId() string {
@@ -2256,7 +2631,7 @@ type AssignableUser struct {
 
 func (x *AssignableUser) Reset() {
 	*x = AssignableUser{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[33]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2268,7 +2643,7 @@ func (x *AssignableUser) String() string {
 func (*AssignableUser) ProtoMessage() {}
 
 func (x *AssignableUser) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[33]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2281,7 +2656,7 @@ func (x *AssignableUser) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssignableUser.ProtoReflect.Descriptor instead.
 func (*AssignableUser) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{33}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *AssignableUser) GetLogin() string {
@@ -2316,7 +2691,7 @@ type Label struct {
 
 func (x *Label) Reset() {
 	*x = Label{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[34]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2328,7 +2703,7 @@ func (x *Label) String() string {
 func (*Label) ProtoMessage() {}
 
 func (x *Label) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[34]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2341,7 +2716,7 @@ func (x *Label) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Label.ProtoReflect.Descriptor instead.
 func (*Label) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{34}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *Label) GetName() string {
@@ -2377,7 +2752,7 @@ type ProjectComment struct {
 
 func (x *ProjectComment) Reset() {
 	*x = ProjectComment{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[35]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2389,7 +2764,7 @@ func (x *ProjectComment) String() string {
 func (*ProjectComment) ProtoMessage() {}
 
 func (x *ProjectComment) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[35]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2402,7 +2777,7 @@ func (x *ProjectComment) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectComment.ProtoReflect.Descriptor instead.
 func (*ProjectComment) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{35}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ProjectComment) GetId() string {
@@ -2451,7 +2826,7 @@ type WorkItemDetails struct {
 
 func (x *WorkItemDetails) Reset() {
 	*x = WorkItemDetails{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[36]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2463,7 +2838,7 @@ func (x *WorkItemDetails) String() string {
 func (*WorkItemDetails) ProtoMessage() {}
 
 func (x *WorkItemDetails) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[36]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2476,7 +2851,7 @@ func (x *WorkItemDetails) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkItemDetails.ProtoReflect.Descriptor instead.
 func (*WorkItemDetails) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{36}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *WorkItemDetails) GetSlug() string {
@@ -2530,7 +2905,7 @@ type ListAccessibleProjectsRequest struct {
 
 func (x *ListAccessibleProjectsRequest) Reset() {
 	*x = ListAccessibleProjectsRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[37]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2542,7 +2917,7 @@ func (x *ListAccessibleProjectsRequest) String() string {
 func (*ListAccessibleProjectsRequest) ProtoMessage() {}
 
 func (x *ListAccessibleProjectsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[37]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2555,7 +2930,7 @@ func (x *ListAccessibleProjectsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAccessibleProjectsRequest.ProtoReflect.Descriptor instead.
 func (*ListAccessibleProjectsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{37}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *ListAccessibleProjectsRequest) GetTenantId() string {
@@ -2574,7 +2949,7 @@ type ListAccessibleProjectsResponse struct {
 
 func (x *ListAccessibleProjectsResponse) Reset() {
 	*x = ListAccessibleProjectsResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[38]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2586,7 +2961,7 @@ func (x *ListAccessibleProjectsResponse) String() string {
 func (*ListAccessibleProjectsResponse) ProtoMessage() {}
 
 func (x *ListAccessibleProjectsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[38]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2599,7 +2974,7 @@ func (x *ListAccessibleProjectsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAccessibleProjectsResponse.ProtoReflect.Descriptor instead.
 func (*ListAccessibleProjectsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{38}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ListAccessibleProjectsResponse) GetProjects() []*Project {
@@ -2620,7 +2995,7 @@ type ResolveProjectRefRequest struct {
 
 func (x *ResolveProjectRefRequest) Reset() {
 	*x = ResolveProjectRefRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[39]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2632,7 +3007,7 @@ func (x *ResolveProjectRefRequest) String() string {
 func (*ResolveProjectRefRequest) ProtoMessage() {}
 
 func (x *ResolveProjectRefRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[39]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2645,7 +3020,7 @@ func (x *ResolveProjectRefRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveProjectRefRequest.ProtoReflect.Descriptor instead.
 func (*ResolveProjectRefRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{39}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *ResolveProjectRefRequest) GetTenantId() string {
@@ -2679,7 +3054,7 @@ type ResolveProjectRefResponse struct {
 
 func (x *ResolveProjectRefResponse) Reset() {
 	*x = ResolveProjectRefResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[40]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2691,7 +3066,7 @@ func (x *ResolveProjectRefResponse) String() string {
 func (*ResolveProjectRefResponse) ProtoMessage() {}
 
 func (x *ResolveProjectRefResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[40]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2704,7 +3079,7 @@ func (x *ResolveProjectRefResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveProjectRefResponse.ProtoReflect.Descriptor instead.
 func (*ResolveProjectRefResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{40}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ResolveProjectRefResponse) GetSlug() string {
@@ -2731,7 +3106,7 @@ type ListProjectViewsRequest struct {
 
 func (x *ListProjectViewsRequest) Reset() {
 	*x = ListProjectViewsRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[41]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2743,7 +3118,7 @@ func (x *ListProjectViewsRequest) String() string {
 func (*ListProjectViewsRequest) ProtoMessage() {}
 
 func (x *ListProjectViewsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[41]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2756,7 +3131,7 @@ func (x *ListProjectViewsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProjectViewsRequest.ProtoReflect.Descriptor instead.
 func (*ListProjectViewsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{41}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ListProjectViewsRequest) GetTenantId() string {
@@ -2782,7 +3157,7 @@ type ListProjectViewsResponse struct {
 
 func (x *ListProjectViewsResponse) Reset() {
 	*x = ListProjectViewsResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[42]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2794,7 +3169,7 @@ func (x *ListProjectViewsResponse) String() string {
 func (*ListProjectViewsResponse) ProtoMessage() {}
 
 func (x *ListProjectViewsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[42]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2807,7 +3182,7 @@ func (x *ListProjectViewsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListProjectViewsResponse.ProtoReflect.Descriptor instead.
 func (*ListProjectViewsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{42}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *ListProjectViewsResponse) GetViews() []*ProjectView {
@@ -2830,7 +3205,7 @@ type ViewProjectTableRequest struct {
 
 func (x *ViewProjectTableRequest) Reset() {
 	*x = ViewProjectTableRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[43]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2842,7 +3217,7 @@ func (x *ViewProjectTableRequest) String() string {
 func (*ViewProjectTableRequest) ProtoMessage() {}
 
 func (x *ViewProjectTableRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[43]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2855,7 +3230,7 @@ func (x *ViewProjectTableRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ViewProjectTableRequest.ProtoReflect.Descriptor instead.
 func (*ViewProjectTableRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{43}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *ViewProjectTableRequest) GetTenantId() string {
@@ -2903,7 +3278,7 @@ type ViewProjectTableResponse struct {
 
 func (x *ViewProjectTableResponse) Reset() {
 	*x = ViewProjectTableResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[44]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2915,7 +3290,7 @@ func (x *ViewProjectTableResponse) String() string {
 func (*ViewProjectTableResponse) ProtoMessage() {}
 
 func (x *ViewProjectTableResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[44]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2928,7 +3303,7 @@ func (x *ViewProjectTableResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ViewProjectTableResponse.ProtoReflect.Descriptor instead.
 func (*ViewProjectTableResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{44}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *ViewProjectTableResponse) GetItems() []*ProjectItem {
@@ -2957,7 +3332,7 @@ type UpdateProjectItemFieldRequest struct {
 
 func (x *UpdateProjectItemFieldRequest) Reset() {
 	*x = UpdateProjectItemFieldRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[45]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2969,7 +3344,7 @@ func (x *UpdateProjectItemFieldRequest) String() string {
 func (*UpdateProjectItemFieldRequest) ProtoMessage() {}
 
 func (x *UpdateProjectItemFieldRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[45]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2982,7 +3357,7 @@ func (x *UpdateProjectItemFieldRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateProjectItemFieldRequest.ProtoReflect.Descriptor instead.
 func (*UpdateProjectItemFieldRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{45}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *UpdateProjectItemFieldRequest) GetTenantId() string {
@@ -3025,7 +3400,7 @@ type ClearProjectItemFieldRequest struct {
 
 func (x *ClearProjectItemFieldRequest) Reset() {
 	*x = ClearProjectItemFieldRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[46]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3037,7 +3412,7 @@ func (x *ClearProjectItemFieldRequest) String() string {
 func (*ClearProjectItemFieldRequest) ProtoMessage() {}
 
 func (x *ClearProjectItemFieldRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[46]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3050,7 +3425,7 @@ func (x *ClearProjectItemFieldRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ClearProjectItemFieldRequest.ProtoReflect.Descriptor instead.
 func (*ClearProjectItemFieldRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{46}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *ClearProjectItemFieldRequest) GetTenantId() string {
@@ -3091,7 +3466,7 @@ type GetWorkItemDetailsBySlugRequest struct {
 
 func (x *GetWorkItemDetailsBySlugRequest) Reset() {
 	*x = GetWorkItemDetailsBySlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[47]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[52]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3103,7 +3478,7 @@ func (x *GetWorkItemDetailsBySlugRequest) String() string {
 func (*GetWorkItemDetailsBySlugRequest) ProtoMessage() {}
 
 func (x *GetWorkItemDetailsBySlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[47]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[52]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3116,7 +3491,7 @@ func (x *GetWorkItemDetailsBySlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkItemDetailsBySlugRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkItemDetailsBySlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{47}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{52}
 }
 
 func (x *GetWorkItemDetailsBySlugRequest) GetTenantId() string {
@@ -3148,7 +3523,7 @@ type UpdateIssueBySlugRequest struct {
 
 func (x *UpdateIssueBySlugRequest) Reset() {
 	*x = UpdateIssueBySlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[48]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[53]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3160,7 +3535,7 @@ func (x *UpdateIssueBySlugRequest) String() string {
 func (*UpdateIssueBySlugRequest) ProtoMessage() {}
 
 func (x *UpdateIssueBySlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[48]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[53]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3173,7 +3548,7 @@ func (x *UpdateIssueBySlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIssueBySlugRequest.ProtoReflect.Descriptor instead.
 func (*UpdateIssueBySlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{48}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{53}
 }
 
 func (x *UpdateIssueBySlugRequest) GetTenantId() string {
@@ -3238,7 +3613,7 @@ type UpdatePullRequestBySlugRequest struct {
 
 func (x *UpdatePullRequestBySlugRequest) Reset() {
 	*x = UpdatePullRequestBySlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[49]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3250,7 +3625,7 @@ func (x *UpdatePullRequestBySlugRequest) String() string {
 func (*UpdatePullRequestBySlugRequest) ProtoMessage() {}
 
 func (x *UpdatePullRequestBySlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[49]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3263,7 +3638,7 @@ func (x *UpdatePullRequestBySlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePullRequestBySlugRequest.ProtoReflect.Descriptor instead.
 func (*UpdatePullRequestBySlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{49}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *UpdatePullRequestBySlugRequest) GetTenantId() string {
@@ -3312,7 +3687,7 @@ type UpdateIssueTypeBySlugRequest struct {
 
 func (x *UpdateIssueTypeBySlugRequest) Reset() {
 	*x = UpdateIssueTypeBySlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[50]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3324,7 +3699,7 @@ func (x *UpdateIssueTypeBySlugRequest) String() string {
 func (*UpdateIssueTypeBySlugRequest) ProtoMessage() {}
 
 func (x *UpdateIssueTypeBySlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[50]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3337,7 +3712,7 @@ func (x *UpdateIssueTypeBySlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIssueTypeBySlugRequest.ProtoReflect.Descriptor instead.
 func (*UpdateIssueTypeBySlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{50}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *UpdateIssueTypeBySlugRequest) GetTenantId() string {
@@ -3371,7 +3746,7 @@ type ListIssueTypesBySlugRequest struct {
 
 func (x *ListIssueTypesBySlugRequest) Reset() {
 	*x = ListIssueTypesBySlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[51]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3383,7 +3758,7 @@ func (x *ListIssueTypesBySlugRequest) String() string {
 func (*ListIssueTypesBySlugRequest) ProtoMessage() {}
 
 func (x *ListIssueTypesBySlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[51]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3396,7 +3771,7 @@ func (x *ListIssueTypesBySlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIssueTypesBySlugRequest.ProtoReflect.Descriptor instead.
 func (*ListIssueTypesBySlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{51}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *ListIssueTypesBySlugRequest) GetTenantId() string {
@@ -3422,7 +3797,7 @@ type ListIssueTypesBySlugResponse struct {
 
 func (x *ListIssueTypesBySlugResponse) Reset() {
 	*x = ListIssueTypesBySlugResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[52]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3434,7 +3809,7 @@ func (x *ListIssueTypesBySlugResponse) String() string {
 func (*ListIssueTypesBySlugResponse) ProtoMessage() {}
 
 func (x *ListIssueTypesBySlugResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[52]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3447,7 +3822,7 @@ func (x *ListIssueTypesBySlugResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListIssueTypesBySlugResponse.ProtoReflect.Descriptor instead.
 func (*ListIssueTypesBySlugResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{52}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *ListIssueTypesBySlugResponse) GetIssueTypes() []*IssueType {
@@ -3467,7 +3842,7 @@ type ListAssignableUsersBySlugRequest struct {
 
 func (x *ListAssignableUsersBySlugRequest) Reset() {
 	*x = ListAssignableUsersBySlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[53]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3479,7 +3854,7 @@ func (x *ListAssignableUsersBySlugRequest) String() string {
 func (*ListAssignableUsersBySlugRequest) ProtoMessage() {}
 
 func (x *ListAssignableUsersBySlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[53]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3492,7 +3867,7 @@ func (x *ListAssignableUsersBySlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListAssignableUsersBySlugRequest.ProtoReflect.Descriptor instead.
 func (*ListAssignableUsersBySlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{53}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *ListAssignableUsersBySlugRequest) GetTenantId() string {
@@ -3518,7 +3893,7 @@ type ListAssignableUsersBySlugResponse struct {
 
 func (x *ListAssignableUsersBySlugResponse) Reset() {
 	*x = ListAssignableUsersBySlugResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[54]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3530,7 +3905,7 @@ func (x *ListAssignableUsersBySlugResponse) String() string {
 func (*ListAssignableUsersBySlugResponse) ProtoMessage() {}
 
 func (x *ListAssignableUsersBySlugResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[54]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3543,7 +3918,7 @@ func (x *ListAssignableUsersBySlugResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListAssignableUsersBySlugResponse.ProtoReflect.Descriptor instead.
 func (*ListAssignableUsersBySlugResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{54}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *ListAssignableUsersBySlugResponse) GetUsers() []*AssignableUser {
@@ -3563,7 +3938,7 @@ type ListLabelsBySlugRequest struct {
 
 func (x *ListLabelsBySlugRequest) Reset() {
 	*x = ListLabelsBySlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[55]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3575,7 +3950,7 @@ func (x *ListLabelsBySlugRequest) String() string {
 func (*ListLabelsBySlugRequest) ProtoMessage() {}
 
 func (x *ListLabelsBySlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[55]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3588,7 +3963,7 @@ func (x *ListLabelsBySlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListLabelsBySlugRequest.ProtoReflect.Descriptor instead.
 func (*ListLabelsBySlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{55}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *ListLabelsBySlugRequest) GetTenantId() string {
@@ -3614,7 +3989,7 @@ type ListLabelsBySlugResponse struct {
 
 func (x *ListLabelsBySlugResponse) Reset() {
 	*x = ListLabelsBySlugResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[56]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3626,7 +4001,7 @@ func (x *ListLabelsBySlugResponse) String() string {
 func (*ListLabelsBySlugResponse) ProtoMessage() {}
 
 func (x *ListLabelsBySlugResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[56]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3639,7 +4014,7 @@ func (x *ListLabelsBySlugResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListLabelsBySlugResponse.ProtoReflect.Descriptor instead.
 func (*ListLabelsBySlugResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{56}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *ListLabelsBySlugResponse) GetLabels() []*Label {
@@ -3660,7 +4035,7 @@ type AddIssueCommentBySlugRequest struct {
 
 func (x *AddIssueCommentBySlugRequest) Reset() {
 	*x = AddIssueCommentBySlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[57]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3672,7 +4047,7 @@ func (x *AddIssueCommentBySlugRequest) String() string {
 func (*AddIssueCommentBySlugRequest) ProtoMessage() {}
 
 func (x *AddIssueCommentBySlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[57]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3685,7 +4060,7 @@ func (x *AddIssueCommentBySlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AddIssueCommentBySlugRequest.ProtoReflect.Descriptor instead.
 func (*AddIssueCommentBySlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{57}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *AddIssueCommentBySlugRequest) GetTenantId() string {
@@ -3721,7 +4096,7 @@ type UpdateIssueCommentBySlugRequest struct {
 
 func (x *UpdateIssueCommentBySlugRequest) Reset() {
 	*x = UpdateIssueCommentBySlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[58]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3733,7 +4108,7 @@ func (x *UpdateIssueCommentBySlugRequest) String() string {
 func (*UpdateIssueCommentBySlugRequest) ProtoMessage() {}
 
 func (x *UpdateIssueCommentBySlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[58]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3746,7 +4121,7 @@ func (x *UpdateIssueCommentBySlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdateIssueCommentBySlugRequest.ProtoReflect.Descriptor instead.
 func (*UpdateIssueCommentBySlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{58}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *UpdateIssueCommentBySlugRequest) GetTenantId() string {
@@ -3788,7 +4163,7 @@ type DeleteIssueCommentBySlugRequest struct {
 
 func (x *DeleteIssueCommentBySlugRequest) Reset() {
 	*x = DeleteIssueCommentBySlugRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[59]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3800,7 +4175,7 @@ func (x *DeleteIssueCommentBySlugRequest) String() string {
 func (*DeleteIssueCommentBySlugRequest) ProtoMessage() {}
 
 func (x *DeleteIssueCommentBySlugRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[59]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3813,7 +4188,7 @@ func (x *DeleteIssueCommentBySlugRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteIssueCommentBySlugRequest.ProtoReflect.Descriptor instead.
 func (*DeleteIssueCommentBySlugRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{59}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *DeleteIssueCommentBySlugRequest) GetTenantId() string {
@@ -3856,7 +4231,7 @@ type MergeRequest struct {
 
 func (x *MergeRequest) Reset() {
 	*x = MergeRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[60]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[65]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3868,7 +4243,7 @@ func (x *MergeRequest) String() string {
 func (*MergeRequest) ProtoMessage() {}
 
 func (x *MergeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[60]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[65]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3881,7 +4256,7 @@ func (x *MergeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergeRequest.ProtoReflect.Descriptor instead.
 func (*MergeRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{60}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{65}
 }
 
 func (x *MergeRequest) GetId() string {
@@ -3973,7 +4348,7 @@ type ListMergeRequestsRequest struct {
 
 func (x *ListMergeRequestsRequest) Reset() {
 	*x = ListMergeRequestsRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[61]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3985,7 +4360,7 @@ func (x *ListMergeRequestsRequest) String() string {
 func (*ListMergeRequestsRequest) ProtoMessage() {}
 
 func (x *ListMergeRequestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[61]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3998,7 +4373,7 @@ func (x *ListMergeRequestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMergeRequestsRequest.ProtoReflect.Descriptor instead.
 func (*ListMergeRequestsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{61}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{66}
 }
 
 func (x *ListMergeRequestsRequest) GetTenantId() string {
@@ -4038,7 +4413,7 @@ type ListMergeRequestsResponse struct {
 
 func (x *ListMergeRequestsResponse) Reset() {
 	*x = ListMergeRequestsResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[62]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4050,7 +4425,7 @@ func (x *ListMergeRequestsResponse) String() string {
 func (*ListMergeRequestsResponse) ProtoMessage() {}
 
 func (x *ListMergeRequestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[62]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4063,7 +4438,7 @@ func (x *ListMergeRequestsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListMergeRequestsResponse.ProtoReflect.Descriptor instead.
 func (*ListMergeRequestsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{62}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *ListMergeRequestsResponse) GetMergeRequests() []*MergeRequest {
@@ -4084,7 +4459,7 @@ type MergeRequestDiscussion struct {
 
 func (x *MergeRequestDiscussion) Reset() {
 	*x = MergeRequestDiscussion{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[63]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[68]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4096,7 +4471,7 @@ func (x *MergeRequestDiscussion) String() string {
 func (*MergeRequestDiscussion) ProtoMessage() {}
 
 func (x *MergeRequestDiscussion) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[63]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[68]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4109,7 +4484,7 @@ func (x *MergeRequestDiscussion) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use MergeRequestDiscussion.ProtoReflect.Descriptor instead.
 func (*MergeRequestDiscussion) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{63}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{68}
 }
 
 func (x *MergeRequestDiscussion) GetId() string {
@@ -4146,7 +4521,7 @@ type ResolveMergeRequestDiscussionRequest struct {
 
 func (x *ResolveMergeRequestDiscussionRequest) Reset() {
 	*x = ResolveMergeRequestDiscussionRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[64]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[69]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4158,7 +4533,7 @@ func (x *ResolveMergeRequestDiscussionRequest) String() string {
 func (*ResolveMergeRequestDiscussionRequest) ProtoMessage() {}
 
 func (x *ResolveMergeRequestDiscussionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[64]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[69]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4171,7 +4546,7 @@ func (x *ResolveMergeRequestDiscussionRequest) ProtoReflect() protoreflect.Messa
 
 // Deprecated: Use ResolveMergeRequestDiscussionRequest.ProtoReflect.Descriptor instead.
 func (*ResolveMergeRequestDiscussionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{64}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{69}
 }
 
 func (x *ResolveMergeRequestDiscussionRequest) GetTenantId() string {
@@ -4221,7 +4596,7 @@ type GetWorkItemDetailsRequest struct {
 
 func (x *GetWorkItemDetailsRequest) Reset() {
 	*x = GetWorkItemDetailsRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[65]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[70]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4233,7 +4608,7 @@ func (x *GetWorkItemDetailsRequest) String() string {
 func (*GetWorkItemDetailsRequest) ProtoMessage() {}
 
 func (x *GetWorkItemDetailsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[65]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[70]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4246,7 +4621,7 @@ func (x *GetWorkItemDetailsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetWorkItemDetailsRequest.ProtoReflect.Descriptor instead.
 func (*GetWorkItemDetailsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{65}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{70}
 }
 
 func (x *GetWorkItemDetailsRequest) GetTenantId() string {
@@ -4293,7 +4668,7 @@ type WorkItemDetailsGitLab struct {
 
 func (x *WorkItemDetailsGitLab) Reset() {
 	*x = WorkItemDetailsGitLab{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[66]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[71]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4305,7 +4680,7 @@ func (x *WorkItemDetailsGitLab) String() string {
 func (*WorkItemDetailsGitLab) ProtoMessage() {}
 
 func (x *WorkItemDetailsGitLab) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[66]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[71]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4318,7 +4693,7 @@ func (x *WorkItemDetailsGitLab) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WorkItemDetailsGitLab.ProtoReflect.Descriptor instead.
 func (*WorkItemDetailsGitLab) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{66}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{71}
 }
 
 func (x *WorkItemDetailsGitLab) GetId() string {
@@ -4390,7 +4765,7 @@ type CheckHostedReviewEligibilityRequest struct {
 
 func (x *CheckHostedReviewEligibilityRequest) Reset() {
 	*x = CheckHostedReviewEligibilityRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[67]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[72]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4402,7 +4777,7 @@ func (x *CheckHostedReviewEligibilityRequest) String() string {
 func (*CheckHostedReviewEligibilityRequest) ProtoMessage() {}
 
 func (x *CheckHostedReviewEligibilityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[67]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[72]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4415,7 +4790,7 @@ func (x *CheckHostedReviewEligibilityRequest) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use CheckHostedReviewEligibilityRequest.ProtoReflect.Descriptor instead.
 func (*CheckHostedReviewEligibilityRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{67}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{72}
 }
 
 func (x *CheckHostedReviewEligibilityRequest) GetTenantId() string {
@@ -4473,7 +4848,7 @@ type HostedReviewEligibility struct {
 
 func (x *HostedReviewEligibility) Reset() {
 	*x = HostedReviewEligibility{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[68]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[73]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4485,7 +4860,7 @@ func (x *HostedReviewEligibility) String() string {
 func (*HostedReviewEligibility) ProtoMessage() {}
 
 func (x *HostedReviewEligibility) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[68]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[73]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4498,7 +4873,7 @@ func (x *HostedReviewEligibility) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HostedReviewEligibility.ProtoReflect.Descriptor instead.
 func (*HostedReviewEligibility) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{68}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{73}
 }
 
 func (x *HostedReviewEligibility) GetEligible() bool {
@@ -4534,7 +4909,7 @@ type SetIntegrationCredentialRequest struct {
 
 func (x *SetIntegrationCredentialRequest) Reset() {
 	*x = SetIntegrationCredentialRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[69]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[74]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4546,7 +4921,7 @@ func (x *SetIntegrationCredentialRequest) String() string {
 func (*SetIntegrationCredentialRequest) ProtoMessage() {}
 
 func (x *SetIntegrationCredentialRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[69]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[74]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4559,7 +4934,7 @@ func (x *SetIntegrationCredentialRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetIntegrationCredentialRequest.ProtoReflect.Descriptor instead.
 func (*SetIntegrationCredentialRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{69}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{74}
 }
 
 func (x *SetIntegrationCredentialRequest) GetTenantId() string {
@@ -4598,7 +4973,7 @@ type SetIntegrationCredentialResponse struct {
 
 func (x *SetIntegrationCredentialResponse) Reset() {
 	*x = SetIntegrationCredentialResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[70]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4610,7 +4985,7 @@ func (x *SetIntegrationCredentialResponse) String() string {
 func (*SetIntegrationCredentialResponse) ProtoMessage() {}
 
 func (x *SetIntegrationCredentialResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[70]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4623,7 +4998,7 @@ func (x *SetIntegrationCredentialResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SetIntegrationCredentialResponse.ProtoReflect.Descriptor instead.
 func (*SetIntegrationCredentialResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{70}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{75}
 }
 
 type GetIntegrationCredentialStatusRequest struct {
@@ -4636,7 +5011,7 @@ type GetIntegrationCredentialStatusRequest struct {
 
 func (x *GetIntegrationCredentialStatusRequest) Reset() {
 	*x = GetIntegrationCredentialStatusRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[71]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4648,7 +5023,7 @@ func (x *GetIntegrationCredentialStatusRequest) String() string {
 func (*GetIntegrationCredentialStatusRequest) ProtoMessage() {}
 
 func (x *GetIntegrationCredentialStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[71]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4661,7 +5036,7 @@ func (x *GetIntegrationCredentialStatusRequest) ProtoReflect() protoreflect.Mess
 
 // Deprecated: Use GetIntegrationCredentialStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetIntegrationCredentialStatusRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{71}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *GetIntegrationCredentialStatusRequest) GetTenantId() string {
@@ -4688,7 +5063,7 @@ type GetIntegrationCredentialStatusResponse struct {
 
 func (x *GetIntegrationCredentialStatusResponse) Reset() {
 	*x = GetIntegrationCredentialStatusResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[72]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4700,7 +5075,7 @@ func (x *GetIntegrationCredentialStatusResponse) String() string {
 func (*GetIntegrationCredentialStatusResponse) ProtoMessage() {}
 
 func (x *GetIntegrationCredentialStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[72]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4713,7 +5088,7 @@ func (x *GetIntegrationCredentialStatusResponse) ProtoReflect() protoreflect.Mes
 
 // Deprecated: Use GetIntegrationCredentialStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetIntegrationCredentialStatusResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{72}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{77}
 }
 
 func (x *GetIntegrationCredentialStatusResponse) GetConfigured() bool {
@@ -4739,7 +5114,7 @@ type ListIntegrationCredentialsRequest struct {
 
 func (x *ListIntegrationCredentialsRequest) Reset() {
 	*x = ListIntegrationCredentialsRequest{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[73]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4751,7 +5126,7 @@ func (x *ListIntegrationCredentialsRequest) String() string {
 func (*ListIntegrationCredentialsRequest) ProtoMessage() {}
 
 func (x *ListIntegrationCredentialsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[73]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4764,7 +5139,7 @@ func (x *ListIntegrationCredentialsRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListIntegrationCredentialsRequest.ProtoReflect.Descriptor instead.
 func (*ListIntegrationCredentialsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{73}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *ListIntegrationCredentialsRequest) GetTenantId() string {
@@ -4783,7 +5158,7 @@ type ListIntegrationCredentialsResponse struct {
 
 func (x *ListIntegrationCredentialsResponse) Reset() {
 	*x = ListIntegrationCredentialsResponse{}
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[74]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4795,7 +5170,7 @@ func (x *ListIntegrationCredentialsResponse) String() string {
 func (*ListIntegrationCredentialsResponse) ProtoMessage() {}
 
 func (x *ListIntegrationCredentialsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[74]
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4808,7 +5183,7 @@ func (x *ListIntegrationCredentialsResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use ListIntegrationCredentialsResponse.ProtoReflect.Descriptor instead.
 func (*ListIntegrationCredentialsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{74}
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *ListIntegrationCredentialsResponse) GetConfiguredProviders() []ScmProvider {
@@ -4816,6 +5191,475 @@ func (x *ListIntegrationCredentialsResponse) GetConfiguredProviders() []ScmProvi
 		return x.ConfiguredProviders
 	}
 	return nil
+}
+
+// Subject: orca.scm.pull_request.created / orca.scm.pull_request.merged
+type PullRequestLifecycleEvent struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	EventId             string                 `protobuf:"bytes,1,opt,name=event_id,json=eventId,proto3" json:"event_id,omitempty"`
+	TenantId            string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	OccurredAt          string                 `protobuf:"bytes,3,opt,name=occurred_at,json=occurredAt,proto3" json:"occurred_at,omitempty"`
+	SchemaVersion       int32                  `protobuf:"varint,4,opt,name=schema_version,json=schemaVersion,proto3" json:"schema_version,omitempty"`
+	Provider            string                 `protobuf:"bytes,5,opt,name=provider,proto3" json:"provider,omitempty"`
+	Repo                string                 `protobuf:"bytes,6,opt,name=repo,proto3" json:"repo,omitempty"`
+	PrNumber            int32                  `protobuf:"varint,7,opt,name=pr_number,json=prNumber,proto3" json:"pr_number,omitempty"`
+	LinkedIssueProvider string                 `protobuf:"bytes,8,opt,name=linked_issue_provider,json=linkedIssueProvider,proto3" json:"linked_issue_provider,omitempty"`
+	LinkedIssueRef      string                 `protobuf:"bytes,9,opt,name=linked_issue_ref,json=linkedIssueRef,proto3" json:"linked_issue_ref,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *PullRequestLifecycleEvent) Reset() {
+	*x = PullRequestLifecycleEvent{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[80]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PullRequestLifecycleEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PullRequestLifecycleEvent) ProtoMessage() {}
+
+func (x *PullRequestLifecycleEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[80]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PullRequestLifecycleEvent.ProtoReflect.Descriptor instead.
+func (*PullRequestLifecycleEvent) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{80}
+}
+
+func (x *PullRequestLifecycleEvent) GetEventId() string {
+	if x != nil {
+		return x.EventId
+	}
+	return ""
+}
+
+func (x *PullRequestLifecycleEvent) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *PullRequestLifecycleEvent) GetOccurredAt() string {
+	if x != nil {
+		return x.OccurredAt
+	}
+	return ""
+}
+
+func (x *PullRequestLifecycleEvent) GetSchemaVersion() int32 {
+	if x != nil {
+		return x.SchemaVersion
+	}
+	return 0
+}
+
+func (x *PullRequestLifecycleEvent) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *PullRequestLifecycleEvent) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *PullRequestLifecycleEvent) GetPrNumber() int32 {
+	if x != nil {
+		return x.PrNumber
+	}
+	return 0
+}
+
+func (x *PullRequestLifecycleEvent) GetLinkedIssueProvider() string {
+	if x != nil {
+		return x.LinkedIssueProvider
+	}
+	return ""
+}
+
+func (x *PullRequestLifecycleEvent) GetLinkedIssueRef() string {
+	if x != nil {
+		return x.LinkedIssueRef
+	}
+	return ""
+}
+
+// Webhook ingestion — plain HTTP via api-gateway at
+// /v1/scm/webhooks/{provider}, forwarded to this RPC. Deliberate exception
+// to gRPC-for-sync: the caller is GitHub/GitLab's own servers, which cannot
+// be given an Orca JWT.
+type ReceiveWebhookRequest struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Provider         string                 `protobuf:"bytes,1,opt,name=provider,proto3" json:"provider,omitempty"`
+	RawBody          []byte                 `protobuf:"bytes,2,opt,name=raw_body,json=rawBody,proto3" json:"raw_body,omitempty"` // signature verified against this exact byte sequence
+	SignatureHeader  string                 `protobuf:"bytes,3,opt,name=signature_header,json=signatureHeader,proto3" json:"signature_header,omitempty"`
+	DeliveryIdHeader string                 `protobuf:"bytes,4,opt,name=delivery_id_header,json=deliveryIdHeader,proto3" json:"delivery_id_header,omitempty"` // GitHub X-GitHub-Delivery / GitLab X-Gitlab-Event-UUID
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *ReceiveWebhookRequest) Reset() {
+	*x = ReceiveWebhookRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[81]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReceiveWebhookRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReceiveWebhookRequest) ProtoMessage() {}
+
+func (x *ReceiveWebhookRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[81]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReceiveWebhookRequest.ProtoReflect.Descriptor instead.
+func (*ReceiveWebhookRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{81}
+}
+
+func (x *ReceiveWebhookRequest) GetProvider() string {
+	if x != nil {
+		return x.Provider
+	}
+	return ""
+}
+
+func (x *ReceiveWebhookRequest) GetRawBody() []byte {
+	if x != nil {
+		return x.RawBody
+	}
+	return nil
+}
+
+func (x *ReceiveWebhookRequest) GetSignatureHeader() string {
+	if x != nil {
+		return x.SignatureHeader
+	}
+	return ""
+}
+
+func (x *ReceiveWebhookRequest) GetDeliveryIdHeader() string {
+	if x != nil {
+		return x.DeliveryIdHeader
+	}
+	return ""
+}
+
+type ReceiveWebhookResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Accepted      bool                   `protobuf:"varint,1,opt,name=accepted,proto3" json:"accepted,omitempty"`
+	Duplicate     bool                   `protobuf:"varint,2,opt,name=duplicate,proto3" json:"duplicate,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReceiveWebhookResponse) Reset() {
+	*x = ReceiveWebhookResponse{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[82]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReceiveWebhookResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReceiveWebhookResponse) ProtoMessage() {}
+
+func (x *ReceiveWebhookResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[82]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReceiveWebhookResponse.ProtoReflect.Descriptor instead.
+func (*ReceiveWebhookResponse) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{82}
+}
+
+func (x *ReceiveWebhookResponse) GetAccepted() bool {
+	if x != nil {
+		return x.Accepted
+	}
+	return false
+}
+
+func (x *ReceiveWebhookResponse) GetDuplicate() bool {
+	if x != nil {
+		return x.Duplicate
+	}
+	return false
+}
+
+type ReviewComment struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`  // matches Anchor.file_path (annotation.proto)
+	Line          int32                  `protobuf:"varint,2,opt,name=line,proto3" json:"line,omitempty"` // matches Anchor.line (annotation.proto)
+	Body          string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`  // matches Annotation.content (annotation.proto)
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ReviewComment) Reset() {
+	*x = ReviewComment{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[83]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ReviewComment) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ReviewComment) ProtoMessage() {}
+
+func (x *ReviewComment) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[83]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ReviewComment.ProtoReflect.Descriptor instead.
+func (*ReviewComment) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{83}
+}
+
+func (x *ReviewComment) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *ReviewComment) GetLine() int32 {
+	if x != nil {
+		return x.Line
+	}
+	return 0
+}
+
+func (x *ReviewComment) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+type SubmitReviewRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Provider      ScmProvider            `protobuf:"varint,2,opt,name=provider,proto3,enum=orca.scmintegration.v1.ScmProvider" json:"provider,omitempty"`
+	Repo          string                 `protobuf:"bytes,3,opt,name=repo,proto3" json:"repo,omitempty"`
+	PrNumber      int32                  `protobuf:"varint,4,opt,name=pr_number,json=prNumber,proto3" json:"pr_number,omitempty"`
+	ReviewType    ReviewType             `protobuf:"varint,5,opt,name=review_type,json=reviewType,proto3,enum=orca.scmintegration.v1.ReviewType" json:"review_type,omitempty"` // REVIEW_TYPE_UNSPECIFIED triggers BR-PI-11's default-to-REQUEST_CHANGES
+	SummaryBody   string                 `protobuf:"bytes,6,opt,name=summary_body,json=summaryBody,proto3" json:"summary_body,omitempty"`                                      // top-level review comment, optional
+	Comments      []*ReviewComment       `protobuf:"bytes,7,rep,name=comments,proto3" json:"comments,omitempty"`                                                               // BR-PI-10: must be non-empty
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SubmitReviewRequest) Reset() {
+	*x = SubmitReviewRequest{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[84]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SubmitReviewRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SubmitReviewRequest) ProtoMessage() {}
+
+func (x *SubmitReviewRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[84]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SubmitReviewRequest.ProtoReflect.Descriptor instead.
+func (*SubmitReviewRequest) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{84}
+}
+
+func (x *SubmitReviewRequest) GetTenantId() string {
+	if x != nil {
+		return x.TenantId
+	}
+	return ""
+}
+
+func (x *SubmitReviewRequest) GetProvider() ScmProvider {
+	if x != nil {
+		return x.Provider
+	}
+	return ScmProvider_SCM_PROVIDER_UNSPECIFIED
+}
+
+func (x *SubmitReviewRequest) GetRepo() string {
+	if x != nil {
+		return x.Repo
+	}
+	return ""
+}
+
+func (x *SubmitReviewRequest) GetPrNumber() int32 {
+	if x != nil {
+		return x.PrNumber
+	}
+	return 0
+}
+
+func (x *SubmitReviewRequest) GetReviewType() ReviewType {
+	if x != nil {
+		return x.ReviewType
+	}
+	return ReviewType_REVIEW_TYPE_UNSPECIFIED
+}
+
+func (x *SubmitReviewRequest) GetSummaryBody() string {
+	if x != nil {
+		return x.SummaryBody
+	}
+	return ""
+}
+
+func (x *SubmitReviewRequest) GetComments() []*ReviewComment {
+	if x != nil {
+		return x.Comments
+	}
+	return nil
+}
+
+type Review struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ReviewerId    string                 `protobuf:"bytes,2,opt,name=reviewer_id,json=reviewerId,proto3" json:"reviewer_id,omitempty"`
+	State         ReviewType             `protobuf:"varint,3,opt,name=state,proto3,enum=orca.scmintegration.v1.ReviewType" json:"state,omitempty"`
+	SubmittedAt   string                 `protobuf:"bytes,4,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
+	Comments      []*ReviewComment       `protobuf:"bytes,5,rep,name=comments,proto3" json:"comments,omitempty"`
+	Url           string                 `protobuf:"bytes,6,opt,name=url,proto3" json:"url,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Review) Reset() {
+	*x = Review{}
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[85]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Review) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Review) ProtoMessage() {}
+
+func (x *Review) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_scmintegration_v1_scmintegration_proto_msgTypes[85]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Review.ProtoReflect.Descriptor instead.
+func (*Review) Descriptor() ([]byte, []int) {
+	return file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP(), []int{85}
+}
+
+func (x *Review) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Review) GetReviewerId() string {
+	if x != nil {
+		return x.ReviewerId
+	}
+	return ""
+}
+
+func (x *Review) GetState() ReviewType {
+	if x != nil {
+		return x.State
+	}
+	return ReviewType_REVIEW_TYPE_UNSPECIFIED
+}
+
+func (x *Review) GetSubmittedAt() string {
+	if x != nil {
+		return x.SubmittedAt
+	}
+	return ""
+}
+
+func (x *Review) GetComments() []*ReviewComment {
+	if x != nil {
+		return x.Comments
+	}
+	return nil
+}
+
+func (x *Review) GetUrl() string {
+	if x != nil {
+		return x.Url
+	}
+	return ""
 }
 
 var File_orca_scmintegration_v1_scmintegration_proto protoreflect.FileDescriptor
@@ -4828,13 +5672,36 @@ const file_orca_scmintegration_v1_scmintegration_proto_rawDesc = "" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x14\n" +
 	"\x05state\x18\x03 \x01(\tR\x05state\x12\x10\n" +
 	"\x03url\x18\x04 \x01(\tR\x03url\x12\x16\n" +
-	"\x06number\x18\x05 \x01(\x05R\x06number\"\x85\x01\n" +
+	"\x06number\x18\x05 \x01(\x05R\x06number\"u\n" +
+	"\vIssueFilter\x12\x14\n" +
+	"\x05state\x18\x01 \x01(\tR\x05state\x12\x1a\n" +
+	"\bassignee\x18\x02 \x01(\tR\bassignee\x12\x16\n" +
+	"\x06labels\x18\x03 \x03(\tR\x06labels\x12\x1c\n" +
+	"\tmilestone\x18\x04 \x01(\tR\tmilestone\"\xe7\x01\n" +
 	"\x11ListIssuesRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12?\n" +
 	"\bprovider\x18\x02 \x01(\x0e2#.orca.scmintegration.v1.ScmProviderR\bprovider\x12\x12\n" +
-	"\x04repo\x18\x03 \x01(\tR\x04repo\"K\n" +
+	"\x04repo\x18\x03 \x01(\tR\x04repo\x12;\n" +
+	"\x06filter\x18\x04 \x01(\v2#.orca.scmintegration.v1.IssueFilterR\x06filter\x12#\n" +
+	"\rforce_refresh\x18\x05 \x01(\bR\fforceRefresh\"\x95\x01\n" +
 	"\x12ListIssuesResponse\x125\n" +
-	"\x06issues\x18\x01 \x03(\v2\x1d.orca.scmintegration.v1.IssueR\x06issues\"\x97\x02\n" +
+	"\x06issues\x18\x01 \x03(\v2\x1d.orca.scmintegration.v1.IssueR\x06issues\x12\x1d\n" +
+	"\n" +
+	"from_cache\x18\x02 \x01(\bR\tfromCache\x12)\n" +
+	"\x11cached_at_unix_ms\x18\x03 \x01(\x03R\x0ecachedAtUnixMs\"Z\n" +
+	"\x1eListIssueCommentsBySlugRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x1b\n" +
+	"\titem_slug\x18\x02 \x01(\tR\bitemSlug\"e\n" +
+	"\x1fListIssueCommentsBySlugResponse\x12B\n" +
+	"\bcomments\x18\x01 \x03(\v2&.orca.scmintegration.v1.ProjectCommentR\bcomments\"\xbb\x01\n" +
+	"$GetLinkedPullRequestsForIssueRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12?\n" +
+	"\bprovider\x18\x02 \x01(\x0e2#.orca.scmintegration.v1.ScmProviderR\bprovider\x12\x12\n" +
+	"\x04repo\x18\x03 \x01(\tR\x04repo\x12!\n" +
+	"\fissue_number\x18\x04 \x01(\x05R\vissueNumber\"\xa8\x01\n" +
+	"%GetLinkedPullRequestsForIssueResponse\x12H\n" +
+	"\rpull_requests\x18\x01 \x03(\v2#.orca.scmintegration.v1.PullRequestR\fpullRequests\x125\n" +
+	"\x16capability_unsupported\x18\x02 \x01(\bR\x15capabilityUnsupported\"\x97\x02\n" +
 	"\x18CreatePullRequestRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12?\n" +
 	"\bprovider\x18\x02 \x01(\x0e2#.orca.scmintegration.v1.ScmProviderR\bprovider\x12\x12\n" +
@@ -5179,17 +6046,65 @@ const file_orca_scmintegration_v1_scmintegration_proto_rawDesc = "" +
 	"!ListIntegrationCredentialsRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\"|\n" +
 	"\"ListIntegrationCredentialsResponse\x12V\n" +
-	"\x14configured_providers\x18\x01 \x03(\x0e2#.orca.scmintegration.v1.ScmProviderR\x13configuredProviders*\xb0\x01\n" +
+	"\x14configured_providers\x18\x01 \x03(\x0e2#.orca.scmintegration.v1.ScmProviderR\x13configuredProviders\"\xc6\x02\n" +
+	"\x19PullRequestLifecycleEvent\x12\x19\n" +
+	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1b\n" +
+	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x1f\n" +
+	"\voccurred_at\x18\x03 \x01(\tR\n" +
+	"occurredAt\x12%\n" +
+	"\x0eschema_version\x18\x04 \x01(\x05R\rschemaVersion\x12\x1a\n" +
+	"\bprovider\x18\x05 \x01(\tR\bprovider\x12\x12\n" +
+	"\x04repo\x18\x06 \x01(\tR\x04repo\x12\x1b\n" +
+	"\tpr_number\x18\a \x01(\x05R\bprNumber\x122\n" +
+	"\x15linked_issue_provider\x18\b \x01(\tR\x13linkedIssueProvider\x12(\n" +
+	"\x10linked_issue_ref\x18\t \x01(\tR\x0elinkedIssueRef\"\xa7\x01\n" +
+	"\x15ReceiveWebhookRequest\x12\x1a\n" +
+	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x19\n" +
+	"\braw_body\x18\x02 \x01(\fR\arawBody\x12)\n" +
+	"\x10signature_header\x18\x03 \x01(\tR\x0fsignatureHeader\x12,\n" +
+	"\x12delivery_id_header\x18\x04 \x01(\tR\x10deliveryIdHeader\"R\n" +
+	"\x16ReceiveWebhookResponse\x12\x1a\n" +
+	"\baccepted\x18\x01 \x01(\bR\baccepted\x12\x1c\n" +
+	"\tduplicate\x18\x02 \x01(\bR\tduplicate\"K\n" +
+	"\rReviewComment\x12\x12\n" +
+	"\x04path\x18\x01 \x01(\tR\x04path\x12\x12\n" +
+	"\x04line\x18\x02 \x01(\x05R\x04line\x12\x12\n" +
+	"\x04body\x18\x03 \x01(\tR\x04body\"\xcf\x02\n" +
+	"\x13SubmitReviewRequest\x12\x1b\n" +
+	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12?\n" +
+	"\bprovider\x18\x02 \x01(\x0e2#.orca.scmintegration.v1.ScmProviderR\bprovider\x12\x12\n" +
+	"\x04repo\x18\x03 \x01(\tR\x04repo\x12\x1b\n" +
+	"\tpr_number\x18\x04 \x01(\x05R\bprNumber\x12C\n" +
+	"\vreview_type\x18\x05 \x01(\x0e2\".orca.scmintegration.v1.ReviewTypeR\n" +
+	"reviewType\x12!\n" +
+	"\fsummary_body\x18\x06 \x01(\tR\vsummaryBody\x12A\n" +
+	"\bcomments\x18\a \x03(\v2%.orca.scmintegration.v1.ReviewCommentR\bcomments\"\xeb\x01\n" +
+	"\x06Review\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vreviewer_id\x18\x02 \x01(\tR\n" +
+	"reviewerId\x128\n" +
+	"\x05state\x18\x03 \x01(\x0e2\".orca.scmintegration.v1.ReviewTypeR\x05state\x12!\n" +
+	"\fsubmitted_at\x18\x04 \x01(\tR\vsubmittedAt\x12A\n" +
+	"\bcomments\x18\x05 \x03(\v2%.orca.scmintegration.v1.ReviewCommentR\bcomments\x12\x10\n" +
+	"\x03url\x18\x06 \x01(\tR\x03url*\xb0\x01\n" +
 	"\vScmProvider\x12\x1c\n" +
 	"\x18SCM_PROVIDER_UNSPECIFIED\x10\x00\x12\x17\n" +
 	"\x13SCM_PROVIDER_GITHUB\x10\x01\x12\x17\n" +
 	"\x13SCM_PROVIDER_GITLAB\x10\x02\x12\x1a\n" +
 	"\x16SCM_PROVIDER_BITBUCKET\x10\x03\x12\x1d\n" +
 	"\x19SCM_PROVIDER_AZURE_DEVOPS\x10\x04\x12\x16\n" +
-	"\x12SCM_PROVIDER_GITEA\x10\x052\xf6$\n" +
+	"\x12SCM_PROVIDER_GITEA\x10\x05*|\n" +
+	"\n" +
+	"ReviewType\x12\x1b\n" +
+	"\x17REVIEW_TYPE_UNSPECIFIED\x10\x00\x12\x17\n" +
+	"\x13REVIEW_TYPE_COMMENT\x10\x01\x12\x17\n" +
+	"\x13REVIEW_TYPE_APPROVE\x10\x02\x12\x1f\n" +
+	"\x1bREVIEW_TYPE_REQUEST_CHANGES\x10\x032\xf0(\n" +
 	"\x15ScmIntegrationService\x12c\n" +
 	"\n" +
-	"ListIssues\x12).orca.scmintegration.v1.ListIssuesRequest\x1a*.orca.scmintegration.v1.ListIssuesResponse\x12x\n" +
+	"ListIssues\x12).orca.scmintegration.v1.ListIssuesRequest\x1a*.orca.scmintegration.v1.ListIssuesResponse\x12\x8a\x01\n" +
+	"\x17ListIssueCommentsBySlug\x126.orca.scmintegration.v1.ListIssueCommentsBySlugRequest\x1a7.orca.scmintegration.v1.ListIssueCommentsBySlugResponse\x12\x9c\x01\n" +
+	"\x1dGetLinkedPullRequestsForIssue\x12<.orca.scmintegration.v1.GetLinkedPullRequestsForIssueRequest\x1a=.orca.scmintegration.v1.GetLinkedPullRequestsForIssueResponse\x12x\n" +
 	"\x11CreatePullRequest\x120.orca.scmintegration.v1.CreatePullRequestRequest\x1a1.orca.scmintegration.v1.CreatePullRequestResponse\x12u\n" +
 	"\x10ListPullRequests\x12/.orca.scmintegration.v1.ListPullRequestsRequest\x1a0.orca.scmintegration.v1.ListPullRequestsResponse\x12{\n" +
 	"\x12GetRateLimitStatus\x121.orca.scmintegration.v1.GetRateLimitStatusRequest\x1a2.orca.scmintegration.v1.GetRateLimitStatusResponse\x12l\n" +
@@ -5227,7 +6142,9 @@ const file_orca_scmintegration_v1_scmintegration_proto_rawDesc = "" +
 	"\x1cCheckHostedReviewEligibility\x12;.orca.scmintegration.v1.CheckHostedReviewEligibilityRequest\x1a/.orca.scmintegration.v1.HostedReviewEligibility\x12\x8d\x01\n" +
 	"\x18SetIntegrationCredential\x127.orca.scmintegration.v1.SetIntegrationCredentialRequest\x1a8.orca.scmintegration.v1.SetIntegrationCredentialResponse\x12\x9f\x01\n" +
 	"\x1eGetIntegrationCredentialStatus\x12=.orca.scmintegration.v1.GetIntegrationCredentialStatusRequest\x1a>.orca.scmintegration.v1.GetIntegrationCredentialStatusResponse\x12\x93\x01\n" +
-	"\x1aListIntegrationCredentials\x129.orca.scmintegration.v1.ListIntegrationCredentialsRequest\x1a:.orca.scmintegration.v1.ListIntegrationCredentialsResponseBRZPgithub.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1;scmintegrationv1b\x06proto3"
+	"\x1aListIntegrationCredentials\x129.orca.scmintegration.v1.ListIntegrationCredentialsRequest\x1a:.orca.scmintegration.v1.ListIntegrationCredentialsResponse\x12o\n" +
+	"\x0eReceiveWebhook\x12-.orca.scmintegration.v1.ReceiveWebhookRequest\x1a..orca.scmintegration.v1.ReceiveWebhookResponse\x12[\n" +
+	"\fSubmitReview\x12+.orca.scmintegration.v1.SubmitReviewRequest\x1a\x1e.orca.scmintegration.v1.ReviewBRZPgithub.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1;scmintegrationv1b\x06proto3"
 
 var (
 	file_orca_scmintegration_v1_scmintegration_proto_rawDescOnce sync.Once
@@ -5241,205 +6158,234 @@ func file_orca_scmintegration_v1_scmintegration_proto_rawDescGZIP() []byte {
 	return file_orca_scmintegration_v1_scmintegration_proto_rawDescData
 }
 
-var file_orca_scmintegration_v1_scmintegration_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_scmintegration_v1_scmintegration_proto_msgTypes = make([]protoimpl.MessageInfo, 75)
+var file_orca_scmintegration_v1_scmintegration_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
+var file_orca_scmintegration_v1_scmintegration_proto_msgTypes = make([]protoimpl.MessageInfo, 86)
 var file_orca_scmintegration_v1_scmintegration_proto_goTypes = []any{
 	(ScmProvider)(0),                               // 0: orca.scmintegration.v1.ScmProvider
-	(*Issue)(nil),                                  // 1: orca.scmintegration.v1.Issue
-	(*ListIssuesRequest)(nil),                      // 2: orca.scmintegration.v1.ListIssuesRequest
-	(*ListIssuesResponse)(nil),                     // 3: orca.scmintegration.v1.ListIssuesResponse
-	(*CreatePullRequestRequest)(nil),               // 4: orca.scmintegration.v1.CreatePullRequestRequest
-	(*PullRequest)(nil),                            // 5: orca.scmintegration.v1.PullRequest
-	(*CreatePullRequestResponse)(nil),              // 6: orca.scmintegration.v1.CreatePullRequestResponse
-	(*ListPullRequestsRequest)(nil),                // 7: orca.scmintegration.v1.ListPullRequestsRequest
-	(*ListPullRequestsResponse)(nil),               // 8: orca.scmintegration.v1.ListPullRequestsResponse
-	(*GetRateLimitStatusRequest)(nil),              // 9: orca.scmintegration.v1.GetRateLimitStatusRequest
-	(*GetRateLimitStatusResponse)(nil),             // 10: orca.scmintegration.v1.GetRateLimitStatusResponse
-	(*GetAuthStatusRequest)(nil),                   // 11: orca.scmintegration.v1.GetAuthStatusRequest
-	(*GetAuthStatusResponse)(nil),                  // 12: orca.scmintegration.v1.GetAuthStatusResponse
-	(*StartOAuthFlowRequest)(nil),                  // 13: orca.scmintegration.v1.StartOAuthFlowRequest
-	(*StartOAuthFlowResponse)(nil),                 // 14: orca.scmintegration.v1.StartOAuthFlowResponse
-	(*CompleteOAuthFlowRequest)(nil),               // 15: orca.scmintegration.v1.CompleteOAuthFlowRequest
-	(*CompleteOAuthFlowResponse)(nil),              // 16: orca.scmintegration.v1.CompleteOAuthFlowResponse
-	(*RevokeAuthRequest)(nil),                      // 17: orca.scmintegration.v1.RevokeAuthRequest
-	(*RevokeAuthResponse)(nil),                     // 18: orca.scmintegration.v1.RevokeAuthResponse
-	(*MergePullRequestRequest)(nil),                // 19: orca.scmintegration.v1.MergePullRequestRequest
-	(*MergePullRequestResponse)(nil),               // 20: orca.scmintegration.v1.MergePullRequestResponse
-	(*RequestPullRequestReviewersRequest)(nil),     // 21: orca.scmintegration.v1.RequestPullRequestReviewersRequest
-	(*RemovePullRequestReviewersRequest)(nil),      // 22: orca.scmintegration.v1.RemovePullRequestReviewersRequest
-	(*SetPullRequestAutoMergeRequest)(nil),         // 23: orca.scmintegration.v1.SetPullRequestAutoMergeRequest
-	(*UpdateIssueRequest)(nil),                     // 24: orca.scmintegration.v1.UpdateIssueRequest
-	(*GetPullRequestForBranchRequest)(nil),         // 25: orca.scmintegration.v1.GetPullRequestForBranchRequest
-	(*GetPullRequestForBranchResponse)(nil),        // 26: orca.scmintegration.v1.GetPullRequestForBranchResponse
-	(*ResolveRepoSlugRequest)(nil),                 // 27: orca.scmintegration.v1.ResolveRepoSlugRequest
-	(*ResolveRepoSlugResponse)(nil),                // 28: orca.scmintegration.v1.ResolveRepoSlugResponse
-	(*ProjectFieldValue)(nil),                      // 29: orca.scmintegration.v1.ProjectFieldValue
-	(*ProjectItem)(nil),                            // 30: orca.scmintegration.v1.ProjectItem
-	(*Project)(nil),                                // 31: orca.scmintegration.v1.Project
-	(*ProjectView)(nil),                            // 32: orca.scmintegration.v1.ProjectView
-	(*IssueType)(nil),                              // 33: orca.scmintegration.v1.IssueType
-	(*AssignableUser)(nil),                         // 34: orca.scmintegration.v1.AssignableUser
-	(*Label)(nil),                                  // 35: orca.scmintegration.v1.Label
-	(*ProjectComment)(nil),                         // 36: orca.scmintegration.v1.ProjectComment
-	(*WorkItemDetails)(nil),                        // 37: orca.scmintegration.v1.WorkItemDetails
-	(*ListAccessibleProjectsRequest)(nil),          // 38: orca.scmintegration.v1.ListAccessibleProjectsRequest
-	(*ListAccessibleProjectsResponse)(nil),         // 39: orca.scmintegration.v1.ListAccessibleProjectsResponse
-	(*ResolveProjectRefRequest)(nil),               // 40: orca.scmintegration.v1.ResolveProjectRefRequest
-	(*ResolveProjectRefResponse)(nil),              // 41: orca.scmintegration.v1.ResolveProjectRefResponse
-	(*ListProjectViewsRequest)(nil),                // 42: orca.scmintegration.v1.ListProjectViewsRequest
-	(*ListProjectViewsResponse)(nil),               // 43: orca.scmintegration.v1.ListProjectViewsResponse
-	(*ViewProjectTableRequest)(nil),                // 44: orca.scmintegration.v1.ViewProjectTableRequest
-	(*ViewProjectTableResponse)(nil),               // 45: orca.scmintegration.v1.ViewProjectTableResponse
-	(*UpdateProjectItemFieldRequest)(nil),          // 46: orca.scmintegration.v1.UpdateProjectItemFieldRequest
-	(*ClearProjectItemFieldRequest)(nil),           // 47: orca.scmintegration.v1.ClearProjectItemFieldRequest
-	(*GetWorkItemDetailsBySlugRequest)(nil),        // 48: orca.scmintegration.v1.GetWorkItemDetailsBySlugRequest
-	(*UpdateIssueBySlugRequest)(nil),               // 49: orca.scmintegration.v1.UpdateIssueBySlugRequest
-	(*UpdatePullRequestBySlugRequest)(nil),         // 50: orca.scmintegration.v1.UpdatePullRequestBySlugRequest
-	(*UpdateIssueTypeBySlugRequest)(nil),           // 51: orca.scmintegration.v1.UpdateIssueTypeBySlugRequest
-	(*ListIssueTypesBySlugRequest)(nil),            // 52: orca.scmintegration.v1.ListIssueTypesBySlugRequest
-	(*ListIssueTypesBySlugResponse)(nil),           // 53: orca.scmintegration.v1.ListIssueTypesBySlugResponse
-	(*ListAssignableUsersBySlugRequest)(nil),       // 54: orca.scmintegration.v1.ListAssignableUsersBySlugRequest
-	(*ListAssignableUsersBySlugResponse)(nil),      // 55: orca.scmintegration.v1.ListAssignableUsersBySlugResponse
-	(*ListLabelsBySlugRequest)(nil),                // 56: orca.scmintegration.v1.ListLabelsBySlugRequest
-	(*ListLabelsBySlugResponse)(nil),               // 57: orca.scmintegration.v1.ListLabelsBySlugResponse
-	(*AddIssueCommentBySlugRequest)(nil),           // 58: orca.scmintegration.v1.AddIssueCommentBySlugRequest
-	(*UpdateIssueCommentBySlugRequest)(nil),        // 59: orca.scmintegration.v1.UpdateIssueCommentBySlugRequest
-	(*DeleteIssueCommentBySlugRequest)(nil),        // 60: orca.scmintegration.v1.DeleteIssueCommentBySlugRequest
-	(*MergeRequest)(nil),                           // 61: orca.scmintegration.v1.MergeRequest
-	(*ListMergeRequestsRequest)(nil),               // 62: orca.scmintegration.v1.ListMergeRequestsRequest
-	(*ListMergeRequestsResponse)(nil),              // 63: orca.scmintegration.v1.ListMergeRequestsResponse
-	(*MergeRequestDiscussion)(nil),                 // 64: orca.scmintegration.v1.MergeRequestDiscussion
-	(*ResolveMergeRequestDiscussionRequest)(nil),   // 65: orca.scmintegration.v1.ResolveMergeRequestDiscussionRequest
-	(*GetWorkItemDetailsRequest)(nil),              // 66: orca.scmintegration.v1.GetWorkItemDetailsRequest
-	(*WorkItemDetailsGitLab)(nil),                  // 67: orca.scmintegration.v1.WorkItemDetailsGitLab
-	(*CheckHostedReviewEligibilityRequest)(nil),    // 68: orca.scmintegration.v1.CheckHostedReviewEligibilityRequest
-	(*HostedReviewEligibility)(nil),                // 69: orca.scmintegration.v1.HostedReviewEligibility
-	(*SetIntegrationCredentialRequest)(nil),        // 70: orca.scmintegration.v1.SetIntegrationCredentialRequest
-	(*SetIntegrationCredentialResponse)(nil),       // 71: orca.scmintegration.v1.SetIntegrationCredentialResponse
-	(*GetIntegrationCredentialStatusRequest)(nil),  // 72: orca.scmintegration.v1.GetIntegrationCredentialStatusRequest
-	(*GetIntegrationCredentialStatusResponse)(nil), // 73: orca.scmintegration.v1.GetIntegrationCredentialStatusResponse
-	(*ListIntegrationCredentialsRequest)(nil),      // 74: orca.scmintegration.v1.ListIntegrationCredentialsRequest
-	(*ListIntegrationCredentialsResponse)(nil),     // 75: orca.scmintegration.v1.ListIntegrationCredentialsResponse
-	(*emptypb.Empty)(nil),                          // 76: google.protobuf.Empty
+	(ReviewType)(0),                                // 1: orca.scmintegration.v1.ReviewType
+	(*Issue)(nil),                                  // 2: orca.scmintegration.v1.Issue
+	(*IssueFilter)(nil),                            // 3: orca.scmintegration.v1.IssueFilter
+	(*ListIssuesRequest)(nil),                      // 4: orca.scmintegration.v1.ListIssuesRequest
+	(*ListIssuesResponse)(nil),                     // 5: orca.scmintegration.v1.ListIssuesResponse
+	(*ListIssueCommentsBySlugRequest)(nil),         // 6: orca.scmintegration.v1.ListIssueCommentsBySlugRequest
+	(*ListIssueCommentsBySlugResponse)(nil),        // 7: orca.scmintegration.v1.ListIssueCommentsBySlugResponse
+	(*GetLinkedPullRequestsForIssueRequest)(nil),   // 8: orca.scmintegration.v1.GetLinkedPullRequestsForIssueRequest
+	(*GetLinkedPullRequestsForIssueResponse)(nil),  // 9: orca.scmintegration.v1.GetLinkedPullRequestsForIssueResponse
+	(*CreatePullRequestRequest)(nil),               // 10: orca.scmintegration.v1.CreatePullRequestRequest
+	(*PullRequest)(nil),                            // 11: orca.scmintegration.v1.PullRequest
+	(*CreatePullRequestResponse)(nil),              // 12: orca.scmintegration.v1.CreatePullRequestResponse
+	(*ListPullRequestsRequest)(nil),                // 13: orca.scmintegration.v1.ListPullRequestsRequest
+	(*ListPullRequestsResponse)(nil),               // 14: orca.scmintegration.v1.ListPullRequestsResponse
+	(*GetRateLimitStatusRequest)(nil),              // 15: orca.scmintegration.v1.GetRateLimitStatusRequest
+	(*GetRateLimitStatusResponse)(nil),             // 16: orca.scmintegration.v1.GetRateLimitStatusResponse
+	(*GetAuthStatusRequest)(nil),                   // 17: orca.scmintegration.v1.GetAuthStatusRequest
+	(*GetAuthStatusResponse)(nil),                  // 18: orca.scmintegration.v1.GetAuthStatusResponse
+	(*StartOAuthFlowRequest)(nil),                  // 19: orca.scmintegration.v1.StartOAuthFlowRequest
+	(*StartOAuthFlowResponse)(nil),                 // 20: orca.scmintegration.v1.StartOAuthFlowResponse
+	(*CompleteOAuthFlowRequest)(nil),               // 21: orca.scmintegration.v1.CompleteOAuthFlowRequest
+	(*CompleteOAuthFlowResponse)(nil),              // 22: orca.scmintegration.v1.CompleteOAuthFlowResponse
+	(*RevokeAuthRequest)(nil),                      // 23: orca.scmintegration.v1.RevokeAuthRequest
+	(*RevokeAuthResponse)(nil),                     // 24: orca.scmintegration.v1.RevokeAuthResponse
+	(*MergePullRequestRequest)(nil),                // 25: orca.scmintegration.v1.MergePullRequestRequest
+	(*MergePullRequestResponse)(nil),               // 26: orca.scmintegration.v1.MergePullRequestResponse
+	(*RequestPullRequestReviewersRequest)(nil),     // 27: orca.scmintegration.v1.RequestPullRequestReviewersRequest
+	(*RemovePullRequestReviewersRequest)(nil),      // 28: orca.scmintegration.v1.RemovePullRequestReviewersRequest
+	(*SetPullRequestAutoMergeRequest)(nil),         // 29: orca.scmintegration.v1.SetPullRequestAutoMergeRequest
+	(*UpdateIssueRequest)(nil),                     // 30: orca.scmintegration.v1.UpdateIssueRequest
+	(*GetPullRequestForBranchRequest)(nil),         // 31: orca.scmintegration.v1.GetPullRequestForBranchRequest
+	(*GetPullRequestForBranchResponse)(nil),        // 32: orca.scmintegration.v1.GetPullRequestForBranchResponse
+	(*ResolveRepoSlugRequest)(nil),                 // 33: orca.scmintegration.v1.ResolveRepoSlugRequest
+	(*ResolveRepoSlugResponse)(nil),                // 34: orca.scmintegration.v1.ResolveRepoSlugResponse
+	(*ProjectFieldValue)(nil),                      // 35: orca.scmintegration.v1.ProjectFieldValue
+	(*ProjectItem)(nil),                            // 36: orca.scmintegration.v1.ProjectItem
+	(*Project)(nil),                                // 37: orca.scmintegration.v1.Project
+	(*ProjectView)(nil),                            // 38: orca.scmintegration.v1.ProjectView
+	(*IssueType)(nil),                              // 39: orca.scmintegration.v1.IssueType
+	(*AssignableUser)(nil),                         // 40: orca.scmintegration.v1.AssignableUser
+	(*Label)(nil),                                  // 41: orca.scmintegration.v1.Label
+	(*ProjectComment)(nil),                         // 42: orca.scmintegration.v1.ProjectComment
+	(*WorkItemDetails)(nil),                        // 43: orca.scmintegration.v1.WorkItemDetails
+	(*ListAccessibleProjectsRequest)(nil),          // 44: orca.scmintegration.v1.ListAccessibleProjectsRequest
+	(*ListAccessibleProjectsResponse)(nil),         // 45: orca.scmintegration.v1.ListAccessibleProjectsResponse
+	(*ResolveProjectRefRequest)(nil),               // 46: orca.scmintegration.v1.ResolveProjectRefRequest
+	(*ResolveProjectRefResponse)(nil),              // 47: orca.scmintegration.v1.ResolveProjectRefResponse
+	(*ListProjectViewsRequest)(nil),                // 48: orca.scmintegration.v1.ListProjectViewsRequest
+	(*ListProjectViewsResponse)(nil),               // 49: orca.scmintegration.v1.ListProjectViewsResponse
+	(*ViewProjectTableRequest)(nil),                // 50: orca.scmintegration.v1.ViewProjectTableRequest
+	(*ViewProjectTableResponse)(nil),               // 51: orca.scmintegration.v1.ViewProjectTableResponse
+	(*UpdateProjectItemFieldRequest)(nil),          // 52: orca.scmintegration.v1.UpdateProjectItemFieldRequest
+	(*ClearProjectItemFieldRequest)(nil),           // 53: orca.scmintegration.v1.ClearProjectItemFieldRequest
+	(*GetWorkItemDetailsBySlugRequest)(nil),        // 54: orca.scmintegration.v1.GetWorkItemDetailsBySlugRequest
+	(*UpdateIssueBySlugRequest)(nil),               // 55: orca.scmintegration.v1.UpdateIssueBySlugRequest
+	(*UpdatePullRequestBySlugRequest)(nil),         // 56: orca.scmintegration.v1.UpdatePullRequestBySlugRequest
+	(*UpdateIssueTypeBySlugRequest)(nil),           // 57: orca.scmintegration.v1.UpdateIssueTypeBySlugRequest
+	(*ListIssueTypesBySlugRequest)(nil),            // 58: orca.scmintegration.v1.ListIssueTypesBySlugRequest
+	(*ListIssueTypesBySlugResponse)(nil),           // 59: orca.scmintegration.v1.ListIssueTypesBySlugResponse
+	(*ListAssignableUsersBySlugRequest)(nil),       // 60: orca.scmintegration.v1.ListAssignableUsersBySlugRequest
+	(*ListAssignableUsersBySlugResponse)(nil),      // 61: orca.scmintegration.v1.ListAssignableUsersBySlugResponse
+	(*ListLabelsBySlugRequest)(nil),                // 62: orca.scmintegration.v1.ListLabelsBySlugRequest
+	(*ListLabelsBySlugResponse)(nil),               // 63: orca.scmintegration.v1.ListLabelsBySlugResponse
+	(*AddIssueCommentBySlugRequest)(nil),           // 64: orca.scmintegration.v1.AddIssueCommentBySlugRequest
+	(*UpdateIssueCommentBySlugRequest)(nil),        // 65: orca.scmintegration.v1.UpdateIssueCommentBySlugRequest
+	(*DeleteIssueCommentBySlugRequest)(nil),        // 66: orca.scmintegration.v1.DeleteIssueCommentBySlugRequest
+	(*MergeRequest)(nil),                           // 67: orca.scmintegration.v1.MergeRequest
+	(*ListMergeRequestsRequest)(nil),               // 68: orca.scmintegration.v1.ListMergeRequestsRequest
+	(*ListMergeRequestsResponse)(nil),              // 69: orca.scmintegration.v1.ListMergeRequestsResponse
+	(*MergeRequestDiscussion)(nil),                 // 70: orca.scmintegration.v1.MergeRequestDiscussion
+	(*ResolveMergeRequestDiscussionRequest)(nil),   // 71: orca.scmintegration.v1.ResolveMergeRequestDiscussionRequest
+	(*GetWorkItemDetailsRequest)(nil),              // 72: orca.scmintegration.v1.GetWorkItemDetailsRequest
+	(*WorkItemDetailsGitLab)(nil),                  // 73: orca.scmintegration.v1.WorkItemDetailsGitLab
+	(*CheckHostedReviewEligibilityRequest)(nil),    // 74: orca.scmintegration.v1.CheckHostedReviewEligibilityRequest
+	(*HostedReviewEligibility)(nil),                // 75: orca.scmintegration.v1.HostedReviewEligibility
+	(*SetIntegrationCredentialRequest)(nil),        // 76: orca.scmintegration.v1.SetIntegrationCredentialRequest
+	(*SetIntegrationCredentialResponse)(nil),       // 77: orca.scmintegration.v1.SetIntegrationCredentialResponse
+	(*GetIntegrationCredentialStatusRequest)(nil),  // 78: orca.scmintegration.v1.GetIntegrationCredentialStatusRequest
+	(*GetIntegrationCredentialStatusResponse)(nil), // 79: orca.scmintegration.v1.GetIntegrationCredentialStatusResponse
+	(*ListIntegrationCredentialsRequest)(nil),      // 80: orca.scmintegration.v1.ListIntegrationCredentialsRequest
+	(*ListIntegrationCredentialsResponse)(nil),     // 81: orca.scmintegration.v1.ListIntegrationCredentialsResponse
+	(*PullRequestLifecycleEvent)(nil),              // 82: orca.scmintegration.v1.PullRequestLifecycleEvent
+	(*ReceiveWebhookRequest)(nil),                  // 83: orca.scmintegration.v1.ReceiveWebhookRequest
+	(*ReceiveWebhookResponse)(nil),                 // 84: orca.scmintegration.v1.ReceiveWebhookResponse
+	(*ReviewComment)(nil),                          // 85: orca.scmintegration.v1.ReviewComment
+	(*SubmitReviewRequest)(nil),                    // 86: orca.scmintegration.v1.SubmitReviewRequest
+	(*Review)(nil),                                 // 87: orca.scmintegration.v1.Review
+	(*emptypb.Empty)(nil),                          // 88: google.protobuf.Empty
 }
 var file_orca_scmintegration_v1_scmintegration_proto_depIdxs = []int32{
 	0,  // 0: orca.scmintegration.v1.ListIssuesRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	1,  // 1: orca.scmintegration.v1.ListIssuesResponse.issues:type_name -> orca.scmintegration.v1.Issue
-	0,  // 2: orca.scmintegration.v1.CreatePullRequestRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	5,  // 3: orca.scmintegration.v1.CreatePullRequestResponse.pull_request:type_name -> orca.scmintegration.v1.PullRequest
-	0,  // 4: orca.scmintegration.v1.ListPullRequestsRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	5,  // 5: orca.scmintegration.v1.ListPullRequestsResponse.pull_requests:type_name -> orca.scmintegration.v1.PullRequest
-	0,  // 6: orca.scmintegration.v1.GetRateLimitStatusRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 7: orca.scmintegration.v1.GetAuthStatusRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 8: orca.scmintegration.v1.StartOAuthFlowRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 9: orca.scmintegration.v1.CompleteOAuthFlowRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 10: orca.scmintegration.v1.RevokeAuthRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 11: orca.scmintegration.v1.MergePullRequestRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	5,  // 12: orca.scmintegration.v1.MergePullRequestResponse.pull_request:type_name -> orca.scmintegration.v1.PullRequest
-	0,  // 13: orca.scmintegration.v1.RequestPullRequestReviewersRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 14: orca.scmintegration.v1.RemovePullRequestReviewersRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 15: orca.scmintegration.v1.SetPullRequestAutoMergeRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 16: orca.scmintegration.v1.UpdateIssueRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 17: orca.scmintegration.v1.GetPullRequestForBranchRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	5,  // 18: orca.scmintegration.v1.GetPullRequestForBranchResponse.pull_request:type_name -> orca.scmintegration.v1.PullRequest
-	0,  // 19: orca.scmintegration.v1.ResolveRepoSlugRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	29, // 20: orca.scmintegration.v1.ProjectItem.fields:type_name -> orca.scmintegration.v1.ProjectFieldValue
-	29, // 21: orca.scmintegration.v1.WorkItemDetails.fields:type_name -> orca.scmintegration.v1.ProjectFieldValue
-	31, // 22: orca.scmintegration.v1.ListAccessibleProjectsResponse.projects:type_name -> orca.scmintegration.v1.Project
-	31, // 23: orca.scmintegration.v1.ResolveProjectRefResponse.project:type_name -> orca.scmintegration.v1.Project
-	32, // 24: orca.scmintegration.v1.ListProjectViewsResponse.views:type_name -> orca.scmintegration.v1.ProjectView
-	30, // 25: orca.scmintegration.v1.ViewProjectTableResponse.items:type_name -> orca.scmintegration.v1.ProjectItem
-	29, // 26: orca.scmintegration.v1.UpdateProjectItemFieldRequest.field:type_name -> orca.scmintegration.v1.ProjectFieldValue
-	33, // 27: orca.scmintegration.v1.ListIssueTypesBySlugResponse.issue_types:type_name -> orca.scmintegration.v1.IssueType
-	34, // 28: orca.scmintegration.v1.ListAssignableUsersBySlugResponse.users:type_name -> orca.scmintegration.v1.AssignableUser
-	35, // 29: orca.scmintegration.v1.ListLabelsBySlugResponse.labels:type_name -> orca.scmintegration.v1.Label
-	61, // 30: orca.scmintegration.v1.ListMergeRequestsResponse.merge_requests:type_name -> orca.scmintegration.v1.MergeRequest
-	0,  // 31: orca.scmintegration.v1.CheckHostedReviewEligibilityRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	5,  // 32: orca.scmintegration.v1.HostedReviewEligibility.existing_pull_request:type_name -> orca.scmintegration.v1.PullRequest
-	0,  // 33: orca.scmintegration.v1.SetIntegrationCredentialRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 34: orca.scmintegration.v1.GetIntegrationCredentialStatusRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
-	0,  // 35: orca.scmintegration.v1.ListIntegrationCredentialsResponse.configured_providers:type_name -> orca.scmintegration.v1.ScmProvider
-	2,  // 36: orca.scmintegration.v1.ScmIntegrationService.ListIssues:input_type -> orca.scmintegration.v1.ListIssuesRequest
-	4,  // 37: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:input_type -> orca.scmintegration.v1.CreatePullRequestRequest
-	7,  // 38: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:input_type -> orca.scmintegration.v1.ListPullRequestsRequest
-	9,  // 39: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:input_type -> orca.scmintegration.v1.GetRateLimitStatusRequest
-	11, // 40: orca.scmintegration.v1.ScmIntegrationService.GetAuthStatus:input_type -> orca.scmintegration.v1.GetAuthStatusRequest
-	13, // 41: orca.scmintegration.v1.ScmIntegrationService.StartOAuthFlow:input_type -> orca.scmintegration.v1.StartOAuthFlowRequest
-	15, // 42: orca.scmintegration.v1.ScmIntegrationService.CompleteOAuthFlow:input_type -> orca.scmintegration.v1.CompleteOAuthFlowRequest
-	17, // 43: orca.scmintegration.v1.ScmIntegrationService.RevokeAuth:input_type -> orca.scmintegration.v1.RevokeAuthRequest
-	19, // 44: orca.scmintegration.v1.ScmIntegrationService.MergePullRequest:input_type -> orca.scmintegration.v1.MergePullRequestRequest
-	21, // 45: orca.scmintegration.v1.ScmIntegrationService.RequestPullRequestReviewers:input_type -> orca.scmintegration.v1.RequestPullRequestReviewersRequest
-	22, // 46: orca.scmintegration.v1.ScmIntegrationService.RemovePullRequestReviewers:input_type -> orca.scmintegration.v1.RemovePullRequestReviewersRequest
-	23, // 47: orca.scmintegration.v1.ScmIntegrationService.SetPullRequestAutoMerge:input_type -> orca.scmintegration.v1.SetPullRequestAutoMergeRequest
-	24, // 48: orca.scmintegration.v1.ScmIntegrationService.UpdateIssue:input_type -> orca.scmintegration.v1.UpdateIssueRequest
-	25, // 49: orca.scmintegration.v1.ScmIntegrationService.GetPullRequestForBranch:input_type -> orca.scmintegration.v1.GetPullRequestForBranchRequest
-	27, // 50: orca.scmintegration.v1.ScmIntegrationService.ResolveRepoSlug:input_type -> orca.scmintegration.v1.ResolveRepoSlugRequest
-	38, // 51: orca.scmintegration.v1.ScmIntegrationService.ListAccessibleProjects:input_type -> orca.scmintegration.v1.ListAccessibleProjectsRequest
-	40, // 52: orca.scmintegration.v1.ScmIntegrationService.ResolveProjectRef:input_type -> orca.scmintegration.v1.ResolveProjectRefRequest
-	42, // 53: orca.scmintegration.v1.ScmIntegrationService.ListProjectViews:input_type -> orca.scmintegration.v1.ListProjectViewsRequest
-	44, // 54: orca.scmintegration.v1.ScmIntegrationService.ViewProjectTable:input_type -> orca.scmintegration.v1.ViewProjectTableRequest
-	46, // 55: orca.scmintegration.v1.ScmIntegrationService.UpdateProjectItemField:input_type -> orca.scmintegration.v1.UpdateProjectItemFieldRequest
-	47, // 56: orca.scmintegration.v1.ScmIntegrationService.ClearProjectItemField:input_type -> orca.scmintegration.v1.ClearProjectItemFieldRequest
-	48, // 57: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetailsBySlug:input_type -> orca.scmintegration.v1.GetWorkItemDetailsBySlugRequest
-	49, // 58: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueBySlug:input_type -> orca.scmintegration.v1.UpdateIssueBySlugRequest
-	50, // 59: orca.scmintegration.v1.ScmIntegrationService.UpdatePullRequestBySlug:input_type -> orca.scmintegration.v1.UpdatePullRequestBySlugRequest
-	51, // 60: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueTypeBySlug:input_type -> orca.scmintegration.v1.UpdateIssueTypeBySlugRequest
-	52, // 61: orca.scmintegration.v1.ScmIntegrationService.ListIssueTypesBySlug:input_type -> orca.scmintegration.v1.ListIssueTypesBySlugRequest
-	54, // 62: orca.scmintegration.v1.ScmIntegrationService.ListAssignableUsersBySlug:input_type -> orca.scmintegration.v1.ListAssignableUsersBySlugRequest
-	56, // 63: orca.scmintegration.v1.ScmIntegrationService.ListLabelsBySlug:input_type -> orca.scmintegration.v1.ListLabelsBySlugRequest
-	58, // 64: orca.scmintegration.v1.ScmIntegrationService.AddIssueCommentBySlug:input_type -> orca.scmintegration.v1.AddIssueCommentBySlugRequest
-	59, // 65: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueCommentBySlug:input_type -> orca.scmintegration.v1.UpdateIssueCommentBySlugRequest
-	60, // 66: orca.scmintegration.v1.ScmIntegrationService.DeleteIssueCommentBySlug:input_type -> orca.scmintegration.v1.DeleteIssueCommentBySlugRequest
-	62, // 67: orca.scmintegration.v1.ScmIntegrationService.ListMergeRequests:input_type -> orca.scmintegration.v1.ListMergeRequestsRequest
-	65, // 68: orca.scmintegration.v1.ScmIntegrationService.ResolveMergeRequestDiscussion:input_type -> orca.scmintegration.v1.ResolveMergeRequestDiscussionRequest
-	66, // 69: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetails:input_type -> orca.scmintegration.v1.GetWorkItemDetailsRequest
-	68, // 70: orca.scmintegration.v1.ScmIntegrationService.CheckHostedReviewEligibility:input_type -> orca.scmintegration.v1.CheckHostedReviewEligibilityRequest
-	70, // 71: orca.scmintegration.v1.ScmIntegrationService.SetIntegrationCredential:input_type -> orca.scmintegration.v1.SetIntegrationCredentialRequest
-	72, // 72: orca.scmintegration.v1.ScmIntegrationService.GetIntegrationCredentialStatus:input_type -> orca.scmintegration.v1.GetIntegrationCredentialStatusRequest
-	74, // 73: orca.scmintegration.v1.ScmIntegrationService.ListIntegrationCredentials:input_type -> orca.scmintegration.v1.ListIntegrationCredentialsRequest
-	3,  // 74: orca.scmintegration.v1.ScmIntegrationService.ListIssues:output_type -> orca.scmintegration.v1.ListIssuesResponse
-	6,  // 75: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:output_type -> orca.scmintegration.v1.CreatePullRequestResponse
-	8,  // 76: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:output_type -> orca.scmintegration.v1.ListPullRequestsResponse
-	10, // 77: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:output_type -> orca.scmintegration.v1.GetRateLimitStatusResponse
-	12, // 78: orca.scmintegration.v1.ScmIntegrationService.GetAuthStatus:output_type -> orca.scmintegration.v1.GetAuthStatusResponse
-	14, // 79: orca.scmintegration.v1.ScmIntegrationService.StartOAuthFlow:output_type -> orca.scmintegration.v1.StartOAuthFlowResponse
-	16, // 80: orca.scmintegration.v1.ScmIntegrationService.CompleteOAuthFlow:output_type -> orca.scmintegration.v1.CompleteOAuthFlowResponse
-	18, // 81: orca.scmintegration.v1.ScmIntegrationService.RevokeAuth:output_type -> orca.scmintegration.v1.RevokeAuthResponse
-	20, // 82: orca.scmintegration.v1.ScmIntegrationService.MergePullRequest:output_type -> orca.scmintegration.v1.MergePullRequestResponse
-	5,  // 83: orca.scmintegration.v1.ScmIntegrationService.RequestPullRequestReviewers:output_type -> orca.scmintegration.v1.PullRequest
-	5,  // 84: orca.scmintegration.v1.ScmIntegrationService.RemovePullRequestReviewers:output_type -> orca.scmintegration.v1.PullRequest
-	5,  // 85: orca.scmintegration.v1.ScmIntegrationService.SetPullRequestAutoMerge:output_type -> orca.scmintegration.v1.PullRequest
-	1,  // 86: orca.scmintegration.v1.ScmIntegrationService.UpdateIssue:output_type -> orca.scmintegration.v1.Issue
-	26, // 87: orca.scmintegration.v1.ScmIntegrationService.GetPullRequestForBranch:output_type -> orca.scmintegration.v1.GetPullRequestForBranchResponse
-	28, // 88: orca.scmintegration.v1.ScmIntegrationService.ResolveRepoSlug:output_type -> orca.scmintegration.v1.ResolveRepoSlugResponse
-	39, // 89: orca.scmintegration.v1.ScmIntegrationService.ListAccessibleProjects:output_type -> orca.scmintegration.v1.ListAccessibleProjectsResponse
-	41, // 90: orca.scmintegration.v1.ScmIntegrationService.ResolveProjectRef:output_type -> orca.scmintegration.v1.ResolveProjectRefResponse
-	43, // 91: orca.scmintegration.v1.ScmIntegrationService.ListProjectViews:output_type -> orca.scmintegration.v1.ListProjectViewsResponse
-	45, // 92: orca.scmintegration.v1.ScmIntegrationService.ViewProjectTable:output_type -> orca.scmintegration.v1.ViewProjectTableResponse
-	30, // 93: orca.scmintegration.v1.ScmIntegrationService.UpdateProjectItemField:output_type -> orca.scmintegration.v1.ProjectItem
-	30, // 94: orca.scmintegration.v1.ScmIntegrationService.ClearProjectItemField:output_type -> orca.scmintegration.v1.ProjectItem
-	37, // 95: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetailsBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
-	37, // 96: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
-	37, // 97: orca.scmintegration.v1.ScmIntegrationService.UpdatePullRequestBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
-	37, // 98: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueTypeBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
-	53, // 99: orca.scmintegration.v1.ScmIntegrationService.ListIssueTypesBySlug:output_type -> orca.scmintegration.v1.ListIssueTypesBySlugResponse
-	55, // 100: orca.scmintegration.v1.ScmIntegrationService.ListAssignableUsersBySlug:output_type -> orca.scmintegration.v1.ListAssignableUsersBySlugResponse
-	57, // 101: orca.scmintegration.v1.ScmIntegrationService.ListLabelsBySlug:output_type -> orca.scmintegration.v1.ListLabelsBySlugResponse
-	36, // 102: orca.scmintegration.v1.ScmIntegrationService.AddIssueCommentBySlug:output_type -> orca.scmintegration.v1.ProjectComment
-	36, // 103: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueCommentBySlug:output_type -> orca.scmintegration.v1.ProjectComment
-	76, // 104: orca.scmintegration.v1.ScmIntegrationService.DeleteIssueCommentBySlug:output_type -> google.protobuf.Empty
-	63, // 105: orca.scmintegration.v1.ScmIntegrationService.ListMergeRequests:output_type -> orca.scmintegration.v1.ListMergeRequestsResponse
-	64, // 106: orca.scmintegration.v1.ScmIntegrationService.ResolveMergeRequestDiscussion:output_type -> orca.scmintegration.v1.MergeRequestDiscussion
-	67, // 107: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetails:output_type -> orca.scmintegration.v1.WorkItemDetailsGitLab
-	69, // 108: orca.scmintegration.v1.ScmIntegrationService.CheckHostedReviewEligibility:output_type -> orca.scmintegration.v1.HostedReviewEligibility
-	71, // 109: orca.scmintegration.v1.ScmIntegrationService.SetIntegrationCredential:output_type -> orca.scmintegration.v1.SetIntegrationCredentialResponse
-	73, // 110: orca.scmintegration.v1.ScmIntegrationService.GetIntegrationCredentialStatus:output_type -> orca.scmintegration.v1.GetIntegrationCredentialStatusResponse
-	75, // 111: orca.scmintegration.v1.ScmIntegrationService.ListIntegrationCredentials:output_type -> orca.scmintegration.v1.ListIntegrationCredentialsResponse
-	74, // [74:112] is the sub-list for method output_type
-	36, // [36:74] is the sub-list for method input_type
-	36, // [36:36] is the sub-list for extension type_name
-	36, // [36:36] is the sub-list for extension extendee
-	0,  // [0:36] is the sub-list for field type_name
+	3,  // 1: orca.scmintegration.v1.ListIssuesRequest.filter:type_name -> orca.scmintegration.v1.IssueFilter
+	2,  // 2: orca.scmintegration.v1.ListIssuesResponse.issues:type_name -> orca.scmintegration.v1.Issue
+	42, // 3: orca.scmintegration.v1.ListIssueCommentsBySlugResponse.comments:type_name -> orca.scmintegration.v1.ProjectComment
+	0,  // 4: orca.scmintegration.v1.GetLinkedPullRequestsForIssueRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	11, // 5: orca.scmintegration.v1.GetLinkedPullRequestsForIssueResponse.pull_requests:type_name -> orca.scmintegration.v1.PullRequest
+	0,  // 6: orca.scmintegration.v1.CreatePullRequestRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	11, // 7: orca.scmintegration.v1.CreatePullRequestResponse.pull_request:type_name -> orca.scmintegration.v1.PullRequest
+	0,  // 8: orca.scmintegration.v1.ListPullRequestsRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	11, // 9: orca.scmintegration.v1.ListPullRequestsResponse.pull_requests:type_name -> orca.scmintegration.v1.PullRequest
+	0,  // 10: orca.scmintegration.v1.GetRateLimitStatusRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 11: orca.scmintegration.v1.GetAuthStatusRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 12: orca.scmintegration.v1.StartOAuthFlowRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 13: orca.scmintegration.v1.CompleteOAuthFlowRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 14: orca.scmintegration.v1.RevokeAuthRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 15: orca.scmintegration.v1.MergePullRequestRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	11, // 16: orca.scmintegration.v1.MergePullRequestResponse.pull_request:type_name -> orca.scmintegration.v1.PullRequest
+	0,  // 17: orca.scmintegration.v1.RequestPullRequestReviewersRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 18: orca.scmintegration.v1.RemovePullRequestReviewersRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 19: orca.scmintegration.v1.SetPullRequestAutoMergeRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 20: orca.scmintegration.v1.UpdateIssueRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 21: orca.scmintegration.v1.GetPullRequestForBranchRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	11, // 22: orca.scmintegration.v1.GetPullRequestForBranchResponse.pull_request:type_name -> orca.scmintegration.v1.PullRequest
+	0,  // 23: orca.scmintegration.v1.ResolveRepoSlugRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	35, // 24: orca.scmintegration.v1.ProjectItem.fields:type_name -> orca.scmintegration.v1.ProjectFieldValue
+	35, // 25: orca.scmintegration.v1.WorkItemDetails.fields:type_name -> orca.scmintegration.v1.ProjectFieldValue
+	37, // 26: orca.scmintegration.v1.ListAccessibleProjectsResponse.projects:type_name -> orca.scmintegration.v1.Project
+	37, // 27: orca.scmintegration.v1.ResolveProjectRefResponse.project:type_name -> orca.scmintegration.v1.Project
+	38, // 28: orca.scmintegration.v1.ListProjectViewsResponse.views:type_name -> orca.scmintegration.v1.ProjectView
+	36, // 29: orca.scmintegration.v1.ViewProjectTableResponse.items:type_name -> orca.scmintegration.v1.ProjectItem
+	35, // 30: orca.scmintegration.v1.UpdateProjectItemFieldRequest.field:type_name -> orca.scmintegration.v1.ProjectFieldValue
+	39, // 31: orca.scmintegration.v1.ListIssueTypesBySlugResponse.issue_types:type_name -> orca.scmintegration.v1.IssueType
+	40, // 32: orca.scmintegration.v1.ListAssignableUsersBySlugResponse.users:type_name -> orca.scmintegration.v1.AssignableUser
+	41, // 33: orca.scmintegration.v1.ListLabelsBySlugResponse.labels:type_name -> orca.scmintegration.v1.Label
+	67, // 34: orca.scmintegration.v1.ListMergeRequestsResponse.merge_requests:type_name -> orca.scmintegration.v1.MergeRequest
+	0,  // 35: orca.scmintegration.v1.CheckHostedReviewEligibilityRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	11, // 36: orca.scmintegration.v1.HostedReviewEligibility.existing_pull_request:type_name -> orca.scmintegration.v1.PullRequest
+	0,  // 37: orca.scmintegration.v1.SetIntegrationCredentialRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 38: orca.scmintegration.v1.GetIntegrationCredentialStatusRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 39: orca.scmintegration.v1.ListIntegrationCredentialsResponse.configured_providers:type_name -> orca.scmintegration.v1.ScmProvider
+	0,  // 40: orca.scmintegration.v1.SubmitReviewRequest.provider:type_name -> orca.scmintegration.v1.ScmProvider
+	1,  // 41: orca.scmintegration.v1.SubmitReviewRequest.review_type:type_name -> orca.scmintegration.v1.ReviewType
+	85, // 42: orca.scmintegration.v1.SubmitReviewRequest.comments:type_name -> orca.scmintegration.v1.ReviewComment
+	1,  // 43: orca.scmintegration.v1.Review.state:type_name -> orca.scmintegration.v1.ReviewType
+	85, // 44: orca.scmintegration.v1.Review.comments:type_name -> orca.scmintegration.v1.ReviewComment
+	4,  // 45: orca.scmintegration.v1.ScmIntegrationService.ListIssues:input_type -> orca.scmintegration.v1.ListIssuesRequest
+	6,  // 46: orca.scmintegration.v1.ScmIntegrationService.ListIssueCommentsBySlug:input_type -> orca.scmintegration.v1.ListIssueCommentsBySlugRequest
+	8,  // 47: orca.scmintegration.v1.ScmIntegrationService.GetLinkedPullRequestsForIssue:input_type -> orca.scmintegration.v1.GetLinkedPullRequestsForIssueRequest
+	10, // 48: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:input_type -> orca.scmintegration.v1.CreatePullRequestRequest
+	13, // 49: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:input_type -> orca.scmintegration.v1.ListPullRequestsRequest
+	15, // 50: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:input_type -> orca.scmintegration.v1.GetRateLimitStatusRequest
+	17, // 51: orca.scmintegration.v1.ScmIntegrationService.GetAuthStatus:input_type -> orca.scmintegration.v1.GetAuthStatusRequest
+	19, // 52: orca.scmintegration.v1.ScmIntegrationService.StartOAuthFlow:input_type -> orca.scmintegration.v1.StartOAuthFlowRequest
+	21, // 53: orca.scmintegration.v1.ScmIntegrationService.CompleteOAuthFlow:input_type -> orca.scmintegration.v1.CompleteOAuthFlowRequest
+	23, // 54: orca.scmintegration.v1.ScmIntegrationService.RevokeAuth:input_type -> orca.scmintegration.v1.RevokeAuthRequest
+	25, // 55: orca.scmintegration.v1.ScmIntegrationService.MergePullRequest:input_type -> orca.scmintegration.v1.MergePullRequestRequest
+	27, // 56: orca.scmintegration.v1.ScmIntegrationService.RequestPullRequestReviewers:input_type -> orca.scmintegration.v1.RequestPullRequestReviewersRequest
+	28, // 57: orca.scmintegration.v1.ScmIntegrationService.RemovePullRequestReviewers:input_type -> orca.scmintegration.v1.RemovePullRequestReviewersRequest
+	29, // 58: orca.scmintegration.v1.ScmIntegrationService.SetPullRequestAutoMerge:input_type -> orca.scmintegration.v1.SetPullRequestAutoMergeRequest
+	30, // 59: orca.scmintegration.v1.ScmIntegrationService.UpdateIssue:input_type -> orca.scmintegration.v1.UpdateIssueRequest
+	31, // 60: orca.scmintegration.v1.ScmIntegrationService.GetPullRequestForBranch:input_type -> orca.scmintegration.v1.GetPullRequestForBranchRequest
+	33, // 61: orca.scmintegration.v1.ScmIntegrationService.ResolveRepoSlug:input_type -> orca.scmintegration.v1.ResolveRepoSlugRequest
+	44, // 62: orca.scmintegration.v1.ScmIntegrationService.ListAccessibleProjects:input_type -> orca.scmintegration.v1.ListAccessibleProjectsRequest
+	46, // 63: orca.scmintegration.v1.ScmIntegrationService.ResolveProjectRef:input_type -> orca.scmintegration.v1.ResolveProjectRefRequest
+	48, // 64: orca.scmintegration.v1.ScmIntegrationService.ListProjectViews:input_type -> orca.scmintegration.v1.ListProjectViewsRequest
+	50, // 65: orca.scmintegration.v1.ScmIntegrationService.ViewProjectTable:input_type -> orca.scmintegration.v1.ViewProjectTableRequest
+	52, // 66: orca.scmintegration.v1.ScmIntegrationService.UpdateProjectItemField:input_type -> orca.scmintegration.v1.UpdateProjectItemFieldRequest
+	53, // 67: orca.scmintegration.v1.ScmIntegrationService.ClearProjectItemField:input_type -> orca.scmintegration.v1.ClearProjectItemFieldRequest
+	54, // 68: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetailsBySlug:input_type -> orca.scmintegration.v1.GetWorkItemDetailsBySlugRequest
+	55, // 69: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueBySlug:input_type -> orca.scmintegration.v1.UpdateIssueBySlugRequest
+	56, // 70: orca.scmintegration.v1.ScmIntegrationService.UpdatePullRequestBySlug:input_type -> orca.scmintegration.v1.UpdatePullRequestBySlugRequest
+	57, // 71: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueTypeBySlug:input_type -> orca.scmintegration.v1.UpdateIssueTypeBySlugRequest
+	58, // 72: orca.scmintegration.v1.ScmIntegrationService.ListIssueTypesBySlug:input_type -> orca.scmintegration.v1.ListIssueTypesBySlugRequest
+	60, // 73: orca.scmintegration.v1.ScmIntegrationService.ListAssignableUsersBySlug:input_type -> orca.scmintegration.v1.ListAssignableUsersBySlugRequest
+	62, // 74: orca.scmintegration.v1.ScmIntegrationService.ListLabelsBySlug:input_type -> orca.scmintegration.v1.ListLabelsBySlugRequest
+	64, // 75: orca.scmintegration.v1.ScmIntegrationService.AddIssueCommentBySlug:input_type -> orca.scmintegration.v1.AddIssueCommentBySlugRequest
+	65, // 76: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueCommentBySlug:input_type -> orca.scmintegration.v1.UpdateIssueCommentBySlugRequest
+	66, // 77: orca.scmintegration.v1.ScmIntegrationService.DeleteIssueCommentBySlug:input_type -> orca.scmintegration.v1.DeleteIssueCommentBySlugRequest
+	68, // 78: orca.scmintegration.v1.ScmIntegrationService.ListMergeRequests:input_type -> orca.scmintegration.v1.ListMergeRequestsRequest
+	71, // 79: orca.scmintegration.v1.ScmIntegrationService.ResolveMergeRequestDiscussion:input_type -> orca.scmintegration.v1.ResolveMergeRequestDiscussionRequest
+	72, // 80: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetails:input_type -> orca.scmintegration.v1.GetWorkItemDetailsRequest
+	74, // 81: orca.scmintegration.v1.ScmIntegrationService.CheckHostedReviewEligibility:input_type -> orca.scmintegration.v1.CheckHostedReviewEligibilityRequest
+	76, // 82: orca.scmintegration.v1.ScmIntegrationService.SetIntegrationCredential:input_type -> orca.scmintegration.v1.SetIntegrationCredentialRequest
+	78, // 83: orca.scmintegration.v1.ScmIntegrationService.GetIntegrationCredentialStatus:input_type -> orca.scmintegration.v1.GetIntegrationCredentialStatusRequest
+	80, // 84: orca.scmintegration.v1.ScmIntegrationService.ListIntegrationCredentials:input_type -> orca.scmintegration.v1.ListIntegrationCredentialsRequest
+	83, // 85: orca.scmintegration.v1.ScmIntegrationService.ReceiveWebhook:input_type -> orca.scmintegration.v1.ReceiveWebhookRequest
+	86, // 86: orca.scmintegration.v1.ScmIntegrationService.SubmitReview:input_type -> orca.scmintegration.v1.SubmitReviewRequest
+	5,  // 87: orca.scmintegration.v1.ScmIntegrationService.ListIssues:output_type -> orca.scmintegration.v1.ListIssuesResponse
+	7,  // 88: orca.scmintegration.v1.ScmIntegrationService.ListIssueCommentsBySlug:output_type -> orca.scmintegration.v1.ListIssueCommentsBySlugResponse
+	9,  // 89: orca.scmintegration.v1.ScmIntegrationService.GetLinkedPullRequestsForIssue:output_type -> orca.scmintegration.v1.GetLinkedPullRequestsForIssueResponse
+	12, // 90: orca.scmintegration.v1.ScmIntegrationService.CreatePullRequest:output_type -> orca.scmintegration.v1.CreatePullRequestResponse
+	14, // 91: orca.scmintegration.v1.ScmIntegrationService.ListPullRequests:output_type -> orca.scmintegration.v1.ListPullRequestsResponse
+	16, // 92: orca.scmintegration.v1.ScmIntegrationService.GetRateLimitStatus:output_type -> orca.scmintegration.v1.GetRateLimitStatusResponse
+	18, // 93: orca.scmintegration.v1.ScmIntegrationService.GetAuthStatus:output_type -> orca.scmintegration.v1.GetAuthStatusResponse
+	20, // 94: orca.scmintegration.v1.ScmIntegrationService.StartOAuthFlow:output_type -> orca.scmintegration.v1.StartOAuthFlowResponse
+	22, // 95: orca.scmintegration.v1.ScmIntegrationService.CompleteOAuthFlow:output_type -> orca.scmintegration.v1.CompleteOAuthFlowResponse
+	24, // 96: orca.scmintegration.v1.ScmIntegrationService.RevokeAuth:output_type -> orca.scmintegration.v1.RevokeAuthResponse
+	26, // 97: orca.scmintegration.v1.ScmIntegrationService.MergePullRequest:output_type -> orca.scmintegration.v1.MergePullRequestResponse
+	11, // 98: orca.scmintegration.v1.ScmIntegrationService.RequestPullRequestReviewers:output_type -> orca.scmintegration.v1.PullRequest
+	11, // 99: orca.scmintegration.v1.ScmIntegrationService.RemovePullRequestReviewers:output_type -> orca.scmintegration.v1.PullRequest
+	11, // 100: orca.scmintegration.v1.ScmIntegrationService.SetPullRequestAutoMerge:output_type -> orca.scmintegration.v1.PullRequest
+	2,  // 101: orca.scmintegration.v1.ScmIntegrationService.UpdateIssue:output_type -> orca.scmintegration.v1.Issue
+	32, // 102: orca.scmintegration.v1.ScmIntegrationService.GetPullRequestForBranch:output_type -> orca.scmintegration.v1.GetPullRequestForBranchResponse
+	34, // 103: orca.scmintegration.v1.ScmIntegrationService.ResolveRepoSlug:output_type -> orca.scmintegration.v1.ResolveRepoSlugResponse
+	45, // 104: orca.scmintegration.v1.ScmIntegrationService.ListAccessibleProjects:output_type -> orca.scmintegration.v1.ListAccessibleProjectsResponse
+	47, // 105: orca.scmintegration.v1.ScmIntegrationService.ResolveProjectRef:output_type -> orca.scmintegration.v1.ResolveProjectRefResponse
+	49, // 106: orca.scmintegration.v1.ScmIntegrationService.ListProjectViews:output_type -> orca.scmintegration.v1.ListProjectViewsResponse
+	51, // 107: orca.scmintegration.v1.ScmIntegrationService.ViewProjectTable:output_type -> orca.scmintegration.v1.ViewProjectTableResponse
+	36, // 108: orca.scmintegration.v1.ScmIntegrationService.UpdateProjectItemField:output_type -> orca.scmintegration.v1.ProjectItem
+	36, // 109: orca.scmintegration.v1.ScmIntegrationService.ClearProjectItemField:output_type -> orca.scmintegration.v1.ProjectItem
+	43, // 110: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetailsBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
+	43, // 111: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
+	43, // 112: orca.scmintegration.v1.ScmIntegrationService.UpdatePullRequestBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
+	43, // 113: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueTypeBySlug:output_type -> orca.scmintegration.v1.WorkItemDetails
+	59, // 114: orca.scmintegration.v1.ScmIntegrationService.ListIssueTypesBySlug:output_type -> orca.scmintegration.v1.ListIssueTypesBySlugResponse
+	61, // 115: orca.scmintegration.v1.ScmIntegrationService.ListAssignableUsersBySlug:output_type -> orca.scmintegration.v1.ListAssignableUsersBySlugResponse
+	63, // 116: orca.scmintegration.v1.ScmIntegrationService.ListLabelsBySlug:output_type -> orca.scmintegration.v1.ListLabelsBySlugResponse
+	42, // 117: orca.scmintegration.v1.ScmIntegrationService.AddIssueCommentBySlug:output_type -> orca.scmintegration.v1.ProjectComment
+	42, // 118: orca.scmintegration.v1.ScmIntegrationService.UpdateIssueCommentBySlug:output_type -> orca.scmintegration.v1.ProjectComment
+	88, // 119: orca.scmintegration.v1.ScmIntegrationService.DeleteIssueCommentBySlug:output_type -> google.protobuf.Empty
+	69, // 120: orca.scmintegration.v1.ScmIntegrationService.ListMergeRequests:output_type -> orca.scmintegration.v1.ListMergeRequestsResponse
+	70, // 121: orca.scmintegration.v1.ScmIntegrationService.ResolveMergeRequestDiscussion:output_type -> orca.scmintegration.v1.MergeRequestDiscussion
+	73, // 122: orca.scmintegration.v1.ScmIntegrationService.GetWorkItemDetails:output_type -> orca.scmintegration.v1.WorkItemDetailsGitLab
+	75, // 123: orca.scmintegration.v1.ScmIntegrationService.CheckHostedReviewEligibility:output_type -> orca.scmintegration.v1.HostedReviewEligibility
+	77, // 124: orca.scmintegration.v1.ScmIntegrationService.SetIntegrationCredential:output_type -> orca.scmintegration.v1.SetIntegrationCredentialResponse
+	79, // 125: orca.scmintegration.v1.ScmIntegrationService.GetIntegrationCredentialStatus:output_type -> orca.scmintegration.v1.GetIntegrationCredentialStatusResponse
+	81, // 126: orca.scmintegration.v1.ScmIntegrationService.ListIntegrationCredentials:output_type -> orca.scmintegration.v1.ListIntegrationCredentialsResponse
+	84, // 127: orca.scmintegration.v1.ScmIntegrationService.ReceiveWebhook:output_type -> orca.scmintegration.v1.ReceiveWebhookResponse
+	87, // 128: orca.scmintegration.v1.ScmIntegrationService.SubmitReview:output_type -> orca.scmintegration.v1.Review
+	87, // [87:129] is the sub-list for method output_type
+	45, // [45:87] is the sub-list for method input_type
+	45, // [45:45] is the sub-list for extension type_name
+	45, // [45:45] is the sub-list for extension extendee
+	0,  // [0:45] is the sub-list for field type_name
 }
 
 func init() { file_orca_scmintegration_v1_scmintegration_proto_init() }
@@ -5447,16 +6393,16 @@ func file_orca_scmintegration_v1_scmintegration_proto_init() {
 	if File_orca_scmintegration_v1_scmintegration_proto != nil {
 		return
 	}
-	file_orca_scmintegration_v1_scmintegration_proto_msgTypes[23].OneofWrappers = []any{}
-	file_orca_scmintegration_v1_scmintegration_proto_msgTypes[48].OneofWrappers = []any{}
-	file_orca_scmintegration_v1_scmintegration_proto_msgTypes[49].OneofWrappers = []any{}
+	file_orca_scmintegration_v1_scmintegration_proto_msgTypes[28].OneofWrappers = []any{}
+	file_orca_scmintegration_v1_scmintegration_proto_msgTypes[53].OneofWrappers = []any{}
+	file_orca_scmintegration_v1_scmintegration_proto_msgTypes[54].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_scmintegration_v1_scmintegration_proto_rawDesc), len(file_orca_scmintegration_v1_scmintegration_proto_rawDesc)),
-			NumEnums:      1,
-			NumMessages:   75,
+			NumEnums:      2,
+			NumMessages:   86,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

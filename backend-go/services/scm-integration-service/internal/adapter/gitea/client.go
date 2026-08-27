@@ -297,3 +297,14 @@ func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo
 		return false, fmt.Errorf("gitea: branch exists: unexpected status %d", resp.StatusCode)
 	}
 }
+
+// GetLinkedPullRequestsForIssue — Gitea has no cross-reference/timeline API
+// equivalent to GitHub's; same placeholder posture as
+// MergePullRequest/ResolveRepoSlug above until wired.
+func (c *Client) GetLinkedPullRequestsForIssue(_ context.Context, _ usecase.Credential, _ string, _ int32) ([]domain.PullRequest, bool, error) {
+	return nil, false, nil
+}
+
+func (c *Client) SubmitReview(_ context.Context, _ usecase.Credential, _ string, _ int32, _ domain.ReviewInput) (domain.Review, error) {
+	return domain.Review{}, ErrCapabilityUnsupported
+}

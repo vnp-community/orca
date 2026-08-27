@@ -372,6 +372,8 @@ type fakeWorktreeRepository struct {
 	listErr          error
 	setActivationErr error
 	renameErr        error
+
+	enqueuedEvents []domain.OutboxEvent
 }
 
 func newFakeWorktreeRepository() *fakeWorktreeRepository {
@@ -394,6 +396,28 @@ func (f *fakeWorktreeRepository) RecordWorktreeRemoved(ctx context.Context, work
 		return domain.ErrWorktreeNotFound
 	}
 	delete(f.worktrees, worktreeID)
+	return nil
+}
+
+func (f *fakeWorktreeRepository) CreateWorktreeWithEvent(ctx context.Context, wt domain.Worktree, event domain.OutboxEvent) (domain.Worktree, error) {
+	if f.recordCreatedErr != nil {
+		return domain.Worktree{}, f.recordCreatedErr
+	}
+	f.worktrees[wt.ID] = wt
+	f.enqueuedEvents = append(f.enqueuedEvents, event)
+	return wt, nil
+}
+
+func (f *fakeWorktreeRepository) RemoveWorktreeWithEvent(ctx context.Context, worktreeID string, buildEvent func(domain.Worktree) domain.OutboxEvent) error {
+	if f.recordRemovedErr != nil {
+		return f.recordRemovedErr
+	}
+	wt, ok := f.worktrees[worktreeID]
+	if !ok {
+		return domain.ErrWorktreeNotFound
+	}
+	delete(f.worktrees, worktreeID)
+	f.enqueuedEvents = append(f.enqueuedEvents, buildEvent(wt))
 	return nil
 }
 

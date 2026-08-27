@@ -24,7 +24,7 @@ import (
 // COALESCE — COALESCE(uuid_col, ”) fails at parse time (Postgres unifies
 // the branch types to uuid and tries to parse ” as one), a latent bug this
 // change also fixes on dev_server_id, not just the new created_by column.
-const projectColumns = `id, tenant_id, name, COALESCE(dev_server_id::text, ''), description, default_branch, visibility, COALESCE(created_by::text, ''), created_at, updated_at`
+const projectColumns = `id, tenant_id, name, COALESCE(dev_server_id::text, ''), description, default_branch, visibility, COALESCE(created_by::text, ''), created_at, updated_at, issue_status_sync_enabled`
 
 // Repository implements usecase.ProjectRepository against Postgres via pgx
 // — hand-written SQL (see architecture/04-tech-stack.md: sqlc codegen is the
@@ -41,10 +41,10 @@ func New(pool *pgxpool.Pool) *Repository {
 
 func (r *Repository) Create(ctx context.Context, p domain.Project) (domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO project.projects (id, tenant_id, name, dev_server_id, description, default_branch, visibility, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+		INSERT INTO project.projects (id, tenant_id, name, dev_server_id, description, default_branch, visibility, created_by, issue_status_sync_enabled)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
 		RETURNING `+projectColumns,
-		p.ID, p.TenantID, p.Name, nullableString(p.DevServerID), p.Description, p.DefaultBranch, p.Visibility, nullableString(p.CreatedBy),
+		p.ID, p.TenantID, p.Name, nullableString(p.DevServerID), p.Description, p.DefaultBranch, p.Visibility, nullableString(p.CreatedBy), p.IssueStatusSyncEnabled,
 	)
 
 	out, err := scanProject(row)
@@ -145,14 +145,15 @@ func (r *Repository) UpdateDevServerID(ctx context.Context, tenantID, projectID,
 func (r *Repository) UpdateProject(ctx context.Context, tenantID, projectID string, patch domain.ProjectUpdatePatch) (domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE project.projects
-		SET name           = COALESCE(NULLIF($3, ''), name),
-		    description    = COALESCE(NULLIF($4, ''), description),
-		    default_branch = COALESCE(NULLIF($5, ''), default_branch),
-		    visibility     = COALESCE(NULLIF($6, ''), visibility),
-		    updated_at     = now()
+		SET name                       = COALESCE(NULLIF($3, ''), name),
+		    description                = COALESCE(NULLIF($4, ''), description),
+		    default_branch             = COALESCE(NULLIF($5, ''), default_branch),
+		    visibility                 = COALESCE(NULLIF($6, ''), visibility),
+		    issue_status_sync_enabled  = COALESCE($7, issue_status_sync_enabled),
+		    updated_at                 = now()
 		WHERE tenant_id = $1 AND id = $2
 		RETURNING `+projectColumns,
-		tenantID, projectID, patch.Name, patch.Description, patch.DefaultBranch, patch.Visibility,
+		tenantID, projectID, patch.Name, patch.Description, patch.DefaultBranch, patch.Visibility, patch.IssueStatusSyncEnabled,
 	)
 
 	out, err := scanProject(row)
@@ -280,7 +281,7 @@ func scanProject(row rowScanner) (domain.Project, error) {
 	var p domain.Project
 	if err := row.Scan(
 		&p.ID, &p.TenantID, &p.Name, &p.DevServerID, &p.Description, &p.DefaultBranch, &p.Visibility, &p.CreatedBy,
-		&p.CreatedAt, &p.UpdatedAt,
+		&p.CreatedAt, &p.UpdatedAt, &p.IssueStatusSyncEnabled,
 	); err != nil {
 		return domain.Project{}, err
 	}

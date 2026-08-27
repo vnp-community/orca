@@ -351,3 +351,16 @@ func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo
 		return false, fmt.Errorf("bitbucket: branch exists: unexpected status %d", resp.StatusCode)
 	}
 }
+
+// GetLinkedPullRequestsForIssue — Bitbucket Cloud has no cheap
+// "linked pull requests for an issue" query (its Issue Tracker and PR
+// systems aren't cross-referenced the way GitHub's timeline or GitLab's
+// related_merge_requests are); same placeholder posture as
+// MergePullRequest/ResolveRepoSlug above until wired.
+func (c *Client) GetLinkedPullRequestsForIssue(_ context.Context, _ usecase.Credential, _ string, _ int32) ([]domain.PullRequest, bool, error) {
+	return nil, false, nil
+}
+
+func (c *Client) SubmitReview(_ context.Context, _ usecase.Credential, _ string, _ int32, _ domain.ReviewInput) (domain.Review, error) {
+	return domain.Review{}, ErrCapabilityUnsupported
+}

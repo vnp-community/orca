@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -19,9 +20,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/policy"
 	"github.com/stablyai/orca-go/common/tracing"
 
@@ -80,6 +83,34 @@ func run() error {
 	projectGroupRepo := projectpostgres.NewProjectGroupRepository(pool)
 	folderWorkspaceRepo := projectpostgres.NewFolderWorkspaceRepository(pool)
 	hostSetupRepo := projectpostgres.NewHostSetupRepository(pool)
+	outboxRepo := projectpostgres.NewOutboxRepository(pool)
+
+	// Transactional-outbox relay (SOL-PI-03) — RecordWorktreeCreated/
+	// RecordWorktreeRemoved durably enqueue in the same transaction as
+	// their worktrees write (WorktreeRepository.CreateWorktreeWithEvent/
+	// RemoveWorktreeWithEvent); this relay is what actually gets those rows
+	// to NATS. Mirrors issue-tracking-service/cmd/server/main.go's own
+	// wiring exactly.
+	var relay *outbox.Relay
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "PROJECT", []string{"orca.project.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			relay = outbox.NewRelay(outboxRepo, pub, outbox.DefaultConfig, logger)
+		}
+	}
+	var relayWG sync.WaitGroup
+	if relay != nil {
+		relayWG.Add(1)
+		go func() {
+			defer relayWG.Done()
+			relay.Run(ctx)
+		}()
+	}
 
 	// Real clients — Epic C (docs/execution-plan.md §10, 2026-08-17) closed
 	// the gap these were previously stubs for. Dialed lazily (doesn't block
@@ -189,9 +220,9 @@ func run() error {
 		ListProjectGroups:  listProjectGroupsUC,
 
 		FolderWorkspaces: folderWorkspaceUC,
-		MoveProject:        moveProjectUC,
-		ScanNested:         scanNestedUC,
-		ImportNested:       importNestedUC,
+		MoveProject:      moveProjectUC,
+		ScanNested:       scanNestedUC,
+		ImportNested:     importNestedUC,
 
 		CreateHostSetup:     createHostSetupUC,
 		ListHostSetups:      listHostSetupsUC,
@@ -248,6 +279,8 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+
+	relayWG.Wait()
 
 	return nil
 }

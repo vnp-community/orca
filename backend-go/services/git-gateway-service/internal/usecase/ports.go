@@ -340,8 +340,34 @@ func dispatchFilesystemExecutor(ctx context.Context, resolver ConnectionResolver
 // real answer, until project-service grows one.
 type ProjectClient interface {
 	GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error)
-	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error)
+	// RecordWorktreeCreated's lineage param carries the linked-issue
+	// reference CreateWorktreeFromIssue resolved (SOL-PI-02) — a plain
+	// CreateWorktree call passes domain.WorktreeLineageCapture{}, which
+	// project-service's RPC now maps to "no linked issue".
+	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error)
 	RecordWorktreeRemoved(ctx context.Context, worktreeID string) error
+	// IsIssueStatusSyncEnabled reads project-service's per-project
+	// issue_status_sync_enabled flag (BR-PI-06/TASK-PI-02-06) via GetProject.
+	IsIssueStatusSyncEnabled(ctx context.Context, projectID string) (bool, error)
+}
+
+// IssueSourceClient abstracts scm-integration-service vs.
+// issue-tracking-service — resolved by the caller's oneof (ScmIssueRef vs
+// TrackerIssueRef).
+type IssueSourceClient interface {
+	GetIssue(ctx context.Context, ref domain.IssueRef) (domain.Issue, error)
+}
+
+// AgentSpawner wraps infra-fleet-service.SpawnTerminalSession (BL-AG-01's
+// agent.spawn) — git-gateway-service does not implement PTY spawn itself.
+// The follow-up prompt-injection write once the PTY reports idle is a
+// CONFIRMED GAP: infra-fleet-service's proto has no write/inject RPC yet
+// (only Spawn/Resize/Kill/Stop/List/Wait/Focus/GetStatus/Inspect) — see
+// internal/adapter/grpcclient/infrafleet_client.go's doc comment, same
+// "typed catchable gap, not fabricated behavior" posture as
+// internal/adapter/scmclient's confirmed proto gap.
+type AgentSpawner interface {
+	SpawnAndInject(ctx context.Context, worktreeID, cwd, prompt string) (sessionID string, err error)
 }
 
 // SCMClient wraps scm-integration-service's PR/MR base-branch lookups — a
