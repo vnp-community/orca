@@ -472,6 +472,13 @@ func (f *fakeProjectServiceClient) SetupExistingFolder(_ context.Context, in *pr
 	return f.setupExistingFolderResp, nil
 }
 
+// GetMobileWorktreeStatus (TASK-MB-04-03) is not exercised by this file's
+// httpgateway route tests — a minimal stub keeps fakeProjectServiceClient
+// satisfying the widened projectv1.ProjectServiceClient interface.
+func (f *fakeProjectServiceClient) GetMobileWorktreeStatus(_ context.Context, in *projectv1.GetMobileWorktreeStatusRequest, _ ...grpc.CallOption) (*projectv1.GetMobileWorktreeStatusResponse, error) {
+	return &projectv1.GetMobileWorktreeStatusResponse{}, nil
+}
+
 var _ projectv1.ProjectServiceClient = (*fakeProjectServiceClient)(nil)
 
 // projectTestRouter mounts mountProjectRoutes standalone (router.go isn't

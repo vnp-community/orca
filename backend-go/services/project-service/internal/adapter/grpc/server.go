@@ -61,6 +61,8 @@ type Server struct {
 	updateHostSetup     *usecase.UpdateHostSetup
 	deleteHostSetup     *usecase.DeleteHostSetup
 	setupExistingFolder *usecase.SetupExistingFolder
+
+	getMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
 }
 
 // Deps groups every usecase Server needs — a plain constructor with 20
@@ -106,6 +108,8 @@ type Deps struct {
 	UpdateHostSetup     *usecase.UpdateHostSetup
 	DeleteHostSetup     *usecase.DeleteHostSetup
 	SetupExistingFolder *usecase.SetupExistingFolder
+
+	GetMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
 }
 
 func New(deps Deps) *Server {
@@ -149,6 +153,8 @@ func New(deps Deps) *Server {
 		updateHostSetup:     deps.UpdateHostSetup,
 		deleteHostSetup:     deps.DeleteHostSetup,
 		setupExistingFolder: deps.SetupExistingFolder,
+
+		getMobileWorktreeStatus: deps.GetMobileWorktreeStatus,
 	}
 }
 
@@ -651,6 +657,27 @@ func (s *Server) GetFolderWorkspacePathStatus(ctx context.Context, req *projectv
 	return &projectv1.GetFolderWorkspacePathStatusResponse{
 		Status:                    result.Status,
 		ExistingFolderWorkspaceId: result.ExistingID,
+	}, nil
+}
+
+// GetMobileWorktreeStatus is BL-MB-04's ONE composed-read call — tenant_id/
+// user_id come from request-context metadata (see GetMobileWorktreeStatusRequest's
+// proto doc comment), not the (empty) request message.
+func (s *Server) GetMobileWorktreeStatus(ctx context.Context, req *projectv1.GetMobileWorktreeStatusRequest) (*projectv1.GetMobileWorktreeStatusResponse, error) {
+	result, err := s.getMobileWorktreeStatus.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.MobileWorktreeStatus, 0, len(result.Worktrees))
+	for _, wt := range result.Worktrees {
+		out = append(out, &projectv1.MobileWorktreeStatus{
+			Id: wt.ID, Name: wt.Name, Agent: wt.Agent, Status: wt.Status,
+			DurationMs: wt.DurationMs, LastOutput: wt.LastOutput,
+		})
+	}
+	return &projectv1.GetMobileWorktreeStatusResponse{
+		Worktrees:         out,
+		GeneratedAtUnixMs: result.GeneratedAt.UnixMilli(),
 	}, nil
 }
 
