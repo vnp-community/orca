@@ -2,8 +2,10 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/tenant-service/internal/domain"
 )
 
@@ -21,13 +23,28 @@ type UpdateCompany struct {
 	profiles     UserProfileRepository
 	cache        ProfileCache
 	invalidation CacheInvalidationPublisher
+	opa          OPAClient      // NEW
+	audit        AuditPublisher // NEW
 }
 
-func NewUpdateCompany(companies CompanyRepository, profiles UserProfileRepository, cache ProfileCache, invalidation CacheInvalidationPublisher) *UpdateCompany {
-	return &UpdateCompany{companies: companies, profiles: profiles, cache: cache, invalidation: invalidation}
+func NewUpdateCompany(companies CompanyRepository, profiles UserProfileRepository, cache ProfileCache, invalidation CacheInvalidationPublisher, opa OPAClient, audit AuditPublisher) *UpdateCompany {
+	return &UpdateCompany{companies: companies, profiles: profiles, cache: cache, invalidation: invalidation, opa: opa, audit: audit}
 }
 
 func (uc *UpdateCompany) Execute(ctx context.Context, in UpdateCompanyInput) (domain.Company, error) {
+	if err := requireCompanyAdmin(ctx, uc.opa); err != nil {
+		return domain.Company{}, err
+	}
+	if in.Patch.SettingsJSON != "" {
+		var settings domain.Settings
+		if err := json.Unmarshal([]byte(in.Patch.SettingsJSON), &settings); err != nil {
+			return domain.Company{}, apperrors.New(apperrors.KindInvalidArgument, "TENANT_INVALID_SETTINGS_JSON", "malformed settings_json", err)
+		}
+		if err := domain.ValidateCompanySettings(settings); err != nil {
+			return domain.Company{}, apperrors.New(apperrors.KindInvalidArgument, "TENANT_INVALID_COMPANY_SETTINGS", err.Error(), err)
+		}
+	}
+
 	company, found, err := uc.companies.Update(ctx, in.ID, in.Patch)
 	if err != nil {
 		return domain.Company{}, apperrors.New(apperrors.KindInternal, "TENANT_UPDATE_COMPANY_FAILED", "failed to update company", err)
@@ -47,6 +64,11 @@ func (uc *UpdateCompany) Execute(ctx context.Context, in UpdateCompanyInput) (do
 		if uc.invalidation != nil {
 			_ = uc.invalidation.PublishProfileInvalidated(ctx, in.ID, uid)
 		}
+	}
+
+	if uc.audit != nil {
+		actorID, _ := tenant.UserID(ctx)
+		_ = uc.audit.PublishAuditEvent(ctx, in.ID, actorID, "company.profile.updated", in.ID)
 	}
 	return company, nil
 }

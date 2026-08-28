@@ -15,6 +15,7 @@ package usecase
 import (
 	"context"
 
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
 
@@ -34,6 +35,12 @@ type ResolvedConnection struct {
 	Connected    bool
 	ConnectionID string
 	RepoPath     string
+	// Mode is empty when Connected is false (host-local — the distinction
+	// doesn't apply). Populated from infra-fleet-service's
+	// ResolveConnectionResponse.dev_server.mode. Added SOL-PW-03 to gate
+	// the merge/stash/branch-write/push-stream operations Part B
+	// (relay-ssh) genuinely does not support.
+	Mode infrafleetv1.ConnectionMode
 }
 
 // ConnectionResolver resolves which host owns a worktree, by calling
@@ -166,8 +173,10 @@ type GitExecutor interface {
 	WriteIssueCommand(ctx context.Context, repoPath, content string) error
 	ScanSetupScriptImports(ctx context.Context, repoPath string) (importedPaths []string, err error)
 
-	// New, SOL-031 (TASK-193):
-	CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error)
+	// New, SOL-031 (TASK-193). targetPath, if non-empty, overrides the
+	// default repoPath+"-"+sanitize(branch) convention — see SOL-WT-01's
+	// custom name/path input support.
+	CreateWorktree(ctx context.Context, repoPath, branch, baseRef, targetPath string) (domain.WorktreeCreateResult, error)
 	RemoveWorktree(ctx context.Context, worktreePath string, force bool) error
 	// FetchAndResolveRef ensures ref is fetched/up to date in repoPath's
 	// local clone and returns its resolved SHA — shared by
@@ -223,6 +232,14 @@ type GitExecutor interface {
 	RebaseFromBase(ctx context.Context, repoPath, baseRef string) (domain.RebaseResult, error)
 	AbortRebase(ctx context.Context, repoPath string) (domain.SimpleResult, error)
 	AbortMerge(ctx context.Context, repoPath string) (domain.SimpleResult, error)
+	// MergeBranch runs `git merge --no-ff <branch>` ("merge" strategy) or
+	// `git merge --squash <branch>` followed by a commit ("squash"
+	// strategy). NEVER called for the "rebase" strategy — see
+	// MergeWorktreeIntoBase.Execute, which composes RebaseFromBase+FastForward
+	// for that case instead. A real conflict is a domain outcome
+	// (HasConflicts=true), not a Go error — same posture as
+	// RebaseFromBase/Pull's conflict handling.
+	MergeBranch(ctx context.Context, repoPath, branch, strategy, commitMessage string) (domain.MergeResult, error)
 	// ConflictOperation is a DETECTOR ONLY, matching the real agent exactly
 	// — returns which operation (if any) left repoPath conflicted
 	// ("merge"/"rebase"/"cherry-pick"/"unknown"). See ResolveConflict below
@@ -236,6 +253,41 @@ type GitExecutor interface {
 	ResolveConflict(ctx context.Context, repoPath, path, operation string) (domain.SimpleResult, error)
 	Discard(ctx context.Context, repoPath, path string) (domain.SimpleResult, error)
 	BulkDiscard(ctx context.Context, repoPath string, paths []string) (domain.BulkDiscardResult, error)
+
+	// ── SOL-PW-03 — merge/stash/branch-write. Only reachable when the
+	// usecase layer's ConnectionResolver check confirms the target is not
+	// a relay-ssh connection; RelayExecutor's implementations do not
+	// re-check mode themselves. ─────────────────────────────────────────
+	// MergeIntoBranch — named distinctly from MergeBranch above (SOL-WT-05's
+	// worktree-into-base merge): this merges an arbitrary branch INTO the
+	// current branch, a different operation with a different result shape.
+	MergeIntoBranch(ctx context.Context, repoPath, branch string, noFF bool) (domain.MergeOutcome, error)
+	StashPush(ctx context.Context, repoPath, message string, includeUntracked bool) (domain.SimpleResult, error)
+	StashPop(ctx context.Context, repoPath, stashRef string) (domain.MergeOutcome, error) // reuses MergeOutcome's had_conflicts shape
+	CreateBranch(ctx context.Context, repoPath, branch, baseRef string, checkout bool) (string, error)
+	DeleteBranch(ctx context.Context, repoPath, branch string) error // soft; ForceDeleteBranch (existing) stays the -D path
+}
+
+// StreamingGitExecutor performs push/pull with incremental progress
+// (TASK-PW-03-08, SOL-PW-03) — a separate port from GitExecutor rather than
+// two more methods bolted onto that already-large interface, since only
+// PushStream/PullStream need it and only two of GitExecutor's two
+// implementations have a real streaming story:
+//   - internal/adapter/localgit: os/exec's Stdout/Stderr piped line-by-line
+//     as they arrive, via a real `git push`/`git pull` subprocess.
+//   - internal/adapter/grpcclient: relays to infra-fleet-service's
+//     RelayStream RPC, which relays to the agent's git.execStream — see
+//     usecase.PushStream/PullStream's doc comments for the relay-ssh
+//     restriction this port's callers must check BEFORE calling either
+//     method below (RelayStream itself does not re-check connection mode).
+//
+// sink is called once per line, in order; the final call always has
+// IsFinal=true and carries the unary-equivalent outcome. Returning a
+// non-nil error from sink aborts the operation (mirrors
+// usecase.RelayStream.Execute's own sink-abort contract).
+type StreamingGitExecutor interface {
+	PushStream(ctx context.Context, repoPath, remote, branch string, sink func(domain.GitProgressLine) error) error
+	PullStream(ctx context.Context, repoPath string, sink func(domain.GitProgressLine) error) error
 }
 
 // DevServerReachability resolves whether devServerID is a live,
@@ -340,8 +392,65 @@ func dispatchFilesystemExecutor(ctx context.Context, resolver ConnectionResolver
 // real answer, until project-service grows one.
 type ProjectClient interface {
 	GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error)
-	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error)
+	// RecordWorktreeCreated's lineage param carries the linked-issue
+	// reference CreateWorktreeFromIssue resolved (SOL-PI-02) — a plain
+	// CreateWorktree call passes domain.WorktreeLineageCapture{}, which
+	// project-service's RPC now maps to "no linked issue". baseRef is
+	// forwarded onto RecordWorktreeCreatedRequest.base_ref (SOL-WT-04's
+	// base_ref backfill) — the branch/tag/sha this worktree was created
+	// from, so it can later be persisted and used by CompareWorktrees'
+	// BR-WT-13 check.
+	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch, baseRef string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error)
 	RecordWorktreeRemoved(ctx context.Context, worktreeID string) error
+	// FindWorktreeByIdempotencyKey backs BR-CLI-01 — see CreateWorktree.Execute.
+	// found=false, err=nil means "no match yet".
+	FindWorktreeByIdempotencyKey(ctx context.Context, projectID, idempotencyKey string) (domain.WorktreeRecord, bool, error)
+	// IsIssueStatusSyncEnabled reads project-service's per-project
+	// issue_status_sync_enabled flag (BR-PI-06/TASK-PI-02-06) via GetProject.
+	IsIssueStatusSyncEnabled(ctx context.Context, projectID string) (bool, error)
+	// ListWorktrees backs BR-WT-04's count cap (max 20 active worktrees per
+	// repo) — project-service.ListWorktrees(project_id) already exists
+	// (proto/orca/project/v1/project.proto); this is a new call on an
+	// existing RPC, not a new proto surface.
+	ListWorktrees(ctx context.Context, projectID string) ([]domain.WorktreeRecord, error)
+	// GetWorktree wraps project-service's new GetWorktree RPC (added
+	// alongside base_ref persistence) — CompareWorktrees uses it to look up
+	// each compared worktree's repo_id/branch/base_ref.
+	GetWorktree(ctx context.Context, worktreeID string) (domain.WorktreeInfo, error)
+}
+
+// TerminalSessionLister wraps infra-fleet-service's ListTerminalSessions/
+// KillTerminalSession — both already-real RPCs (infra-fleet-service.md
+// :131-132) — reusing the existing git-gateway-service --> infra-fleet-service
+// dependency edge (git-gateway-service.md §7), not a new one.
+type TerminalSessionLister interface {
+	ListSessions(ctx context.Context, connectionID string) ([]domain.TerminalSessionRef, error)
+	Kill(ctx context.Context, ptyID string) error
+}
+
+// ScrollbackCleaner wraps infra-fleet-service's DeleteTerminalScrollbackSnapshots
+// RPC — called best-effort by RemoveWorktree; see that usecase's doc comment.
+type ScrollbackCleaner interface {
+	DeleteTerminalScrollbackSnapshots(ctx context.Context, worktreeID string) error
+}
+
+// IssueSourceClient abstracts scm-integration-service vs.
+// issue-tracking-service — resolved by the caller's oneof (ScmIssueRef vs
+// TrackerIssueRef).
+type IssueSourceClient interface {
+	GetIssue(ctx context.Context, ref domain.IssueRef) (domain.Issue, error)
+}
+
+// AgentSpawner wraps infra-fleet-service.SpawnTerminalSession (BL-AG-01's
+// agent.spawn) — git-gateway-service does not implement PTY spawn itself.
+// The follow-up prompt-injection write once the PTY reports idle is a
+// CONFIRMED GAP: infra-fleet-service's proto has no write/inject RPC yet
+// (only Spawn/Resize/Kill/Stop/List/Wait/Focus/GetStatus/Inspect) — see
+// internal/adapter/grpcclient/infrafleet_client.go's doc comment, same
+// "typed catchable gap, not fabricated behavior" posture as
+// internal/adapter/scmclient's confirmed proto gap.
+type AgentSpawner interface {
+	SpawnAndInject(ctx context.Context, worktreeID, cwd, prompt string) (sessionID string, err error)
 }
 
 // SCMClient wraps scm-integration-service's PR/MR base-branch lookups — a
@@ -361,6 +470,21 @@ type ProjectClient interface {
 type SCMClient interface {
 	GetPullRequestBase(ctx context.Context, repoID string, prNumber int32) (baseBranch, baseSHA string, err error)
 	GetMergeRequestBase(ctx context.Context, repoID string, mrNumber int32) (baseBranch, baseSHA string, err error)
+	// GetPullRequestForBranch looks up the open pull/merge request (if any)
+	// for branch — BR-AT-12's open-PR safety check. found=false (not an
+	// error) means no PR exists for branch; a non-nil err means the lookup
+	// itself failed (e.g. no SCM integration configured for this repo) —
+	// callers fail OPEN on err, per RemoveWorktree.Execute's doc comment.
+	GetPullRequestForBranch(ctx context.Context, tenantID, branch string) (PullRequestInfo, bool, error)
+}
+
+// PullRequestInfo is the minimal PR/MR shape BR-AT-12's open-PR check
+// needs — State is compared against "open" (case-sensitive, matching
+// scm-integration-service's PullRequest.state wire value).
+type PullRequestInfo struct {
+	URL    string
+	State  string
+	Number int32
 }
 
 // dispatchExecutor is the resolve-and-dispatch logic every RPC-shaped

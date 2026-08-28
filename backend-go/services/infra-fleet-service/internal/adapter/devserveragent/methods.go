@@ -43,6 +43,17 @@ func (c *Client) SpawnPty(ctx context.Context, devServer domain.DevServer, in us
 	if in.Rows > 0 {
 		params["rows"] = in.Rows
 	}
+	if in.ShellIntegration {
+		params["shellIntegration"] = in.ShellIntegration
+	}
+	// command/userId engage pty-handler.ts's gh/glab-prefix env-isolation
+	// branch (TASK-INT-01-01) — see SpawnPtyInput's doc comment.
+	if in.Command != "" {
+		params["command"] = in.Command
+	}
+	if in.UserID != "" {
+		params["userId"] = in.UserID
+	}
 
 	raw, err := sess.call(ctx, "pty.create", params)
 	if err != nil {

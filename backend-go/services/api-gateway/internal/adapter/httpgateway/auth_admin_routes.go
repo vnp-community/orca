@@ -40,9 +40,10 @@ func mountAuthAdminRoutes(r chi.Router, client authv1.AuthServiceClient) {
 // validated Identity of the acting admin, never trusted from the request
 // body, matching every existing handler in usage_routes.go/task_routes.go.
 type createUserRequestBody struct {
-	Email string `json:"email"`
-	Name  string `json:"name"`
-	Role  string `json:"role"`
+	Email    string `json:"email"`
+	Name     string `json:"name"`
+	Role     string `json:"role"`
+	Password string `json:"password"`
 }
 
 func handleCreateUser(client authv1.AuthServiceClient) http.HandlerFunc {
@@ -61,6 +62,7 @@ func handleCreateUser(client authv1.AuthServiceClient) http.HandlerFunc {
 			Name:     body.Name,
 			TenantId: identity.TenantID,
 			Role:     parseRole(body.Role),
+			Password: body.Password,
 		})
 		if err != nil {
 			writeGRPCError(w, err)
@@ -163,6 +165,8 @@ func handleQueryAuditLog(client authv1.AuthServiceClient) http.HandlerFunc {
 			TenantId:  identity.TenantID,
 			PageToken: q.Get("page_token"),
 			PageSize:  pageSize,
+			Action:    q.Get("action"),
+			ActorId:   q.Get("userId"), // "userId" matches the spec's literal query param name
 		}
 		if v := q.Get("since"); v != "" {
 			since, err := time.Parse(time.RFC3339, v)
@@ -171,6 +175,14 @@ func handleQueryAuditLog(client authv1.AuthServiceClient) http.HandlerFunc {
 				return
 			}
 			req.Since = timestamppb.New(since)
+		}
+		if v := q.Get("to"); v != "" {
+			to, err := time.Parse(time.RFC3339, v)
+			if err != nil {
+				writeJSONError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "to must be an RFC3339 timestamp")
+				return
+			}
+			req.To = timestamppb.New(to)
 		}
 
 		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)

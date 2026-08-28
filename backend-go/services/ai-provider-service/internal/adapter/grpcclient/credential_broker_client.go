@@ -99,6 +99,20 @@ func (c *CredentialBrokerClient) ResolveCredential(ctx context.Context, credenti
 	return toCredentialRef(resp.GetMetadata()), nil
 }
 
+// RevokeCredential asks credential-broker-service to revoke credentialRef —
+// used by CreateAccount's test-before-save rollback path (TASK-AIP-01-06)
+// when a just-written credential fails its live connection test. Never
+// touches a secret value; the broker handles Vault revocation on its own
+// side of this call.
+func (c *CredentialBrokerClient) RevokeCredential(ctx context.Context, credentialRef string) error {
+	if _, err := c.client.RevokeCredential(ctx, &credentialbrokerv1.RevokeCredentialRequest{
+		CredentialId: credentialRef,
+	}); err != nil {
+		return fmt.Errorf("grpcclient: credential-broker-service RevokeCredential: %w", err)
+	}
+	return nil
+}
+
 func toCredentialRef(m *credentialbrokerv1.CredentialMetadata) usecase.CredentialRef {
 	return usecase.CredentialRef{ID: m.GetId(), Status: m.GetStatus()}
 }

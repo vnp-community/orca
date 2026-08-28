@@ -3,6 +3,7 @@ go 1.25.0
 use (
 	./common
 	./proto
+	./cmd/orca-cli
 	./services/ai-provider-service
 	./services/annotation-service
 	./services/api-gateway
@@ -11,6 +12,7 @@ use (
 	./services/credential-broker-service
 	./services/git-gateway-service
 	./services/infra-fleet-service
+	./services/issue-status-sync
 	./services/issue-tracking-service
 	./services/notification-service
 	./services/orchestration-service

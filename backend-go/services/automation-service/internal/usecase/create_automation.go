@@ -11,6 +11,10 @@ import (
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
 )
 
+// maxAutomationsPerProject caps a project at 20 automations — BR-AT-02.
+// ProjectID == "" (unscoped/back-compat) skips the cap.
+const maxAutomationsPerProject = 20
+
 // CreateAutomationInput mirrors the gRPC request 1:1 by design — see
 // architecture/03's note that usecase granularity mirrors today's RPC
 // methods so the TS->Go mapping stays traceable. TenantID is NOT trusted
@@ -18,12 +22,20 @@ import (
 // wire strings (RFC3339 / IANA tz name); empty means "default" — see
 // Execute for the resolution rules.
 type CreateAutomationInput struct {
-	Name           string
-	RRule          string
+	Name      string
+	RRule     string
+	ProjectID string // BR-AT-02; empty = unscoped
+	// Actions is the preferred way to specify what this automation runs —
+	// BR-AT-01. StepType/StepConfigJSON below are the deprecated
+	// single-step back-compat path, used only when Actions is empty.
+	Actions        []domain.AutomationAction
 	StepType       domain.StepType
 	StepConfigJSON string
 	DTStart        string // RFC3339; empty = defaults to now
 	Timezone       string // IANA tz name; empty = UTC
+	TriggerType    domain.TriggerType
+	TriggerEvent   domain.EventName
+	TriggerFilter  *domain.TriggerFilter
 }
 
 // CreateAutomation is automation-service's definition-creation path.
@@ -66,12 +78,50 @@ func (uc *CreateAutomation) Execute(ctx context.Context, in CreateAutomationInpu
 		dtstart = dtstart.In(loc)
 	}
 
+	// BR-AT-02 — per-project cap, skipped for unscoped (ProjectID == "")
+	// automations.
+	if in.ProjectID != "" {
+		count, err := uc.repo.CountByProject(ctx, tenantID, in.ProjectID)
+		if err != nil {
+			return domain.Automation{}, apperrors.New(apperrors.KindInternal, "AUTOMATION_COUNT_FAILED", "failed to count existing automations", err)
+		}
+		if count >= maxAutomationsPerProject {
+			return domain.Automation{}, apperrors.New(apperrors.KindFailedPrecondition, "AUTOMATION_PROJECT_LIMIT_EXCEEDED", "project already has 20 automations", nil)
+		}
+	}
+
 	// New automations default enabled=true — the generated
 	// CreateAutomationRequest has no enabled field (Automation does; see
 	// automation.proto), so there is nothing on the wire to read here.
-	automation, err := domain.NewAutomation(uuid.NewString(), tenantID, in.Name, in.RRule, in.StepType, in.StepConfigJSON, dtstart, timezone, true, now)
+	automation, err := domain.NewAutomation(domain.NewAutomationParams{
+		ID:             uuid.NewString(),
+		TenantID:       tenantID,
+		ProjectID:      in.ProjectID,
+		Name:           in.Name,
+		RRule:          in.RRule,
+		Actions:        in.Actions,
+		StepType:       in.StepType,
+		StepConfigJSON: in.StepConfigJSON,
+		DTStart:        dtstart,
+		Timezone:       timezone,
+		Enabled:        true,
+		CreatedAt:      now,
+		TriggerType:    in.TriggerType,
+		TriggerEvent:   in.TriggerEvent,
+		TriggerFilter:  in.TriggerFilter,
+	})
 	if err != nil {
 		return domain.Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID", err.Error(), err)
+	}
+
+	// BR-AT-10/BR-AT-04 — reject a create that would introduce a cycle in
+	// the event-triggered automation graph. Only meaningful for
+	// event-triggered automations; DetectTriggerCycle is a no-op graph
+	// build otherwise (cron/manual automations never add edges).
+	if automation.TriggerType == domain.TriggerTypeEvent {
+		if err := DetectTriggerCycle(ctx, uc.repo, tenantID, automation); err != nil {
+			return domain.Automation{}, err
+		}
 	}
 
 	// Compute the FIRST next_run_at from rrule+dtstart so the scheduler has

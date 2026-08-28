@@ -29,19 +29,21 @@ type Server struct {
 	commit                *usecase.Commit
 	push                  *usecase.Push
 	pull                  *usecase.Pull
+	pushStream            *usecase.PushStream
+	pullStream            *usecase.PullStream
 	generateCommitMessage *usecase.GenerateCommitMessage
 
 	stage   *usecase.Stage
 	unstage *usecase.Unstage
 
-	history        *usecase.History
-	checkIgnored   *usecase.CheckIgnored
-	forkSync       *usecase.ForkSync
-	upstreamStatus *usecase.UpstreamStatus
-	commitCompare  *usecase.CommitCompare
-	branchCompare  *usecase.BranchCompare
-	commitDiff     *usecase.CommitDiff
-	branchDiff     *usecase.BranchDiff
+	history         *usecase.History
+	checkIgnored    *usecase.CheckIgnored
+	forkSync        *usecase.ForkSync
+	upstreamStatus  *usecase.UpstreamStatus
+	commitCompare   *usecase.CommitCompare
+	branchCompare   *usecase.BranchCompare
+	commitDiff      *usecase.CommitDiff
+	branchDiff      *usecase.BranchDiff
 	submoduleStatus *usecase.SubmoduleStatus
 
 	remoteCommitURL *usecase.RemoteCommitURL
@@ -76,25 +78,38 @@ type Server struct {
 	scanSetupScriptImports *usecase.ScanSetupScriptImports
 
 	// New, SOL-031 (TASK-192/193/194):
-	createWorktree     *usecase.CreateWorktree
-	removeWorktree     *usecase.RemoveWorktree
-	forceDeleteBranch  *usecase.ForceDeleteBranch
-	detectWorktrees    *usecase.DetectWorktrees
-	prefetchCreateBase *usecase.PrefetchCreateBase
-	resolvePrBase      *usecase.ResolvePrBase
-	resolveMrBase      *usecase.ResolveMrBase
+	createWorktree          *usecase.CreateWorktree
+	createWorktreeFromIssue *usecase.CreateWorktreeFromIssue
+	removeWorktree          *usecase.RemoveWorktree
+	forceDeleteBranch       *usecase.ForceDeleteBranch
+	detectWorktrees         *usecase.DetectWorktrees
+	prefetchCreateBase      *usecase.PrefetchCreateBase
+	resolvePrBase           *usecase.ResolvePrBase
+	resolveMrBase           *usecase.ResolveMrBase
 
 	// Group A — branch/ref operations (TASK-207)
-	checkout           *usecase.Checkout
-	listLocalBranches  *usecase.ListLocalBranches
-	fastForward        *usecase.FastForward
-	rebaseFromBase     *usecase.RebaseFromBase
-	abortRebase        *usecase.AbortRebase
-	abortMerge         *usecase.AbortMerge
-	conflictOperation  *usecase.ConflictOperation
-	resolveConflict    *usecase.ResolveConflict
-	discard            *usecase.Discard
-	bulkDiscard        *usecase.BulkDiscard
+	checkout          *usecase.Checkout
+	listLocalBranches *usecase.ListLocalBranches
+	fastForward       *usecase.FastForward
+	rebaseFromBase    *usecase.RebaseFromBase
+	abortRebase       *usecase.AbortRebase
+	abortMerge        *usecase.AbortMerge
+	conflictOperation *usecase.ConflictOperation
+	resolveConflict   *usecase.ResolveConflict
+	discard           *usecase.Discard
+	bulkDiscard       *usecase.BulkDiscard
+
+	// New, SOL-WT-03/04/05 (logic-v1):
+	checkWorktreeDeleteSafety *usecase.CheckWorktreeDeleteSafety
+	compareWorktrees          *usecase.CompareWorktrees
+	mergeWorktreeIntoBase     *usecase.MergeWorktreeIntoBase
+
+	// SOL-PW-03 — merge/stash/branch-write
+	mergeIntoBranch *usecase.MergeBranch
+	stashPush       *usecase.StashPush
+	stashPop        *usecase.StashPop
+	createBranch    *usecase.CreateBranch
+	deleteBranch    *usecase.DeleteBranch
 }
 
 // New wires every usecase this server dispatches to. Parameter order
@@ -106,6 +121,8 @@ func New(
 	commit *usecase.Commit,
 	push *usecase.Push,
 	pull *usecase.Pull,
+	pushStream *usecase.PushStream,
+	pullStream *usecase.PullStream,
 	generateCommitMessage *usecase.GenerateCommitMessage,
 	stage *usecase.Stage,
 	unstage *usecase.Unstage,
@@ -146,6 +163,7 @@ func New(
 	writeIssueCommand *usecase.WriteIssueCommand,
 	scanSetupScriptImports *usecase.ScanSetupScriptImports,
 	createWorktree *usecase.CreateWorktree,
+	createWorktreeFromIssue *usecase.CreateWorktreeFromIssue,
 	removeWorktree *usecase.RemoveWorktree,
 	forceDeleteBranch *usecase.ForceDeleteBranch,
 	detectWorktrees *usecase.DetectWorktrees,
@@ -162,6 +180,14 @@ func New(
 	resolveConflict *usecase.ResolveConflict,
 	discard *usecase.Discard,
 	bulkDiscard *usecase.BulkDiscard,
+	checkWorktreeDeleteSafety *usecase.CheckWorktreeDeleteSafety,
+	compareWorktrees *usecase.CompareWorktrees,
+	mergeWorktreeIntoBase *usecase.MergeWorktreeIntoBase,
+	mergeIntoBranch *usecase.MergeBranch,
+	stashPush *usecase.StashPush,
+	stashPop *usecase.StashPop,
+	createBranch *usecase.CreateBranch,
+	deleteBranch *usecase.DeleteBranch,
 ) *Server {
 	return &Server{
 		getStatus:                   getStatus,
@@ -169,6 +195,8 @@ func New(
 		commit:                      commit,
 		push:                        push,
 		pull:                        pull,
+		pushStream:                  pushStream,
+		pullStream:                  pullStream,
 		generateCommitMessage:       generateCommitMessage,
 		stage:                       stage,
 		unstage:                     unstage,
@@ -210,13 +238,14 @@ func New(
 		writeIssueCommand:      writeIssueCommand,
 		scanSetupScriptImports: scanSetupScriptImports,
 
-		createWorktree:     createWorktree,
-		removeWorktree:     removeWorktree,
-		forceDeleteBranch:  forceDeleteBranch,
-		detectWorktrees:    detectWorktrees,
-		prefetchCreateBase: prefetchCreateBase,
-		resolvePrBase:      resolvePrBase,
-		resolveMrBase:      resolveMrBase,
+		createWorktree:          createWorktree,
+		createWorktreeFromIssue: createWorktreeFromIssue,
+		removeWorktree:          removeWorktree,
+		forceDeleteBranch:       forceDeleteBranch,
+		detectWorktrees:         detectWorktrees,
+		prefetchCreateBase:      prefetchCreateBase,
+		resolvePrBase:           resolvePrBase,
+		resolveMrBase:           resolveMrBase,
 
 		checkout:          checkout,
 		listLocalBranches: listLocalBranches,
@@ -228,6 +257,16 @@ func New(
 		resolveConflict:   resolveConflict,
 		discard:           discard,
 		bulkDiscard:       bulkDiscard,
+
+		checkWorktreeDeleteSafety: checkWorktreeDeleteSafety,
+		compareWorktrees:          compareWorktrees,
+		mergeWorktreeIntoBase:     mergeWorktreeIntoBase,
+
+		mergeIntoBranch: mergeIntoBranch,
+		stashPush:       stashPush,
+		stashPop:        stashPop,
+		createBranch:    createBranch,
+		deleteBranch:    deleteBranch,
 	}
 }
 
@@ -282,6 +321,48 @@ func (s *Server) Pull(ctx context.Context, req *gitgatewayv1.PullRequest) (*gitg
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.PullResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
+}
+
+// PushStream is Push's incremental-progress counterpart (TASK-PW-03-08,
+// SOL-PW-03) — forwards usecase.PushStream's sink callback frames via
+// stream.Send, one GitProgressEvent per domain.GitProgressLine.
+func (s *Server) PushStream(req *gitgatewayv1.PushRequest, stream gitgatewayv1.GitGatewayService_PushStreamServer) error {
+	err := s.pushStream.Execute(stream.Context(), usecase.PushInputStream{
+		WorktreeID: req.GetWorktreeId(),
+		Remote:     req.GetRemote(),
+		Branch:     req.GetBranch(),
+	}, func(line domain.GitProgressLine) error {
+		return stream.Send(toProtoGitProgressEvent(line))
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	return nil
+}
+
+// PullStream is Pull's incremental-progress counterpart — see PushStream's
+// doc comment.
+func (s *Server) PullStream(req *gitgatewayv1.PullRequest, stream gitgatewayv1.GitGatewayService_PullStreamServer) error {
+	err := s.pullStream.Execute(stream.Context(), usecase.PullInputStream{
+		WorktreeID: req.GetWorktreeId(),
+	}, func(line domain.GitProgressLine) error {
+		return stream.Send(toProtoGitProgressEvent(line))
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	return nil
+}
+
+// toProtoGitProgressEvent mirrors domain.GitProgressLine 1:1 onto
+// gitgatewayv1.GitProgressEvent.
+func toProtoGitProgressEvent(line domain.GitProgressLine) *gitgatewayv1.GitProgressEvent {
+	return &gitgatewayv1.GitProgressEvent{
+		Line:     line.Line,
+		Source:   line.Source,
+		IsFinal:  line.IsFinal,
+		ExitCode: line.ExitCode,
+	}
 }
 
 // GenerateCommitMessage relays the worktree's staged diff to the Dev Server
@@ -533,7 +614,7 @@ func (s *Server) ReadDir(ctx context.Context, req *gitgatewayv1.ReadDirRequest) 
 	}
 	out := make([]*gitgatewayv1.DirEntry, 0, len(entries))
 	for _, e := range entries {
-		out = append(out, &gitgatewayv1.DirEntry{Name: e.Name, IsDirectory: e.IsDirectory})
+		out = append(out, &gitgatewayv1.DirEntry{Name: e.Name, IsDirectory: e.IsDirectory, SizeBytes: e.SizeBytes})
 	}
 	return &gitgatewayv1.ReadDirResponse{Entries: out}, nil
 }
@@ -678,6 +759,8 @@ func (s *Server) ScanSetupScriptImports(ctx context.Context, req *gitgatewayv1.S
 func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
 	result, err := s.createWorktree.Execute(ctx, usecase.CreateWorktreeInput{
 		ProjectID: req.GetProjectId(), RepoID: req.GetRepoId(), Branch: req.GetBranch(), BaseRef: req.GetBaseRef(),
+		IdempotencyKey: req.GetIdempotencyKey(),
+		Name:           req.GetName(), Path: req.GetPath(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -685,11 +768,95 @@ func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWor
 	return &gitgatewayv1.CreateWorktreeResponse{WorktreeId: result.WorktreeID, Path: result.Path, HeadSha: result.HeadSHA}, nil
 }
 
-func (s *Server) RemoveWorktree(ctx context.Context, req *gitgatewayv1.RemoveWorktreeRequest) (*emptypb.Empty, error) {
-	if err := s.removeWorktree.Execute(ctx, req.GetWorktreeId(), req.GetForce()); err != nil {
+func (s *Server) CreateWorktreeFromIssue(ctx context.Context, req *gitgatewayv1.CreateWorktreeFromIssueRequest) (*gitgatewayv1.CreateWorktreeFromIssueResponse, error) {
+	ref, err := toDomainIssueRef(req)
+	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &emptypb.Empty{}, nil
+	result, err := s.createWorktreeFromIssue.Execute(ctx, usecase.CreateWorktreeFromIssueInput{
+		ProjectID: req.GetProjectId(), RepoID: req.GetRepoId(), BaseRef: req.GetBaseRef(),
+		IssueRef:         ref,
+		SkipStatusUpdate: req.GetSkipStatusUpdate(),
+		SkipAgentStart:   req.GetSkipAgentStart(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CreateWorktreeFromIssueResponse{
+		WorktreeId: result.Worktree.WorktreeID, Path: result.Worktree.Path, HeadSha: result.Worktree.HeadSHA,
+		BranchName: result.BranchName, AgentSessionId: result.AgentSessionID, AgentStartError: result.AgentStartError,
+		StatusUpdateEnqueued: result.StatusUpdateEnqueued,
+	}, nil
+}
+
+// toDomainIssueRef translates CreateWorktreeFromIssueRequest's oneof
+// issue_source into domain.IssueRef.
+func toDomainIssueRef(req *gitgatewayv1.CreateWorktreeFromIssueRequest) (domain.IssueRef, error) {
+	switch src := req.GetIssueSource().(type) {
+	case *gitgatewayv1.CreateWorktreeFromIssueRequest_ScmIssue:
+		return domain.IssueRef{Provider: src.ScmIssue.GetProvider(), Repo: src.ScmIssue.GetRepo(), Number: src.ScmIssue.GetNumber()}, nil
+	case *gitgatewayv1.CreateWorktreeFromIssueRequest_TrackerIssue:
+		return domain.IssueRef{Provider: src.TrackerIssue.GetProvider(), TrackerRef: src.TrackerIssue.GetIssueRef()}, nil
+	default:
+		return domain.IssueRef{}, apperrors.New(apperrors.KindInvalidArgument, "WORKTREE_FROM_ISSUE_NO_SOURCE", "issue_source is required", nil)
+	}
+}
+
+func (s *Server) RemoveWorktree(ctx context.Context, req *gitgatewayv1.RemoveWorktreeRequest) (*gitgatewayv1.RemoveWorktreeResponse, error) {
+	result, err := s.removeWorktree.Execute(ctx, usecase.RemoveWorktreeInput{
+		WorktreeID: req.GetWorktreeId(), Force: req.GetForce(), AllowOpenPR: req.GetAllowOpenPr(), StopAgents: req.GetStopAgents(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.RemoveWorktreeResponse{
+		UncommittedFilesDiscarded: int32(result.UncommittedFilesDiscarded),
+		StoppedPtyIds:             result.StoppedPtyIDs,
+	}, nil
+}
+
+func (s *Server) CheckWorktreeDeleteSafety(ctx context.Context, req *gitgatewayv1.CheckWorktreeDeleteSafetyRequest) (*gitgatewayv1.CheckWorktreeDeleteSafetyResponse, error) {
+	report, err := s.checkWorktreeDeleteSafety.Execute(ctx, req.GetWorktreeId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CheckWorktreeDeleteSafetyResponse{
+		UncommittedFiles: int32(report.UncommittedFiles),
+		UntrackedFiles:   int32(report.UntrackedFiles),
+		AgentRunning:     report.AgentRunning,
+		ActivePtyIds:     report.ActivePtyIDs,
+		SafeToDelete:     report.SafeToDelete,
+	}, nil
+}
+
+func (s *Server) CompareWorktrees(ctx context.Context, req *gitgatewayv1.CompareWorktreesRequest) (*gitgatewayv1.CompareWorktreesResponse, error) {
+	result, err := s.compareWorktrees.Execute(ctx, req.GetWorktreeIds())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*gitgatewayv1.WorktreeComparison, 0, len(result.Worktrees))
+	for _, w := range result.Worktrees {
+		out = append(out, &gitgatewayv1.WorktreeComparison{
+			WorktreeId: w.WorktreeID, ChangedFiles: int32(w.ChangedFiles),
+			AddedLines: int32(w.AddedLines), RemovedLines: int32(w.RemovedLines),
+			MergeBase: w.MergeBase, Status: w.Status, ErrorMessage: w.ErrorMessage,
+		})
+	}
+	return &gitgatewayv1.CompareWorktreesResponse{BaseRef: result.BaseRef, Worktrees: out}, nil
+}
+
+func (s *Server) MergeBranch(ctx context.Context, req *gitgatewayv1.MergeBranchRequest) (*gitgatewayv1.MergeBranchResponse, error) {
+	result, err := s.mergeWorktreeIntoBase.Execute(ctx, usecase.MergeWorktreeInput{
+		WorktreeID: req.GetWorktreeId(), BaseBranch: req.GetBaseBranch(),
+		Strategy: req.GetStrategy(), CommitMessage: req.GetCommitMessage(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.MergeBranchResponse{
+		ResultSha: result.ResultSHA, HasConflicts: result.HasConflicts,
+		ConflictedPaths: result.ConflictedPaths, ConflictDispatchKey: result.ConflictDispatchKey,
+	}, nil
 }
 
 func (s *Server) ForceDeleteBranch(ctx context.Context, req *gitgatewayv1.ForceDeleteBranchRequest) (*emptypb.Empty, error) {
@@ -758,7 +925,7 @@ func (s *Server) FastForward(ctx context.Context, req *gitgatewayv1.FastForwardR
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &gitgatewayv1.FastForwardResponse{Success: result.Success}, nil
+	return &gitgatewayv1.FastForwardResponse{Success: result.Success, ResultSha: result.ResultSHA}, nil
 }
 
 func (s *Server) RebaseFromBase(ctx context.Context, req *gitgatewayv1.RebaseFromBaseRequest) (*gitgatewayv1.RebaseFromBaseResponse, error) {
@@ -822,6 +989,58 @@ func (s *Server) BulkDiscard(ctx context.Context, req *gitgatewayv1.BulkDiscardR
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.BulkDiscardResponse{Success: result.Success, FailedPaths: result.FailedPaths}, nil
+}
+
+// ── SOL-PW-03 — merge/stash/branch-write ────────────────────────────────
+
+func (s *Server) MergeIntoBranch(ctx context.Context, req *gitgatewayv1.MergeIntoBranchRequest) (*gitgatewayv1.MergeIntoBranchResponse, error) {
+	result, err := s.mergeIntoBranch.Execute(ctx, usecase.MergeBranchInput{
+		WorktreeID: req.GetWorktreeId(), Branch: req.GetBranch(), NoFF: req.GetNoFf(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.MergeIntoBranchResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
+}
+
+func (s *Server) StashPush(ctx context.Context, req *gitgatewayv1.StashPushRequest) (*gitgatewayv1.StashPushResponse, error) {
+	result, err := s.stashPush.Execute(ctx, usecase.StashPushInput{
+		WorktreeID: req.GetWorktreeId(), Message: req.GetMessage(), IncludeUntracked: req.GetIncludeUntracked(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.StashPushResponse{Success: result.Success}, nil
+}
+
+func (s *Server) StashPop(ctx context.Context, req *gitgatewayv1.StashPopRequest) (*gitgatewayv1.StashPopResponse, error) {
+	result, err := s.stashPop.Execute(ctx, usecase.StashPopInput{
+		WorktreeID: req.GetWorktreeId(), StashRef: req.GetStashRef(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.StashPopResponse{Success: result.Success, HadConflicts: result.HadConflicts}, nil
+}
+
+func (s *Server) CreateBranch(ctx context.Context, req *gitgatewayv1.CreateBranchRequest) (*gitgatewayv1.CreateBranchResponse, error) {
+	branch, err := s.createBranch.Execute(ctx, usecase.CreateBranchInput{
+		WorktreeID: req.GetWorktreeId(), Branch: req.GetBranch(), BaseRef: req.GetBaseRef(), Checkout: req.GetCheckout(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.CreateBranchResponse{Branch: branch}, nil
+}
+
+func (s *Server) DeleteBranch(ctx context.Context, req *gitgatewayv1.DeleteBranchRequest) (*gitgatewayv1.DeleteBranchResponse, error) {
+	result, err := s.deleteBranch.Execute(ctx, usecase.DeleteBranchInput{
+		WorktreeID: req.GetWorktreeId(), Branch: req.GetBranch(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.DeleteBranchResponse{Success: result.Success}, nil
 }
 
 func toProtoBranches(branches []domain.BranchInfo) []*gitgatewayv1.BranchInfo {

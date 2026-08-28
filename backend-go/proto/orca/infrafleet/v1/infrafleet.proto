@@ -20,6 +20,10 @@ service InfraFleetService {
   // DevServerRepository.List method already existed but was never exposed
   // over gRPC before Epic A's second pass.
   rpc ListDevServers(ListDevServersRequest) returns (ListDevServersResponse);
+  // ListDevServersByTag backs workflow-service's "fleet:tag:<tag>"
+  // dispatch-target shape (TASK-WF-02-02/04) — load-balance across this
+  // tenant's healthy dev servers carrying tag.
+  rpc ListDevServersByTag(ListDevServersByTagRequest) returns (ListDevServersByTagResponse);
   // CreateConnection is the write path for infra.connections
   // (migrations/0002_connections) — binds a dev server to a worktree/repo
   // path, producing the connectionId ResolveConnection/Relay resolve
@@ -32,6 +36,15 @@ service InfraFleetService {
   // shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
   // all go through this one).
   rpc Relay(RelayRequest) returns (RelayResponse);
+  // RelayStream is Relay's server-streaming counterpart (TASK-PW-03-08,
+  // SOL-PW-03) — mirrors Relay's connectionId+method+params shape but for
+  // agent methods that reply with multiple frames instead of one (currently
+  // only git-gateway-service's PushStream/PullStream, relaying to the
+  // agent's git.execStream — specs/agent/api/agent-rpc-catalog-git-fs.md's
+  // "git.execStream streaming shape" section). Each frame_json is one
+  // JSON-RPC response frame's result, encoded verbatim — same "no per-method
+  // translation" contract as RelayResponse.result_json, just repeated.
+  rpc RelayStream(RelayStreamRequest) returns (stream RelayStreamFrame);
   // ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
   // latter derives from this same read — see wscompat's registerSshChannels).
   rpc ListSshTargets(ListSshTargetsRequest) returns (ListSshTargetsResponse);
@@ -42,7 +55,26 @@ service InfraFleetService {
   // handshake synchronously — it IS the connection-establishment act, not
   // a record of one requested. See usecase.EstablishConnection's doc comment.
   rpc EstablishConnection(EstablishConnectionRequest) returns (Connection);
+  // TeardownConnection is BR-SSH-13's "Cancel" action: marks the connection
+  // closed and stops any in-flight relaySSHReconnect backoff loop.
+  rpc TeardownConnection(TeardownConnectionRequest) returns (google.protobuf.Empty);
   rpc KillWorkspacePort(KillWorkspacePortRequest) returns (KillWorkspacePortResponse);
+
+  // CreateAgentToken/ListAgentTokens/RevokeAgentToken back BL-AWS-03's
+  // persistent, named, per-DevServer agent token admin surface — see
+  // specs/backend-go/bugs/logic-v1/solutions/SOL-AWS-03-agent-token-management.md.
+  rpc CreateAgentToken(CreateAgentTokenRequest) returns (CreateAgentTokenResponse);
+  rpc ListAgentTokens(ListAgentTokensRequest) returns (ListAgentTokensResponse);
+  rpc RevokeAgentToken(RevokeAgentTokenRequest) returns (google.protobuf.Empty);
+
+  // --- Auto port-forwarding (SOL-SSH-04) ---
+  rpc CreatePortForward(CreatePortForwardRequest) returns (PortForward);
+  rpc ListPortForwards(ListPortForwardsRequest) returns (ListPortForwardsResponse);
+  rpc DeletePortForward(DeletePortForwardRequest) returns (google.protobuf.Empty);
+  // StreamPortForwardEvents pushes port_opened/port_closed lifecycle events
+  // for one connectionId — BR-SSH-15's "live push, no polling" requirement
+  // (TASK-SSH-04-08), fed by internal/adapter/portevents.Broadcaster.
+  rpc StreamPortForwardEvents(StreamPortForwardEventsRequest) returns (stream PortForwardEvent);
 
   // --- Terminal/PTY lifecycle (control-plane, unary) ---
   rpc SpawnTerminalSession(SpawnTerminalSessionRequest) returns (SpawnTerminalSessionResponse);
@@ -54,6 +86,38 @@ service InfraFleetService {
   rpc FocusTerminalSession(FocusTerminalSessionRequest) returns (google.protobuf.Empty);     // terminal.focus — bookkeeping touch
   rpc GetTerminalAgentStatus(GetTerminalAgentStatusRequest) returns (GetTerminalAgentStatusResponse); // backs BOTH terminal.agentStatus and terminal.isRunningAgent
   rpc InspectTerminalProcess(InspectTerminalProcessRequest) returns (InspectTerminalProcessResponse); // best-effort — see message doc comment
+
+  // --- Terminal scrollback persistence (SOL-TM-03) — distinct from
+  // AttachPty/live PTY I/O. NOT the same path as terminal.multiplex's
+  // SnapshotRequest opcode, which resolves against a LIVE pty_id this flow
+  // structurally cannot have (a fresh pty_id is spawned on worktree reopen).
+  rpc SaveTerminalScrollbackSnapshot(SaveTerminalScrollbackSnapshotRequest) returns (google.protobuf.Empty);
+  rpc GetTerminalScrollbackSnapshot(GetTerminalScrollbackSnapshotRequest) returns (GetTerminalScrollbackSnapshotResponse);
+  // Called by git-gateway-service's RemoveWorktree on hard worktree deletion
+  // — cleanup, not part of the save/restore flow itself.
+  rpc DeleteTerminalScrollbackSnapshots(DeleteTerminalScrollbackSnapshotsRequest) returns (google.protobuf.Empty);
+
+  // GetAgentTerminalSession resolves worktree_id -> the live TerminalSession
+  // whose cwd matches that worktree's path, if one exists. Composes
+  // ResolveConnection + ListTerminalSessions server-side so no caller
+  // re-derives the match/tie-break logic itself.
+  rpc GetAgentTerminalSession(GetAgentTerminalSessionRequest) returns (GetAgentTerminalSessionResponse);
+
+  // SendTerminalInput writes directly to the pty's input, bypassing
+  // AttachPty's stream — for stateless (REST/CLI) callers that never
+  // attach. GUI callers keep using terminal.send/AttachPty for lower
+  // latency; this is not a replacement for that path.
+  rpc SendTerminalInput(SendTerminalInputRequest) returns (google.protobuf.Empty);
+
+  // GetTerminalScrollback returns a flat-text capture of a pty's recent
+  // output, for callers that want a redirectable string, not multiplex
+  // frames.
+  rpc GetTerminalScrollback(GetTerminalScrollbackRequest) returns (GetTerminalScrollbackResponse);
+  // DispatchPrompt is the ONE decision point BR-MB-09/10/12 all reduce to:
+  // gate on agent readiness, queue if running, require confirmation to
+  // overwrite an existing queued prompt.
+  rpc DispatchPrompt(DispatchPromptRequest) returns (DispatchPromptResponse);
+  rpc GetQueuedPrompt(GetQueuedPromptRequest) returns (GetQueuedPromptResponse);
 
   // --- Terminal/PTY I/O ---
   // The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
@@ -100,6 +164,54 @@ service InfraFleetService {
   // does not exist yet (confirmed absent as of this pass) — see
   // usecase.GetHostCapabilities's doc comment.
   rpc GetHostCapabilities(GetHostCapabilitiesRequest) returns (GetHostCapabilitiesResponse);
+
+  // ImportFleetInventory is the batch YAML-import entry point for BL-FLEET-01
+  // — upserts SshTargets by (tenant_id, host, user), see
+  // usecase.ImportFleetInventory's doc comment.
+  rpc ImportFleetInventory(ImportFleetInventoryRequest) returns (ImportFleetInventoryResponse);
+
+  // BulkProvisionFleet fans out provisioning across a tenant's SSH targets
+  // — unary (not streaming): bulk provisioning is N-servers-in-parallel,
+  // not one server's steps in sequence, and BL-FLEET-02's own contract is
+  // a single terminal summary object. See usecase.BulkProvisionFleet's doc
+  // comment.
+  rpc BulkProvisionFleet(BulkProvisionFleetRequest) returns (BulkProvisionFleetResponse);
+
+  // DetectDevServerAgents/CheckDevServerPreflight close BL-FLEET-04 Steps
+  // 3/4 (agent detection, remote preflight) — see usecase.DetectDevServerAgents
+  // / usecase.CheckDevServerPreflight doc comments.
+  rpc DetectDevServerAgents(DetectDevServerAgentsRequest) returns (DetectDevServerAgentsResponse);
+  rpc CheckDevServerPreflight(CheckDevServerPreflightRequest) returns (CheckDevServerPreflightResponse);
+
+  // --- Agent sessions (SOL-AG-01..05) --------------------------------------
+
+  // StartAgentSession spawns an AI-CLI agent (Claude Code, Codex, ...) via
+  // the Dev Server Agent's real agent.spawn RPC — sibling to
+  // SpawnTerminalSession, not a replacement (a bare shell PTY still uses
+  // SpawnTerminalSession).
+  rpc StartAgentSession(StartAgentSessionRequest) returns (AgentSession);
+
+  // StopAgentSession sends agent.sendInput('\x03') — graceful interrupt,
+  // BR-AG-05. Does not tear the session down; the transition to 'stopped'
+  // happens once agent.exited arrives (TASK-AG-05's classifier) — status
+  // transition is exit-driven, not request-driven.
+  rpc StopAgentSession(StopAgentSessionRequest) returns (google.protobuf.Empty);
+
+  // KillAgentSession sends agent.kill with the given signal (default
+  // SIGKILL) — full teardown, mirrors KillTerminalSession's "mark closed
+  // even if the agent call fails" discipline.
+  rpc KillAgentSession(KillAgentSessionRequest) returns (google.protobuf.Empty);
+
+  // ResumeAgentSession — loads the latest AgentSession for worktree_id,
+  // validates BR-AG-08 (7-day expiry) and BR-AG-09 (agent version match),
+  // then re-spawns via the same path as StartAgentSession with resume_id
+  // populated.
+  rpc ResumeAgentSession(ResumeAgentSessionRequest) returns (AgentSession);
+
+  // SwitchAgentAccount — BL-AG-04's saga: force-kill the current session,
+  // resolve a replacement account excluding the one just switched away
+  // from, then resume/start with the new account.
+  rpc SwitchAgentAccount(SwitchAgentAccountRequest) returns (AgentSession);
 }
 
 enum ConnectionMode {
@@ -120,6 +232,21 @@ message DevServer {
   // "DevServer<->SshTarget linkage the domain model doesn't have yet" gap
   // this service's README flagged (Epic A third pass).
   string ssh_target_id = 5;
+  // status is domain.DevServerStatus verbatim: pending|healthy|degraded|
+  // unhealthy — see BulkProvisionFleet's doc comment (SOL-FLEET-02).
+  string status = 6;
+  // platform/arch/node_version/agent_version are handshake-derived facts
+  // (SOL-FLEET-04) — the same columns SOL-FLEET-02's BulkProvisionFleet
+  // also persists into (domain.DevServer), see
+  // usecase.DevServerRepository.UpdateProvisionResult.
+  string platform = 7;
+  string arch = 8;
+  string node_version = 9;
+  string agent_version = 10;
+  // tags is free-form, tenant-scoped (e.g. "gpu", "region:us-east"); also
+  // BL-PRF-03's allowedServerTags match target and WF's ListDevServersByTag
+  // dispatch-target key.
+  repeated string tags = 11;
 }
 
 message RegisterDevServerRequest {
@@ -127,6 +254,10 @@ message RegisterDevServerRequest {
   string host = 2;
   ConnectionMode mode = 3;
   string ssh_target_id = 4; // required when mode=CONNECTION_MODE_RELAY_SSH
+  // relay_port: 0 = no daemon port — foreground stdio session, honest
+  // placeholder until agent/ gains a daemon (see TASK-FLEET-02-08).
+  int32 relay_port = 5;
+  repeated string tags = 6; // BL-PRF-03's allowedServerTags match target
 }
 
 message RegisterDevServerResponse {
@@ -171,6 +302,11 @@ message ResolveConnectionResponse {
   // valid Relay connection_id without re-deriving it from DevServer.id,
   // which is a different id space (dev_servers.id, not connections.id).
   string connection_id = 5;
+  // node_version is the connected session's self-reported Node.js version
+  // (devserveragent.HandshakeInfo.NodeVersion, captured at handshake time)
+  // — empty when connected is false or the session predates this field.
+  // Added for SOL-INT-03's preflight merge; not populated by any other RPC.
+  string node_version = 6;
 }
 
 message ListDevServersRequest {
@@ -180,6 +316,15 @@ message ListDevServersRequest {
 }
 
 message ListDevServersResponse {
+  repeated DevServer dev_servers = 1;
+}
+
+message ListDevServersByTagRequest {
+  string tag = 1;
+  bool healthy_only = 2; // filters against GetFleetHealth's own reachability check
+}
+
+message ListDevServersByTagResponse {
   repeated DevServer dev_servers = 1;
 }
 
@@ -208,11 +353,29 @@ message RelayResponse {
   string result_json = 1;
 }
 
+message RelayStreamRequest {
+  string connection_id = 1;
+  string method = 2;
+  string params_json = 3; // same JSON-encoded-object convention as RelayRequest.params_json
+}
+
+message RelayStreamFrame {
+  // frame_json is one streamed JSON-RPC response frame's result,
+  // JSON-encoded verbatim (e.g. git.execStream's
+  // {type:'stream.chunk',line,source?} / {type:'stream.end',exitCode}) —
+  // git-gateway-service's grpcclient adapter decodes this into a
+  // domain.GitProgressLine, this RPC itself stays method-agnostic like Relay.
+  string frame_json = 1;
+}
+
 message CreateSshTargetRequest {
   string tenant_id = 1;
   string host = 2;
   string user = 3;
   string vault_ssh_role = 4; // Vault SSH secrets engine role for cert issuance
+  int32 port = 5;                     // 0 = default to 22, mirrors domain.NewSshTarget
+  string known_hosts_fingerprint = 6; // optional; "" = unverified (documented gap)
+  string jump_host_target_id = 7;     // optional; "" = no jump host
 }
 
 message CreateSshTargetResponse {
@@ -241,8 +404,15 @@ message ScanWorkspacePortsRequest {
   string worktree_id = 2;
 }
 
+message DetectedPortProto {
+  int32 port = 1;
+  string host = 2;
+  int32 pid = 3;
+  string process_name = 4;
+}
+
 message ScanWorkspacePortsResponse {
-  repeated int32 open_ports = 1;
+  repeated DetectedPortProto ports = 1;
 }
 
 message KillWorkspacePortRequest {
@@ -250,6 +420,35 @@ message KillWorkspacePortRequest {
   string worktree_id = 2;
   int32 pid = 3;
   int32 port = 4;
+}
+
+message PortForward {
+  string id = 1;
+  string connection_id = 2;
+  int32 local_port = 3;
+  int32 remote_port = 4;
+  string process_name = 5;
+  string status = 6; // "active" | "closed"
+}
+message CreatePortForwardRequest {
+  string connection_id = 1;
+  int32 remote_port = 2;
+}
+message ListPortForwardsRequest {
+  string connection_id = 1;
+}
+message ListPortForwardsResponse {
+  repeated PortForward port_forwards = 1;
+}
+message DeletePortForwardRequest {
+  string id = 1;
+}
+message StreamPortForwardEventsRequest {
+  string connection_id = 1;
+}
+message PortForwardEvent {
+  string kind = 1; // "opened" | "closed"
+  PortForward forward = 2;
 }
 
 message KillWorkspacePortResponse {
@@ -263,6 +462,11 @@ message SshTarget {
   string host = 3;
   string user = 4;
   string vault_ssh_role = 5; // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
+  int32 port = 6;
+  string known_hosts_fingerprint = 7;
+  string jump_host_target_id = 8;
+  string project = 9;  // "" = ungrouped
+  repeated string tags = 10;
 }
 
 message ListSshTargetsRequest {
@@ -282,10 +486,15 @@ message GetSshStateResponse {
   bool connected = 1;
   string connection_id = 2;       // empty when not connected
   int64 last_activity_unix_ms = 3; // 0 when not connected or never active
+  string status = 4; // "" | "established" | "degraded" | "reconnecting" | "closed"
 }
 
 message EstablishConnectionRequest {
   string ssh_target_id = 1;
+}
+
+message TeardownConnectionRequest {
+  string connection_id = 1;
 }
 
 message Connection {
@@ -300,6 +509,21 @@ message SpawnTerminalSessionRequest {
   string shell = 3;          // optional; agent applies its own default if empty
   int32  cols = 4;
   int32  rows = 5;
+  // BR-TM-13 — opt-in shell-integration bootstrap (OSC 133). Forwarded
+  // unexamined to the agent's pty.create; see SOL-TM-04. Defaults to
+  // false — existing callers that don't set it see no behavior change.
+  bool   shell_integration = 6;
+  // command, when set, is the initial command line the spawned shell runs
+  // (agent's pty.create `command` param) instead of an interactive shell
+  // prompt — added for github.startAuthLogin/gitlab.startAuthLogin
+  // (TASK-INT-01-01), which spawn `gh auth login`/`glab auth login`
+  // directly rather than typing it into an interactive shell.
+  string command = 7;
+  // user_id engages pty-handler.ts's per-user GH_CONFIG_DIR/GLAB_CONFIG_DIR
+  // env isolation for a `gh `/`glab `-prefixed command — see
+  // pty-handler.ts:680-699. Always set from the caller's authenticated
+  // identity server-side (wscompat), never trusted from client args.
+  string user_id = 8;
 }
 message SpawnTerminalSessionResponse {
   TerminalSession session = 1;
@@ -310,6 +534,33 @@ message TerminalSession {
   string cwd = 3;
   int64  created_at_unix_ms = 4;
   int64  last_active_at_unix_ms = 5;
+  string last_output_preview = 6; // BR-MB-15: truncated to 500 chars server-side, never a raw dump — see terminal_session.go's TruncatedForMobile
+}
+
+message SaveTerminalScrollbackSnapshotRequest {
+  string worktree_id = 1;
+  string pane_key    = 2;
+  int32  cols = 3;
+  int32  rows = 4;
+  bytes  data  = 5;   // raw ANSI text, NOT pre-gzipped by the caller — usecase compresses it
+  string last_title = 6;
+}
+
+message GetTerminalScrollbackSnapshotRequest {
+  string worktree_id = 1;
+  string pane_key    = 2;
+}
+message GetTerminalScrollbackSnapshotResponse {
+  bool   found = 1;
+  int32  cols = 2;
+  int32  rows = 3;
+  bytes  data = 4;      // decompressed
+  string last_title = 5;
+  int64  updated_at_unix_ms = 6;
+}
+
+message DeleteTerminalScrollbackSnapshotsRequest {
+  string worktree_id = 1;
 }
 
 message ResizeTerminalSessionRequest { string pty_id = 1; int32 cols = 2; int32 rows = 3; }
@@ -331,6 +582,23 @@ message GetTerminalAgentStatusResponse {
   bool   agent_running = 1;     // answers both terminal.agentStatus and terminal.isRunningAgent
   string agent_kind = 2;        // best-effort, e.g. "claude" | "codex" | "" if unknown
   bool   ready_for_input = 3;   // agentStatus's richer question: is it idle-and-ready, not just alive
+  string last_output_preview = 4; // BR-MB-15: truncated to 500 chars server-side, never a raw dump
+}
+
+message GetAgentTerminalSessionRequest  { string worktree_id = 1; }
+message GetAgentTerminalSessionResponse {
+  bool found = 1;
+  TerminalSession session = 2; // unset when found=false
+}
+
+message SendTerminalInputRequest { string pty_id = 1; bytes data = 2; }
+
+message GetTerminalScrollbackRequest  { string pty_id = 1; }
+message GetTerminalScrollbackResponse {
+  string text = 1;
+  bool   truncated = 2; // true if the retention bound already dropped
+                         // earlier output — an honest signal, not silently
+                         // partial data
 }
 
 message InspectTerminalProcessRequest  { string pty_id = 1; }
@@ -471,4 +739,171 @@ message GetHostCapabilitiesResponse {
   repeated string wsl_distros = 2;
   bool pwsh_available = 3;
   bool git_bash_available = 4;
+}
+
+// --- Fleet inventory import (BL-FLEET-01) ----------------------------------
+
+message FleetServerInput {
+  string host = 1;
+  string user = 2;
+  string vault_ssh_role = 3;
+  string project = 4;
+  repeated string tags = 5;
+}
+
+message ImportFleetInventoryRequest {
+  repeated FleetServerInput servers = 1;
+  bool dry_run = 2;
+}
+message ImportFleetInventoryError { string host = 1; string user = 2; string reason = 3; }
+message ImportFleetInventoryResponse {
+  int32 imported = 1;
+  int32 updated = 2;
+  int32 skipped = 3;
+  repeated ImportFleetInventoryError errors = 4;
+}
+
+// --- Bulk fleet provisioning (BL-FLEET-02) ---------------------------------
+
+message BulkProvisionFleetRequest {
+  string project = 1; // "" = all
+  int32 concurrency = 2; // 0 = default 5
+}
+message ProvisionOutcome { string dev_server_id = 1; string host = 2; string status = 3; string error = 4; }
+message BulkProvisionFleetResponse {
+  int32 success = 1; int32 failed = 2; int32 skipped = 3;
+  repeated ProvisionOutcome outcomes = 4;
+}
+
+// --- Dev server onboarding: agent detection + remote preflight (BL-FLEET-04) ---
+
+message AgentProbe {
+  string id = 1;
+  string cmd = 2;
+  repeated string required_commands = 3;
+  repeated string unsupported_runtimes = 4;
+}
+message DetectDevServerAgentsRequest {
+  string dev_server_id = 1;
+  repeated AgentProbe commands = 2;
+}
+message DetectDevServerAgentsResponse {
+  repeated string agents = 1;
+  string platform = 2;
+}
+
+message CheckDevServerPreflightRequest {
+  string dev_server_id = 1;
+  int32 probe_port = 2;
+}
+message CheckResult { bool installed = 1; string version = 2; bool meets_min = 3; }
+message DiskCheckResult { double free_gb = 1; bool meets_min = 2; }
+message PortCheckResult { int32 port = 1; bool available = 2; }
+message CheckDevServerPreflightResponse {
+  CheckResult git = 1;
+  CheckResult node = 2;
+  DiskCheckResult disk = 3;
+  PortCheckResult port = 4;
+  CheckResult gh = 5;
+}
+
+// --- Persistent agent tokens (BL-AWS-03) -----------------------------------
+
+message CreateAgentTokenRequest  { string dev_server_id = 1; string name = 2; }
+message CreateAgentTokenResponse {
+  string id = 1;
+  string token = 2; // plaintext — shown once, never returned again
+  string name = 3;
+  int64 created_at_unix_ms = 4;
+}
+
+message AgentTokenSummary {
+  string id = 1;
+  string name = 2;
+  int64 created_at_unix_ms = 3;
+  optional int64 last_used_at_unix_ms = 4;
+}
+message ListAgentTokensRequest  { string dev_server_id = 1; }
+message ListAgentTokensResponse { repeated AgentTokenSummary tokens = 1; }
+
+message RevokeAgentTokenRequest { string dev_server_id = 1; string id = 2; }
+
+// --- Agent sessions (SOL-AG-01..05) ---------------------------------------
+
+message StartAgentSessionRequest {
+  string connection_id = 1;     // -> DevServer, same resolution as SpawnTerminalSession
+  string worktree_id   = 2;     // logical FK -> project-service; BR-AG-01 scope key
+  string user_id       = 3;     // BR-AG-01: one agent per worktree PER USER
+  string cwd           = 4;     // worktree path on the dev server
+  string model_id      = 5;     // e.g. "claude", "gpt-4o", "gemini", "opencode", "ollama"
+  string account_id    = 6;     // ai_provider.accounts.id — from aiProvider.resolve; "" for localInference models
+  string trust_preset  = 7;     // "standard" | "full" | "none" — forwarded as-is, applied agent-side as CLI args
+  int32  cols          = 8;
+  int32  rows          = 9;
+  // resolved_api_key is DELIBERATELY ABSENT — see TASK-AG-01-04 (credential
+  // injection blocker). Adding it here would let a caller populate
+  // agent.spawn's resolvedApiKey param, silently reintroducing Gap 2.
+}
+
+message AgentSession {
+  string id              = 1;   // sessionId — agent_sessions.id
+  string pty_id          = 2;
+  string connection_id   = 3;   // -> DevServer, same resolution key as TerminalSession.connection_id
+  string worktree_id     = 4;
+  string dev_server_id   = 5;   // snapshot of the dev server resolved at spawn time, for display only
+  string user_id         = 6;
+  string model_id        = 7;
+  string account_id      = 8;
+  string status          = 9;   // spawning|idle|running|waiting|completed|error|stopped — see TASK-AG-05-*
+  int64  started_at_unix_ms      = 10;
+  int64  last_active_at_unix_ms  = 11;
+}
+
+message StopAgentSessionRequest { string session_id = 1; }
+message KillAgentSessionRequest {
+  string session_id = 1;
+  string signal      = 2; // "SIGTERM" | "SIGKILL", default SIGKILL — mirrors agent.kill's own default
+}
+
+message ResumeAgentSessionRequest {
+  string connection_id = 1;
+  string worktree_id   = 2;
+  string user_id       = 3;
+  string cwd           = 4;
+  int32  cols          = 5;
+  int32  rows          = 6;
+}
+
+message SwitchAgentAccountRequest {
+  string connection_id = 1;
+  string worktree_id   = 2;
+  string user_id       = 3;
+  string project_id    = 4; // threaded into ResolveProvider's cascade exclusion
+  string cwd           = 5;
+}
+
+// --- Mobile prompt dispatch (SOL-MB-03) ------------------------------------
+
+message DispatchPromptRequest {
+  string pty_id = 1;
+  string prompt = 2;          // already decrypted by the caller (api-gateway) before this RPC
+  bool   overwrite = 3;       // BR-MB-12: true only on a caller's explicit confirmation of a second dispatch
+  string dispatched_by_device_id = 4; // audit/attribution — which paired mobile device sent this
+}
+message DispatchPromptResponse {
+  enum Outcome {
+    OUTCOME_UNSPECIFIED = 0;
+    INJECTED_IMMEDIATELY = 1;  // BR-MB-09: agent was idle/waiting, written straight to the PTY
+    QUEUED = 2;                // BR-MB-10: agent running, held for later
+    REJECTED_NEEDS_CONFIRMATION = 3; // BR-MB-12: a prompt is already queued and overwrite=false
+  }
+  Outcome outcome = 1;
+  string  existing_queued_prompt_preview = 2; // populated only for REJECTED_NEEDS_CONFIRMATION
+}
+
+message GetQueuedPromptRequest { string pty_id = 1; }
+message GetQueuedPromptResponse {
+  bool   has_queued_prompt = 1;
+  string prompt = 2;
+  int64  queued_at_unix_ms = 3;
 }

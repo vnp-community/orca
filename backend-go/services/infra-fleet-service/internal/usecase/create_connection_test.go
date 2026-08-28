@@ -13,11 +13,30 @@ type fakeConnectionRepository struct {
 	created []domain.Connection
 	err     error
 
+	// outboxCreated/outboxEvents record CreateConnectionWithOutbox calls —
+	// used by establish_connection_test.go to assert the outbox publish is
+	// attempted after a successful connection.
+	outboxCreated []domain.Connection
+	outboxEvents  []domain.OutboxEvent
+	outboxErr     error
+
 	// found/activeConn/activeErr drive GetActiveByDevServer's fake answer —
 	// used by get_ssh_state_test.go.
 	found      bool
 	activeConn domain.Connection
 	activeErr  error
+
+	// updatedStatuses records every UpdateStatus call — used by
+	// teardown_connection_test.go.
+	updatedStatuses []string
+	updateStatusErr error
+
+	// devServerByConnection/devServerByConnectionFound/devServerByConnectionErr
+	// drive GetDevServerByConnection's fake answer — used by
+	// teardown_connection_test.go.
+	devServerByConnection      domain.DevServer
+	devServerByConnectionFound bool
+	devServerByConnectionErr   error
 }
 
 func (f *fakeConnectionRepository) CreateConnection(ctx context.Context, conn domain.Connection) (domain.Connection, error) {
@@ -25,6 +44,16 @@ func (f *fakeConnectionRepository) CreateConnection(ctx context.Context, conn do
 		return domain.Connection{}, f.err
 	}
 	f.created = append(f.created, conn)
+	return conn, nil
+}
+
+// CreateConnectionWithOutbox implements usecase.ConnectionRepository.CreateConnectionWithOutbox.
+func (f *fakeConnectionRepository) CreateConnectionWithOutbox(ctx context.Context, conn domain.Connection, event domain.OutboxEvent) (domain.Connection, error) {
+	if f.outboxErr != nil {
+		return domain.Connection{}, f.outboxErr
+	}
+	f.outboxCreated = append(f.outboxCreated, conn)
+	f.outboxEvents = append(f.outboxEvents, event)
 	return conn, nil
 }
 
@@ -37,6 +66,26 @@ func (f *fakeConnectionRepository) GetActiveByDevServer(ctx context.Context, ten
 		return domain.Connection{}, false, nil
 	}
 	return f.activeConn, true, nil
+}
+
+// UpdateStatus implements usecase.ConnectionRepository.UpdateStatus.
+func (f *fakeConnectionRepository) UpdateStatus(ctx context.Context, tenantID, connectionID, status string) error {
+	if f.updateStatusErr != nil {
+		return f.updateStatusErr
+	}
+	f.updatedStatuses = append(f.updatedStatuses, connectionID+":"+status)
+	return nil
+}
+
+// GetDevServerByConnection implements usecase.ConnectionRepository.GetDevServerByConnection.
+func (f *fakeConnectionRepository) GetDevServerByConnection(ctx context.Context, tenantID, connectionID string) (domain.DevServer, bool, error) {
+	if f.devServerByConnectionErr != nil {
+		return domain.DevServer{}, false, f.devServerByConnectionErr
+	}
+	if !f.devServerByConnectionFound {
+		return domain.DevServer{}, false, nil
+	}
+	return f.devServerByConnection, true, nil
 }
 
 func TestCreateConnection_RequiresTenantContext(t *testing.T) {

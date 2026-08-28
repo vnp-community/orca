@@ -24,6 +24,7 @@ import (
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/policy"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/tenant-service/internal/config"
@@ -31,6 +32,7 @@ import (
 	tenantcache "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/cache"
 	tenanteventbus "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/eventbus"
 	tenantgrpc "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/grpc"
+	tenantopaclient "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/opaclient"
 	tenantpostgres "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/tenant-service/internal/usecase"
 
@@ -79,6 +81,7 @@ func run() error {
 	departments := tenantpostgres.NewDepartmentRepository(pool)
 	profiles := tenantpostgres.NewUserProfileRepository(pool)
 	teams := tenantpostgres.NewTeamRepository(pool)
+	opa := tenantopaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
 
 	// In-process LRU-with-TTL cache — a usecase-layer decorator, not
 	// baked into adapter/postgres. See tenant-service.md §6 for why this
@@ -99,6 +102,7 @@ func run() error {
 	// (§3 Phase 4 — "do this last, everything depends on it"), so it degrades
 	// to today's TTL-bounded-only staleness instead of crash-looping.
 	var invalidationPublisher usecase.CacheInvalidationPublisher
+	var auditPublisher usecase.AuditPublisher
 	var consumerWG sync.WaitGroup
 	pub, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
 	if err != nil {
@@ -109,6 +113,7 @@ func run() error {
 			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
 		} else {
 			invalidationPublisher = tenanteventbus.New(pub)
+			auditPublisher = tenanteventbus.New(pub)                // NEW — same Publisher implements both ports
 			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
 
 			invalidationConsumer := tenanteventbus.NewConsumer(cons, profileCache)
@@ -122,17 +127,18 @@ func run() error {
 
 	createCompanyUC := usecase.NewCreateCompany(companies)
 	validateTenantUC := usecase.NewValidateTenant(companies)
-	createDepartmentUC := usecase.NewCreateDepartment(companies, departments)
+	createDepartmentUC := usecase.NewCreateDepartment(companies, departments, opa, auditPublisher)
 	setUserDepartmentUC := usecase.NewSetUserDepartment(departments, profiles, profileCache, invalidationPublisher)
 	baseGetResolvedProfileUC := usecase.NewGetResolvedProfile(companies, departments, profiles, teams)
 	getResolvedProfileUC := usecase.NewCachedGetResolvedProfile(baseGetResolvedProfileUC, profileCache, usecase.DefaultProfileCacheTTL)
 	createTeamUC := usecase.NewCreateTeam(companies, teams)
 	addTeamMemberUC := usecase.NewAddTeamMember(teams, profileCache, invalidationPublisher)
 	listTeamMembersUC := usecase.NewListTeamMembers(teams)
+	listTeamsForUserUC := usecase.NewListTeamsForUser(teams)
 	getUserProfileUC := usecase.NewGetUserProfile(profiles)
 	listDepartmentsUC := usecase.NewListDepartments(departments)
-	updateCompanyUC := usecase.NewUpdateCompany(companies, profiles, profileCache, invalidationPublisher)
-	updateDepartmentUC := usecase.NewUpdateDepartment(departments, profiles, profileCache, invalidationPublisher)
+	updateCompanyUC := usecase.NewUpdateCompany(companies, profiles, profileCache, invalidationPublisher, opa, auditPublisher)
+	updateDepartmentUC := usecase.NewUpdateDepartment(departments, profiles, profileCache, invalidationPublisher, opa, auditPublisher)
 	updateUserProfileUC := usecase.NewUpdateUserProfile(profiles, profileCache, invalidationPublisher)
 	listTeamsUC := usecase.NewListTeams(teams)
 	removeTeamMemberUC := usecase.NewRemoveTeamMember(teams, profileCache, invalidationPublisher)
@@ -147,6 +153,7 @@ func run() error {
 		createTeamUC,
 		addTeamMemberUC,
 		listTeamMembersUC,
+		listTeamsForUserUC,
 		getUserProfileUC,
 		listDepartmentsUC,
 		updateCompanyUC,

@@ -17,6 +17,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -130,6 +131,7 @@ type giteaPullRequest struct {
 	Title   string `json:"title"`
 	State   string `json:"state"`
 	HTMLURL string `json:"html_url"`
+	Draft   bool   `json:"draft"`
 	Head    struct {
 		Ref string `json:"ref"`
 	} `json:"head"`
@@ -139,23 +141,32 @@ type giteaPullRequest struct {
 }
 
 func toDomainPullRequest(repo string, gp giteaPullRequest) (domain.PullRequest, error) {
-	return domain.NewPullRequest(
+	pr, err := domain.NewPullRequest(
 		strconv.Itoa(gp.Number), domain.ScmProviderGitea, repo, gp.Title, gp.State, gp.HTMLURL,
 		gp.Head.Ref, gp.Base.Ref,
 	)
+	if err != nil {
+		return domain.PullRequest{}, err
+	}
+	pr.Draft = gp.Draft
+	return pr, nil
 }
 
 // CreatePullRequest calls Gitea's REST API for real: POST
 // /repos/{repo}/pulls, with the resolved per-tenant token as a Bearer
 // credential — see ListIssues' doc comment for the token-handling
-// invariant this shares.
+// invariant this shares. requires Gitea >= 1.16 for the `draft` field to be
+// honored; older instances silently ignore it (not this adapter's problem
+// to detect — no version-negotiation primitive exists in this client
+// today).
 func (c *Client) CreatePullRequest(ctx context.Context, cred usecase.Credential, repo string, input usecase.CreatePullRequestInput) (domain.PullRequest, error) {
 	body, err := json.Marshal(struct {
 		Title string `json:"title"`
 		Body  string `json:"body,omitempty"`
 		Head  string `json:"head"`
 		Base  string `json:"base"`
-	}{Title: input.Title, Body: input.Body, Head: input.HeadBranch, Base: input.BaseBranch})
+		Draft bool   `json:"draft,omitempty"` // NEW — requires Gitea >= 1.16
+	}{Title: input.Title, Body: input.Body, Head: input.HeadBranch, Base: input.BaseBranch, Draft: input.Draft})
 	if err != nil {
 		return domain.PullRequest{}, fmt.Errorf("gitea: encode create pull request body: %w", err)
 	}
@@ -296,4 +307,44 @@ func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo
 	default:
 		return false, fmt.Errorf("gitea: branch exists: unexpected status %d", resp.StatusCode)
 	}
+}
+
+// GetRepoFileContent fetches one file's raw content at ref via Gitea's raw
+// content endpoint. found=false (not an error) on a 404 — the expected
+// case for "no CODEOWNERS file".
+func (c *Client) GetRepoFileContent(ctx context.Context, cred usecase.Credential, repo, path, ref string) (string, bool, error) {
+	reqURL := fmt.Sprintf("%s/repos/%s/raw/%s?ref=%s", c.baseURL, repo, path, url.QueryEscape(ref))
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", false, fmt.Errorf("gitea: build get repo file content request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", false, fmt.Errorf("gitea: get repo file content request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", false, fmt.Errorf("gitea: get repo file content: unexpected status %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", false, fmt.Errorf("gitea: read repo file content response: %w", err)
+	}
+	return string(body), true, nil
+}
+
+// GetLinkedPullRequestsForIssue — Gitea has no cross-reference/timeline API
+// equivalent to GitHub's; same placeholder posture as
+// MergePullRequest/ResolveRepoSlug above until wired.
+func (c *Client) GetLinkedPullRequestsForIssue(_ context.Context, _ usecase.Credential, _ string, _ int32) ([]domain.PullRequest, bool, error) {
+	return nil, false, nil
+}
+
+func (c *Client) SubmitReview(_ context.Context, _ usecase.Credential, _ string, _ int32, _ domain.ReviewInput) (domain.Review, error) {
+	return domain.Review{}, ErrCapabilityUnsupported
 }

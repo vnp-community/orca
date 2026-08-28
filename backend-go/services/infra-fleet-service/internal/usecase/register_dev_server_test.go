@@ -3,13 +3,21 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
-// fakeDevServerRepository is an in-memory DevServerRepository.
+// fakeDevServerRepository is an in-memory DevServerRepository. mu guards
+// every mutable field below — BulkProvisionFleet calls Register/
+// UpdateProvisionResult concurrently across its fan-out goroutines, same as
+// a real Postgres-backed repository would be called under real
+// concurrency.
 type fakeDevServerRepository struct {
+	mu sync.Mutex
+
 	registered  []domain.DevServer
 	registerErr error
 	byID        map[string]domain.DevServer
@@ -23,9 +31,49 @@ type fakeDevServerRepository struct {
 	findErr        error
 	registerCalled bool
 	lastRegistered domain.DevServer
+
+	// updateProvisionResultErr and the last* fields drive/record
+	// UpdateProvisionResult's fake behavior — used by
+	// bulk_provision_fleet_test.go/establish_connection_test.go.
+	updateProvisionResultErr   error
+	updateProvisionResultCalls int
+	lastProvisionStatus        domain.DevServerStatus
+	lastProvisionInfo          HandshakeInfo
+	lastProvisionAt            time.Time
+
+	// byTagErr drives ListByTag's fake error path — used by
+	// list_dev_servers_by_tag_test.go.
+	byTagErr error
+}
+
+// ListAllForPolling implements usecase.DevServerRepository.ListAllForPolling.
+func (f *fakeDevServerRepository) ListAllForPolling(ctx context.Context) ([]domain.DevServer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	out := make([]domain.DevServer, 0, len(f.byID))
+	for _, ds := range f.byID {
+		out = append(out, ds)
+	}
+	return out, nil
+}
+
+// UpdateProvisionResult implements usecase.DevServerRepository.UpdateProvisionResult.
+func (f *fakeDevServerRepository) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info HandshakeInfo, provisionedAt time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.updateProvisionResultCalls++
+	f.lastProvisionStatus = status
+	f.lastProvisionInfo = info
+	f.lastProvisionAt = provisionedAt
+	return f.updateProvisionResultErr
 }
 
 func (f *fakeDevServerRepository) Register(ctx context.Context, ds domain.DevServer) (domain.DevServer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.registerCalled = true
 	f.lastRegistered = ds
 	if f.registerErr != nil {
@@ -37,6 +85,8 @@ func (f *fakeDevServerRepository) Register(ctx context.Context, ds domain.DevSer
 
 // FindBySshTarget implements usecase.DevServerRepository.FindBySshTarget.
 func (f *fakeDevServerRepository) FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (domain.DevServer, bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.findErr != nil {
 		return domain.DevServer{}, false, f.findErr
 	}
@@ -47,6 +97,8 @@ func (f *fakeDevServerRepository) FindBySshTarget(ctx context.Context, tenantID,
 }
 
 func (f *fakeDevServerRepository) Get(ctx context.Context, tenantID, id string) (domain.DevServer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.getErr != nil {
 		return domain.DevServer{}, f.getErr
 	}
@@ -54,6 +106,8 @@ func (f *fakeDevServerRepository) Get(ctx context.Context, tenantID, id string) 
 }
 
 func (f *fakeDevServerRepository) List(ctx context.Context, tenantID string) ([]domain.DevServer, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.listErr != nil {
 		return nil, f.listErr
 	}
@@ -61,6 +115,27 @@ func (f *fakeDevServerRepository) List(ctx context.Context, tenantID string) ([]
 	for _, ds := range f.byID {
 		if ds.TenantID == tenantID {
 			out = append(out, ds)
+		}
+	}
+	return out, nil
+}
+
+// ListByTag implements usecase.DevServerRepository.ListByTag — used by
+// list_dev_servers_by_tag_test.go.
+func (f *fakeDevServerRepository) ListByTag(ctx context.Context, tenantID, tag string) ([]domain.DevServer, error) {
+	if f.byTagErr != nil {
+		return nil, f.byTagErr
+	}
+	var out []domain.DevServer
+	for _, ds := range f.byID {
+		if ds.TenantID != tenantID {
+			continue
+		}
+		for _, t := range ds.Tags {
+			if t == tag {
+				out = append(out, ds)
+				break
+			}
 		}
 	}
 	return out, nil

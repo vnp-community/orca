@@ -27,6 +27,7 @@ const (
 	AutomationService_ListAutomations_FullMethodName       = "/orca.automation.v1.AutomationService/ListAutomations"
 	AutomationService_UpdateAutomation_FullMethodName      = "/orca.automation.v1.AutomationService/UpdateAutomation"
 	AutomationService_DeleteAutomation_FullMethodName      = "/orca.automation.v1.AutomationService/DeleteAutomation"
+	AutomationService_WriteCleanupReport_FullMethodName    = "/orca.automation.v1.AutomationService/WriteCleanupReport"
 )
 
 // AutomationServiceClient is the client API for AutomationService service.
@@ -50,6 +51,12 @@ type AutomationServiceClient interface {
 	ListAutomations(ctx context.Context, in *ListAutomationsRequest, opts ...grpc.CallOption) (*ListAutomationsResponse, error)
 	UpdateAutomation(ctx context.Context, in *UpdateAutomationRequest, opts ...grpc.CallOption) (*UpdateAutomationResponse, error)
 	DeleteAutomation(ctx context.Context, in *DeleteAutomationRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// WriteCleanupReport records one row per worktree per cleanup run —
+	// workflow-service.CleanupWorktreesStepExecutor calls this (a
+	// workflow-service -> automation-service call, the reverse of this
+	// service's usual direction) since automation-service already owns run
+	// bookkeeping. See BR-AT-14.
+	WriteCleanupReport(ctx context.Context, in *WriteCleanupReportRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type automationServiceClient struct {
@@ -130,6 +137,16 @@ func (c *automationServiceClient) DeleteAutomation(ctx context.Context, in *Dele
 	return out, nil
 }
 
+func (c *automationServiceClient) WriteCleanupReport(ctx context.Context, in *WriteCleanupReportRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AutomationService_WriteCleanupReport_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AutomationServiceServer is the server API for AutomationService service.
 // All implementations must embed UnimplementedAutomationServiceServer
 // for forward compatibility.
@@ -151,6 +168,12 @@ type AutomationServiceServer interface {
 	ListAutomations(context.Context, *ListAutomationsRequest) (*ListAutomationsResponse, error)
 	UpdateAutomation(context.Context, *UpdateAutomationRequest) (*UpdateAutomationResponse, error)
 	DeleteAutomation(context.Context, *DeleteAutomationRequest) (*emptypb.Empty, error)
+	// WriteCleanupReport records one row per worktree per cleanup run —
+	// workflow-service.CleanupWorktreesStepExecutor calls this (a
+	// workflow-service -> automation-service call, the reverse of this
+	// service's usual direction) since automation-service already owns run
+	// bookkeeping. See BR-AT-14.
+	WriteCleanupReport(context.Context, *WriteCleanupReportRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAutomationServiceServer()
 }
 
@@ -181,6 +204,9 @@ func (UnimplementedAutomationServiceServer) UpdateAutomation(context.Context, *U
 }
 func (UnimplementedAutomationServiceServer) DeleteAutomation(context.Context, *DeleteAutomationRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAutomation not implemented")
+}
+func (UnimplementedAutomationServiceServer) WriteCleanupReport(context.Context, *WriteCleanupReportRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method WriteCleanupReport not implemented")
 }
 func (UnimplementedAutomationServiceServer) mustEmbedUnimplementedAutomationServiceServer() {}
 func (UnimplementedAutomationServiceServer) testEmbeddedByValue()                           {}
@@ -329,6 +355,24 @@ func _AutomationService_DeleteAutomation_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AutomationService_WriteCleanupReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(WriteCleanupReportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AutomationServiceServer).WriteCleanupReport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AutomationService_WriteCleanupReport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AutomationServiceServer).WriteCleanupReport(ctx, req.(*WriteCleanupReportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AutomationService_ServiceDesc is the grpc.ServiceDesc for AutomationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -363,6 +407,10 @@ var AutomationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAutomation",
 			Handler:    _AutomationService_DeleteAutomation_Handler,
+		},
+		{
+			MethodName: "WriteCleanupReport",
+			Handler:    _AutomationService_WriteCleanupReport_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

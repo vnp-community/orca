@@ -40,11 +40,13 @@ type Server struct {
 	removeRepo   *usecase.RemoveRepo
 	updateRepo   *usecase.UpdateRepo
 
-	recordWorktreeCreated *usecase.RecordWorktreeCreated
-	recordWorktreeRemoved *usecase.RecordWorktreeRemoved
-	listWorktrees         *usecase.ListWorktrees
-	setWorktreeActivation *usecase.SetWorktreeActivation
-	renameWorktree        *usecase.RenameWorktree
+	recordWorktreeCreated       *usecase.RecordWorktreeCreated
+	recordWorktreeRemoved       *usecase.RecordWorktreeRemoved
+	listWorktrees               *usecase.ListWorktrees
+	getWorktree                 *usecase.GetWorktree
+	setWorktreeActivation       *usecase.SetWorktreeActivation
+	renameWorktree              *usecase.RenameWorktree
+	getWorktreeByIdempotencyKey *usecase.GetWorktreeByIdempotencyKey
 
 	createProjectGroup *usecase.CreateProjectGroup
 	updateProjectGroup *usecase.UpdateProjectGroup
@@ -52,15 +54,18 @@ type Server struct {
 	listProjectGroups  *usecase.ListProjectGroups
 
 	folderWorkspaces *usecase.FolderWorkspaceUseCase
-	moveProject        *usecase.MoveProject
-	scanNested         *usecase.ScanNested
-	importNested       *usecase.ImportNested
+	moveProject      *usecase.MoveProject
+	scanNested       *usecase.ScanNested
+	importNested     *usecase.ImportNested
 
 	createHostSetup     *usecase.CreateHostSetup
 	listHostSetups      *usecase.ListHostSetups
 	updateHostSetup     *usecase.UpdateHostSetup
 	deleteHostSetup     *usecase.DeleteHostSetup
 	setupExistingFolder *usecase.SetupExistingFolder
+
+	getProjectContext       *usecase.GetProjectContext
+	getMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
 }
 
 // Deps groups every usecase Server needs — a plain constructor with 20
@@ -85,11 +90,13 @@ type Deps struct {
 	RemoveRepo   *usecase.RemoveRepo
 	UpdateRepo   *usecase.UpdateRepo
 
-	RecordWorktreeCreated *usecase.RecordWorktreeCreated
-	RecordWorktreeRemoved *usecase.RecordWorktreeRemoved
-	ListWorktrees         *usecase.ListWorktrees
-	SetWorktreeActivation *usecase.SetWorktreeActivation
-	RenameWorktree        *usecase.RenameWorktree
+	RecordWorktreeCreated       *usecase.RecordWorktreeCreated
+	RecordWorktreeRemoved       *usecase.RecordWorktreeRemoved
+	ListWorktrees               *usecase.ListWorktrees
+	GetWorktree                 *usecase.GetWorktree
+	SetWorktreeActivation       *usecase.SetWorktreeActivation
+	RenameWorktree              *usecase.RenameWorktree
+	GetWorktreeByIdempotencyKey *usecase.GetWorktreeByIdempotencyKey
 
 	CreateProjectGroup *usecase.CreateProjectGroup
 	UpdateProjectGroup *usecase.UpdateProjectGroup
@@ -97,15 +104,18 @@ type Deps struct {
 	ListProjectGroups  *usecase.ListProjectGroups
 
 	FolderWorkspaces *usecase.FolderWorkspaceUseCase
-	MoveProject        *usecase.MoveProject
-	ScanNested         *usecase.ScanNested
-	ImportNested       *usecase.ImportNested
+	MoveProject      *usecase.MoveProject
+	ScanNested       *usecase.ScanNested
+	ImportNested     *usecase.ImportNested
 
 	CreateHostSetup     *usecase.CreateHostSetup
 	ListHostSetups      *usecase.ListHostSetups
 	UpdateHostSetup     *usecase.UpdateHostSetup
 	DeleteHostSetup     *usecase.DeleteHostSetup
 	SetupExistingFolder *usecase.SetupExistingFolder
+
+	GetProjectContext       *usecase.GetProjectContext
+	GetMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
 }
 
 func New(deps Deps) *Server {
@@ -128,11 +138,13 @@ func New(deps Deps) *Server {
 		removeRepo:   deps.RemoveRepo,
 		updateRepo:   deps.UpdateRepo,
 
-		recordWorktreeCreated: deps.RecordWorktreeCreated,
-		recordWorktreeRemoved: deps.RecordWorktreeRemoved,
-		listWorktrees:         deps.ListWorktrees,
-		setWorktreeActivation: deps.SetWorktreeActivation,
-		renameWorktree:        deps.RenameWorktree,
+		recordWorktreeCreated:       deps.RecordWorktreeCreated,
+		recordWorktreeRemoved:       deps.RecordWorktreeRemoved,
+		listWorktrees:               deps.ListWorktrees,
+		getWorktree:                 deps.GetWorktree,
+		setWorktreeActivation:       deps.SetWorktreeActivation,
+		renameWorktree:              deps.RenameWorktree,
+		getWorktreeByIdempotencyKey: deps.GetWorktreeByIdempotencyKey,
 
 		createProjectGroup: deps.CreateProjectGroup,
 		updateProjectGroup: deps.UpdateProjectGroup,
@@ -140,15 +152,18 @@ func New(deps Deps) *Server {
 		listProjectGroups:  deps.ListProjectGroups,
 
 		folderWorkspaces: deps.FolderWorkspaces,
-		moveProject:        deps.MoveProject,
-		scanNested:         deps.ScanNested,
-		importNested:       deps.ImportNested,
+		moveProject:      deps.MoveProject,
+		scanNested:       deps.ScanNested,
+		importNested:     deps.ImportNested,
 
 		createHostSetup:     deps.CreateHostSetup,
 		listHostSetups:      deps.ListHostSetups,
 		updateHostSetup:     deps.UpdateHostSetup,
 		deleteHostSetup:     deps.DeleteHostSetup,
 		setupExistingFolder: deps.SetupExistingFolder,
+
+		getProjectContext:       deps.GetProjectContext,
+		getMobileWorktreeStatus: deps.GetMobileWorktreeStatus,
 	}
 }
 
@@ -163,6 +178,8 @@ func (s *Server) CreateProject(ctx context.Context, req *projectv1.CreateProject
 		Description:   req.GetDescription(),
 		DefaultBranch: req.GetDefaultBranch(),
 		Visibility:    req.GetVisibility(),
+		DevServerID:   req.GetDevServerId(), // NEW
+		RepoPath:      req.GetRepoPath(),    // NEW
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -253,11 +270,12 @@ func (s *Server) RebindDevServer(ctx context.Context, req *projectv1.RebindDevSe
 
 func (s *Server) UpdateProject(ctx context.Context, req *projectv1.UpdateProjectRequest) (*projectv1.UpdateProjectResponse, error) {
 	project, err := s.updateProject.Execute(ctx, usecase.UpdateProjectInput{
-		ProjectID:     req.GetProjectId(),
-		Name:          req.GetName(),
-		Description:   req.GetDescription(),
-		DefaultBranch: req.GetDefaultBranch(),
-		Visibility:    req.GetVisibility(),
+		ProjectID:              req.GetProjectId(),
+		Name:                   req.GetName(),
+		Description:            req.GetDescription(),
+		DefaultBranch:          req.GetDefaultBranch(),
+		Visibility:             req.GetVisibility(),
+		IssueStatusSyncEnabled: req.IssueStatusSyncEnabled,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -327,15 +345,27 @@ func (s *Server) UpdateRepo(ctx context.Context, req *projectv1.UpdateRepoReques
 
 func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.RecordWorktreeCreatedRequest) (*projectv1.RecordWorktreeCreatedResponse, error) {
 	wt, err := s.recordWorktreeCreated.Execute(ctx, usecase.RecordWorktreeCreatedInput{
-		ProjectID: req.GetProjectId(),
-		RepoID:    req.GetRepoId(),
-		Path:      req.GetPath(),
-		Branch:    req.GetBranch(),
+		ProjectID:           req.GetProjectId(),
+		RepoID:              req.GetRepoId(),
+		Path:                req.GetPath(),
+		Branch:              req.GetBranch(),
+		IdempotencyKey:      req.GetIdempotencyKey(),
+		BaseRef:             req.GetBaseRef(),
+		LinkedIssueProvider: req.GetLinkedIssueProvider(),
+		LinkedIssueRef:      req.GetLinkedIssueRef(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.RecordWorktreeCreatedResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+func (s *Server) GetWorktree(ctx context.Context, req *projectv1.GetWorktreeRequest) (*projectv1.Worktree, error) {
+	wt, err := s.getWorktree.Execute(ctx, req.GetWorktreeId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoWorktree(wt), nil
 }
 
 func (s *Server) RecordWorktreeRemoved(ctx context.Context, req *projectv1.RecordWorktreeRemovedRequest) (*projectv1.RecordWorktreeRemovedResponse, error) {
@@ -346,7 +376,12 @@ func (s *Server) RecordWorktreeRemoved(ctx context.Context, req *projectv1.Recor
 }
 
 func (s *Server) ListWorktrees(ctx context.Context, req *projectv1.ListWorktreesRequest) (*projectv1.ListWorktreesResponse, error) {
-	worktrees, err := s.listWorktrees.Execute(ctx, usecase.ListWorktreesInput{ProjectID: req.GetProjectId()})
+	in := usecase.ListWorktreesInput{ProjectID: req.GetProjectId(), StatusIn: req.GetStatusIn()}
+	if req.GetOlderThan() != nil {
+		t := req.GetOlderThan().AsTime()
+		in.OlderThan = &t
+	}
+	worktrees, err := s.listWorktrees.Execute(ctx, in)
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -377,6 +412,18 @@ func (s *Server) RenameWorktree(ctx context.Context, req *projectv1.RenameWorktr
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.RenameWorktreeResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+func (s *Server) GetWorktreeByIdempotencyKey(ctx context.Context, req *projectv1.GetWorktreeByIdempotencyKeyRequest) (*projectv1.GetWorktreeByIdempotencyKeyResponse, error) {
+	wt, found, err := s.getWorktreeByIdempotencyKey.Execute(ctx, req.GetProjectId(), req.GetIdempotencyKey())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &projectv1.GetWorktreeByIdempotencyKeyResponse{Found: found}
+	if found {
+		resp.Worktree = toProtoWorktree(wt)
+	}
+	return resp, nil
 }
 
 func (s *Server) CreateProjectGroup(ctx context.Context, req *projectv1.CreateProjectGroupRequest) (*projectv1.CreateProjectGroupResponse, error) {
@@ -548,14 +595,15 @@ func toProtoRole(r domain.ProjectRole) projectv1.ProjectRole {
 
 func toProtoProject(p domain.Project) *projectv1.Project {
 	out := &projectv1.Project{
-		Id:            p.ID,
-		TenantId:      p.TenantID,
-		Name:          p.Name,
-		DevServerId:   p.DevServerID,
-		Description:   p.Description,
-		DefaultBranch: p.DefaultBranch,
-		Visibility:    p.Visibility,
-		CreatedBy:     p.CreatedBy,
+		Id:                     p.ID,
+		TenantId:               p.TenantID,
+		Name:                   p.Name,
+		DevServerId:            p.DevServerID,
+		Description:            p.Description,
+		DefaultBranch:          p.DefaultBranch,
+		Visibility:             p.Visibility,
+		CreatedBy:              p.CreatedBy,
+		IssueStatusSyncEnabled: p.IssueStatusSyncEnabled,
 	}
 	if !p.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(p.CreatedAt)
@@ -577,14 +625,24 @@ func toProtoRepo(r domain.Repo) *projectv1.Repo {
 }
 
 func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
-	return &projectv1.Worktree{
-		Id:        wt.ID,
-		ProjectId: wt.ProjectID,
-		RepoId:    wt.RepoID,
-		Path:      wt.Path,
-		Branch:    wt.Branch,
-		Active:    wt.Active,
+	out := &projectv1.Worktree{
+		Id:             wt.ID,
+		ProjectId:      wt.ProjectID,
+		RepoId:         wt.RepoID,
+		Path:           wt.Path,
+		Branch:         wt.Branch,
+		Active:         wt.Active,
+		IdempotencyKey: wt.IdempotencyKey,
+		Status:         string(wt.Status),
+		BaseRef:        wt.BaseRef, // NEW (SOL-WT-04)
 	}
+	if wt.LinkedIssueProvider != "" {
+		out.LinkedIssueProvider = &wt.LinkedIssueProvider
+	}
+	if wt.LinkedIssueRef != "" {
+		out.LinkedIssueRef = &wt.LinkedIssueRef
+	}
+	return out
 }
 
 func toProtoProjectGroup(g domain.ProjectGroup) *projectv1.ProjectGroup {
@@ -651,6 +709,38 @@ func (s *Server) GetFolderWorkspacePathStatus(ctx context.Context, req *projectv
 	return &projectv1.GetFolderWorkspacePathStatusResponse{
 		Status:                    result.Status,
 		ExistingFolderWorkspaceId: result.ExistingID,
+	}, nil
+}
+
+func (s *Server) GetProjectContext(ctx context.Context, req *projectv1.GetProjectContextRequest) (*projectv1.ProjectContext, error) {
+	pc, err := s.getProjectContext.Execute(ctx, req.GetProjectId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.ProjectContext{
+		ProjectId: pc.ProjectID, ProjectName: pc.ProjectName, Description: pc.Description,
+		RepoUrl: pc.RepoURL, DevServerId: pc.DevServerID, DevServerHostname: pc.DevServerHostname,
+	}, nil
+}
+
+// GetMobileWorktreeStatus is BL-MB-04's ONE composed-read call — tenant_id/
+// user_id come from request-context metadata (see GetMobileWorktreeStatusRequest's
+// proto doc comment), not the (empty) request message.
+func (s *Server) GetMobileWorktreeStatus(ctx context.Context, req *projectv1.GetMobileWorktreeStatusRequest) (*projectv1.GetMobileWorktreeStatusResponse, error) {
+	result, err := s.getMobileWorktreeStatus.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.MobileWorktreeStatus, 0, len(result.Worktrees))
+	for _, wt := range result.Worktrees {
+		out = append(out, &projectv1.MobileWorktreeStatus{
+			Id: wt.ID, Name: wt.Name, Agent: wt.Agent, Status: wt.Status,
+			DurationMs: wt.DurationMs, LastOutput: wt.LastOutput,
+		})
+	}
+	return &projectv1.GetMobileWorktreeStatusResponse{
+		Worktrees:         out,
+		GeneratedAtUnixMs: result.GeneratedAt.UnixMilli(),
 	}, nil
 }
 

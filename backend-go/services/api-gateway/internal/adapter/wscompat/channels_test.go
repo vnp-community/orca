@@ -11,8 +11,38 @@ import (
 	"google.golang.org/grpc/metadata"
 
 	"github.com/stablyai/orca-go/common/grpcmw"
+	annotationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
+
+// fakeAnnotationClient is a minimal test double for
+// annotationv1.AnnotationServiceClient — see fakeInfraFleetClient's doc
+// comment for the embedding pattern this follows.
+type fakeAnnotationClient struct {
+	annotationv1.AnnotationServiceClient
+
+	createAnnotationFunc    func(ctx context.Context, in *annotationv1.CreateAnnotationRequest) (*annotationv1.CreateAnnotationResponse, error)
+	listAnnotationsFunc     func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error)
+	deleteAnnotationFunc    func(ctx context.Context, in *annotationv1.DeleteAnnotationRequest) (*annotationv1.DeleteAnnotationResponse, error)
+	markAnnotationsSentFunc func(ctx context.Context, in *annotationv1.MarkAnnotationsSentRequest) (*annotationv1.MarkAnnotationsSentResponse, error)
+}
+
+func (f *fakeAnnotationClient) CreateAnnotation(ctx context.Context, in *annotationv1.CreateAnnotationRequest, _ ...grpc.CallOption) (*annotationv1.CreateAnnotationResponse, error) {
+	return f.createAnnotationFunc(ctx, in)
+}
+
+func (f *fakeAnnotationClient) ListAnnotations(ctx context.Context, in *annotationv1.ListAnnotationsRequest, _ ...grpc.CallOption) (*annotationv1.ListAnnotationsResponse, error) {
+	return f.listAnnotationsFunc(ctx, in)
+}
+
+func (f *fakeAnnotationClient) DeleteAnnotation(ctx context.Context, in *annotationv1.DeleteAnnotationRequest, _ ...grpc.CallOption) (*annotationv1.DeleteAnnotationResponse, error) {
+	return f.deleteAnnotationFunc(ctx, in)
+}
+
+func (f *fakeAnnotationClient) MarkAnnotationsSent(ctx context.Context, in *annotationv1.MarkAnnotationsSentRequest, _ ...grpc.CallOption) (*annotationv1.MarkAnnotationsSentResponse, error) {
+	return f.markAnnotationsSentFunc(ctx, in)
+}
 
 // fakeInfraFleetClient is a minimal test double for
 // infrafleetv1.InfraFleetServiceClient — embeds the (nil) interface so it
@@ -22,10 +52,12 @@ import (
 type fakeInfraFleetClient struct {
 	infrafleetv1.InfraFleetServiceClient
 
-	listDevServersFunc    func(ctx context.Context, in *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error)
-	registerDevServerFunc func(ctx context.Context, in *infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error)
-	getFleetHealthFunc    func(ctx context.Context, in *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error)
-	relayFunc             func(ctx context.Context, in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
+	listDevServersFunc          func(ctx context.Context, in *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error)
+	registerDevServerFunc       func(ctx context.Context, in *infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error)
+	getFleetHealthFunc          func(ctx context.Context, in *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error)
+	relayFunc                   func(ctx context.Context, in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
+	scanWorkspacePortsFunc      func(ctx context.Context, in *infrafleetv1.ScanWorkspacePortsRequest) (*infrafleetv1.ScanWorkspacePortsResponse, error)
+	streamPortForwardEventsFunc func(ctx context.Context, in *infrafleetv1.StreamPortForwardEventsRequest) (infrafleetv1.InfraFleetService_StreamPortForwardEventsClient, error)
 }
 
 func (f *fakeInfraFleetClient) Relay(ctx context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
@@ -42,6 +74,14 @@ func (f *fakeInfraFleetClient) RegisterDevServer(ctx context.Context, in *infraf
 
 func (f *fakeInfraFleetClient) GetFleetHealth(ctx context.Context, in *infrafleetv1.GetFleetHealthRequest, _ ...grpc.CallOption) (*infrafleetv1.GetFleetHealthResponse, error) {
 	return f.getFleetHealthFunc(ctx, in)
+}
+
+func (f *fakeInfraFleetClient) ScanWorkspacePorts(ctx context.Context, in *infrafleetv1.ScanWorkspacePortsRequest, _ ...grpc.CallOption) (*infrafleetv1.ScanWorkspacePortsResponse, error) {
+	return f.scanWorkspacePortsFunc(ctx, in)
+}
+
+func (f *fakeInfraFleetClient) StreamPortForwardEvents(ctx context.Context, in *infrafleetv1.StreamPortForwardEventsRequest, _ ...grpc.CallOption) (infrafleetv1.InfraFleetService_StreamPortForwardEventsClient, error) {
+	return f.streamPortForwardEventsFunc(ctx, in)
 }
 
 // outgoingTenantUser reads back the metadata AttachIdentity is expected to
@@ -496,74 +536,196 @@ func TestFleetHealthCheckAll_FailsFastWhenServiceSlow(t *testing.T) {
 	}
 }
 
-// ── TASK-010: preflight.check tests ─────────────────────────────────────────
+// ── TASK-INT-03-03: preflight.check tests ───────────────────────────────────
 
-// TestPreflightCheckChannel_CompletesInstantly verifies that preflight.check
-// returns within 50ms — it makes no downstream calls and should be sub-millisecond
-// in practice. Regression guard for BUG-004.
-func TestPreflightCheckChannel_CompletesInstantly(t *testing.T) {
+// TestPreflightCheckChannel_NoConnectionIDIsLocalOnly verifies that an empty
+// connectionId returns local-only results with zero RPC calls made — no
+// fake RPC funcs are set, so any call would panic on the nil-func deref.
+func TestPreflightCheckChannel_NoConnectionIDIsLocalOnly(t *testing.T) {
 	r := NewRegistry()
-	registerPreflightChannels(r)
+	registerPreflightChannels(r, &fakeInfraFleetClient{})
 
-	start := time.Now()
-	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "preflight.check", nil)
-	elapsed := time.Since(start)
-
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "preflight.check", argsJSON(t, map[string]any{}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if elapsed > 50*time.Millisecond {
-		t.Errorf("preflight.check took %s, want < 50ms (local handler, no gRPC call)", elapsed)
-	}
-
-	m, ok := result.(map[string]any)
+	results, ok := result.([]usecase.PreflightCheckResult)
 	if !ok {
-		t.Fatalf("unexpected result type %T, want map[string]any", result)
+		t.Fatalf("unexpected result type %T", result)
 	}
-
-	// Verify git key exists and installed=true (git-gateway-service uses real git binary).
-	gitInfo, ok := m["git"].(map[string]any)
-	if !ok {
-		t.Fatalf("result['git'] is %T, want map[string]any", m["git"])
-	}
-	if gitInfo["installed"] != true {
-		t.Errorf("result['git']['installed'] = %v, want true", gitInfo["installed"])
-	}
-
-	// Verify gh and glab report installed=false (no CLI wrappers in backend-go).
-	for _, tool := range []string{"gh", "glab"} {
-		info, ok := m[tool].(map[string]any)
-		if !ok {
-			t.Fatalf("result[%q] is %T, want map[string]any", tool, m[tool])
-		}
-		if info["installed"] != false {
-			t.Errorf("result[%q]['installed'] = %v, want false (no CLI in backend-go)", tool, info["installed"])
-		}
-		if info["authenticated"] != false {
-			t.Errorf("result[%q]['authenticated'] = %v, want false", tool, info["authenticated"])
-		}
+	if len(results) != 1 || results[0].ID != "git" || results[0].Source != usecase.PreflightSourceLocal {
+		t.Fatalf("expected local-only [git], got %+v", results)
 	}
 }
 
-// TestPreflightCheckChannel_ReturnsExpectedKeys verifies the response has
-// exactly the keys the frontend expects (git, gh, glab).
-func TestPreflightCheckChannel_ReturnsExpectedKeys(t *testing.T) {
-	r := NewRegistry()
-	registerPreflightChannels(r)
+// ── TASK-CR-03-04: RegisterRealChannels wiring ──────────────────────────────
 
-	result, err := r.Dispatch(context.Background(), Identity{}, "preflight.check", nil)
+// TestRegisterRealChannels_RegistersAnnotationSendToAgent confirms
+// annotation.sendToAgent is wired into the composition root alongside every
+// other real channel — see channels_annotation_send.go's
+// registerAnnotationSendChannel and this file's RegisterRealChannels call
+// site. Every client arg besides rateLimits can be nil: registration only
+// closes over the client in each handler, it never calls a client method at
+// registration time.
+func TestRegisterRealChannels_RegistersAnnotationSendToAgent(t *testing.T) {
+	r := NewRegistry()
+	RegisterRealChannels(r, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, &fakeRateLimitReader{}, nil, nil)
+
+	if _, ok := r.handlers["annotation.sendToAgent"]; !ok {
+		t.Error("want annotation.sendToAgent registered by RegisterRealChannels")
+	}
+	if _, ok := r.handlers["annotation.markSent"]; !ok {
+		t.Error("want annotation.markSent registered by RegisterRealChannels")
+	}
+}
+
+// ── TASK-CR-02-07: annotation.delete/markSent tests ─────────────────────────
+
+// TestAnnotationDeleteChannel_ForwardsConfirmed verifies annotation.delete
+// threads the new `confirmed` arg (BR-CR-08) into DeleteAnnotationRequest.
+func TestAnnotationDeleteChannel_ForwardsConfirmed(t *testing.T) {
+	var gotReq *annotationv1.DeleteAnnotationRequest
+	fake := &fakeAnnotationClient{
+		deleteAnnotationFunc: func(ctx context.Context, in *annotationv1.DeleteAnnotationRequest) (*annotationv1.DeleteAnnotationResponse, error) {
+			gotReq = in
+			return &annotationv1.DeleteAnnotationResponse{}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerAnnotationChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"id": "annot-1", "confirmed": true})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "annotation.delete", args)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
+	if gotReq.Id != "annot-1" || !gotReq.Confirmed {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	m, ok := result.(map[string]bool)
+	if !ok || !m["ok"] {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
 
-	m, ok := result.(map[string]any)
+// TestAnnotationMarkSentChannel_Wired verifies annotation.markSent is wired
+// and forwards ids to MarkAnnotationsSent.
+func TestAnnotationMarkSentChannel_Wired(t *testing.T) {
+	var gotReq *annotationv1.MarkAnnotationsSentRequest
+	fake := &fakeAnnotationClient{
+		markAnnotationsSentFunc: func(ctx context.Context, in *annotationv1.MarkAnnotationsSentRequest) (*annotationv1.MarkAnnotationsSentResponse, error) {
+			gotReq = in
+			return &annotationv1.MarkAnnotationsSentResponse{
+				Annotations: []*annotationv1.Annotation{{Id: "annot-1"}, {Id: "annot-2"}},
+			}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerAnnotationChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"ids": []string{"annot-1", "annot-2"}})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "annotation.markSent", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(gotReq.GetIds()) != 2 || gotReq.GetIds()[0] != "annot-1" || gotReq.GetIds()[1] != "annot-2" {
+		t.Errorf("unexpected request ids: %v", gotReq.GetIds())
+	}
+	resp, ok := result.(*annotationv1.MarkAnnotationsSentResponse)
+	if !ok || len(resp.GetAnnotations()) != 2 {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+// TestPreflightCheckChannel_FleetHealthFailureProducesConnectivityWarning
+// verifies a hard GetFleetHealth failure degrades to the relay-connectivity
+// warning while the local git check is still present.
+//
+// Supersedes the pre-SOL-INT-03 TestPreflightCheckChannel_ReturnsExpectedKeys
+// (dropped in this merge) — that test called registerPreflightChannels with
+// the old no-client signature and asserted a map[string]any{git,gh,glab}
+// result shape, both of which the preflight-merge rework replaced.
+func TestPreflightCheckChannel_FleetHealthFailureProducesConnectivityWarning(t *testing.T) {
+	fake := &fakeInfraFleetClient{
+		getFleetHealthFunc: func(context.Context, *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error) {
+			return nil, errors.New("connection refused")
+		},
+	}
+	r := NewRegistry()
+	registerPreflightChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "preflight.check", argsJSON(t, map[string]any{"connectionId": "conn-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	results, ok := result.([]usecase.PreflightCheckResult)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	var sawGit, sawWarning bool
+	for _, c := range results {
+		if c.ID == "git" {
+			sawGit = true
+		}
+		if c.ID == "relay-connectivity" && c.Status == usecase.PreflightWarning {
+			sawWarning = true
+		}
+	}
+	if !sawGit || !sawWarning {
+		t.Fatalf("expected local git check + relay-connectivity warning, got %+v", results)
+	}
+}
+
+// TestPreflightCheckChannel_AuthStatusRelayFailureIsPerCheckSkip simulates a
+// relay-ssh Dev Server (github.auth.status/gitlab.auth.status not
+// implemented) — those 2 checks must come back skip-status while
+// disk-space/port-availability still succeed, and every result must carry a
+// non-empty Source.
+func TestPreflightCheckChannel_AuthStatusRelayFailureIsPerCheckSkip(t *testing.T) {
+	fake := &fakeInfraFleetClient{
+		getFleetHealthFunc: func(context.Context, *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error) {
+			return &infrafleetv1.GetFleetHealthResponse{Statuses: []*infrafleetv1.DevServerHealth{
+				{DevServerId: "dev-1", DiskPercent: 10},
+			}}, nil
+		},
+		scanWorkspacePortsFunc: func(context.Context, *infrafleetv1.ScanWorkspacePortsRequest) (*infrafleetv1.ScanWorkspacePortsResponse, error) {
+			return &infrafleetv1.ScanWorkspacePortsResponse{}, nil
+		},
+		relayFunc: func(_ context.Context, in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+			return nil, errors.New("agent method not found")
+		},
+	}
+	r := NewRegistry()
+	registerPreflightChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "preflight.check", argsJSON(t, map[string]any{"connectionId": "conn-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	results, ok := result.([]usecase.PreflightCheckResult)
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
 
-	for _, key := range []string{"git", "gh", "glab"} {
-		if _, exists := m[key]; !exists {
-			t.Errorf("preflight.check response missing expected key %q", key)
+	byID := make(map[string]usecase.PreflightCheckResult, len(results))
+	for _, c := range results {
+		if c.Source == "" {
+			t.Errorf("PreflightCheckResult %q has empty Source — every result must be tagged", c.ID)
+		}
+		byID[c.ID] = c
+	}
+
+	if byID["disk-space"].Status != usecase.PreflightOK {
+		t.Errorf("disk-space = %+v, want ok", byID["disk-space"])
+	}
+	if byID["port-availability"].Status != usecase.PreflightOK {
+		t.Errorf("port-availability = %+v, want ok", byID["port-availability"])
+	}
+	for _, id := range []string{"github-cli-auth", "gitlab-cli-auth"} {
+		if byID[id].Status != usecase.PreflightSkip {
+			t.Errorf("%s = %+v, want skip", id, byID[id])
 		}
 	}
 }

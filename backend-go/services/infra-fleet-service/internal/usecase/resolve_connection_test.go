@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/stablyai/orca-go/common/tenant"
@@ -95,7 +96,7 @@ func TestResolveConnection_EmptyConnectionID_ShortCircuitsToLocal(t *testing.T) 
 
 // Branch 1: found — the connectionId resolves to a live dev server.
 func TestResolveConnection_Found_ReturnsConnectedAndDevServer(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -110,8 +111,84 @@ func TestResolveConnection_Found_ReturnsConnectedAndDevServer(t *testing.T) {
 	if !out.Connected {
 		t.Fatal("expected Connected=true for a resolvable connectionId")
 	}
-	if out.DevServer != ds {
+	if out.DevServer.ID != ds.ID || out.DevServer.TenantID != ds.TenantID || out.DevServer.Host != ds.Host ||
+		out.DevServer.Mode != ds.Mode || out.DevServer.SSHTargetID != ds.SSHTargetID {
 		t.Errorf("expected resolved dev server %+v, got %+v", ds, out.DevServer)
+	}
+}
+
+// fakeHandshakeInfoProvider is an in-memory usecase.HandshakeInfoProvider
+// for TASK-INT-03-02's node_version enrichment tests.
+type fakeHandshakeInfoProvider struct {
+	byDevServer map[string]string // devServerID -> nodeVersion
+}
+
+func (f fakeHandshakeInfoProvider) NodeVersionFor(devServerID string) (string, bool) {
+	v, ok := f.byDevServer[devServerID]
+	return v, ok
+}
+
+// TestResolveConnection_Sessions_EnrichesNodeVersion covers TASK-INT-03-02:
+// a connected resolution with Sessions set gets NodeVersion populated from
+// the live session.
+func TestResolveConnection_Sessions_EnrichesNodeVersion(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
+	uc := NewResolveConnection(resolver)
+	uc.Sessions = fakeHandshakeInfoProvider{byDevServer: map[string]string{"ds1": "20.11.0"}}
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.NodeVersion != "20.11.0" {
+		t.Errorf("NodeVersion = %q, want 20.11.0", out.NodeVersion)
+	}
+}
+
+// TestResolveConnection_Sessions_NilLeavesNodeVersionEmpty covers the
+// default (nil Sessions) case: NodeVersion stays empty, never an error.
+func TestResolveConnection_Sessions_NilLeavesNodeVersionEmpty(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
+	uc := NewResolveConnection(resolver)
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.NodeVersion != "" {
+		t.Errorf("NodeVersion = %q, want empty when Sessions is nil", out.NodeVersion)
+	}
+}
+
+// TestResolveConnection_Sessions_MissLeavesNodeVersionEmpty covers a
+// Sessions miss (no live session, or a session that predates the field) —
+// still not an error.
+func TestResolveConnection_Sessions_MissLeavesNodeVersionEmpty(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
+	uc := NewResolveConnection(resolver)
+	uc.Sessions = fakeHandshakeInfoProvider{byDevServer: map[string]string{}}
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.NodeVersion != "" {
+		t.Errorf("NodeVersion = %q, want empty on a Sessions miss", out.NodeVersion)
 	}
 }
 
@@ -149,7 +226,7 @@ func TestResolveConnection_RepositoryFailurePropagates(t *testing.T) {
 // to the same output a by-ConnectionID resolve of the same live connection
 // would.
 func TestResolveConnection_ByDevServerID_MatchesByConnectionID(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -173,7 +250,7 @@ func TestResolveConnection_ByDevServerID_MatchesByConnectionID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error resolving by dev server id: %v", err)
 	}
-	if gotOut != wantOut {
+	if !reflect.DeepEqual(gotOut, wantOut) {
 		t.Errorf("resolving by dev_server_id = %+v, want %+v (same as by connection_id)", gotOut, wantOut)
 	}
 	if gotOut.ConnectionID != "conn-1" {
@@ -183,7 +260,7 @@ func TestResolveConnection_ByDevServerID_MatchesByConnectionID(t *testing.T) {
 
 // TASK-025/TASK-030: same as above, but keyed by WorktreeID.
 func TestResolveConnection_ByWorktreeID_MatchesByConnectionID(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -207,7 +284,7 @@ func TestResolveConnection_ByWorktreeID_MatchesByConnectionID(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error resolving by worktree id: %v", err)
 	}
-	if gotOut != wantOut {
+	if !reflect.DeepEqual(gotOut, wantOut) {
 		t.Errorf("resolving by worktree_id = %+v, want %+v (same as by connection_id)", gotOut, wantOut)
 	}
 	if gotOut.ConnectionID != "conn-1" {

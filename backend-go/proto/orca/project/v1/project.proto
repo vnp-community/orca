@@ -38,8 +38,18 @@ service ProjectService {
   rpc RecordWorktreeCreated(RecordWorktreeCreatedRequest) returns (RecordWorktreeCreatedResponse);
   rpc RecordWorktreeRemoved(RecordWorktreeRemovedRequest) returns (RecordWorktreeRemovedResponse);
   rpc ListWorktrees(ListWorktreesRequest) returns (ListWorktreesResponse);
+  // NEW (SOL-WT-04) — single-worktree lookup, the same class of gap SOL-031
+  // already flagged for GetRepo ("project.proto has no single-repo-by-id
+  // lookup RPC"). CompareWorktrees (git-gateway-service) uses this to look
+  // up each compared worktree's repo_id/branch/base_ref.
+  rpc GetWorktree(GetWorktreeRequest) returns (Worktree);
   rpc SetWorktreeActivation(SetWorktreeActivationRequest) returns (SetWorktreeActivationResponse);
   rpc RenameWorktree(RenameWorktreeRequest) returns (RenameWorktreeResponse);
+
+  // GetWorktreeByIdempotencyKey backs BR-CLI-01 — git-gateway-service's
+  // CreateWorktree saga calls this before running `git worktree add`.
+  // found=false means "no dedupe match yet", not an error.
+  rpc GetWorktreeByIdempotencyKey(GetWorktreeByIdempotencyKeyRequest) returns (GetWorktreeByIdempotencyKeyResponse);
 
   // ProjectGroup surface — self-referential tree via parent_group_id, per
   // project-service.md §4.
@@ -73,6 +83,18 @@ service ProjectService {
   rpc UpdateHostSetup(UpdateHostSetupRequest) returns (UpdateHostSetupResponse);
   rpc DeleteHostSetup(DeleteHostSetupRequest) returns (DeleteHostSetupResponse);
   rpc SetupExistingFolder(SetupExistingFolderRequest) returns (SetupExistingFolderResponse);
+
+  // GetProjectContext is project-service.md §2's Boundary-decision RPC:
+  // the read-only project-context lookup workflow-service/task-service call
+  // to build an agent-spawn env/preamble — a two-step saga (resolve context
+  // here, then call the execution-owning service), not a synchronous
+  // cross-service execution call.
+  rpc GetProjectContext(GetProjectContextRequest) returns (ProjectContext);
+  // GetMobileWorktreeStatus is the ONE composed-read call BL-MB-04 reduces
+  // to — project-service already depends on infra-fleet-service (dev-server
+  // binding validation), so this extends that existing edge rather than
+  // adding a new cross-service dependency.
+  rpc GetMobileWorktreeStatus(GetMobileWorktreeStatusRequest) returns (GetMobileWorktreeStatusResponse);
 }
 
 message Project {
@@ -86,6 +108,7 @@ message Project {
   string created_by = 8; // logical FK -> tenant-service user id
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  bool issue_status_sync_enabled = 11;  // BR-PI-07/BR-PI-06, default true
 }
 
 message CreateProjectRequest {
@@ -94,6 +117,8 @@ message CreateProjectRequest {
   string description = 3;
   string default_branch = 4;
   string visibility = 5;
+  string dev_server_id = 6; // NEW — binds at creation time, per BL-PRF-03's flow
+  string repo_path = 7;     // NEW — absolute path on dev_server_id; becomes the project's first Repo
 }
 
 message CreateProjectResponse {
@@ -181,6 +206,9 @@ message UpdateProjectRequest {
   string description = 3; // empty = no change
   string default_branch = 4; // empty = no change
   string visibility = 5; // empty = no change
+  // issue_status_sync_enabled is presence-based (unlike the string fields
+  // above) since "" can't mean no-change for a bool — unset = no change.
+  optional bool issue_status_sync_enabled = 6;
 }
 
 message UpdateProjectResponse {
@@ -249,13 +277,25 @@ message Worktree {
   string path = 4;
   string branch = 5;
   bool active = 6;
+  optional string idempotency_key = 7; // BR-CLI-01: caller-supplied dedupe key, unset when not set
+  optional string linked_issue_provider = 8;  // "github" | "gitlab" | "jira" | "linear"
+  optional string linked_issue_ref = 9;       // provider-native ref: "owner/repo#123" or "ENG-123"
+  string status = 10; // NEW — "active" | "completed" | "error" | "stopped"; orthogonal to activation_state (the `active` field above)
+  optional string base_ref = 11; // NEW (SOL-WT-04) — the branch/tag/sha this worktree was created from; empty for worktrees created before this backfill
 }
+
+// NEW (SOL-WT-04) — single-worktree lookup by id.
+message GetWorktreeRequest { string worktree_id = 1; }
 
 message RecordWorktreeCreatedRequest {
   string project_id = 1;
   string repo_id = 2;
   string path = 3;
   string branch = 4;
+  optional string idempotency_key = 5; // BR-CLI-01, see Worktree.idempotency_key
+  optional string linked_issue_provider = 6;
+  optional string linked_issue_ref = 7;
+  optional string base_ref = 8; // NEW — the branch/tag/sha this worktree was created from
 }
 
 message RecordWorktreeCreatedResponse {
@@ -268,8 +308,26 @@ message RecordWorktreeRemovedRequest {
 
 message RecordWorktreeRemovedResponse {}
 
+// Subject: orca.project.worktree.created / orca.project.worktree.deleted
+// Naming per 08-inter-service-communication.md: orca.<service>.<entity>.<event>.
+// Published via NATS JetStream (see internal/adapter/eventbus), not gRPC —
+// this message only documents the wire schema.
+message WorktreeLifecycleEvent {
+  string event_id = 1;          // consumer-side dedup key
+  string tenant_id = 2;
+  string occurred_at = 3;       // RFC3339
+  int32 schema_version = 4;     // starts at 1
+  string worktree_id = 5;
+  string project_id = 6;
+  string linked_issue_provider = 7;  // empty = no linked issue, consumer no-ops
+  string linked_issue_ref = 8;
+  bool had_open_pr = 9;              // worktree.deleted only; publisher always sends false — see record_worktree_removed.go's doc comment
+}
+
 message ListWorktreesRequest {
   string project_id = 1;
+  repeated string status_in = 2;             // NEW — optional; unset = no filtering
+  google.protobuf.Timestamp older_than = 3;  // NEW — optional; created_at cutoff
 }
 
 message ListWorktreesResponse {
@@ -292,6 +350,15 @@ message RenameWorktreeRequest {
 
 message RenameWorktreeResponse {
   Worktree worktree = 1;
+}
+
+message GetWorktreeByIdempotencyKeyRequest {
+  string project_id = 1;
+  string idempotency_key = 2;
+}
+message GetWorktreeByIdempotencyKeyResponse {
+  bool found = 1;
+  Worktree worktree = 2; // unset when found=false
 }
 
 message ProjectGroup {
@@ -474,4 +541,33 @@ message SetupExistingFolderRequest {
 message SetupExistingFolderResponse {
   HostSetup setup = 1;  // status now "completed" or "failed"
   Project project = 2;  // set only on success
+}
+
+message GetProjectContextRequest {
+  string project_id = 1;
+}
+
+message ProjectContext {
+  string project_id = 1;
+  string project_name = 2;
+  string description = 3;
+  string repo_url = 4;            // from the project's primary Repo (position 0), if any
+  string dev_server_id = 5;
+  string dev_server_hostname = 6; // resolved via infra-fleet-service, best-effort — empty if unresolvable
+}
+
+message GetMobileWorktreeStatusRequest {} // tenant_id/user_id via metadata
+
+message GetMobileWorktreeStatusResponse {
+  repeated MobileWorktreeStatus worktrees = 1;
+  int64 generated_at_unix_ms = 2; // BR-MB-16: client computes "last updated X ago" from this
+}
+
+message MobileWorktreeStatus {
+  string id = 1;              // Worktree.ID
+  string name = 2;            // Worktree.Branch
+  string agent = 3;           // AgentKind, e.g. "claude" | "codex" | "" if none running
+  string status = 4;          // "completed" | "running" | "waiting" | "idle" | "unknown"
+  int64  duration_ms = 5;     // now - TerminalSession.CreatedAt for a running session; 0 if idle
+  string last_output = 6;     // BR-MB-15: truncated to 500 chars server-side, never a raw dump
 }

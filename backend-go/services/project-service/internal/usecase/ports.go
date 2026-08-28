@@ -6,8 +6,11 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
+
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
 
 // ProjectRepository is the persistence port for projects and project
@@ -53,6 +56,11 @@ type ProjectRepository interface {
 	// CountOwners is the read RemoveMember/UpdateMemberRole use to enforce
 	// the "≥1 owner" invariant before mutating.
 	CountOwners(ctx context.Context, projectID string) (int, error)
+	// ListForMember returns only projects userID is a member of, within
+	// tenantID — unlike List, which returns every tenant project regardless
+	// of caller membership (a pre-existing gap this closes; ListProjects's
+	// visibility filter is meaningless layered over an unscoped list). NEW.
+	ListForMember(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error)
 }
 
 // MembershipRepository is the read-only subset of ProjectRepository that
@@ -131,16 +139,41 @@ type RepoRepository interface {
 // project.worktrees. See domain.Worktree's doc comment: never authoritative
 // for on-disk existence.
 type WorktreeRepository interface {
-	RecordWorktreeCreated(ctx context.Context, worktree domain.Worktree) (domain.Worktree, error)
+	// RecordWorktreeCreated inserts the worktree row and durably enqueues
+	// event as an outbox row, in the SAME transaction — the
+	// transactional-outbox pattern (05-data-architecture.md).
+	RecordWorktreeCreated(ctx context.Context, worktree domain.Worktree, event domain.OutboxEvent) (domain.Worktree, error)
 	// RecordWorktreeRemoved hard-deletes the worktree row — a deliberate
 	// choice over a soft-removed flag: this table is disposable metadata
 	// with git-gateway-service as the source of truth for lineage/history,
 	// so there is no reporting/audit need for a tombstone row here. See
 	// this service's README for the explicit decision record.
 	RecordWorktreeRemoved(ctx context.Context, worktreeID string) error
-	ListWorktrees(ctx context.Context, projectID string) ([]domain.Worktree, error)
+	// ListWorktrees returns projectID's worktrees, optionally filtered by
+	// statusIn (nil/empty = no filter) and olderThan (nil = no filter) —
+	// BL-AT-04's cleanup_worktrees step candidate query.
+	ListWorktrees(ctx context.Context, projectID string, statusIn []string, olderThan *time.Time) ([]domain.Worktree, error)
+	// GetWorktree looks up a single worktree by id — backs the new
+	// GetWorktree RPC (SOL-WT-04).
+	GetWorktree(ctx context.Context, worktreeID string) (domain.Worktree, error)
 	SetWorktreeActivation(ctx context.Context, worktreeID string, active bool) (domain.Worktree, error)
 	RenameWorktree(ctx context.Context, worktreeID, branch string) (domain.Worktree, error)
+	// FindWorktreeByIdempotencyKey backs BR-CLI-01 — see
+	// GetWorktreeByIdempotencyKey's doc comment. found=false, err=nil means
+	// "no match yet", not an error.
+	FindWorktreeByIdempotencyKey(ctx context.Context, projectID, idempotencyKey string) (domain.Worktree, bool, error)
+
+	// CreateWorktreeWithEvent inserts worktree and its worktree.created
+	// outbox event in ONE transaction (SOL-PI-03) — see usage-service's
+	// SaveSession(ctx, session, event) for the precedent this follows.
+	// RecordWorktreeCreated (used by usecase.RecordWorktreeCreated as of
+	// TASK-PI-03-03) now calls this instead of the bare method above.
+	CreateWorktreeWithEvent(ctx context.Context, worktree domain.Worktree, event domain.OutboxEvent) (domain.Worktree, error)
+	// RemoveWorktreeWithEvent deletes the row and enqueues worktree.deleted
+	// in the same transaction. buildEvent is called with the just-deleted
+	// row (for its linked-issue fields) so the caller can build the event
+	// payload without a separate pre-delete read.
+	RemoveWorktreeWithEvent(ctx context.Context, worktreeID string, buildEvent func(removed domain.Worktree) domain.OutboxEvent) error
 }
 
 // ProjectGroupRepository is the persistence port for the folder-style
@@ -210,6 +243,25 @@ type DevServerLister interface {
 	Exists(ctx context.Context, tenantID, devServerID string) (bool, error)
 }
 
+// TerminalStatusResolver is the outbound port toward infra-fleet-service's
+// PTY/terminal-session surface — GetMobileWorktreeStatus's ONE cross-service
+// dependency (SOL-MB-04), implemented by internal/adapter/grpcclient against
+// infrafleetv1.InfraFleetServiceClient. Kept as infrafleetv1 DTOs rather than
+// a project-service domain type: this data never persists here, it is
+// composed fresh into MobileWorktreeStatus on every call, so an extra
+// translation layer would buy nothing.
+type TerminalStatusResolver interface {
+	// ListSessionsForDevServer resolves devServerID to its live connection
+	// and lists its terminal sessions — nil, nil (not an error) when the dev
+	// server has no live connection.
+	ListSessionsForDevServer(ctx context.Context, devServerID string) ([]*infrafleetv1.TerminalSession, error)
+	// GetAgentStatus fetches one ptyId's AgentKind/AgentRunning/
+	// ReadyForInput — TerminalSession itself doesn't carry these (see
+	// GetMobileWorktreeStatus's doc comment for the extra-RPC-cost tradeoff
+	// this implies).
+	GetAgentStatus(ctx context.Context, ptyID string) (*infrafleetv1.GetTerminalAgentStatusResponse, error)
+}
+
 // FolderWorkspaceRepository is the persistence port for FolderWorkspace —
 // see domain.FolderWorkspace's doc comment for why this is a standalone
 // entity, not a ProjectGroup extension. Implemented by internal/adapter/
@@ -238,4 +290,75 @@ type FolderWorkspaceRepository interface {
 	// Update/Delete's ownership check (usecase.FolderWorkspaceUseCase) to
 	// load the caller's added_by before mutating.
 	Get(ctx context.Context, id string) (*domain.FolderWorkspace, error)
+}
+
+// DevServerHealthChecker is the outbound port toward infra-fleet-service's
+// GetFleetHealth RPC — CreateProject/RebindDevServer's online/health guard.
+// Genuinely new: infra-fleet-service.md §1 already documents fleet health
+// monitoring, but no caller in this service used it before this task.
+type DevServerHealthChecker interface {
+	// IsReachable fails closed on error — a health-check outage must never
+	// silently bind/rebind to a server that might be down.
+	IsReachable(ctx context.Context, tenantID, devServerID string) (bool, error)
+}
+
+// AuditPublisher is the outbound port RebindDevServer calls after a
+// successful rebind to emit a security-relevant audit event — outbox
+// pattern (05-data-architecture.md), not a synchronous call to another
+// service. A nil AuditPublisher is valid — callers must nil-check, same
+// convention as tenant-service's CacheInvalidationPublisher.
+type AuditPublisher interface {
+	PublishAuditEvent(ctx context.Context, tenantID, actorID, action, target string) error
+}
+
+// MemberNotifier is the outbound port RebindDevServer calls after a
+// successful rebind to notify every project member — best-effort, same
+// outbox posture as AuditPublisher. A nil MemberNotifier is valid.
+type MemberNotifier interface {
+	NotifyDevServerChanged(ctx context.Context, tenantID string, userIDs []string, projectID, oldDevServerID, newDevServerID string) error
+}
+
+// ProfileResolver is the outbound port ListProjects uses to resolve the
+// caller's ResolvedProfile for the fleet.allowedServerTags visibility
+// filter — a NEW outbound edge from project-service to tenant-service
+// (tenant-service.md §3/§7 already documents GetResolvedProfile as callable
+// by any service, just not exercised by project-service before this task).
+// DevServerTags resolves a dev server's tags via infra-fleet-service.ListDevServers.
+type ProfileResolver interface {
+	GetResolvedProfile(ctx context.Context, tenantID, userID string) (ResolvedProfileView, error)
+	DevServerTags(ctx context.Context, tenantID, devServerID string) ([]string, error)
+}
+
+// ResolvedProfileView is the subset of tenant-service's ResolvedProfile this
+// service actually reads — decoded from GetResolvedProfileResponse's
+// resolved_settings_json by the adapter, not the raw JSON map, so usecase/
+// code never touches encoding/json directly.
+type ResolvedProfileView struct {
+	allowedServerTags []string
+	hasRestriction    bool
+}
+
+// NewResolvedProfileView constructs a ResolvedProfileView — called by
+// internal/adapter/infrafleetclient.ProfileResolver's implementation (or
+// wherever the JSON is decoded) after reading fleet.allowedServerTags out of
+// the decoded resolved_settings_json. hasRestriction distinguishes "key
+// absent" (false, unrestricted) from "key present, possibly empty" (true) —
+// see domain/profile_resolution.go's mergeAllowedServerTags doc comment
+// (tenant-service, SOL-PRF-02) for why this distinction must survive.
+func NewResolvedProfileView(tags []string, hasRestriction bool) ResolvedProfileView {
+	return ResolvedProfileView{allowedServerTags: tags, hasRestriction: hasRestriction}
+}
+
+// AllowedServerTags returns the tag allowlist and whether one is defined at
+// all (false = unrestricted, filter nothing).
+func (v ResolvedProfileView) AllowedServerTags() ([]string, bool) {
+	return v.allowedServerTags, v.hasRestriction
+}
+
+// DevServerHostnameResolver resolves a dev server id to its host string via
+// infra-fleet-service.ListDevServers — best-effort, used only by
+// GetProjectContext's display-only dev_server_hostname field. A lookup
+// failure never fails the whole GetProjectContext read.
+type DevServerHostnameResolver interface {
+	Hostname(ctx context.Context, tenantID, devServerID string) (string, error)
 }

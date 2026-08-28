@@ -658,6 +658,28 @@ async function route(
       }
     }
 
+    // ── SOL-SSH-04: ports.detect (auto port-forwarding scan) ────────────────
+    case 'ports.detect': {
+      try {
+        const { handlePortsDetect } = await import('./port-scan-handler')
+        return (await handlePortsDetect(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `ports.detect unavailable: ${msg}`)
+      }
+    }
+
+    // ── SOL-SSH-04: ports.kill (KillWorkspacePort relay target) ──────────────
+    case 'ports.kill': {
+      try {
+        const { handlePortsKill } = await import('./port-kill-handler')
+        return (await handlePortsKill(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `ports.kill unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: ai.provider.writeCredential ────────────────────────────────────
     case 'ai.provider.writeCredential': {
       try {
@@ -701,6 +723,20 @@ async function route(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `ai.provider.testConnection unavailable: ${msg}`)
+      }
+    }
+
+    // ── ai.testProviderConnection ────────────────────────────────────────────
+    // Distinct from ai.provider.testConnection above — see
+    // specs/backend-go/bugs/logic-v1/tasks/TASK-AIP-SHARED-01-add-agent-test-connection-rpc.md.
+    // Called by ai-provider-service (backend-go) via infra-fleet-service's Relay.
+    case 'ai.testProviderConnection': {
+      try {
+        const { handleTestProviderConnection } = await import('./agent-credential-store')
+        return (await handleTestProviderConnection(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `ai.testProviderConnection unavailable: ${msg}`)
       }
     }
 
@@ -1470,7 +1506,9 @@ async function route(
 
     // ── v5.0: pty.create ─────────────────────────────────────────────────────
     // TM-001/TM-006: Create a PTY session in agent mode.
-    // Params: { cwd, cols?, rows?, env?, shellOverride? }
+    // Params: { cwd, cols?, rows?, env?, shellOverride?, shellIntegration? }
+    // shellIntegration (BR-TM-13, SOL-TM-04): opt-in PowerShell OSC 133
+    // bootstrap injection — default false, no effect on non-PowerShell shells.
     // Returns: { id, cols, rows, cwd, shell }
     // Why all six pty.* cases below pass makeNotifier(ws, state) (not just
     // create/attach): PTYs now live in the detached pty-daemon process

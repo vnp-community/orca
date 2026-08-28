@@ -4,12 +4,19 @@ import (
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshconn"
 )
+
+// ErrChecksumMismatch is deploy()'s checksum-mismatch sentinel — lets
+// deployWithRetry distinguish it from a network/SFTP error via errors.Is
+// rather than string-matching, so dispatch survives message wording changes.
+var ErrChecksumMismatch = errors.New("sshrelay: relay bundle checksum mismatch")
 
 // remoteDir/remoteAgentFile are fixed — one dedicated SSH connection is
 // opened per relay-ssh session (see transport.go's Connection field), so
@@ -74,10 +81,50 @@ func deploy(ctx context.Context, conn *sshconn.Connection, cfg Config) (string, 
 	}
 	remoteHex := strings.TrimSpace(remoteHexOut)
 	if remoteHex != localHex {
-		return "", fmt.Errorf("sshrelay: relay bundle checksum mismatch after upload (local=%s remote=%s) — aborting deploy", localHex, remoteHex)
+		return "", fmt.Errorf("%w after upload (local=%s remote=%s)", ErrChecksumMismatch, localHex, remoteHex)
 	}
 
 	return remoteDir, nil
+}
+
+const maxDeployNetworkRetries = 3
+
+// deployWithRetry wraps deploy() with up to maxDeployNetworkRetries attempts
+// (A1). A checksum mismatch (A2) triggers exactly one immediate
+// re-upload-and-recheck, not folded into the network-retry budget — a
+// persistent mismatch after that one retry fails outright rather than
+// retrying identically 3x (which would just repeat the same corrupted
+// transfer and mask a real corruption/tampering signal).
+func deployWithRetry(ctx context.Context, conn *sshconn.Connection, cfg Config) (string, error) {
+	var lastErr error
+	for attempt := 0; attempt < maxDeployNetworkRetries; attempt++ {
+		dir, err := deploy(ctx, conn, cfg)
+		if err == nil {
+			return dir, nil
+		}
+		lastErr = err
+		if errors.Is(err, ErrChecksumMismatch) {
+			if dir, rerr := deploy(ctx, conn, cfg); rerr == nil {
+				return dir, nil
+			} else if errors.Is(rerr, ErrChecksumMismatch) {
+				return "", fmt.Errorf("sshrelay: relay bundle checksum mismatch persisted after re-upload — refusing to launch a possibly-corrupted/tampered bundle: %w", rerr)
+			} else {
+				lastErr = rerr
+			}
+			break // don't network-retry after a checksum-specific failure path
+		}
+		if attempt < maxDeployNetworkRetries-1 {
+			time.Sleep(deployBackoffDelay(attempt))
+		}
+	}
+	return "", fmt.Errorf("sshrelay: deploy failed after %d attempts: %w", maxDeployNetworkRetries, lastErr)
+}
+
+// deployBackoffDelay: 500ms, 1s, 2s — small on purpose, deploy sits on the
+// connect-latency-sensitive path (a caller is waiting for EstablishConnection
+// to return).
+func deployBackoffDelay(attempt int) time.Duration {
+	return 500 * time.Millisecond * time.Duration(1<<uint(attempt))
 }
 
 // shellQuote wraps s in single quotes for POSIX shell, escaping any

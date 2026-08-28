@@ -11,9 +11,10 @@ import (
 	commonconfig "github.com/stablyai/orca-go/common/config"
 )
 
-// defaultSchedulerInterval matches automation-service.md §7's "~1 minute"
-// in-process ticker loop guidance.
-const defaultSchedulerInterval = time.Minute
+// defaultSchedulerInterval matches BL-AT-02's main-flow-specified 30-second
+// scheduler tick (BUG-AT-02) — was previously time.Minute, matching an
+// earlier "~1 minute" guidance since superseded.
+const defaultSchedulerInterval = 30 * time.Second
 
 // defaultSchedulerBatchSize caps how many due automations a single tick
 // claims — an unbounded claim could hold the claim transaction (see
@@ -33,6 +34,11 @@ type Config struct {
 	SchedulerInterval time.Duration
 	// SchedulerBatchSize is the max due automations claimed per tick.
 	SchedulerBatchSize int32
+	// NATSURL is the JetStream connection string — internal/adapter/eventbus
+	// uses it both to publish orca.automation.run.completed (via the
+	// transactional-outbox relay) and to consume the 5 event-trigger
+	// subjects (TASK-AT-03-05).
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -53,6 +59,7 @@ func Load() (Config, error) {
 		WorkflowServiceAddr: commonconfig.StringEnv("WORKFLOW_SERVICE_ADDR", "localhost:9091"),
 		SchedulerInterval:   interval,
 		SchedulerBatchSize:  batchSize,
+		NATSURL:             commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }
 

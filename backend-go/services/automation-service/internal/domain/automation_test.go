@@ -19,12 +19,17 @@ func TestNewAutomation_ValidatesInvariants(t *testing.T) {
 		{"empty tenant", "", "nightly-report", "FREQ=DAILY;INTERVAL=1", `{}`, ErrEmptyTenant},
 		{"empty name", "t1", "", "FREQ=DAILY;INTERVAL=1", `{}`, ErrEmptyName},
 		{"empty rrule", "t1", "nightly-report", "", `{}`, ErrEmptyRRule},
-		{"empty step config", "t1", "nightly-report", "FREQ=DAILY;INTERVAL=1", "", ErrEmptyStepConfig},
+		// BR-AT-01: an automation with no populated Actions and no
+		// back-compat step_config_json has nothing to run.
+		{"empty step config", "t1", "nightly-report", "FREQ=DAILY;INTERVAL=1", "", ErrEmptyActions},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewAutomation("a1", tt.tenantID, tt.automationName, tt.rrule, StepTypeAgent, tt.stepConfig, now, "UTC", true, now)
+			_, err := NewAutomation(NewAutomationParams{
+				ID: "a1", TenantID: tt.tenantID, Name: tt.automationName, RRule: tt.rrule,
+				StepType: StepTypeAgent, StepConfigJSON: tt.stepConfig, DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+			})
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -37,7 +42,10 @@ func TestNewAutomation_ValidatesInvariants(t *testing.T) {
 
 func TestNewAutomation_RejectsInvalidRRule(t *testing.T) {
 	now := time.Now()
-	_, err := NewAutomation("a1", "t1", "bad-rule", "NOT_A_RULE", StepTypeAgent, `{}`, now, "UTC", true, now)
+	_, err := NewAutomation(NewAutomationParams{
+		ID: "a1", TenantID: "t1", Name: "bad-rule", RRule: "NOT_A_RULE",
+		StepType: StepTypeAgent, StepConfigJSON: `{}`, DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+	})
 	if err == nil {
 		t.Fatal("expected an error for an invalid rrule")
 	}
@@ -45,7 +53,10 @@ func TestNewAutomation_RejectsInvalidRRule(t *testing.T) {
 
 func TestNewAutomation_DefaultsStepTypeWhenInvalid(t *testing.T) {
 	now := time.Now()
-	a, err := NewAutomation("a1", "t1", "nightly-report", "FREQ=DAILY;INTERVAL=1", StepTypeUnspecified, `{}`, now, "UTC", true, now)
+	a, err := NewAutomation(NewAutomationParams{
+		ID: "a1", TenantID: "t1", Name: "nightly-report", RRule: "FREQ=DAILY;INTERVAL=1",
+		StepType: StepTypeUnspecified, StepConfigJSON: `{}`, DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -56,12 +67,86 @@ func TestNewAutomation_DefaultsStepTypeWhenInvalid(t *testing.T) {
 
 func TestNewAutomation_DefaultsTimezoneWhenEmpty(t *testing.T) {
 	now := time.Now()
-	a, err := NewAutomation("a1", "t1", "nightly-report", "FREQ=DAILY;INTERVAL=1", StepTypeAgent, `{}`, now, "", true, now)
+	a, err := NewAutomation(NewAutomationParams{
+		ID: "a1", TenantID: "t1", Name: "nightly-report", RRule: "FREQ=DAILY;INTERVAL=1",
+		StepType: StepTypeAgent, StepConfigJSON: `{}`, DTStart: now, Timezone: "", Enabled: true, CreatedAt: now,
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if a.Timezone != "UTC" {
 		t.Errorf("expected Timezone to default to UTC, got %q", a.Timezone)
+	}
+}
+
+func TestNewAutomation_EmptyActionsAndEmptyStepConfigRejected(t *testing.T) {
+	now := time.Now()
+	_, err := NewAutomation(NewAutomationParams{
+		ID: "a1", TenantID: "t1", Name: "nightly-report", RRule: "FREQ=DAILY;INTERVAL=1",
+		DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+	})
+	if err != ErrEmptyActions {
+		t.Fatalf("expected ErrEmptyActions, got %v", err)
+	}
+}
+
+func TestNewAutomation_PopulatedActionsChainSucceeds(t *testing.T) {
+	now := time.Now()
+	a, err := NewAutomation(NewAutomationParams{
+		ID: "a1", TenantID: "t1", Name: "nightly-report", RRule: "FREQ=DAILY;INTERVAL=1",
+		Actions: []AutomationAction{
+			{StepType: StepTypeAgent, StepConfigJSON: `{}`},
+			{StepType: StepTypeShell, StepConfigJSON: `{"command":"echo hi"}`, OnFailure: OnFailureContinue},
+		},
+		DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(a.Actions) != 2 {
+		t.Fatalf("expected 2 actions, got %d", len(a.Actions))
+	}
+	if a.Actions[0].OnFailure != OnFailureStop {
+		t.Errorf("expected unset OnFailure to default to stop, got %v", a.Actions[0].OnFailure)
+	}
+	if a.Actions[1].OnFailure != OnFailureContinue {
+		t.Errorf("expected explicit OnFailure to be preserved, got %v", a.Actions[1].OnFailure)
+	}
+}
+
+func TestNewAutomation_TriggerEventRequiresValidEventName(t *testing.T) {
+	now := time.Now()
+	_, err := NewAutomation(NewAutomationParams{
+		ID: "a1", TenantID: "t1", Name: "n", RRule: "FREQ=DAILY;INTERVAL=1",
+		StepType: StepTypeAgent, StepConfigJSON: `{}`, DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+		TriggerType: TriggerTypeEvent,
+	})
+	if err == nil {
+		t.Fatal("expected an error for trigger_type=event with no trigger_event")
+	}
+
+	a, err := NewAutomation(NewAutomationParams{
+		ID: "a1", TenantID: "t1", Name: "n", RRule: "FREQ=DAILY;INTERVAL=1",
+		StepType: StepTypeAgent, StepConfigJSON: `{}`, DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+		TriggerType: TriggerTypeEvent, TriggerEvent: EventAgentCompleted,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if a.TriggerEvent != EventAgentCompleted {
+		t.Errorf("expected trigger_event=agent:completed, got %v", a.TriggerEvent)
+	}
+}
+
+func TestNewAutomation_TriggerEventRejectedWhenTypeIsNotEvent(t *testing.T) {
+	now := time.Now()
+	_, err := NewAutomation(NewAutomationParams{
+		ID: "a1", TenantID: "t1", Name: "n", RRule: "FREQ=DAILY;INTERVAL=1",
+		StepType: StepTypeAgent, StepConfigJSON: `{}`, DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+		TriggerType: TriggerTypeCron, TriggerEvent: EventAgentCompleted,
+	})
+	if err == nil {
+		t.Fatal("expected an error for a non-event trigger_type with a non-empty trigger_event")
 	}
 }
 

@@ -15,6 +15,9 @@ import (
 type Identity struct {
 	TenantID string
 	UserID   string
+	// DeviceID is non-empty only for a mobile-paired-device JWT (SOL-MB-01)
+	// — read from the token's device_id claim, see jwtauth.Claims.DeviceID.
+	DeviceID string
 }
 
 var (
@@ -94,7 +97,7 @@ func (v *AuthValidator) Validate(r *http.Request) (Identity, error) {
 	if claims.TenantID == "" || claims.Subject == "" {
 		return Identity{}, ErrMissingIdentityClaims
 	}
-	return Identity{TenantID: claims.TenantID, UserID: claims.Subject}, nil
+	return Identity{TenantID: claims.TenantID, UserID: claims.Subject, DeviceID: claims.DeviceID}, nil
 }
 
 func bearerToken(r *http.Request) string {

@@ -65,7 +65,11 @@ const (
 	GitGatewayService_WriteIssueCommand_FullMethodName           = "/orca.gitgateway.v1.GitGatewayService/WriteIssueCommand"
 	GitGatewayService_ScanSetupScriptImports_FullMethodName      = "/orca.gitgateway.v1.GitGatewayService/ScanSetupScriptImports"
 	GitGatewayService_CreateWorktree_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/CreateWorktree"
+	GitGatewayService_CreateWorktreeFromIssue_FullMethodName     = "/orca.gitgateway.v1.GitGatewayService/CreateWorktreeFromIssue"
 	GitGatewayService_RemoveWorktree_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/RemoveWorktree"
+	GitGatewayService_CheckWorktreeDeleteSafety_FullMethodName   = "/orca.gitgateway.v1.GitGatewayService/CheckWorktreeDeleteSafety"
+	GitGatewayService_CompareWorktrees_FullMethodName            = "/orca.gitgateway.v1.GitGatewayService/CompareWorktrees"
+	GitGatewayService_MergeBranch_FullMethodName                 = "/orca.gitgateway.v1.GitGatewayService/MergeBranch"
 	GitGatewayService_ForceDeleteBranch_FullMethodName           = "/orca.gitgateway.v1.GitGatewayService/ForceDeleteBranch"
 	GitGatewayService_DetectWorktrees_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/DetectWorktrees"
 	GitGatewayService_PrefetchCreateBase_FullMethodName          = "/orca.gitgateway.v1.GitGatewayService/PrefetchCreateBase"
@@ -81,6 +85,13 @@ const (
 	GitGatewayService_ResolveConflict_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/ResolveConflict"
 	GitGatewayService_Discard_FullMethodName                     = "/orca.gitgateway.v1.GitGatewayService/Discard"
 	GitGatewayService_BulkDiscard_FullMethodName                 = "/orca.gitgateway.v1.GitGatewayService/BulkDiscard"
+	GitGatewayService_MergeIntoBranch_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/MergeIntoBranch"
+	GitGatewayService_StashPush_FullMethodName                   = "/orca.gitgateway.v1.GitGatewayService/StashPush"
+	GitGatewayService_StashPop_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/StashPop"
+	GitGatewayService_CreateBranch_FullMethodName                = "/orca.gitgateway.v1.GitGatewayService/CreateBranch"
+	GitGatewayService_DeleteBranch_FullMethodName                = "/orca.gitgateway.v1.GitGatewayService/DeleteBranch"
+	GitGatewayService_PushStream_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/PushStream"
+	GitGatewayService_PullStream_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/PullStream"
 )
 
 // GitGatewayServiceClient is the client API for GitGatewayService service.
@@ -160,7 +171,21 @@ type GitGatewayServiceClient interface {
 	WriteIssueCommand(ctx context.Context, in *WriteIssueCommandRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ScanSetupScriptImports(ctx context.Context, in *ScanSetupScriptImportsRequest, opts ...grpc.CallOption) (*ScanSetupScriptImportsResponse, error)
 	CreateWorktree(ctx context.Context, in *CreateWorktreeRequest, opts ...grpc.CallOption) (*CreateWorktreeResponse, error)
-	RemoveWorktree(ctx context.Context, in *RemoveWorktreeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// CreateWorktreeFromIssue is the same saga as CreateWorktree with issue
+	// fetch/branch-derivation prepended and agent-spawn/status-sync-enqueue
+	// appended — see SOL-PI-02.
+	CreateWorktreeFromIssue(ctx context.Context, in *CreateWorktreeFromIssueRequest, opts ...grpc.CallOption) (*CreateWorktreeFromIssueResponse, error)
+	RemoveWorktree(ctx context.Context, in *RemoveWorktreeRequest, opts ...grpc.CallOption) (*RemoveWorktreeResponse, error)
+	// NEW — read-only pre-delete check, called by the client before rendering
+	// the confirm dialog (mirrors worktree.detectedList's separate-read-call
+	// shape).
+	CheckWorktreeDeleteSafety(ctx context.Context, in *CheckWorktreeDeleteSafetyRequest, opts ...grpc.CallOption) (*CheckWorktreeDeleteSafetyResponse, error)
+	// NEW (SOL-WT-04) — aggregates each compared worktree's BranchCompare
+	// stats plus BR-WT-13's shared-base_ref cross-check.
+	CompareWorktrees(ctx context.Context, in *CompareWorktreesRequest, opts ...grpc.CallOption) (*CompareWorktreesResponse, error)
+	// NEW (SOL-WT-05) — completes an RPC git-gateway-service.md §3 already
+	// named but was never added to the real proto.
+	MergeBranch(ctx context.Context, in *MergeBranchRequest, opts ...grpc.CallOption) (*MergeBranchResponse, error)
 	// Required on every GitExecutor implementation from day one — TASK-194
 	// makes it a required interface method, not an optional one, closing the
 	// old TS backend's crash-bug class (forceDeletePreservedBranch? was
@@ -194,6 +219,20 @@ type GitGatewayServiceClient interface {
 	ResolveConflict(ctx context.Context, in *ResolveConflictRequest, opts ...grpc.CallOption) (*ResolveConflictResponse, error)
 	Discard(ctx context.Context, in *DiscardRequest, opts ...grpc.CallOption) (*DiscardResponse, error)
 	BulkDiscard(ctx context.Context, in *BulkDiscardRequest, opts ...grpc.CallOption) (*BulkDiscardResponse, error)
+	// ── SOL-PW-03 — merge/stash/branch-write + push/pull progress streaming.
+	// Only reachable over relay-websocket/direct-websocket connections; a
+	// relay-ssh connection's git.exec whitelist rejects these subcommands
+	// outright (usecase-layer mode gate, not an executor-level check).
+	// Named MergeIntoBranch (not MergeBranch) — that name is already taken by
+	// SOL-WT-05's worktree-into-base merge RPC above; this one merges an
+	// arbitrary branch INTO the current branch, a different operation. ─────
+	MergeIntoBranch(ctx context.Context, in *MergeIntoBranchRequest, opts ...grpc.CallOption) (*MergeIntoBranchResponse, error)
+	StashPush(ctx context.Context, in *StashPushRequest, opts ...grpc.CallOption) (*StashPushResponse, error)
+	StashPop(ctx context.Context, in *StashPopRequest, opts ...grpc.CallOption) (*StashPopResponse, error)
+	CreateBranch(ctx context.Context, in *CreateBranchRequest, opts ...grpc.CallOption) (*CreateBranchResponse, error)
+	DeleteBranch(ctx context.Context, in *DeleteBranchRequest, opts ...grpc.CallOption) (*DeleteBranchResponse, error)
+	PushStream(ctx context.Context, in *PushRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GitProgressEvent], error)
+	PullStream(ctx context.Context, in *PullRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GitProgressEvent], error)
 }
 
 type gitGatewayServiceClient struct {
@@ -654,10 +693,50 @@ func (c *gitGatewayServiceClient) CreateWorktree(ctx context.Context, in *Create
 	return out, nil
 }
 
-func (c *gitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *RemoveWorktreeRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+func (c *gitGatewayServiceClient) CreateWorktreeFromIssue(ctx context.Context, in *CreateWorktreeFromIssueRequest, opts ...grpc.CallOption) (*CreateWorktreeFromIssueResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
+	out := new(CreateWorktreeFromIssueResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CreateWorktreeFromIssue_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) RemoveWorktree(ctx context.Context, in *RemoveWorktreeRequest, opts ...grpc.CallOption) (*RemoveWorktreeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveWorktreeResponse)
 	err := c.cc.Invoke(ctx, GitGatewayService_RemoveWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CheckWorktreeDeleteSafety(ctx context.Context, in *CheckWorktreeDeleteSafetyRequest, opts ...grpc.CallOption) (*CheckWorktreeDeleteSafetyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckWorktreeDeleteSafetyResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CheckWorktreeDeleteSafety_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CompareWorktrees(ctx context.Context, in *CompareWorktreesRequest, opts ...grpc.CallOption) (*CompareWorktreesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompareWorktreesResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CompareWorktrees_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) MergeBranch(ctx context.Context, in *MergeBranchRequest, opts ...grpc.CallOption) (*MergeBranchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MergeBranchResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_MergeBranch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -814,6 +893,94 @@ func (c *gitGatewayServiceClient) BulkDiscard(ctx context.Context, in *BulkDisca
 	return out, nil
 }
 
+func (c *gitGatewayServiceClient) MergeIntoBranch(ctx context.Context, in *MergeIntoBranchRequest, opts ...grpc.CallOption) (*MergeIntoBranchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MergeIntoBranchResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_MergeIntoBranch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) StashPush(ctx context.Context, in *StashPushRequest, opts ...grpc.CallOption) (*StashPushResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StashPushResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_StashPush_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) StashPop(ctx context.Context, in *StashPopRequest, opts ...grpc.CallOption) (*StashPopResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StashPopResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_StashPop_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) CreateBranch(ctx context.Context, in *CreateBranchRequest, opts ...grpc.CallOption) (*CreateBranchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateBranchResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CreateBranch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) DeleteBranch(ctx context.Context, in *DeleteBranchRequest, opts ...grpc.CallOption) (*DeleteBranchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DeleteBranchResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_DeleteBranch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) PushStream(ctx context.Context, in *PushRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GitProgressEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &GitGatewayService_ServiceDesc.Streams[0], GitGatewayService_PushStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[PushRequest, GitProgressEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GitGatewayService_PushStreamClient = grpc.ServerStreamingClient[GitProgressEvent]
+
+func (c *gitGatewayServiceClient) PullStream(ctx context.Context, in *PullRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GitProgressEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &GitGatewayService_ServiceDesc.Streams[1], GitGatewayService_PullStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[PullRequest, GitProgressEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GitGatewayService_PullStreamClient = grpc.ServerStreamingClient[GitProgressEvent]
+
 // GitGatewayServiceServer is the server API for GitGatewayService service.
 // All implementations must embed UnimplementedGitGatewayServiceServer
 // for forward compatibility.
@@ -891,7 +1058,21 @@ type GitGatewayServiceServer interface {
 	WriteIssueCommand(context.Context, *WriteIssueCommandRequest) (*emptypb.Empty, error)
 	ScanSetupScriptImports(context.Context, *ScanSetupScriptImportsRequest) (*ScanSetupScriptImportsResponse, error)
 	CreateWorktree(context.Context, *CreateWorktreeRequest) (*CreateWorktreeResponse, error)
-	RemoveWorktree(context.Context, *RemoveWorktreeRequest) (*emptypb.Empty, error)
+	// CreateWorktreeFromIssue is the same saga as CreateWorktree with issue
+	// fetch/branch-derivation prepended and agent-spawn/status-sync-enqueue
+	// appended — see SOL-PI-02.
+	CreateWorktreeFromIssue(context.Context, *CreateWorktreeFromIssueRequest) (*CreateWorktreeFromIssueResponse, error)
+	RemoveWorktree(context.Context, *RemoveWorktreeRequest) (*RemoveWorktreeResponse, error)
+	// NEW — read-only pre-delete check, called by the client before rendering
+	// the confirm dialog (mirrors worktree.detectedList's separate-read-call
+	// shape).
+	CheckWorktreeDeleteSafety(context.Context, *CheckWorktreeDeleteSafetyRequest) (*CheckWorktreeDeleteSafetyResponse, error)
+	// NEW (SOL-WT-04) — aggregates each compared worktree's BranchCompare
+	// stats plus BR-WT-13's shared-base_ref cross-check.
+	CompareWorktrees(context.Context, *CompareWorktreesRequest) (*CompareWorktreesResponse, error)
+	// NEW (SOL-WT-05) — completes an RPC git-gateway-service.md §3 already
+	// named but was never added to the real proto.
+	MergeBranch(context.Context, *MergeBranchRequest) (*MergeBranchResponse, error)
 	// Required on every GitExecutor implementation from day one — TASK-194
 	// makes it a required interface method, not an optional one, closing the
 	// old TS backend's crash-bug class (forceDeletePreservedBranch? was
@@ -925,6 +1106,20 @@ type GitGatewayServiceServer interface {
 	ResolveConflict(context.Context, *ResolveConflictRequest) (*ResolveConflictResponse, error)
 	Discard(context.Context, *DiscardRequest) (*DiscardResponse, error)
 	BulkDiscard(context.Context, *BulkDiscardRequest) (*BulkDiscardResponse, error)
+	// ── SOL-PW-03 — merge/stash/branch-write + push/pull progress streaming.
+	// Only reachable over relay-websocket/direct-websocket connections; a
+	// relay-ssh connection's git.exec whitelist rejects these subcommands
+	// outright (usecase-layer mode gate, not an executor-level check).
+	// Named MergeIntoBranch (not MergeBranch) — that name is already taken by
+	// SOL-WT-05's worktree-into-base merge RPC above; this one merges an
+	// arbitrary branch INTO the current branch, a different operation. ─────
+	MergeIntoBranch(context.Context, *MergeIntoBranchRequest) (*MergeIntoBranchResponse, error)
+	StashPush(context.Context, *StashPushRequest) (*StashPushResponse, error)
+	StashPop(context.Context, *StashPopRequest) (*StashPopResponse, error)
+	CreateBranch(context.Context, *CreateBranchRequest) (*CreateBranchResponse, error)
+	DeleteBranch(context.Context, *DeleteBranchRequest) (*DeleteBranchResponse, error)
+	PushStream(*PushRequest, grpc.ServerStreamingServer[GitProgressEvent]) error
+	PullStream(*PullRequest, grpc.ServerStreamingServer[GitProgressEvent]) error
 	mustEmbedUnimplementedGitGatewayServiceServer()
 }
 
@@ -1070,8 +1265,20 @@ func (UnimplementedGitGatewayServiceServer) ScanSetupScriptImports(context.Conte
 func (UnimplementedGitGatewayServiceServer) CreateWorktree(context.Context, *CreateWorktreeRequest) (*CreateWorktreeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateWorktree not implemented")
 }
-func (UnimplementedGitGatewayServiceServer) RemoveWorktree(context.Context, *RemoveWorktreeRequest) (*emptypb.Empty, error) {
+func (UnimplementedGitGatewayServiceServer) CreateWorktreeFromIssue(context.Context, *CreateWorktreeFromIssueRequest) (*CreateWorktreeFromIssueResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateWorktreeFromIssue not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) RemoveWorktree(context.Context, *RemoveWorktreeRequest) (*RemoveWorktreeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveWorktree not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CheckWorktreeDeleteSafety(context.Context, *CheckWorktreeDeleteSafetyRequest) (*CheckWorktreeDeleteSafetyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckWorktreeDeleteSafety not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CompareWorktrees(context.Context, *CompareWorktreesRequest) (*CompareWorktreesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompareWorktrees not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) MergeBranch(context.Context, *MergeBranchRequest) (*MergeBranchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MergeBranch not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) ForceDeleteBranch(context.Context, *ForceDeleteBranchRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method ForceDeleteBranch not implemented")
@@ -1117,6 +1324,27 @@ func (UnimplementedGitGatewayServiceServer) Discard(context.Context, *DiscardReq
 }
 func (UnimplementedGitGatewayServiceServer) BulkDiscard(context.Context, *BulkDiscardRequest) (*BulkDiscardResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BulkDiscard not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) MergeIntoBranch(context.Context, *MergeIntoBranchRequest) (*MergeIntoBranchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MergeIntoBranch not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) StashPush(context.Context, *StashPushRequest) (*StashPushResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StashPush not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) StashPop(context.Context, *StashPopRequest) (*StashPopResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StashPop not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) CreateBranch(context.Context, *CreateBranchRequest) (*CreateBranchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateBranch not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) DeleteBranch(context.Context, *DeleteBranchRequest) (*DeleteBranchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteBranch not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) PushStream(*PushRequest, grpc.ServerStreamingServer[GitProgressEvent]) error {
+	return status.Error(codes.Unimplemented, "method PushStream not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) PullStream(*PullRequest, grpc.ServerStreamingServer[GitProgressEvent]) error {
+	return status.Error(codes.Unimplemented, "method PullStream not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) mustEmbedUnimplementedGitGatewayServiceServer() {}
 func (UnimplementedGitGatewayServiceServer) testEmbeddedByValue()                           {}
@@ -1949,6 +2177,24 @@ func _GitGatewayService_CreateWorktree_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitGatewayService_CreateWorktreeFromIssue_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateWorktreeFromIssueRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CreateWorktreeFromIssue(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CreateWorktreeFromIssue_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CreateWorktreeFromIssue(ctx, req.(*CreateWorktreeFromIssueRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GitGatewayService_RemoveWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RemoveWorktreeRequest)
 	if err := dec(in); err != nil {
@@ -1963,6 +2209,60 @@ func _GitGatewayService_RemoveWorktree_Handler(srv interface{}, ctx context.Cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(GitGatewayServiceServer).RemoveWorktree(ctx, req.(*RemoveWorktreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CheckWorktreeDeleteSafety_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckWorktreeDeleteSafetyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CheckWorktreeDeleteSafety(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CheckWorktreeDeleteSafety_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CheckWorktreeDeleteSafety(ctx, req.(*CheckWorktreeDeleteSafetyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CompareWorktrees_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompareWorktreesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CompareWorktrees(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CompareWorktrees_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CompareWorktrees(ctx, req.(*CompareWorktreesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_MergeBranch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MergeBranchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).MergeBranch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_MergeBranch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).MergeBranch(ctx, req.(*MergeBranchRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2237,6 +2537,118 @@ func _GitGatewayService_BulkDiscard_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitGatewayService_MergeIntoBranch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MergeIntoBranchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).MergeIntoBranch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_MergeIntoBranch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).MergeIntoBranch(ctx, req.(*MergeIntoBranchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_StashPush_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StashPushRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).StashPush(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_StashPush_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).StashPush(ctx, req.(*StashPushRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_StashPop_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StashPopRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).StashPop(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_StashPop_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).StashPop(ctx, req.(*StashPopRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_CreateBranch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateBranchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CreateBranch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CreateBranch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CreateBranch(ctx, req.(*CreateBranchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_DeleteBranch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteBranchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).DeleteBranch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_DeleteBranch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).DeleteBranch(ctx, req.(*DeleteBranchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_PushStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(PushRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(GitGatewayServiceServer).PushStream(m, &grpc.GenericServerStream[PushRequest, GitProgressEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GitGatewayService_PushStreamServer = grpc.ServerStreamingServer[GitProgressEvent]
+
+func _GitGatewayService_PullStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(PullRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(GitGatewayServiceServer).PullStream(m, &grpc.GenericServerStream[PullRequest, GitProgressEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GitGatewayService_PullStreamServer = grpc.ServerStreamingServer[GitProgressEvent]
+
 // GitGatewayService_ServiceDesc is the grpc.ServiceDesc for GitGatewayService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2425,8 +2837,24 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GitGatewayService_CreateWorktree_Handler,
 		},
 		{
+			MethodName: "CreateWorktreeFromIssue",
+			Handler:    _GitGatewayService_CreateWorktreeFromIssue_Handler,
+		},
+		{
 			MethodName: "RemoveWorktree",
 			Handler:    _GitGatewayService_RemoveWorktree_Handler,
+		},
+		{
+			MethodName: "CheckWorktreeDeleteSafety",
+			Handler:    _GitGatewayService_CheckWorktreeDeleteSafety_Handler,
+		},
+		{
+			MethodName: "CompareWorktrees",
+			Handler:    _GitGatewayService_CompareWorktrees_Handler,
+		},
+		{
+			MethodName: "MergeBranch",
+			Handler:    _GitGatewayService_MergeBranch_Handler,
 		},
 		{
 			MethodName: "ForceDeleteBranch",
@@ -2488,7 +2916,38 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "BulkDiscard",
 			Handler:    _GitGatewayService_BulkDiscard_Handler,
 		},
+		{
+			MethodName: "MergeIntoBranch",
+			Handler:    _GitGatewayService_MergeIntoBranch_Handler,
+		},
+		{
+			MethodName: "StashPush",
+			Handler:    _GitGatewayService_StashPush_Handler,
+		},
+		{
+			MethodName: "StashPop",
+			Handler:    _GitGatewayService_StashPop_Handler,
+		},
+		{
+			MethodName: "CreateBranch",
+			Handler:    _GitGatewayService_CreateBranch_Handler,
+		},
+		{
+			MethodName: "DeleteBranch",
+			Handler:    _GitGatewayService_DeleteBranch_Handler,
+		},
 	},
-	Streams:  []grpc.StreamDesc{},
+	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "PushStream",
+			Handler:       _GitGatewayService_PushStream_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "PullStream",
+			Handler:       _GitGatewayService_PullStream_Handler,
+			ServerStreams: true,
+		},
+	},
 	Metadata: "orca/gitgateway/v1/gitgateway.proto",
 }

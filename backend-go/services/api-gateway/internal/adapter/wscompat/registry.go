@@ -12,6 +12,13 @@ import (
 type Identity struct {
 	TenantID string
 	UserID   string
+	// DeviceID is non-empty only for a mobile-paired-device JWT (SOL-MB-01,
+	// minted by auth-service's CompleteDevicePairing/IssueToken.ExecuteForDevice)
+	// — required by every mobile.* channel (channels_mobile_dispatch.go,
+	// channels_mobile_status.go). A plain browser session's Identity never
+	// carries one, so mobile.* channels stay unreachable from a browser
+	// session.
+	DeviceID string
 }
 
 // ChannelHandler implements one RPC channel (e.g. "task.create") — args are

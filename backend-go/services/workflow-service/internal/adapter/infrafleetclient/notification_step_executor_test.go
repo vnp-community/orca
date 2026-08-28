@@ -20,7 +20,7 @@ func TestNotificationExecutor_SuccessfulRelayProducesCompletedStepResult(t *test
 			return &infrafleetv1.RelayResponse{ResultJson: `{}`}, nil
 		},
 	}
-	exec := NewNotificationExecutor(fake)
+	exec := NewNotificationExecutor(fake, testResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.NotificationStepConfig{ConnectionID: "conn-1", Channel: "#builds", Message: "workflow finished"})
@@ -46,7 +46,7 @@ func TestNotificationExecutor_RelayResultErrorProducesFailedStepResult(t *testin
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewNotificationExecutor(fake)
+	exec := NewNotificationExecutor(fake, testResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.NotificationStepConfig{ConnectionID: "conn-1", Channel: "#nope", Message: "hi"})
@@ -65,7 +65,7 @@ func TestNotificationExecutor_RelayErrorPropagates(t *testing.T) {
 			return nil, errors.New("dev server unreachable")
 		},
 	}
-	exec := NewNotificationExecutor(fake)
+	exec := NewNotificationExecutor(fake, testResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.NotificationStepConfig{ConnectionID: "conn-1", Channel: "#builds", Message: "hi"})

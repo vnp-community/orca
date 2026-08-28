@@ -10,7 +10,7 @@ import (
 )
 
 func TestUpdateTask_RequiresTenantContext(t *testing.T) {
-	uc := NewUpdateTask(newFakeTaskRepository())
+	uc := NewUpdateTask(newFakeTaskRepository(), &fakeEdgeRepository{})
 	if _, err := uc.Execute(context.Background(), UpdateTaskInput{ID: "t1"}); err == nil {
 		t.Fatal("expected an error when no tenant is in context")
 	}
@@ -22,7 +22,7 @@ func TestUpdateTask_RequiresTenantContext(t *testing.T) {
 func TestUpdateTask_RejectsTransitionIntoInProgress(t *testing.T) {
 	repo := newFakeTaskRepository()
 	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Status: domain.StatusOpen}
-	uc := NewUpdateTask(repo)
+	uc := NewUpdateTask(repo, &fakeEdgeRepository{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	status := domain.StatusInProgress
@@ -39,7 +39,7 @@ func TestUpdateTask_RejectsTransitionIntoInProgress(t *testing.T) {
 func TestUpdateTask_AllowsOtherTransitions(t *testing.T) {
 	repo := newFakeTaskRepository()
 	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Status: domain.StatusOpen}
-	uc := NewUpdateTask(repo)
+	uc := NewUpdateTask(repo, &fakeEdgeRepository{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	status := domain.StatusDone
@@ -55,7 +55,7 @@ func TestUpdateTask_AllowsOtherTransitions(t *testing.T) {
 func TestUpdateTask_UpdatesTitleOnly(t *testing.T) {
 	repo := newFakeTaskRepository()
 	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Title: "old", Status: domain.StatusOpen}
-	uc := NewUpdateTask(repo)
+	uc := NewUpdateTask(repo, &fakeEdgeRepository{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	newTitle := "new"
@@ -69,10 +69,120 @@ func TestUpdateTask_UpdatesTitleOnly(t *testing.T) {
 }
 
 func TestUpdateTask_NotFound(t *testing.T) {
-	uc := NewUpdateTask(newFakeTaskRepository())
+	uc := NewUpdateTask(newFakeTaskRepository(), &fakeEdgeRepository{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, UpdateTaskInput{ID: "does-not-exist"}); err == nil {
 		t.Fatal("expected an error for a nonexistent task")
+	}
+}
+
+// TestUpdateTask_UnblocksSingleDependencyDependent locks in SOL-TG-01's
+// un-block design: a dependent blocked on exactly one dependency transitions
+// back to Open the moment that dependency is marked Done via UpdateTask.
+func TestUpdateTask_UnblocksSingleDependencyDependent(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["blocker"] = domain.Task{ID: "blocker", TenantID: "tenant-1", Status: domain.StatusOpen}
+	repo.tasks["dependent"] = domain.Task{ID: "dependent", TenantID: "tenant-1", Status: domain.StatusBlocked}
+	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
+		{FromTaskID: "dependent", ToTaskID: "blocker", Kind: domain.EdgeKindDependsOn},
+	}}
+	uc := NewUpdateTask(repo, edges)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	status := domain.StatusDone
+	if _, err := uc.Execute(ctx, UpdateTaskInput{ID: "blocker", Status: &status}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := repo.tasks["dependent"].Status; got != domain.StatusOpen {
+		t.Errorf("expected dependent to be unblocked to open, got %q", got)
+	}
+}
+
+// TestUpdateTask_MultiDependencyDependentStaysBlockedUntilAllClear is the
+// mirror case: a dependent with TWO dependencies stays Blocked until BOTH
+// clear, not just the one UpdateTask happens to touch.
+func TestUpdateTask_MultiDependencyDependentStaysBlockedUntilAllClear(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["blocker1"] = domain.Task{ID: "blocker1", TenantID: "tenant-1", Status: domain.StatusOpen}
+	repo.tasks["blocker2"] = domain.Task{ID: "blocker2", TenantID: "tenant-1", Status: domain.StatusOpen}
+	repo.tasks["dependent"] = domain.Task{ID: "dependent", TenantID: "tenant-1", Status: domain.StatusBlocked}
+	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
+		{FromTaskID: "dependent", ToTaskID: "blocker1", Kind: domain.EdgeKindDependsOn},
+		{FromTaskID: "dependent", ToTaskID: "blocker2", Kind: domain.EdgeKindDependsOn},
+	}}
+	uc := NewUpdateTask(repo, edges)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	status := domain.StatusDone
+	if _, err := uc.Execute(ctx, UpdateTaskInput{ID: "blocker1", Status: &status}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := repo.tasks["dependent"].Status; got != domain.StatusBlocked {
+		t.Errorf("expected dependent to STAY blocked (blocker2 still open), got %q", got)
+	}
+
+	if _, err := uc.Execute(ctx, UpdateTaskInput{ID: "blocker2", Status: &status}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := repo.tasks["dependent"].Status; got != domain.StatusOpen {
+		t.Errorf("expected dependent to unblock once every dependency cleared, got %q", got)
+	}
+}
+
+// ── SOL-PW-04 — outbox enqueue regression guards (TASK-PW-04-03) ─────────
+
+func TestUpdateTask_StatusTransition_EnqueuesExactlyOneStatusChangedEvent(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Status: domain.StatusOpen}
+	uc := NewUpdateTask(repo, &fakeEdgeRepository{})
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	status := domain.StatusCancelled
+	if _, err := uc.Execute(ctx, UpdateTaskInput{ID: "t1", Status: &status}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repo.lastUpdateEvents) != 1 {
+		t.Fatalf("expected exactly 1 outbox event, got %+v", repo.lastUpdateEvents)
+	}
+	if repo.lastUpdateEvents[0].Subject != "orca.task.task.statuschanged" {
+		t.Errorf("unexpected subject: %q", repo.lastUpdateEvents[0].Subject)
+	}
+}
+
+func TestUpdateTask_TransitionIntoDone_AlsoEnqueuesCompletedEvent(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Status: domain.StatusOpen}
+	uc := NewUpdateTask(repo, &fakeEdgeRepository{})
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	status := domain.StatusDone
+	if _, err := uc.Execute(ctx, UpdateTaskInput{ID: "t1", Status: &status}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repo.lastUpdateEvents) != 2 {
+		t.Fatalf("expected 2 outbox events (statuschanged + completed), got %+v", repo.lastUpdateEvents)
+	}
+	subjects := map[string]bool{}
+	for _, e := range repo.lastUpdateEvents {
+		subjects[e.Subject] = true
+	}
+	if !subjects["orca.task.task.statuschanged"] || !subjects["orca.task.task.completed"] {
+		t.Errorf("expected both statuschanged and completed subjects, got %+v", repo.lastUpdateEvents)
+	}
+}
+
+func TestUpdateTask_TitleOnly_EnqueuesNoEvents(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Title: "old", Status: domain.StatusOpen}
+	uc := NewUpdateTask(repo, &fakeEdgeRepository{})
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	newTitle := "new"
+	if _, err := uc.Execute(ctx, UpdateTaskInput{ID: "t1", Title: &newTitle}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(repo.lastUpdateEvents) != 0 {
+		t.Errorf("expected no outbox events for a title-only update, got %+v", repo.lastUpdateEvents)
 	}
 }

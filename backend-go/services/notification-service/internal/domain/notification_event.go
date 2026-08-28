@@ -99,6 +99,16 @@ var subjectRules = map[string]subjectRule{
 		Type: "task_completed", Title: "Task completed", Body: "Your task has finished.",
 		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
 	},
+	// Added SOL-PW-04 (TASK-PW-04-08). Fires on EVERY status transition
+	// (open->in_progress, etc.), not just completion — an "open ->
+	// in_progress" toast on every single task dispatch would be noise the
+	// .completed subject above doesn't have, so this is deliberately
+	// WS-only, low-severity: available to any future in-app UI without
+	// becoming a push notification.
+	"orca.task.task.statuschanged": {
+		Type: "task_status_changed", Title: "Task updated", Body: "",
+		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS},
+	},
 	"orca.workflow.execution.completed": {
 		Type: "workflow_completed", Title: "Workflow finished", Body: "Your workflow execution has completed.",
 		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
@@ -120,6 +130,29 @@ var subjectRules = map[string]subjectRule{
 	},
 	"orca.orchestration.decision_gate.opened": {
 		Type: "decision_gate_opened", Title: "Needs your decision", Body: "A workflow is waiting on your decision.",
+		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
+	"orca.project.devserver.changed": {
+		Type: "project_devserver_changed", Title: "Dev server changed",
+		Body:     "This project's dev server binding was changed.",
+		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS},
+	},
+	// BL-MB-02 (SOL-MB-02): infra-fleet-service's PTY output-quiescence
+	// tracking and ai-provider-service's connection-test relay parsing.
+	"orca.infra.terminal_session.agent_completed": {
+		Type: "agent_completed", Title: "✅ Agent xong", Body: "{agent} đã hoàn thành task.",
+		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
+	"orca.infra.terminal_session.agent_error": {
+		Type: "agent_error", Title: "❌ Agent lỗi",
+		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
+	"orca.infra.terminal_session.agent_waiting": {
+		Type: "agent_waiting", Title: "⏸ Agent chờ input",
+		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
+	"orca.aiprovider.account.rate_limited": {
+		Type: "rate_limited", Title: "⚠️ Rate limit",
 		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
 	},
 }
@@ -172,6 +205,14 @@ func TranslateEvent(id, sourceEventID, subject, tenantID string, payload EventPa
 		Channels:         rule.Channels,
 		CreatedAt:        occurredAt,
 	}, nil
+}
+
+// BufferedNotification is one pending buffered push notification (BR-MB-07)
+// — decoded back into a NotificationEvent so callers (StreamNotifications'
+// reconnect drain) can reuse the same wire-framing a live event uses.
+type BufferedNotification struct {
+	ID    string
+	Event NotificationEvent
 }
 
 func recipientsOf(p EventPayload) []string {

@@ -24,6 +24,47 @@ type fakeSshTargetRepository struct {
 	// used by list_ssh_targets_test.go.
 	targets map[string][]domain.SshTarget
 	listErr error
+
+	// byHostUser (tenantID|host|user -> target) and getByHostUserErr drive
+	// GetByHostUser's fake answer — used by import_fleet_inventory_test.go's
+	// dry-run assertions.
+	byHostUser       map[string]domain.SshTarget
+	getByHostUserErr error
+
+	// upserted records every Upsert call in order, upsertErr forces an
+	// error, and upsertUpdated forces the returned `updated` flag when a
+	// matching byHostUser entry does not already decide it.
+	upserted      []domain.SshTarget
+	upsertErr     error
+	upsertUpdated bool
+}
+
+func sshTargetHostUserKey(tenantID, host, userName string) string {
+	return tenantID + "|" + host + "|" + userName
+}
+
+// Upsert implements usecase.SshTargetRepository.Upsert.
+func (f *fakeSshTargetRepository) Upsert(ctx context.Context, target domain.SshTarget) (domain.SshTarget, bool, error) {
+	if f.upsertErr != nil {
+		return domain.SshTarget{}, false, f.upsertErr
+	}
+	key := sshTargetHostUserKey(target.TenantID, target.Host, target.UserName)
+	_, existed := f.byHostUser[key]
+	if f.byHostUser == nil {
+		f.byHostUser = map[string]domain.SshTarget{}
+	}
+	f.byHostUser[key] = target
+	f.upserted = append(f.upserted, target)
+	return target, existed || f.upsertUpdated, nil
+}
+
+// GetByHostUser implements usecase.SshTargetRepository.GetByHostUser.
+func (f *fakeSshTargetRepository) GetByHostUser(ctx context.Context, tenantID, host, userName string) (domain.SshTarget, bool, error) {
+	if f.getByHostUserErr != nil {
+		return domain.SshTarget{}, false, f.getByHostUserErr
+	}
+	t, ok := f.byHostUser[sshTargetHostUserKey(tenantID, host, userName)]
+	return t, ok, nil
 }
 
 func (f *fakeSshTargetRepository) Create(ctx context.Context, target domain.SshTarget) (domain.SshTarget, error) {

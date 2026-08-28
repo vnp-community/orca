@@ -40,6 +40,21 @@ var ErrForceDeleteBranchUnsupported = errors.New("git-gateway-service: relay tar
 // errors.Is) can import it without an import cycle.
 var ErrConflictResolveUnsupportedOverRelay = errors.New("git-gateway-service: relay target does not support per-file conflict resolution")
 
+// ErrGitOpUnsupportedOverSSHRelay is returned when a merge/stash/branch-
+// write or push/pull-progress-stream operation is attempted against a
+// relay-ssh-mode connection — the real agent's git.exec whitelist for Part
+// B (the surface RelayExecutor's SSH-relay calls reach) explicitly
+// excludes merge/rebase/stash and has no execStream equivalent at all
+// (specs/agent/api/agent-rpc-catalog-git-fs.md's "Not allowed at all"
+// list). Same operational-fallback shape as ErrForceDeleteBranchUnsupported
+// above — lives in domain so both grpcclient (which returns it) and
+// usecase (which checks it via errors.Is) can import it without an import
+// cycle.
+var ErrGitOpUnsupportedOverSSHRelay = errors.New(
+	"git-gateway-service: this operation requires a relay-websocket or " +
+		"direct-websocket connection; relay-ssh's git.exec whitelist does " +
+		"not permit merge/stash/branch-write subcommands")
+
 // FileState enumerates the file-status values git-gateway-service's wire
 // protocol carries (mirrors the generated proto's FileStatus.state string
 // per gitgateway.proto's comment: "modified/added/deleted/untracked/conflicted").
@@ -111,11 +126,40 @@ type PullResult struct {
 	HadConflicts bool
 }
 
+// GitProgressLine is one streamed line of push/pull progress output
+// (TASK-PW-03-08, SOL-PW-03) — mirrors gitgateway.proto's GitProgressEvent
+// 1:1 and the agent's git.execStream frame shape
+// (specs/agent/api/agent-rpc-catalog-git-fs.md: {type:'stream.chunk',
+// line,source?} / {type:'stream.end',exitCode}). IsFinal=true carries the
+// unary-equivalent outcome in Success/HadConflicts (mirroring PushResult/
+// PullResult's own shape) rather than a separate terminal message type.
+type GitProgressLine struct {
+	Line         string
+	Source       string // "stdout" | "stderr"; empty for the final line
+	IsFinal      bool
+	ExitCode     int32
+	Success      bool // only meaningful when IsFinal
+	HadConflicts bool // only meaningful when IsFinal (pull's had_conflicts shape)
+}
+
 // SimpleResult is the bare-success-flag shape shared by Stage/Unstage
 // (TASK-208) and Fetch — any operation with no richer result than
 // "did it work".
 type SimpleResult struct {
 	Success bool
+}
+
+// MergeOutcome reflects whether a MergeIntoBranch (or StashPop, which
+// reuses this shape) operation succeeded, and whether it left the worktree
+// with unresolved conflicts — same Success/HadConflicts shape as
+// PullResult/RebaseResult, since a merge conflict is a real domain outcome,
+// not a Go error. Named distinctly from MergeResult (below), which is
+// SOL-WT-05's MergeBranch worktree-into-base outcome — the two ops merge
+// different things and were built by separate batches, so the names must
+// not collide.
+type MergeOutcome struct {
+	Success      bool
+	HadConflicts bool
 }
 
 // CommitRef is one commit's metadata, returned by History. Mirrors
@@ -244,11 +288,115 @@ type RepoInfo struct {
 }
 
 // WorktreeRecord mirrors project-service's Worktree message — the
-// bookkeeping row RecordWorktreeCreated/SetWorktreeActivation return.
+// bookkeeping row RecordWorktreeCreated/SetWorktreeActivation/ListWorktrees
+// return. RepoID/Active added for BR-WT-04's per-repo active-count cap.
 type WorktreeRecord struct {
 	ID     string
+	RepoID string
 	Path   string
 	Branch string
+	Active bool
+}
+
+// WorktreeInfo is project-service's GetWorktree answer — the richer shape
+// CompareWorktrees needs (RepoID + Branch + BaseRef), vs. WorktreeRecord's
+// narrower ID/Path/Branch used by CreateWorktree's own bookkeeping call.
+type WorktreeInfo struct {
+	ID      string
+	RepoID  string
+	Branch  string
+	BaseRef string // empty = never backfilled (worktree created before base_ref was added)
+}
+
+// TerminalSessionRef is one active PTY session, as reported by
+// infra-fleet-service.ListTerminalSessions — the subset CheckWorktreeDeleteSafety/
+// RemoveWorktree need to determine whether a session's cwd falls under a
+// worktree's path.
+type TerminalSessionRef struct {
+	PtyID string
+	Cwd   string
+}
+
+// DeleteSafetyReport is CheckWorktreeDeleteSafety's answer — see that
+// usecase's doc comment for AgentRunning's heuristic-not-precise caveat.
+type DeleteSafetyReport struct {
+	UncommittedFiles int
+	UntrackedFiles   int
+	AgentRunning     bool
+	ActivePtyIDs     []string
+	SafeToDelete     bool
+}
+
+// RemoveWorktreeResult is RemoveWorktree's answer — UncommittedFilesDiscarded
+// is only meaningful when Force was true (echoes what was overridden, for
+// the UI's post-delete confirmation toast).
+type RemoveWorktreeResult struct {
+	UncommittedFilesDiscarded int
+	StoppedPtyIDs             []string
+}
+
+// WorktreeComparison is one worktree's entry within CompareWorktrees'
+// aggregated answer.
+type WorktreeComparison struct {
+	WorktreeID   string
+	ChangedFiles int
+	AddedLines   int
+	RemovedLines int
+	MergeBase    string
+	Status       string
+	ErrorMessage string
+}
+
+// CompareWorktreesResult is CompareWorktrees' full answer.
+type CompareWorktreesResult struct {
+	BaseRef   string
+	Worktrees []WorktreeComparison
+}
+
+// MergeResult reflects a MergeBranch operation's outcome. A conflict is
+// reported via HasConflicts, not an error — the repo is left in the
+// conflicted state for the client to resolve via the existing
+// ConflictOperation/ResolveConflict/AbortMerge RPCs (BR-WT-17: manual
+// resolution only, never auto-resolved or auto-aborted).
+type MergeResult struct {
+	ResultSHA           string
+	HasConflicts        bool
+	ConflictedPaths     []string
+	ConflictDispatchKey string
+}
+
+// WorktreeLineageCapture carries the linked-issue reference
+// CreateWorktreeFromIssue resolves through to project-service's
+// RecordWorktreeCreated (SOL-PI-02/SOL-PI-03) — empty fields mean "no
+// linked issue" (BR-PI-06 opt-out, or a plain CreateWorktree call).
+type WorktreeLineageCapture struct {
+	Origin              string
+	CaptureSource       string
+	LinkedIssueProvider string
+	LinkedIssueRef      string
+}
+
+// IssueRef identifies an issue in either an SCM (GitHub/GitLab) or an
+// issue-tracker (Jira/Linear), resolved by IssueSourceClient — mirrors
+// gitgatewayv1.CreateWorktreeFromIssueRequest's oneof issue_source.
+type IssueRef struct {
+	Provider   string // "github" | "gitlab" | "jira" | "linear"
+	Repo       string // scm only
+	Number     int32  // scm only
+	TrackerRef string // tracker only, e.g. "ENG-123"
+}
+
+// Issue is the minimal shape create_worktree_from_issue.go needs from
+// either issue source — title/labels feed branch-name derivation,
+// description/AC/comments feed the agent prompt.
+type Issue struct {
+	Title              string
+	Description        string
+	AcceptanceCriteria string
+	Labels             []string
+	Comments           []string
+	Provider           string
+	ExternalRef        string // "owner/repo#123" or "ENG-123", matches Worktree.linked_issue_ref
 }
 
 // ResolvedBase is PrefetchCreateBase/ResolvePrBase/ResolveMrBase's answer:
@@ -295,7 +443,8 @@ type PushTargetInput struct {
 
 // FastForwardResult reflects whether a FastForward operation succeeded.
 type FastForwardResult struct {
-	Success bool
+	Success   bool
+	ResultSHA string // NEW — HEAD's SHA after a successful fast-forward
 }
 
 // RebaseResult reflects whether a RebaseFromBase operation succeeded, and

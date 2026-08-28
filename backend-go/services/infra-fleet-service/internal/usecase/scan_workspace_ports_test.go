@@ -60,6 +60,43 @@ type fakeDevServerAgentClient struct {
 
 	inspectResult InspectProcessResult
 	inspectErr    error
+
+	// lastHandshakeInfo/lastHandshakeOK drive LastHandshakeInfo's fake
+	// answer — used by establish_connection_test.go.
+	lastHandshakeInfo HandshakeInfo
+	lastHandshakeOK   bool
+
+	// cancelReconnectCalls records every CancelReconnect(devServerID) call —
+	// used by teardown_connection_test.go.
+	cancelReconnectCalls []string
+
+	// --- Agent sessions (TASK-AG-01..05) ---
+	spawnAgentResult SpawnAgentResult
+	spawnAgentErr    error
+	spawnAgentCalls  []SpawnAgentInput
+
+	killAgentErr   error
+	killAgentCalls []string // "ptyID:signal", for assertions
+
+	sendAgentInputErr   error
+	sendAgentInputCalls []string // "ptyID:data", for assertions
+
+	streamAgentHooksEvents chan AgentHookEvent
+	streamAgentHooksErr    error
+
+	// execStreamFrames/execStreamErr drive ExecStream's fake answer
+	// (TASK-PW-03-08) — same "test owns writing to (and closing) it" shape
+	// as streamPtyEvents above. execStreamUnsubscribed records whether the
+	// returned unsubscribe func was called.
+	execStreamFrames       chan map[string]any
+	execStreamErr          error
+	execStreamCalls        []string // methods called with, for assertions
+	execStreamUnsubscribed bool
+}
+
+// LastHandshakeInfo implements usecase.DevServerAgentClient.LastHandshakeInfo.
+func (f *fakeDevServerAgentClient) LastHandshakeInfo(devServerID string) (HandshakeInfo, bool) {
+	return f.lastHandshakeInfo, f.lastHandshakeOK
 }
 
 type resizePtyCall struct {
@@ -153,6 +190,68 @@ func (f *fakeDevServerAgentClient) InspectProcess(ctx context.Context, devServer
 	return f.inspectResult, nil
 }
 
+// CancelReconnect implements usecase.DevServerAgentClient.CancelReconnect —
+// used by teardown_connection_test.go.
+func (f *fakeDevServerAgentClient) CancelReconnect(devServerID string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.cancelReconnectCalls = append(f.cancelReconnectCalls, devServerID)
+}
+
+func (f *fakeDevServerAgentClient) SpawnAgent(ctx context.Context, devServer domain.DevServer, in SpawnAgentInput) (SpawnAgentResult, error) {
+	f.mu.Lock()
+	f.spawnAgentCalls = append(f.spawnAgentCalls, in)
+	f.mu.Unlock()
+	if f.spawnAgentErr != nil {
+		return SpawnAgentResult{}, f.spawnAgentErr
+	}
+	return f.spawnAgentResult, nil
+}
+
+func (f *fakeDevServerAgentClient) KillAgent(ctx context.Context, devServer domain.DevServer, ptyID, signal string) error {
+	f.mu.Lock()
+	f.killAgentCalls = append(f.killAgentCalls, ptyID+":"+signal)
+	f.mu.Unlock()
+	return f.killAgentErr
+}
+
+func (f *fakeDevServerAgentClient) SendAgentInput(ctx context.Context, devServer domain.DevServer, ptyID string, data []byte) error {
+	f.mu.Lock()
+	f.sendAgentInputCalls = append(f.sendAgentInputCalls, ptyID+":"+string(data))
+	f.mu.Unlock()
+	return f.sendAgentInputErr
+}
+
+func (f *fakeDevServerAgentClient) StreamAgentHooks(ctx context.Context, devServer domain.DevServer) (<-chan AgentHookEvent, func(), error) {
+	if f.streamAgentHooksErr != nil {
+		return nil, nil, f.streamAgentHooksErr
+	}
+	events := f.streamAgentHooksEvents
+	if events == nil {
+		events = make(chan AgentHookEvent)
+	}
+	return events, func() {}, nil
+}
+
+func (f *fakeDevServerAgentClient) ExecStream(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (<-chan map[string]any, func(), error) {
+	f.mu.Lock()
+	f.execStreamCalls = append(f.execStreamCalls, method)
+	f.mu.Unlock()
+	if f.execStreamErr != nil {
+		return nil, nil, f.execStreamErr
+	}
+	frames := f.execStreamFrames
+	if frames == nil {
+		frames = make(chan map[string]any)
+	}
+	unsubscribe := func() {
+		f.mu.Lock()
+		f.execStreamUnsubscribed = true
+		f.mu.Unlock()
+	}
+	return frames, unsubscribe, nil
+}
+
 func TestScanWorkspacePorts_RequiresTenantContext(t *testing.T) {
 	uc := NewScanWorkspacePorts(&fakeConnectionResolver{}, &fakeDevServerAgentClient{})
 	_, err := uc.Execute(context.Background(), ScanWorkspacePortsInput{})
@@ -182,12 +281,18 @@ func TestScanWorkspacePorts_NoConnectionID_ReturnsEmptyWithoutRelaying(t *testin
 // This is the regression test for TS Gap 7: a bound connectionId must
 // always relay, never silently short-circuit to an empty result.
 func TestScanWorkspacePorts_ConnectionIDBound_AlwaysRelays(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
-	agent := &fakeDevServerAgentClient{execResult: map[string]any{"openPorts": []any{float64(3000), float64(8080)}}}
+	agent := &fakeDevServerAgentClient{execResult: map[string]any{
+		"ports": []any{
+			map[string]any{"port": float64(3000), "host": "127.0.0.1", "pid": float64(1234), "processName": "node"},
+			map[string]any{"port": float64(8080), "host": "0.0.0.0", "pid": float64(5678), "processName": "python"},
+		},
+		"platform": "linux",
+	}}
 	uc := NewScanWorkspacePorts(resolver, agent)
 
 	ctx := withTenant(context.Background(), "tenant-1")
@@ -195,18 +300,22 @@ func TestScanWorkspacePorts_ConnectionIDBound_AlwaysRelays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(agent.execCalls) != 1 || agent.execCalls[0] != "ports.scan" {
-		t.Fatalf("expected exactly one ports.scan relay call, got %v", agent.execCalls)
+	if len(agent.execCalls) != 1 || agent.execCalls[0] != "ports.detect" {
+		t.Fatalf("expected exactly one ports.detect relay call, got %v", agent.execCalls)
 	}
-	if len(ports) != 2 || ports[0] != 3000 || ports[1] != 8080 {
-		t.Errorf("expected [3000 8080], got %v", ports)
+	want := []DetectedPort{
+		{Port: 3000, Host: "127.0.0.1", PID: 1234, ProcessName: "node"},
+		{Port: 8080, Host: "0.0.0.0", PID: 5678, ProcessName: "python"},
+	}
+	if len(ports) != len(want) || ports[0] != want[0] || ports[1] != want[1] {
+		t.Errorf("expected %+v, got %+v", want, ports)
 	}
 }
 
 // A bound connectionId whose agent call fails must propagate the error, not
 // swallow it into an empty result — the exact bug class TS Gap 7 describes.
 func TestScanWorkspacePorts_ConnectionIDBound_AgentFailurePropagates(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

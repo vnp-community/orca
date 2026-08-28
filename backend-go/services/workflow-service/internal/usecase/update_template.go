@@ -28,14 +28,18 @@ func (uc *UpdateTemplate) Execute(ctx context.Context, in UpdateTemplateInput) (
 	if err != nil {
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindUnauthenticated, "WORKFLOW_NO_TENANT", "no tenant in request context", err)
 	}
-	if _, err := uc.templates.GetTemplate(ctx, tenantID, in.ID); err != nil {
+	existing, err := uc.templates.GetTemplate(ctx, tenantID, in.ID)
+	if err != nil {
 		if errors.Is(err, domain.ErrTemplateNotFound) {
 			return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindNotFound, "WORKFLOW_TEMPLATE_NOT_FOUND", "template does not exist", nil)
 		}
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_TEMPLATE_LOOKUP_FAILED", "failed to look up template", err)
 	}
 
-	next, err := domain.NewWorkflowTemplate(in.ID, tenantID, in.Name, in.DAGJSON, in.Scope, in.ParentTemplateID)
+	// OwnerID is authoring provenance, not editable via update — it stays
+	// pinned to whoever originally created the template regardless of who is
+	// updating it now.
+	next, err := domain.NewWorkflowTemplate(in.ID, tenantID, in.Name, in.DAGJSON, in.Scope, in.ParentTemplateID, existing.OwnerID)
 	if err != nil {
 		return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_TEMPLATE", err.Error(), err)
 	}
@@ -58,7 +62,16 @@ func (uc *UpdateTemplate) Execute(ctx context.Context, in UpdateTemplateInput) (
 		}
 	}
 
-	updated, err := uc.templates.Update(ctx, next, in.ExpectedVersion)
+	// SOL-030's version-bump gate: templates.version only moves for a
+	// BREAKING dag_json change (a step removed, or a step's Type changed
+	// under the same id) to a template with active usage (UsageCount > 0).
+	// Metadata-only edits (description/tags/scope) and non-breaking DAG
+	// edits (adding a step, adding a new optional dependsOn) never bump —
+	// bumping unconditionally on every write (the old behavior) made
+	// version meaningless as a "does this break existing consumers" signal.
+	bumpVersion := existing.UsageCount > 0 && isBreakingChange(existing, next)
+
+	updated, err := uc.templates.Update(ctx, next, in.ExpectedVersion, bumpVersion)
 	if err != nil {
 		if errors.Is(err, domain.ErrTemplateVersionConflict) {
 			return domain.WorkflowTemplate{}, apperrors.New(apperrors.KindFailedPrecondition, "WORKFLOW_TEMPLATE_VERSION_CONFLICT", "template was modified by another request", err)
@@ -69,4 +82,22 @@ func (uc *UpdateTemplate) Execute(ctx context.Context, in UpdateTemplateInput) (
 	// freezes at Execute time (workflow-service.md §4), so this update can
 	// never retroactively change a running execution's behavior.
 	return updated, nil
+}
+
+// isBreakingChange reports true if any step id present in old is absent
+// from next (a removed step — anything downstream referencing its output
+// via {{outputs.stepId...}} silently breaks), or any step id present in
+// both has a different Type. Config-only changes and new steps/edges are
+// treated as non-breaking — a conservative first cut, flagged as a policy
+// choice reviewable independently of schema/proto changes.
+func isBreakingChange(old, next domain.WorkflowTemplate) bool {
+	oldSteps := parseSteps(old.DAGJSON)
+	newSteps := parseStepsByID(next.DAGJSON)
+	for _, os := range oldSteps {
+		ns, ok := newSteps[os.ID]
+		if !ok || ns.Type != os.Type {
+			return true
+		}
+	}
+	return false
 }

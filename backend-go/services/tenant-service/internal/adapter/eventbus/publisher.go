@@ -57,3 +57,33 @@ func (p *Publisher) PublishProfileInvalidated(ctx context.Context, tenantID, use
 		Payload:    payload,
 	})
 }
+
+// AuditSubject is the event subject UpdateCompany/UpdateDepartment/
+// CreateDepartment publish to after a successful write. Something must
+// consume this and append into auth.audit_log for these events to reach
+// QueryAuditLog — that consumer is auth-service's own follow-up work (it
+// already owns writes to that table), not built by this task.
+const AuditSubject = "orca.tenant.audit.recorded"
+
+type auditPayload struct {
+	Action  string `json:"action"`
+	ActorID string `json:"actor_id"`
+	Target  string `json:"target"`
+}
+
+// PublishAuditEvent implements usecase.AuditPublisher — best-effort, same
+// posture as PublishProfileInvalidated above (a missed publish degrades the
+// audit trail, it never blocks or fails the write it's reporting on).
+func (p *Publisher) PublishAuditEvent(ctx context.Context, tenantID, actorID, action, target string) error {
+	payload, err := json.Marshal(auditPayload{Action: action, ActorID: actorID, Target: target})
+	if err != nil {
+		return fmt.Errorf("eventbus: marshal audit payload: %w", err)
+	}
+	return p.pub.Publish(ctx, AuditSubject, commoneventbus.Event{
+		ID:         uuid.NewString(),
+		TenantID:   tenantID,
+		OccurredAt: time.Now().UTC(),
+		Version:    1,
+		Payload:    payload,
+	})
+}

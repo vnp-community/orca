@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -173,6 +174,14 @@ func toDomainPullRequest(repo string, bp bitbucketPullRequest) (domain.PullReque
 // Bearer credential — see ListIssues' doc comment for the token-handling
 // invariant this shares.
 func (c *Client) CreatePullRequest(ctx context.Context, cred usecase.Credential, repo string, input usecase.CreatePullRequestInput) (domain.PullRequest, error) {
+	if input.Draft {
+		// Bitbucket Cloud's PR API has no draft concept — see
+		// ErrCapabilityUnsupported's doc comment above. Wrapping this
+		// package's own sentinel with domain.ErrCapabilityUnsupported lets
+		// usecase/create_pull_request.go (TASK-CR-05-07) detect this via
+		// errors.Is without importing this package.
+		return domain.PullRequest{}, fmt.Errorf("bitbucket: draft pull requests are not supported: %w", domain.ErrCapabilityUnsupported)
+	}
 	body, err := json.Marshal(struct {
 		Title       string             `json:"title"`
 		Description string             `json:"description,omitempty"`
@@ -350,4 +359,46 @@ func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo
 	default:
 		return false, fmt.Errorf("bitbucket: branch exists: unexpected status %d", resp.StatusCode)
 	}
+}
+
+// GetRepoFileContent fetches one file's raw content at ref via Bitbucket's
+// src endpoint. found=false (not an error) on a 404 — the expected case
+// for "no CODEOWNERS file".
+func (c *Client) GetRepoFileContent(ctx context.Context, cred usecase.Credential, repo, path, ref string) (string, bool, error) {
+	reqURL := fmt.Sprintf("%s/repositories/%s/src/%s/%s", c.baseURL, repo, url.PathEscape(ref), path)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", false, fmt.Errorf("bitbucket: build get repo file content request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", false, fmt.Errorf("bitbucket: get repo file content request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", false, fmt.Errorf("bitbucket: get repo file content: unexpected status %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", false, fmt.Errorf("bitbucket: read repo file content response: %w", err)
+	}
+	return string(body), true, nil
+}
+
+// GetLinkedPullRequestsForIssue — Bitbucket Cloud has no cheap
+// "linked pull requests for an issue" query (its Issue Tracker and PR
+// systems aren't cross-referenced the way GitHub's timeline or GitLab's
+// related_merge_requests are); same placeholder posture as
+// MergePullRequest/ResolveRepoSlug above until wired.
+func (c *Client) GetLinkedPullRequestsForIssue(_ context.Context, _ usecase.Credential, _ string, _ int32) ([]domain.PullRequest, bool, error) {
+	return nil, false, nil
+}
+
+func (c *Client) SubmitReview(_ context.Context, _ usecase.Credential, _ string, _ int32, _ domain.ReviewInput) (domain.Review, error) {
+	return domain.Review{}, ErrCapabilityUnsupported
 }

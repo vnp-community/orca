@@ -116,3 +116,117 @@ func TestAIApply_MidLoopFailure_RollsBackEntireSubtree(t *testing.T) {
 		t.Errorf("expected no edges to remain after rollback, got %+v", edges.edges)
 	}
 }
+
+// TestAIApply_DependsOnIndices_CreatesDependsOnEdgesAfterAllSiblingsExist
+// is TASK-TG-02-05's core regression test: proposal[1] depends on
+// proposal[0] (by index) — the resulting depends_on edge must reference the
+// REAL created Task.IDs, not the proposal indices themselves, and can only
+// be built once every sibling proposal has been created.
+func TestAIApply_DependsOnIndices_CreatesDependsOnEdgesAfterAllSiblingsExist(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["parent"] = domain.Task{ID: "parent", TenantID: "tenant-1"}
+	edges := &fakeEdgeRepository{}
+	uc := NewAIApply(newFakeTxRunner(tasks, edges))
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	proposals := []domain.SubtaskProposal{
+		{Title: "Design API"}, // index 0
+		{Title: "Implement handler", DependsOnIndices: []int{0}}, // index 1 depends on index 0
+	}
+	created, err := uc.Execute(ctx, AIApplyInput{TaskID: "parent", Proposals: proposals})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(created) != 2 {
+		t.Fatalf("expected 2 created subtasks, got %d", len(created))
+	}
+
+	var dependsOnEdges []domain.TaskEdge
+	for _, e := range edges.edges {
+		if e.Kind == domain.EdgeKindDependsOn {
+			dependsOnEdges = append(dependsOnEdges, e)
+		}
+	}
+	if len(dependsOnEdges) != 1 {
+		t.Fatalf("expected exactly 1 depends_on edge, got %d: %+v", len(dependsOnEdges), dependsOnEdges)
+	}
+	if dependsOnEdges[0].FromTaskID != created[1].ID || dependsOnEdges[0].ToTaskID != created[0].ID {
+		t.Errorf("expected depends_on edge %s -> %s, got %+v", created[1].ID, created[0].ID, dependsOnEdges[0])
+	}
+}
+
+// TestAIApply_OutOfRangeDependsOnIndex_SkippedNotFailed: a hallucinated
+// out-of-range DependsOnIndices entry is silently skipped, not a hard
+// failure of the whole apply.
+func TestAIApply_OutOfRangeDependsOnIndex_SkippedNotFailed(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["parent"] = domain.Task{ID: "parent", TenantID: "tenant-1"}
+	edges := &fakeEdgeRepository{}
+	uc := NewAIApply(newFakeTxRunner(tasks, edges))
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	proposals := []domain.SubtaskProposal{
+		{Title: "Only one", DependsOnIndices: []int{5}}, // out of range — no index 5 exists
+	}
+	created, err := uc.Execute(ctx, AIApplyInput{TaskID: "parent", Proposals: proposals})
+	if err != nil {
+		t.Fatalf("expected no error for an out-of-range depends_on index, got %v", err)
+	}
+	if len(created) != 1 {
+		t.Fatalf("expected 1 created subtask, got %d", len(created))
+	}
+	for _, e := range edges.edges {
+		if e.Kind == domain.EdgeKindDependsOn {
+			t.Errorf("expected no depends_on edge for an out-of-range index, got %+v", e)
+		}
+	}
+}
+
+// TestAIApply_RawAIResponse_PersistedToAIPlanJSON confirms the raw AI
+// response is echoed through to Task.AIPlanJSON via UpdateAIPlanJSON.
+func TestAIApply_RawAIResponse_PersistedToAIPlanJSON(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["parent"] = domain.Task{ID: "parent", TenantID: "tenant-1"}
+	uc := NewAIApply(newFakeTxRunner(tasks, &fakeEdgeRepository{}))
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	raw := `{"subtasks":[{"title":"x"}]}`
+	if _, err := uc.Execute(ctx, AIApplyInput{TaskID: "parent", Proposals: []domain.SubtaskProposal{{Title: "x"}}, RawAIResponse: raw}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := tasks.tasks["parent"].AIPlanJSON; got != raw {
+		t.Errorf("expected parent.AIPlanJSON=%q, got %q", raw, got)
+	}
+}
+
+// TestAIApply_DependencyPassFailure_RollsBackWholeTransaction extends the
+// rollback guarantee to the SECOND pass (dependency edges): a failure
+// there must still roll back the already-created subtasks + parent_child
+// edges from the first pass, not just the dependency edges themselves.
+func TestAIApply_DependencyPassFailure_RollsBackWholeTransaction(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["parent"] = domain.Task{ID: "parent", TenantID: "tenant-1"}
+	// Two parent_child Add calls (one per proposal) succeed; the third Add
+	// call (the depends_on edge, in the second pass) fails.
+	edges := &fakeEdgeRepository{addErr: errors.New("boom"), addErrAfterCalls: 2}
+	uc := NewAIApply(newFakeTxRunner(tasks, edges))
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	proposals := []domain.SubtaskProposal{
+		{Title: "Design API"},
+		{Title: "Implement handler", DependsOnIndices: []int{0}},
+	}
+	created, err := uc.Execute(ctx, AIApplyInput{TaskID: "parent", Proposals: proposals})
+	if err == nil {
+		t.Fatal("expected an error when the dependency-edge pass fails")
+	}
+	if created != nil {
+		t.Errorf("expected no created subtasks returned on failure, got %+v", created)
+	}
+	if len(tasks.tasks) != 1 {
+		t.Errorf("expected only the pre-existing parent task to remain, got %d: %+v", len(tasks.tasks), tasks.tasks)
+	}
+	if len(edges.edges) != 0 {
+		t.Errorf("expected no edges to remain after rollback, got %+v", edges.edges)
+	}
+}

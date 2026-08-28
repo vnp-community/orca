@@ -1,7 +1,7 @@
 // project_client.go implements usecase.ProjectClient against
-// project-service's gRPC surface. RecordWorktreeCreated/RecordWorktreeRemoved
-// need no project-service proto change — those RPCs already exist
-// (proto/orca/project/v1/project.proto). GetRepo is this task's own
+// project-service's gRPC surface. RecordWorktreeCreated/RecordWorktreeRemoved/
+// ListWorktrees/GetWorktree need no project-service proto change beyond
+// SOL-WT-04's base_ref/GetWorktree additions — GetRepo is this task's own
 // addition on top of that surface — see its doc comment below for the
 // confirmed gap.
 package grpcclient
@@ -45,19 +45,27 @@ func (p *ProjectClient) GetRepo(ctx context.Context, repoID string) (domain.Repo
 		"project-service has no RPC to fetch a single repo by id yet (only ListRepos(project_id)); see project_client.go's GetRepo doc comment", nil)
 }
 
-func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error) {
+func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch, baseRef string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
 	ctx, err := withTenantMetadata(ctx)
 	if err != nil {
 		return domain.WorktreeRecord{}, err
 	}
-	resp, err := p.client.RecordWorktreeCreated(ctx, &projectv1.RecordWorktreeCreatedRequest{
+	req := &projectv1.RecordWorktreeCreatedRequest{
 		ProjectId: projectID, RepoId: repoID, Path: path, Branch: branch,
-	})
+		BaseRef: nonEmptyPtr(baseRef),
+	}
+	if lineage.LinkedIssueProvider != "" {
+		req.LinkedIssueProvider = &lineage.LinkedIssueProvider
+	}
+	if lineage.LinkedIssueRef != "" {
+		req.LinkedIssueRef = &lineage.LinkedIssueRef
+	}
+	resp, err := p.client.RecordWorktreeCreated(ctx, req)
 	if err != nil {
 		return domain.WorktreeRecord{}, err
 	}
 	wt := resp.GetWorktree()
-	return domain.WorktreeRecord{ID: wt.GetId(), Path: wt.GetPath(), Branch: wt.GetBranch()}, nil
+	return domain.WorktreeRecord{ID: wt.GetId(), RepoID: wt.GetRepoId(), Path: wt.GetPath(), Branch: wt.GetBranch(), Active: wt.GetActive()}, nil
 }
 
 func (p *ProjectClient) RecordWorktreeRemoved(ctx context.Context, worktreeID string) error {
@@ -67,4 +75,82 @@ func (p *ProjectClient) RecordWorktreeRemoved(ctx context.Context, worktreeID st
 	}
 	_, err = p.client.RecordWorktreeRemoved(ctx, &projectv1.RecordWorktreeRemovedRequest{WorktreeId: worktreeID})
 	return err
+}
+
+// FindWorktreeByIdempotencyKey backs BR-CLI-01 — see
+// usecase.ProjectClient.FindWorktreeByIdempotencyKey's doc comment.
+func (p *ProjectClient) FindWorktreeByIdempotencyKey(ctx context.Context, projectID, idempotencyKey string) (domain.WorktreeRecord, bool, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return domain.WorktreeRecord{}, false, err
+	}
+	resp, err := p.client.GetWorktreeByIdempotencyKey(ctx, &projectv1.GetWorktreeByIdempotencyKeyRequest{
+		ProjectId: projectID, IdempotencyKey: idempotencyKey,
+	})
+	if err != nil {
+		return domain.WorktreeRecord{}, false, err
+	}
+	if !resp.GetFound() {
+		return domain.WorktreeRecord{}, false, nil
+	}
+	wt := resp.GetWorktree()
+	return domain.WorktreeRecord{ID: wt.GetId(), Path: wt.GetPath(), Branch: wt.GetBranch()}, true, nil
+}
+
+// IsIssueStatusSyncEnabled reads project-service's per-project
+// issue_status_sync_enabled flag (BR-PI-06/TASK-PI-02-06) via GetProject.
+func (p *ProjectClient) IsIssueStatusSyncEnabled(ctx context.Context, projectID string) (bool, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return false, err
+	}
+	resp, err := p.client.GetProject(ctx, &projectv1.GetProjectRequest{Id: projectID})
+	if err != nil {
+		return false, err
+	}
+	return resp.GetProject().GetIssueStatusSyncEnabled(), nil
+}
+
+// ListWorktrees backs BR-WT-04's count cap (max 20 active worktrees per
+// repo) — project-service.ListWorktrees(project_id) already exists; this is
+// a new call on an existing RPC, not a new proto surface.
+func (p *ProjectClient) ListWorktrees(ctx context.Context, projectID string) ([]domain.WorktreeRecord, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := p.client.ListWorktrees(ctx, &projectv1.ListWorktreesRequest{ProjectId: projectID})
+	if err != nil {
+		return nil, err
+	}
+	out := make([]domain.WorktreeRecord, 0, len(resp.GetWorktrees()))
+	for _, wt := range resp.GetWorktrees() {
+		out = append(out, domain.WorktreeRecord{ID: wt.GetId(), RepoID: wt.GetRepoId(), Path: wt.GetPath(), Branch: wt.GetBranch(), Active: wt.GetActive()})
+	}
+	return out, nil
+}
+
+// GetWorktree wraps project-service's GetWorktree RPC (SOL-WT-04) —
+// CompareWorktrees uses it to look up each compared worktree's
+// repo_id/branch/base_ref.
+func (p *ProjectClient) GetWorktree(ctx context.Context, worktreeID string) (domain.WorktreeInfo, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return domain.WorktreeInfo{}, err
+	}
+	wt, err := p.client.GetWorktree(ctx, &projectv1.GetWorktreeRequest{WorktreeId: worktreeID})
+	if err != nil {
+		return domain.WorktreeInfo{}, err
+	}
+	return domain.WorktreeInfo{ID: wt.GetId(), RepoID: wt.GetRepoId(), Branch: wt.GetBranch(), BaseRef: wt.GetBaseRef()}, nil
+}
+
+// nonEmptyPtr returns nil for an empty string, otherwise a pointer to s —
+// this file's convention for populating a proto `optional string` field
+// from a plain Go string param.
+func nonEmptyPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

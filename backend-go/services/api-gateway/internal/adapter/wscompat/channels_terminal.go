@@ -178,11 +178,12 @@ func attachContext(id Identity) (context.Context, context.CancelFunc) {
 // ── terminal.create ─────────────────────────────────────────────────────
 
 type terminalCreateArgs struct {
-	ConnectionID string `json:"connectionId"`
-	Cwd          string `json:"cwd"`
-	Shell        string `json:"shell"`
-	Cols         int32  `json:"cols"`
-	Rows         int32  `json:"rows"`
+	ConnectionID     string `json:"connectionId"`
+	Cwd              string `json:"cwd"`
+	Shell            string `json:"shell"`
+	Cols             int32  `json:"cols"`
+	Rows             int32  `json:"rows"`
+	ShellIntegration bool   `json:"shellIntegration"` // BR-TM-13
 }
 
 func registerTerminalCreateChannel(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
@@ -198,11 +199,12 @@ func registerTerminalCreateChannel(r *Registry, client infrafleetv1.InfraFleetSe
 
 		invokeCtx := gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		spawnResp, err := client.SpawnTerminalSession(invokeCtx, &infrafleetv1.SpawnTerminalSessionRequest{
-			ConnectionId: in.ConnectionID,
-			Cwd:          in.Cwd,
-			Shell:        in.Shell,
-			Cols:         in.Cols,
-			Rows:         in.Rows,
+			ConnectionId:     in.ConnectionID,
+			Cwd:              in.Cwd,
+			Shell:            in.Shell,
+			Cols:             in.Cols,
+			Rows:             in.Rows,
+			ShellIntegration: in.ShellIntegration,
 		})
 		if err != nil {
 			return nil, nil, err

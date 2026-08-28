@@ -639,6 +639,41 @@ func (c *Client) AddIssueCommentBySlug(ctx context.Context, cred usecase.Credent
 	return decodeGitHubComment(resp)
 }
 
+// ListIssueCommentsBySlug calls GitHub's REST API: GET
+// /repos/{repo}/issues/{number}/comments — the read half missing from the
+// existing Add/Update/DeleteIssueCommentBySlug group (BUG-PI-01 step 6).
+func (c *Client) ListIssueCommentsBySlug(ctx context.Context, cred usecase.Credential, itemSlug string) ([]usecase.ProjectComment, error) {
+	repo, number, err := parseItemSlug(itemSlug)
+	if err != nil {
+		return nil, err
+	}
+	reqURL := fmt.Sprintf("%s/repos/%s/issues/%d/comments", c.baseURL, repo, number)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return nil, fmt.Errorf("github: build list issue comments request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+	req.Header.Set("Accept", "application/vnd.github+json")
+	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("github: list issue comments request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("github: list issue comments: unexpected status %d", resp.StatusCode)
+	}
+	var raw []githubComment
+	if err := json.NewDecoder(resp.Body).Decode(&raw); err != nil {
+		return nil, fmt.Errorf("github: decode list issue comments response: %w", err)
+	}
+	out := make([]usecase.ProjectComment, 0, len(raw))
+	for _, c := range raw {
+		out = append(out, usecase.ProjectComment{ID: strconv.Itoa(c.ID), Body: c.Body, Author: c.User.Login, URL: c.HTMLURL})
+	}
+	return out, nil
+}
+
 // UpdateIssueCommentBySlug calls GitHub's REST API: PATCH
 // /repos/{repo}/issues/comments/{commentId} — commentId is NOT
 // repo-number-scoped, GitHub addresses comments by a global id, passed

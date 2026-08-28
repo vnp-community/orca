@@ -3,9 +3,11 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
 )
 
@@ -47,9 +49,23 @@ type fakeProvider struct {
 	branchExists    bool
 	branchExistsErr error
 
-	lastCred Credential
-	lastRepo string
-	calls    int
+	repoFileContent     string
+	repoFileFound       bool
+	repoFileErr         error
+	getRepoFileCalls    int
+	lastGetRepoFilePath string
+
+	linkedPRs          []domain.PullRequest
+	linkedPRsSupported bool
+	linkedPRsErr       error
+
+	review    domain.Review
+	reviewErr error
+
+	lastCred   Credential
+	lastRepo   string
+	lastFilter IssueFilter
+	calls      int
 }
 
 func (f *fakeProvider) MergePullRequest(ctx context.Context, cred Credential, repo string, number int32, input MergePullRequestInput) (domain.PullRequest, bool, string, error) {
@@ -124,8 +140,37 @@ func (f *fakeProvider) BranchExists(ctx context.Context, cred Credential, repo, 
 	return f.branchExists, nil
 }
 
-func (f *fakeProvider) ListIssues(ctx context.Context, cred Credential, repo string, filter IssueFilter) ([]domain.Issue, error) {
+func (f *fakeProvider) GetRepoFileContent(ctx context.Context, cred Credential, repo, path, ref string) (string, bool, error) {
 	f.lastCred, f.lastRepo = cred, repo
+	f.lastGetRepoFilePath = path
+	f.getRepoFileCalls++
+	f.calls++
+	if f.repoFileErr != nil {
+		return "", false, f.repoFileErr
+	}
+	return f.repoFileContent, f.repoFileFound, nil
+}
+
+func (f *fakeProvider) GetLinkedPullRequestsForIssue(ctx context.Context, cred Credential, repo string, issueNumber int32) ([]domain.PullRequest, bool, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.linkedPRsErr != nil {
+		return nil, false, f.linkedPRsErr
+	}
+	return f.linkedPRs, f.linkedPRsSupported, nil
+}
+
+func (f *fakeProvider) SubmitReview(ctx context.Context, cred Credential, repo string, prNumber int32, in domain.ReviewInput) (domain.Review, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.reviewErr != nil {
+		return domain.Review{}, f.reviewErr
+	}
+	return f.review, nil
+}
+
+func (f *fakeProvider) ListIssues(ctx context.Context, cred Credential, repo string, filter IssueFilter) ([]domain.Issue, error) {
+	f.lastCred, f.lastRepo, f.lastFilter = cred, repo, filter
 	f.calls++
 	if f.issuesErr != nil {
 		return nil, f.issuesErr
@@ -239,6 +284,9 @@ type fakeGitHubProjects struct {
 
 	comment    ProjectComment
 	commentErr error
+
+	comments    []ProjectComment
+	commentsErr error
 
 	deleteErr error
 
@@ -381,6 +429,15 @@ func (f *fakeGitHubProjects) DeleteIssueCommentBySlug(ctx context.Context, cred 
 	return f.deleteErr
 }
 
+func (f *fakeGitHubProjects) ListIssueCommentsBySlug(ctx context.Context, cred Credential, itemSlug string) ([]ProjectComment, error) {
+	f.lastItemSlug = itemSlug
+	f.calls++
+	if f.commentsErr != nil {
+		return nil, f.commentsErr
+	}
+	return f.comments, nil
+}
+
 // fakeGitLabMergeRequestProvider is an in-memory GitLabMergeRequestProvider
 // — mirrors fakeProvider's recording-fields pattern.
 type fakeGitLabMergeRequestProvider struct {
@@ -439,14 +496,14 @@ func TestListIssues_DispatchesToResolvedProviderWithCredential(t *testing.T) {
 	}}
 	creds := &fakeCredentialResolver{token: "tok-123"}
 
-	uc := NewListIssues(creds, registry)
+	uc := NewListIssues(creds, registry, nil, nil)
 	got, err := uc.Execute(context.Background(), ListIssuesInput{
 		TenantID: "tenant-1", Provider: domain.ScmProviderGitHub, Repo: "octocat/hello-world",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(got) != 1 || got[0].ID != "1" {
+	if len(got.Issues) != 1 || got.Issues[0].ID != "1" {
 		t.Fatalf("expected the github fake's issue back, got %+v", got)
 	}
 	if github.calls != 1 || gitlab.calls != 0 {
@@ -461,7 +518,7 @@ func TestListIssues_DispatchesToResolvedProviderWithCredential(t *testing.T) {
 }
 
 func TestListIssues_RequiresTenantAndRepo(t *testing.T) {
-	uc := NewListIssues(&fakeCredentialResolver{}, &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{}})
+	uc := NewListIssues(&fakeCredentialResolver{}, &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{}}, nil, nil)
 
 	if _, err := uc.Execute(context.Background(), ListIssuesInput{Repo: "a/b"}); err == nil {
 		t.Error("expected error when tenant_id is missing")
@@ -474,7 +531,7 @@ func TestListIssues_RequiresTenantAndRepo(t *testing.T) {
 func TestListIssues_PropagatesCredentialResolutionFailure(t *testing.T) {
 	creds := &fakeCredentialResolver{err: errors.New("broker unavailable")}
 	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: &fakeProvider{}}}
-	uc := NewListIssues(creds, registry)
+	uc := NewListIssues(creds, registry, nil, nil)
 
 	_, err := uc.Execute(context.Background(), ListIssuesInput{TenantID: "t1", Provider: domain.ScmProviderGitHub, Repo: "a/b"})
 	if err == nil {
@@ -483,7 +540,7 @@ func TestListIssues_PropagatesCredentialResolutionFailure(t *testing.T) {
 }
 
 func TestListIssues_UnregisteredProviderFails(t *testing.T) {
-	uc := NewListIssues(&fakeCredentialResolver{token: "tok"}, &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{}})
+	uc := NewListIssues(&fakeCredentialResolver{token: "tok"}, &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{}}, nil, nil)
 
 	_, err := uc.Execute(context.Background(), ListIssuesInput{TenantID: "t1", Provider: domain.ScmProviderBitbucket, Repo: "a/b"})
 	if err == nil {
@@ -496,7 +553,7 @@ func TestCreatePullRequest_DispatchesToResolvedProviderWithCredential(t *testing
 	if err != nil {
 		t.Fatalf("unexpected error building fixture: %v", err)
 	}
-	gitlab := &fakeProvider{pr: want}
+	gitlab := &fakeProvider{pr: want, branchExists: true}
 	github := &fakeProvider{}
 	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{
 		domain.ScmProviderGitHub: github,
@@ -504,18 +561,19 @@ func TestCreatePullRequest_DispatchesToResolvedProviderWithCredential(t *testing
 	}}
 	creds := &fakeCredentialResolver{token: "tok-456"}
 
-	uc := NewCreatePullRequest(creds, registry)
-	got, err := uc.Execute(context.Background(), CreatePullRequestParams{
+	uc := NewCreatePullRequest(creds, registry, NewUpdateIssue(creds, registry), nil, nil)
+	result, err := uc.Execute(context.Background(), CreatePullRequestParams{
 		TenantID: "tenant-1", Provider: domain.ScmProviderGitLab, Repo: "group/project",
 		Title: "feature", HeadBranch: "feature", BaseBranch: "main",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.ID != "9" {
-		t.Fatalf("expected the gitlab fake's pull request back, got %+v", got)
+	if result.PullRequest.ID != "9" {
+		t.Fatalf("expected the gitlab fake's pull request back, got %+v", result.PullRequest)
 	}
-	if gitlab.calls != 1 || github.calls != 0 {
+	// gitlab.calls counts both BranchExists and CreatePullRequest.
+	if gitlab.calls != 2 || github.calls != 0 {
 		t.Fatalf("expected exactly the gitlab adapter to be called, gitlab.calls=%d github.calls=%d", gitlab.calls, github.calls)
 	}
 	if gitlab.lastCred.Token != "tok-456" {
@@ -525,11 +583,115 @@ func TestCreatePullRequest_DispatchesToResolvedProviderWithCredential(t *testing
 
 func TestCreatePullRequest_RequiresTitle(t *testing.T) {
 	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: &fakeProvider{}}}
-	uc := NewCreatePullRequest(&fakeCredentialResolver{}, registry)
+	creds := &fakeCredentialResolver{}
+	uc := NewCreatePullRequest(creds, registry, NewUpdateIssue(creds, registry), nil, nil)
 
 	_, err := uc.Execute(context.Background(), CreatePullRequestParams{TenantID: "t1", Provider: domain.ScmProviderGitHub, Repo: "a/b"})
 	if err == nil {
 		t.Error("expected error when title is missing")
+	}
+}
+
+// TestCreatePullRequest_BranchNotPushed_ReturnsFailedPreconditionAndSkipsCreate
+// is a regression guard for BR-CR-17: a branch that hasn't been pushed
+// must reject before ever calling the provider's CreatePullRequest.
+func TestCreatePullRequest_BranchNotPushed_ReturnsFailedPreconditionAndSkipsCreate(t *testing.T) {
+	provider := &fakeProvider{branchExists: false}
+	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: provider}}
+	creds := &fakeCredentialResolver{token: "tok"}
+	uc := NewCreatePullRequest(creds, registry, NewUpdateIssue(creds, registry), nil, nil)
+
+	_, err := uc.Execute(context.Background(), CreatePullRequestParams{
+		TenantID: "t1", Provider: domain.ScmProviderGitHub, Repo: "a/b",
+		Title: "t", HeadBranch: "h", BaseBranch: "main",
+	})
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "SCM_BRANCH_NOT_PUSHED" {
+		t.Fatalf("expected SCM_BRANCH_NOT_PUSHED, got %v", err)
+	}
+	// Only BranchExists should have been called — CreatePullRequest never
+	// reached.
+	if provider.calls != 1 {
+		t.Errorf("expected exactly 1 call (BranchExists only), got %d", provider.calls)
+	}
+}
+
+// TestCreatePullRequest_DraftUnsupported_MapsToTypedPrecondition covers
+// BR-CR-20: a provider adapter returning an error wrapping
+// domain.ErrCapabilityUnsupported for a draft request maps to
+// SCM_DRAFT_UNSUPPORTED, not a generic internal error.
+func TestCreatePullRequest_DraftUnsupported_MapsToTypedPrecondition(t *testing.T) {
+	provider := &fakeProvider{branchExists: true, prErr: fmt.Errorf("bitbucket: draft not supported: %w", domain.ErrCapabilityUnsupported)}
+	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderBitbucket: provider}}
+	creds := &fakeCredentialResolver{token: "tok"}
+	uc := NewCreatePullRequest(creds, registry, NewUpdateIssue(creds, registry), nil, nil)
+
+	_, err := uc.Execute(context.Background(), CreatePullRequestParams{
+		TenantID: "t1", Provider: domain.ScmProviderBitbucket, Repo: "a/b",
+		Title: "t", HeadBranch: "h", BaseBranch: "main", Draft: true,
+	})
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "SCM_DRAFT_UNSUPPORTED" {
+		t.Fatalf("expected SCM_DRAFT_UNSUPPORTED, got %v", err)
+	}
+}
+
+// TestCreatePullRequest_LinkedIssueUpdateFailure_DoesNotFailPRCreation
+// covers BR-CR-19's failure mode: a failed linked-issue update must not
+// roll back or mask a successful PR creation.
+func TestCreatePullRequest_LinkedIssueUpdateFailure_DoesNotFailPRCreation(t *testing.T) {
+	created, err := domain.NewPullRequest("9", domain.ScmProviderGitHub, "a/b", "feature", "open", "https://example.invalid/pull/9", "h", "main")
+	if err != nil {
+		t.Fatalf("unexpected error building fixture: %v", err)
+	}
+	provider := &fakeProvider{branchExists: true, pr: created, updateIssueErr: errors.New("issue update failed")}
+	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: provider}}
+	creds := &fakeCredentialResolver{token: "tok"}
+	uc := NewCreatePullRequest(creds, registry, NewUpdateIssue(creds, registry), nil, nil)
+
+	result, err := uc.Execute(context.Background(), CreatePullRequestParams{
+		TenantID: "t1", Provider: domain.ScmProviderGitHub, Repo: "a/b",
+		Title: "t", HeadBranch: "h", BaseBranch: "main", LinkedIssueNumber: 42,
+	})
+	if err != nil {
+		t.Fatalf("expected PR creation to succeed despite the linked-issue update failing, got %v", err)
+	}
+	if result.PullRequest.ID != "9" {
+		t.Errorf("expected the created PR to be returned, got %+v", result.PullRequest)
+	}
+	if result.LinkedIssueUpdateError == "" {
+		t.Error("expected a non-empty LinkedIssueUpdateError")
+	}
+}
+
+// TestCreatePullRequest_NoLinkedIssue_DoesNotCallUpdateIssue is a
+// regression guard: LinkedIssueNumber unset (0) must never call UpdateIssue.
+func TestCreatePullRequest_NoLinkedIssue_DoesNotCallUpdateIssue(t *testing.T) {
+	created, err := domain.NewPullRequest("9", domain.ScmProviderGitHub, "a/b", "feature", "open", "https://example.invalid/pull/9", "h", "main")
+	if err != nil {
+		t.Fatalf("unexpected error building fixture: %v", err)
+	}
+	provider := &fakeProvider{branchExists: true, pr: created}
+	registry := &fakeRegistry{providers: map[domain.ScmProvider]ScmProvider{domain.ScmProviderGitHub: provider}}
+	creds := &fakeCredentialResolver{token: "tok"}
+	uc := NewCreatePullRequest(creds, registry, NewUpdateIssue(creds, registry), nil, nil)
+
+	result, err := uc.Execute(context.Background(), CreatePullRequestParams{
+		TenantID: "t1", Provider: domain.ScmProviderGitHub, Repo: "a/b",
+		Title: "t", HeadBranch: "h", BaseBranch: "main",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.LinkedIssueUpdateError != "" {
+		t.Errorf("expected no linked-issue-update error when LinkedIssueNumber is unset, got %q", result.LinkedIssueUpdateError)
+	}
+	// provider.calls: BranchExists + CreatePullRequest only — UpdateIssue
+	// would be an additional call on the same fake since registry resolves
+	// to the same provider for both ScmProvider and UpdateIssue's own
+	// resolution.
+	if provider.calls != 2 {
+		t.Errorf("expected exactly 2 calls (BranchExists + CreatePullRequest), got %d — UpdateIssue must not have been called", provider.calls)
 	}
 }
 

@@ -3,11 +3,15 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
+
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
 
 // Shared in-memory fakes used across this package's *_test.go files — the
@@ -41,6 +45,12 @@ type fakeProjectRepository struct {
 	// TestRemoveMember_RejectsWhenWouldBeOwnerless's doc comment.
 	removeMemberCalled     bool
 	updateMemberRoleCalled bool
+
+	// listForMemberCalls counts ListForMember invocations — lets tests
+	// assert role-based short-circuiting (e.g. admin/lead skip the
+	// ProfileResolver visibility filter but ListForMember itself is always
+	// called).
+	listForMemberCalls int
 }
 
 func newFakeProjectRepository() *fakeProjectRepository {
@@ -67,6 +77,26 @@ func (f *fakeProjectRepository) List(ctx context.Context, tenantID, pageToken st
 	var out []domain.Project
 	for _, p := range f.projects {
 		if p.TenantID == tenantID {
+			out = append(out, p)
+		}
+	}
+	return out, "", nil
+}
+
+// ListForMember returns only projects userID has a membership row for,
+// within tenantID — driven off f.members, same source of truth AddMember
+// writes to.
+func (f *fakeProjectRepository) ListForMember(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
+	f.listForMemberCalls++
+	memberProjectIDs := map[string]bool{}
+	for _, m := range f.members {
+		if m.UserID == userID {
+			memberProjectIDs[m.ProjectID] = true
+		}
+	}
+	var out []domain.Project
+	for _, p := range f.projects {
+		if p.TenantID == tenantID && memberProjectIDs[p.ID] {
 			out = append(out, p)
 		}
 	}
@@ -366,23 +396,49 @@ func (f *fakeRepoRepository) RemoveRepo(ctx context.Context, repoID string) erro
 // fakeWorktreeRepository is an in-memory WorktreeRepository.
 type fakeWorktreeRepository struct {
 	worktrees map[string]domain.Worktree
+	// createdAt backs the ListWorktrees olderThan filter — domain.Worktree
+	// itself carries no CreatedAt field (the real Postgres repository
+	// filters server-side against its own created_at column, never
+	// round-tripping it into the Go struct), so this fake tracks it
+	// separately for tests that need to exercise the filter.
+	createdAt map[string]time.Time
 
-	recordCreatedErr error
-	recordRemovedErr error
-	listErr          error
-	setActivationErr error
-	renameErr        error
+	recordCreatedErr        error
+	recordRemovedErr        error
+	listErr                 error
+	getWorktreeErr          error
+	setActivationErr        error
+	renameErr               error
+	findByIdempotencyKeyErr error
+
+	enqueuedEvents []domain.OutboxEvent
+
+	// lastOutboxEvent captures RecordWorktreeCreated's event arg — asserted
+	// by TestRecordWorktreeCreated_WritesOutboxEventInSameTransaction.
+	lastOutboxEvent domain.OutboxEvent
 }
 
 func newFakeWorktreeRepository() *fakeWorktreeRepository {
-	return &fakeWorktreeRepository{worktrees: map[string]domain.Worktree{}}
+	return &fakeWorktreeRepository{worktrees: map[string]domain.Worktree{}, createdAt: map[string]time.Time{}}
 }
 
-func (f *fakeWorktreeRepository) RecordWorktreeCreated(ctx context.Context, wt domain.Worktree) (domain.Worktree, error) {
+func (f *fakeWorktreeRepository) RecordWorktreeCreated(ctx context.Context, wt domain.Worktree, event domain.OutboxEvent) (domain.Worktree, error) {
 	if f.recordCreatedErr != nil {
 		return domain.Worktree{}, f.recordCreatedErr
 	}
+	f.lastOutboxEvent = event
 	f.worktrees[wt.ID] = wt
+	return wt, nil
+}
+
+func (f *fakeWorktreeRepository) GetWorktree(ctx context.Context, worktreeID string) (domain.Worktree, error) {
+	if f.getWorktreeErr != nil {
+		return domain.Worktree{}, f.getWorktreeErr
+	}
+	wt, ok := f.worktrees[worktreeID]
+	if !ok {
+		return domain.Worktree{}, domain.ErrWorktreeNotFound
+	}
 	return wt, nil
 }
 
@@ -397,15 +453,50 @@ func (f *fakeWorktreeRepository) RecordWorktreeRemoved(ctx context.Context, work
 	return nil
 }
 
-func (f *fakeWorktreeRepository) ListWorktrees(ctx context.Context, projectID string) ([]domain.Worktree, error) {
+func (f *fakeWorktreeRepository) CreateWorktreeWithEvent(ctx context.Context, wt domain.Worktree, event domain.OutboxEvent) (domain.Worktree, error) {
+	if f.recordCreatedErr != nil {
+		return domain.Worktree{}, f.recordCreatedErr
+	}
+	f.worktrees[wt.ID] = wt
+	f.enqueuedEvents = append(f.enqueuedEvents, event)
+	return wt, nil
+}
+
+func (f *fakeWorktreeRepository) RemoveWorktreeWithEvent(ctx context.Context, worktreeID string, buildEvent func(domain.Worktree) domain.OutboxEvent) error {
+	if f.recordRemovedErr != nil {
+		return f.recordRemovedErr
+	}
+	wt, ok := f.worktrees[worktreeID]
+	if !ok {
+		return domain.ErrWorktreeNotFound
+	}
+	delete(f.worktrees, worktreeID)
+	f.enqueuedEvents = append(f.enqueuedEvents, buildEvent(wt))
+	return nil
+}
+
+func (f *fakeWorktreeRepository) ListWorktrees(ctx context.Context, projectID string, statusIn []string, olderThan *time.Time) ([]domain.Worktree, error) {
 	if f.listErr != nil {
 		return nil, f.listErr
 	}
+	statusSet := make(map[string]bool, len(statusIn))
+	for _, s := range statusIn {
+		statusSet[s] = true
+	}
 	var out []domain.Worktree
 	for _, wt := range f.worktrees {
-		if wt.ProjectID == projectID {
-			out = append(out, wt)
+		if wt.ProjectID != projectID {
+			continue
 		}
+		if len(statusSet) > 0 && !statusSet[string(wt.Status)] {
+			continue
+		}
+		if olderThan != nil {
+			if createdAt, ok := f.createdAt[wt.ID]; !ok || !createdAt.Before(*olderThan) {
+				continue
+			}
+		}
+		out = append(out, wt)
 	}
 	return out, nil
 }
@@ -434,6 +525,18 @@ func (f *fakeWorktreeRepository) RenameWorktree(ctx context.Context, worktreeID,
 	wt.Branch = branch
 	f.worktrees[worktreeID] = wt
 	return wt, nil
+}
+
+func (f *fakeWorktreeRepository) FindWorktreeByIdempotencyKey(ctx context.Context, projectID, idempotencyKey string) (domain.Worktree, bool, error) {
+	if f.findByIdempotencyKeyErr != nil {
+		return domain.Worktree{}, false, f.findByIdempotencyKeyErr
+	}
+	for _, wt := range f.worktrees {
+		if wt.ProjectID == projectID && wt.IdempotencyKey != nil && *wt.IdempotencyKey == idempotencyKey {
+			return wt, true, nil
+		}
+	}
+	return domain.Worktree{}, false, nil
 }
 
 // fakeProjectGroupRepository is an in-memory ProjectGroupRepository.
@@ -629,6 +732,13 @@ func withTenant(ctx context.Context, tenantID string) context.Context {
 
 func withTenantAndUser(ctx context.Context, tenantID, userID string) context.Context {
 	return tenant.WithUserID(tenant.WithTenantID(ctx, tenantID), userID)
+}
+
+// withRole attaches the caller's role claim — see common/tenant.Role's doc
+// comment for the (currently unpopulated in production) upstream gap this
+// simulates for tests. Used by ListProjects's admin/lead/developer tests.
+func withRole(ctx context.Context, role string) context.Context {
+	return tenant.WithRole(ctx, role)
 }
 
 // assertAppError asserts err is an *apperrors.AppError with the given Kind
@@ -827,4 +937,157 @@ func (f *fakeDevServerLister) Exists(ctx context.Context, tenantID, devServerID 
 		return false, f.err
 	}
 	return f.exists, nil
+}
+
+// fakeDevServerHealthChecker is an in-memory usecase.DevServerHealthChecker.
+type fakeDevServerHealthChecker struct {
+	reachable bool
+	err       error
+	calls     []string // devServerIDs, in call order
+}
+
+func (f *fakeDevServerHealthChecker) IsReachable(ctx context.Context, tenantID, devServerID string) (bool, error) {
+	f.calls = append(f.calls, devServerID)
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.reachable, nil
+}
+
+// fakeProjectAuditPublisher is an in-memory usecase.AuditPublisher for
+// project-service (mirrors tenant-service's own fakeAuditPublisher shape).
+type fakeProjectAuditEvent struct {
+	tenantID, actorID, action, target string
+}
+
+type fakeProjectAuditPublisher struct {
+	calls []fakeProjectAuditEvent
+	err   error
+}
+
+func (f *fakeProjectAuditPublisher) PublishAuditEvent(ctx context.Context, tenantID, actorID, action, target string) error {
+	f.calls = append(f.calls, fakeProjectAuditEvent{tenantID: tenantID, actorID: actorID, action: action, target: target})
+	return f.err
+}
+
+// fakeMemberNotifier is an in-memory usecase.MemberNotifier.
+type fakeMemberNotifierCall struct {
+	tenantID                        string
+	userIDs                         []string
+	projectID, oldDevServer, newDev string
+}
+
+type fakeMemberNotifier struct {
+	calls []fakeMemberNotifierCall
+	err   error
+}
+
+func (f *fakeMemberNotifier) NotifyDevServerChanged(ctx context.Context, tenantID string, userIDs []string, projectID, oldDevServerID, newDevServerID string) error {
+	f.calls = append(f.calls, fakeMemberNotifierCall{tenantID: tenantID, userIDs: userIDs, projectID: projectID, oldDevServer: oldDevServerID, newDev: newDevServerID})
+	return f.err
+}
+
+// fakeProfileResolver is an in-memory usecase.ProfileResolver.
+type fakeProfileResolver struct {
+	allowedTags       []string
+	hasRestriction    bool
+	resolveErr        error
+	devServerTags     map[string][]string // devServerID -> tags
+	devServerTagsErr  error
+	resolveCalls      int
+	devServerTagCalls []string // devServerIDs, in call order
+}
+
+func newFakeProfileResolver() *fakeProfileResolver {
+	return &fakeProfileResolver{devServerTags: map[string][]string{}}
+}
+
+func (f *fakeProfileResolver) GetResolvedProfile(ctx context.Context, tenantID, userID string) (ResolvedProfileView, error) {
+	f.resolveCalls++
+	if f.resolveErr != nil {
+		return ResolvedProfileView{}, f.resolveErr
+	}
+	return NewResolvedProfileView(f.allowedTags, f.hasRestriction), nil
+}
+
+func (f *fakeProfileResolver) DevServerTags(ctx context.Context, tenantID, devServerID string) ([]string, error) {
+	f.devServerTagCalls = append(f.devServerTagCalls, devServerID)
+	if f.devServerTagsErr != nil {
+		return nil, f.devServerTagsErr
+	}
+	return f.devServerTags[devServerID], nil
+}
+
+// fakeDevServerHostnameResolver is an in-memory usecase.DevServerHostnameResolver.
+type fakeDevServerHostnameResolver struct {
+	hostnames map[string]string // devServerID -> hostname
+	err       error
+}
+
+func newFakeDevServerHostnameResolver() *fakeDevServerHostnameResolver {
+	return &fakeDevServerHostnameResolver{hostnames: map[string]string{}}
+}
+
+func (f *fakeDevServerHostnameResolver) Hostname(ctx context.Context, tenantID, devServerID string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.hostnames[devServerID], nil
+}
+
+// fakeTerminalStatusResolver is an in-memory usecase.TerminalStatusResolver
+// — sessionsByDevServer/errByDevServer let a test seed sessions (or force a
+// failure) per dev_server_id; statusByPtyID/statusErrByPtyID do the same
+// for GetAgentStatus. callsByDevServer/getAgentStatusCalls record call
+// counts so tests can assert de-duplication (one ListSessionsForDevServer
+// call per distinct dev_server_id, per TASK-MB-04-04's Verify section).
+type fakeTerminalStatusResolver struct {
+	mu sync.Mutex
+
+	sessionsByDevServer map[string][]*infrafleetv1.TerminalSession
+	errByDevServer      map[string]error
+	callsByDevServer    map[string]int
+
+	statusByPtyID       map[string]*infrafleetv1.GetTerminalAgentStatusResponse
+	statusErrByPtyID    map[string]error
+	getAgentStatusCalls []string
+}
+
+func newFakeTerminalStatusResolver() *fakeTerminalStatusResolver {
+	return &fakeTerminalStatusResolver{
+		sessionsByDevServer: map[string][]*infrafleetv1.TerminalSession{},
+		errByDevServer:      map[string]error{},
+		callsByDevServer:    map[string]int{},
+		statusByPtyID:       map[string]*infrafleetv1.GetTerminalAgentStatusResponse{},
+		statusErrByPtyID:    map[string]error{},
+	}
+}
+
+func (f *fakeTerminalStatusResolver) ListSessionsForDevServer(ctx context.Context, devServerID string) ([]*infrafleetv1.TerminalSession, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.callsByDevServer[devServerID]++
+	if err, ok := f.errByDevServer[devServerID]; ok {
+		return nil, err
+	}
+	return f.sessionsByDevServer[devServerID], nil
+}
+
+func (f *fakeTerminalStatusResolver) GetAgentStatus(ctx context.Context, ptyID string) (*infrafleetv1.GetTerminalAgentStatusResponse, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.getAgentStatusCalls = append(f.getAgentStatusCalls, ptyID)
+	if err, ok := f.statusErrByPtyID[ptyID]; ok {
+		return nil, err
+	}
+	if status, ok := f.statusByPtyID[ptyID]; ok {
+		return status, nil
+	}
+	return &infrafleetv1.GetTerminalAgentStatusResponse{}, nil
+}
+
+func (f *fakeTerminalStatusResolver) callCount(devServerID string) int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.callsByDevServer[devServerID]
 }

@@ -10,7 +10,7 @@ import (
 )
 
 func TestAddEdge_RequiresTenantContext(t *testing.T) {
-	uc := NewAddEdge(&fakeEdgeRepository{})
+	uc := NewAddEdge(newFakeTxRunner(newFakeTaskRepository(), &fakeEdgeRepository{}))
 	_, err := uc.Execute(context.Background(), AddEdgeInput{FromTaskID: "a", ToTaskID: "b", Kind: domain.EdgeKindDependsOn})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
@@ -18,8 +18,11 @@ func TestAddEdge_RequiresTenantContext(t *testing.T) {
 }
 
 func TestAddEdge_PersistsAValidEdge(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	dep, _ := domain.NewTask("b", "tenant-1", "b", domain.StatusDone, "", "")
+	tasks.tasks["b"] = dep
 	edges := &fakeEdgeRepository{}
-	uc := NewAddEdge(edges)
+	uc := NewAddEdge(newFakeTxRunner(tasks, edges))
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	got, err := uc.Execute(ctx, AddEdgeInput{FromTaskID: "a", ToTaskID: "b", Kind: domain.EdgeKindDependsOn})
@@ -43,7 +46,7 @@ func TestAddEdge_RejectsCyclicDependency(t *testing.T) {
 		{FromTaskID: "a", ToTaskID: "b", Kind: domain.EdgeKindDependsOn},
 		{FromTaskID: "b", ToTaskID: "c", Kind: domain.EdgeKindDependsOn},
 	}}
-	uc := NewAddEdge(edges)
+	uc := NewAddEdge(newFakeTxRunner(newFakeTaskRepository(), edges))
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	// c -> a would close the 3-hop loop a -> b -> c -> a.
@@ -70,9 +73,9 @@ func TestAddEdge_RejectsCyclicDependency(t *testing.T) {
 func TestAddEdge_DoesNotCycleCheckParentChildEdges(t *testing.T) {
 	// parent_child edges skip the cycle check entirely (single-parent
 	// invariant is DB-enforced, not a DAG-cycle concern) — this must not
-	// call ListByKind at all.
-	edges := &fakeEdgeRepository{listErr: errors.New("ListByKind must not be called for parent_child edges")}
-	uc := NewAddEdge(edges)
+	// call ListByKindForUpdate at all.
+	edges := &fakeEdgeRepository{listErr: errors.New("ListByKindForUpdate must not be called for parent_child edges")}
+	uc := NewAddEdge(newFakeTxRunner(newFakeTaskRepository(), edges))
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	_, err := uc.Execute(ctx, AddEdgeInput{FromTaskID: "parent", ToTaskID: "child", Kind: domain.EdgeKindParentChild})
@@ -83,7 +86,7 @@ func TestAddEdge_DoesNotCycleCheckParentChildEdges(t *testing.T) {
 
 func TestAddEdge_RejectsSelfEdgeBeforeTouchingTheRepository(t *testing.T) {
 	edges := &fakeEdgeRepository{listErr: errors.New("must not be called")}
-	uc := NewAddEdge(edges)
+	uc := NewAddEdge(newFakeTxRunner(newFakeTaskRepository(), edges))
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	_, err := uc.Execute(ctx, AddEdgeInput{FromTaskID: "a", ToTaskID: "a", Kind: domain.EdgeKindDependsOn})
@@ -94,11 +97,52 @@ func TestAddEdge_RejectsSelfEdgeBeforeTouchingTheRepository(t *testing.T) {
 
 func TestAddEdge_RepositoryFailurePropagates(t *testing.T) {
 	edges := &fakeEdgeRepository{addErr: errors.New("db unavailable")}
-	uc := NewAddEdge(edges)
+	uc := NewAddEdge(newFakeTxRunner(newFakeTaskRepository(), edges))
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	_, err := uc.Execute(ctx, AddEdgeInput{FromTaskID: "a", ToTaskID: "b", Kind: domain.EdgeKindDependsOn})
 	if err == nil {
 		t.Fatal("expected error to propagate from repository failure")
+	}
+}
+
+// TestAddEdge_AutoBlocksDependentWhenDependencyNotDone locks in SOL-TG-01's
+// auto-block design: adding "from depends_on to" transitions `from` to
+// StatusBlocked when `to` isn't yet Done/Cancelled.
+func TestAddEdge_AutoBlocksDependentWhenDependencyNotDone(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	from, _ := domain.NewTask("a", "tenant-1", "a", domain.StatusOpen, "", "")
+	to, _ := domain.NewTask("b", "tenant-1", "b", domain.StatusOpen, "", "")
+	tasks.tasks["a"] = from
+	tasks.tasks["b"] = to
+	edges := &fakeEdgeRepository{}
+	uc := NewAddEdge(newFakeTxRunner(tasks, edges))
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, AddEdgeInput{FromTaskID: "a", ToTaskID: "b", Kind: domain.EdgeKindDependsOn}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := tasks.tasks["a"].Status; got != domain.StatusBlocked {
+		t.Errorf("expected from-task to be auto-blocked, got status %q", got)
+	}
+}
+
+// TestAddEdge_DoesNotBlockWhenDependencyAlreadyDone is the mirror case: `to`
+// already Done leaves `from` untouched.
+func TestAddEdge_DoesNotBlockWhenDependencyAlreadyDone(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	from, _ := domain.NewTask("a", "tenant-1", "a", domain.StatusOpen, "", "")
+	to, _ := domain.NewTask("b", "tenant-1", "b", domain.StatusDone, "", "")
+	tasks.tasks["a"] = from
+	tasks.tasks["b"] = to
+	edges := &fakeEdgeRepository{}
+	uc := NewAddEdge(newFakeTxRunner(tasks, edges))
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, AddEdgeInput{FromTaskID: "a", ToTaskID: "b", Kind: domain.EdgeKindDependsOn}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := tasks.tasks["a"].Status; got != domain.StatusOpen {
+		t.Errorf("expected from-task to remain %q, got %q", domain.StatusOpen, got)
 	}
 }

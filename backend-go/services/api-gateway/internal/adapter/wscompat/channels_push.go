@@ -13,7 +13,11 @@ import (
 	"encoding/json"
 	"sync"
 
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	notificationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1"
+
+	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
 
 // NotificationStreamOpener opens a live StreamNotifications gRPC call for
@@ -30,9 +34,10 @@ type NotificationStreamOpener func(ctx context.Context, userID string) (notifica
 // RegisterPushChannels wires every StreamHandler-backed (push-capable)
 // channel this pass adds. Called once from main.go's composition root,
 // alongside (not instead of) RegisterRealChannels.
-func RegisterPushChannels(r *Registry, notificationStreamOpener NotificationStreamOpener, bus *ClientEventBus) {
+func RegisterPushChannels(r *Registry, notificationStreamOpener NotificationStreamOpener, bus *ClientEventBus, infraFleetClient infrafleetv1.InfraFleetServiceClient) {
 	registerNotificationStreamChannel(r, notificationStreamOpener)
 	registerClientEventsChannel(r, bus)
+	registerWorkspacePortsStreamChannel(r, infraFleetClient)
 }
 
 // ── notifications.* (stream) ────────────────────────────────────────────
@@ -64,6 +69,64 @@ func registerNotificationStreamChannel(r *Registry, opener NotificationStreamOpe
 		}()
 		return out, nil
 	})
+}
+
+// ── workspacePorts.subscribe (stream) ───────────────────────────────────
+//
+// BR-SSH-15's live-push requirement (TASK-SSH-04-08): mirrors
+// registerNotificationStreamChannel's exact "open a stream, forward each
+// item" shape against infra-fleet-service's new StreamPortForwardEvents RPC,
+// which itself fans out from portevents.Broadcaster.
+func registerWorkspacePortsStreamChannel(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
+	r.RegisterStream("workspacePorts.subscribe", func(ctx context.Context, id Identity, args []json.RawMessage) (<-chan PushEvent, error) {
+		type subArgs struct {
+			ConnectionID string `json:"connectionId"`
+		}
+		in, err := decodeArg[subArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		stream, err := client.StreamPortForwardEvents(ctx, &infrafleetv1.StreamPortForwardEventsRequest{ConnectionId: in.ConnectionID})
+		if err != nil {
+			return nil, err
+		}
+		out := make(chan PushEvent)
+		go func() {
+			defer close(out)
+			for {
+				item, err := stream.Recv()
+				if err != nil {
+					return
+				}
+				channel := "workspacePorts.opened"
+				if item.GetKind() == "closed" {
+					channel = "workspacePorts.closed"
+				}
+				select {
+				case out <- PushEvent{Channel: channel, Args: []any{toWorkspacePortForwardResult(item.GetForward())}}:
+				case <-ctx.Done():
+					return
+				}
+			}
+		}()
+		return out, nil
+	})
+}
+
+// toWorkspacePortForwardResult maps infrafleetv1.PortForward onto the same
+// field naming convention toWorkspacePortScanResult already uses
+// (channels_repo_ssh_status_workspace.go) — id/connectionId/localPort/
+// remotePort/processName/status.
+func toWorkspacePortForwardResult(pf *infrafleetv1.PortForward) map[string]any {
+	return map[string]any{
+		"id":           pf.GetId(),
+		"connectionId": pf.GetConnectionId(),
+		"localPort":    pf.GetLocalPort(),
+		"remotePort":   pf.GetRemotePort(),
+		"processName":  pf.GetProcessName(),
+		"status":       pf.GetStatus(),
+	}
 }
 
 // ── runtime.clientEvents.* (local in-process fan-out) ───────────────────

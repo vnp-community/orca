@@ -3,6 +3,7 @@ package httpgateway
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -24,6 +25,10 @@ func mountTaskRoutes(r chi.Router, client taskv1.TaskServiceClient) {
 		sub.Get("/{id}/permission", handleResolvePermission(client))
 		sub.Post("/{id}/execute", handleExecuteTask(client))
 		sub.Get("/{id}/active-executions", handleHasActiveExecutions(client))
+		sub.Get("/{id}/subtree", handleGetSubtree(client))
+		sub.Post("/{id}/progress:recalculate", handleRecalculateProgress(client))
+		sub.Post("/{id}/comments", handleAddComment(client))
+		sub.Get("/{id}/comments", handleListComments(client))
 	})
 }
 
@@ -252,5 +257,100 @@ func handleHasActiveExecutions(client taskv1.TaskServiceClient) http.HandlerFunc
 			return
 		}
 		writeJSON(w, http.StatusOK, hasActiveExecutionsResponseBody{HasActive: resp.GetHasActive()})
+	}
+}
+
+// handleGetSubtree serves GET /v1/tasks/{id}/subtree — {id} is the subtree
+// root, per GetSubtree's usecase doc comment (per-node access filter, not a
+// whole-branch cut).
+func handleGetSubtree(client taskv1.TaskServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		id := chi.URLParam(r, "id")
+
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		resp, err := client.GetSubtree(ctx, &taskv1.GetSubtreeRequest{RootId: id})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+// recalculateProgressResponseBody is the REST response shape for POST
+// /v1/tasks/{id}/progress:recalculate.
+type recalculateProgressResponseBody struct {
+	ProgressPercent int32 `json:"progress_percent"`
+}
+
+func handleRecalculateProgress(client taskv1.TaskServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		id := chi.URLParam(r, "id")
+
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		resp, err := client.RecalculateProgress(ctx, &taskv1.RecalculateProgressRequest{RootId: id})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, recalculateProgressResponseBody{ProgressPercent: resp.GetProgressPercent()})
+	}
+}
+
+// addCommentRequestBody is the REST request shape for POST
+// /v1/tasks/{id}/comments.
+type addCommentRequestBody struct {
+	Content string `json:"content"`
+}
+
+func handleAddComment(client taskv1.TaskServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		id := chi.URLParam(r, "id")
+
+		var body addCommentRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid JSON body: "+err.Error())
+			return
+		}
+
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		resp, err := client.AddComment(ctx, &taskv1.AddCommentRequest{TaskId: id, Content: body.Content})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, resp)
+	}
+}
+
+// handleListComments serves GET /v1/tasks/{id}/comments, paginated via the
+// same page_token/page_size query params every other list endpoint in this
+// gateway uses.
+func handleListComments(client taskv1.TaskServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		id := chi.URLParam(r, "id")
+
+		var pageSize int32
+		if v := r.URL.Query().Get("page_size"); v != "" {
+			if n, err := strconv.ParseInt(v, 10, 32); err == nil {
+				pageSize = int32(n)
+			}
+		}
+
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		resp, err := client.ListComments(ctx, &taskv1.ListCommentsRequest{
+			TaskId:    id,
+			PageToken: r.URL.Query().Get("page_token"),
+			PageSize:  pageSize,
+		})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
 	}
 }

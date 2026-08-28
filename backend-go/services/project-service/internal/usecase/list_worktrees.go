@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -10,6 +11,11 @@ import (
 
 type ListWorktreesInput struct {
 	ProjectID string
+	// StatusIn/OlderThan are optional filters — BL-AT-04's
+	// cleanup_worktrees step candidate query. Both unset = every existing
+	// caller's unfiltered behavior.
+	StatusIn  []string
+	OlderThan *time.Time
 }
 
 type ListWorktrees struct {
@@ -32,7 +38,7 @@ func (uc *ListWorktrees) Execute(ctx context.Context, in ListWorktreesInput) ([]
 		return nil, err
 	}
 
-	worktrees, err := uc.repo.ListWorktrees(ctx, in.ProjectID)
+	worktrees, err := uc.repo.ListWorktrees(ctx, in.ProjectID, in.StatusIn, in.OlderThan)
 	if err != nil {
 		return nil, apperrors.New(apperrors.KindInternal, "PROJECT_LIST_WORKTREES_FAILED", "failed to list worktrees", err)
 	}

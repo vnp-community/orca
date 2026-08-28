@@ -35,7 +35,7 @@ func TestExecute_TemplateNotFound(t *testing.T) {
 
 func TestExecute_InvalidDAGRejectedSynchronously(t *testing.T) {
 	templates := newFakeTemplateRepository()
-	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell","dependsOn":["ghost"]}]}`, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell","dependsOn":["ghost"]}]}`, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 	executions := newFakeExecutionRepository()
 	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), newFakeRegistry())
@@ -62,7 +62,7 @@ func TestExecute_CyclicDAGRejectedSynchronously(t *testing.T) {
 		{"id":"b","type":"shell","dependsOn":["a"]},
 		{"id":"c","type":"shell","dependsOn":["b"]}
 	]}`
-	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", dagJSON, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", dagJSON, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 	executions := newFakeExecutionRepository()
 	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), newFakeRegistry())
@@ -82,7 +82,7 @@ func TestExecute_CyclicDAGRejectedSynchronously(t *testing.T) {
 
 func TestExecute_ReturnsRunningImmediatelyWithoutWaitingForDispatch(t *testing.T) {
 	templates := newFakeTemplateRepository()
-	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
 	executions := newFakeExecutionRepository()
@@ -137,7 +137,7 @@ func TestExecute_DispatchesWavesAndMarksExecutionCompleted(t *testing.T) {
 		{"id":"a","type":"shell"},
 		{"id":"b","type":"webhook","dependsOn":["a"]}
 	]}`
-	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", dagJSON, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", dagJSON, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
 	executions := newFakeExecutionRepository()
@@ -168,6 +168,9 @@ func TestExecute_DispatchesWavesAndMarksExecutionCompleted(t *testing.T) {
 	if final.Status != domain.StatusCompleted {
 		t.Fatalf("expected the execution to finish completed, got %v", final.Status)
 	}
+	if executions.lastUpdateEvent == nil || executions.lastUpdateEvent.Subject != "orca.workflow.execution.completed" {
+		t.Errorf("expected exactly one orca.workflow.execution.completed outbox event, got %+v", executions.lastUpdateEvent)
+	}
 
 	rows := stepExecutions.byExecution(exec.ID)
 	if len(rows) != 2 {
@@ -182,7 +185,7 @@ func TestExecute_DispatchesWavesAndMarksExecutionCompleted(t *testing.T) {
 
 func TestExecute_WaveFailureMarksExecutionFailed(t *testing.T) {
 	templates := newFakeTemplateRepository()
-	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
 	executions := newFakeExecutionRepository()
@@ -207,11 +210,14 @@ func TestExecute_WaveFailureMarksExecutionFailed(t *testing.T) {
 	if final.Status != domain.StatusFailed {
 		t.Fatalf("expected the execution to finish failed, got %v", final.Status)
 	}
+	if executions.lastUpdateEvent == nil || executions.lastUpdateEvent.Subject != "orca.workflow.execution.failed" {
+		t.Errorf("expected exactly one orca.workflow.execution.failed outbox event, got %+v", executions.lastUpdateEvent)
+	}
 }
 
 func TestExecute_ZeroStepTemplateCompletesImmediately(t *testing.T) {
 	templates := newFakeTemplateRepository()
-	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[]}`, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
 	executions := newFakeExecutionRepository()

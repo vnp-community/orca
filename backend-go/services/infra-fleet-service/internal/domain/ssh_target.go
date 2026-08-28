@@ -19,19 +19,26 @@ var (
 // SshTarget is host/port/username plus a pointer to the Vault SSH secrets
 // engine role that signs short-lived certificates for this target — never a
 // raw private key, per the security invariant in
-// specs/backend-go/services/infra-fleet-service.md §9. Port, known-hosts
-// fingerprint, and jump-host chaining from the fuller design-doc entity are
-// not modeled in this scaffold — see this service's README "Known gaps".
+// specs/backend-go/services/infra-fleet-service.md §9.
 type SshTarget struct {
-	ID           string
-	TenantID     string
-	Host         string
-	UserName     string
-	VaultSSHRole string
+	ID                    string
+	TenantID              string
+	Host                  string
+	Port                  int // defaults to 22 at construction
+	UserName              string
+	VaultSSHRole          string
+	KnownHostsFingerprint string   // "" = unverified — sshconn.Connector falls back to InsecureIgnoreHostKey
+	JumpHostTargetID      string   // "" = no jump host; self-referential FK to another SshTarget.ID
+	Project               string   // "" = ungrouped; matches YAML's servers[].project
+	Tags                  []string // matches YAML's servers[].tags
 }
 
 // NewSshTarget constructs an SshTarget, enforcing the invariants above.
-func NewSshTarget(id, tenantID, host, userName, vaultSSHRole string) (SshTarget, error) {
+// port == 0 defaults to 22, mirroring sshconn.defaultSSHPort's existing
+// default so a caller that omits port keeps today's behavior exactly.
+// project/tags are optional grouping metadata (BL-FLEET-01) — both may be
+// zero-valued, no new invariant is added for either.
+func NewSshTarget(id, tenantID, host string, port int, userName, vaultSSHRole, knownHostsFingerprint, jumpHostTargetID string, project string, tags []string) (SshTarget, error) {
 	if tenantID == "" {
 		return SshTarget{}, ErrEmptySshTargetTenant
 	}
@@ -44,5 +51,19 @@ func NewSshTarget(id, tenantID, host, userName, vaultSSHRole string) (SshTarget,
 	if vaultSSHRole == "" {
 		return SshTarget{}, ErrEmptyVaultSSHRole
 	}
-	return SshTarget{ID: id, TenantID: tenantID, Host: host, UserName: userName, VaultSSHRole: vaultSSHRole}, nil
+	if port == 0 {
+		port = 22
+	}
+	return SshTarget{
+		ID:                    id,
+		TenantID:              tenantID,
+		Host:                  host,
+		Port:                  port,
+		UserName:              userName,
+		VaultSSHRole:          vaultSSHRole,
+		KnownHostsFingerprint: knownHostsFingerprint,
+		JumpHostTargetID:      jumpHostTargetID,
+		Project:               project,
+		Tags:                  tags,
+	}, nil
 }

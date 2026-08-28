@@ -10,10 +10,16 @@ import (
 
 // ResolveProviderInput mirrors the gRPC ResolveProviderRequest. ProjectID
 // may be empty (a spawn with no project context still resolves at server
-// scope). UserID is required — the cascade's narrowest tier.
+// scope). UserID is required for the user-scope tier — the cascade's
+// narrowest tier.
 type ResolveProviderInput struct {
-	UserID    string
-	ProjectID string
+	UserID           string
+	ProjectID        string
+	DevServerID      string // threads into every ListAccountsFilter tier
+	ModelHint        string // detected to a ProviderType filter
+	AccountID        string // Case 1, short-circuits the cascade entirely
+	ScopedRef        string // Case 2, parsed then resolved directly
+	ExcludeAccountID string // "" = no exclusion (existing callers unaffected)
 }
 
 // ResolveProvider implements the spawn-time cascade: user-scope wins over
@@ -45,15 +51,42 @@ func (uc *ResolveProvider) Resolve(ctx context.Context, in ResolveProviderInput)
 		return domain.ProviderAccount{}, apperrors.New(apperrors.KindUnauthenticated, "AIPROVIDER_NO_TENANT", "no tenant in request context", err)
 	}
 
+	// Case 1 — explicit account id bypasses the cascade entirely.
+	if in.AccountID != "" {
+		account, err := uc.repo.Get(ctx, tenantID, in.AccountID)
+		if err != nil {
+			return domain.ProviderAccount{}, err
+		}
+		if !account.Resolvable() {
+			return domain.ProviderAccount{}, &domain.ErrNoProviderAvailable{Reason: domain.ReasonQuotaOrInactive}
+		}
+		return account, nil
+	}
+
+	// Case 2 — scope-qualified ref, resolved directly.
+	if in.ScopedRef != "" {
+		return uc.resolveScopedRef(ctx, tenantID, in.ScopedRef)
+	}
+
+	var providerFilter domain.ProviderType
+	if in.ModelHint != "" {
+		if p, ok := detectProviderFromModel(in.ModelHint); ok {
+			providerFilter = p
+		}
+	}
+
 	sawAnyCandidate := false
 
 	// Tier 1: user scope — narrowest, wins first.
 	if in.UserID != "" {
-		accounts, err := uc.repo.List(ctx, ListAccountsFilter{TenantID: tenantID, Scope: domain.ScopeUser, ScopeRefID: in.UserID})
+		accounts, err := uc.repo.List(ctx, ListAccountsFilter{
+			TenantID: tenantID, Scope: domain.ScopeUser, ScopeRefID: in.UserID,
+			DevServerID: in.DevServerID, ProviderType: providerFilter,
+		})
 		if err != nil {
 			return domain.ProviderAccount{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_RESOLVE_FAILED", "failed to list user-scope accounts", err)
 		}
-		if acc, ok := firstResolvable(accounts); ok {
+		if acc, ok := firstResolvable(accounts, in.ExcludeAccountID); ok {
 			return acc, nil
 		}
 		sawAnyCandidate = sawAnyCandidate || len(accounts) > 0
@@ -61,22 +94,28 @@ func (uc *ResolveProvider) Resolve(ctx context.Context, in ResolveProviderInput)
 
 	// Tier 2: project scope.
 	if in.ProjectID != "" {
-		accounts, err := uc.repo.List(ctx, ListAccountsFilter{TenantID: tenantID, Scope: domain.ScopeProject, ScopeRefID: in.ProjectID})
+		accounts, err := uc.repo.List(ctx, ListAccountsFilter{
+			TenantID: tenantID, Scope: domain.ScopeProject, ScopeRefID: in.ProjectID,
+			DevServerID: in.DevServerID, ProviderType: providerFilter,
+		})
 		if err != nil {
 			return domain.ProviderAccount{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_RESOLVE_FAILED", "failed to list project-scope accounts", err)
 		}
-		if acc, ok := firstResolvable(accounts); ok {
+		if acc, ok := firstResolvable(accounts, in.ExcludeAccountID); ok {
 			return acc, nil
 		}
 		sawAnyCandidate = sawAnyCandidate || len(accounts) > 0
 	}
 
-	// Tier 3: server scope — tenant-wide fallback.
-	accounts, err := uc.repo.List(ctx, ListAccountsFilter{TenantID: tenantID, Scope: domain.ScopeServer})
+	// Tier 3: server scope — tenant-wide fallback, now scoped to DevServerID too.
+	accounts, err := uc.repo.List(ctx, ListAccountsFilter{
+		TenantID: tenantID, Scope: domain.ScopeServer,
+		DevServerID: in.DevServerID, ProviderType: providerFilter,
+	})
 	if err != nil {
 		return domain.ProviderAccount{}, apperrors.New(apperrors.KindInternal, "AIPROVIDER_RESOLVE_FAILED", "failed to list server-scope accounts", err)
 	}
-	if acc, ok := firstResolvable(accounts); ok {
+	if acc, ok := firstResolvable(accounts, in.ExcludeAccountID); ok {
 		return acc, nil
 	}
 	sawAnyCandidate = sawAnyCandidate || len(accounts) > 0
@@ -89,9 +128,15 @@ func (uc *ResolveProvider) Resolve(ctx context.Context, in ResolveProviderInput)
 }
 
 // firstResolvable returns the first account in accounts whose status makes
-// it eligible to be handed to a spawn-time caller (domain.ProviderAccount.Resolvable).
-func firstResolvable(accounts []domain.ProviderAccount) (domain.ProviderAccount, bool) {
+// it eligible to be handed to a spawn-time caller (domain.ProviderAccount.Resolvable()),
+// skipping excludeAccountID if set — see ResolveProviderInput.ExcludeAccountID's
+// doc comment. Cascade ORDER (user -> project -> server tier, and within a
+// tier, list order) is unchanged by this filter.
+func firstResolvable(accounts []domain.ProviderAccount, excludeAccountID string) (domain.ProviderAccount, bool) {
 	for _, acc := range accounts {
+		if excludeAccountID != "" && acc.ID == excludeAccountID {
+			continue
+		}
 		if acc.Resolvable() {
 			return acc, true
 		}

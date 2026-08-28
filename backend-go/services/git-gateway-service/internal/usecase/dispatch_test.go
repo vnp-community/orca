@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
 
@@ -102,10 +103,27 @@ type fakeGitExecutor struct {
 	discardErr               error
 	bulkDiscardErr           error
 
+	// SOL-PW-03 — merge/stash/branch-write
+	calledMergeIntoBranch bool
+	calledStashPush       bool
+	calledStashPop        bool
+	calledCreateBranch    bool
+	calledDeleteBranch    bool
+	mergeIntoBranchResult domain.MergeOutcome
+	mergeIntoBranchErr    error
+	stashPushResult       domain.SimpleResult
+	stashPushErr          error
+	stashPopResult        domain.MergeOutcome
+	stashPopErr           error
+	createBranchResult    string
+	createBranchErr       error
+	deleteBranchErr       error
+
 	gotRepoPath string
 	gotFilePath string
 
 	statusErr                 error
+	statusResult              domain.GitStatus
 	diffErr                   error
 	commitErr                 error
 	pushErr                   error
@@ -140,10 +158,22 @@ type fakeGitExecutor struct {
 	fetchAndResolveRefSHA string
 	listWorktreePathsOut  []string
 
-	createWorktreeCallCount int
-	removeWorktreeCallCount int
-	gotRemoveWorktreePath   string
-	gotRemoveWorktreeForce  bool
+	createWorktreeCallCount     int
+	gotCreateWorktreeTargetPath string
+	removeWorktreeCallCount     int
+	gotRemoveWorktreePath       string
+	gotRemoveWorktreeForce      bool
+
+	// getStatusResult overrides the default dirty-file GetStatus response
+	// below — used by remove_worktree_test.go's BR-AT-12 cases, which need
+	// a clean status (no BR-AT-11 short-circuit) to reach the PR check.
+	getStatusResult *domain.GitStatus
+
+	calledMergeBranch      bool
+	gotMergeBranchStrategy string
+	gotMergeBranchMessage  string
+	mergeBranchResult      domain.MergeResult
+	mergeBranchErr         error
 }
 
 func (f *fakeGitExecutor) GetStatus(ctx context.Context, repoPath string) (domain.GitStatus, error) {
@@ -151,6 +181,15 @@ func (f *fakeGitExecutor) GetStatus(ctx context.Context, repoPath string) (domai
 	f.gotRepoPath = repoPath
 	if f.statusErr != nil {
 		return domain.GitStatus{}, f.statusErr
+	}
+	// statusResult, when its Files is non-nil, overrides the default
+	// single-file status below — lets a test control status.Files' count
+	// (e.g. BR-CR-15's >50-file threshold) without a bespoke fake.
+	if f.statusResult.Files != nil {
+		return f.statusResult, nil
+	}
+	if f.getStatusResult != nil {
+		return *f.getStatusResult, nil
 	}
 	// One changed file so gatherFullDiff (used by GenerateCommitMessage /
 	// GeneratePullRequestFields) actually calls GetDiff below.
@@ -381,17 +420,22 @@ func (f *fakeDevServerReachability) IsReachable(ctx context.Context, devServerID
 	return f.reachable, f.err
 }
 
-func (f *fakeGitExecutor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error) {
+func (f *fakeGitExecutor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef, targetPath string) (domain.WorktreeCreateResult, error) {
 	f.calledCreateWorktree = true
 	f.createWorktreeCallCount++
 	f.gotRepoPath = repoPath
+	f.gotCreateWorktreeTargetPath = targetPath
 	if f.createWorktreeErr != nil {
 		return domain.WorktreeCreateResult{}, f.createWorktreeErr
 	}
 	if f.createWorktreeResult != (domain.WorktreeCreateResult{}) {
 		return f.createWorktreeResult, nil
 	}
-	return domain.WorktreeCreateResult{Path: repoPath + "-" + branch, HeadSHA: "deadbeef"}, nil
+	path := targetPath
+	if path == "" {
+		path = repoPath + "-" + branch
+	}
+	return domain.WorktreeCreateResult{Path: path, HeadSHA: "deadbeef"}, nil
 }
 
 func (f *fakeGitExecutor) RemoveWorktree(ctx context.Context, worktreePath string, force bool) error {
@@ -488,6 +532,20 @@ func (f *fakeGitExecutor) AbortMerge(ctx context.Context, repoPath string) (doma
 	return domain.SimpleResult{Success: true}, nil
 }
 
+func (f *fakeGitExecutor) MergeBranch(ctx context.Context, repoPath, branch, strategy, commitMessage string) (domain.MergeResult, error) {
+	f.calledMergeBranch = true
+	f.gotRepoPath = repoPath
+	f.gotMergeBranchStrategy = strategy
+	f.gotMergeBranchMessage = commitMessage
+	if f.mergeBranchErr != nil {
+		return domain.MergeResult{}, f.mergeBranchErr
+	}
+	if f.mergeBranchResult.ResultSHA != "" || f.mergeBranchResult.HasConflicts {
+		return f.mergeBranchResult, nil
+	}
+	return domain.MergeResult{ResultSHA: "deadbeef"}, nil
+}
+
 func (f *fakeGitExecutor) ConflictOperation(ctx context.Context, repoPath string) (string, error) {
 	f.calledConflictOperation = true
 	f.gotRepoPath = repoPath
@@ -525,6 +583,62 @@ func (f *fakeGitExecutor) BulkDiscard(ctx context.Context, repoPath string, path
 		return domain.BulkDiscardResult{}, f.bulkDiscardErr
 	}
 	return domain.BulkDiscardResult{Success: true}, nil
+}
+
+// ── SOL-PW-03 — merge/stash/branch-write ─────────────────────────────────
+
+func (f *fakeGitExecutor) MergeIntoBranch(ctx context.Context, repoPath, branch string, noFF bool) (domain.MergeOutcome, error) {
+	f.calledMergeIntoBranch = true
+	f.gotRepoPath = repoPath
+	if f.mergeIntoBranchErr != nil {
+		return domain.MergeOutcome{}, f.mergeIntoBranchErr
+	}
+	if f.mergeIntoBranchResult != (domain.MergeOutcome{}) {
+		return f.mergeIntoBranchResult, nil
+	}
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) StashPush(ctx context.Context, repoPath, message string, includeUntracked bool) (domain.SimpleResult, error) {
+	f.calledStashPush = true
+	f.gotRepoPath = repoPath
+	if f.stashPushErr != nil {
+		return domain.SimpleResult{}, f.stashPushErr
+	}
+	if f.stashPushResult != (domain.SimpleResult{}) {
+		return f.stashPushResult, nil
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) StashPop(ctx context.Context, repoPath, stashRef string) (domain.MergeOutcome, error) {
+	f.calledStashPop = true
+	f.gotRepoPath = repoPath
+	if f.stashPopErr != nil {
+		return domain.MergeOutcome{}, f.stashPopErr
+	}
+	if f.stashPopResult != (domain.MergeOutcome{}) {
+		return f.stashPopResult, nil
+	}
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+func (f *fakeGitExecutor) CreateBranch(ctx context.Context, repoPath, branch, baseRef string, checkout bool) (string, error) {
+	f.calledCreateBranch = true
+	f.gotRepoPath = repoPath
+	if f.createBranchErr != nil {
+		return "", f.createBranchErr
+	}
+	if f.createBranchResult != "" {
+		return f.createBranchResult, nil
+	}
+	return branch, nil
+}
+
+func (f *fakeGitExecutor) DeleteBranch(ctx context.Context, repoPath, branch string) error {
+	f.calledDeleteBranch = true
+	f.gotRepoPath = repoPath
+	return f.deleteBranchErr
 }
 
 func TestGetStatus_NotConnected_RoutesToLocalExecutor(t *testing.T) {
@@ -697,8 +811,9 @@ func TestGenerateCommitMessage_Connected_RelaysDiffAndReturnsMessage(t *testing.
 	relay := &fakeGitExecutor{name: "relay"}
 	getStatus := NewGetStatus(resolver, local, relay)
 	getDiff := NewGetDiff(resolver, local, relay)
+	history := NewHistory(resolver, local, relay)
 	completer := &fakeAICompleter{message: "feat: add widget"}
-	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, completer)
+	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, history, completer)
 
 	got, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
 	if err != nil {
@@ -725,8 +840,9 @@ func TestGenerateCommitMessage_NotConnected_ReturnsFailedPrecondition(t *testing
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo/wt1"}}
 	getStatus := NewGetStatus(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	getDiff := NewGetDiff(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
+	history := NewHistory(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	completer := &fakeAICompleter{message: "should not be called"}
-	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, completer)
+	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, history, completer)
 
 	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
 	if err == nil {
@@ -745,8 +861,9 @@ func TestGenerateCommitMessage_RelayFailure_Propagates(t *testing.T) {
 	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: true, ConnectionID: "conn-1", RepoPath: "/repo/wt1"}}
 	getStatus := NewGetStatus(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	getDiff := NewGetDiff(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
+	history := NewHistory(resolver, &fakeGitExecutor{}, &fakeGitExecutor{})
 	completer := &fakeAICompleter{err: errors.New("dev server agent unreachable")}
-	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, completer)
+	uc := NewGenerateCommitMessage(resolver, getStatus, getDiff, history, completer)
 
 	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{WorktreeID: "wt1"})
 	if err == nil {
@@ -760,7 +877,7 @@ func TestGenerateCommitMessage_RelayFailure_Propagates(t *testing.T) {
 
 func TestGenerateCommitMessage_MissingWorktreeID_ReturnsError(t *testing.T) {
 	emptyResolver := &fakeConnectionResolver{}
-	uc := NewGenerateCommitMessage(emptyResolver, NewGetStatus(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), NewGetDiff(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), &fakeAICompleter{})
+	uc := NewGenerateCommitMessage(emptyResolver, NewGetStatus(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), NewGetDiff(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), NewHistory(emptyResolver, &fakeGitExecutor{}, &fakeGitExecutor{}), &fakeAICompleter{})
 	_, err := uc.Execute(context.Background(), GenerateCommitMessageInput{})
 	if err == nil {
 		t.Fatal("expected error for missing worktree_id")
@@ -1456,5 +1573,184 @@ func TestUpstreamStatus_ForwardsPushTarget(t *testing.T) {
 	}
 	if local.gotUpstreamPushTarget != pushTarget {
 		t.Errorf("expected pushTarget to be forwarded, got %+v", local.gotUpstreamPushTarget)
+	}
+}
+
+// ── SOL-PW-03 — merge/stash/branch-write (TASK-PW-03-06) ─────────────────
+//
+// Each of these five usecases calls resolver.ResolveConnection inline
+// (not dispatchExecutor) so it can fail closed on relay-ssh BEFORE ever
+// attempting the relay call — the zero-call assertions below are the
+// regression guard for that.
+
+func TestMergeBranch_LocalDispatch_CallsLocalExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewMergeBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), MergeBranchInput{WorktreeID: "wt1", Branch: "feature", NoFF: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledMergeIntoBranch || relay.calledMergeIntoBranch {
+		t.Error("expected MergeBranch to route to local when Connected=false")
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestMergeBranch_RelayWebsocketDispatch_CallsRelayExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewMergeBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_WEBSOCKET}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), MergeBranchInput{WorktreeID: "wt1", Branch: "feature"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if local.calledMergeIntoBranch || !relay.calledMergeIntoBranch {
+		t.Error("expected MergeBranch to route to relay when Connected=true over relay-websocket")
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestMergeBranch_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewMergeBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_SSH}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), MergeBranchInput{WorktreeID: "wt1", Branch: "feature"})
+	if !errors.Is(err, domain.ErrGitOpUnsupportedOverSSHRelay) {
+		t.Fatalf("expected ErrGitOpUnsupportedOverSSHRelay, got %v", err)
+	}
+	if local.calledMergeIntoBranch || relay.calledMergeIntoBranch {
+		t.Error("expected zero calls to either executor when relay-ssh is rejected")
+	}
+}
+
+func TestStashPush_LocalDispatch_CallsLocalExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewStashPush(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), StashPushInput{WorktreeID: "wt1", Message: "wip", IncludeUntracked: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledStashPush || relay.calledStashPush {
+		t.Error("expected StashPush to route to local when Connected=false")
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestStashPush_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewStashPush(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_SSH}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), StashPushInput{WorktreeID: "wt1"})
+	if !errors.Is(err, domain.ErrGitOpUnsupportedOverSSHRelay) {
+		t.Fatalf("expected ErrGitOpUnsupportedOverSSHRelay, got %v", err)
+	}
+	if local.calledStashPush || relay.calledStashPush {
+		t.Error("expected zero calls to either executor when relay-ssh is rejected")
+	}
+}
+
+func TestStashPop_RelayWebsocketDispatch_CallsRelayExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewStashPop(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_DIRECT_WEBSOCKET}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), StashPopInput{WorktreeID: "wt1", StashRef: "stash@{0}"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if local.calledStashPop || !relay.calledStashPop {
+		t.Error("expected StashPop to route to relay when Connected=true over direct-websocket")
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestStashPop_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewStashPop(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_SSH}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), StashPopInput{WorktreeID: "wt1"})
+	if !errors.Is(err, domain.ErrGitOpUnsupportedOverSSHRelay) {
+		t.Fatalf("expected ErrGitOpUnsupportedOverSSHRelay, got %v", err)
+	}
+	if local.calledStashPop || relay.calledStashPop {
+		t.Error("expected zero calls to either executor when relay-ssh is rejected")
+	}
+}
+
+func TestCreateBranch_LocalDispatch_CallsLocalExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewCreateBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), CreateBranchInput{WorktreeID: "wt1", Branch: "feature", Checkout: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledCreateBranch || relay.calledCreateBranch {
+		t.Error("expected CreateBranch to route to local when Connected=false")
+	}
+	if got != "feature" {
+		t.Errorf("unexpected result: %q", got)
+	}
+}
+
+func TestCreateBranch_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewCreateBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_SSH}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), CreateBranchInput{WorktreeID: "wt1", Branch: "feature"})
+	if !errors.Is(err, domain.ErrGitOpUnsupportedOverSSHRelay) {
+		t.Fatalf("expected ErrGitOpUnsupportedOverSSHRelay, got %v", err)
+	}
+	if local.calledCreateBranch || relay.calledCreateBranch {
+		t.Error("expected zero calls to either executor when relay-ssh is rejected")
+	}
+}
+
+func TestDeleteBranch_LocalDispatch_CallsLocalExecutor(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewDeleteBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: false}}, local, relay)
+
+	got, err := uc.Execute(context.Background(), DeleteBranchInput{WorktreeID: "wt1", Branch: "feature"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !local.calledDeleteBranch || relay.calledDeleteBranch {
+		t.Error("expected DeleteBranch to route to local when Connected=false")
+	}
+	if !got.Success {
+		t.Errorf("unexpected result: %+v", got)
+	}
+}
+
+func TestDeleteBranch_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
+	local := &fakeGitExecutor{}
+	relay := &fakeGitExecutor{}
+	uc := NewDeleteBranch(&fakeConnectionResolver{conn: ResolvedConnection{Connected: true, Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_SSH}}, local, relay)
+
+	_, err := uc.Execute(context.Background(), DeleteBranchInput{WorktreeID: "wt1", Branch: "feature"})
+	if !errors.Is(err, domain.ErrGitOpUnsupportedOverSSHRelay) {
+		t.Fatalf("expected ErrGitOpUnsupportedOverSSHRelay, got %v", err)
+	}
+	if local.calledDeleteBranch || relay.calledDeleteBranch {
+		t.Error("expected zero calls to either executor when relay-ssh is rejected")
 	}
 }

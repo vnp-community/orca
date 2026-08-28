@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 // DefaultMaxAncestorDepth bounds the ancestor walk ResolveGrant performs —
 // task-service.md §8's "configurable max-depth guard so a malformed
 // hierarchy can't turn a check into an unbounded walk." The usecase layer
@@ -34,7 +36,7 @@ const DefaultMaxAncestorDepth = 64
 //  5. No match anywhere -> (GrantLevelUnspecified, false): default-deny,
 //     left to the caller (ResolvePermission usecase / OPA per §9) to turn
 //     into an actual allow/deny decision.
-func ResolveGrant(ancestorChain []string, grantsByTask map[string][]Grant, caller CallerIdentity, maxDepth int) (GrantLevel, bool) {
+func ResolveGrant(ancestorChain []string, grantsByTask map[string][]Grant, caller CallerIdentity, maxDepth int, now time.Time) (GrantLevel, bool) {
 	if maxDepth <= 0 {
 		maxDepth = len(ancestorChain)
 	}
@@ -49,6 +51,9 @@ func ResolveGrant(ancestorChain []string, grantsByTask map[string][]Grant, calle
 		for _, g := range grantsByTask[taskID] {
 			if depth > 0 && !g.ApplyTree {
 				continue // only inherited grants count above the target task
+			}
+			if g.ExpiresAt != nil && !g.ExpiresAt.After(now) { // expired at or before `now` — !After, not !Before, is the boundary test
+				continue
 			}
 			if !g.Matches(caller) {
 				continue

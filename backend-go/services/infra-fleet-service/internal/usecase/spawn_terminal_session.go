@@ -12,11 +12,20 @@ import (
 // SpawnTerminalSessionInput mirrors the gRPC request 1:1 by design, see
 // register_dev_server.go's comment for the rationale.
 type SpawnTerminalSessionInput struct {
-	ConnectionID string
-	Cwd          string
-	Shell        string
-	Cols         int32
-	Rows         int32
+	ConnectionID     string
+	Cwd              string
+	Shell            string
+	Cols             int32
+	Rows             int32
+	ShellIntegration bool // BR-TM-13 — forwarded to SpawnPtyInput, never inspected here
+	// Command, when set, is the initial command line the spawned shell runs
+	// instead of an interactive prompt — see infrafleet.proto's
+	// SpawnTerminalSessionRequest.command doc comment (TASK-INT-01-01).
+	Command string
+	// UserID engages pty-handler.ts's per-user GH_CONFIG_DIR/GLAB_CONFIG_DIR
+	// isolation for a gh/glab Command — always the caller's authenticated
+	// identity, set server-side by wscompat, never client-supplied.
+	UserID string
 }
 
 // SpawnTerminalSession creates a new PTY on the dev server ConnectionID
@@ -66,7 +75,12 @@ func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSes
 		return domain.TerminalSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "no dev server owns this connectionId", nil)
 	}
 
-	result, err := uc.agent.SpawnPty(ctx, devServer, SpawnPtyInput{Cwd: in.Cwd, Shell: in.Shell, Cols: in.Cols, Rows: in.Rows})
+	result, err := uc.agent.SpawnPty(ctx, devServer, SpawnPtyInput{
+		Cwd: in.Cwd, Shell: in.Shell, Cols: in.Cols, Rows: in.Rows,
+		ShellIntegration: in.ShellIntegration,
+		Command:          in.Command,
+		UserID:           in.UserID,
+	})
 	if err != nil {
 		return domain.TerminalSession{}, apperrors.New(apperrors.KindInternal, "INFRA_AGENT_SPAWN_PTY_FAILED", "failed to spawn pty on dev server agent", err)
 	}
@@ -79,13 +93,19 @@ func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSes
 	if cwd == "" {
 		cwd = in.Cwd
 	}
+	// userID, ok is deliberately not required: terminal spawning must not
+	// start failing for callers that don't carry a resolved user identity
+	// yet (e.g. pre-BL-MB-02 callers) — an empty CreatedByUserID just means
+	// the agent-lifecycle event (TASK-MB-02-01) has no known recipient.
+	userID, _ := tenant.UserID(ctx)
 	session, err := uc.sessions.Create(ctx, domain.TerminalSession{
-		PtyID:        result.PtyID,
-		TenantID:     tenantID,
-		ConnectionID: in.ConnectionID,
-		Cwd:          cwd,
-		CreatedAt:    now,
-		LastActiveAt: now,
+		PtyID:           result.PtyID,
+		TenantID:        tenantID,
+		ConnectionID:    in.ConnectionID,
+		Cwd:             cwd,
+		CreatedAt:       now,
+		LastActiveAt:    now,
+		CreatedByUserID: userID,
 	})
 	if err != nil {
 		return domain.TerminalSession{}, apperrors.New(apperrors.KindInternal, "INFRA_CREATE_TERMINAL_SESSION_FAILED", "failed to persist terminal session", err)

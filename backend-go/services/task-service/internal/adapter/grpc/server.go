@@ -6,10 +6,14 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 
@@ -20,19 +24,31 @@ import (
 type Server struct {
 	taskv1.UnimplementedTaskServiceServer
 
-	createTask          *usecase.CreateTask
-	getTask             *usecase.GetTask
-	addEdge             *usecase.AddEdge
-	grant               *usecase.Grant
-	resolvePermission   *usecase.ResolvePermission
-	executeTask         *usecase.ExecuteTask
-	hasActiveExecutions *usecase.HasActiveExecutions
-	listTasks           *usecase.ListTasks
-	updateTask          *usecase.UpdateTask
-	deleteTask          *usecase.DeleteTask
-	getDependencies     *usecase.GetDependencies
-	aiDecompose         *usecase.AIDecompose
-	aiApply             *usecase.AIApply
+	createTask            *usecase.CreateTask
+	getTask               *usecase.GetTask
+	addEdge               *usecase.AddEdge
+	grant                 *usecase.Grant
+	resolvePermission     *usecase.ResolvePermission
+	executeTask           *usecase.ExecuteTask
+	hasActiveExecutions   *usecase.HasActiveExecutions
+	listTasks             *usecase.ListTasks
+	updateTask            *usecase.UpdateTask
+	deleteTask            *usecase.DeleteTask
+	getDependencies       *usecase.GetDependencies
+	aiDecompose           *usecase.AIDecompose
+	aiApply               *usecase.AIApply
+	generateAgentPrompt   *usecase.GenerateAgentPrompt
+	revokeGrant           *usecase.RevokeGrant
+	listGrants            *usecase.ListGrants
+	createPublicLink      *usecase.CreatePublicLink
+	revokePublicLink      *usecase.RevokePublicLink
+	resolvePublicLink     *usecase.ResolvePublicLink
+	getSubtree            *usecase.GetSubtree
+	recalculateProgress   *usecase.RecalculateProgress
+	addComment            *usecase.AddComment
+	listComments          *usecase.ListComments
+	reportExecutionResult *usecase.ReportTaskExecutionResult
+	findTaskByNumber      *usecase.FindTaskByNumber
 }
 
 func New(
@@ -49,22 +65,54 @@ func New(
 	getDependencies *usecase.GetDependencies,
 	aiDecompose *usecase.AIDecompose,
 	aiApply *usecase.AIApply,
+	generateAgentPrompt *usecase.GenerateAgentPrompt,
+	revokeGrant *usecase.RevokeGrant,
+	listGrants *usecase.ListGrants,
+	createPublicLink *usecase.CreatePublicLink,
+	revokePublicLink *usecase.RevokePublicLink,
+	resolvePublicLink *usecase.ResolvePublicLink,
+	getSubtree *usecase.GetSubtree,
+	recalculateProgress *usecase.RecalculateProgress,
+	addComment *usecase.AddComment,
+	listComments *usecase.ListComments,
+	reportExecutionResult *usecase.ReportTaskExecutionResult,
+	findTaskByNumber *usecase.FindTaskByNumber,
 ) *Server {
 	return &Server{
-		createTask:          createTask,
-		getTask:             getTask,
-		addEdge:             addEdge,
-		grant:               grant,
-		resolvePermission:   resolvePermission,
-		executeTask:         executeTask,
-		hasActiveExecutions: hasActiveExecutions,
-		listTasks:           listTasks,
-		updateTask:          updateTask,
-		deleteTask:          deleteTask,
-		getDependencies:     getDependencies,
-		aiDecompose:         aiDecompose,
-		aiApply:             aiApply,
+		createTask:            createTask,
+		getTask:               getTask,
+		addEdge:               addEdge,
+		grant:                 grant,
+		resolvePermission:     resolvePermission,
+		executeTask:           executeTask,
+		hasActiveExecutions:   hasActiveExecutions,
+		listTasks:             listTasks,
+		updateTask:            updateTask,
+		deleteTask:            deleteTask,
+		getDependencies:       getDependencies,
+		aiDecompose:           aiDecompose,
+		aiApply:               aiApply,
+		generateAgentPrompt:   generateAgentPrompt,
+		revokeGrant:           revokeGrant,
+		listGrants:            listGrants,
+		createPublicLink:      createPublicLink,
+		revokePublicLink:      revokePublicLink,
+		resolvePublicLink:     resolvePublicLink,
+		getSubtree:            getSubtree,
+		recalculateProgress:   recalculateProgress,
+		addComment:            addComment,
+		listComments:          listComments,
+		reportExecutionResult: reportExecutionResult,
+		findTaskByNumber:      findTaskByNumber,
 	}
+}
+
+func (s *Server) GenerateAgentPrompt(ctx context.Context, req *taskv1.GenerateAgentPromptRequest) (*taskv1.GenerateAgentPromptResponse, error) {
+	prompt, err := s.generateAgentPrompt.Execute(ctx, usecase.GenerateAgentPromptInput{TaskID: req.GetTaskId(), Save: req.GetSave()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.GenerateAgentPromptResponse{Prompt: prompt}, nil
 }
 
 func (s *Server) CreateTask(ctx context.Context, req *taskv1.CreateTaskRequest) (*taskv1.CreateTaskResponse, error) {
@@ -102,28 +150,101 @@ func (s *Server) AddEdge(ctx context.Context, req *taskv1.AddEdgeRequest) (*task
 }
 
 func (s *Server) Grant(ctx context.Context, req *taskv1.GrantRequest) (*taskv1.GrantResponse, error) {
-	err := s.grant.Execute(ctx, usecase.GrantInput{
+	in := usecase.GrantInput{
 		TaskID:    req.GetTaskId(),
 		SubjectID: req.GetSubjectId(),
 		Level:     toDomainGrantLevel(req.GetLevel()),
 		ApplyTree: req.GetApplyTree(),
-	})
+	}
+	if req.GetExpiresAt() != nil {
+		t := req.GetExpiresAt().AsTime()
+		in.ExpiresAt = &t
+	}
+	id, err := s.grant.Execute(ctx, in)
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &taskv1.GrantResponse{}, nil
+	return &taskv1.GrantResponse{Id: id}, nil
+}
+
+func (s *Server) RevokeGrant(ctx context.Context, req *taskv1.RevokeGrantRequest) (*emptypb.Empty, error) {
+	if err := s.revokeGrant.Execute(ctx, usecase.RevokeGrantInput{TaskID: req.GetTaskId(), GrantID: req.GetGrantId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ListGrants(ctx context.Context, req *taskv1.ListGrantsRequest) (*taskv1.ListGrantsResponse, error) {
+	grants, err := s.listGrants.Execute(ctx, req.GetTaskId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.Grant, 0, len(grants))
+	for _, g := range grants {
+		pg := &taskv1.Grant{Id: g.ID, TaskId: g.TaskID, SubjectId: g.SubjectID, Level: toProtoGrantLevel(g.Level), ApplyTree: g.ApplyTree}
+		if g.ExpiresAt != nil {
+			pg.ExpiresAt = timestamppb.New(*g.ExpiresAt)
+		}
+		out = append(out, pg)
+	}
+	return &taskv1.ListGrantsResponse{Grants: out}, nil
+}
+
+func (s *Server) CreatePublicLink(ctx context.Context, req *taskv1.CreatePublicLinkRequest) (*taskv1.CreatePublicLinkResponse, error) {
+	id, token, err := s.createPublicLink.Execute(ctx, req.GetTaskId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.CreatePublicLinkResponse{Id: id, Token: token}, nil
+}
+
+func (s *Server) RevokePublicLink(ctx context.Context, req *taskv1.RevokePublicLinkRequest) (*emptypb.Empty, error) {
+	if err := s.revokePublicLink.Execute(ctx, req.GetId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// ResolvePublicLink is the one RPC in this service meaningfully callable
+// without a JWT (spec: "anonymous read-only access via a random token") —
+// see TASK-TG-03-08's Context section for why api-gateway is NOT yet wired
+// to expose this to a browser (a new unauthenticated-route trust boundary,
+// out of scope here) and why tenantID below still comes from
+// tenant.RequireTenantID(ctx) rather than the wire request (which has no
+// tenant_id field) in the meantime.
+func (s *Server) ResolvePublicLink(ctx context.Context, req *taskv1.ResolvePublicLinkRequest) (*taskv1.ResolvePublicLinkResponse, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "TASK_NO_TENANT", "no tenant in request context", err))
+	}
+	taskID, err := s.resolvePublicLink.Execute(ctx, tenantID, req.GetToken())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.ResolvePublicLinkResponse{TaskId: taskID}, nil
+}
+
+// ReportTaskExecutionResult is called BY orchestration-service only — see
+// usecase.ReportTaskExecutionResult's doc comment for the service-identity
+// check this handler is missing (flagged, not resolved: no mTLS/mesh-identity
+// interceptor exists anywhere in this codebase's common/grpcmw to reuse; a
+// guessed-at check would be worse than an honest gap). api-gateway never
+// routes to this RPC.
+func (s *Server) ReportTaskExecutionResult(ctx context.Context, req *taskv1.ReportTaskExecutionResultRequest) (*emptypb.Empty, error) {
+	if err := s.reportExecutionResult.Execute(ctx, usecase.ReportTaskExecutionResultInput{
+		TaskID: req.GetTaskId(), CoordinatorRunID: req.GetCoordinatorRunId(),
+		Success: req.GetSuccess(), ActualHours: req.GetActualHours(),
+	}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermissionRequest) (*taskv1.ResolvePermissionResponse, error) {
 	level, err := s.resolvePermission.Execute(ctx, usecase.ResolvePermissionInput{
 		TaskID: req.GetTaskId(),
 		UserID: req.GetUserId(),
-		// ResolvePermissionRequest has no action-equivalent field yet (see
-		// this service's README "Known gaps") — default to "read", the one
-		// action task_grant.rego's level_actions table authorizes for
-		// every named GrantLevel, so a resolved grant of any kind still
-		// passes the OPA check until the wire contract grows a real field.
-		Action: "read",
+		Action: req.GetAction(), // real field now (TASK-TG-03-04/03-06) — closes README.md's "not reachable through the RPC surface yet" gap
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -132,14 +253,14 @@ func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermi
 }
 
 func (s *Server) Execute(ctx context.Context, req *taskv1.TaskServiceExecuteRequest) (*taskv1.TaskServiceExecuteResponse, error) {
-	ref, err := s.executeTask.Execute(ctx, usecase.ExecuteTaskInput{
+	result, err := s.executeTask.Execute(ctx, usecase.ExecuteTaskInput{
 		TaskID:    req.GetTaskId(),
 		RequestID: req.GetRequestId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &taskv1.TaskServiceExecuteResponse{ExecutionRef: ref}, nil
+	return &taskv1.TaskServiceExecuteResponse{ExecutionRef: result.ExecutionRef, Async: result.Async}, nil
 }
 
 func (s *Server) HasActiveExecutions(ctx context.Context, req *taskv1.HasActiveExecutionsRequest) (*taskv1.HasActiveExecutionsResponse, error) {
@@ -176,6 +297,14 @@ func (s *Server) UpdateTask(ctx context.Context, req *taskv1.UpdateTaskRequest) 
 		v := req.GetStatus().GetValue()
 		in.Status = &v
 	}
+	if req.GetPrUrl() != nil {
+		v := req.GetPrUrl().GetValue()
+		in.PRURL = &v
+	}
+	if req.GetWorktreeId() != nil {
+		v := req.GetWorktreeId().GetValue()
+		in.WorktreeID = &v
+	}
 	task, err := s.updateTask.Execute(ctx, in)
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -203,17 +332,21 @@ func (s *Server) GetDependencies(ctx context.Context, req *taskv1.GetDependencie
 }
 
 func (s *Server) AIDecompose(ctx context.Context, req *taskv1.AIDecomposeRequest) (*taskv1.AIDecomposeResponse, error) {
-	proposals, err := s.aiDecompose.Execute(ctx, usecase.AIDecomposeInput{TaskID: req.GetTaskId()})
+	result, err := s.aiDecompose.Execute(ctx, usecase.AIDecomposeInput{TaskID: req.GetTaskId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &taskv1.AIDecomposeResponse{Proposals: toProtoSubtaskProposals(proposals)}, nil
+	return &taskv1.AIDecomposeResponse{
+		Proposals:   toProtoSubtaskProposals(result.Proposals),
+		RawResponse: result.RawResponse,
+	}, nil
 }
 
 func (s *Server) AIApply(ctx context.Context, req *taskv1.AIApplyRequest) (*taskv1.AIApplyResponse, error) {
 	created, err := s.aiApply.Execute(ctx, usecase.AIApplyInput{
-		TaskID:    req.GetTaskId(),
-		Proposals: toDomainSubtaskProposals(req.GetProposals()),
+		TaskID:        req.GetTaskId(),
+		Proposals:     toDomainSubtaskProposals(req.GetProposals()),
+		RawAIResponse: req.GetRawAiResponse(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -225,10 +358,61 @@ func (s *Server) AIApply(ctx context.Context, req *taskv1.AIApplyRequest) (*task
 	return &taskv1.AIApplyResponse{CreatedSubtasks: out}, nil
 }
 
+func (s *Server) GetSubtree(ctx context.Context, req *taskv1.GetSubtreeRequest) (*taskv1.GetSubtreeResponse, error) {
+	result, err := s.getSubtree.Execute(ctx, usecase.GetSubtreeInput{RootID: req.GetRootId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.Task, 0, len(result.Tasks))
+	for _, t := range result.Tasks {
+		out = append(out, toProtoTask(t))
+	}
+	edges := make([]*taskv1.AddEdgeRequest, 0, len(result.DependsOnEdges))
+	for _, e := range result.DependsOnEdges {
+		edges = append(edges, &taskv1.AddEdgeRequest{FromTaskId: e.FromTaskID, ToTaskId: e.ToTaskID, Type: taskv1.EdgeType_EDGE_TYPE_DEPENDS_ON})
+	}
+	return &taskv1.GetSubtreeResponse{Tasks: out, DependsOnEdges: edges}, nil
+}
+
+func (s *Server) RecalculateProgress(ctx context.Context, req *taskv1.RecalculateProgressRequest) (*taskv1.RecalculateProgressResponse, error) {
+	p, err := s.recalculateProgress.Execute(ctx, req.GetRootId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.RecalculateProgressResponse{ProgressPercent: int32(p)}, nil
+}
+
+func (s *Server) AddComment(ctx context.Context, req *taskv1.AddCommentRequest) (*taskv1.AddCommentResponse, error) {
+	c, err := s.addComment.Execute(ctx, req.GetTaskId(), req.GetContent())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.AddCommentResponse{Id: c.ID, AuthorId: c.AuthorID, Content: c.Content, CreatedAt: c.CreatedAt.Format(time.RFC3339)}, nil
+}
+
+func (s *Server) ListComments(ctx context.Context, req *taskv1.ListCommentsRequest) (*taskv1.ListCommentsResponse, error) {
+	comments, next, err := s.listComments.Execute(ctx, req.GetTaskId(), req.GetPageToken(), req.GetPageSize())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.AddCommentResponse, 0, len(comments))
+	for _, c := range comments {
+		out = append(out, &taskv1.AddCommentResponse{Id: c.ID, AuthorId: c.AuthorID, Content: c.Content, CreatedAt: c.CreatedAt.Format(time.RFC3339)})
+	}
+	return &taskv1.ListCommentsResponse{Comments: out, NextPageToken: next}, nil
+}
+
 func toProtoSubtaskProposals(proposals []domain.SubtaskProposal) []*taskv1.SubtaskProposal {
 	out := make([]*taskv1.SubtaskProposal, 0, len(proposals))
 	for _, p := range proposals {
-		out = append(out, &taskv1.SubtaskProposal{Title: p.Title, Description: p.Description})
+		wire := &taskv1.SubtaskProposal{
+			Title: p.Title, Description: p.Description, Type: p.Type,
+			DependsOnIndices: toInt32Slice(p.DependsOnIndices), PromptTemplate: p.PromptTemplate,
+		}
+		if p.EstimatedHours != nil {
+			wire.EstimatedHours = wrapperspb.Double(*p.EstimatedHours)
+		}
+		out = append(out, wire)
 	}
 	return out
 }
@@ -236,7 +420,31 @@ func toProtoSubtaskProposals(proposals []domain.SubtaskProposal) []*taskv1.Subta
 func toDomainSubtaskProposals(proposals []*taskv1.SubtaskProposal) []domain.SubtaskProposal {
 	out := make([]domain.SubtaskProposal, 0, len(proposals))
 	for _, p := range proposals {
-		out = append(out, domain.SubtaskProposal{Title: p.GetTitle(), Description: p.GetDescription()})
+		proposal := domain.SubtaskProposal{
+			Title: p.GetTitle(), Description: p.GetDescription(), Type: p.GetType(),
+			DependsOnIndices: toIntSlice(p.GetDependsOnIndices()), PromptTemplate: p.GetPromptTemplate(),
+		}
+		if p.GetEstimatedHours() != nil {
+			v := p.GetEstimatedHours().GetValue()
+			proposal.EstimatedHours = &v
+		}
+		out = append(out, proposal)
+	}
+	return out
+}
+
+func toInt32Slice(in []int) []int32 {
+	out := make([]int32, len(in))
+	for i, v := range in {
+		out[i] = int32(v)
+	}
+	return out
+}
+
+func toIntSlice(in []int32) []int {
+	out := make([]int, len(in))
+	for i, v := range in {
+		out[i] = int(v)
 	}
 	return out
 }
@@ -288,11 +496,24 @@ func toProtoGrantLevel(l domain.GrantLevel) taskv1.GrantLevel {
 
 func toProtoTask(t domain.Task) *taskv1.Task {
 	return &taskv1.Task{
-		Id:        t.ID,
-		TenantId:  t.TenantID,
-		Title:     t.Title,
-		Status:    t.Status,
-		ParentId:  t.ParentID,
-		ProjectId: t.ProjectID,
+		Id:         t.ID,
+		TenantId:   t.TenantID,
+		Title:      t.Title,
+		Status:     t.Status,
+		ParentId:   t.ParentID,
+		ProjectId:  t.ProjectID,
+		TaskNumber: t.TaskNumber,
+		WorktreeId: t.WorktreeID,
+		PrUrl:      t.PRURL,
 	}
+}
+
+func (s *Server) FindTaskByNumber(ctx context.Context, req *taskv1.FindTaskByNumberRequest) (*taskv1.FindTaskByNumberResponse, error) {
+	task, err := s.findTaskByNumber.Execute(ctx, usecase.FindTaskByNumberInput{
+		ProjectID: req.GetProjectId(), TaskNumber: req.GetTaskNumber(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.FindTaskByNumberResponse{Task: toProtoTask(task)}, nil
 }

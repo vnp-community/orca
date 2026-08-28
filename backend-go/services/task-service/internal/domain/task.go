@@ -4,14 +4,19 @@
 // database, no gRPC, no framework, no context.Context.
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // Status values a Task can hold. Kept as an open-ish small set matching the
 // TS source's status strings (see specs/backend-go/services/task-service.md
 // §10 — faithful port, not a redesign).
 const (
 	StatusOpen       = "open"
+	StatusBlocked    = "blocked" // new — see TASK-TG-01-07's auto-block design
 	StatusInProgress = "in_progress"
+	StatusReview     = "review" // new — SOL-TG-04's completion target
 	StatusDone       = "done"
 	StatusCancelled  = "cancelled"
 )
@@ -66,11 +71,49 @@ type Task struct {
 	// task currently in_progress" — see that usecase's doc comment for the
 	// honest limit on what "in_progress" currently means here.
 	ProjectID string
+
+	Description    string
+	Type           string // task|bug|feature|epic
+	Priority       string
+	AssigneeID     string
+	OwnerID        string // see SOL-TG-03 — intrinsic-owner short-circuit
+	DueDate        *time.Time
+	EstimatedHours *float64
+	ActualHours    *float64 // see SOL-TG-04
+	PromptTemplate string   // see SOL-TG-02
+	AIContext      string
+	AIPlanJSON     string // see SOL-TG-02
+	Visibility     string
+	WorktreeID     string // see SOL-TG-04; also mirrors project-service's Worktree.TaskID (SOL-PW-04)
+	AgentSessionID string // see SOL-TG-04
+	// ActiveExecutionID is the complex path's ComplexExecutor.Execute
+	// return value (an orchestration-service coordinator_run id) — set
+	// right after StartCoordinatorRun succeeds (TASK-TG-04-04), read by
+	// ReportTaskExecutionResult (TASK-TG-04-05) to reject a stale/
+	// duplicate callback (retried delivery, or a callback for a run this
+	// task was re-dispatched away from) rather than erroring on it, per
+	// 05-data-architecture.md's at-least-once consumer idempotence note.
+	ActiveExecutionID string
+	// LastExecutionOutput is this task's most recent successful run's
+	// stdout, truncated to 8KB at the application layer before persisting
+	// (SOL-TG-04's product-tradeoff decision, see migration 0007's doc
+	// comment) — read by a LATER batch wave's buildExecutePrompt
+	// (TASK-TG-04-06/07) to resolve `{{outputs.<taskId>.*}}` interpolation
+	// against an EARLIER wave's completed dependency.
+	LastExecutionOutput string
+	ProgressPercent     int
+	// TaskNumber is a per-project sequential number (immutable, assigned
+	// once at Create) so a commit message can reference "#TG-42" without
+	// embedding a UUID — added SOL-PW-04.
+	TaskNumber int64
+	// PRURL is set by the PR-creation write-back saga — empty until a PR
+	// referencing this task's #TG-N is created. Added SOL-PW-04.
+	PRURL string
 }
 
 func validStatus(s string) bool {
 	switch s {
-	case StatusOpen, StatusInProgress, StatusDone, StatusCancelled:
+	case StatusOpen, StatusBlocked, StatusInProgress, StatusReview, StatusDone, StatusCancelled:
 		return true
 	default:
 		return false

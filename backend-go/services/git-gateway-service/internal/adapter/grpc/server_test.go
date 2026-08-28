@@ -124,7 +124,10 @@ func (fakeExecutor) ReadFilePreview(context.Context, string, string, int64) ([]b
 }
 
 func (fakeExecutor) ReadDir(context.Context, string, string) ([]domain.DirEntry, error) {
-	return []domain.DirEntry{{Name: "a.txt"}}, nil
+	return []domain.DirEntry{
+		{Name: "a.txt", SizeBytes: 42},
+		{Name: "sub", IsDirectory: true},
+	}, nil
 }
 
 func (fakeExecutor) WriteFile(context.Context, string, string, []byte, bool) (int64, error) {
@@ -136,7 +139,7 @@ func (fakeExecutor) WriteFileChunk(context.Context, string, string, int64, []byt
 }
 
 func (fakeExecutor) CreateDir(context.Context, string, string, bool, bool) error { return nil }
-func (fakeExecutor) Delete(context.Context, string, string, bool) error         { return nil }
+func (fakeExecutor) Delete(context.Context, string, string, bool) error          { return nil }
 
 func (fakeExecutor) Stat(context.Context, string, string) (domain.FileStat, error) {
 	return domain.FileStat{Exists: true, SizeBytes: 7}, nil
@@ -193,12 +196,16 @@ func (f fakeReachability) IsReachable(context.Context, string) (bool, error) {
 	return f.reachable, nil
 }
 
-func (fakeExecutor) CreateWorktree(context.Context, string, string, string) (domain.WorktreeCreateResult, error) {
+func (fakeExecutor) CreateWorktree(context.Context, string, string, string, string) (domain.WorktreeCreateResult, error) {
 	return domain.WorktreeCreateResult{Path: "/repo-branch", HeadSHA: "deadbeef"}, nil
 }
 
 func (fakeExecutor) RemoveWorktree(context.Context, string, bool) error {
 	return nil
+}
+
+func (fakeExecutor) MergeBranch(context.Context, string, string, string, string) (domain.MergeResult, error) {
+	return domain.MergeResult{ResultSHA: "deadbeef"}, nil
 }
 
 func (fakeExecutor) FetchAndResolveRef(context.Context, string, string) (string, error) {
@@ -255,6 +262,39 @@ func (fakeExecutor) BulkDiscard(context.Context, string, []string) (domain.BulkD
 	return domain.BulkDiscardResult{Success: true}, nil
 }
 
+func (fakeExecutor) MergeIntoBranch(context.Context, string, string, bool) (domain.MergeOutcome, error) {
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+func (fakeExecutor) StashPush(context.Context, string, string, bool) (domain.SimpleResult, error) {
+	return domain.SimpleResult{Success: true}, nil
+}
+
+func (fakeExecutor) StashPop(context.Context, string, string) (domain.MergeOutcome, error) {
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+func (fakeExecutor) CreateBranch(context.Context, string, string, string, bool) (string, error) {
+	return "feature", nil
+}
+
+func (fakeExecutor) DeleteBranch(context.Context, string, string) error {
+	return nil
+}
+
+// PushStream/PullStream (TASK-PW-03-08, SOL-PW-03) — fakeExecutor also
+// stands in for usecase.StreamingGitExecutor: one final success frame is
+// enough for this file's Server-adapter-layer tests, which only exercise
+// the wire<->usecase translation, not streaming content (that's
+// push_stream_test.go/pull_stream_test.go's job).
+func (fakeExecutor) PushStream(ctx context.Context, repoPath, remote, branch string, sink func(domain.GitProgressLine) error) error {
+	return sink(domain.GitProgressLine{IsFinal: true, Success: true})
+}
+
+func (fakeExecutor) PullStream(ctx context.Context, repoPath string, sink func(domain.GitProgressLine) error) error {
+	return sink(domain.GitProgressLine{IsFinal: true, Success: true})
+}
+
 // fakeProjectClient/fakeSCMClient are minimal stubs for exercising the
 // worktree usecases' wire<->usecase translation — none of this file's
 // tests exercise the saga/compensation logic itself (that's
@@ -266,11 +306,63 @@ func (fakeProjectClient) GetRepo(_ context.Context, repoID string) (domain.RepoI
 	return domain.RepoInfo{ID: repoID}, nil
 }
 
-func (fakeProjectClient) RecordWorktreeCreated(_ context.Context, _, _, path, branch string) (domain.WorktreeRecord, error) {
-	return domain.WorktreeRecord{ID: "wt-1", Path: path, Branch: branch}, nil
+func (fakeProjectClient) RecordWorktreeCreated(_ context.Context, _, repoID, path, branch, _ string, _ domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
+	return domain.WorktreeRecord{ID: "wt-1", RepoID: repoID, Path: path, Branch: branch, Active: true}, nil
 }
 
 func (fakeProjectClient) RecordWorktreeRemoved(context.Context, string) error {
+	return nil
+}
+
+func (fakeProjectClient) FindWorktreeByIdempotencyKey(context.Context, string, string) (domain.WorktreeRecord, bool, error) {
+	return domain.WorktreeRecord{}, false, nil
+}
+
+func (fakeProjectClient) IsIssueStatusSyncEnabled(context.Context, string) (bool, error) {
+	return true, nil
+}
+
+func (fakeProjectClient) ListWorktrees(context.Context, string) ([]domain.WorktreeRecord, error) {
+	return nil, nil
+}
+
+func (fakeProjectClient) GetWorktree(_ context.Context, worktreeID string) (domain.WorktreeInfo, error) {
+	return domain.WorktreeInfo{ID: worktreeID, RepoID: "repo-1", Branch: "feature", BaseRef: "main"}, nil
+}
+
+// fakeScrollbackCleaner is a usecase.ScrollbackCleaner stub — this file's
+// tests exercise the gRPC wire<->usecase translation, not RemoveWorktree's
+// best-effort cleanup call itself (that's internal/usecase's own test
+// suite); this just needs to satisfy NewRemoveWorktree's constructor
+// signature with something that succeeds.
+type fakeScrollbackCleaner struct{}
+
+func (fakeScrollbackCleaner) DeleteTerminalScrollbackSnapshots(context.Context, string) error {
+	return nil
+}
+
+type fakeIssueSourceClient struct{}
+
+func (fakeIssueSourceClient) GetIssue(context.Context, domain.IssueRef) (domain.Issue, error) {
+	return domain.Issue{Title: "fake issue", Provider: "github", ExternalRef: "owner/repo#1"}, nil
+}
+
+type fakeAgentSpawner struct{}
+
+func (fakeAgentSpawner) SpawnAndInject(context.Context, string, string, string) (string, error) {
+	return "session-1", nil
+}
+
+// fakeTerminalSessionLister is a usecase.TerminalSessionLister stub for
+// exercising CheckWorktreeDeleteSafety/RemoveWorktree's wire<->usecase
+// translation.
+type fakeTerminalSessionLister struct{}
+
+func (fakeTerminalSessionLister) ListSessions(context.Context, string) ([]domain.TerminalSessionRef, error) {
+	return nil, nil
+}
+
+func (fakeTerminalSessionLister) Kill(context.Context, string) error {
 	return nil
 }
 
@@ -282,6 +374,10 @@ func (fakeSCMClient) GetPullRequestBase(context.Context, string, int32) (string,
 
 func (fakeSCMClient) GetMergeRequestBase(context.Context, string, int32) (string, string, error) {
 	return "main", "basesha", nil
+}
+
+func (fakeSCMClient) GetPullRequestForBranch(context.Context, string, string) (usecase.PullRequestInfo, bool, error) {
+	return usecase.PullRequestInfo{}, false, nil
 }
 
 // fakeAICompleter is a usecase.AICompleter stub for exercising
@@ -306,18 +402,22 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 	reachability := fakeReachability{reachable: false}
 	projects := fakeProjectClient{}
 	scm := fakeSCMClient{}
+	createWorktreeUC := usecase.NewCreateWorktree(resolver, projects, exec, exec)
 	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
 	completer := fakeAICompleter{message: "generated message"}
+	historyUC := usecase.NewHistory(resolver, exec, exec)
 	return New(
 		getStatusUC,
 		getDiffUC,
 		usecase.NewCommit(resolver, exec, exec),
 		usecase.NewPush(resolver, exec, exec),
 		usecase.NewPull(resolver, exec, exec),
-		usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, completer),
+		usecase.NewPushStream(resolver, exec, exec),
+		usecase.NewPullStream(resolver, exec, exec),
+		usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, historyUC, completer),
 		usecase.NewStage(resolver, exec, exec),
 		usecase.NewUnstage(resolver, exec, exec),
-		usecase.NewHistory(resolver, exec, exec),
+		historyUC,
 		usecase.NewCheckIgnored(resolver, exec, exec),
 		usecase.NewForkSync(resolver, exec, exec),
 		usecase.NewUpstreamStatus(resolver, exec, exec),
@@ -353,8 +453,9 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewReadIssueCommand(resolver, exec, exec),
 		usecase.NewWriteIssueCommand(resolver, exec, exec),
 		usecase.NewScanSetupScriptImports(resolver, exec, exec),
-		usecase.NewCreateWorktree(resolver, projects, exec, exec),
-		usecase.NewRemoveWorktree(resolver, projects, exec, exec),
+		createWorktreeUC,
+		usecase.NewCreateWorktreeFromIssue(fakeIssueSourceClient{}, createWorktreeUC, fakeAgentSpawner{}, projects),
+		usecase.NewRemoveWorktree(resolver, projects, fakeScrollbackCleaner{}, scm, exec, exec, fakeTerminalSessionLister{}),
 		usecase.NewForceDeleteBranch(resolver, exec, exec),
 		usecase.NewDetectWorktrees(resolver, projects, exec, exec),
 		usecase.NewPrefetchCreateBase(resolver, projects, exec, exec),
@@ -370,6 +471,14 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewResolveConflict(resolver, exec, exec),
 		usecase.NewDiscard(resolver, exec, exec),
 		usecase.NewBulkDiscard(resolver, exec, exec),
+		usecase.NewCheckWorktreeDeleteSafety(resolver, exec, exec, fakeTerminalSessionLister{}),
+		usecase.NewCompareWorktrees(resolver, projects, exec, exec),
+		usecase.NewMergeWorktreeIntoBase(resolver, projects, exec, exec),
+		usecase.NewMergeBranch(resolver, exec, exec),
+		usecase.NewStashPush(resolver, exec, exec),
+		usecase.NewStashPop(resolver, exec, exec),
+		usecase.NewCreateBranch(resolver, exec, exec),
+		usecase.NewDeleteBranch(resolver, exec, exec),
 	)
 }
 
@@ -592,6 +701,79 @@ func TestServer_WriteFile_TranslatesResult(t *testing.T) {
 	}
 	if resp.GetBytesWritten() != 7 {
 		t.Errorf("unexpected bytes written: %d", resp.GetBytesWritten())
+	}
+}
+
+func TestReadDir_TranslatesSizeBytes(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.ReadDir(context.Background(), &gitgatewayv1.ReadDirRequest{WorktreeId: "wt-1", Path: "."})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	entries := resp.GetEntries()
+	if len(entries) != 2 {
+		t.Fatalf("unexpected entries: %+v", entries)
+	}
+	if entries[0].GetName() != "a.txt" || entries[0].GetIsDirectory() || entries[0].GetSizeBytes() != 42 {
+		t.Errorf("unexpected file entry: %+v", entries[0])
+	}
+	if entries[1].GetName() != "sub" || !entries[1].GetIsDirectory() || entries[1].GetSizeBytes() != 0 {
+		t.Errorf("unexpected directory entry: %+v", entries[1])
+	}
+}
+
+func TestMergeIntoBranch_Server_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.MergeIntoBranch(context.Background(), &gitgatewayv1.MergeIntoBranchRequest{WorktreeId: "wt-1", Branch: "feature", NoFf: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() || resp.GetHadConflicts() {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func TestStashPush_Server_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.StashPush(context.Background(), &gitgatewayv1.StashPushRequest{WorktreeId: "wt-1", Message: "wip"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func TestStashPop_Server_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.StashPop(context.Background(), &gitgatewayv1.StashPopRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func TestCreateBranch_Server_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.CreateBranch(context.Background(), &gitgatewayv1.CreateBranchRequest{WorktreeId: "wt-1", Branch: "feature", Checkout: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetBranch() != "feature" {
+		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func TestDeleteBranch_Server_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.DeleteBranch(context.Background(), &gitgatewayv1.DeleteBranchRequest{WorktreeId: "wt-1", Branch: "feature"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !resp.GetSuccess() {
+		t.Errorf("unexpected response: %+v", resp)
 	}
 }
 
@@ -911,5 +1093,81 @@ func TestServer_Fetch_TranslatesResult(t *testing.T) {
 	}
 	if !resp.GetSuccess() {
 		t.Errorf("unexpected fetch response: %+v", resp)
+	}
+}
+
+func TestServer_CompareWorktrees_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.CompareWorktrees(context.Background(), &gitgatewayv1.CompareWorktreesRequest{
+		WorktreeIds: []string{"wt-1", "wt-2"},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetBaseRef() != "main" {
+		t.Errorf("expected base_ref=main, got %q", resp.GetBaseRef())
+	}
+	if len(resp.GetWorktrees()) != 2 {
+		t.Fatalf("expected 2 comparisons, got %d", len(resp.GetWorktrees()))
+	}
+	if resp.GetWorktrees()[0].GetChangedFiles() != 1 {
+		t.Errorf("expected changed_files=1 (from fakeExecutor.BranchCompare), got %d", resp.GetWorktrees()[0].GetChangedFiles())
+	}
+}
+
+func TestServer_CompareWorktrees_TooFewWorktrees_ReturnsInvalidArgument(t *testing.T) {
+	s := newTestServer()
+	_, err := s.CompareWorktrees(context.Background(), &gitgatewayv1.CompareWorktreesRequest{WorktreeIds: []string{"wt-1"}})
+	if status.Code(err) != codes.InvalidArgument {
+		t.Errorf("expected InvalidArgument, got %v", err)
+	}
+}
+
+func TestServer_CheckWorktreeDeleteSafety_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.CheckWorktreeDeleteSafety(context.Background(), &gitgatewayv1.CheckWorktreeDeleteSafetyRequest{WorktreeId: "wt-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// fakeExecutor.GetStatus returns one modified file.
+	if resp.GetUncommittedFiles() != 1 {
+		t.Errorf("expected uncommitted_files=1, got %d", resp.GetUncommittedFiles())
+	}
+}
+
+func TestServer_RemoveWorktree_TranslatesResult(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.RemoveWorktree(context.Background(), &gitgatewayv1.RemoveWorktreeRequest{WorktreeId: "wt-1", Force: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected a non-nil RemoveWorktreeResponse")
+	}
+}
+
+// cleanStatusExecutor wraps fakeExecutor and reports a clean (no
+// uncommitted changes) worktree — fakeExecutor.GetStatus always returns one
+// changed file (for GenerateCommitMessage's own tests), which would
+// spuriously trip MergeBranch's BR-WT-16 guard.
+type cleanStatusExecutor struct{ fakeExecutor }
+
+func (cleanStatusExecutor) GetStatus(context.Context, string) (domain.GitStatus, error) {
+	return domain.GitStatus{Branch: "main"}, nil
+}
+
+func TestServer_MergeBranch_TranslatesResult(t *testing.T) {
+	resolver := &fakeResolver{conn: usecase.ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	projects := fakeProjectClient{}
+	s := &Server{mergeWorktreeIntoBase: usecase.NewMergeWorktreeIntoBase(resolver, projects, cleanStatusExecutor{}, cleanStatusExecutor{})}
+
+	resp, err := s.MergeBranch(context.Background(), &gitgatewayv1.MergeBranchRequest{
+		WorktreeId: "wt-1", BaseBranch: "main", Strategy: "merge",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp.GetResultSha() == "" {
+		t.Error("expected a non-empty result_sha")
 	}
 }

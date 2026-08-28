@@ -101,4 +101,20 @@ func registerWorkflowChannels(r *Registry, client workflowv1.WorkflowServiceClie
 		}
 		return resp.GetTemplate(), nil
 	})
+
+	r.Register("workflow.hasActiveExecutions", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type hasActiveArgs struct {
+			ProjectID string `json:"projectId"`
+		}
+		in, err := decodeArg[hasActiveArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		resp, err := client.HasActiveExecutions(ctx, &workflowv1.HasActiveExecutionsRequest{ProjectId: in.ProjectID})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]bool{"hasActiveExecutions": resp.GetHasActive()}, nil
+	})
 }

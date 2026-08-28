@@ -2,9 +2,11 @@ package httpgateway
 
 import (
 	"bytes"
+	"encoding/csv"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/go-chi/chi/v5"
@@ -84,19 +86,35 @@ func TestAdminRoutes_CreateUser(t *testing.T) {
 	}
 }
 
-func TestAdminRoutes_UpdateUserRole(t *testing.T) {
-	fake := &fakeAdminAuthServiceClient{}
+func TestAdminRoutes_UpdateUser_EmailOnlyLeavesRoleAndNameNil(t *testing.T) {
+	fake := &fakeAdminAuthServiceClient{updateUserResp: &authv1.UpdateUserResponse{
+		User: &authv1.User{Id: "u1", Email: "new@x.com"},
+	}}
 	router := testAdminRouter(fake)
 
-	body, _ := json.Marshal(updateUserRoleRequestBody{Role: "admin"})
+	body, _ := json.Marshal(updateUserRequestBody{Email: stringPtr("new@x.com")})
 	req := httptest.NewRequest(http.MethodPatch, "/admin/api/users/u1", bytes.NewReader(body))
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code == http.StatusNotFound {
-		t.Fatalf("expected PATCH /admin/api/users/:id to route, got 404; body=%s", w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if fake.lastUpdateUserReq.GetUserId() != "u1" {
+		t.Fatalf("UpdateUser called with UserId = %q, want %q", fake.lastUpdateUserReq.GetUserId(), "u1")
+	}
+	if fake.lastUpdateUserReq.GetEmail().GetValue() != "new@x.com" {
+		t.Fatalf("UpdateUser Email = %+v, want %q", fake.lastUpdateUserReq.GetEmail(), "new@x.com")
+	}
+	if fake.lastUpdateUserReq.Name != nil {
+		t.Fatalf("UpdateUser Name = %+v, want nil (only email was set in the request body)", fake.lastUpdateUserReq.Name)
+	}
+	if fake.lastUpdateUserReq.Role != nil {
+		t.Fatalf("UpdateUser Role = %+v, want nil (only email was set in the request body)", fake.lastUpdateUserReq.Role)
 	}
 }
+
+func stringPtr(s string) *string { return &s }
 
 func TestAdminRoutes_DeactivateUser(t *testing.T) {
 	fake := &fakeAdminAuthServiceClient{deactivateUserResp: &authv1.DeactivateUserResponse{
@@ -123,16 +141,29 @@ func TestAdminRoutes_DeactivateUser(t *testing.T) {
 	}
 }
 
-func TestAdminRoutes_ListSessions_RequiresUserIDQueryParam(t *testing.T) {
-	fake := &fakeAdminAuthServiceClient{}
+func TestAdminRoutes_ListSessions_NoUserIDProxiesToCrossUserListSessions(t *testing.T) {
+	fake := &fakeAdminAuthServiceClient{listSessionsAllResp: &authv1.ListSessionsResponse{
+		Sessions:      []*authv1.SessionWithUser{{Session: &authv1.Session{Id: "sess-1"}}},
+		NextPageToken: "next",
+	}}
 	router := testAdminRouter(fake)
 
 	req := httptest.NewRequest(http.MethodGet, "/admin/api/sessions", nil)
 	w := httptest.NewRecorder()
 	router.ServeHTTP(w, req)
 
-	if w.Code != http.StatusBadRequest {
-		t.Fatalf("status = %d, want %d (no cross-user ListAllSessions RPC exists); body=%s", w.Code, http.StatusBadRequest, w.Body.String())
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if fake.lastListSessionsAllReq == nil {
+		t.Fatal("expected ListSessions to be called")
+	}
+	var resp authv1.ListSessionsResponse
+	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
+		t.Fatalf("response body is not the expected JSON shape: %v; body=%s", err, w.Body.String())
+	}
+	if resp.NextPageToken != "next" || len(resp.Sessions) != 1 {
+		t.Fatalf("unexpected ListSessionsResponse: nextPageToken=%q sessions=%d", resp.NextPageToken, len(resp.Sessions))
 	}
 }
 
@@ -306,5 +337,70 @@ func TestAdminRoutes_AuditMatchesV1AuthAuditLog(t *testing.T) {
 	}
 	if adminW.Body.String() != v1W.Body.String() {
 		t.Fatalf("/admin/api/audit body %q != /v1/auth/audit-log body %q — the two REST surfaces have drifted apart", adminW.Body.String(), v1W.Body.String())
+	}
+}
+
+func TestAdminRoutes_ExportAuditLog_ReturnsCSVWithHeaderRow(t *testing.T) {
+	fake := &fakeAdminAuthServiceClient{queryAuditLogResp: &authv1.QueryAuditLogResponse{
+		Entries: []*authv1.AuditEntry{{Id: "e1", ActorId: "u1", Action: "user.created"}},
+	}}
+	router := testAdminRouter(fake)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/api/audit/export", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+	if ct := w.Header().Get("Content-Type"); ct != "text/csv" {
+		t.Fatalf("Content-Type = %q, want %q", ct, "text/csv")
+	}
+	lines := strings.SplitN(w.Body.String(), "\n", 2)
+	if lines[0] != "id,actor_id,action,target_type,target_id,ip_address,occurred_at,metadata" {
+		t.Fatalf("first line = %q, want the exact header row", lines[0])
+	}
+}
+
+// TestAdminRoutes_ExportAuditLog_MultiPageProducesNoDuplicateOrMissingRows
+// verifies a multi-page audit log (fake client returns 2 pages) produces one
+// CSV with rows from both pages, no duplicate/missing rows at the page
+// boundary.
+func TestAdminRoutes_ExportAuditLog_MultiPageProducesNoDuplicateOrMissingRows(t *testing.T) {
+	fake := &fakeAdminAuthServiceClient{
+		queryAuditLogResps: []*authv1.QueryAuditLogResponse{
+			{
+				Entries:       []*authv1.AuditEntry{{Id: "e1", Action: "a1"}, {Id: "e2", Action: "a2"}},
+				NextPageToken: "page-2",
+			},
+			{
+				Entries: []*authv1.AuditEntry{{Id: "e3", Action: "a3"}},
+			},
+		},
+	}
+	router := testAdminRouter(fake)
+
+	req := httptest.NewRequest(http.MethodGet, "/admin/api/audit/export", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+
+	rows, err := csv.NewReader(strings.NewReader(w.Body.String())).ReadAll()
+	if err != nil {
+		t.Fatalf("failed to parse CSV body: %v; body=%s", err, w.Body.String())
+	}
+	// header + 3 entry rows, no duplicates/missing at the page boundary.
+	if len(rows) != 4 {
+		t.Fatalf("got %d CSV rows (incl. header), want 4; body=%s", len(rows), w.Body.String())
+	}
+	gotIDs := []string{rows[1][0], rows[2][0], rows[3][0]}
+	wantIDs := []string{"e1", "e2", "e3"}
+	for i, want := range wantIDs {
+		if gotIDs[i] != want {
+			t.Fatalf("row %d id = %q, want %q; got ids=%v", i+1, gotIDs[i], want, gotIDs)
+		}
 	}
 }

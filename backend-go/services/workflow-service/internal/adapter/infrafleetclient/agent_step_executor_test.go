@@ -10,8 +10,38 @@ import (
 
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serverresolver"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 )
+
+// testResolver is the real serverresolver.New with nil project/infra
+// clients — safe here because every fixture in this package's tests uses
+// only the "connection:"/legacy-ConnectionID/empty Target shapes, none of
+// which ever touch those clients (see resolver.Resolve's switch). Testing
+// the RPC-calling shapes (server:/project:/fleet:tag:) is
+// internal/adapter/serverresolver's own job.
+func testResolver() usecase.ServerResolver {
+	return serverresolver.New(nil, nil)
+}
+
+// fakeProviderResolver is a minimal usecase.ProviderResolver — resolving
+// which ai-provider-service account to use is
+// internal/adapter/providerresolver's own job to test; AgentExecutor's
+// tests only need SOME resolution to succeed (or fail, via err) so the
+// relay call's AccountID param is exercised.
+type fakeProviderResolver struct {
+	accountID string
+	err       error
+}
+
+func (f *fakeProviderResolver) Resolve(ctx context.Context, tenantID, userID, projectID string, pin *domain.ProviderPin) (string, error) {
+	return f.accountID, f.err
+}
+
+func testProviderResolver() usecase.ProviderResolver {
+	return &fakeProviderResolver{accountID: "acct-1"}
+}
 
 // fakeInfraFleetClient implements infrafleetv1.InfraFleetServiceClient
 // directly — embedding the (nil) interface means any RPC this package's
@@ -32,6 +62,36 @@ func withTenantContext(ctx context.Context, tenantID string) context.Context {
 	return tenant.WithTenantID(ctx, tenantID)
 }
 
+// fakeAgentProfileResolver is an in-memory usecase.ProfileResolver.
+type fakeAgentProfileResolver struct {
+	settings map[string]any
+	err      error
+	calls    []string // userIDs, in call order
+}
+
+func (f *fakeAgentProfileResolver) GetResolvedProfile(ctx context.Context, userID string) (map[string]any, error) {
+	f.calls = append(f.calls, userID)
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.settings, nil
+}
+
+// fakeAgentProjectContextResolver is an in-memory usecase.ProjectContextResolver.
+type fakeAgentProjectContextResolver struct {
+	ctx   usecase.ProjectContext
+	err   error
+	calls []string // projectIDs, in call order
+}
+
+func (f *fakeAgentProjectContextResolver) GetProjectContext(ctx context.Context, projectID string) (usecase.ProjectContext, error) {
+	f.calls = append(f.calls, projectID)
+	if f.err != nil {
+		return usecase.ProjectContext{}, f.err
+	}
+	return f.ctx, nil
+}
+
 func TestAgentExecutor_SuccessfulRelayProducesCompletedStepResult(t *testing.T) {
 	var gotRequest *infrafleetv1.RelayRequest
 	fake := &fakeInfraFleetClient{
@@ -41,7 +101,7 @@ func TestAgentExecutor_SuccessfulRelayProducesCompletedStepResult(t *testing.T) 
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewAgentExecutor(fake)
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing", WorktreePath: "/wt"})
@@ -58,8 +118,37 @@ func TestAgentExecutor_SuccessfulRelayProducesCompletedStepResult(t *testing.T) 
 	if gotRequest.ConnectionId != "conn-1" {
 		t.Errorf("expected connectionId conn-1, got %q", gotRequest.ConnectionId)
 	}
-	if gotRequest.Method != agentExecMethod {
-		t.Errorf("expected method %q, got %q", agentExecMethod, gotRequest.Method)
+	if gotRequest.Method != agentExecPromptMethod {
+		t.Errorf("expected method %q, got %q", agentExecPromptMethod, gotRequest.Method)
+	}
+}
+
+// TestAgentExecutor_MethodIsAlwaysAgentExecPrompt is the hard regression
+// test for the stale "agent.exec" bug this task fixes — asserted
+// unconditionally, both with and without a UserID in the step config.
+func TestAgentExecutor_MethodIsAlwaysAgentExecPrompt(t *testing.T) {
+	for _, cfg := range []domain.AgentStepConfig{
+		{ConnectionID: "conn-1", Prompt: "p"},
+		{ConnectionID: "conn-1", Prompt: "p", UserID: "user-1"},
+	} {
+		var gotMethod string
+		fake := &fakeInfraFleetClient{
+			relayFunc: func(_ context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
+				gotMethod = in.Method
+				result, _ := json.Marshal(map[string]any{"exitCode": 0})
+				return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
+			},
+		}
+		exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{settings: map[string]any{}}, &fakeAgentProjectContextResolver{})
+		ctx := withTenantContext(context.Background(), "tenant-1")
+
+		cfgJSON, _ := json.Marshal(cfg)
+		if _, err := exec.Execute(ctx, string(cfgJSON)); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotMethod != agentExecPromptMethod {
+			t.Errorf("expected method %q, got %q", agentExecPromptMethod, gotMethod)
+		}
 	}
 }
 
@@ -70,7 +159,7 @@ func TestAgentExecutor_NonZeroExitCodeProducesFailedStepResult(t *testing.T) {
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewAgentExecutor(fake)
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
@@ -89,7 +178,7 @@ func TestAgentExecutor_RelayErrorPropagates(t *testing.T) {
 			return nil, errors.New("dev server unreachable")
 		},
 	}
-	exec := NewAgentExecutor(fake)
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
@@ -106,7 +195,7 @@ func TestAgentExecutor_MissingConnectionIDErrorsWithoutCallingRelay(t *testing.T
 			return nil, nil
 		},
 	}
-	exec := NewAgentExecutor(fake)
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{Prompt: "do the thing"})
@@ -123,11 +212,107 @@ func TestAgentExecutor_NoTenantInContextErrorsWithoutCallingRelay(t *testing.T) 
 			return nil, nil
 		},
 	}
-	exec := NewAgentExecutor(fake)
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), &fakeAgentProfileResolver{}, &fakeAgentProjectContextResolver{})
 
 	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
 	_, err := exec.Execute(context.Background(), string(cfg))
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
+	}
+}
+
+// TestAgentExecutor_EmptyUserID_LegacyPassthrough asserts that when
+// cfg.UserID is empty, the profile-aware path is skipped entirely — no
+// ProfileResolver call, params.Env/Model stay unset.
+func TestAgentExecutor_EmptyUserID_LegacyPassthrough(t *testing.T) {
+	var gotParams agentExecPromptParams
+	fake := &fakeInfraFleetClient{
+		relayFunc: func(_ context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
+			_ = json.Unmarshal([]byte(in.ParamsJson), &gotParams)
+			result, _ := json.Marshal(map[string]any{"exitCode": 0})
+			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
+		},
+	}
+	profiles := &fakeAgentProfileResolver{}
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), profiles, &fakeAgentProjectContextResolver{})
+	ctx := withTenantContext(context.Background(), "tenant-1")
+
+	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing"})
+	if _, err := exec.Execute(ctx, string(cfg)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(profiles.calls) != 0 {
+		t.Errorf("expected no ProfileResolver call for an empty UserID, got %v", profiles.calls)
+	}
+	if len(gotParams.Env) != 0 {
+		t.Errorf("expected no env for legacy passthrough, got %+v", gotParams.Env)
+	}
+	if gotParams.Model != "" {
+		t.Errorf("expected no model for legacy passthrough, got %q", gotParams.Model)
+	}
+}
+
+// TestAgentExecutor_UserIDSet_ResolvesProfileAndPopulatesEnv asserts the
+// profile-aware path: ProfileResolver called with the right userID, env
+// populated, params.Model equals the raw resolved model string (not a
+// binary name).
+func TestAgentExecutor_UserIDSet_ResolvesProfileAndPopulatesEnv(t *testing.T) {
+	var gotParams agentExecPromptParams
+	fake := &fakeInfraFleetClient{
+		relayFunc: func(_ context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
+			_ = json.Unmarshal([]byte(in.ParamsJson), &gotParams)
+			result, _ := json.Marshal(map[string]any{"exitCode": 0})
+			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
+		},
+	}
+	profiles := &fakeAgentProfileResolver{settings: map[string]any{
+		"agent": map[string]any{"preferredModel": "claude-opus-4-5"},
+	}}
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), profiles, &fakeAgentProjectContextResolver{})
+	ctx := withTenantContext(context.Background(), "tenant-1")
+
+	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing", UserID: "user-42"})
+	if _, err := exec.Execute(ctx, string(cfg)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(profiles.calls) != 1 || profiles.calls[0] != "user-42" {
+		t.Errorf("expected ProfileResolver called with user-42, got %v", profiles.calls)
+	}
+	if gotParams.Model != "claude-opus-4-5" {
+		t.Errorf("expected raw resolved model string, got %q", gotParams.Model)
+	}
+	if gotParams.Env == nil {
+		t.Error("expected env to be populated")
+	}
+}
+
+// TestAgentExecutor_ProjectContextResolverFailure_BestEffort asserts that a
+// ProjectContextResolver failure never blocks the agent spawn — the relay
+// call still happens, with InitFile empty.
+func TestAgentExecutor_ProjectContextResolverFailure_BestEffort(t *testing.T) {
+	var gotParams agentExecPromptParams
+	var relayCalled bool
+	fake := &fakeInfraFleetClient{
+		relayFunc: func(_ context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
+			relayCalled = true
+			_ = json.Unmarshal([]byte(in.ParamsJson), &gotParams)
+			result, _ := json.Marshal(map[string]any{"exitCode": 0})
+			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
+		},
+	}
+	profiles := &fakeAgentProfileResolver{settings: map[string]any{}}
+	projects := &fakeAgentProjectContextResolver{err: errors.New("project-service unreachable")}
+	exec := NewAgentExecutor(fake, testResolver(), testProviderResolver(), profiles, projects)
+	ctx := withTenantContext(context.Background(), "tenant-1")
+
+	cfg, _ := json.Marshal(domain.AgentStepConfig{ConnectionID: "conn-1", Prompt: "do the thing", UserID: "user-1", ProjectID: "proj-1"})
+	if _, err := exec.Execute(ctx, string(cfg)); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relayCalled {
+		t.Fatal("expected the relay/spawn call to still happen despite the project-context failure")
+	}
+	if gotParams.InitFile != "" {
+		t.Errorf("expected empty InitFile on project-context failure, got %q", gotParams.InitFile)
 	}
 }

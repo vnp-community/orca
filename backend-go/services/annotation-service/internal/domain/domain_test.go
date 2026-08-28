@@ -22,7 +22,7 @@ func TestNewAnchor_ValidatesInvariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewAnchor(tt.repoID, tt.filePath, tt.line, "main")
+			_, err := NewAnchor(tt.repoID, "", tt.filePath, tt.line, 0, SideUnspecified, "main")
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -57,7 +57,7 @@ func TestNewAnnotation_ValidatesInvariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewAnnotation("a1", tt.tenantID, tt.authorID, tt.anchor, tt.content, false, tt.requestID, now, now)
+			_, err := NewAnnotation("a1", tt.tenantID, tt.authorID, tt.anchor, tt.content, "", false, tt.requestID, now, now)
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -72,7 +72,7 @@ func TestNewAnnotation_ReturnsPopulatedAnnotation(t *testing.T) {
 	now := time.Now()
 	anchor := Anchor{RepoID: "repo-1", FilePath: "main.go", Line: 42, Ref: "abc123"}
 
-	got, err := NewAnnotation("a1", "t1", "u1", anchor, "nit: rename this", true, "req-1", now, now)
+	got, err := NewAnnotation("a1", "t1", "u1", anchor, "nit: rename this", "", true, "req-1", now, now)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

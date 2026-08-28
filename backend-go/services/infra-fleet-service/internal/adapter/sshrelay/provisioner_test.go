@@ -12,6 +12,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -79,6 +80,26 @@ type fakeSSHServer struct {
 	// badChecksum, if true, makes the checksum exec reply with a wrong hash
 	// — exercises deploy()'s mismatch-detection path for real.
 	badChecksum bool
+	// reportedVersion, if non-empty, makes the exec handler answer
+	// remoteVersionAndPresence's `require(...).AGENT_VERSION` probe with
+	// this string instead of falling through to the default (empty-output)
+	// branch — lets TestProvision_* exercise BR-SSH-07's version-gate
+	// against a "server already has this exact version deployed" scenario.
+	reportedVersion string
+	// mkdirCalls counts real mkdir execs — TestProvision_VersionMatches_
+	// SkipsDeploy asserts this stays 0 when the version gate skips deploy.
+	mkdirCalls atomic.Int32
+	// skipHandshake, if true, makes the "--connect"/"--stdio" exec handler
+	// write a fake crash message to the SSH channel's stderr (extended data)
+	// and then simply never send agent.handshake — simulates a launched
+	// process that starts but never completes the handshake, driving
+	// TestProvision_HandshakeTimeout_IncludesDiagnostics.
+	skipHandshake bool
+	// detachedStarted tracks whether a "--detach --sock-path" exec has run
+	// — the fake server's stand-in for the real detached process actually
+	// creating its Unix socket, so a later `test -S <path>` (reattach's
+	// liveness probe) reports "alive" only after a real detach happened.
+	detachedStarted atomic.Bool
 }
 
 func startFakeSSHServer(t *testing.T, trustedCAPub ssh.PublicKey, expectPrincipal string, badChecksum bool) *fakeSSHServer {
@@ -201,10 +222,18 @@ func (s *fakeSSHServer) handleExec(t *testing.T, channel ssh.Channel, cmd string
 		// really create it under s.deployDir so the SFTP upload that
 		// follows (Create doesn't make parent dirs) has somewhere to land,
 		// same as a real remote shell would.
+		s.mkdirCalls.Add(1)
 		dir := strings.Trim(strings.TrimSpace(strings.TrimPrefix(cmd, "mkdir -p")), "'\"")
 		if err := os.MkdirAll(filepath.Join(s.deployDir, dir), 0o755); err != nil {
 			exitStatus(channel, 1)
 			return
+		}
+		exitStatus(channel, 0)
+	case strings.Contains(cmd, "AGENT_VERSION"):
+		// version_check.go's remoteVersionAndPresence probe:
+		// `test -f <path> && node -e "...AGENT_VERSION..." || true`.
+		if s.reportedVersion != "" {
+			_, _ = channel.Write([]byte(s.reportedVersion))
 		}
 		exitStatus(channel, 0)
 	case strings.Contains(cmd, "createHash('sha256')"):
@@ -237,7 +266,30 @@ func (s *fakeSSHServer) handleExec(t *testing.T, channel ssh.Channel, cmd string
 		}
 		_, _ = channel.Write([]byte(hexSum))
 		exitStatus(channel, 0)
-	case strings.Contains(cmd, "--stdio"):
+	case strings.Contains(cmd, "--detach"):
+		// launch.go's detach-start command: the parent blocks until the
+		// (simulated) detached child reports listening, then exits 0 — the
+		// fake server stands in for that by just flipping a flag other execs
+		// on this same fake connection can observe.
+		s.detachedStarted.Store(true)
+		exitStatus(channel, 0)
+	case strings.HasPrefix(cmd, "test -S"):
+		// launch.go/reattach's liveness probe: `test -S <sockPath> && echo alive`.
+		if s.detachedStarted.Load() {
+			_, _ = channel.Write([]byte("alive"))
+		}
+		exitStatus(channel, 0)
+	case strings.Contains(cmd, "--connect"), strings.Contains(cmd, "--stdio"):
+		if s.skipHandshake {
+			// Write to the channel's extended-data (stderr) stream — this is
+			// what session.Stderr (launch.go's diagnosticStderr) receives on
+			// the real Provisioner side.
+			_, _ = channel.Stderr().Write([]byte("fatal: relay process crashed before handshake\n"))
+			// Never send agent.handshake and never exit — the channel just
+			// stays open with no response, forcing receiveHandshake's own
+			// timeout to fire.
+			return
+		}
 		s.runFakeAgentHandshake(t, channel)
 		// Deliberately no exit-status here — a real launched process stays
 		// running; the session/channel simply stays open as the live
@@ -324,17 +376,17 @@ func TestProvision_SucceedsAgainstFakeServer(t *testing.T) {
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", false)
 	bundlePath := writeLocalBundle(t, "// fake agent bundle content\n")
 
-	target, err := domain.NewSshTarget("ssht-1", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("ssht-1", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
 	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"ssht-1": target}}
-	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
+	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{
 		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "test",
 	})
 
-	devServer, err := domain.NewDevServer("ds-1", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1")
+	devServer, err := domain.NewDevServer("ds-1", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -360,17 +412,17 @@ func TestProvision_FailsOnChecksumMismatch(t *testing.T) {
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", true) // badChecksum
 	bundlePath := writeLocalBundle(t, "// fake agent bundle content\n")
 
-	target, err := domain.NewSshTarget("ssht-2", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("ssht-2", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
 	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"ssht-2": target}}
-	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
+	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{
 		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "test",
 	})
 
-	devServer, err := domain.NewDevServer("ds-2", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-2")
+	devServer, err := domain.NewDevServer("ds-2", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-2", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -390,15 +442,15 @@ func TestProvision_FailsWhenBundlePathNotConfigured(t *testing.T) {
 	ca := newFakeCA(t)
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", false)
 
-	target, err := domain.NewSshTarget("ssht-3", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("ssht-3", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
 	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"ssht-3": target}}
-	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
+	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{HandshakeTimeout: 5 * time.Second}) // no BundlePath
 
-	devServer, err := domain.NewDevServer("ds-3", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-3")
+	devServer, err := domain.NewDevServer("ds-3", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-3", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -413,10 +465,10 @@ func TestProvision_FailsWhenBundlePathNotConfigured(t *testing.T) {
 
 func TestProvision_FailsWhenSshTargetUnresolvable(t *testing.T) {
 	resolver := &fakeSshTargetResolver{err: fmt.Errorf("postgres: ssh target not found")}
-	connector := sshconn.NewConnector(&fakeIssuer{}, sshconn.Config{})
+	connector := sshconn.NewConnector(&fakeIssuer{}, nil, sshconn.Config{}, nil)
 	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{BundlePath: "/nonexistent", HandshakeTimeout: time.Second})
 
-	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-missing")
+	devServer, err := domain.NewDevServer("ds-4", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-missing", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -424,5 +476,121 @@ func TestProvision_FailsWhenSshTargetUnresolvable(t *testing.T) {
 	_, _, err = provisioner.Provision(context.Background(), devServer)
 	if err == nil {
 		t.Fatal("expected Provision to fail when the ssh target can't be resolved")
+	}
+}
+
+// TestProvision_VersionMatches_SkipsDeploy is TASK-SSH-02-04's regression:
+// BR-SSH-07's version gate must skip the SFTP upload entirely when the
+// remote's already-deployed AGENT_VERSION matches OrcaVersion.
+func TestProvision_VersionMatches_SkipsDeploy(t *testing.T) {
+	ca := newFakeCA(t)
+	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", false)
+	server.reportedVersion = "2.1.0"
+	bundlePath := writeLocalBundle(t, "// fake agent bundle content\n")
+
+	target, err := domain.NewSshTarget("ssht-version-match", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
+	if err != nil {
+		t.Fatalf("NewSshTarget: %v", err)
+	}
+	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"ssht-version-match": target}}
+	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
+	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{
+		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "2.1.0",
+	})
+
+	devServer, err := domain.NewDevServer("ds-version-match", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-version-match", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	transport, info, err := provisioner.Provision(ctx, devServer)
+	if err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+	t.Cleanup(func() { _ = transport.Close("test done") })
+
+	if info.AgentVersion != "2.1.0" {
+		t.Errorf("expected handshake to still complete, got info=%+v", info)
+	}
+	if got := server.mkdirCalls.Load(); got != 0 {
+		t.Errorf("expected deploy() to be skipped entirely (0 mkdir calls) when the version already matches, got %d calls", got)
+	}
+}
+
+// TestProvision_VersionMismatch_StillDeploys is the converse: an absent or
+// mismatched remote version must fall through to deployWithRetry.
+func TestProvision_VersionMismatch_StillDeploys(t *testing.T) {
+	ca := newFakeCA(t)
+	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", false)
+	server.reportedVersion = "1.0.0-old" // mismatches OrcaVersion below
+	bundlePath := writeLocalBundle(t, "// fake agent bundle content\n")
+
+	target, err := domain.NewSshTarget("ssht-version-mismatch", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
+	if err != nil {
+		t.Fatalf("NewSshTarget: %v", err)
+	}
+	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"ssht-version-mismatch": target}}
+	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
+	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{
+		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "2.1.0",
+	})
+
+	devServer, err := domain.NewDevServer("ds-version-mismatch", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-version-mismatch", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	transport, _, err := provisioner.Provision(ctx, devServer)
+	if err != nil {
+		t.Fatalf("Provision: %v", err)
+	}
+	t.Cleanup(func() { _ = transport.Close("test done") })
+
+	if got := server.mkdirCalls.Load(); got != 1 {
+		t.Errorf("expected deploy() to run once on a version mismatch, got %d mkdir calls", got)
+	}
+}
+
+// TestProvision_HandshakeTimeout_IncludesDiagnostics is TASK-SSH-02-07's
+// regression: a handshake timeout must surface collectDiagnostics' output,
+// not a bare timeout error.
+func TestProvision_HandshakeTimeout_IncludesDiagnostics(t *testing.T) {
+	ca := newFakeCA(t)
+	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", false)
+	server.skipHandshake = true
+	bundlePath := writeLocalBundle(t, "// fake agent bundle content\n")
+
+	target, err := domain.NewSshTarget("ssht-handshake-timeout", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
+	if err != nil {
+		t.Fatalf("NewSshTarget: %v", err)
+	}
+	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"ssht-handshake-timeout": target}}
+	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
+	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{
+		BundlePath: bundlePath, HandshakeTimeout: 500 * time.Millisecond, OrcaVersion: "test",
+	})
+
+	devServer, err := domain.NewDevServer("ds-handshake-timeout", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-handshake-timeout", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	_, _, err = provisioner.Provision(ctx, devServer)
+	if err == nil {
+		t.Fatal("expected Provision to fail when the handshake never arrives")
+	}
+	for _, want := range []string{"os=", "arch=", "node=", "user=", "stderr_tail="} {
+		if !strings.Contains(err.Error(), want) {
+			t.Errorf("expected the error to include diagnostics marker %q, got: %v", want, err)
+		}
+	}
+	if !strings.Contains(err.Error(), "relay process crashed before handshake") {
+		t.Errorf("expected the error to include the captured stderr, got: %v", err)
 	}
 }

@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
@@ -97,12 +100,19 @@ func (t *pipeTransport) respondToNextCall(tb testing.TB, result map[string]any) 
 	t.reads <- respDecoded
 }
 
-// fakeSshProvisioner is an in-memory devserveragent.SshProvisioner.
+// fakeSshProvisioner is an in-memory devserveragent.SshProvisioner +
+// SshReattacher (sshReattacherAndProvisioner) — WithRelaySSH requires both.
 type fakeSshProvisioner struct {
 	transport  *pipeTransport
 	info       HandshakeInfo
 	err        error
 	provisions int
+
+	mu              sync.Mutex
+	reattachTrans   Transport
+	reattachErr     error
+	reattaches      int
+	reattachSockets []string
 }
 
 func (f *fakeSshProvisioner) Provision(context.Context, domain.DevServer) (Transport, HandshakeInfo, error) {
@@ -113,9 +123,26 @@ func (f *fakeSshProvisioner) Provision(context.Context, domain.DevServer) (Trans
 	return f.transport, f.info, nil
 }
 
+func (f *fakeSshProvisioner) Reattach(_ context.Context, _ domain.DevServer, sockPath string) (Transport, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.reattaches++
+	f.reattachSockets = append(f.reattachSockets, sockPath)
+	if f.reattachErr != nil {
+		return nil, f.reattachErr
+	}
+	return f.reattachTrans, nil
+}
+
+func (f *fakeSshProvisioner) reattachCount() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.reattaches
+}
+
 func relaySSHDevServer(t *testing.T, id string) domain.DevServer {
 	t.Helper()
-	ds, err := domain.NewDevServer(id, "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1")
+	ds, err := domain.NewDevServer(id, "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-1", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -186,5 +213,113 @@ func TestClient_RelaySSH_ProvisionFailurePropagates(t *testing.T) {
 
 	if _, err := client.Exec(context.Background(), devServer, "shell.exec", nil); err == nil {
 		t.Fatal("expected Exec to propagate the provisioner's error")
+	}
+}
+
+// TestSession_RelaySSHReconnect_ReattachesWithoutRedeploy mirrors
+// TestSession_BackgroundReconnect_RecoversAfterDropWithoutCallerRetry
+// (session_test.go) for relay-ssh's managedModeRelaySSHReattach path:
+// dropping the transport must call Reattach, never Provision again.
+func TestSession_RelaySSHReconnect_ReattachesWithoutRedeploy(t *testing.T) {
+	firstTransport := newPipeTransport()
+	secondTransport := newPipeTransport()
+	provisioner := &fakeSshProvisioner{
+		transport:     firstTransport,
+		info:          HandshakeInfo{Platform: "linux", SockPath: "/tmp/orca-relay/relay.sock"},
+		reattachTrans: secondTransport,
+	}
+
+	cfg := DefaultConfig()
+	cfg.ReconnectBaseDelay = 10 * time.Millisecond
+	cfg.ReconnectMaxDelay = 50 * time.Millisecond
+	client := New(cfg, slog.Default(), WithRelaySSH(provisioner))
+	t.Cleanup(client.Close)
+
+	devServer := relaySSHDevServer(t, "ds-reattach-1")
+
+	healthy, err := client.Health(context.Background(), devServer)
+	if err != nil {
+		t.Fatalf("Health: %v", err)
+	}
+	if !healthy {
+		t.Fatal("expected the initial provision to handshake successfully")
+	}
+	if provisioner.provisions != 1 {
+		t.Fatalf("provisions = %d, want 1", provisioner.provisions)
+	}
+
+	// Simulate an SSH-drop: close the first transport out from under the
+	// session, same as readLoop observing a real ReadFrame error.
+	_ = firstTransport.Close("simulated ssh drop")
+
+	deadline := time.After(2 * time.Second)
+	for provisioner.reattachCount() < 1 {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for relaySSHReconnect to call Reattach")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+
+	if provisioner.provisions != 1 {
+		t.Errorf("provisions = %d, want still exactly 1 (reconnect must reattach, not re-provision)", provisioner.provisions)
+	}
+	if got := provisioner.reattachSockets[0]; got != "/tmp/orca-relay/relay.sock" {
+		t.Errorf("Reattach's sockPath = %q, want the cached HandshakeInfo.SockPath", got)
+	}
+
+	// The session should be live again on the SECOND transport without any
+	// caller having to retry — same "recovers on its own" assertion
+	// TestSession_BackgroundReconnect_RecoversAfterDropWithoutCallerRetry
+	// makes for relay-websocket.
+	go secondTransport.respondToNextCall(t, map[string]any{"ok": true})
+	if _, err := client.Exec(context.Background(), devServer, "preflight.check", nil); err != nil {
+		t.Fatalf("Exec after reattach: %v", err)
+	}
+}
+
+// TestSession_RelaySSHReconnect_DetachedProcessGoneStopsLooping asserts the
+// ErrRelayDetachedProcessGone path returns without looping further, leaving
+// the session non-live for the next caller's full re-Provision.
+func TestSession_RelaySSHReconnect_DetachedProcessGoneStopsLooping(t *testing.T) {
+	firstTransport := newPipeTransport()
+	provisioner := &fakeSshProvisioner{
+		transport:   firstTransport,
+		info:        HandshakeInfo{Platform: "linux", SockPath: "/tmp/orca-relay/relay.sock"},
+		reattachErr: fmt.Errorf("sshrelay: reattach: %w", ErrRelayDetachedProcessGone),
+	}
+
+	cfg := DefaultConfig()
+	cfg.ReconnectBaseDelay = 10 * time.Millisecond
+	cfg.ReconnectMaxDelay = 20 * time.Millisecond
+	client := New(cfg, slog.Default(), WithRelaySSH(provisioner))
+	t.Cleanup(client.Close)
+
+	devServer := relaySSHDevServer(t, "ds-reattach-gone")
+
+	healthy, err := client.Health(context.Background(), devServer)
+	if err != nil {
+		t.Fatalf("Health: %v", err)
+	}
+	if !healthy {
+		t.Fatal("expected the initial provision to handshake successfully")
+	}
+
+	_ = firstTransport.Close("simulated ssh drop")
+
+	deadline := time.After(2 * time.Second)
+	for provisioner.reattachCount() < 1 {
+		select {
+		case <-deadline:
+			t.Fatal("timed out waiting for relaySSHReconnect's first Reattach attempt")
+		case <-time.After(5 * time.Millisecond):
+		}
+	}
+
+	// Give the loop a chance to retry (it must NOT — it should have returned
+	// after the first ErrRelayDetachedProcessGone).
+	time.Sleep(100 * time.Millisecond)
+	if got := provisioner.reattachCount(); got != 1 {
+		t.Errorf("reattachCount = %d, want exactly 1 (loop must stop on ErrRelayDetachedProcessGone, not keep retrying)", got)
 	}
 }

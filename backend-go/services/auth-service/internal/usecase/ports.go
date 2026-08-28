@@ -64,6 +64,10 @@ type UserRepository interface {
 	// Count returns the total number of users across every tenant — backs
 	// GetAdminStats's total_users field (internal/usecase/get_admin_stats.go).
 	Count(ctx context.Context) (int32, error)
+	// UpdateUser applies a partial update — nil fields are left unchanged
+	// (COALESCE semantics at the SQL layer). Distinct from UpdateUserRole
+	// (kept as-is, a narrower single-field update).
+	UpdateUser(ctx context.Context, userID string, email, name *string, role *domain.Role) (domain.User, error)
 }
 
 // SessionRepository is the persistence port for sessions. Only the SHA-256
@@ -87,6 +91,27 @@ type SessionRepository interface {
 	// unexpired) sessions across every tenant — backs GetAdminStats's
 	// active_sessions field.
 	CountActive(ctx context.Context, now time.Time) (int32, error)
+
+	// TouchLastSeen updates last_seen_at for tokenHash to now — a no-op,
+	// not an error, if tokenHash doesn't exist (the session may have been
+	// revoked/expired between the IsValid check and this call landing;
+	// ValidateSession has already returned its decision by then).
+	TouchLastSeen(ctx context.Context, tokenHash string, now time.Time) error
+
+	// DeleteExpiredBefore removes every session row whose expires_at (or
+	// revoked_at) is older than cutoff, returning the count removed — the
+	// reaper's primitive. Takes a cutoff, not "now": the reaper purges rows
+	// expired/revoked more than a retention window ago, not the instant
+	// they expire, so a brief "recently expired sessions" admin view still
+	// has something to show. This is storage/observability hygiene, not a
+	// security boundary — expired rows already fail domain.Session.IsValid
+	// at read time regardless of whether they've been purged yet.
+	DeleteExpiredBefore(ctx context.Context, cutoff time.Time) (int64, error)
+
+	// ListForTenant returns a page of sessions for tenantID joined with each
+	// session's owning user's email (denormalized to avoid an N+1 lookup in
+	// the admin dashboard).
+	ListForTenant(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.SessionWithUser, string, error)
 }
 
 // AccessPolicyRepository is the persistence port for admin-console access
@@ -126,7 +151,18 @@ type PolicyDataPublisher interface {
 // doc comment.
 type AuditRepository interface {
 	Append(ctx context.Context, entry domain.AuditEntry) error
-	Query(ctx context.Context, tenantID string, since time.Time, pageToken string, pageSize int32) ([]domain.AuditEntry, string, error)
+	Query(ctx context.Context, filter AuditQueryFilter, pageToken string, pageSize int32) ([]domain.AuditEntry, string, error)
+}
+
+// AuditQueryFilter narrows a Query call. Zero-value fields (empty string,
+// zero time.Time) mean "no filter on this dimension" — only TenantID and
+// Since are ever required by a real caller today.
+type AuditQueryFilter struct {
+	TenantID string
+	Since    time.Time
+	To       time.Time // zero value = no upper bound
+	Action   string    // "" = no filter
+	ActorID  string    // "" = no filter
 }
 
 // PasswordHasher hashes and verifies passwords. Implemented by
@@ -176,4 +212,53 @@ type TokenSigner interface {
 	// PublicJWKS returns the current+previous signing key version as an
 	// RFC 7517 JWK Set, for GetJWKS to publish.
 	PublicJWKS(ctx context.Context) (jose.JSONWebKeySet, error)
+}
+
+// DeviceKeyExchanger generates NaCl X25519 keypairs and computes shared
+// secrets for BL-MB-01's pairing handshake. Implemented by
+// internal/adapter/nacl.KeyExchanger over golang.org/x/crypto/nacl/box.
+type DeviceKeyExchanger interface {
+	GenerateEphemeralKeypair() (pub, priv []byte, err error)
+	SharedSecret(priv, peerPub []byte) ([]byte, error)
+}
+
+// SharedSecretSealer mediates a paired device's shared secret through
+// Vault Transit — never a plaintext value in this service's own Postgres
+// row, mirroring notification-service's/infra-fleet-service's Vault-mediated
+// secret pattern extended here to a per-device-pairing secret class.
+// Implemented by internal/adapter/vault.SharedSecretSealer.
+type SharedSecretSealer interface {
+	Encrypt(ctx context.Context, plaintext []byte) (ciphertext []byte, keyRef string, err error)
+	Decrypt(ctx context.Context, ciphertext []byte, keyRef string) ([]byte, error)
+}
+
+// PairingSessionRepository is the persistence port for the ephemeral
+// server-side state of an in-progress QR pairing attempt (BL-MB-01).
+// Implemented by internal/adapter/postgres.PairingSessionStore.
+type PairingSessionRepository interface {
+	Save(ctx context.Context, session domain.PairingSession) error
+	// GetAndConsume atomically marks the session consumed and returns it —
+	// the one statement that enforces BR-MB-02 (one-time use) across two
+	// concurrent CompleteDevicePairing calls racing on the same token.
+	// Returns an error satisfying errors.Is(err, domain.ErrPairingTokenNotFound)
+	// if no unconsumed row matches id.
+	GetAndConsume(ctx context.Context, id string) (domain.PairingSession, error)
+}
+
+// PairedDeviceRepository is the persistence port for durably paired mobile
+// devices. Implemented by internal/adapter/postgres.PairedDeviceStore.
+type PairedDeviceRepository interface {
+	Save(ctx context.Context, device domain.PairedDevice) error
+	// CountActive backs BR-MB-03's max-3-active-devices cap check.
+	CountActive(ctx context.Context, tenantID, userID string) (int, error)
+	// Get returns an error satisfying errors.Is(err, domain.ErrDeviceNotFound)
+	// if id doesn't exist.
+	Get(ctx context.Context, id string) (domain.PairedDevice, error)
+	List(ctx context.Context, tenantID, userID string) ([]domain.PairedDevice, error)
+	// RevokeAndWipeSecret marks a device revoked AND nulls its shared-secret
+	// ciphertext in the same statement — BR-MB-04's enforcement mechanism.
+	RevokeAndWipeSecret(ctx context.Context, id string) error
+	// Touch updates last_used_at — called best-effort from
+	// ResolveDeviceSharedSecret.
+	Touch(ctx context.Context, id string, now time.Time) error
 }

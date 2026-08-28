@@ -27,12 +27,15 @@ var (
 // stored anywhere. A stolen DB snapshot must not yield a usable token
 // (auth-service.md §5/§9).
 type Session struct {
-	TokenHash string
-	UserID    string
-	TenantID  string
-	CreatedAt time.Time
-	ExpiresAt time.Time
-	RevokedAt *time.Time
+	TokenHash  string
+	UserID     string
+	TenantID   string
+	CreatedAt  time.Time
+	ExpiresAt  time.Time
+	RevokedAt  *time.Time
+	LastSeenAt *time.Time // nil until first touch — see ValidateSession (TASK-AUTH-02-06)
+	IP         string     // may be "" for a session created before this migration, or if unresolved
+	UserAgent  string
 }
 
 // NewSession constructs a Session, enforcing that every session has a
@@ -62,6 +65,13 @@ func NewSession(tokenHash, userID, tenantID string, createdAt, expiresAt time.Ti
 	}, nil
 }
 
+// WithClientInfo sets IP/UserAgent on a Session after construction —
+// metadata, not an invariant NewSession's error returns need to enforce.
+func (s Session) WithClientInfo(ip, userAgent string) Session {
+	s.IP, s.UserAgent = ip, userAgent
+	return s
+}
+
 // IsValid reports whether the session is neither revoked nor expired as of
 // now — the check ValidateSession performs on every authenticated request.
 func (s Session) IsValid(now time.Time) bool {
@@ -69,6 +79,14 @@ func (s Session) IsValid(now time.Time) bool {
 		return false
 	}
 	return now.Before(s.ExpiresAt)
+}
+
+// SessionWithUser pairs a Session with its owning user's email —
+// denormalized via a JOIN at the postgres layer to avoid an N+1 lookup in
+// the admin dashboard's cross-user session listing (ListSessions usecase).
+type SessionWithUser struct {
+	Session   Session
+	UserEmail string
 }
 
 // HashSessionToken computes the SHA-256 hash (hex-encoded) of a raw session

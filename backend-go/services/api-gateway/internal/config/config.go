@@ -46,6 +46,17 @@ type Config struct {
 	// an empty host.
 	InfraFleetHTTPAddr string
 
+	// NATSURL is the shared eventbus connection string — dialed by both
+	// agent.subscribeStatus (TASK-AG-05-06, forwards infra-fleet-service's
+	// agent.statusChanged/agent.rateLimited events to the renderer) and the
+	// workspace-event bridge (TASK-PW-04-07/SOL-PW-04, forwards task/
+	// workflow-service outbox events). Same env var / default as
+	// notification-service's own NATS_URL, since all three dial the same
+	// NATS cluster. Empty/unreachable degrades each consumer independently
+	// (closed-immediately channel for agent.subscribeStatus, a startup
+	// warning for the workspace bridge) rather than crashing api-gateway.
+	NATSURL string
+
 	// RateLimitRPS/RateLimitBurst configure the per-tenant in-memory
 	// token-bucket rate limiter (internal/usecase/rate_limit.go).
 	RateLimitRPS   float64
@@ -81,6 +92,7 @@ func Load() (Config, error) {
 		UsageServiceAddr:        commonconfig.StringEnv("USAGE_SERVICE_ADDR", "localhost:9101"),
 		NotificationServiceAddr: commonconfig.StringEnv("NOTIFICATION_SERVICE_ADDR", "localhost:9102"),
 		InfraFleetHTTPAddr:      commonconfig.StringEnv("INFRA_FLEET_SERVICE_HTTP_ADDR", ""),
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		RateLimitRPS:            50,
 		RateLimitBurst:          100,
 		OtherServiceAddrs: map[string]string{

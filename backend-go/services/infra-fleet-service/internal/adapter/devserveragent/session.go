@@ -3,6 +3,7 @@ package devserveragent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"math/rand"
@@ -11,7 +12,22 @@ import (
 	"time"
 
 	"github.com/coder/websocket"
+
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
+
+// ErrRelayDetachedProcessGone is devserveragent's local sentinel for
+// sshrelay.ErrDetachedProcessGone — wrapped at the adapter boundary by
+// SshReattacher implementations (see adapter/sshrelay.Provisioner.Reattach)
+// so this package never has to import adapter/sshrelay directly (wrong
+// dependency direction per this codebase's Dependency Inversion convention).
+var ErrRelayDetachedProcessGone = errors.New("devserveragent: relay-ssh detached process is no longer running")
+
+// SshReattacher is relay-ssh's background-reconnect port, mirroring
+// SshProvisioner's shape — implemented by adapter/sshrelay.Provisioner.
+type SshReattacher interface {
+	Reattach(ctx context.Context, devServer domain.DevServer, sockPath string) (Transport, error)
+}
 
 // handshakeParams mirrors AgentHandshakeParams as sent by
 // runOrcaInitiatorHandshake (ws-handshake.ts) — only the orcaVersion field,
@@ -34,11 +50,26 @@ type HandshakeInfo struct {
 	AgentVersion string   `json:"agentVersion"`
 	SessionID    string   `json:"sessionId"`
 	Capabilities []string `json:"capabilities"`
+	// SockPath is relay-ssh mode's Unix socket path for the detached agent
+	// process (see adapter/sshrelay's launch/reattach — SOL-SSH-03), cached
+	// on *session so relaySSHReconnect can call reattach() again without
+	// re-resolving the SshTarget or re-deploying. Empty for
+	// relay-websocket/direct-websocket, which have no detached process.
+	SockPath string `json:"-"`
 }
 
 // pendingCall is one in-flight JSON-RPC request awaiting its response.
+// Exactly one of resultCh/streamCh is set: resultCh for an ordinary call()
+// (exactly one response frame, then removed from session.pending by
+// readLoop itself); streamCh for a callStream() call (TASK-PW-03-08) —
+// every response frame sharing this request id is forwarded there until a
+// terminal frame is observed (isTerminalStreamResponse), at which point
+// readLoop removes the pending entry AND closes streamCh. readLoop is the
+// only goroutine that ever writes to or closes streamCh — see callStream's
+// doc comment for why the unsubscribe side deliberately never closes it.
 type pendingCall struct {
 	resultCh chan JSONRPCResponse
+	streamCh chan JSONRPCResponse
 }
 
 // session is one persistent connection to a single dev server's agent —
@@ -50,7 +81,15 @@ type pendingCall struct {
 // inbound wsTransport, relay-ssh gets a Transport from adapter/sshrelay's
 // SSH-exec-channel deploy+launch pipeline — everything past
 // attachTransport is identical across all three; only how the Transport was
-// obtained differs, tracked by managedExternally.
+// obtained differs, tracked by managedMode.
+type managedMode int
+
+const (
+	managedModeNone             managedMode = iota // relay-websocket: backgroundReconnect dials as before
+	managedModeInboundOnly                          // direct-websocket: agent re-dials on its own
+	managedModeRelaySSHReattach                     // relay-ssh: relaySSHReconnect (reattach, not redeploy)
+)
+
 type session struct {
 	cfg    Config
 	host   string
@@ -66,12 +105,16 @@ type session struct {
 	pending        map[uint32]*pendingCall
 	closed         bool
 
-	// managedExternally marks a session this package doesn't own
-	// re-establishing on its own — direct-websocket's inbound accept (the
-	// agent must dial in again) and relay-ssh's active provision (a fresh
-	// deploy+launch, not a reconnect). backgroundReconnect no-ops for both;
-	// there is nothing for it to dial.
-	managedExternally bool
+	// managedMode marks a session this package doesn't reconnect the plain
+	// relay-websocket way — direct-websocket's inbound accept (the agent
+	// must dial in again) and relay-ssh's reattach-to-a-detached-process
+	// loop (relaySSHReconnect), as opposed to relay-websocket's plain
+	// backgroundReconnect redial.
+	managedMode managedMode
+	// relaySSHDevServer/reattacher are set only for managedModeRelaySSHReattach
+	// sessions (by Client.getOrProvisionSession) — relaySSHReconnect's inputs.
+	relaySSHDevServer domain.DevServer
+	reattacher        SshReattacher
 
 	// ptyMu/ptySubs implement the notification demux TASK-183 adds: routing
 	// pty.data/pty.exit/pty.replay notifications (see routeNotification) to
@@ -81,10 +124,25 @@ type session struct {
 	ptyMu   sync.Mutex
 	ptySubs map[string][]chan rawPtyNotification
 
+	// hookMu/hookSubs implement TASK-AG-03-03's agent.hook fan-out — unkeyed
+	// (there is no ptyId/session correlation key on the wire yet, see
+	// TASK-AG-03-07), so every subscriber on this session gets every
+	// agent.hook notification, unlike ptySubs's per-pty-id keying.
+	hookMu   sync.Mutex
+	hookSubs []chan rawAgentHookNotification
+
 	reconnectAttempt int
 
 	closeCh chan struct{}
 	closeMu sync.Mutex
+
+	// tokenSource resolves this session's current relay-websocket bearer
+	// token, re-invoked on every (re)connect so a token rotated between
+	// attempts is picked up with no process restart — set by Client at
+	// newSession time for relay-websocket only; nil for
+	// direct-websocket/relay-ssh, which never call connect(). See
+	// TASK-AWS-01-03/SOL-AWS-01.
+	tokenSource func(ctx context.Context) (string, error)
 }
 
 // wsURL builds ws://host:port/orca-relay — the fixed path
@@ -104,20 +162,21 @@ func newSession(host string, cfg Config, logger *slog.Logger) *session {
 	}
 }
 
-// connect dials the agent and runs the initiator handshake. Safe to call
-// again after a disconnect (reconnect path) — each call replaces
-// s.transport. relay-websocket only — direct-websocket/relay-ssh sessions
-// never call this, see attachTransport's callers.
-func (s *session) connect(ctx context.Context) error {
-	if s.cfg.Token == "" {
-		return fmt.Errorf("devserveragent: ORCA_AGENT_TOKEN is not configured — relay-websocket mode requires it (see specs/agent/api/connection-modes.md §2)")
+// connect dials the agent and runs the initiator handshake using token
+// (resolved per-dial by the caller — see Client.AgentTokenSource). Safe to
+// call again after a disconnect (reconnect path). relay-websocket only —
+// direct-websocket/relay-ssh sessions never call this, see
+// attachTransport's callers.
+func (s *session) connect(ctx context.Context, token string) error {
+	if token == "" {
+		return fmt.Errorf("devserveragent: no relay-websocket token resolved for this dev server (see SOL-AWS-01)")
 	}
 
 	dialCtx, cancel := context.WithTimeout(ctx, s.cfg.DialTimeout)
 	defer cancel()
 
 	header := http.Header{}
-	header.Set("Authorization", "Bearer "+s.cfg.Token)
+	header.Set("Authorization", "Bearer "+token)
 	conn, _, err := websocket.Dial(dialCtx, s.wsURL(), &websocket.DialOptions{HTTPHeader: header})
 	if err != nil {
 		return fmt.Errorf("devserveragent: dial %s: %w", s.wsURL(), err)
@@ -235,6 +294,21 @@ func (s *session) readLoop(t Transport) {
 		if err == nil && ok {
 			s.mu.Lock()
 			call := s.pending[resp.ID]
+			if call != nil && call.streamCh != nil {
+				terminal := isTerminalStreamResponse(resp)
+				if terminal {
+					delete(s.pending, resp.ID)
+				}
+				s.mu.Unlock()
+				select {
+				case call.streamCh <- resp:
+				default: // slow/gone consumer — drop rather than block the read loop
+				}
+				if terminal {
+					close(call.streamCh)
+				}
+				continue
+			}
 			delete(s.pending, resp.ID)
 			s.mu.Unlock()
 			if call != nil {
@@ -283,19 +357,28 @@ type ptyNotificationParams struct {
 	ExitCode int32  `json:"exitCode"`
 }
 
-// routeNotification decodes and fans out one pty.* notification to every
+// routeNotification demuxes an incoming notification by method — pty.*
+// notifications route by pty id (routePtyNotification), agent.hook fans out
+// to every subscriber on this session (routeAgentHookNotification, TASK-AG-03-03,
+// unkeyed — see hookSubs's doc comment).
+func (s *session) routeNotification(n JSONRPCNotification) {
+	switch n.Method {
+	case "pty.data", "pty.exit", "pty.replay":
+		s.routePtyNotification(n)
+	case "agent.hook":
+		s.routeAgentHookNotification(n)
+	default:
+		return // not a notification this client demuxes, see package doc comment's "Two RPC surfaces" note
+	}
+}
+
+// routePtyNotification decodes and fans out one pty.* notification to every
 // subscriber currently registered for its pty id (subscribePty/StreamPty).
 // A slow subscriber never blocks the read loop — see the non-blocking send
 // below, matching this adapter's "the read loop must never block on a
 // consumer" discipline (see keepAliveLoop's write-timeout, handleDisconnect's
 // unblocking of pending calls).
-func (s *session) routeNotification(n JSONRPCNotification) {
-	switch n.Method {
-	case "pty.data", "pty.exit", "pty.replay":
-	default:
-		return // not a pty notification this client demuxes, see package doc comment's "Two RPC surfaces" note
-	}
-
+func (s *session) routePtyNotification(n JSONRPCNotification) {
 	var p ptyNotificationParams
 	if len(n.Params) > 0 {
 		_ = json.Unmarshal(n.Params, &p) // best-effort, see ptyNotificationParams's FLAGGED doc comment
@@ -356,6 +439,85 @@ func (s *session) unsubscribePty(ptyID string, ch chan rawPtyNotification) {
 	close(ch)
 }
 
+// rawAgentHookNotification is session.go's internal decoding of one
+// agent.hook notification — RecordAgentHookProviderSession (usecase layer)
+// wraps this into AgentHookEvent. providerSession fields are empty when the
+// hook event carried none (not every hook fires one).
+type rawAgentHookNotification struct {
+	WorktreeID         string
+	PtyID              string
+	ProviderSessionKey string
+	ProviderSessionID  string
+}
+
+// agentHookNotificationParams mirrors agent-hook-server.ts's
+// AgentHookRelayEnvelope's fields this client cares about — worktreeId for
+// the correlation fallback (TASK-AG-03-05), ptyId for the exact-match
+// correlation TASK-AG-03-07 added (empty on older agent builds mid-rollout
+// — RecordAgentHookProviderSession.Handle falls back to worktreeId when so),
+// providerSession.{key,id} for what to persist.
+type agentHookNotificationParams struct {
+	WorktreeID      string `json:"worktreeId"`
+	PtyID           string `json:"ptyId"`
+	ProviderSession *struct {
+		Key string `json:"key"`
+		ID  string `json:"id"`
+	} `json:"providerSession"`
+}
+
+// routeAgentHookNotification decodes and fans out one agent.hook
+// notification to every subscriber on this session — unkeyed, see
+// hookSubs's doc comment.
+func (s *session) routeAgentHookNotification(n JSONRPCNotification) {
+	var p agentHookNotificationParams
+	if len(n.Params) > 0 {
+		_ = json.Unmarshal(n.Params, &p)
+	}
+	raw := rawAgentHookNotification{WorktreeID: p.WorktreeID, PtyID: p.PtyID}
+	if p.ProviderSession != nil {
+		raw.ProviderSessionKey = p.ProviderSession.Key
+		raw.ProviderSessionID = p.ProviderSession.ID
+	}
+
+	s.hookMu.Lock()
+	subs := append([]chan rawAgentHookNotification(nil), s.hookSubs...)
+	s.hookMu.Unlock()
+
+	for _, ch := range subs {
+		select {
+		case ch <- raw:
+		default: // slow/gone consumer — drop rather than block the read loop
+		}
+	}
+}
+
+// subscribeAgentHooks registers a new listener for every agent.hook
+// notification on this session (unkeyed — see routeAgentHookNotification's
+// doc comment). Exactly one long-lived subscriber per devServer connection
+// is expected (usecase.RecordAgentHookProviderSession), not one per
+// AgentSession.
+func (s *session) subscribeAgentHooks() chan rawAgentHookNotification {
+	ch := make(chan rawAgentHookNotification, 64)
+	s.hookMu.Lock()
+	s.hookSubs = append(s.hookSubs, ch)
+	s.hookMu.Unlock()
+	return ch
+}
+
+// unsubscribeAgentHooks removes and closes ch — MUST be called exactly once
+// by whoever called subscribeAgentHooks.
+func (s *session) unsubscribeAgentHooks(ch chan rawAgentHookNotification) {
+	s.hookMu.Lock()
+	for i, c := range s.hookSubs {
+		if c == ch {
+			s.hookSubs = append(s.hookSubs[:i], s.hookSubs[i+1:]...)
+			break
+		}
+	}
+	s.hookMu.Unlock()
+	close(ch)
+}
+
 // keepAliveLoop sends a KeepAlive frame every cfg.KeepAliveInterval —
 // mirrors SshChannelMultiplexer.startKeepalive(). Exits once the session is
 // marked closed or superseded by a newer transport.
@@ -404,29 +566,55 @@ func (s *session) handleDisconnect(t Transport, cause error) {
 	s.pending = make(map[uint32]*pendingCall)
 	s.mu.Unlock()
 
+	lostErr := JSONRPCResponse{Error: &JSONRPCError{Code: -32000, Message: fmt.Sprintf("devserveragent: connection lost: %v", cause)}}
 	for _, call := range pending {
-		call.resultCh <- JSONRPCResponse{Error: &JSONRPCError{Code: -32000, Message: fmt.Sprintf("devserveragent: connection lost: %v", cause)}}
+		if call.streamCh != nil {
+			// callStream callers select on ctx.Done() alongside reading this
+			// channel (see devserveragent.Client.ExecStream) — a non-blocking
+			// send-then-close here mirrors routeNotification's "never block
+			// the read loop on a consumer" discipline, and this is the
+			// terminal frame for this stream: readLoop won't observe another
+			// one on a torn-down transport.
+			select {
+			case call.streamCh <- lostErr:
+			default:
+			}
+			close(call.streamCh)
+			continue
+		}
+		call.resultCh <- lostErr
 	}
 
 	go s.backgroundReconnect()
 }
 
-// backgroundReconnect retries connect() with backoffDelay-paced attempts
-// (mirroring DevServerRelayBridge's exponential-backoff loop) until it
-// succeeds or the session is closed. getOrCreateSession's existing lazy
-// redial remains the fallback for a call that arrives mid-backoff — this
-// loop just means a dropped session doesn't sit dead until one does.
-// relay-websocket only — see managedExternally's doc comment.
+// backgroundReconnect dispatches by managedMode: relay-websocket retries
+// connect() itself (below); direct-websocket is a true no-op (the agent
+// re-dials on its own — specs/agent/api/connection-modes.md §7's
+// RECONNECT_DELAYS_MS — and re-attaches via Client.AttachInboundSession);
+// relay-ssh runs relaySSHReconnect, a real reconnect loop now that the
+// detached process (SOL-SSH-03) survives an SSH drop.
 func (s *session) backgroundReconnect() {
-	if s.managedExternally {
-		// direct-websocket: there is nothing to dial, the agent owns
-		// reconnection on its side (specs/agent/api/connection-modes.md §7's
-		// RECONNECT_DELAYS_MS) and re-attaches via Client.AttachInboundSession.
-		// relay-ssh: reconnecting means redeploying+relaunching, not dialing
-		// this same transport again — the next Exec/Health call re-provisions
-		// via Client.getOrProvisionSession instead of this loop.
+	s.mu.Lock()
+	mode := s.managedMode
+	s.mu.Unlock()
+	switch mode {
+	case managedModeInboundOnly:
+		return // agent must dial in again — see AttachInboundSession
+	case managedModeRelaySSHReattach:
+		s.relaySSHReconnect()
 		return
 	}
+	s.backgroundReconnectRelayWebSocket()
+}
+
+// backgroundReconnectRelayWebSocket retries connect() with
+// backoffDelay-paced attempts (mirroring DevServerRelayBridge's
+// exponential-backoff loop) until it succeeds or the session is closed.
+// getOrCreateSession's existing lazy redial remains the fallback for a call
+// that arrives mid-backoff — this loop just means a dropped session doesn't
+// sit dead until one does. relay-websocket only.
+func (s *session) backgroundReconnectRelayWebSocket() {
 	for {
 		s.mu.Lock()
 		alreadyLive := s.handshaked && s.transport != nil
@@ -452,7 +640,14 @@ func (s *session) backgroundReconnect() {
 		s.mu.Unlock()
 
 		ctx, cancel := context.WithTimeout(context.Background(), s.cfg.DialTimeout+s.cfg.HandshakeTimeout)
-		err := s.connect(ctx)
+		token := ""
+		var err error
+		if s.tokenSource != nil {
+			token, err = s.tokenSource(ctx)
+		}
+		if err == nil {
+			err = s.connect(ctx, token)
+		}
 		cancel()
 
 		s.mu.Lock()
@@ -469,6 +664,90 @@ func (s *session) backgroundReconnect() {
 		if s.logger != nil {
 			s.logger.Warn("devserveragent: background reconnect attempt failed", slog.String("host", s.host), slog.Int("attempt", attempt), slog.Any("error", err))
 		}
+	}
+}
+
+// relaySSHReconnect mirrors backgroundReconnectRelayWebSocket's loop
+// structure exactly (same backoffDelay call, same closed/superseded checks)
+// but calls reattacher.Reattach instead of connect() — the detached agent
+// process's in-memory state (its AgentSession, its pty-daemon children)
+// survived the SSH drop untouched, only the bridge died, so no fresh
+// agent.handshake is needed: this just confirms the bridge is live and
+// reuses the HandshakeInfo captured at first Provision (cached via
+// s.handshakeInfo).
+func (s *session) relaySSHReconnect() {
+	for {
+		s.mu.Lock()
+		alreadyLive := s.handshaked && s.transport != nil
+		closed := s.closed
+		attempt := s.reconnectAttempt
+		sockPath := s.handshakeInfo.SockPath
+		devServer := s.relaySSHDevServer
+		reattacher := s.reattacher
+		s.mu.Unlock()
+		if alreadyLive || closed {
+			return
+		}
+
+		delay := backoffDelay(s.cfg, attempt)
+		select {
+		case <-time.After(delay):
+		case <-s.closeCh:
+			return
+		}
+
+		s.mu.Lock()
+		if s.closed || (s.handshaked && s.transport != nil) {
+			s.mu.Unlock()
+			return
+		}
+		s.mu.Unlock()
+
+		ctx, cancel := context.WithTimeout(context.Background(), s.cfg.DialTimeout+s.cfg.HandshakeTimeout)
+		conn, err := reattacher.Reattach(ctx, devServer, sockPath)
+		cancel()
+
+		if errors.Is(err, ErrRelayDetachedProcessGone) {
+			// Detached process itself is gone — reattach can never succeed
+			// again; the next Exec/Health call's getOrProvisionSession will
+			// do a full re-Provision (redeploy+relaunch) once this loop exits.
+			return
+		}
+
+		s.mu.Lock()
+		if err != nil {
+			s.reconnectAttempt++
+		} else {
+			s.reconnectAttempt = 0
+		}
+		s.mu.Unlock()
+
+		if err == nil {
+			s.attachTransport(conn, s.handshakeInfo) // reuse cached info, only transport/liveness changed
+			return
+		}
+		if s.logger != nil {
+			s.logger.Warn("devserveragent: relay-ssh reattach attempt failed", slog.String("host", s.host), slog.Int("attempt", attempt), slog.Any("error", err))
+		}
+	}
+}
+
+// cancelReconnect unblocks a waiting backgroundReconnectRelayWebSocket/
+// relaySSHReconnect loop without closing the session outright —
+// TeardownConnection's cancel path (BR-SSH-13). Safe to call when no
+// reconnect loop is running. Reuses closeMu the same way close() does to
+// guard against re-closing an already-closed channel.
+func (s *session) cancelReconnect() {
+	s.closeMu.Lock()
+	defer s.closeMu.Unlock()
+	select {
+	case <-s.closeCh:
+		return // already closed/cancelled
+	default:
+		close(s.closeCh)
+		s.mu.Lock()
+		s.closeCh = make(chan struct{}) // replace so a FUTURE reconnect loop (next drop) gets a fresh channel
+		s.mu.Unlock()
 	}
 }
 
@@ -526,6 +805,86 @@ func (s *session) call(ctx context.Context, method string, params any) (json.Raw
 	}
 }
 
+// callStream sends one JSON-RPC request the same way call() does, but
+// registers a streamCh instead of a resultCh so every response frame
+// sharing this request id — not just the first — is forwarded to the
+// returned channel (TASK-PW-03-08's ExecStream/git.execStream support; see
+// specs/agent/api/agent-rpc-catalog-git-fs.md's "git.execStream streaming
+// shape" section: multiple frames replying to one request id, terminated
+// by a stream.end-typed frame).
+//
+// Unlike call(), this has no per-call RequestTimeout — a git push/pull can
+// run arbitrarily long — so the caller's ctx is the only cancellation path
+// (only used to size the initial WriteFrame's deadline via the transport;
+// the returned channel keeps delivering frames until readLoop observes the
+// terminal frame or the session itself closes).
+//
+// The returned unsubscribe func only removes the pending-map entry (so a
+// caller that loses interest early stops being routed future frames); it
+// deliberately does NOT close the returned channel itself — only readLoop
+// (session.go's single reader/writer of streamCh) ever closes it, avoiding
+// the send-on-closed-channel race a consumer-side close would risk.
+func (s *session) callStream(ctx context.Context, method string, params any) (<-chan JSONRPCResponse, func(), error) {
+	s.mu.Lock()
+	if s.transport == nil || !s.handshaked {
+		s.mu.Unlock()
+		return nil, nil, fmt.Errorf("devserveragent: not connected")
+	}
+	t := s.transport
+	reqID := s.nextRequestID
+	s.nextRequestID++
+	frameID := s.nextFrameID
+	s.nextFrameID++
+	ack := s.highestPeerSeq
+	call := &pendingCall{streamCh: make(chan JSONRPCResponse, 256)}
+	s.pending[reqID] = call
+	s.mu.Unlock()
+
+	var paramsRaw json.RawMessage
+	if params != nil {
+		encoded, err := json.Marshal(params)
+		if err != nil {
+			s.dropPending(reqID)
+			return nil, nil, err
+		}
+		paramsRaw = encoded
+	}
+	req := JSONRPCRequest{JSONRPC: "2.0", ID: reqID, Method: method, Params: paramsRaw}
+	frame, err := EncodeJSONRPCFrame(req, frameID, ack)
+	if err != nil {
+		s.dropPending(reqID)
+		return nil, nil, err
+	}
+
+	if err := t.WriteFrame(ctx, frame); err != nil {
+		s.dropPending(reqID)
+		return nil, nil, fmt.Errorf("devserveragent: sending %q: %w", method, err)
+	}
+
+	unsubscribe := func() { s.dropPending(reqID) }
+	return call.streamCh, unsubscribe, nil
+}
+
+// isTerminalStreamResponse decides whether resp ends a callStream() call —
+// either an agent-level JSON-RPC error, or a decoded result whose "type"
+// field is "stream.end" (git.execStream's own terminator, per
+// specs/agent/api/agent-rpc-catalog-git-fs.md). FLAGGED: this "type" probe
+// is this adapter's best-effort reading of the doc's
+// {type:'stream.chunk',...}/{type:'stream.end',...} shape, same
+// unconfirmed-against-a-real-build caveat as ptyNotificationParams above.
+func isTerminalStreamResponse(resp JSONRPCResponse) bool {
+	if resp.Error != nil {
+		return true
+	}
+	var probe struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal(resp.Result, &probe); err != nil {
+		return false
+	}
+	return probe.Type == "stream.end"
+}
+
 func (s *session) dropPending(id uint32) {
 	s.mu.Lock()
 	delete(s.pending, id)
@@ -536,6 +895,20 @@ func (s *session) isHandshaked() bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.handshaked && s.transport != nil
+}
+
+// handshakeInfoSnapshot returns the HandshakeInfo captured at the most
+// recent attachTransport, if this session has completed one and is still
+// live — shared by Client.LastHandshakeInfo (SOL-FLEET-04) and
+// Client.HandshakeInfoFor (TASK-INT-03-02), both narrow wrappers over this
+// same session-local read.
+func (s *session) handshakeInfoSnapshot() (HandshakeInfo, bool) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if !s.handshaked || s.transport == nil {
+		return HandshakeInfo{}, false
+	}
+	return s.handshakeInfo, true
 }
 
 // close tears down the session — used when a devServer is removed or the

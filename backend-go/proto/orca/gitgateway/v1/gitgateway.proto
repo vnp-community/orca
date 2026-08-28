@@ -84,7 +84,21 @@ service GitGatewayService {
   rpc WriteIssueCommand(WriteIssueCommandRequest) returns (google.protobuf.Empty);
   rpc ScanSetupScriptImports(ScanSetupScriptImportsRequest) returns (ScanSetupScriptImportsResponse);
   rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse);
-  rpc RemoveWorktree(RemoveWorktreeRequest) returns (google.protobuf.Empty);
+  // CreateWorktreeFromIssue is the same saga as CreateWorktree with issue
+  // fetch/branch-derivation prepended and agent-spawn/status-sync-enqueue
+  // appended — see SOL-PI-02.
+  rpc CreateWorktreeFromIssue(CreateWorktreeFromIssueRequest) returns (CreateWorktreeFromIssueResponse);
+  rpc RemoveWorktree(RemoveWorktreeRequest) returns (RemoveWorktreeResponse);
+  // NEW — read-only pre-delete check, called by the client before rendering
+  // the confirm dialog (mirrors worktree.detectedList's separate-read-call
+  // shape).
+  rpc CheckWorktreeDeleteSafety(CheckWorktreeDeleteSafetyRequest) returns (CheckWorktreeDeleteSafetyResponse);
+  // NEW (SOL-WT-04) — aggregates each compared worktree's BranchCompare
+  // stats plus BR-WT-13's shared-base_ref cross-check.
+  rpc CompareWorktrees(CompareWorktreesRequest) returns (CompareWorktreesResponse);
+  // NEW (SOL-WT-05) — completes an RPC git-gateway-service.md §3 already
+  // named but was never added to the real proto.
+  rpc MergeBranch(MergeBranchRequest) returns (MergeBranchResponse);
   // Required on every GitExecutor implementation from day one — TASK-194
   // makes it a required interface method, not an optional one, closing the
   // old TS backend's crash-bug class (forceDeletePreservedBranch? was
@@ -121,6 +135,22 @@ service GitGatewayService {
   rpc ResolveConflict(ResolveConflictRequest) returns (ResolveConflictResponse);
   rpc Discard(DiscardRequest) returns (DiscardResponse);
   rpc BulkDiscard(BulkDiscardRequest) returns (BulkDiscardResponse);
+
+  // ── SOL-PW-03 — merge/stash/branch-write + push/pull progress streaming.
+  // Only reachable over relay-websocket/direct-websocket connections; a
+  // relay-ssh connection's git.exec whitelist rejects these subcommands
+  // outright (usecase-layer mode gate, not an executor-level check).
+  // Named MergeIntoBranch (not MergeBranch) — that name is already taken by
+  // SOL-WT-05's worktree-into-base merge RPC above; this one merges an
+  // arbitrary branch INTO the current branch, a different operation. ─────
+  rpc MergeIntoBranch(MergeIntoBranchRequest) returns (MergeIntoBranchResponse);
+  rpc StashPush(StashPushRequest) returns (StashPushResponse);
+  rpc StashPop(StashPopRequest) returns (StashPopResponse);
+  rpc CreateBranch(CreateBranchRequest) returns (CreateBranchResponse);
+  rpc DeleteBranch(DeleteBranchRequest) returns (DeleteBranchResponse); // soft (-d); ForceDeleteBranch remains the -D path
+
+  rpc PushStream(PushRequest) returns (stream GitProgressEvent);
+  rpc PullStream(PullRequest) returns (stream GitProgressEvent);
 }
 
 message GetStatusRequest {
@@ -462,6 +492,11 @@ message ReadDirRequest {
 message DirEntry {
   string name = 1;
   bool is_directory = 2;
+  // Added (SOL-PW-02): 0 for directories — a directory's "size" isn't a
+  // meaningful git-gateway-service concept and the frontend doesn't render
+  // one for folder rows (BL-PW-02's expandDirectory() contract). Populated
+  // from the same os.Stat/fs.stat source StatFile already uses.
+  int64 size_bytes = 3;
 }
 message ReadDirResponse {
   repeated DirEntry entries = 1;
@@ -601,26 +636,186 @@ message WriteIssueCommandRequest { string worktree_id = 1; string content = 2; }
 
 message ScanSetupScriptImportsRequest { string worktree_id = 1; }
 message ScanSetupScriptImportsResponse { repeated string imported_paths = 1; }
+// CreateWorktree's usecase may fail with (via apperrors.Code, not a proto
+// field): WORKTREE_NAME_INVALID (BR-WT-01 charset), WORKTREE_PATH_EXISTS
+// ([A1], response still carries suggested_name), WORKTREE_BASE_REF_NOT_FOUND
+// ([A2]), WORKTREE_LIMIT_EXCEEDED (BR-WT-04, cap 20/repo). See
+// specs/backend-go/bugs/logic-v1/solutions/SOL-WT-01-tao-worktree.md.
 message CreateWorktreeRequest {
   string project_id = 1;
   string repo_id = 2;
   string branch = 3;      // new branch name for the worktree
   string base_ref = 4;    // branch/tag/sha to branch from; typically pre-resolved via ResolvePrBase/ResolveMrBase/PrefetchCreateBase
+
+  // idempotency_key: caller-supplied dedupe key (BR-CLI-01). orca-cli
+  // defaults to sha256(project_id|repo_id|branch) when the user passes
+  // none. A second CreateWorktree call with the same (project_id,
+  // idempotency_key) returns the existing worktree instead of re-running
+  // `git worktree add`. Empty means "no dedupe requested" — every existing
+  // caller (wscompat's worktree.create) keeps working unchanged.
+  optional string idempotency_key = 5;
+  // NEW (BL-WT-01 Input contract, SOL-WT-01) — empty means "derive a
+  // sanitized default": name defaults to a sanitized branch name, path
+  // defaults to the existing repoPath+"-"+name convention.
+  optional string name = 6;
+  optional string path = 7;
 }
 message CreateWorktreeResponse {
   string worktree_id = 1; // project-service's Worktree.id, from the saga's RecordWorktreeCreated step (TASK-193)
   string path = 2;
   string head_sha = 3;
+  // NEW — populated only when the call fails with WORKTREE_PATH_EXISTS, so
+  // a client that reads a non-OK response can still recover the suggestion.
+  optional string suggested_name = 4;
+}
+
+message ScmIssueRef {
+  string provider = 1;   // "github" | "gitlab"
+  string repo = 2;
+  int32 number = 3;
+}
+message TrackerIssueRef {
+  string provider = 1;   // "jira" | "linear"
+  string issue_ref = 2;  // provider-native key, e.g. "ENG-123"
+}
+
+// CreateWorktreeFromIssue is the same saga as CreateWorktree with two steps
+// prepended (fetch issue, derive branch name) and two appended (spawn
+// agent, thread the issue link through to project-service for BR-PI-06's
+// eventual status-sync consumer — see SOL-PI-03).
+message CreateWorktreeFromIssueRequest {
+  string project_id = 1;
+  string repo_id = 2;
+  string base_ref = 3;
+
+  oneof issue_source {
+    ScmIssueRef scm_issue = 4;
+    TrackerIssueRef tracker_issue = 5;
+  }
+
+  bool skip_status_update = 6;   // BR-PI-06 per-call opt-out
+  bool skip_agent_start = 7;
+}
+
+message CreateWorktreeFromIssueResponse {
+  string worktree_id = 1;
+  string path = 2;
+  string head_sha = 3;
+  string branch_name = 4;         // the derived name, surfaced for the UI's worktree card
+  string agent_session_id = 5;    // empty if skip_agent_start or spawn failed non-fatally
+  string agent_start_error = 6;   // non-fatal spawn error, if any
+  bool status_update_enqueued = 7;
 }
 
 message RemoveWorktreeRequest {
   string worktree_id = 1;
-  bool   force = 2;       // maps to `git worktree remove --force` (uncommitted changes present)
+  bool   force = 2;          // maps to `git worktree remove --force` (uncommitted changes present); BR-AT-11
+  bool   allow_open_pr = 3;  // NEW — separate, explicit override for BR-AT-12; NEVER set true by the cleanup_worktrees path
+  bool   stop_agents = 4;    // NEW — spec's "Stop & Delete" choice: kill active PTY sessions found in this worktree before removing it
+}
+message RemoveWorktreeResponse {  // NEW — replaces google.protobuf.Empty
+  int32 uncommitted_files_discarded = 1; // echoes the safety-check count that was overridden by force, for the UI's post-delete confirmation toast
+  repeated string stopped_pty_ids = 2;
+}
+
+message CheckWorktreeDeleteSafetyRequest { string worktree_id = 1; }
+message CheckWorktreeDeleteSafetyResponse {
+  int32 uncommitted_files = 1;   // modified + added + deleted + conflicted, per FileStatus.state
+  int32 untracked_files = 2;
+  bool agent_running = 3;        // heuristic: any active PTY session whose cwd is under this worktree's path — see SOL-WT-03's rationale for why this isn't a precise "is this an agent" check
+  repeated string active_pty_ids = 4;
+  bool safe_to_delete = 5;       // true iff all counts are zero and !agent_running
+}
+
+// CompareWorktrees aggregates each compared worktree's BranchCompare stats
+// (already-real: file count, lines added/removed, per-file status) plus
+// BR-WT-13's shared-base_ref cross-check across all compared worktrees.
+message CompareWorktreesRequest {
+  repeated string worktree_ids = 1; // 2..N worktrees being compared
+}
+message CompareWorktreesResponse {
+  string base_ref = 1;              // the shared base branch (BR-WT-13)
+  repeated WorktreeComparison worktrees = 2;
+}
+message WorktreeComparison {
+  string worktree_id = 1;
+  int32 changed_files = 2;
+  int32 added_lines = 3;
+  int32 removed_lines = 4;
+  string merge_base = 5;   // for BR-WT-14 cross-checking — see compare_worktrees.go's usecase comment
+  string status = 6;       // BranchCompareResponse.status passthrough
+  string error_message = 7;
+}
+
+// MergeBranch completes an RPC git-gateway-service.md §3 already named but
+// was never added to the real proto. See merge_worktree_into_base.go's
+// usecase doc comment for the "merge"/"squash"/"rebase" strategy split.
+message MergeBranchRequest {
+  string worktree_id = 1;    // the WINNING worktree; its branch is merged INTO base_branch
+  string base_branch = 2;    // typically the repo's default branch
+  string strategy = 3;       // "merge" | "squash" | "rebase"
+  string commit_message = 4; // optional override for the merge-commit/squash commit
+}
+message MergeBranchResponse {
+  string result_sha = 1;
+  bool   has_conflicts = 2;
+  repeated string conflicted_paths = 3;
+  string conflict_dispatch_key = 4; // pass this to AbortMerge/ConflictOperation/ResolveConflict's worktree_id field when has_conflicts=true — see merge_worktree_into_base.go's usecase doc comment
 }
 
 message ForceDeleteBranchRequest {
   string worktree_id = 1;
   string branch = 2;
+}
+
+// ── SOL-PW-03 additions ─────────────────────────────────────────────────
+message MergeIntoBranchRequest {
+  string worktree_id = 1;
+  string branch = 2;      // branch to merge INTO the current branch
+  bool   no_ff = 3;       // default true when unset at the usecase layer
+}
+message MergeIntoBranchResponse {
+  bool success = 1;
+  bool had_conflicts = 2;  // mirrors PullResponse's existing had_conflicts shape
+}
+
+message StashPushRequest {
+  string worktree_id = 1;
+  string message = 2;      // optional; empty = git's default stash message
+  bool   include_untracked = 3;
+}
+message StashPushResponse { bool success = 1; }
+
+message StashPopRequest {
+  string worktree_id = 1;
+  string stash_ref = 2;    // empty = pop the most recent (stash@{0})
+}
+message StashPopResponse {
+  bool success = 1;
+  bool had_conflicts = 2;
+}
+
+message CreateBranchRequest {
+  string worktree_id = 1;
+  string branch = 2;
+  string base_ref = 3;     // empty = branch from current HEAD
+  bool   checkout = 4;     // true = also switch to it
+}
+message CreateBranchResponse { string branch = 1; }
+
+message DeleteBranchRequest {
+  string worktree_id = 1;
+  string branch = 2;
+}
+message DeleteBranchResponse { bool success = 1; }
+
+// GitProgressEvent mirrors the agent's git.execStream frame shape
+// (specs/agent/api/agent-rpc-catalog-git-fs.md: {type:'stream.chunk',line,source?} / {type:'stream.end',exitCode}).
+message GitProgressEvent {
+  string line = 1;
+  string source = 2;      // "stdout" | "stderr"
+  bool   is_final = 3;
+  int32  exit_code = 4;   // only meaningful when is_final
 }
 
 message DetectWorktreesRequest  { string repo_id = 1; }
@@ -706,6 +901,7 @@ message FastForwardRequest {
 }
 message FastForwardResponse {
   bool success = 1;
+  string result_sha = 2; // NEW — HEAD's SHA after a successful fast-forward; needed by MergeBranch's "rebase" strategy to report result_sha
 }
 
 message RebaseFromBaseRequest {

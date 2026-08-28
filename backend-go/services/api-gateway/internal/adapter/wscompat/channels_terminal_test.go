@@ -223,6 +223,64 @@ func TestTerminalCreateChannel_SpawnsAndOpensAttachPtyStream(t *testing.T) {
 	}
 }
 
+// TestTerminalCreateChannel_ShellIntegrationPassesThrough guards BR-TM-13's
+// pass-through chain: shellIntegration in terminal.create's args must ride
+// straight through to SpawnTerminalSessionRequest.ShellIntegration.
+func TestTerminalCreateChannel_ShellIntegrationPassesThrough(t *testing.T) {
+	var gotShellIntegration bool
+	fake := &fakeTerminalInfraFleetClient{
+		spawnFunc: func(in *infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
+			gotShellIntegration = in.GetShellIntegration()
+			return &infrafleetv1.SpawnTerminalSessionResponse{
+				Session: &infrafleetv1.TerminalSession{PtyId: "pty-1", ConnectionId: "conn-1", Cwd: "/repo"},
+			}, nil
+		},
+	}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+
+	_, _, isStream, err := r.DispatchStreamChannel(newTerminalTestCtx(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "terminal.create",
+		argsJSON(t, terminalCreateArgs{ConnectionID: "conn-1", Cwd: "/repo", ShellIntegration: true}))
+	if !isStream {
+		t.Fatal("expected terminal.create to be registered as a StreamChannelHandler")
+	}
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !gotShellIntegration {
+		t.Error("expected ShellIntegration: true to pass through to SpawnTerminalSessionRequest")
+	}
+}
+
+// TestTerminalCreateChannel_ShellIntegrationOmitted_DefaultsFalse is the
+// regression guard: an existing caller that never sets shellIntegration
+// must keep getting ShellIntegration: false, unchanged.
+func TestTerminalCreateChannel_ShellIntegrationOmitted_DefaultsFalse(t *testing.T) {
+	var gotShellIntegration bool
+	fake := &fakeTerminalInfraFleetClient{
+		spawnFunc: func(in *infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
+			gotShellIntegration = in.GetShellIntegration()
+			return &infrafleetv1.SpawnTerminalSessionResponse{
+				Session: &infrafleetv1.TerminalSession{PtyId: "pty-1", ConnectionId: "conn-1", Cwd: "/repo"},
+			}, nil
+		},
+	}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+
+	_, _, isStream, err := r.DispatchStreamChannel(newTerminalTestCtx(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "terminal.create",
+		argsJSON(t, terminalCreateArgs{ConnectionID: "conn-1", Cwd: "/repo"}))
+	if !isStream {
+		t.Fatal("expected terminal.create to be registered as a StreamChannelHandler")
+	}
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotShellIntegration {
+		t.Error("expected ShellIntegration: false when omitted from args")
+	}
+}
+
 func TestTerminalCreateChannel_SpawnFailurePropagates(t *testing.T) {
 	fake := &fakeTerminalInfraFleetClient{
 		spawnFunc: func(*infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {

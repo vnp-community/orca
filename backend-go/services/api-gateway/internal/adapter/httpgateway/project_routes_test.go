@@ -31,6 +31,10 @@ type fakeProjectServiceClient struct {
 	getProjectResp    *projectv1.GetProjectResponse
 	getProjectErr     error
 
+	lastGetProjectContextReq *projectv1.GetProjectContextRequest
+	getProjectContextResp    *projectv1.ProjectContext
+	getProjectContextErr     error
+
 	lastListProjectsReq *projectv1.ListProjectsRequest
 	listProjectsResp    *projectv1.ListProjectsResponse
 	listProjectsErr     error
@@ -83,6 +87,9 @@ type fakeProjectServiceClient struct {
 	listWorktreesResp    *projectv1.ListWorktreesResponse
 	listWorktreesErr     error
 
+	getWorktreeResp *projectv1.Worktree
+	getWorktreeErr  error
+
 	lastSetWorktreeActivationReq *projectv1.SetWorktreeActivationRequest
 	setWorktreeActivationResp    *projectv1.SetWorktreeActivationResponse
 	setWorktreeActivationErr     error
@@ -131,9 +138,9 @@ type fakeProjectServiceClient struct {
 	lastGetFolderWorkspacePathStatusReq *projectv1.GetFolderWorkspacePathStatusRequest
 	getFolderWorkspacePathStatusResp    *projectv1.GetFolderWorkspacePathStatusResponse
 	getFolderWorkspacePathStatusErr     error
-	lastListMembersReq *projectv1.ListMembersRequest
-	listMembersResp    *projectv1.ListMembersResponse
-	listMembersErr     error
+	lastListMembersReq                  *projectv1.ListMembersRequest
+	listMembersResp                     *projectv1.ListMembersResponse
+	listMembersErr                      error
 
 	lastRemoveMemberReq *projectv1.RemoveMemberRequest
 	removeMemberResp    *projectv1.RemoveMemberResponse
@@ -296,6 +303,13 @@ func (f *fakeProjectServiceClient) ListWorktrees(_ context.Context, in *projectv
 	return f.listWorktreesResp, nil
 }
 
+func (f *fakeProjectServiceClient) GetWorktree(_ context.Context, in *projectv1.GetWorktreeRequest, _ ...grpc.CallOption) (*projectv1.Worktree, error) {
+	if f.getWorktreeErr != nil {
+		return nil, f.getWorktreeErr
+	}
+	return f.getWorktreeResp, nil
+}
+
 func (f *fakeProjectServiceClient) SetWorktreeActivation(_ context.Context, in *projectv1.SetWorktreeActivationRequest, _ ...grpc.CallOption) (*projectv1.SetWorktreeActivationResponse, error) {
 	f.lastSetWorktreeActivationReq = in
 	if f.setWorktreeActivationErr != nil {
@@ -310,6 +324,10 @@ func (f *fakeProjectServiceClient) RenameWorktree(_ context.Context, in *project
 		return nil, f.renameWorktreeErr
 	}
 	return f.renameWorktreeResp, nil
+}
+
+func (f *fakeProjectServiceClient) GetWorktreeByIdempotencyKey(_ context.Context, in *projectv1.GetWorktreeByIdempotencyKeyRequest, _ ...grpc.CallOption) (*projectv1.GetWorktreeByIdempotencyKeyResponse, error) {
+	return &projectv1.GetWorktreeByIdempotencyKeyResponse{}, nil
 }
 
 func (f *fakeProjectServiceClient) CreateProjectGroup(_ context.Context, in *projectv1.CreateProjectGroupRequest, _ ...grpc.CallOption) (*projectv1.CreateProjectGroupResponse, error) {
@@ -470,6 +488,21 @@ func (f *fakeProjectServiceClient) SetupExistingFolder(_ context.Context, in *pr
 		return nil, f.setupExistingFolderErr
 	}
 	return f.setupExistingFolderResp, nil
+}
+
+func (f *fakeProjectServiceClient) GetProjectContext(_ context.Context, in *projectv1.GetProjectContextRequest, _ ...grpc.CallOption) (*projectv1.ProjectContext, error) {
+	f.lastGetProjectContextReq = in
+	if f.getProjectContextErr != nil {
+		return nil, f.getProjectContextErr
+	}
+	return f.getProjectContextResp, nil
+}
+
+// GetMobileWorktreeStatus (TASK-MB-04-03) is not exercised by this file's
+// httpgateway route tests — a minimal stub keeps fakeProjectServiceClient
+// satisfying the widened projectv1.ProjectServiceClient interface.
+func (f *fakeProjectServiceClient) GetMobileWorktreeStatus(_ context.Context, in *projectv1.GetMobileWorktreeStatusRequest, _ ...grpc.CallOption) (*projectv1.GetMobileWorktreeStatusResponse, error) {
+	return &projectv1.GetMobileWorktreeStatusResponse{}, nil
 }
 
 var _ projectv1.ProjectServiceClient = (*fakeProjectServiceClient)(nil)

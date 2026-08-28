@@ -34,14 +34,19 @@ type HandleIncomingEventInput struct {
 type HandleIncomingEvent struct {
 	broadcaster     NotificationBroadcaster
 	processedEvents ProcessedEventRepository
-	logger          *slog.Logger
+	// deliverPush is nil-safe (BL-MB-02 push pipeline is additive to the
+	// pre-existing WS-only broadcast path) — a nil deliverPush just skips
+	// push delivery entirely, e.g. in a test that only cares about WS
+	// fan-out.
+	deliverPush *DeliverPush
+	logger      *slog.Logger
 }
 
-func NewHandleIncomingEvent(broadcaster NotificationBroadcaster, processedEvents ProcessedEventRepository, logger *slog.Logger) *HandleIncomingEvent {
+func NewHandleIncomingEvent(broadcaster NotificationBroadcaster, processedEvents ProcessedEventRepository, deliverPush *DeliverPush, logger *slog.Logger) *HandleIncomingEvent {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &HandleIncomingEvent{broadcaster: broadcaster, processedEvents: processedEvents, logger: logger}
+	return &HandleIncomingEvent{broadcaster: broadcaster, processedEvents: processedEvents, deliverPush: deliverPush, logger: logger}
 }
 
 // Execute translates in into a NotificationEvent and broadcasts it. A
@@ -86,5 +91,18 @@ func (uc *HandleIncomingEvent) Execute(ctx context.Context, in HandleIncomingEve
 	}
 
 	uc.broadcaster.Broadcast(ctx, event)
+
+	// Push delivery (BL-MB-02) is best-effort and additive to WS fan-out
+	// above — a push-delivery hiccup must never NAK the whole event back
+	// into JetStream redelivery (DeliverPush.Execute already never
+	// returns an error itself; this guard is just defense in depth plus
+	// the nil-safety for callers/tests that don't wire push delivery).
+	if uc.deliverPush != nil {
+		if err := uc.deliverPush.Execute(ctx, event); err != nil {
+			uc.logger.WarnContext(ctx, "deliver_push failed for event",
+				slog.String("subject", in.Subject), slog.String("event_id", in.EventID), slog.Any("error", err))
+		}
+	}
+
 	return nil
 }

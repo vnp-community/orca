@@ -5,6 +5,8 @@ package config
 
 import (
 	"os"
+	"strconv"
+	"time"
 
 	commonconfig "github.com/stablyai/orca-go/common/config"
 )
@@ -24,7 +26,37 @@ type Config struct {
 	// fail-safe: an unrecognized value should not silently widen what
 	// host-local terminal spawning is allowed.
 	ServerDeployment bool
+	// NATSURL is where the transactional-outbox relay connects to publish
+	// infra.outbox_events rows — both cmd/server/main.go's SSH-connect audit
+	// outbox relay (TASK-AUTH-05-08) and TASK-FLEET-03-06's HealthPublisher
+	// (dev_server.health_degraded) publish through it, as well as
+	// TASK-AG-05-05's AgentStatusPublisher (direct publish for
+	// statusChanged) and its rateLimited outbox relay, and TASK-MB-02-01's
+	// agent-lifecycle event publisher. Mirrors usage-service's identical
+	// Config.NATSURL/NATS_URL convention. If NATS is unreachable at startup,
+	// outbox rows still get written durably (see cmd/server/main.go), they
+	// just queue up unpublished until a future restart — and mobile push
+	// notifications degrade to "none", never a fatal error.
+	NATSURL string
+	// FleetPollInterval is BL-FLEET-03's poll cadence — read from
+	// FLEET_POLL_INTERVAL_SEC (default 30). An unparseable or non-positive
+	// value falls back to the default, fail-safe: a misconfigured interval
+	// should not silently disable polling (0) or spin (negative).
+	FleetPollInterval time.Duration
+	// FleetWebhookURL is BL-FLEET-03's status-change alert target — read
+	// from FLEET_WEBHOOK_URL, empty (the default) disables webhook.Alerter
+	// entirely (see that package's doc comment).
+	FleetWebhookURL string
+	// CredentialBrokerAddr is credential-broker-service's gRPC target —
+	// dialed for relay-websocket agent token write/resolve (SOL-AWS-01).
+	CredentialBrokerAddr string
+	// AIProviderServiceAddr is where SwitchAgentAccount's AIProviderResolver
+	// client dials ai-provider-service.ResolveProvider — TASK-AG-04-03, this
+	// service's first outbound call to ai-provider-service.
+	AIProviderServiceAddr string
 }
+
+const defaultFleetPollIntervalSec = 30
 
 func Load() (Config, error) {
 	base, err := commonconfig.LoadBase("infra-fleet-service")
@@ -32,7 +64,22 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:             base,
-		ServerDeployment: os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		Base:                  base,
+		ServerDeployment:      os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		FleetPollInterval:     fleetPollIntervalFromEnv(),
+		FleetWebhookURL:       os.Getenv("FLEET_WEBHOOK_URL"),
+		CredentialBrokerAddr:  commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
+		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 	}, nil
+}
+
+func fleetPollIntervalFromEnv() time.Duration {
+	sec := defaultFleetPollIntervalSec
+	if raw := os.Getenv("FLEET_POLL_INTERVAL_SEC"); raw != "" {
+		if parsed, err := strconv.Atoi(raw); err == nil && parsed > 0 {
+			sec = parsed
+		}
+	}
+	return time.Duration(sec) * time.Second
 }

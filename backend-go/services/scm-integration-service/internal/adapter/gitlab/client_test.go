@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/usecase"
 )
 
@@ -261,5 +262,168 @@ func TestGetRateLimitStatus_NonOKStatusIsAnError(t *testing.T) {
 	_, err := client.GetRateLimitStatus(context.Background(), usecase.Credential{Token: "bad-token"})
 	if err == nil {
 		t.Fatal("expected an error for a non-200 response")
+	}
+}
+
+// TestCreatePullRequest_DraftSerializesIntoPayload asserts Draft: true
+// serializes into the "draft" JSON field — BR-CR-20.
+func TestCreatePullRequest_DraftSerializesIntoPayload(t *testing.T) {
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"iid": 9, "title": "wip", "state": "opened",
+			"web_url":       "https://gitlab.com/a/b/-/merge_requests/9",
+			"source_branch": "h", "target_branch": "b", "draft": true,
+		})
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	pr, err := client.CreatePullRequest(context.Background(), usecase.Credential{Token: "tok"}, "a/b", usecase.CreatePullRequestInput{Title: "t", HeadBranch: "h", BaseBranch: "b", Draft: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if draft, ok := gotBody["draft"].(bool); !ok || !draft {
+		t.Errorf("expected draft:true in the request payload, got %v", gotBody["draft"])
+	}
+	if !pr.Draft {
+		t.Error("expected the echoed PullRequest.Draft to be true")
+	}
+}
+
+func TestGetRepoFileContent_Found(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("* @alice\n"))
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	content, found, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found || content != "* @alice\n" {
+		t.Errorf("expected found=true content=%q, got found=%v content=%q", "* @alice\n", found, content)
+	}
+}
+
+func TestGetRepoFileContent_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, found, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err != nil {
+		t.Fatalf("expected no error on 404, got %v", err)
+	}
+	if found {
+		t.Error("expected found=false on 404")
+	}
+}
+
+func TestGetRepoFileContent_NonOKNonNotFoundIsAnError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, _, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err == nil {
+		t.Fatal("expected an error for a non-200/404 response")
+	}
+}
+
+// TestClient_SubmitReview_CommentThenApproveCallOrder asserts SubmitReview
+// posts each comment's discussion BEFORE calling approve — never the
+// reverse (BUG-PI-04/TASK-PI-04-07).
+func TestClient_SubmitReview_CommentThenApproveCallOrder(t *testing.T) {
+	var callOrder []string
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.Method == http.MethodPost && r.URL.Path == "/projects/group/project/merge_requests/5/discussions":
+			callOrder = append(callOrder, "discussion")
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{})
+		case r.Method == http.MethodPost && r.URL.Path == "/projects/group/project/merge_requests/5/approve":
+			callOrder = append(callOrder, "approve")
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{"user": map[string]any{"username": "octocat"}})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, err := client.SubmitReview(context.Background(), usecase.Credential{Token: "tok"}, "group/project", 5, domain.ReviewInput{
+		Type: domain.ReviewTypeApprove,
+		Comments: []domain.ReviewComment{
+			{Path: "a.go", Line: 1, Body: "nice"},
+			{Path: "b.go", Line: 2, Body: "also nice"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	want := []string{"discussion", "discussion", "approve"}
+	if len(callOrder) != len(want) {
+		t.Fatalf("call order = %v, want %v", callOrder, want)
+	}
+	for i, step := range want {
+		if callOrder[i] != step {
+			t.Fatalf("call order = %v, want %v", callOrder, want)
+		}
+	}
+}
+
+// TestClient_SubmitReview_DiscussionFailureStopsBeforeApproveOrNote asserts
+// a failure on the SECOND discussion call does not silently continue to
+// approve/note — approveMR/noteMR must never be called after a
+// createDiscussion error.
+func TestClient_SubmitReview_DiscussionFailureStopsBeforeApproveOrNote(t *testing.T) {
+	discussionCalls := 0
+	approveOrNoteCalled := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/projects/group/project/merge_requests/5/discussions":
+			discussionCalls++
+			if discussionCalls == 2 {
+				w.WriteHeader(http.StatusInternalServerError)
+				return
+			}
+			w.WriteHeader(http.StatusCreated)
+			_ = json.NewEncoder(w).Encode(map[string]any{})
+		case r.URL.Path == "/projects/group/project/merge_requests/5/approve" || r.URL.Path == "/projects/group/project/merge_requests/5/notes":
+			approveOrNoteCalled = true
+			w.WriteHeader(http.StatusOK)
+			_ = json.NewEncoder(w).Encode(map[string]any{})
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, err := client.SubmitReview(context.Background(), usecase.Credential{Token: "tok"}, "group/project", 5, domain.ReviewInput{
+		Type: domain.ReviewTypeApprove,
+		Comments: []domain.ReviewComment{
+			{Path: "a.go", Line: 1, Body: "first"},
+			{Path: "b.go", Line: 2, Body: "second, fails"},
+		},
+	})
+	if err == nil {
+		t.Fatal("expected the second discussion call's failure to propagate")
+	}
+	if discussionCalls != 2 {
+		t.Fatalf("expected exactly 2 discussion calls (stop at the failure), got %d", discussionCalls)
+	}
+	if approveOrNoteCalled {
+		t.Fatal("expected approve/note to never be called after a discussion failure")
 	}
 }

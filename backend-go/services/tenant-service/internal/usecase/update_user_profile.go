@@ -39,6 +39,21 @@ func (uc *UpdateUserProfile) Execute(ctx context.Context, in UpdateUserProfileIn
 	if err != nil {
 		return domain.UserProfile{}, apperrors.New(apperrors.KindUnauthenticated, "TENANT_NO_TENANT", "no tenant in request context", err)
 	}
+	actorID, ok := tenant.UserID(ctx)
+	if !ok {
+		return domain.UserProfile{}, apperrors.New(apperrors.KindUnauthenticated, "TENANT_NO_ACTOR", "no authenticated user in request context", nil)
+	}
+	if actorID != in.UserID {
+		// Self-service only — no admin-on-behalf-of path exists in BL-PRF-01's
+		// flow (§4 shows only "User -> Settings -> My Profile -> Edit");
+		// adding one is a product decision, not this bug's scope.
+		return domain.UserProfile{}, apperrors.New(apperrors.KindPermissionDenied, "TENANT_NOT_SELF", "users may only edit their own profile", nil)
+	}
+	if in.SetSettings {
+		if err := domain.ValidateUserSettings(in.Settings); err != nil {
+			return domain.UserProfile{}, apperrors.New(apperrors.KindInvalidArgument, "TENANT_INVALID_USER_SETTINGS", err.Error(), err)
+		}
+	}
 
 	existing, _, err := uc.profiles.Get(ctx, companyID, in.UserID)
 	if err != nil {
@@ -70,5 +85,8 @@ func (uc *UpdateUserProfile) Execute(ctx context.Context, in UpdateUserProfileIn
 	if uc.invalidation != nil {
 		_ = uc.invalidation.PublishProfileInvalidated(ctx, companyID, in.UserID)
 	}
+	// No PublishAuditEvent call here — deliberate, see this file's Execute
+	// doc comment / TASK-PRF-01-07's Context: BL-PRF-01 §4 exempts
+	// personal-preference updates from audit logging (privacy).
 	return profile, nil
 }

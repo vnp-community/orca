@@ -7,6 +7,7 @@ import {
   getZshShellReadyMarkerRegistrationBlock,
   getZshStartupFileSourceBlock
 } from '../main/shell-templates'
+import { encodePowerShellCommand, getPowerShellOsc133Bootstrap } from './pty-osc133-bootstrap'
 
 const RELAY_SHELL_READY_DIR = '.orca-relay/shell-ready'
 const POSIX_LOGIN_ARGS = ['-l']
@@ -27,13 +28,18 @@ function shellBasename(shellPath: string): string {
 
 function windowsShellArgs(
   shellName: string,
-  options: { terminalWindowsWslDistro?: string | null } = {}
+  options: { terminalWindowsWslDistro?: string | null; shellIntegration?: boolean } = {}
 ): string[] | null {
-  if (shellName === 'powershell.exe' || shellName === 'powershell') {
-    return ['-NoLogo']
-  }
-  if (shellName === 'pwsh.exe' || shellName === 'pwsh') {
-    return ['-NoLogo']
+  if (shellName === 'powershell.exe' || shellName === 'powershell' ||
+      shellName === 'pwsh.exe' || shellName === 'pwsh') {
+    if (!options.shellIntegration) {
+      return ['-NoLogo']
+    }
+    // Why: -NoExit keeps the bootstrapped prompt/readline functions active
+    // for the session's lifetime — PowerShell never emits OSC 133 natively
+    // (BR-TM-14), so the wrapper must stay loaded, not run once and exit.
+    const encoded = encodePowerShellCommand(getPowerShellOsc133Bootstrap())
+    return ['-NoLogo', '-NoExit', '-EncodedCommand', encoded]
   }
   if (shellName === 'cmd.exe' || shellName === 'cmd') {
     return []
@@ -264,7 +270,11 @@ export function getRelayShellLaunchConfig(
   shellPath: string,
   env: Record<string, string>,
   platform: NodeJS.Platform = process.platform,
-  options: { emitReadyMarker?: boolean; terminalWindowsWslDistro?: string | null } = {}
+  options: {
+    emitReadyMarker?: boolean
+    terminalWindowsWslDistro?: string | null
+    shellIntegration?: boolean
+  } = {}
 ): RelayShellLaunchConfig {
   const shellName = shellBasename(shellPath)
   const emitReadyMarker = options.emitReadyMarker === true
@@ -274,7 +284,8 @@ export function getRelayShellLaunchConfig(
     return {
       args:
         windowsShellArgs(shellName, {
-          terminalWindowsWslDistro: options.terminalWindowsWslDistro
+          terminalWindowsWslDistro: options.terminalWindowsWslDistro,
+          shellIntegration: options.shellIntegration
         }) ?? [],
       env: {}
     }

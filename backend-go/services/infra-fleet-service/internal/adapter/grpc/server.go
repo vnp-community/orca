@@ -8,6 +8,7 @@ package grpc
 import (
 	"context"
 	"encoding/json"
+	"sync"
 
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -16,6 +17,7 @@ import (
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/portevents"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
@@ -26,14 +28,16 @@ import (
 type Server struct {
 	infrafleetv1.UnimplementedInfraFleetServiceServer
 
-	registerDevServer  *usecase.RegisterDevServer
-	resolveConnection  *usecase.ResolveConnection
-	createSshTarget    *usecase.CreateSshTarget
-	getFleetHealth     *usecase.GetFleetHealth
-	scanWorkspacePorts *usecase.ScanWorkspacePorts
-	listDevServers     *usecase.ListDevServers
-	createConnection   *usecase.CreateConnection
-	relay              *usecase.Relay
+	registerDevServer   *usecase.RegisterDevServer
+	resolveConnection   *usecase.ResolveConnection
+	createSshTarget     *usecase.CreateSshTarget
+	getFleetHealth      *usecase.GetFleetHealth
+	scanWorkspacePorts  *usecase.ScanWorkspacePorts
+	listDevServers      *usecase.ListDevServers
+	listDevServersByTag *usecase.ListDevServersByTag
+	createConnection    *usecase.CreateConnection
+	relay               *usecase.Relay
+	relayStream         *usecase.RelayStream
 
 	listSshTargets      *usecase.ListSshTargets
 	getSshState         *usecase.GetSshState
@@ -54,11 +58,60 @@ type Server struct {
 	createBrowserProfile   *usecase.CreateBrowserProfile
 	deleteBrowserProfile   *usecase.DeleteBrowserProfile
 
+	// --- Terminal scrollback persistence (SOL-TM-03) ---
+	saveTerminalScrollbackSnapshot    *usecase.SaveTerminalScrollbackSnapshot
+	getTerminalScrollbackSnapshot     *usecase.GetTerminalScrollbackSnapshot
+	deleteTerminalScrollbackSnapshots *usecase.DeleteTerminalScrollbackSnapshots
+
 	// --- Emulator relay (TASK-048) / host capabilities relay (TASK-070) ---
 	// Shipped-but-honestly-inert until agent/ gains device.*/host.capabilities
 	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
 	emulatorRelay       *usecase.EmulatorRelay
 	getHostCapabilities *usecase.GetHostCapabilities
+
+	// --- CLI agent access (BUG-CLI-02) ---
+	getAgentTerminalSession *usecase.GetAgentTerminalSession
+	sendTerminalInput       *usecase.SendTerminalInput
+	getTerminalScrollback   *usecase.GetTerminalScrollback
+
+	importFleetInventory *usecase.ImportFleetInventory
+	bulkProvisionFleet   *usecase.BulkProvisionFleet
+
+	detectDevServerAgents   *usecase.DetectDevServerAgents
+	checkDevServerPreflight *usecase.CheckDevServerPreflight
+
+	// --- Persistent agent tokens (BL-AWS-03, TASK-AWS-03-07) ---
+	createAgentToken *usecase.CreateAgentToken
+	listAgentTokens  *usecase.ListAgentTokens
+	revokeAgentToken *usecase.RevokeAgentToken
+
+	// --- BR-SSH-13 reconnect cancellation ---
+	teardownConnection *usecase.TeardownConnection
+
+	// --- Auto port-forwarding (SOL-SSH-04) ---
+	createPortForward *usecase.CreatePortForward
+	listPortForwards  *usecase.ListPortForwards
+	deletePortForward *usecase.DeletePortForward
+
+	// --- Port-forward push notifications (TASK-SSH-04-08) --- shared with
+	// PollWorkspacePorts as its usecase.PortForwardEventPublisher.
+	portEvents *portevents.Broadcaster
+
+	// --- Agent sessions (TASK-AG-01..04) ---
+	startAgentSession  *usecase.StartAgentSession
+	stopAgentSession   *usecase.StopAgentSession
+	killAgentSession   *usecase.KillAgentSession
+	resumeAgentSession *usecase.ResumeAgentSession
+	switchAgentAccount *usecase.SwitchAgentAccount
+	// --- Mobile prompt dispatch (SOL-MB-03) ---
+	dispatchPrompt  *usecase.DispatchPrompt
+	getQueuedPrompt *usecase.GetQueuedPrompt
+
+	// liveStates is the SAME per-pod quiescence registry AttachPty/
+	// GetTerminalAgentStatus share (TASK-MB-02-01) — read here only to
+	// populate ListTerminalSessions/SpawnTerminalSession's
+	// TerminalSession.LastOutputPreview (TASK-MB-04-02), never written.
+	liveStates *sync.Map
 }
 
 func New(
@@ -68,8 +121,10 @@ func New(
 	getFleetHealth *usecase.GetFleetHealth,
 	scanWorkspacePorts *usecase.ScanWorkspacePorts,
 	listDevServers *usecase.ListDevServers,
+	listDevServersByTag *usecase.ListDevServersByTag,
 	createConnection *usecase.CreateConnection,
 	relay *usecase.Relay,
+	relayStream *usecase.RelayStream,
 	listSshTargets *usecase.ListSshTargets,
 	getSshState *usecase.GetSshState,
 	establishConnection *usecase.EstablishConnection,
@@ -89,6 +144,32 @@ func New(
 	deleteBrowserProfile *usecase.DeleteBrowserProfile,
 	emulatorRelay *usecase.EmulatorRelay,
 	getHostCapabilities *usecase.GetHostCapabilities,
+	saveTerminalScrollbackSnapshot *usecase.SaveTerminalScrollbackSnapshot,
+	getTerminalScrollbackSnapshot *usecase.GetTerminalScrollbackSnapshot,
+	deleteTerminalScrollbackSnapshots *usecase.DeleteTerminalScrollbackSnapshots,
+	getAgentTerminalSession *usecase.GetAgentTerminalSession,
+	sendTerminalInput *usecase.SendTerminalInput,
+	getTerminalScrollback *usecase.GetTerminalScrollback,
+	importFleetInventory *usecase.ImportFleetInventory,
+	bulkProvisionFleet *usecase.BulkProvisionFleet,
+	detectDevServerAgents *usecase.DetectDevServerAgents,
+	checkDevServerPreflight *usecase.CheckDevServerPreflight,
+	createAgentToken *usecase.CreateAgentToken,
+	listAgentTokens *usecase.ListAgentTokens,
+	revokeAgentToken *usecase.RevokeAgentToken,
+	teardownConnection *usecase.TeardownConnection,
+	createPortForward *usecase.CreatePortForward,
+	listPortForwards *usecase.ListPortForwards,
+	deletePortForward *usecase.DeletePortForward,
+	portEvents *portevents.Broadcaster,
+	startAgentSession *usecase.StartAgentSession,
+	stopAgentSession *usecase.StopAgentSession,
+	killAgentSession *usecase.KillAgentSession,
+	resumeAgentSession *usecase.ResumeAgentSession,
+	switchAgentAccount *usecase.SwitchAgentAccount,
+	dispatchPrompt *usecase.DispatchPrompt,
+	getQueuedPrompt *usecase.GetQueuedPrompt,
+	liveStates *sync.Map,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -97,8 +178,10 @@ func New(
 		getFleetHealth:         getFleetHealth,
 		scanWorkspacePorts:     scanWorkspacePorts,
 		listDevServers:         listDevServers,
+		listDevServersByTag:    listDevServersByTag,
 		createConnection:       createConnection,
 		relay:                  relay,
+		relayStream:            relayStream,
 		listSshTargets:         listSshTargets,
 		getSshState:            getSshState,
 		establishConnection:    establishConnection,
@@ -118,6 +201,39 @@ func New(
 		deleteBrowserProfile:   deleteBrowserProfile,
 		emulatorRelay:          emulatorRelay,
 		getHostCapabilities:    getHostCapabilities,
+
+		saveTerminalScrollbackSnapshot:    saveTerminalScrollbackSnapshot,
+		getTerminalScrollbackSnapshot:     getTerminalScrollbackSnapshot,
+		deleteTerminalScrollbackSnapshots: deleteTerminalScrollbackSnapshots,
+
+		getAgentTerminalSession: getAgentTerminalSession,
+		sendTerminalInput:       sendTerminalInput,
+		getTerminalScrollback:   getTerminalScrollback,
+
+		importFleetInventory: importFleetInventory,
+		bulkProvisionFleet:   bulkProvisionFleet,
+
+		detectDevServerAgents:   detectDevServerAgents,
+		checkDevServerPreflight: checkDevServerPreflight,
+
+		createAgentToken: createAgentToken,
+		listAgentTokens:  listAgentTokens,
+		revokeAgentToken: revokeAgentToken,
+
+		teardownConnection: teardownConnection,
+		createPortForward:  createPortForward,
+		listPortForwards:   listPortForwards,
+		deletePortForward:  deletePortForward,
+		portEvents:         portEvents,
+
+		startAgentSession:  startAgentSession,
+		stopAgentSession:   stopAgentSession,
+		killAgentSession:   killAgentSession,
+		resumeAgentSession: resumeAgentSession,
+		switchAgentAccount: switchAgentAccount,
+		dispatchPrompt:         dispatchPrompt,
+		getQueuedPrompt:        getQueuedPrompt,
+		liveStates:             liveStates,
 	}
 }
 
@@ -126,6 +242,7 @@ func (s *Server) RegisterDevServer(ctx context.Context, req *infrafleetv1.Regist
 		Host:        req.GetHost(),
 		Mode:        toDomainConnectionMode(req.GetMode()),
 		SSHTargetID: req.GetSshTargetId(),
+		Tags:        req.GetTags(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -150,6 +267,7 @@ func (s *Server) ResolveConnection(ctx context.Context, req *infrafleetv1.Resolv
 		resp.RepoPath = out.RepoPath
 		resp.WorktreeId = out.WorktreeID
 		resp.ConnectionId = out.ConnectionID
+		resp.NodeVersion = out.NodeVersion
 	}
 	return resp, nil
 }
@@ -166,6 +284,23 @@ func (s *Server) ListDevServers(ctx context.Context, req *infrafleetv1.ListDevSe
 		out = append(out, toProtoDevServer(ds))
 	}
 	return &infrafleetv1.ListDevServersResponse{DevServers: out}, nil
+}
+
+// ListDevServersByTag backs workflow-service's "fleet:tag:<tag>"
+// dispatch-target shape — see usecase.ListDevServersByTag's doc comment.
+func (s *Server) ListDevServersByTag(ctx context.Context, req *infrafleetv1.ListDevServersByTagRequest) (*infrafleetv1.ListDevServersByTagResponse, error) {
+	devServers, err := s.listDevServersByTag.Execute(ctx, usecase.ListDevServersByTagInput{
+		Tag:         req.GetTag(),
+		HealthyOnly: req.GetHealthyOnly(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.DevServer, 0, len(devServers))
+	for _, ds := range devServers {
+		out = append(out, toProtoDevServer(ds))
+	}
+	return &infrafleetv1.ListDevServersByTagResponse{DevServers: out}, nil
 }
 
 // CreateConnection is the write path for infra.connections — see
@@ -209,11 +344,41 @@ func (s *Server) Relay(ctx context.Context, req *infrafleetv1.RelayRequest) (*in
 	return &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}, nil
 }
 
+// RelayStream is Relay's server-streaming counterpart — see
+// usecase.RelayStream's doc comment.
+func (s *Server) RelayStream(req *infrafleetv1.RelayStreamRequest, stream infrafleetv1.InfraFleetService_RelayStreamServer) error {
+	var params map[string]any
+	if raw := req.GetParamsJson(); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &params); err != nil {
+			return apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInvalidArgument, "INFRA_RELAY_STREAM_BAD_PARAMS", "params_json must be a JSON object", err))
+		}
+	}
+
+	err := s.relayStream.Execute(stream.Context(), usecase.RelayStreamInput{
+		ConnectionID: req.GetConnectionId(),
+		Method:       req.GetMethod(),
+		Params:       params,
+	}, func(frame map[string]any) error {
+		frameJSON, err := json.Marshal(frame)
+		if err != nil {
+			return apperrors.New(apperrors.KindInternal, "INFRA_RELAY_STREAM_ENCODE_FAILED", "failed to encode relay stream frame", err)
+		}
+		return stream.Send(&infrafleetv1.RelayStreamFrame{FrameJson: string(frameJSON)})
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	return nil
+}
+
 func (s *Server) CreateSshTarget(ctx context.Context, req *infrafleetv1.CreateSshTargetRequest) (*infrafleetv1.CreateSshTargetResponse, error) {
 	target, err := s.createSshTarget.Execute(ctx, usecase.CreateSshTargetInput{
-		Host:         req.GetHost(),
-		UserName:     req.GetUser(),
-		VaultSSHRole: req.GetVaultSshRole(),
+		Host:                  req.GetHost(),
+		Port:                  int(req.GetPort()),
+		UserName:              req.GetUser(),
+		VaultSSHRole:          req.GetVaultSshRole(),
+		KnownHostsFingerprint: req.GetKnownHostsFingerprint(),
+		JumpHostTargetID:      req.GetJumpHostTargetId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -234,14 +399,23 @@ func (s *Server) GetFleetHealth(ctx context.Context, req *infrafleetv1.GetFleetH
 }
 
 func (s *Server) ScanWorkspacePorts(ctx context.Context, req *infrafleetv1.ScanWorkspacePortsRequest) (*infrafleetv1.ScanWorkspacePortsResponse, error) {
-	ports, err := s.scanWorkspacePorts.Execute(ctx, usecase.ScanWorkspacePortsInput{
+	detected, err := s.scanWorkspacePorts.Execute(ctx, usecase.ScanWorkspacePortsInput{
 		ConnectionID: req.GetConnectionId(),
 		WorktreeID:   req.GetWorktreeId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &infrafleetv1.ScanWorkspacePortsResponse{OpenPorts: ports}, nil
+	out := make([]*infrafleetv1.DetectedPortProto, 0, len(detected))
+	for _, d := range detected {
+		out = append(out, &infrafleetv1.DetectedPortProto{
+			Port:        d.Port,
+			Host:        d.Host,
+			Pid:         d.PID,
+			ProcessName: d.ProcessName,
+		})
+	}
+	return &infrafleetv1.ScanWorkspacePortsResponse{Ports: out}, nil
 }
 
 func (s *Server) ListSshTargets(ctx context.Context, req *infrafleetv1.ListSshTargetsRequest) (*infrafleetv1.ListSshTargetsResponse, error) {
@@ -252,10 +426,94 @@ func (s *Server) ListSshTargets(ctx context.Context, req *infrafleetv1.ListSshTa
 	out := make([]*infrafleetv1.SshTarget, 0, len(targets))
 	for _, t := range targets {
 		out = append(out, &infrafleetv1.SshTarget{
-			Id: t.ID, TenantId: t.TenantID, Host: t.Host, User: t.UserName, VaultSshRole: t.VaultSSHRole,
+			Id:                    t.ID,
+			TenantId:              t.TenantID,
+			Host:                  t.Host,
+			Port:                  int32(t.Port),
+			User:                  t.UserName,
+			VaultSshRole:          t.VaultSSHRole,
+			KnownHostsFingerprint: t.KnownHostsFingerprint,
+			JumpHostTargetId:      t.JumpHostTargetID,
 		})
 	}
 	return &infrafleetv1.ListSshTargetsResponse{SshTargets: out}, nil
+}
+
+// ImportFleetInventory is BL-FLEET-01's batch YAML-import entry point —
+// see usecase.ImportFleetInventory's doc comment for the upsert semantics.
+func (s *Server) ImportFleetInventory(ctx context.Context, req *infrafleetv1.ImportFleetInventoryRequest) (*infrafleetv1.ImportFleetInventoryResponse, error) {
+	servers := make([]usecase.FleetServerInput, 0, len(req.GetServers()))
+	for _, sv := range req.GetServers() {
+		servers = append(servers, usecase.FleetServerInput{
+			Host: sv.GetHost(), UserName: sv.GetUser(), VaultSSHRole: sv.GetVaultSshRole(),
+			Project: sv.GetProject(), Tags: sv.GetTags(),
+		})
+	}
+	result, err := s.importFleetInventory.Execute(ctx, usecase.ImportFleetInventoryInput{Servers: servers, DryRun: req.GetDryRun()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.ImportFleetInventoryResponse{
+		Imported: int32(result.Imported), Updated: int32(result.Updated), Skipped: int32(result.Skipped),
+	}
+	for _, e := range result.Errors {
+		resp.Errors = append(resp.Errors, &infrafleetv1.ImportFleetInventoryError{Host: e.Host, User: e.UserName, Reason: e.Reason})
+	}
+	return resp, nil
+}
+
+// BulkProvisionFleet is BL-FLEET-02's fan-out batch-provision entry point —
+// see usecase.BulkProvisionFleet's doc comment.
+func (s *Server) BulkProvisionFleet(ctx context.Context, req *infrafleetv1.BulkProvisionFleetRequest) (*infrafleetv1.BulkProvisionFleetResponse, error) {
+	result, err := s.bulkProvisionFleet.Execute(ctx, usecase.BulkProvisionFleetInput{
+		Project: req.GetProject(), Concurrency: int(req.GetConcurrency()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.BulkProvisionFleetResponse{
+		Success: int32(result.Success), Failed: int32(result.Failed), Skipped: int32(result.Skipped),
+	}
+	for _, o := range result.Outcomes {
+		resp.Outcomes = append(resp.Outcomes, &infrafleetv1.ProvisionOutcome{
+			DevServerId: o.DevServerID, Host: o.Host, Status: o.Status, Error: o.Error,
+		})
+	}
+	return resp, nil
+}
+
+// DetectDevServerAgents closes BL-FLEET-04 Step 3 — see
+// usecase.DetectDevServerAgents's doc comment.
+func (s *Server) DetectDevServerAgents(ctx context.Context, req *infrafleetv1.DetectDevServerAgentsRequest) (*infrafleetv1.DetectDevServerAgentsResponse, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err))
+	}
+	result, err := s.detectDevServerAgents.Execute(ctx, tenantID, req.GetDevServerId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.DetectDevServerAgentsResponse{Agents: result.Agents, Platform: result.Platform}, nil
+}
+
+// CheckDevServerPreflight closes BL-FLEET-04 Step 4 — see
+// usecase.CheckDevServerPreflight's doc comment.
+func (s *Server) CheckDevServerPreflight(ctx context.Context, req *infrafleetv1.CheckDevServerPreflightRequest) (*infrafleetv1.CheckDevServerPreflightResponse, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err))
+	}
+	result, err := s.checkDevServerPreflight.Execute(ctx, tenantID, req.GetDevServerId(), req.GetProbePort())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.CheckDevServerPreflightResponse{
+		Git:  &infrafleetv1.CheckResult{Installed: result.Git.Installed, Version: result.Git.Version, MeetsMin: result.Git.MeetsMin},
+		Node: &infrafleetv1.CheckResult{Installed: result.Node.Installed, Version: result.Node.Version, MeetsMin: result.Node.MeetsMin},
+		Disk: &infrafleetv1.DiskCheckResult{FreeGb: result.Disk.FreeGB, MeetsMin: result.Disk.MeetsMin},
+		Port: &infrafleetv1.PortCheckResult{Port: result.Port.Port, Available: result.Port.Available},
+		Gh:   &infrafleetv1.CheckResult{Installed: result.GH.Installed, Version: result.GH.Version, MeetsMin: result.GH.MeetsMin},
+	}, nil
 }
 
 func (s *Server) GetSshState(ctx context.Context, req *infrafleetv1.GetSshStateRequest) (*infrafleetv1.GetSshStateResponse, error) {
@@ -263,7 +521,7 @@ func (s *Server) GetSshState(ctx context.Context, req *infrafleetv1.GetSshStateR
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	resp := &infrafleetv1.GetSshStateResponse{Connected: state.Connected, ConnectionId: state.ConnectionID}
+	resp := &infrafleetv1.GetSshStateResponse{Connected: state.Connected, ConnectionId: state.ConnectionID, Status: state.Status}
 	if state.LastActivity != nil {
 		resp.LastActivityUnixMs = state.LastActivity.UnixMilli()
 	}
@@ -282,6 +540,13 @@ func (s *Server) EstablishConnection(ctx context.Context, req *infrafleetv1.Esta
 	return resp, nil
 }
 
+func (s *Server) TeardownConnection(ctx context.Context, req *infrafleetv1.TeardownConnectionRequest) (*emptypb.Empty, error) {
+	if err := s.teardownConnection.Execute(ctx, usecase.TeardownConnectionInput{ConnectionID: req.GetConnectionId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
 func (s *Server) KillWorkspacePort(ctx context.Context, req *infrafleetv1.KillWorkspacePortRequest) (*infrafleetv1.KillWorkspacePortResponse, error) {
 	ok, reason, err := s.killWorkspacePort.Execute(ctx, usecase.KillWorkspacePortInput{
 		ConnectionID: req.GetConnectionId(),
@@ -293,6 +558,110 @@ func (s *Server) KillWorkspacePort(ctx context.Context, req *infrafleetv1.KillWo
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &infrafleetv1.KillWorkspacePortResponse{Ok: ok, Reason: reason}, nil
+}
+
+// CreateAgentToken/ListAgentTokens/RevokeAgentToken back BL-AWS-03's
+// persistent, named, per-DevServer agent token admin surface — see
+// specs/backend-go/bugs/logic-v1/solutions/SOL-AWS-03-agent-token-management.md.
+
+func (s *Server) CreateAgentToken(ctx context.Context, req *infrafleetv1.CreateAgentTokenRequest) (*infrafleetv1.CreateAgentTokenResponse, error) {
+	plaintext, tok, err := s.createAgentToken.Execute(ctx, req.GetDevServerId(), req.GetName())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.CreateAgentTokenResponse{
+		Id: tok.ID, Token: plaintext, Name: tok.Name, CreatedAtUnixMs: tok.CreatedAt.UnixMilli(),
+	}, nil
+}
+
+func (s *Server) ListAgentTokens(ctx context.Context, req *infrafleetv1.ListAgentTokensRequest) (*infrafleetv1.ListAgentTokensResponse, error) {
+	summaries, err := s.listAgentTokens.Execute(ctx, req.GetDevServerId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.AgentTokenSummary, 0, len(summaries))
+	for _, sum := range summaries {
+		pb := &infrafleetv1.AgentTokenSummary{Id: sum.ID, Name: sum.Name, CreatedAtUnixMs: sum.CreatedAt.UnixMilli()}
+		if sum.LastUsedAt != nil {
+			ms := sum.LastUsedAt.UnixMilli()
+			pb.LastUsedAtUnixMs = &ms
+		}
+		out = append(out, pb)
+	}
+	return &infrafleetv1.ListAgentTokensResponse{Tokens: out}, nil
+}
+
+func (s *Server) RevokeAgentToken(ctx context.Context, req *infrafleetv1.RevokeAgentTokenRequest) (*emptypb.Empty, error) {
+	if err := s.revokeAgentToken.Execute(ctx, req.GetDevServerId(), req.GetId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) CreatePortForward(ctx context.Context, req *infrafleetv1.CreatePortForwardRequest) (*infrafleetv1.PortForward, error) {
+	pf, err := s.createPortForward.Execute(ctx, usecase.CreatePortForwardInput{
+		ConnectionID: req.GetConnectionId(),
+		RemotePort:   int(req.GetRemotePort()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoPortForward(pf), nil
+}
+
+func (s *Server) ListPortForwards(ctx context.Context, req *infrafleetv1.ListPortForwardsRequest) (*infrafleetv1.ListPortForwardsResponse, error) {
+	forwards, err := s.listPortForwards.Execute(ctx, usecase.ListPortForwardsInput{ConnectionID: req.GetConnectionId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.PortForward, 0, len(forwards))
+	for _, pf := range forwards {
+		out = append(out, toProtoPortForward(pf))
+	}
+	return &infrafleetv1.ListPortForwardsResponse{PortForwards: out}, nil
+}
+
+func (s *Server) DeletePortForward(ctx context.Context, req *infrafleetv1.DeletePortForwardRequest) (*emptypb.Empty, error) {
+	if err := s.deletePortForward.Execute(ctx, usecase.DeletePortForwardInput{ID: req.GetId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func toProtoPortForward(pf domain.PortForward) *infrafleetv1.PortForward {
+	return &infrafleetv1.PortForward{
+		Id:           pf.ID,
+		ConnectionId: pf.ConnectionID,
+		LocalPort:    int32(pf.LocalPort),
+		RemotePort:   int32(pf.RemotePort),
+		ProcessName:  pf.ProcessName,
+		Status:       string(pf.Status),
+	}
+}
+
+// StreamPortForwardEvents pushes portevents.Broadcaster's per-connectionId
+// port_opened/port_closed events to the caller for as long as the stream
+// stays open — BR-SSH-15's live-push requirement (TASK-SSH-04-08), the same
+// "open a stream, forward each item" shape AttachPty already uses.
+func (s *Server) StreamPortForwardEvents(req *infrafleetv1.StreamPortForwardEventsRequest, stream infrafleetv1.InfraFleetService_StreamPortForwardEventsServer) error {
+	events, unsubscribe := s.portEvents.Subscribe(req.GetConnectionId())
+	defer unsubscribe()
+	for {
+		select {
+		case ev, ok := <-events:
+			if !ok {
+				return nil
+			}
+			if err := stream.Send(&infrafleetv1.PortForwardEvent{
+				Kind:    ev.Kind,
+				Forward: toProtoPortForward(ev.Forward),
+			}); err != nil {
+				return err
+			}
+		case <-stream.Context().Done():
+			return nil
+		}
+	}
 }
 
 // ListBrowserProfiles backs the frontend's browser.profileList channel —
@@ -361,11 +730,17 @@ func toProtoConnectionMode(m domain.ConnectionMode) infrafleetv1.ConnectionMode 
 
 func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 	return &infrafleetv1.DevServer{
-		Id:          ds.ID,
-		TenantId:    ds.TenantID,
-		Host:        ds.Host,
-		Mode:        toProtoConnectionMode(ds.Mode),
-		SshTargetId: ds.SSHTargetID,
+		Id:           ds.ID,
+		TenantId:     ds.TenantID,
+		Host:         ds.Host,
+		Mode:         toProtoConnectionMode(ds.Mode),
+		SshTargetId:  ds.SSHTargetID,
+		Status:       string(ds.Status),
+		Platform:     ds.Platform,
+		Arch:         ds.Arch,
+		NodeVersion:  ds.NodeVersion,
+		AgentVersion: ds.AgentVersion,
+		Tags:         ds.Tags,
 	}
 }
 
@@ -373,16 +748,19 @@ func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 
 func (s *Server) SpawnTerminalSession(ctx context.Context, req *infrafleetv1.SpawnTerminalSessionRequest) (*infrafleetv1.SpawnTerminalSessionResponse, error) {
 	session, err := s.spawnTerminalSession.Execute(ctx, usecase.SpawnTerminalSessionInput{
-		ConnectionID: req.GetConnectionId(),
-		Cwd:          req.GetCwd(),
-		Shell:        req.GetShell(),
-		Cols:         req.GetCols(),
-		Rows:         req.GetRows(),
+		ConnectionID:     req.GetConnectionId(),
+		Cwd:              req.GetCwd(),
+		Shell:            req.GetShell(),
+		Cols:             req.GetCols(),
+		Rows:             req.GetRows(),
+		ShellIntegration: req.GetShellIntegration(),
+		Command:          req.GetCommand(),
+		UserID:           req.GetUserId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &infrafleetv1.SpawnTerminalSessionResponse{Session: toProtoTerminalSession(session)}, nil
+	return &infrafleetv1.SpawnTerminalSessionResponse{Session: s.toProtoTerminalSession(session)}, nil
 }
 
 func (s *Server) ResizeTerminalSession(ctx context.Context, req *infrafleetv1.ResizeTerminalSessionRequest) (*emptypb.Empty, error) {
@@ -413,7 +791,7 @@ func (s *Server) ListTerminalSessions(ctx context.Context, req *infrafleetv1.Lis
 	}
 	out := make([]*infrafleetv1.TerminalSession, 0, len(sessions))
 	for _, session := range sessions {
-		out = append(out, toProtoTerminalSession(session))
+		out = append(out, s.toProtoTerminalSession(session))
 	}
 	return &infrafleetv1.ListTerminalSessionsResponse{Sessions: out}, nil
 }
@@ -439,10 +817,38 @@ func (s *Server) GetTerminalAgentStatus(ctx context.Context, req *infrafleetv1.G
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &infrafleetv1.GetTerminalAgentStatusResponse{
-		AgentRunning:  result.AgentRunning,
-		AgentKind:     result.AgentKind,
-		ReadyForInput: result.ReadyForInput,
+		AgentRunning:      result.AgentRunning,
+		AgentKind:         result.AgentKind,
+		ReadyForInput:     result.ReadyForInput,
+		LastOutputPreview: result.LastOutputPreview,
 	}, nil
+}
+
+func (s *Server) GetAgentTerminalSession(ctx context.Context, req *infrafleetv1.GetAgentTerminalSessionRequest) (*infrafleetv1.GetAgentTerminalSessionResponse, error) {
+	session, found, err := s.getAgentTerminalSession.Execute(ctx, req.GetWorktreeId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.GetAgentTerminalSessionResponse{Found: found}
+	if found {
+		resp.Session = s.toProtoTerminalSession(session)
+	}
+	return resp, nil
+}
+
+func (s *Server) SendTerminalInput(ctx context.Context, req *infrafleetv1.SendTerminalInputRequest) (*emptypb.Empty, error) {
+	if err := s.sendTerminalInput.Execute(ctx, req.GetPtyId(), req.GetData()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) GetTerminalScrollback(ctx context.Context, req *infrafleetv1.GetTerminalScrollbackRequest) (*infrafleetv1.GetTerminalScrollbackResponse, error) {
+	result, err := s.getTerminalScrollback.Execute(ctx, req.GetPtyId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.GetTerminalScrollbackResponse{Text: result.Text, Truncated: result.Truncated}, nil
 }
 
 func (s *Server) InspectTerminalProcess(ctx context.Context, req *infrafleetv1.InspectTerminalProcessRequest) (*infrafleetv1.InspectTerminalProcessResponse, error) {
@@ -456,6 +862,62 @@ func (s *Server) InspectTerminalProcess(ctx context.Context, req *infrafleetv1.I
 		Command: result.Command,
 		Cwd:     result.Cwd,
 	}, nil
+}
+
+// --- Terminal scrollback persistence (SOL-TM-03) ---
+
+func (s *Server) SaveTerminalScrollbackSnapshot(ctx context.Context, req *infrafleetv1.SaveTerminalScrollbackSnapshotRequest) (*emptypb.Empty, error) {
+	err := s.saveTerminalScrollbackSnapshot.Execute(ctx, usecase.SaveTerminalScrollbackSnapshotInput{
+		WorktreeID: req.GetWorktreeId(), PaneKey: req.GetPaneKey(),
+		Cols: req.GetCols(), Rows: req.GetRows(), Data: req.GetData(), LastTitle: req.GetLastTitle(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) GetTerminalScrollbackSnapshot(ctx context.Context, req *infrafleetv1.GetTerminalScrollbackSnapshotRequest) (*infrafleetv1.GetTerminalScrollbackSnapshotResponse, error) {
+	result, err := s.getTerminalScrollbackSnapshot.Execute(ctx, req.GetWorktreeId(), req.GetPaneKey())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.GetTerminalScrollbackSnapshotResponse{
+		Found: result.Found, Cols: result.Cols, Rows: result.Rows, Data: result.Data,
+		LastTitle: result.LastTitle, UpdatedAtUnixMs: result.UpdatedAt.UnixMilli(),
+	}, nil
+}
+
+func (s *Server) DeleteTerminalScrollbackSnapshots(ctx context.Context, req *infrafleetv1.DeleteTerminalScrollbackSnapshotsRequest) (*emptypb.Empty, error) {
+	if err := s.deleteTerminalScrollbackSnapshots.Execute(ctx, req.GetWorktreeId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// --- Mobile prompt dispatch (SOL-MB-03) ------------------------------------
+
+// DispatchPrompt is the ONE decision point BR-MB-09/10/12 all reduce to —
+// see usecase.DispatchPrompt's doc comment.
+func (s *Server) DispatchPrompt(ctx context.Context, req *infrafleetv1.DispatchPromptRequest) (*infrafleetv1.DispatchPromptResponse, error) {
+	result, err := s.dispatchPrompt.Execute(ctx, usecase.DispatchPromptInput{
+		PtyID: req.GetPtyId(), Prompt: req.GetPrompt(), Overwrite: req.GetOverwrite(), DeviceID: req.GetDispatchedByDeviceId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.DispatchPromptResponse{
+		Outcome:                     infrafleetv1.DispatchPromptResponse_Outcome(infrafleetv1.DispatchPromptResponse_Outcome_value[result.Outcome]),
+		ExistingQueuedPromptPreview: result.ExistingPreview,
+	}, nil
+}
+
+func (s *Server) GetQueuedPrompt(ctx context.Context, req *infrafleetv1.GetQueuedPromptRequest) (*infrafleetv1.GetQueuedPromptResponse, error) {
+	has, prompt, queuedAt, err := s.getQueuedPrompt.Execute(ctx, req.GetPtyId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.GetQueuedPromptResponse{HasQueuedPrompt: has, Prompt: prompt, QueuedAtUnixMs: queuedAt}, nil
 }
 
 // AttachPty implements the bidirectional streaming RPC: pumps
@@ -566,13 +1028,19 @@ func toProtoPtyServerFrame(msg usecase.PtyServerMessage) *infrafleetv1.PtyServer
 	return &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Out{Out: &infrafleetv1.PtyOutput{Data: msg.Output}}}
 }
 
-func toProtoTerminalSession(session domain.TerminalSession) *infrafleetv1.TerminalSession {
+// toProtoTerminalSession is a method (not a free function) because
+// LastOutputPreview (TASK-MB-04-02) is read from the server's shared
+// liveStates registry, keyed by PtyID — empty when no live entry exists
+// (cross-pod case, or a freshly spawned session with no output yet), not an
+// error.
+func (s *Server) toProtoTerminalSession(session domain.TerminalSession) *infrafleetv1.TerminalSession {
 	return &infrafleetv1.TerminalSession{
 		PtyId:              session.PtyID,
 		ConnectionId:       session.ConnectionID,
 		Cwd:                session.Cwd,
 		CreatedAtUnixMs:    session.CreatedAt.UnixMilli(),
 		LastActiveAtUnixMs: session.LastActiveAt.UnixMilli(),
+		LastOutputPreview:  usecase.LastOutputPreview(s.liveStates, session.PtyID),
 	}
 }
 
@@ -585,6 +1053,77 @@ func toProtoBrowserProfile(p domain.BrowserProfile) *infrafleetv1.BrowserProfile
 		SourceBrowser: p.SourceBrowser,
 		IsDefault:     p.IsDefault,
 		CreatedAt:     timestamppb.New(p.CreatedAt),
+	}
+}
+
+// --- Agent sessions (TASK-AG-01..04) ---
+
+func (s *Server) StartAgentSession(ctx context.Context, req *infrafleetv1.StartAgentSessionRequest) (*infrafleetv1.AgentSession, error) {
+	session, err := s.startAgentSession.Execute(ctx, usecase.StartAgentSessionInput{
+		ConnectionID: req.GetConnectionId(),
+		WorktreeID:   req.GetWorktreeId(),
+		UserID:       req.GetUserId(),
+		Cwd:          req.GetCwd(),
+		ModelID:      req.GetModelId(),
+		AccountID:    req.GetAccountId(),
+		TrustPreset:  req.GetTrustPreset(),
+		Cols:         req.GetCols(),
+		Rows:         req.GetRows(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoAgentSession(session), nil
+}
+
+func (s *Server) StopAgentSession(ctx context.Context, req *infrafleetv1.StopAgentSessionRequest) (*emptypb.Empty, error) {
+	if err := s.stopAgentSession.Execute(ctx, req.GetSessionId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) KillAgentSession(ctx context.Context, req *infrafleetv1.KillAgentSessionRequest) (*emptypb.Empty, error) {
+	if err := s.killAgentSession.Execute(ctx, req.GetSessionId(), req.GetSignal()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ResumeAgentSession(ctx context.Context, req *infrafleetv1.ResumeAgentSessionRequest) (*infrafleetv1.AgentSession, error) {
+	session, err := s.resumeAgentSession.Execute(ctx, usecase.ResumeAgentSessionInput{
+		ConnectionID: req.GetConnectionId(),
+		WorktreeID:   req.GetWorktreeId(),
+		UserID:       req.GetUserId(),
+		Cwd:          req.GetCwd(),
+		Cols:         req.GetCols(),
+		Rows:         req.GetRows(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoAgentSession(session), nil
+}
+
+func (s *Server) SwitchAgentAccount(ctx context.Context, req *infrafleetv1.SwitchAgentAccountRequest) (*infrafleetv1.AgentSession, error) {
+	session, err := s.switchAgentAccount.Execute(ctx, usecase.SwitchAgentAccountInput{
+		ConnectionID: req.GetConnectionId(),
+		WorktreeID:   req.GetWorktreeId(),
+		UserID:       req.GetUserId(),
+		ProjectID:    req.GetProjectId(),
+		Cwd:          req.GetCwd(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoAgentSession(session), nil
+}
+
+func toProtoAgentSession(s domain.AgentSession) *infrafleetv1.AgentSession {
+	return &infrafleetv1.AgentSession{
+		Id: s.ID, PtyId: s.PtyID, ConnectionId: s.ConnectionID, WorktreeId: s.WorktreeID, DevServerId: s.DevServerID,
+		UserId: s.UserID, ModelId: s.ModelID, AccountId: s.AccountID, Status: string(s.Status),
+		StartedAtUnixMs: s.StartedAt.UnixMilli(), LastActiveAtUnixMs: s.LastActiveAt.UnixMilli(),
 	}
 }
 

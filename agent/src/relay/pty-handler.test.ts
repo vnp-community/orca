@@ -242,6 +242,63 @@ describe('PtyHandler', () => {
     }
   })
 
+  it('injects the OSC 133 bootstrap when params.shellIntegration is true against a PowerShell shell', async () => {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'win32'
+    })
+    try {
+      await dispatcher.callRequest('pty.spawn', {
+        cols: 80,
+        rows: 24,
+        shellOverride: 'powershell.exe',
+        shellIntegration: true
+      })
+      expect(mockPtySpawn).toHaveBeenCalledWith(
+        'powershell.exe',
+        expect.arrayContaining(['-EncodedCommand']),
+        expect.any(Object)
+      )
+    } finally {
+      Object.defineProperty(process, 'platform', {
+        configurable: true,
+        value: originalPlatform
+      })
+    }
+  })
+
+  it('keeps the unchanged ["-NoLogo"] args when params.shellIntegration is omitted or false (regression guard)', async () => {
+    const originalPlatform = process.platform
+    Object.defineProperty(process, 'platform', {
+      configurable: true,
+      value: 'win32'
+    })
+    try {
+      await dispatcher.callRequest('pty.spawn', {
+        cols: 80,
+        rows: 24,
+        shellOverride: 'powershell.exe'
+      })
+      expect(mockPtySpawn).toHaveBeenCalledWith('powershell.exe', ['-NoLogo'], expect.any(Object))
+
+      mockPtySpawn.mockClear()
+
+      await dispatcher.callRequest('pty.spawn', {
+        cols: 80,
+        rows: 24,
+        shellOverride: 'powershell.exe',
+        shellIntegration: false
+      })
+      expect(mockPtySpawn).toHaveBeenCalledWith('powershell.exe', ['-NoLogo'], expect.any(Object))
+    } finally {
+      Object.defineProperty(process, 'platform', {
+        configurable: true,
+        value: originalPlatform
+      })
+    }
+  })
+
   it('rejects unsupported shell overrides on Windows relay hosts', async () => {
     const originalPlatform = process.platform
     Object.defineProperty(process, 'platform', {

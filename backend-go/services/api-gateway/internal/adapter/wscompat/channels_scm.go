@@ -19,8 +19,10 @@ import (
 	"encoding/json"
 	"time"
 
+	annotationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1"
 	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
@@ -43,11 +45,11 @@ func attachSCMIdentity(ctx context.Context, id Identity) context.Context {
 // to, against scm-integration-service's gRPC client. Called once from
 // main.go's composition root — see channels.go's RegisterRealChannels for
 // where the integration pass adds `registerSCMChannels(r, scmClient)`.
-func registerSCMChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient) {
+func registerSCMChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient, annotationClient annotationv1.AnnotationServiceClient) {
 	registerGitHubChannels(r, client)
 	registerGitHubProjectChannels(r, client)
 	registerGitLabChannels(r, client)
-	registerHostedReviewChannels(r, client)
+	registerHostedReviewChannels(r, client, annotationClient)
 }
 
 // ── github.* (PR/issue mutations, repo/branch resolution, auth, rate limit) ──
@@ -60,6 +62,54 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		defer cancel()
 		resp, err := client.GetRateLimitStatus(attachSCMIdentity(rpcCtx, id),
 			&scmintegrationv1.GetRateLimitStatusRequest{TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// github.issues — BUG-PI-01's fix: filters/force_refresh now actually
+	// reach the RPC, was previously a hardcoded empty IssueFilter{}.
+	r.Register("github.issues", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type issuesArgs struct {
+			Repo      string   `json:"repo"`
+			State     string   `json:"state"`
+			Assignee  string   `json:"assignee"`
+			Labels    []string `json:"labels"`
+			Milestone string   `json:"milestone"`
+			Refresh   bool     `json:"refresh"`
+		}
+		in, err := decodeArg[issuesArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
+		defer cancel()
+		resp, err := client.ListIssues(attachSCMIdentity(rpcCtx, id), &scmintegrationv1.ListIssuesRequest{
+			TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB, Repo: in.Repo,
+			Filter:       &scmintegrationv1.IssueFilter{State: in.State, Assignee: in.Assignee, Labels: in.Labels, Milestone: in.Milestone},
+			ForceRefresh: in.Refresh,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
+	// github.issueComments — completes the *BySlug comment RPC group's read
+	// side (BUG-PI-01 step 6), same registration pattern as github.rateLimit.
+	r.Register("github.issueComments", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type commentsArgs struct {
+			ItemSlug string `json:"itemSlug"`
+		}
+		in, err := decodeArg[commentsArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
+		defer cancel()
+		resp, err := client.ListIssueCommentsBySlug(attachSCMIdentity(rpcCtx, id),
+			&scmintegrationv1.ListIssueCommentsBySlugRequest{TenantId: id.TenantID, ItemSlug: in.ItemSlug})
 		if err != nil {
 			return nil, err
 		}
@@ -631,6 +681,37 @@ func registerGitLabChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 		return resp, nil
 	})
 
+	// gitlab.issues — ListIssues is provider-generic (BUG-PI-01), so unlike
+	// gitlab.issueComments (deliberately NOT added below — ListIssueCommentsBySlug
+	// is GitHub Projects v2-only, see list_issue_comments_by_slug.go's doc
+	// comment; a gitlab.issueComments channel would just resolve to
+	// SCM_PROVIDER_UNSUPPORTED on every call), this one has a real backing RPC.
+	r.Register("gitlab.issues", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type issuesArgs struct {
+			Repo      string   `json:"repo"`
+			State     string   `json:"state"`
+			Assignee  string   `json:"assignee"`
+			Labels    []string `json:"labels"`
+			Milestone string   `json:"milestone"`
+			Refresh   bool     `json:"refresh"`
+		}
+		in, err := decodeArg[issuesArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
+		defer cancel()
+		resp, err := client.ListIssues(attachSCMIdentity(rpcCtx, id), &scmintegrationv1.ListIssuesRequest{
+			TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITLAB, Repo: in.Repo,
+			Filter:       &scmintegrationv1.IssueFilter{State: in.State, Assignee: in.Assignee, Labels: in.Labels, Milestone: in.Milestone},
+			ForceRefresh: in.Refresh,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
 	r.Register("gitlab.listMRs", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type listArgs struct {
 			Repo         string `json:"repo"`
@@ -737,16 +818,18 @@ func registerGitLabChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 
 // ── hostedReview.* ────────────────────────────────────────────────────────
 
-func registerHostedReviewChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient) {
+func registerHostedReviewChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient, annotationClient annotationv1.AnnotationServiceClient) {
 	r.Register("hostedReview.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
-			Provider   string `json:"provider"`
-			Repo       string `json:"repo"`
-			Title      string `json:"title"`
-			Body       string `json:"body"`
-			HeadBranch string `json:"headBranch"`
-			BaseBranch string `json:"baseBranch"`
-			RequestID  string `json:"requestId"`
+			Provider          string `json:"provider"`
+			Repo              string `json:"repo"`
+			Title             string `json:"title"`
+			Body              string `json:"body"`
+			HeadBranch        string `json:"headBranch"`
+			BaseBranch        string `json:"baseBranch"`
+			RequestID         string `json:"requestId"`
+			Draft             bool   `json:"draft"`             // NEW — BR-CR-20
+			LinkedIssueNumber *int32 `json:"linkedIssueNumber"` // NEW — BR-CR-19; *int32 so an absent field round-trips as unset, not 0 (the frontend doesn't send this yet — no call site to confirm a 0-is-valid convention against)
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
@@ -759,11 +842,37 @@ func registerHostedReviewChannels(r *Registry, client scmintegrationv1.ScmIntegr
 				TenantId: id.TenantID, Provider: parseWSProvider(in.Provider),
 				Repo: in.Repo, Title: in.Title, Body: in.Body,
 				HeadBranch: in.HeadBranch, BaseBranch: in.BaseBranch, RequestId: in.RequestID,
+				Draft: in.Draft, LinkedIssueNumber: in.LinkedIssueNumber,
 			})
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetPullRequest(), nil
+		return resp, nil // NEW — was resp.GetPullRequest(); now returns the whole response so
+		// linked_issue_update_error (BR-CR-19) reaches the client too
+	})
+
+	r.Register("hostedReview.suggestReviewers", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type suggestArgs struct {
+			Provider     string   `json:"provider"`
+			Repo         string   `json:"repo"`
+			BaseRef      string   `json:"baseRef"`
+			ChangedFiles []string `json:"changedFiles"`
+		}
+		in, err := decodeArg[suggestArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
+		defer cancel()
+		resp, err := client.SuggestPullRequestReviewers(attachSCMIdentity(rpcCtx, id),
+			&scmintegrationv1.SuggestPullRequestReviewersRequest{
+				TenantId: id.TenantID, Provider: parseWSProvider(in.Provider),
+				Repo: in.Repo, BaseRef: in.BaseRef, ChangedFiles: in.ChangedFiles,
+			})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
 	})
 
 	// hostedReview.forBranch — uses the same provider-generic single-result
@@ -818,6 +927,65 @@ func registerHostedReviewChannels(r *Registry, client scmintegrationv1.ScmIntegr
 		}
 		return resp, nil
 	})
+
+	// hostedReview.submit — wraps the same annotation-aggregation
+	// composition as pr_review_routes.go's SubmitPullRequestReview
+	// (TASK-PI-04-05) for the WS-compat surface (SOL-PI-04). BR-PI-12 needs
+	// no special-case code here — this channel and the BL-CR-03
+	// agent-feedback channel are already independent calls the frontend can
+	// issue in parallel; no new orchestration.
+	r.Register("hostedReview.submit", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type submitArgs struct {
+			RepoID     string `json:"repoId"`
+			Provider   string `json:"provider"`
+			PRNumber   int32  `json:"prNumber"`
+			ReviewType string `json:"reviewType"`
+			Summary    string `json:"summary"`
+		}
+		in, err := decodeArg[submitArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+
+		// Aggregation read — same drain-all-pages + BR-PI-10 fail-fast as
+		// pr_review_routes.go's SubmitPullRequestReview (TASK-PI-04-05).
+		var allAnnotations []*annotationv1.Annotation
+		pageToken := ""
+		for {
+			resp, err := annotationClient.ListAnnotations(ctx, &annotationv1.ListAnnotationsRequest{
+				RepoId: in.RepoID, PageToken: pageToken,
+			})
+			if err != nil {
+				return nil, err
+			}
+			allAnnotations = append(allAnnotations, resp.GetAnnotations()...)
+			if pageToken = resp.GetNextPageToken(); pageToken == "" {
+				break
+			}
+		}
+		if len(allAnnotations) == 0 {
+			return nil, apperrors.New(apperrors.KindInvalidArgument, "PR_REVIEW_NO_COMMENTS", "annotate at least one line before submitting a review", nil)
+		}
+
+		comments := make([]*scmintegrationv1.ReviewComment, 0, len(allAnnotations))
+		for _, a := range allAnnotations {
+			comments = append(comments, &scmintegrationv1.ReviewComment{
+				Path: a.GetAnchor().GetFilePath(), Line: a.GetAnchor().GetLine(), Body: a.GetContent(),
+			})
+		}
+
+		rpcCtx, cancel := context.WithTimeout(ctx, scmRPCTimeout)
+		defer cancel()
+		resp, err := client.SubmitReview(attachSCMIdentity(rpcCtx, id), &scmintegrationv1.SubmitReviewRequest{
+			TenantId: id.TenantID, Provider: parseWSProvider(in.Provider), Repo: in.RepoID,
+			PrNumber: in.PRNumber, ReviewType: parseWSReviewType(in.ReviewType),
+			SummaryBody: in.Summary, Comments: comments,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
 }
 
 // parseWSProvider mirrors httpgateway.parseSCMProvider (scm_routes.go) —
@@ -826,6 +994,21 @@ func registerHostedReviewChannels(r *Registry, client scmintegrationv1.ScmIntegr
 // layering (both are "adapter", neither should depend on the other); a
 // future cleanup could hoist this into a small shared internal package if a
 // third caller appears, but two isn't yet a pattern.
+// parseWSReviewType mirrors httpgateway.parseReviewType (pr_review_routes.go)
+// — same duplication rationale as parseWSProvider above.
+func parseWSReviewType(v string) scmintegrationv1.ReviewType {
+	switch v {
+	case "comment":
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_COMMENT
+	case "approve":
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_APPROVE
+	case "request_changes":
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_REQUEST_CHANGES
+	default:
+		return scmintegrationv1.ReviewType_REVIEW_TYPE_UNSPECIFIED
+	}
+}
+
 func parseWSProvider(v string) scmintegrationv1.ScmProvider {
 	switch v {
 	case "github":

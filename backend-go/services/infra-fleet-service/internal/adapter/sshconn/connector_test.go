@@ -6,6 +6,7 @@ import (
 	"crypto/rand"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"strings"
 	"testing"
@@ -157,16 +158,65 @@ func (s *fakeSSHServer) handleConn(rawConn net.Conn, cfg *ssh.ServerConfig) {
 	go ssh.DiscardRequests(reqs)
 
 	for newChannel := range chans {
-		if newChannel.ChannelType() != "session" {
-			_ = newChannel.Reject(ssh.UnknownChannelType, "only session channels supported")
-			continue
+		switch newChannel.ChannelType() {
+		case "session":
+			channel, requests, err := newChannel.Accept()
+			if err != nil {
+				continue
+			}
+			go handleSessionRequests(channel, requests)
+		case "direct-tcpip":
+			// Minimal port-forwarding support so this fake server can act as
+			// a jump host/bastion for TestConnect_DialsThroughJumpHost — a
+			// real proxy, not a mock: it actually dials the requested
+			// address and pipes bytes both ways.
+			go handleDirectTCPIP(newChannel)
+		default:
+			_ = newChannel.Reject(ssh.UnknownChannelType, "only session/direct-tcpip channels supported")
 		}
-		channel, requests, err := newChannel.Accept()
-		if err != nil {
-			continue
-		}
-		go handleSessionRequests(channel, requests)
 	}
+}
+
+// directTCPIPPayload mirrors RFC 4254 §7.2's "direct-tcpip" channel-open
+// extra data: the address ssh.Client.Dial asked this server to forward to.
+type directTCPIPPayload struct {
+	HostToConnect  string
+	PortToConnect  uint32
+	OriginatorAddr string
+	OriginatorPort uint32
+}
+
+func handleDirectTCPIP(newChannel ssh.NewChannel) {
+	var payload directTCPIPPayload
+	if err := ssh.Unmarshal(newChannel.ExtraData(), &payload); err != nil {
+		_ = newChannel.Reject(ssh.ConnectionFailed, "malformed direct-tcpip payload")
+		return
+	}
+	target := net.JoinHostPort(payload.HostToConnect, fmt.Sprintf("%d", payload.PortToConnect))
+	targetConn, err := net.Dial("tcp", target)
+	if err != nil {
+		_ = newChannel.Reject(ssh.ConnectionFailed, "dial failed: "+err.Error())
+		return
+	}
+	channel, requests, err := newChannel.Accept()
+	if err != nil {
+		_ = targetConn.Close()
+		return
+	}
+	go ssh.DiscardRequests(requests)
+
+	done := make(chan struct{}, 2)
+	go func() {
+		_, _ = io.Copy(targetConn, channel)
+		done <- struct{}{}
+	}()
+	go func() {
+		_, _ = io.Copy(channel, targetConn)
+		done <- struct{}{}
+	}()
+	<-done
+	_ = targetConn.Close()
+	_ = channel.Close()
 }
 
 func handleSessionRequests(channel ssh.Channel, requests <-chan *ssh.Request) {
@@ -193,13 +243,13 @@ func TestConnectAndRunCommand_SucceedsAgainstFakeServer(t *testing.T) {
 	ca := newFakeCA(t)
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
 
-	target, err := domain.NewSshTarget("target-1", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("target-1", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
 
 	issuer := &fakeIssuer{ca: ca, principal: "deploy"}
-	connector := sshconn.NewConnector(issuer, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
+	connector := sshconn.NewConnector(issuer, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -222,13 +272,13 @@ func TestConnect_FailsWhenIssuerErrors(t *testing.T) {
 	ca := newFakeCA(t)
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
 
-	target, err := domain.NewSshTarget("target-2", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("target-2", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
 
 	issuer := &fakeIssuer{ca: ca, principal: "deploy", failWith: errors.New("vault: role not found")}
-	connector := sshconn.NewConnector(issuer, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
+	connector := sshconn.NewConnector(issuer, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -247,13 +297,13 @@ func TestConnect_FailsWhenServerRejectsCert(t *testing.T) {
 	wrongCA := newFakeCA(t)
 	server := startFakeSSHServer(t, realCA.signer.PublicKey(), "deploy") // server trusts realCA only
 
-	target, err := domain.NewSshTarget("target-3", "tenant-1", "127.0.0.1", "deploy", "role-1")
+	target, err := domain.NewSshTarget("target-3", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
 
 	issuer := &fakeIssuer{ca: wrongCA, principal: "deploy"} // signs with the WRONG CA
-	connector := sshconn.NewConnector(issuer, sshconn.Config{DialTimeout: 5 * time.Second, Port: server.port(t)})
+	connector := sshconn.NewConnector(issuer, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -261,5 +311,161 @@ func TestConnect_FailsWhenServerRejectsCert(t *testing.T) {
 	if err == nil {
 		_ = conn.Close()
 		t.Fatal("expected Connect to fail when the fake server rejects a cert signed by an untrusted CA")
+	}
+}
+
+// fakeSshTargetResolver satisfies sshconn.SshTargetResolver against an
+// in-memory map — no postgres involved.
+type fakeSshTargetResolver struct {
+	byID map[string]domain.SshTarget
+}
+
+func (f *fakeSshTargetResolver) Get(_ context.Context, _, id string) (domain.SshTarget, error) {
+	target, ok := f.byID[id]
+	if !ok {
+		return domain.SshTarget{}, fmt.Errorf("fakeSshTargetResolver: no target %q", id)
+	}
+	return target, nil
+}
+
+func TestConnect_DialsThroughJumpHost(t *testing.T) {
+	ca := newFakeCA(t)
+	bastion := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
+	realTarget := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
+
+	bastionTarget, err := domain.NewSshTarget("bastion-1", "tenant-1", "127.0.0.1", bastion.port(t), "deploy", "role-1", "", "", "", nil)
+	if err != nil {
+		t.Fatalf("NewSshTarget(bastion): %v", err)
+	}
+	finalTarget, err := domain.NewSshTarget("target-jump", "tenant-1", "127.0.0.1", realTarget.port(t), "deploy", "role-1", "", "bastion-1", "", nil)
+	if err != nil {
+		t.Fatalf("NewSshTarget(final): %v", err)
+	}
+
+	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"bastion-1": bastionTarget}}
+	issuer := &fakeIssuer{ca: ca, principal: "deploy"}
+	connector := sshconn.NewConnector(issuer, resolver, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := connector.Connect(ctx, finalTarget)
+	if err != nil {
+		t.Fatalf("Connect through jump host: %v", err)
+	}
+	defer func() { _ = conn.Close() }()
+
+	stdout, _, err := conn.RunCommand(ctx, "echo through-bastion")
+	if err != nil {
+		t.Fatalf("RunCommand: %v", err)
+	}
+	if !strings.Contains(stdout, "echo through-bastion") {
+		t.Errorf("stdout = %q, want it to contain the executed command (proves traffic reached the real target through the bastion)", stdout)
+	}
+}
+
+func TestConnect_KnownHostsMismatchRejectsDial(t *testing.T) {
+	ca := newFakeCA(t)
+	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
+
+	target, err := domain.NewSshTarget("target-mismatch", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "SHA256:not-the-real-fingerprint", "", "", nil)
+	if err != nil {
+		t.Fatalf("NewSshTarget: %v", err)
+	}
+
+	issuer := &fakeIssuer{ca: ca, principal: "deploy"}
+	connector := sshconn.NewConnector(issuer, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := connector.Connect(ctx, target)
+	if err == nil {
+		_ = conn.Close()
+		t.Fatal("expected Connect to fail on a known-hosts fingerprint mismatch")
+	}
+	// The handshake failure is wrapped in ErrUnreachableHost (same as a dial
+	// failure); the underlying cause is the fingerprint-mismatch error.
+	var unreachable *sshconn.ErrUnreachableHost
+	if !errors.As(err, &unreachable) {
+		t.Fatalf("expected an *sshconn.ErrUnreachableHost, got %T: %v", err, err)
+	}
+	if !strings.Contains(unreachable.Cause.Error(), "fingerprint mismatch") {
+		t.Errorf("expected the wrapped cause to mention a fingerprint mismatch, got: %v", unreachable.Cause)
+	}
+}
+
+func TestErrUnreachableHost_ErrorMessages(t *testing.T) {
+	refused := &sshconn.ErrUnreachableHost{Host: "10.0.0.1", Port: 22, Cause: errors.New("connect: connection refused")}
+	if got, want := refused.Error(), "sshconn: connection refused: 10.0.0.1:22"; got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
+
+	timedOut := &sshconn.ErrUnreachableHost{Host: "10.0.0.1", Port: 22, Cause: context.DeadlineExceeded}
+	if got, want := timedOut.Error(), "sshconn: connection to 10.0.0.1:22 timed out"; got != want {
+		t.Errorf("Error() = %q, want %q", got, want)
+	}
+}
+
+func TestConnect_UnreachableHostReturnsTypedError(t *testing.T) {
+	// Nothing is listening on this OS-assigned-then-closed port.
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("listening: %v", err)
+	}
+	addr := listener.Addr().String()
+	_ = listener.Close()
+	_, portStr, _ := net.SplitHostPort(addr)
+	var port int
+	_, _ = fmt.Sscanf(portStr, "%d", &port)
+
+	target, err := domain.NewSshTarget("target-unreachable", "tenant-1", "127.0.0.1", port, "deploy", "role-1", "", "", "", nil)
+	if err != nil {
+		t.Fatalf("NewSshTarget: %v", err)
+	}
+	issuer := &fakeIssuer{ca: newFakeCA(t), principal: "deploy"}
+	connector := sshconn.NewConnector(issuer, nil, sshconn.Config{DialTimeout: 2 * time.Second}, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	_, err = connector.Connect(ctx, target)
+	if err == nil {
+		t.Fatal("expected Connect to fail against an unreachable host")
+	}
+	var unreachable *sshconn.ErrUnreachableHost
+	if !errors.As(err, &unreachable) {
+		t.Fatalf("expected an *sshconn.ErrUnreachableHost, got %T: %v", err, err)
+	}
+}
+
+func TestKeepAlive_SendsRequestsAtInterval(t *testing.T) {
+	ca := newFakeCA(t)
+	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
+
+	target, err := domain.NewSshTarget("target-keepalive", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
+	if err != nil {
+		t.Fatalf("NewSshTarget: %v", err)
+	}
+	issuer := &fakeIssuer{ca: ca, principal: "deploy"}
+	connector := sshconn.NewConnector(issuer, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := connector.Connect(ctx, target)
+	if err != nil {
+		t.Fatalf("Connect: %v", err)
+	}
+
+	keepAliveCtx, keepAliveCancel := context.WithCancel(context.Background())
+	conn.StartKeepAlive(keepAliveCtx, 20*time.Millisecond)
+
+	// Let a few intervals elapse — the fake server's ssh.DiscardRequests
+	// replies to every global request, so SendRequest returning without
+	// error at each tick proves the loop is actually running.
+	time.Sleep(100 * time.Millisecond)
+
+	// Close should stop the loop without leaking a goroutine — closing conn
+	// twice (via Close and via keepAliveCancel) must both be safe.
+	keepAliveCancel()
+	if err := conn.Close(); err != nil {
+		t.Fatalf("Close: %v", err)
 	}
 }

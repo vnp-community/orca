@@ -2,8 +2,10 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -21,6 +23,11 @@ type ExecuteInput struct {
 	ProjectID   string
 	RootTraceID string
 	RequestID   string
+	// InputsJSON is caller-supplied {{...}} values (TASK-WF-02-06) — e.g.
+	// {"feature_description": "..."} — available to every step's Config as
+	// {{feature_description}}. Malformed JSON fails Execute synchronously
+	// (same as an invalid dag_json), not silently at dispatch time.
+	InputsJSON string
 }
 
 // Execute resolves a template, validates and wave-computes its DAG,
@@ -97,6 +104,19 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindFailedPrecondition, "WORKFLOW_DAG_CYCLIC", err.Error(), err)
 	}
 
+	var inputs map[string]any
+	if in.InputsJSON != "" {
+		if err := json.Unmarshal([]byte(in.InputsJSON), &inputs); err != nil {
+			return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_INPUTS", "inputs_json must be a valid JSON object", err)
+		}
+	}
+	// userID is captured from the INBOUND ctx (the acting caller, per
+	// common/tenant's identity-forwarding convention) before dispatchCtx
+	// below detaches from it — see domain.ExecutionContext.UserID's doc
+	// comment and execute.go's own doc comment on why dispatch uses its
+	// own context.
+	userID, _ := tenant.UserID(ctx)
+
 	rootTraceID := in.RootTraceID
 	if rootTraceID == "" {
 		// No caller-supplied trace to resume against — mint a fresh one so
@@ -120,7 +140,12 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 	// StepExecutionRepository/ExecutionRepository calls made from the
 	// background goroutine still need it — see this type's doc comment.
 	dispatchCtx := tenant.WithTenantID(context.Background(), tenantID)
-	go uc.runToCompletion(dispatchCtx, exec, waves)
+	execCtx := newExecutionContext(domain.ExecutionContext{
+		Inputs:    inputs,
+		ProjectID: in.ProjectID,
+		UserID:    userID,
+	})
+	go uc.runToCompletion(dispatchCtx, exec, waves, execCtx)
 
 	return exec, nil
 }
@@ -129,14 +154,41 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 // final status (completed if every wave succeeded, failed if any step
 // did not — see waveDispatcher's doc comment for the failure-semantics
 // rationale). Runs entirely off the originating RPC's goroutine.
-func (uc *Execute) runToCompletion(ctx context.Context, exec domain.WorkflowExecution, waves [][]domain.Step) {
-	succeeded := uc.dispatcher.dispatchWaves(ctx, exec.ID, waves)
+// runToCompletion is the one place exec.Status transitions to a terminal
+// value for the main dispatch path — the single outbox publish point
+// SOL-PW-04 (TASK-PW-04-06) adds. A marshal failure degrades to "persist
+// status, skip the event" rather than failing the whole terminal
+// transition — matches this function's existing best-effort logging
+// posture for UpdateExecution failures (both are already fire-and-forget
+// from a background goroutine with no caller to propagate an error to).
+func (uc *Execute) runToCompletion(ctx context.Context, exec domain.WorkflowExecution, waves [][]domain.Step, execCtx *executionContext) {
+	succeeded := uc.dispatcher.dispatchWaves(ctx, exec.ID, waves, execCtx)
 
 	exec.Status = domain.StatusCompleted
+	subject := "orca.workflow.execution.completed"
 	if !succeeded {
 		exec.Status = domain.StatusFailed
+		subject = "orca.workflow.execution.failed"
 	}
-	if err := uc.executions.UpdateExecution(ctx, exec); err != nil {
+
+	payload, err := json.Marshal(workflowExecutionTerminalPayload{
+		ExecutionID: exec.ID, TemplateID: exec.TemplateID, ProjectID: exec.ProjectID, Status: string(exec.Status),
+	})
+	var event *domain.OutboxEvent
+	if err != nil {
+		slog.ErrorContext(ctx, "workflow: marshaling terminal-status event payload failed", slog.String("execution_id", exec.ID), slog.Any("error", err))
+	} else {
+		event = &domain.OutboxEvent{ID: uuid.NewString(), Subject: subject, OccurredAt: time.Now().UTC(), PayloadJSON: payload}
+	}
+
+	if err := uc.executions.UpdateExecution(ctx, exec, event); err != nil {
 		slog.ErrorContext(ctx, "workflow: persisting final execution status failed", slog.String("execution_id", exec.ID), slog.String("status", string(exec.Status)), slog.Any("error", err))
 	}
+}
+
+type workflowExecutionTerminalPayload struct {
+	ExecutionID string `json:"execution_id"`
+	TemplateID  string `json:"template_id"`
+	ProjectID   string `json:"project_id"`
+	Status      string `json:"status"`
 }

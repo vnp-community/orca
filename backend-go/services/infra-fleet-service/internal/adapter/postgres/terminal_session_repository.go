@@ -32,9 +32,9 @@ func NewTerminalSessionStore(pool *pgxpool.Pool) *TerminalSessionStore {
 // ssh_target_id.
 func (s *TerminalSessionStore) Create(ctx context.Context, session domain.TerminalSession) (domain.TerminalSession, error) {
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO infra.terminal_sessions (pty_id, tenant_id, connection_id, cwd, created_at, last_active_at)
-		VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5, $6)
-	`, session.PtyID, session.TenantID, session.ConnectionID, session.Cwd, session.CreatedAt, session.LastActiveAt)
+		INSERT INTO infra.terminal_sessions (pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, created_by_user_id)
+		VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5, $6, NULLIF($7, '')::uuid)
+	`, session.PtyID, session.TenantID, session.ConnectionID, session.Cwd, session.CreatedAt, session.LastActiveAt, session.CreatedByUserID)
 	if err != nil {
 		return domain.TerminalSession{}, fmt.Errorf("postgres: insert terminal session: %w", err)
 	}
@@ -45,7 +45,7 @@ func (s *TerminalSessionStore) Create(ctx context.Context, session domain.Termin
 // when no row matches, per usecase.TerminalSessionRepository's doc comment.
 func (s *TerminalSessionStore) Get(ctx context.Context, tenantID, ptyID string) (bool, domain.TerminalSession, error) {
 	row := s.pool.QueryRow(ctx, `
-		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at
+		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at, created_by_user_id
 		FROM infra.terminal_sessions
 		WHERE tenant_id = $1 AND pty_id = $2
 	`, tenantID, ptyID)
@@ -64,7 +64,7 @@ func (s *TerminalSessionStore) Get(ctx context.Context, tenantID, ptyID string) 
 // connectionID.
 func (s *TerminalSessionStore) List(ctx context.Context, tenantID, connectionID string) ([]domain.TerminalSession, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at
+		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at, created_by_user_id
 		FROM infra.terminal_sessions
 		WHERE tenant_id = $1
 		  AND closed_at IS NULL
@@ -132,7 +132,8 @@ func scanTerminalSession(row rowScanner) (domain.TerminalSession, error) {
 	var session domain.TerminalSession
 	var connectionID *string
 	var closedAt *time.Time
-	err := row.Scan(&session.PtyID, &session.TenantID, &connectionID, &session.Cwd, &session.CreatedAt, &session.LastActiveAt, &closedAt)
+	var createdByUserID *string
+	err := row.Scan(&session.PtyID, &session.TenantID, &connectionID, &session.Cwd, &session.CreatedAt, &session.LastActiveAt, &closedAt, &createdByUserID)
 	if err != nil {
 		return domain.TerminalSession{}, err
 	}
@@ -140,5 +141,8 @@ func scanTerminalSession(row rowScanner) (domain.TerminalSession, error) {
 		session.ConnectionID = *connectionID
 	}
 	session.ClosedAt = closedAt
+	if createdByUserID != nil {
+		session.CreatedByUserID = *createdByUserID
+	}
 	return session, nil
 }

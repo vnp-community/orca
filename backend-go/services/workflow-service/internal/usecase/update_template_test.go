@@ -12,9 +12,9 @@ import (
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 )
 
-func TestUpdateTemplate_Succeeds_ForwardsExpectedVersionAndReturnsBumpedResult(t *testing.T) {
+func TestUpdateTemplate_Succeeds_ForwardsExpectedVersionAndReturnsResult(t *testing.T) {
 	repo := newFakeTemplateRepository()
-	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "")
+	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	if err != nil {
 		t.Fatalf("building template: %v", err)
 	}
@@ -29,8 +29,11 @@ func TestUpdateTemplate_Succeeds_ForwardsExpectedVersionAndReturnsBumpedResult(t
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.Version != 2 {
-		t.Errorf("want bumped version 2, got %d", got.Version)
+	// No active usage (UsageCount==0) and no breaking DAG change (both
+	// {"steps":[]}) — SOL-030's gate means version does NOT bump here; see
+	// the isBreakingChange/bumpVersion table tests below for the matrix.
+	if got.Version != 1 {
+		t.Errorf("want version unchanged at 1 (no active usage, non-breaking edit), got %d", got.Version)
 	}
 	if got.Name != "deploy-v2" {
 		t.Errorf("want name=deploy-v2, got %q", got.Name)
@@ -41,11 +44,84 @@ func TestUpdateTemplate_Succeeds_ForwardsExpectedVersionAndReturnsBumpedResult(t
 	if repo.lastUpdateExpectedVersion != 1 {
 		t.Errorf("want expectedVersion=1 forwarded unchanged, got %d", repo.lastUpdateExpectedVersion)
 	}
+	if repo.lastUpdateBumpVersion {
+		t.Error("want bumpVersion=false forwarded")
+	}
+}
+
+func TestUpdateTemplate_VersionBumpGate(t *testing.T) {
+	tests := []struct {
+		name       string
+		usageCount int32
+		oldDAGJSON string
+		newDAGJSON string
+		wantBump   bool
+	}{
+		{
+			name:       "no active usage + breaking edit (step removed) -> no bump",
+			usageCount: 0,
+			oldDAGJSON: `{"steps":[{"id":"s1","type":"shell"}]}`,
+			newDAGJSON: `{"steps":[]}`,
+			wantBump:   false,
+		},
+		{
+			name:       "active usage + breaking edit (step removed) -> bump",
+			usageCount: 1,
+			oldDAGJSON: `{"steps":[{"id":"s1","type":"shell"}]}`,
+			newDAGJSON: `{"steps":[]}`,
+			wantBump:   true,
+		},
+		{
+			name:       "active usage + non-breaking edit (new step added) -> no bump",
+			usageCount: 1,
+			oldDAGJSON: `{"steps":[{"id":"s1","type":"shell"}]}`,
+			newDAGJSON: `{"steps":[{"id":"s1","type":"shell"},{"id":"s2","type":"webhook"}]}`,
+			wantBump:   false,
+		},
+		{
+			name:       "active usage + step type changed under same id -> bump",
+			usageCount: 1,
+			oldDAGJSON: `{"steps":[{"id":"s1","type":"shell"}]}`,
+			newDAGJSON: `{"steps":[{"id":"s1","type":"webhook"}]}`,
+			wantBump:   true,
+		},
+		{
+			name:       "active usage + description-only-equivalent edit (dag unchanged) -> no bump",
+			usageCount: 1,
+			oldDAGJSON: `{"steps":[{"id":"s1","type":"shell"}]}`,
+			newDAGJSON: `{"steps":[{"id":"s1","type":"shell"}]}`,
+			wantBump:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newFakeTemplateRepository()
+			existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", tt.oldDAGJSON, domain.ScopePersonal, "", "owner-1",
+				domain.WithUsageCount(tt.usageCount))
+			if err != nil {
+				t.Fatalf("building template: %v", err)
+			}
+			repo.templates[existing.ID] = existing
+
+			uc := NewUpdateTemplate(repo)
+			ctx := withTenantContext(context.Background(), "tenant-1")
+
+			if _, err := uc.Execute(ctx, UpdateTemplateInput{
+				ID: "tmpl-1", Name: "deploy", DAGJSON: tt.newDAGJSON, Scope: domain.ScopePersonal, ExpectedVersion: 1,
+			}); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if repo.lastUpdateBumpVersion != tt.wantBump {
+				t.Errorf("want bumpVersion=%v, got %v", tt.wantBump, repo.lastUpdateBumpVersion)
+			}
+		})
+	}
 }
 
 func TestUpdateTemplate_StaleExpectedVersion_ReturnsFailedPrecondition(t *testing.T) {
 	repo := newFakeTemplateRepository()
-	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "")
+	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	if err != nil {
 		t.Fatalf("building template: %v", err)
 	}
@@ -84,11 +160,11 @@ func TestUpdateTemplate_CyclicParent_RejectsBeforeWriting(t *testing.T) {
 	// case ErrTemplateSelfParent's updated doc comment says UpdateTemplate
 	// must now catch via ResolveChain, since NewWorkflowTemplate's
 	// direct-self-parent check alone can't see it.
-	tmplA, err := domain.NewWorkflowTemplate("tmpl-a", "tenant-1", "a", `{"steps":[]}`, domain.ScopePersonal, "")
+	tmplA, err := domain.NewWorkflowTemplate("tmpl-a", "tenant-1", "a", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	if err != nil {
 		t.Fatalf("building tmpl-a: %v", err)
 	}
-	tmplB, err := domain.NewWorkflowTemplate("tmpl-b", "tenant-1", "b", `{"steps":[]}`, domain.ScopePersonal, "tmpl-a")
+	tmplB, err := domain.NewWorkflowTemplate("tmpl-b", "tenant-1", "b", `{"steps":[]}`, domain.ScopePersonal, "tmpl-a", "owner-1")
 	if err != nil {
 		t.Fatalf("building tmpl-b: %v", err)
 	}
@@ -119,7 +195,7 @@ func TestUpdateTemplate_CyclicParent_RejectsBeforeWriting(t *testing.T) {
 
 func TestUpdateTemplate_EmptyParent_SkipsResolveChain(t *testing.T) {
 	repo := newFakeTemplateRepository()
-	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "")
+	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	if err != nil {
 		t.Fatalf("building template: %v", err)
 	}

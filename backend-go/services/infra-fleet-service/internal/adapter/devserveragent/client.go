@@ -12,8 +12,9 @@
 // correspondence.
 //
 //   - relay-websocket: Orca dials out to the agent's own WebSocket server
-//     (agent-connection-relay.ts), authenticating with a static
-//     ORCA_AGENT_TOKEN bearer token.
+//     (agent-connection-relay.ts), authenticating with a per-DevServer
+//     bearer token resolved fresh on every dial (AgentTokenSource, see
+//     TASK-AWS-01-03/SOL-AWS-01).
 //   - direct-websocket: the agent dials in to adapter/agentwsserver's
 //     inbound WS server, authenticating with a single-use, SHA-256-hashed
 //     token slot; a successful handshake there calls
@@ -78,6 +79,15 @@ type SshProvisioner interface {
 	Provision(ctx context.Context, devServer domain.DevServer) (Transport, HandshakeInfo, error)
 }
 
+// sshReattacherAndProvisioner is what WithRelaySSH actually requires: a
+// single concrete value (adapter/sshrelay.Provisioner) implementing both
+// narrow ports — SshProvisioner for the first connect, SshReattacher for
+// every reconnect after (relaySSHReconnect, session.go).
+type sshReattacherAndProvisioner interface {
+	SshProvisioner
+	SshReattacher
+}
+
 // Client implements usecase.DevServerAgentClient for all three connection
 // modes, keeping one persistent session per dev server ID (reused across
 // calls; established lazily on first use). A dropped relay-websocket
@@ -96,6 +106,33 @@ type Client struct {
 	// sshProvisioner is nil unless WithRelaySSH was passed to New —
 	// relay-ssh mode returns ErrConnectionModeNotImplemented until it is.
 	sshProvisioner SshProvisioner
+
+	// sshReattacher is the same value as sshProvisioner (both narrow ports
+	// implemented by the one *sshrelay.Provisioner WithRelaySSH is given) —
+	// getOrProvisionSession sets it on every relay-ssh session so
+	// relaySSHReconnect can call Reattach later.
+	sshReattacher SshReattacher
+
+	// tokens resolves relay-websocket bearer tokens per dial — nil means
+	// relay-websocket dev servers always fail to connect (WithAgentTokens
+	// was not passed to New), matching sshProvisioner's nil-means-disabled
+	// convention.
+	tokens AgentTokenSource
+}
+
+var _ usecase.LiveSessionCloser = (*Client)(nil)
+
+// AgentTokenSource is the narrow seam Client needs to resolve a
+// relay-websocket DevServer's current bearer token — implemented over
+// usecase.AgentTokenRepository + usecase.CredentialBrokerClient
+// (TASK-AWS-03-04, TASK-AWS-01-02). Defined here per this package's
+// existing "accept interfaces, return structs" convention (see
+// SshProvisioner's doc comment).
+type AgentTokenSource interface {
+	// TokenFor resolves devServer's current active relay-websocket bearer
+	// token, resolved fresh — not cached across process restarts — so a
+	// revoked token is honored on the very next dial with no deploy.
+	TokenFor(ctx context.Context, devServer domain.DevServer) (string, error)
 }
 
 // Option configures optional Client behavior beyond relay-websocket/
@@ -105,16 +142,28 @@ type Option func(*Client)
 // WithRelaySSH enables relay-ssh mode by supplying the provisioner that
 // deploys/launches/attaches a session for a given DevServer — see
 // adapter/sshrelay.Provisioner (the production implementation, over a real
-// SSH connection via adapter/sshconn) and SshProvisioner's doc comment.
-func WithRelaySSH(provisioner SshProvisioner) Option {
+// SSH connection via adapter/sshconn), which implements both SshProvisioner
+// (first connect) and SshReattacher (every reconnect after — see
+// session.go's relaySSHReconnect).
+func WithRelaySSH(provisioner sshReattacherAndProvisioner) Option {
 	return func(c *Client) {
 		c.sshProvisioner = provisioner
+		c.sshReattacher = provisioner
 	}
 }
 
-// New constructs a Client. cfg.Token (ORCA_AGENT_TOKEN) must be set for any
-// relay-websocket dev server to be reachable — see Config's doc comment for
-// why this is deployment-wide config rather than a per-DevServer field.
+// WithAgentTokens enables relay-websocket mode by supplying the
+// per-DevServer token resolver — see AgentTokenSource's doc comment.
+func WithAgentTokens(tokens AgentTokenSource) Option {
+	return func(c *Client) {
+		c.tokens = tokens
+	}
+}
+
+// New constructs a Client. WithAgentTokens must be passed for any
+// relay-websocket dev server to be reachable — see AgentTokenSource's doc
+// comment for why this is resolved per-dial rather than a single
+// deployment-wide config value.
 func New(cfg Config, logger *slog.Logger, opts ...Option) *Client {
 	if logger == nil {
 		logger = slog.Default()
@@ -142,12 +191,24 @@ func (c *Client) getOrCreateSession(ctx context.Context, devServer domain.DevSer
 }
 
 // getOrDialSession is relay-websocket's original path: create the session
-// lazily on first use, (re)dial if the previous connection dropped.
+// lazily on first use, (re)dial if the previous connection dropped. The
+// bearer token is resolved fresh via c.tokens on every dial — never cached
+// across process restarts — so a revoked token is honored on the very next
+// reconnect attempt (see AgentTokenSource's doc comment, TASK-AWS-01-03).
 func (c *Client) getOrDialSession(ctx context.Context, devServer domain.DevServer) (*session, error) {
+	if c.tokens == nil {
+		return nil, fmt.Errorf("devserveragent: relay-websocket support was not enabled (see WithAgentTokens)")
+	}
+	token, err := c.tokens.TokenFor(ctx, devServer)
+	if err != nil {
+		return nil, fmt.Errorf("devserveragent: resolving agent token for dev server %s: %w", devServer.ID, err)
+	}
+
 	c.mu.Lock()
 	sess, ok := c.sessions[devServer.ID]
 	if !ok {
 		sess = newSession(devServer.Host, c.cfg, c.logger)
+		sess.tokenSource = func(ctx context.Context) (string, error) { return c.tokens.TokenFor(ctx, devServer) }
 		c.sessions[devServer.ID] = sess
 	}
 	c.mu.Unlock()
@@ -155,7 +216,7 @@ func (c *Client) getOrDialSession(ctx context.Context, devServer domain.DevServe
 	if sess.isHandshaked() {
 		return sess, nil
 	}
-	if err := sess.connect(ctx); err != nil {
+	if err := sess.connect(ctx, token); err != nil {
 		return nil, err
 	}
 	return sess, nil
@@ -203,10 +264,18 @@ func (c *Client) getOrProvisionSession(ctx context.Context, devServer domain.Dev
 	sess, ok = c.sessions[devServer.ID]
 	if !ok {
 		sess = newSession(devServer.Host, c.cfg, c.logger)
-		sess.managedExternally = true
 		c.sessions[devServer.ID] = sess
 	}
 	c.mu.Unlock()
+
+	// s.mu-guarded: relaySSHReconnect (a goroutine spawned by a PRIOR
+	// attachTransport, if this session already existed) may concurrently
+	// read managedMode/relaySSHDevServer/reattacher.
+	sess.mu.Lock()
+	sess.managedMode = managedModeRelaySSHReattach
+	sess.relaySSHDevServer = devServer
+	sess.reattacher = c.sshReattacher
+	sess.mu.Unlock()
 
 	sess.attachTransport(t, info)
 	return sess, nil
@@ -226,12 +295,75 @@ func (c *Client) AttachInboundSession(devServerID, host string, conn *websocket.
 	sess, ok := c.sessions[devServerID]
 	if !ok {
 		sess = newSession(host, c.cfg, c.logger)
-		sess.managedExternally = true
 		c.sessions[devServerID] = sess
 	}
 	c.mu.Unlock()
 
+	sess.mu.Lock()
+	sess.managedMode = managedModeInboundOnly
+	sess.mu.Unlock()
+
 	sess.attachTransport(newWSTransport(conn, c.logger), info)
+}
+
+// LiveSessionCount reports the number of dev servers this Client currently
+// holds a session entry for (handshaked or not — reconnecting sessions
+// still occupy a slot) — backs agentwsserver's capacity check
+// (TASK-AWS-02-03).
+func (c *Client) LiveSessionCount() int {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	return len(c.sessions)
+}
+
+// CloseSessionsForDevServerToken implements usecase.LiveSessionCloser.
+// direct-websocket only: this Client tracks at most one live session per
+// devServerID (see the Client doc comment), so "close the session
+// authenticated as tokenID" reduces to "close devServerID's current
+// session" — the token/session binding itself isn't tracked separately
+// (a revoked token's *next* handshake attempt is what actually enforces
+// revocation; this call just also drops the currently-live connection, if
+// any, per SOL-AWS-03's immediate-effect guarantee).
+func (c *Client) CloseSessionsForDevServerToken(ctx context.Context, devServerID, tokenID string) (int, error) {
+	c.mu.Lock()
+	sess, ok := c.sessions[devServerID]
+	c.mu.Unlock()
+	if !ok || !sess.isHandshaked() {
+		return 0, nil
+	}
+	sess.close()
+	return 1, nil
+}
+
+// HandshakeInfoFor returns the live session's most recently attached
+// HandshakeInfo for devServerID — backs ResolveConnection's optional
+// Node-version enrichment (TASK-INT-03-02). found=false covers both "no
+// session at all" and "session exists but isn't currently handshaked",
+// mirroring LiveSessionCount's mutex-guarded read shape.
+func (c *Client) HandshakeInfoFor(devServerID string) (HandshakeInfo, bool) {
+	c.mu.Lock()
+	sess, ok := c.sessions[devServerID]
+	c.mu.Unlock()
+	if !ok {
+		return HandshakeInfo{}, false
+	}
+	return sess.handshakeInfoSnapshot()
+}
+
+// CancelReconnect stops devServerID's session's relaySSHReconnect (or
+// relay-websocket backgroundReconnect) loop immediately, mirroring
+// session.close()'s existing closeCh-signaling shape — the session itself
+// is not closed, only its in-flight reconnect attempt is abandoned, so a
+// later Exec/Health call still triggers a fresh getOrProvisionSession/
+// getOrDialSession rather than staying permanently dead.
+func (c *Client) CancelReconnect(devServerID string) {
+	c.mu.Lock()
+	sess, ok := c.sessions[devServerID]
+	c.mu.Unlock()
+	if !ok {
+		return
+	}
+	sess.cancelReconnect()
 }
 
 // Exec dispatches one JSON-RPC method call (e.g. "ports.scan",
@@ -280,6 +412,33 @@ func (c *Client) Health(ctx context.Context, devServer domain.DevServer) (bool, 
 		return false, nil
 	}
 	return sess.isHandshaked(), nil
+}
+
+// LastHandshakeInfo returns the HandshakeInfo captured at the most recent
+// successful attachTransport for devServerID, if a live, handshaked session
+// exists. Cheap in-memory lookup — no round trip to the remote host.
+// EstablishConnection (TASK-FLEET-04-03) uses this to persist
+// handshake-derived facts (platform/arch/node version) after a successful
+// connect, without a second round trip.
+func (c *Client) LastHandshakeInfo(devServerID string) (usecase.HandshakeInfo, bool) {
+	c.mu.Lock()
+	sess, ok := c.sessions[devServerID]
+	c.mu.Unlock()
+	if !ok {
+		return usecase.HandshakeInfo{}, false
+	}
+	info, found := sess.handshakeInfoSnapshot()
+	if !found {
+		return usecase.HandshakeInfo{}, false
+	}
+	// Convert at the adapter boundary — usecase.HandshakeInfo is a
+	// deliberate duplicate of this package's own HandshakeInfo (see
+	// usecase/ports.go's doc comment: usecase must never import this
+	// adapter package, which already imports usecase to implement
+	// DevServerAgentClient).
+	return usecase.HandshakeInfo{
+		Platform: info.Platform, Arch: info.Arch, NodeVersion: info.NodeVersion, AgentVersion: info.AgentVersion,
+	}, true
 }
 
 // Note: relay-ssh's liveness check is NOT a separate dial-and-probe path —
@@ -337,6 +496,68 @@ func (c *Client) StreamPty(ctx context.Context, devServer domain.DevServer, ptyI
 			sess.unsubscribePty(ptyID, raw)
 		})
 	}
+	return out, unsubscribe, nil
+}
+
+// ExecStream dispatches one streaming JSON-RPC method call (currently only
+// "git.execStream", TASK-PW-03-08/SOL-PW-03) whose result arrives as
+// multiple response frames replying to the original request id instead of
+// one — see session.go's callStream/isTerminalStreamResponse for the wire
+// mechanics, distinct from StreamPty's out-of-band notification demux
+// above (routeNotification keyed by pty id): these are ordinary JSON-RPC
+// response frames sharing one request id, not notifications.
+//
+// relay-ssh mode has no persistent session (same restriction as StreamPty)
+// so this always errors for it — usecase.RelayStream's caller
+// (git-gateway-service's PushStream/PullStream) is expected to have
+// already rejected relay-ssh before ever reaching here (SOL-PW-03's
+// domain.ErrGitOpUnsupportedOverSSHRelay check), so this is a defense in
+// depth, not the primary guard.
+//
+// The returned channel is closed once the agent's terminal frame is
+// observed, the session disconnects, or ctx is cancelled — every caller
+// MUST still call the returned unsubscribe func (typically via defer) to
+// release the pending-call slot on an early return.
+func (c *Client) ExecStream(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (<-chan map[string]any, func(), error) {
+	if devServer.Mode == domain.ConnectionModeRelaySSH {
+		return nil, nil, fmt.Errorf("%w: relay-ssh mode has no streaming JSON-RPC surface (no relay.js deployed)", ErrConnectionModeNotImplemented)
+	}
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	raw, unsubscribe, err := sess.callStream(ctx, method, params)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	out := make(chan map[string]any, 64)
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case resp, ok := <-raw:
+				if !ok {
+					return
+				}
+				if resp.Error != nil {
+					out <- map[string]any{"type": "stream.end", "error": resp.Error.Error()}
+					return
+				}
+				var frame map[string]any
+				if err := json.Unmarshal(resp.Result, &frame); err != nil {
+					continue // malformed frame — skip rather than abort the whole stream
+				}
+				out <- frame
+				if t, _ := frame["type"].(string); t == "stream.end" {
+					return
+				}
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
 	return out, unsubscribe, nil
 }
 

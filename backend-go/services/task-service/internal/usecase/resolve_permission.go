@@ -11,15 +11,12 @@ import (
 type ResolvePermissionInput struct {
 	TaskID string
 	UserID string
-	// Action is the operation the caller wants to perform on TaskID —
-	// one of task_grant.rego's level_actions keys ("read"/"write"/
-	// "execute"/"admin"). The generated ResolvePermissionRequest proto
-	// message has no action-equivalent field yet (see this service's
-	// README "Known gaps"), so internal/adapter/grpc.Server.ResolvePermission
-	// defaults this to "read" today — every named GrantLevel authorizes
-	// "read", so this only changes behavior for the (already-denied)
-	// not-found case. Pass Action explicitly once the wire contract grows
-	// a real field for it.
+	// Action is the operation the caller wants to perform on TaskID — one
+	// of task_grant.rego's level_actions keys ("read"/"write"/"execute"/
+	// "admin"/"manage"). ResolvePermissionRequest.action (TASK-TG-03-04) is
+	// a real wire field as of TASK-TG-03-06 — internal/adapter/grpc.Server.
+	// ResolvePermission threads req.GetAction() straight through instead of
+	// hardcoding "read".
 	Action string
 }
 
@@ -41,11 +38,19 @@ type ResolvePermission struct {
 	grants   GrantRepository
 	teams    TeamScopeResolver
 	opa      OPAClient
+	clock    Clock
 	maxDepth int
 }
 
 func NewResolvePermission(tasks TaskRepository, grants GrantRepository, teams TeamScopeResolver, opa OPAClient) *ResolvePermission {
-	return &ResolvePermission{tasks: tasks, grants: grants, teams: teams, opa: opa, maxDepth: domain.DefaultMaxAncestorDepth}
+	return &ResolvePermission{tasks: tasks, grants: grants, teams: teams, opa: opa, clock: SystemClock{}, maxDepth: domain.DefaultMaxAncestorDepth}
+}
+
+// WithClock overrides the default SystemClock — used by tests that need a
+// deterministic `now` for grant-expiry assertions.
+func (uc *ResolvePermission) WithClock(clock Clock) *ResolvePermission {
+	uc.clock = clock
+	return uc
 }
 
 func (uc *ResolvePermission) Execute(ctx context.Context, in ResolvePermissionInput) (domain.GrantLevel, error) {
@@ -68,13 +73,30 @@ func (uc *ResolvePermission) Execute(ctx context.Context, in ResolvePermissionIn
 		return domain.GrantLevelUnspecified, apperrors.New(apperrors.KindInternal, "TASK_GRANT_LIST_FAILED", "failed to list grants for ancestor chain", err)
 	}
 
+	// Owner-intrinsic short-circuit: synthesize an Owner-level grant at the
+	// target task, ApplyTree=true, so an owner behaves identically to a
+	// real owner grant for the whole subtree they'd expect to manage —
+	// without a stored row. ancestors[0] is the target task itself (same
+	// convention GetAncestors always returns). Pulled forward from
+	// TASK-TG-03-06 into this task (TASK-TG-03-01) — without it, Grant's
+	// new manage-access check would lock every new task's creator out of
+	// granting anyone else access, since CreateTask sets Task.OwnerID but a
+	// brand-new task otherwise has no grant rows at all yet. TASK-TG-03-06
+	// extends this same block with expiry/now handling once
+	// domain.Grant.ExpiresAt exists.
+	if len(ancestors) > 0 && in.UserID != "" && ancestors[0].OwnerID == in.UserID {
+		grantsByTask[ancestors[0].ID] = append(grantsByTask[ancestors[0].ID], domain.Grant{
+			TaskID: ancestors[0].ID, SubjectID: in.UserID, Level: domain.GrantLevelOwner, ApplyTree: true,
+		})
+	}
+
 	teamIDs, err := uc.teams.ResolveTeams(ctx, tenantID, in.UserID)
 	if err != nil {
 		return domain.GrantLevelUnspecified, apperrors.New(apperrors.KindInternal, "TASK_TEAM_RESOLVE_FAILED", "failed to resolve caller's team membership", err)
 	}
 
 	caller := domain.CallerIdentity{UserID: in.UserID, TeamIDs: teamIDs, CompanyID: tenantID}
-	level, found := domain.ResolveGrant(chain, grantsByTask, caller, uc.maxDepth)
+	level, found := domain.ResolveGrant(chain, grantsByTask, caller, uc.maxDepth, uc.clock.Now())
 	if !found {
 		return domain.GrantLevelUnspecified, errNoGrant(nil)
 	}

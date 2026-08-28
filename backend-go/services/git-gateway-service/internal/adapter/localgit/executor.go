@@ -461,16 +461,20 @@ func (e *Executor) ScanSetupScriptImports(ctx context.Context, repoPath string) 
 	return imports, nil
 }
 
-// CreateWorktree runs `git worktree add <path> -b <branch> <baseRef>` — a
-// new worktree directory is created as a sibling of repoPath, named after
-// the branch (mirrors the old TS backend's convention: worktree path =
-// repo root's parent dir / branch name, sanitized). This uses
-// repoPath + "-" + branch as the target path; adjust to match
-// project-service.md's actual path-template convention if it specifies
-// one more precisely — flagged as a best-effort default, not verified
-// against a real path-template spec.
-func (e *Executor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error) {
-	targetPath := repoPath + "-" + sanitizeBranchForPath(branch)
+// minFreeSpaceBytes is [A3]'s soft-warning threshold — no spec-given number
+// exists for "cảnh báo dung lượng disk" (BL-WT-01), 500MB is a conservative
+// default worth revisiting once product specifies one.
+const minFreeSpaceBytes = 500 * 1024 * 1024
+
+// CreateWorktree runs `git worktree add <targetPath> -b <branch> <baseRef>`.
+// targetPath, if non-empty, overrides the default repoPath + "-" + branch
+// convention (mirrors the old TS backend's convention: worktree path =
+// repo root's parent dir / branch name, sanitized) — see SOL-WT-01's
+// custom name/path input support.
+func (e *Executor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef, targetPath string) (domain.WorktreeCreateResult, error) {
+	if targetPath == "" {
+		targetPath = repoPath + "-" + sanitizeBranchForPath(branch)
+	}
 	if _, err := e.run(ctx, repoPath, "worktree", "add", targetPath, "-b", branch, baseRef); err != nil {
 		return domain.WorktreeCreateResult{}, err
 	}
@@ -619,7 +623,11 @@ func (e *Executor) FastForward(ctx context.Context, repoPath string, pushTarget 
 	if _, err := e.run(ctx, repoPath, args...); err != nil {
 		return domain.FastForwardResult{}, err
 	}
-	return domain.FastForwardResult{Success: true}, nil
+	sha, err := e.run(ctx, repoPath, "rev-parse", "HEAD")
+	if err != nil {
+		return domain.FastForwardResult{}, err
+	}
+	return domain.FastForwardResult{Success: true, ResultSHA: strings.TrimSpace(sha)}, nil
 }
 
 // RebaseFromBase runs `git rebase <baseRef>`. A conflict (nonzero exit with
@@ -650,6 +658,64 @@ func (e *Executor) AbortMerge(ctx context.Context, repoPath string) (domain.Simp
 		return domain.SimpleResult{}, err
 	}
 	return domain.SimpleResult{Success: true}, nil
+}
+
+// conflictedPaths runs `git diff --name-only --diff-filter=U` — the
+// cheapest way to list unmerged/conflicted paths, matching what git itself
+// considers "conflicted" rather than a marker-file scan.
+func (e *Executor) conflictedPaths(ctx context.Context, repoPath string) ([]string, error) {
+	out, err := e.run(ctx, repoPath, "diff", "--name-only", "--diff-filter=U")
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, line := range strings.Split(out, "\n") {
+		if line = strings.TrimSpace(line); line != "" {
+			paths = append(paths, line)
+		}
+	}
+	return paths, nil
+}
+
+// MergeBranch runs `git merge --no-ff <branch>` ("merge" strategy) or
+// `git merge --squash <branch>` followed by a commit ("squash" strategy).
+// "rebase" is handled entirely by the caller composing RebaseFromBase+
+// FastForward — this method is never called for that strategy, see
+// MergeWorktreeIntoBase.Execute. A conflict (nonzero exit with CONFLICT
+// markers) is a domain outcome, not a Go error — same posture as
+// RebaseFromBase's existing conflict-detection posture.
+func (e *Executor) MergeBranch(ctx context.Context, repoPath, branch, strategy, commitMessage string) (domain.MergeResult, error) {
+	args := []string{"merge"}
+	switch strategy {
+	case "merge":
+		args = append(args, "--no-ff", branch)
+	case "squash":
+		args = append(args, "--squash", branch)
+	default:
+		args = append(args, branch)
+	}
+	out, err := e.run(ctx, repoPath, args...)
+	if err != nil {
+		if strings.Contains(out, "CONFLICT") || strings.Contains(err.Error(), "CONFLICT") {
+			paths, _ := e.conflictedPaths(ctx, repoPath)
+			return domain.MergeResult{HasConflicts: true, ConflictedPaths: paths}, nil
+		}
+		return domain.MergeResult{}, err
+	}
+	if strategy == "squash" {
+		msg := commitMessage
+		if msg == "" {
+			msg = "Squash merge " + branch
+		}
+		if _, err := e.run(ctx, repoPath, "commit", "-m", msg); err != nil {
+			return domain.MergeResult{}, err
+		}
+	}
+	sha, err := e.run(ctx, repoPath, "rev-parse", "HEAD")
+	if err != nil {
+		return domain.MergeResult{}, err
+	}
+	return domain.MergeResult{ResultSHA: strings.TrimSpace(sha)}, nil
 }
 
 // resolveGitDir resolves repoPath's actual .git directory, following a
@@ -1217,4 +1283,83 @@ func (e *Executor) Fetch(ctx context.Context, repoPath string, pushTarget *domai
 		return domain.SimpleResult{}, err
 	}
 	return domain.SimpleResult{Success: true}, nil
+}
+
+// ── SOL-PW-03 — merge/stash/branch-write. Host-local case — always
+// supported, no connection-mode gate applies here (that gate lives in the
+// usecase layer). All five subcommands are baseline-compatible per
+// docs/reference/git-compatibility.md's Git 2.25 floor. ───────────────────
+
+// MergeIntoBranch runs `git merge [--no-ff] <branch>`. A merge conflict is a
+// real domain outcome (git exits non-zero, but the working tree is left in
+// a legitimate conflicted state) rather than an operational error, so the
+// error path folds into MergeOutcome{HadConflicts:true} instead of
+// propagating err. Named MergeIntoBranch, not MergeBranch — that name is
+// already taken by the worktree-into-base MergeBranch method above.
+func (e *Executor) MergeIntoBranch(ctx context.Context, repoPath, branch string, noFF bool) (domain.MergeOutcome, error) {
+	args := []string{"merge"}
+	if noFF {
+		args = append(args, "--no-ff")
+	}
+	args = append(args, branch)
+	out, err := e.run(ctx, repoPath, args...)
+	if err != nil {
+		return domain.MergeOutcome{Success: false, HadConflicts: strings.Contains(out, "CONFLICT")}, nil
+	}
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+// StashPush runs `git stash push [-u] [-m <message>]`.
+func (e *Executor) StashPush(ctx context.Context, repoPath, message string, includeUntracked bool) (domain.SimpleResult, error) {
+	args := []string{"stash", "push"}
+	if includeUntracked {
+		args = append(args, "-u")
+	}
+	if message != "" {
+		args = append(args, "-m", message)
+	}
+	if _, err := e.run(ctx, repoPath, args...); err != nil {
+		return domain.SimpleResult{}, err
+	}
+	return domain.SimpleResult{Success: true}, nil
+}
+
+// StashPop runs `git stash pop [<stashRef>]` — a pop-time conflict is a
+// real domain outcome, same MergeOutcome shape as MergeIntoBranch above.
+func (e *Executor) StashPop(ctx context.Context, repoPath, stashRef string) (domain.MergeOutcome, error) {
+	args := []string{"stash", "pop"}
+	if stashRef != "" {
+		args = append(args, stashRef)
+	}
+	out, err := e.run(ctx, repoPath, args...)
+	if err != nil {
+		return domain.MergeOutcome{Success: false, HadConflicts: strings.Contains(out, "CONFLICT")}, nil
+	}
+	return domain.MergeOutcome{Success: true}, nil
+}
+
+// CreateBranch runs `git branch <branch> [<baseRef>]`, then optionally
+// `git checkout <branch>`.
+func (e *Executor) CreateBranch(ctx context.Context, repoPath, branch, baseRef string, checkout bool) (string, error) {
+	args := []string{"branch", branch}
+	if baseRef != "" {
+		args = append(args, baseRef)
+	}
+	if _, err := e.run(ctx, repoPath, args...); err != nil {
+		return "", err
+	}
+	if checkout {
+		if _, err := e.run(ctx, repoPath, "checkout", branch); err != nil {
+			return "", err
+		}
+	}
+	return branch, nil
+}
+
+// DeleteBranch runs `git branch -d <branch>` — the soft-delete path, which
+// git itself refuses on an unmerged branch (unlike ForceDeleteBranch's -D
+// above).
+func (e *Executor) DeleteBranch(ctx context.Context, repoPath, branch string) error {
+	_, err := e.run(ctx, repoPath, "branch", "-d", branch)
+	return err
 }

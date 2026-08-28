@@ -80,9 +80,10 @@ func run() error {
 	listUC := usecase.NewListAnnotations(repo)
 	updateUC := usecase.NewUpdateAnnotation(repo, opa)
 	deleteUC := usecase.NewDeleteAnnotation(repo, opa)
+	markSentUC := usecase.NewMarkAnnotationsSent(repo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	annotationv1.RegisterAnnotationServiceServer(grpcServer, annotationgrpc.New(createUC, listUC, updateUC, deleteUC))
+	annotationv1.RegisterAnnotationServiceServer(grpcServer, annotationgrpc.New(createUC, listUC, updateUC, deleteUC, markSentUC))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	healthSrv := health.New()

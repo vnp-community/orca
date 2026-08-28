@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,14 +21,17 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/automation-service/internal/config"
 
 	automationgrpc "github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpc"
+	automationeventbus "github.com/stablyai/orca-go/services/automation-service/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpcclient"
 	automationpostgres "github.com/stablyai/orca-go/services/automation-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/scheduler"
@@ -75,7 +79,8 @@ func run() error {
 	defer pool.Close()
 
 	automationRepo := automationpostgres.NewAutomationRepository(pool)
-	runRepo := automationpostgres.NewAutomationRunRepository(pool)
+	runCompletedPublisher := automationeventbus.NewRunCompletedPublisher()
+	runRepo := automationpostgres.NewAutomationRunRepository(pool, runCompletedPublisher)
 
 	// Real gRPC connection to workflow-service — RunNow's whole reason for
 	// existing (see automation-service.md §2/§6). Insecure transport
@@ -97,11 +102,13 @@ func run() error {
 	listAutomationsUC := usecase.NewListAutomations(automationRepo)
 	updateAutomationUC := usecase.NewUpdateAutomation(automationRepo)
 	deleteAutomationUC := usecase.NewDeleteAutomation(automationRepo)
+	writeCleanupReportUC := usecase.NewWriteCleanupReport(runRepo)
+	handleEventTriggerUC := usecase.NewHandleEventTrigger(automationRepo, runNowUC, logger)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	automationv1.RegisterAutomationServiceServer(grpcServer, automationgrpc.New(
 		createAutomationUC, runNowUC, listRunsUC, handleExternalTriggerUC,
-		listAutomationsUC, updateAutomationUC, deleteAutomationUC,
+		listAutomationsUC, updateAutomationUC, deleteAutomationUC, writeCleanupReportUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -113,6 +120,39 @@ func run() error {
 	// ctx every other goroutine here watches.
 	schedulerTicker := scheduler.New(automationRepo, runNowUC, cfg.SchedulerInterval, cfg.SchedulerBatchSize, logger)
 	go schedulerTicker.Run(ctx)
+
+	// Transactional-outbox relay for orca.automation.run.completed
+	// (TASK-AT-02-04): UpdateStatus durably enqueues an outbox row in the
+	// SAME Postgres transaction as the terminal status write
+	// (internal/adapter/postgres.AutomationRunRepository.UpdateStatus) —
+	// this relay is what actually gets those rows to NATS. Also wires the
+	// durable event-trigger consumer (TASK-AT-03-05): if NATS is
+	// unreachable at startup, both are skipped and this replica logs a
+	// warning rather than failing to start — matching usage-service's same
+	// "outbox rows queue up until a future restart" posture.
+	var relay *outbox.Relay
+	pub, sub, closeBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart and event triggers won't fire", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "AUTOMATION", []string{"orca.automation.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			relay = outbox.NewRelay(runRepo, pub, outbox.DefaultConfig, logger)
+		}
+		eventConsumer := automationeventbus.NewConsumer(sub, handleEventTriggerUC)
+		go eventConsumer.Run(ctx, logger)
+	}
+
+	var relayWG sync.WaitGroup
+	if relay != nil {
+		relayWG.Add(1)
+		go func() {
+			defer relayWG.Done()
+			relay.Run(ctx)
+		}()
+	}
 
 	healthSrv := health.New()
 	healthSrv.Register("postgres", func() error {

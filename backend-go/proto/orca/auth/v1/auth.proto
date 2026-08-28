@@ -6,6 +6,7 @@ option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1;authv
 
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
 
 // AuthService owns users, sessions, RBAC/access-policies, audit log, admin console.
 // See specs/backend-go/services/auth-service.md.
@@ -24,6 +25,14 @@ service AuthService {
   rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
   rpc UpdateUserRole(UpdateUserRoleRequest) returns (UpdateUserRoleResponse);
+  // ListSessions is the cross-user, tenant-scoped admin session-dashboard
+  // RPC — distinct from ListSessionsForUser (single-user scope, kept as-is).
+  // Scope addition beyond this service's original RPC surface (auth-service.md
+  // §3 only lists ListSessionsForUser).
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  // UpdateUser — the RPC auth-service.md §3 already names but the current
+  // codebase never implemented (only the narrower UpdateUserRole exists).
+  rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
   rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
   rpc QueryAuditLog(QueryAuditLogRequest) returns (QueryAuditLogResponse);
   rpc DeactivateUser(DeactivateUserRequest) returns (DeactivateUserResponse);
@@ -36,6 +45,26 @@ service AuthService {
   rpc UpdateAccessPolicy(UpdateAccessPolicyRequest) returns (AccessPolicy);
   rpc DeleteAccessPolicy(DeleteAccessPolicyRequest) returns (google.protobuf.Empty);
   rpc GetAdminStats(GetAdminStatsRequest) returns (GetAdminStatsResponse);
+
+  // ── Mobile device pairing (BL-MB-01) ──────────────────────────────────
+  // InitiateDevicePairing requires an authenticated caller (browser session
+  // or an already-issued desktop JWT) — "my account wants to pair a new
+  // device," never anonymous.
+  rpc InitiateDevicePairing(InitiateDevicePairingRequest) returns (InitiateDevicePairingResponse);
+  // CompleteDevicePairing is the ONE unauthenticated RPC on this service's
+  // entire surface — guarded solely by pairing_token possession +
+  // one-time-use + 5-minute expiry. api-gateway routes it through a
+  // dedicated, rate-limited, unauthenticated REST path (TASK-MB-01-08).
+  rpc CompleteDevicePairing(CompleteDevicePairingRequest) returns (CompleteDevicePairingResponse);
+  rpc ListPairedDevices(ListPairedDevicesRequest) returns (ListPairedDevicesResponse);
+  rpc UnpairDevice(UnpairDeviceRequest) returns (google.protobuf.Empty);
+
+  // Internal-only (mesh ingress, never routed by api-gateway's REST facade)
+  // — the ONE path any other service uses to obtain a device's raw shared
+  // secret for E2E encrypt/decrypt. Mirrors credential-broker-service's
+  // "mediator hands back decrypted material on demand, never persists it"
+  // pattern.
+  rpc ResolveDeviceSharedSecret(ResolveDeviceSharedSecretRequest) returns (ResolveDeviceSharedSecretResponse);
 }
 
 enum Role {
@@ -57,6 +86,13 @@ message User {
 message LoginRequest {
   string email = 1;
   string password = 2;
+  // ip/user_agent are populated by api-gateway from the terminating HTTP
+  // request (real client IP behind any reverse proxy, User-Agent header) —
+  // never trusted from an external caller, since Login is only ever called
+  // internally by api-gateway over mTLS. See auth-service.md's "who calls
+  // whom" contract (§7) — no other service calls Login.
+  string ip = 3;
+  string user_agent = 4;
 }
 
 message LoginResponse {
@@ -104,6 +140,14 @@ message CreateUserRequest {
   string name = 2;
   string tenant_id = 3;
   Role role = 4;
+  // password: the admin-chosen initial credential, per this RPC's spec
+  // contract (docs/logic/auth/BL-AUTH-04-admin-user-crud.md). Communicated
+  // to the new user out-of-band (email/Slack/etc.) by the admin — this
+  // service has no email-sending capability and none is added by this
+  // change. Contrast with Bootstrap.EnsureAdmin, which generates+prints its
+  // own password because no admin actor exists yet to supply one for the
+  // very first account.
+  string password = 5;
 }
 
 message CreateUserResponse {
@@ -141,8 +185,14 @@ message AuditEntry {
   string tenant_id = 2;
   string actor_id = 3;
   string action = 4;
+  // target: superseded by target_type/target_id below (SOL-AUTH-05) — kept
+  // during the transition window, never populated by new code.
   string target = 5;
   google.protobuf.Timestamp occurred_at = 6;
+  string target_type = 7;
+  string target_id = 8;
+  string metadata_json = 9;  // JSON-serialized map[string]any
+  string ip_address = 10;
 }
 
 message QueryAuditLogRequest {
@@ -150,6 +200,9 @@ message QueryAuditLogRequest {
   google.protobuf.Timestamp since = 2;
   string page_token = 3;
   int32 page_size = 4;
+  google.protobuf.Timestamp to = 5;
+  string action = 6;
+  string actor_id = 7;
 }
 
 message QueryAuditLogResponse {
@@ -197,4 +250,75 @@ message GetAdminStatsResponse {
   int32 total_users = 1;
   int32 active_sessions = 2;
   int32 total_policies = 3;
+}
+
+message ListSessionsRequest {
+  string tenant_id = 1;  // ignored if caller-supplied — resolved from the
+                          // admin's own validated identity server-side
+  string page_token = 2;
+  int32  page_size  = 3;
+}
+message ListSessionsResponse {
+  repeated SessionWithUser sessions = 1;
+  string next_page_token = 2;
+}
+// SessionWithUser avoids an N+1 user lookup per session row in the admin
+// dashboard — email is denormalized into the response via a JOIN, not a
+// second round trip per row.
+message SessionWithUser {
+  Session session = 1;
+  string user_email = 2;
+}
+
+// UpdateUserRequest — wrapper types distinguish "field omitted" from "field
+// explicitly set to empty string" for a true partial update.
+message UpdateUserRequest {
+  string user_id = 1;
+  google.protobuf.StringValue email = 2;
+  google.protobuf.StringValue name  = 3;
+  optional Role role = 4; // proto3 `optional` scalar — present/absent distinguishable
+}
+message UpdateUserResponse {
+  User user = 1;
+}
+
+message InitiateDevicePairingRequest {
+  // tenant_id/user_id come from gRPC metadata (identity propagation, per
+  // 08-inter-service-communication.md's gRPC conventions) — never a field.
+}
+message InitiateDevicePairingResponse {
+  string pairing_token = 1;          // opaque, high-entropy; hashed at rest (mirrors sessions.id)
+  bytes  desktop_public_key = 2;     // this pairing session's ephemeral X25519 public key
+  string server_address = 3;         // api-gateway's public base URL (server-mode adaptation, see SOL-MB-01 rationale)
+  int64  expires_at_unix_ms = 4;     // BR-MB-01: now + 5 minutes
+}
+
+message CompleteDevicePairingRequest {
+  string pairing_token = 1;
+  bytes  mobile_public_key = 2;      // mobile's own ephemeral X25519 public key
+  string device_label = 3;           // e.g. "Sam's iPhone" — user-facing, not trusted for anything security-relevant
+}
+message CompleteDevicePairingResponse {
+  string device_id = 1;
+  bytes  desktop_public_key_confirmation = 2; // echoes InitiateDevicePairingResponse.desktop_public_key
+  string access_token = 3;  // BR-MB-01: JWT issued immediately after a successful handshake
+  string refresh_token = 4;
+}
+
+message ListPairedDevicesRequest {}
+message ListPairedDevicesResponse { repeated PairedDevice devices = 1; }
+message PairedDevice {
+  string id = 1;
+  string device_label = 2;
+  int64  paired_at_unix_ms = 3;
+  int64  last_used_at_unix_ms = 4;
+  string status = 5; // "active" | "revoked"
+}
+
+message UnpairDeviceRequest { string device_id = 1; }
+
+// Internal-only — never exposed over the REST facade.
+message ResolveDeviceSharedSecretRequest { string device_id = 1; }
+message ResolveDeviceSharedSecretResponse {
+  bytes shared_secret = 1; // raw 32-byte NaCl box shared secret; caller must not persist it
 }

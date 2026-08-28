@@ -33,6 +33,7 @@ import (
 
 	gitgatewaygrpc "github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/grpcclient"
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/infraclient"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/localfs"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/localgit"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/adapter/scmclient"
@@ -41,6 +42,7 @@ import (
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	issuetrackingv1 "github.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 )
@@ -122,18 +124,34 @@ func run() error {
 	defer func() { _ = scmConn.Close() }()
 	scmIntegrationClient := scmintegrationv1.NewScmIntegrationServiceClient(scmConn)
 	scmClient := scmclient.New(scmIntegrationClient)
+	scmSourceClient := grpcclient.NewScmSourceClient(scmIntegrationClient)
+
+	// issue-tracking-service — new outbound dependency (SOL-PI-02):
+	// CreateWorktreeFromIssue's tracker_issue half of its oneof issue_source.
+	issueTrackingConn, err := grpcclient.Dial(cfg.IssueTrackingServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing issue-tracking-service: %w", err)
+	}
+	defer func() { _ = issueTrackingConn.Close() }()
+	issueTrackingClient := issuetrackingv1.NewIssueTrackingServiceClient(issueTrackingConn)
+	issueTrackingSourceClient := grpcclient.NewIssueTrackingSourceClient(issueTrackingClient)
+	issueSourceClient := grpcclient.NewIssueSourceDispatcher(scmSourceClient, issueTrackingSourceClient)
+
+	agentSpawner := grpcclient.NewInfraFleetAgentSpawner(infraFleetClient, logger)
 
 	getStatusUC := usecase.NewGetStatus(resolver, local, relay)
 	getDiffUC := usecase.NewGetDiff(resolver, local, relay)
 	commitUC := usecase.NewCommit(resolver, local, relay)
 	pushUC := usecase.NewPush(resolver, local, relay)
 	pullUC := usecase.NewPull(resolver, local, relay)
-	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, relay)
+	historyUC := usecase.NewHistory(resolver, local, relay)
+	pushStreamUC := usecase.NewPushStream(resolver, local, relay)
+	pullStreamUC := usecase.NewPullStream(resolver, local, relay)
+	generateCommitMessageUC := usecase.NewGenerateCommitMessage(resolver, getStatusUC, getDiffUC, historyUC, relay)
 
 	stageUC := usecase.NewStage(resolver, local, relay)
 	unstageUC := usecase.NewUnstage(resolver, local, relay)
 
-	historyUC := usecase.NewHistory(resolver, local, relay)
 	checkIgnoredUC := usecase.NewCheckIgnored(resolver, local, relay)
 	forkSyncUC := usecase.NewForkSync(resolver, local, relay)
 	upstreamStatusUC := usecase.NewUpstreamStatus(resolver, local, relay)
@@ -178,13 +196,24 @@ func run() error {
 	writeIssueCommandUC := usecase.NewWriteIssueCommand(resolver, local, relay)
 	scanSetupScriptImportsUC := usecase.NewScanSetupScriptImports(resolver, local, relay)
 
+	scrollbackCleaner := grpcclient.NewScrollbackCleaner(infraFleetClient)
+	// terminalSessionLister backs BR-WT-09/10's server-side agent-running
+	// guards (RemoveWorktree) and CheckWorktreeDeleteSafety's read — both
+	// new outbound calls on the already-existing git-gateway-service -->
+	// infra-fleet-service dependency edge (SOL-WT-03), not a new one.
+	terminalSessionLister := infraclient.NewTerminalSessionLister(infraFleetClient)
+
 	createWorktreeUC := usecase.NewCreateWorktree(resolver, projectClient, local, relay)
-	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, local, relay)
+	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, scrollbackCleaner, scmClient, local, relay, terminalSessionLister)
+	checkWorktreeDeleteSafetyUC := usecase.NewCheckWorktreeDeleteSafety(resolver, local, relay, terminalSessionLister)
+	compareWorktreesUC := usecase.NewCompareWorktrees(resolver, projectClient, local, relay)
+	mergeWorktreeIntoBaseUC := usecase.NewMergeWorktreeIntoBase(resolver, projectClient, local, relay)
 	forceDeleteBranchUC := usecase.NewForceDeleteBranch(resolver, local, relay)
 	detectWorktreesUC := usecase.NewDetectWorktrees(resolver, projectClient, local, relay)
 	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(resolver, projectClient, local, relay)
 	resolvePrBaseUC := usecase.NewResolvePrBase(scmClient, resolver, projectClient, local, relay)
 	resolveMrBaseUC := usecase.NewResolveMrBase(scmClient, resolver, projectClient, local, relay)
+	createWorktreeFromIssueUC := usecase.NewCreateWorktreeFromIssue(issueSourceClient, createWorktreeUC, agentSpawner, projectClient)
 
 	// Group A — branch/ref operations (TASK-207). Checkout/ListLocalBranches/
 	// FastForward/ConflictOperation's shapes were redesigned against the real
@@ -200,9 +229,19 @@ func run() error {
 	discardUC := usecase.NewDiscard(resolver, local, relay)
 	bulkDiscardUC := usecase.NewBulkDiscard(resolver, local, relay)
 
+	// SOL-PW-03 — merge/stash/branch-write. Mode-gated inline (each
+	// usecase calls resolver.ResolveConnection directly rather than going
+	// through dispatchExecutor) so a relay-ssh connection fails closed
+	// before ever attempting the relay call.
+	mergeIntoBranchUC := usecase.NewMergeBranch(resolver, local, relay)
+	stashPushUC := usecase.NewStashPush(resolver, local, relay)
+	stashPopUC := usecase.NewStashPop(resolver, local, relay)
+	createBranchUC := usecase.NewCreateBranch(resolver, local, relay)
+	deleteBranchUC := usecase.NewDeleteBranch(resolver, local, relay)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
-		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, generateCommitMessageUC,
+		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, pushStreamUC, pullStreamUC, generateCommitMessageUC,
 		stageUC, unstageUC,
 		historyUC, checkIgnoredUC, forkSyncUC, upstreamStatusUC,
 		commitCompareUC, branchCompareUC, commitDiffUC, branchDiffUC, submoduleStatusUC,
@@ -213,11 +252,13 @@ func run() error {
 		renameFileUC, copyFileUC,
 		cloneUC, initRepoUC, baseRefDefaultUC, searchRefsUC, checkHooksUC,
 		readIssueCommandUC, writeIssueCommandUC, scanSetupScriptImportsUC,
-		createWorktreeUC, removeWorktreeUC, forceDeleteBranchUC, detectWorktreesUC,
+		createWorktreeUC, createWorktreeFromIssueUC, removeWorktreeUC, forceDeleteBranchUC, detectWorktreesUC,
 		prefetchCreateBaseUC, resolvePrBaseUC, resolveMrBaseUC,
 		checkoutUC, listLocalBranchesUC, fastForwardUC, rebaseFromBaseUC,
 		abortRebaseUC, abortMergeUC, conflictOperationUC, resolveConflictUC,
 		discardUC, bulkDiscardUC,
+		checkWorktreeDeleteSafetyUC, compareWorktreesUC, mergeWorktreeIntoBaseUC,
+		mergeIntoBranchUC, stashPushUC, stashPopUC, createBranchUC, deleteBranchUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -233,6 +274,7 @@ func run() error {
 	healthSrv.Register("infra-fleet-service", grpcConnHealthCheck(infraFleetConn))
 	healthSrv.Register("project-service", grpcConnHealthCheck(projectConn))
 	healthSrv.Register("scm-integration-service", grpcConnHealthCheck(scmConn))
+	healthSrv.Register("issue-tracking-service", grpcConnHealthCheck(issueTrackingConn))
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),

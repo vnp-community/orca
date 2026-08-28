@@ -25,13 +25,19 @@ import (
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/notification-service/internal/config"
 
 	notificationbroadcaster "github.com/stablyai/orca-go/services/notification-service/internal/adapter/broadcaster"
 	notificationeventbus "github.com/stablyai/orca-go/services/notification-service/internal/adapter/eventbus"
+	notificationapns "github.com/stablyai/orca-go/services/notification-service/internal/adapter/external/apns"
+	notificationfcm "github.com/stablyai/orca-go/services/notification-service/internal/adapter/external/fcm"
+	notificationwebpush "github.com/stablyai/orca-go/services/notification-service/internal/adapter/external/webpush"
 	notificationgrpc "github.com/stablyai/orca-go/services/notification-service/internal/adapter/grpc"
+	notificationauthclient "github.com/stablyai/orca-go/services/notification-service/internal/adapter/grpcclient/authclient"
+	notificationnacl "github.com/stablyai/orca-go/services/notification-service/internal/adapter/nacl"
 	notificationpostgres "github.com/stablyai/orca-go/services/notification-service/internal/adapter/postgres"
 	notificationvaultsigner "github.com/stablyai/orca-go/services/notification-service/internal/adapter/vaultsigner"
 	"github.com/stablyai/orca-go/services/notification-service/internal/usecase"
@@ -97,10 +103,60 @@ func run() error {
 	defer func() { _ = brokerConn.Close() }()
 	signer := notificationvaultsigner.New(brokerConn)
 
+	// BL-MB-02 (SOL-MB-02): mobile push delivery pipeline — buffered
+	// notifications + per-event preferences (TASK-MB-02-06), device
+	// shared-secret resolution + E2E sealing (TASK-MB-02-07), APNs/FCM/Web
+	// Push transports (TASK-MB-02-07/08).
+	bufferStore := notificationpostgres.NewBufferedNotificationStore(pool)
+	preferenceStore := notificationpostgres.NewNotificationPreferenceStore(pool)
+	sealer := notificationnacl.New()
+	webpushClient := notificationwebpush.New()
+
+	// auth-service connection — resolves a paired mobile device's shared
+	// secret (SOL-MB-01's ResolveDeviceSharedSecret, internal-only RPC).
+	// Dialing doesn't block/error on an unreachable target; a call-time
+	// failure there just means that one subscription's delivery gets
+	// buffered (BR-MB-07), same graceful-degradation shape as every other
+	// peer-service client in this composition root.
+	deviceSecrets, err := notificationauthclient.New(cfg.AuthServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing auth-service at %s: %w", cfg.AuthServiceAddr, err)
+	}
+	defer func() { _ = deviceSecrets.Close() }()
+
+	// APNs/FCM's own Transit-mediated credential (TASK-MB-02-08) — never
+	// VAPID. vaultClient construction only fails on a malformed
+	// VAULT_ADDR, not on Vault being unreachable (see
+	// infra-fleet-service's identical precedent) — a nil vaultClient here
+	// (or unset APNS_*/FCM_* identifiers) means the ios/android channels
+	// degrade to a clear per-delivery error rather than a process crash;
+	// the web/VAPID channel is entirely unaffected.
+	var apnsClient usecase.APNsClient
+	var fcmClient usecase.FCMClient
+	vaultClient, err := secrets.NewClient()
+	if err != nil {
+		logger.Warn("failed to construct Vault client — APNs/FCM push (ios/android channels) will be unavailable", slog.Any("error", err))
+	} else {
+		apnsClient = notificationapns.New(vaultClient, notificationapns.Config{
+			TeamID: cfg.APNsTeamID, KeyID: cfg.APNsKeyID, Topic: cfg.APNsTopic, Endpoint: cfg.APNsEndpoint,
+		})
+		fcmClient = notificationfcm.New(vaultClient, notificationfcm.Config{
+			ProjectID: cfg.FCMProjectID, ServiceAccountEmail: cfg.FCMServiceAccountEmail,
+		})
+		if cfg.APNsTeamID == "" || cfg.APNsKeyID == "" || cfg.APNsTopic == "" {
+			logger.Warn("APNS_TEAM_ID/APNS_KEY_ID/APNS_TOPIC not fully configured — ios push will fail with a clear config error until set")
+		}
+		if cfg.FCMProjectID == "" || cfg.FCMServiceAccountEmail == "" {
+			logger.Warn("FCM_PROJECT_ID/FCM_SERVICE_ACCOUNT_EMAIL not configured — android push will fail with a clear config error until set")
+		}
+	}
+
+	deliverPushUC := usecase.NewDeliverPush(repo, deviceSecrets, sealer, signer, webpushClient, bufferStore, preferenceStore, apnsClient, fcmClient, logger)
+
 	subscribeUC := usecase.NewSubscribe(repo)
 	unregisterPushSubscriptionUC := usecase.NewUnregisterPushSubscription(repo)
 	getVapidPublicKeyUC := usecase.NewGetVapidPublicKey(repo)
-	handleIncomingEventUC := usecase.NewHandleIncomingEvent(broadcast, repo, logger)
+	handleIncomingEventUC := usecase.NewHandleIncomingEvent(broadcast, repo, deliverPushUC, logger)
 
 	var consumerWG sync.WaitGroup
 	_, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
@@ -121,7 +177,7 @@ func run() error {
 	}
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	notificationv1.RegisterNotificationServiceServer(grpcServer, notificationgrpc.New(subscribeUC, unregisterPushSubscriptionUC, getVapidPublicKeyUC, broadcast, signer))
+	notificationv1.RegisterNotificationServiceServer(grpcServer, notificationgrpc.New(subscribeUC, unregisterPushSubscriptionUC, getVapidPublicKeyUC, broadcast, signer, bufferStore))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	healthSrv := health.New()

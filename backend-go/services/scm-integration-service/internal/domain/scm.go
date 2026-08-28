@@ -47,6 +47,14 @@ var (
 	ErrEmptyRepo = errors.New("domain: repo is required")
 	// ErrEmptyTitle guards against a titleless issue/PR.
 	ErrEmptyTitle = errors.New("domain: title is required")
+	// ErrCapabilityUnsupported is a shared sentinel a provider adapter wraps
+	// its own package-level "not supported" error with (via %w), so
+	// usecase/ code can detect the condition via errors.Is without
+	// importing the adapter package directly — see
+	// scm-integration-service.md §4's ErrCapabilityUnsupported degrade
+	// pattern and this file's package doc comment on why usecase/ never
+	// imports adapter packages.
+	ErrCapabilityUnsupported = errors.New("domain: capability not supported by this provider")
 )
 
 // Issue is a provider-agnostic issue — see scm-integration-service.md §4.
@@ -89,6 +97,7 @@ type PullRequest struct {
 	HeadBranch string
 	BaseBranch string
 	Number     int32
+	Draft      bool // NEW — BR-CR-20
 }
 
 // NewPullRequest constructs a PullRequest, enforcing the same non-empty
@@ -159,4 +168,36 @@ type WorkItemDetailsGitLab struct {
 	State    string
 	URL      string
 	Labels   []string
+}
+
+// ── SubmitReview (BUG-PI-04/SOL-PI-04) ──────────────────────────────────
+
+type ReviewType string
+
+const (
+	ReviewTypeUnspecified    ReviewType = ""
+	ReviewTypeComment        ReviewType = "comment"
+	ReviewTypeApprove        ReviewType = "approve"
+	ReviewTypeRequestChanges ReviewType = "request_changes"
+)
+
+type ReviewComment struct {
+	Path string
+	Line int32
+	Body string
+}
+
+type ReviewInput struct {
+	Type     ReviewType
+	Summary  string
+	Comments []ReviewComment
+}
+
+type Review struct {
+	ID          string
+	ReviewerID  string
+	State       ReviewType
+	SubmittedAt string
+	Comments    []ReviewComment
+	URL         string
 }

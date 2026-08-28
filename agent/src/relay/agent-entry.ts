@@ -35,6 +35,28 @@ process.on('unhandledRejection', (reason) => {
   process.stderr.write(`[DIAG BUG-FE-PTY-001] unhandledRejection: ${detail}\n`)
 })
 
+// AGENT_VERSION is injected at build time by build.mjs's esbuild `define`
+// (__AGENT_VERSION__) — infra-fleet-service's sshrelay.remoteVersionAndPresence
+// reads this via `require('./agent.js').AGENT_VERSION` to skip a redundant
+// redeploy when the remote bundle is already current (BR-SSH-07).
+export const AGENT_VERSION: string =
+  typeof __AGENT_VERSION__ !== 'undefined' ? __AGENT_VERSION__ : '0.0.0-dev'
+
+/**
+ * readSockPathArg reads the `--sock-path <path>` pair from argv — both
+ * `--detach` and `--connect` modes require it (SOL-SSH-03); throws a clear
+ * error if absent rather than letting either mode fail later with a
+ * confusing "sockPath is undefined" symptom.
+ */
+function readSockPathArg(argv: string[]): string {
+  const flagIndex = argv.indexOf('--sock-path')
+  const value = flagIndex >= 0 ? argv[flagIndex + 1] : undefined
+  if (!value) {
+    throw new Error('--sock-path <path> is required with --detach/--connect')
+  }
+  return value
+}
+
 async function main(): Promise<void> {
   // Why this branch runs before anything else: pty-daemon-client.ts spawns
   // this SAME agent.js file with ORCA_PTY_DAEMON_SOCKET set to run as the
@@ -67,6 +89,26 @@ async function main(): Promise<void> {
     return
   }
 
+  // BR-SSH-10 (SOL-SSH-03): the detached relay process + the bridge that
+  // reattaches to it — see agent-connection-stdio.ts's runDetachedStdioMode
+  // and relay-detach-bridge.ts's runConnectBridgeMode. backend-go's
+  // sshrelay.launch()/reattach() are the only callers of these two flags.
+  if (process.argv.includes('--detach')) {
+    const sockPath = readSockPathArg(process.argv)
+    const config = loadAgentConfig({ stdio: true })
+    const log = createAgentLogger(config.logLevel)
+    const tools = await discoverTools(config)
+    const { runDetachedStdioMode } = await import('./agent-connection-stdio')
+    await runDetachedStdioMode(sockPath, config, tools, log)
+    return
+  }
+  if (process.argv.includes('--connect')) {
+    const sockPath = readSockPathArg(process.argv)
+    const { runConnectBridgeMode } = await import('./relay-detach-bridge')
+    await runConnectBridgeMode(sockPath)
+    return
+  }
+
   const config = loadAgentConfig()
   const log = createAgentLogger(config.logLevel)
 
@@ -92,11 +134,9 @@ async function main(): Promise<void> {
   process.on('SIGINT',  () => shutdown('SIGINT'))
   process.on('SIGTERM', () => shutdown('SIGTERM'))
 
-  if (config.mode === 'relay-websocket') {
-    await listenRelay(config, tools, log)
-  } else {
-    await connectDirect(config, tools, log)
-  }
+  await (config.mode === 'relay-websocket'
+    ? listenRelay(config, tools, log)
+    : connectDirect(config, tools, log))
 }
 
 main().catch((err: unknown) => {

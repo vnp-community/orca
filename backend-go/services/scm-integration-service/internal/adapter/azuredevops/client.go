@@ -12,6 +12,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -90,6 +91,7 @@ type azureDevOpsPullRequest struct {
 	Status        string `json:"status"`
 	SourceRefName string `json:"sourceRefName"`
 	TargetRefName string `json:"targetRefName"`
+	IsDraft       bool   `json:"isDraft"`
 }
 
 // azureDevOpsPullRequestList mirrors Azure DevOps' list response envelope —
@@ -104,11 +106,16 @@ type azureDevOpsPullRequestList struct {
 // URL field, so the browsable URL is constructed from the org/project/repo
 // path segments and the pull request ID.
 func toDomainPullRequest(org, project, repositoryID, repo string, ap azureDevOpsPullRequest) (domain.PullRequest, error) {
-	url := fmt.Sprintf("https://dev.azure.com/%s/%s/_git/%s/pullrequest/%d", org, project, repositoryID, ap.PullRequestID)
-	return domain.NewPullRequest(
-		strconv.Itoa(ap.PullRequestID), domain.ScmProviderAzureDevOps, repo, ap.Title, ap.Status, url,
+	prURL := fmt.Sprintf("https://dev.azure.com/%s/%s/_git/%s/pullrequest/%d", org, project, repositoryID, ap.PullRequestID)
+	pr, err := domain.NewPullRequest(
+		strconv.Itoa(ap.PullRequestID), domain.ScmProviderAzureDevOps, repo, ap.Title, ap.Status, prURL,
 		strings.TrimPrefix(ap.SourceRefName, "refs/heads/"), strings.TrimPrefix(ap.TargetRefName, "refs/heads/"),
 	)
+	if err != nil {
+		return domain.PullRequest{}, err
+	}
+	pr.Draft = ap.IsDraft
+	return pr, nil
 }
 
 // CreatePullRequest calls Azure DevOps' REST API for real: POST
@@ -128,11 +135,13 @@ func (c *Client) CreatePullRequest(ctx context.Context, cred usecase.Credential,
 		Description   string `json:"description,omitempty"`
 		SourceRefName string `json:"sourceRefName"`
 		TargetRefName string `json:"targetRefName"`
+		IsDraft       bool   `json:"isDraft,omitempty"` // NEW
 	}{
 		Title:         input.Title,
 		Description:   input.Body,
 		SourceRefName: "refs/heads/" + input.HeadBranch,
 		TargetRefName: "refs/heads/" + input.BaseBranch,
+		IsDraft:       input.Draft,
 	})
 	if err != nil {
 		return domain.PullRequest{}, fmt.Errorf("azuredevops: encode create pull request body: %w", err)
@@ -332,4 +341,50 @@ func (c *Client) BranchExists(ctx context.Context, cred usecase.Credential, repo
 		return false, fmt.Errorf("azuredevops: decode branch exists response: %w", err)
 	}
 	return len(raw.Value) > 0, nil
+}
+
+// GetRepoFileContent fetches one file's raw content at ref via Azure
+// DevOps' Items API. found=false (not an error) on a 404 — the expected
+// case for "no CODEOWNERS file".
+func (c *Client) GetRepoFileContent(ctx context.Context, cred usecase.Credential, repo, path, ref string) (string, bool, error) {
+	org, project, repositoryID, err := splitRepo(repo)
+	if err != nil {
+		return "", false, err
+	}
+	reqURL := fmt.Sprintf("%s/%s/%s/_apis/git/repositories/%s/items?path=%s&version=%s&api-version=%s",
+		c.baseURL, org, project, repositoryID, url.QueryEscape(path), url.QueryEscape(ref), apiVersion)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, reqURL, nil)
+	if err != nil {
+		return "", false, fmt.Errorf("azuredevops: build get repo file content request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+cred.Token)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", false, fmt.Errorf("azuredevops: get repo file content request failed: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode == http.StatusNotFound {
+		return "", false, nil
+	}
+	if resp.StatusCode != http.StatusOK {
+		return "", false, fmt.Errorf("azuredevops: get repo file content: unexpected status %d", resp.StatusCode)
+	}
+	body, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return "", false, fmt.Errorf("azuredevops: read repo file content response: %w", err)
+	}
+	return string(body), true, nil
+}
+
+// GetLinkedPullRequestsForIssue — Azure DevOps' work-item/PR linking uses a
+// different addressing scheme (work item id, not issue number) this
+// adapter doesn't otherwise resolve; same placeholder posture as
+// MergePullRequest/ResolveRepoSlug above until wired.
+func (c *Client) GetLinkedPullRequestsForIssue(_ context.Context, _ usecase.Credential, _ string, _ int32) ([]domain.PullRequest, bool, error) {
+	return nil, false, nil
+}
+
+func (c *Client) SubmitReview(_ context.Context, _ usecase.Credential, _ string, _ int32, _ domain.ReviewInput) (domain.Review, error) {
+	return domain.Review{}, ErrCapabilityUnsupported
 }

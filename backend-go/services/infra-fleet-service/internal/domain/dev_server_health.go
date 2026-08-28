@@ -24,6 +24,39 @@ type DevServerHealth struct {
 	RAMPercent  float64
 	DiskPercent float64
 	LatencyMS   int64
+	Status      HealthStatus
+}
+
+// HealthStatus is BL-FLEET-03's per-server health classification — see
+// ComputeHealthStatus's doc comment for the threshold table it implements.
+type HealthStatus string
+
+const (
+	HealthStatusHealthy     HealthStatus = "healthy"
+	HealthStatusDegraded    HealthStatus = "degraded"
+	HealthStatusUnhealthy   HealthStatus = "unhealthy"
+	HealthStatusUnreachable HealthStatus = "unreachable"
+)
+
+// ComputeHealthStatus applies BL-FLEET-03's threshold table verbatim
+// (docs/logic/fleet/BL-FLEET-03-health-monitoring.md's Status Model table)
+// — a pure function so its thresholds are unit-testable without any I/O.
+//
+//	healthy     — SSH + relay reachable, CPU < 80%, RAM < 85%
+//	degraded    — relay reachable but CPU > 80% or RAM > 85%
+//	unhealthy   — relay not reachable but SSH still is
+//	unreachable — SSH connect timeout/fail
+func ComputeHealthStatus(reachable, relayReachable bool, cpuPercent, ramPercent float64) HealthStatus {
+	if !reachable {
+		return HealthStatusUnreachable // SSH/agent connect itself failed
+	}
+	if !relayReachable {
+		return HealthStatusUnhealthy // SSH/session alive, agent handshake not
+	}
+	if cpuPercent > 80 || ramPercent > 85 {
+		return HealthStatusDegraded
+	}
+	return HealthStatusHealthy
 }
 
 // NewDevServerHealth constructs a DevServerHealth, enforcing the invariants

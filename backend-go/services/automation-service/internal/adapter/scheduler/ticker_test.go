@@ -48,6 +48,18 @@ func (f *fakeAutomationRepository) Delete(ctx context.Context, tenantID, id stri
 	return nil
 }
 
+func (f *fakeAutomationRepository) CountByProject(ctx context.Context, tenantID, projectID string) (int, error) {
+	return 0, nil
+}
+
+func (f *fakeAutomationRepository) ListByTrigger(ctx context.Context, tenantID string, eventName domain.EventName) ([]domain.Automation, error) {
+	return nil, nil
+}
+
+func (f *fakeAutomationRepository) ListEventTriggered(ctx context.Context, tenantID string) ([]domain.Automation, error) {
+	return nil, nil
+}
+
 type fakeAutomationRunRepository struct {
 	byID map[string]domain.AutomationRun
 }
@@ -73,6 +85,23 @@ func (f *fakeAutomationRunRepository) UpdateStatus(ctx context.Context, run doma
 
 func (f *fakeAutomationRunRepository) ListByAutomation(ctx context.Context, tenantID, automationID, pageToken string, pageSize int32) ([]domain.AutomationRun, string, error) {
 	return nil, "", nil
+}
+
+func (f *fakeAutomationRunRepository) FindRunning(ctx context.Context, tenantID, automationID string) (domain.AutomationRun, bool, error) {
+	for _, r := range f.byID {
+		if r.TenantID == tenantID && r.AutomationID == automationID && r.Status == domain.RunStatusRunning {
+			return r, true, nil
+		}
+	}
+	return domain.AutomationRun{}, false, nil
+}
+
+func (f *fakeAutomationRunRepository) PruneOldRuns(ctx context.Context, tenantID, automationID string, keep int) error {
+	return nil
+}
+
+func (f *fakeAutomationRunRepository) WriteCleanupReport(ctx context.Context, tenantID, runID string, entries []domain.CleanupLogEntry) error {
+	return nil
 }
 
 type fakeWorkflowStepExecutor struct {
@@ -135,7 +164,11 @@ func newRunNow(t *testing.T, automations *fakeAutomationRepository, executor *fa
 func seedDueAutomation(t *testing.T, id, tenantID string, nextRunAt time.Time) domain.Automation {
 	t.Helper()
 	now := nextRunAt.Add(-time.Hour)
-	a, err := domain.NewAutomation(id, tenantID, "nightly-report", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{"prompt":"summarize"}`, now, "UTC", true, now)
+	a, err := domain.NewAutomation(domain.NewAutomationParams{
+		ID: id, TenantID: tenantID, Name: "nightly-report", RRule: "FREQ=DAILY;INTERVAL=1",
+		StepType: domain.StepTypeAgent, StepConfigJSON: `{"prompt":"summarize"}`,
+		DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
+	})
 	if err != nil {
 		t.Fatalf("building automation: %v", err)
 	}

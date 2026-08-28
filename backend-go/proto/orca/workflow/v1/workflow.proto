@@ -4,6 +4,8 @@ package orca.workflow.v1;
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1;workflowv1";
 
+import "google/protobuf/timestamp.proto";
+
 // WorkflowService owns templates + DAG execution/step dispatch. Also exposes
 // ExecuteAdHocStep so automation-service can reuse step execution directly
 // (closes TS Gap 3) without a fake-workflow indirection.
@@ -48,6 +50,39 @@ service WorkflowService {
   // project-service.RebindDevServer's guard, previously a client-side
   // no-op because this RPC didn't exist.
   rpc HasActiveExecutions(HasActiveExecutionsRequest) returns (HasActiveExecutionsResponse);
+
+  // CloneTemplate snapshots a RESOLVED template (server-computed) into a
+  // brand-new, disconnected root template — distinct from CreateTemplate,
+  // which always takes caller-supplied dag_json.
+  rpc CloneTemplate(CloneTemplateRequest) returns (CloneTemplateResponse);
+
+  // StreamExecutionEvents streams step/execution-level events for a running
+  // (or already-completed, for replay) execution — BUG-WF-02's live
+  // execution streaming gap.
+  rpc StreamExecutionEvents(StreamExecutionEventsRequest) returns (stream ExecutionEvent);
+
+  // PublishTemplate escalates/de-escalates a template's Visibility — see
+  // domain.Visibility.CanEscalateTo. Escalating to company/public may land
+  // the template in a pending Approval instead of taking effect
+  // immediately (BUG-WF-03).
+  rpc PublishTemplate(PublishTemplateRequest) returns (WorkflowTemplate);
+  // ListPendingApprovals lists this tenant's pending publish-approval gates.
+  rpc ListPendingApprovals(ListPendingApprovalsRequest) returns (ListPendingApprovalsResponse);
+  // ResolveApproval approves or rejects a pending approval — an admin-only
+  // operation (enforced at the usecase layer).
+  rpc ResolveApproval(ResolveApprovalRequest) returns (Approval);
+  // GenerateShareLink mints (or returns the existing) share_token for a
+  // public template.
+  rpc GenerateShareLink(GenerateShareLinkRequest) returns (GenerateShareLinkResponse);
+  // PreviewSharedTemplate returns a read-only preview of a shared
+  // template by its share_token — no auth required beyond knowing the
+  // token (matches a typical "anyone with the link" share model).
+  rpc PreviewSharedTemplate(PreviewSharedTemplateRequest) returns (SharedTemplatePreview);
+  // ImportSharedTemplate clones a shared template (by share_token) into
+  // the caller's own tenant as a new, disconnected root template.
+  rpc ImportSharedTemplate(ImportSharedTemplateRequest) returns (WorkflowTemplate);
+  // RateTemplate records (or updates) the caller's 1-5 star rating.
+  rpc RateTemplate(RateTemplateRequest) returns (RateTemplateResponse);
 }
 
 enum StepType {
@@ -57,6 +92,9 @@ enum StepType {
   STEP_TYPE_NOTIFICATION = 3;
   STEP_TYPE_WEBHOOK = 4;
   STEP_TYPE_CONDITION = 5;
+  STEP_TYPE_CLEANUP_WORKTREES = 6; // BL-AT-04
+  STEP_TYPE_ACTION = 7;
+  STEP_TYPE_PARALLEL = 8;
 }
 
 message WorkflowTemplate {
@@ -67,6 +105,20 @@ message WorkflowTemplate {
   string scope = 5; // company | team | personal
   string parent_template_id = 6; // empty = root of its inheritance chain; see ResolveTemplate
   int32 version = 7; // bumped by UpdateTemplate on every write; 1 at creation
+
+  string owner_id = 8; // required — the authoring user, workflow-service.md §4
+  string description = 9;
+  repeated string tags = 10;
+  string overrides_json = 11;    // Inherit-mode: map[stepId]json.RawMessage merge instructions
+  string inject_steps_json = 12; // Inherit-mode: []Step appended after remove_steps is applied
+  string remove_steps_json = 13; // Inherit-mode: []string step ids to drop from the parent's resolved steps
+  int32 usage_count = 14;
+  string cloned_from_template_id = 15; // Clone-mode provenance pointer; never walked by ResolveTemplate
+
+  string visibility = 16;   // private | team | company | public — see domain.Visibility.CanEscalateTo
+  string share_token = 17;  // non-empty once visibility reaches "public"
+  int32 rating_sum = 18;
+  int32 rating_count = 19;
 }
 
 message CreateTemplateRequest {
@@ -75,10 +127,40 @@ message CreateTemplateRequest {
   string dag_json = 3;
   string scope = 4;
   string parent_template_id = 5; // optional; empty = no parent
+  string description = 6;
+  repeated string tags = 7;
+  string overrides_json = 8;
+  string inject_steps_json = 9;
+  string remove_steps_json = 10;
 }
 
 message CreateTemplateResponse {
   WorkflowTemplate template = 1;
+}
+
+// CloneTemplate snapshots a RESOLVED template (server-computed) into a
+// brand-new, disconnected root template — distinct from CreateTemplate,
+// which always takes caller-supplied dag_json.
+message CloneTemplateRequest {
+  string source_template_id = 1;
+  string name = 2;
+  string description = 3;
+  repeated string tags = 4;
+}
+message CloneTemplateResponse {
+  WorkflowTemplate template = 1;
+}
+
+message StreamExecutionEventsRequest {
+  string execution_id = 1;
+}
+
+message ExecutionEvent {
+  string execution_id = 1;
+  string step_id = 2;       // empty for execution-level events
+  string type = 3;          // step.output | step.completed | execution.completed
+  string payload_json = 4;
+  int64 occurred_at_unix_ms = 5;
 }
 
 message ExecuteRequest {
@@ -86,6 +168,7 @@ message ExecuteRequest {
   string project_id = 2;
   string root_trace_id = 3; // resumability across restart
   string request_id = 4;
+  string inputs_json = 5; // caller-supplied {{...}} values, e.g. {"feature_description": "..."}
 }
 
 message WorkflowExecution {
@@ -162,6 +245,9 @@ message ListTemplatesRequest {
   string scope = 1; // optional filter: company | team | personal, empty = all scopes
   string page_token = 2;
   int32 page_size = 3;
+  string query = 4;         // full-text against name/description
+  repeated string tags = 5; // AND-filter — every listed tag must be present
+  string sort = 6;          // "trending" | "recent" | "" (default: id order)
 }
 
 message ListTemplatesResponse {
@@ -201,8 +287,72 @@ message UpdateTemplateRequest {
   string scope = 4;
   string parent_template_id = 5; // empty = detach from any parent
   int32 expected_version = 6;    // optimistic concurrency: reject if templates.version has moved
+  string description = 7;
+  repeated string tags = 8;
+  string overrides_json = 9;
+  string inject_steps_json = 10;
+  string remove_steps_json = 11;
 }
 
 message UpdateTemplateResponse {
   WorkflowTemplate template = 1; // includes the bumped version
+}
+
+message PublishTemplateRequest {
+  string template_id = 1;
+  string new_visibility = 2;
+}
+
+message ListPendingApprovalsRequest {
+  string page_token = 1;
+  int32 page_size = 2;
+}
+message ListPendingApprovalsResponse {
+  repeated Approval approvals = 1;
+  string next_page_token = 2;
+}
+message Approval {
+  string id = 1;
+  string template_id = 2;
+  string requested_by = 3;
+  string status = 4;
+  string resolved_by = 5;
+  google.protobuf.Timestamp resolved_at = 6;
+}
+
+message ResolveApprovalRequest {
+  string approval_id = 1;
+  string decision = 2; // "approved" | "rejected"
+}
+
+message GenerateShareLinkRequest {
+  string template_id = 1;
+}
+message GenerateShareLinkResponse {
+  string share_token = 1;
+}
+
+message PreviewSharedTemplateRequest {
+  string share_token = 1;
+}
+message SharedTemplatePreview {
+  string name = 1;
+  string description = 2;
+  repeated string tags = 3;
+  string dag_json = 4;
+  int32 rating_sum = 5;
+  int32 rating_count = 6;
+}
+
+message ImportSharedTemplateRequest {
+  string share_token = 1;
+}
+
+message RateTemplateRequest {
+  string template_id = 1;
+  int32 stars = 2;
+}
+message RateTemplateResponse {
+  int32 rating_sum = 1;
+  int32 rating_count = 2;
 }

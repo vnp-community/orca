@@ -2,6 +2,8 @@ package agentwsserver
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log/slog"
@@ -31,6 +33,11 @@ const (
 	authFailedCode    = -33101
 	authFailedMessage = "Authentication failed: invalid or unregistered agent token"
 
+	// handshakeFailedCode mirrors AgentErrorCode.HandshakeFailed
+	// (agent-wire-protocol.ts:47) — used for the version-mismatch
+	// rejection below, distinct from authFailedCode.
+	handshakeFailedCode = -33100
+
 	base36Chars = "0123456789abcdefghijklmnopqrstuvwxyz"
 )
 
@@ -41,6 +48,21 @@ const (
 // concrete struct today and this package only ever calls this one method.
 type InboundSessionAttacher interface {
 	AttachInboundSession(devServerID, host string, conn *websocket.Conn, info devserveragent.HandshakeInfo)
+}
+
+// TokenValidator is the fallback token check for direct-websocket
+// handshakes once Registry.Consume misses — backed by
+// usecase.AgentTokenRepository.FindActiveByHash (TASK-AWS-03-04). Defined
+// here, not in usecase/, since this package already defines its own narrow
+// seams (see InboundSessionAttacher's doc comment).
+type TokenValidator interface {
+	// FindActiveByHash returns the DevServer ID a persistent, non-revoked
+	// token hashes to. found=false means no match — try the caller's next
+	// fallback / fail the handshake.
+	FindActiveByHash(ctx context.Context, hash string) (devServerID string, tokenID string, found bool, err error)
+	// TouchLastUsed is called best-effort on a hit — never blocks the
+	// handshake on its result.
+	TouchLastUsed(ctx context.Context, tokenID string)
 }
 
 // inboundHandshakeParams mirrors AgentHandshakeParams as sent by the agent
@@ -77,6 +99,8 @@ type handshakeOKResult struct {
 type Server struct {
 	Registry *Registry
 	Client   InboundSessionAttacher
+	Sessions SessionCounter // TASK-AWS-02-03 — may be the same concrete value as Client
+	Tokens   TokenValidator // TASK-AWS-03-06 — may be nil, falls back to Registry-only (bootstrap-flow-only deployments)
 	Cfg      Config
 	Logger   *slog.Logger
 }
@@ -93,6 +117,17 @@ func New(registry *Registry, client InboundSessionAttacher, cfg Config, logger *
 // handshake exchange. Mount this at the fixed path "/agent"
 // (AGENT_WS_PATH in the TS reference) on the composition root's HTTP mux.
 func (s *Server) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Capacity check happens before the WS upgrade even completes reading a
+	// handshake frame — a rejected-for-capacity connection must never reach
+	// Registry.Consume (see server_test.go's assertion on this).
+	if s.Cfg.MaxConcurrentSessions > 0 && s.Sessions != nil && s.Sessions.LiveSessionCount() >= s.Cfg.MaxConcurrentSessions {
+		conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
+		if err == nil {
+			conn.Close(websocket.StatusPolicyViolation, "Server at capacity") // 1008, not a new 4004 — see SOL-AWS-02
+		}
+		return
+	}
+
 	// InsecureSkipVerify: no CORS/origin allow-list wired yet in this
 	// scaffold pass, matching wscompat.Handler's identical posture — this
 	// is an agent dialing in over its own configured URL, not a browser
@@ -145,8 +180,26 @@ func (s *Server) handleConnection(ctx context.Context, conn *websocket.Conn) {
 	}
 
 	devServerID, ok := s.Registry.Consume(params.AgentToken)
+	if !ok && s.Tokens != nil {
+		hash := hashAgentToken(params.AgentToken) // sha256 hex, matches slots.go's hashToken
+		var tokenID string
+		var findErr error
+		devServerID, tokenID, ok, findErr = s.Tokens.FindActiveByHash(hctx, hash)
+		if findErr != nil {
+			s.logger().ErrorContext(hctx, "agentwsserver: persistent token lookup failed", slog.Any("error", findErr))
+			ok = false
+		}
+		if ok {
+			s.Tokens.TouchLastUsed(hctx, tokenID)
+		}
+	}
 	if !ok {
 		s.rejectHandshake(hctx, conn, req.ID)
+		return
+	}
+
+	if params.AgentVersion != "" && isBelowMinimumVersion(params.AgentVersion, s.Cfg.MinAgentVersion) {
+		s.rejectVersion(hctx, conn, req.ID, params.AgentVersion)
 		return
 	}
 
@@ -188,6 +241,22 @@ func (s *Server) rejectHandshake(ctx context.Context, conn *websocket.Conn, requ
 	conn.Close(websocket.StatusPolicyViolation, authFailedMessage)
 }
 
+// rejectVersion sends a JSON-RPC HandshakeFailed error frame, then closes
+// the WS with code 1008 — same code rejectHandshake uses for a bad token,
+// disambiguated by message text per the settled TS-era decision (see
+// SOL-AWS-02): no custom 4000-range close code.
+func (s *Server) rejectVersion(ctx context.Context, conn *websocket.Conn, requestID uint32, agentVersion string) {
+	msg := fmt.Sprintf("Agent version %s is below the minimum supported version %s. Please update the Orca agent.", agentVersion, s.Cfg.MinAgentVersion)
+	resp := devserveragent.JSONRPCResponse{
+		JSONRPC: "2.0", ID: requestID,
+		Error: &devserveragent.JSONRPCError{Code: handshakeFailedCode, Message: msg},
+	}
+	if frame, err := devserveragent.EncodeJSONRPCFrame(resp, 1, 0); err == nil {
+		_ = conn.Write(ctx, websocket.MessageBinary, frame)
+	}
+	conn.Close(websocket.StatusPolicyViolation, msg)
+}
+
 // acknowledgeHandshake sends the {ok:true, orcaVersion, sessionId} success
 // result for requestID.
 func (s *Server) acknowledgeHandshake(ctx context.Context, conn *websocket.Conn, requestID uint32, sessionID string) error {
@@ -201,6 +270,14 @@ func (s *Server) acknowledgeHandshake(ctx context.Context, conn *websocket.Conn,
 		return err
 	}
 	return conn.Write(ctx, websocket.MessageBinary, frame)
+}
+
+// hashAgentToken mirrors slots.go's unexported hashToken — duplicated here
+// rather than exported cross-package, matching this package's existing
+// self-containment (TASK-AWS-03-06).
+func hashAgentToken(token string) string {
+	sum := sha256.Sum256([]byte(token))
+	return hex.EncodeToString(sum[:])
 }
 
 func firstNonEmpty(v, fallback string) string {

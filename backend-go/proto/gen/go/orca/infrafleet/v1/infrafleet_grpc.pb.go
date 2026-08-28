@@ -20,40 +20,67 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	InfraFleetService_RegisterDevServer_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
-	InfraFleetService_ResolveConnection_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
-	InfraFleetService_CreateSshTarget_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
-	InfraFleetService_GetFleetHealth_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
-	InfraFleetService_ScanWorkspacePorts_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
-	InfraFleetService_ListDevServers_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
-	InfraFleetService_CreateConnection_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
-	InfraFleetService_Relay_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/Relay"
-	InfraFleetService_ListSshTargets_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
-	InfraFleetService_GetSshState_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
-	InfraFleetService_EstablishConnection_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
-	InfraFleetService_KillWorkspacePort_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
-	InfraFleetService_SpawnTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
-	InfraFleetService_ResizeTerminalSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
-	InfraFleetService_KillTerminalSession_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/KillTerminalSession"
-	InfraFleetService_StopTerminalProcess_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/StopTerminalProcess"
-	InfraFleetService_ListTerminalSessions_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/ListTerminalSessions"
-	InfraFleetService_WaitTerminalSession_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/WaitTerminalSession"
-	InfraFleetService_FocusTerminalSession_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/FocusTerminalSession"
-	InfraFleetService_GetTerminalAgentStatus_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/GetTerminalAgentStatus"
-	InfraFleetService_InspectTerminalProcess_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/InspectTerminalProcess"
-	InfraFleetService_AttachPty_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/AttachPty"
-	InfraFleetService_ListBrowserProfiles_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListBrowserProfiles"
-	InfraFleetService_CreateBrowserProfile_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/CreateBrowserProfile"
-	InfraFleetService_DeleteBrowserProfile_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/DeleteBrowserProfile"
-	InfraFleetService_ListEmulatorDevices_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListEmulatorDevices"
-	InfraFleetService_GetEmulatorAvailability_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/GetEmulatorAvailability"
-	InfraFleetService_AttachEmulatorSession_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/AttachEmulatorSession"
-	InfraFleetService_SendEmulatorTap_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorTap"
-	InfraFleetService_SendEmulatorGesture_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorGesture"
-	InfraFleetService_SendEmulatorButton_FullMethodName      = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorButton"
-	InfraFleetService_RotateEmulator_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/RotateEmulator"
-	InfraFleetService_ShutdownEmulator_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/ShutdownEmulator"
-	InfraFleetService_GetHostCapabilities_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetHostCapabilities"
+	InfraFleetService_RegisterDevServer_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
+	InfraFleetService_ResolveConnection_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
+	InfraFleetService_CreateSshTarget_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
+	InfraFleetService_GetFleetHealth_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
+	InfraFleetService_ScanWorkspacePorts_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
+	InfraFleetService_ListDevServers_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
+	InfraFleetService_ListDevServersByTag_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/ListDevServersByTag"
+	InfraFleetService_CreateConnection_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/CreateConnection"
+	InfraFleetService_Relay_FullMethodName                             = "/orca.infrafleet.v1.InfraFleetService/Relay"
+	InfraFleetService_RelayStream_FullMethodName                       = "/orca.infrafleet.v1.InfraFleetService/RelayStream"
+	InfraFleetService_ListSshTargets_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/ListSshTargets"
+	InfraFleetService_GetSshState_FullMethodName                       = "/orca.infrafleet.v1.InfraFleetService/GetSshState"
+	InfraFleetService_EstablishConnection_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/EstablishConnection"
+	InfraFleetService_TeardownConnection_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/TeardownConnection"
+	InfraFleetService_KillWorkspacePort_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/KillWorkspacePort"
+	InfraFleetService_CreateAgentToken_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/CreateAgentToken"
+	InfraFleetService_ListAgentTokens_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/ListAgentTokens"
+	InfraFleetService_RevokeAgentToken_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/RevokeAgentToken"
+	InfraFleetService_CreatePortForward_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/CreatePortForward"
+	InfraFleetService_ListPortForwards_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/ListPortForwards"
+	InfraFleetService_DeletePortForward_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/DeletePortForward"
+	InfraFleetService_StreamPortForwardEvents_FullMethodName           = "/orca.infrafleet.v1.InfraFleetService/StreamPortForwardEvents"
+	InfraFleetService_SpawnTerminalSession_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/SpawnTerminalSession"
+	InfraFleetService_ResizeTerminalSession_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/ResizeTerminalSession"
+	InfraFleetService_KillTerminalSession_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/KillTerminalSession"
+	InfraFleetService_StopTerminalProcess_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/StopTerminalProcess"
+	InfraFleetService_ListTerminalSessions_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/ListTerminalSessions"
+	InfraFleetService_WaitTerminalSession_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/WaitTerminalSession"
+	InfraFleetService_FocusTerminalSession_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/FocusTerminalSession"
+	InfraFleetService_GetTerminalAgentStatus_FullMethodName            = "/orca.infrafleet.v1.InfraFleetService/GetTerminalAgentStatus"
+	InfraFleetService_InspectTerminalProcess_FullMethodName            = "/orca.infrafleet.v1.InfraFleetService/InspectTerminalProcess"
+	InfraFleetService_SaveTerminalScrollbackSnapshot_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/SaveTerminalScrollbackSnapshot"
+	InfraFleetService_GetTerminalScrollbackSnapshot_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/GetTerminalScrollbackSnapshot"
+	InfraFleetService_DeleteTerminalScrollbackSnapshots_FullMethodName = "/orca.infrafleet.v1.InfraFleetService/DeleteTerminalScrollbackSnapshots"
+	InfraFleetService_GetAgentTerminalSession_FullMethodName           = "/orca.infrafleet.v1.InfraFleetService/GetAgentTerminalSession"
+	InfraFleetService_SendTerminalInput_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/SendTerminalInput"
+	InfraFleetService_GetTerminalScrollback_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/GetTerminalScrollback"
+	InfraFleetService_DispatchPrompt_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/DispatchPrompt"
+	InfraFleetService_GetQueuedPrompt_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/GetQueuedPrompt"
+	InfraFleetService_AttachPty_FullMethodName                         = "/orca.infrafleet.v1.InfraFleetService/AttachPty"
+	InfraFleetService_ListBrowserProfiles_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/ListBrowserProfiles"
+	InfraFleetService_CreateBrowserProfile_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/CreateBrowserProfile"
+	InfraFleetService_DeleteBrowserProfile_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/DeleteBrowserProfile"
+	InfraFleetService_ListEmulatorDevices_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/ListEmulatorDevices"
+	InfraFleetService_GetEmulatorAvailability_FullMethodName           = "/orca.infrafleet.v1.InfraFleetService/GetEmulatorAvailability"
+	InfraFleetService_AttachEmulatorSession_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/AttachEmulatorSession"
+	InfraFleetService_SendEmulatorTap_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorTap"
+	InfraFleetService_SendEmulatorGesture_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorGesture"
+	InfraFleetService_SendEmulatorButton_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/SendEmulatorButton"
+	InfraFleetService_RotateEmulator_FullMethodName                    = "/orca.infrafleet.v1.InfraFleetService/RotateEmulator"
+	InfraFleetService_ShutdownEmulator_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/ShutdownEmulator"
+	InfraFleetService_GetHostCapabilities_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/GetHostCapabilities"
+	InfraFleetService_ImportFleetInventory_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/ImportFleetInventory"
+	InfraFleetService_BulkProvisionFleet_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/BulkProvisionFleet"
+	InfraFleetService_DetectDevServerAgents_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/DetectDevServerAgents"
+	InfraFleetService_CheckDevServerPreflight_FullMethodName           = "/orca.infrafleet.v1.InfraFleetService/CheckDevServerPreflight"
+	InfraFleetService_StartAgentSession_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/StartAgentSession"
+	InfraFleetService_StopAgentSession_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/StopAgentSession"
+	InfraFleetService_KillAgentSession_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/KillAgentSession"
+	InfraFleetService_ResumeAgentSession_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/ResumeAgentSession"
+	InfraFleetService_SwitchAgentAccount_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/SwitchAgentAccount"
 )
 
 // InfraFleetServiceClient is the client API for InfraFleetService service.
@@ -73,6 +100,10 @@ type InfraFleetServiceClient interface {
 	// DevServerRepository.List method already existed but was never exposed
 	// over gRPC before Epic A's second pass.
 	ListDevServers(ctx context.Context, in *ListDevServersRequest, opts ...grpc.CallOption) (*ListDevServersResponse, error)
+	// ListDevServersByTag backs workflow-service's "fleet:tag:<tag>"
+	// dispatch-target shape (TASK-WF-02-02/04) — load-balance across this
+	// tenant's healthy dev servers carrying tag.
+	ListDevServersByTag(ctx context.Context, in *ListDevServersByTagRequest, opts ...grpc.CallOption) (*ListDevServersByTagResponse, error)
 	// CreateConnection is the write path for infra.connections
 	// (migrations/0002_connections) — binds a dev server to a worktree/repo
 	// path, producing the connectionId ResolveConnection/Relay resolve
@@ -85,6 +116,15 @@ type InfraFleetServiceClient interface {
 	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
 	// all go through this one).
 	Relay(ctx context.Context, in *RelayRequest, opts ...grpc.CallOption) (*RelayResponse, error)
+	// RelayStream is Relay's server-streaming counterpart (TASK-PW-03-08,
+	// SOL-PW-03) — mirrors Relay's connectionId+method+params shape but for
+	// agent methods that reply with multiple frames instead of one (currently
+	// only git-gateway-service's PushStream/PullStream, relaying to the
+	// agent's git.execStream — specs/agent/api/agent-rpc-catalog-git-fs.md's
+	// "git.execStream streaming shape" section). Each frame_json is one
+	// JSON-RPC response frame's result, encoded verbatim — same "no per-method
+	// translation" contract as RelayResponse.result_json, just repeated.
+	RelayStream(ctx context.Context, in *RelayStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RelayStreamFrame], error)
 	// ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
 	// latter derives from this same read — see wscompat's registerSshChannels).
 	ListSshTargets(ctx context.Context, in *ListSshTargetsRequest, opts ...grpc.CallOption) (*ListSshTargetsResponse, error)
@@ -95,7 +135,24 @@ type InfraFleetServiceClient interface {
 	// handshake synchronously — it IS the connection-establishment act, not
 	// a record of one requested. See usecase.EstablishConnection's doc comment.
 	EstablishConnection(ctx context.Context, in *EstablishConnectionRequest, opts ...grpc.CallOption) (*Connection, error)
+	// TeardownConnection is BR-SSH-13's "Cancel" action: marks the connection
+	// closed and stops any in-flight relaySSHReconnect backoff loop.
+	TeardownConnection(ctx context.Context, in *TeardownConnectionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	KillWorkspacePort(ctx context.Context, in *KillWorkspacePortRequest, opts ...grpc.CallOption) (*KillWorkspacePortResponse, error)
+	// CreateAgentToken/ListAgentTokens/RevokeAgentToken back BL-AWS-03's
+	// persistent, named, per-DevServer agent token admin surface — see
+	// specs/backend-go/bugs/logic-v1/solutions/SOL-AWS-03-agent-token-management.md.
+	CreateAgentToken(ctx context.Context, in *CreateAgentTokenRequest, opts ...grpc.CallOption) (*CreateAgentTokenResponse, error)
+	ListAgentTokens(ctx context.Context, in *ListAgentTokensRequest, opts ...grpc.CallOption) (*ListAgentTokensResponse, error)
+	RevokeAgentToken(ctx context.Context, in *RevokeAgentTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// --- Auto port-forwarding (SOL-SSH-04) ---
+	CreatePortForward(ctx context.Context, in *CreatePortForwardRequest, opts ...grpc.CallOption) (*PortForward, error)
+	ListPortForwards(ctx context.Context, in *ListPortForwardsRequest, opts ...grpc.CallOption) (*ListPortForwardsResponse, error)
+	DeletePortForward(ctx context.Context, in *DeletePortForwardRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// StreamPortForwardEvents pushes port_opened/port_closed lifecycle events
+	// for one connectionId — BR-SSH-15's "live push, no polling" requirement
+	// (TASK-SSH-04-08), fed by internal/adapter/portevents.Broadcaster.
+	StreamPortForwardEvents(ctx context.Context, in *StreamPortForwardEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PortForwardEvent], error)
 	// --- Terminal/PTY lifecycle (control-plane, unary) ---
 	SpawnTerminalSession(ctx context.Context, in *SpawnTerminalSessionRequest, opts ...grpc.CallOption) (*SpawnTerminalSessionResponse, error)
 	ResizeTerminalSession(ctx context.Context, in *ResizeTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
@@ -106,6 +163,34 @@ type InfraFleetServiceClient interface {
 	FocusTerminalSession(ctx context.Context, in *FocusTerminalSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetTerminalAgentStatus(ctx context.Context, in *GetTerminalAgentStatusRequest, opts ...grpc.CallOption) (*GetTerminalAgentStatusResponse, error)
 	InspectTerminalProcess(ctx context.Context, in *InspectTerminalProcessRequest, opts ...grpc.CallOption) (*InspectTerminalProcessResponse, error)
+	// --- Terminal scrollback persistence (SOL-TM-03) — distinct from
+	// AttachPty/live PTY I/O. NOT the same path as terminal.multiplex's
+	// SnapshotRequest opcode, which resolves against a LIVE pty_id this flow
+	// structurally cannot have (a fresh pty_id is spawned on worktree reopen).
+	SaveTerminalScrollbackSnapshot(ctx context.Context, in *SaveTerminalScrollbackSnapshotRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	GetTerminalScrollbackSnapshot(ctx context.Context, in *GetTerminalScrollbackSnapshotRequest, opts ...grpc.CallOption) (*GetTerminalScrollbackSnapshotResponse, error)
+	// Called by git-gateway-service's RemoveWorktree on hard worktree deletion
+	// — cleanup, not part of the save/restore flow itself.
+	DeleteTerminalScrollbackSnapshots(ctx context.Context, in *DeleteTerminalScrollbackSnapshotsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetAgentTerminalSession resolves worktree_id -> the live TerminalSession
+	// whose cwd matches that worktree's path, if one exists. Composes
+	// ResolveConnection + ListTerminalSessions server-side so no caller
+	// re-derives the match/tie-break logic itself.
+	GetAgentTerminalSession(ctx context.Context, in *GetAgentTerminalSessionRequest, opts ...grpc.CallOption) (*GetAgentTerminalSessionResponse, error)
+	// SendTerminalInput writes directly to the pty's input, bypassing
+	// AttachPty's stream — for stateless (REST/CLI) callers that never
+	// attach. GUI callers keep using terminal.send/AttachPty for lower
+	// latency; this is not a replacement for that path.
+	SendTerminalInput(ctx context.Context, in *SendTerminalInputRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetTerminalScrollback returns a flat-text capture of a pty's recent
+	// output, for callers that want a redirectable string, not multiplex
+	// frames.
+	GetTerminalScrollback(ctx context.Context, in *GetTerminalScrollbackRequest, opts ...grpc.CallOption) (*GetTerminalScrollbackResponse, error)
+	// DispatchPrompt is the ONE decision point BR-MB-09/10/12 all reduce to:
+	// gate on agent readiness, queue if running, require confirmation to
+	// overwrite an existing queued prompt.
+	DispatchPrompt(ctx context.Context, in *DispatchPromptRequest, opts ...grpc.CallOption) (*DispatchPromptResponse, error)
+	GetQueuedPrompt(ctx context.Context, in *GetQueuedPromptRequest, opts ...grpc.CallOption) (*GetQueuedPromptResponse, error)
 	// --- Terminal/PTY I/O ---
 	// The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
 	// names but §3 never enumerates. Bidirectional, not server-streaming-only:
@@ -148,6 +233,44 @@ type InfraFleetServiceClient interface {
 	// does not exist yet (confirmed absent as of this pass) — see
 	// usecase.GetHostCapabilities's doc comment.
 	GetHostCapabilities(ctx context.Context, in *GetHostCapabilitiesRequest, opts ...grpc.CallOption) (*GetHostCapabilitiesResponse, error)
+	// ImportFleetInventory is the batch YAML-import entry point for BL-FLEET-01
+	// — upserts SshTargets by (tenant_id, host, user), see
+	// usecase.ImportFleetInventory's doc comment.
+	ImportFleetInventory(ctx context.Context, in *ImportFleetInventoryRequest, opts ...grpc.CallOption) (*ImportFleetInventoryResponse, error)
+	// BulkProvisionFleet fans out provisioning across a tenant's SSH targets
+	// — unary (not streaming): bulk provisioning is N-servers-in-parallel,
+	// not one server's steps in sequence, and BL-FLEET-02's own contract is
+	// a single terminal summary object. See usecase.BulkProvisionFleet's doc
+	// comment.
+	BulkProvisionFleet(ctx context.Context, in *BulkProvisionFleetRequest, opts ...grpc.CallOption) (*BulkProvisionFleetResponse, error)
+	// DetectDevServerAgents/CheckDevServerPreflight close BL-FLEET-04 Steps
+	// 3/4 (agent detection, remote preflight) — see usecase.DetectDevServerAgents
+	// / usecase.CheckDevServerPreflight doc comments.
+	DetectDevServerAgents(ctx context.Context, in *DetectDevServerAgentsRequest, opts ...grpc.CallOption) (*DetectDevServerAgentsResponse, error)
+	CheckDevServerPreflight(ctx context.Context, in *CheckDevServerPreflightRequest, opts ...grpc.CallOption) (*CheckDevServerPreflightResponse, error)
+	// StartAgentSession spawns an AI-CLI agent (Claude Code, Codex, ...) via
+	// the Dev Server Agent's real agent.spawn RPC — sibling to
+	// SpawnTerminalSession, not a replacement (a bare shell PTY still uses
+	// SpawnTerminalSession).
+	StartAgentSession(ctx context.Context, in *StartAgentSessionRequest, opts ...grpc.CallOption) (*AgentSession, error)
+	// StopAgentSession sends agent.sendInput('\x03') — graceful interrupt,
+	// BR-AG-05. Does not tear the session down; the transition to 'stopped'
+	// happens once agent.exited arrives (TASK-AG-05's classifier) — status
+	// transition is exit-driven, not request-driven.
+	StopAgentSession(ctx context.Context, in *StopAgentSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// KillAgentSession sends agent.kill with the given signal (default
+	// SIGKILL) — full teardown, mirrors KillTerminalSession's "mark closed
+	// even if the agent call fails" discipline.
+	KillAgentSession(ctx context.Context, in *KillAgentSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ResumeAgentSession — loads the latest AgentSession for worktree_id,
+	// validates BR-AG-08 (7-day expiry) and BR-AG-09 (agent version match),
+	// then re-spawns via the same path as StartAgentSession with resume_id
+	// populated.
+	ResumeAgentSession(ctx context.Context, in *ResumeAgentSessionRequest, opts ...grpc.CallOption) (*AgentSession, error)
+	// SwitchAgentAccount — BL-AG-04's saga: force-kill the current session,
+	// resolve a replacement account excluding the one just switched away
+	// from, then resume/start with the new account.
+	SwitchAgentAccount(ctx context.Context, in *SwitchAgentAccountRequest, opts ...grpc.CallOption) (*AgentSession, error)
 }
 
 type infraFleetServiceClient struct {
@@ -218,6 +341,16 @@ func (c *infraFleetServiceClient) ListDevServers(ctx context.Context, in *ListDe
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) ListDevServersByTag(ctx context.Context, in *ListDevServersByTagRequest, opts ...grpc.CallOption) (*ListDevServersByTagResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListDevServersByTagResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListDevServersByTag_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *infraFleetServiceClient) CreateConnection(ctx context.Context, in *CreateConnectionRequest, opts ...grpc.CallOption) (*CreateConnectionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateConnectionResponse)
@@ -237,6 +370,25 @@ func (c *infraFleetServiceClient) Relay(ctx context.Context, in *RelayRequest, o
 	}
 	return out, nil
 }
+
+func (c *infraFleetServiceClient) RelayStream(ctx context.Context, in *RelayStreamRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RelayStreamFrame], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_RelayStream_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[RelayStreamRequest, RelayStreamFrame]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_RelayStreamClient = grpc.ServerStreamingClient[RelayStreamFrame]
 
 func (c *infraFleetServiceClient) ListSshTargets(ctx context.Context, in *ListSshTargetsRequest, opts ...grpc.CallOption) (*ListSshTargetsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -268,6 +420,16 @@ func (c *infraFleetServiceClient) EstablishConnection(ctx context.Context, in *E
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) TeardownConnection(ctx context.Context, in *TeardownConnectionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_TeardownConnection_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *infraFleetServiceClient) KillWorkspacePort(ctx context.Context, in *KillWorkspacePortRequest, opts ...grpc.CallOption) (*KillWorkspacePortResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(KillWorkspacePortResponse)
@@ -277,6 +439,85 @@ func (c *infraFleetServiceClient) KillWorkspacePort(ctx context.Context, in *Kil
 	}
 	return out, nil
 }
+
+func (c *infraFleetServiceClient) CreateAgentToken(ctx context.Context, in *CreateAgentTokenRequest, opts ...grpc.CallOption) (*CreateAgentTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateAgentTokenResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_CreateAgentToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ListAgentTokens(ctx context.Context, in *ListAgentTokensRequest, opts ...grpc.CallOption) (*ListAgentTokensResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentTokensResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListAgentTokens_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) RevokeAgentToken(ctx context.Context, in *RevokeAgentTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_RevokeAgentToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) CreatePortForward(ctx context.Context, in *CreatePortForwardRequest, opts ...grpc.CallOption) (*PortForward, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PortForward)
+	err := c.cc.Invoke(ctx, InfraFleetService_CreatePortForward_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ListPortForwards(ctx context.Context, in *ListPortForwardsRequest, opts ...grpc.CallOption) (*ListPortForwardsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListPortForwardsResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListPortForwards_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) DeletePortForward(ctx context.Context, in *DeletePortForwardRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_DeletePortForward_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) StreamPortForwardEvents(ctx context.Context, in *StreamPortForwardEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[PortForwardEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[1], InfraFleetService_StreamPortForwardEvents_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[StreamPortForwardEventsRequest, PortForwardEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_StreamPortForwardEventsClient = grpc.ServerStreamingClient[PortForwardEvent]
 
 func (c *infraFleetServiceClient) SpawnTerminalSession(ctx context.Context, in *SpawnTerminalSessionRequest, opts ...grpc.CallOption) (*SpawnTerminalSessionResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -368,9 +609,89 @@ func (c *infraFleetServiceClient) InspectTerminalProcess(ctx context.Context, in
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) SaveTerminalScrollbackSnapshot(ctx context.Context, in *SaveTerminalScrollbackSnapshotRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_SaveTerminalScrollbackSnapshot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetTerminalScrollbackSnapshot(ctx context.Context, in *GetTerminalScrollbackSnapshotRequest, opts ...grpc.CallOption) (*GetTerminalScrollbackSnapshotResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTerminalScrollbackSnapshotResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetTerminalScrollbackSnapshot_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) DeleteTerminalScrollbackSnapshots(ctx context.Context, in *DeleteTerminalScrollbackSnapshotsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_DeleteTerminalScrollbackSnapshots_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetAgentTerminalSession(ctx context.Context, in *GetAgentTerminalSessionRequest, opts ...grpc.CallOption) (*GetAgentTerminalSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAgentTerminalSessionResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetAgentTerminalSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) SendTerminalInput(ctx context.Context, in *SendTerminalInputRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_SendTerminalInput_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetTerminalScrollback(ctx context.Context, in *GetTerminalScrollbackRequest, opts ...grpc.CallOption) (*GetTerminalScrollbackResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTerminalScrollbackResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetTerminalScrollback_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) DispatchPrompt(ctx context.Context, in *DispatchPromptRequest, opts ...grpc.CallOption) (*DispatchPromptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DispatchPromptResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_DispatchPrompt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetQueuedPrompt(ctx context.Context, in *GetQueuedPromptRequest, opts ...grpc.CallOption) (*GetQueuedPromptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetQueuedPromptResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetQueuedPrompt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *infraFleetServiceClient) AttachPty(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_AttachPty_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[2], InfraFleetService_AttachPty_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -501,6 +822,96 @@ func (c *infraFleetServiceClient) GetHostCapabilities(ctx context.Context, in *G
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) ImportFleetInventory(ctx context.Context, in *ImportFleetInventoryRequest, opts ...grpc.CallOption) (*ImportFleetInventoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ImportFleetInventoryResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ImportFleetInventory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) BulkProvisionFleet(ctx context.Context, in *BulkProvisionFleetRequest, opts ...grpc.CallOption) (*BulkProvisionFleetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BulkProvisionFleetResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_BulkProvisionFleet_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) DetectDevServerAgents(ctx context.Context, in *DetectDevServerAgentsRequest, opts ...grpc.CallOption) (*DetectDevServerAgentsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(DetectDevServerAgentsResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_DetectDevServerAgents_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) CheckDevServerPreflight(ctx context.Context, in *CheckDevServerPreflightRequest, opts ...grpc.CallOption) (*CheckDevServerPreflightResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CheckDevServerPreflightResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_CheckDevServerPreflight_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) StartAgentSession(ctx context.Context, in *StartAgentSessionRequest, opts ...grpc.CallOption) (*AgentSession, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentSession)
+	err := c.cc.Invoke(ctx, InfraFleetService_StartAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) StopAgentSession(ctx context.Context, in *StopAgentSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_StopAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) KillAgentSession(ctx context.Context, in *KillAgentSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, InfraFleetService_KillAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ResumeAgentSession(ctx context.Context, in *ResumeAgentSessionRequest, opts ...grpc.CallOption) (*AgentSession, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentSession)
+	err := c.cc.Invoke(ctx, InfraFleetService_ResumeAgentSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) SwitchAgentAccount(ctx context.Context, in *SwitchAgentAccountRequest, opts ...grpc.CallOption) (*AgentSession, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AgentSession)
+	err := c.cc.Invoke(ctx, InfraFleetService_SwitchAgentAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InfraFleetServiceServer is the server API for InfraFleetService service.
 // All implementations must embed UnimplementedInfraFleetServiceServer
 // for forward compatibility.
@@ -518,6 +929,10 @@ type InfraFleetServiceServer interface {
 	// DevServerRepository.List method already existed but was never exposed
 	// over gRPC before Epic A's second pass.
 	ListDevServers(context.Context, *ListDevServersRequest) (*ListDevServersResponse, error)
+	// ListDevServersByTag backs workflow-service's "fleet:tag:<tag>"
+	// dispatch-target shape (TASK-WF-02-02/04) — load-balance across this
+	// tenant's healthy dev servers carrying tag.
+	ListDevServersByTag(context.Context, *ListDevServersByTagRequest) (*ListDevServersByTagResponse, error)
 	// CreateConnection is the write path for infra.connections
 	// (migrations/0002_connections) — binds a dev server to a worktree/repo
 	// path, producing the connectionId ResolveConnection/Relay resolve
@@ -530,6 +945,15 @@ type InfraFleetServiceServer interface {
 	// shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
 	// all go through this one).
 	Relay(context.Context, *RelayRequest) (*RelayResponse, error)
+	// RelayStream is Relay's server-streaming counterpart (TASK-PW-03-08,
+	// SOL-PW-03) — mirrors Relay's connectionId+method+params shape but for
+	// agent methods that reply with multiple frames instead of one (currently
+	// only git-gateway-service's PushStream/PullStream, relaying to the
+	// agent's git.execStream — specs/agent/api/agent-rpc-catalog-git-fs.md's
+	// "git.execStream streaming shape" section). Each frame_json is one
+	// JSON-RPC response frame's result, encoded verbatim — same "no per-method
+	// translation" contract as RelayResponse.result_json, just repeated.
+	RelayStream(*RelayStreamRequest, grpc.ServerStreamingServer[RelayStreamFrame]) error
 	// ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
 	// latter derives from this same read — see wscompat's registerSshChannels).
 	ListSshTargets(context.Context, *ListSshTargetsRequest) (*ListSshTargetsResponse, error)
@@ -540,7 +964,24 @@ type InfraFleetServiceServer interface {
 	// handshake synchronously — it IS the connection-establishment act, not
 	// a record of one requested. See usecase.EstablishConnection's doc comment.
 	EstablishConnection(context.Context, *EstablishConnectionRequest) (*Connection, error)
+	// TeardownConnection is BR-SSH-13's "Cancel" action: marks the connection
+	// closed and stops any in-flight relaySSHReconnect backoff loop.
+	TeardownConnection(context.Context, *TeardownConnectionRequest) (*emptypb.Empty, error)
 	KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error)
+	// CreateAgentToken/ListAgentTokens/RevokeAgentToken back BL-AWS-03's
+	// persistent, named, per-DevServer agent token admin surface — see
+	// specs/backend-go/bugs/logic-v1/solutions/SOL-AWS-03-agent-token-management.md.
+	CreateAgentToken(context.Context, *CreateAgentTokenRequest) (*CreateAgentTokenResponse, error)
+	ListAgentTokens(context.Context, *ListAgentTokensRequest) (*ListAgentTokensResponse, error)
+	RevokeAgentToken(context.Context, *RevokeAgentTokenRequest) (*emptypb.Empty, error)
+	// --- Auto port-forwarding (SOL-SSH-04) ---
+	CreatePortForward(context.Context, *CreatePortForwardRequest) (*PortForward, error)
+	ListPortForwards(context.Context, *ListPortForwardsRequest) (*ListPortForwardsResponse, error)
+	DeletePortForward(context.Context, *DeletePortForwardRequest) (*emptypb.Empty, error)
+	// StreamPortForwardEvents pushes port_opened/port_closed lifecycle events
+	// for one connectionId — BR-SSH-15's "live push, no polling" requirement
+	// (TASK-SSH-04-08), fed by internal/adapter/portevents.Broadcaster.
+	StreamPortForwardEvents(*StreamPortForwardEventsRequest, grpc.ServerStreamingServer[PortForwardEvent]) error
 	// --- Terminal/PTY lifecycle (control-plane, unary) ---
 	SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error)
 	ResizeTerminalSession(context.Context, *ResizeTerminalSessionRequest) (*emptypb.Empty, error)
@@ -551,6 +992,34 @@ type InfraFleetServiceServer interface {
 	FocusTerminalSession(context.Context, *FocusTerminalSessionRequest) (*emptypb.Empty, error)
 	GetTerminalAgentStatus(context.Context, *GetTerminalAgentStatusRequest) (*GetTerminalAgentStatusResponse, error)
 	InspectTerminalProcess(context.Context, *InspectTerminalProcessRequest) (*InspectTerminalProcessResponse, error)
+	// --- Terminal scrollback persistence (SOL-TM-03) — distinct from
+	// AttachPty/live PTY I/O. NOT the same path as terminal.multiplex's
+	// SnapshotRequest opcode, which resolves against a LIVE pty_id this flow
+	// structurally cannot have (a fresh pty_id is spawned on worktree reopen).
+	SaveTerminalScrollbackSnapshot(context.Context, *SaveTerminalScrollbackSnapshotRequest) (*emptypb.Empty, error)
+	GetTerminalScrollbackSnapshot(context.Context, *GetTerminalScrollbackSnapshotRequest) (*GetTerminalScrollbackSnapshotResponse, error)
+	// Called by git-gateway-service's RemoveWorktree on hard worktree deletion
+	// — cleanup, not part of the save/restore flow itself.
+	DeleteTerminalScrollbackSnapshots(context.Context, *DeleteTerminalScrollbackSnapshotsRequest) (*emptypb.Empty, error)
+	// GetAgentTerminalSession resolves worktree_id -> the live TerminalSession
+	// whose cwd matches that worktree's path, if one exists. Composes
+	// ResolveConnection + ListTerminalSessions server-side so no caller
+	// re-derives the match/tie-break logic itself.
+	GetAgentTerminalSession(context.Context, *GetAgentTerminalSessionRequest) (*GetAgentTerminalSessionResponse, error)
+	// SendTerminalInput writes directly to the pty's input, bypassing
+	// AttachPty's stream — for stateless (REST/CLI) callers that never
+	// attach. GUI callers keep using terminal.send/AttachPty for lower
+	// latency; this is not a replacement for that path.
+	SendTerminalInput(context.Context, *SendTerminalInputRequest) (*emptypb.Empty, error)
+	// GetTerminalScrollback returns a flat-text capture of a pty's recent
+	// output, for callers that want a redirectable string, not multiplex
+	// frames.
+	GetTerminalScrollback(context.Context, *GetTerminalScrollbackRequest) (*GetTerminalScrollbackResponse, error)
+	// DispatchPrompt is the ONE decision point BR-MB-09/10/12 all reduce to:
+	// gate on agent readiness, queue if running, require confirmation to
+	// overwrite an existing queued prompt.
+	DispatchPrompt(context.Context, *DispatchPromptRequest) (*DispatchPromptResponse, error)
+	GetQueuedPrompt(context.Context, *GetQueuedPromptRequest) (*GetQueuedPromptResponse, error)
 	// --- Terminal/PTY I/O ---
 	// The "server-streaming terminal-data endpoint" infra-fleet-service.md §7
 	// names but §3 never enumerates. Bidirectional, not server-streaming-only:
@@ -593,6 +1062,44 @@ type InfraFleetServiceServer interface {
 	// does not exist yet (confirmed absent as of this pass) — see
 	// usecase.GetHostCapabilities's doc comment.
 	GetHostCapabilities(context.Context, *GetHostCapabilitiesRequest) (*GetHostCapabilitiesResponse, error)
+	// ImportFleetInventory is the batch YAML-import entry point for BL-FLEET-01
+	// — upserts SshTargets by (tenant_id, host, user), see
+	// usecase.ImportFleetInventory's doc comment.
+	ImportFleetInventory(context.Context, *ImportFleetInventoryRequest) (*ImportFleetInventoryResponse, error)
+	// BulkProvisionFleet fans out provisioning across a tenant's SSH targets
+	// — unary (not streaming): bulk provisioning is N-servers-in-parallel,
+	// not one server's steps in sequence, and BL-FLEET-02's own contract is
+	// a single terminal summary object. See usecase.BulkProvisionFleet's doc
+	// comment.
+	BulkProvisionFleet(context.Context, *BulkProvisionFleetRequest) (*BulkProvisionFleetResponse, error)
+	// DetectDevServerAgents/CheckDevServerPreflight close BL-FLEET-04 Steps
+	// 3/4 (agent detection, remote preflight) — see usecase.DetectDevServerAgents
+	// / usecase.CheckDevServerPreflight doc comments.
+	DetectDevServerAgents(context.Context, *DetectDevServerAgentsRequest) (*DetectDevServerAgentsResponse, error)
+	CheckDevServerPreflight(context.Context, *CheckDevServerPreflightRequest) (*CheckDevServerPreflightResponse, error)
+	// StartAgentSession spawns an AI-CLI agent (Claude Code, Codex, ...) via
+	// the Dev Server Agent's real agent.spawn RPC — sibling to
+	// SpawnTerminalSession, not a replacement (a bare shell PTY still uses
+	// SpawnTerminalSession).
+	StartAgentSession(context.Context, *StartAgentSessionRequest) (*AgentSession, error)
+	// StopAgentSession sends agent.sendInput('\x03') — graceful interrupt,
+	// BR-AG-05. Does not tear the session down; the transition to 'stopped'
+	// happens once agent.exited arrives (TASK-AG-05's classifier) — status
+	// transition is exit-driven, not request-driven.
+	StopAgentSession(context.Context, *StopAgentSessionRequest) (*emptypb.Empty, error)
+	// KillAgentSession sends agent.kill with the given signal (default
+	// SIGKILL) — full teardown, mirrors KillTerminalSession's "mark closed
+	// even if the agent call fails" discipline.
+	KillAgentSession(context.Context, *KillAgentSessionRequest) (*emptypb.Empty, error)
+	// ResumeAgentSession — loads the latest AgentSession for worktree_id,
+	// validates BR-AG-08 (7-day expiry) and BR-AG-09 (agent version match),
+	// then re-spawns via the same path as StartAgentSession with resume_id
+	// populated.
+	ResumeAgentSession(context.Context, *ResumeAgentSessionRequest) (*AgentSession, error)
+	// SwitchAgentAccount — BL-AG-04's saga: force-kill the current session,
+	// resolve a replacement account excluding the one just switched away
+	// from, then resume/start with the new account.
+	SwitchAgentAccount(context.Context, *SwitchAgentAccountRequest) (*AgentSession, error)
 	mustEmbedUnimplementedInfraFleetServiceServer()
 }
 
@@ -621,11 +1128,17 @@ func (UnimplementedInfraFleetServiceServer) ScanWorkspacePorts(context.Context, 
 func (UnimplementedInfraFleetServiceServer) ListDevServers(context.Context, *ListDevServersRequest) (*ListDevServersResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListDevServers not implemented")
 }
+func (UnimplementedInfraFleetServiceServer) ListDevServersByTag(context.Context, *ListDevServersByTagRequest) (*ListDevServersByTagResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListDevServersByTag not implemented")
+}
 func (UnimplementedInfraFleetServiceServer) CreateConnection(context.Context, *CreateConnectionRequest) (*CreateConnectionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateConnection not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) Relay(context.Context, *RelayRequest) (*RelayResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Relay not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) RelayStream(*RelayStreamRequest, grpc.ServerStreamingServer[RelayStreamFrame]) error {
+	return status.Error(codes.Unimplemented, "method RelayStream not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) ListSshTargets(context.Context, *ListSshTargetsRequest) (*ListSshTargetsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSshTargets not implemented")
@@ -636,8 +1149,32 @@ func (UnimplementedInfraFleetServiceServer) GetSshState(context.Context, *GetSsh
 func (UnimplementedInfraFleetServiceServer) EstablishConnection(context.Context, *EstablishConnectionRequest) (*Connection, error) {
 	return nil, status.Error(codes.Unimplemented, "method EstablishConnection not implemented")
 }
+func (UnimplementedInfraFleetServiceServer) TeardownConnection(context.Context, *TeardownConnectionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method TeardownConnection not implemented")
+}
 func (UnimplementedInfraFleetServiceServer) KillWorkspacePort(context.Context, *KillWorkspacePortRequest) (*KillWorkspacePortResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method KillWorkspacePort not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) CreateAgentToken(context.Context, *CreateAgentTokenRequest) (*CreateAgentTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateAgentToken not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListAgentTokens(context.Context, *ListAgentTokensRequest) (*ListAgentTokensResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentTokens not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) RevokeAgentToken(context.Context, *RevokeAgentTokenRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeAgentToken not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) CreatePortForward(context.Context, *CreatePortForwardRequest) (*PortForward, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreatePortForward not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListPortForwards(context.Context, *ListPortForwardsRequest) (*ListPortForwardsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListPortForwards not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) DeletePortForward(context.Context, *DeletePortForwardRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeletePortForward not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) StreamPortForwardEvents(*StreamPortForwardEventsRequest, grpc.ServerStreamingServer[PortForwardEvent]) error {
+	return status.Error(codes.Unimplemented, "method StreamPortForwardEvents not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) SpawnTerminalSession(context.Context, *SpawnTerminalSessionRequest) (*SpawnTerminalSessionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SpawnTerminalSession not implemented")
@@ -665,6 +1202,30 @@ func (UnimplementedInfraFleetServiceServer) GetTerminalAgentStatus(context.Conte
 }
 func (UnimplementedInfraFleetServiceServer) InspectTerminalProcess(context.Context, *InspectTerminalProcessRequest) (*InspectTerminalProcessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method InspectTerminalProcess not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) SaveTerminalScrollbackSnapshot(context.Context, *SaveTerminalScrollbackSnapshotRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SaveTerminalScrollbackSnapshot not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetTerminalScrollbackSnapshot(context.Context, *GetTerminalScrollbackSnapshotRequest) (*GetTerminalScrollbackSnapshotResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTerminalScrollbackSnapshot not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) DeleteTerminalScrollbackSnapshots(context.Context, *DeleteTerminalScrollbackSnapshotsRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeleteTerminalScrollbackSnapshots not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetAgentTerminalSession(context.Context, *GetAgentTerminalSessionRequest) (*GetAgentTerminalSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAgentTerminalSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) SendTerminalInput(context.Context, *SendTerminalInputRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SendTerminalInput not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetTerminalScrollback(context.Context, *GetTerminalScrollbackRequest) (*GetTerminalScrollbackResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTerminalScrollback not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) DispatchPrompt(context.Context, *DispatchPromptRequest) (*DispatchPromptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DispatchPrompt not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetQueuedPrompt(context.Context, *GetQueuedPromptRequest) (*GetQueuedPromptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetQueuedPrompt not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) AttachPty(grpc.BidiStreamingServer[PtyClientFrame, PtyServerFrame]) error {
 	return status.Error(codes.Unimplemented, "method AttachPty not implemented")
@@ -704,6 +1265,33 @@ func (UnimplementedInfraFleetServiceServer) ShutdownEmulator(context.Context, *S
 }
 func (UnimplementedInfraFleetServiceServer) GetHostCapabilities(context.Context, *GetHostCapabilitiesRequest) (*GetHostCapabilitiesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetHostCapabilities not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ImportFleetInventory(context.Context, *ImportFleetInventoryRequest) (*ImportFleetInventoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ImportFleetInventory not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) BulkProvisionFleet(context.Context, *BulkProvisionFleetRequest) (*BulkProvisionFleetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BulkProvisionFleet not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) DetectDevServerAgents(context.Context, *DetectDevServerAgentsRequest) (*DetectDevServerAgentsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method DetectDevServerAgents not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) CheckDevServerPreflight(context.Context, *CheckDevServerPreflightRequest) (*CheckDevServerPreflightResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CheckDevServerPreflight not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) StartAgentSession(context.Context, *StartAgentSessionRequest) (*AgentSession, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartAgentSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) StopAgentSession(context.Context, *StopAgentSessionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method StopAgentSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) KillAgentSession(context.Context, *KillAgentSessionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method KillAgentSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ResumeAgentSession(context.Context, *ResumeAgentSessionRequest) (*AgentSession, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResumeAgentSession not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) SwitchAgentAccount(context.Context, *SwitchAgentAccountRequest) (*AgentSession, error) {
+	return nil, status.Error(codes.Unimplemented, "method SwitchAgentAccount not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) mustEmbedUnimplementedInfraFleetServiceServer() {}
 func (UnimplementedInfraFleetServiceServer) testEmbeddedByValue()                           {}
@@ -834,6 +1422,24 @@ func _InfraFleetService_ListDevServers_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_ListDevServersByTag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListDevServersByTagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListDevServersByTag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListDevServersByTag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListDevServersByTag(ctx, req.(*ListDevServersByTagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InfraFleetService_CreateConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreateConnectionRequest)
 	if err := dec(in); err != nil {
@@ -869,6 +1475,17 @@ func _InfraFleetService_Relay_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _InfraFleetService_RelayStream_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(RelayStreamRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(InfraFleetServiceServer).RelayStream(m, &grpc.GenericServerStream[RelayStreamRequest, RelayStreamFrame]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_RelayStreamServer = grpc.ServerStreamingServer[RelayStreamFrame]
 
 func _InfraFleetService_ListSshTargets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListSshTargetsRequest)
@@ -924,6 +1541,24 @@ func _InfraFleetService_EstablishConnection_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_TeardownConnection_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TeardownConnectionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).TeardownConnection(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_TeardownConnection_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).TeardownConnection(ctx, req.(*TeardownConnectionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InfraFleetService_KillWorkspacePort_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(KillWorkspacePortRequest)
 	if err := dec(in); err != nil {
@@ -941,6 +1576,125 @@ func _InfraFleetService_KillWorkspacePort_Handler(srv interface{}, ctx context.C
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _InfraFleetService_CreateAgentToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateAgentTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).CreateAgentToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_CreateAgentToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).CreateAgentToken(ctx, req.(*CreateAgentTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ListAgentTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentTokensRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListAgentTokens(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListAgentTokens_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListAgentTokens(ctx, req.(*ListAgentTokensRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_RevokeAgentToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeAgentTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).RevokeAgentToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_RevokeAgentToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).RevokeAgentToken(ctx, req.(*RevokeAgentTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_CreatePortForward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreatePortForwardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).CreatePortForward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_CreatePortForward_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).CreatePortForward(ctx, req.(*CreatePortForwardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ListPortForwards_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListPortForwardsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListPortForwards(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListPortForwards_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListPortForwards(ctx, req.(*ListPortForwardsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_DeletePortForward_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeletePortForwardRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).DeletePortForward(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_DeletePortForward_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).DeletePortForward(ctx, req.(*DeletePortForwardRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_StreamPortForwardEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(StreamPortForwardEventsRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(InfraFleetServiceServer).StreamPortForwardEvents(m, &grpc.GenericServerStream[StreamPortForwardEventsRequest, PortForwardEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_StreamPortForwardEventsServer = grpc.ServerStreamingServer[PortForwardEvent]
 
 func _InfraFleetService_SpawnTerminalSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SpawnTerminalSessionRequest)
@@ -1100,6 +1854,150 @@ func _InfraFleetService_InspectTerminalProcess_Handler(srv interface{}, ctx cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(InfraFleetServiceServer).InspectTerminalProcess(ctx, req.(*InspectTerminalProcessRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_SaveTerminalScrollbackSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveTerminalScrollbackSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).SaveTerminalScrollbackSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_SaveTerminalScrollbackSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).SaveTerminalScrollbackSnapshot(ctx, req.(*SaveTerminalScrollbackSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetTerminalScrollbackSnapshot_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTerminalScrollbackSnapshotRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetTerminalScrollbackSnapshot(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetTerminalScrollbackSnapshot_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetTerminalScrollbackSnapshot(ctx, req.(*GetTerminalScrollbackSnapshotRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_DeleteTerminalScrollbackSnapshots_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteTerminalScrollbackSnapshotsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).DeleteTerminalScrollbackSnapshots(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_DeleteTerminalScrollbackSnapshots_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).DeleteTerminalScrollbackSnapshots(ctx, req.(*DeleteTerminalScrollbackSnapshotsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetAgentTerminalSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAgentTerminalSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetAgentTerminalSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetAgentTerminalSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetAgentTerminalSession(ctx, req.(*GetAgentTerminalSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_SendTerminalInput_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SendTerminalInputRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).SendTerminalInput(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_SendTerminalInput_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).SendTerminalInput(ctx, req.(*SendTerminalInputRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetTerminalScrollback_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTerminalScrollbackRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetTerminalScrollback(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetTerminalScrollback_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetTerminalScrollback(ctx, req.(*GetTerminalScrollbackRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_DispatchPrompt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DispatchPromptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).DispatchPrompt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_DispatchPrompt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).DispatchPrompt(ctx, req.(*DispatchPromptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetQueuedPrompt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetQueuedPromptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetQueuedPrompt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetQueuedPrompt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetQueuedPrompt(ctx, req.(*GetQueuedPromptRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1327,6 +2225,168 @@ func _InfraFleetService_GetHostCapabilities_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_ImportFleetInventory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ImportFleetInventoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ImportFleetInventory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ImportFleetInventory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ImportFleetInventory(ctx, req.(*ImportFleetInventoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_BulkProvisionFleet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BulkProvisionFleetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).BulkProvisionFleet(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_BulkProvisionFleet_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).BulkProvisionFleet(ctx, req.(*BulkProvisionFleetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_DetectDevServerAgents_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DetectDevServerAgentsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).DetectDevServerAgents(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_DetectDevServerAgents_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).DetectDevServerAgents(ctx, req.(*DetectDevServerAgentsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_CheckDevServerPreflight_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CheckDevServerPreflightRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).CheckDevServerPreflight(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_CheckDevServerPreflight_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).CheckDevServerPreflight(ctx, req.(*CheckDevServerPreflightRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_StartAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartAgentSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).StartAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_StartAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).StartAgentSession(ctx, req.(*StartAgentSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_StopAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StopAgentSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).StopAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_StopAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).StopAgentSession(ctx, req.(*StopAgentSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_KillAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(KillAgentSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).KillAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_KillAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).KillAgentSession(ctx, req.(*KillAgentSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ResumeAgentSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResumeAgentSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ResumeAgentSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ResumeAgentSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ResumeAgentSession(ctx, req.(*ResumeAgentSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_SwitchAgentAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SwitchAgentAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).SwitchAgentAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_SwitchAgentAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).SwitchAgentAccount(ctx, req.(*SwitchAgentAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InfraFleetService_ServiceDesc is the grpc.ServiceDesc for InfraFleetService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1359,6 +2419,10 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _InfraFleetService_ListDevServers_Handler,
 		},
 		{
+			MethodName: "ListDevServersByTag",
+			Handler:    _InfraFleetService_ListDevServersByTag_Handler,
+		},
+		{
 			MethodName: "CreateConnection",
 			Handler:    _InfraFleetService_CreateConnection_Handler,
 		},
@@ -1379,8 +2443,36 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _InfraFleetService_EstablishConnection_Handler,
 		},
 		{
+			MethodName: "TeardownConnection",
+			Handler:    _InfraFleetService_TeardownConnection_Handler,
+		},
+		{
 			MethodName: "KillWorkspacePort",
 			Handler:    _InfraFleetService_KillWorkspacePort_Handler,
+		},
+		{
+			MethodName: "CreateAgentToken",
+			Handler:    _InfraFleetService_CreateAgentToken_Handler,
+		},
+		{
+			MethodName: "ListAgentTokens",
+			Handler:    _InfraFleetService_ListAgentTokens_Handler,
+		},
+		{
+			MethodName: "RevokeAgentToken",
+			Handler:    _InfraFleetService_RevokeAgentToken_Handler,
+		},
+		{
+			MethodName: "CreatePortForward",
+			Handler:    _InfraFleetService_CreatePortForward_Handler,
+		},
+		{
+			MethodName: "ListPortForwards",
+			Handler:    _InfraFleetService_ListPortForwards_Handler,
+		},
+		{
+			MethodName: "DeletePortForward",
+			Handler:    _InfraFleetService_DeletePortForward_Handler,
 		},
 		{
 			MethodName: "SpawnTerminalSession",
@@ -1417,6 +2509,38 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "InspectTerminalProcess",
 			Handler:    _InfraFleetService_InspectTerminalProcess_Handler,
+		},
+		{
+			MethodName: "SaveTerminalScrollbackSnapshot",
+			Handler:    _InfraFleetService_SaveTerminalScrollbackSnapshot_Handler,
+		},
+		{
+			MethodName: "GetTerminalScrollbackSnapshot",
+			Handler:    _InfraFleetService_GetTerminalScrollbackSnapshot_Handler,
+		},
+		{
+			MethodName: "DeleteTerminalScrollbackSnapshots",
+			Handler:    _InfraFleetService_DeleteTerminalScrollbackSnapshots_Handler,
+		},
+		{
+			MethodName: "GetAgentTerminalSession",
+			Handler:    _InfraFleetService_GetAgentTerminalSession_Handler,
+		},
+		{
+			MethodName: "SendTerminalInput",
+			Handler:    _InfraFleetService_SendTerminalInput_Handler,
+		},
+		{
+			MethodName: "GetTerminalScrollback",
+			Handler:    _InfraFleetService_GetTerminalScrollback_Handler,
+		},
+		{
+			MethodName: "DispatchPrompt",
+			Handler:    _InfraFleetService_DispatchPrompt_Handler,
+		},
+		{
+			MethodName: "GetQueuedPrompt",
+			Handler:    _InfraFleetService_GetQueuedPrompt_Handler,
 		},
 		{
 			MethodName: "ListBrowserProfiles",
@@ -1466,8 +2590,54 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 			MethodName: "GetHostCapabilities",
 			Handler:    _InfraFleetService_GetHostCapabilities_Handler,
 		},
+		{
+			MethodName: "ImportFleetInventory",
+			Handler:    _InfraFleetService_ImportFleetInventory_Handler,
+		},
+		{
+			MethodName: "BulkProvisionFleet",
+			Handler:    _InfraFleetService_BulkProvisionFleet_Handler,
+		},
+		{
+			MethodName: "DetectDevServerAgents",
+			Handler:    _InfraFleetService_DetectDevServerAgents_Handler,
+		},
+		{
+			MethodName: "CheckDevServerPreflight",
+			Handler:    _InfraFleetService_CheckDevServerPreflight_Handler,
+		},
+		{
+			MethodName: "StartAgentSession",
+			Handler:    _InfraFleetService_StartAgentSession_Handler,
+		},
+		{
+			MethodName: "StopAgentSession",
+			Handler:    _InfraFleetService_StopAgentSession_Handler,
+		},
+		{
+			MethodName: "KillAgentSession",
+			Handler:    _InfraFleetService_KillAgentSession_Handler,
+		},
+		{
+			MethodName: "ResumeAgentSession",
+			Handler:    _InfraFleetService_ResumeAgentSession_Handler,
+		},
+		{
+			MethodName: "SwitchAgentAccount",
+			Handler:    _InfraFleetService_SwitchAgentAccount_Handler,
+		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "RelayStream",
+			Handler:       _InfraFleetService_RelayStream_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "StreamPortForwardEvents",
+			Handler:       _InfraFleetService_StreamPortForwardEvents_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "AttachPty",
 			Handler:       _InfraFleetService_AttachPty_Handler,

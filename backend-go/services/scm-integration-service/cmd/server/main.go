@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,15 +21,18 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/scm-integration-service/internal/config"
 
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/azuredevops"
+	scmbackoff "github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/backoff"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/bitbucket"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/credentialbroker"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/gitea"
@@ -39,6 +43,7 @@ import (
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/oauthstate"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/providerregistry"
+	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/webhookverify"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/usecase"
 
@@ -75,9 +80,8 @@ func run() error {
 
 	// scm.rate_limit_cache (migrations/0001_init.up.sql) as of Phase 3
 	// (docs/execution-plan.md §3) — this service's first real database
-	// connection. webhook_delivery_log lives in the same migration but has
-	// no writer yet (schema-only — see README "Known gaps"); no repository
-	// is wired for it here for that reason, not by oversight.
+	// connection. webhook_delivery_log lives in the same migration; its own
+	// repository (webhookDeliveries, below) was wired in TASK-PI-03-06.
 	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
 	if err != nil {
 		return fmt.Errorf("resolving database credentials: %w", err)
@@ -88,6 +92,15 @@ func run() error {
 	}
 	defer pool.Close()
 	rateLimitCache := postgres.New(pool)
+	// issue_list_cache (migrations/0002) — BR-PI-01's 5-minute cache in
+	// front of ListIssues, sibling of rateLimitCache above.
+	issueListCache := postgres.NewIssueListCache(pool)
+	backoffExecutor := scmbackoff.New(3, 0, 0) // BR-PI-03: 3 attempts, default base/max delay
+	outboxRepo := postgres.NewOutboxRepository(pool)
+	// webhook_delivery_log (migrations/0001) — BUG-PI-03/TASK-PI-03-06's
+	// first writer for this table.
+	webhookDeliveries := postgres.NewWebhookDeliveryRepository(pool)
+	webhookVerifier := webhookverify.New(cfg.GitHubWebhookSecret, cfg.GitLabWebhookToken)
 
 	// githubProjectsAdapter/gitlabMRAdapter are the SAME instances registered
 	// below in registry's map — one GitHub adapter satisfying both
@@ -143,8 +156,32 @@ func run() error {
 	defer func() { _ = brokerConn.Close() }()
 	credentials := credentialbroker.New(brokerConn)
 
-	listIssuesUC := usecase.NewListIssues(credentials, registry)
-	createPullRequestUC := usecase.NewCreatePullRequest(credentials, registry)
+	// Transactional-outbox relay (SOL-PI-03) — CreatePullRequest/
+	// MergePullRequest durably enqueue via outboxRepo.Enqueue; this relay is
+	// what actually gets those rows to NATS. Mirrors
+	// issue-tracking-service/cmd/server/main.go's own wiring exactly.
+	var relay *outbox.Relay
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "SCM", []string{"orca.scm.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			relay = outbox.NewRelay(outboxRepo, pub, outbox.DefaultConfig, logger)
+		}
+	}
+	var relayWG sync.WaitGroup
+	if relay != nil {
+		relayWG.Add(1)
+		go func() {
+			defer relayWG.Done()
+			relay.Run(ctx)
+		}()
+	}
+
+	listIssuesUC := usecase.NewListIssues(credentials, registry, issueListCache, backoffExecutor)
 	listPullRequestsUC := usecase.NewListPullRequests(credentials, registry)
 	getRateLimitStatusUC := usecase.NewGetRateLimitStatus(credentials, registry, rateLimitCache)
 	getAuthStatusUC := usecase.NewGetAuthStatus(credentials)
@@ -159,13 +196,23 @@ func run() error {
 	// (TASK-076). registry already fans out per-provider; these usecases
 	// resolve the concrete adapter the same way every other usecase above
 	// does.
-	mergePullRequestUC := usecase.NewMergePullRequest(credentials, registry)
+	mergePullRequestUC := usecase.NewMergePullRequest(credentials, registry, outboxRepo, logger)
 	requestPullRequestReviewersUC := usecase.NewRequestPullRequestReviewers(credentials, registry)
 	removePullRequestReviewersUC := usecase.NewRemovePullRequestReviewers(credentials, registry)
 	setPullRequestAutoMergeUC := usecase.NewSetPullRequestAutoMerge(credentials, registry)
 	updateIssueUC := usecase.NewUpdateIssue(credentials, registry)
 	getPullRequestForBranchUC := usecase.NewGetPullRequestForBranch(credentials, registry)
 	resolveRepoSlugUC := usecase.NewResolveRepoSlug(credentials, registry)
+
+	// createPullRequestUC composes updateIssueUC in-process (BR-CR-19's
+	// best-effort linked-issue update), so updateIssueUC must be
+	// constructed before this line — same ordering concern as
+	// git-gateway-service's historyUC/generateCommitMessageUC. It also
+	// durably enqueues orca.scm.pull_request.created via outboxRepo
+	// (SOL-PI-03) — the same outboxRepo instance mergePullRequestUC enqueues
+	// to below.
+	createPullRequestUC := usecase.NewCreatePullRequest(credentials, registry, updateIssueUC, outboxRepo, logger)
+	suggestPullRequestReviewersUC := usecase.NewSuggestPullRequestReviewers(credentials, registry)
 
 	// SOL-012 shape 3 — GitHub Projects v2 (TASK-079). githubProjectsAdapter
 	// is the SAME *github.Client instance registered in registry's map below
@@ -187,6 +234,7 @@ func run() error {
 	addIssueCommentBySlugUC := usecase.NewAddIssueCommentBySlug(credentials, githubProjectsAdapter)
 	updateIssueCommentBySlugUC := usecase.NewUpdateIssueCommentBySlug(credentials, githubProjectsAdapter)
 	deleteIssueCommentBySlugUC := usecase.NewDeleteIssueCommentBySlug(credentials, githubProjectsAdapter)
+	listIssueCommentsBySlugUC := usecase.NewListIssueCommentsBySlug(credentials, githubProjectsAdapter)
 
 	// SOL-013 — GitLab-specific (TASK-084). gitlabMRAdapter is the SAME
 	// *gitlab.Client instance registered in registry's map below.
@@ -197,6 +245,16 @@ func run() error {
 	// SOL-014 — hostedReview.getCreationEligibility (TASK-088). Reuses the
 	// same getAuthStatusUC instance the GetAuthStatus RPC already uses.
 	checkHostedReviewEligibilityUC := usecase.NewCheckHostedReviewEligibility(credentials, registry, getAuthStatusUC)
+
+	// BUG-PI-01/SOL-PI-01 (TASK-PI-01-06) and BUG-PI-04/SOL-PI-04
+	// (TASK-PI-04-02) additions.
+	getLinkedPullRequestsForIssueUC := usecase.NewGetLinkedPullRequestsForIssue(credentials, registry)
+	submitReviewUC := usecase.NewSubmitReview(credentials, registry)
+
+	// BUG-PI-03/SOL-PI-03 (TASK-PI-03-06). outboxRepo is the SAME instance
+	// createPullRequestUC/mergePullRequestUC already enqueue to above — one
+	// outbox table, multiple publishers, per SOL-PI-03's design.
+	receiveWebhookUC := usecase.NewReceiveWebhook(webhookVerifier, webhookDeliveries, outboxRepo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	scmintegrationv1.RegisterScmIntegrationServiceServer(grpcServer, scmgrpc.New(
@@ -212,6 +270,9 @@ func run() error {
 		listMergeRequestsUC, resolveMergeRequestDiscussionUC, getWorkItemDetailsUC,
 		checkHostedReviewEligibilityUC,
 		setIntegrationCredentialUC, getIntegrationCredentialStatusUC, listIntegrationCredentialsUC,
+		suggestPullRequestReviewersUC,
+		listIssueCommentsBySlugUC, getLinkedPullRequestsForIssueUC, submitReviewUC,
+		receiveWebhookUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -262,6 +323,8 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+
+	relayWG.Wait()
 
 	return nil
 }

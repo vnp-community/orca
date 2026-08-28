@@ -13,6 +13,9 @@ type QueryAuditLogInput struct {
 	Since     time.Time
 	PageToken string
 	PageSize  int32
+	To        time.Time // zero value = no upper bound
+	Action    string    // "" = no filter
+	ActorID   string    // "" = no filter
 }
 
 type QueryAuditLogOutput struct {
@@ -43,7 +46,14 @@ func (uc *QueryAuditLog) Execute(ctx context.Context, in QueryAuditLogInput) (Qu
 		pageSize = 50
 	}
 
-	entries, next, err := uc.audit.Query(ctx, in.TenantID, in.Since, in.PageToken, pageSize)
+	filter := AuditQueryFilter{
+		TenantID: in.TenantID,
+		Since:    in.Since,
+		To:       in.To,
+		Action:   in.Action,
+		ActorID:  in.ActorID,
+	}
+	entries, next, err := uc.audit.Query(ctx, filter, in.PageToken, pageSize)
 	if err != nil {
 		return QueryAuditLogOutput{}, apperrors.New(apperrors.KindInternal, "AUTH_AUDIT_QUERY_FAILED", "failed to query audit log", err)
 	}

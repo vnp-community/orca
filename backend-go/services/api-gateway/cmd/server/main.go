@@ -20,12 +20,14 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
+	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/tracing"
@@ -35,6 +37,7 @@ import (
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/authclient"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/fanout"
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/httpgateway"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/wsbridge"
@@ -44,6 +47,7 @@ import (
 	annotationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1"
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	automationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1"
+	credentialbrokerv1 "github.com/stablyai/orca-go/proto/gen/go/orca/credentialbroker/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	issuetrackingv1 "github.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1"
@@ -202,6 +206,17 @@ func run() error {
 	defer func() { _ = workflowConn.Close() }()
 	workflowClient := workflowv1.NewWorkflowServiceClient(workflowConn)
 
+	// credentialBrokerClient — SOL-INT-02/TASK-INT-02-01. Previously
+	// reached only indirectly via infra-fleet-service's credential path
+	// (see registry.go's now-updated doc comment); dialed directly here so
+	// wscompat can call it for the credentials.* namespace.
+	credentialBrokerConn, err := gatewaygrpc.Dial(cfg.OtherServiceAddrs["credential-broker-service"])
+	if err != nil {
+		return fmt.Errorf("dialing credential-broker-service: %w", err)
+	}
+	defer func() { _ = credentialBrokerConn.Close() }()
+	credentialBrokerClient := credentialbrokerv1.NewCredentialBrokerServiceClient(credentialBrokerConn)
+
 	// jwksClient resolves auth-service's public signing keys (cached, short
 	// TTL — see authclient.JWKSClient) so authValidator can verify RS256
 	// JWT signatures for real, instead of trusting unverified claims.
@@ -235,6 +250,29 @@ func run() error {
 	})
 	wsHandler := wsbridge.New(logger, authValidator, sessionValidator, notificationStreamOpener)
 
+	// fanOutUseCase composes SOL-WT-02's "create N worktrees, spawn N
+	// agents, inject N prompts" saga out of three already-real per-service
+	// gRPC clients — see usecase.FanOutCreateWorktrees's doc comment.
+	fanOutUseCase := usecase.NewFanOutCreateWorktrees(
+		fanout.NewGRPCWorktreeCreator(gitClient),
+		fanout.NewGRPCAgentSpawner(projectClient, infraFleetClient),
+		fanout.NewGRPCPromptInjector(infraFleetClient),
+	)
+
+	// eventBusConsumer backs agent.subscribeStatus (TASK-AG-05-06) — this is
+	// api-gateway's first NATS-consuming channel, dialed the same
+	// lazy/non-blocking way as every gRPC downstream above: an unreachable
+	// NATS degrades that one channel to a closed-immediately push stream
+	// (see channels_agent.go's registerAgentStatusSubscribeChannel doc
+	// comment) rather than crashing startup.
+	_, eventBusConsumer, closeEventBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.Warn("eventbus unavailable — agent.subscribeStatus will not deliver push events", slog.Any("error", err))
+		eventBusConsumer = nil
+	} else {
+		defer func() { _ = closeEventBus() }()
+	}
+
 	// wscompat: the legacy channel-based RPC transport the deployed
 	// frontend/ actually speaks over /ws (see internal/adapter/wscompat's
 	// package doc and docs/execution-plan.md's frontend-compatibility-layer
@@ -247,13 +285,46 @@ func run() error {
 		wsCompatRegistry, annotationClient, taskClient, gitClient, automationClient, infraFleetClient,
 		tenantClient, projectClient, issueTrackingClient, orchestrationClient, scmClient, workflowClient,
 		aiProviderClient,
+		credentialBrokerClient,
 		rateLimiter,
+		fanOutUseCase,
+		eventBusConsumer,
 	)
 	// RegisterPushChannels wires the StreamHandler-backed (push-capable)
 	// channels — a separate registration mechanism from RegisterRealChannels'
 	// request/response ChannelHandlers, see channels_push.go's doc comment.
 	clientEventBus := wscompat.NewClientEventBus()
-	wscompat.RegisterPushChannels(wsCompatRegistry, wscompat.NotificationStreamOpener(notificationStreamOpener), clientEventBus)
+	wscompat.RegisterPushChannels(wsCompatRegistry, wscompat.NotificationStreamOpener(notificationStreamOpener), clientEventBus, infraFleetClient)
+
+	// workspace.subscribe (TASK-PW-04-07, SOL-PW-04): bridges task-service's
+	// orca.task.task.statuschanged and workflow-service's
+	// orca.workflow.execution.completed/.failed outbox events to connected
+	// WS sessions — see wscompat/workspace_events.go's doc comment.
+	// Graceful-degradation posture matches every other eventbus consumer in
+	// this codebase (notification-service's own eventbus.Connect call):
+	// NATS unavailable at startup logs a warning, does not fail service
+	// startup.
+	workspaceEventBus := wscompat.NewWorkspaceEventBus()
+	wscompat.RegisterWorkspaceSubscribeChannel(wsCompatRegistry, workspaceEventBus)
+	var workspaceBridgeWG sync.WaitGroup
+	_, workspaceEventConsumer, closeWorkspaceEventBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "workspace event bridge: eventbus unavailable, continuing without event consumption", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeWorkspaceEventBus() }()
+		workspaceBridgeWG.Add(1)
+		go func() {
+			defer workspaceBridgeWG.Done()
+			wscompat.RunWorkspaceEventBridge(ctx, workspaceEventConsumer, workspaceEventBus, logger)
+		}()
+	}
+
+	// mobile.* channels (SOL-MB-01/03/04) — deviceSecretResolver wraps
+	// auth-service's internal-only ResolveDeviceSharedSecret RPC, the same
+	// authClient every other real channel registration above shares.
+	deviceSecretResolver := authclient.NewDeviceSecretResolver(authClient)
+	wscompat.RegisterMobileChannels(wsCompatRegistry, infraFleetClient, projectClient, deviceSecretResolver)
+
 	wsCompatHandler := wscompat.New(logger, sessionValidator, wsCompatRegistry)
 
 	// agentProxyHandler raw-proxies the Dev Server Agent's /agent (WS) and
@@ -350,6 +421,12 @@ func run() error {
 	defer cancel()
 	_ = publicServer.Shutdown(shutdownCtx)
 	_ = healthServer.Shutdown(shutdownCtx)
+
+	// Wait for the workspace-event bridge's background goroutine to observe
+	// ctx cancellation and return, so it doesn't outlive the rest of the
+	// server on shutdown — same pattern as notification-service's
+	// consumerWG.Wait().
+	workspaceBridgeWG.Wait()
 
 	return nil
 }

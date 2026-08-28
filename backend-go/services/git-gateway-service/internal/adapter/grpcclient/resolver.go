@@ -11,6 +11,7 @@ package grpcclient
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
@@ -18,6 +19,15 @@ import (
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
 )
+
+// repoDispatchPrefix marks a dispatchExecutor key as a repo id rather than a
+// worktree id — MergeWorktreeIntoBase's genuine extension beyond what
+// git-gateway-service.md documents (SOL-WT-05): AbortMerge/ConflictOperation/
+// ResolveConflict's request messages all name their dispatch field
+// worktree_id, but a conflicted MergeBranch happens against the repo's own
+// checkout, which has no worktree_id in project-service's bookkeeping. See
+// usecase.dispatchKeyForRepo's doc comment.
+const repoDispatchPrefix = "repo:"
 
 // ConnectionResolver implements usecase.ConnectionResolver by calling
 // infra-fleet-service's ResolveConnection RPC.
@@ -66,19 +76,27 @@ func (r *ConnectionResolver) ResolveConnection(ctx context.Context, worktreeID s
 		return usecase.ResolvedConnection{}, err
 	}
 
+	// A "repo:"-prefixed key is a repo id, not a worktree id — strip it
+	// before resolving; infra-fleet-service's ResolveConnection takes
+	// whatever id git-gateway-service is currently dispatching against, so
+	// the underlying repo id round-trips through this prefix scheme
+	// unchanged. See repoDispatchPrefix's doc comment.
+	dispatchID := strings.TrimPrefix(worktreeID, repoDispatchPrefix)
+
 	resp, err := r.client.ResolveConnection(ctx, &infrafleetv1.ResolveConnectionRequest{
-		ConnectionId: worktreeID,
+		ConnectionId: dispatchID,
 	})
 	if err != nil {
 		return usecase.ResolvedConnection{}, fmt.Errorf("grpcclient: ResolveConnection(%q): %w", worktreeID, err)
 	}
 
 	if !resp.GetConnected() {
-		return usecase.ResolvedConnection{Connected: false, RepoPath: worktreeID}, nil
+		return usecase.ResolvedConnection{Connected: false, RepoPath: dispatchID}, nil
 	}
 	return usecase.ResolvedConnection{
 		Connected:    true,
-		ConnectionID: worktreeID,
+		ConnectionID: dispatchID,
 		RepoPath:     resp.GetRepoPath(),
+		Mode:         resp.GetDevServer().GetMode(),
 	}, nil
 }

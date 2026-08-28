@@ -42,11 +42,15 @@ const (
 	RunTriggerManual    RunTrigger = "manual"
 	RunTriggerScheduled RunTrigger = "scheduled"
 	RunTriggerExternal  RunTrigger = "external"
+	// RunTriggerEvent marks a run dispatched by HandleEventTrigger — an
+	// incoming JetStream event matched an enabled event-triggered
+	// automation (BL-AT-03).
+	RunTriggerEvent RunTrigger = "event"
 )
 
 func (t RunTrigger) Valid() bool {
 	switch t {
-	case RunTriggerManual, RunTriggerScheduled, RunTriggerExternal:
+	case RunTriggerManual, RunTriggerScheduled, RunTriggerExternal, RunTriggerEvent:
 		return true
 	default:
 		return false
@@ -66,20 +70,36 @@ var (
 	ErrInvalidTransition = errors.New("domain: invalid automation run status transition")
 )
 
+// ActionResult is the outcome of one action in an automation's chain —
+// SOL-AT-01's per-action result schema, recorded so a multi-action run's
+// history shows which step(s) succeeded/failed, not just the run's overall
+// terminal status.
+type ActionResult struct {
+	Index        int
+	Status       string // "succeeded" | "failed"
+	OutputJSON   string
+	ErrorMessage string
+}
+
 // AutomationRun is one dispatch of an Automation — bookkeeping only. The
 // actual step execution happens on workflow-service's side; this record
 // tracks the outcome workflow-service reported back synchronously.
 type AutomationRun struct {
-	ID             string
-	AutomationID   string
-	TenantID       string
-	RequestID      string // idempotency key, see automation-service.md §8
-	Status         RunStatus
-	StepType       StepType
-	Trigger        RunTrigger
+	ID           string
+	AutomationID string
+	TenantID     string
+	RequestID    string // idempotency key, see automation-service.md §8
+	Status       RunStatus
+	StepType     StepType
+	Trigger      RunTrigger
+	// StepConfigJSON/OutputJSON/ErrorMessage hold the *last* action's
+	// config/output/error, kept for back-compat with any caller still
+	// reading them directly — ActionResults is the source of truth for a
+	// multi-action chain's per-step outcomes (SOL-AT-01).
 	StepConfigJSON string
 	OutputJSON     string
 	ErrorMessage   string
+	ActionResults  []ActionResult
 	CreatedAt      time.Time
 	StartedAt      time.Time
 	CompletedAt    time.Time

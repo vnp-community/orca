@@ -11,7 +11,10 @@ option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegratio
 // See specs/backend-go/services/scm-integration-service.md.
 service ScmIntegrationService {
   rpc ListIssues(ListIssuesRequest) returns (ListIssuesResponse);
+  rpc ListIssueCommentsBySlug(ListIssueCommentsBySlugRequest) returns (ListIssueCommentsBySlugResponse);
+  rpc GetLinkedPullRequestsForIssue(GetLinkedPullRequestsForIssueRequest) returns (GetLinkedPullRequestsForIssueResponse);
   rpc CreatePullRequest(CreatePullRequestRequest) returns (CreatePullRequestResponse);
+  rpc SuggestPullRequestReviewers(SuggestPullRequestReviewersRequest) returns (SuggestPullRequestReviewersResponse);
   rpc ListPullRequests(ListPullRequestsRequest) returns (ListPullRequestsResponse);
   rpc GetRateLimitStatus(GetRateLimitStatusRequest) returns (GetRateLimitStatusResponse);
 
@@ -87,6 +90,16 @@ service ScmIntegrationService {
   rpc SetIntegrationCredential(SetIntegrationCredentialRequest) returns (SetIntegrationCredentialResponse);
   rpc GetIntegrationCredentialStatus(GetIntegrationCredentialStatusRequest) returns (GetIntegrationCredentialStatusResponse);
   rpc ListIntegrationCredentials(ListIntegrationCredentialsRequest) returns (ListIntegrationCredentialsResponse);
+
+  // ReceiveWebhook — plain HTTP via api-gateway at
+  // /v1/scm/webhooks/{provider}, forwarded to this RPC. Deliberate exception
+  // to gRPC-for-sync: the caller is GitHub/GitLab's own servers, which
+  // cannot be given an Orca JWT.
+  rpc ReceiveWebhook(ReceiveWebhookRequest) returns (ReceiveWebhookResponse);
+
+  // SubmitReview — scm-integration-service.md §3's "Reviewers & reviews"
+  // sketch, implemented here (BUG-PI-04).
+  rpc SubmitReview(SubmitReviewRequest) returns (Review);
 }
 
 enum ScmProvider {
@@ -109,14 +122,51 @@ message Issue {
   int32 number = 5;
 }
 
+message IssueFilter {
+  string state = 1;       // "open" | "closed" | "all" — default "open"
+  string assignee = 2;    // GitHub login / GitLab username; "" = unfiltered
+  repeated string labels = 3;
+  string milestone = 4;   // milestone title or number-as-string
+}
+
 message ListIssuesRequest {
   string tenant_id = 1;
   ScmProvider provider = 2;
   string repo = 3;
+  IssueFilter filter = 4;      // NEW — was previously absent
+  bool force_refresh = 5;      // NEW — bypasses the 5-minute cache
 }
 
 message ListIssuesResponse {
   repeated Issue issues = 1;
+  bool from_cache = 2;         // NEW
+  int64 cached_at_unix_ms = 3; // NEW
+}
+
+// ListIssueCommentsBySlug completes the *BySlug comment RPC group —
+// AddIssueCommentBySlug/UpdateIssueCommentBySlug/DeleteIssueCommentBySlug
+// already exist with no way to read the thread back.
+message ListIssueCommentsBySlugRequest {
+  string tenant_id = 1;
+  string item_slug = 2; // matches every other *BySlug request's field name
+}
+message ListIssueCommentsBySlugResponse {
+  repeated ProjectComment comments = 1; // reuses AddIssueCommentBySlug's existing comment shape
+}
+
+// GetLinkedPullRequestsForIssue has no *BySlug precedent — provider-generic
+// like ListIssues. A provider with no cheap "linked PRs" query sets
+// capability_unsupported=true and returns an empty list, never an RPC error
+// (same degrade pattern as GetBoardView's ErrCapabilityUnsupported).
+message GetLinkedPullRequestsForIssueRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  int32 issue_number = 4;
+}
+message GetLinkedPullRequestsForIssueResponse {
+  repeated PullRequest pull_requests = 1;
+  bool capability_unsupported = 2;
 }
 
 message CreatePullRequestRequest {
@@ -128,6 +178,8 @@ message CreatePullRequestRequest {
   string head_branch = 6;
   string base_branch = 7;
   string request_id = 8;
+  bool draft = 9;                          // NEW — BR-CR-20
+  optional int32 linked_issue_number = 10; // NEW — BR-CR-19
 }
 
 message PullRequest {
@@ -137,10 +189,31 @@ message PullRequest {
   // number is GitHub's repo-scoped PR number — see Issue.number's doc
   // comment for why this is additive, not a breaking rename.
   int32 number = 4;
+  bool draft = 5; // NEW — echoes the provider's actual draft state; a
+                  // provider without draft support (Bitbucket) never
+                  // returns true even when requested
 }
 
 message CreatePullRequestResponse {
   PullRequest pull_request = 1;
+  // NEW — set only when linked_issue_number was provided and the PR was
+  // created successfully but the issue update itself failed. The PR is
+  // NOT rolled back for this.
+  string linked_issue_update_error = 2;
+}
+
+message SuggestPullRequestReviewersRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  string base_ref = 4;               // CODEOWNERS is read from base_ref, matching GitHub's own resolution rule
+  repeated string changed_files = 5; // caller-supplied — see TASK-CR-05-08 for why
+}
+
+message SuggestPullRequestReviewersResponse {
+  repeated string reviewer_logins = 1;
+  repeated string team_slugs = 2;
+  bool codeowners_found = 3; // false = no CODEOWNERS file at any canonical path; empty suggestion is not an error
 }
 
 message ListPullRequestsRequest {
@@ -604,4 +677,70 @@ message ListIntegrationCredentialsRequest {
 }
 message ListIntegrationCredentialsResponse {
   repeated ScmProvider configured_providers = 1;
+}
+
+// ── Lifecycle events (published via NATS JetStream, not gRPC — schema
+// lives here per this codebase's convention of each publisher owning its
+// own event proto) ───────────────────────────────────────────────────────
+
+// Subject: orca.scm.pull_request.created / orca.scm.pull_request.merged
+message PullRequestLifecycleEvent {
+  string event_id = 1;
+  string tenant_id = 2;
+  string occurred_at = 3;
+  int32 schema_version = 4;
+  string provider = 5;
+  string repo = 6;
+  int32 pr_number = 7;
+  string linked_issue_provider = 8;
+  string linked_issue_ref = 9;
+}
+
+// Webhook ingestion — plain HTTP via api-gateway at
+// /v1/scm/webhooks/{provider}, forwarded to this RPC. Deliberate exception
+// to gRPC-for-sync: the caller is GitHub/GitLab's own servers, which cannot
+// be given an Orca JWT.
+message ReceiveWebhookRequest {
+  string provider = 1;
+  bytes raw_body = 2;             // signature verified against this exact byte sequence
+  string signature_header = 3;
+  string delivery_id_header = 4;  // GitHub X-GitHub-Delivery / GitLab X-Gitlab-Event-UUID
+}
+message ReceiveWebhookResponse {
+  bool accepted = 1;
+  bool duplicate = 2;
+}
+
+// ── SubmitReview ─────────────────────────────────────────────────────────
+
+enum ReviewType {
+  REVIEW_TYPE_UNSPECIFIED = 0;
+  REVIEW_TYPE_COMMENT = 1;
+  REVIEW_TYPE_APPROVE = 2;
+  REVIEW_TYPE_REQUEST_CHANGES = 3;
+}
+
+message ReviewComment {
+  string path = 1;       // matches Anchor.file_path (annotation.proto)
+  int32 line = 2;         // matches Anchor.line (annotation.proto)
+  string body = 3;        // matches Annotation.content (annotation.proto)
+}
+
+message SubmitReviewRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  int32 pr_number = 4;
+  ReviewType review_type = 5;         // REVIEW_TYPE_UNSPECIFIED triggers BR-PI-11's default-to-REQUEST_CHANGES
+  string summary_body = 6;            // top-level review comment, optional
+  repeated ReviewComment comments = 7; // BR-PI-10: must be non-empty
+}
+
+message Review {
+  string id = 1;
+  string reviewer_id = 2;
+  ReviewType state = 3;
+  string submitted_at = 4;
+  repeated ReviewComment comments = 5;
+  string url = 6;
 }

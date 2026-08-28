@@ -14,7 +14,8 @@ import (
 // annotation-service.md §9 and this service's README "Known gaps" for the
 // actor-role propagation caveat.
 type DeleteAnnotationInput struct {
-	ID string
+	ID        string
+	Confirmed bool // NEW — BR-CR-08
 }
 
 type DeleteAnnotation struct {
@@ -55,6 +56,16 @@ func (uc *DeleteAnnotation) Execute(ctx context.Context, in DeleteAnnotationInpu
 	}
 	if !allowed {
 		return apperrors.New(apperrors.KindPermissionDenied, "ANNOTATION_NOT_AUTHOR", "only the annotation's author (or an admin) may delete it", nil)
+	}
+
+	// BR-CR-08 — a comment already sent to the agent needs an explicit
+	// confirm before it can be deleted; the client is expected to retry with
+	// Confirmed=true after showing that dialog.
+	if existing.SentToAgent && !in.Confirmed {
+		return apperrors.New(apperrors.KindFailedPrecondition,
+			"ANNOTATION_ALREADY_SENT",
+			"this comment was already sent to the agent — confirm to delete anyway",
+			nil)
 	}
 
 	if err := uc.repo.DeleteAnnotation(ctx, tenantID, in.ID); err != nil {

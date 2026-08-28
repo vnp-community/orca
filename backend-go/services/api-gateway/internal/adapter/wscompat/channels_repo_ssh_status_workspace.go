@@ -497,7 +497,7 @@ func registerWorkspacePortsChannels(r *Registry, client infrafleetv1.InfraFleetS
 		if err != nil {
 			return nil, err
 		}
-		return toWorkspacePortScanResult(resp.GetOpenPorts()), nil
+		return toWorkspacePortScanResult(resp.GetPorts()), nil
 	})
 
 	r.Register("workspacePorts.kill", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -527,17 +527,31 @@ func registerWorkspacePortsChannels(r *Registry, client infrafleetv1.InfraFleetS
 	})
 }
 
-// toWorkspacePortScanResult maps ScanWorkspacePortsResponse's []int32 open
-// ports onto the frontend's WorkspacePortScanResult{platform, scannedAt,
-// ports, unavailableReason?} shape (frontend/src/shared/workspace-ports.ts)
-// — platform reported as "unknown" (this service never inspects the target
-// host's OS) and unavailableReason left empty on success, honest-placeholder
-// convention.
-func toWorkspacePortScanResult(openPorts []int32) map[string]any {
+// toWorkspacePortScanResult maps ScanWorkspacePortsResponse's
+// []*DetectedPortProto onto the frontend's WorkspacePortScanResult{platform,
+// scannedAt, ports, unavailableReason?} shape
+// (frontend/src/shared/workspace-ports.ts) — platform reported as "unknown"
+// (this service never inspects the target host's OS) and unavailableReason
+// left empty on success, honest-placeholder convention. Each port entry
+// carries only port/host/pid/processName — WorkspacePort's fuller
+// id/bindHost/connectHost/protocol/kind/owner shape needs a
+// project-service repoId/worktree join this handler doesn't yet do (see
+// this file's "Integration TODO" note below), so those fields are left for
+// a future pass rather than fabricated here.
+func toWorkspacePortScanResult(detected []*infrafleetv1.DetectedPortProto) map[string]any {
+	ports := make([]map[string]any, 0, len(detected))
+	for _, d := range detected {
+		ports = append(ports, map[string]any{
+			"port":        d.GetPort(),
+			"host":        d.GetHost(),
+			"pid":         d.GetPid(),
+			"processName": d.GetProcessName(),
+		})
+	}
 	return map[string]any{
 		"platform":  "unknown",
 		"scannedAt": time.Now().UnixMilli(),
-		"ports":     openPorts,
+		"ports":     ports,
 	}
 }
 

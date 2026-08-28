@@ -28,6 +28,11 @@ const (
 	KindFailedPrecondition // e.g. cyclic task dependency, rebind while active execution
 	KindUnauthenticated
 	KindInternal
+	// KindDeadlineExceeded is an outer deadline expiring around a
+	// multi-step operation (e.g. automation-service's BR-AT-06 2-hour
+	// RunNow budget) — distinct from KindInternal so callers can tell a
+	// timeout apart from an ordinary failure.
+	KindDeadlineExceeded
 )
 
 // AppError is the typed error every domain/ package returns instead of a
@@ -84,6 +89,8 @@ func ToGRPCStatus(err error) error {
 		code = codes.FailedPrecondition
 	case KindUnauthenticated:
 		code = codes.Unauthenticated
+	case KindDeadlineExceeded:
+		code = codes.DeadlineExceeded
 	case KindInternal, KindUnknown:
 		code = codes.Internal
 	}
