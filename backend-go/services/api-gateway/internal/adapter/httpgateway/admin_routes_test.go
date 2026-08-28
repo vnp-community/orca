@@ -42,7 +42,14 @@ func TestAdminRoutes_Stats(t *testing.T) {
 	if w.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusOK, w.Body.String())
 	}
-	var resp authv1.GetAdminStatsResponse
+	// camelCase, not the raw proto struct's snake_case tags — see
+	// admin_routes.go's adminStatsJSON doc comment
+	// (specs/backend-go/bugs/missing-v2/ follow-up).
+	var resp struct {
+		TotalUsers     int32 `json:"totalUsers"`
+		ActiveSessions int32 `json:"activeSessions"`
+		TotalPolicies  int32 `json:"totalPolicies"`
+	}
 	if err := json.Unmarshal(w.Body.Bytes(), &resp); err != nil {
 		t.Fatalf("response body is not the expected JSON shape: %v; body=%s", err, w.Body.String())
 	}
@@ -114,7 +121,13 @@ func TestAdminRoutes_DeactivateUser(t *testing.T) {
 	if fake.lastDeactivateUserReq.GetUserId() != "u1" {
 		t.Fatalf("DeactivateUser called with UserId = %q, want %q", fake.lastDeactivateUserReq.GetUserId(), "u1")
 	}
-	var user authv1.User
+	// userJSON's shape (camelCase, role as a string) — not the raw proto
+	// struct's snake_case/numeric-enum tags. See auth_admin_routes.go's
+	// userJSON doc comment (specs/backend-go/bugs/missing-v2/ follow-up).
+	var user struct {
+		IsActive bool   `json:"isActive"`
+		Role     string `json:"role"`
+	}
 	if err := json.Unmarshal(w.Body.Bytes(), &user); err != nil {
 		t.Fatalf("response body is not the expected JSON shape: %v; body=%s", err, w.Body.String())
 	}

@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** Medium — the mobile emulator/simulator pane is a real feature (device preview, tap/gesture/button input, attach/shutdown lifecycle), but it's a secondary/opt-in workflow, not core to daily terminal/git/task usage.
 **Symptom:** Every `emulator.*` call from the emulator pane and mobile-emulator settings times out with `channel "emulator.X" is not yet implemented in backend-go — see backend-go/docs/execution-plan.md's frontend-compatibility-layer coverage table`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-046–048 (3 task(s), all DONE) for implementation evidence.
 
 ---
 

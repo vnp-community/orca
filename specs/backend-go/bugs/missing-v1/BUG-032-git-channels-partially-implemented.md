@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** High — largest partial gap in the whole audit (32/34 methods missing), and `git.*` is core to the product's entire code-review/commit workflow.
 **Symptom:** Every `git.*` call the frontend makes other than `git.status`/`git.diff` resolves through `notImplementedHandler` and errors out (see BUG-002 for the general "unregistered channel" failure mode).
-**Status: ❌ Open**
+**Status:** ✅ Resolved — see TASK-206–216 (11 task(s), all DONE) for implementation evidence.
 
 ---
 

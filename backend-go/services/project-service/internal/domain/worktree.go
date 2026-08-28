@@ -1,6 +1,9 @@
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 var (
 	// ErrEmptyRepoID is returned by NewWorktree when RepoID is empty — a
@@ -29,6 +32,35 @@ type Worktree struct {
 	Path      string
 	Branch    string
 	Active    bool
+	CreatedAt time.Time
+
+	// Lineage — explicit-capture only (nil unless this worktree was created
+	// with a captured parent context). See
+	// proto/orca/project/v1/project.proto's WorktreeLineageEntry doc
+	// comment for what each field means; CaptureConfidence is always
+	// "explicit" here — project-service never infers it.
+	ParentWorktreeID        *string
+	Origin                  *string
+	CaptureSource           *string
+	CaptureConfidence       *string
+	TaskID                  *string
+	OrchestrationRunID      *string
+	CoordinatorHandle       *string
+	CreatedByTerminalHandle *string
+}
+
+// WorktreeLineageCapture is the optional lineage context a caller may
+// supply to NewWorktree — kept as its own type (rather than more NewWorktree
+// positional params) since every field is optional and most callers pass
+// none of them.
+type WorktreeLineageCapture struct {
+	ParentWorktreeID        string
+	Origin                  string
+	CaptureSource           string
+	TaskID                  string
+	OrchestrationRunID      string
+	CoordinatorHandle       string
+	CreatedByTerminalHandle string
 }
 
 // NewWorktree constructs a Worktree, enforcing the invariants a metadata
@@ -36,7 +68,7 @@ type Worktree struct {
 // Active — RecordWorktreeCreated is only ever called after the real `git
 // worktree add` already succeeded, so there is no "created but inactive"
 // state to represent at construction time.
-func NewWorktree(id, projectID, repoID, path, branch string) (Worktree, error) {
+func NewWorktree(id, projectID, repoID, path, branch string, lineage WorktreeLineageCapture) (Worktree, error) {
 	if projectID == "" {
 		return Worktree{}, ErrEmptyProjectID
 	}
@@ -49,5 +81,33 @@ func NewWorktree(id, projectID, repoID, path, branch string) (Worktree, error) {
 	if branch == "" {
 		return Worktree{}, ErrEmptyWorktreeBranch
 	}
-	return Worktree{ID: id, ProjectID: projectID, RepoID: repoID, Path: path, Branch: branch, Active: true}, nil
+	wt := Worktree{
+		ID: id, ProjectID: projectID, RepoID: repoID, Path: path, Branch: branch, Active: true,
+		ParentWorktreeID:        nonEmptyPtr(lineage.ParentWorktreeID),
+		Origin:                  nonEmptyPtr(lineage.Origin),
+		CaptureSource:           nonEmptyPtr(lineage.CaptureSource),
+		TaskID:                  nonEmptyPtr(lineage.TaskID),
+		OrchestrationRunID:      nonEmptyPtr(lineage.OrchestrationRunID),
+		CoordinatorHandle:       nonEmptyPtr(lineage.CoordinatorHandle),
+		CreatedByTerminalHandle: nonEmptyPtr(lineage.CreatedByTerminalHandle),
+	}
+	// Any captured lineage field means this worktree's lineage was captured
+	// explicitly by its creator — project-service never infers lineage
+	// itself (see WorktreeLineageEntry's doc comment), so this is the only
+	// value CaptureConfidence ever takes today.
+	if wt.ParentWorktreeID != nil || wt.Origin != nil || wt.TaskID != nil || wt.OrchestrationRunID != nil {
+		explicit := "explicit"
+		wt.CaptureConfidence = &explicit
+	}
+	return wt, nil
+}
+
+// nonEmptyPtr returns nil for an empty string, else a pointer to it — the
+// idiom every optional string lineage field uses to distinguish "not
+// supplied" from a genuinely empty value.
+func nonEmptyPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }

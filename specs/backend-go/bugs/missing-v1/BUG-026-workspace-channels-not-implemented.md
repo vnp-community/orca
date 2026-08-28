@@ -4,7 +4,7 @@
 **File:** `internal/adapter/wscompat/channels.go`
 **Severity:** Medium — called on every `WorkspaceContext` mount/refresh, so frequently hit despite being "legacy".
 **Symptom:** `workspace.refreshFileTree` `callRuntimeRpc` calls fall through to `registry.go`'s `notImplementedHandler` and return `channel "workspace.refreshFileTree" is not yet implemented in backend-go`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-168 (1 task(s), all DONE) for implementation evidence.
 
 ---
 

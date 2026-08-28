@@ -76,9 +76,16 @@ type fakeProjectServiceClient struct {
 
 	listWorktreesFunc         func(ctx context.Context, in *projectv1.ListWorktreesRequest) (*projectv1.ListWorktreesResponse, error)
 	setWorktreeActivationFunc func(ctx context.Context, in *projectv1.SetWorktreeActivationRequest) (*projectv1.SetWorktreeActivationResponse, error)
+	listWorktreeLineageFunc   func(ctx context.Context, in *projectv1.ListWorktreeLineageRequest) (*projectv1.ListWorktreeLineageResponse, error)
 
 	calledListWorktrees         bool
 	calledSetWorktreeActivation bool
+	calledListWorktreeLineage   bool
+}
+
+func (f *fakeProjectServiceClient) ListWorktreeLineage(ctx context.Context, in *projectv1.ListWorktreeLineageRequest, _ ...grpc.CallOption) (*projectv1.ListWorktreeLineageResponse, error) {
+	f.calledListWorktreeLineage = true
+	return f.listWorktreeLineageFunc(ctx, in)
 }
 
 func (f *fakeProjectServiceClient) ListWorktrees(ctx context.Context, in *projectv1.ListWorktreesRequest, _ ...grpc.CallOption) (*projectv1.ListWorktreesResponse, error) {
@@ -114,6 +121,103 @@ func TestWorktreeCreateChannel_Success(t *testing.T) {
 	resp, ok := result.(*gitgatewayv1.CreateWorktreeResponse)
 	if !ok || resp.GetWorktreeId() != "wt-1" || resp.GetPath() != "/repo-feature" || resp.GetHeadSha() != "sha1" {
 		t.Errorf("expected response to be returned unmodified, got %+v", result)
+	}
+}
+
+func TestWorktreeCreateChannel_ThreadsOptionalLineageArgs(t *testing.T) {
+	var gotReq *gitgatewayv1.CreateWorktreeRequest
+	git := &fakeGitGatewayServiceClient{
+		createWorktreeFunc: func(_ context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "wt-2"}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.create",
+		argsJSON(t, map[string]any{
+			"projectId": "proj-1", "repoId": "repo-1", "branch": "feature", "baseRef": "main",
+			"parentWorktreeId": "wt-1", "origin": "orchestration", "taskId": "task_abc123",
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetParentWorktreeId() != "wt-1" || gotReq.GetOrigin() != "orchestration" || gotReq.GetTaskId() != "task_abc123" {
+		t.Errorf("expected lineage args to thread through, got %+v", gotReq)
+	}
+	if gotReq.CaptureSource != nil {
+		t.Errorf("expected an unsupplied optional field to stay nil, got %v", gotReq.CaptureSource)
+	}
+}
+
+func TestWorktreeCreateChannel_NoLineageArgsMeansNilFields(t *testing.T) {
+	var gotReq *gitgatewayv1.CreateWorktreeRequest
+	git := &fakeGitGatewayServiceClient{
+		createWorktreeFunc: func(_ context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "wt-3"}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.create",
+		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1", "branch": "feature", "baseRef": "main"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.ParentWorktreeId != nil || gotReq.Origin != nil || gotReq.TaskId != nil {
+		t.Errorf("expected every unsupplied lineage field to stay nil, got %+v", gotReq)
+	}
+}
+
+func TestWorktreeLineageListChannel_MapsResponseToLineageMap(t *testing.T) {
+	parentID := "wt-parent"
+	origin := "cli"
+	confidence := "explicit"
+	project := &fakeProjectServiceClient{
+		listWorktreeLineageFunc: func(_ context.Context, _ *projectv1.ListWorktreeLineageRequest) (*projectv1.ListWorktreeLineageResponse, error) {
+			return &projectv1.ListWorktreeLineageResponse{
+				Lineage: []*projectv1.WorktreeLineageEntry{
+					{
+						WorktreeId: "wt-child", ParentWorktreeId: &parentID, Origin: &origin,
+						CaptureConfidence: &confidence, CreatedAtUnixMs: 1700000000000,
+					},
+				},
+			}, nil
+		},
+	}
+	git := &fakeGitGatewayServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.lineageList", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !project.calledListWorktreeLineage {
+		t.Fatal("expected ListWorktreeLineage to be called")
+	}
+	out, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected a map[string]any result, got %T", result)
+	}
+	lineage, ok := out["lineage"].(map[string]worktreeLineageView)
+	if !ok {
+		t.Fatalf("expected lineage to be a map[string]worktreeLineageView, got %T", out["lineage"])
+	}
+	entry, ok := lineage["wt-child"]
+	if !ok {
+		t.Fatalf("expected an entry keyed by worktreeId, got %+v", lineage)
+	}
+	if entry.WorktreeInstanceID != "wt-child" || entry.ParentWorktreeID == nil || *entry.ParentWorktreeID != parentID {
+		t.Errorf("unexpected entry: %+v", entry)
+	}
+	if out["workspaceLineage"] == nil {
+		t.Error("expected workspaceLineage to be present (empty map, per this pass's scope cut)")
 	}
 }
 

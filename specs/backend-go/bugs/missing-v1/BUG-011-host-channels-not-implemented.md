@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** Low — Windows-terminal-capability probing (WSL/PowerShell/git-bash availability) is a niche, platform-specific concern, not part of core daily workflows.
 **Symptom:** Every `host.*` call from `windows-terminal-capability-read.ts` times out with `channel "host.X" is not yet implemented in backend-go — see backend-go/docs/execution-plan.md's frontend-compatibility-layer coverage table`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-068–070 (3 task(s), all DONE) for implementation evidence.
 
 ---
 

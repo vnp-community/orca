@@ -141,6 +141,12 @@ type WorktreeRepository interface {
 	ListWorktrees(ctx context.Context, projectID string) ([]domain.Worktree, error)
 	SetWorktreeActivation(ctx context.Context, worktreeID string, active bool) (domain.Worktree, error)
 	RenameWorktree(ctx context.Context, worktreeID, branch string) (domain.Worktree, error)
+	// ListLineage returns every worktree with an explicitly-captured parent
+	// — this is unrelated to the "lineage/history" mentioned in
+	// RecordWorktreeRemoved's doc comment above (that one means git commit
+	// history, owned by git-gateway-service; this one means worktree
+	// creation lineage — see domain.Worktree's ParentWorktreeID field).
+	ListLineage(ctx context.Context) ([]domain.Worktree, error)
 }
 
 // ProjectGroupRepository is the persistence port for the folder-style

@@ -5,7 +5,7 @@
 **Affected files (proposed):**
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_test.go`
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 1 task(s) (TASK-167) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

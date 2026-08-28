@@ -2,6 +2,7 @@ package wscompat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -385,6 +386,23 @@ func TestRegisterSshChannels(t *testing.T) {
 		targets, ok := result.([]*infrafleetv1.SshTarget)
 		if !ok || len(targets) != 1 || targets[0].GetId() != "s1" {
 			t.Errorf("unexpected result: %+v", result)
+		}
+	})
+
+	t.Run("ssh.listTargets empty result returns [] not null (BUG-005)", func(t *testing.T) {
+		fake.listSshTargetsFunc = func(ctx context.Context, in *infrafleetv1.ListSshTargetsRequest) (*infrafleetv1.ListSshTargetsResponse, error) {
+			return &infrafleetv1.ListSshTargetsResponse{}, nil // SshTargets left nil
+		}
+		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "ssh.listTargets", nil)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		b, err := json.Marshal(result)
+		if err != nil {
+			t.Fatalf("Marshal: %v", err)
+		}
+		if string(b) != "[]" {
+			t.Errorf("expected [], got %s", b)
 		}
 	})
 

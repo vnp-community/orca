@@ -9,7 +9,7 @@
 - `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 - `backend-go/services/api-gateway/internal/adapter/httpgateway/infra_routes.go` (REST parity, optional)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 5 task(s) (TASK-169–173) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

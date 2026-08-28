@@ -4,6 +4,13 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"reflect"
+	"time"
+
+	"google.golang.org/protobuf/proto"
+
+	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
 
 // Identity is the caller's resolved tenant/user, threaded into every
@@ -70,6 +77,11 @@ func (r *Registry) DispatchStreamChannel(ctx context.Context, id Identity, chann
 	if !found {
 		return nil, nil, false, nil
 	}
+	// Why: attach identity here too, for consistency with Dispatch (TASK-001,
+	// specs/backend-go/bugs/missing-v2/) — deliberately NO context.WithTimeout,
+	// unlike Dispatch: a stream channel's ack/events lifecycle is long-lived
+	// by design (e.g. a terminal session), not a single bounded RPC.
+	ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 	ack, events, err = h(ctx, id, args)
 	return ack, events, true, err
 }
@@ -114,18 +126,109 @@ func (r *Registry) BinaryStreamHandlerFor(channel string) (BinaryStreamChannelHa
 	return h, ok
 }
 
+// dispatchRPCTimeout is the OUTER safety-net deadline applied to every
+// dispatched call, attached here so a handler that sets no deadline of its
+// own is never unbounded — matches 08-inter-service-communication.md's
+// "Deadlines are mandatory on every outbound call... no unbounded gRPC
+// call exists anywhere in the system."
+//
+// Set to 60s, not that doc's "default 5s for intra-cluster calls" — a
+// child context.WithTimeout can only ever SHRINK a parent's deadline, never
+// extend it, so a short outer default here would silently clip every
+// handler that documents and relies on a longer explicit override (found
+// live, not guessed: channels_tenant_project.go's projectGroup.scanNested/
+// projectHostSetup.setupExistingFolder both need 30s for a filesystem scan
+// that can legitimately run long, channels_repo_ssh_status_workspace.go
+// has one 60s and one 20s override — a 5s outer bound broke exactly those
+// cases in this package's existing test suite). 60s matches the longest
+// currently-documented per-handler override, so this bound is a true
+// no-handler-left-unbounded safety net, never a silent tightening of an
+// already-reasoned-about per-call budget — those handlers' own shorter
+// group constants (rpcTimeout=8s, etc.) still apply correctly, since a
+// handler requesting LESS than the remaining outer budget always wins.
+const dispatchRPCTimeout = 60 * time.Second
+
 // Dispatch resolves and invokes the handler for channel, falling back to
-// notImplementedHandler when nothing is registered.
+// notImplementedHandler when nothing is registered. Attaches the caller's
+// identity onto ctx as outbound gRPC metadata and applies dispatchRPCTimeout
+// ONCE here, and normalizes a nil-slice result to an empty one before
+// returning — see specs/backend-go/bugs/missing-v2/BUG-001 and BUG-005 for
+// why these must not be left to each handler to do individually.
 func (r *Registry) Dispatch(ctx context.Context, id Identity, channel string, args []json.RawMessage) (any, error) {
 	h, ok := r.handlers[channel]
 	if !ok {
 		return notImplementedHandler(ctx, id, channel)
 	}
-	return h(ctx, id, args)
+	ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+	ctx, cancel := context.WithTimeout(ctx, dispatchRPCTimeout)
+	defer cancel()
+	result, err := h(ctx, id, args)
+	if err != nil {
+		return nil, err
+	}
+	return normalizeNilSlices(result), nil
 }
 
 func notImplementedHandler(_ context.Context, _ Identity, channel string) (any, error) {
 	return nil, fmt.Errorf("channel %q is not yet implemented in backend-go — see backend-go/docs/execution-plan.md's frontend-compatibility-layer coverage table", channel)
+}
+
+// normalizeNilSlices replaces a nil slice — at the top level, or one level
+// into a plain (non-proto) value struct's exported fields — with a
+// non-nil, empty slice of the same type, so encoding/json emits [] instead
+// of null. See specs/backend-go/bugs/missing-v2/BUG-005: several channel
+// handlers return a proto-generated getter (e.g. resp.GetGroups()) or a
+// locally-declared `var xs []T` that stays nil for an empty result, and
+// every real frontend caller for those channels destructures/iterates the
+// result with no null-guard.
+//
+// Deliberately conservative: proto.Message values (the overwhelming
+// majority of single-object channel results, e.g. *projectv1.Project) are
+// returned completely untouched, never copied or dereferenced — an
+// earlier version of this function walked into every pointer/struct
+// result generically and broke type assertions + proto's own no-copy
+// contract for results that were never nil-slice cases at all (found via
+// the full wscompat test suite, not guessed — see TASK-010's Status
+// note). Only a bare top-level slice (projectGroup.list/ssh.listTargets/
+// team.list's shape) or a plain, non-proto VALUE struct
+// (credentials.list's credentialsListView) are normalized; a pointer
+// result is never unwrapped.
+func normalizeNilSlices(v any) any {
+	if v == nil {
+		return v
+	}
+	if _, isProto := v.(proto.Message); isProto {
+		return v
+	}
+	rv := reflect.ValueOf(v)
+	switch rv.Kind() {
+	case reflect.Slice:
+		if rv.IsNil() {
+			return reflect.MakeSlice(rv.Type(), 0, 0).Interface()
+		}
+		return v
+	case reflect.Struct:
+		return normalizeStructSliceFields(rv)
+	default:
+		return v
+	}
+}
+
+func normalizeStructSliceFields(rv reflect.Value) any {
+	t := rv.Type()
+	out := reflect.New(t).Elem()
+	out.Set(rv)
+	for i := 0; i < t.NumField(); i++ {
+		field := t.Field(i)
+		if !field.IsExported() {
+			continue
+		}
+		fv := out.Field(i)
+		if fv.Kind() == reflect.Slice && fv.IsNil() {
+			fv.Set(reflect.MakeSlice(fv.Type(), 0, 0))
+		}
+	}
+	return out.Interface()
 }
 
 // decodeArg is a small helper every channels_*.go handler uses to pull a

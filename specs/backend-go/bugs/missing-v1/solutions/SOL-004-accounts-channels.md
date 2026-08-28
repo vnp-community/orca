@@ -8,7 +8,7 @@
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (add `registerAccountsChannels` to `RegisterRealChannels`)
 - `frontend/src/renderer/src/runtime/runtime-provider-accounts-client.ts` (param addition — see "Open prerequisite" below; frontend change, flagged not implemented here)
 - `agent/` (new JSON-RPC methods — explicitly out of scope for this proposal, flagged below)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 3 task(s) (TASK-021–023) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

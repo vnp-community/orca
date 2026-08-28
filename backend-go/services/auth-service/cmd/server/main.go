@@ -30,6 +30,7 @@ import (
 
 	authbcrypt "github.com/stablyai/orca-go/services/auth-service/internal/adapter/bcrypt"
 	authgrpc "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpc"
+	authgrpcclient "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpcclient"
 	authopaclient "github.com/stablyai/orca-go/services/auth-service/internal/adapter/opaclient"
 	authpolicypublisher "github.com/stablyai/orca-go/services/auth-service/internal/adapter/policypublisher"
 	authpostgres "github.com/stablyai/orca-go/services/auth-service/internal/adapter/postgres"
@@ -102,6 +103,9 @@ func run() error {
 	// query string (common/policy.Evaluator's own cache) and is shared by
 	// every requireAdminActor call for this process's lifetime.
 	opaEvaluator := policy.NewEvaluator(cfg.OPABundlePath)
+	if err := opaEvaluator.Warm(ctx, "data.orca.authz.admin.allow"); err != nil {
+		return fmt.Errorf("auth-service: OPA bundle failed to load at startup (bundle path %q): %w", cfg.OPABundlePath, err)
+	}
 	opaClient := authopaclient.New(opaEvaluator)
 
 	loginUC := usecase.NewLogin(repo, repo, repo, hasher, clock, cfg.SessionTTL)
@@ -133,23 +137,34 @@ func run() error {
 
 	// Runs once, before the server starts accepting traffic — see
 	// internal/usecase/bootstrap.go's doc comment for why this isn't an
-	// RPC. No-op unless BOOTSTRAP_TENANT_ID/BOOTSTRAP_ADMIN_EMAIL are set
-	// AND no user already exists anywhere.
-	bootstrap := usecase.NewBootstrap(repo, repo, hasher, clock)
-	generatedPassword, err := bootstrap.EnsureAdmin(ctx, usecase.BootstrapConfig{
-		TenantID: cfg.BootstrapTenantID,
-		Email:    cfg.BootstrapAdminEmail,
-		Password: cfg.BootstrapAdminPassword,
-	}, logger)
-	if err != nil {
-		return fmt.Errorf("bootstrapping admin user: %w", err)
-	}
-	if generatedPassword != "" {
-		// Printed once, at first boot, never stored — same contract the
-		// old TS backend used for an auto-generated admin password.
-		logger.Warn("auth-service: AUTO-GENERATED ADMIN PASSWORD (save this now, it will not be shown again)",
-			slog.String("email", cfg.BootstrapAdminEmail),
-			slog.String("password", generatedPassword))
+	// RPC. No-op unless BOOTSTRAP_ADMIN_EMAIL is set AND no user already
+	// exists anywhere. Only dial tenant-service when bootstrap will
+	// actually run — avoids adding an always-on startup dependency on
+	// tenant-service being reachable for every ordinary (already
+	// bootstrapped) boot.
+	if cfg.BootstrapAdminEmail != "" {
+		tenantProvisioner, err := authgrpcclient.NewTenantProvisioner(cfg.TenantServiceAddr)
+		if err != nil {
+			return fmt.Errorf("dialing tenant-service: %w", err)
+		}
+		defer func() { _ = tenantProvisioner.Close() }()
+
+		bootstrap := usecase.NewBootstrap(repo, repo, hasher, clock, tenantProvisioner)
+		generatedPassword, err := bootstrap.EnsureAdmin(ctx, usecase.BootstrapConfig{
+			CompanyName: cfg.BootstrapCompanyName,
+			Email:       cfg.BootstrapAdminEmail,
+			Password:    cfg.BootstrapAdminPassword,
+		}, logger)
+		if err != nil {
+			return fmt.Errorf("bootstrapping admin user: %w", err)
+		}
+		if generatedPassword != "" {
+			// Printed once, at first boot, never stored — same contract the
+			// old TS backend used for an auto-generated admin password.
+			logger.Warn("auth-service: AUTO-GENERATED ADMIN PASSWORD (save this now, it will not be shown again)",
+				slog.String("email", cfg.BootstrapAdminEmail),
+				slog.String("password", generatedPassword))
+		}
 	}
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))

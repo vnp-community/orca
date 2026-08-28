@@ -12,7 +12,7 @@
 - `backend-go/services/project-service/internal/adapter/postgres/*.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (new `registerProjectChannels`)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_test.go`
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 5 task(s) (TASK-131–135) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

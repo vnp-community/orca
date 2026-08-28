@@ -42,6 +42,27 @@ func mountAdminRoutes(r chi.Router, client authv1.AuthServiceClient) {
 	})
 }
 
+// adminStatsJSON is GET /admin/api/stats' response shape — camelCase,
+// matching the old TS backend's AdminStats
+// (backend/src/main/admin/admin-stats-handler.ts: totalUsers/activeUsers/
+// activeSessions/pairedDevices) as closely as this service's actual
+// GetAdminStats usecase allows. Found live (specs/backend-go/bugs/
+// missing-v2/ follow-up): the raw GetAdminStatsResponse proto struct's
+// `json:"..."` tags are snake_case (total_users, active_sessions), not
+// this contract's camelCase — passing it straight to writeJSON silently
+// emitted the wrong field names.
+//
+// activeUsers/pairedDevices are honestly omitted, not fabricated as 0:
+// this service's GetAdminStats (auth-service/internal/usecase/
+// get_admin_stats.go) doesn't track either (it added total_policies
+// instead, which the old TS contract never had) — inventing fake zeros for
+// fields nothing computes would be worse than a client seeing them absent.
+type adminStatsJSON struct {
+	TotalUsers     int32 `json:"totalUsers"`
+	ActiveSessions int32 `json:"activeSessions"`
+	TotalPolicies  int32 `json:"totalPolicies"`
+}
+
 func handleAdminStats(client authv1.AuthServiceClient) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		identity, _ := identityFromContext(r.Context())
@@ -51,7 +72,11 @@ func handleAdminStats(client authv1.AuthServiceClient) http.HandlerFunc {
 			writeGRPCError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, resp)
+		writeJSON(w, http.StatusOK, adminStatsJSON{
+			TotalUsers:     resp.GetTotalUsers(),
+			ActiveSessions: resp.GetActiveSessions(),
+			TotalPolicies:  resp.GetTotalPolicies(),
+		})
 	}
 }
 
@@ -70,7 +95,7 @@ func handleDeactivateUser(client authv1.AuthServiceClient) http.HandlerFunc {
 			writeGRPCError(w, err)
 			return
 		}
-		writeJSON(w, http.StatusOK, resp.GetUser())
+		writeJSON(w, http.StatusOK, toUserJSON(resp.GetUser()))
 	}
 }
 

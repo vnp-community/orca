@@ -372,6 +372,7 @@ type fakeWorktreeRepository struct {
 	listErr          error
 	setActivationErr error
 	renameErr        error
+	listLineageErr   error
 }
 
 func newFakeWorktreeRepository() *fakeWorktreeRepository {
@@ -434,6 +435,19 @@ func (f *fakeWorktreeRepository) RenameWorktree(ctx context.Context, worktreeID,
 	wt.Branch = branch
 	f.worktrees[worktreeID] = wt
 	return wt, nil
+}
+
+func (f *fakeWorktreeRepository) ListLineage(ctx context.Context) ([]domain.Worktree, error) {
+	if f.listLineageErr != nil {
+		return nil, f.listLineageErr
+	}
+	var out []domain.Worktree
+	for _, wt := range f.worktrees {
+		if wt.ParentWorktreeID != nil {
+			out = append(out, wt)
+		}
+	}
+	return out, nil
 }
 
 // fakeProjectGroupRepository is an in-memory ProjectGroupRepository.

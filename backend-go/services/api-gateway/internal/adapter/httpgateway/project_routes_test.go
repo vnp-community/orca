@@ -131,9 +131,9 @@ type fakeProjectServiceClient struct {
 	lastGetFolderWorkspacePathStatusReq *projectv1.GetFolderWorkspacePathStatusRequest
 	getFolderWorkspacePathStatusResp    *projectv1.GetFolderWorkspacePathStatusResponse
 	getFolderWorkspacePathStatusErr     error
-	lastListMembersReq *projectv1.ListMembersRequest
-	listMembersResp    *projectv1.ListMembersResponse
-	listMembersErr     error
+	lastListMembersReq                  *projectv1.ListMembersRequest
+	listMembersResp                     *projectv1.ListMembersResponse
+	listMembersErr                      error
 
 	lastRemoveMemberReq *projectv1.RemoveMemberRequest
 	removeMemberResp    *projectv1.RemoveMemberResponse
@@ -294,6 +294,10 @@ func (f *fakeProjectServiceClient) ListWorktrees(_ context.Context, in *projectv
 		return nil, f.listWorktreesErr
 	}
 	return f.listWorktreesResp, nil
+}
+
+func (f *fakeProjectServiceClient) ListWorktreeLineage(_ context.Context, _ *projectv1.ListWorktreeLineageRequest, _ ...grpc.CallOption) (*projectv1.ListWorktreeLineageResponse, error) {
+	return &projectv1.ListWorktreeLineageResponse{}, nil
 }
 
 func (f *fakeProjectServiceClient) SetWorktreeActivation(_ context.Context, in *projectv1.SetWorktreeActivationRequest, _ ...grpc.CallOption) (*projectv1.SetWorktreeActivationResponse, error) {

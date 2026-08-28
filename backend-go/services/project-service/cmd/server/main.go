@@ -112,7 +112,11 @@ func run() error {
 	// global-admin authorization — mirrors auth-service/annotation-service/
 	// task-service's own composition-root wiring. One Evaluator, pointed at
 	// the same orca-authz bundle, shared by every OPA-gated usecase below.
-	opa := projectopaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
+	evaluator := policy.NewEvaluator(cfg.OPABundlePath)
+	if err := evaluator.Warm(ctx, "data.orca.authz.project.allow"); err != nil {
+		return fmt.Errorf("project-service: OPA bundle failed to load at startup (bundle path %q): %w", cfg.OPABundlePath, err)
+	}
+	opa := projectopaclient.New(evaluator)
 
 	createProjectUC := usecase.NewCreateProject(repo)
 	getProjectUC := usecase.NewGetProject(repo, opa)
@@ -140,6 +144,7 @@ func run() error {
 	listWorktreesUC := usecase.NewListWorktrees(worktreeRepo, repo, opa)
 	setWorktreeActivationUC := usecase.NewSetWorktreeActivation(worktreeRepo)
 	renameWorktreeUC := usecase.NewRenameWorktree(worktreeRepo)
+	listWorktreeLineageUC := usecase.NewListWorktreeLineage(worktreeRepo)
 
 	createProjectGroupUC := usecase.NewCreateProjectGroup(projectGroupRepo)
 	updateProjectGroupUC := usecase.NewUpdateProjectGroup(projectGroupRepo)
@@ -182,6 +187,7 @@ func run() error {
 		ListWorktrees:         listWorktreesUC,
 		SetWorktreeActivation: setWorktreeActivationUC,
 		RenameWorktree:        renameWorktreeUC,
+		ListWorktreeLineage:   listWorktreeLineageUC,
 
 		CreateProjectGroup: createProjectGroupUC,
 		UpdateProjectGroup: updateProjectGroupUC,
@@ -189,9 +195,9 @@ func run() error {
 		ListProjectGroups:  listProjectGroupsUC,
 
 		FolderWorkspaces: folderWorkspaceUC,
-		MoveProject:        moveProjectUC,
-		ScanNested:         scanNestedUC,
-		ImportNested:       importNestedUC,
+		MoveProject:      moveProjectUC,
+		ScanNested:       scanNestedUC,
+		ImportNested:     importNestedUC,
 
 		CreateHostSetup:     createHostSetupUC,
 		ListHostSetups:      listHostSetupsUC,

@@ -11,7 +11,7 @@
 - `backend-go/services/issue-tracking-service/internal/usecase/{revoke_auth,set_integration_credential,get_integration_credential_status,list_integration_credentials}.go` (new — this service has no credential-broker adapter at all yet)
 - `backend-go/services/credential-broker-service/internal/usecase/{get_credential_metadata_by_owner,list_credentials_by_category}.go` (new)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_credentials.go` (new)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 7 task(s) (TASK-037–043) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

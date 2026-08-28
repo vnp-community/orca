@@ -15,7 +15,7 @@
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_jira.go` (new file)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_jira_test.go` (new file)
 - `backend-go/services/api-gateway/cmd/server/main.go` (pass `issueTrackingClient` into `RegisterRealChannels`)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 6 task(s) (TASK-096–101) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

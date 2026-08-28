@@ -11,7 +11,7 @@
 - `backend-go/services/infra-fleet-service/internal/adapter/postgres/*.go`
 - `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 5 task(s) (TASK-162–166) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

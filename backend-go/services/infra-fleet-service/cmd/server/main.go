@@ -147,6 +147,8 @@ func run() error {
 	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient)
 	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, agentClient)
 	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter)
+	screencastStreamLimiter := usecase.NewConnectionStreamLimiter(0)
+	attachScreencastUC := usecase.NewAttachScreencast(repo, agentClient, screencastStreamLimiter)
 	listBrowserProfilesUC := usecase.NewListBrowserProfiles(browserProfileStore)
 	createBrowserProfileUC := usecase.NewCreateBrowserProfile(browserProfileStore, uuid.NewString)
 	deleteBrowserProfileUC := usecase.NewDeleteBrowserProfile(browserProfileStore)
@@ -181,6 +183,7 @@ func run() error {
 		getTerminalAgentStatusUC,
 		inspectTerminalProcessUC,
 		attachPtyUC,
+		attachScreencastUC,
 		listBrowserProfilesUC,
 		createBrowserProfileUC,
 		deleteBrowserProfileUC,

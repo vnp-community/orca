@@ -12,7 +12,7 @@
 - `backend-go/services/project-service/internal/adapter/grpcclient/infrafleet.go` (new outbound client)
 - `backend-go/services/project-service/internal/adapter/postgres/*.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (new `registerProjectGroupChannels`)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 5 task(s) (TASK-136–140) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

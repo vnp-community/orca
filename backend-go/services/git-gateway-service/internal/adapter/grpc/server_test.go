@@ -136,7 +136,7 @@ func (fakeExecutor) WriteFileChunk(context.Context, string, string, int64, []byt
 }
 
 func (fakeExecutor) CreateDir(context.Context, string, string, bool, bool) error { return nil }
-func (fakeExecutor) Delete(context.Context, string, string, bool) error         { return nil }
+func (fakeExecutor) Delete(context.Context, string, string, bool) error          { return nil }
 
 func (fakeExecutor) Stat(context.Context, string, string) (domain.FileStat, error) {
 	return domain.FileStat{Exists: true, SizeBytes: 7}, nil
@@ -266,7 +266,7 @@ func (fakeProjectClient) GetRepo(_ context.Context, repoID string) (domain.RepoI
 	return domain.RepoInfo{ID: repoID}, nil
 }
 
-func (fakeProjectClient) RecordWorktreeCreated(_ context.Context, _, _, path, branch string) (domain.WorktreeRecord, error) {
+func (fakeProjectClient) RecordWorktreeCreated(_ context.Context, _, _, path, branch string, _ domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
 	return domain.WorktreeRecord{ID: "wt-1", Path: path, Branch: branch}, nil
 }
 

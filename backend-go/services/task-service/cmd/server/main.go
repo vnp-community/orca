@@ -108,6 +108,9 @@ func run() error {
 	// query string (common/policy.Evaluator's own cache) and is shared by
 	// every ResolvePermission call for this process's lifetime.
 	opaEvaluator := policy.NewEvaluator(cfg.OPABundlePath)
+	if err := opaEvaluator.Warm(ctx, "data.orca.authz.task.allow"); err != nil {
+		return fmt.Errorf("task-service: OPA bundle failed to load at startup (bundle path %q): %w", cfg.OPABundlePath, err)
+	}
 	opaClient := taskopaclient.New(opaEvaluator)
 
 	createTaskUC := usecase.NewCreateTask(repo)

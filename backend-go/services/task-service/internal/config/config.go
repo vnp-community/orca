@@ -33,7 +33,7 @@ func Load() (Config, error) {
 	}
 	return Config{
 		Base:                  base,
-		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "/policy/orca-authz"),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 	}, nil

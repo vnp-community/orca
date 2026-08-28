@@ -4,7 +4,7 @@
 **File:** `internal/adapter/httpgateway/auth_routes.go` — `mountAuthRoutes`
 **Severity:** Low — SSO is a stub everywhere (old backend included), but the *behavior* on a hit still regresses
 **Symptom:** `SsoButton` (`LoginPage.tsx`) hitting `GET /auth/sso/:provider` gets chi's default `404 Not Found` page instead of the documented, structured `501`
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-007–008 (2 task(s), all DONE) for implementation evidence.
 
 ---
 

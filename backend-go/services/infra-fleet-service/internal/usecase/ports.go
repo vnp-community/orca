@@ -184,6 +184,56 @@ type DevServerAgentClient interface {
 	// handlePtyListProcesses now includes it) as of this pass — see
 	// devserveragent/methods.go's InspectProcess doc comment.
 	InspectProcess(ctx context.Context, devServer domain.DevServer, ptyID string) (InspectProcessResult, error)
+
+	// --- Browser screencast (browser.screencast's live-view stream) ---
+
+	// StreamScreencast starts a browser.screencast capture on the agent
+	// (fire-and-forget browser.screencastStart dispatch, mirroring how
+	// git.execStream/agent.spawn ack immediately then push further data via
+	// notify) and subscribes to its ready/frame/ended/error notifications
+	// over devServer's persistent session — same shape as StreamPty, except
+	// there's no separate "spawn" step to call first: starting IS
+	// subscribing, driven entirely by params.WorktreeID (the agent has no
+	// pre-existing screencast identity to key off of the way a pty already
+	// exists before StreamPty attaches to it). unsubscribe MUST be called
+	// exactly once by the caller (usecase.AttachScreencast).
+	StreamScreencast(ctx context.Context, devServer domain.DevServer, params ScreencastParams) (<-chan ScreencastEvent, func(), error)
+}
+
+// ScreencastParams carries browser.screencastStart's request fields —
+// mirrors proto/orca/infrafleet/v1/infrafleet.proto's StartScreencast
+// message 1:1 (clamping to the same bounds happens at the wscompat layer,
+// before this usecase is ever reached, matching the OLD TS backend's
+// clampInteger/clampOptionalInteger/clampOptionalNumber behavior).
+type ScreencastParams struct {
+	WorktreeID         string
+	Page               string
+	Format             string
+	Quality            int32
+	MaxWidth           int32
+	MaxHeight          int32
+	ViewportWidth      *int32
+	ViewportHeight     *int32
+	DeviceScaleFactor  *float64
+	Mobile             bool
+	EveryNthFrame      int32
+	MinFrameIntervalMs int32
+}
+
+// ScreencastEvent is one event StreamScreencast's channel delivers —
+// exactly one of Ready/Frame/Ended/ErrorMsg is meaningfully populated per
+// value, mirroring PtyEvent's "one raw struct, narrow by which field is
+// set" convention. Frame carries opaque, already-encoded bytes produced
+// agent-side (encodeBrowserScreencastFrame) — this usecase and every layer
+// above it never parses image bytes, only relays them.
+type ScreencastEvent struct {
+	Ready          bool
+	SubscriptionID string
+	BrowserPageID  string
+	Format         string
+	Frame          []byte
+	Ended          bool
+	ErrorMsg       string
 }
 
 // SpawnPtyInput carries pty.create's request fields.

@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** High — project creation/membership is core navigation; `WorkspaceContext.tsx` calls `project.get` on load
 **Symptom:** Every `project.*` call from `CreateProjectDialog.tsx`, `WorkspaceContext.tsx`, `MemberManager.tsx`, `ProjectSwitcher.tsx`, `repos.ts` times out with `channel "project.X" is not yet implemented in backend-go`
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-131–135 (5 task(s), all DONE) for implementation evidence.
 
 ---
 

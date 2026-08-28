@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** High — this is one of the largest namespaces (18 methods) and backs the file viewer, file search, and every file-tree mutation (create/rename/copy/delete) — core to daily app usage.
 **Symptom:** Every `files.*` call from `runtime-file-client.ts` and the workspace file viewer/search/context-menu components times out with `channel "files.X" is not yet implemented in backend-go — see backend-go/docs/execution-plan.md's frontend-compatibility-layer coverage table`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-049–060 (12 task(s), all DONE) for implementation evidence.
 
 ---
 

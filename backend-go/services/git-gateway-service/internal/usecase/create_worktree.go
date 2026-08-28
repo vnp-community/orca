@@ -10,6 +10,7 @@ import (
 
 type CreateWorktreeInput struct {
 	ProjectID, RepoID, Branch, BaseRef string
+	Lineage                            domain.WorktreeLineageCapture
 }
 
 // CreateWorktree is the saga: resolve host, run `git worktree add`, then
@@ -56,7 +57,7 @@ func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (
 		return domain.WorktreeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_CREATE_FAILED", "git worktree add failed", err)
 	}
 
-	worktree, err := uc.projects.RecordWorktreeCreated(ctx, in.ProjectID, in.RepoID, result.Path, in.Branch)
+	worktree, err := uc.projects.RecordWorktreeCreated(ctx, in.ProjectID, in.RepoID, result.Path, in.Branch, in.Lineage)
 	if err != nil {
 		// Compensating step (05-data-architecture.md's saga pattern) — the
 		// git op already succeeded; project-service has no record of it.

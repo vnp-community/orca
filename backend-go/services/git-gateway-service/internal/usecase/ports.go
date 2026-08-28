@@ -340,7 +340,7 @@ func dispatchFilesystemExecutor(ctx context.Context, resolver ConnectionResolver
 // real answer, until project-service grows one.
 type ProjectClient interface {
 	GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error)
-	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string) (domain.WorktreeRecord, error)
+	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error)
 	RecordWorktreeRemoved(ctx context.Context, worktreeID string) error
 }
 

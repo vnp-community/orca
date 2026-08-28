@@ -45,6 +45,7 @@ type Server struct {
 	listWorktrees         *usecase.ListWorktrees
 	setWorktreeActivation *usecase.SetWorktreeActivation
 	renameWorktree        *usecase.RenameWorktree
+	listWorktreeLineage   *usecase.ListWorktreeLineage
 
 	createProjectGroup *usecase.CreateProjectGroup
 	updateProjectGroup *usecase.UpdateProjectGroup
@@ -52,9 +53,9 @@ type Server struct {
 	listProjectGroups  *usecase.ListProjectGroups
 
 	folderWorkspaces *usecase.FolderWorkspaceUseCase
-	moveProject        *usecase.MoveProject
-	scanNested         *usecase.ScanNested
-	importNested       *usecase.ImportNested
+	moveProject      *usecase.MoveProject
+	scanNested       *usecase.ScanNested
+	importNested     *usecase.ImportNested
 
 	createHostSetup     *usecase.CreateHostSetup
 	listHostSetups      *usecase.ListHostSetups
@@ -90,6 +91,7 @@ type Deps struct {
 	ListWorktrees         *usecase.ListWorktrees
 	SetWorktreeActivation *usecase.SetWorktreeActivation
 	RenameWorktree        *usecase.RenameWorktree
+	ListWorktreeLineage   *usecase.ListWorktreeLineage
 
 	CreateProjectGroup *usecase.CreateProjectGroup
 	UpdateProjectGroup *usecase.UpdateProjectGroup
@@ -97,9 +99,9 @@ type Deps struct {
 	ListProjectGroups  *usecase.ListProjectGroups
 
 	FolderWorkspaces *usecase.FolderWorkspaceUseCase
-	MoveProject        *usecase.MoveProject
-	ScanNested         *usecase.ScanNested
-	ImportNested       *usecase.ImportNested
+	MoveProject      *usecase.MoveProject
+	ScanNested       *usecase.ScanNested
+	ImportNested     *usecase.ImportNested
 
 	CreateHostSetup     *usecase.CreateHostSetup
 	ListHostSetups      *usecase.ListHostSetups
@@ -133,6 +135,7 @@ func New(deps Deps) *Server {
 		listWorktrees:         deps.ListWorktrees,
 		setWorktreeActivation: deps.SetWorktreeActivation,
 		renameWorktree:        deps.RenameWorktree,
+		listWorktreeLineage:   deps.ListWorktreeLineage,
 
 		createProjectGroup: deps.CreateProjectGroup,
 		updateProjectGroup: deps.UpdateProjectGroup,
@@ -140,9 +143,9 @@ func New(deps Deps) *Server {
 		listProjectGroups:  deps.ListProjectGroups,
 
 		folderWorkspaces: deps.FolderWorkspaces,
-		moveProject:        deps.MoveProject,
-		scanNested:         deps.ScanNested,
-		importNested:       deps.ImportNested,
+		moveProject:      deps.MoveProject,
+		scanNested:       deps.ScanNested,
+		importNested:     deps.ImportNested,
 
 		createHostSetup:     deps.CreateHostSetup,
 		listHostSetups:      deps.ListHostSetups,
@@ -331,6 +334,15 @@ func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.Recor
 		RepoID:    req.GetRepoId(),
 		Path:      req.GetPath(),
 		Branch:    req.GetBranch(),
+		Lineage: domain.WorktreeLineageCapture{
+			ParentWorktreeID:        req.GetParentWorktreeId(),
+			Origin:                  req.GetOrigin(),
+			CaptureSource:           req.GetCaptureSource(),
+			TaskID:                  req.GetTaskId(),
+			OrchestrationRunID:      req.GetOrchestrationRunId(),
+			CoordinatorHandle:       req.GetCoordinatorHandle(),
+			CreatedByTerminalHandle: req.GetCreatedByTerminalHandle(),
+		},
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -377,6 +389,18 @@ func (s *Server) RenameWorktree(ctx context.Context, req *projectv1.RenameWorktr
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.RenameWorktreeResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+func (s *Server) ListWorktreeLineage(ctx context.Context, _ *projectv1.ListWorktreeLineageRequest) (*projectv1.ListWorktreeLineageResponse, error) {
+	worktrees, err := s.listWorktreeLineage.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.WorktreeLineageEntry, 0, len(worktrees))
+	for _, wt := range worktrees {
+		out = append(out, toProtoWorktreeLineageEntry(wt))
+	}
+	return &projectv1.ListWorktreeLineageResponse{Lineage: out}, nil
 }
 
 func (s *Server) CreateProjectGroup(ctx context.Context, req *projectv1.CreateProjectGroupRequest) (*projectv1.CreateProjectGroupResponse, error) {
@@ -584,6 +608,35 @@ func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
 		Path:      wt.Path,
 		Branch:    wt.Branch,
 		Active:    wt.Active,
+
+		ParentWorktreeId:        wt.ParentWorktreeID,
+		Origin:                  wt.Origin,
+		CaptureSource:           wt.CaptureSource,
+		CaptureConfidence:       wt.CaptureConfidence,
+		TaskId:                  wt.TaskID,
+		OrchestrationRunId:      wt.OrchestrationRunID,
+		CoordinatorHandle:       wt.CoordinatorHandle,
+		CreatedByTerminalHandle: wt.CreatedByTerminalHandle,
+		CreatedAtUnixMs:         wt.CreatedAt.UnixMilli(),
+	}
+}
+
+// toProtoWorktreeLineageEntry mirrors toProtoWorktree's lineage fields —
+// kept separate (rather than reusing Worktree wholesale) since
+// ListWorktreeLineage's wire contract is deliberately narrower than the
+// full Worktree message (see WorktreeLineageEntry's doc comment).
+func toProtoWorktreeLineageEntry(wt domain.Worktree) *projectv1.WorktreeLineageEntry {
+	return &projectv1.WorktreeLineageEntry{
+		WorktreeId:              wt.ID,
+		ParentWorktreeId:        wt.ParentWorktreeID,
+		Origin:                  wt.Origin,
+		CaptureSource:           wt.CaptureSource,
+		CaptureConfidence:       wt.CaptureConfidence,
+		TaskId:                  wt.TaskID,
+		OrchestrationRunId:      wt.OrchestrationRunID,
+		CoordinatorHandle:       wt.CoordinatorHandle,
+		CreatedByTerminalHandle: wt.CreatedByTerminalHandle,
+		CreatedAtUnixMs:         wt.CreatedAt.UnixMilli(),
 	}
 }
 

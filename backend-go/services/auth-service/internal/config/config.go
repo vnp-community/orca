@@ -36,13 +36,22 @@ type Config struct {
 	OPABundlePath string
 
 	// Bootstrap* configure the one-time first-admin creation
-	// (internal/usecase/bootstrap.go) — no-op unless BootstrapTenantID and
-	// BootstrapAdminEmail are both set. BootstrapAdminPassword empty =>
-	// auto-generate and log once at startup, mirroring the old TS
-	// backend's ORCA_ADMIN_EMAIL/ORCA_ADMIN_PASSWORD behavior.
-	BootstrapTenantID      string
+	// (internal/usecase/bootstrap.go) — no-op unless BootstrapAdminEmail is
+	// set. BootstrapAdminPassword empty => auto-generate and log once at
+	// startup, mirroring the old TS backend's
+	// ORCA_ADMIN_EMAIL/ORCA_ADMIN_PASSWORD behavior. BootstrapCompanyName
+	// is optional (empty => bootstrap.go derives one from the admin
+	// email's domain) — there is no BootstrapTenantID: tenant-service
+	// originates the tenant id itself (see bootstrap.go's doc comment,
+	// specs/backend-go/bugs/missing-v2/BUG-002/SOL-002).
+	BootstrapCompanyName   string
 	BootstrapAdminEmail    string
 	BootstrapAdminPassword string
+
+	// TenantServiceAddr is where bootstrap.go's TenantProvisioner dials to
+	// originate a tenant for the first admin — only used when
+	// BootstrapAdminEmail is set (see cmd/server/main.go).
+	TenantServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -71,10 +80,11 @@ func Load() (Config, error) {
 		BcryptCost:             bcryptCost,
 		SessionTTL:             sessionTTL,
 		ServiceTokenTTL:        serviceTokenTTL,
-		OPABundlePath:          commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
-		BootstrapTenantID:      os.Getenv("BOOTSTRAP_TENANT_ID"),
+		OPABundlePath:          commonconfig.StringEnv("OPA_BUNDLE_PATH", "/policy/orca-authz"),
+		BootstrapCompanyName:   os.Getenv("BOOTSTRAP_COMPANY_NAME"),
 		BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
 		BootstrapAdminPassword: os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
+		TenantServiceAddr:      commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
 	}, nil
 }
 

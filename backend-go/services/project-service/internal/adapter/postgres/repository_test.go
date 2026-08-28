@@ -9,12 +9,14 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/common/testutil"
@@ -143,5 +145,60 @@ func TestRepository_UpdateDevServerID(t *testing.T) {
 	}
 	if updated.DevServerID != "33333333-3333-3333-3333-333333333333" {
 		t.Errorf("expected dev_server_id to be updated, got %q", updated.DevServerID)
+	}
+}
+
+// TestRepository_List_EmptyPageToken_ReturnsFirstPage is the regression test
+// for BUG-004: List previously bound pageToken="" straight into `id > $2`
+// (id is UUID), which Postgres rejected as "invalid input syntax for type
+// uuid" on every first-page call.
+func TestRepository_List_EmptyPageToken_ReturnsFirstPage(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "44444444-4444-4444-4444-444444444444"
+
+	for i := 0; i < 3; i++ {
+		p := newTestProject(uuid.NewString(), tenantID, fmt.Sprintf("project-%d", i))
+		if _, err := repo.Create(ctx, p); err != nil {
+			t.Fatalf("seeding project %d: %v", i, err)
+		}
+	}
+
+	got, _, err := repo.List(ctx, tenantID, "", 10)
+	if err != nil {
+		t.Fatalf("List with empty pageToken: %v", err)
+	}
+	if len(got) != 3 {
+		t.Errorf("expected 3 projects, got %d", len(got))
+	}
+}
+
+func TestRepository_List_ValidCursor_ReturnsNextPage(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "55555555-5555-5555-5555-555555555555"
+
+	for i := 0; i < 3; i++ {
+		p := newTestProject(uuid.NewString(), tenantID, fmt.Sprintf("project-%d", i))
+		if _, err := repo.Create(ctx, p); err != nil {
+			t.Fatalf("seeding project %d: %v", i, err)
+		}
+	}
+
+	firstPage, next, err := repo.List(ctx, tenantID, "", 2)
+	if err != nil {
+		t.Fatalf("List (first page): %v", err)
+	}
+	if len(firstPage) != 2 || next == "" {
+		t.Fatalf("expected 2 results and a non-empty cursor, got %d results, next=%q", len(firstPage), next)
+	}
+
+	// Guards the fix didn't break the already-working cursor path.
+	secondPage, _, err := repo.List(ctx, tenantID, next, 2)
+	if err != nil {
+		t.Fatalf("List (second page, real cursor): %v", err)
+	}
+	if len(secondPage) != 1 {
+		t.Errorf("expected 1 remaining project on the second page, got %d", len(secondPage))
 	}
 }

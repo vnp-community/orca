@@ -13,6 +13,7 @@
 package wscompat
 
 import (
+	"cmp"
 	"context"
 	"encoding/json"
 	"time"
@@ -64,14 +65,21 @@ func registerProfileChannels(r *Registry, client tenantv1.TenantServiceClient) {
 		type getArgs struct {
 			UserID string `json:"userId"`
 		}
-		in, err := decodeArg[getArgs](args, 0)
-		if err != nil {
-			return nil, err
-		}
+		// decodeOptionalArg, not decodeArg: userId is genuinely optional —
+		// "no userId → resolves from session" is this method's documented
+		// contract (specs/frontend/api/rpc-catalog.md).
+		in := decodeOptionalArg[getArgs](args, 0)
+		userID := cmp.Or(in.UserID, id.UserID)
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
 		defer cancel()
-		resp, err := client.GetUserProfile(rpcCtx, &tenantv1.GetUserProfileRequest{UserId: in.UserID})
+		// Why (found live, specs/backend-go/bugs/missing-v2/ follow-up):
+		// this previously always sent in.UserID verbatim — an omitted userId
+		// decoded to "", which tenant-service's GetUserProfile binds
+		// straight into a UUID column, erroring TENANT_PROFILE_LOOKUP_FAILED
+		// instead of resolving the caller's own profile. Defaulting to
+		// id.UserID matches profile.getResolved's pattern immediately above.
+		resp, err := client.GetUserProfile(rpcCtx, &tenantv1.GetUserProfileRequest{UserId: userID})
 		if err != nil {
 			return nil, err
 		}
@@ -82,14 +90,20 @@ func registerProfileChannels(r *Registry, client tenantv1.TenantServiceClient) {
 		type listArgs struct {
 			CompanyID string `json:"companyId"`
 		}
-		in, err := decodeArg[listArgs](args, 0)
-		if err != nil {
-			return nil, err
-		}
+		// decodeOptionalArg — companyId is optional, defaults to the
+		// caller's own tenant (a Company row's id IS the tenant_id in this
+		// domain — tenant-service.md).
+		in := decodeOptionalArg[listArgs](args, 0)
+		companyID := cmp.Or(in.CompanyID, id.TenantID)
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
 		defer cancel()
-		resp, err := client.ListDepartments(rpcCtx, &tenantv1.ListDepartmentsRequest{CompanyId: in.CompanyID})
+		// Why: same class of bug as profile.getUserProfile above — an
+		// omitted companyId previously decoded to "", bound straight into a
+		// UUID column by tenant-service's ListDepartments, erroring
+		// TENANT_LIST_DEPARTMENTS_FAILED instead of listing the caller's
+		// own company's departments.
+		resp, err := client.ListDepartments(rpcCtx, &tenantv1.ListDepartmentsRequest{CompanyId: companyID})
 		if err != nil {
 			return nil, err
 		}

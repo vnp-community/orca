@@ -4,7 +4,7 @@
 **File:** `internal/adapter/httpgateway/notification_routes.go`, `router.go`
 **Severity:** Medium — breaks browser push subscribe/unsubscribe for any client still calling the documented `/api/push-*` contract
 **Symptom:** `fetch('/api/vapid-public-key')`, `fetch('/api/push-subscribe')`, `fetch('/api/push-unsubscribe')` all 404; the two that do exist require session auth the spec says they don't
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-009–011 (3 task(s), all DONE) for implementation evidence.
 
 ---
 

@@ -42,6 +42,7 @@ const (
 	InfraFleetService_GetTerminalAgentStatus_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/GetTerminalAgentStatus"
 	InfraFleetService_InspectTerminalProcess_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/InspectTerminalProcess"
 	InfraFleetService_AttachPty_FullMethodName               = "/orca.infrafleet.v1.InfraFleetService/AttachPty"
+	InfraFleetService_AttachScreencast_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/AttachScreencast"
 	InfraFleetService_ListBrowserProfiles_FullMethodName     = "/orca.infrafleet.v1.InfraFleetService/ListBrowserProfiles"
 	InfraFleetService_CreateBrowserProfile_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/CreateBrowserProfile"
 	InfraFleetService_DeleteBrowserProfile_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/DeleteBrowserProfile"
@@ -114,6 +115,18 @@ type InfraFleetServiceClient interface {
 	// RPC is opened once per terminal.create by api-gateway's wscompat bridge
 	// (TASK-186) and piped into `push` frames via TASK-012's pipePush.
 	AttachPty(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame], error)
+	// AttachScreencast is browser.screencast's transport — the remote-
+	// headless-browser live-view stream, mirroring AttachPty's bidi shape
+	// exactly (see docs/execution-plan.md and TASK-036's "Status by layer"
+	// section for why this exists: the agent+backend-go layers of the 12-op
+	// browser.* relay were already real, but the live view was missing).
+	// frame_data carries opaque, already-encoded bytes produced agent-side
+	// by encodeBrowserScreencastFrame (frontend/src/shared/browser-screencast-protocol.ts,
+	// copied verbatim into agent/src/shared/) — infra-fleet-service and
+	// api-gateway never parse image bytes, they relay them byte-for-byte.
+	// dialog/dialogClosed are deliberately NOT modeled here — see
+	// channels_browser_screencast.go's doc comment for the scope cut.
+	AttachScreencast(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ScreencastClientFrame, ScreencastServerFrame], error)
 	// ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile back
 	// api-gateway's browser.profileList/profileCreate/profileDelete channels
 	// (SOL-006 Group C) — Postgres-backed metadata CRUD, mirroring
@@ -381,6 +394,19 @@ func (c *infraFleetServiceClient) AttachPty(ctx context.Context, opts ...grpc.Ca
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type InfraFleetService_AttachPtyClient = grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame]
 
+func (c *infraFleetServiceClient) AttachScreencast(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ScreencastClientFrame, ScreencastServerFrame], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[1], InfraFleetService_AttachScreencast_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ScreencastClientFrame, ScreencastServerFrame]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_AttachScreencastClient = grpc.BidiStreamingClient[ScreencastClientFrame, ScreencastServerFrame]
+
 func (c *infraFleetServiceClient) ListBrowserProfiles(ctx context.Context, in *ListBrowserProfilesRequest, opts ...grpc.CallOption) (*ListBrowserProfilesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListBrowserProfilesResponse)
@@ -559,6 +585,18 @@ type InfraFleetServiceServer interface {
 	// RPC is opened once per terminal.create by api-gateway's wscompat bridge
 	// (TASK-186) and piped into `push` frames via TASK-012's pipePush.
 	AttachPty(grpc.BidiStreamingServer[PtyClientFrame, PtyServerFrame]) error
+	// AttachScreencast is browser.screencast's transport — the remote-
+	// headless-browser live-view stream, mirroring AttachPty's bidi shape
+	// exactly (see docs/execution-plan.md and TASK-036's "Status by layer"
+	// section for why this exists: the agent+backend-go layers of the 12-op
+	// browser.* relay were already real, but the live view was missing).
+	// frame_data carries opaque, already-encoded bytes produced agent-side
+	// by encodeBrowserScreencastFrame (frontend/src/shared/browser-screencast-protocol.ts,
+	// copied verbatim into agent/src/shared/) — infra-fleet-service and
+	// api-gateway never parse image bytes, they relay them byte-for-byte.
+	// dialog/dialogClosed are deliberately NOT modeled here — see
+	// channels_browser_screencast.go's doc comment for the scope cut.
+	AttachScreencast(grpc.BidiStreamingServer[ScreencastClientFrame, ScreencastServerFrame]) error
 	// ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile back
 	// api-gateway's browser.profileList/profileCreate/profileDelete channels
 	// (SOL-006 Group C) — Postgres-backed metadata CRUD, mirroring
@@ -668,6 +706,9 @@ func (UnimplementedInfraFleetServiceServer) InspectTerminalProcess(context.Conte
 }
 func (UnimplementedInfraFleetServiceServer) AttachPty(grpc.BidiStreamingServer[PtyClientFrame, PtyServerFrame]) error {
 	return status.Error(codes.Unimplemented, "method AttachPty not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) AttachScreencast(grpc.BidiStreamingServer[ScreencastClientFrame, ScreencastServerFrame]) error {
+	return status.Error(codes.Unimplemented, "method AttachScreencast not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) ListBrowserProfiles(context.Context, *ListBrowserProfilesRequest) (*ListBrowserProfilesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListBrowserProfiles not implemented")
@@ -1111,6 +1152,13 @@ func _InfraFleetService_AttachPty_Handler(srv interface{}, stream grpc.ServerStr
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type InfraFleetService_AttachPtyServer = grpc.BidiStreamingServer[PtyClientFrame, PtyServerFrame]
 
+func _InfraFleetService_AttachScreencast_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(InfraFleetServiceServer).AttachScreencast(&grpc.GenericServerStream[ScreencastClientFrame, ScreencastServerFrame]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_AttachScreencastServer = grpc.BidiStreamingServer[ScreencastClientFrame, ScreencastServerFrame]
+
 func _InfraFleetService_ListBrowserProfiles_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListBrowserProfilesRequest)
 	if err := dec(in); err != nil {
@@ -1471,6 +1519,12 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "AttachPty",
 			Handler:       _InfraFleetService_AttachPty_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "AttachScreencast",
+			Handler:       _InfraFleetService_AttachScreencast_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
 		},

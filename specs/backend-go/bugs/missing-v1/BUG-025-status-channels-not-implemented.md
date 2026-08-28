@@ -4,7 +4,7 @@
 **File:** `internal/adapter/wscompat/channels.go`
 **Severity:** Low-Medium — a single method (`status.get`), called from a browser-pane remote-probe path and a Windows-terminal capability read, neither on the critical bootstrap path.
 **Symptom:** `status.get` `callRuntimeRpc` calls fall through to `registry.go`'s `notImplementedHandler` and return `channel "status.get" is not yet implemented in backend-go`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-167 (1 task(s), all DONE) for implementation evidence.
 
 ---
 

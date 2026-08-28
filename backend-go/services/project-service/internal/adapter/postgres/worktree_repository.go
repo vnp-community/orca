@@ -11,7 +11,9 @@ import (
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 )
 
-const worktreeColumns = `id, project_id, repo_id, path, branch, active`
+const worktreeColumns = `id, project_id, repo_id, path, branch, active, created_at,
+	parent_worktree_id, origin, capture_source, capture_confidence, task_id,
+	orchestration_run_id, coordinator_handle, created_by_terminal_handle`
 
 // WorktreeRepository implements usecase.WorktreeRepository against
 // project.worktrees.
@@ -25,10 +27,16 @@ func NewWorktreeRepository(pool *pgxpool.Pool) *WorktreeRepository {
 
 func (r *WorktreeRepository) RecordWorktreeCreated(ctx context.Context, wt domain.Worktree) (domain.Worktree, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO project.worktrees (id, project_id, repo_id, path, branch, active)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO project.worktrees (
+			id, project_id, repo_id, path, branch, active,
+			parent_worktree_id, origin, capture_source, capture_confidence, task_id,
+			orchestration_run_id, coordinator_handle, created_by_terminal_handle
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 		RETURNING `+worktreeColumns,
 		wt.ID, wt.ProjectID, wt.RepoID, wt.Path, wt.Branch, wt.Active,
+		wt.ParentWorktreeID, wt.Origin, wt.CaptureSource, wt.CaptureConfidence, wt.TaskID,
+		wt.OrchestrationRunID, wt.CoordinatorHandle, wt.CreatedByTerminalHandle,
 	)
 
 	out, err := scanWorktree(row)
@@ -117,8 +125,42 @@ func (r *WorktreeRepository) RenameWorktree(ctx context.Context, worktreeID, bra
 // checks errors.Is(err, pgx.ErrNoRows) against the raw scan error).
 func scanWorktree(row rowScanner) (domain.Worktree, error) {
 	var wt domain.Worktree
-	if err := row.Scan(&wt.ID, &wt.ProjectID, &wt.RepoID, &wt.Path, &wt.Branch, &wt.Active); err != nil {
+	if err := row.Scan(
+		&wt.ID, &wt.ProjectID, &wt.RepoID, &wt.Path, &wt.Branch, &wt.Active, &wt.CreatedAt,
+		&wt.ParentWorktreeID, &wt.Origin, &wt.CaptureSource, &wt.CaptureConfidence, &wt.TaskID,
+		&wt.OrchestrationRunID, &wt.CoordinatorHandle, &wt.CreatedByTerminalHandle,
+	); err != nil {
 		return domain.Worktree{}, err
 	}
 	return wt, nil
+}
+
+// ListLineage returns every worktree with an explicitly-captured parent,
+// tenant-scoped implicitly via the same RLS policy every other query
+// against this table relies on (see 0004_worktrees.up.sql's tenant_isolation
+// policy) — no explicit tenant filter needed here.
+func (r *WorktreeRepository) ListLineage(ctx context.Context) ([]domain.Worktree, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT `+worktreeColumns+`
+		FROM project.worktrees
+		WHERE parent_worktree_id IS NOT NULL
+		ORDER BY id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query worktree lineage: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Worktree
+	for rows.Next() {
+		wt, err := scanWorktree(rows)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: scan worktree lineage row: %w", err)
+		}
+		out = append(out, wt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate worktree lineage rows: %w", err)
+	}
+	return out, nil
 }
