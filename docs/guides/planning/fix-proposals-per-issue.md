@@ -115,7 +115,7 @@ quyết định — tạm giữ nguyên ở frontend.
 (tái dùng `orca_team_members` đã có sẵn làm bảng nối), thêm RPC `team.create/addMember/
 removeMember/list`. Frontend: thêm UI quản lý Team (đặt trong trang Admin — quản trị tổ chức
 thuộc "backend quản trị dữ liệu", UI của nó vẫn là frontend hiển thị). Chi tiết schema đề xuất ở
-[user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md) mục 5.2.
+[user-profile-team-department-rbac.md](../profile/user-profile-team-department-rbac.md) mục 5.2.
 
 ## Nhóm B — Project / OrcaProject
 
@@ -130,7 +130,7 @@ ký project methods (đổi thứ tự trong `server-bootstrap.ts`), truyền v�
 **Nơi sửa: frontend.** Đổi `git.status({projectId})` → `git.status({worktree: <worktreeId>})`
 đúng schema thật (`GitStatusParams extends WorktreeSelector`). Cần có `worktreeId` thật trước —
 phụ thuộc quyết định nguồn `currentWorktree` (xem
-[project-workspace-f38-doc-vs-code.md](./project-workspace-f38-doc-vs-code.md) mục 3, và
+[project-workspace-f38-doc-vs-code.md](../project-workspace/project-workspace-f38-doc-vs-code.md) mục 3, và
 [decisions-needed.md](./decisions-needed.md)).
 
 ### B3. `workspace.listFiles` không tồn tại
@@ -167,7 +167,7 @@ phạm vi audit này, cần điều tra riêng bằng log thật khi bug tái di
 
 **✅ Đã sửa trong Giai đoạn 1** tại `TaskPromptEditor.tsx`, `TaskDetail.tsx`, `useTask.ts` — theo
 bảng trong
-[task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md)
+[task-automation-orchestration-integration.md](../task-automation/task-automation-orchestration-integration.md)
 mục 4. Không đụng backend — backend đã đúng, đã có sẵn 18 method thật. Khi sửa, phát hiện thêm
 2 việc ngoài phạm vi ban đầu: (a) một vài chỗ không chỉ sai TÊN mà còn sai SHAPE tham số (`task.update`
 cần `{taskId, patch}` lồng nhau, không phải spread phẳng; `task.execute` không nhận `prompt` —
@@ -200,7 +200,7 @@ sang đường dẫn tương đối, hoặc định nghĩa alias đó trong tsco
 ### C4. Field liên kết cross-system (`worktreeId`/`agentSessionId`/`workflowExecutionId`) chưa tồn tại trên `OrcaTask`
 
 **Nơi sửa: backend (schema mới) + backend (service logic nối ①②③).** Xem đề xuất chi tiết ở
-[task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md)
+[task-automation-orchestration-integration.md](../task-automation/task-automation-orchestration-integration.md)
 mục 9.2 — cần quyết định trước (2 con đường "chạy task" độc lập hiện có), xem
 [decisions-needed.md](./decisions-needed.md).
 
@@ -238,7 +238,7 @@ người đọc code sau này — việc nhỏ, không khẩn.
 ### D4. Pipeline Source→Plan→Execute (Task ↔ Orchestration coordinator) chưa tồn tại
 
 **Nơi sửa: backend.** Xem
-[task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md)
+[task-automation-orchestration-integration.md](../task-automation/task-automation-orchestration-integration.md)
 mục 9.2/9.4 — cần quyết định thiết kế trước (2 con đường "chạy task" hiện có), xem
 [decisions-needed.md](./decisions-needed.md).
 

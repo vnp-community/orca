@@ -3,8 +3,8 @@
 **Nguồn:** Trích xuất từ HLD v1 (C1, C2, C3, C4)
 **Cập nhật:** 2026-08-14 (đợt hiệu đính lớn — đối chiếu lại toàn bộ nội dung với code thật
 `backend/src/**` tính đến commit `72ace6187`. Nguồn: `audit/backend/backend-vs-design-review.md`
-(12 agent, file:line-cited) + `docs/guides/audit-backend-agent-2026-08-13.md` +
-`docs/guides/roadmap-orca-project-task-rbac.md` cho các mục đã được sửa SAU ngày audit gốc
+(12 agent, file:line-cited) + `docs/guides/planning/audit-backend-agent-2026-08-13.md` +
+`docs/guides/planning/roadmap-orca-project-task-rbac.md` cho các mục đã được sửa SAU ngày audit gốc
 2026-08-08. Trước bản này tài liệu mô tả nhiều hành vi aspirational/tương lai như thể đã có —
 bản này chỉ mô tả code đang chạy thật, đánh dấu rõ phần nào còn là đề xuất.)
 

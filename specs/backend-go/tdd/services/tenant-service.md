@@ -106,7 +106,7 @@ tree) · `UserProfile` (1:1 with a user, logical FK to `auth-service`, holds
 its own `Settings` override and `department_id`) · `Team` (belongs to a
 `Company`; deliberately **no** `department_id` — not scoped to one
 department by design, carried forward from
-`docs/guides/user-profile-team-department-rbac.md` §5.2) · `TeamMembership`
+`docs/guides/profile/user-profile-team-department-rbac.md` §5.2) · `TeamMembership`
 (join of `Team` and a user, with `role` and `priority int` — introduced by
 the TS system's migration `0016`, carried forward unchanged). A user may
 belong to zero, one, or many teams.

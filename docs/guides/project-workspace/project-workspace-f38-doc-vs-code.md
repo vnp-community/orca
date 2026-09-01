@@ -14,18 +14,18 @@
 > `WorkspaceContext.tsx` vẫn truyền `{projectId}` thay vì `{worktree}`, lỗi vẫn bị `.catch(() =>
 > null)` nuốt âm thầm). Mount vào `App.tsx` **cộng thêm** một nút "Project Workspace (Beta)" mới
 > trong sidebar nav — dẫn tới `activeView: 'workspace'` — **không thay thế** luồng Project/Repo
-> sidebar hiện có. Chi tiết đầy đủ: [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md)
+> sidebar hiện có. Chi tiết đầy đủ: [roadmap-orca-project-task-rbac.md](../planning/roadmap-orca-project-task-rbac.md)
 > Giai đoạn 2c.
 
 > Nối tiếp [terminal-workspace-project-devserver-architecture.md](./terminal-workspace-project-devserver-architecture.md)
 > (mô hình `OrcaProject` nói chung) — tài liệu này đi sâu riêng vào
-> [F38 — Project Workspace](../features/F38-project-workspace.md): đối chiếu từng phần giữa đặc
+> [F38 — Project Workspace](../../features/F38-project-workspace.md): đối chiếu từng phần giữa đặc
 > tả và code thật, rồi đưa phương án hợp nhất.
 >
 > Phần Task/Automation/AI orchestration (F37, F14, và hệ điều phối multi-agent) được tách riêng
-> sang [task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md).
+> sang [task-automation-orchestration-integration.md](../task-automation/task-automation-orchestration-integration.md).
 > Kế hoạch thực thi (thứ tự, phụ thuộc) xem
-> [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
+> [roadmap-orca-project-task-rbac.md](../planning/roadmap-orca-project-task-rbac.md).
 >
 > **⚠️ Đính chính 2026-08-13**: nội dung dưới đây về cấu trúc UI (`WorkspaceLayout.tsx` và cụm
 > `components/workspace/`) vẫn đúng — được đọc trực tiếp từ `frontend/src/renderer/`, không phải
@@ -34,8 +34,8 @@
 > từ hệ Task. Vấn đề thật sự không phải "chưa xây backend", mà là **`WorkspaceContext` gọi 2/4
 > RPC method sai** (`git.status` sai tham số luôn fail, `workspace.listFiles` không tồn tại) —
 > xem chi tiết mục A/B trong
-> [audit-backend-agent-2026-08-13.md](./audit-backend-agent-2026-08-13.md) mục B5, và giải pháp
-> cụ thể trong [fix-proposals-per-issue.md](./fix-proposals-per-issue.md).
+> [audit-backend-agent-2026-08-13.md](../planning/audit-backend-agent-2026-08-13.md) mục B5, và giải pháp
+> cụ thể trong [fix-proposals-per-issue.md](../planning/fix-proposals-per-issue.md).
 
 ## 1. F38 mô tả gì
 
@@ -103,7 +103,7 @@ setCurrentWorktree, emit, on }` — không có `devServer`/`connection`, có th�
 
 2 lỗi trên bị `.catch(() => null)` nuốt âm thầm — `WorkspaceContext` không bao giờ báo lỗi thật,
 chỉ lặng lẽ trả `null`. Chi tiết đầy đủ:
-[audit-backend-agent-2026-08-13.md](./audit-backend-agent-2026-08-13.md) mục B5.
+[audit-backend-agent-2026-08-13.md](../planning/audit-backend-agent-2026-08-13.md) mục B5.
 
 ### 2.5 Code xây RỘNG hơn doc ở mảng Git
 

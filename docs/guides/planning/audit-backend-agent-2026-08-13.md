@@ -75,7 +75,7 @@ file kèm theo audit này bám theo nguyên tắc này — xem
 | 5 | `frontend/src/renderer/src/types/profile-types.ts` | **UI thật dùng bản này** — lệch backend nhiều nhất — ✅ đã khớp lại field/enum trong Giai đoạn 1 |
 
 Bảng lệch field chi tiết #5 vs #1: xem
-[user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md) mục 4.
+[user-profile-team-department-rbac.md](../profile/user-profile-team-department-rbac.md) mục 4.
 
 ### A4. Bug thật — RPC method sai tên (production, chưa ai phát hiện)
 
