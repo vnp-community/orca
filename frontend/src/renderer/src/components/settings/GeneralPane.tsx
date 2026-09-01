@@ -3,11 +3,13 @@ import type { GlobalSettings } from '../../../../shared/types'
 import { useAppStore } from '../../store'
 import { Separator } from '../ui/separator'
 import { CliSection } from './CliSection'
+import { GeneralAccountSection } from './GeneralAccountSection'
 import { GeneralEditorSettingsSection } from './GeneralEditorSettingsSection'
 import { GeneralSupportSection } from './GeneralSupportSection'
 import { GeneralUpdateSettingsSection } from './GeneralUpdateSettingsSection'
 import { GeneralWorkspaceSettingsSection } from './GeneralWorkspaceSettingsSection'
 import {
+  getGeneralAccountSearchEntries,
   getGeneralCliSearchEntries,
   getGeneralEditorSearchEntries,
   getGeneralNavigationSearchEntries,
@@ -208,6 +210,9 @@ export function GeneralPane({
       ))}
       {matchesSettingsSearch(searchQuery, getGeneralSupportSearchEntries()) ? (
         <GeneralSupportSection hasPrecedingSections={visibleSections.length > 0} />
+      ) : null}
+      {matchesSettingsSearch(searchQuery, getGeneralAccountSearchEntries()) ? (
+        <GeneralAccountSection hasPrecedingSections={visibleSections.length > 0} />
       ) : null}
     </div>
   )

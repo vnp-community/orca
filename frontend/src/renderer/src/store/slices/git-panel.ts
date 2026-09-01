@@ -1,40 +1,41 @@
 import type { StateCreator } from 'zustand'
+import type { AppState } from '../types'
 
 export type GitFileStatus = 'M' | 'A' | 'D' | 'R' | 'U'
 
 export type GitFileChange = {
-  path:   string
+  path: string
   status: GitFileStatus
   staged: boolean
 }
 
 export type GitCommit = {
-  hash:      string
+  hash: string
   shortHash: string
-  message:   string
-  author:    string
-  date:      number
+  message: string
+  author: string
+  date: number
 }
 
 export type GitBranch = {
-  name:      string
-  isRemote:  boolean
+  name: string
+  isRemote: boolean
   isCurrent: boolean
   upstream?: string
-  aheadBy:   number
-  behindBy:  number
+  aheadBy: number
+  behindBy: number
 }
 
 export type GitPanelSliceState = {
-  stagedFiles:      GitFileChange[]
-  unstagedFiles:    GitFileChange[]
-  gitHistory:       GitCommit[]
-  branches:         GitBranch[]
+  stagedFiles: GitFileChange[]
+  unstagedFiles: GitFileChange[]
+  gitHistory: GitCommit[]
+  branches: GitBranch[]
   selectedDiffFile: string | null
-  diffContent:      string | null
-  pushLines:        string[]
-  isPushing:        boolean
-  isCommitting:     boolean
+  diffContent: string | null
+  pushLines: string[]
+  isPushing: boolean
+  isCommitting: boolean
 }
 
 export type GitPanelSliceActions = {
@@ -52,29 +53,33 @@ export type GitPanelSliceActions = {
 
 export type GitPanelSlice = GitPanelSliceState & GitPanelSliceActions
 
-export function createGitPanelSlice(
-  set: StateCreator<GitPanelSlice>['arguments'][0]
-): GitPanelSlice {
-  return {
-    stagedFiles:      [],
-    unstagedFiles:    [],
-    gitHistory:       [],
-    branches:         [],
-    selectedDiffFile: null,
-    diffContent:      null,
-    pushLines:        [],
-    isPushing:        false,
-    isCommitting:     false,
+// Why every action returns a partial object instead of mutating `s` and
+// returning nothing: this store has no immer middleware, so plain zustand's
+// `set` treats a non-object return value (i.e. `undefined`, from a bare
+// `set(s => { s.stagedFiles = files })`) as a full-state REPLACE — wiping
+// the entire AppState to `undefined`. Same bug class fixed in task.ts's own
+// doc comment (BUG-FE-TASKGRAPH-SETTINGS) — this slice had it too, just
+// never live-triggered yet since GitPanel's fetches haven't succeeded on
+// this deployment (worktree-scoped git.status has no worktree to target).
+export const createGitPanelSlice: StateCreator<AppState, [], [], GitPanelSlice> = (set) => ({
+  stagedFiles: [],
+  unstagedFiles: [],
+  gitHistory: [],
+  branches: [],
+  selectedDiffFile: null,
+  diffContent: null,
+  pushLines: [],
+  isPushing: false,
+  isCommitting: false,
 
-    setStagedFiles:      (files)  => set(s => { s.stagedFiles = files }),
-    setUnstagedFiles:    (files)  => set(s => { s.unstagedFiles = files }),
-    setGitHistory:       (c)      => set(s => { s.gitHistory = c }),
-    setBranches:         (b)      => set(s => { s.branches = b }),
-    setSelectedDiffFile: (path)   => set(s => { s.selectedDiffFile = path }),
-    setDiffContent:      (diff)   => set(s => { s.diffContent = diff }),
-    appendPushLine:      (line)   => set(s => { s.pushLines.push(line) }),
-    clearPushLines:      ()       => set(s => { s.pushLines = [] }),
-    setIsPushing:        (v)      => set(s => { s.isPushing = v }),
-    setIsCommitting:     (v)      => set(s => { s.isCommitting = v }),
-  }
-}
+  setStagedFiles: (files) => set(() => ({ stagedFiles: files })),
+  setUnstagedFiles: (files) => set(() => ({ unstagedFiles: files })),
+  setGitHistory: (c) => set(() => ({ gitHistory: c })),
+  setBranches: (b) => set(() => ({ branches: b })),
+  setSelectedDiffFile: (path) => set(() => ({ selectedDiffFile: path })),
+  setDiffContent: (diff) => set(() => ({ diffContent: diff })),
+  appendPushLine: (line) => set((s) => ({ pushLines: [...s.pushLines, line] })),
+  clearPushLines: () => set(() => ({ pushLines: [] })),
+  setIsPushing: (v) => set(() => ({ isPushing: v })),
+  setIsCommitting: (v) => set(() => ({ isCommitting: v }))
+})
