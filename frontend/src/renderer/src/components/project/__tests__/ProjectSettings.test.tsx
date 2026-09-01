@@ -50,6 +50,12 @@ vi.mock('../LinkedProjectsManager', () => ({
   )
 }))
 
+vi.mock('../ProjectDevServerSection', () => ({
+  ProjectDevServerSection: ({ projectId }: { projectId: string }) => (
+    <div data-testid="project-dev-server-section">ProjectDevServerSection for {projectId}</div>
+  )
+}))
+
 vi.mock('../../ui/dialog', () => ({
   Dialog: (p: { onOpenChange: MouseEventHandler; children: ReactNode }) => (
     <div data-testid="dialog" onClick={p.onOpenChange}>

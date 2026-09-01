@@ -5,6 +5,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs'
 import { MemberManager } from './MemberManager'
 import { RepoMemberManager } from './RepoMemberManager'
 import { LinkedProjectsManager } from './LinkedProjectsManager'
+import { ProjectDevServerSection } from './ProjectDevServerSection'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { useAppStore } from '../../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
@@ -88,11 +89,12 @@ export function ProjectSettings({ projectId, open, onClose }: ProjectSettingsPro
           </TabsList>
 
           <TabsContent value="general" className="py-4">
-            <div className="space-y-3">
+            <div className="space-y-6">
               <p className="text-sm text-muted-foreground">
                 General project settings (name, description, repository bindings).
               </p>
               {/* TODO: Add name/description form fields in future tasks */}
+              <ProjectDevServerSection projectId={projectId} />
             </div>
           </TabsContent>
 
