@@ -11,7 +11,7 @@
 
 Sửa bug RPC-contract, nối tab Agent/terminal, mount `ProjectSwitcher`/`WorkspaceLayout` vào
 layout thật. Xem kế hoạch chi tiết ở
-[project-workspace-f38-doc-vs-code.md](./project-workspace-f38-doc-vs-code.md) mục 4 và roadmap
+[project-workspace-f38-doc-vs-code.md](../project-workspace/project-workspace-f38-doc-vs-code.md) mục 4 và roadmap
 mục Nhóm 3.
 
 ## 2. `WorkspaceContextV6` ✅ QUYẾT ĐỊNH: có kế hoạch nâng cấp, nhưng KHÔNG động tới trong đợt này
@@ -25,7 +25,7 @@ cho mọi việc nối tab/mount layout — không chuyển sang V6 trong đợt
 
 `priority: number` trên `TeamMember`, số cao thắng khi 2 Team user thuộc về xung đột cấu hình.
 `_sources` ghi rõ `team:<teamId>` nào đã thắng để audit được. Áp dụng khi xây `Team`/`TeamMember`
-ở [user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md) mục 5.2.
+ở [user-profile-team-department-rbac.md](../profile/user-profile-team-department-rbac.md) mục 5.2.
 
 ## 4. `TaskGrantService` vs `ProjectMember` ✅ QUYẾT ĐỊNH: giữ nguyên 2 hệ tách biệt
 
@@ -44,7 +44,7 @@ task (không cần field/flag mới do người dùng chọn tay):
   subtree của task, giao `coordinator.ts` điều phối lead/worker.
 
 Thiết kế đầy đủ (bao gồm field schema mới cần thêm, code rẽ nhánh cụ thể) xem
-[task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md)
+[task-automation-orchestration-integration.md](../task-automation/task-automation-orchestration-integration.md)
 mục 9.2.
 
 ## 6. Field Profile UI ✅ QUYẾT ĐỊNH (một phần): `security.require2FA` theo phương án (a) — thêm vào backend
@@ -61,7 +61,7 @@ vào.
 ## 7. `OrcaProject` cross-user sharing ✅ QUYẾT ĐỊNH: tiến hành theo thiết kế đã đề xuất (Nhóm 3.2 trong roadmap)
 
 Tiến hành xây theo đề xuất "OrcaProject là lớp SỞ HỮU + CHIA SẺ" ở
-[terminal-workspace-project-devserver-architecture.md](./terminal-workspace-project-devserver-architecture.md).
+[terminal-workspace-project-devserver-architecture.md](../project-workspace/terminal-workspace-project-devserver-architecture.md).
 **Lưu ý quan trọng vẫn giữ nguyên từ đề xuất gốc**: đây là phần đụng ranh giới cô lập bảo mật
 giữa các user — bước đọc-chéo-user (bước 5 trong luồng đã thiết kế) cần review kỹ, viết test xác
 nhận rõ ràng cả 2 chiều (thấy đúng phần được share, KHÔNG thấy phần chưa share) trước khi coi là
@@ -71,4 +71,4 @@ xong, không chỉ dựa vào code review thông thường.
 
 Tái dùng cơ chế chọn worktree đã có ở sidebar chính (`WorktreeList.tsx`) — không xây bộ chọn
 worktree riêng cho Workspace. Cần thiết kế cách 2 UI (sidebar + Workspace) đồng bộ lựa chọn khi
-triển khai (xem [project-workspace-f38-doc-vs-code.md](./project-workspace-f38-doc-vs-code.md)).
+triển khai (xem [project-workspace-f38-doc-vs-code.md](../project-workspace/project-workspace-f38-doc-vs-code.md)).

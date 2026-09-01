@@ -2,9 +2,9 @@
 
 **Cập nhật:** 2026-08-13 (viết lại toàn bộ sau khi kiểm chứng lại bằng `backend/src/` +
 `agent/src/` — xem đính chính ở
-[terminal-workspace-project-devserver-architecture.md](./terminal-workspace-project-devserver-architecture.md)
+[terminal-workspace-project-devserver-architecture.md](../project-workspace/terminal-workspace-project-devserver-architecture.md)
 và chi tiết đầy đủ ở
-[audit-backend-agent-2026-08-13.md](./audit-backend-agent-2026-08-13.md))
+[audit-backend-agent-2026-08-13.md](../planning/audit-backend-agent-2026-08-13.md))
 
 > Bản gốc của file này (viết cùng ngày, trước đính chính) kết luận "F37 gần như chưa xây gì" —
 > **sai**. Backend Task system hoàn chỉnh, đang chạy thật. Giữ lại nguyên vẹn phần đúng (F14
@@ -219,7 +219,7 @@ bước/nhiều agent nên giao cho `coordinator.ts`.
 trong quá khứ** — `TaskGrantService` được xây độc lập, đầy đủ, đang chạy thật, có cơ chế kế thừa
 theo cây. Hiện có **2 hệ RBAC thật, không chia sẻ code**: `ProjectMember` (project-level) và
 `orca_task_grants` (task-level, scope `'user'|'team'|'role'|'everyone'`). Xem đề xuất hợp nhất ở
-[user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md) mục 5.3.
+[user-profile-team-department-rbac.md](../profile/user-profile-team-department-rbac.md) mục 5.3.
 
 ### 9.4 Thứ tự triển khai (đã chốt đủ quyết định, sẵn sàng thực thi)
 

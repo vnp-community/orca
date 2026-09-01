@@ -1,7 +1,7 @@
 # Postgres dùng chung — thiết kế + thực thi (BUG-BE-RPC-001/002/003)
 
-**Ngày:** 2026-08-14. Follow-up trực tiếp của [BUG-BE-RPC-001](./bug-be-rpc-001-userid-not-forwarded.md)/
-[BUG-BE-RPC-002](./bug-be-rpc-002-devservermanager-sync-get-in-user-process.md) — sau khi cả 2 fix
+**Ngày:** 2026-08-14. Follow-up trực tiếp của [BUG-BE-RPC-001](../bugs/bug-be-rpc-001-userid-not-forwarded.md)/
+[BUG-BE-RPC-002](../bugs/bug-be-rpc-002-devservermanager-sync-get-in-user-process.md) — sau khi cả 2 fix
 đó lên production, `project.create` lộ lỗi kế tiếp: `FOREIGN KEY constraint failed`.
 
 ## Root cause thật — BUG-BE-RPC-003: mỗi user-process có 1 DB SQLite cô lập riêng

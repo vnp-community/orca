@@ -2,13 +2,13 @@
 
 **Cập nhật:** 2026-08-13 (viết lại toàn bộ sau khi 4 subagent kiểm chứng lại bằng `backend/src/`
 thay vì `frontend/src/main/` — xem ghi chú đính chính ở đầu
-[terminal-workspace-project-devserver-architecture.md](./terminal-workspace-project-devserver-architecture.md))
+[terminal-workspace-project-devserver-architecture.md](../project-workspace/terminal-workspace-project-devserver-architecture.md))
 
 > Tài liệu này mô tả identity/tổ chức hiện có trong code, chỉ ra khoảng trống, và đề xuất mô
 > hình RBAC cho `Project`/`OrcaProject`. Chi tiết audit đầy đủ (file:line) xem
-> [audit-backend-agent-2026-08-13.md](./audit-backend-agent-2026-08-13.md) mục A. Giải pháp
-> từng bug xem [fix-proposals-per-issue.md](./fix-proposals-per-issue.md) nhóm A. Kế hoạch thực
-> thi xem [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
+> [audit-backend-agent-2026-08-13.md](../planning/audit-backend-agent-2026-08-13.md) mục A. Giải pháp
+> từng bug xem [fix-proposals-per-issue.md](../planning/fix-proposals-per-issue.md) nhóm A. Kế hoạch thực
+> thi xem [roadmap-orca-project-task-rbac.md](../planning/roadmap-orca-project-task-rbac.md).
 
 ## 1. `OrcaUser` — identity + role toàn cục (đang chạy thật)
 
@@ -94,7 +94,7 @@ Ngoài ra `DeptProfileAdmin.tsx` không được `AdminApp.tsx` import vào rout
   `(team_id TEXT, user_id TEXT, role TEXT, added_at)`, PK `(team_id, user_id)` — nhưng `team_id`
   là chuỗi trơn, **không có bảng metadata nào** lưu tên/mô tả team.
   - Người dùng duy nhất: `TaskGrantService.ts` — SELECT read-only để resolve grant scope
-    `'team'` cho Task (xem [task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md)).
+    `'team'` cho Task (xem [task-automation-orchestration-integration.md](../task-automation/task-automation-orchestration-integration.md)).
   - **Không có method/route nào từng `INSERT` vào bảng này** — không có RPC `team.*` để tạo team
     hay thêm thành viên. **Nhánh grant `'team'` trong `TaskGrantService` hiện là dead code** —
     永远 không match được ai vì bảng luôn rỗng.
@@ -119,10 +119,10 @@ Ngoài ra `DeptProfileAdmin.tsx` không được `AdminApp.tsx` import vào rout
 | `agent.trustPreset` | `'strict'\|'standard'\|'relaxed'\|'custom'` | `'minimal'\|'standard'\|'full'` | lệch enum |
 | `agent.approvedModels` | có | không có ở `agent` (nằm dưới `security`) | field đặt sai chỗ |
 | `editor.fontSize/fontFamily/keybindings` | có | **hoàn toàn không tồn tại** trên backend | ghi vào, không bao giờ đọc lại được |
-| `integrations.*` (githubOrg/linearWorkspace/prTemplate) | có | **section không tồn tại** | `ProfileResolver.merge()` không duyệt qua section này — **lưu được nhưng chết vĩnh viễn**, không bao giờ trả về trong `profile.getResolved` — ⏳ **còn mở**, chưa quyết định (xem [decisions-needed.md](./decisions-needed.md) mục 6) |
+| `integrations.*` (githubOrg/linearWorkspace/prTemplate) | có | **section không tồn tại** | `ProfileResolver.merge()` không duyệt qua section này — **lưu được nhưng chết vĩnh viễn**, không bao giờ trả về trong `profile.getResolved` — ⏳ **còn mở**, chưa quyết định (xem [decisions-needed.md](../planning/decisions-needed.md) mục 6) |
 | `fleet.*` | có | **section không tồn tại** | tương tự — chết vĩnh viễn nếu ghi — ⏳ **còn mở**, chưa quyết định |
 | `security.disallowedCmds` | tên này | `disallowedCommands` | lệch tên field |
-| `security.require2FA` | có | **không có field này** | ✅ Quyết định: thêm vào backend `SecurityProfileSection` — xem [decisions-needed.md](./decisions-needed.md) mục 6 |
+| `security.require2FA` | có | **không có field này** | ✅ Quyết định: thêm vào backend `SecurityProfileSection` — xem [decisions-needed.md](../planning/decisions-needed.md) mục 6 |
 | `security.sessionTimeoutHours` | tên này | `maxSessionHours` | lệch tên field |
 
 May mắn: `ProfileEditor.tsx` (component thật, được render) chỉ động tới `agent.preferredModel`
@@ -135,7 +135,7 @@ lệch chưa gây lỗi hiển thị cho user, nhưng đã "bake" sẵn vào typ
 
 1. Sửa `useProfile.ts`: `profile.getUser` → `profile.getUserProfile`.
 2. Thêm method `profile.listDepts` vào backend (`CompanyProfileAdmin.tsx`/`DeptProfileAdmin.tsx`
-   giữ nguyên cách gọi) — xem [fix-proposals-per-issue.md](./fix-proposals-per-issue.md) mục A2.
+   giữ nguyên cách gọi) — xem [fix-proposals-per-issue.md](../planning/fix-proposals-per-issue.md) mục A2.
 3. Sửa route `/admin` trong `http-server.ts` — tách rõ `/admin/api/*` (Express, giữ nguyên) khỏi
    `/admin`/`/admin-index.html` (cần fallback về static file serve).
 4. Hợp nhất 5 bản `OrcaProfile`/profile-types — chọn `backend/src/main/profile/OrcaProfile.ts`

@@ -191,7 +191,7 @@ insert khi caller không có 1 row users sạch.
 | `orca_project_source_projects` | `orca_project_id FK→orca_v5_projects CASCADE`, `owner_user_id FK→orca_users CASCADE`, `project_id TEXT` (**logic FK** sang `Project.id` trong file JSON per-user, KHÔNG phải SQL FK — vì Project data desktop nằm trong JSON, không SQL), `created_at BIGINT`, `PK(orca_project_id,owner_user_id,project_id)` | `idx_orca_project_source_projects_orca_project` | ✅ `OrcaProjectSourceProjectService` (verify bằng grep) |
 
 `orca_teams` **không có** `department_id`/`parent_id` — 1 Team **không** thuộc về 1 department cụ thể theo
-thiết kế (`docs/guides/user-profile-team-department-rbac.md §5.2`); độc lập với `orca_team_members` (nhóm I,
+thiết kế (`docs/guides/profile/user-profile-team-department-rbac.md §5.2`); độc lập với `orca_team_members` (nhóm I,
 tạo từ migration 0010, không đụng tới bởi 0016 ngoại trừ thêm cột `priority`).
 
 ---

@@ -288,7 +288,7 @@ This deployment runs `ORCA_MULTI_USER=1`, `ORCA_AUTH_MODE=local`, and — as of 
 7987228b4  fix(deploy): tạm tắt ORCA_DB_URL — migrations SQLite không tương thích Postgres
 cbdf8b455  fix(backend): BUG-BE-RPC-003 — migrations + pg-adapter sửa xong cho Postgres, bật lại
 ```
-i.e. Postgres was briefly disabled because the migration files weren't dialect-portable, then re-enabled once the migrations + `pg-adapter.ts`'s `?`→`$N` placeholder translation were fixed and verified end-to-end (see `docs/guides/postgres-shared-database-design.md` and the comment in `docker-compose.orca.artifact.yml`).
+i.e. Postgres was briefly disabled because the migration files weren't dialect-portable, then re-enabled once the migrations + `pg-adapter.ts`'s `?`→`$N` placeholder translation were fixed and verified end-to-end (see `docs/guides/database/postgres-shared-database-design.md` and the comment in `docker-compose.orca.artifact.yml`).
 
 **Real env vars in active use** (from `deploy/dev/.env`, confirmed read by `backend/src/main/db/config-loader.ts` and `backend/src/main/credentials/index.ts`):
 ```bash

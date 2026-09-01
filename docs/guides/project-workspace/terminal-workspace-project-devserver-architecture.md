@@ -5,21 +5,21 @@
 > Tài liệu này mô tả **kiến trúc đang chạy thật** trong code (`frontend/src/shared/types.ts`,
 > `frontend/src/shared/dev-server-types.ts`, `frontend/src/renderer/src/store/slices/repos.ts`,
 > `worktrees.ts`) — **không phải** mô hình `OrcaProject` được đặc tả trong
-> [F34 — Project-Dev Server Binding](../features/F34-project-dev-server-binding.md) và
-> [F38 — Project Workspace](../features/F38-project-workspace.md), vốn vẫn đang ở trạng thái
+> [F34 — Project-Dev Server Binding](../../features/F34-project-dev-server-binding.md) và
+> [F38 — Project Workspace](../../features/F38-project-workspace.md), vốn vẫn đang ở trạng thái
 > "🚧 Phát triển" (v5.0+, chưa release). Xem mục [Lưu ý: 2 mô hình song song](#lưu-ý-2-mô-hình-song-song-hiện-tại-vs-f34f38) ở cuối.
 >
 > Phần RBAC/phân quyền (user, profile, team, department) cho 2 mô hình project này được tách
-> riêng sang [user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md).
+> riêng sang [user-profile-team-department-rbac.md](../profile/user-profile-team-department-rbac.md).
 > Đối chiếu chi tiết F38 (đặc tả) với code Project Workspace thật, kèm phương án merge, xem
 > [project-workspace-f38-doc-vs-code.md](./project-workspace-f38-doc-vs-code.md).
 >
 > Chi tiết audit đầy đủ (file:line, dùng `backend/`+`agent/` làm nguồn sự thật) xem
-> [audit-backend-agent-2026-08-13.md](./audit-backend-agent-2026-08-13.md). Giải pháp từng bug
-> xem [fix-proposals-per-issue.md](./fix-proposals-per-issue.md). Điểm cần quyết định xem
-> [decisions-needed.md](./decisions-needed.md). Kế hoạch thực thi tổng hợp cho toàn bộ đề xuất
+> [audit-backend-agent-2026-08-13.md](../planning/audit-backend-agent-2026-08-13.md). Giải pháp từng bug
+> xem [fix-proposals-per-issue.md](../planning/fix-proposals-per-issue.md). Điểm cần quyết định xem
+> [decisions-needed.md](../planning/decisions-needed.md). Kế hoạch thực thi tổng hợp cho toàn bộ đề xuất
 > trong `docs/guides/` — thứ tự, phụ thuộc — xem
-> [roadmap-orca-project-task-rbac.md](./roadmap-orca-project-task-rbac.md).
+> [roadmap-orca-project-task-rbac.md](../planning/roadmap-orca-project-task-rbac.md).
 
 ## 1. Dev Server (host chạy)
 
@@ -147,7 +147,7 @@ tạo và đăng ký RPC thật** (`project.list`, `project.get`, `project.creat
 `project.delete`, `project.addMember`, `project.removeMember`, `project.updateMemberRole`,
 `project.getMembers`, `project.agentSpawn`). Có FK thật từ bảng `orca_tasks` sang
 `orca_v5_projects` — hệ Task (xem
-[task-automation-orchestration-integration.md](./task-automation-orchestration-integration.md))
+[task-automation-orchestration-integration.md](../task-automation/task-automation-orchestration-integration.md))
 được xây THẬT trên nền `OrcaProject`, không phải trên `Project`/`Repo` hiện tại.
 
 ## Mô hình `OrcaProject` — trạng thái thật (đã kiểm chứng qua `backend/`)
@@ -197,7 +197,7 @@ không phải 1 cái thật 1 cái ý tưởng như đính chính ở trên từ
      scaffolding **khác**, dùng type `OrcaProject` cục bộ riêng (`renderer/src/types/
      workspace-types.ts`) — khác cả `frontend/src/shared/project-types.ts` VÀ
      `backend/src/shared/project-types.ts`. Xem chi tiết phân biệt các bản type ở
-     [user-profile-team-department-rbac.md](./user-profile-team-department-rbac.md).
+     [user-profile-team-department-rbac.md](../profile/user-profile-team-department-rbac.md).
 
 ### Quan hệ `OrcaProject` ↔ `Repo`/`Worktree` hiện tại: KHÔNG có — xác nhận lại kể cả trong backend thật
 
