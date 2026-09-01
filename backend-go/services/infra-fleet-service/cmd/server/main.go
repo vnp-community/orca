@@ -126,6 +126,7 @@ func run() error {
 	resolveConnectionUC := usecase.NewResolveConnection(repo)
 	createSshTargetUC := usecase.NewCreateSshTarget(sshTargetStore)
 	getFleetHealthUC := usecase.NewGetFleetHealth(repo)
+	pollFleetHealthUC := usecase.NewPollFleetHealth(repo, repo, agentClient, logger)
 	scanWorkspacePortsUC := usecase.NewScanWorkspacePorts(repo, agentClient)
 	listDevServersUC := usecase.NewListDevServers(repo)
 	createConnectionUC := usecase.NewCreateConnection(repo)
@@ -276,6 +277,34 @@ func run() error {
 		logger.Info("infra-fleet-service http (health) listening", slog.Int("port", cfg.HTTPPort))
 		if err := httpServer.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 			errCh <- fmt.Errorf("http server: %w", err)
+		}
+	}()
+
+	// Fleet-health poller — specs/backend-go/services/infra-fleet-service.md
+	// §8's 30s cadence. A poll failure never reaches errCh: one bad tick
+	// (e.g. a transient DB error) should not take the whole service down,
+	// only skip that round — see PollFleetHealth's own doc comment for the
+	// per-dev-server error handling this relies on.
+	go func() {
+		const fleetHealthPollInterval = 30 * time.Second
+		// Poll once immediately on startup — otherwise a freshly-started
+		// service (or one that just came back up) leaves every dev server
+		// unreachable-by-default in fleet_health for a full interval before
+		// its first real sample lands.
+		if err := pollFleetHealthUC.Execute(ctx); err != nil {
+			logger.WarnContext(ctx, "fleet health poll failed", slog.Any("error", err))
+		}
+		ticker := time.NewTicker(fleetHealthPollInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := pollFleetHealthUC.Execute(ctx); err != nil {
+					logger.WarnContext(ctx, "fleet health poll failed", slog.Any("error", err))
+				}
+			}
 		}
 	}()
 

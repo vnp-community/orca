@@ -165,12 +165,32 @@ type ConnectionResolver interface {
 	ResolveConnectionByWorktree(ctx context.Context, tenantID, worktreeID string) (connected bool, devServer domain.DevServer, conn domain.Connection, err error)
 }
 
-// FleetHealthPort is the read port over fleet health samples. The
-// health-polling writer side (the 30s-cadence poller from
-// specs/backend-go/services/infra-fleet-service.md §8) is not implemented in
-// this scaffold — see this service's README "Known gaps".
+// FleetHealthPort is the read port over fleet health samples.
 type FleetHealthPort interface {
 	GetFleetHealth(ctx context.Context, tenantID string) ([]domain.DevServerHealth, error)
+}
+
+// FleetHealthWriter is the write port PollFleetHealth uses to persist each
+// dev server's sample — separate from FleetHealthPort (the user-facing read
+// side) since only the poller ever writes. See PollFleetHealth's doc
+// comment for what "the 30s-cadence poller from
+// specs/backend-go/services/infra-fleet-service.md §8" actually covers now.
+type FleetHealthWriter interface {
+	UpsertFleetHealth(ctx context.Context, health domain.DevServerHealth) error
+}
+
+// FleetHealthPollerRepository lists poll targets — deliberately a separate,
+// narrow port from DevServerRepository (not an added method on it) so the
+// 16+ existing DevServerRepository test fakes across this package don't all
+// need a new no-op method just to keep compiling; only PollFleetHealth (and
+// its own test's fake) depends on this port.
+type FleetHealthPollerRepository interface {
+	// ListAllDevServers returns every dev server across every tenant —
+	// deliberately unscoped, unlike DevServerRepository.List. An internal
+	// background poller has no request-scoped tenant to join through, and
+	// polling reachability is not tenant-sensitive data exposure the way a
+	// user-facing RPC's response would be.
+	ListAllDevServers(ctx context.Context) ([]domain.DevServer, error)
 }
 
 // BrowserProfileRepository is the persistence port for browser profile

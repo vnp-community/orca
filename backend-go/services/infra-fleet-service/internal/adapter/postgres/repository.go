@@ -466,3 +466,76 @@ func (r *Repository) GetFleetHealth(ctx context.Context, tenantID string) ([]dom
 	}
 	return out, nil
 }
+
+// ListAllDevServers returns every registered dev server across every
+// tenant — deliberately unscoped, unlike List/Get/GetFleetHealth. The one
+// caller (the fleet-health poller, usecase.PollFleetHealth) is an internal
+// background process with no request-scoped tenant to join through, and
+// polling reachability is not tenant-sensitive data exposure the way a
+// user-facing RPC's response would be.
+func (r *Repository) ListAllDevServers(ctx context.Context) ([]domain.DevServer, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id
+		FROM infra.dev_servers
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query all dev servers: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.DevServer
+	for rows.Next() {
+		var ds domain.DevServer
+		var mode, status string
+		var sshTargetID, groupID *string
+		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &status, &groupID); err != nil {
+			return nil, fmt.Errorf("postgres: scan dev server row: %w", err)
+		}
+		ds.Mode = domain.ConnectionMode(mode)
+		ds.Status = domain.DevServerStatus(status)
+		if sshTargetID != nil {
+			ds.SSHTargetID = *sshTargetID
+		}
+		if groupID != nil {
+			ds.GroupID = *groupID
+		}
+		out = append(out, ds)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate all dev server rows: %w", err)
+	}
+	return out, nil
+}
+
+// UpsertFleetHealth writes one dev server's latest health sample —
+// infra.fleet_health's primary key is dev_server_id alone (one row per dev
+// server, not a history table, see migrations/0001_init.up.sql), so every
+// poll replaces the previous sample rather than accumulating rows.
+//
+// status is derived from reachable alone (healthy/unreachable) — this
+// poller only ever measures agent-handshake reachability
+// (DevServerAgentClient.Health), not real CPU/RAM/disk thresholds, so
+// 'degraded'/'unhealthy' are never produced yet; see PollFleetHealth's own
+// doc comment for that scope cut.
+func (r *Repository) UpsertFleetHealth(ctx context.Context, h domain.DevServerHealth) error {
+	status := "unreachable"
+	if h.Reachable {
+		status = "healthy"
+	}
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO infra.fleet_health (dev_server_id, reachable, cpu_percent, ram_percent, disk_percent, latency_ms, checked_at, status)
+		VALUES ($1, $2, $3, $4, $5, $6, now(), $7)
+		ON CONFLICT (dev_server_id) DO UPDATE SET
+			reachable    = EXCLUDED.reachable,
+			cpu_percent  = EXCLUDED.cpu_percent,
+			ram_percent  = EXCLUDED.ram_percent,
+			disk_percent = EXCLUDED.disk_percent,
+			latency_ms   = EXCLUDED.latency_ms,
+			checked_at   = EXCLUDED.checked_at,
+			status       = EXCLUDED.status
+	`, h.DevServerID, h.Reachable, h.CPUPercent, h.RAMPercent, h.DiskPercent, h.LatencyMS, status)
+	if err != nil {
+		return fmt.Errorf("postgres: upsert fleet health: %w", err)
+	}
+	return nil
+}
