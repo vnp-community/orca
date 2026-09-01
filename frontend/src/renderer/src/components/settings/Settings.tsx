@@ -63,6 +63,8 @@ import { PrivacyPane } from './PrivacyPane'
 import { AdvancedPane } from './AdvancedPane'
 import { SettingsSidebar } from './SettingsSidebar'
 import { DevServerPane } from './DevServerPane'
+import { AdminDevServerConsole } from './AdminDevServerConsole'
+import { AdminOrgConsole } from './AdminOrgConsole'
 import { SettingsSetupGuidePane } from './SettingsSetupGuidePane'
 import { ActiveSettingsSectionProvider, SettingsSection } from './SettingsSection'
 import { getSettingsSectionSearchEntries, rankSettingsSearchItems } from './settings-search'
@@ -270,6 +272,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 
 function Settings(): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
+  const isAdmin = useAppStore((s) => s.currentUser?.role === 'admin')
   const keybindings = useAppStore((s) => s.keybindings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const switchRuntimeEnvironment = useAppStore((s) => s.switchRuntimeEnvironment)
@@ -1567,6 +1570,40 @@ function Settings(): React.JSX.Element {
                 >
                   {isSectionMounted('dev-servers') ? <DevServerPane /> : null}
                 </SettingsSection>
+
+                {isAdmin ? (
+                  <SettingsSection
+                    id="admin-dev-servers"
+                    title={translate(
+                      'auto.components.settings.Settings.adminDevServersTitle',
+                      'Admin console'
+                    )}
+                    description={translate(
+                      'auto.components.settings.Settings.adminDevServersDesc',
+                      'Approve dev server agents, assign groups, and resolve access requests.'
+                    )}
+                    searchEntries={getSectionSearchEntries('admin-dev-servers')}
+                  >
+                    {isSectionMounted('admin-dev-servers') ? <AdminDevServerConsole /> : null}
+                  </SettingsSection>
+                ) : null}
+
+                {isAdmin ? (
+                  <SettingsSection
+                    id="admin-org"
+                    title={translate(
+                      'auto.components.settings.Settings.adminOrgTitle',
+                      'Organization'
+                    )}
+                    description={translate(
+                      'auto.components.settings.Settings.adminOrgDesc',
+                      'Manage departments and user accounts.'
+                    )}
+                    searchEntries={getSectionSearchEntries('admin-org')}
+                  >
+                    {isSectionMounted('admin-org') ? <AdminOrgConsole /> : null}
+                  </SettingsSection>
+                ) : null}
 
                 {showDesktopOnlySettings ? (
                   <SettingsSection

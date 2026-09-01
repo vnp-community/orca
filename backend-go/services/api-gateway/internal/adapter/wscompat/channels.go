@@ -22,10 +22,12 @@ package wscompat
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"time"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	annotationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1"
+	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	automationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/automation/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -49,11 +51,38 @@ type rateLimitReader interface {
 	Burst() int
 }
 
-// rateLimitInfo is the wire shape rateLimits.get returns — mirrors the
-// frontend's RateLimitInfo type.
+// rateLimitInfo is the wire shape apiGateway.rateLimits.get returns.
 type rateLimitInfo struct {
 	RequestsPerSecond float64 `json:"requestsPerSecond"`
 	Burst             int     `json:"burst"`
+}
+
+// rateLimitRuntimeTargetView mirrors frontend/src/shared/rate-limit-types.ts's
+// RateLimitRuntimeTarget.
+type rateLimitRuntimeTargetView struct {
+	Runtime   string  `json:"runtime"` // "host" | "wsl"
+	WSLDistro *string `json:"wslDistro"`
+}
+
+// rateLimitStateView is the wire shape rateLimits.get returns — mirrors
+// frontend/src/shared/rate-limit-types.ts's RateLimitState field-for-field.
+// Every provider is nil (not merely absent) since backend-go tracks no
+// AI-provider usage yet — see registerRateLimitChannels's doc comment.
+type rateLimitStateView struct {
+	Claude                  any                        `json:"claude"`
+	Codex                   any                        `json:"codex"`
+	Gemini                  any                        `json:"gemini"`
+	OpencodeGo              any                        `json:"opencodeGo"`
+	Kimi                    any                        `json:"kimi"`
+	Antigravity             any                        `json:"antigravity"`
+	Minimax                 any                        `json:"minimax"`
+	Grok                    any                        `json:"grok"`
+	MinimaxCookieConfigured bool                       `json:"minimaxCookieConfigured"`
+	GrokAuthConfigured      bool                       `json:"grokAuthConfigured"`
+	ClaudeTarget            rateLimitRuntimeTargetView `json:"claudeTarget"`
+	CodexTarget             rateLimitRuntimeTargetView `json:"codexTarget"`
+	InactiveClaudeAccounts  []any                      `json:"inactiveClaudeAccounts"`
+	InactiveCodexAccounts   []any                      `json:"inactiveCodexAccounts"`
 }
 
 // rpcTimeout is the per-RPC deadline applied to each outbound gRPC call inside
@@ -82,6 +111,7 @@ func RegisterRealChannels(
 	scmClient scmintegrationv1.ScmIntegrationServiceClient,
 	workflowClient workflowv1.WorkflowServiceClient,
 	aiProviderClient aiproviderv1.AiProviderServiceClient,
+	authClient authv1.AuthServiceClient,
 	rateLimits rateLimitReader,
 ) {
 	registerAnnotationChannels(r, annotationClient)
@@ -90,9 +120,12 @@ func RegisterRealChannels(
 	registerAutomationChannels(r, automationClient)
 	registerPreflightChannels(r)
 	registerDevServerChannels(r, infraFleetClient)
+	registerDevServerAccessControlChannels(r, infraFleetClient, tenantClient)
 	registerFleetChannels(r, infraFleetClient)
 	registerCrashReportChannels(r)
 	registerRateLimitChannels(r, rateLimits)
+	registerOnboardingChannels(r, infraFleetClient, tenantClient)
+	registerTelemetryChannels(r)
 
 	// Final integration pass — every group below was implemented as a
 	// standalone channels_*.go file (channels.go itself deliberately
@@ -125,6 +158,7 @@ func RegisterRealChannels(
 	registerTerminalChannels(r, infraFleetClient)
 	registerTenantProjectChannels(r, tenantClient, projectClient)
 	registerWorkflowChannels(r, workflowClient)
+	registerAdminUserChannels(r, authClient, tenantClient)
 }
 
 // ── annotation.* ────────────────────────────────────────────────────────
@@ -370,6 +404,13 @@ type devServerView struct {
 	WorkspaceDir    *string  `json:"workspaceDir"`
 	AddedAt         int64    `json:"addedAt"`
 	Capabilities    []string `json:"capabilities"`
+	// ApprovalStatus/GroupID — CR-DS-006 Phase 2. Frontend field names
+	// (approvalStatus, groupId) — NOT the same as this struct's own Go
+	// field naming for the pre-existing "status" field (a different,
+	// unrelated concept: live relay connection state, always
+	// "disconnected" here per this view's own comment below).
+	ApprovalStatus string `json:"approvalStatus"`
+	GroupID        string `json:"groupId"`
 }
 
 // toDevServerView maps a proto DevServer (id/tenant_id/host/mode only) onto
@@ -380,10 +421,37 @@ func toDevServerView(ds *infrafleetv1.DevServer) devServerView {
 		ID:             ds.GetId(),
 		Name:           ds.GetHost(), // no `name` field server-side — host doubles as display name
 		ConnectionType: fromConnectionMode(ds.GetMode()),
-		Status:         "disconnected", // backend-go doesn't track live relay connection state yet
+		Status:         "disconnected", // overwritten by attachConnectionStatus wherever live status matters
+		ApprovalStatus: ds.GetApprovalStatus(),
+		GroupID:        ds.GetGroupId(),
 	}
 	if host := ds.GetHost(); host != "" {
 		view.WSUrl = &host
+	}
+	return view
+}
+
+// attachConnectionStatus overwrites view.Status with the dev server's REAL
+// live-connection state via IsDevServerConnected — the live-bug fix for
+// devServer.list/listForUser always reporting "disconnected" regardless of
+// whether the agent actually has a live session (toDevServerView's
+// placeholder never distinguished the two). Fails open to "disconnected"
+// on any RPC error — a status check hiccup must never break the whole list.
+// Used only where the caller actually renders/filters on live status
+// (devServer.list/listForUser); the single-object mutation-response
+// channels (approve/reject/assignGroup/add) are left as the honest
+// placeholder since their callers don't use Status to decide anything.
+func attachConnectionStatus(ctx context.Context, client infrafleetv1.InfraFleetServiceClient, view devServerView) devServerView {
+	rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+	defer cancel()
+	resp, err := client.IsDevServerConnected(rpcCtx, &infrafleetv1.IsDevServerConnectedRequest{DevServerId: view.ID})
+	if err != nil {
+		return view
+	}
+	if resp.GetConnected() {
+		view.Status = "connected"
+	} else {
+		view.Status = "disconnected"
 	}
 	return view
 }
@@ -446,7 +514,7 @@ func registerDevServerChannels(r *Registry, client infrafleetv1.InfraFleetServic
 		}
 		views := make([]devServerView, 0, len(resp.GetDevServers()))
 		for _, ds := range resp.GetDevServers() {
-			views = append(views, toDevServerView(ds))
+			views = append(views, attachConnectionStatus(ctx, client, toDevServerView(ds)))
 		}
 		return views, nil
 	})
@@ -476,6 +544,165 @@ func registerDevServerChannels(r *Registry, client infrafleetv1.InfraFleetServic
 		}
 		return toDevServerView(resp.GetDevServer()), nil
 	})
+
+	// devServer.listSshTargets: lets the "connect a dev server" UI (onboarding
+	// DevServerStep.tsx) offer a picker of already-configured SSH targets for
+	// connectionType relay-ssh, instead of a free-text target-id box. Reuses
+	// the exact same InfraFleetServiceClient.ListSshTargets call
+	// "ssh.listTargets" already wraps — this file only adds the response
+	// envelope frontend/src/renderer/src/web/web-preload-api.ts's
+	// listSshTargets() expects: `{ targets: [...] }`, not a bare array.
+	//
+	// Field gap: backend-go's SshTarget proto message only carries
+	// id/host/user (Vault-cert auth, no key-file config) — frontend/src/
+	// shared/ssh-types.ts's SshTarget additionally requires label/port/
+	// username. label/port are synthesized here (not fabricated data —
+	// `user@host` and the standard SSH port are reasonable, honest
+	// defaults for a picker, not claims about the real target's config).
+	r.Register("devServer.listSshTargets", func(ctx context.Context, id Identity, _ []json.RawMessage) (any, error) {
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		resp, err := client.ListSshTargets(rpcCtx, &infrafleetv1.ListSshTargetsRequest{})
+		if err != nil {
+			return nil, err
+		}
+		targets := make([]sshTargetPickerView, 0, len(resp.GetSshTargets()))
+		for _, t := range resp.GetSshTargets() {
+			targets = append(targets, sshTargetPickerView{
+				ID:       t.GetId(),
+				Label:    t.GetUser() + "@" + t.GetHost(),
+				Host:     t.GetHost(),
+				Port:     22,
+				Username: t.GetUser(),
+			})
+		}
+		return map[string]any{"targets": targets}, nil
+	})
+
+	// devServer.browseDir — the onboarding "Add a project" flow's folder
+	// picker (Browse host / Clone from URL's parent folder / Create on
+	// host's parent folder — all three ultimately render RemoteFileBrowser
+	// with a devServerId) always failed live: this channel never existed at
+	// all, so web-preload-api.ts's devServer.browseDir call always hit
+	// Registry's generic "not yet implemented" error.
+	//
+	// Relays through RelayByDevServer, NOT ResolveConnection+Relay
+	// (onboarding.detectAgents's pattern) — deliberately: ResolveConnection
+	// answers "is there an infra.connections row for this dev server", a
+	// DIFFERENT concept from "is the agent's session live" (see
+	// usecase.RelayByDevServer's doc comment). A dev server has no
+	// connections row until a repo/worktree is bound to it — exactly the
+	// chicken-and-egg case browsing BEFORE picking a project hits. First
+	// live bug found this way: a genuinely-connected, freshly-added dev
+	// server always reported "not connected" here, and separately always
+	// showed "disconnected" in the dev server list (toDevServerView's
+	// Status was a hardcoded placeholder — see attachConnectionStatus, the
+	// real fix for that half).
+	//
+	// Relays to the agent's own confirmed fs.readDir RPC
+	// (specs/agent/api/agent-rpc-catalog-git-fs.md), mapping its
+	// {entries:[{path,name,type,size?}],path} into the
+	// {resolvedPath,entries:[{name,isDirectory,isSymlink}]} shape
+	// web-preload-api.ts / RemoteFileBrowser already expect (same shape
+	// desktop's own local files.browseServerDir returns).
+	//
+	// Home-directory resolution gap, honestly disclosed rather than faked:
+	// fs.readDir does no `~` expansion (no shell involved, pure Node fs
+	// calls) and no dev-server-agent RPC reports the remote user's home
+	// directory today. An incoming "" or "~" therefore starts the browse at
+	// "/" (always a valid absolute directory) instead of a guessed home —
+	// the user can navigate from there. Revisit if/when the agent gains a
+	// home-directory-reporting RPC.
+	r.Register("devServer.browseDir", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type browseDirArgs struct {
+			DevServerID string `json:"id"`
+			Path        string `json:"path"`
+		}
+		in, err := decodeArg[browseDirArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if in.DevServerID == "" {
+			return nil, fmt.Errorf("DEVSERVER_BROWSE_NO_DEV_SERVER: id is required")
+		}
+		path := in.Path
+		if path == "" || path == "~" {
+			path = "/"
+		}
+
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID, Role: id.Role})
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+
+		paramsJSON, err := json.Marshal(map[string]any{"path": path, "depth": 1})
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.RelayByDevServer(rpcCtx, &infrafleetv1.RelayByDevServerRequest{
+			DevServerId: in.DevServerID,
+			Method:      "fs.readDir",
+			ParamsJson:  string(paramsJSON),
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		var relayResult struct {
+			Path    string `json:"path"`
+			Entries []struct {
+				Name string `json:"name"`
+				Type string `json:"type"`
+			} `json:"entries"`
+		}
+		if raw := resp.GetResultJson(); raw != "" {
+			if err := json.Unmarshal([]byte(raw), &relayResult); err != nil {
+				return nil, fmt.Errorf("devServer.browseDir: decoding relay result: %w", err)
+			}
+		}
+		entries := make([]devServerBrowseDirEntryView, 0, len(relayResult.Entries))
+		for _, e := range relayResult.Entries {
+			entries = append(entries, devServerBrowseDirEntryView{
+				Name:        e.Name,
+				IsDirectory: e.Type == "directory",
+				// fs.readDir does not report symlink-ness — see this
+				// channel's doc comment.
+				IsSymlink: false,
+			})
+		}
+		resolvedPath := relayResult.Path
+		if resolvedPath == "" {
+			resolvedPath = path
+		}
+		return devServerBrowseDirResultView{ResolvedPath: resolvedPath, Entries: entries}, nil
+	})
+}
+
+// devServerBrowseDirEntryView/devServerBrowseDirResultView mirror
+// web-preload-api.ts's devServer.browseDir return type
+// ({resolvedPath, entries:[{name,isDirectory,isSymlink}]}) — see that
+// channel's doc comment above.
+type devServerBrowseDirEntryView struct {
+	Name        string `json:"name"`
+	IsDirectory bool   `json:"isDirectory"`
+	IsSymlink   bool   `json:"isSymlink"`
+}
+
+type devServerBrowseDirResultView struct {
+	ResolvedPath string                        `json:"resolvedPath"`
+	Entries      []devServerBrowseDirEntryView `json:"entries"`
+}
+
+// sshTargetPickerView is the minimal subset of frontend/src/shared/
+// ssh-types.ts's SshTarget that devServer.listSshTargets can honestly
+// populate from backend-go's SshTarget proto message — see that channel's
+// doc comment for which fields are synthesized and why.
+type sshTargetPickerView struct {
+	ID       string `json:"id"`
+	Label    string `json:"label"`
+	Host     string `json:"host"`
+	Port     int    `json:"port"`
+	Username string `json:"username"`
 }
 
 // ── fleet.health.checkAll ─────────────────────────────────────────────────
@@ -589,18 +816,44 @@ func registerCrashReportChannels(r *Registry) {
 	})
 }
 
-// ── rateLimits.* ────────────────────────────────────────────────────────────
+// ── apiGateway.rateLimits.* / rateLimits.* ──────────────────────────────────
 //
-// Exposes api-gateway's in-process per-tenant rate limiter configuration.
-// The frontend calls rateLimits.get during bootstrap to understand the
-// current throttle policy (e.g. for UI-level quota indicators). Returns
-// the limiter's configured RPS/burst — not per-tenant counters (those are
+// apiGateway.rateLimits.get exposes api-gateway's in-process per-tenant rate
+// limiter configuration (RPS/burst) — not per-tenant counters (those are
 // ephemeral per-replica state, not meaningful to expose externally).
+//
+// This does NOT own the "rateLimits.get" name: the frontend already has a
+// long-standing, unrelated rateLimits.get RPC for AI-provider usage
+// snapshots (frontend/src/renderer/src/runtime/runtime-rate-limits-client.ts,
+// frontend/src/shared/rate-limit-types.ts's RateLimitState) — StatusBar
+// destructures its per-provider fields on every render. An earlier pass
+// registered this gateway-throttle feature under the bare "rateLimits.get"
+// name without checking that (the doc comment even claimed a "RateLimitInfo"
+// frontend type that never existed), silently shadowing it — StatusBar then
+// crashed reading `.status` off the throttle shape's missing provider keys
+// (undefined, not null — see status-bar-provider-visibility.ts's
+// isProviderConfigured). Namespaced under apiGateway.* here so both can
+// coexist; rateLimits.get below now answers the real contract.
 func registerRateLimitChannels(r *Registry, rl rateLimitReader) {
-	r.Register("rateLimits.get", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+	r.Register("apiGateway.rateLimits.get", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		return rateLimitInfo{
 			RequestsPerSecond: rl.RPS(),
 			Burst:             rl.Burst(),
+		}, nil
+	})
+
+	// rateLimits.get: the real AI-provider-usage contract. backend-go has no
+	// provider-usage tracking yet (that lived in the old TS backend's
+	// backend/src/main/telemetry-sibling rate-limits module, never ported) —
+	// every provider null / status absent is the honest "not tracked here"
+	// answer, matching RateLimitState's shape field-for-field so StatusBar's
+	// destructure sees real nulls instead of missing keys.
+	r.Register("rateLimits.get", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		return rateLimitStateView{
+			ClaudeTarget:           rateLimitRuntimeTargetView{Runtime: "host"},
+			CodexTarget:            rateLimitRuntimeTargetView{Runtime: "host"},
+			InactiveClaudeAccounts: []any{},
+			InactiveCodexAccounts:  []any{},
 		}, nil
 	})
 }

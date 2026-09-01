@@ -122,6 +122,7 @@ func run() error {
 	defer agentClient.Close()
 
 	registerDevServerUC := usecase.NewRegisterDevServer(repo)
+	resolveDirectWebSocketDevServerUC := usecase.NewResolveDirectWebSocketDevServer(repo)
 	resolveConnectionUC := usecase.NewResolveConnection(repo)
 	createSshTargetUC := usecase.NewCreateSshTarget(sshTargetStore)
 	getFleetHealthUC := usecase.NewGetFleetHealth(repo)
@@ -129,6 +130,8 @@ func run() error {
 	listDevServersUC := usecase.NewListDevServers(repo)
 	createConnectionUC := usecase.NewCreateConnection(repo)
 	relayUC := usecase.NewRelay(repo, agentClient)
+	relayByDevServerUC := usecase.NewRelayByDevServer(repo, agentClient)
+	isDevServerConnectedUC := usecase.NewIsDevServerConnected(repo, agentClient)
 	listSshTargetsUC := usecase.NewListSshTargets(sshTargetStore)
 	getSshStateUC := usecase.NewGetSshState(sshTargetStore, repo, repo)
 	establishConnectionUC := usecase.NewEstablishConnection(sshTargetStore, repo, repo, agentClient)
@@ -137,16 +140,16 @@ func run() error {
 	// --- Terminal/PTY (TASK-185) --- one ConnectionStreamLimiter shared by
 	// AttachPty across every stream this process serves.
 	ptyStreamLimiter := usecase.NewConnectionStreamLimiter(0)
-	spawnTerminalSessionUC := usecase.NewSpawnTerminalSession(repo, agentClient, terminalSessionStore, cfg.ServerDeployment)
-	resizeTerminalSessionUC := usecase.NewResizeTerminalSession(terminalSessionStore, repo, agentClient)
-	killTerminalSessionUC := usecase.NewKillTerminalSession(terminalSessionStore, repo, agentClient)
-	stopTerminalProcessUC := usecase.NewStopTerminalProcess(terminalSessionStore, repo, agentClient)
+	spawnTerminalSessionUC := usecase.NewSpawnTerminalSession(repo, repo, agentClient, terminalSessionStore, cfg.ServerDeployment)
+	resizeTerminalSessionUC := usecase.NewResizeTerminalSession(terminalSessionStore, repo, repo, agentClient)
+	killTerminalSessionUC := usecase.NewKillTerminalSession(terminalSessionStore, repo, repo, agentClient)
+	stopTerminalProcessUC := usecase.NewStopTerminalProcess(terminalSessionStore, repo, repo, agentClient)
 	listTerminalSessionsUC := usecase.NewListTerminalSessions(terminalSessionStore)
-	waitTerminalSessionUC := usecase.NewWaitTerminalSession(terminalSessionStore, repo, agentClient)
+	waitTerminalSessionUC := usecase.NewWaitTerminalSession(terminalSessionStore, repo, repo, agentClient)
 	focusTerminalSessionUC := usecase.NewFocusTerminalSession(terminalSessionStore)
-	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient)
-	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, agentClient)
-	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter)
+	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, repo, agentClient)
+	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, repo, agentClient)
+	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, repo, agentClient, ptyStreamLimiter)
 	screencastStreamLimiter := usecase.NewConnectionStreamLimiter(0)
 	attachScreencastUC := usecase.NewAttachScreencast(repo, agentClient, screencastStreamLimiter)
 	listBrowserProfilesUC := usecase.NewListBrowserProfiles(browserProfileStore)
@@ -158,6 +161,23 @@ func run() error {
 	// — see usecase.EmulatorRelay / usecase.GetHostCapabilities doc comments.
 	emulatorRelayUC := usecase.NewEmulatorRelay(repo, agentClient)
 	getHostCapabilitiesUC := usecase.NewGetHostCapabilities(repo, agentClient)
+
+	// --- CR-DS-006 Phase 2 / CR-DS-007 / CR-DS-008 (dev server access control) ---
+	devServerGroupStore := infrapostgres.NewDevServerGroupStore(pool)
+	devServerGroupGrantStore := infrapostgres.NewDevServerGroupGrantStore(pool)
+	devServerAccessRequestStore := infrapostgres.NewDevServerAccessRequestStore(pool)
+	approveDevServerUC := usecase.NewApproveDevServer(repo)
+	rejectDevServerUC := usecase.NewRejectDevServer(repo)
+	assignDevServerGroupUC := usecase.NewAssignDevServerGroup(repo)
+	createDevServerGroupUC := usecase.NewCreateDevServerGroup(devServerGroupStore)
+	listDevServerGroupsUC := usecase.NewListDevServerGroups(devServerGroupStore)
+	grantDevServerGroupAccessUC := usecase.NewGrantDevServerGroupAccess(devServerGroupGrantStore)
+	revokeDevServerGroupAccessUC := usecase.NewRevokeDevServerGroupAccess(devServerGroupGrantStore)
+	listDevServerGroupGrantsUC := usecase.NewListDevServerGroupGrants(devServerGroupGrantStore)
+	listDevServersForUserUC := usecase.NewListDevServersForUser(repo, devServerGroupStore, devServerGroupGrantStore)
+	createAccessRequestUC := usecase.NewCreateAccessRequest(devServerAccessRequestStore)
+	listPendingAccessRequestsUC := usecase.NewListPendingAccessRequests(devServerAccessRequestStore)
+	resolveAccessRequestUC := usecase.NewResolveAccessRequest(devServerAccessRequestStore, devServerGroupGrantStore)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
@@ -189,6 +209,20 @@ func run() error {
 		deleteBrowserProfileUC,
 		emulatorRelayUC,
 		getHostCapabilitiesUC,
+		approveDevServerUC,
+		rejectDevServerUC,
+		assignDevServerGroupUC,
+		createDevServerGroupUC,
+		listDevServerGroupsUC,
+		grantDevServerGroupAccessUC,
+		revokeDevServerGroupAccessUC,
+		listDevServerGroupGrantsUC,
+		listDevServersForUserUC,
+		createAccessRequestUC,
+		listPendingAccessRequestsUC,
+		resolveAccessRequestUC,
+		relayByDevServerUC,
+		isDevServerConnectedUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -212,7 +246,7 @@ func run() error {
 	slotRegistry := infraagentwsserver.NewRegistry(infraagentwsserver.DefaultConnectTimeout)
 	defer slotRegistry.Stop()
 	agentWSServer := infraagentwsserver.New(slotRegistry, agentClient, agentWSCfg, logger)
-	agentTokenIssuer := infraagentwsserver.NewTokenIssuer(slotRegistry, agentWSCfg, logger)
+	agentTokenIssuer := infraagentwsserver.NewTokenIssuer(slotRegistry, agentWSCfg, logger, resolveDirectWebSocketDevServerUC)
 
 	mux := http.NewServeMux()
 	mux.Handle("/", healthSrv.Handler())

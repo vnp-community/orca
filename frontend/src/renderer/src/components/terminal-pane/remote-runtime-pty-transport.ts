@@ -129,6 +129,7 @@ export function createRemoteRuntimePtyTransport(
     launchConfig,
     launchToken,
     launchAgent,
+    connectionId,
     worktreeId,
     tabId,
     leafId,
@@ -725,10 +726,23 @@ export function createRemoteRuntimePtyTransport(
       viewport: subscribedViewport ?? undefined,
       callbacks: subscribeCallbacks
     }
-    // Why: the web session client's Unix-socket-proxied transport has no
-    // binary-frame capability at any layer, so terminal.multiplex (which
-    // requires sendBinary/registerBinaryStreamHandler) can never work there —
-    // fall back to the plain-JSON terminal.subscribe RPC instead.
+    // Why: 'session-auth' (backend-go's WebSessionClient) genuinely cannot
+    // carry binary WS frames — confirmed by reading the client itself:
+    // handleSocketMessage's `if (typeof rawData !== 'string') return` drops
+    // every binary frame outright, and subscribe()'s returned sendBinary
+    // unconditionally throws ("Binary frames not supported in session mode
+    // over this channel"). An earlier pass here assumed WebSessionClient
+    // supported binary because the TS interface declares sendBinary/onBinary
+    // (satisfying RemoteRuntimeMultiplexedTerminalCallbacks structurally) —
+    // wrong; those fields exist only to satisfy the type, the implementation
+    // stubs them. terminal.multiplex is for WebRuntimeClient (paired/E2EE)
+    // only. 'session-auth' must use the plain-JSON fallback — which needs
+    // backend-go to actually implement terminal.subscribe/unsubscribe (see
+    // channels_terminal_subscribe.go) — found live 2026-08-30 via direct WS
+    // frame capture (script-based, not a screenshot): confirmed the create
+    // RPC, the multiplex RPC ack, and the initial prompt all succeed, but
+    // zero binary frames ever cross the wire and every later terminal.* RPC
+    // silently no-ops or 404s.
     const nextStream =
       currentRuntimeEnvironmentId === 'session-auth'
         ? await subscribeTerminalViaJson({
@@ -801,6 +815,13 @@ export function createRemoteRuntimePtyTransport(
           'terminal.create',
           {
             worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
+            // Why: backend-go's terminal.create (channels_terminal.go) only
+            // reads connectionId, never worktree — SpawnTerminalSession takes
+            // an empty ConnectionID as "spawn a host-local PTY", which the
+            // web deployment cannot do (INFRA_TERMINAL_HOST_LOCAL_UNIMPLEMENTED,
+            // found live 2026-08-30). Every dev-server-bound terminal on web
+            // rides this transport, so connectionId must travel with it.
+            ...(connectionId ? { connectionId } : {}),
             ...(commandToSend !== undefined ? { command: commandToSend } : {}),
             ...(startupCommandDeliveryToSend !== undefined
               ? { startupCommandDelivery: startupCommandDeliveryToSend }
@@ -1069,7 +1090,7 @@ export function createRemoteRuntimePtyTransport(
     },
 
     getConnectionId() {
-      return null
+      return connectionId ?? null
     },
 
     getRuntimeEnvironmentId() {

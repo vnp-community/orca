@@ -283,6 +283,25 @@ func (c *Client) Health(ctx context.Context, devServer domain.DevServer) (bool, 
 	return sess.isHandshaked(), nil
 }
 
+// IsConnected reports whether devServerID already has a live, handshaked
+// session RIGHT NOW — a pure map peek, never dialing/provisioning a new one
+// the way Health does. Health is right for its own call site
+// (EstablishConnection, a deliberate connect-time reachability check where
+// dialing IS the point); IsConnected is for callers that just want to know
+// current status cheaply and safely in bulk (e.g. listing dev servers, or
+// deciding whether a browse/detect action can relay anywhere at all) —
+// calling Health per row there would risk a slow dial-out per
+// not-yet-connected relay-websocket/relay-ssh row. direct-websocket mode
+// (an inbound-only session, see getInboundSession) never dials regardless,
+// so this is exactly as accurate as Health for that mode and just skips the
+// unnecessary round trip for the other two.
+func (c *Client) IsConnected(devServerID string) bool {
+	c.mu.Lock()
+	sess, ok := c.sessions[devServerID]
+	c.mu.Unlock()
+	return ok && sess.isHandshaked()
+}
+
 // Note: relay-ssh's liveness check is NOT a separate dial-and-probe path —
 // Health above already covers it uniformly via getOrCreateSession's
 // mode dispatch to getOrProvisionSession/sshProvisioner.Provision, the same

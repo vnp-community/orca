@@ -30,8 +30,10 @@ type fakeDevServerAgentClient struct {
 
 	// healthy/healthErr drive Health's fake answer — used by
 	// establish_connection_test.go.
-	healthy        bool
-	healthErr      error
+	healthy   bool
+	healthErr error
+	// isConnected drives IsConnected's fake answer.
+	isConnected    bool
 	spawnPtyResult SpawnPtyResult
 	spawnPtyErr    error
 	spawnPtyCalls  []SpawnPtyInput
@@ -90,6 +92,10 @@ func (f *fakeDevServerAgentClient) Health(ctx context.Context, devServer domain.
 		return false, f.healthErr
 	}
 	return f.healthy, nil
+}
+
+func (f *fakeDevServerAgentClient) IsConnected(devServerID string) bool {
+	return f.isConnected
 }
 
 func (f *fakeDevServerAgentClient) SpawnPty(ctx context.Context, devServer domain.DevServer, in SpawnPtyInput) (SpawnPtyResult, error) {

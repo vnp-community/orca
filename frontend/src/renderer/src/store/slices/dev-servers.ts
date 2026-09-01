@@ -1,8 +1,6 @@
 import type { StateCreator } from 'zustand'
-import { useShallow } from 'zustand/react/shallow'
 import type { DevServer } from '../../../../shared/dev-server-types'
 import type { AppState } from '../types'
-import { useAppStore } from '../index'
 
 // ─── Slice Type ───────────────────────────────────────────────────────────────
 
@@ -24,6 +22,12 @@ export type DevServerSlice = {
 }
 
 // ─── Slice Implementation ─────────────────────────────────────────────────────
+// Why: this file deliberately holds ONLY the slice, no useAppStore-reading
+// hooks — store/index.ts imports createDevServerSlice from here directly to
+// build the aggregate store, and a hook needing a top-level `import {
+// useAppStore } from '../index'` living in the SAME file would make that a
+// genuine circular module dependency (see dev-servers-selectors.ts's own
+// doc comment, where those hooks now live, for the live bug this caused).
 
 export const createDevServerSlice: StateCreator<AppState, [], [], DevServerSlice> = (set) => ({
   devServers: [],
@@ -35,54 +39,19 @@ export const createDevServerSlice: StateCreator<AppState, [], [], DevServerSlice
     set((state) => ({
       devServers: state.devServers.some((ds) => ds.id === server.id)
         ? state.devServers.map((ds) => (ds.id === server.id ? { ...ds, ...server } : ds))
-        : [...state.devServers, server],
+        : [...state.devServers, server]
     })),
 
   removeDevServer: (id) =>
     set((state) => ({
       devServers: state.devServers.filter((ds) => ds.id !== id),
-      activeDevServerId: state.activeDevServerId === id ? null : state.activeDevServerId,
+      activeDevServerId: state.activeDevServerId === id ? null : state.activeDevServerId
     })),
 
   setActiveDevServerId: (id) => set({ activeDevServerId: id }),
 
   updateDevServerStatus: (id, status, extra = {}) =>
     set((state) => ({
-      devServers: state.devServers.map((ds) =>
-        ds.id === id ? { ...ds, status, ...extra } : ds
-      ),
-    })),
+      devServers: state.devServers.map((ds) => (ds.id === id ? { ...ds, status, ...extra } : ds))
+    }))
 })
-
-// ─── Selectors ────────────────────────────────────────────────────────────────
-// Why: useAppStore is imported lazily (via require) inside each hook to avoid
-// a circular dependency at module evaluation time. dev-servers.ts is imported
-// by store/index.ts (which creates the store), so a top-level import of
-// useAppStore from '../index' would create a cycle that returns undefined for
-// createDevServerSlice in test isolation. The hooks are only called at React
-// render time, by which point all modules are fully initialized.
-
-/** All dev servers (stable reference via shallow equality) */
-export function useDevServers() {
-  return useAppStore(useShallow((s) => s.devServers))
-}
-
-/** Currently active dev server, or null */
-export function useActiveDevServer() {
-  return useAppStore(
-    useShallow((s) => {
-      const id = s.activeDevServerId
-      return id ? (s.devServers.find((ds) => ds.id === id) ?? null) : null
-    })
-  )
-}
-
-/** Only servers that are actively connected */
-export function useConnectedDevServers() {
-  return useAppStore(useShallow((s) => s.devServers.filter((ds) => ds.status === 'connected')))
-}
-
-/** Look up a single server by id */
-export function useDevServerById(id: string | null) {
-  return useAppStore((s) => (id ? (s.devServers.find((ds) => ds.id === id) ?? null) : null))
-}

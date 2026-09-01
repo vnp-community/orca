@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useAppStore } from '@/store'
 import { cn } from '@/lib/utils'
 import { isEditableTarget } from '@/lib/editable-target'
 import { getScreenSubmitModifierLabel, isScreenSubmitShortcut } from '@/lib/screen-submit-shortcut'
@@ -12,6 +13,7 @@ import { WindowsTerminalStep } from './WindowsTerminalStep'
 import { DevServerStep } from './DevServerStep'
 import { useOnboardingFlow } from './use-onboarding-flow'
 import { OnboardingSkipConfirmationDialog } from './OnboardingSkipConfirmationDialog'
+import { AccessRequestDialog } from './AccessRequestDialog'
 import { OnboardingFooter } from './OnboardingFooter'
 import { shouldRequestOnboardingSkipConfirmation } from './onboarding-dismiss-target'
 import logo from '../../../../../resources/logo.svg'
@@ -133,8 +135,17 @@ export default function OnboardingFlow({
   const footerPrimaryLabel =
     busyLabel ?? (currentStep.id === 'notifications' ? 'Add your first project' : 'Continue')
   const [skipConfirmOpen, setSkipConfirmOpen] = useState(false)
+  const [accessRequestOpen, setAccessRequestOpen] = useState(false)
   const skipConfirmAdvancedViaRef = useRef<'button' | 'keyboard'>('button')
-  const { next: flowNext, dismissOnboarding: flowDismissOnboarding } = flow
+  const {
+    next: flowNext,
+    dismissOnboarding: flowDismissOnboarding,
+    openSettingsPage: flowOpenSettingsPage
+  } = flow
+  // Why: skip-onboarding branches by role (CR-DS-008) — admin bypasses
+  // straight to Settings, a non-admin with no accessible dev servers files
+  // an access request instead of landing in an empty app.
+  const isAdmin = useAppStore((s) => s.currentUser?.role === 'admin')
 
   const requestSkipConfirmation = useCallback(
     (advancedVia: 'button' | 'keyboard') => {
@@ -152,7 +163,38 @@ export default function OnboardingFlow({
   const confirmSkipOnboarding = useCallback(() => {
     const advancedVia = skipConfirmAdvancedViaRef.current
     setSkipConfirmOpen(false)
-    void flowDismissOnboarding(advancedVia)
+
+    if (isAdmin) {
+      void flowDismissOnboarding(advancedVia).then((closed) => {
+        if (closed) {
+          flowOpenSettingsPage()
+        }
+      })
+      return
+    }
+
+    // Non-admin: only dismiss normally if they already have at least one
+    // accessible dev server — otherwise route to the access request form
+    // rather than skip into a feature-less app.
+    window.api.devServer
+      .listForUser()
+      .then((servers) => {
+        if (servers.length > 0) {
+          void flowDismissOnboarding(advancedVia)
+        } else {
+          setAccessRequestOpen(true)
+        }
+      })
+      .catch(() => {
+        // Why fail-open: if the availability check itself fails, don't trap
+        // the user in onboarding — let the normal skip proceed.
+        void flowDismissOnboarding(advancedVia)
+      })
+  }, [isAdmin, flowDismissOnboarding, flowOpenSettingsPage])
+
+  const handleAccessRequested = useCallback(() => {
+    setAccessRequestOpen(false)
+    void flowDismissOnboarding(skipConfirmAdvancedViaRef.current)
   }, [flowDismissOnboarding])
 
   // Why: depend on stable callbacks + step id only so the listener doesn't
@@ -353,6 +395,11 @@ export default function OnboardingFlow({
           open={skipConfirmOpen}
           onOpenChange={setSkipConfirmOpen}
           onSkip={confirmSkipOnboarding}
+        />
+        <AccessRequestDialog
+          open={accessRequestOpen}
+          onOpenChange={setAccessRequestOpen}
+          onRequested={handleAccessRequested}
         />
       </div>
     </TooltipProvider>

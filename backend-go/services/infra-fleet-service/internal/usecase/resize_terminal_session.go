@@ -20,13 +20,14 @@ type ResizeTerminalSessionInput struct {
 // PtyResize frame (see PtyResizeMessage's doc comment) — same underlying
 // agent call, reachable without an open stream.
 type ResizeTerminalSession struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	agent      DevServerAgentClient
 }
 
-func NewResizeTerminalSession(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient) *ResizeTerminalSession {
-	return &ResizeTerminalSession{sessions: sessions, resolver: resolver, agent: agent}
+func NewResizeTerminalSession(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient) *ResizeTerminalSession {
+	return &ResizeTerminalSession{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent}
 }
 
 func (uc *ResizeTerminalSession) Execute(ctx context.Context, in ResizeTerminalSessionInput) error {
@@ -35,7 +36,7 @@ func (uc *ResizeTerminalSession) Execute(ctx context.Context, in ResizeTerminalS
 		return apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	_, devServer, err := resolveTerminalSession(ctx, tenantID, in.PtyID, uc.sessions, uc.resolver)
+	_, devServer, err := resolveTerminalSession(ctx, tenantID, in.PtyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		return err
 	}

@@ -20,10 +20,11 @@ type UpdateRepoInput struct {
 
 // UpdateRepo applies a field-masked edit to a repo's url/display_name.
 //
-// Authorization mirrors RemoveRepo/AddRepo's own judgment call: UpdateRepo
-// carries only a repo_id, so Execute resolves the repo's owning project via
-// RepoRepository.GetRepo before it can check the caller's role, same
-// owner-or-admin gate.
+// Authorization: repo_admin_only — a project owner always passes (see
+// requireRepoAccess), or a caller holding an "admin" repo_members grant on
+// this specific repo. UpdateRepoInput carries only a repo_id, so Execute
+// resolves the repo's owning project via RepoRepository.GetRepo before it
+// can check the caller's role against it.
 type UpdateRepo struct {
 	repo       RepoRepository
 	membership MembershipRepository
@@ -49,7 +50,7 @@ func (uc *UpdateRepo) Execute(ctx context.Context, in UpdateRepoInput) (domain.R
 	if err != nil {
 		return domain.Repo{}, apperrors.New(apperrors.KindInternal, "PROJECT_REPO_FETCH_FAILED", "failed to fetch repo", err)
 	}
-	if err := requireProjectAccess(ctx, uc.membership, uc.opa, repo.ProjectID, projectActionOwnerOnly); err != nil {
+	if err := requireRepoAccess(ctx, uc.membership, uc.repo, uc.opa, repo.ProjectID, repo.ID, repoActionAdminOnly); err != nil {
 		return domain.Repo{}, err
 	}
 

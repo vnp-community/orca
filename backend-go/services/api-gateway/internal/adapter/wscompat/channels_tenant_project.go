@@ -16,6 +16,8 @@ import (
 	"cmp"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"time"
 
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
@@ -24,6 +26,15 @@ import (
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
+
+// errNotAdmin is returned by profile.createCompany/createDept — tenant-service
+// itself has no role-based authorization (unlike infra-fleet-service's
+// requireAdmin), so this gate lives here, at the gateway edge, the same
+// place attachAdminIdentity's admin-gated channels live in
+// channels_dev_server_access_control.go. Company/department creation is
+// rare, foundational, org-wide state — not something a regular user should
+// ever be able to trigger.
+var errNotAdmin = errors.New("caller is not an admin")
 
 // rpcTimeout (8s) is already declared package-wide in channels.go — reused
 // here as-is per that file's own anticipated-collision note; deduped during
@@ -49,6 +60,60 @@ func registerTenantProjectChannels(r *Registry, tenantClient tenantv1.TenantServ
 // handleGetResolvedProfile) — wiring-only. The other 5 profile.* channels
 // (getUserProfile/listDepts/updateCompany/updateDept/updateUser) call the
 // new RPCs TASK-127/128 added to tenant.proto/tenant-service.
+
+// userProfileView/departmentView: protoc-gen-go's own `encoding/json` struct
+// tags are snake_case (e.g. `json:"department_id,omitempty"`), not the
+// camelCase a TypeScript frontend expects — the wscompat envelope
+// serializes `Result any` via plain encoding/json, not protojson. Found live
+// while wiring the Department Gate (CR-DS-008): profile.getUserProfile/
+// listDepts/updateUser previously returned the raw *tenantv1.UserProfile/
+// Department, silently shipping departmentId/companyId/etc. as undefined to
+// the frontend. Same fix pattern as devServerView etc. in
+// channels_dev_server_access_control.go.
+type userProfileView struct {
+	UserID       string `json:"userId"`
+	CompanyID    string `json:"companyId"`
+	DepartmentID string `json:"departmentId"`
+	SettingsJSON string `json:"settingsJson"`
+}
+
+type departmentView struct {
+	ID           string `json:"id"`
+	CompanyID    string `json:"companyId"`
+	Name         string `json:"name"`
+	SettingsJSON string `json:"settingsJson"`
+}
+
+// companyView — same bug, same fix, for profile.updateCompany/createCompany:
+// tenantv1.Company.SettingsJson has `json:"settings_json,omitempty"`.
+type companyView struct {
+	ID           string `json:"id"`
+	Name         string `json:"name"`
+	SettingsJSON string `json:"settingsJson"`
+}
+
+func toUserProfileView(p *tenantv1.UserProfile) userProfileView {
+	return userProfileView{
+		UserID:       p.GetUserId(),
+		CompanyID:    p.GetCompanyId(),
+		DepartmentID: p.GetDepartmentId(),
+		SettingsJSON: p.GetSettingsJson(),
+	}
+}
+
+func toCompanyView(c *tenantv1.Company) companyView {
+	return companyView{ID: c.GetId(), Name: c.GetName(), SettingsJSON: c.GetSettingsJson()}
+}
+
+func toDepartmentView(d *tenantv1.Department) departmentView {
+	return departmentView{
+		ID:           d.GetId(),
+		CompanyID:    d.GetCompanyId(),
+		Name:         d.GetName(),
+		SettingsJSON: d.GetSettingsJson(),
+	}
+}
+
 func registerProfileChannels(r *Registry, client tenantv1.TenantServiceClient) {
 	r.Register("profile.getResolved", func(ctx context.Context, id Identity, _ []json.RawMessage) (any, error) {
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
@@ -83,7 +148,7 @@ func registerProfileChannels(r *Registry, client tenantv1.TenantServiceClient) {
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetProfile(), nil
+		return toUserProfileView(resp.GetProfile()), nil
 	})
 
 	r.Register("profile.listDepts", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -107,7 +172,57 @@ func registerProfileChannels(r *Registry, client tenantv1.TenantServiceClient) {
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetDepartments(), nil
+		// []departmentView, not resp.GetDepartments(): keeps the established
+		// "empty list channels return [] not null" convention too, since a
+		// nil proto slice converts to a non-nil empty slice here.
+		views := make([]departmentView, 0, len(resp.GetDepartments()))
+		for _, d := range resp.GetDepartments() {
+			views = append(views, toDepartmentView(d))
+		}
+		return views, nil
+	})
+
+	r.Register("profile.getCompany", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type getArgs struct {
+			ID string `json:"id"`
+		}
+		// decodeOptionalArg — id is optional, defaults to the caller's own
+		// company, same "a Company row's id IS the tenant_id in this
+		// domain" convention profile.listDepts already documents.
+		in := decodeOptionalArg[getArgs](args, 0)
+		companyID := cmp.Or(in.ID, id.TenantID)
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		resp, err := client.GetCompany(rpcCtx, &tenantv1.GetCompanyRequest{Id: companyID})
+		if err != nil {
+			return nil, err
+		}
+		return toCompanyView(resp.GetCompany()), nil
+	})
+
+	// profile.listCompanies — admin-only, cross-tenant (see
+	// usecase.CompanyRepository.List's doc comment on tenant-service).
+	// Without this, a company created via profile.createCompany was
+	// unreachable the instant the creating session ended: nothing else ever
+	// listed tenant.companies, so the Admin Console's "New company" flow
+	// silently dropped it after the creation toast disappeared.
+	r.Register("profile.listCompanies", func(ctx context.Context, id Identity, _ []json.RawMessage) (any, error) {
+		if id.Role != "admin" {
+			return nil, errNotAdmin
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID, Role: id.Role})
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		resp, err := client.ListCompanies(rpcCtx, &tenantv1.ListCompaniesRequest{})
+		if err != nil {
+			return nil, err
+		}
+		views := make([]companyView, 0, len(resp.GetCompanies()))
+		for _, c := range resp.GetCompanies() {
+			views = append(views, toCompanyView(c))
+		}
+		return map[string]any{"companies": views}, nil
 	})
 
 	r.Register("profile.updateCompany", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -129,7 +244,55 @@ func registerProfileChannels(r *Registry, client tenantv1.TenantServiceClient) {
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetCompany(), nil
+		return toCompanyView(resp.GetCompany()), nil
+	})
+
+	r.Register("profile.createCompany", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		if id.Role != "admin" {
+			return nil, errNotAdmin
+		}
+		type createArgs struct {
+			Name string `json:"name"`
+		}
+		in, err := decodeArg[createArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID, Role: id.Role})
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		resp, err := client.CreateCompany(rpcCtx, &tenantv1.CreateCompanyRequest{Name: in.Name})
+		if err != nil {
+			return nil, err
+		}
+		return toCompanyView(resp.GetCompany()), nil
+	})
+
+	r.Register("profile.createDept", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		if id.Role != "admin" {
+			return nil, errNotAdmin
+		}
+		type createArgs struct {
+			CompanyID string `json:"companyId"`
+			Name      string `json:"name"`
+		}
+		in, err := decodeArg[createArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		// Why default to id.TenantID: same "a Company row's id IS the
+		// tenant_id in this domain" convention profile.listDepts already
+		// documents — the caller's own company, unless they explicitly name
+		// a different one.
+		companyID := cmp.Or(in.CompanyID, id.TenantID)
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID, Role: id.Role})
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		resp, err := client.CreateDepartment(rpcCtx, &tenantv1.CreateDepartmentRequest{CompanyId: companyID, Name: in.Name})
+		if err != nil {
+			return nil, err
+		}
+		return toDepartmentView(resp.GetDepartment()), nil
 	})
 
 	r.Register("profile.updateDept", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -151,7 +314,7 @@ func registerProfileChannels(r *Registry, client tenantv1.TenantServiceClient) {
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetDepartment(), nil
+		return toDepartmentView(resp.GetDepartment()), nil
 	})
 
 	r.Register("profile.updateUser", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -161,21 +324,108 @@ func registerProfileChannels(r *Registry, client tenantv1.TenantServiceClient) {
 			ClearDepartment bool   `json:"clearDepartment"`
 			SettingsJSON    string `json:"settingsJson"`
 		}
-		in, err := decodeArg[updateArgs](args, 0)
-		if err != nil {
-			return nil, err
-		}
+		// decodeOptionalArg, not decodeArg: userId is optional, same
+		// "omitted → resolves from session" contract as profile.getUserProfile
+		// above (the Department Gate calls this to set the CALLER's own
+		// department without needing to already know their own user id).
+		in := decodeOptionalArg[updateArgs](args, 0)
+		userID := cmp.Or(in.UserID, id.UserID)
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
 		defer cancel()
 		resp, err := client.UpdateUserProfile(rpcCtx, &tenantv1.UpdateUserProfileRequest{
-			UserId: in.UserID, DepartmentId: in.DepartmentID, ClearDepartment: in.ClearDepartment, SettingsJson: in.SettingsJSON,
+			UserId: userID, DepartmentId: in.DepartmentID, ClearDepartment: in.ClearDepartment, SettingsJson: in.SettingsJSON,
 		})
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetProfile(), nil
+		return toUserProfileView(resp.GetProfile()), nil
 	})
+}
+
+// projectView/toProjectView, projectMemberView/toProjectMemberView,
+// projectGroupView/toProjectGroupView, hostSetupView/toHostSetupView,
+// nestedRepoCandidateView/toNestedRepoCandidateView: protoc-gen-go's own
+// encoding/json struct tags are snake_case (e.g. `json:"dev_server_id"`,
+// `json:"parent_group_id"`), and ProjectRole is a proto enum that plain
+// encoding/json marshals as a bare int — but this envelope's Result field
+// (envelope.go) is serialized via plain encoding/json (wsjson.Write), not
+// protojson. Returning a raw proto struct/enum here silently ships
+// undefined/wrong-typed fields to a frontend that only ever reads
+// camelCase strings (types/workspace-types.ts's OrcaProject/ProjectMember).
+// Same bug class already fixed for profile.* above (userProfileView/
+// departmentView/companyView) — found live for the rest of this file
+// during Phase 4b's repo-catalog unification pass: ProjectSwitcher's
+// devServerId, MemberManager's role/userId, projectGroup.update's
+// parentGroupId, etc. were all silently broken on the wire.
+type projectView struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	DevServerID   string `json:"devServerId"`
+	DefaultBranch string `json:"defaultBranch"`
+	Visibility    string `json:"visibility"`
+	CreatedBy     string `json:"createdBy"`
+	CreatedAt     int64  `json:"createdAt"`
+	UpdatedAt     int64  `json:"updatedAt"`
+}
+
+func toProjectView(p *projectv1.Project) projectView {
+	return projectView{
+		ID: p.GetId(), Name: p.GetName(), Description: p.GetDescription(),
+		DevServerID: p.GetDevServerId(), DefaultBranch: p.GetDefaultBranch(),
+		Visibility: p.GetVisibility(), CreatedBy: p.GetCreatedBy(),
+		CreatedAt: protoTimeMillis(p.GetCreatedAt()), UpdatedAt: protoTimeMillis(p.GetUpdatedAt()),
+	}
+}
+
+type projectMemberView struct {
+	UserID string `json:"userId"`
+	Role   string `json:"role"`
+}
+
+func toProjectMemberView(m *projectv1.Member) projectMemberView {
+	return projectMemberView{UserID: m.GetUserId(), Role: fromProjectRoleArg(m.GetRole())}
+}
+
+type projectGroupView struct {
+	ID            string `json:"id"`
+	Name          string `json:"name"`
+	ParentGroupID string `json:"parentGroupId"`
+	ProjectID     string `json:"projectId"`
+}
+
+func toProjectGroupView(g *projectv1.ProjectGroup) projectGroupView {
+	return projectGroupView{
+		ID: g.GetId(), Name: g.GetName(),
+		ParentGroupID: g.GetParentGroupId(), ProjectID: g.GetProjectId(),
+	}
+}
+
+type hostSetupView struct {
+	ID          string `json:"id"`
+	DevServerID string `json:"devServerId"`
+	FolderPath  string `json:"folderPath"`
+	DisplayName string `json:"displayName"`
+	Status      string `json:"status"`
+	ProjectID   string `json:"projectId"`
+}
+
+func toHostSetupView(s *projectv1.HostSetup) hostSetupView {
+	return hostSetupView{
+		ID: s.GetId(), DevServerID: s.GetDevServerId(), FolderPath: s.GetFolderPath(),
+		DisplayName: s.GetDisplayName(), Status: s.GetStatus(), ProjectID: s.GetProjectId(),
+	}
+}
+
+type nestedRepoCandidateView struct {
+	Path          string `json:"path"`
+	SuggestedName string `json:"suggestedName"`
+	IsGitRepo     bool   `json:"isGitRepo"`
+}
+
+func toNestedRepoCandidateView(c *projectv1.NestedRepoCandidate) nestedRepoCandidateView {
+	return nestedRepoCandidateView{Path: c.GetPath(), SuggestedName: c.GetSuggestedName(), IsGitRepo: c.GetIsGitRepo()}
 }
 
 // ── project.* ──────────────────────────────────────────────────────────
@@ -206,12 +456,35 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetProject(), nil
+		// Why: CreateProject.Execute's own doc comment says the creator
+		// "becomes an implicit owner via a follow-up AddMember call by the
+		// caller (api-gateway)" — that follow-up call never actually existed
+		// anywhere (checked project-service's gRPC server too), so every
+		// created project had zero membership rows. requireProjectAccess
+		// grants nothing from Project.CreatedBy alone — only a real
+		// project_members row — so the creator's very next call
+		// (GetProject, to load the project they just made) was denied
+		// PROJECT_NOT_AUTHORIZED. Live-reproduced via "New Project" submit
+		// in Project Workspace (Beta).
+		if _, err := client.AddMember(rpcCtx, &projectv1.AddMemberRequest{
+			ProjectId: resp.GetProject().GetId(), UserId: id.UserID, Role: projectv1.ProjectRole_PROJECT_ROLE_OWNER,
+		}); err != nil {
+			return nil, fmt.Errorf("project.create: creator membership: %w", err)
+		}
+		return toProjectView(resp.GetProject()), nil
 	})
 
 	r.Register("project.get", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type getArgs struct {
-			ID string `json:"id"`
+			// Why: json tag must be "projectId" — the ONLY real caller
+			// (WorkspaceContext.tsx's switchProject) sends {projectId: ...},
+			// never {id: ...}. The previous "id" tag silently decoded to "",
+			// which reached project-service's GetMembership as an empty
+			// string bound against a uuid-typed column — Postgres rejects
+			// that at bind time, wrapped into PROJECT_MEMBERSHIP_LOOKUP_FAILED
+			// (live-reproduced: "New Project" submit → immediate GetProject
+			// with the just-created id → this error every time).
+			ID string `json:"projectId"`
 		}
 		in, err := decodeArg[getArgs](args, 0)
 		if err != nil {
@@ -224,7 +497,7 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetProject(), nil
+		return toProjectView(resp.GetProject()), nil
 	})
 
 	r.Register("project.list", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -249,7 +522,12 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetProjects(), nil
+		projects := resp.GetProjects()
+		views := make([]projectView, 0, len(projects))
+		for _, p := range projects {
+			views = append(views, toProjectView(p))
+		}
+		return views, nil
 	})
 
 	r.Register("project.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -274,7 +552,7 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetProject(), nil
+		return toProjectView(resp.GetProject()), nil
 	})
 
 	r.Register("project.getMembers", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -292,7 +570,12 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetMembers(), nil
+		members := resp.GetMembers()
+		views := make([]projectMemberView, 0, len(members))
+		for _, m := range members {
+			views = append(views, toProjectMemberView(m))
+		}
+		return views, nil
 	})
 
 	r.Register("project.removeMember", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -334,7 +617,62 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetMember(), nil
+		return toProjectMemberView(resp.GetMember()), nil
+	})
+
+	// Why this channel was missing: AddMember.Execute/proto/REST all existed
+	// (project_routes.go's handleAddMember), but no wscompat caller ever
+	// reached it except project.create's own internal owner-bootstrap call —
+	// MemberManager.tsx could list/remove/re-role members but had no way to
+	// add a new one at all.
+	r.Register("project.addMember", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type addArgs struct {
+			ProjectID string `json:"projectId"`
+			UserID    string `json:"userId"`
+			Role      string `json:"role"`
+		}
+		in, err := decodeArg[addArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		// AddMemberResponse carries no payload (unlike UpdateMemberRoleResponse's
+		// Member) — echo back what the caller just granted.
+		if _, err := client.AddMember(rpcCtx, &projectv1.AddMemberRequest{
+			ProjectId: in.ProjectID, UserId: in.UserID, Role: toProjectRoleArg(in.Role),
+		}); err != nil {
+			return nil, err
+		}
+		return projectMemberView{UserID: in.UserID, Role: fromProjectRoleArg(toProjectRoleArg(in.Role))}, nil
+	})
+
+	// Why this channel was missing: RebindDevServer's usecase (with its
+	// workflow/task active-execution guard) and proto RPC existed, but no
+	// caller could ever reach it — CreateProjectDialog.tsx collects a dev
+	// server but project.create's request has no dev_server_id field at all
+	// (bound only via this RPC), so the chosen dev server was silently
+	// dropped on every "New Project" submit.
+	r.Register("project.rebindDevServer", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type rebindArgs struct {
+			ProjectID      string `json:"projectId"`
+			NewDevServerID string `json:"newDevServerId"`
+		}
+		in, err := decodeArg[rebindArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
+		defer cancel()
+		resp, err := client.RebindDevServer(rpcCtx, &projectv1.RebindDevServerRequest{
+			ProjectId: in.ProjectID, NewDevServerId: in.NewDevServerID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return toProjectView(resp.GetProject()), nil
 	})
 }
 
@@ -349,6 +687,21 @@ func toProjectRoleArg(role string) projectv1.ProjectRole {
 		return projectv1.ProjectRole_PROJECT_ROLE_MEMBER
 	default:
 		return projectv1.ProjectRole_PROJECT_ROLE_UNSPECIFIED
+	}
+}
+
+// fromProjectRoleArg is toProjectRoleArg's inverse — every project.*Member*
+// response view needs it: ProjectRole is a proto enum, which plain
+// encoding/json marshals as a bare int (0/1/2), not the "owner"/"member"
+// string types/workspace-types.ts's ProjectMember expects.
+func fromProjectRoleArg(role projectv1.ProjectRole) string {
+	switch role {
+	case projectv1.ProjectRole_PROJECT_ROLE_OWNER:
+		return "owner"
+	case projectv1.ProjectRole_PROJECT_ROLE_MEMBER:
+		return "member"
+	default:
+		return ""
 	}
 }
 
@@ -376,7 +729,7 @@ func registerProjectGroupChannels(r *Registry, client projectv1.ProjectServiceCl
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetGroup(), nil
+		return toProjectGroupView(resp.GetGroup()), nil
 	})
 
 	r.Register("projectGroup.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -397,7 +750,7 @@ func registerProjectGroupChannels(r *Registry, client projectv1.ProjectServiceCl
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetGroup(), nil
+		return toProjectGroupView(resp.GetGroup()), nil
 	})
 
 	r.Register("projectGroup.delete", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -425,7 +778,12 @@ func registerProjectGroupChannels(r *Registry, client projectv1.ProjectServiceCl
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetGroups(), nil
+		groups := resp.GetGroups()
+		views := make([]projectGroupView, 0, len(groups))
+		for _, g := range groups {
+			views = append(views, toProjectGroupView(g))
+		}
+		return views, nil
 	})
 
 	r.Register("projectGroup.moveProject", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -446,7 +804,7 @@ func registerProjectGroupChannels(r *Registry, client projectv1.ProjectServiceCl
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetGroup(), nil
+		return toProjectGroupView(resp.GetGroup()), nil
 	})
 
 	r.Register("projectGroup.scanNested", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -470,7 +828,12 @@ func registerProjectGroupChannels(r *Registry, client projectv1.ProjectServiceCl
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetCandidates(), nil
+		candidates := resp.GetCandidates()
+		views := make([]nestedRepoCandidateView, 0, len(candidates))
+		for _, c := range candidates {
+			views = append(views, toNestedRepoCandidateView(c))
+		}
+		return views, nil
 	})
 
 	r.Register("projectGroup.importNested", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -503,7 +866,24 @@ func registerProjectGroupChannels(r *Registry, client projectv1.ProjectServiceCl
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		// Why a view struct, not raw resp: ImportNestedResponse's
+		// created_groups/created_projects are the same camelCase bug as
+		// every other view in this file, one level deeper (nested proto
+		// messages inside a proto message).
+		createdGroups := resp.GetCreatedGroups()
+		groupViews := make([]projectGroupView, 0, len(createdGroups))
+		for _, g := range createdGroups {
+			groupViews = append(groupViews, toProjectGroupView(g))
+		}
+		createdProjects := resp.GetCreatedProjects()
+		projectViews := make([]projectView, 0, len(createdProjects))
+		for _, p := range createdProjects {
+			projectViews = append(projectViews, toProjectView(p))
+		}
+		return map[string]any{
+			"createdGroups":   groupViews,
+			"createdProjects": projectViews,
+		}, nil
 	})
 }
 
@@ -531,7 +911,7 @@ func registerProjectHostSetupChannels(r *Registry, client projectv1.ProjectServi
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetSetup(), nil
+		return toHostSetupView(resp.GetSetup()), nil
 	})
 
 	r.Register("projectHostSetup.list", func(ctx context.Context, id Identity, _ []json.RawMessage) (any, error) {
@@ -542,7 +922,12 @@ func registerProjectHostSetupChannels(r *Registry, client projectv1.ProjectServi
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetSetups(), nil
+		setups := resp.GetSetups()
+		views := make([]hostSetupView, 0, len(setups))
+		for _, s := range setups {
+			views = append(views, toHostSetupView(s))
+		}
+		return views, nil
 	})
 
 	r.Register("projectHostSetup.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -564,7 +949,7 @@ func registerProjectHostSetupChannels(r *Registry, client projectv1.ProjectServi
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetSetup(), nil
+		return toHostSetupView(resp.GetSetup()), nil
 	})
 
 	r.Register("projectHostSetup.delete", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -601,7 +986,18 @@ func registerProjectHostSetupChannels(r *Registry, client projectv1.ProjectServi
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		// project stays nil (not a zero-value view) on failure — Project is
+		// only set on success per SetupExistingFolderResponse's own doc
+		// comment, and the handler does no status branching itself
+		// (TASK-143 Step 9), so a raw passthrough of that nil-ness matters.
+		var project any
+		if resp.GetProject() != nil {
+			project = toProjectView(resp.GetProject())
+		}
+		return map[string]any{
+			"setup":   toHostSetupView(resp.GetSetup()),
+			"project": project,
+		}, nil
 	})
 }
 

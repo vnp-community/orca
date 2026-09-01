@@ -68,6 +68,41 @@ func TestRepoRepository_ListRepos_OrderedByPosition(t *testing.T) {
 	}
 }
 
+// TestRepoRepository_ListReposForTenant_AcrossProjects guards the exact bug
+// that motivated ListReposForTenant: ListRepos(ctx, "") fails because
+// project_id is a Postgres uuid column — an empty string is invalid input
+// syntax for that type, not "no rows". ListReposForTenant must return every
+// project's repos without ever passing an empty project_id as a query param.
+func TestRepoRepository_ListReposForTenant_AcrossProjects(t *testing.T) {
+	pool := setupPool(t)
+	projectRepo := New(pool)
+	repoRepo := NewRepoRepository(pool)
+	ctx := context.Background()
+
+	p1 := setupProjectForRepo(t, projectRepo)
+	p2 := setupProjectForRepo(t, projectRepo)
+	_, _ = repoRepo.AddRepo(ctx, domain.Repo{ID: uuid.NewString(), ProjectID: p1.ID, URL: "https://github.com/org/one"})
+	_, _ = repoRepo.AddRepo(ctx, domain.Repo{ID: uuid.NewString(), ProjectID: p2.ID, URL: "https://github.com/org/two"})
+
+	repos, err := repoRepo.ListReposForTenant(ctx)
+	if err != nil {
+		t.Fatalf("list repos for tenant: %v", err)
+	}
+
+	var sawP1, sawP2 bool
+	for _, r := range repos {
+		switch r.ProjectID {
+		case p1.ID:
+			sawP1 = true
+		case p2.ID:
+			sawP2 = true
+		}
+	}
+	if !sawP1 || !sawP2 {
+		t.Errorf("expected repos from both projects, got %+v", repos)
+	}
+}
+
 func TestRepoRepository_ReorderRepos_RewritesPositions(t *testing.T) {
 	pool := setupPool(t)
 	projectRepo := New(pool)

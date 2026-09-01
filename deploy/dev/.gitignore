@@ -5,3 +5,8 @@
 # rebuilt on every deploy, not source
 bin/
 dist/
+
+# Copied fresh from backend-go/policy/orca-authz/ on every build — see
+# build-local.sh's OPA policy bundle step doc comment. Not source; the real
+# source of truth is backend-go/policy/orca-authz/ itself.
+policy/

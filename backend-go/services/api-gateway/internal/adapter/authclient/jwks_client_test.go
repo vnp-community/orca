@@ -16,13 +16,17 @@ import (
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 )
 
-// fakeAuthServiceClient stubs just GetJWKS — every other AuthServiceClient
-// method is left nil-embedded and unused by JWKSClient.
+// fakeAuthServiceClient stubs GetJWKS (JWKSClient's needs) and
+// ValidateSession (session_validator_test.go's needs) — shared across this
+// package's test files, every other AuthServiceClient method left
+// nil-embedded and unused.
 type fakeAuthServiceClient struct {
 	authv1.AuthServiceClient
 	jwksJSON string
 	err      error
 	calls    int
+
+	validateSessionFunc func(ctx context.Context, in *authv1.ValidateSessionRequest) (*authv1.ValidateSessionResponse, error)
 }
 
 func (f *fakeAuthServiceClient) GetJWKS(_ context.Context, _ *authv1.GetJWKSRequest, _ ...grpc.CallOption) (*authv1.GetJWKSResponse, error) {
@@ -31,6 +35,10 @@ func (f *fakeAuthServiceClient) GetJWKS(_ context.Context, _ *authv1.GetJWKSRequ
 		return nil, f.err
 	}
 	return &authv1.GetJWKSResponse{JwksJson: f.jwksJSON}, nil
+}
+
+func (f *fakeAuthServiceClient) ValidateSession(ctx context.Context, in *authv1.ValidateSessionRequest, _ ...grpc.CallOption) (*authv1.ValidateSessionResponse, error) {
+	return f.validateSessionFunc(ctx, in)
 }
 
 func testJWKSJSON(t *testing.T, kid string) string {

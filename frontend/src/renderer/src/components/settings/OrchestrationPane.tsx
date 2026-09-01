@@ -15,6 +15,7 @@ import {
   useInstalledAgentSkill
 } from '@/hooks/useInstalledAgentSkills'
 import { useActiveProjectSkillRuntime } from '@/hooks/useActiveProjectSkillRuntime'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { SearchableSetting } from './SearchableSetting'
 import { matchesSettingsSearch } from './settings-search'
 import { useAppStore } from '../../store'
@@ -29,7 +30,10 @@ import { OrchestrationSkillAgentCoverage } from './OrchestrationSkillAgentCovera
 import { OrchestrationExampleDialog } from './OrchestrationExamplesDialog'
 import { OrchestrationSkillPromptDialog } from './OrchestrationSkillPromptDialog'
 import { translate } from '@/i18n/i18n'
-import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
+import {
+  getRuntimeCliInstallStatus,
+  getRuntimeWslCliInstallStatus
+} from '@/runtime/runtime-cli-client'
 
 const EXAMPLE_ICONS = {
   handoff: ArrowRightLeft,
@@ -45,6 +49,15 @@ export function OrchestrationPane(): React.JSX.Element {
   const [selectedExampleId, setSelectedExampleId] = useState<string | null>(null)
   const [skillPromptOpen, setSkillPromptOpen] = useState(false)
   const activeSkillRuntime = useActiveProjectSkillRuntime()
+  // Why: this panel's setup terminal has no project/repo behind it, so it
+  // has no natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   const orchestrationInstallCommand = !activeSkillRuntime.installDisabledReason
     ? buildSkillCommandForRuntime(
         ORCHESTRATION_SKILL_INSTALL_COMMAND,
@@ -100,6 +113,7 @@ export function OrchestrationPane(): React.JSX.Element {
         terminalTitle="Orchestration setup"
         terminalAriaLabel="Orchestration skill install terminal"
         terminalWorktreeId="settings-orchestration-skill-terminal"
+        devServerId={devServerId}
         terminalShellOverride={activeSkillRuntime.terminalShellOverride}
         installed={orchestrationSkillDetected}
         loading={orchestrationSkillLoading}
@@ -109,9 +123,7 @@ export function OrchestrationPane(): React.JSX.Element {
         preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
         getPrerequisiteStatus={() =>
           activeSkillRuntime.agentRuntime?.runtime === 'wsl'
-            ? getRuntimeWslCliInstallStatus(
-                getWslCliDistroRequest(activeSkillRuntime.agentRuntime)
-              )
+            ? getRuntimeWslCliInstallStatus(getWslCliDistroRequest(activeSkillRuntime.agentRuntime))
             : getRuntimeCliInstallStatus()
         }
         onBeforeOpenTerminal={async () => {

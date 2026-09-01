@@ -37,13 +37,14 @@ type WaitTerminalSessionResult struct {
 // keeps waiting for the exit event instead of returning early on the first
 // unrelated output chunk.
 type WaitTerminalSession struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	agent      DevServerAgentClient
 }
 
-func NewWaitTerminalSession(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient) *WaitTerminalSession {
-	return &WaitTerminalSession{sessions: sessions, resolver: resolver, agent: agent}
+func NewWaitTerminalSession(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient) *WaitTerminalSession {
+	return &WaitTerminalSession{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent}
 }
 
 func (uc *WaitTerminalSession) Execute(ctx context.Context, in WaitTerminalSessionInput) (WaitTerminalSessionResult, error) {
@@ -52,7 +53,7 @@ func (uc *WaitTerminalSession) Execute(ctx context.Context, in WaitTerminalSessi
 		return WaitTerminalSessionResult{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	_, devServer, err := resolveTerminalSession(ctx, tenantID, in.PtyID, uc.sessions, uc.resolver)
+	_, devServer, err := resolveTerminalSession(ctx, tenantID, in.PtyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		return WaitTerminalSessionResult{}, err
 	}

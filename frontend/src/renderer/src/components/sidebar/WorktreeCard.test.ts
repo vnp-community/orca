@@ -19,7 +19,7 @@ vi.mock('@/lib/agent-status', () => ({
 }))
 
 import { getWorktreeStatus } from '@/lib/worktree-status'
-import { shouldBeginWorktreeRename } from './WorktreeCard'
+import { getDirectoryName, shouldBeginWorktreeRename } from './WorktreeCard'
 
 function makeTerminalTab(title: string): TerminalTab {
   return {
@@ -68,5 +68,31 @@ describe('shouldBeginWorktreeRename', () => {
 
     expect(shouldBeginWorktreeRename(request, 'wt-1', 'all:wt-1')).toBe(true)
     expect(shouldBeginWorktreeRename(request, 'wt-1', 'pinned:wt-1')).toBe(false)
+  })
+})
+
+describe('getDirectoryName', () => {
+  it('returns the last path segment', () => {
+    expect(getDirectoryName('/home/user/projects/my-repo')).toBe('my-repo')
+    expect(getDirectoryName('C:\\Users\\dev\\my-repo')).toBe('my-repo')
+  })
+
+  it('strips a trailing slash before taking the last segment', () => {
+    expect(getDirectoryName('/home/user/projects/my-repo/')).toBe('my-repo')
+  })
+
+  // Regression guard: a worktree/repo whose path comes from a
+  // project-service Repo ({id, projectId, url, displayName, position} — no
+  // path field at all) reaching this card via the legacy sidebar's
+  // tenant-wide repo.list fetch used to crash the whole worktree list —
+  // "Cannot read properties of undefined (reading 'replace')" — live-
+  // reproduced right after CreateProjectDialog's repo.add fix started
+  // actually populating project.repos for the first time.
+  it('returns an empty string instead of throwing when folderPath is undefined', () => {
+    expect(getDirectoryName(undefined)).toBe('')
+  })
+
+  it('returns an empty string instead of throwing when folderPath is empty', () => {
+    expect(getDirectoryName('')).toBe('')
   })
 })

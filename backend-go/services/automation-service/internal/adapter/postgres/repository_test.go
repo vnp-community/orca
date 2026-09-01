@@ -207,6 +207,55 @@ func TestAutomationRunRepository_FindByRequestID_IsIdempotencyBackstop(t *testin
 	}
 }
 
+// TestAutomationRunRepository_ListByAutomation_EmptyAutomationIDListsAllTenantRuns
+// covers the Automation page's initial page-load call, which has no
+// automation selected yet and calls ListByAutomation with automationID="" —
+// live-reproduced as AUTOMATION_LIST_RUNS_FAILED: Postgres rejected "" bound
+// against the uuid-typed automation_id column before this fix.
+func TestAutomationRunRepository_ListByAutomation_EmptyAutomationIDListsAllTenantRuns(t *testing.T) {
+	automations, runs := setupRepositories(t)
+	ctx := context.Background()
+	now := time.Now().UTC().Truncate(time.Second)
+	tenantID := "11111111-1111-1111-1111-111111111111"
+
+	a1, _ := domain.NewAutomation("00000000-0000-0000-0000-0000000000a1", tenantID, "job-1", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{}`, now, "UTC", true, now)
+	a2, _ := domain.NewAutomation("00000000-0000-0000-0000-0000000000a2", tenantID, "job-2", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{}`, now, "UTC", true, now)
+	if err := automations.Create(ctx, a1); err != nil {
+		t.Fatalf("create automation 1: %v", err)
+	}
+	if err := automations.Create(ctx, a2); err != nil {
+		t.Fatalf("create automation 2: %v", err)
+	}
+
+	run1, _ := domain.NewPendingRun("00000000-0000-0000-0000-000000000201", a1.ID, tenantID, "req-a1", domain.StepTypeAgent, domain.RunTriggerManual, a1.StepConfigJSON, now)
+	run2, _ := domain.NewPendingRun("00000000-0000-0000-0000-000000000202", a2.ID, tenantID, "req-a2", domain.StepTypeAgent, domain.RunTriggerManual, a2.StepConfigJSON, now)
+	if err := runs.Create(ctx, run1); err != nil {
+		t.Fatalf("create run 1: %v", err)
+	}
+	if err := runs.Create(ctx, run2); err != nil {
+		t.Fatalf("create run 2: %v", err)
+	}
+
+	// automationID="" — the real gap this test targets — must list runs
+	// across both automations, not error on the empty-string uuid bind.
+	got, _, err := runs.ListByAutomation(ctx, tenantID, "", "", 50)
+	if err != nil {
+		t.Fatalf("list all runs for tenant: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 runs across both automations, got %d", len(got))
+	}
+
+	// automationID scoped to a1 must still filter correctly.
+	scoped, _, err := runs.ListByAutomation(ctx, tenantID, a1.ID, "", 50)
+	if err != nil {
+		t.Fatalf("list runs scoped to automation 1: %v", err)
+	}
+	if len(scoped) != 1 || scoped[0].ID != run1.ID {
+		t.Fatalf("expected only run 1 scoped to automation 1, got %+v", scoped)
+	}
+}
+
 func TestAutomationRepository_List_ScopesToTenant(t *testing.T) {
 	automations, _ := setupRepositories(t)
 	ctx := context.Background()

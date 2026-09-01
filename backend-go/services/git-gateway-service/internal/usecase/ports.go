@@ -174,13 +174,19 @@ type GitExecutor interface {
 	// PrefetchCreateBase and ResolvePrBase/ResolveMrBase's "confirm the
 	// platform's base branch actually exists locally" step.
 	FetchAndResolveRef(ctx context.Context, repoPath, ref string) (sha string, err error)
-	// ListWorktreePaths returns the raw on-disk worktree paths for repoPath
+	// ListWorktreePaths returns the raw on-disk worktrees for repoPath
 	// (`git worktree list --porcelain`, no bookkeeping join) — DetectWorktrees
 	// needs this. Added directly to the interface rather than behind a
 	// runtime type assertion (TASK-193 Step 8's own correction: a
 	// compile-time-required method is available one edit away, so ship
 	// that instead of a type-assertion sketch).
-	ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error)
+	//
+	// Returns domain.WorktreeGitInfo (path + HEAD sha + branch), not bare
+	// paths — api-gateway's worktree.detectedList handler needs the git-level
+	// identity to synthesize a real DetectedWorktree for a path with no
+	// project.worktrees bookkeeping row (an "external"/orphaned worktree),
+	// not just confirm it exists.
+	ListWorktreePaths(ctx context.Context, repoPath string) ([]domain.WorktreeGitInfo, error)
 	// ForceDeleteBranch is REQUIRED on every GitExecutor implementation —
 	// deliberately not an optional/type-asserted method (TASK-194). This is
 	// the structural fix for the old TS backend's forceDeletePreservedBranch?
@@ -332,12 +338,11 @@ func dispatchFilesystemExecutor(ctx context.Context, resolver ConnectionResolver
 // project-service's existing RecordWorktreeCreated/RecordWorktreeRemoved
 // RPCs (no project-service proto change — those RPCs already exist).
 //
-// GetRepo is this task's own addition on top of that existing surface: see
-// its doc comment on domain.RepoInfo and internal/adapter/grpcclient's
-// project_client.go for the confirmed proto gap — project.proto has no
-// single-repo-by-id lookup RPC (only ListRepos(project_id)), so today's
-// grpcclient implementation returns a typed, catchable error rather than a
-// real answer, until project-service grows one.
+// GetRepo backs project.proto's ProjectService.GetRepo RPC — added
+// specifically to close this confirmed gap (project.proto previously had
+// no single-repo-by-id lookup, only ListRepos(project_id)). Returns the
+// repo's owning project's dev_server_id alongside it, so dispatchExecutor-
+// ForRepo can route without a second RPC.
 type ProjectClient interface {
 	GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error)
 	RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error)
@@ -363,23 +368,26 @@ type SCMClient interface {
 	GetMergeRequestBase(ctx context.Context, repoID string, mrNumber int32) (baseBranch, baseSHA string, err error)
 }
 
-// dispatchExecutor is the resolve-and-dispatch logic every RPC-shaped
-// usecase in this package shares: ask ConnectionResolver which host owns
-// worktreeID, then return whichever GitExecutor answers for that host plus
-// the resolved repo path to operate against. Centralized here so the
-// routing behavior — connected=false -> local, connected=true -> relay — is
-// implemented and tested exactly once.
+// dispatchExecutor is the resolve-and-dispatch logic for a usecase that
+// already has a live worktreeID/connectionId to resolve through
+// ConnectionResolver — today, only RemoveWorktree (see its own doc
+// comment: RemoveWorktreeRequest carries a worktree_id directly, which IS
+// the dispatch key ConnectionResolver expects).
 //
-// worktreeID here is also reused, unchanged, as the dispatch key for the
-// repo-scoped worktree usecases (CreateWorktree, DetectWorktrees,
-// PrefetchCreateBase, ResolvePrBase, ResolveMrBase) — see those usecases'
-// doc comments for why passing a bare, caller-supplied repoID straight
-// through here (without first confirming it via ProjectClient.GetRepo)
-// would silently conflate a repo id with a worktree/connection id;
-// resolved by having each of them call ProjectClient.GetRepo first and
-// pass its echoed-back repo.ID into dispatchExecutor, the same shape
-// CreateWorktree's own uc.projects.GetRepo call establishes, rather than
-// forwarding the raw request field.
+// Historical note, corrected: an earlier revision of this package also
+// routed the repo-scoped usecases (CreateWorktree, DetectWorktrees,
+// PrefetchCreateBase, ResolvePrBase, ResolveMrBase) through this same
+// function, passing GetRepo's echoed-back repo.ID as if it were a
+// worktreeID. That never worked: ConnectionResolver.ResolveConnection
+// treats its argument as an infra-fleet-service connectionId (see
+// grpcclient/resolver.go's doc comment), and no infra.connections row is
+// ever keyed by a bare repo id — only CreateConnection call sites
+// (SetupExistingFolder, ScanNested) create one, keyed by a dev-server path,
+// never by repo.ID. Every one of those five usecases would resolve
+// Connected=false and silently treat the repo id itself as a filesystem
+// path. Fixed by dispatchExecutorForRepo below, which uses the same
+// DevServerReachability-based routing Clone/InitRepo already use
+// successfully instead.
 func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, relay GitExecutor, worktreeID string) (GitExecutor, string, error) {
 	conn, err := resolver.ResolveConnection(ctx, worktreeID)
 	if err != nil {
@@ -389,4 +397,46 @@ func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, r
 		return relay, conn.RepoPath, nil
 	}
 	return local, conn.RepoPath, nil
+}
+
+// dispatchExecutorForRepo is dispatchExecutor's repo-scoped counterpart,
+// used by every worktree usecase that starts from a repo id rather than an
+// existing worktree/connection id (CreateWorktree, DetectWorktrees,
+// PrefetchCreateBase, ResolvePrBase, ResolveMrBase — see dispatchExecutor's
+// doc comment for why routing these through ConnectionResolver never
+// worked). Mirrors Clone/InitRepo's own DevServerReachability-based
+// dispatch (usecase.Clone/InitRepo) rather than inventing a new pattern:
+// ask infra-fleet-service's fleet-health sample whether repo's dev server
+// is a live, agent-reachable host, and use repo.URL directly as the
+// on-disk repoPath — project-service's SetupExistingFolder/ImportNested
+// doc comments explain why Repo.URL carries an absolute filesystem path
+// for these repos, not a git remote URL.
+//
+// repo.DevServerID == "" (no dev server bound to the owning project) is
+// treated as "operate locally" rather than an error — a project created
+// without ever calling RebindDevServer is a valid, if degenerate, local-only
+// state.
+//
+// Known gap this does NOT close (pre-existing, also affects Clone/InitRepo
+// today): the relay branch still requires infra-fleet-service to already
+// have an infra.connections row keyed by repo.URL for RelayExecutor's own
+// connectionID-doubles-as-repoPath convention (see relay_executor.go's own
+// "Known gap" doc comment) to resolve — nothing here creates one on demand.
+// For a dev server with no live SSH/relay agent (this deployment's actual
+// mode today, confirmed via GetFleetHealth reporting no reachable sample),
+// IsReachable returns false and every call takes the local branch, so this
+// gap does not block the common case; it remains open for a genuinely
+// relay-connected dev server, same as it already was for Clone/InitRepo.
+func dispatchExecutorForRepo(ctx context.Context, reachability DevServerReachability, local, relay GitExecutor, repo domain.RepoInfo) (GitExecutor, string, error) {
+	if repo.DevServerID == "" {
+		return local, repo.URL, nil
+	}
+	reachable, err := reachability.IsReachable(ctx, repo.DevServerID)
+	if err != nil {
+		return nil, "", err
+	}
+	if reachable {
+		return relay, repo.URL, nil
+	}
+	return local, repo.URL, nil
 }

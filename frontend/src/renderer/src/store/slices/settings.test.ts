@@ -9,6 +9,7 @@ import {
   RUNTIME_PROTOCOL_VERSION
 } from '../../../../shared/protocol-version'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
+import { resetDefaultProjectCacheForTests } from './repos'
 
 vi.mock('sonner', () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }))
 vi.mock('@/lib/agent-status', async (importOriginal) => {
@@ -37,6 +38,7 @@ const env2Lineage: WorktreeLineage = {
 beforeEach(() => {
   delete (globalThis as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__
   clearRuntimeCompatibilityCacheForTests()
+  resetDefaultProjectCacheForTests()
   vi.clearAllMocks()
   runtimeEnvironmentGetStatus.mockResolvedValue({
     id: 'status-rpc-1',
@@ -50,8 +52,8 @@ beforeEach(() => {
     _meta: { runtimeId: 'runtime-2' }
   })
   runtimeEnvironmentCall.mockImplementation(
-    ({ method, params }: { method: string; params?: { repo?: string } }) => {
-      const detectedRepoId = params?.repo ?? 'repo-env-2'
+    ({ method, params }: { method: string; params?: { repoId?: string } }) => {
+      const detectedRepoId = params?.repoId ?? 'repo-env-2'
       const detectedPath = detectedRepoId === 'repo-env-1' ? '/env-1/repo' : '/env-2/repo'
       const result =
         method === 'status.get'
@@ -61,55 +63,71 @@ beforeEach(() => {
               runtimeProtocolVersion: RUNTIME_PROTOCOL_VERSION,
               minCompatibleRuntimeClientVersion: MIN_COMPATIBLE_RUNTIME_CLIENT_VERSION
             }
-          : method === 'repo.list'
-            ? {
-                repos: [
-                  {
-                    id: 'repo-env-2',
-                    path: '/env-2/repo',
-                    displayName: 'Env 2',
-                    badgeColor: 'blue',
-                    addedAt: 1
-                  }
-                ]
-              }
-            : method === 'worktree.list'
-              ? {
-                  worktrees: [
-                    makeWorktree({
-                      id: 'repo-env-2::/env-2/repo',
-                      repoId: 'repo-env-2',
-                      path: '/env-2/repo'
-                    })
-                  ],
-                  totalCount: 1,
-                  truncated: false
+          : // Why a bare array, not the {projects,...}/{} shapes below: this is
+            // getOrCreateDefaultProject's default-project resolution (Phase
+            // 4b), called before every repo.list — project-service's
+            // project.list returns a plain OrcaProject[] array.
+            method === 'project.list'
+            ? [
+                {
+                  id: 'default-project',
+                  name: 'My Repos',
+                  defaultBranch: 'main',
+                  devServerId: '',
+                  visibility: 'private',
+                  createdAt: 1,
+                  updatedAt: 1
                 }
-              : method === 'worktree.detectedList'
+              ]
+            : method === 'repo.list'
+              ? {
+                  repos: [
+                    {
+                      id: 'repo-env-2',
+                      projectId: 'default-project',
+                      url: '/env-2/repo',
+                      displayName: 'Env 2',
+                      position: 0
+                    }
+                  ]
+                }
+              : method === 'worktree.list'
                 ? {
-                    repoId: detectedRepoId,
-                    authoritative: true,
-                    source: 'git',
                     worktrees: [
-                      {
-                        ...makeWorktree({
-                          id: `${detectedRepoId}::${detectedPath}`,
-                          repoId: detectedRepoId,
-                          path: detectedPath
-                        }),
-                        ownership: 'orca-managed',
-                        selectedCheckout: true,
-                        visible: true
-                      }
-                    ]
+                      makeWorktree({
+                        id: 'repo-env-2::/env-2/repo',
+                        repoId: 'repo-env-2',
+                        path: '/env-2/repo'
+                      })
+                    ],
+                    totalCount: 1,
+                    truncated: false
                   }
-                : method === 'browser.profileList'
-                  ? { profiles: [] }
-                  : method === 'projectGroup.list'
-                    ? { groups: [] }
-                    : method === 'worktree.lineageList'
-                      ? { lineage: { [env2Lineage.worktreeId]: env2Lineage } }
-                      : {}
+                : method === 'worktree.detectedList'
+                  ? {
+                      repoId: detectedRepoId,
+                      authoritative: true,
+                      source: 'git',
+                      worktrees: [
+                        {
+                          ...makeWorktree({
+                            id: `${detectedRepoId}::${detectedPath}`,
+                            repoId: detectedRepoId,
+                            path: detectedPath
+                          }),
+                          ownership: 'orca-managed',
+                          selectedCheckout: true,
+                          visible: true
+                        }
+                      ]
+                    }
+                  : method === 'browser.profileList'
+                    ? { profiles: [] }
+                    : method === 'projectGroup.list'
+                      ? { groups: [] }
+                      : method === 'worktree.lineageList'
+                        ? { lineage: { [env2Lineage.worktreeId]: env2Lineage } }
+                        : {}
       return Promise.resolve({ id: 'rpc-1', ok: true, result, _meta: { runtimeId: 'runtime-2' } })
     }
   )

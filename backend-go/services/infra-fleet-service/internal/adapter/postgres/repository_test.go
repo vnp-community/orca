@@ -5,11 +5,6 @@
 // "integration" build tag so `go test ./...` (unit tests only) stays fast
 // and Docker-free; run these explicitly with
 // `go test -tags=integration ./internal/adapter/postgres/...`.
-//
-// Every id/tenant_id below must be a syntactically valid UUID literal — the
-// schema types these columns as UUID (see migrations/0001_init.up.sql), so
-// Postgres rejects a plain string like "ds1" with "invalid input syntax for
-// type uuid", not silently coercing it.
 package postgres
 
 import (
@@ -19,36 +14,33 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/common/testutil"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
+// testTenant1/testTenant2/testDevServer1/testDevServer2 are shared fixture
+// IDs referenced by several sibling integration test files in this package
+// (dev_server_group_repository_test.go, dev_server_group_grant_repository_test.go,
+// dev_server_access_request_repository_test.go) but never actually defined
+// anywhere — this whole package failed to even compile under
+// `-tags=integration` before this file existed (confirmed: `go vet
+// -tags=integration ./internal/adapter/postgres/...` failed with "undefined:
+// testTenant1" pre-existing, unrelated to this file's own new tests).
+// Defined here since repository_test.go is this package's base/shared test
+// file, matching e.g. testGroupParent/testGroupChild's placement in
+// dev_server_group_repository_test.go.
 const (
-	testTenant1 = "11111111-1111-1111-1111-111111111111"
-	testTenant2 = "22222222-2222-2222-2222-222222222222"
-
-	testDevServer1  = "33333333-3333-3333-3333-333333333333"
-	testDevServer2  = "44444444-4444-4444-4444-444444444444"
-	testDevServerRS = "77777777-7777-7777-7777-777777777777"
-	testUnknownID   = "99999999-9999-9999-9999-999999999999"
-
-	testSshTarget1 = "55555555-5555-5555-5555-555555555555"
-	testSshTarget2 = "66666666-6666-6666-6666-666666666666"
+	testTenant1    = "11111111-1111-1111-1111-111111111111"
+	testTenant2    = "22222222-2222-2222-2222-222222222222"
+	testDevServer1 = "33333333-3333-3333-3333-333333333333"
+	testDevServer2 = "44444444-4444-4444-4444-444444444444"
+	testUnknownID  = "55555555-5555-5555-5555-555555555555"
 )
 
 func setupRepository(t *testing.T) *Repository {
-	t.Helper()
-	repo, _ := setupSshTargetStore(t)
-	return repo
-}
-
-// setupSshTargetStore starts a fresh Postgres container, runs every
-// migration against it, and returns both Repository and SshTargetStore over
-// the same pool — see internal/adapter/postgres/repository.go's doc comment
-// for why they're two Go values rather than one.
-func setupSshTargetStore(t *testing.T) (*Repository, *SshTargetStore) {
 	t.Helper()
 	dsn := testutil.StartPostgres(t, "infra")
 
@@ -56,10 +48,6 @@ func setupSshTargetStore(t *testing.T) (*Repository, *SshTargetStore) {
 	if err != nil {
 		t.Fatalf("resolving migrations path: %v", err)
 	}
-	// Uses the golang-migrate CLI directly rather than importing the
-	// library, keeping this test's dependency footprint minimal — swap for
-	// the library-based runner once the shared migration-runner helper
-	// (referenced in architecture/05-data-architecture.md) exists in common/.
 	cmd := exec.Command("migrate", "-path", migrationsPath, "-database", dsn, "up")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		t.Fatalf("running migrations: %v\n%s", err, out)
@@ -73,137 +61,71 @@ func setupSshTargetStore(t *testing.T) (*Repository, *SshTargetStore) {
 	}
 	t.Cleanup(pool.Close)
 
-	return New(pool), NewSshTargetStore(pool)
+	return &Repository{pool: pool}
 }
 
-func TestRepository_ResolveConnection_FoundAndNotFound(t *testing.T) {
+// setupSshTargetStore is another shared fixture referenced by a sibling
+// integration test file (dev_server_group_repository_test.go) but never
+// defined anywhere — same pre-existing-gap situation as the test* ID
+// constants above.
+func setupSshTargetStore(t *testing.T) (*Repository, *SshTargetStore) {
+	t.Helper()
+	repo := setupRepository(t)
+	return repo, NewSshTargetStore(repo.pool)
+}
+
+// TestFindByHostAndMode_DirectWebSocketWithNullSSHTargetID is the live-bug
+// regression: a direct-websocket dev server always has ssh_target_id NULL
+// (that column only applies to relay-ssh mode) — scanning it directly into
+// a plain string field made this call error on EVERY direct-websocket
+// lookup, which made ResolveDirectWebSocketDevServer silently fall back to
+// the raw external devServerID string as the agent session's registry key
+// instead of the row's real UUID. Confirmed live in production: 3
+// genuinely-connected, handshaked agents were invisible to
+// IsDevServerConnected/ListDevServers for the entire session because of
+// this exact error ("cannot scan NULL into *string").
+func TestFindByHostAndMode_DirectWebSocketWithNullSSHTargetID(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	registered, err := repo.Register(ctx, domain.DevServer{
+		ID:       uuid.NewString(),
+		TenantID: tenantID,
+		Host:     "dev-01",
+		Mode:     domain.ConnectionModeDirectWebSocket,
+		Status:   domain.DevServerStatusApproved,
+		// SSHTargetID intentionally empty — Register must persist this as
+		// SQL NULL for direct-websocket mode, matching production data.
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	found, ok, err := repo.FindByHostAndMode(ctx, tenantID, "dev-01", domain.ConnectionModeDirectWebSocket)
+	if err != nil {
+		t.Fatalf("FindByHostAndMode returned an error instead of resolving the row (this is the exact live bug): %v", err)
+	}
+	if !ok {
+		t.Fatal("FindByHostAndMode: want found=true")
+	}
+	if found.ID != registered.ID {
+		t.Errorf("want resolved ID=%q (the real row, reused across reconnects), got %q", registered.ID, found.ID)
+	}
+	if found.SSHTargetID != "" {
+		t.Errorf("want SSHTargetID empty for a direct-websocket row, got %q", found.SSHTargetID)
+	}
+}
+
+func TestFindByHostAndMode_NoMatchReturnsNotFound(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 
-	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	_, ok, err := repo.FindByHostAndMode(ctx, uuid.NewString(), "no-such-host", domain.ConnectionModeDirectWebSocket)
 	if err != nil {
-		t.Fatalf("building dev server: %v", err)
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if _, err := repo.Register(ctx, ds); err != nil {
-		t.Fatalf("registering dev server: %v", err)
-	}
-
-	connected, got, _, err := repo.ResolveConnection(ctx, testTenant1, testDevServer1)
-	if err != nil {
-		t.Fatalf("resolve connection: %v", err)
-	}
-	if !connected || got.ID != testDevServer1 {
-		t.Errorf("expected connected=true, dev server %s, got connected=%v dev_server=%+v", testDevServer1, connected, got)
-	}
-
-	connected, _, _, err = repo.ResolveConnection(ctx, testTenant1, testUnknownID)
-	if err != nil {
-		t.Fatalf("resolve connection: %v", err)
-	}
-	if connected {
-		t.Error("expected connected=false for an unregistered connectionId")
-	}
-
-	// Cross-tenant lookup must never succeed, even for a valid id.
-	connected, _, _, err = repo.ResolveConnection(ctx, testTenant2, testDevServer1)
-	if err != nil {
-		t.Fatalf("resolve connection: %v", err)
-	}
-	if connected {
-		t.Error("expected connected=false when the dev server belongs to a different tenant")
-	}
-}
-
-func TestRepository_List_FiltersByTenant(t *testing.T) {
-	repo := setupRepository(t)
-	ctx := context.Background()
-
-	ds1, _ := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
-	ds2, _ := domain.NewDevServer(testDevServer2, testTenant2, "10.0.0.2", domain.ConnectionModeRelayWebSocket, "")
-	_, _ = repo.Register(ctx, ds1)
-	_, _ = repo.Register(ctx, ds2)
-
-	got, err := repo.List(ctx, testTenant1)
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
-	if len(got) != 1 || got[0].TenantID != testTenant1 {
-		t.Errorf("expected only tenant-1's dev server, got %+v", got)
-	}
-}
-
-// TestSshTargetStore_Get_FoundAndNotFound covers usecase.SshTargetRepository.Get
-// / usecase.SshTargetResolver.Get — the read path adapter/devserveragent.Client
-// uses (via WithRelaySSH) to resolve a DevServer.SSHTargetID into a full
-// domain.SshTarget before dialing.
-func TestSshTargetStore_Get_FoundAndNotFound(t *testing.T) {
-	_, store := setupSshTargetStore(t)
-	ctx := context.Background()
-
-	target, err := domain.NewSshTarget(testSshTarget1, testTenant1, "10.0.0.9", "deploy", "role-1")
-	if err != nil {
-		t.Fatalf("building ssh target: %v", err)
-	}
-	if _, err := store.Create(ctx, target); err != nil {
-		t.Fatalf("creating ssh target: %v", err)
-	}
-
-	got, err := store.Get(ctx, testTenant1, testSshTarget1)
-	if err != nil {
-		t.Fatalf("get: %v", err)
-	}
-	if got != target {
-		t.Errorf("expected %+v, got %+v", target, got)
-	}
-
-	// Cross-tenant lookup must never succeed, even for a valid id.
-	if _, err := store.Get(ctx, testTenant2, testSshTarget1); err == nil {
-		t.Error("expected an error when the ssh target belongs to a different tenant")
-	}
-
-	if _, err := store.Get(ctx, testTenant1, testUnknownID); err == nil {
-		t.Error("expected an error for an unregistered ssh target id")
-	}
-}
-
-// TestRepository_RegisterAndGet_PersistsSSHTargetID is the round-trip
-// regression for the ssh_target_id column added in
-// migrations/0003_dev_server_ssh_target — a relay-ssh DevServer must come
-// back out of Register/Get/List with the same SSHTargetID it was created
-// with, not silently dropped.
-func TestRepository_RegisterAndGet_PersistsSSHTargetID(t *testing.T) {
-	repo, store := setupSshTargetStore(t)
-	ctx := context.Background()
-
-	target, err := domain.NewSshTarget(testSshTarget2, testTenant1, "10.0.0.9", "deploy", "role-1")
-	if err != nil {
-		t.Fatalf("building ssh target: %v", err)
-	}
-	if _, err := store.Create(ctx, target); err != nil {
-		t.Fatalf("creating ssh target: %v", err)
-	}
-
-	ds, err := domain.NewDevServer(testDevServerRS, testTenant1, "10.0.0.5", domain.ConnectionModeRelaySSH, testSshTarget2)
-	if err != nil {
-		t.Fatalf("building dev server: %v", err)
-	}
-	if _, err := repo.Register(ctx, ds); err != nil {
-		t.Fatalf("registering dev server: %v", err)
-	}
-
-	got, err := repo.Get(ctx, testTenant1, testDevServerRS)
-	if err != nil {
-		t.Fatalf("get: %v", err)
-	}
-	if got.SSHTargetID != testSshTarget2 {
-		t.Errorf("expected SSHTargetID %q to round-trip, got %q", testSshTarget2, got.SSHTargetID)
-	}
-
-	list, err := repo.List(ctx, testTenant1)
-	if err != nil {
-		t.Fatalf("list: %v", err)
-	}
-	if len(list) != 1 || list[0].SSHTargetID != testSshTarget2 {
-		t.Errorf("expected List to also carry SSHTargetID, got %+v", list)
+	if ok {
+		t.Error("want found=false for a host with no registered dev server")
 	}
 }

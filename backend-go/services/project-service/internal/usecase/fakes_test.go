@@ -63,11 +63,17 @@ func (f *fakeProjectRepository) Get(ctx context.Context, tenantID, id string) (d
 	return p, nil
 }
 
-func (f *fakeProjectRepository) List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
+func (f *fakeProjectRepository) List(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
 	var out []domain.Project
 	for _, p := range f.projects {
-		if p.TenantID == tenantID {
-			out = append(out, p)
+		if p.TenantID != tenantID {
+			continue
+		}
+		for _, m := range f.members {
+			if m.ProjectID == p.ID && m.UserID == userID {
+				out = append(out, p)
+				break
+			}
 		}
 	}
 	return out, "", nil
@@ -207,11 +213,15 @@ func (f *fakeProjectRepository) CountOwners(ctx context.Context, projectID strin
 // calls, so a test can assert exactly what the usecase asked OPA to decide.
 type fakeOPAClient struct {
 	decide func(callerProjectRole, callerGlobalRole, action string) bool
+	// repoDecide is RepoDecision's counterpart to decide — see
+	// repoRegoDecide.
+	repoDecide func(callerProjectRole, callerRepoRole, callerGlobalRole, action string) bool
 
 	allow bool
 	err   error
 
-	calls []opaDecisionCall
+	calls     []opaDecisionCall
+	repoCalls []repoOpaDecisionCall
 }
 
 type opaDecisionCall struct {
@@ -229,6 +239,50 @@ func (f *fakeOPAClient) Decision(ctx context.Context, callerProjectRole, callerG
 		return f.decide(callerProjectRole, callerGlobalRole, action), nil
 	}
 	return f.allow, nil
+}
+
+// repoDecide, repoCalls, and RepoDecision mirror the Decision/decide/calls
+// fields above one tier down (repo, not project) — a separate field set
+// rather than overloading the existing ones, since repo.rego's input shape
+// carries an extra caller_repo_role dimension Decision's input doesn't have.
+type repoOpaDecisionCall struct {
+	CallerProjectRole string
+	CallerRepoRole    string
+	CallerGlobalRole  string
+	Action            string
+}
+
+func (f *fakeOPAClient) RepoDecision(ctx context.Context, callerProjectRole, callerRepoRole, callerGlobalRole, action string) (bool, error) {
+	f.repoCalls = append(f.repoCalls, repoOpaDecisionCall{
+		CallerProjectRole: callerProjectRole, CallerRepoRole: callerRepoRole, CallerGlobalRole: callerGlobalRole, Action: action,
+	})
+	if f.err != nil {
+		return false, f.err
+	}
+	if f.repoDecide != nil {
+		return f.repoDecide(callerProjectRole, callerRepoRole, callerGlobalRole, action), nil
+	}
+	return f.allow, nil
+}
+
+// repoRegoDecide mirrors policy/orca-authz/repo.rego's action_roles table
+// plus its project-owner bypass and global-admin override — used by
+// fakeOPAClient.repoDecide in authorization tests that need realistic
+// role-gating instead of a single static allow/deny answer.
+func repoRegoDecide(callerProjectRole, callerRepoRole, callerGlobalRole, action string) bool {
+	if callerGlobalRole == "admin" || callerProjectRole == "owner" {
+		return true
+	}
+	switch action {
+	case repoActionAdminOnly:
+		return callerRepoRole == "admin"
+	case repoActionLeadOrAdmin:
+		return callerRepoRole == "lead" || callerRepoRole == "admin"
+	case repoActionAnyFunctionalRole:
+		return callerRepoRole == "developer" || callerRepoRole == "lead" || callerRepoRole == "admin"
+	default:
+		return false
+	}
 }
 
 // projectRegoDecide mirrors policy/orca-authz/project.rego's action_roles
@@ -271,14 +325,23 @@ func (f *fakeExecutionChecker) HasActiveExecutions(ctx context.Context, projectI
 
 // fakeRepoRepository is an in-memory RepoRepository.
 type fakeRepoRepository struct {
-	repos map[string]domain.Repo
+	repos       map[string]domain.Repo
+	repoMembers []domain.RepoMember
 
-	addErr     error
-	listErr    error
-	reorderErr error
-	removeErr  error
-	getErr     error
-	updateErr  error
+	addErr           error
+	listErr          error
+	listForTenantErr error
+	reorderErr       error
+	removeErr        error
+	getErr           error
+	updateErr        error
+
+	addMemberErr             error
+	getMembershipErr         error
+	listMembersErr           error
+	removeMemberErr          error
+	updateMemberRoleErr      error
+	listIDsWithMembershipErr error
 }
 
 func newFakeRepoRepository() *fakeRepoRepository {
@@ -309,6 +372,17 @@ func (f *fakeRepoRepository) ListRepos(ctx context.Context, projectID string) ([
 		if r.ProjectID == projectID {
 			out = append(out, r)
 		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepoRepository) ListReposForTenant(ctx context.Context) ([]domain.Repo, error) {
+	if f.listForTenantErr != nil {
+		return nil, f.listForTenantErr
+	}
+	var out []domain.Repo
+	for _, r := range f.repos {
+		out = append(out, r)
 	}
 	return out, nil
 }
@@ -361,6 +435,87 @@ func (f *fakeRepoRepository) RemoveRepo(ctx context.Context, repoID string) erro
 	}
 	delete(f.repos, repoID)
 	return nil
+}
+
+// ── repo_members (functional-role tier) ─────────────────────────────────
+
+func (f *fakeRepoRepository) AddRepoMember(ctx context.Context, m domain.RepoMember) error {
+	if f.addMemberErr != nil {
+		return f.addMemberErr
+	}
+	for i, existing := range f.repoMembers {
+		if existing.RepoID == m.RepoID && existing.UserID == m.UserID {
+			f.repoMembers[i] = m
+			return nil
+		}
+	}
+	f.repoMembers = append(f.repoMembers, m)
+	return nil
+}
+
+func (f *fakeRepoRepository) GetRepoMembership(ctx context.Context, repoID, userID string) (domain.RepoMember, error) {
+	if f.getMembershipErr != nil {
+		return domain.RepoMember{}, f.getMembershipErr
+	}
+	for _, m := range f.repoMembers {
+		if m.RepoID == repoID && m.UserID == userID {
+			return m, nil
+		}
+	}
+	return domain.RepoMember{}, domain.ErrRepoMembershipNotFound
+}
+
+func (f *fakeRepoRepository) ListRepoMembers(ctx context.Context, repoID string) ([]domain.RepoMember, error) {
+	if f.listMembersErr != nil {
+		return nil, f.listMembersErr
+	}
+	var out []domain.RepoMember
+	for _, m := range f.repoMembers {
+		if m.RepoID == repoID {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepoRepository) RemoveRepoMember(ctx context.Context, repoID, userID string) error {
+	if f.removeMemberErr != nil {
+		return f.removeMemberErr
+	}
+	for i, m := range f.repoMembers {
+		if m.RepoID == repoID && m.UserID == userID {
+			f.repoMembers = append(f.repoMembers[:i], f.repoMembers[i+1:]...)
+			return nil
+		}
+	}
+	return domain.ErrRepoMembershipNotFound
+}
+
+func (f *fakeRepoRepository) UpdateRepoMemberRole(ctx context.Context, repoID, userID string, role domain.RepoRole) (domain.RepoMember, error) {
+	if f.updateMemberRoleErr != nil {
+		return domain.RepoMember{}, f.updateMemberRoleErr
+	}
+	for i, m := range f.repoMembers {
+		if m.RepoID == repoID && m.UserID == userID {
+			f.repoMembers[i].Role = role
+			return f.repoMembers[i], nil
+		}
+	}
+	return domain.RepoMember{}, domain.ErrRepoMembershipNotFound
+}
+
+func (f *fakeRepoRepository) ListRepoIDsWithMembership(ctx context.Context, projectID, userID string) ([]string, error) {
+	if f.listIDsWithMembershipErr != nil {
+		return nil, f.listIDsWithMembershipErr
+	}
+	var out []string
+	for _, m := range f.repoMembers {
+		r, ok := f.repos[m.RepoID]
+		if ok && r.ProjectID == projectID && m.UserID == userID {
+			out = append(out, m.RepoID)
+		}
+	}
+	return out, nil
 }
 
 // fakeWorktreeRepository is an in-memory WorktreeRepository.
@@ -539,6 +694,10 @@ type fakeFolderWorkspaceRepository struct {
 	workspaces map[string]domain.FolderWorkspace
 
 	repoPathExists bool
+	// createErr, when set, is returned by Create instead of the normal
+	// duplicate-path check — used to exercise the project_group_id
+	// foreign-key-violation mapping without a real Postgres constraint.
+	createErr error
 
 	findByPathCalls     int
 	repoPathExistsCalls int
@@ -549,6 +708,9 @@ func newFakeFolderWorkspaceRepository() *fakeFolderWorkspaceRepository {
 }
 
 func (f *fakeFolderWorkspaceRepository) Create(ctx context.Context, fw domain.FolderWorkspace) (domain.FolderWorkspace, error) {
+	if f.createErr != nil {
+		return domain.FolderWorkspace{}, f.createErr
+	}
 	for _, existing := range f.workspaces {
 		if existing.TenantID == fw.TenantID && existing.DevServerID == fw.DevServerID && existing.Path == fw.Path {
 			return domain.FolderWorkspace{}, domain.ErrPathAlreadyRegistered

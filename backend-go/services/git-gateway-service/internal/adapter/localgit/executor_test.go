@@ -1066,3 +1066,75 @@ func TestFetch_NilPushTargetUsesDefaultRemote(t *testing.T) {
 		t.Errorf("expected Success=true, got %+v", got)
 	}
 }
+
+func TestListWorktreePaths_MainWorktreeOnly(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+
+	got, err := e.ListWorktreePaths(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected exactly 1 worktree, got %+v", got)
+	}
+	if got[0].Path != dir {
+		t.Errorf("expected path %q, got %q", dir, got[0].Path)
+	}
+	if got[0].Branch != "refs/heads/main" {
+		t.Errorf("expected branch refs/heads/main, got %q", got[0].Branch)
+	}
+	if got[0].Head == "" {
+		t.Error("expected a non-empty HEAD sha")
+	}
+}
+
+func TestListWorktreePaths_MainPlusLinkedWorktree(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+
+	result, err := e.CreateWorktree(context.Background(), dir, "feature", "main")
+	if err != nil {
+		t.Fatalf("CreateWorktree: %v", err)
+	}
+
+	got, err := e.ListWorktreePaths(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 worktrees, got %+v", got)
+	}
+
+	byPath := make(map[string]string, len(got))
+	for _, info := range got {
+		byPath[info.Path] = info.Branch
+	}
+	if branch := byPath[dir]; branch != "refs/heads/main" {
+		t.Errorf("expected main worktree on refs/heads/main, got %q", branch)
+	}
+	if branch := byPath[result.Path]; branch != "refs/heads/feature" {
+		t.Errorf("expected linked worktree on refs/heads/feature, got %q", branch)
+	}
+}
+
+func TestListWorktreePaths_DetachedHead_EmptyBranch(t *testing.T) {
+	dir := initRepo(t)
+	cmd := exec.Command("git", "checkout", "--detach", "HEAD")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("detach failed: %v\n%s", err, out)
+	}
+	e := New()
+
+	got, err := e.ListWorktreePaths(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0].Branch != "" {
+		t.Errorf("expected 1 worktree with empty branch (detached), got %+v", got)
+	}
+	if got[0].Head == "" {
+		t.Error("expected a non-empty HEAD sha even when detached")
+	}
+}

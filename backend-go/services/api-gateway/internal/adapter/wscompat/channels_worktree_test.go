@@ -418,15 +418,18 @@ func TestWorktreeSetChannel_CallsProjectClientNotGitClient(t *testing.T) {
 	}
 }
 
-func TestWorktreeDetectedListChannel_OrphanedPathNotInBookkeeping(t *testing.T) {
+func TestWorktreeDetectedListChannel_MergesOnDiskAndBookkeeping(t *testing.T) {
 	git := &fakeGitGatewayServiceClient{
 		detectWorktreesFunc: func(_ context.Context, in *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error) {
-			return &gitgatewayv1.DetectWorktreesResponse{OnDiskPaths: []string{"/repo-main", "/repo-orphan"}}, nil
+			return &gitgatewayv1.DetectWorktreesResponse{OnDiskWorktrees: []*gitgatewayv1.DetectedWorktreeGitInfo{
+				{Path: "/repo-main", Head: "abc123", Branch: "refs/heads/main"},
+				{Path: "/repo-orphan", Head: "def456", Branch: "refs/heads/feature"},
+			}}, nil
 		},
 	}
 	project := &fakeProjectServiceClient{
 		listWorktreesFunc: func(_ context.Context, in *projectv1.ListWorktreesRequest) (*projectv1.ListWorktreesResponse, error) {
-			return &projectv1.ListWorktreesResponse{Worktrees: []*projectv1.Worktree{{Id: "wt-1", Path: "/repo-main"}}}, nil
+			return &projectv1.ListWorktreesResponse{Worktrees: []*projectv1.Worktree{{Id: "wt-1", RepoId: "repo-1", Path: "/repo-main"}}}, nil
 		},
 	}
 	r := NewRegistry()
@@ -441,12 +444,25 @@ func TestWorktreeDetectedListChannel_OrphanedPathNotInBookkeeping(t *testing.T) 
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-	orphaned, ok := m["orphanedPaths"].([]string)
-	if !ok {
-		t.Fatalf("unexpected orphanedPaths type: %+v", m)
+	if m["repoId"] != "repo-1" || m["authoritative"] != true || m["source"] != "git" {
+		t.Errorf("unexpected envelope fields: %+v", m)
 	}
-	if len(orphaned) != 1 || orphaned[0] != "/repo-orphan" {
-		t.Errorf("expected only /repo-orphan to be orphaned, got %v", orphaned)
+	worktrees, ok := m["worktrees"].([]detectedWorktreeView)
+	if !ok {
+		t.Fatalf("unexpected worktrees type: %+v", m)
+	}
+	if len(worktrees) != 2 {
+		t.Fatalf("expected 2 worktrees, got %+v", worktrees)
+	}
+	main, orphan := worktrees[0], worktrees[1]
+	if main.ID != "wt-1" || main.Ownership != "orca-managed" || main.IsMainWorktree != true {
+		t.Errorf("expected /repo-main to be the bookkept main worktree, got %+v", main)
+	}
+	if orphan.ID != "repo-1::/repo-orphan" || orphan.Ownership != "external" || orphan.IsMainWorktree != false {
+		t.Errorf("expected /repo-orphan to be a synthesized external worktree, got %+v", orphan)
+	}
+	if orphan.DisplayName != "feature" {
+		t.Errorf("expected orphan displayName derived from its branch, got %q", orphan.DisplayName)
 	}
 }
 
@@ -477,7 +493,7 @@ func TestWorktreeDetectedListChannel_GitGatewayErrors_WholeCallFails(t *testing.
 func TestWorktreeDetectedListChannel_BothEmpty_ReturnsEmptyNotError(t *testing.T) {
 	git := &fakeGitGatewayServiceClient{
 		detectWorktreesFunc: func(_ context.Context, _ *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error) {
-			return &gitgatewayv1.DetectWorktreesResponse{OnDiskPaths: nil}, nil
+			return &gitgatewayv1.DetectWorktreesResponse{OnDiskWorktrees: nil}, nil
 		},
 	}
 	project := &fakeProjectServiceClient{
@@ -497,14 +513,14 @@ func TestWorktreeDetectedListChannel_BothEmpty_ReturnsEmptyNotError(t *testing.T
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-	orphaned, ok := m["orphanedPaths"].([]string)
+	worktrees, ok := m["worktrees"].([]detectedWorktreeView)
 	if !ok {
-		t.Fatalf("unexpected orphanedPaths type: %+v", m)
+		t.Fatalf("unexpected worktrees type: %+v", m)
 	}
-	if orphaned == nil {
-		t.Error("expected orphanedPaths to be a non-nil empty slice, not nil, when both sides are empty")
+	if worktrees == nil {
+		t.Error("expected worktrees to be a non-nil empty slice, not nil, when both sides are empty")
 	}
-	if len(orphaned) != 0 {
-		t.Errorf("expected orphanedPaths to be empty, got %v", orphaned)
+	if len(worktrees) != 0 {
+		t.Errorf("expected worktrees to be empty, got %v", worktrees)
 	}
 }

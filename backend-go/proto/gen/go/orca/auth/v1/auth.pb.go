@@ -633,11 +633,17 @@ func (x *GetJWKSResponse) GetJwksJson() string {
 }
 
 type CreateUserRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Email         string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
-	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
-	TenantId      string                 `protobuf:"bytes,3,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	Role          Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=orca.auth.v1.Role" json:"role,omitempty"`
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	Email    string                 `protobuf:"bytes,1,opt,name=email,proto3" json:"email,omitempty"`
+	Name     string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	TenantId string                 `protobuf:"bytes,3,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Role     Role                   `protobuf:"varint,4,opt,name=role,proto3,enum=orca.auth.v1.Role" json:"role,omitempty"`
+	// password: optional. Empty means "auto-generate" — the plaintext is
+	// returned exactly once in CreateUserResponse.generated_password (never
+	// stored, never logged) since there is no invite/reset-link flow yet; the
+	// calling admin is responsible for relaying it to the new user out of
+	// band. A caller-supplied password skips generation entirely.
+	Password      string `protobuf:"bytes,5,opt,name=password,proto3" json:"password,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -700,11 +706,21 @@ func (x *CreateUserRequest) GetRole() Role {
 	return Role_ROLE_UNSPECIFIED
 }
 
+func (x *CreateUserRequest) GetPassword() string {
+	if x != nil {
+		return x.Password
+	}
+	return ""
+}
+
 type CreateUserResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	User          *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state protoimpl.MessageState `protogen:"open.v1"`
+	User  *User                  `protobuf:"bytes,1,opt,name=user,proto3" json:"user,omitempty"`
+	// generated_password is set only when the request's password field was
+	// empty — see CreateUserRequest.password's doc comment.
+	GeneratedPassword string `protobuf:"bytes,2,opt,name=generated_password,json=generatedPassword,proto3" json:"generated_password,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *CreateUserResponse) Reset() {
@@ -742,6 +758,13 @@ func (x *CreateUserResponse) GetUser() *User {
 		return x.User
 	}
 	return nil
+}
+
+func (x *CreateUserResponse) GetGeneratedPassword() string {
+	if x != nil {
+		return x.GeneratedPassword
+	}
+	return ""
 }
 
 type ListUsersRequest struct {
@@ -2217,14 +2240,16 @@ const file_orca_auth_v1_auth_proto_rawDesc = "" +
 	"expires_at\x18\x02 \x01(\v2\x1a.google.protobuf.TimestampR\texpiresAt\"\x10\n" +
 	"\x0eGetJWKSRequest\".\n" +
 	"\x0fGetJWKSResponse\x12\x1b\n" +
-	"\tjwks_json\x18\x01 \x01(\tR\bjwksJson\"\x82\x01\n" +
+	"\tjwks_json\x18\x01 \x01(\tR\bjwksJson\"\x9e\x01\n" +
 	"\x11CreateUserRequest\x12\x14\n" +
 	"\x05email\x18\x01 \x01(\tR\x05email\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x1b\n" +
 	"\ttenant_id\x18\x03 \x01(\tR\btenantId\x12&\n" +
-	"\x04role\x18\x04 \x01(\x0e2\x12.orca.auth.v1.RoleR\x04role\"<\n" +
+	"\x04role\x18\x04 \x01(\x0e2\x12.orca.auth.v1.RoleR\x04role\x12\x1a\n" +
+	"\bpassword\x18\x05 \x01(\tR\bpassword\"k\n" +
 	"\x12CreateUserResponse\x12&\n" +
-	"\x04user\x18\x01 \x01(\v2\x12.orca.auth.v1.UserR\x04user\"k\n" +
+	"\x04user\x18\x01 \x01(\v2\x12.orca.auth.v1.UserR\x04user\x12-\n" +
+	"\x12generated_password\x18\x02 \x01(\tR\x11generatedPassword\"k\n" +
 	"\x10ListUsersRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x1d\n" +
 	"\n" +

@@ -22,6 +22,7 @@ package wscompat
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"golang.org/x/sync/errgroup"
 
@@ -219,17 +220,12 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 			return nil, err
 		}
 
-		knownPaths := make(map[string]bool, len(known.GetWorktrees()))
-		for _, w := range known.GetWorktrees() {
-			knownPaths[w.GetPath()] = true
-		}
-		orphaned := make([]string, 0, len(onDisk.GetOnDiskPaths()))
-		for _, p := range onDisk.GetOnDiskPaths() {
-			if !knownPaths[p] {
-				orphaned = append(orphaned, p)
-			}
-		}
-		return map[string]any{"orphanedPaths": orphaned}, nil
+		return map[string]any{
+			"repoId":        in.RepoID,
+			"authoritative": true,
+			"source":        "git",
+			"worktrees":     mergeDetectedWorktrees(in.RepoID, in.ProjectID, onDisk.GetOnDiskWorktrees(), known.GetWorktrees()),
+		}, nil
 	})
 
 	// worktree.lineageList — no args (tenant-scoped via identity + RLS,
@@ -301,4 +297,116 @@ func nonEmptyPtr(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// detectedWorktreeView mirrors the frontend's DetectedWorktree type
+// (shared/types.ts: Worktree & {ownership, selectedCheckout, visible}) —
+// worktree.detectedList's real response shape, replacing the earlier
+// {orphanedPaths: [...]} stub this handler shipped with (see the spec
+// doc's "Thirtieth"/"Thirty-first"/"Thirty-second" entries for that
+// history). Every field this backend has no data source for gets the
+// exact same safe default the frontend's OWN legacy-fallback synthesis
+// (toLegacyDetectedWorktreeResult in store/slices/worktrees.ts and
+// web-preload-api.ts) already established, so a worktree this handler
+// discovers is shape-identical to one that path already produced.
+type detectedWorktreeView struct {
+	ID                string  `json:"id"`
+	RepoID            string  `json:"repoId"`
+	ProjectID         string  `json:"projectId,omitempty"`
+	DisplayName       string  `json:"displayName"`
+	Comment           string  `json:"comment"`
+	LinkedIssue       *int32  `json:"linkedIssue"`
+	LinkedPR          *int32  `json:"linkedPR"`
+	LinkedLinearIssue *string `json:"linkedLinearIssue"`
+	IsArchived        bool    `json:"isArchived"`
+	IsUnread          bool    `json:"isUnread"`
+	IsPinned          bool    `json:"isPinned"`
+	SortOrder         int32   `json:"sortOrder"`
+	LastActivityAt    int64   `json:"lastActivityAt"`
+	Path              string  `json:"path"`
+	Head              string  `json:"head"`
+	Branch            string  `json:"branch"`
+	IsBare            bool    `json:"isBare"`
+	IsMainWorktree    bool    `json:"isMainWorktree"`
+	Ownership         string  `json:"ownership"`
+	SelectedCheckout  bool    `json:"selectedCheckout"`
+	Visible           bool    `json:"visible"`
+}
+
+// mergeDetectedWorktrees combines git-gateway-service's on-disk ground
+// truth (real paths, guaranteed to exist right now) with project-service's
+// bookkeeping (the worktree's real id/lineage, when Orca created it) —
+// per this file's own top-of-file doc comment, this merge is deliberately
+// computed here at api-gateway's edge, not inside either owning service.
+//
+// A bookkept worktree missing from onDisk is deliberately NOT included —
+// the frontend's own reconciliation (getRemovedWorktreeIdsAfterAuthoritative-
+// Scan in store/slices/worktrees.ts) already purges a bookkept id that
+// isn't in this result's ids, comparing against its own separately-fetched
+// worktreesByRepo state; duplicating that purge decision here would be a
+// second, harder-to-keep-in-sync source of truth for the same decision.
+func mergeDetectedWorktrees(repoID, projectID string, onDisk []*gitgatewayv1.DetectedWorktreeGitInfo, known []*projectv1.Worktree) []detectedWorktreeView {
+	knownByPath := make(map[string]*projectv1.Worktree, len(known))
+	for _, w := range known {
+		knownByPath[w.GetPath()] = w
+	}
+
+	out := make([]detectedWorktreeView, 0, len(onDisk))
+	for i, info := range onDisk {
+		view := detectedWorktreeView{
+			ProjectID:        projectID,
+			Path:             info.GetPath(),
+			Head:             info.GetHead(),
+			Branch:           info.GetBranch(),
+			IsMainWorktree:   i == 0,
+			SelectedCheckout: false,
+			Visible:          true,
+		}
+		if w, ok := knownByPath[info.GetPath()]; ok {
+			// Bookkept by project-service — a worktree Orca itself created
+			// (or previously reconciled). Reuse its real id so the
+			// frontend's own already-fetched worktreesByRepo state matches
+			// up by id, not just by path.
+			view.ID = w.GetId()
+			view.RepoID = w.GetRepoId()
+			view.Ownership = "orca-managed"
+			view.LastActivityAt = w.GetCreatedAtUnixMs()
+		} else {
+			// On disk, but Orca has no bookkeeping row for it — created
+			// outside Orca's own worktree.create flow (a manual
+			// `git worktree add`, or an import this pass doesn't attempt to
+			// resolve). Synthesize the same id shape every other worktree
+			// id in this codebase uses (see shared/worktree-id.ts).
+			view.ID = repoID + "::" + info.GetPath()
+			view.RepoID = repoID
+			view.Ownership = "external"
+		}
+		view.DisplayName = displayNameForDetectedWorktree(view.Branch, view.Path)
+		out = append(out, view)
+	}
+	return out
+}
+
+// displayNameForDetectedWorktree picks a reasonable label for a worktree
+// this backend has no explicit display_name for (project.worktrees has no
+// such column) — the branch name when one exists (the common, meaningful
+// case), else the path's own basename (a detached-HEAD worktree, or one
+// git couldn't resolve a branch for).
+func displayNameForDetectedWorktree(branch, path string) string {
+	if short, ok := strings.CutPrefix(branch, "refs/heads/"); ok && short != "" {
+		return short
+	}
+	if branch != "" {
+		return branch
+	}
+	trimmed := strings.TrimRight(path, "/\\")
+	if base := trimmed; base != "" {
+		if idx := strings.LastIndexAny(trimmed, "/\\"); idx != -1 {
+			base = trimmed[idx+1:]
+		}
+		if base != "" {
+			return base
+		}
+	}
+	return path
 }

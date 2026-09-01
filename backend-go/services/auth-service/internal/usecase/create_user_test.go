@@ -43,8 +43,8 @@ func TestCreateUser_AllowedWhenOPADecisionIsTrue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if created.Email != "new@example.com" || created.TenantID != "t1" {
-		t.Errorf("unexpected created user: %+v", created)
+	if created.User.Email != "new@example.com" || created.User.TenantID != "t1" {
+		t.Errorf("unexpected created user: %+v", created.User)
 	}
 	if _, _, err := users.GetUserByEmail(ctx, "new@example.com"); err != nil {
 		t.Errorf("expected user to be persisted: %v", err)
@@ -54,6 +54,43 @@ func TestCreateUser_AllowedWhenOPADecisionIsTrue(t *testing.T) {
 	}
 	if opa.lastActor.ID != "admin1" || opa.lastActor.Role != domain.RoleAdmin {
 		t.Errorf("expected OPA to be queried with the resolved admin actor, got %+v", opa.lastActor)
+	}
+	// Why: no password was supplied, so Execute must generate + return one —
+	// this is the ONLY chance the caller ever gets to see it (never stored,
+	// never logged past this return).
+	if created.GeneratedPassword == "" {
+		t.Error("expected a generated password to be returned when none was supplied")
+	}
+}
+
+func TestCreateUser_CallerSuppliedPasswordIsUsedAndNotReturned(t *testing.T) {
+	users := newFakeUserRepository()
+	seedActiveUser(t, users, fakeHasher{}, "admin1", "t1", "admin@example.com", "pw", domain.RoleAdmin)
+
+	uc := NewCreateUser(users, &fakeAuditRepository{}, fakeHasher{}, &fakeClock{now: time.Now()}, &fakeOPAClient{allow: true})
+	ctx := withActor(context.Background(), "t1", "admin1")
+	created, err := uc.Execute(ctx, CreateUserInput{
+		Email: "new@example.com", Name: "New", TenantID: "t1", Role: domain.RoleUser, Password: "correct-horse-battery",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if created.GeneratedPassword != "" {
+		t.Errorf("expected no generated password when caller supplied one, got %q", created.GeneratedPassword)
+	}
+}
+
+func TestCreateUser_RejectsWeakCallerSuppliedPassword(t *testing.T) {
+	users := newFakeUserRepository()
+	seedActiveUser(t, users, fakeHasher{}, "admin1", "t1", "admin@example.com", "pw", domain.RoleAdmin)
+
+	uc := NewCreateUser(users, &fakeAuditRepository{}, fakeHasher{}, &fakeClock{now: time.Now()}, &fakeOPAClient{allow: true})
+	ctx := withActor(context.Background(), "t1", "admin1")
+	_, err := uc.Execute(ctx, CreateUserInput{
+		Email: "new@example.com", Name: "New", TenantID: "t1", Role: domain.RoleUser, Password: "short",
+	})
+	if err == nil {
+		t.Fatal("expected an error for a too-short password")
 	}
 }
 

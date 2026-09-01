@@ -19,9 +19,12 @@ type ReorderReposInput struct {
 // rejected with KindInvalidArgument before any write happens, rather than
 // silently reordering a subset.
 //
-// Authorization is the same judgment call as AddRepo (see that usecase's
-// doc comment): owner-or-admin, since ReorderRepos mutates a project's repo
-// catalog and isn't named in project-service.md §9's matrix.
+// Authorization stays project-level owner-only (projectActionOwnerOnly),
+// NOT the repo-scoped repo_admin_only/repo_lead_or_admin tier — deliberately:
+// this rewrites EVERY repo's position in the project in one call, so there
+// is no single repo to resolve a repo_members grant against (a caller could
+// hold "lead" on one repo in the list and nothing on another). Reordering
+// the whole catalog is a project-wide action, same as AddRepo.
 type ReorderRepos struct {
 	repo       RepoRepository
 	membership MembershipRepository

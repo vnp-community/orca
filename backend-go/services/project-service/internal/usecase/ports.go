@@ -18,7 +18,13 @@ import (
 type ProjectRepository interface {
 	Create(ctx context.Context, project domain.Project) (domain.Project, error)
 	Get(ctx context.Context, tenantID, id string) (domain.Project, error)
-	List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Project, string, error)
+	// List returns only projects userID is a member of — see
+	// usecase.ListProjects.Execute's doc comment for why this is not just
+	// tenant-scoped (found live during the "one private default project per
+	// user" pass: a bare tenant_id filter here leaked every tenant member's
+	// projects to every other member, undermining the private-by-default
+	// design before it existed).
+	List(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error)
 	AddMember(ctx context.Context, member domain.ProjectMember) error
 	// UpdateDevServerID rebinds a project to a new dev server — the only
 	// write path for dev_server_id (see usecase.RebindDevServer). Returns
@@ -65,6 +71,13 @@ type MembershipRepository interface {
 	GetMembership(ctx context.Context, projectID, userID string) (domain.ProjectMember, error)
 }
 
+// RepoMembershipRepository is the read-only subset of RepoRepository that
+// requireRepoAccess needs to resolve caller_repo_role — same shape/reasoning
+// as MembershipRepository, one tier down (repo, not project).
+type RepoMembershipRepository interface {
+	GetRepoMembership(ctx context.Context, repoID, userID string) (domain.RepoMember, error)
+}
+
 // OPAClient is the authorization port every OPA-gated usecase in this
 // service uses for the "does this caller_project_role/caller_global_role
 // authorize this action" decision — implemented by internal/adapter/
@@ -78,6 +91,13 @@ type OPAClient interface {
 	// "action"} input contract. action is one of the projectAction* constants
 	// in authorization.go.
 	Decision(ctx context.Context, callerProjectRole, callerGlobalRole, action string) (bool, error)
+	// RepoDecision is Decision's repo-scoped counterpart, consuming
+	// backend-go/policy/orca-authz/repo.rego's data.orca.authz.repo.allow
+	// rule instead — an owner always passes (repo.rego's own bypass rule)
+	// regardless of callerRepoRole; a non-owner project member needs a
+	// repo_members grant matching the action's tier. action is one of the
+	// repoAction* constants in authorization.go.
+	RepoDecision(ctx context.Context, callerProjectRole, callerRepoRole, callerGlobalRole, action string) (bool, error)
 }
 
 // WorkflowExecutionChecker is the outbound port toward workflow-service —
@@ -107,6 +127,15 @@ type RepoRepository interface {
 	AddRepo(ctx context.Context, repo domain.Repo) (domain.Repo, error)
 	// ListRepos returns a project's repos ordered by position.
 	ListRepos(ctx context.Context, projectID string) ([]domain.Repo, error)
+	// ListReposForTenant returns every repo across every project in the
+	// caller's tenant — the wscompat repo.list channel's "no project
+	// filter" call shape (frontend/src/main/runtime/rpc/methods/repo.ts's
+	// old repo.list took no params at all). No single project_id to check
+	// per-project membership against, so usecase.ListRepos gates this path
+	// on tenant membership alone, same reasoning as
+	// usecase.ListWorktreeLineage's doc comment — Postgres RLS on
+	// project.repos already scopes the query to the caller's tenant.
+	ListReposForTenant(ctx context.Context) ([]domain.Repo, error)
 	// ReorderRepos rewrites every listed repo's position (0-indexed, by
 	// list order) in a single transaction. Callers must have already
 	// validated idsInOrder is an exact permutation of the project's
@@ -124,6 +153,29 @@ type RepoRepository interface {
 	// usecase.UpdateRepo after it applies the field-mask. Returns
 	// domain.ErrRepoNotFound (wrapped) if no repo matches.
 	Update(ctx context.Context, repo domain.Repo) (domain.Repo, error)
+
+	// ── repo_members (functional-role tier, layered on top of project_members) ──
+
+	// AddRepoMember grants userID a functional role on repoID — additional
+	// to (never a replacement for) that user's project membership.
+	AddRepoMember(ctx context.Context, member domain.RepoMember) error
+	// GetRepoMembership returns userID's functional-role grant on repoID.
+	// Returns domain.ErrRepoMembershipNotFound (wrapped) if no row matches
+	// — requireRepoAccess's normal "no grant on this repo" case.
+	GetRepoMembership(ctx context.Context, repoID, userID string) (domain.RepoMember, error)
+	// ListRepoMembers returns every functional-role grant for one repo.
+	ListRepoMembers(ctx context.Context, repoID string) ([]domain.RepoMember, error)
+	// RemoveRepoMember deletes one grant. Returns
+	// domain.ErrRepoMembershipNotFound (wrapped) if none exists.
+	RemoveRepoMember(ctx context.Context, repoID, userID string) error
+	// UpdateRepoMemberRole changes one grant's functional role. Returns
+	// domain.ErrRepoMembershipNotFound (wrapped) if none exists.
+	UpdateRepoMemberRole(ctx context.Context, repoID, userID string, role domain.RepoRole) (domain.RepoMember, error)
+	// ListRepoIDsWithMembership returns the subset of projectID's repo ids
+	// where userID holds a repo_members row — usecase.ListRepos' non-owner
+	// visibility filter ("a member sees only repos they're explicitly
+	// granted onto").
+	ListRepoIDsWithMembership(ctx context.Context, projectID, userID string) ([]string, error)
 }
 
 // WorktreeRepository is the persistence port for a project's worktree

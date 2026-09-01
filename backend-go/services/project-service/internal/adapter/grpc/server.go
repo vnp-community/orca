@@ -39,6 +39,12 @@ type Server struct {
 	reorderRepos *usecase.ReorderRepos
 	removeRepo   *usecase.RemoveRepo
 	updateRepo   *usecase.UpdateRepo
+	getRepo      *usecase.GetRepo
+
+	addRepoMember        *usecase.AddRepoMember
+	listRepoMembers      *usecase.ListRepoMembers
+	removeRepoMember     *usecase.RemoveRepoMember
+	updateRepoMemberRole *usecase.UpdateRepoMemberRole
 
 	recordWorktreeCreated *usecase.RecordWorktreeCreated
 	recordWorktreeRemoved *usecase.RecordWorktreeRemoved
@@ -85,6 +91,12 @@ type Deps struct {
 	ReorderRepos *usecase.ReorderRepos
 	RemoveRepo   *usecase.RemoveRepo
 	UpdateRepo   *usecase.UpdateRepo
+	GetRepo      *usecase.GetRepo
+
+	AddRepoMember        *usecase.AddRepoMember
+	ListRepoMembers      *usecase.ListRepoMembers
+	RemoveRepoMember     *usecase.RemoveRepoMember
+	UpdateRepoMemberRole *usecase.UpdateRepoMemberRole
 
 	RecordWorktreeCreated *usecase.RecordWorktreeCreated
 	RecordWorktreeRemoved *usecase.RecordWorktreeRemoved
@@ -129,6 +141,12 @@ func New(deps Deps) *Server {
 		reorderRepos: deps.ReorderRepos,
 		removeRepo:   deps.RemoveRepo,
 		updateRepo:   deps.UpdateRepo,
+		getRepo:      deps.GetRepo,
+
+		addRepoMember:        deps.AddRepoMember,
+		listRepoMembers:      deps.ListRepoMembers,
+		removeRepoMember:     deps.RemoveRepoMember,
+		updateRepoMemberRole: deps.UpdateRepoMemberRole,
 
 		recordWorktreeCreated: deps.RecordWorktreeCreated,
 		recordWorktreeRemoved: deps.RecordWorktreeRemoved,
@@ -326,6 +344,56 @@ func (s *Server) UpdateRepo(ctx context.Context, req *projectv1.UpdateRepoReques
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.UpdateRepoResponse{Repo: toProtoRepo(repo)}, nil
+}
+
+func (s *Server) GetRepo(ctx context.Context, req *projectv1.GetRepoRequest) (*projectv1.GetRepoResponse, error) {
+	result, err := s.getRepo.Execute(ctx, usecase.GetRepoInput{RepoID: req.GetRepoId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.GetRepoResponse{Repo: toProtoRepo(result.Repo), DevServerId: result.DevServerID}, nil
+}
+
+func (s *Server) AddRepoMember(ctx context.Context, req *projectv1.AddRepoMemberRequest) (*projectv1.AddRepoMemberResponse, error) {
+	member, err := s.addRepoMember.Execute(ctx, usecase.AddRepoMemberInput{
+		RepoID: req.GetRepoId(), UserID: req.GetUserId(), Role: toDomainRepoRole(req.GetRole()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.AddRepoMemberResponse{Member: toProtoRepoMember(member)}, nil
+}
+
+func (s *Server) ListRepoMembers(ctx context.Context, req *projectv1.ListRepoMembersRequest) (*projectv1.ListRepoMembersResponse, error) {
+	members, err := s.listRepoMembers.Execute(ctx, usecase.ListRepoMembersInput{RepoID: req.GetRepoId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.RepoMember, 0, len(members))
+	for _, m := range members {
+		out = append(out, toProtoRepoMember(m))
+	}
+	return &projectv1.ListRepoMembersResponse{Members: out}, nil
+}
+
+func (s *Server) RemoveRepoMember(ctx context.Context, req *projectv1.RemoveRepoMemberRequest) (*projectv1.RemoveRepoMemberResponse, error) {
+	err := s.removeRepoMember.Execute(ctx, usecase.RemoveRepoMemberInput{
+		RepoID: req.GetRepoId(), UserID: req.GetUserId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RemoveRepoMemberResponse{}, nil
+}
+
+func (s *Server) UpdateRepoMemberRole(ctx context.Context, req *projectv1.UpdateRepoMemberRoleRequest) (*projectv1.UpdateRepoMemberRoleResponse, error) {
+	member, err := s.updateRepoMemberRole.Execute(ctx, usecase.UpdateRepoMemberRoleInput{
+		RepoID: req.GetRepoId(), UserID: req.GetUserId(), Role: toDomainRepoRole(req.GetRole()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UpdateRepoMemberRoleResponse{Member: toProtoRepoMember(member)}, nil
 }
 
 func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.RecordWorktreeCreatedRequest) (*projectv1.RecordWorktreeCreatedResponse, error) {
@@ -590,6 +658,37 @@ func toProtoProject(p domain.Project) *projectv1.Project {
 	return out
 }
 
+func toDomainRepoRole(r projectv1.RepoRole) domain.RepoRole {
+	switch r {
+	case projectv1.RepoRole_REPO_ROLE_DEVELOPER:
+		return domain.RepoRoleDeveloper
+	case projectv1.RepoRole_REPO_ROLE_LEAD:
+		return domain.RepoRoleLead
+	case projectv1.RepoRole_REPO_ROLE_ADMIN:
+		return domain.RepoRoleAdmin
+	default:
+		return ""
+	}
+}
+
+// toProtoRepoRole is toDomainRepoRole's inverse.
+func toProtoRepoRole(r domain.RepoRole) projectv1.RepoRole {
+	switch r {
+	case domain.RepoRoleDeveloper:
+		return projectv1.RepoRole_REPO_ROLE_DEVELOPER
+	case domain.RepoRoleLead:
+		return projectv1.RepoRole_REPO_ROLE_LEAD
+	case domain.RepoRoleAdmin:
+		return projectv1.RepoRole_REPO_ROLE_ADMIN
+	default:
+		return projectv1.RepoRole_REPO_ROLE_UNSPECIFIED
+	}
+}
+
+func toProtoRepoMember(m domain.RepoMember) *projectv1.RepoMember {
+	return &projectv1.RepoMember{RepoId: m.RepoID, UserId: m.UserID, Role: toProtoRepoRole(m.Role)}
+}
+
 func toProtoRepo(r domain.Repo) *projectv1.Repo {
 	return &projectv1.Repo{
 		Id:          r.ID,
@@ -659,9 +758,10 @@ func toProtoHostSetup(s domain.HostSetup) *projectv1.HostSetup {
 
 func (s *Server) CreateFolderWorkspace(ctx context.Context, req *projectv1.CreateFolderWorkspaceRequest) (*projectv1.CreateFolderWorkspaceResponse, error) {
 	fw, err := s.folderWorkspaces.Create(ctx, usecase.CreateFolderWorkspaceInput{
-		DevServerID: req.GetDevServerId(),
-		Path:        req.GetPath(),
-		Name:        req.GetName(),
+		DevServerID:    req.GetDevServerId(),
+		Path:           req.GetPath(),
+		Name:           req.GetName(),
+		ProjectGroupID: req.GetProjectGroupId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -709,11 +809,12 @@ func (s *Server) GetFolderWorkspacePathStatus(ctx context.Context, req *projectv
 
 func toProtoFolderWorkspace(fw domain.FolderWorkspace) *projectv1.FolderWorkspace {
 	out := &projectv1.FolderWorkspace{
-		Id:          fw.ID,
-		DevServerId: fw.DevServerID,
-		Path:        fw.Path,
-		Name:        fw.Name,
-		AddedBy:     fw.AddedBy,
+		Id:             fw.ID,
+		DevServerId:    fw.DevServerID,
+		Path:           fw.Path,
+		Name:           fw.Name,
+		AddedBy:        fw.AddedBy,
+		ProjectGroupId: fw.ProjectGroupID,
 	}
 	if !fw.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(fw.CreatedAt)

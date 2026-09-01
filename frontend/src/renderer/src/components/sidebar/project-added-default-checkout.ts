@@ -179,7 +179,7 @@ export async function finishProjectAddWithDefaultCheckout({
   closeModal: () => void
   setHideDefaultBranchWorkspace: (value: boolean) => void
 }): Promise<void> {
-  await markOnboardingProjectAdded('addedRepo')
+  await markOnboardingProjectAdded('addedRepo', useAppStore.getState().settings)
   closeModal()
   await openProjectDefaultCheckout({
     repoId,

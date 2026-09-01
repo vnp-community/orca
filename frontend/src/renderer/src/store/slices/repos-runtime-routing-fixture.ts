@@ -6,10 +6,50 @@ import {
   type RuntimeEnvironmentCallRequest
 } from '../../runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
+import { resetDefaultProjectCacheForTests } from './repos'
 
 // Shared harness for the repo-slice runtime-routing suite: sample repos, IPC/runtime
 // mocks, and the window stub reset between tests. Extracted to keep the test file itself
 // under the max-lines limit.
+
+// Phase 4b: repo.add/repo.list/repo.reorder on the runtime path all resolve
+// an implicit default OrcaProject first (getOrCreateDefaultProject). Tests
+// that exercise those methods must branch runtimeEnvironmentCall on
+// `method` and answer 'project.list' with this fixed project so the
+// resolution is deterministic without also mocking project.create.
+export const DEFAULT_PROJECT_ID = 'default-project'
+
+export function defaultProjectListRuntimeResult(): {
+  id: string
+  ok: true
+  result: {
+    id: string
+    name: string
+    defaultBranch: string
+    devServerId: string
+    visibility: string
+    createdAt: number
+    updatedAt: number
+  }[]
+  _meta: { runtimeId: string }
+} {
+  return {
+    id: 'rpc-project-list',
+    ok: true,
+    result: [
+      {
+        id: DEFAULT_PROJECT_ID,
+        name: 'My Repos',
+        defaultBranch: 'main',
+        devServerId: '',
+        visibility: 'private',
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ],
+    _meta: { runtimeId: 'runtime-remote' }
+  }
+}
 
 export const localRepo: Repo = {
   id: 'local-repo',
@@ -59,6 +99,7 @@ export const orcaProfileFindProjectProfiles: Mock = vi.fn()
 export function installReposRuntimeRoutingHarness(): void {
   beforeEach(() => {
     clearRuntimeCompatibilityCacheForTests()
+    resetDefaultProjectCacheForTests()
     vi.mocked(toast.error).mockReset()
     vi.mocked(toast.info).mockReset()
     vi.mocked(toast.success).mockReset()

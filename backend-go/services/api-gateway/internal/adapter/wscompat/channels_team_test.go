@@ -25,6 +25,13 @@ type fakeTenantServiceClient struct {
 	addTeamMemberFunc    func(ctx context.Context, in *tenantv1.AddTeamMemberRequest) (*tenantv1.AddTeamMemberResponse, error)
 	removeTeamMemberFunc func(ctx context.Context, in *tenantv1.RemoveTeamMemberRequest) (*emptypb.Empty, error)
 	listTeamMembersFunc  func(ctx context.Context, in *tenantv1.ListTeamMembersRequest) (*tenantv1.ListTeamMembersResponse, error)
+	getUserProfileFunc   func(ctx context.Context, in *tenantv1.GetUserProfileRequest) (*tenantv1.GetUserProfileResponse, error)
+}
+
+// GetUserProfile — CR-DS-007/CR-DS-008's devServer.listForUser/
+// devServer.requestAccess channels (channels_dev_server_access_control.go).
+func (f *fakeTenantServiceClient) GetUserProfile(ctx context.Context, in *tenantv1.GetUserProfileRequest, _ ...grpc.CallOption) (*tenantv1.GetUserProfileResponse, error) {
+	return f.getUserProfileFunc(ctx, in)
 }
 
 func (f *fakeTenantServiceClient) CreateTeam(ctx context.Context, in *tenantv1.CreateTeamRequest, _ ...grpc.CallOption) (*tenantv1.CreateTeamResponse, error) {

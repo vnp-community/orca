@@ -6,12 +6,16 @@
 #   (1) build binary locally  →  (2) sync to server  →  (3) mount into container
 #
 # Unlike deploy/old/scripts/sync-to-server-artifact.sh, there is NO
-# `docker compose build` step here at all — every image
+# `docker compose build` step here at all — every image except one
 # (gcr.io/distroless/static-debian12, nginx:1.27-alpine, postgres:16-alpine,
 # hashicorp/vault, nats, migrate/migrate) is public and unmodified; the
 # server only needs `docker compose pull` (cached after the first run) and
 # the rsynced binaries/static assets bind-mounted in. This is what makes
-# redeploys fast: no server-side compile, no server-side image build.
+# redeploys fast: no server-side compile, no server-side image build. The
+# one exception is git-gateway-service's own small runtime image (needs a
+# real `git` binary — see docker-compose.yml's comment on that service) —
+# built locally by build-local.sh, never on a registry, so it's transferred
+# via `docker save | ssh docker load` (step 3 below) instead of a pull.
 #
 # Usage:
 #   ./deploy/dev/scripts/sync-to-server.sh <version>
@@ -59,7 +63,7 @@ echo "[pre] Testing SSH connection..."
 ssh_cmd "echo '✅ Connected to \$(hostname)'"
 echo ""
 
-echo "[1/5] Building backend-go binaries + frontend LOCALLY..."
+echo "[1/6] Building backend-go binaries + frontend LOCALLY..."
 ORCA_GO_VERSION="${ORCA_GO_VERSION}" bash "${SCRIPT_DIR}/build-local.sh"
 echo ""
 
@@ -72,7 +76,7 @@ if [ ! -d "${DEPLOY_DIR}/dist" ]; then
     exit 1
 fi
 
-echo "[2/5] Syncing binaries + migrations + frontend + deploy config to server..."
+echo "[2/6] Syncing binaries + migrations + frontend + deploy config to server..."
 ssh_cmd "mkdir -p ${SERVER_DEPLOY}"
 
 # Binaries + per-service migrations (small — SQL files + a handful of ~10MB
@@ -105,17 +109,43 @@ fi
 echo "✅ Synced"
 echo ""
 
-echo "[3/5] Pulling public images on server (cached after first run)..."
-ssh_cmd "cd ${SERVER_DEPLOY} && docker compose pull postgres vault nats frontend"
+# git-gateway-service's own runtime image (built by build-local.sh, needs a
+# real `git` binary — see docker-compose.yml's comment) isn't on any
+# registry, so `docker compose pull` can never fetch it — transfer it the
+# same no-registry way this whole deploy flow already avoids one:
+# docker save | ssh docker load, straight over the same SSH connection
+# everything else here uses.
+echo "[3/6] Transferring git-gateway-service's runtime image to server..."
+docker save "orca-git-gateway-runtime:${ORCA_GO_VERSION}" | \
+    ssh ${SSH_OPTS} "${SERVER_USER}@${SERVER_HOST}" "docker load"
+echo "✅ Transferred"
 echo ""
 
-echo "[4/5] Running migrations (profile: migrate) for every DB-owning service..."
+echo "[4/6] Pulling public images on server (cached after first run)..."
+# Best-effort: every image here is a pinned tag (postgres:16-alpine,
+# hashicorp/vault:1.17, nats:2.10-alpine, nginx:1.27-alpine via the
+# frontend service) that's already cached on the server after the first
+# successful deploy — a transient registry hiccup (live-verified twice,
+# 2026-08-29: "TLS handshake timeout" against registry-1.docker.io)
+# shouldn't abort an otherwise-ready deploy. `|| true` degrades to the
+# already-cached local image; a genuinely NEW pinned tag (edited in this
+# compose file) would still need a real pull to succeed at least once.
+ssh_cmd "cd ${SERVER_DEPLOY} && docker compose pull postgres vault nats frontend" || \
+    echo "⚠️  Image pull failed (registry hiccup?) — continuing with whatever's already cached on the server."
+echo ""
+
+echo "[5/6] Running migrations (profile: migrate) for every DB-owning service..."
 ssh_cmd "cd ${SERVER_DEPLOY} && docker compose up -d postgres vault nats && sleep 5"
 bash "${SCRIPT_DIR}/migrate.sh" --remote
 echo ""
 
-echo "[5/5] Starting/recreating the full stack..."
-ssh_cmd "cd ${SERVER_DEPLOY} && docker compose up -d --force-recreate --remove-orphans"
+echo "[6/6] Starting/recreating the full stack..."
+# ORCA_GO_VERSION is passed inline, not via the server's .env (which this
+# script deliberately never overwrites once it exists — see step 2 above):
+# docker-compose.yml's git-gateway-service image tag
+# (orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}) must resolve to the
+# exact tag step 3 just `docker load`-ed on this same run.
+ssh_cmd "cd ${SERVER_DEPLOY} && ORCA_GO_VERSION=${ORCA_GO_VERSION} docker compose up -d --force-recreate --remove-orphans"
 echo ""
 
 echo "Health check (waiting 15s for startup)..."

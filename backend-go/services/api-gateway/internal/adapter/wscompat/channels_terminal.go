@@ -137,6 +137,14 @@ func registerTerminalChannels(r *Registry, client infrafleetv1.InfraFleetService
 	// does not replace, terminal.create's terminal.output/terminal.exited
 	// JSON push channels above.
 	registerTerminalMultiplexChannel(r, client)
+	// terminal.subscribe/unsubscribe/updateViewport
+	// (channels_terminal_subscribe.go): the plain-JSON I/O fallback a
+	// WebSessionClient-backed web session actually uses, since it cannot
+	// carry the binary multiplex protocol at all — see that file's package
+	// doc comment.
+	registerTerminalSubscribeChannel(r, client)
+	registerTerminalUnsubscribeChannel(r)
+	registerTerminalUpdateViewportChannel(r, client)
 }
 
 // terminalSessionView is the wire shape terminal.create/terminal.list
@@ -157,6 +165,36 @@ func toTerminalSessionView(s *infrafleetv1.TerminalSession) terminalSessionView 
 		Cwd:          s.GetCwd(),
 		CreatedAt:    s.GetCreatedAtUnixMs(),
 		LastActiveAt: s.GetLastActiveAtUnixMs(),
+	}
+}
+
+// terminalCreateResultView is terminal.create's own ack shape — distinct
+// from terminal.list's bare []terminalSessionView. The frontend's remote
+// runtime terminal transport (remote-runtime-pty-transport.ts,
+// launch-agent-background-session.ts — both written against the legacy
+// TypeScript backend's runtime RPC contract, RuntimeTerminalCreate) reads
+// `created.terminal.handle` as its opaque terminal identifier; backend-go
+// has no separate "handle" concept from ptyId, so Handle just echoes
+// PtyID. Found live 2026-08-30: without this wrapper, `created.terminal`
+// was undefined and every terminal pane crashed the instant terminal.create
+// resolved ("Cannot read properties of undefined (reading 'handle')"),
+// right after the SpawnTerminalSession/resolveTerminalSession fixes made
+// the RPC itself finally succeed end-to-end.
+type terminalCreateResultView struct {
+	Terminal terminalCreateHandleView `json:"terminal"`
+}
+
+type terminalCreateHandleView struct {
+	terminalSessionView
+	Handle string `json:"handle"`
+}
+
+func toTerminalCreateResultView(s *infrafleetv1.TerminalSession) terminalCreateResultView {
+	return terminalCreateResultView{
+		Terminal: terminalCreateHandleView{
+			terminalSessionView: toTerminalSessionView(s),
+			Handle:              s.GetPtyId(),
+		},
 	}
 }
 
@@ -230,7 +268,7 @@ func registerTerminalCreateChannel(r *Registry, client infrafleetv1.InfraFleetSe
 		events := make(chan PushEvent)
 		go drainAttachPtyOutput(streamCtx, session.GetPtyId(), entry, streams, events)
 
-		return toTerminalSessionView(session), events, nil
+		return toTerminalCreateResultView(session), events, nil
 	})
 }
 
@@ -275,9 +313,19 @@ func drainAttachPtyOutput(streamCtx context.Context, ptyID string, entry *termin
 
 // ── terminal.send ───────────────────────────────────────────────────────
 
+// terminalSendArgs's field names are "terminal"/"text", not "ptyId"/"data" —
+// the real, unmodified frontend (remote-runtime-pty-transport.ts's plain-RPC
+// fallback, used whenever no multiplexed/JSON-subscribed stream is current)
+// sends `{terminal: <ptyId>, text: <input>, client, viewport, claimViewport}`
+// verbatim; PtyID/Data just name the Go-side concept, matching the payload's
+// real KEYS was the part earlier passes here got backwards (see
+// channels_terminal_multiplex.go's Subscribe payload doc comment for the
+// identical class of bug). Found live 2026-08-30: every terminal.send call
+// silently no-op'd ("no live AttachPty stream for pty \"\"") because in.PtyID
+// always decoded empty.
 type terminalSendArgs struct {
-	PtyID string `json:"ptyId"`
-	Data  string `json:"data"`
+	PtyID string `json:"terminal"`
+	Data  string `json:"text"`
 }
 
 func registerTerminalSendChannel(r *Registry) {
@@ -311,7 +359,7 @@ func registerTerminalSendChannel(r *Registry) {
 // ALTERNATIVE to the unary RPC", i.e. the unary path is the primary one.
 
 type terminalResizeArgs struct {
-	PtyID string `json:"ptyId"`
+	PtyID string `json:"terminal"`
 	Cols  int32  `json:"cols"`
 	Rows  int32  `json:"rows"`
 }
@@ -330,8 +378,14 @@ func registerTerminalResizeChannel(r *Registry, client infrafleetv1.InfraFleetSe
 
 // ── terminal.close ──────────────────────────────────────────────────────
 
+// terminalPtyIDArg's field is "terminal", not "ptyId" — see terminalSendArgs's
+// doc comment; shared by close/focus/agentStatus/isRunningAgent/
+// inspectProcess, all confirmed to send this key by the real frontend
+// (terminal.stop is the one exception — its real call site sends
+// {worktree: ...} instead, a deeper worktree-resolution gap this rename
+// does not address, tracked separately).
 type terminalPtyIDArg struct {
-	PtyID string `json:"ptyId"`
+	PtyID string `json:"terminal"`
 }
 
 func registerTerminalCloseChannel(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
@@ -392,7 +446,7 @@ func registerTerminalListChannel(r *Registry, client infrafleetv1.InfraFleetServ
 // ── terminal.wait ───────────────────────────────────────────────────────
 
 type terminalWaitArgs struct {
-	PtyID     string `json:"ptyId"`
+	PtyID     string `json:"terminal"`
 	TimeoutMs int32  `json:"timeoutMs"`
 }
 

@@ -47,6 +47,10 @@ type AutomationRunRepository interface {
 	// UpdateStatus persists a run's status transition (and whichever of
 	// StartedAt/CompletedAt/OutputJSON/ErrorMessage changed).
 	UpdateStatus(ctx context.Context, run domain.AutomationRun) error
+	// ListByAutomation lists runs for a tenant, optionally filtered to one
+	// automation. An empty automationID lists every run for the tenant (the
+	// Automation page's initial load has no automation selected yet); an
+	// empty pageToken means "first page" — both are valid, not error inputs.
 	ListByAutomation(ctx context.Context, tenantID, automationID, pageToken string, pageSize int32) ([]domain.AutomationRun, string, error)
 }
 

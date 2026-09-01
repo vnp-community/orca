@@ -178,13 +178,13 @@ func run() error {
 	writeIssueCommandUC := usecase.NewWriteIssueCommand(resolver, local, relay)
 	scanSetupScriptImportsUC := usecase.NewScanSetupScriptImports(resolver, local, relay)
 
-	createWorktreeUC := usecase.NewCreateWorktree(resolver, projectClient, local, relay)
+	createWorktreeUC := usecase.NewCreateWorktree(devServerReachability, projectClient, local, relay)
 	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, local, relay)
 	forceDeleteBranchUC := usecase.NewForceDeleteBranch(resolver, local, relay)
-	detectWorktreesUC := usecase.NewDetectWorktrees(resolver, projectClient, local, relay)
-	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(resolver, projectClient, local, relay)
-	resolvePrBaseUC := usecase.NewResolvePrBase(scmClient, resolver, projectClient, local, relay)
-	resolveMrBaseUC := usecase.NewResolveMrBase(scmClient, resolver, projectClient, local, relay)
+	detectWorktreesUC := usecase.NewDetectWorktrees(devServerReachability, projectClient, local, relay)
+	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(devServerReachability, projectClient, local, relay)
+	resolvePrBaseUC := usecase.NewResolvePrBase(scmClient, devServerReachability, projectClient, local, relay)
+	resolveMrBaseUC := usecase.NewResolveMrBase(scmClient, devServerReachability, projectClient, local, relay)
 
 	// Group A — branch/ref operations (TASK-207). Checkout/ListLocalBranches/
 	// FastForward/ConflictOperation's shapes were redesigned against the real

@@ -66,6 +66,20 @@ func registerAutomationTaskChannels(r *Registry, automationClient automationv1.A
 	registerTaskCRUDChannels(r, taskClient)
 }
 
+// automationRunsListView/automationsListView are plain (non-proto.Message)
+// mirrors of ListRunsResponse/ListAutomationsResponse — see the automation.
+// runs/automation.list handlers below for why returning the proto response
+// directly would silently reach the caller as JSON `null` for an empty list.
+type automationRunsListView struct {
+	Runs          []*automationv1.AutomationRun `json:"runs"`
+	NextPageToken string                        `json:"nextPageToken"`
+}
+
+type automationsListView struct {
+	Automations   []*automationv1.Automation `json:"automations"`
+	NextPageToken string                     `json:"nextPageToken"`
+}
+
 // ── automation.create / automation.runs (TASK-217) and
 // automation.list/update/delete (TASK-219) ──────────────────────────────
 
@@ -113,7 +127,14 @@ func registerAutomationCRUDChannels(r *Registry, client automationv1.AutomationS
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		// Why: returning resp directly would skip Dispatch's normalizeNilSlices
+		// guard (specs/backend-go/bugs/missing-v2/BUG-005) — resp implements
+		// proto.Message, which that normalizer deliberately never reaches
+		// into, so a zero-runs response's `Runs` field would stay the nil
+		// slice proto3's generated getter returns, serializing as JSON `null`
+		// instead of `[]` (live-reproduced on the Automation page's initial,
+		// no-automation-selected "all runs" load).
+		return automationRunsListView{Runs: resp.GetRuns(), NextPageToken: resp.GetNextPageToken()}, nil
 	})
 
 	r.Register("automation.list", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -131,7 +152,9 @@ func registerAutomationCRUDChannels(r *Registry, client automationv1.AutomationS
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		// Why: same BUG-005 gap as automation.runs above — resp implements
+		// proto.Message, so Dispatch's normalizeNilSlices skips it entirely.
+		return automationsListView{Automations: resp.GetAutomations(), NextPageToken: resp.GetNextPageToken()}, nil
 	})
 
 	r.Register("automation.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {

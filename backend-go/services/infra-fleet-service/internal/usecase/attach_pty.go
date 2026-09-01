@@ -59,14 +59,15 @@ const outboundQueueSize = 64
 // back out. See Execute's doc comment for the two-channel contract
 // adapter/grpc's handler pumps against the real stream.
 type AttachPty struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
-	limiter  *ConnectionStreamLimiter
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	agent      DevServerAgentClient
+	limiter    *ConnectionStreamLimiter
 }
 
-func NewAttachPty(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient, limiter *ConnectionStreamLimiter) *AttachPty {
-	return &AttachPty{sessions: sessions, resolver: resolver, agent: agent, limiter: limiter}
+func NewAttachPty(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient, limiter *ConnectionStreamLimiter) *AttachPty {
+	return &AttachPty{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent, limiter: limiter}
 }
 
 // Execute starts a goroutine driving the stream and returns immediately with
@@ -101,7 +102,7 @@ func (uc *AttachPty) run(ctx context.Context, inbound <-chan PtyClientMessage, o
 	}
 	ptyID := first.PtyID
 
-	session, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver)
+	session, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		errCh <- err
 		return

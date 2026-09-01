@@ -31,6 +31,22 @@ service ProjectService {
   rpc ReorderRepos(ReorderReposRequest) returns (ReorderReposResponse);
   rpc RemoveRepo(RemoveRepoRequest) returns (RemoveRepoResponse);
   rpc UpdateRepo(UpdateRepoRequest) returns (UpdateRepoResponse);
+  // GetRepo answers git-gateway-service's "does this repo exist, and which
+  // dev server does it live on" — ListRepos(project_id) was the only repo
+  // lookup RPC before this, unusable when a caller only has a repo_id (see
+  // git-gateway-service's project_client.go GetRepo doc comment for the
+  // confirmed gap this closes).
+  rpc GetRepo(GetRepoRequest) returns (GetRepoResponse);
+
+  // repo_members — a functional-role tier (developer/lead/admin) layered on
+  // top of project membership (AddMember/ListMembers/... above): decides
+  // what a project member can do on ONE specific repo, not the project as a
+  // whole. See policy/orca-authz/repo.rego and project-service's
+  // requireRepoAccess.
+  rpc AddRepoMember(AddRepoMemberRequest) returns (AddRepoMemberResponse);
+  rpc ListRepoMembers(ListRepoMembersRequest) returns (ListRepoMembersResponse);
+  rpc RemoveRepoMember(RemoveRepoMemberRequest) returns (RemoveRepoMemberResponse);
+  rpc UpdateRepoMemberRole(UpdateRepoMemberRoleRequest) returns (UpdateRepoMemberRoleResponse);
 
   // Worktree surface — metadata only, never authoritative for on-disk
   // existence (git-gateway-service reconciles on demand, per
@@ -247,6 +263,68 @@ message UpdateRepoResponse {
   Repo repo = 1;
 }
 
+message GetRepoRequest {
+  string repo_id = 1;
+}
+
+message GetRepoResponse {
+  Repo repo = 1;
+  // dev_server_id is the repo's OWNING PROJECT's dev-server binding, not a
+  // field on Repo itself (project.repos has no such column — see
+  // domain.Repo's doc comment) — resolved server-side by joining through
+  // Repo.project_id so callers like git-gateway-service don't need a
+  // second RPC to look up the project.
+  string dev_server_id = 2;
+}
+
+enum RepoRole {
+  REPO_ROLE_UNSPECIFIED = 0;
+  REPO_ROLE_DEVELOPER = 1;
+  REPO_ROLE_LEAD = 2;
+  REPO_ROLE_ADMIN = 3;
+}
+
+message RepoMember {
+  string repo_id = 1;
+  string user_id = 2;
+  RepoRole role = 3;
+}
+
+message AddRepoMemberRequest {
+  string repo_id = 1;
+  string user_id = 2;
+  RepoRole role = 3;
+}
+
+message AddRepoMemberResponse {
+  RepoMember member = 1;
+}
+
+message ListRepoMembersRequest {
+  string repo_id = 1;
+}
+
+message ListRepoMembersResponse {
+  repeated RepoMember members = 1;
+}
+
+message RemoveRepoMemberRequest {
+  string repo_id = 1;
+  string user_id = 2;
+}
+
+message RemoveRepoMemberResponse {}
+
+message UpdateRepoMemberRoleRequest {
+  string repo_id = 1;
+  string user_id = 2;
+  RepoRole role = 3;
+}
+
+message UpdateRepoMemberRoleResponse {
+  RepoMember member = 1;
+}
+
 message Worktree {
   string id = 1;
   string project_id = 2;
@@ -402,12 +480,14 @@ message FolderWorkspace {
   string name = 4;            // display name (defaults to basename(path) if unset on create)
   string added_by = 5;        // logical FK -> tenant-service.users
   google.protobuf.Timestamp created_at = 6;
+  string project_group_id = 7; // empty = no group, logical FK -> project.project_groups
 }
 
 message CreateFolderWorkspaceRequest {
   string dev_server_id = 1;
   string path = 2;
   string name = 3;
+  string project_group_id = 4; // empty = no group
 }
 
 message CreateFolderWorkspaceResponse {

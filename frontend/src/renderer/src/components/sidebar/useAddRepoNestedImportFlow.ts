@@ -44,6 +44,7 @@ export function useAddRepoNestedImportFlow({
     connectionId?: string
     scanId?: string
     mode: 'group' | 'separate'
+    selectedCandidates?: NestedRepoScanResult['repos']
   }) => Promise<ProjectGroupImportResult | null>
   getNestedRepoRuntimeKind: (connectionId: string | null) => NestedRepoTelemetryRuntimeKind
   onGitRepoReady: (repoId: string, source: AddRepoExistingWorkspaceSource) => Promise<void>
@@ -125,6 +126,11 @@ export function useAddRepoNestedImportFlow({
           // Why: Set insertion order can drift after deselect/reselect; import
           // ordering should match the visible scan order users reviewed.
           projectPaths: selectedProjectPaths,
+          // Why: the remote path needs each candidate's suggestedName/
+          // isGitRepo (project.proto's NestedRepoCandidate), not just its
+          // path — nestedScan.repos is the already-known rich candidate
+          // data from the scan that produced this review step.
+          selectedCandidates: nestedScan.repos,
           ...(nestedConnectionId ? { connectionId: nestedConnectionId } : {}),
           ...(nestedImportScanId ? { scanId: nestedImportScanId } : {}),
           mode

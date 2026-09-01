@@ -13793,6 +13793,89 @@ describe('connectPanePty', () => {
     }
   })
 
+  it('forwards the repo connectionId into the remote-runtime transport options for a Dev Server-owned repo in the web client', async () => {
+    // Regression: getConnectionId(worktreeId) correctly resolved the repo's
+    // devServerId, but createRemoteRuntimePtyTransport's own terminal.create
+    // call never read opts.connectionId at all — every web dev-server
+    // terminal reached backend-go with an empty connectionId, which
+    // SpawnTerminalSession treats as "spawn a host-local PTY" and rejects
+    // (INFRA_TERMINAL_HOST_LOCAL_UNIMPLEMENTED — found live 2026-08-30, first
+    // via the onboarding CLI-install terminal, then confirmed here to affect
+    // every real Dev Server-bound project terminal too).
+    const originalOrcaPlatform = (globalThis.window as unknown as { __orca_platform?: string })
+      .__orca_platform
+    ;(globalThis.window as unknown as { __orca_platform?: string }).__orca_platform = 'web'
+    try {
+      const { connectPanePty } = await import('./pty-connection')
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const transport = createMockTransport('remote:session-auth@@terminal-1')
+      transportFactoryQueue.push(transport)
+
+      mockStoreState = {
+        ...mockStoreState,
+        tabsByWorktree: {
+          'wt-1': [{ id: 'tab-1', ptyId: null }]
+        },
+        repos: [{ id: 'repo1', connectionId: 'dev-01', displayName: 'orca' }],
+        devServers: [makeDevServerFixture('dev-01')]
+      } as StoreState
+
+      const pane = createPane(2)
+      const manager = createManager(2)
+      const deps = createDeps()
+
+      connectPanePty(pane as never, manager as never, deps as never)
+
+      expect(createRemoteRuntimePtyTransport).toHaveBeenCalledWith(
+        'session-auth',
+        expect.objectContaining({ connectionId: 'dev-01' })
+      )
+    } finally {
+      ;(globalThis.window as unknown as { __orca_platform?: string }).__orca_platform =
+        originalOrcaPlatform
+    }
+  })
+
+  it('resolves connectionId from the tab itself for a repo-less ephemeral terminal in the web client', async () => {
+    // Regression: OnboardingInlineCommandTerminal's worktreeId (CLI install,
+    // agent-skill setup) has no backing repo record, so getConnectionId
+    // always returned null/undefined for it — the tab's own explicit
+    // connectionId (threaded from createTab's caller) is the only source of
+    // truth for these ephemeral, no-repo terminals. Found live 2026-08-30.
+    const originalOrcaPlatform = (globalThis.window as unknown as { __orca_platform?: string })
+      .__orca_platform
+    ;(globalThis.window as unknown as { __orca_platform?: string }).__orca_platform = 'web'
+    try {
+      const { connectPanePty } = await import('./pty-connection')
+      const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+      const transport = createMockTransport('remote:session-auth@@terminal-1')
+      transportFactoryQueue.push(transport)
+
+      mockStoreState = {
+        ...mockStoreState,
+        tabsByWorktree: {
+          'wt-1': [{ id: 'tab-1', ptyId: null, connectionId: 'dev-01' }]
+        },
+        repos: [],
+        devServers: [makeDevServerFixture('dev-01')]
+      } as unknown as StoreState
+
+      const pane = createPane(2)
+      const manager = createManager(2)
+      const deps = createDeps()
+
+      connectPanePty(pane as never, manager as never, deps as never)
+
+      expect(createRemoteRuntimePtyTransport).toHaveBeenCalledWith(
+        'session-auth',
+        expect.objectContaining({ connectionId: 'dev-01' })
+      )
+    } finally {
+      ;(globalThis.window as unknown as { __orca_platform?: string }).__orca_platform =
+        originalOrcaPlatform
+    }
+  })
+
   it('keeps the local IPC transport for a Dev Server-owned repo on desktop', async () => {
     // Desktop already has a real DevServerPtyProvider registered against this
     // connectionId in the main process's local IPC path — must not divert to

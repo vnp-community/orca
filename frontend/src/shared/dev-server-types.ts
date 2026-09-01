@@ -4,8 +4,12 @@
 
 export type DevServerConnectionType =
   | 'relay-ssh' // Orca SSH → deploy relay → stdin/stdout
-  | 'relay-websocket' // Dev server connects WS → Orca (reverse)
-  | 'direct-websocket' // Orca connects WS → dev server relay
+  // Direction fix: these two were previously commented the other way
+  // around — see agent/src/relay/agent-connection-relay.ts/
+  // agent-connection-direct.ts's own header comments, which this now
+  // matches, plus DevServerStep.tsx's DEV_SERVER_CONNECTION_TYPE_LABELS.
+  | 'relay-websocket' // Orca connects WS → dev server (dev server only listens)
+  | 'direct-websocket' // Dev server connects WS → Orca (reverse)
 
 export type DevServerStatus = 'connected' | 'disconnected' | 'connecting' | 'error'
 
@@ -29,6 +33,11 @@ export type DevServer = {
   /** Capabilities the agent advertised at handshake (e.g. 'pty', 'pty.stream',
    *  'fs.watch'). Null until a successful handshake has completed at least once. */
   capabilities: readonly string[] | null
+  // CR-DS-006: admin-approval + grouping. Optional since older cached/local
+  // DevServer objects (pre-migration) won't carry these — callers should
+  // treat a missing approvalStatus as 'pending_approval' (fail closed).
+  approvalStatus?: DevServerApprovalStatus
+  groupId?: string
 }
 
 export type DevServerInput = {
@@ -123,4 +132,39 @@ export type AgentTokenInfo = {
   agentToken: string
   /** Orca WebSocket URL the agent should connect to: "ws://<host>:6768/agent" */
   orcaUrl: string
+}
+
+// ─── Dev Server Access Control (CR-DS-006/007/008) ───────────────────────────
+// docs/crs/v2/dev-server/CR-DS-006-dev-server-approval-and-grouping.md et seq.
+
+export type DevServerApprovalStatus = 'pending_approval' | 'approved' | 'rejected'
+
+export type DevServerGroup = {
+  id: string
+  tenantId: string
+  name: string
+  /** Empty = root of the tree. */
+  parentGroupId: string
+}
+
+export type DevServerGranteeKind = 'department' | 'team'
+
+export type DevServerGroupGrant = {
+  id: string
+  tenantId: string
+  devServerGroupId: string
+  granteeKind: DevServerGranteeKind
+  granteeId: string
+}
+
+export type DevServerAccessRequestStatus = 'pending' | 'approved' | 'rejected'
+
+export type DevServerAccessRequest = {
+  id: string
+  tenantId: string
+  userId: string
+  devServerGroupId: string
+  status: DevServerAccessRequestStatus
+  message: string
+  createdAtUnixMs: number
 }

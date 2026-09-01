@@ -31,6 +31,56 @@ func TestFolderWorkspaceUseCase_CreateThenList(t *testing.T) {
 	}
 }
 
+func TestFolderWorkspaceUseCase_Create_ThreadsProjectGroupID(t *testing.T) {
+	repo := newFakeFolderWorkspaceRepository()
+	uc := NewFolderWorkspaceUseCase(repo)
+	ctx := withTenantAndUser(context.Background(), "t1", "u1")
+
+	created, err := uc.Create(ctx, CreateFolderWorkspaceInput{
+		DevServerID: "d1", Path: "/home/x", ProjectGroupID: "group-1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ProjectGroupID != "group-1" {
+		t.Errorf("expected ProjectGroupID %q, got %q", "group-1", created.ProjectGroupID)
+	}
+}
+
+func TestFolderWorkspaceUseCase_Create_EmptyProjectGroupIDIsValid(t *testing.T) {
+	repo := newFakeFolderWorkspaceRepository()
+	uc := NewFolderWorkspaceUseCase(repo)
+	ctx := withTenantAndUser(context.Background(), "t1", "u1")
+
+	created, err := uc.Create(ctx, CreateFolderWorkspaceInput{DevServerID: "d1", Path: "/home/x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if created.ProjectGroupID != "" {
+		t.Errorf("expected empty ProjectGroupID, got %q", created.ProjectGroupID)
+	}
+}
+
+// TestFolderWorkspaceUseCase_Create_InvalidProjectGroupID covers the
+// project_group_id foreign-key-violation mapping — no app-level pre-check
+// of group existence, so a nonexistent group only surfaces as this error
+// once the repository (a real Postgres FK constraint, or here the fake
+// standing in for it) rejects the write.
+func TestFolderWorkspaceUseCase_Create_InvalidProjectGroupID(t *testing.T) {
+	repo := newFakeFolderWorkspaceRepository()
+	repo.createErr = domain.ErrProjectGroupNotFound
+	uc := NewFolderWorkspaceUseCase(repo)
+	ctx := withTenantAndUser(context.Background(), "t1", "u1")
+
+	_, err := uc.Create(ctx, CreateFolderWorkspaceInput{
+		DevServerID: "d1", Path: "/home/x", ProjectGroupID: "nonexistent",
+	})
+	if !errors.Is(err, domain.ErrProjectGroupNotFound) {
+		t.Errorf("expected ErrProjectGroupNotFound, got %v", err)
+	}
+	assertAppError(t, err, apperrors.KindInvalidArgument, "PROJECT_GROUP_NOT_FOUND")
+}
+
 func TestFolderWorkspaceUseCase_Create_DuplicatePath(t *testing.T) {
 	repo := newFakeFolderWorkspaceRepository()
 	uc := NewFolderWorkspaceUseCase(repo)

@@ -224,7 +224,13 @@ export function AddRepoServerPathStartStep({
                   size="icon"
                   className="h-11 w-11 shrink-0"
                   onClick={() => setBrowsing(true)}
-                  disabled={isAddingServerPath || !runtimeEnvironmentId}
+                  // Why: was missing devServerId (live bug — "Browse" stayed
+                  // disabled for the whole onboarding "Add a project" flow on
+                  // a dev-server-agent-only session, which has neither
+                  // runtimeEnvironmentId nor sshTargetId) — the render branch
+                  // above (browsing && (runtimeEnvironmentId || devServerId))
+                  // already supports it, this button just never let you reach it.
+                  disabled={isAddingServerPath || (!runtimeEnvironmentId && !devServerId)}
                   aria-label={translate(
                     'auto.components.sidebar.AddRepoServerStartStep.ac66a3ed2d',
                     'Browse host filesystem'

@@ -71,6 +71,30 @@ func (f *fakeTenantServiceClient) CreateCompany(_ context.Context, _ *tenantv1.C
 	return f.createCompanyResp, nil
 }
 
+// GetCompany is unused by this file's tests today — a minimal stub keeps
+// fakeTenantServiceClient satisfying tenantv1.TenantServiceClient (this
+// fake predates the embed-the-nil-interface pattern used elsewhere in this
+// package, so every new interface method needs an explicit stub here).
+func (f *fakeTenantServiceClient) GetCompany(_ context.Context, _ *tenantv1.GetCompanyRequest, _ ...grpc.CallOption) (*tenantv1.GetCompanyResponse, error) {
+	return &tenantv1.GetCompanyResponse{}, nil
+}
+
+// GetOnboardingState/SetOnboardingState are unused by this file's tests
+// today — same stub rationale as GetCompany above.
+func (f *fakeTenantServiceClient) GetOnboardingState(_ context.Context, _ *tenantv1.GetOnboardingStateRequest, _ ...grpc.CallOption) (*tenantv1.GetOnboardingStateResponse, error) {
+	return &tenantv1.GetOnboardingStateResponse{}, nil
+}
+
+func (f *fakeTenantServiceClient) SetOnboardingState(_ context.Context, _ *tenantv1.SetOnboardingStateRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
+}
+
+// ListCompanies is unused by this file's tests today — same stub rationale
+// as GetCompany above.
+func (f *fakeTenantServiceClient) ListCompanies(_ context.Context, _ *tenantv1.ListCompaniesRequest, _ ...grpc.CallOption) (*tenantv1.ListCompaniesResponse, error) {
+	return &tenantv1.ListCompaniesResponse{}, nil
+}
+
 func (f *fakeTenantServiceClient) ValidateTenant(_ context.Context, _ *tenantv1.ValidateTenantRequest, _ ...grpc.CallOption) (*tenantv1.ValidateTenantResponse, error) {
 	if f.validateTenantErr != nil {
 		return nil, f.validateTenantErr

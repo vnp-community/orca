@@ -11,11 +11,19 @@ import { translate } from '@/i18n/i18n'
 type FeatureSetupInlineTerminalProps = {
   command: string
   selection: OnboardingFeatureSetupSelection
+  /** Dev server to bind this ephemeral terminal's PTY to. Required on the
+   *  web build: this synthetic worktreeId has no backing repo, so without
+   *  it the tab would try to spawn a host-local PTY, which the web
+   *  deployment cannot do (INFRA_TERMINAL_HOST_LOCAL_UNIMPLEMENTED — found
+   *  live 2026-08-30). Desktop callers may omit it to keep spawning a real
+   *  local shell. See OnboardingInlineCommandTerminal's devServerId doc. */
+  devServerId?: string | null
 }
 
 export function FeatureSetupInlineTerminal({
   command,
-  selection
+  selection,
+  devServerId
 }: FeatureSetupInlineTerminalProps): React.JSX.Element {
   const terminalOpenedTrackedRef = useRef(false)
   const terminalInteractedTrackedRef = useRef(false)
@@ -75,6 +83,7 @@ export function FeatureSetupInlineTerminal({
       onOpened={trackTerminalOpened}
       onInteracted={trackTerminalInteraction}
       onTerminalExit={notifyInstalledAgentSkillsChanged}
+      devServerId={devServerId}
     />
   )
 }

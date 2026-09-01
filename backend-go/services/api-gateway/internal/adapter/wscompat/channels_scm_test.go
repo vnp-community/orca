@@ -194,6 +194,23 @@ func (f *fakeScmIntegrationClient) UpdateIssueCommentBySlug(ctx context.Context,
 
 // ── github.* ──────────────────────────────────────────────────────────────
 
+// TestGitHubCheckOrcaStarredChannel_ReturnsNull verifies the channel
+// resolves to null ("unable to determine") instead of erroring — both
+// frontend call sites (Landing.tsx, GeneralSupportSection.tsx) already
+// treat null as a designed fallback state, not an error.
+func TestGitHubCheckOrcaStarredChannel_ReturnsNull(t *testing.T) {
+	r := NewRegistry()
+	registerSCMChannels(r, &fakeScmIntegrationClient{})
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "github.checkOrcaStarred", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result != nil {
+		t.Errorf("want nil (unable to determine star status), got %v", result)
+	}
+}
+
 func TestGitHubMergePRChannel_Success(t *testing.T) {
 	var gotReq *scmintegrationv1.MergePullRequestRequest
 	fake := &fakeScmIntegrationClient{

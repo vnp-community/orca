@@ -12,7 +12,7 @@ import (
 func TestRemoveRepo_DeletesRepo(t *testing.T) {
 	repo := newFakeRepoRepository()
 	repo.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1"}
-	uc := NewRemoveRepo(repo, ownerMembership("p1", "u1"), &fakeOPAClient{decide: projectRegoDecide})
+	uc := NewRemoveRepo(repo, ownerMembership("p1", "u1"), &fakeOPAClient{repoDecide: repoRegoDecide})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	if err := uc.Execute(ctx, RemoveRepoInput{RepoID: "r1"}); err != nil {
@@ -46,7 +46,7 @@ func TestRemoveRepo_OwnerAllowedMemberDenied(t *testing.T) {
 	repo.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1"}
 	membership := newFakeProjectRepository()
 	membership.members = append(membership.members, domain.ProjectMember{ProjectID: "p1", UserID: "member-1", Role: domain.ProjectRoleMember})
-	uc := NewRemoveRepo(repo, membership, &fakeOPAClient{decide: projectRegoDecide})
+	uc := NewRemoveRepo(repo, membership, &fakeOPAClient{repoDecide: repoRegoDecide})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "member-1")
 	err := uc.Execute(ctx, RemoveRepoInput{RepoID: "r1"})
@@ -59,7 +59,7 @@ func TestRemoveRepo_OwnerAllowedMemberDenied(t *testing.T) {
 func TestRemoveRepo_GlobalAdminAllowedRegardlessOfProjectRole(t *testing.T) {
 	repo := newFakeRepoRepository()
 	repo.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "u1"}
-	opa := &fakeOPAClient{decide: func(callerProjectRole, callerGlobalRole, action string) bool { return true }}
+	opa := &fakeOPAClient{repoDecide: func(callerProjectRole, callerRepoRole, callerGlobalRole, action string) bool { return true }}
 	uc := NewRemoveRepo(repo, newFakeProjectRepository(), opa)
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "admin-1")

@@ -52,6 +52,9 @@ Orca Backend Server (Control Plane)     Dev Server Agent (Data Plane)
 | [CR-DS-003](./CR-DS-003-feature-delegation-matrix.md) | Feature Delegation Matrix | P0 | CR-DS-001, CR-DS-002 |
 | [CR-DS-004](./CR-DS-004-agent-lifecycle-management.md) | Agent Lifecycle & Deployment | P0 | CR-DS-001 |
 | [CR-DS-005](./CR-DS-005-agent-session-context-propagation.md) | Session Context Propagation | P0 | CR-DS-001, CR-DS-002 |
+| [CR-DS-006](./CR-DS-006-dev-server-approval-and-grouping.md) | Dev Server Agent Approval & Grouping | P1 | CR-DS-001/002, CR-AG-004 — ✅ Hoàn tất (backend + frontend) |
+| [CR-DS-007](./CR-DS-007-department-based-access-control.md) | Department-Based Dev Server Access Control | P1 | CR-DS-006 — ✅ Hoàn tất (backend + frontend) |
+| [CR-DS-008](./CR-DS-008-first-login-department-gate-and-access-request.md) | First-Login Department Gate & Access Request Flow | P2 | CR-DS-006, CR-DS-007 — ✅ Hoàn tất (backend + frontend) |
 
 ---
 

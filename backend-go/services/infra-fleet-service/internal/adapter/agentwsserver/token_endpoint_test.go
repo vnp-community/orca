@@ -2,17 +2,21 @@ package agentwsserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
 func newTestIssuer(secret string) (*TokenIssuer, *Registry) {
 	registry := NewRegistry(time.Hour)
-	issuer := NewTokenIssuer(registry, Config{APISecret: secret, OrcaVersion: "test-version", Port: 6768}, nil)
+	issuer := NewTokenIssuer(registry, Config{APISecret: secret, OrcaVersion: "test-version", Port: 6768}, nil, nil)
 	return issuer, registry
 }
 
@@ -180,6 +184,75 @@ func TestTokenEndpoint_CustomDevServerIDAndName(t *testing.T) {
 	token, _ := body["token"].(string)
 	if !strings.HasPrefix(token, "agt-ds-42-") {
 		t.Errorf("token = %q, want prefix agt-ds-42-", token)
+	}
+}
+
+// fakeResolverRepo is a minimal usecase.DevServerRepository for exercising
+// TokenIssuer's Resolver wiring — only Register/FindByHostAndMode matter
+// here, every other method is unreachable from ResolveDirectWebSocketDevServer.
+type fakeResolverRepo struct {
+	registered []domain.DevServer
+}
+
+func (f *fakeResolverRepo) Register(ctx context.Context, ds domain.DevServer) (domain.DevServer, error) {
+	f.registered = append(f.registered, ds)
+	return ds, nil
+}
+func (f *fakeResolverRepo) Get(context.Context, string, string) (domain.DevServer, error) {
+	return domain.DevServer{}, nil
+}
+func (f *fakeResolverRepo) List(context.Context, string) ([]domain.DevServer, error) { return nil, nil }
+func (f *fakeResolverRepo) FindBySshTarget(context.Context, string, string) (domain.DevServer, bool, error) {
+	return domain.DevServer{}, false, nil
+}
+func (f *fakeResolverRepo) FindByHostAndMode(ctx context.Context, tenantID, host string, mode domain.ConnectionMode) (domain.DevServer, bool, error) {
+	return domain.DevServer{}, false, nil // always "not found" — forces Register every call, fine for this test
+}
+func (f *fakeResolverRepo) UpdateApprovalStatus(context.Context, string, string, domain.DevServerStatus) (domain.DevServer, error) {
+	return domain.DevServer{}, nil
+}
+func (f *fakeResolverRepo) AssignGroup(context.Context, string, string, string) (domain.DevServer, error) {
+	return domain.DevServer{}, nil
+}
+
+// TestTokenEndpoint_WithResolver_RegistrySlotKeyIsResolvedUUIDNotRawDevServerID
+// is the regression guard for the live-verified bug this Resolver wiring
+// fixes: 3 real agents connected and handshook successfully while
+// infra.dev_servers stayed empty, because Registry tracked the raw
+// caller-supplied devServerID string, never a row ApproveDevServer/
+// ListDevServers could see. With a Resolver wired, Consume must return the
+// resolved row's real UUID, not "ds-42".
+func TestTokenEndpoint_WithResolver_RegistrySlotKeyIsResolvedUUIDNotRawDevServerID(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	repo := &fakeResolverRepo{}
+	resolver := usecase.NewResolveDirectWebSocketDevServer(repo)
+	issuer := NewTokenIssuer(registry, Config{APISecret: "s3cr3t", OrcaVersion: "test-version", Port: 6768, DefaultTenantID: "tenant-1"}, nil, resolver)
+
+	rec := doRequest(t, issuer, http.MethodPost, `{"devServerId":"ds-42"}`, "s3cr3t")
+	body := decodeJSON(t, rec)
+	token, _ := body["token"].(string)
+
+	if len(repo.registered) != 1 {
+		t.Fatalf("want exactly 1 dev server registered, got %d", len(repo.registered))
+	}
+	registeredID := repo.registered[0].ID
+	if registeredID == "" || registeredID == "ds-42" {
+		t.Fatalf("want a generated UUID, got %q", registeredID)
+	}
+	if repo.registered[0].TenantID != "tenant-1" {
+		t.Errorf("want TenantID from Cfg.DefaultTenantID, got %q", repo.registered[0].TenantID)
+	}
+	if repo.registered[0].Host != "ds-42" {
+		t.Errorf("want Host set to the caller's devServerID, got %q", repo.registered[0].Host)
+	}
+
+	slotKey, ok := registry.Consume(token)
+	if !ok {
+		t.Fatal("want a pending slot for the minted token")
+	}
+	if slotKey != registeredID {
+		t.Errorf("registry slot key = %q, want the resolved row's UUID %q — AttachInboundSession would key devserveragent.Client.sessions by the wrong value", slotKey, registeredID)
 	}
 }
 

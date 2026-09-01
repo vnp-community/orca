@@ -26,6 +26,11 @@ import (
 const (
 	MetadataTenantID = "x-orca-tenant-id"
 	MetadataUserID   = "x-orca-user-id"
+	// MetadataRole carries the caller's global role ("admin"/"user") —
+	// added for CR-DS-006 Phase 2's admin-gated dev-server-approval RPCs.
+	// Only populated end-to-end for the cookie/session auth path today
+	// (authclient.SessionValidator) — see common/tenant.Role's doc comment.
+	MetadataRole = "x-orca-role"
 )
 
 // TenantExtractionInterceptor pulls MetadataTenantID/MetadataUserID out of
@@ -51,6 +56,9 @@ func TenantExtractionInterceptor() grpc.UnaryServerInterceptor {
 			}
 			if v := md.Get(MetadataUserID); len(v) > 0 && v[0] != "" {
 				ctx = tenant.WithUserID(ctx, v[0])
+			}
+			if v := md.Get(MetadataRole); len(v) > 0 && v[0] != "" {
+				ctx = tenant.WithRole(ctx, v[0])
 			}
 		}
 		return handler(ctx, req)

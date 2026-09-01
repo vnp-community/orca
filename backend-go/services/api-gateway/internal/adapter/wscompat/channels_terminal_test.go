@@ -180,7 +180,8 @@ func awaitPushEvent(t *testing.T, events <-chan PushEvent) PushEvent {
 // isolation guarantee production gets from ServeHTTP constructing a fresh
 // registry per accepted connection.
 func newTerminalTestCtx() context.Context {
-	return terminalStreamsContext(context.Background(), newTerminalStreamRegistry())
+	ctx := terminalStreamsContext(context.Background(), newTerminalStreamRegistry())
+	return terminalJSONSubscribeContext(ctx, newTerminalJSONSubscribeRegistry())
 }
 
 func TestTerminalCreateChannel_SpawnsAndOpensAttachPtyStream(t *testing.T) {
@@ -208,9 +209,16 @@ func TestTerminalCreateChannel_SpawnsAndOpensAttachPtyStream(t *testing.T) {
 	if events == nil {
 		t.Fatal("expected a non-nil push events channel")
 	}
-	view, ok := ack.(terminalSessionView)
-	if !ok || view.PtyID != "pty-1" || view.ConnectionID != "conn-1" {
+	view, ok := ack.(terminalCreateResultView)
+	if !ok || view.Terminal.PtyID != "pty-1" || view.Terminal.ConnectionID != "conn-1" {
 		t.Fatalf("unexpected ack: %+v", ack)
+	}
+	// Why: the frontend's remote runtime terminal transport reads
+	// created.terminal.handle as its opaque terminal identifier — a nil/
+	// missing handle here crashes the terminal pane the instant
+	// terminal.create resolves. Found live 2026-08-30.
+	if view.Terminal.Handle != "pty-1" {
+		t.Errorf("expected Terminal.Handle to echo the ptyId %q, got %q", "pty-1", view.Terminal.Handle)
 	}
 
 	if fake.lastStream == nil {
@@ -385,6 +393,34 @@ func TestTerminalSendChannel_RelaysInputOnTheStream(t *testing.T) {
 	input := frame.GetInput()
 	if input == nil || string(input.GetData()) != "ls\n" {
 		t.Errorf("expected an input frame carrying %q, got %+v", "ls\n", frame)
+	}
+}
+
+// TestTerminalSendChannel_RecognizesTheRealFrontendWireKeys is the
+// regression test for the exact live bug: every other test in this file
+// builds its args via argsJSON(t, terminalSendArgs{...}), which is circular
+// — it always round-trips through this same struct's own tags, so it could
+// never catch those tags disagreeing with the real wire format. This test
+// hand-writes the JSON exactly as remote-runtime-pty-transport.ts's plain-RPC
+// fallback actually encodes it — keys "terminal"/"text", not "ptyId"/"data"
+// — the payload that silently no-op'd (found live 2026-08-30) before this fix.
+func TestTerminalSendChannel_RecognizesTheRealFrontendWireKeys(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+	ctx := newTerminalTestCtx()
+	createSession(t, ctx, r, fake, "pty-1")
+	awaitSentFrame(t, fake.lastStream) // drain the attach frame
+
+	rawArgs := []json.RawMessage{[]byte(`{"terminal":"pty-1","text":"echo hi\n","client":{"id":"c1","type":"desktop"}}`)}
+	_, err := r.Dispatch(ctx, Identity{TenantID: "tenant-1"}, "terminal.send", rawArgs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	frame := awaitSentFrame(t, fake.lastStream)
+	input := frame.GetInput()
+	if input == nil || string(input.GetData()) != "echo hi\n" {
+		t.Errorf("expected an input frame carrying %q, got %+v", "echo hi\n", frame)
 	}
 }
 
@@ -758,8 +794,8 @@ func TestTerminalCreateChannel_EndToEndPushInterleavesWithConcurrentSend(t *test
 	if ack.Type != "result" || ack.ID != "create-1" {
 		t.Fatalf("first frame = %+v, want the terminal.create ack", ack)
 	}
-	var session terminalSessionView
-	if err := json.Unmarshal(ack.Result, &session); err != nil || session.PtyID != "pty-1" {
+	var session terminalCreateResultView
+	if err := json.Unmarshal(ack.Result, &session); err != nil || session.Terminal.PtyID != "pty-1" {
 		t.Fatalf("unexpected terminal.create ack result: %s (err=%v)", ack.Result, err)
 	}
 

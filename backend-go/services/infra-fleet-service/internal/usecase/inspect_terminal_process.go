@@ -14,13 +14,14 @@ import (
 // agent-call-degrades-gracefully split as GetTerminalAgentStatus — see that
 // type's doc comment for the rationale.
 type InspectTerminalProcess struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	agent      DevServerAgentClient
 }
 
-func NewInspectTerminalProcess(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient) *InspectTerminalProcess {
-	return &InspectTerminalProcess{sessions: sessions, resolver: resolver, agent: agent}
+func NewInspectTerminalProcess(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient) *InspectTerminalProcess {
+	return &InspectTerminalProcess{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent}
 }
 
 func (uc *InspectTerminalProcess) Execute(ctx context.Context, ptyID string) (InspectProcessResult, error) {
@@ -29,7 +30,7 @@ func (uc *InspectTerminalProcess) Execute(ctx context.Context, ptyID string) (In
 		return InspectProcessResult{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver)
+	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		return InspectProcessResult{}, err
 	}

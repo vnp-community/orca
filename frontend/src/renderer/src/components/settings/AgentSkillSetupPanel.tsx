@@ -24,6 +24,14 @@ type AgentSkillSetupPanelProps = {
   terminalTitle: string
   terminalAriaLabel: string
   terminalWorktreeId: string
+  /** Dev server to bind this panel's ephemeral setup terminal to. Required
+   *  on the web build: terminalWorktreeId is always a synthetic id with no
+   *  backing repo, so without it the tab would try to spawn a host-local
+   *  PTY, which the web deployment cannot do
+   *  (INFRA_TERMINAL_HOST_LOCAL_UNIMPLEMENTED — found live 2026-08-30 on
+   *  the CLI-install terminal, then again 2026-08-31 on Orchestration's).
+   *  Desktop callers may omit it to keep spawning a real local shell. */
+  devServerId?: string | null
   installed: boolean
   loading: boolean
   error: string | null
@@ -59,6 +67,7 @@ export function AgentSkillSetupPanel({
   terminalTitle,
   terminalAriaLabel,
   terminalWorktreeId,
+  devServerId,
   installed,
   loading,
   error,
@@ -340,6 +349,7 @@ export function AgentSkillSetupPanel({
           </div>
           <OnboardingInlineCommandTerminal
             worktreeId={terminalWorktreeId}
+            devServerId={devServerId}
             command={openTerminalCommand}
             title={terminalTitle}
             description={translate(

@@ -10,6 +10,7 @@ type Props = {
   skillLoading: boolean
   skillError: string | null
   disabled?: boolean
+  devServerId?: string | null
   terminalShellOverride?: string
   preInstallNotice?: ReactNode
   getPrerequisiteStatus?: () => Promise<Awaited<ReturnType<typeof window.api.cli.getInstallStatus>>>
@@ -24,6 +25,7 @@ export function BrowserUseSkillStep({
   skillLoading,
   skillError,
   disabled = false,
+  devServerId,
   terminalShellOverride,
   preInstallNotice,
   getPrerequisiteStatus,
@@ -46,6 +48,7 @@ export function BrowserUseSkillStep({
       terminalTitle="Browser Use setup"
       terminalAriaLabel="Browser Use skill install terminal"
       terminalWorktreeId="settings-browser-use-skill-terminal"
+      devServerId={devServerId}
       terminalShellOverride={terminalShellOverride}
       installed={skillDetected}
       loading={skillLoading}

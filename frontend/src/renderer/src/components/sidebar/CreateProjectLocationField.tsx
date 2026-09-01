@@ -9,6 +9,10 @@ import { translate } from '@/i18n/i18n'
 type CreateProjectParentBrowserProps = {
   runtimeEnvironmentId?: string | null
   sshTargetId?: string | null
+  // Why: added alongside runtimeEnvironmentId/sshTargetId — was missing
+  // entirely (live bug: "Create a new project" could never browse to a
+  // parent folder on a dev-server-agent-only session).
+  devServerId?: string | null
   createParent: string
   onParentChange: (value: string) => void
   onClose: () => void
@@ -17,6 +21,7 @@ type CreateProjectParentBrowserProps = {
 export function CreateProjectParentBrowser({
   runtimeEnvironmentId,
   sshTargetId,
+  devServerId,
   createParent,
   onParentChange,
   onClose
@@ -47,9 +52,19 @@ export function CreateProjectParentBrowser({
           }}
           onCancel={onClose}
         />
+      ) : runtimeEnvironmentId ? (
+        <RemoteFileBrowser
+          runtimeEnvironmentId={runtimeEnvironmentId}
+          initialPath={createParent || '~'}
+          onSelect={(path) => {
+            onParentChange(path)
+            onClose()
+          }}
+          onCancel={onClose}
+        />
       ) : (
         <RemoteFileBrowser
-          runtimeEnvironmentId={runtimeEnvironmentId as string}
+          devServerId={devServerId as string}
           initialPath={createParent || '~'}
           onSelect={(path) => {
             onParentChange(path)
@@ -68,6 +83,9 @@ type CreateProjectLocationFieldProps = {
   manualParentEntry: boolean
   runtimeEnvironmentId?: string | null
   sshTargetId?: string | null
+  // Why: added alongside runtimeEnvironmentId/sshTargetId — see
+  // CreateProjectParentBrowserProps's doc comment.
+  devServerId?: string | null
   onParentChange: (value: string) => void
   onPickParent: () => void
   onBrowseServer: () => void
@@ -79,6 +97,7 @@ export function CreateProjectLocationField({
   manualParentEntry,
   runtimeEnvironmentId,
   sshTargetId,
+  devServerId,
   onParentChange,
   onPickParent,
   onBrowseServer
@@ -110,7 +129,7 @@ export function CreateProjectLocationField({
                 size="icon"
                 className="h-11 w-11 shrink-0"
                 onClick={onBrowseServer}
-                disabled={isCreating || (!runtimeEnvironmentId && !sshTargetId)}
+                disabled={isCreating || (!runtimeEnvironmentId && !sshTargetId && !devServerId)}
                 aria-label={translate(
                   'auto.components.sidebar.CreateProjectLocationField.f520f83a97',
                   'Browse host filesystem'

@@ -34,15 +34,22 @@ type SpawnTerminalSessionInput struct {
 // host-local request always fails today, with a distinct error explaining
 // why, rather than silently no-opping. Tracked as a known gap, not
 // implemented by this pass.
+//
+// ConnectionID resolution falls back to treating it as a devServerId
+// directly (via DevServerRepository) when ResolveConnection finds no
+// infra.connections row — see the Execute body's own comment for why: a
+// pre-project ephemeral terminal (CLI install, agent-skill setup) has no
+// connections row to resolve, the same gap RelayByDevServer closes for Relay.
 type SpawnTerminalSession struct {
 	resolver         ConnectionResolver
+	devServers       DevServerRepository
 	agent            DevServerAgentClient
 	sessions         TerminalSessionRepository
 	serverDeployment bool
 }
 
-func NewSpawnTerminalSession(resolver ConnectionResolver, agent DevServerAgentClient, sessions TerminalSessionRepository, serverDeployment bool) *SpawnTerminalSession {
-	return &SpawnTerminalSession{resolver: resolver, agent: agent, sessions: sessions, serverDeployment: serverDeployment}
+func NewSpawnTerminalSession(resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient, sessions TerminalSessionRepository, serverDeployment bool) *SpawnTerminalSession {
+	return &SpawnTerminalSession{resolver: resolver, devServers: devServers, agent: agent, sessions: sessions, serverDeployment: serverDeployment}
 }
 
 func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSessionInput) (domain.TerminalSession, error) {
@@ -63,7 +70,22 @@ func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSes
 		return domain.TerminalSession{}, apperrors.New(apperrors.KindInternal, "INFRA_RESOLVE_FAILED", "failed to resolve connection", err)
 	}
 	if !connected {
-		return domain.TerminalSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "no dev server owns this connectionId", nil)
+		// Fallback: in.ConnectionID may actually be a devServerId, not an
+		// infra.connections row id — pre-project ephemeral terminals (CLI
+		// install, agent-skill setup) have no connections row to resolve
+		// (no repo/worktree bound yet), the exact same chicken-and-egg gap
+		// RelayByDevServer exists to close for Relay. Found live 2026-08-30:
+		// api-gateway's terminal.create channel started passing a devServerId
+		// straight through as connectionId for these terminals once they were
+		// given a dev-server binding at all — try it directly before failing.
+		devServerByID, devErr := uc.devServers.Get(ctx, tenantID, in.ConnectionID)
+		if devErr != nil {
+			return domain.TerminalSession{}, apperrors.New(apperrors.KindNotFound, "INFRA_CONNECTION_NOT_FOUND", "no dev server owns this connectionId", nil)
+		}
+		if !uc.agent.IsConnected(devServerByID.ID) {
+			return domain.TerminalSession{}, apperrors.New(apperrors.KindFailedPrecondition, "INFRA_DEV_SERVER_NOT_CONNECTED", "this dev server has no live agent connection right now", nil)
+		}
+		devServer = devServerByID
 	}
 
 	result, err := uc.agent.SpawnPty(ctx, devServer, SpawnPtyInput{Cwd: in.Cwd, Shell: in.Shell, Cols: in.Cols, Rows: in.Rows})

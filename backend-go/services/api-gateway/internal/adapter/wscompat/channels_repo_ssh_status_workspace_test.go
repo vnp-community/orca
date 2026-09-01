@@ -28,6 +28,11 @@ type fakeRepoProjectClient struct {
 	reorderReposFunc func(ctx context.Context, in *projectv1.ReorderReposRequest) (*projectv1.ReorderReposResponse, error)
 	removeRepoFunc   func(ctx context.Context, in *projectv1.RemoveRepoRequest) (*projectv1.RemoveRepoResponse, error)
 	updateRepoFunc   func(ctx context.Context, in *projectv1.UpdateRepoRequest) (*projectv1.UpdateRepoResponse, error)
+
+	listRepoMembersFunc      func(ctx context.Context, in *projectv1.ListRepoMembersRequest) (*projectv1.ListRepoMembersResponse, error)
+	addRepoMemberFunc        func(ctx context.Context, in *projectv1.AddRepoMemberRequest) (*projectv1.AddRepoMemberResponse, error)
+	removeRepoMemberFunc     func(ctx context.Context, in *projectv1.RemoveRepoMemberRequest) (*projectv1.RemoveRepoMemberResponse, error)
+	updateRepoMemberRoleFunc func(ctx context.Context, in *projectv1.UpdateRepoMemberRoleRequest) (*projectv1.UpdateRepoMemberRoleResponse, error)
 }
 
 func (f *fakeRepoProjectClient) AddRepo(ctx context.Context, in *projectv1.AddRepoRequest, _ ...grpc.CallOption) (*projectv1.AddRepoResponse, error) {
@@ -44,6 +49,18 @@ func (f *fakeRepoProjectClient) RemoveRepo(ctx context.Context, in *projectv1.Re
 }
 func (f *fakeRepoProjectClient) UpdateRepo(ctx context.Context, in *projectv1.UpdateRepoRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoResponse, error) {
 	return f.updateRepoFunc(ctx, in)
+}
+func (f *fakeRepoProjectClient) ListRepoMembers(ctx context.Context, in *projectv1.ListRepoMembersRequest, _ ...grpc.CallOption) (*projectv1.ListRepoMembersResponse, error) {
+	return f.listRepoMembersFunc(ctx, in)
+}
+func (f *fakeRepoProjectClient) AddRepoMember(ctx context.Context, in *projectv1.AddRepoMemberRequest, _ ...grpc.CallOption) (*projectv1.AddRepoMemberResponse, error) {
+	return f.addRepoMemberFunc(ctx, in)
+}
+func (f *fakeRepoProjectClient) RemoveRepoMember(ctx context.Context, in *projectv1.RemoveRepoMemberRequest, _ ...grpc.CallOption) (*projectv1.RemoveRepoMemberResponse, error) {
+	return f.removeRepoMemberFunc(ctx, in)
+}
+func (f *fakeRepoProjectClient) UpdateRepoMemberRole(ctx context.Context, in *projectv1.UpdateRepoMemberRoleRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoMemberRoleResponse, error) {
+	return f.updateRepoMemberRoleFunc(ctx, in)
 }
 
 // fakeRepoGitGatewayClient is a minimal test double for
@@ -158,9 +175,33 @@ func TestRegisterRepoChannels_AddListReorderRmUpdate(t *testing.T) {
 		if gotReq.GetProjectId() != "p1" {
 			t.Errorf("unexpected ListReposRequest: %+v", gotReq)
 		}
-		repos, ok := result.([]*projectv1.Repo)
-		if !ok || len(repos) != 1 {
-			t.Errorf("unexpected result: %+v", result)
+		// Wrapped in {repos: [...]}, not a bare array — see the handler's
+		// doc comment. Both frontend call sites do `(await
+		// callRuntimeResult<{ repos: Repo[] }>('repo.list')).repos`.
+		wrapped, ok := result.(map[string]any)
+		if !ok {
+			t.Fatalf("unexpected result type %T, want map[string]any{\"repos\": ...}", result)
+		}
+		repos, ok := wrapped["repos"].([]repoView)
+		if !ok || len(repos) != 1 || repos[0].ID != "r1" {
+			t.Errorf("unexpected repos: %+v", wrapped["repos"])
+		}
+	})
+
+	t.Run("repo.list returns an empty array, not null, when there are no repos", func(t *testing.T) {
+		fake.listReposFunc = func(ctx context.Context, in *projectv1.ListReposRequest) (*projectv1.ListReposResponse, error) {
+			return &projectv1.ListReposResponse{}, nil
+		}
+		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.list", argsJSON(t, map[string]any{}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		raw, err := json.Marshal(result)
+		if err != nil {
+			t.Fatalf("marshal result: %v", err)
+		}
+		if string(raw) != `{"repos":[]}` {
+			t.Errorf("want {\"repos\":[]}, got %s", raw)
 		}
 	})
 
@@ -210,8 +251,8 @@ func TestRegisterRepoChannels_AddListReorderRmUpdate(t *testing.T) {
 		if gotReq.GetRepoId() != "r1" || gotReq.GetUrl() != "https://new" {
 			t.Errorf("unexpected UpdateRepoRequest: %+v", gotReq)
 		}
-		repo, ok := result.(*projectv1.Repo)
-		if !ok || repo.GetUrl() != "https://new" {
+		repo, ok := result.(repoView)
+		if !ok || repo.URL != "https://new" {
 			t.Errorf("unexpected result: %+v", result)
 		}
 	})
@@ -357,6 +398,7 @@ func TestRegisterRepoChannels_RegistrationCoverage(t *testing.T) {
 
 	want := []string{
 		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update",
+		"repo.getMembers", "repo.addMember", "repo.removeMember", "repo.updateMemberRole",
 		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.create",
 		"repo.hooksCheck", "repo.issueCommandRead", "repo.issueCommandWrite",
 		"repo.setupScriptImports",
@@ -366,6 +408,92 @@ func TestRegisterRepoChannels_RegistrationCoverage(t *testing.T) {
 			t.Errorf("expected channel %q to be registered", channel)
 		}
 	}
+}
+
+// TestRegisterRepoChannels_MemberChannels covers the repo-scoped
+// functional-role tier (developer/lead/admin), layered on top of
+// project.getMembers/addMember/removeMember/updateMemberRole's project-level
+// owner/member tier (channels_tenant_project_test.go).
+func TestRegisterRepoChannels_MemberChannels(t *testing.T) {
+	fake := &fakeRepoProjectClient{}
+	r := NewRegistry()
+	registerRepoChannels(r, fake, &fakeRepoGitGatewayClient{})
+
+	t.Run("repo.getMembers", func(t *testing.T) {
+		var gotReq *projectv1.ListRepoMembersRequest
+		fake.listRepoMembersFunc = func(ctx context.Context, in *projectv1.ListRepoMembersRequest) (*projectv1.ListRepoMembersResponse, error) {
+			gotReq = in
+			return &projectv1.ListRepoMembersResponse{Members: []*projectv1.RepoMember{{UserId: "u1", Role: projectv1.RepoRole_REPO_ROLE_DEVELOPER}}}, nil
+		}
+		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.getMembers",
+			argsJSON(t, map[string]any{"repoId": "r1"}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRepoId() != "r1" {
+			t.Errorf("unexpected ListRepoMembersRequest: %+v", gotReq)
+		}
+		members, ok := result.([]*projectv1.RepoMember)
+		if !ok || len(members) != 1 {
+			t.Errorf("unexpected result: %+v", result)
+		}
+	})
+
+	t.Run("repo.addMember", func(t *testing.T) {
+		var gotReq *projectv1.AddRepoMemberRequest
+		fake.addRepoMemberFunc = func(ctx context.Context, in *projectv1.AddRepoMemberRequest) (*projectv1.AddRepoMemberResponse, error) {
+			gotReq = in
+			return &projectv1.AddRepoMemberResponse{Member: &projectv1.RepoMember{UserId: in.GetUserId(), Role: in.GetRole()}}, nil
+		}
+		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.addMember",
+			argsJSON(t, map[string]any{"repoId": "r1", "userId": "u2", "role": "developer"}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRepoId() != "r1" || gotReq.GetUserId() != "u2" || gotReq.GetRole() != projectv1.RepoRole_REPO_ROLE_DEVELOPER {
+			t.Errorf("unexpected AddRepoMemberRequest: %+v", gotReq)
+		}
+		member, ok := result.(*projectv1.RepoMember)
+		if !ok || member.GetRole() != projectv1.RepoRole_REPO_ROLE_DEVELOPER {
+			t.Errorf("unexpected result: %+v", result)
+		}
+	})
+
+	t.Run("repo.removeMember", func(t *testing.T) {
+		var gotReq *projectv1.RemoveRepoMemberRequest
+		fake.removeRepoMemberFunc = func(ctx context.Context, in *projectv1.RemoveRepoMemberRequest) (*projectv1.RemoveRepoMemberResponse, error) {
+			gotReq = in
+			return &projectv1.RemoveRepoMemberResponse{}, nil
+		}
+		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.removeMember",
+			argsJSON(t, map[string]any{"repoId": "r1", "userId": "u2"}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRepoId() != "r1" || gotReq.GetUserId() != "u2" {
+			t.Errorf("unexpected RemoveRepoMemberRequest: %+v", gotReq)
+		}
+	})
+
+	t.Run("repo.updateMemberRole", func(t *testing.T) {
+		var gotReq *projectv1.UpdateRepoMemberRoleRequest
+		fake.updateRepoMemberRoleFunc = func(ctx context.Context, in *projectv1.UpdateRepoMemberRoleRequest) (*projectv1.UpdateRepoMemberRoleResponse, error) {
+			gotReq = in
+			return &projectv1.UpdateRepoMemberRoleResponse{Member: &projectv1.RepoMember{UserId: in.GetUserId(), Role: in.GetRole()}}, nil
+		}
+		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.updateMemberRole",
+			argsJSON(t, map[string]any{"repoId": "r1", "userId": "u2", "role": "admin"}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRole() != projectv1.RepoRole_REPO_ROLE_ADMIN {
+			t.Errorf("want role mapped to REPO_ROLE_ADMIN, got %v", gotReq.GetRole())
+		}
+		member, ok := result.(*projectv1.RepoMember)
+		if !ok || member.GetRole() != projectv1.RepoRole_REPO_ROLE_ADMIN {
+			t.Errorf("unexpected result: %+v", result)
+		}
+	})
 }
 
 // ── ssh.* ────────────────────────────────────────────────────────────────
@@ -584,6 +712,7 @@ func TestRegisterRepoSshStatusWorkspaceChannels_RegistersEverything(t *testing.T
 
 	want := []string{
 		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update",
+		"repo.getMembers", "repo.addMember", "repo.removeMember", "repo.updateMemberRole",
 		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.create",
 		"repo.hooksCheck", "repo.issueCommandRead", "repo.issueCommandWrite",
 		"repo.setupScriptImports",

@@ -142,6 +142,37 @@ func TestTerminalMultiplexChannel_SubscribeOpensAttachPtyAndForwardsOutput(t *te
 	}
 }
 
+// TestTerminalMultiplexChannel_SubscribeRecognizesTheRealFrontendWireKey is
+// the regression test for the exact live bug: every other test in this file
+// builds its Subscribe payload via json.Marshal(terminalMultiplexSubscribePayload{...}),
+// which is circular — it always round-trips through this same struct's own
+// tag, so it could never catch that struct's tag disagreeing with the real
+// wire format. This test hand-writes the JSON exactly as
+// remote-runtime-terminal-multiplexer.ts's real, unmodified encodeTerminalStreamJson
+// call produces it — key "terminal", not "ptyId" — the payload that was
+// silently dropped (found live 2026-08-30) before this fix.
+func TestTerminalMultiplexChannel_SubscribeRecognizesTheRealFrontendWireKey(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	io, cancel := startMultiplex(t, fake)
+	defer cancel()
+
+	io.deliver(TerminalStreamFrame{
+		Opcode:   TerminalStreamOpcodeSubscribe,
+		StreamID: terminalMultiplexControlStreamID,
+		Payload:  []byte(`{"streamId":7,"terminal":"pty-1","client":{"id":"c1","type":"desktop"}}`),
+	})
+
+	stream := fake.lastStream
+	if stream == nil {
+		t.Fatal("expected AttachPty to have been called — the Subscribe frame must not be silently dropped")
+	}
+	attachFrame := awaitSentFrame(t, stream)
+	attach := attachFrame.GetAttach()
+	if attach == nil || attach.GetPtyId() != "pty-1" {
+		t.Fatalf("expected an Attach frame for pty-1, got %+v", attachFrame)
+	}
+}
+
 func TestTerminalMultiplexChannel_ExitedSendsErrorFrame(t *testing.T) {
 	fake := &fakeTerminalInfraFleetClient{}
 	io, cancel := startMultiplex(t, fake)

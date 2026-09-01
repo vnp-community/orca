@@ -26,6 +26,12 @@ type CompanyRepository interface {
 	// Update applies patch's non-empty fields only. Returns found=false if
 	// no company matches id.
 	Update(ctx context.Context, id string, patch domain.CompanySettingsPatch) (domain.Company, bool, error)
+	// List returns every company row — genuinely cross-tenant (this table
+	// IS the tenant root, see this interface's own doc comment), so callers
+	// MUST admin-gate before exposing it. Added because a created company
+	// was otherwise unreachable after the creating session ended (nothing
+	// else lists tenant.companies) — see wscompat's profile.listCompanies.
+	List(ctx context.Context) ([]domain.Company, error)
 }
 
 // DepartmentRepository persists Department aggregates, always scoped by
@@ -62,6 +68,17 @@ type UserProfileRepository interface {
 	// UpdateCompany's (wider) cache-invalidation scope. Cheap indexed read
 	// against idx_user_profiles_company.
 	ListUserIDsByCompany(ctx context.Context, companyID string) ([]string, error)
+	// GetOnboardingState/SetOnboardingState persist the onboarding wizard's
+	// per-user progress (frontend/src/shared/types.ts's OnboardingState,
+	// stored as an opaque JSON blob — see onboarding_state_json's migration
+	// comment). found=false means "no state ever saved" (row missing OR
+	// column NULL), the same "wizard not started" default the caller
+	// already renders for a brand-new user. A dedicated partial-update
+	// method rather than routing through Upsert: Upsert fully replaces
+	// department_id/settings_json each call, which would silently clobber
+	// them for a caller that only wants to touch onboarding state.
+	GetOnboardingState(ctx context.Context, companyID, userID string) (stateJSON string, found bool, err error)
+	SetOnboardingState(ctx context.Context, companyID, userID, stateJSON string) error
 }
 
 // TeamRepository persists Team aggregates and TeamMember rows, always

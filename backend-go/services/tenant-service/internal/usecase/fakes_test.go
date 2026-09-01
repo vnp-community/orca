@@ -44,6 +44,7 @@ type fakeCompanyRepository struct {
 	getErr    error
 	existsErr error
 	updateErr error
+	listErr   error
 }
 
 func newFakeCompanyRepository() *fakeCompanyRepository {
@@ -64,6 +65,17 @@ func (f *fakeCompanyRepository) Get(ctx context.Context, id string) (domain.Comp
 	}
 	c, ok := f.byID[id]
 	return c, ok, nil
+}
+
+func (f *fakeCompanyRepository) List(ctx context.Context) ([]domain.Company, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	companies := make([]domain.Company, 0, len(f.byID))
+	for _, c := range f.byID {
+		companies = append(companies, c)
+	}
+	return companies, nil
 }
 
 func (f *fakeCompanyRepository) Exists(ctx context.Context, id string) (bool, error) {
@@ -163,17 +175,23 @@ func (f *fakeDepartmentRepository) Update(ctx context.Context, companyID, id str
 }
 
 type fakeUserProfileRepository struct {
-	byUserID           map[string]domain.UserProfile
-	upsertErr          error
-	getErr             error
-	listByDeptErr      error
-	listByCompanyErr   error
-	listByDeptCalls    int
-	listByCompanyCalls int
+	byUserID              map[string]domain.UserProfile
+	onboardingStateByUser map[string]string
+	upsertErr             error
+	getErr                error
+	listByDeptErr         error
+	listByCompanyErr      error
+	listByDeptCalls       int
+	listByCompanyCalls    int
+	getOnboardingStateErr error
+	setOnboardingStateErr error
 }
 
 func newFakeUserProfileRepository() *fakeUserProfileRepository {
-	return &fakeUserProfileRepository{byUserID: map[string]domain.UserProfile{}}
+	return &fakeUserProfileRepository{
+		byUserID:              map[string]domain.UserProfile{},
+		onboardingStateByUser: map[string]string{},
+	}
 }
 
 func (f *fakeUserProfileRepository) Upsert(ctx context.Context, p domain.UserProfile) error {
@@ -221,6 +239,25 @@ func (f *fakeUserProfileRepository) ListUserIDsByCompany(ctx context.Context, co
 		}
 	}
 	return out, nil
+}
+
+func (f *fakeUserProfileRepository) GetOnboardingState(ctx context.Context, companyID, userID string) (string, bool, error) {
+	if f.getOnboardingStateErr != nil {
+		return "", false, f.getOnboardingStateErr
+	}
+	stateJSON, ok := f.onboardingStateByUser[userID]
+	if !ok {
+		return "", false, nil
+	}
+	return stateJSON, true, nil
+}
+
+func (f *fakeUserProfileRepository) SetOnboardingState(ctx context.Context, companyID, userID, stateJSON string) error {
+	if f.setOnboardingStateErr != nil {
+		return f.setOnboardingStateErr
+	}
+	f.onboardingStateByUser[userID] = stateJSON
+	return nil
 }
 
 type teamKey struct{ companyID, id string }

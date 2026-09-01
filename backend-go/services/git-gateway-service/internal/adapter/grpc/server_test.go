@@ -205,8 +205,8 @@ func (fakeExecutor) FetchAndResolveRef(context.Context, string, string) (string,
 	return "resolvedsha", nil
 }
 
-func (fakeExecutor) ListWorktreePaths(context.Context, string) ([]string, error) {
-	return []string{"/repo", "/repo-branch"}, nil
+func (fakeExecutor) ListWorktreePaths(context.Context, string) ([]domain.WorktreeGitInfo, error) {
+	return []domain.WorktreeGitInfo{{Path: "/repo"}, {Path: "/repo-branch"}}, nil
 }
 
 func (fakeExecutor) ForceDeleteBranch(context.Context, string, string) error {
@@ -353,13 +353,13 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewReadIssueCommand(resolver, exec, exec),
 		usecase.NewWriteIssueCommand(resolver, exec, exec),
 		usecase.NewScanSetupScriptImports(resolver, exec, exec),
-		usecase.NewCreateWorktree(resolver, projects, exec, exec),
+		usecase.NewCreateWorktree(reachability, projects, exec, exec),
 		usecase.NewRemoveWorktree(resolver, projects, exec, exec),
 		usecase.NewForceDeleteBranch(resolver, exec, exec),
-		usecase.NewDetectWorktrees(resolver, projects, exec, exec),
-		usecase.NewPrefetchCreateBase(resolver, projects, exec, exec),
-		usecase.NewResolvePrBase(scm, resolver, projects, exec, exec),
-		usecase.NewResolveMrBase(scm, resolver, projects, exec, exec),
+		usecase.NewDetectWorktrees(reachability, projects, exec, exec),
+		usecase.NewPrefetchCreateBase(reachability, projects, exec, exec),
+		usecase.NewResolvePrBase(scm, reachability, projects, exec, exec),
+		usecase.NewResolveMrBase(scm, reachability, projects, exec, exec),
 		usecase.NewCheckout(resolver, exec, exec),
 		usecase.NewListLocalBranches(resolver, exec, exec),
 		usecase.NewFastForward(resolver, exec, exec),

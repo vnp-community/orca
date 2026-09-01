@@ -28,10 +28,21 @@ func NewListProjects(repo ProjectRepository) *ListProjects {
 	return &ListProjects{repo: repo}
 }
 
+// Execute lists only projects the caller is a member of — NOT every
+// project in the tenant. Found live during the "one private default
+// project per user" pass (Phase 4b): the original tenant-only filter
+// meant `project.list` (this RPC's wscompat channel) handed every tenant
+// member the full tenant-wide project catalog, defeating the private-by-
+// default design before it existed — ListMembers/GetMembership already
+// gate per-project access correctly, but nothing gated the LIST itself.
 func (uc *ListProjects) Execute(ctx context.Context, in ListProjectsInput) (ListProjectsOutput, error) {
 	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
 		return ListProjectsOutput{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err)
+	}
+	userID, ok := tenant.UserID(ctx)
+	if !ok {
+		return ListProjectsOutput{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_USER", "no user in request context", nil)
 	}
 
 	if in.PageToken != "" {
@@ -45,7 +56,7 @@ func (uc *ListProjects) Execute(ctx context.Context, in ListProjectsInput) (List
 		pageSize = 50
 	}
 
-	projects, next, err := uc.repo.List(ctx, tenantID, in.PageToken, pageSize)
+	projects, next, err := uc.repo.List(ctx, tenantID, userID, in.PageToken, pageSize)
 	if err != nil {
 		return ListProjectsOutput{}, apperrors.New(apperrors.KindInternal, "PROJECT_LIST_FAILED", "failed to list projects", err)
 	}

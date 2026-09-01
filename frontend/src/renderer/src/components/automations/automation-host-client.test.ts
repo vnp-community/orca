@@ -3,6 +3,7 @@ import type { Automation, AutomationCreateInput } from '../../../../shared/autom
 import {
   createAutomationForTarget,
   getAutomationListTarget,
+  listAutomationRunsForTarget,
   listAutomationsForTarget,
   runAutomationNowForTarget,
   updateAutomationForTarget
@@ -82,6 +83,28 @@ describe('automation host client', () => {
       undefined,
       { timeoutMs: 15_000 }
     )
+  })
+
+  it('returns an empty array when the response omits `automations` (proto3 omitempty, zero automations)', async () => {
+    // Live-reproduced bug: a tenant with zero automations gets a response
+    // with no `automations` key at all, not `{ automations: [] }` — crashed
+    // AutomationsPage's refresh() with "Cannot read properties of undefined
+    // (reading 'some')" before this fallback was added.
+    vi.mocked(callRuntimeRpc).mockResolvedValueOnce({})
+
+    const target = getAutomationListTarget({ activeRuntimeEnvironmentId: 'gpu' })
+    const automations = await listAutomationsForTarget(target)
+
+    expect(automations).toEqual([])
+  })
+
+  it('returns an empty array when the response omits `runs` (proto3 omitempty, zero runs)', async () => {
+    vi.mocked(callRuntimeRpc).mockResolvedValueOnce({})
+
+    const target = getAutomationListTarget({ activeRuntimeEnvironmentId: 'gpu' })
+    const runs = await listAutomationRunsForTarget(target)
+
+    expect(runs).toEqual([])
   })
 
   it('creates and manually runs runtime-host automations through that server', async () => {

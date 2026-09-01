@@ -216,6 +216,17 @@ type WorktreeCreateResult struct {
 	HeadSHA string
 }
 
+// WorktreeGitInfo is one entry from `git worktree list --porcelain` — path
+// plus enough git-level identity (HEAD sha, branch) for DetectWorktrees to
+// build a real reconciled worktree record without a second git invocation
+// per path. Branch is "" for a detached HEAD (the porcelain output's own
+// `detached` line, not a `branch <ref>` one).
+type WorktreeGitInfo struct {
+	Path   string
+	Head   string
+	Branch string
+}
+
 // WorktreeResult is CreateWorktree's usecase-level result: the saga's
 // combined answer once both the git operation and project-service's
 // bookkeeping record have succeeded.
@@ -225,22 +236,26 @@ type WorktreeResult struct {
 	HeadSHA    string
 }
 
-// RepoInfo is project-service's answer to "does this repo exist, and what
-// project/URL does it belong to" — the minimal shape the worktree usecases
-// need to validate a repo id before dispatching a git operation against it.
+// RepoInfo is project-service's answer to "does this repo exist, what
+// project/URL does it belong to, and which dev server does it live on" —
+// the shape the worktree usecases need to validate a repo id and dispatch
+// a git operation against it (see dispatchExecutorForRepo in
+// usecase/ports.go).
 //
-// Deviation from TASK-193's original sketch: project.proto's real Repo
-// message (backend-go/proto/orca/project/v1/project.proto) has no
-// dev_server_id or path field — those fields were this task's best-effort
-// guess before checking the proto and don't exist. Dev-server/host
-// resolution for a worktree op instead goes entirely through
-// ConnectionResolver (see dispatchExecutor in usecase/ports.go), never
-// through RepoInfo; RepoInfo here only carries what Repo actually has.
+// Deviation from TASK-193's original sketch, since corrected: project.proto's
+// Repo message itself still has no dev_server_id/path field (project.repos
+// has no such column — Repo.URL doubles as an absolute filesystem path for
+// repos set up via SetupExistingFolder/ImportNested, see those usecases'
+// doc comments). DevServerID here comes from project.proto's GetRepo RPC
+// resolving it through the repo's OWNING PROJECT instead (ProjectService.
+// GetRepoResponse.dev_server_id) — a second, project-service-side lookup
+// this service doesn't need to make itself.
 type RepoInfo struct {
 	ID          string
 	ProjectID   string
 	URL         string
 	DisplayName string
+	DevServerID string
 }
 
 // WorktreeRecord mirrors project-service's Worktree message — the

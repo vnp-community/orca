@@ -20,6 +20,19 @@ service InfraFleetService {
   // DevServerRepository.List method already existed but was never exposed
   // over gRPC before Epic A's second pass.
   rpc ListDevServers(ListDevServersRequest) returns (ListDevServersResponse);
+  // --- CR-DS-006 Phase 2 / CR-DS-007 / CR-DS-008 (dev server access control) ---
+  rpc ApproveDevServer(ApproveDevServerRequest) returns (ApproveDevServerResponse);
+  rpc RejectDevServer(RejectDevServerRequest) returns (RejectDevServerResponse);
+  rpc AssignDevServerGroup(AssignDevServerGroupRequest) returns (AssignDevServerGroupResponse);
+  rpc CreateDevServerGroup(CreateDevServerGroupRequest) returns (CreateDevServerGroupResponse);
+  rpc ListDevServerGroups(ListDevServerGroupsRequest) returns (ListDevServerGroupsResponse);
+  rpc GrantDevServerGroupAccess(GrantDevServerGroupAccessRequest) returns (GrantDevServerGroupAccessResponse);
+  rpc RevokeDevServerGroupAccess(RevokeDevServerGroupAccessRequest) returns (RevokeDevServerGroupAccessResponse);
+  rpc ListDevServerGroupGrants(ListDevServerGroupGrantsRequest) returns (ListDevServerGroupGrantsResponse);
+  rpc ListDevServersForUser(ListDevServersForUserRequest) returns (ListDevServersForUserResponse);
+  rpc CreateAccessRequest(CreateAccessRequestRequest) returns (CreateAccessRequestResponse);
+  rpc ListPendingAccessRequests(ListPendingAccessRequestsRequest) returns (ListPendingAccessRequestsResponse);
+  rpc ResolveAccessRequest(ResolveAccessRequestRequest) returns (ResolveAccessRequestResponse);
   // CreateConnection is the write path for infra.connections
   // (migrations/0002_connections) — binds a dev server to a worktree/repo
   // path, producing the connectionId ResolveConnection/Relay resolve
@@ -32,6 +45,18 @@ service InfraFleetService {
   // shell.exec/notification.send, wscompat's devServer.*/fleet.* channels
   // all go through this one).
   rpc Relay(RelayRequest) returns (RelayResponse);
+  // RelayByDevServer is Relay's devServerId-keyed counterpart — see
+  // usecase.RelayByDevServer's doc comment for why: a dev server has no
+  // infra.connections row (what Relay resolves through) until a repo/
+  // worktree is bound to it, but "browse this dev server's filesystem to
+  // pick the first repo/worktree" needs to reach the agent BEFORE that
+  // exists. Bypasses infra.connections entirely.
+  rpc RelayByDevServer(RelayByDevServerRequest) returns (RelayResponse);
+  // IsDevServerConnected answers "does this dev server have a live agent
+  // session right now" — cheap, side-effect-free (never dials). Replaces
+  // the hardcoded "disconnected" wscompat's devServer.list/listForUser used
+  // to always report regardless of the agent's real state.
+  rpc IsDevServerConnected(IsDevServerConnectedRequest) returns (IsDevServerConnectedResponse);
   // ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
   // latter derives from this same read — see wscompat's registerSshChannels).
   rpc ListSshTargets(ListSshTargetsRequest) returns (ListSshTargetsResponse);
@@ -133,6 +158,14 @@ message DevServer {
   // "DevServer<->SshTarget linkage the domain model doesn't have yet" gap
   // this service's README flagged (Epic A third pass).
   string ssh_target_id = 5;
+  // approval_status/group_id — CR-DS-006 Phase 2
+  // (docs/crs/v2/dev-server/CR-DS-006-dev-server-approval-and-grouping.md).
+  // Column named approval_status, not status: infra.dev_servers already has
+  // an unrelated status column (health/bootstrap state) from a separate
+  // migration — see migrations/0008_dev_server_approval_status_and_groups.up.sql's
+  // header comment.
+  string approval_status = 6; // pending_approval | approved | rejected
+  string group_id = 7;        // empty = ungrouped
 }
 
 message RegisterDevServerRequest {
@@ -196,6 +229,183 @@ message ListDevServersResponse {
   repeated DevServer dev_servers = 1;
 }
 
+// ── CR-DS-006 Phase 2: admin approval + grouping ────────────────────────
+// docs/crs/v2/dev-server/CR-DS-006-dev-server-approval-and-grouping.md
+
+message DevServerGroup {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string parent_group_id = 4; // empty = root of the tree
+}
+
+// ApproveDevServer/RejectDevServer/AssignDevServerGroup are admin-gated —
+// see usecase.requireAdmin (internal/usecase/authorization.go), which reads
+// the caller's role from common/tenant.Role(ctx). Fails closed
+// (PermissionDenied) if the role claim is absent, per that gap's own
+// documented "empty means unknown, never trust it" contract.
+message ApproveDevServerRequest {
+  string dev_server_id = 1;
+}
+message ApproveDevServerResponse {
+  DevServer dev_server = 1;
+}
+
+message RejectDevServerRequest {
+  string dev_server_id = 1;
+  string reason = 2;
+}
+message RejectDevServerResponse {
+  DevServer dev_server = 1;
+}
+
+message AssignDevServerGroupRequest {
+  string dev_server_id = 1;
+  string group_id = 2; // empty = unassign (ungroup)
+}
+message AssignDevServerGroupResponse {
+  DevServer dev_server = 1;
+}
+
+message CreateDevServerGroupRequest {
+  string name = 1;
+  string parent_group_id = 2;
+}
+message CreateDevServerGroupResponse {
+  DevServerGroup group = 1;
+}
+
+message ListDevServerGroupsRequest {
+  // tenant_id intentionally absent — pulled from context, same convention
+  // as ListDevServersRequest.
+}
+message ListDevServerGroupsResponse {
+  repeated DevServerGroup groups = 1;
+}
+
+// ── CR-DS-007: department/team ↔ group access grants ────────────────────
+// docs/crs/v2/dev-server/CR-DS-007-department-based-access-control.md
+//
+// Open decisions this proto encodes an answer to (recorded, not silently
+// assumed — see that CR's §3 and this pass's own solution docs for the
+// reasoning): ungrouped/unassigned dev servers are admin-only (never
+// returned by ListDevServersForUser); a group's grants are inherited by
+// every descendant group in its tree; department and team grants are OR'd
+// together (either one is sufficient).
+
+enum DevServerGroupGranteeKind {
+  DEV_SERVER_GROUP_GRANTEE_KIND_UNSPECIFIED = 0;
+  DEV_SERVER_GROUP_GRANTEE_KIND_DEPARTMENT = 1;
+  DEV_SERVER_GROUP_GRANTEE_KIND_TEAM = 2;
+}
+
+message DevServerGroupGrant {
+  string id = 1;
+  string tenant_id = 2;
+  string dev_server_group_id = 3;
+  DevServerGroupGranteeKind grantee_kind = 4;
+  string grantee_id = 5; // department_id or team_id — logical FK into tenant-service
+}
+
+// GrantDevServerGroupAccess/RevokeDevServerGroupAccess are admin-gated.
+message GrantDevServerGroupAccessRequest {
+  string dev_server_group_id = 1;
+  DevServerGroupGranteeKind grantee_kind = 2;
+  string grantee_id = 3;
+}
+message GrantDevServerGroupAccessResponse {
+  DevServerGroupGrant grant = 1;
+}
+
+message RevokeDevServerGroupAccessRequest {
+  string grant_id = 1;
+}
+message RevokeDevServerGroupAccessResponse {}
+
+message ListDevServerGroupGrantsRequest {
+  string dev_server_group_id = 1; // empty = every grant in the tenant
+}
+message ListDevServerGroupGrantsResponse {
+  repeated DevServerGroupGrant grants = 1;
+}
+
+// ListDevServersForUser is NOT admin-gated (every authenticated tenant user
+// calls this) — department_id/team_ids are supplied by the caller
+// (api-gateway, having already resolved them via
+// tenant-service.GetResolvedProfile), not looked up by infra-fleet-service
+// itself. Matches the "multi-service view assembled at api-gateway's edge,
+// not inside either owning service" pattern
+// worktree.detectedList/registerWorktreeChannels already established — see
+// that channel's doc comment. Keeps infra-fleet-service free of a new
+// cross-service dependency on tenant-service.
+message ListDevServersForUserRequest {
+  string department_id = 1; // "" if the user has none
+  repeated string team_ids = 2;
+}
+message ListDevServersForUserResponse {
+  repeated DevServer dev_servers = 1;
+}
+
+// ── CR-DS-008: dev server access requests ───────────────────────────────
+// docs/crs/v2/dev-server/CR-DS-008-first-login-department-gate-and-access-request.md
+
+enum DevServerAccessRequestStatus {
+  DEV_SERVER_ACCESS_REQUEST_STATUS_UNSPECIFIED = 0;
+  DEV_SERVER_ACCESS_REQUEST_STATUS_PENDING = 1;
+  DEV_SERVER_ACCESS_REQUEST_STATUS_APPROVED = 2;
+  DEV_SERVER_ACCESS_REQUEST_STATUS_REJECTED = 3;
+}
+
+message DevServerAccessRequest {
+  string id = 1;
+  string tenant_id = 2;
+  string user_id = 3;
+  string dev_server_group_id = 4;
+  DevServerAccessRequestStatus status = 5;
+  string message = 6;
+  int64 created_at_unix_ms = 7;
+  // grantee_kind/grantee_id — captured at request-creation time (computed
+  // by api-gateway from the requester's tenant-service profile, same
+  // "resolve at the edge" reasoning as ListDevServersForUserRequest's
+  // department_id/team_ids), not re-derived at resolve time. When approved,
+  // ResolveAccessRequest grants exactly this (kind, id) pair — see that
+  // RPC's doc comment.
+  DevServerGroupGranteeKind grantee_kind = 8;
+  string grantee_id = 9;
+}
+
+// CreateAccessRequest is called by any authenticated tenant user — not
+// admin-gated (the whole point is a non-admin asking for access).
+// grantee_kind/grantee_id are supplied by the caller (api-gateway), same
+// reasoning as DevServerAccessRequest.grantee_kind's doc comment — this
+// service never looks up the requester's department/team itself.
+message CreateAccessRequestRequest {
+  string dev_server_group_id = 1;
+  string message = 2;
+  DevServerGroupGranteeKind grantee_kind = 3;
+  string grantee_id = 4;
+}
+message CreateAccessRequestResponse {
+  DevServerAccessRequest request = 1;
+}
+
+// ListPendingAccessRequests/ResolveAccessRequest are admin-gated.
+message ListPendingAccessRequestsRequest {}
+message ListPendingAccessRequestsResponse {
+  repeated DevServerAccessRequest requests = 1;
+}
+
+message ResolveAccessRequestRequest {
+  string request_id = 1;
+  bool approve = 2; // false = reject
+}
+message ResolveAccessRequestResponse {
+  DevServerAccessRequest request = 1;
+  // grant is populated only when approve=true — the GrantDevServerGroupAccess
+  // row this resolution created for the requester's department/team.
+  DevServerGroupGrant grant = 2;
+}
+
 message CreateConnectionRequest {
   string dev_server_id = 1;
   string repo_path = 2;
@@ -219,6 +429,21 @@ message RelayRequest {
 message RelayResponse {
   // result_json is the agent's JSON-RPC result, JSON-encoded verbatim.
   string result_json = 1;
+}
+
+message RelayByDevServerRequest {
+  string dev_server_id = 1;
+  string method = 2;
+  // params_json — same convention as RelayRequest.params_json.
+  string params_json = 3;
+}
+
+message IsDevServerConnectedRequest {
+  string dev_server_id = 1;
+}
+
+message IsDevServerConnectedResponse {
+  bool connected = 1;
 }
 
 message CreateSshTargetRequest {

@@ -28,6 +28,30 @@ func (m ConnectionMode) Valid() bool {
 	}
 }
 
+// DevServerStatus is the admin-approval state a DevServer is in — see
+// docs/crs/v2/dev-server/CR-DS-006-dev-server-approval-and-grouping.md.
+// NOT enforced anywhere yet (Phase 1: data model only) — a
+// StatusPendingApproval dev server works exactly like an approved one today.
+type DevServerStatus string
+
+const (
+	// DevServerStatusPendingApproval is what NewDevServer sets for every
+	// freshly-registered dev server — an admin has not yet reviewed it.
+	DevServerStatusPendingApproval DevServerStatus = "pending_approval"
+	DevServerStatusApproved        DevServerStatus = "approved"
+	DevServerStatusRejected        DevServerStatus = "rejected"
+)
+
+// Valid reports whether s is one of the known enum values.
+func (s DevServerStatus) Valid() bool {
+	switch s {
+	case DevServerStatusPendingApproval, DevServerStatusApproved, DevServerStatusRejected:
+		return true
+	default:
+		return false
+	}
+}
+
 var (
 	// ErrEmptyDevServerTenant is returned when TenantID is empty — a dev
 	// server with no owning tenant is never a valid domain state.
@@ -58,6 +82,11 @@ type DevServer struct {
 	Host        string
 	Mode        ConnectionMode
 	SSHTargetID string
+	// Status and GroupID are CR-DS-006 Phase 1 additions — see that CR and
+	// this file's DevServerStatus doc comment. Neither is enforced by any
+	// usecase yet; GroupID empty means "ungrouped", a valid state.
+	Status  DevServerStatus
+	GroupID string
 }
 
 // NewDevServer constructs a DevServer, enforcing the invariants a record
@@ -77,7 +106,14 @@ func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID st
 	if mode == ConnectionModeRelaySSH && sshTargetID == "" {
 		return DevServer{}, ErrMissingSSHTargetForRelaySSH
 	}
-	return DevServer{ID: id, TenantID: tenantID, Host: host, Mode: mode, SSHTargetID: sshTargetID}, nil
+	return DevServer{
+		ID:          id,
+		TenantID:    tenantID,
+		Host:        host,
+		Mode:        mode,
+		SSHTargetID: sshTargetID,
+		Status:      DevServerStatusPendingApproval,
+	}, nil
 }
 
 // IsZero reports whether ds is the zero-value DevServer — used by

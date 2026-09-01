@@ -243,7 +243,14 @@ export function mergeWorkspacePortScans(
     return entries[0][1]
   }
   const ports = entries.flatMap(([key, scan]) =>
-    scan.ports.map((port) => ({
+    // Why the guard: a scan result whose own fetch failed/hasn't
+    // completed can carry ports as null/undefined at runtime despite the
+    // WorkspacePortScanResult type declaring it a required array — found
+    // live crashing the whole Ports panel on the very first scan
+    // triggered right after creating a project (same "backend response is
+    // a partial record" bug class as repo-display-labels.ts's
+    // normalizePathSegments/wsl-paths.ts's parseWslUncPath guards).
+    (scan.ports ?? []).map((port) => ({
       ...port,
       // Why: local and runtime scanners can both report simple ids like
       // `tcp:3000`; aggregate All-hosts views need stable unique row keys.

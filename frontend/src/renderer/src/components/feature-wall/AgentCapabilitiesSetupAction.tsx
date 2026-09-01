@@ -4,6 +4,7 @@ import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { FeatureSetupInlineTerminal } from '../onboarding/FeatureSetupInlineTerminal'
 import {
   DEFAULT_ONBOARDING_FEATURE_SETUP_SELECTION,
@@ -39,6 +40,16 @@ export function AgentCapabilitiesSetupAction(props: {
     useState<OnboardingFeatureSetupSelection | null>(null)
   const [setupBusyLabel, setSetupBusyLabel] = useState<string | null>(null)
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
+  // Why: this checklist's setup terminal has no project/repo behind it, so it
+  // has no natural dev-server binding to inherit — pick the onboarding-
+  // selected dev server if it's actually connected, otherwise fall back to
+  // any connected one. See OnboardingInlineCommandTerminal's devServerId doc.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   useEffect(() => {
     onBrowserUseSkillInstalledChange(readiness.browserUseSkillInstalled)
   }, [onBrowserUseSkillInstalledChange, readiness.browserUseSkillInstalled])
@@ -128,6 +139,7 @@ export function AgentCapabilitiesSetupAction(props: {
         setupBusyLabel={setupBusyLabel}
         onStartFeatureSetup={() => void handleStartFeatureSetup()}
         installStatus={capabilitySetupStatus.installStatus}
+        devServerId={devServerId}
       />
     </div>
   )
@@ -199,6 +211,7 @@ function AgentCapabilitySetupControls(props: {
   setupBusyLabel: string | null
   onStartFeatureSetup: () => void
   installStatus: Record<OnboardingFeatureSetupId, AgentCapabilityInstallStatus>
+  devServerId: string | null
 }): React.JSX.Element {
   const hasSelectedFeatures = hasSelectedOnboardingFeatureSetup(props.featureSetup)
   const showSetupAction = !props.featureSetupCommand
@@ -237,6 +250,7 @@ function AgentCapabilitySetupControls(props: {
         <FeatureSetupInlineTerminal
           command={props.featureSetupCommand}
           selection={props.featureSetupCommandSelection ?? props.featureSetup}
+          devServerId={props.devServerId}
         />
       ) : null}
     </>

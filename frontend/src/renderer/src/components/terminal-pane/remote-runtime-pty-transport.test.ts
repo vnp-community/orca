@@ -639,6 +639,37 @@ describe('createRemoteRuntimePtyTransport', () => {
     expect(transport.isConnected()).toBe(true)
   })
 
+  // Why: regression guard for the live bug where 'session-auth' (backend-go's
+  // WebSessionClient) was routed to terminal.multiplex, the binary protocol —
+  // confirmed via direct WS-frame capture against the real deployment that
+  // WebSessionClient cannot carry binary frames at all: its subscribe()
+  // sendBinary unconditionally throws, and its onmessage handler drops any
+  // non-string frame outright. The TS interface declares sendBinary/onBinary
+  // (satisfying RemoteRuntimeMultiplexedTerminalCallbacks structurally) but
+  // the implementation stubs them — an earlier pass here mistook the type
+  // for real support. 'session-auth' must use the plain-JSON
+  // subscribeTerminalViaJson fallback; terminal.multiplex is for
+  // WebRuntimeClient (paired/E2EE) only. Found live 2026-08-30.
+  it('subscribes via the plain-JSON terminal.subscribe fallback for session-auth, not terminal.multiplex', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('session-auth', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+
+    expect(runtimeSubscribe).toHaveBeenCalledWith(
+      expect.objectContaining({ selector: 'session-auth', method: 'terminal.subscribe' }),
+      expect.anything()
+    )
+    expect(runtimeSubscribe).not.toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'terminal.multiplex' }),
+      expect.anything()
+    )
+  })
+
   it('does not send queued input through a stale stream during remote handle replacement', async () => {
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
     const transport = createRemoteRuntimePtyTransport('env-1', {
@@ -994,6 +1025,49 @@ describe('createRemoteRuntimePtyTransport', () => {
         })
       })
     )
+  })
+
+  // Why: backend-go's terminal.create only reads connectionId, never
+  // worktree — an omitted connectionId is "spawn a host-local PTY", which
+  // the web deployment cannot do (INFRA_TERMINAL_HOST_LOCAL_UNIMPLEMENTED,
+  // found live 2026-08-30 on the onboarding CLI-install terminal). Every
+  // dev-server-bound terminal on web rides this transport, so a
+  // connectionId passed into opts must reach the wire call.
+  it('forwards connectionId to terminal.create when the caller provides one', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('env-1', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1',
+      connectionId: 'dev-server-1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+
+    expect(runtimeCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'terminal.create',
+        params: expect.objectContaining({
+          connectionId: 'dev-server-1'
+        })
+      })
+    )
+    expect(transport.getConnectionId?.()).toBe('dev-server-1')
+  })
+
+  it('omits connectionId from terminal.create when the caller has none (host-local desktop terminals)', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('env-1', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+
+    const call = runtimeCall.mock.calls.find((c) => c[0].method === 'terminal.create')
+    expect(call?.[0].params).not.toHaveProperty('connectionId')
+    expect(transport.getConnectionId?.()).toBeNull()
   })
 
   it('passes startup command delivery when creating the remote runtime terminal', async () => {

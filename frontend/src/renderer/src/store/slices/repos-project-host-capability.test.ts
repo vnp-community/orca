@@ -4,6 +4,9 @@ import { PROJECT_HOST_SETUP_RUNTIME_CAPABILITY } from '../../../../shared/protoc
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
 import type { RuntimeEnvironmentCallRequest } from '../../runtime/runtime-compatibility-test-fixture'
 import { createTestStore } from './store-test-helpers'
+import { resetDefaultProjectCacheForTests } from './repos'
+
+const DEFAULT_PROJECT_ID = 'default-project'
 
 const remoteRepo: Repo = {
   id: 'remote-repo',
@@ -41,6 +44,7 @@ function runtimeStatusWithoutProjectHostSetup() {
 
 beforeEach(() => {
   clearRuntimeCompatibilityCacheForTests()
+  resetDefaultProjectCacheForTests()
   reposList.mockReset()
   reposClone.mockReset()
   reposCloneRemote.mockReset()
@@ -67,11 +71,41 @@ beforeEach(() => {
 
 describe('repo slice project-host setup runtime capability', () => {
   it('falls back to repo-derived project setup state when a remote runtime lacks support', async () => {
-    runtimeEnvironmentCall.mockResolvedValue({
-      id: 'rpc-1',
-      ok: true,
-      result: { repos: [remoteRepo] },
-      _meta: { runtimeId: 'runtime-remote' }
+    runtimeEnvironmentCall.mockImplementation(async (args: { method: string }) => {
+      if (args.method === 'project.list') {
+        return {
+          id: 'rpc-project-list',
+          ok: true,
+          result: [
+            {
+              id: DEFAULT_PROJECT_ID,
+              name: 'My Repos',
+              defaultBranch: 'main',
+              devServerId: '',
+              visibility: 'private',
+              createdAt: 1,
+              updatedAt: 1
+            }
+          ],
+          _meta: { runtimeId: 'runtime-remote' }
+        }
+      }
+      return {
+        id: 'rpc-1',
+        ok: true,
+        result: {
+          repos: [
+            {
+              id: remoteRepo.id,
+              projectId: DEFAULT_PROJECT_ID,
+              url: remoteRepo.path,
+              displayName: remoteRepo.displayName,
+              position: 0
+            }
+          ]
+        },
+        _meta: { runtimeId: 'runtime-remote' }
+      }
     })
     const store = createTestStore()
     store.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
@@ -81,11 +115,11 @@ describe('repo slice project-host setup runtime capability', () => {
     expect(store.getState().projectHostSetups).toEqual([
       expect.objectContaining({ id: 'remote-repo', hostId: 'runtime:env-1' })
     ])
-    expect(runtimeEnvironmentCall).toHaveBeenCalledTimes(1)
+    expect(runtimeEnvironmentCall).toHaveBeenCalledTimes(2)
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.list',
-      params: undefined,
+      params: { projectId: DEFAULT_PROJECT_ID },
       timeoutMs: 15_000
     })
   })

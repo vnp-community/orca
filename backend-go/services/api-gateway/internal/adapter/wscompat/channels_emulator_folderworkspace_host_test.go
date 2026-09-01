@@ -274,14 +274,21 @@ func TestFolderWorkspaceCreateChannel_Success(t *testing.T) {
 	fake := &fakeProjectClient{
 		createFolderWorkspaceFunc: func(ctx context.Context, in *projectv1.CreateFolderWorkspaceRequest) (*projectv1.CreateFolderWorkspaceResponse, error) {
 			return &projectv1.CreateFolderWorkspaceResponse{
-				FolderWorkspace: &projectv1.FolderWorkspace{Id: "fw-1", DevServerId: in.DevServerId, Path: in.Path, Name: in.Name},
+				FolderWorkspace: &projectv1.FolderWorkspace{
+					Id: "fw-1", DevServerId: in.DevServerId, Path: in.Path, Name: in.Name, ProjectGroupId: in.ProjectGroupId,
+				},
 			}, nil
 		},
 	}
 	r := NewRegistry()
 	registerFolderWorkspaceChannels(r, fake)
 
-	args := argsJSON(t, map[string]any{"devServerId": "d1", "path": "/home/x", "name": "x"})
+	// Why projectGroupId is asserted here: migration 0012 added real
+	// persistence for it — this channel used to silently drop it (no field
+	// in the decode struct at all) before that.
+	args := argsJSON(t, map[string]any{
+		"devServerId": "d1", "path": "/home/x", "name": "x", "projectGroupId": "group-1",
+	})
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "folderWorkspace.create", args)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -289,11 +296,12 @@ func TestFolderWorkspaceCreateChannel_Success(t *testing.T) {
 	if fake.callCount != 1 {
 		t.Fatalf("expected exactly 1 call, got %d", fake.callCount)
 	}
-	if fake.lastCreateReq.DevServerId != "d1" || fake.lastCreateReq.Path != "/home/x" || fake.lastCreateReq.Name != "x" {
+	if fake.lastCreateReq.DevServerId != "d1" || fake.lastCreateReq.Path != "/home/x" || fake.lastCreateReq.Name != "x" ||
+		fake.lastCreateReq.ProjectGroupId != "group-1" {
 		t.Errorf("unexpected request fields: %+v", fake.lastCreateReq)
 	}
-	fw, ok := result.(*projectv1.FolderWorkspace)
-	if !ok || fw.GetId() != "fw-1" {
+	fw, ok := result.(folderWorkspaceView)
+	if !ok || fw.ID != "fw-1" || fw.ProjectGroupID != "group-1" {
 		t.Errorf("unexpected result: %#v", result)
 	}
 }
@@ -315,8 +323,8 @@ func TestFolderWorkspaceUpdateChannel_Success(t *testing.T) {
 	if fake.callCount != 1 || fake.lastUpdateReq.Id != "fw-1" || fake.lastUpdateReq.Name != "renamed" {
 		t.Errorf("unexpected request: %+v (calls=%d)", fake.lastUpdateReq, fake.callCount)
 	}
-	fw, ok := result.(*projectv1.FolderWorkspace)
-	if !ok || fw.GetName() != "renamed" {
+	fw, ok := result.(folderWorkspaceView)
+	if !ok || fw.Name != "renamed" {
 		t.Errorf("unexpected result: %#v", result)
 	}
 }
@@ -362,7 +370,11 @@ func TestFolderWorkspaceListChannel_Success(t *testing.T) {
 	if fake.callCount != 1 {
 		t.Errorf("expected exactly 1 call, got %d", fake.callCount)
 	}
-	list, ok := result.([]*projectv1.FolderWorkspace)
+	resp, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	list, ok := resp["folderWorkspaces"].([]folderWorkspaceView)
 	if !ok || len(list) != 2 {
 		t.Errorf("unexpected result: %#v", result)
 	}
@@ -385,8 +397,8 @@ func TestFolderWorkspaceGetPathStatusChannel_Success(t *testing.T) {
 	if fake.callCount != 1 || fake.lastStatusReq.DevServerId != "d1" || fake.lastStatusReq.Path != "/home/new" {
 		t.Errorf("unexpected request: %+v (calls=%d)", fake.lastStatusReq, fake.callCount)
 	}
-	resp, ok := result.(*projectv1.GetFolderWorkspacePathStatusResponse)
-	if !ok || resp.GetStatus() != "PATH_STATUS_AVAILABLE" {
+	resp, ok := result.(map[string]any)
+	if !ok || resp["status"] != "PATH_STATUS_AVAILABLE" {
 		t.Errorf("unexpected result: %#v", result)
 	}
 }

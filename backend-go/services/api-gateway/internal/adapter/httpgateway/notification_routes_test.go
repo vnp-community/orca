@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -14,6 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/emptypb"
 
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/wscompat"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
 	notificationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1"
@@ -145,16 +147,28 @@ func TestHandleGetVapidPublicKey_Success(t *testing.T) {
 // identity into request context — these routes are unauthenticated by
 // design (see mountPushRoutes's doc comment), so a test router for them
 // must not simulate authMiddleware the way notificationTestRouter does for
-// the authenticated /v1/notifications/* mount.
-func pushTestRouter(client notificationv1.NotificationServiceClient) http.Handler {
+// the authenticated /v1/notifications/* mount. cookieValidator is nil for
+// the "genuinely no session" tests below; TestPushRoutes_SoftAuth_* passes
+// a fake one to exercise resolveSoftIdentity's cookie-validation fallback.
+func pushTestRouter(client notificationv1.NotificationServiceClient, cookieValidator CookieSessionValidator) http.Handler {
 	r := chi.NewRouter()
-	mountPushRoutes(r, client)
+	mountPushRoutes(r, client, cookieValidator)
 	return r
+}
+
+// fakeCookieValidator is a minimal CookieSessionValidator test double.
+type fakeCookieValidator struct {
+	identity wscompat.Identity
+	err      error
+}
+
+func (f *fakeCookieValidator) ValidateCookie(_ context.Context, _ *http.Request) (wscompat.Identity, error) {
+	return f.identity, f.err
 }
 
 func TestHandlePushUnsubscribe_KnownEndpoint(t *testing.T) {
 	fake := &fakeNotificationServiceClient{}
-	router := pushTestRouter(fake)
+	router := pushTestRouter(fake, nil)
 
 	body, err := json.Marshal(unsubscribeRequestBody{Endpoint: "https://push.example.com/ep"})
 	if err != nil {
@@ -177,7 +191,7 @@ func TestHandlePushUnsubscribe_KnownEndpoint(t *testing.T) {
 // never registered (or already removed) must not surface as an error.
 func TestHandlePushUnsubscribe_UnknownEndpoint_StillReturns204(t *testing.T) {
 	fake := &fakeNotificationServiceClient{} // UnregisterPushSubscription succeeds unconditionally (no unregisterErr set)
-	router := pushTestRouter(fake)
+	router := pushTestRouter(fake, nil)
 
 	body, err := json.Marshal(unsubscribeRequestBody{Endpoint: "https://push.example.com/never-subscribed"})
 	if err != nil {
@@ -202,7 +216,7 @@ func TestPushRoutes_NoAuthRequired(t *testing.T) {
 		vapidResp:     &notificationv1.GetVapidPublicKeyResponse{PublicKey: "vapid-key"},
 		subscribeResp: &notificationv1.SubscribeResponse{SubscriptionId: "sub-1"},
 	}
-	router := pushTestRouter(fake)
+	router := pushTestRouter(fake, nil)
 
 	// GET /api/vapid-public-key — no identity in context at all (unlike
 	// notificationTestRouter's tests, this router never injects one).
@@ -227,6 +241,56 @@ func TestPushRoutes_NoAuthRequired(t *testing.T) {
 	router.ServeHTTP(w, req)
 	if w.Code != http.StatusNoContent {
 		t.Fatalf("POST /api/push-unsubscribe: status = %d, want %d (push routes must not require auth — regression against BUG-003); body=%s", w.Code, http.StatusNoContent, w.Body.String())
+	}
+}
+
+// TestPushRoutes_SoftAuth_NoCookie_StillNoIdentity documents the no-cookie
+// half of resolveSoftIdentity's fallback: with a cookieValidator configured
+// but the request carrying no valid session, the caller still gets an empty
+// identity (never a 401) — same behavior as nil cookieValidator, preserving
+// BUG-003's guarantee for a truly anonymous caller.
+func TestPushRoutes_SoftAuth_NoCookie_StillNoIdentity(t *testing.T) {
+	fake := &fakeNotificationServiceClient{
+		vapidResp: &notificationv1.GetVapidPublicKeyResponse{PublicKey: "vapid-key"},
+	}
+	validator := &fakeCookieValidator{err: errors.New("no session cookie")}
+	router := pushTestRouter(fake, validator)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/vapid-public-key", nil)
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusOK, w.Body.String())
+	}
+}
+
+// TestPushRoutes_SoftAuth_ValidCookie_ResolvesRealTenant is the live-bug
+// regression: GetVapidPublicKey/Subscribe are tenant-scoped usecases
+// (tenant.RequireTenantID), but the unauthenticated /api/push-* mount never
+// gave them a tenant — NOTIFICATION_NO_TENANT fired even for a genuinely
+// logged-in browser whose fetch() sends the session cookie same-origin.
+// With a cookieValidator that resolves a real session, the identity must
+// now reach the downstream Subscribe call.
+func TestPushRoutes_SoftAuth_ValidCookie_ResolvesRealTenant(t *testing.T) {
+	fake := &fakeNotificationServiceClient{
+		subscribeResp: &notificationv1.SubscribeResponse{SubscriptionId: "sub-1"},
+	}
+	validator := &fakeCookieValidator{
+		identity: wscompat.Identity{TenantID: "tenant-1", UserID: "user-1", Role: "user"},
+	}
+	router := pushTestRouter(fake, validator)
+
+	body, _ := json.Marshal(subscribeRequestBody{Endpoint: "https://push.example.com/ep"})
+	req := httptest.NewRequest(http.MethodPost, "/api/push-subscribe", bytes.NewReader(body))
+	w := httptest.NewRecorder()
+	router.ServeHTTP(w, req)
+
+	if w.Code != http.StatusCreated {
+		t.Fatalf("status = %d, want %d; body=%s", w.Code, http.StatusCreated, w.Body.String())
+	}
+	if fake.subscribeReq.GetUserId() != "user-1" {
+		t.Fatalf("Subscribe called with UserId = %q, want %q (soft auth should have resolved the cookie's identity)", fake.subscribeReq.GetUserId(), "user-1")
 	}
 }
 

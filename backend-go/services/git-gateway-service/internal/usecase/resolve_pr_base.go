@@ -12,15 +12,15 @@ import (
 // comment for why this resolves repoID via ProjectClient.GetRepo before
 // dispatching, rather than passing repoID straight into dispatchExecutor.
 type ResolvePrBase struct {
-	scm      SCMClient
-	resolver ConnectionResolver
-	projects ProjectClient
-	local    GitExecutor
-	relay    GitExecutor
+	scm          SCMClient
+	reachability DevServerReachability
+	projects     ProjectClient
+	local        GitExecutor
+	relay        GitExecutor
 }
 
-func NewResolvePrBase(scm SCMClient, resolver ConnectionResolver, projects ProjectClient, local, relay GitExecutor) *ResolvePrBase {
-	return &ResolvePrBase{scm: scm, resolver: resolver, projects: projects, local: local, relay: relay}
+func NewResolvePrBase(scm SCMClient, reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *ResolvePrBase {
+	return &ResolvePrBase{scm: scm, reachability: reachability, projects: projects, local: local, relay: relay}
 }
 
 func (uc *ResolvePrBase) Execute(ctx context.Context, repoID string, prNumber int32) (domain.ResolvedBase, error) {
@@ -32,7 +32,7 @@ func (uc *ResolvePrBase) Execute(ctx context.Context, repoID string, prNumber in
 	if err != nil {
 		return domain.ResolvedBase{}, apperrors.New(apperrors.KindNotFound, "WORKTREE_REPO_NOT_FOUND", "repo does not exist", err)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, repo.ID)
+	executor, repoPath, err := dispatchExecutorForRepo(ctx, uc.reachability, uc.local, uc.relay, repo)
 	if err != nil {
 		return domain.ResolvedBase{}, apperrors.New(apperrors.KindInternal, "WORKTREE_RESOLVE_FAILED", "failed to resolve host", err)
 	}

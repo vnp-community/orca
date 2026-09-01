@@ -7,7 +7,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import type { TuiAgent } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
-import { useActiveDevServer } from '../../store/slices/dev-servers'
+import { useActiveDevServer } from '../../store/slices/dev-servers-selectors'
 import { DevServerStatusBadge } from '../dev-server/DevServerStatusBadge'
 
 import { shellOpenUrl } from '../../runtime/runtime-shell-client'

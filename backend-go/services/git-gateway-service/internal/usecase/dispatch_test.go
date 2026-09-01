@@ -138,7 +138,7 @@ type fakeGitExecutor struct {
 
 	createWorktreeResult  domain.WorktreeCreateResult
 	fetchAndResolveRefSHA string
-	listWorktreePathsOut  []string
+	listWorktreePathsOut  []domain.WorktreeGitInfo
 
 	createWorktreeCallCount int
 	removeWorktreeCallCount int
@@ -415,7 +415,7 @@ func (f *fakeGitExecutor) FetchAndResolveRef(ctx context.Context, repoPath, ref 
 	return "resolvedsha", nil
 }
 
-func (f *fakeGitExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error) {
+func (f *fakeGitExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]domain.WorktreeGitInfo, error) {
 	f.calledListWorktreePaths = true
 	f.gotRepoPath = repoPath
 	if f.listWorktreePathsErr != nil {

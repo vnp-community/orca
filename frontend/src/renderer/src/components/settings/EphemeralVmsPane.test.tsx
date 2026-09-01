@@ -21,7 +21,11 @@ const mockStoreState = {
   projects: [],
   repos: [],
   settings: null,
-  worktreesByRepo: {}
+  worktreesByRepo: {},
+  // Read by useActiveDevServer/useConnectedDevServers, which
+  // EphemeralVmsPane now calls to resolve a devServerId for its setup terminal.
+  devServers: [],
+  activeDevServerId: null
 }
 
 vi.mock('sonner', () => ({
@@ -97,7 +101,9 @@ describe('EphemeralVmsPane', () => {
             if (method === 'cli.getWslInstallStatus') {
               return { ok: true, result: { state: 'installed', pathConfigured: true } }
             }
-            throw new Error(`Unexpected runtime.call method in test stub: ${method}, ${JSON.stringify(params)}`)
+            throw new Error(
+              `Unexpected runtime.call method in test stub: ${method}, ${JSON.stringify(params)}`
+            )
           })
         },
         platform: {

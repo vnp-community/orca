@@ -5,7 +5,7 @@ import {
   DialogContent,
   DialogDescription,
   DialogHeader,
-  DialogTitle,
+  DialogTitle
 } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -14,7 +14,7 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
+  SelectValue
 } from '@/components/ui/select'
 import { useAddDevServer } from '../../hooks/useAddDevServer'
 import type { DevServerConnectionType } from '../../../../shared/dev-server-types'
@@ -65,15 +65,15 @@ export function AddDevServerDialog({ open, onOpenChange, onAdded }: Props) {
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Add Dev Server</DialogTitle>
-          <DialogDescription>
-            Connect your local machine or a remote workstation.
-          </DialogDescription>
+          <DialogDescription>Connect your local machine or a remote workstation.</DialogDescription>
         </DialogHeader>
 
         <div className="space-y-4 py-2">
           {/* Name */}
           <div className="space-y-1">
-            <label htmlFor="add-ds-name" className="text-sm font-medium">Name</label>
+            <label htmlFor="add-ds-name" className="text-sm font-medium">
+              Name
+            </label>
             <Input
               id="add-ds-name"
               placeholder="MacBook Pro M3"
@@ -94,8 +94,8 @@ export function AddDevServerDialog({ open, onOpenChange, onAdded }: Props) {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="relay-ssh">SSH Relay</SelectItem>
-                <SelectItem value="relay-websocket">WebSocket (dev server → Orca)</SelectItem>
-                <SelectItem value="direct-websocket">WebSocket (Orca → dev server)</SelectItem>
+                <SelectItem value="relay-websocket">WebSocket (Orca → dev server)</SelectItem>
+                <SelectItem value="direct-websocket">WebSocket (dev server → Orca)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -108,9 +108,7 @@ export function AddDevServerDialog({ open, onOpenChange, onAdded }: Props) {
             <Input
               id="add-ds-host"
               placeholder={
-                connectionType === 'relay-ssh'
-                  ? 'user@dev.example.com'
-                  : 'ws://localhost:6799'
+                connectionType === 'relay-ssh' ? 'user@dev.example.com' : 'ws://localhost:6799'
               }
               value={host}
               onChange={(e) => setHost(e.target.value)}
@@ -145,7 +143,10 @@ export function AddDevServerDialog({ open, onOpenChange, onAdded }: Props) {
             disabled={!host || state === 'testing'}
           >
             {state === 'testing' ? (
-              <><Loader2 className="mr-1 size-4 animate-spin" />Testing…</>
+              <>
+                <Loader2 className="mr-1 size-4 animate-spin" />
+                Testing…
+              </>
             ) : (
               'Test Connection'
             )}
@@ -156,7 +157,10 @@ export function AddDevServerDialog({ open, onOpenChange, onAdded }: Props) {
             disabled={!testResult?.ok || state === 'connecting'}
           >
             {state === 'connecting' ? (
-              <><Loader2 className="mr-1 size-4 animate-spin" />Connecting…</>
+              <>
+                <Loader2 className="mr-1 size-4 animate-spin" />
+                Connecting…
+              </>
             ) : (
               'Add Server'
             )}

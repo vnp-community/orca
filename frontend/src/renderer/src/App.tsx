@@ -48,6 +48,7 @@ import { isRemoteWorkspaceSnapshotApplyInProgress, useIpcEvents } from './hooks/
 import { useAutomationDispatchEvents } from './hooks/useAutomationDispatchEvents'
 import RetainedAgentsSyncGate from './components/dashboard/RetainedAgentsSyncGate'
 import { AgentHibernationGate } from './components/AgentHibernationGate'
+import { DepartmentGate } from './components/DepartmentGate'
 import { ActivityTitlebarControls } from './components/activity/ActivityTitlebarControls'
 import Sidebar from './components/Sidebar'
 import { shutdownBufferCaptures } from './components/terminal-pane/shutdown-buffer-captures'
@@ -1337,7 +1338,9 @@ function App(): React.JSX.Element {
         )
         if (hydratedTargetIds.length > 0) {
           void localWrite
-            .then(() => setRemoteWorkspaceForConnectedTargets(state.settings, { hydratedTargetIds }))
+            .then(() =>
+              setRemoteWorkspaceForConnectedTargets(state.settings, { hydratedTargetIds })
+            )
             .then((results) => {
               for (const { targetId, result } of results ?? []) {
                 applyRemoteWorkspacePatchStatus(targetId, result)
@@ -2269,6 +2272,7 @@ function App(): React.JSX.Element {
             subscriptions from re-rendering the App tree. */}
             <RetainedAgentsSyncGate />
             <AgentHibernationGate />
+            <DepartmentGate />
             {/* Why: workspace activation is a hot path; including activeWorktreeId
             in reset keys remounts whole surfaces during wake. */}
             <RecoverableRenderErrorBoundary

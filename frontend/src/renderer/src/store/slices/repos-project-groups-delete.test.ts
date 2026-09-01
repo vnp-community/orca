@@ -103,11 +103,16 @@ describe('project group deletion store routing', () => {
     ])
   })
 
+  // Why `result: { ok: false }`, not `{ deleted: false }`: the Go handler
+  // returns map[string]bool{"ok": true/false} (channels_tenant_project.go's
+  // projectGroup.delete) — a `deleted` key was never actually on the wire,
+  // so deleteProjectGroup's `.deleted` read was always undefined regardless
+  // of the real outcome (a live bug fixed alongside this test).
   it('uses the remote delete response shape before mutating local state', async () => {
     runtimeEnvironmentCall.mockResolvedValue({
       id: 'rpc-delete-group',
       ok: true,
-      result: { deleted: false },
+      result: { ok: false },
       _meta: { runtimeId: 'runtime-remote' }
     })
     const groupedRepo = { ...remoteRepo, projectGroupId: projectGroup.id }
@@ -129,6 +134,26 @@ describe('project group deletion store routing', () => {
       timeoutMs: 15_000
     })
     expect(projectGroupsDelete).not.toHaveBeenCalled()
+  })
+
+  it('resolves true and removes the group on a genuinely successful remote delete', async () => {
+    runtimeEnvironmentCall.mockResolvedValue({
+      id: 'rpc-delete-group',
+      ok: true,
+      result: { ok: true },
+      _meta: { runtimeId: 'runtime-remote' }
+    })
+    const groupedRepo = { ...remoteRepo, projectGroupId: projectGroup.id }
+    const store = createTestStore()
+    store.setState({
+      settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
+      projectGroups: [projectGroup],
+      repos: [groupedRepo]
+    })
+
+    await expect(store.getState().deleteProjectGroup(projectGroup.id)).resolves.toBe(true)
+
+    expect(store.getState().projectGroups).toEqual([])
   })
 
   it('deletes only the group when contained project removal is not requested', async () => {

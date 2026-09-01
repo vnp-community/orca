@@ -524,14 +524,28 @@ func (r *RelayExecutor) FetchAndResolveRef(ctx context.Context, repoPath, ref st
 	return result.SHA, err
 }
 
-func (r *RelayExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error) {
+// ListWorktreePaths: KNOWN GAP, not a new one this method introduces — the
+// real Dev Server Agent has no `git.worktreeList` method at all (confirmed
+// against agent/src/relay/*.ts; only test fixtures reference the name),
+// so this relay call already fails for any genuinely relay-connected dev
+// server, same as before. Kept returning bare paths with no Head/Branch
+// (that data isn't available without a working agent method to ask) —
+// enriching this is that pre-existing gap's own fix, not this one's.
+func (r *RelayExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]domain.WorktreeGitInfo, error) {
 	var result struct {
 		Paths []string `json:"paths"`
 	}
 	err := r.relay(ctx, repoPath, "git.worktreeList", map[string]any{
 		"repoPath": repoPath,
 	}, &result)
-	return result.Paths, err
+	if err != nil {
+		return nil, err
+	}
+	infos := make([]domain.WorktreeGitInfo, 0, len(result.Paths))
+	for _, p := range result.Paths {
+		infos = append(infos, domain.WorktreeGitInfo{Path: p})
+	}
+	return infos, nil
 }
 
 // ForceDeleteBranch implements the REQUIRED (TASK-194) GitExecutor method —

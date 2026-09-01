@@ -150,16 +150,17 @@ func (s *Server) GetJWKS(ctx context.Context, req *authv1.GetJWKSRequest) (*auth
 }
 
 func (s *Server) CreateUser(ctx context.Context, req *authv1.CreateUserRequest) (*authv1.CreateUserResponse, error) {
-	user, err := s.createUser.Execute(ctx, usecase.CreateUserInput{
+	out, err := s.createUser.Execute(ctx, usecase.CreateUserInput{
 		Email:    req.GetEmail(),
 		Name:     req.GetName(),
 		TenantID: req.GetTenantId(),
 		Role:     toDomainRole(req.GetRole()),
+		Password: req.GetPassword(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &authv1.CreateUserResponse{User: toProtoUser(user)}, nil
+	return &authv1.CreateUserResponse{User: toProtoUser(out.User), GeneratedPassword: out.GeneratedPassword}, nil
 }
 
 func (s *Server) ListUsers(ctx context.Context, req *authv1.ListUsersRequest) (*authv1.ListUsersResponse, error) {

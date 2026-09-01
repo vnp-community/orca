@@ -36,6 +36,20 @@ import type {
 } from '../../../shared/types'
 import type { SkillDiscoveryResult } from '../../../shared/skills'
 import type { SshConnectionState, SshTarget } from '../../../shared/ssh-types'
+import type {
+  DevServerStatus,
+  DevServer,
+  ConnectionTestResult,
+  DevServerAccessRequest,
+  DevServerGroup,
+  DevServerGroupGrant
+} from '../../../shared/dev-server-types'
+import type {
+  TenantUserProfile,
+  TenantDepartment,
+  TenantCompany
+} from '../../../shared/tenant-user-profile-types'
+import type { AdminUser } from '../../../shared/admin-user-types'
 import {
   getDefaultOnboardingState,
   getDefaultSettings,
@@ -76,6 +90,7 @@ import { normalizeTerminalCursorStyleDefault } from '../../../shared/terminal-cu
 import { normalizeTerminalCustomThemes } from '../../../shared/terminal-custom-themes'
 import { normalizeUiLanguage } from '../../../shared/ui-language'
 import { normalizeUsagePercentageDisplay } from '../../../shared/usage-percentage-display'
+import { buildAgentDetectionCommands } from '../../../shared/agent-detection-commands'
 import type { RateLimitState } from '../../../shared/rate-limit-types'
 import type { RuntimeStatus, RuntimeSyncWindowGraph } from '../../../shared/runtime-types'
 import {
@@ -670,7 +685,26 @@ function createWebPreloadApi(): Partial<PreloadApi> {
         }
         writeJson(ONBOARDING_STORAGE_KEY, next)
         return next
-      }
+      },
+      // Why: the web build has no paired Electron desktop process, so
+      // preflight.detectAgents (createPreflightApi below) can never answer
+      // "which agent CLIs are installed" — it's gated on a runtime
+      // environment pairing that a plain browser session never has. This is
+      // the real answer for a dev-server-agent connection: relay the
+      // agent's own confirmed preflight.detectAgents RPC through the
+      // backend's onboarding.detectAgents channel, which resolves
+      // devServerId to a live connection and asks THAT host. commands is
+      // built here (not passed in by callers) from the same TUI_AGENT_CONFIG
+      // catalog desktop's relay bridge uses — see buildAgentDetectionCommands.
+      detectAgents: (params) =>
+        callRuntimeResult<{
+          agents: string[]
+          platform: NodeJS.Platform | null
+          devServerId: string | null
+        }>('onboarding.detectAgents', {
+          devServerId: params.devServerId,
+          commands: buildAgentDetectionCommands()
+        }).catch(() => ({ agents: [], platform: null, devServerId: params.devServerId }))
     },
     cache: {
       getGitHub: () =>
@@ -698,6 +732,9 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     hostedReview: createRuntimeNamespaceApi('hostedReview'),
     linear: createRuntimeNamespaceApi('linear'),
     devServer: createDevServerApi(),
+    devServerGroup: createDevServerGroupApi(),
+    tenantProfile: createTenantProfileApi(),
+    admin: createAdminApi(),
     hooks: createHooksApi(),
     stats: {
       getSummary: async () =>
@@ -1243,15 +1280,119 @@ function webAiVaultUnavailableResult(executionHostId: ExecutionHostId): AiVaultL
   }
 }
 
+// ── project-scoped repo bridge (mirrors store/slices/repos.ts's Phase 4b
+// fix) ─────────────────────────────────────────────────────────────────
+//
+// This whole section mirrors store/slices/repos.ts's RemoteRepoView/
+// mergeRepoViewIntoRepo/listCallerProjects/fetchAllRemoteRepoViews/
+// getOrCreateDefaultProject — a SEPARATE copy, not an import, because this
+// file's runtime call plumbing (callRuntimeResult, bound to the one paired
+// runtime connection) is a different transport than repos.ts's
+// target-parameterized callRuntimeRpc. Found live: this file previously
+// reimplemented repo.list/add/update/remove/reorder against the OLD,
+// pre-Phase-4b wire shapes ({path, kind} for add, no projectId anywhere,
+// a bare RemoteRepoView cast straight to the rich Repo type) — the same
+// bug class Phase 4b fixed in repos.ts, never applied here. Keep these two
+// copies in sync if either backend shape changes again.
+type RemoteRepoView = {
+  id: string
+  projectId: string
+  url: string
+  displayName: string
+  position: number
+}
+
+function repoDisplayNameFromUrl(url: string): string {
+  const trimmed = url.replace(/\/+$/, '')
+  const base = trimmed.split('/').findLast(Boolean) || trimmed || url
+  return base.replace(/\.git$/, '') || base
+}
+
+function mergeRepoViewIntoRepo(view: RemoteRepoView, existing?: Repo): Repo {
+  return {
+    ...existing,
+    id: view.id,
+    projectId: view.projectId,
+    path: view.url,
+    displayName: view.displayName || repoDisplayNameFromUrl(view.url),
+    badgeColor: existing?.badgeColor ?? '',
+    addedAt: existing?.addedAt ?? Date.now()
+  }
+}
+
+async function listCallerProjectIds(): Promise<{ id: string; createdAt: number }[]> {
+  const projects = await callRuntimeResult<{ id: string; createdAt: number }[]>('project.list')
+  return projects ?? []
+}
+
+// fetchAllRemoteRepoViews lists repos across EVERY project the caller
+// belongs to, not just a default one — see repos.ts's own doc comment on
+// its identically-named function for why (a repo can live in any project
+// the caller belongs to, e.g. one created via Project Workspace (Beta)'s
+// "New Project" dialog).
+async function fetchAllRemoteRepoViews(): Promise<RemoteRepoView[]> {
+  const projects = await listCallerProjectIds()
+  if (projects.length === 0) {
+    return []
+  }
+  const perProject = await Promise.all(
+    projects.map((project) =>
+      callRuntimeResult<{ repos: RemoteRepoView[] }>('repo.list', { projectId: project.id }).then(
+        (result) => result.repos,
+        (err) => {
+          console.error(`[web-preload-api] repo.list failed for project ${project.id}:`, err)
+          return []
+        }
+      )
+    )
+  )
+  return perProject.flat()
+}
+
+let cachedDefaultProjectId: string | null = null
+const DEFAULT_PROJECT_NAME = 'My Repos'
+
+async function getOrCreateDefaultProjectId(): Promise<string> {
+  if (cachedDefaultProjectId) {
+    return cachedDefaultProjectId
+  }
+  const projects = await listCallerProjectIds()
+  const earliest = projects.slice().sort((a, b) => a.createdAt - b.createdAt)[0]
+  if (earliest) {
+    cachedDefaultProjectId = earliest.id
+    return earliest.id
+  }
+  const created = await callRuntimeResult<{ id: string }>('project.create', {
+    name: DEFAULT_PROJECT_NAME,
+    visibility: 'private'
+  })
+  cachedDefaultProjectId = created.id
+  return created.id
+}
+
 function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
   return {
-    list: async () => (await callRuntimeResult<{ repos: Repo[] }>('repo.list')).repos,
-    add: async ({ path, kind }) => {
+    list: async () => {
+      const views = await fetchAllRemoteRepoViews()
+      return views.map((view) => mergeRepoViewIntoRepo(view))
+    },
+    add: async ({ path }) => {
       invalidateRuntimeWorktreeCaches()
-      return callRuntimeResult('repo.add', { path, kind })
+      const projectId = await getOrCreateDefaultProjectId()
+      const displayName = repoDisplayNameFromUrl(path)
+      // Why a bare RemoteRepoView, not {repo: ...}: channels_repo_ssh_
+      // status_workspace.go's repo.add handler returns toRepoView(...)
+      // directly — confirmed live (an earlier version of this fix wrapped
+      // it and crashed on `result.repo` being undefined).
+      const view = await callRuntimeResult<RemoteRepoView>('repo.add', {
+        projectId,
+        url: path,
+        displayName
+      })
+      return { repo: mergeRepoViewIntoRepo(view) }
     },
     remove: async ({ repoId }) => {
-      await callRuntimeResult('repo.rm', { repo: repoId })
+      await callRuntimeResult('repo.rm', { repoId })
       invalidateRuntimeWorktreeCaches()
     },
     // Why: host-scoped forget targets a disconnected/removed SSH host owned by
@@ -1260,9 +1401,28 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
     removeForHost: () => {
       throw new Error('Forgetting a host is unavailable in paired web clients.')
     },
-    reorder: async ({ orderedIds }) => callRuntimeResult('repo.reorder', { orderedIds }),
-    update: async ({ repoId, updates }) =>
-      (await callRuntimeResult<{ repo: Repo }>('repo.update', { repo: repoId, updates })).repo,
+    reorder: async ({ orderedIds }) => {
+      // Why fetch the repo list first: repo.reorder needs a projectId
+      // (Go's ReorderReposRequest is project-scoped, not repo-scoped), which
+      // this method's own args don't carry — resolved from whichever repo
+      // in orderedIds we can find, same as repos.ts's reorderRepos action.
+      const views = await fetchAllRemoteRepoViews()
+      const byId = new Map(views.map((view) => [view.id, view]))
+      const projectId = orderedIds.map((id) => byId.get(id)?.projectId).find(Boolean) ?? ''
+      if (!projectId) {
+        return { status: 'rejected' }
+      }
+      await callRuntimeResult('repo.reorder', { projectId, repoIdsInOrder: orderedIds })
+      return { status: 'applied' }
+    },
+    update: async ({ repoId, updates }) => {
+      // Bare RemoteRepoView — see add()'s doc comment above.
+      const view = await callRuntimeResult<RemoteRepoView>('repo.update', {
+        repoId,
+        displayName: updates.displayName ?? ''
+      })
+      return mergeRepoViewIntoRepo(view)
+    },
     pickFolder: () => Promise.resolve(null),
     pickFolders: () => Promise.resolve([]),
     pickDirectory: () => Promise.resolve(null),
@@ -1283,20 +1443,16 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
       throw new Error('Creating projects on SSH hosts is unavailable in paired web clients.')
     },
     cloneAbort: () => Promise.resolve(),
-    addRemote: async ({ remotePath, displayName, kind }) => {
+    addRemote: async ({ remotePath, displayName }) => {
       invalidateRuntimeWorktreeCaches()
-      const result = await callRuntimeResult<{ repo: Repo }>('repo.add', {
-        path: remotePath,
-        kind
+      const projectId = await getOrCreateDefaultProjectId()
+      // Bare RemoteRepoView — see add()'s doc comment above.
+      const view = await callRuntimeResult<RemoteRepoView>('repo.add', {
+        projectId,
+        url: remotePath,
+        displayName: displayName || repoDisplayNameFromUrl(remotePath)
       })
-      return displayName
-        ? {
-            repo: await createReposApi().update({
-              repoId: result.repo.id,
-              updates: { displayName }
-            })
-          }
-        : result
+      return { repo: mergeRepoViewIntoRepo(view) }
     },
     create: async ({ parentPath, name, kind }) => {
       invalidateRuntimeWorktreeCaches()
@@ -1346,7 +1502,8 @@ function createWorktreesApi(): NonNullable<Partial<PreloadApi>['worktrees']> {
           limit: WEB_RUNTIME_WORKTREE_LIST_LIMIT
         })
       ).worktrees,
-    listDetected: async ({ repoId }) => callRuntimeDetectedWorktrees(repoId),
+    listDetected: async ({ repoId, projectId }) =>
+      callRuntimeDetectedWorktrees(repoId, projectId ?? ''),
     listAll: () => listAllRuntimeWorktrees(),
     create: async (args) => {
       invalidateRuntimeWorktreeCaches()
@@ -2197,7 +2354,7 @@ function createRuntimeNamespaceApi(prefix: string): never {
 function createDevServerApi(): NonNullable<Partial<PreloadApi>['devServer']> {
   type StatusHandler = (event: {
     id: string
-    status: import('../../../shared/dev-server-types').DevServerStatus
+    status: DevServerStatus
     platform?: NodeJS.Platform
     error?: string
   }) => void
@@ -2209,13 +2366,13 @@ function createDevServerApi(): NonNullable<Partial<PreloadApi>['devServer']> {
   // are not yet plumbed through the client-events stream in web mode.
   let statusSubscribed = false
   function ensureStatusSubscription(): void {
-    if (statusSubscribed) {return}
+    if (statusSubscribed) {
+      return
+    }
     statusSubscribed = true
 
     const poll = (): void => {
-      void callRuntimeResult<import('../../../shared/dev-server-types').DevServer[]>(
-        'devServer.list'
-      )
+      void callRuntimeResult<DevServer[]>('devServer.list')
         .then((servers) => {
           for (const server of servers) {
             // Emit full status event so updateDevServerStatus gets arch/nodeVersion/error too
@@ -2228,7 +2385,7 @@ function createDevServerApi(): NonNullable<Partial<PreloadApi>['devServer']> {
                 arch: (server as any).arch ?? undefined,
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
                 nodeVersion: (server as any).nodeVersion ?? undefined,
-                error: server.lastError ?? undefined,
+                error: server.lastError ?? undefined
               })
             }
           }
@@ -2243,40 +2400,26 @@ function createDevServerApi(): NonNullable<Partial<PreloadApi>['devServer']> {
   }
 
   return {
-    list: () =>
-      callRuntimeResult<import('../../../shared/dev-server-types').DevServer[]>('devServer.list'),
+    list: () => callRuntimeResult<DevServer[]>('devServer.list'),
 
-    add: (input) =>
-      callRuntimeResult<import('../../../shared/dev-server-types').DevServer>(
-        'devServer.add',
-        input
-      ),
+    add: (input) => callRuntimeResult<DevServer>('devServer.add', input),
 
     remove: (id) => callRuntimeResult<void>('devServer.remove', { id }),
 
-    connect: (id) =>
-      callRuntimeResult<import('../../../shared/dev-server-types').DevServer>(
-        'devServer.connect',
-        { id }
-      ),
+    connect: (id) => callRuntimeResult<DevServer>('devServer.connect', { id }),
 
     disconnect: (id) => callRuntimeResult<void>('devServer.disconnect', { id }),
 
     testConnection: (input) =>
-      callRuntimeResult<import('../../../shared/dev-server-types').ConnectionTestResult>(
-        'devServer.testConnection',
-        input
-      ),
+      callRuntimeResult<ConnectionTestResult>('devServer.testConnection', input),
 
     listSshTargets: async () => {
-      const result = await callRuntimeResult<{ targets: import('../../../shared/ssh-types').SshTarget[] }>(
-        'devServer.listSshTargets'
-      )
+      const result = await callRuntimeResult<{ targets: SshTarget[] }>('devServer.listSshTargets')
       return result.targets
     },
 
     addSshTarget: async (params) => {
-      const result = await callRuntimeResult<{ target: import('../../../shared/ssh-types').SshTarget }>(
+      const result = await callRuntimeResult<{ target: SshTarget }>(
         'devServer.addSshTarget',
         params
       )
@@ -2295,18 +2438,138 @@ function createDevServerApi(): NonNullable<Partial<PreloadApi>['devServer']> {
     offAgentToken: () => {},
 
     browseDir: async ({ id, path }) => {
-      return callRuntimeResult<{ resolvedPath: string; entries: { name: string; isDirectory: boolean; isSymlink: boolean }[] }>(
-        'devServer.browseDir',
-        { id, path }
-      )
+      return callRuntimeResult<{
+        resolvedPath: string
+        entries: { name: string; isDirectory: boolean; isSymlink: boolean }[]
+      }>('devServer.browseDir', { id, path })
     },
     mkdir: async ({ id, path }) => {
       return callRuntimeResult<{ path: string }>('devServer.mkdir', { id, path })
     },
     rmdir: async ({ id, path }) => {
       return callRuntimeResult<void>('devServer.rmdir', { id, path })
-    }
+    },
+
+    // ── CR-DS-006/007/008: admin approval, grouping, department access ──
+    // Why devServerId, not id: the wscompat channel handlers
+    // (channels_dev_server_access_control.go) decode this key as
+    // `devServerId` — live-verified bug: sending `{ id }` here left the
+    // backend's DevServerID empty (no matching JSON key), so
+    // ApproveDevServer's WHERE id = '' matched no row and failed with
+    // INFRA_APPROVE_DEV_SERVER_FAILED regardless of which server was
+    // clicked.
+    approve: (id) => callRuntimeResult<DevServer>('devServer.approve', { devServerId: id }),
+    reject: (id, reason) =>
+      callRuntimeResult<DevServer>('devServer.reject', { devServerId: id, reason }),
+    assignGroup: (id, groupId) =>
+      callRuntimeResult<DevServer>('devServer.assignGroup', { devServerId: id, groupId }),
+    listForUser: async () => {
+      // Why the unwrap: devServer.listForUser's wscompat handler returns
+      // {devServers: [...]}, not a bare array — same wrapped-object
+      // convention as devServerGroup.list/.listGrants and
+      // devServer.listPendingAccessRequests below (matches
+      // listSshTargets/addSshTarget's existing unwrap above). Live-verified
+      // bug: without this, `groups`/`devServers` etc. were the wrapper
+      // object itself, and every `.map()` call downstream crashed with
+      // "t.map is not a function".
+      const result = await callRuntimeResult<{
+        devServers: DevServer[]
+      }>('devServer.listForUser')
+      return result.devServers
+    },
+    requestAccess: (params) =>
+      callRuntimeResult<DevServerAccessRequest>('devServer.requestAccess', params),
+    listPendingAccessRequests: async () => {
+      const result = await callRuntimeResult<{
+        requests: DevServerAccessRequest[]
+      }>('devServer.listPendingAccessRequests')
+      return result.requests
+    },
+    resolveAccessRequest: (params) =>
+      callRuntimeResult<{
+        request: DevServerAccessRequest
+        grant: DevServerGroupGrant | null
+      }>('devServer.resolveAccessRequest', params)
   } as NonNullable<Partial<PreloadApi>['devServer']>
+}
+
+// ─── Dev Server Group Web API (CR-DS-006/007) ─────────────────────────────
+function createDevServerGroupApi(): NonNullable<Partial<PreloadApi>['devServerGroup']> {
+  return {
+    create: (params) => callRuntimeResult<DevServerGroup>('devServerGroup.create', params),
+    list: async () => {
+      // Why the unwrap: see devServer.listForUser's comment above — same
+      // {groups: [...]} wrapped-object convention, not a bare array.
+      const result = await callRuntimeResult<{
+        groups: DevServerGroup[]
+      }>('devServerGroup.list')
+      return result.groups
+    },
+    grant: (params) => callRuntimeResult<DevServerGroupGrant>('devServerGroup.grant', params),
+    revoke: (grantId) => callRuntimeResult<void>('devServerGroup.revoke', { grantId }),
+    listGrants: async (devServerGroupId) => {
+      const result = await callRuntimeResult<{
+        grants: DevServerGroupGrant[]
+      }>('devServerGroup.listGrants', { devServerGroupId })
+      return result.grants
+    }
+  }
+}
+
+// ─── Tenant Profile Web API (CR-DS-008 Department Gate) ───────────────────
+// Bridges to the pre-existing tenant-service profile.* wscompat channels
+// (profile.getUserProfile / profile.listDepts / profile.updateUser) — not
+// the unrelated renderer/src/hooks/useProfile.ts (TDD-FE-11's OrcaProfile
+// settings-hierarchy feature, which reuses the same channel names for a
+// different payload shape).
+function createTenantProfileApi(): NonNullable<Partial<PreloadApi>['tenantProfile']> {
+  return {
+    getUserProfile: () => callRuntimeResult<TenantUserProfile>('profile.getUserProfile'),
+    listDepartments: () => callRuntimeResult<TenantDepartment[]>('profile.listDepts'),
+    setUserDepartment: ({ departmentId }) =>
+      callRuntimeResult<TenantUserProfile>('profile.updateUser', {
+        departmentId,
+        clearDepartment: false
+      }),
+    setUserDepartmentFor: ({ userId, departmentId }) =>
+      callRuntimeResult<TenantUserProfile>('profile.updateUser', {
+        userId,
+        departmentId,
+        clearDepartment: false
+      }),
+    getCompany: (params) => callRuntimeResult<TenantCompany>('profile.getCompany', params ?? {}),
+    updateCompany: (params) => callRuntimeResult<TenantCompany>('profile.updateCompany', params),
+    createCompany: (params) => callRuntimeResult<TenantCompany>('profile.createCompany', params),
+    listCompanies: async () => {
+      const result = await callRuntimeResult<{
+        companies: TenantCompany[]
+      }>('profile.listCompanies')
+      return result.companies
+    },
+    createDepartment: ({ name, companyId }) =>
+      callRuntimeResult<TenantDepartment>('profile.createDept', { name, companyId })
+  }
+}
+
+// ─── Admin User Management Web API ────────────────────────────────────────
+// Bridges to auth-service's user-management RPCs via the new admin.*
+// wscompat channels (channels_admin_users.go) — admin-gated server-side.
+function createAdminApi(): NonNullable<Partial<PreloadApi>['admin']> {
+  return {
+    createUser: (params) =>
+      callRuntimeResult<{
+        user: AdminUser
+        generatedPassword: string
+      }>('admin.createUser', params),
+    listUsers: (params) =>
+      callRuntimeResult<{
+        users: AdminUser[]
+        nextPageToken: string
+      }>('admin.listUsers', params ?? {}),
+    updateUserRole: (params) => callRuntimeResult<AdminUser>('admin.updateUserRole', params),
+    deactivateUser: (params) => callRuntimeResult<AdminUser>('admin.deactivateUser', params),
+    reactivateUser: (params) => callRuntimeResult<AdminUser>('admin.reactivateUser', params)
+  }
 }
 
 function createHooksApi(): NonNullable<Partial<PreloadApi>['hooks']> {
@@ -3140,16 +3403,15 @@ function getClientForEnvironment(
       environment.endpoints.find((ep) => ep.id === environment.preferredEndpointId) ??
       environment.endpoints[0]
 
-    if (preferredEndpoint && (!preferredEndpoint.deviceToken || !preferredEndpoint.publicKeyB64)) {
-      // Why: session-auth environment has empty E2EE keys — WsSessionRouter validates
-      // the session cookie server-side. Use WebSessionClient (plain WS over cookie)
-      // instead of WebRuntimeClient which requires Curve25519 key exchange.
-      // See TASK-PC-004 in specs/backend/bugs/paircode-v1/.
-      activeClient = new WebSessionClient(preferredEndpoint.endpoint)
-    } else {
-      // Pair code / E2EE environment: full key exchange via WebRuntimeClient.
-      activeClient = new WebRuntimeClient(getPreferredWebPairingOffer(environment))
-    }
+    // Why: session-auth environment has empty E2EE keys — WsSessionRouter validates
+    // the session cookie server-side. Use WebSessionClient (plain WS over cookie)
+    // instead of WebRuntimeClient which requires Curve25519 key exchange.
+    // See TASK-PC-004 in specs/backend/bugs/paircode-v1/.
+    // Otherwise (pair code / E2EE environment): full key exchange via WebRuntimeClient.
+    activeClient =
+      preferredEndpoint && (!preferredEndpoint.deviceToken || !preferredEndpoint.publicKeyB64)
+        ? new WebSessionClient(preferredEndpoint.endpoint)
+        : new WebRuntimeClient(getPreferredWebPairingOffer(environment))
 
     activeClientEnvironmentId = environment.id
   }
@@ -3572,34 +3834,78 @@ async function listAllRuntimeDetectedWorktrees(): Promise<Worktree[]> {
     return cachedDetectedWorktrees.worktrees
   }
 
-  const repos = (await callRuntimeResult<{ repos: Repo[] }>('repo.list')).repos
-  const detectedLists = await Promise.all(
-    repos.map((repo) => callRuntimeDetectedWorktrees(repo.id))
-  )
-  const worktrees = detectedLists.flatMap((result) => result.worktrees)
-  cachedDetectedWorktrees = { loadedAt: Date.now(), worktrees }
-  return worktrees
+  // Why a try/catch around the whole thing, not just callRuntimeDetectedWorktrees:
+  // an unexpected error from ANY one project's repo.list call (or from
+  // project.list itself) shouldn't blank the whole sidebar — this feeds
+  // resolveRuntimeWorktreeByPath, whose only caller already handles "no
+  // match found" as an expected outcome, not a crash-worthy one.
+  try {
+    const views = await fetchAllRemoteRepoViews()
+    const detectedLists = await Promise.all(
+      views.map((view) => callRuntimeDetectedWorktrees(view.id, view.projectId))
+    )
+    const worktrees = detectedLists.flatMap((result) => result.worktrees)
+    cachedDetectedWorktrees = { loadedAt: Date.now(), worktrees }
+    return worktrees
+  } catch (err) {
+    console.error('Failed to list runtime detected worktrees:', err)
+    return []
+  }
 }
 
-async function callRuntimeDetectedWorktrees(repoId: string): Promise<DetectedWorktreeListResult> {
-  const response = await callRuntimeEnvelope<DetectedWorktreeListResult>(
-    'worktree.detectedList',
-    { repo: repoId },
-    15_000
-  )
-  if (response.ok) {
-    return response.result
-  }
-  if (response.error.code !== 'method_not_found') {
-    throw new Error(response.error.message)
-  }
+async function callRuntimeDetectedWorktrees(
+  repoId: string,
+  projectId: string
+): Promise<DetectedWorktreeListResult> {
+  try {
+    const response = await callRuntimeEnvelope<DetectedWorktreeListResult>(
+      'worktree.detectedList',
+      { projectId, repoId },
+      15_000
+    )
+    if (response.ok) {
+      // Why the shape guard, kept as defense-in-depth even though
+      // channels_worktree.go's handler now synthesizes a real
+      // {repoId, authoritative, source, worktrees} (see the spec doc's
+      // "Thirty-fourth" entry; mirrors the identical guard store/slices/
+      // worktrees.ts's listDetectedWorktreesForRepo has): a server on an
+      // older binary mid-rollout, or any future regression in that
+      // synthesis, should still degrade safely instead of leaving
+      // .worktrees undefined and crashing the very next .flatMap/.map
+      // over it above and in resolveRuntimeWorktreeByPath.
+      if (!Array.isArray(response.result.worktrees)) {
+        return { repoId, authoritative: false, source: 'metadata-fallback', worktrees: [] }
+      }
+      return response.result
+    }
+    if (response.error.code !== 'method_not_found') {
+      throw new Error(response.error.message)
+    }
 
-  const legacy = await callRuntimeResult<{ worktrees: Worktree[] }>(
-    'worktree.list',
-    { repo: repoId, limit: WEB_RUNTIME_WORKTREE_LIST_LIMIT },
-    15_000
-  )
-  return toLegacyDetectedWorktreeResult(repoId, legacy.worktrees)
+    const legacy = await callRuntimeResult<{ worktrees: Worktree[] }>(
+      'worktree.list',
+      { projectId, limit: WEB_RUNTIME_WORKTREE_LIST_LIMIT },
+      15_000
+    )
+    return toLegacyDetectedWorktreeResult(repoId, legacy.worktrees)
+  } catch (err) {
+    // Why soft-empty here too, not just at the listAll level: PROJECT_
+    // MEMBERSHIP_LOOKUP_FAILED/WORKTREE_REPO_NOT_FOUND were known,
+    // disclosed architectural gaps (worktree.* not fully wired for
+    // project-scoped repos — see the spec doc's "Thirtieth"/"Thirty-first"
+    // entries) — now fixed server-side, but kept here defensively for any
+    // repo whose dev server genuinely can't be resolved (e.g. one with no
+    // dev server bound at all), so a per-repo failure still degrades to
+    // "no worktrees detected yet" rather than blanking the whole list.
+    const message = err instanceof Error ? err.message : String(err)
+    if (
+      message.includes('PROJECT_MEMBERSHIP_LOOKUP_FAILED') ||
+      message.includes('WORKTREE_REPO_NOT_FOUND')
+    ) {
+      return { repoId, authoritative: false, source: 'metadata-fallback', worktrees: [] }
+    }
+    throw err
+  }
 }
 
 function toLegacyDetectedWorktreeResult(

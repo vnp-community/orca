@@ -32,6 +32,9 @@ type CreateStepProps = {
   manualParentEntry?: boolean
   runtimeEnvironmentId?: string | null
   sshTargetId?: string | null
+  // Why: added alongside runtimeEnvironmentId/sshTargetId — see
+  // CreateProjectParentBrowserProps's doc comment (CreateProjectLocationField.tsx).
+  devServerId?: string | null
   onNameChange: (value: string) => void
   onParentChange: (value: string) => void
   onPickParent: () => void
@@ -50,6 +53,7 @@ export function CreateStep({
   manualParentEntry = false,
   runtimeEnvironmentId,
   sshTargetId,
+  devServerId,
   onNameChange,
   onParentChange,
   onPickParent,
@@ -77,7 +81,7 @@ export function CreateStep({
     'auto.components.sidebar.AddRepoCreateStep.6ed14c0281',
     'host folder not selected'
   )
-  const isRemoteHost = Boolean(runtimeEnvironmentId || sshTargetId)
+  const isRemoteHost = Boolean(runtimeEnvironmentId || sshTargetId || devServerId)
 
   const summaryParent = useMemo(
     () =>
@@ -111,11 +115,12 @@ export function CreateStep({
   const showRuntimeMissingParent =
     runtimeEnvironmentId && !createParent.trim() && runtimeParentStatus !== 'checking'
 
-  if (browsingParent && (runtimeEnvironmentId || sshTargetId)) {
+  if (browsingParent && (runtimeEnvironmentId || sshTargetId || devServerId)) {
     return (
       <CreateProjectParentBrowser
         runtimeEnvironmentId={runtimeEnvironmentId}
         sshTargetId={sshTargetId}
+        devServerId={devServerId}
         createParent={createParent}
         onParentChange={onParentChange}
         onClose={() => setBrowsingParent(false)}
@@ -240,6 +245,7 @@ export function CreateStep({
                 manualParentEntry={manualParentEntry}
                 runtimeEnvironmentId={runtimeEnvironmentId}
                 sshTargetId={sshTargetId}
+                devServerId={devServerId}
                 onParentChange={onParentChange}
                 onPickParent={onPickParent}
                 onBrowseServer={() => setBrowsingParent(true)}

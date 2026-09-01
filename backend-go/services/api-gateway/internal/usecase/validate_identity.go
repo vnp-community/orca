@@ -15,6 +15,13 @@ import (
 type Identity struct {
 	TenantID string
 	UserID   string
+	// Role is the caller's global role ("admin"/"user") — added for
+	// CR-DS-006 Phase 2. Empty for every existing call site (the zero
+	// value), and for AuthValidator.Validate's bearer-JWT path specifically
+	// (JWT claims don't carry role yet — a separate, still-open gap).
+	// Populated only by authclient.SessionValidator's cookie path — see
+	// common/tenant.Role's doc comment for the fail-closed contract.
+	Role string
 }
 
 var (

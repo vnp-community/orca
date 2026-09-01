@@ -422,7 +422,10 @@ describe('repo slice host identity routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.reorder',
-      params: { orderedIds: ['same-repo'] },
+      // Why projectId: '' — remoteDuplicate has no projectId set, and the
+      // reorder call site falls back to '' when the reordered repo at the
+      // head of this host's group doesn't carry one.
+      params: { projectId: '', repoIdsInOrder: ['same-repo'] },
       timeoutMs: 15_000
     })
   })

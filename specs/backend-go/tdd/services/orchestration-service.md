@@ -9,7 +9,7 @@ lifecycle-reconciliation.ts, keyed-async-queue.ts}`.
 
 `orchestration-service` is the system of record for the multi-agent
 coordination "complex path" pipeline: **Source → Plan → Execute**
-(`docs/guides/task-automation-orchestration-integration.md §9.2/§9.4.2/§9.4.4`).
+(`docs/guides/task-automation/task-automation-orchestration-integration.md §9.2/§9.4.2/§9.4.4`).
 It owns `messages`, `dispatch_contexts`, `decision_gates`,
 `coordinator_runs`, and `orchestration_tasks` (its own DAG-node table, the
 Go/Postgres equivalent of TS's `TaskRow`), per

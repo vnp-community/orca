@@ -272,6 +272,33 @@ func (f *fakeProjectServiceClient) UpdateRepo(_ context.Context, in *projectv1.U
 	return f.updateRepoResp, nil
 }
 
+// GetRepo has no REST route (only git-gateway-service calls it, server-to-
+// server) — minimal always-succeed stub, only to satisfy
+// projectv1.ProjectServiceClient.
+func (f *fakeProjectServiceClient) GetRepo(_ context.Context, _ *projectv1.GetRepoRequest, _ ...grpc.CallOption) (*projectv1.GetRepoResponse, error) {
+	return &projectv1.GetRepoResponse{}, nil
+}
+
+// AddRepoMember/ListRepoMembers/RemoveRepoMember/UpdateRepoMemberRole have no
+// REST route yet (repo_members is only reachable via wscompat's repo.*
+// channels) — minimal always-succeed stubs, only to satisfy
+// projectv1.ProjectServiceClient at compile time.
+func (f *fakeProjectServiceClient) AddRepoMember(_ context.Context, _ *projectv1.AddRepoMemberRequest, _ ...grpc.CallOption) (*projectv1.AddRepoMemberResponse, error) {
+	return &projectv1.AddRepoMemberResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) ListRepoMembers(_ context.Context, _ *projectv1.ListRepoMembersRequest, _ ...grpc.CallOption) (*projectv1.ListRepoMembersResponse, error) {
+	return &projectv1.ListRepoMembersResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) RemoveRepoMember(_ context.Context, _ *projectv1.RemoveRepoMemberRequest, _ ...grpc.CallOption) (*projectv1.RemoveRepoMemberResponse, error) {
+	return &projectv1.RemoveRepoMemberResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) UpdateRepoMemberRole(_ context.Context, _ *projectv1.UpdateRepoMemberRoleRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoMemberRoleResponse, error) {
+	return &projectv1.UpdateRepoMemberRoleResponse{}, nil
+}
+
 func (f *fakeProjectServiceClient) RecordWorktreeCreated(_ context.Context, in *projectv1.RecordWorktreeCreatedRequest, _ ...grpc.CallOption) (*projectv1.RecordWorktreeCreatedResponse, error) {
 	f.lastRecordWorktreeCreatedReq = in
 	if f.recordWorktreeCreatedErr != nil {

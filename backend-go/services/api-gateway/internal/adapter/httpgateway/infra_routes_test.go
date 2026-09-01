@@ -25,6 +25,13 @@ import (
 // shape as the fakes usage_routes tests would use, hand-rolled here since
 // there's no generated mock for this client.
 type fakeInfraFleetServiceClient struct {
+	// Embedded nil interface: satisfies every InfraFleetServiceClient method
+	// this fake doesn't override below (e.g. CR-DS-006/007/008's
+	// ApproveDevServer et al.) — none of this file's tests exercise those,
+	// so a nil-panic-on-call is the correct "never expected to be called"
+	// signal, same convention wscompat/channels_test.go's fakes use.
+	infrafleetv1.InfraFleetServiceClient
+
 	registerDevServerFn  func(*infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error)
 	resolveConnectionFn  func(*infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error)
 	createSshTargetFn    func(*infrafleetv1.CreateSshTargetRequest) (*infrafleetv1.CreateSshTargetResponse, error)

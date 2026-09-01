@@ -11,14 +11,14 @@ import (
 // comment for why this resolves repoID via ProjectClient.GetRepo before
 // dispatching, rather than passing repoID straight into dispatchExecutor.
 type PrefetchCreateBase struct {
-	resolver ConnectionResolver
-	projects ProjectClient
-	local    GitExecutor
-	relay    GitExecutor
+	reachability DevServerReachability
+	projects     ProjectClient
+	local        GitExecutor
+	relay        GitExecutor
 }
 
-func NewPrefetchCreateBase(resolver ConnectionResolver, projects ProjectClient, local, relay GitExecutor) *PrefetchCreateBase {
-	return &PrefetchCreateBase{resolver: resolver, projects: projects, local: local, relay: relay}
+func NewPrefetchCreateBase(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *PrefetchCreateBase {
+	return &PrefetchCreateBase{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 
 func (uc *PrefetchCreateBase) Execute(ctx context.Context, repoID, baseRef string) (string, error) {
@@ -26,7 +26,7 @@ func (uc *PrefetchCreateBase) Execute(ctx context.Context, repoID, baseRef strin
 	if err != nil {
 		return "", apperrors.New(apperrors.KindNotFound, "WORKTREE_REPO_NOT_FOUND", "repo does not exist", err)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, repo.ID)
+	executor, repoPath, err := dispatchExecutorForRepo(ctx, uc.reachability, uc.local, uc.relay, repo)
 	if err != nil {
 		return "", apperrors.New(apperrors.KindInternal, "WORKTREE_RESOLVE_FAILED", "failed to resolve host", err)
 	}

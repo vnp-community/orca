@@ -10,6 +10,7 @@ import {
 import { BROWSER_USE_ENABLED_STORAGE_KEY } from '@/lib/browser-use-setup-state'
 import type { InstalledAgentSkillState } from '@/hooks/useInstalledAgentSkills'
 import { useActiveProjectSkillRuntime } from '@/hooks/useActiveProjectSkillRuntime'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { AgentSkillSetupPanel } from '@/components/settings/AgentSkillSetupPanel'
 import {
   buildSkillCommandForRuntime,
@@ -18,7 +19,10 @@ import {
 } from '@/components/settings/CliSkillRuntimeSetup'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
-import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
+import {
+  getRuntimeCliInstallStatus,
+  getRuntimeWslCliInstallStatus
+} from '@/runtime/runtime-cli-client'
 
 export function BrowserUseSkillSetupCard(props: {
   compact?: boolean
@@ -27,6 +31,15 @@ export function BrowserUseSkillSetupCard(props: {
 }): JSX.Element {
   const { compact, terminalHeightPx, skill } = props
   const activeSkillRuntime = useActiveProjectSkillRuntime()
+  // Why: this panel's setup terminal has no project/repo behind it, so it
+  // has no natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   const installCommand = !activeSkillRuntime.installDisabledReason
     ? buildSkillCommandForRuntime(ORCA_CLI_SKILL_INSTALL_COMMAND, activeSkillRuntime.agentRuntime)
     : ORCA_CLI_SKILL_INSTALL_COMMAND
@@ -58,6 +71,7 @@ export function BrowserUseSkillSetupCard(props: {
       terminalTitle="Browser Use setup"
       terminalAriaLabel="Browser Use skill install terminal"
       terminalWorktreeId="feature-wall-browser-use-skill-terminal"
+      devServerId={devServerId}
       terminalShellOverride={activeSkillRuntime.terminalShellOverride}
       installed={skill.installed}
       loading={skill.loading}
@@ -67,9 +81,7 @@ export function BrowserUseSkillSetupCard(props: {
       preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
       getPrerequisiteStatus={() =>
         activeSkillRuntime.agentRuntime?.runtime === 'wsl'
-          ? getRuntimeWslCliInstallStatus(
-              getWslCliDistroRequest(activeSkillRuntime.agentRuntime)
-            )
+          ? getRuntimeWslCliInstallStatus(getWslCliDistroRequest(activeSkillRuntime.agentRuntime))
           : getRuntimeCliInstallStatus()
       }
       onBeforeOpenTerminal={handleBeforeOpenTerminal}

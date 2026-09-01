@@ -9,7 +9,7 @@ import (
 )
 
 func TestAttachPty_RequiresAttachFirstFrame(t *testing.T) {
-	uc := NewAttachPty(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerAgentClient{}, NewConnectionStreamLimiter(0))
+	uc := NewAttachPty(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerRepository{}, &fakeDevServerAgentClient{}, NewConnectionStreamLimiter(0))
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	inbound := make(chan PtyClientMessage, 1)
@@ -27,7 +27,7 @@ func TestAttachPty_RequiresAttachFirstFrame(t *testing.T) {
 }
 
 func TestAttachPty_UnknownPtyID_ReturnsError(t *testing.T) {
-	uc := NewAttachPty(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerAgentClient{}, NewConnectionStreamLimiter(0))
+	uc := NewAttachPty(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerRepository{}, &fakeDevServerAgentClient{}, NewConnectionStreamLimiter(0))
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	inbound := make(chan PtyClientMessage, 1)
@@ -69,7 +69,7 @@ func TestAttachPty_RelaysInputAndResizeToAgent(t *testing.T) {
 	resolver := &fakeConnectionResolver{}
 	agent := &fakeDevServerAgentClient{streamPtyEvents: make(chan PtyEvent)}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
-	uc := NewAttachPty(sessions, resolver, agent, NewConnectionStreamLimiter(0))
+	uc := NewAttachPty(sessions, resolver, &fakeDevServerRepository{}, agent, NewConnectionStreamLimiter(0))
 
 	ctx, cancel := context.WithCancel(withTenant(context.Background(), "tenant-1"))
 	defer cancel()
@@ -110,7 +110,7 @@ func TestAttachPty_RelaysAgentOutputAndExit(t *testing.T) {
 	events := make(chan PtyEvent, 2)
 	agent := &fakeDevServerAgentClient{streamPtyEvents: events}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
-	uc := NewAttachPty(sessions, resolver, agent, NewConnectionStreamLimiter(0))
+	uc := NewAttachPty(sessions, resolver, &fakeDevServerRepository{}, agent, NewConnectionStreamLimiter(0))
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	inbound := make(chan PtyClientMessage, 1)
@@ -166,7 +166,7 @@ func TestAttachPty_StreamLimitReached(t *testing.T) {
 	}
 	defer release()
 
-	uc := NewAttachPty(sessions, resolver, agent, limiter)
+	uc := NewAttachPty(sessions, resolver, &fakeDevServerRepository{}, agent, limiter)
 	ctx := withTenant(context.Background(), "tenant-1")
 	inbound := make(chan PtyClientMessage, 1)
 	inbound <- PtyClientMessage{Attach: &PtyAttachMessage{PtyID: "pty-1"}}

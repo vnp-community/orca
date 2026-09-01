@@ -584,6 +584,10 @@ export type TerminalSlice = {
        *  so the tab keeps the implicit `'terminal'` default. */
       viewMode?: Tab['viewMode']
       startupCwd?: string
+      /** Explicit dev-server binding for a worktreeId with no backing repo
+       *  record (ephemeral setup/onboarding terminals) — see
+       *  TerminalTab['connectionId']'s doc comment. */
+      connectionId?: string | null
     }
   ) => TerminalTab
   openNewTerminalTabInActiveWorkspace: (groupId: string) => Promise<void>
@@ -1009,7 +1013,8 @@ export const createTerminalSlice: StateCreator<AppState, [], [], TerminalSlice> 
         // Without this, clicking a never-visited worktree would stamp
         // lastActivityAt and reorder Recent/Smart on click — same bug class as
         // the generation-bump → remount path, different code path.
-        ...(options?.pendingActivationSpawn ? { pendingActivationSpawn: true } : {})
+        ...(options?.pendingActivationSpawn ? { pendingActivationSpawn: true } : {}),
+        ...(options?.connectionId ? { connectionId: options.connectionId } : {})
       }
       const validTargetGroupId =
         targetGroupId && s.groupsByWorktree[worktreeId]?.some((group) => group.id === targetGroupId)

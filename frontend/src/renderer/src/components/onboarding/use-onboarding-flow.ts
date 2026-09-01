@@ -36,6 +36,8 @@ import { translate } from '@/i18n/i18n'
 import { resolveAgentPermissionModeSummary } from '../../../../shared/tui-agent-permissions'
 import { isWindowsUserAgent } from '@/components/terminal-pane/pane-helpers'
 import { buildWindowsTerminalSnapshotPayload } from './windows-terminal-onboarding-telemetry'
+import { useRemoteAgentDetection } from '@/hooks/useRemoteAgentDetection'
+import { isTuiAgent } from '../../../../shared/tui-agent-config'
 
 export { STEPS } from './use-onboarding-flow-types'
 export type { StepId, StepNumber } from './use-onboarding-flow-types'
@@ -222,8 +224,25 @@ export function useOnboardingFlow(
   const settings = useAppStore((s) => s.settings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const refreshDetectedAgents = useAppStore((s) => s.refreshDetectedAgents)
-  const detectedAgentIds = useAppStore((s) => s.detectedAgentIds)
-  const isDetectingAgents = useAppStore((s) => s.isDetectingAgents || s.isRefreshingAgents)
+  const localDetectedAgentIds = useAppStore((s) => s.detectedAgentIds)
+  const isDetectingLocalAgents = useAppStore((s) => s.isDetectingAgents || s.isRefreshingAgents)
+  // [CR-OB-003] The web build has no local PATH to probe — a chosen dev
+  // server (settings.activeDevServerId, set in DevServerStep) is the real
+  // place to detect agents on. Below, activeDevServerId gates between this
+  // remote result and the local-PATH result the rest of this hook already
+  // computed; a null devServerId (Electron desktop, or "blank terminal"
+  // onboarding) makes useRemoteAgentDetection a no-op (see its own
+  // implementation), keeping the local-PATH path exactly as it was before.
+  const activeDevServerId = settings?.activeDevServerId ?? null
+  const remoteAgentDetection = useRemoteAgentDetection(activeDevServerId)
+  const remoteDetectedAgentIds = useMemo(
+    () => remoteAgentDetection.agents.filter(isTuiAgent),
+    [remoteAgentDetection.agents]
+  )
+  const detectedAgentIds = activeDevServerId ? remoteDetectedAgentIds : localDetectedAgentIds
+  const isDetectingAgents = activeDevServerId
+    ? remoteAgentDetection.loading
+    : isDetectingLocalAgents
   const pathSource = useAppStore((s) => s.pathSource)
   const pathFailureReason = useAppStore((s) => s.pathFailureReason)
   const fetchRepos = useAppStore((s) => s.fetchRepos)
@@ -554,6 +573,12 @@ export function useOnboardingFlow(
   // selecting an agent would re-trigger this effect and clobber/race user clicks.
   const didAutoSelectRef = useRef(false)
   useEffect(() => {
+    // [CR-OB-003] A dev server is active — detection runs remotely via
+    // remoteAgentDetection below instead of probing a local PATH that, in
+    // the web build, doesn't exist for this session at all.
+    if (activeDevServerId) {
+      return
+    }
     if (didAutoSelectRef.current) {
       return
     }
@@ -568,7 +593,37 @@ export function useOnboardingFlow(
       const preferred = getAgentCatalog().find((agent) => ids.includes(agent.id))?.id ?? null
       setSelectedAgent(preferred)
     })
-  }, [refreshDetectedAgents])
+  }, [refreshDetectedAgents, activeDevServerId])
+
+  // [CR-OB-003] Remote counterpart of the local auto-select effect above —
+  // useRemoteAgentDetection runs its own detection on devServerId change, so
+  // this only needs to react once that settles (lastDetectedAt set, not
+  // still loading) and auto-pick the first known agent if the user hasn't
+  // already chosen one.
+  const didAutoSelectRemoteRef = useRef(false)
+  useEffect(() => {
+    if (!activeDevServerId) {
+      return
+    }
+    if (didAutoSelectRemoteRef.current) {
+      return
+    }
+    if (remoteAgentDetection.loading || remoteAgentDetection.lastDetectedAt === null) {
+      return
+    }
+    didAutoSelectRemoteRef.current = true
+    if (selectedAgentRef.current !== null) {
+      return
+    }
+    const preferred =
+      getAgentCatalog().find((agent) => remoteDetectedAgentIds.includes(agent.id))?.id ?? null
+    setSelectedAgent(preferred)
+  }, [
+    activeDevServerId,
+    remoteAgentDetection.loading,
+    remoteAgentDetection.lastDetectedAt,
+    remoteDetectedAgentIds
+  ])
 
   const closeWith = useCloseWith({
     onOnboardingChange,
@@ -932,6 +987,11 @@ export function useOnboardingFlow(
         // Why: Set insertion order can drift after deselect/reselect; import
         // ordering should match the visible scan order users reviewed.
         projectPaths: selectedProjectPaths,
+        // Why: the remote path needs each candidate's suggestedName/
+        // isGitRepo (project.proto's NestedRepoCandidate), not just its
+        // path — nestedScan.repos is the already-known rich candidate
+        // data from the scan that produced this review step.
+        selectedCandidates: nestedScan.repos,
         ...(nestedImportScanId ? { scanId: nestedImportScanId } : {}),
         mode
       })
@@ -1324,6 +1384,11 @@ export function useOnboardingFlow(
     openFolder,
     continueWithExistingProject,
     openSshSettings,
-    clone
+    clone,
+    // CR-DS-008: skip-onboarding role branch needs these directly — admin
+    // skip navigates straight to Settings, same store actions openSshSettings
+    // already uses for its own detour.
+    openSettingsPage,
+    openSettingsTarget
   }
 }

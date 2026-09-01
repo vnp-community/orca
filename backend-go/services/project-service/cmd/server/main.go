@@ -138,6 +138,12 @@ func run() error {
 	reorderReposUC := usecase.NewReorderRepos(repoRepo, repo, opa)
 	removeRepoUC := usecase.NewRemoveRepo(repoRepo, repo, opa)
 	updateRepoUC := usecase.NewUpdateRepo(repoRepo, repo, opa)
+	getRepoUC := usecase.NewGetRepo(repoRepo, repo)
+
+	addRepoMemberUC := usecase.NewAddRepoMember(repoRepo, repo, opa)
+	listRepoMembersUC := usecase.NewListRepoMembers(repoRepo, repo, opa)
+	removeRepoMemberUC := usecase.NewRemoveRepoMember(repoRepo, repo, opa)
+	updateRepoMemberRoleUC := usecase.NewUpdateRepoMemberRole(repoRepo, repo, opa)
 
 	recordWorktreeCreatedUC := usecase.NewRecordWorktreeCreated(worktreeRepo)
 	recordWorktreeRemovedUC := usecase.NewRecordWorktreeRemoved(worktreeRepo)
@@ -181,6 +187,12 @@ func run() error {
 		ReorderRepos: reorderReposUC,
 		RemoveRepo:   removeRepoUC,
 		UpdateRepo:   updateRepoUC,
+		GetRepo:      getRepoUC,
+
+		AddRepoMember:        addRepoMemberUC,
+		ListRepoMembers:      listRepoMembersUC,
+		RemoveRepoMember:     removeRepoMemberUC,
+		UpdateRepoMemberRole: updateRepoMemberRoleUC,
 
 		RecordWorktreeCreated: recordWorktreeCreatedUC,
 		RecordWorktreeRemoved: recordWorktreeRemovedUC,

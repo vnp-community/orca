@@ -23,10 +23,7 @@ import { translate } from '../i18n/i18n'
 import { RecoverableRenderErrorBoundary } from '../components/error-boundaries/RecoverableRenderErrorBoundary'
 import { ConnectionStatusProvider } from './ConnectionStatusProvider'
 import { ConnectionStatusBanner } from './ConnectionStatusBanner'
-import {
-  useConnectionStatus,
-  useConnectionRetry
-} from './ConnectionStatusProvider'
+import { useConnectionStatus, useConnectionRetry } from './ConnectionStatusProvider'
 import { WebSocketRpcClient } from '../../../platform/adapters/web/rpc-client'
 import type { IRpcClient } from '../../../platform/rpc-client-interface'
 import { fetchCurrentUser, fetchAuthConfig } from '../auth/auth-api-client'
@@ -36,7 +33,6 @@ import { initBrowserTrace } from '../../../shared/trace/browser'
 import { TracePanel } from '../components/trace/TracePanel'
 import { useAppStore } from '../store'
 
-const WebConnect = lazy(() => import('./WebConnect'))
 const App = lazy(() => import('../App'))
 import { WorkspaceProvider } from '../context/WorkspaceContext'
 const LoginPage = lazy(() => import('./login/LoginPage').then((m) => ({ default: m.LoginPage })))
@@ -83,16 +79,30 @@ function showErrorUi(rootEl: HTMLElement): void {
 function installAuthFailedRedirect(): void {
   let redirected = false
   window.addEventListener('orca:auth-failed', () => {
-    if (redirected) {return}
+    if (redirected) {
+      return
+    }
     const env = readStoredWebRuntimeEnvironment()
-    if (env?.id !== 'session-auth') {return}
+    if (env?.id !== 'session-auth') {
+      return
+    }
     redirected = true
     console.warn('[Orca] Auth failed — clearing session and redirecting to /login')
-    try { localStorage.clear() } catch { /* sandboxed iframe */ }
-    try { sessionStorage.clear() } catch { /* sandboxed iframe */ }
+    try {
+      localStorage.clear()
+    } catch {
+      /* sandboxed iframe */
+    }
+    try {
+      sessionStorage.clear()
+    } catch {
+      /* sandboxed iframe */
+    }
     document.cookie.split(';').forEach((c) => {
       const name = c.split('=')[0].trim()
-      if (!name) {return}
+      if (!name) {
+        return
+      }
       const exp = 'expires=Thu, 01 Jan 1970 00:00:00 GMT'
       document.cookie = `${name}=; ${exp}; path=/`
       document.cookie = `${name}=; ${exp}; path=/; domain=${location.hostname}`
@@ -146,7 +156,7 @@ function WebRoot({
     return decision
   }, [initialPairingInput])
 
-  const [hasEnvironment, setHasEnvironment] = useState(() => {
+  const [hasEnvironment] = useState(() => {
     if (startupDecision.kind === 'auto-save-runtime-offer') {
       saveStoredWebRuntimeEnvironment(
         createStoredWebRuntimeEnvironment({ name: 'Orca Server', offer: startupDecision.offer })
@@ -155,6 +165,32 @@ function WebRoot({
     }
     return startupDecision.kind === 'use-stored-environment'
   })
+
+  // Why: `sessionUser` was resolved here (WebRootBoundary's fetchCurrentUser
+  // call) and used ONLY to decide LoginPage vs App — it was never wired into
+  // useAppStore's authSlice, so `currentUser`/`currentUser.role` read null/
+  // undefined everywhere below <App/> (live-verified: DepartmentGate's admin
+  // bypass never fired for the actual bootstrap admin account, and Settings'
+  // Admin Console never rendered for anyone). Mirror it into the store once
+  // per sessionUser identity change so `useAppStore(s => s.currentUser)`
+  // consumers (DepartmentGate, Settings, OnboardingFlow's skip branch) see
+  // the real signed-in user instead of null.
+  useEffect(() => {
+    if (sessionUser === null) {
+      return
+    }
+    const store = useAppStore.getState()
+    store.setCurrentUser({
+      id: sessionUser.id,
+      email: sessionUser.email,
+      name: sessionUser.name,
+      avatarUrl: sessionUser.avatarUrl,
+      role: sessionUser.role,
+      teams: [],
+      projects: []
+    })
+    store.setAuthStatus('authenticated')
+  }, [sessionUser])
 
   // CR-LOGIN-001: if the user is already authenticated via session cookie,
   // skip the WebConnect / pairing flow entirely and render the App directly.
@@ -174,9 +210,9 @@ function WebRoot({
       <ConnectionStatusProvider client={client}>
         <WebConnectionBannerWrapper />
         <Suspense fallback={<div className="min-h-dvh bg-background" />}>
-        <WorkspaceProvider>
-          <App />
-        </WorkspaceProvider>
+          <WorkspaceProvider>
+            <App />
+          </WorkspaceProvider>
         </Suspense>
       </ConnectionStatusProvider>
     )
@@ -190,7 +226,9 @@ function WebRoot({
       <Suspense fallback={<div className="min-h-dvh bg-background" />}>
         <LoginPage
           availableProviders={availableProviders}
-          onLoginSuccess={() => { window.location.href = '/' }}
+          onLoginSuccess={() => {
+            window.location.href = '/'
+          }}
         />
       </Suspense>
     )
@@ -241,11 +279,7 @@ function WebRootBoundary({ client }: WebRootProps): React.JSX.Element {
         'Retry the web client or reconnect to the paired runtime.'
       )}
     >
-      <WebRoot
-        client={client}
-        sessionUser={sessionUser}
-        availableProviders={availableProviders}
-      />
+      <WebRoot client={client} sessionUser={sessionUser} availableProviders={availableProviders} />
     </RecoverableRenderErrorBoundary>
   )
 }
@@ -255,12 +289,7 @@ function WebRootBoundary({ client }: WebRootProps): React.JSX.Element {
  * Extracted from main.tsx so the startup sequence can be exercised in Vitest.
  */
 export async function bootstrapWebApp(options: BootstrapOptions = {}): Promise<void> {
-  const {
-    rootElementId = 'root',
-    maxRetries = 3,
-    retryDelayMs = 2000,
-    wsUrl
-  } = options
+  const { rootElementId = 'root', maxRetries = 3, retryDelayMs = 2000, wsUrl } = options
 
   const rootEl = document.getElementById(rootElementId)
   if (!rootEl) {

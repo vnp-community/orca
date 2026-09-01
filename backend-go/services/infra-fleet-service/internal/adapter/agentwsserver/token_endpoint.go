@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
 const (
@@ -34,6 +36,13 @@ type TokenIssuer struct {
 	Registry *Registry
 	Cfg      Config
 	Logger   *slog.Logger
+	// Resolver find-or-creates the infra.dev_servers row a minted token's
+	// devServerID maps to — nil is tolerated (falls back to the pre-fix
+	// behavior: token issuance still works, but the resulting session key
+	// won't match any SQL row, so the Admin Console stays blind to it) for
+	// unit tests that only exercise token-issuance mechanics, not
+	// persistence. main.go's composition root always wires a real one.
+	Resolver *usecase.ResolveDirectWebSocketDevServer
 
 	mu   sync.Mutex
 	meta map[string]pendingTokenMeta // plaintext token -> metadata
@@ -44,12 +53,13 @@ type pendingTokenMeta struct {
 	expiresAt   time.Time
 }
 
-// NewTokenIssuer constructs a TokenIssuer.
-func NewTokenIssuer(registry *Registry, cfg Config, logger *slog.Logger) *TokenIssuer {
+// NewTokenIssuer constructs a TokenIssuer. resolver may be nil — see
+// TokenIssuer.Resolver's doc comment.
+func NewTokenIssuer(registry *Registry, cfg Config, logger *slog.Logger, resolver *usecase.ResolveDirectWebSocketDevServer) *TokenIssuer {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &TokenIssuer{Registry: registry, Cfg: cfg, Logger: logger, meta: make(map[string]pendingTokenMeta)}
+	return &TokenIssuer{Registry: registry, Cfg: cfg, Logger: logger, Resolver: resolver, meta: make(map[string]pendingTokenMeta)}
 }
 
 // ServeHTTP handles POST and GET /api/agent-token. Auth is checked before
@@ -174,6 +184,30 @@ func (t *TokenIssuer) handlePost(w http.ResponseWriter, r *http.Request) {
 		name = fmt.Sprintf("Dev Server (%s)", devServerID)
 	}
 
+	// Resolve (find-or-create) the infra.dev_servers row this external
+	// devServerID maps to. registrySlotKey — not devServerID — is what
+	// Registry.Register/Consume actually track, since a later
+	// AttachInboundSession(registrySlotKey, ...) session key must match
+	// domain.DevServer.ID exactly (a real UUID) for ListDevServers/
+	// ApproveDevServer/the Admin Console to see this connection at all. See
+	// ResolveDirectWebSocketDevServer's doc comment for the full "why".
+	// A resolve failure must not also break token issuance/agent
+	// connectivity — it only means this connection stays invisible to the
+	// Admin Console until the next successful mint, so this falls back to
+	// the raw string (old behavior) rather than erroring the request.
+	registrySlotKey := devServerID
+	if t.Resolver != nil {
+		resolved, err := t.Resolver.Execute(r.Context(), usecase.ResolveDirectWebSocketDevServerInput{
+			TenantID:    t.Cfg.DefaultTenantID,
+			DevServerID: devServerID,
+		})
+		if err != nil {
+			t.logger().ErrorContext(r.Context(), "agentwsserver: resolving dev_servers row failed — agent will connect but stay invisible to the Admin Console", slog.String("devServerId", devServerID), slog.Any("error", err))
+		} else {
+			registrySlotKey = resolved.ID
+		}
+	}
+
 	expiresIn := t.resolveExpiresIn(req)
 	token := fmt.Sprintf("agt-%s-%d", devServerID, time.Now().UnixMilli())
 
@@ -183,7 +217,7 @@ func (t *TokenIssuer) handlePost(w http.ResponseWriter, r *http.Request) {
 	t.meta[token] = pendingTokenMeta{devServerID: devServerID, expiresAt: now.Add(expiresIn)}
 	t.mu.Unlock()
 
-	t.Registry.Register(token, devServerID, func(string) {
+	t.Registry.Register(token, registrySlotKey, func(string) {
 		// Best-effort cleanup once the connect-timeout slot expires — not
 		// strictly required for GET's correctness (Registry.Has already
 		// hides it), just keeps meta from holding a stale entry forever.

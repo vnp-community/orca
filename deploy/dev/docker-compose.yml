@@ -4,16 +4,21 @@
 # Flow this file implements (see scripts/build-local.sh + sync-to-server.sh):
 #   (1) build binary locally  →  (2) rsync to server  →  (3) mount into container
 #
-# Every backend-go service and the frontend run from PUBLIC, UNMODIFIED
-# images — gcr.io/distroless/static-debian12 (~2MB, no shell, CA certs +
-# tzdata only) for the 17 Go services, nginx:1.27-alpine for the frontend.
-# No Dockerfile is built for either: the compiled binary / built static
-# assets are bind-mounted read-only into the stock image at a fixed path,
-# per the explicit "mount into container, smallest possible image"
+# 16 of the 17 backend-go services, plus the frontend, run from PUBLIC,
+# UNMODIFIED images — gcr.io/distroless/static-debian12 (~2MB, no shell, CA
+# certs + tzdata only) for the Go services, nginx:1.27-alpine for the
+# frontend. No Dockerfile is built for either: the compiled binary / built
+# static assets are bind-mounted read-only into the stock image at a fixed
+# path, per the explicit "mount into container, smallest possible image"
 # requirement — there is no smaller image than "don't build a custom one at
 # all." See ../README.md for the full rationale and the production caveats
 # (Vault dev-mode, no mTLS/service-mesh here — this is the same
 # convenience-over-rigor tradeoff deploy/old made for the TS backend).
+#
+# git-gateway-service is the one exception — see its own service block
+# below and docker/git-gateway-runtime.Dockerfile for why it needs a real
+# `git` binary and a writable volume that the shared distroless image and
+# read_only:true convention can't provide.
 #
 # Service catalog / DB ownership: specs/backend-go/services/00-service-catalog.md
 # ============================================================
@@ -212,7 +217,16 @@ services:
       # specs/backend-go/bugs/missing-v2/BUG-003/SOL-003/TASK-006. Mounted
       # at the same absolute path config.go's OPABundlePath now defaults
       # to, so no OPA_BUNDLE_PATH override is needed here.
-      - ../../backend-go/policy/orca-authz:/policy/orca-authz:ro
+      #
+      # Source is relative ("./policy/..."), not "../../backend-go/policy/..."
+      # — the latter assumed a full monorepo checkout on the server, but
+      # sync-to-server.sh only ships this directory's own tree. That mismatch
+      # meant every admin-actor check failed closed for every caller
+      # regardless of role (Docker silently bind-mounts an empty directory
+      # for a missing host path instead of erroring) — live-verified
+      # 2026-08-29. build-local.sh now copies backend-go/policy/orca-authz/
+      # into deploy/dev/policy/ on every build so this path is always real.
+      - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/auth?sslmode=disable
@@ -252,7 +266,7 @@ services:
     volumes:
       - ./bin/project-service/orca:/app/bin/orca:ro
       # See auth-service's identical mount above — BUG-003/SOL-003/TASK-006.
-      - ../../backend-go/policy/orca-authz:/policy/orca-authz:ro
+      - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/project?sslmode=disable
@@ -312,7 +326,7 @@ services:
     volumes:
       - ./bin/task-service/orca:/app/bin/orca:ro
       # See auth-service's identical mount above — BUG-003/SOL-003/TASK-006.
-      - ../../backend-go/policy/orca-authz:/policy/orca-authz:ro
+      - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/task?sslmode=disable
@@ -352,7 +366,7 @@ services:
     volumes:
       - ./bin/annotation-service/orca:/app/bin/orca:ro
       # See auth-service's identical mount above — BUG-003/SOL-003/TASK-006.
-      - ../../backend-go/policy/orca-authz:/policy/orca-authz:ro
+      - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/annotation?sslmode=disable
@@ -403,11 +417,35 @@ services:
       vault: { condition: service_healthy }
 
   # 2 services with no database:
+  #
+  # git-gateway-service is the one exception to every other service's
+  # "shared, unmodified distroless image, no writes anywhere" shape — its
+  # host-local dispatch path (internal/adapter/localgit) needs a real `git`
+  # binary AND somewhere writable to run it against (git-gateway-runtime.
+  # Dockerfile installs the former; the read_only override + repos volume
+  # below provide the latter). Per specs/backend-go/tdd/services/
+  # git-gateway-service.md §2, host-local exec is "retained for local/dev
+  # deployments" — this dev deploy IS that case, not a hypothetical.
+  #
+  # git-gateway-repos is where any repo NOT bound to a remote dev server
+  # (Project.dev_server_id empty — e.g. a repo added via the sidebar's bare
+  # "Add Project"/repo.add, which has no dev-server-selection step) actually
+  # lives on disk for git-gateway-service's local git/worktree operations
+  # to succeed against. This is a new convention, not one the codebase
+  # already had anywhere (checked: no existing volume/path convention for
+  # git-gateway-service's local storage) — /data/repos was picked as a
+  # clear, generic root; it is NOT retroactive for any repo whose url/path
+  # already points elsewhere (e.g. a stale /opt/repos/<name> row from
+  # before this volume existed), which still needs re-adding under this
+  # root (or its own dev-server binding) to actually work.
   git-gateway-service:
     <<: *go-defaults
+    image: orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}
     container_name: orca-go-git-gateway
+    read_only: false # see comment above — this service alone needs to write real git/worktree data
     volumes:
       - ./bin/git-gateway-service/orca:/app/bin/orca:ro
+      - git-gateway-repos:/data/repos
     environment: *go-common-env
     depends_on:
       infra-fleet-service: { condition: service_started }
@@ -565,4 +603,6 @@ networks:
 
 volumes:
   orca-go-postgres-data:
+    driver: local
+  git-gateway-repos:
     driver: local

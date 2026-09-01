@@ -23,6 +23,49 @@ type fakeDevServerRepository struct {
 	findErr        error
 	registerCalled bool
 	lastRegistered domain.DevServer
+
+	// CR-DS-006 Phase 2 fakes — approve_dev_server_test.go/
+	// reject_dev_server_test.go/assign_dev_server_group_test.go.
+	updateApprovalStatusErr error
+	assignGroupErr          error
+
+	// found/byHostAndMode/findByHostErr drive FindByHostAndMode's fake
+	// answer — used by resolve_direct_websocket_dev_server_test.go. Kept
+	// separate from found/bySshTarget/findErr above so a test exercising
+	// both find methods can set independent answers.
+	foundByHost   bool
+	byHostAndMode domain.DevServer
+	findByHostErr error
+}
+
+func (f *fakeDevServerRepository) FindByHostAndMode(ctx context.Context, tenantID, host string, mode domain.ConnectionMode) (domain.DevServer, bool, error) {
+	if f.findByHostErr != nil {
+		return domain.DevServer{}, false, f.findByHostErr
+	}
+	if !f.foundByHost {
+		return domain.DevServer{}, false, nil
+	}
+	return f.byHostAndMode, true, nil
+}
+
+func (f *fakeDevServerRepository) UpdateApprovalStatus(ctx context.Context, tenantID, devServerID string, status domain.DevServerStatus) (domain.DevServer, error) {
+	if f.updateApprovalStatusErr != nil {
+		return domain.DevServer{}, f.updateApprovalStatusErr
+	}
+	ds := f.byID[devServerID]
+	ds.Status = status
+	f.byID[devServerID] = ds
+	return ds, nil
+}
+
+func (f *fakeDevServerRepository) AssignGroup(ctx context.Context, tenantID, devServerID, groupID string) (domain.DevServer, error) {
+	if f.assignGroupErr != nil {
+		return domain.DevServer{}, f.assignGroupErr
+	}
+	ds := f.byID[devServerID]
+	ds.GroupID = groupID
+	f.byID[devServerID] = ds
+	return ds, nil
 }
 
 func (f *fakeDevServerRepository) Register(ctx context.Context, ds domain.DevServer) (domain.DevServer, error) {

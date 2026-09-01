@@ -18,6 +18,7 @@ import {
   useInstalledAgentSkill
 } from '@/hooks/useInstalledAgentSkills'
 import { useMountedRef } from '@/hooks/useMountedRef'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip'
@@ -33,7 +34,12 @@ import {
 } from './CliSkillRuntimeSetup'
 import { WslCliRegistration } from './WslCliRegistration'
 import { translate } from '@/i18n/i18n'
-import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus, installRuntimeCli, removeRuntimeCli } from '@/runtime/runtime-cli-client'
+import {
+  getRuntimeCliInstallStatus,
+  getRuntimeWslCliInstallStatus,
+  installRuntimeCli,
+  removeRuntimeCli
+} from '@/runtime/runtime-cli-client'
 
 import { shellOpenPath } from '../../runtime/runtime-shell-client'
 type CliSectionProps = {
@@ -83,6 +89,15 @@ export function CliSection({
   const [dialogOpen, setDialogOpen] = useState(false)
   const [busyAction, setBusyAction] = useState<'install' | 'remove' | null>(null)
   const mountedRef = useMountedRef()
+  // Why: this section's setup terminal has no project/repo behind it, so it
+  // has no natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   const agentRuntime = useMemo(
     () =>
       getSelectedAgentRuntime(settings, wslSupportedPlatform, wslAvailable, wslCapabilitiesLoading),
@@ -377,6 +392,7 @@ export function CliSection({
               terminalTitle="CLI skill setup"
               terminalAriaLabel="CLI skill install terminal"
               terminalWorktreeId={`settings-cli-skill-terminal-${agentRuntime.runtime}`}
+              devServerId={devServerId}
               terminalShellOverride={cliSkillTerminalShellOverride}
               installed={cliSkillDetected}
               loading={cliSkillLoading}

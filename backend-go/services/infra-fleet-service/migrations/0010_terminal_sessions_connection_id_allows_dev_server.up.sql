@@ -1,0 +1,16 @@
+-- infra.terminal_sessions.connection_id was FK'd to infra.connections(id)
+-- only — but SpawnTerminalSession now falls back to storing a devServerId
+-- there when the caller has no infra.connections row yet (a pre-project
+-- ephemeral terminal: CLI install, agent-skill setup — see
+-- spawn_terminal_session.go's fallback comment). A devServerId is never a
+-- row in infra.connections, so every such spawn failed the FK constraint at
+-- INSERT time with INFRA_CREATE_TERMINAL_SESSION_FAILED, right after the
+-- agent had already spawned a real pty — found live 2026-08-30.
+--
+-- Dropping the FK (not repointing it at infra.dev_servers instead) because
+-- this column now legitimately holds either kind of id, and Postgres has no
+-- single-column "FK to one of two tables" constraint. Referential integrity
+-- for the "real connection" case is preserved at the application layer:
+-- resolveTerminalSession/SpawnTerminalSession try ConnectionResolver first,
+-- which itself join-checks the row exists.
+ALTER TABLE infra.terminal_sessions DROP CONSTRAINT terminal_sessions_connection_id_fkey;

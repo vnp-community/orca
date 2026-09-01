@@ -10,6 +10,8 @@ import (
 
 	"github.com/stablyai/orca-go/common/grpcmw"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
 
 // TestDispatch_AttachesIdentityToContext is the direct regression test for
@@ -34,6 +36,64 @@ func TestDispatch_AttachesIdentityToContext(t *testing.T) {
 	}
 	if got := gotMD.Get(grpcmw.MetadataUserID); len(got) != 1 || got[0] != "user-1" {
 		t.Errorf("expected user_id metadata %q, got %v", "user-1", got)
+	}
+}
+
+// TestDispatch_AttachesRoleToContext is the regression guard for a
+// live-verified bug (CR-DS-006 Phase 2, found via a real INFRA_NOT_ADMIN
+// failure on the deployed Admin Console): Dispatch's AttachIdentity call
+// used to omit Role entirely. Since metadata.AppendToOutgoingContext
+// appends rather than replaces, and admin-gated channel handlers each call
+// AttachIdentity a SECOND time with the real Role
+// (attachAdminIdentity, channels_dev_server_access_control.go),
+// TenantExtractionInterceptor's md.Get(...)[0] read only ever saw this
+// call's empty value — the first one appended — silently discarding the
+// real role every single time, regardless of the caller's actual role.
+func TestDispatch_AttachesRoleToContext(t *testing.T) {
+	r := NewRegistry()
+	var gotMD metadata.MD
+	r.Register("test.echo-identity", func(ctx context.Context, id Identity, _ []json.RawMessage) (any, error) {
+		gotMD, _ = metadata.FromOutgoingContext(ctx)
+		return nil, nil
+	})
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1", Role: "admin"}, "test.echo-identity", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := gotMD.Get(grpcmw.MetadataRole); len(got) != 1 || got[0] != "admin" {
+		t.Errorf("expected role metadata %q, got %v", "admin", got)
+	}
+}
+
+// TestDispatch_RoleSurvivesASecondAttachIdentityCall guards the specific
+// failure mode the bug above produced: an admin-gated channel handler that
+// calls gatewaygrpc.AttachIdentity again (with the same Role, as
+// attachAdminIdentity does) must not un-set the Role Dispatch already
+// attached — metadata.FromIncomingContext's md.Get(...)[0] on the server
+// side reads the FIRST appended value, so Dispatch's own call attaching
+// the real Role first is what actually matters; a handler's own redundant
+// re-attach only needs to not conflict with it.
+func TestDispatch_RoleSurvivesASecondAttachIdentityCall(t *testing.T) {
+	r := NewRegistry()
+	var gotMD metadata.MD
+	r.Register("test.echo-identity-after-second-attach", func(ctx context.Context, id Identity, _ []json.RawMessage) (any, error) {
+		// Mirrors attachAdminIdentity's own AttachIdentity call.
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID, Role: id.Role})
+		gotMD, _ = metadata.FromOutgoingContext(ctx)
+		return nil, nil
+	})
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1", Role: "admin"}, "test.echo-identity-after-second-attach", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// The first value is what TenantExtractionInterceptor's md.Get(...)[0]
+	// actually reads server-side — asserting index 0 specifically, not just
+	// "role is in there somewhere", is the point of this test.
+	got := gotMD.Get(grpcmw.MetadataRole)
+	if len(got) == 0 || got[0] != "admin" {
+		t.Errorf("expected role metadata's first value to be %q, got %v", "admin", got)
 	}
 }
 

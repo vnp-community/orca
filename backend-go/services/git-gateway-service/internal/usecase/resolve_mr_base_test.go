@@ -13,12 +13,12 @@ import (
 // SCMClient.GetMergeRequestBase/ResolveMrBase.Execute.
 
 func TestResolveMrBase_HappyPath(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{fetchAndResolveRefSHA: "resolved-sha-2"}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
 	scm := &fakeSCMClient{mrBaseBranch: "main"}
-	uc := NewResolveMrBase(scm, resolver, projects, local, relay)
+	uc := NewResolveMrBase(scm, reachability, projects, local, relay)
 
 	got, err := uc.Execute(context.Background(), "repo-1", 7)
 	if err != nil {
@@ -30,12 +30,12 @@ func TestResolveMrBase_HappyPath(t *testing.T) {
 }
 
 func TestResolveMrBase_FetchAndResolveRefFails_ReturnsUnresolvableAndZeroValue(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{fetchAndResolveRefErr: errors.New("base branch not found locally")}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
 	scm := &fakeSCMClient{mrBaseBranch: "main", mrBaseSHA: "should-not-leak"}
-	uc := NewResolveMrBase(scm, resolver, projects, local, relay)
+	uc := NewResolveMrBase(scm, reachability, projects, local, relay)
 
 	got, err := uc.Execute(context.Background(), "repo-1", 7)
 	if err == nil {
@@ -51,12 +51,12 @@ func TestResolveMrBase_FetchAndResolveRefFails_ReturnsUnresolvableAndZeroValue(t
 }
 
 func TestResolveMrBase_SCMLookupFails_FetchAndResolveRefNeverCalled(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
 	scm := &fakeSCMClient{mrBaseErr: apperrors.New(apperrors.KindInternal, "WORKTREE_SCM_GET_MR_BASE_UNIMPLEMENTED", "scm-integration-service has no RPC yet", nil)}
-	uc := NewResolveMrBase(scm, resolver, projects, local, relay)
+	uc := NewResolveMrBase(scm, reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), "repo-1", 7)
 	if err == nil {

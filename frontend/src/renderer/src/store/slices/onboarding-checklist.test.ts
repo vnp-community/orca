@@ -5,11 +5,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { createStore } from 'zustand'
 import type { OnboardingChecklistSlice } from './onboarding-checklist'
-import {
-  createOnboardingChecklistSlice,
-  DEFAULT_CHECKLIST_STATE,
-  useServerChecklist,
-} from './onboarding-checklist'
+import { createOnboardingChecklistSlice } from './onboarding-checklist'
 
 // ─── Mock window.api ────────────────────────────────────────────────────────────
 
@@ -17,8 +13,8 @@ const markChecklistItem = vi.fn().mockResolvedValue(undefined)
 
 vi.stubGlobal('window', {
   api: {
-    onboarding: { markChecklistItem },
-  },
+    onboarding: { markChecklistItem }
+  }
 })
 
 // ─── Store factory ────────────────────────────────────────────────────────────
@@ -70,7 +66,7 @@ describe('createOnboardingChecklistSlice', () => {
     expect(markChecklistItem).toHaveBeenCalledWith({
       item: 'ranFirstAgent',
       devServerId: 'ds-123',
-      value: true,
+      value: true
     })
   })
 

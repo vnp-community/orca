@@ -2,7 +2,9 @@ package wscompat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -88,9 +90,45 @@ func TestAutomationListChannel_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	resp, ok := result.(*automationv1.ListAutomationsResponse)
-	if !ok || len(resp.GetAutomations()) != 2 {
+	view, ok := result.(automationsListView)
+	if !ok || len(view.Automations) != 2 {
 		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+// TestAutomationListChannel_EmptyResultSerializesAsEmptyArrayNotNull is the
+// BUG-005 regression this specific channel needed: automation.list returns
+// the whole ListAutomationsResponse (not the bare resp.GetAutomations()
+// slice other list channels return), so Dispatch's normalizeNilSlices
+// — which deliberately never reaches into a proto.Message — never touched
+// it. A tenant with zero automations got a response with no `automations`
+// key at all, crashing AutomationsPage's refresh() on `nextAutomations.some`.
+func TestAutomationListChannel_EmptyResultSerializesAsEmptyArrayNotNull(t *testing.T) {
+	fake := &fakeAutomationServiceClient{
+		listAutomationsFunc: func(ctx context.Context, in *automationv1.ListAutomationsRequest) (*automationv1.ListAutomationsResponse, error) {
+			return &automationv1.ListAutomationsResponse{}, nil // Automations left nil, as the real empty-tenant case does
+		},
+	}
+	r := NewRegistry()
+	registerAutomationCRUDChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "automation.list", argsJSON(t, map[string]any{}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	view, ok := result.(automationsListView)
+	if !ok {
+		t.Fatalf("unexpected result type: %+v", result)
+	}
+	if view.Automations == nil {
+		t.Error("expected Automations to be normalized to an empty slice, got nil")
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(encoded), `"automations":[]`) {
+		t.Errorf("expected JSON to contain \"automations\":[], got %s", encoded)
 	}
 }
 
@@ -146,6 +184,39 @@ func TestAutomationDeleteChannel_Success(t *testing.T) {
 	success, ok := result.(map[string]bool)
 	if !ok || !success["success"] {
 		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+// TestAutomationRunsChannel_EmptyResultSerializesAsEmptyArrayNotNull mirrors
+// TestAutomationListChannel_EmptyResultSerializesAsEmptyArrayNotNull for
+// automation.runs — the exact channel the live AUTOMATION_LIST_RUNS_FAILED
+// bug report traced back to.
+func TestAutomationRunsChannel_EmptyResultSerializesAsEmptyArrayNotNull(t *testing.T) {
+	fake := &fakeAutomationServiceClient{
+		listRunsFunc: func(ctx context.Context, in *automationv1.ListRunsRequest) (*automationv1.ListRunsResponse, error) {
+			return &automationv1.ListRunsResponse{}, nil // Runs left nil, as the real zero-runs case does
+		},
+	}
+	r := NewRegistry()
+	registerAutomationCRUDChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "automation.runs", argsJSON(t, map[string]any{}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	view, ok := result.(automationRunsListView)
+	if !ok {
+		t.Fatalf("unexpected result type: %+v", result)
+	}
+	if view.Runs == nil {
+		t.Error("expected Runs to be normalized to an empty slice, got nil")
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(encoded), `"runs":[]`) {
+		t.Errorf("expected JSON to contain \"runs\":[], got %s", encoded)
 	}
 }
 

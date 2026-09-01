@@ -52,12 +52,14 @@ import { createRemoteAgentSessionSlice } from './slices/remote-agent-sessions'
 import { e2eConfig } from '@/lib/e2e-config'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
 
-// Why: createWorkspaceSlice (legacy OrcaProject scaffolding, superseded by
-// RepoSlice's real project system) used to spread here, after createRepoSlice.
-// It redeclared the same removeProject/updateProject/projects keys with a
-// no-op stub, which silently shadowed RepoSlice's real implementations for
-// every "Remove Project" caller in the app — no RPC, no error, no toast.
-// See frontend/src/renderer/src/store/slices/workspace-slice.ts.
+// Why there's no createWorkspaceSlice here: an early OrcaProject scaffolding
+// slice by that name used to spread after createRepoSlice. It redeclared
+// the same removeProject/updateProject/projects keys with a no-op stub,
+// which silently shadowed RepoSlice's real implementations for every
+// "Remove Project" caller in the app — no RPC, no error, no toast. It was
+// already unspread (dead code) and has since been deleted entirely —
+// OrcaProject state lives in WorkspaceContext (context/WorkspaceContext.tsx),
+// not this store. Don't re-add a same-named slice here.
 export const useAppStore = create<AppState>()((...a) => ({
   ...createRepoSlice(...a),
   ...createSparsePresetsSlice(...a),

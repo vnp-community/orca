@@ -93,3 +93,46 @@ exercise the **empty-result** case for these 4 handlers (based on the
 BUG-003, which always stub a non-empty response) — a test asserting
 `json.Marshal(result) == "[]"` (not `"null"`) for an empty upstream
 response would have caught this before deploy.
+
+## Addendum (2026-08-30/31): confirmed this bug class recurs — `automation.list`/`automation.runs`
+
+Live user report: `AUTOMATION_LIST_RUNS_FAILED` (a separate bug, see
+`specs/backend-go/crs/v0/dev-server-access-control/solutions/README.md`'s
+matching entry for that root cause) masked a SECOND bug behind it —
+`AutomationsPage.tsx`'s `refresh()` has no `catch`, so once the first bug
+was fixed and `Promise.all` actually resolved, `nextAutomations.some(...)`
+crashed with `Cannot read properties of undefined (reading 'some')` for
+this tenant's genuine zero-automations/zero-runs state. Traced to exactly
+this bug class, but a **variant this doc's "Suggested Fix" didn't
+anticipate**: `channels_automation_task.go`'s `automation.list`/
+`automation.runs` handlers `return resp, nil` — the WHOLE
+`*ListAutomationsResponse`/`*ListRunsResponse` (needed for
+both the list AND `nextPageToken`), not `resp.GetXxx()`'s bare slice like
+this bug's original 4 examples. Since `Dispatch`'s `normalizeNilSlices`
+deliberately returns any `proto.Message` value untouched (see its doc
+comment in `registry.go` — an earlier, more aggressive version broke
+proto's no-copy contract), it silently skips these two handlers entirely;
+the boundary-level fix this doc already shipped for the original 4 never
+covered them.
+
+Fixed per-handler, matching this doc's own "Suggested Fix" fallback
+option: both handlers now return a small local, non-`proto.Message` view
+struct (`automationsListView`/`automationRunsListView` in
+`channels_automation_task.go`) instead of the raw proto response — being a
+plain struct, `normalizeNilSlices`'s `normalizeStructSliceFields` path
+picks it up correctly. 4 new tests
+(`TestAutomationListChannel_EmptyResultSerializesAsEmptyArrayNotNull`,
+`TestAutomationRunsChannel_EmptyResultSerializesAsEmptyArrayNotNull`, plus
+the pre-existing success-path tests updated for the new return type)
+assert `json.Marshal` produces `"automations":[]`/`"runs":[]`, not a
+missing key. `go build`/`go vet`/`go test ./...` clean for
+`api-gateway`.
+
+**Follow-up still open, not done here**: any other `wscompat` channel that
+`return resp, nil`s a whole multi-field proto response (rather than a bare
+`resp.GetXxx()` slice) likely has the same gap — a
+`grep -rn 'return resp, nil' internal/adapter/wscompat/channels_*.go`
+sweep, cross-referenced against which of those proto messages have a
+`repeated` field, would find the rest. Flagged as follow-up scope per this
+doc's own "not exhaustively checked" precedent, not chased down here to
+keep this addendum grounded in what was actually reproduced live.

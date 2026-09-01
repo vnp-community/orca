@@ -1954,8 +1954,8 @@ describe('web worktree preload API', () => {
       worktrees: [{ id: worktree.id, ownership: 'orca-managed', visible: true }]
     })
     expect(runtimeCalls).toEqual([
-      { method: 'worktree.detectedList', params: { repo: 'repo-1' } },
-      { method: 'worktree.list', params: { repo: 'repo-1', limit: 10_000 } }
+      { method: 'worktree.detectedList', params: { projectId: '', repoId: 'repo-1' } },
+      { method: 'worktree.list', params: { projectId: '', limit: 10_000 } }
     ])
   })
 
@@ -2179,11 +2179,29 @@ describe('web file preload API', () => {
       WebRuntimeClient: class {
         call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
           runtimeCalls.push({ method, params })
+          if (method === 'project.list') {
+            return Promise.resolve({
+              id: `call-${runtimeCalls.length}`,
+              ok: true,
+              result: [{ id: 'proj-1', createdAt: 0 }],
+              _meta: { runtimeId: 'runtime-1' }
+            })
+          }
           if (method === 'repo.list') {
             return Promise.resolve({
               id: `call-${runtimeCalls.length}`,
               ok: true,
-              result: { repos: [{ id: 'repo-1' }] },
+              result: {
+                repos: [
+                  {
+                    id: 'repo-1',
+                    projectId: 'proj-1',
+                    url: '/workspace/repo',
+                    displayName: 'repo',
+                    position: 0
+                  }
+                ]
+              },
               _meta: { runtimeId: 'runtime-1' }
             })
           }
@@ -2216,8 +2234,9 @@ describe('web file preload API', () => {
       globals.window.api.fs.pathExists({ filePath: '/workspace/repo/untitled.md' })
     ).resolves.toBe(false)
     expect(runtimeCalls).toEqual([
-      { method: 'repo.list', params: undefined },
-      { method: 'worktree.detectedList', params: { repo: 'repo-1' } },
+      { method: 'project.list', params: undefined },
+      { method: 'repo.list', params: { projectId: 'proj-1' } },
+      { method: 'worktree.detectedList', params: { projectId: 'proj-1', repoId: 'repo-1' } },
       { method: 'files.stat', params: { worktree: 'id:wt-1', relativePath: 'untitled.md' } }
     ])
   })
@@ -2261,11 +2280,29 @@ describe('web git preload API', () => {
       WebRuntimeClient: class {
         call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
           runtimeCalls.push({ method, params })
+          if (method === 'project.list') {
+            return Promise.resolve({
+              id: `call-${runtimeCalls.length}`,
+              ok: true,
+              result: [{ id: 'proj-1', createdAt: 0 }],
+              _meta: { runtimeId: 'runtime-1' }
+            })
+          }
           if (method === 'repo.list') {
             return Promise.resolve({
               id: `call-${runtimeCalls.length}`,
               ok: true,
-              result: { repos: [{ id: 'repo-1' }] },
+              result: {
+                repos: [
+                  {
+                    id: 'repo-1',
+                    projectId: 'proj-1',
+                    url: '/workspace/repo',
+                    displayName: 'repo',
+                    position: 0
+                  }
+                ]
+              },
               _meta: { runtimeId: 'runtime-1' }
             })
           }
@@ -2309,8 +2346,9 @@ describe('web git preload API', () => {
       })
     ).resolves.toBe(`https://git.example.com/project/commit/${TEST_COMMIT_OID}`)
     expect(runtimeCalls).toEqual([
-      { method: 'repo.list', params: undefined },
-      { method: 'worktree.detectedList', params: { repo: 'repo-1' } },
+      { method: 'project.list', params: undefined },
+      { method: 'repo.list', params: { projectId: 'proj-1' } },
+      { method: 'worktree.detectedList', params: { projectId: 'proj-1', repoId: 'repo-1' } },
       { method: 'git.remoteCommitUrl', params: { worktree: 'id:wt-1', sha: TEST_COMMIT_OID } }
     ])
   })
@@ -3281,5 +3319,202 @@ describe('web GitLab preload API', () => {
         }
       }
     ])
+  })
+})
+
+// Regression guard for a live-verified bug (CR-DS-006/007/008, reported
+// after deploy): the wscompat channels behind these four methods wrap their
+// array in a named key (`{groups: [...]}`, `{grants: [...]}`,
+// `{devServers: [...]}`, `{requests: [...]}`) — see
+// channels_dev_server_access_control.go's `map[string]any{"groups": ...}`
+// etc. Without unwrapping that key here, callers received the wrapper
+// object itself and every downstream `.map()` crashed with
+// "t.map is not a function" (seen live in AdminDevServerConsole's Groups
+// tab). Every other method on these two namespaces returns a bare object
+// already (matches the backend's un-wrapped single-item returns), so only
+// these four need the unwrap.
+describe('web dev server access-control preload API', () => {
+  beforeEach(() => {
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.doUnmock('./web-runtime-client')
+  })
+
+  function mockRuntimeResult(result: unknown): { method: string; params: unknown }[] {
+    const runtimeCalls: { method: string; params: unknown }[] = []
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
+          runtimeCalls.push({ method, params })
+          return Promise.resolve({
+            id: method,
+            ok: true,
+            result,
+            _meta: { runtimeId: 'runtime-1' }
+          })
+        }
+
+        close(): void {}
+      }
+    }))
+    return runtimeCalls
+  }
+
+  // Regression guard for a live-verified bug: devServer.approve/reject/
+  // assignGroup sent `{ id }` while the wscompat channel handlers
+  // (channels_dev_server_access_control.go) decode the key as
+  // `devServerId` — the mismatch left DevServerID empty server-side, so
+  // ApproveDevServer's WHERE id = '' matched no row and failed with
+  // INFRA_APPROVE_DEV_SERVER_FAILED regardless of which server was
+  // approved.
+  it('sends devServer.approve with a devServerId key, not id', async () => {
+    const runtimeCalls = mockRuntimeResult({
+      id: 'ds-1',
+      name: 'dev-01',
+      connectionType: 'direct-websocket',
+      status: 'connected',
+      platform: null,
+      arch: null,
+      nodeVersion: null,
+      lastConnectedAt: null,
+      lastError: null,
+      workspaceDir: null,
+      addedAt: 0,
+      capabilities: null
+    })
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    await globals.window.api.devServer.approve('ds-1')
+    expect(runtimeCalls).toEqual([{ method: 'devServer.approve', params: { devServerId: 'ds-1' } }])
+  })
+
+  it('sends devServer.reject with a devServerId key, not id', async () => {
+    const runtimeCalls = mockRuntimeResult({})
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    await globals.window.api.devServer.reject('ds-1', 'not needed')
+    expect(runtimeCalls).toEqual([
+      { method: 'devServer.reject', params: { devServerId: 'ds-1', reason: 'not needed' } }
+    ])
+  })
+
+  it('sends devServer.assignGroup with a devServerId key, not id', async () => {
+    const runtimeCalls = mockRuntimeResult({})
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    await globals.window.api.devServer.assignGroup('ds-1', 'group-1')
+    expect(runtimeCalls).toEqual([
+      { method: 'devServer.assignGroup', params: { devServerId: 'ds-1', groupId: 'group-1' } }
+    ])
+  })
+
+  it('unwraps devServerGroup.list from {groups: [...]} to a bare array', async () => {
+    mockRuntimeResult({ groups: [{ id: 'g1', tenantId: 't1', name: 'Eng', parentGroupId: '' }] })
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    const groups = await globals.window.api.devServerGroup.list()
+    expect(Array.isArray(groups)).toBe(true)
+    expect(groups).toEqual([{ id: 'g1', tenantId: 't1', name: 'Eng', parentGroupId: '' }])
+  })
+
+  it('unwraps devServerGroup.listGrants from {grants: [...]} to a bare array', async () => {
+    mockRuntimeResult({ grants: [] })
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    const grants = await globals.window.api.devServerGroup.listGrants('g1')
+    expect(grants).toEqual([])
+  })
+
+  it('unwraps devServer.listForUser from {devServers: [...]} to a bare array', async () => {
+    mockRuntimeResult({ devServers: [] })
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    const servers = await globals.window.api.devServer.listForUser()
+    expect(servers).toEqual([])
+  })
+
+  it('unwraps devServer.listPendingAccessRequests from {requests: [...]} to a bare array', async () => {
+    mockRuntimeResult({ requests: [] })
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    const requests = await globals.window.api.devServer.listPendingAccessRequests()
+    expect(requests).toEqual([])
+  })
+
+  // Regression guard for the live-reported "No agents detected on your
+  // PATH" bug: preflight.detectAgents (createPreflightApi) is gated on a
+  // paired runtime environment a plain web session never has, so it always
+  // resolved to []. onboarding.detectAgents is the fix — it must relay
+  // through the backend's dev-server-scoped channel with a real commands
+  // catalog attached, not silently no-op.
+  it('relays onboarding.detectAgents with devServerId and a non-empty commands catalog', async () => {
+    const runtimeCalls = mockRuntimeResult({
+      agents: ['claude', 'codex'],
+      platform: 'linux',
+      devServerId: 'ds-1'
+    })
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    const result = await globals.window.api.onboarding.detectAgents({ devServerId: 'ds-1' })
+
+    expect(runtimeCalls).toHaveLength(1)
+    expect(runtimeCalls[0].method).toBe('onboarding.detectAgents')
+    const params = runtimeCalls[0].params as { devServerId: string; commands: unknown[] }
+    expect(params.devServerId).toBe('ds-1')
+    expect(Array.isArray(params.commands)).toBe(true)
+    expect(params.commands.length).toBeGreaterThan(0)
+    expect(params.commands[0]).toMatchObject({ id: expect.any(String), cmd: expect.any(String) })
+    expect(result).toEqual({ agents: ['claude', 'codex'], platform: 'linux', devServerId: 'ds-1' })
+  })
+
+  it('onboarding.detectAgents degrades to an empty result instead of throwing on relay failure', async () => {
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(): Promise<RuntimeRpcResponse<unknown>> {
+          return Promise.resolve({
+            id: 'onboarding.detectAgents',
+            ok: false,
+            error: { message: 'not connected' },
+            _meta: { runtimeId: 'runtime-1' }
+          })
+        }
+
+        close(): void {}
+      }
+    }))
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    const result = await globals.window.api.onboarding.detectAgents({ devServerId: 'ds-1' })
+    expect(result).toEqual({ agents: [], platform: null, devServerId: 'ds-1' })
   })
 })

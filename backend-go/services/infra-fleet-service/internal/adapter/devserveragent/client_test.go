@@ -267,6 +267,53 @@ func TestClientHealthReflectsHandshake(t *testing.T) {
 	}
 }
 
+// TestClientIsConnected_NoSessionYetIsFalseAndNeverDials verifies
+// IsConnected is a pure peek — a devServerID nobody has ever
+// Health()/Exec()'d against reports false immediately, without attempting
+// any network dial (there is no fake agent server running at all here;
+// if IsConnected tried to dial, this test would hang or error).
+func TestClientIsConnected_NoSessionYetIsFalseAndNeverDials(t *testing.T) {
+	client := New(testConfig(0, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	if client.IsConnected("never-seen-dev-server") {
+		t.Error("IsConnected = true, want false for a devServerId with no session at all")
+	}
+}
+
+// TestClientIsConnected_ReflectsLiveHandshake verifies IsConnected reports
+// true once a real session has handshaked (via Health), and false again
+// once that session is gone — the live bug this fixes: devServer.list's
+// Status was hardcoded to "disconnected" regardless of the agent's real
+// state, and devServer.browseDir/onboarding.detectAgents incorrectly used
+// the infra.connections table (a different concept, see ResolveConnection's
+// doc comment) as a proxy for "is the agent live", which is false for a
+// freshly-connected dev server with no project/repo bound to it yet.
+func TestClientIsConnected_ReflectsLiveHandshake(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
+	host, port := startFakeAgent(t, agent)
+
+	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-4", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	if client.IsConnected(devServer.ID) {
+		t.Error("IsConnected = true before any session was ever established")
+	}
+
+	if _, err := client.Health(context.Background(), devServer); err != nil {
+		t.Fatalf("Health: %v", err)
+	}
+
+	if !client.IsConnected(devServer.ID) {
+		t.Error("IsConnected = false, want true right after a live handshake")
+	}
+}
+
 func TestClientHealthFalseOnAuthFailure(t *testing.T) {
 	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
 	host, port := startFakeAgent(t, agent)

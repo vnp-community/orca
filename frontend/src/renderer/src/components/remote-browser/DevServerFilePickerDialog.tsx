@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/dialog'
 import { cn } from '@/lib/utils'
 import { getFileTypeIcon } from '@/lib/file-type-icons'
-import { useActiveDevServer } from '../../store/slices/dev-servers'
+import { useActiveDevServer } from '../../store/slices/dev-servers-selectors'
 import { useDevServerFilePicker, type DevServerFilePickerMode } from './useDevServerFilePicker'
 
 export type DevServerFilePickerDialogProps = {

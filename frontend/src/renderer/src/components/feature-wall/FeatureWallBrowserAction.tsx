@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { translate } from '@/i18n/i18n'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { useAppStore } from '@/store'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { FeatureSetupInlineTerminal } from '../onboarding/FeatureSetupInlineTerminal'
 import {
   runOnboardingFeatureSetup,
@@ -85,6 +86,15 @@ function BrowserSkillInstallButton(): React.JSX.Element {
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
   const [command, setCommand] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  // Why: this setup terminal has no project/repo behind it, so it has no
+  // natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
 
   const handleInstall = useCallback(async () => {
     if (busy || command !== null) {
@@ -143,7 +153,13 @@ function BrowserSkillInstallButton(): React.JSX.Element {
   }, [busy, command, recordFeatureInteraction])
 
   if (command) {
-    return <FeatureSetupInlineTerminal command={command} selection={BROWSER_ONLY_FEATURE_SETUP} />
+    return (
+      <FeatureSetupInlineTerminal
+        command={command}
+        selection={BROWSER_ONLY_FEATURE_SETUP}
+        devServerId={devServerId}
+      />
+    )
   }
 
   return (

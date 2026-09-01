@@ -13,21 +13,24 @@ import (
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
 
-// fakeAccountsRelayClient is a minimal test double scoped to Relay and
-// ResolveConnection — the only 2 RPCs accounts.* channel handlers call.
+// fakeAccountsRelayClient is a minimal test double scoped to
+// RelayByDevServer and IsDevServerConnected — the only 2 RPCs accounts.*
+// channel handlers call (live-bug fix: previously Relay/ResolveConnection,
+// which answer a different, unrelated question — see this file's package
+// doc comment).
 type fakeAccountsRelayClient struct {
 	infrafleetv1.InfraFleetServiceClient
 
-	relayFunc             func(ctx context.Context, in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
-	resolveConnectionFunc func(ctx context.Context, in *infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error)
+	relayByDevServerFunc func(ctx context.Context, in *infrafleetv1.RelayByDevServerRequest) (*infrafleetv1.RelayResponse, error)
+	isDevServerConnected func(ctx context.Context, in *infrafleetv1.IsDevServerConnectedRequest) (*infrafleetv1.IsDevServerConnectedResponse, error)
 }
 
-func (f *fakeAccountsRelayClient) Relay(ctx context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
-	return f.relayFunc(ctx, in)
+func (f *fakeAccountsRelayClient) RelayByDevServer(ctx context.Context, in *infrafleetv1.RelayByDevServerRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
+	return f.relayByDevServerFunc(ctx, in)
 }
 
-func (f *fakeAccountsRelayClient) ResolveConnection(ctx context.Context, in *infrafleetv1.ResolveConnectionRequest, _ ...grpc.CallOption) (*infrafleetv1.ResolveConnectionResponse, error) {
-	return f.resolveConnectionFunc(ctx, in)
+func (f *fakeAccountsRelayClient) IsDevServerConnected(ctx context.Context, in *infrafleetv1.IsDevServerConnectedRequest, _ ...grpc.CallOption) (*infrafleetv1.IsDevServerConnectedResponse, error) {
+	return f.isDevServerConnected(ctx, in)
 }
 
 func TestAccountsChannels_RelaySuccess(t *testing.T) {
@@ -42,9 +45,9 @@ func TestAccountsChannels_RelaySuccess(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.channel, func(t *testing.T) {
-			var gotReq *infrafleetv1.RelayRequest
+			var gotReq *infrafleetv1.RelayByDevServerRequest
 			fake := &fakeAccountsRelayClient{
-				relayFunc: func(_ context.Context, in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+				relayByDevServerFunc: func(_ context.Context, in *infrafleetv1.RelayByDevServerRequest) (*infrafleetv1.RelayResponse, error) {
 					gotReq = in
 					return &infrafleetv1.RelayResponse{ResultJson: `{"ok":true}`}, nil
 				},
@@ -52,7 +55,10 @@ func TestAccountsChannels_RelaySuccess(t *testing.T) {
 			r := NewRegistry()
 			registerAccountsChannels(r, fake)
 
-			args := argsJSON(t, map[string]any{"accountId": "acct-1", "connectionId": "conn-1"})
+			// "connectionId" here is actually the devServerId
+			// accounts.resolveDevServerConnection echoed back — see this
+			// file's package doc comment.
+			args := argsJSON(t, map[string]any{"accountId": "acct-1", "connectionId": "ds-1"})
 			result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, tc.channel, args)
 			if err != nil {
 				t.Fatalf("unexpected error: %v", err)
@@ -61,8 +67,8 @@ func TestAccountsChannels_RelaySuccess(t *testing.T) {
 			if !ok || got["ok"] != true {
 				t.Fatalf("unexpected result: %#v", result)
 			}
-			if gotReq.GetConnectionId() != "conn-1" {
-				t.Errorf("ConnectionId = %q, want conn-1", gotReq.GetConnectionId())
+			if gotReq.GetDevServerId() != "ds-1" {
+				t.Errorf("DevServerId = %q, want ds-1", gotReq.GetDevServerId())
 			}
 			if gotReq.GetMethod() != tc.wantMethod {
 				t.Errorf("Method = %q, want %q", gotReq.GetMethod(), tc.wantMethod)
@@ -81,7 +87,7 @@ func TestAccountsChannels_RelaySuccess(t *testing.T) {
 func TestAccountsChannels_MissingConnectionID_FailsFastWithoutCallingRelay(t *testing.T) {
 	called := false
 	fake := &fakeAccountsRelayClient{
-		relayFunc: func(context.Context, *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+		relayByDevServerFunc: func(context.Context, *infrafleetv1.RelayByDevServerRequest) (*infrafleetv1.RelayResponse, error) {
 			called = true
 			return nil, nil
 		},
@@ -95,31 +101,31 @@ func TestAccountsChannels_MissingConnectionID_FailsFastWithoutCallingRelay(t *te
 		t.Fatal("expected an error for missing connectionId")
 	}
 	if called {
-		t.Error("Relay must not be called when connectionId is missing")
+		t.Error("RelayByDevServer must not be called when connectionId is missing")
 	}
 }
 
 func TestAccountsChannels_RelayErrorPassesThroughVerbatim(t *testing.T) {
-	wantErr := errors.New("INFRA_CONNECTION_NOT_FOUND: no dev server owns this connectionId")
+	wantErr := errors.New("INFRA_DEV_SERVER_NOT_CONNECTED: this dev server has no live agent connection right now")
 	fake := &fakeAccountsRelayClient{
-		relayFunc: func(context.Context, *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+		relayByDevServerFunc: func(context.Context, *infrafleetv1.RelayByDevServerRequest) (*infrafleetv1.RelayResponse, error) {
 			return nil, wantErr
 		},
 	}
 	r := NewRegistry()
 	registerAccountsChannels(r, fake)
 
-	args := argsJSON(t, map[string]any{"accountId": "acct-1", "connectionId": "conn-1"})
+	args := argsJSON(t, map[string]any{"accountId": "acct-1", "connectionId": "ds-1"})
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "accounts.removeCodex", args)
 	if !errors.Is(err, wantErr) && err.Error() != wantErr.Error() {
-		t.Fatalf("expected Relay's error to pass through verbatim, got: %v", err)
+		t.Fatalf("expected RelayByDevServer's error to pass through verbatim, got: %v", err)
 	}
 }
 
 func TestAccountsSubscribe_MissingConnectionID_FailsFastWithoutCallingRelay(t *testing.T) {
 	called := false
 	fake := &fakeAccountsRelayClient{
-		relayFunc: func(context.Context, *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+		relayByDevServerFunc: func(context.Context, *infrafleetv1.RelayByDevServerRequest) (*infrafleetv1.RelayResponse, error) {
 			called = true
 			return nil, nil
 		},
@@ -138,14 +144,14 @@ func TestAccountsSubscribe_MissingConnectionID_FailsFastWithoutCallingRelay(t *t
 		t.Fatal("expected an error for missing connectionId")
 	}
 	if called {
-		t.Error("Relay must not be called when connectionId is missing")
+		t.Error("RelayByDevServer must not be called when connectionId is missing")
 	}
 }
 
 func TestAccountsSubscribe_RelayErrorOnFirstFetchFailsSubscribeSynchronously(t *testing.T) {
-	wantErr := errors.New("INFRA_CONNECTION_NOT_FOUND: no dev server owns this connectionId")
+	wantErr := errors.New("INFRA_DEV_SERVER_NOT_CONNECTED: this dev server has no live agent connection right now")
 	fake := &fakeAccountsRelayClient{
-		relayFunc: func(context.Context, *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+		relayByDevServerFunc: func(context.Context, *infrafleetv1.RelayByDevServerRequest) (*infrafleetv1.RelayResponse, error) {
 			return nil, wantErr
 		},
 	}
@@ -153,10 +159,10 @@ func TestAccountsSubscribe_RelayErrorOnFirstFetchFailsSubscribeSynchronously(t *
 	registerAccountsChannels(r, fake)
 
 	sh, _ := r.StreamHandlerFor("accounts.subscribe")
-	args := argsJSON(t, map[string]any{"connectionId": "conn-1"})
+	args := argsJSON(t, map[string]any{"connectionId": "ds-1"})
 	_, err := sh(context.Background(), Identity{TenantID: "t1"}, args)
 	if !errors.Is(err, wantErr) && (err == nil || err.Error() != wantErr.Error()) {
-		t.Fatalf("expected Relay's first-fetch error to fail the subscribe call synchronously, got: %v", err)
+		t.Fatalf("expected RelayByDevServer's first-fetch error to fail the subscribe call synchronously, got: %v", err)
 	}
 }
 
@@ -167,7 +173,7 @@ func TestAccountsSubscribe_EmitsReadyThenSnapshotOnChangeOnly(t *testing.T) {
 
 	var call atomic.Int32
 	fake := &fakeAccountsRelayClient{
-		relayFunc: func(context.Context, *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+		relayByDevServerFunc: func(context.Context, *infrafleetv1.RelayByDevServerRequest) (*infrafleetv1.RelayResponse, error) {
 			n := call.Add(1)
 			// First 3 calls (initial fetch + first 2 poll ticks) return the SAME
 			// snapshot — must NOT produce a second push. The 4th call changes
@@ -185,7 +191,7 @@ func TestAccountsSubscribe_EmitsReadyThenSnapshotOnChangeOnly(t *testing.T) {
 	sh, _ := r.StreamHandlerFor("accounts.subscribe")
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
-	args := argsJSON(t, map[string]any{"connectionId": "conn-1"})
+	args := argsJSON(t, map[string]any{"connectionId": "ds-1"})
 	events, err := sh(ctx, Identity{TenantID: "t1"}, args)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -207,12 +213,18 @@ func TestAccountsSubscribe_EmitsReadyThenSnapshotOnChangeOnly(t *testing.T) {
 	}
 }
 
+// TestAccountsResolveDevServerConnection_Connected is the live-bug
+// regression: this channel used to report "connected" from
+// ResolveConnection (an infra.connections DB-row check, unrelated to
+// account management) — now it reports the agent's real live-session
+// state via IsDevServerConnected, and echoes the devServerId back as
+// ConnectionID (see this file's package doc comment).
 func TestAccountsResolveDevServerConnection_Connected(t *testing.T) {
-	var gotReq *infrafleetv1.ResolveConnectionRequest
+	var gotReq *infrafleetv1.IsDevServerConnectedRequest
 	fake := &fakeAccountsRelayClient{
-		resolveConnectionFunc: func(_ context.Context, in *infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error) {
+		isDevServerConnected: func(_ context.Context, in *infrafleetv1.IsDevServerConnectedRequest) (*infrafleetv1.IsDevServerConnectedResponse, error) {
 			gotReq = in
-			return &infrafleetv1.ResolveConnectionResponse{Connected: true, ConnectionId: "conn-1"}, nil
+			return &infrafleetv1.IsDevServerConnectedResponse{Connected: true}, nil
 		},
 	}
 	r := NewRegistry()
@@ -227,8 +239,8 @@ func TestAccountsResolveDevServerConnection_Connected(t *testing.T) {
 	if !ok {
 		t.Fatalf("unexpected result type: %#v", result)
 	}
-	if !got.Connected || got.ConnectionID != "conn-1" {
-		t.Errorf("result = %+v, want Connected=true ConnectionID=conn-1", got)
+	if !got.Connected || got.ConnectionID != "ds-1" {
+		t.Errorf("result = %+v, want Connected=true ConnectionID=ds-1", got)
 	}
 	if gotReq.GetDevServerId() != "ds-1" {
 		t.Errorf("DevServerId = %q, want ds-1", gotReq.GetDevServerId())
@@ -237,8 +249,8 @@ func TestAccountsResolveDevServerConnection_Connected(t *testing.T) {
 
 func TestAccountsResolveDevServerConnection_NotConnected_NotAnError(t *testing.T) {
 	fake := &fakeAccountsRelayClient{
-		resolveConnectionFunc: func(context.Context, *infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error) {
-			return &infrafleetv1.ResolveConnectionResponse{Connected: false}, nil
+		isDevServerConnected: func(context.Context, *infrafleetv1.IsDevServerConnectedRequest) (*infrafleetv1.IsDevServerConnectedResponse, error) {
+			return &infrafleetv1.IsDevServerConnectedResponse{Connected: false}, nil
 		},
 	}
 	r := NewRegistry()
@@ -253,15 +265,15 @@ func TestAccountsResolveDevServerConnection_NotConnected_NotAnError(t *testing.T
 	if !ok {
 		t.Fatalf("unexpected result type: %#v", result)
 	}
-	if got.Connected || got.ConnectionID != "" {
-		t.Errorf("result = %+v, want Connected=false ConnectionID=\"\"", got)
+	if got.Connected {
+		t.Errorf("result = %+v, want Connected=false", got)
 	}
 }
 
 func TestAccountsResolveDevServerConnection_MissingDevServerID_FailsFastWithoutCallingResolve(t *testing.T) {
 	called := false
 	fake := &fakeAccountsRelayClient{
-		resolveConnectionFunc: func(context.Context, *infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error) {
+		isDevServerConnected: func(context.Context, *infrafleetv1.IsDevServerConnectedRequest) (*infrafleetv1.IsDevServerConnectedResponse, error) {
 			called = true
 			return nil, nil
 		},
@@ -275,14 +287,14 @@ func TestAccountsResolveDevServerConnection_MissingDevServerID_FailsFastWithoutC
 		t.Fatal("expected an error for missing devServerId")
 	}
 	if called {
-		t.Error("ResolveConnection must not be called when devServerId is missing")
+		t.Error("IsDevServerConnected must not be called when devServerId is missing")
 	}
 }
 
 func TestAccountsResolveDevServerConnection_UnknownDevServerID_ResolveErrorPassesThrough(t *testing.T) {
 	wantErr := errors.New("INFRA_DEV_SERVER_NOT_FOUND: no such dev server")
 	fake := &fakeAccountsRelayClient{
-		resolveConnectionFunc: func(context.Context, *infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error) {
+		isDevServerConnected: func(context.Context, *infrafleetv1.IsDevServerConnectedRequest) (*infrafleetv1.IsDevServerConnectedResponse, error) {
 			return nil, wantErr
 		},
 	}
@@ -292,7 +304,7 @@ func TestAccountsResolveDevServerConnection_UnknownDevServerID_ResolveErrorPasse
 	args := argsJSON(t, map[string]any{"devServerId": "ds-unknown"})
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "accounts.resolveDevServerConnection", args)
 	if !errors.Is(err, wantErr) && (err == nil || err.Error() != wantErr.Error()) {
-		t.Fatalf("expected ResolveConnection's error to pass through verbatim, got: %v", err)
+		t.Fatalf("expected IsDevServerConnected's error to pass through verbatim, got: %v", err)
 	}
 }
 

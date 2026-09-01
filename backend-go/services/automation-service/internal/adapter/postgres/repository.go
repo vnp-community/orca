@@ -289,11 +289,20 @@ func (r *AutomationRunRepository) UpdateStatus(ctx context.Context, run domain.A
 }
 
 func (r *AutomationRunRepository) ListByAutomation(ctx context.Context, tenantID, automationID, pageToken string, pageSize int32) ([]domain.AutomationRun, string, error) {
+	// automationID/pageToken are legitimately empty (the Automation page's
+	// initial "all runs" load passes no automationID; the first page has no
+	// cursor) — automation_id and id are UUID columns, so binding "" directly
+	// against them fails with "invalid input syntax for type uuid" before
+	// the WHERE clause's own logic ever runs. Same `$n = '' OR col =
+	// $n::uuid` guard AutomationRepository.List already uses for pageToken,
+	// applied to both optional filters here.
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
 		       output_json, error_message, created_at, started_at, completed_at
 		FROM automation.automation_runs
-		WHERE tenant_id = $1 AND automation_id = $2 AND id > $3
+		WHERE tenant_id = $1
+		  AND ($2 = '' OR automation_id = $2::uuid)
+		  AND ($3 = '' OR id > $3::uuid)
 		ORDER BY id
 		LIMIT $4
 	`, tenantID, automationID, pageToken, pageSize)

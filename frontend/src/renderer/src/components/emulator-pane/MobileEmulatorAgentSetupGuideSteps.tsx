@@ -1,6 +1,7 @@
 import { Loader2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '@/store'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { ORCA_CLI_SKILL_INSTALL_COMMAND } from '@/lib/agent-feature-install-commands'
 import {
   AGENT_SKILL_CLI_PREREQUISITE_NOTICE,
@@ -28,6 +29,15 @@ export function MobileEmulatorAgentSetupGuideSteps({
 }: MobileEmulatorAgentSetupGuideStepsProps): React.JSX.Element {
   const recordFeatureInteraction = useAppStore((s) => s.recordFeatureInteraction)
   const terminalWorktreeId = `mobile-emulator-${worktreeId}-orca-cli-skill-terminal`
+  // Why: this synthetic worktreeId has no backing repo, so it has no
+  // natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   const showSkillPreInstallNotice = shouldShowMobileEmulatorSkillPreInstallNotice({
     cliEnabled: setup.cliEnabled,
     cliSkillInstalled: setup.cliSkillInstalled
@@ -159,6 +169,7 @@ export function MobileEmulatorAgentSetupGuideSteps({
               'Mobile emulator Orca CLI skill install terminal'
             )}
             terminalWorktreeId={terminalWorktreeId}
+            devServerId={devServerId}
             installed={setup.cliSkillInstalled}
             loading={setup.cliSkillLoading || setup.setupRechecking}
             error={setup.cliSkillError}

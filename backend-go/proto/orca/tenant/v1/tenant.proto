@@ -10,6 +10,16 @@ import "google/protobuf/empty.proto";
 // This is the origin of tenant_id for every other service. See specs/backend-go/services/tenant-service.md.
 service TenantService {
   rpc CreateCompany(CreateCompanyRequest) returns (CreateCompanyResponse);
+  // GetCompany — the missing read half of Create/UpdateCompany (CR-DS-006/
+  // 007/008 follow-up: the Admin Console's Company tab needs to display the
+  // caller's own company name before offering to rename it).
+  rpc GetCompany(GetCompanyRequest) returns (GetCompanyResponse);
+  // ListCompanies — cross-tenant by nature (tenant.companies has no
+  // tenant_id column, this table IS the tenant root); the caller MUST
+  // admin-gate. Added because a company created via CreateCompany was
+  // otherwise unreachable after the creating session ended — see
+  // wscompat's profile.listCompanies.
+  rpc ListCompanies(ListCompaniesRequest) returns (ListCompaniesResponse);
   rpc ValidateTenant(ValidateTenantRequest) returns (ValidateTenantResponse);
   rpc CreateDepartment(CreateDepartmentRequest) returns (CreateDepartmentResponse);
   rpc SetUserDepartment(SetUserDepartmentRequest) returns (SetUserDepartmentResponse);
@@ -31,6 +41,15 @@ service TenantService {
 
   // RemoveTeamMember — documented gap, services/tenant-service/README.md:101.
   rpc RemoveTeamMember(RemoveTeamMemberRequest) returns (google.protobuf.Empty);
+
+  // GetOnboardingState/SetOnboardingState — per-user onboarding wizard
+  // progress, opaque JSON as far as this service is concerned (api-gateway's
+  // onboarding.get/update wscompat channels own decoding it). Added because
+  // nothing ever persisted this: every page reload re-showed the onboarding
+  // wizard forever. See UserProfileRepository.GetOnboardingState's doc
+  // comment for why this is a dedicated store, not settings_json.
+  rpc GetOnboardingState(GetOnboardingStateRequest) returns (GetOnboardingStateResponse);
+  rpc SetOnboardingState(SetOnboardingStateRequest) returns (google.protobuf.Empty);
 }
 
 message Company {
@@ -52,6 +71,20 @@ message CreateCompanyRequest {
 
 message CreateCompanyResponse {
   Company company = 1;
+}
+
+message GetCompanyRequest {
+  string id = 1;
+}
+
+message GetCompanyResponse {
+  Company company = 1;
+}
+
+message ListCompaniesRequest {}
+
+message ListCompaniesResponse {
+  repeated Company companies = 1;
 }
 
 message ValidateTenantRequest {
@@ -200,4 +233,20 @@ message ListTeamsResponse {
 message RemoveTeamMemberRequest {
   string team_id = 1;
   string user_id = 2;
+}
+
+message GetOnboardingStateRequest {
+  string user_id = 1;
+}
+
+message GetOnboardingStateResponse {
+  // state_json empty + found=false means "wizard never started" — the
+  // caller's existing default, not an error.
+  string state_json = 1;
+  bool found = 2;
+}
+
+message SetOnboardingStateRequest {
+  string user_id = 1;
+  string state_json = 2;
 }

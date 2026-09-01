@@ -15,6 +15,11 @@ type CloneStepProps = {
   disableDestinationPicker?: boolean
   runtimeEnvironmentId?: string | null
   sshTargetId?: string | null
+  // Why: added alongside runtimeEnvironmentId/sshTargetId — was missing
+  // entirely (live bug: "Parent folder" could never be browsed on a
+  // dev-server-agent-only session, since isRemoteClone/canBrowseRemoteDestination
+  // below only ever checked the other two).
+  devServerId?: string | null
   cloneTargetLabel?: string | null
   onUrlChange: (value: string) => void
   onDestChange: (value: string) => void
@@ -31,6 +36,7 @@ export function CloneStep({
   disableDestinationPicker = false,
   runtimeEnvironmentId,
   sshTargetId,
+  devServerId,
   cloneTargetLabel,
   onUrlChange,
   onDestChange,
@@ -38,7 +44,7 @@ export function CloneStep({
   onClone
 }: CloneStepProps): React.JSX.Element {
   const [browsingDestination, setBrowsingDestination] = useState(false)
-  const isRemoteClone = Boolean(runtimeEnvironmentId || sshTargetId)
+  const isRemoteClone = Boolean(runtimeEnvironmentId || sshTargetId || devServerId)
   const canBrowseRemoteDestination = isRemoteClone
   const canClone = !!cloneUrl.trim() && !!cloneDestination.trim() && !isCloning
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -50,7 +56,7 @@ export function CloneStep({
     }
   }
 
-  if (browsingDestination && (runtimeEnvironmentId || sshTargetId)) {
+  if (browsingDestination && (runtimeEnvironmentId || sshTargetId || devServerId)) {
     return (
       <>
         <DialogHeader>
@@ -74,9 +80,19 @@ export function CloneStep({
             }}
             onCancel={() => setBrowsingDestination(false)}
           />
+        ) : runtimeEnvironmentId ? (
+          <RemoteFileBrowser
+            runtimeEnvironmentId={runtimeEnvironmentId}
+            initialPath={cloneDestination || '~'}
+            onSelect={(path) => {
+              onDestChange(path)
+              setBrowsingDestination(false)
+            }}
+            onCancel={() => setBrowsingDestination(false)}
+          />
         ) : (
           <RemoteFileBrowser
-            runtimeEnvironmentId={runtimeEnvironmentId as string}
+            devServerId={devServerId as string}
             initialPath={cloneDestination || '~'}
             onSelect={(path) => {
               onDestChange(path)

@@ -26,6 +26,13 @@ type OnboardingInlineCommandTerminalProps = {
   autoScrollIntoView?: boolean
   worktreeId?: string
   shellOverride?: string
+  /** Dev server to bind this ephemeral terminal's PTY to. Required on the
+   *  web build: this synthetic worktreeId has no backing repo, so without
+   *  it the tab would try to spawn a host-local PTY, which the web
+   *  deployment cannot do (INFRA_TERMINAL_HOST_LOCAL_UNIMPLEMENTED — found
+   *  live 2026-08-30 on the CLI-install terminal). Desktop callers may omit
+   *  it to keep spawning a real local shell. */
+  devServerId?: string | null
   onOpened?: () => void
   onInteracted?: (method: 'keyboard' | 'pointer', event?: KeyboardEvent<HTMLElement>) => void
   onTerminalExit?: () => void
@@ -46,6 +53,7 @@ export function OnboardingInlineCommandTerminal({
   autoScrollIntoView = true,
   worktreeId: worktreeIdProp = ONBOARDING_INLINE_TERMINAL_WORKTREE_ID,
   shellOverride,
+  devServerId,
   onOpened,
   onInteracted,
   onTerminalExit
@@ -69,6 +77,17 @@ export function OnboardingInlineCommandTerminal({
   )
   const [cwd, setCwd] = useState<string | null>(null)
   const [tabId, setTabId] = useState<string | null>(null)
+  // Why: devServerId can start null and resolve to a real value shortly
+  // after mount (the connected-dev-server list loads asynchronously). If
+  // the create-tab effect below re-ran on every devServerId change, that
+  // first resolution would tear down and recreate the tab — destroying a
+  // PTY that may have just started streaming, reproducing the exact
+  // create→destroy churn BUG-FE-PTY-001 was fought over (see that memory).
+  // A ref sidesteps this: the effect reads whatever devServerId is current
+  // AT CREATION TIME only, the same "set once, stable for this tab's
+  // lifetime" treatment worktreeId/shellOverride/title already get.
+  const devServerIdRef = useRef(devServerId)
+  devServerIdRef.current = devServerId
   // Why: starts at `prefersReducedMotion` so users opted out of motion never
   // see the slide-in frame; otherwise we flip to true after first paint so the
   // CSS transition has a starting state to interpolate from.
@@ -95,7 +114,8 @@ export function OnboardingInlineCommandTerminal({
   useEffect(() => {
     const tab = createTab(worktreeId, undefined, shellOverride, {
       activate: false,
-      recordInteraction: false
+      recordInteraction: false,
+      ...(devServerIdRef.current ? { connectionId: devServerIdRef.current } : {})
     })
     setActiveTabForWorktree(worktreeId, tab.id)
     setTabCustomTitle(tab.id, title, { recordInteraction: false })
@@ -105,6 +125,9 @@ export function OnboardingInlineCommandTerminal({
       // the backing tab so installer shells do not keep running invisibly.
       closeTab(tab.id, { recordInteraction: false })
     }
+    // Why: devServerId is deliberately NOT a dependency — see devServerIdRef's
+    // doc comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     closeTab,
     createTab,
@@ -287,7 +310,13 @@ export function OnboardingInlineCommandTerminal({
           onKeyDownCapture={(event) => onInteracted?.('keyboard', event)}
           onPointerDownCapture={() => onInteracted?.('pointer')}
         >
-          {cwd && tabId ? (
+          {/* Why cwd !== null (not a truthy check): see
+              isFloatingTerminalReady's doc comment below — this must stay
+              inline (not a call to that helper) so TypeScript's
+              control-flow narrowing applies to cwd/tabId in the branch
+              below; the helper exists purely so this exact condition has a
+              unit-testable, documented counterpart. Keep both in sync. */}
+          {cwd !== null && tabId !== null ? (
             <TerminalPane
               tabId={tabId}
               worktreeId={worktreeId}
@@ -313,6 +342,20 @@ export function OnboardingInlineCommandTerminal({
       </section>
     </div>
   )
+}
+
+// isFloatingTerminalReady — cwd starts at null ("not loaded yet") and
+// resolves to a real value OR '' ("loaded, no override" — TerminalPane/pty
+// spawn already treat cwd='' the same as omitted, see its own `fallbackCwd:
+// cwd ?? ''` handling). The web build's getFloatingTerminalCwd always
+// resolves '' (no local filesystem to derive a path from), so a truthy
+// check on cwd (`cwd && tabId`) never passed — this pane was stuck on
+// "Starting terminal..." forever for every web session, across every
+// caller (CLI install, agent-skill setup, integrations step). Checking
+// `cwd !== null` instead correctly distinguishes "not loaded" from "loaded,
+// empty".
+export function isFloatingTerminalReady(cwd: string | null, tabId: string | null): boolean {
+  return cwd !== null && tabId !== null
 }
 
 function findTerminalTabElement(tabId: string): HTMLElement | null {

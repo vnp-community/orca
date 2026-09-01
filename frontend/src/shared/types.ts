@@ -231,6 +231,11 @@ export type ProjectHostSetupDeleteResult = {
 
 export type Repo = {
   id: string
+  /** OrcaProject this repo belongs to (project.repos' real project_id).
+   *  Undefined for local/Electron-mode repos, which have no OrcaProject
+   *  concept at all — only ever set for repos fetched/added through the
+   *  remote ('environment') project-service-backed path. */
+  projectId?: string
   path: string
   displayName: string
   badgeColor: string
@@ -359,6 +364,12 @@ export type NestedRepoCandidate = {
   path: string
   displayName: string
   depth: number
+  /** Threaded through from the remote scanNested RPC (project.proto's
+   *  NestedRepoCandidate) so importNestedRepos can round-trip the exact
+   *  candidate shape the backend requires. Undefined for local-mode scans
+   *  (Electron's own scanner has no equivalent concept). */
+  suggestedName?: string
+  isGitRepo?: boolean
 }
 
 export type NestedRepoScanResult = {
@@ -870,6 +881,13 @@ export type TerminalTab = {
    *  `sortEpoch` increments. Split layouts use a numeric count because one tab
    *  can remount several panes. Never persisted — it is a transient handoff. */
   pendingActivationSpawn?: boolean | number
+  /** Explicit dev-server binding for a tab whose worktreeId has no backing
+   *  repo record to resolve a connectionId from (ephemeral setup/onboarding
+   *  terminals — CLI install, agent-skill setup). pty-connection.ts prefers
+   *  this over the repo-based getConnectionId(worktreeId) lookup, which
+   *  always returns null/undefined for these synthetic worktree ids. Unset
+   *  for ordinary repo-backed tabs, which keep resolving via their repo. */
+  connectionId?: string | null
 }
 
 export type BrowserHistoryEntry = {

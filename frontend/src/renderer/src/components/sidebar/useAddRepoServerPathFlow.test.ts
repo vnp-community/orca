@@ -45,6 +45,16 @@ vi.mock('@/lib/onboarding-project-checklist', () => ({
   markOnboardingProjectAdded: mocks.markOnboardingProjectAdded
 }))
 
+// Why this mock is needed now: useAddRepoServerPathFlow's folder-add branch
+// reads useAppStore.getState().settings to pass along to
+// markOnboardingProjectAdded — without a stub, the real store module
+// initializes for real and this test hangs waiting on it.
+vi.mock('@/store', () => ({
+  useAppStore: {
+    getState: () => ({ settings: {} })
+  }
+}))
+
 vi.mock('@/lib/telemetry', () => ({
   track: mocks.track
 }))
@@ -92,7 +102,9 @@ describe('useAddRepoServerPathFlow', () => {
     expect(mocks.scanNestedRepos).not.toHaveBeenCalled()
     expect(mocks.fetchWorktrees).not.toHaveBeenCalled()
     expect(mocks.onGitRepoReady).not.toHaveBeenCalled()
-    expect(mocks.markOnboardingProjectAdded).toHaveBeenCalledWith('addedFolder')
+    // Second arg is whatever settings useAppStore.getState() has at call
+    // time — not this test's concern, only that the checklist item fires.
+    expect(mocks.markOnboardingProjectAdded.mock.calls[0]?.[0]).toBe('addedFolder')
     expect(mocks.closeModal).toHaveBeenCalled()
   })
 })

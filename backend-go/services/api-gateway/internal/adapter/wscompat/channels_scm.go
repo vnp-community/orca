@@ -53,6 +53,19 @@ func registerSCMChannels(r *Registry, client scmintegrationv1.ScmIntegrationServ
 // ── github.* (PR/issue mutations, repo/branch resolution, auth, rate limit) ──
 
 func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient) {
+	// github.checkOrcaStarred — the old TS backend shelled out to the local
+	// `gh` CLI (`gh api user/starred/<repo>`); scm-integration-service has no
+	// equivalent RPC (no GitHub "check if starred" call exists in
+	// scmintegration.proto today — a real port needs a new proto RPC +
+	// usecase, not just wiring). null ("unable to determine") is not a
+	// stub here — it's the same answer the old backend already gave for
+	// every user without `gh` installed/authenticated, and both frontend
+	// call sites (Landing.tsx's GitHubStarButton, GeneralSupportSection.tsx)
+	// already treat null as a designed "web-fallback" state, not an error.
+	r.Register("github.checkOrcaStarred", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		return nil, nil
+	})
+
 	// github.rateLimit — real backing RPC already exists (BUG-012's
 	// finding); this is the wiring-only piece.
 	r.Register("github.rateLimit", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {

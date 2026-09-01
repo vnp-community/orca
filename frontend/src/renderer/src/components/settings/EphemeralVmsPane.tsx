@@ -22,13 +22,17 @@ import {
   useInstalledAgentSkill
 } from '@/hooks/useInstalledAgentSkills'
 import { useActiveProjectSkillRuntime } from '@/hooks/useActiveProjectSkillRuntime'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import {
   buildSkillCommandForRuntime,
   ensureWslCliAvailableForAgentSkillTerminal,
   getWslCliDistroRequest
 } from './CliSkillRuntimeSetup'
 import { isWebClientLocation } from '@/lib/web-client-location'
-import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
+import {
+  getRuntimeCliInstallStatus,
+  getRuntimeWslCliInstallStatus
+} from '@/runtime/runtime-cli-client'
 
 import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 type RecipeCatalogEntry = Awaited<
@@ -43,6 +47,15 @@ const AGENT_PROMPT =
 export function EphemeralVmsPane(): React.JSX.Element {
   const openModal = useAppStore((state) => state.openModal)
   const activeSkillRuntime = useActiveProjectSkillRuntime()
+  // Why: this panel's setup terminal has no project/repo behind it, so it
+  // has no natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   const [catalog, setCatalog] = useState<RecipeCatalogEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [promptCopied, setPromptCopied] = useState(false)
@@ -157,6 +170,7 @@ export function EphemeralVmsPane(): React.JSX.Element {
         terminalTitle="Ephemeral VMs setup"
         terminalAriaLabel="Ephemeral VMs skill install terminal"
         terminalWorktreeId="settings-ephemeral-vms-skill-terminal"
+        devServerId={devServerId}
         terminalShellOverride={activeSkillRuntime.terminalShellOverride}
         installed={skillDetected}
         loading={skillLoading}
@@ -166,9 +180,7 @@ export function EphemeralVmsPane(): React.JSX.Element {
         preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
         getPrerequisiteStatus={() =>
           activeSkillRuntime.agentRuntime?.runtime === 'wsl'
-            ? getRuntimeWslCliInstallStatus(
-                getWslCliDistroRequest(activeSkillRuntime.agentRuntime)
-              )
+            ? getRuntimeWslCliInstallStatus(getWslCliDistroRequest(activeSkillRuntime.agentRuntime))
             : getRuntimeCliInstallStatus()
         }
         onBeforeOpenTerminal={async () => {

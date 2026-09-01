@@ -19,6 +19,12 @@ import (
 type Identity struct {
 	TenantID string
 	UserID   string
+	// Role is the caller's global role ("admin"/"user") — populated only by
+	// authclient.SessionValidator's cookie/session path (the browser/web
+	// path every wscompat call goes through), never by the bearer-JWT
+	// path. See common/tenant.Role's doc comment for the fail-closed
+	// contract: empty means "unknown," never "trust it."
+	Role string
 }
 
 // ChannelHandler implements one RPC channel (e.g. "task.create") — args are
@@ -81,7 +87,9 @@ func (r *Registry) DispatchStreamChannel(ctx context.Context, id Identity, chann
 	// specs/backend-go/bugs/missing-v2/) — deliberately NO context.WithTimeout,
 	// unlike Dispatch: a stream channel's ack/events lifecycle is long-lived
 	// by design (e.g. a terminal session), not a single bounded RPC.
-	ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+	// Role included — see Dispatch's own AttachIdentity call below for why
+	// this must be set here, not left to individual channel handlers.
+	ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID, Role: id.Role})
 	ack, events, err = h(ctx, id, args)
 	return ack, events, true, err
 }
@@ -159,7 +167,22 @@ func (r *Registry) Dispatch(ctx context.Context, id Identity, channel string, ar
 	if !ok {
 		return notImplementedHandler(ctx, id, channel)
 	}
-	ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+	// Role included — live-verified bug (CR-DS-006 Phase 2): this call
+	// (generic, runs before every channel handler) previously omitted Role,
+	// appending metadata.MetadataRole="" to the outgoing gRPC context.
+	// Admin-gated channel handlers each ALSO call AttachIdentity a second
+	// time via attachAdminIdentity (channels_dev_server_access_control.go),
+	// this time with the real Role — but grpc/metadata.AppendToOutgoingContext
+	// appends, it doesn't replace, and TenantExtractionInterceptor's
+	// md.Get(MetadataRole) reads only the FIRST value in that slice. Since
+	// this call runs first, its empty Role always won — the real "admin"
+	// value from the second call was silently discarded, so every
+	// requireAdmin(ctx) check failed with INFRA_NOT_ADMIN regardless of the
+	// caller's actual role. Setting it correctly here (the call that always
+	// runs first for every channel) fixes every admin-gated RPC at once and
+	// makes attachAdminIdentity's own AttachIdentity call redundant-but-
+	// harmless (same value appended twice, first one still wins).
+	ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID, Role: id.Role})
 	ctx, cancel := context.WithTimeout(ctx, dispatchRPCTimeout)
 	defer cancel()
 	result, err := h(ctx, id, args)

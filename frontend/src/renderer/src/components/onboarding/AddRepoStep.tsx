@@ -3,7 +3,7 @@ import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { RemoteDirectoryBrowser } from '../remote-browser/RemoteDirectoryBrowser'
-import { useConnectedDevServers } from '../../store/slices/dev-servers'
+import { useConnectedDevServers } from '../../store/slices/dev-servers-selectors'
 import { useAppStore } from '../../store'
 import { addRuntimeRepoRemote } from '../../runtime/runtime-repo-client'
 
@@ -83,7 +83,7 @@ export function AddRepoStep({ activeDevServerId, onRepoAdded }: Props) {
     try {
       const result = await addRuntimeRepoRemote(useAppStore.getState().settings, {
         connectionId: effectiveDevServerId,
-        remotePath: path,
+        remotePath: path
       })
       if ('error' in result) {
         setAddingError(result.error)
@@ -106,7 +106,7 @@ export function AddRepoStep({ activeDevServerId, onRepoAdded }: Props) {
       const repo = await window.api.repos.cloneRemote({
         connectionId: effectiveDevServerId,
         url: cloneUrl,
-        destination: '',
+        destination: ''
       })
       onRepoAdded(repo.id)
     } catch (err) {
@@ -123,7 +123,7 @@ export function AddRepoStep({ activeDevServerId, onRepoAdded }: Props) {
     try {
       const repos = await window.api.repos.scanRemote({
         devServerId: effectiveDevServerId,
-        rootPath: '/home',
+        rootPath: '/home'
       })
       setScannedRepos(repos)
     } catch {
@@ -139,7 +139,7 @@ export function AddRepoStep({ activeDevServerId, onRepoAdded }: Props) {
       try {
         const result = await addRuntimeRepoRemote(useAppStore.getState().settings, {
           connectionId: effectiveDevServerId,
-          remotePath: path,
+          remotePath: path
         })
         if ('error' in result) {
           setAddingError(result.error)
@@ -203,19 +203,29 @@ export function AddRepoStep({ activeDevServerId, onRepoAdded }: Props) {
               onClick={() => void handleClone()}
               disabled={!cloneUrl || cloning}
             >
-              {cloning ? <><Loader2 className="mr-2 size-4 animate-spin" />Cloning…</> : 'Clone'}
+              {cloning ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Cloning…
+                </>
+              ) : (
+                'Clone'
+              )}
             </Button>
           </div>
         )}
 
         {mode === 'scan' && (
           <div className="add-repo-step__scan">
-            <Button
-              id="scan-btn"
-              onClick={() => void handleScan()}
-              disabled={scanning}
-            >
-              {scanning ? <><Loader2 className="mr-2 size-4 animate-spin" />Scanning…</> : 'Scan for git repos'}
+            <Button id="scan-btn" onClick={() => void handleScan()} disabled={scanning}>
+              {scanning ? (
+                <>
+                  <Loader2 className="mr-2 size-4 animate-spin" />
+                  Scanning…
+                </>
+              ) : (
+                'Scan for git repos'
+              )}
             </Button>
 
             {scannedRepos.length > 0 && (
@@ -229,8 +239,11 @@ export function AddRepoStep({ activeDevServerId, onRepoAdded }: Props) {
                           checked={selectedScanPaths.has(repo.path)}
                           onChange={(e) => {
                             const next = new Set(selectedScanPaths)
-                            if (e.target.checked) {next.add(repo.path)}
-                            else {next.delete(repo.path)}
+                            if (e.target.checked) {
+                              next.add(repo.path)
+                            } else {
+                              next.delete(repo.path)
+                            }
                             setSelectedScanPaths(next)
                           }}
                         />

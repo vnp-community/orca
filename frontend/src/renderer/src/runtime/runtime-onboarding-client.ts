@@ -11,7 +11,7 @@ import type {
 } from '../../../shared/dev-server-types'
 import { callRuntimeRpc, getActiveRuntimeTarget } from './runtime-rpc-client'
 
-type RuntimeOnboardingSettings = Pick<GlobalSettings, 'activeRuntimeEnvironmentId'>
+export type RuntimeOnboardingSettings = Pick<GlobalSettings, 'activeRuntimeEnvironmentId'>
 
 export type RuntimeOnboardingUpdate = Partial<Omit<OnboardingState, 'checklist'>> & {
   checklist?: Partial<OnboardingState['checklist']>

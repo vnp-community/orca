@@ -6,6 +6,7 @@ import {
 } from '../../runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
 import { createTestStore } from './store-test-helpers'
+import { resetDefaultProjectCacheForTests } from './repos'
 
 const localRepo: Repo = {
   id: 'local-repo',
@@ -27,6 +28,7 @@ const runtimeEnvironmentCall = vi.fn()
 
 beforeEach(() => {
   clearRuntimeCompatibilityCacheForTests()
+  resetDefaultProjectCacheForTests()
   runtimeEnvironmentCall.mockReset()
   vi.stubGlobal('window', {
     api: {
@@ -69,6 +71,28 @@ describe('fetchReposForAllHosts generation', () => {
     })
     let repoListCalls = 0
     runtimeEnvironmentCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
+      // Why project.list is answered here too: fetchRepoCatalogForTarget now
+      // resolves an implicit default OrcaProject (getOrCreateDefaultProject)
+      // before every repo.list call — a bare OrcaProject[], not the
+      // {projects, setups} shape the other (unrelated) RPCs below return.
+      if (args.method === 'project.list') {
+        return {
+          id: 'rpc-project-list',
+          ok: true,
+          result: [
+            {
+              id: 'default-project',
+              name: 'My Repos',
+              defaultBranch: 'main',
+              devServerId: '',
+              visibility: 'private',
+              createdAt: 1,
+              updatedAt: 1
+            }
+          ],
+          _meta: { runtimeId: 'runtime-remote' }
+        }
+      }
       if (args.method !== 'repo.list') {
         return {
           id: 'rpc-other',
@@ -94,7 +118,17 @@ describe('fetchReposForAllHosts generation', () => {
     const response = {
       id: 'rpc-repo-list',
       ok: true,
-      result: { repos: [remoteRepo] },
+      result: {
+        repos: [
+          {
+            id: remoteRepo.id,
+            projectId: 'default-project',
+            url: remoteRepo.path,
+            displayName: remoteRepo.displayName,
+            position: 0
+          }
+        ]
+      },
       _meta: { runtimeId: 'runtime-remote' }
     }
 

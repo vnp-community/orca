@@ -27,6 +27,21 @@ const (
 	projectActionAnyMember = "any_member"
 )
 
+// repoAction* are the values repo.rego's action_roles table keys on — the
+// repo-scoped functional-role tier (admin/developer/lead), layered on top
+// of the project-scoped owner/member tier above. Every repo.rego-gated
+// usecase passes one of these three constants to requireRepoAccess.
+const (
+	// repoActionAdminOnly gates RemoveRepo/UpdateRepo/granting or revoking
+	// another user's functional role on this repo.
+	repoActionAdminOnly = "repo_admin_only"
+	// repoActionLeadOrAdmin gates ReorderRepos.
+	repoActionLeadOrAdmin = "repo_lead_or_admin"
+	// repoActionAnyFunctionalRole gates read/visibility access to a
+	// specific repo for a project member who isn't its owner.
+	repoActionAnyFunctionalRole = "repo_any_functional_role"
+)
+
 // callerGlobalRole resolves the acting user's system-wide role for
 // project.rego's admin-override branch. Always "" today: no role claim
 // propagates from api-gateway into a service's request context yet — the
@@ -75,6 +90,60 @@ func requireProjectAccess(ctx context.Context, membership MembershipRepository, 
 		// Fail closed: a policy-evaluation error is never treated as an
 		// allow — matching every other OPA call site in this codebase
 		// (common/policy.Evaluator's doc comment).
+		return apperrors.New(apperrors.KindInternal, "PROJECT_POLICY_EVAL_FAILED", "failed to evaluate authorization policy", err)
+	}
+	if !allowed {
+		return apperrors.New(apperrors.KindPermissionDenied, "PROJECT_NOT_AUTHORIZED", "caller is not authorized for this action", nil)
+	}
+	return nil
+}
+
+// requireRepoAccess is requireProjectAccess's repo-scoped counterpart: it
+// resolves the caller's PROJECT role first (a project owner always passes,
+// regardless of any repo_members grant — repo.rego's own bypass rule, kept
+// in Go too so a missing/erroring repo-membership lookup can never itself
+// deny an owner), then — for a non-owner — resolves their functional role
+// on repoID specifically and asks OPA. Fails closed on every error path,
+// same contract as requireProjectAccess.
+func requireRepoAccess(ctx context.Context, projectMembership MembershipRepository, repoMembership RepoMembershipRepository, opa OPAClient, projectID, repoID, action string) error {
+	actorID, ok := tenant.UserID(ctx)
+	if !ok {
+		return apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_USER", "no user in request context", nil)
+	}
+
+	callerProjectRole := ""
+	pm, err := projectMembership.GetMembership(ctx, projectID, actorID)
+	switch {
+	case errors.Is(err, domain.ErrMembershipNotFound):
+		// No project membership at all — callerProjectRole stays "".
+	case err != nil:
+		return apperrors.New(apperrors.KindInternal, "PROJECT_MEMBERSHIP_LOOKUP_FAILED", "failed to resolve caller's project membership", err)
+	default:
+		callerProjectRole = string(pm.Role)
+	}
+
+	callerRepoRole := ""
+	// Skip the repo-membership lookup entirely for a project owner: their
+	// access never depends on it, and a repo with no repo_members rows at
+	// all (the common case — repo_members is opt-in, not required) would
+	// otherwise report ErrRepoMembershipNotFound on every single owner
+	// call for no reason.
+	if callerProjectRole != string(domain.ProjectRoleOwner) {
+		rm, err := repoMembership.GetRepoMembership(ctx, repoID, actorID)
+		switch {
+		case errors.Is(err, domain.ErrRepoMembershipNotFound):
+			// No functional-role grant on this specific repo — callerRepoRole
+			// stays "". repo.rego's action_roles has no "" entry, so this
+			// alone can never allow a non-owner through.
+		case err != nil:
+			return apperrors.New(apperrors.KindInternal, "PROJECT_REPO_MEMBERSHIP_LOOKUP_FAILED", "failed to resolve caller's repo membership", err)
+		default:
+			callerRepoRole = string(rm.Role)
+		}
+	}
+
+	allowed, err := opa.RepoDecision(ctx, callerProjectRole, callerRepoRole, callerGlobalRole(ctx), action)
+	if err != nil {
 		return apperrors.New(apperrors.KindInternal, "PROJECT_POLICY_EVAL_FAILED", "failed to evaluate authorization policy", err)
 	}
 	if !allowed {

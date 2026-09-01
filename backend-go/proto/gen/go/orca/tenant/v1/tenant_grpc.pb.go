@@ -21,6 +21,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	TenantService_CreateCompany_FullMethodName      = "/orca.tenant.v1.TenantService/CreateCompany"
+	TenantService_GetCompany_FullMethodName         = "/orca.tenant.v1.TenantService/GetCompany"
+	TenantService_ListCompanies_FullMethodName      = "/orca.tenant.v1.TenantService/ListCompanies"
 	TenantService_ValidateTenant_FullMethodName     = "/orca.tenant.v1.TenantService/ValidateTenant"
 	TenantService_CreateDepartment_FullMethodName   = "/orca.tenant.v1.TenantService/CreateDepartment"
 	TenantService_SetUserDepartment_FullMethodName  = "/orca.tenant.v1.TenantService/SetUserDepartment"
@@ -35,6 +37,8 @@ const (
 	TenantService_UpdateUserProfile_FullMethodName  = "/orca.tenant.v1.TenantService/UpdateUserProfile"
 	TenantService_ListTeams_FullMethodName          = "/orca.tenant.v1.TenantService/ListTeams"
 	TenantService_RemoveTeamMember_FullMethodName   = "/orca.tenant.v1.TenantService/RemoveTeamMember"
+	TenantService_GetOnboardingState_FullMethodName = "/orca.tenant.v1.TenantService/GetOnboardingState"
+	TenantService_SetOnboardingState_FullMethodName = "/orca.tenant.v1.TenantService/SetOnboardingState"
 )
 
 // TenantServiceClient is the client API for TenantService service.
@@ -45,6 +49,16 @@ const (
 // This is the origin of tenant_id for every other service. See specs/backend-go/services/tenant-service.md.
 type TenantServiceClient interface {
 	CreateCompany(ctx context.Context, in *CreateCompanyRequest, opts ...grpc.CallOption) (*CreateCompanyResponse, error)
+	// GetCompany — the missing read half of Create/UpdateCompany (CR-DS-006/
+	// 007/008 follow-up: the Admin Console's Company tab needs to display the
+	// caller's own company name before offering to rename it).
+	GetCompany(ctx context.Context, in *GetCompanyRequest, opts ...grpc.CallOption) (*GetCompanyResponse, error)
+	// ListCompanies — cross-tenant by nature (tenant.companies has no
+	// tenant_id column, this table IS the tenant root); the caller MUST
+	// admin-gate. Added because a company created via CreateCompany was
+	// otherwise unreachable after the creating session ended — see
+	// wscompat's profile.listCompanies.
+	ListCompanies(ctx context.Context, in *ListCompaniesRequest, opts ...grpc.CallOption) (*ListCompaniesResponse, error)
 	ValidateTenant(ctx context.Context, in *ValidateTenantRequest, opts ...grpc.CallOption) (*ValidateTenantResponse, error)
 	CreateDepartment(ctx context.Context, in *CreateDepartmentRequest, opts ...grpc.CallOption) (*CreateDepartmentResponse, error)
 	SetUserDepartment(ctx context.Context, in *SetUserDepartmentRequest, opts ...grpc.CallOption) (*SetUserDepartmentResponse, error)
@@ -64,6 +78,14 @@ type TenantServiceClient interface {
 	ListTeams(ctx context.Context, in *ListTeamsRequest, opts ...grpc.CallOption) (*ListTeamsResponse, error)
 	// RemoveTeamMember — documented gap, services/tenant-service/README.md:101.
 	RemoveTeamMember(ctx context.Context, in *RemoveTeamMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetOnboardingState/SetOnboardingState — per-user onboarding wizard
+	// progress, opaque JSON as far as this service is concerned (api-gateway's
+	// onboarding.get/update wscompat channels own decoding it). Added because
+	// nothing ever persisted this: every page reload re-showed the onboarding
+	// wizard forever. See UserProfileRepository.GetOnboardingState's doc
+	// comment for why this is a dedicated store, not settings_json.
+	GetOnboardingState(ctx context.Context, in *GetOnboardingStateRequest, opts ...grpc.CallOption) (*GetOnboardingStateResponse, error)
+	SetOnboardingState(ctx context.Context, in *SetOnboardingStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type tenantServiceClient struct {
@@ -78,6 +100,26 @@ func (c *tenantServiceClient) CreateCompany(ctx context.Context, in *CreateCompa
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateCompanyResponse)
 	err := c.cc.Invoke(ctx, TenantService_CreateCompany_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) GetCompany(ctx context.Context, in *GetCompanyRequest, opts ...grpc.CallOption) (*GetCompanyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCompanyResponse)
+	err := c.cc.Invoke(ctx, TenantService_GetCompany_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) ListCompanies(ctx context.Context, in *ListCompaniesRequest, opts ...grpc.CallOption) (*ListCompaniesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCompaniesResponse)
+	err := c.cc.Invoke(ctx, TenantService_ListCompanies_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -224,6 +266,26 @@ func (c *tenantServiceClient) RemoveTeamMember(ctx context.Context, in *RemoveTe
 	return out, nil
 }
 
+func (c *tenantServiceClient) GetOnboardingState(ctx context.Context, in *GetOnboardingStateRequest, opts ...grpc.CallOption) (*GetOnboardingStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOnboardingStateResponse)
+	err := c.cc.Invoke(ctx, TenantService_GetOnboardingState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) SetOnboardingState(ctx context.Context, in *SetOnboardingStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_SetOnboardingState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TenantServiceServer is the server API for TenantService service.
 // All implementations must embed UnimplementedTenantServiceServer
 // for forward compatibility.
@@ -232,6 +294,16 @@ func (c *tenantServiceClient) RemoveTeamMember(ctx context.Context, in *RemoveTe
 // This is the origin of tenant_id for every other service. See specs/backend-go/services/tenant-service.md.
 type TenantServiceServer interface {
 	CreateCompany(context.Context, *CreateCompanyRequest) (*CreateCompanyResponse, error)
+	// GetCompany — the missing read half of Create/UpdateCompany (CR-DS-006/
+	// 007/008 follow-up: the Admin Console's Company tab needs to display the
+	// caller's own company name before offering to rename it).
+	GetCompany(context.Context, *GetCompanyRequest) (*GetCompanyResponse, error)
+	// ListCompanies — cross-tenant by nature (tenant.companies has no
+	// tenant_id column, this table IS the tenant root); the caller MUST
+	// admin-gate. Added because a company created via CreateCompany was
+	// otherwise unreachable after the creating session ended — see
+	// wscompat's profile.listCompanies.
+	ListCompanies(context.Context, *ListCompaniesRequest) (*ListCompaniesResponse, error)
 	ValidateTenant(context.Context, *ValidateTenantRequest) (*ValidateTenantResponse, error)
 	CreateDepartment(context.Context, *CreateDepartmentRequest) (*CreateDepartmentResponse, error)
 	SetUserDepartment(context.Context, *SetUserDepartmentRequest) (*SetUserDepartmentResponse, error)
@@ -251,6 +323,14 @@ type TenantServiceServer interface {
 	ListTeams(context.Context, *ListTeamsRequest) (*ListTeamsResponse, error)
 	// RemoveTeamMember — documented gap, services/tenant-service/README.md:101.
 	RemoveTeamMember(context.Context, *RemoveTeamMemberRequest) (*emptypb.Empty, error)
+	// GetOnboardingState/SetOnboardingState — per-user onboarding wizard
+	// progress, opaque JSON as far as this service is concerned (api-gateway's
+	// onboarding.get/update wscompat channels own decoding it). Added because
+	// nothing ever persisted this: every page reload re-showed the onboarding
+	// wizard forever. See UserProfileRepository.GetOnboardingState's doc
+	// comment for why this is a dedicated store, not settings_json.
+	GetOnboardingState(context.Context, *GetOnboardingStateRequest) (*GetOnboardingStateResponse, error)
+	SetOnboardingState(context.Context, *SetOnboardingStateRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTenantServiceServer()
 }
 
@@ -263,6 +343,12 @@ type UnimplementedTenantServiceServer struct{}
 
 func (UnimplementedTenantServiceServer) CreateCompany(context.Context, *CreateCompanyRequest) (*CreateCompanyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateCompany not implemented")
+}
+func (UnimplementedTenantServiceServer) GetCompany(context.Context, *GetCompanyRequest) (*GetCompanyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCompany not implemented")
+}
+func (UnimplementedTenantServiceServer) ListCompanies(context.Context, *ListCompaniesRequest) (*ListCompaniesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCompanies not implemented")
 }
 func (UnimplementedTenantServiceServer) ValidateTenant(context.Context, *ValidateTenantRequest) (*ValidateTenantResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ValidateTenant not implemented")
@@ -306,6 +392,12 @@ func (UnimplementedTenantServiceServer) ListTeams(context.Context, *ListTeamsReq
 func (UnimplementedTenantServiceServer) RemoveTeamMember(context.Context, *RemoveTeamMemberRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveTeamMember not implemented")
 }
+func (UnimplementedTenantServiceServer) GetOnboardingState(context.Context, *GetOnboardingStateRequest) (*GetOnboardingStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOnboardingState not implemented")
+}
+func (UnimplementedTenantServiceServer) SetOnboardingState(context.Context, *SetOnboardingStateRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetOnboardingState not implemented")
+}
 func (UnimplementedTenantServiceServer) mustEmbedUnimplementedTenantServiceServer() {}
 func (UnimplementedTenantServiceServer) testEmbeddedByValue()                       {}
 
@@ -341,6 +433,42 @@ func _TenantService_CreateCompany_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TenantServiceServer).CreateCompany(ctx, req.(*CreateCompanyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_GetCompany_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCompanyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).GetCompany(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_GetCompany_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).GetCompany(ctx, req.(*GetCompanyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_ListCompanies_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCompaniesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ListCompanies(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ListCompanies_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ListCompanies(ctx, req.(*ListCompaniesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -597,6 +725,42 @@ func _TenantService_RemoveTeamMember_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_GetOnboardingState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOnboardingStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).GetOnboardingState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_GetOnboardingState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).GetOnboardingState(ctx, req.(*GetOnboardingStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_SetOnboardingState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetOnboardingStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).SetOnboardingState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_SetOnboardingState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).SetOnboardingState(ctx, req.(*SetOnboardingStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TenantService_ServiceDesc is the grpc.ServiceDesc for TenantService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -607,6 +771,14 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateCompany",
 			Handler:    _TenantService_CreateCompany_Handler,
+		},
+		{
+			MethodName: "GetCompany",
+			Handler:    _TenantService_GetCompany_Handler,
+		},
+		{
+			MethodName: "ListCompanies",
+			Handler:    _TenantService_ListCompanies_Handler,
 		},
 		{
 			MethodName: "ValidateTenant",
@@ -663,6 +835,14 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveTeamMember",
 			Handler:    _TenantService_RemoveTeamMember_Handler,
+		},
+		{
+			MethodName: "GetOnboardingState",
+			Handler:    _TenantService_GetOnboardingState_Handler,
+		},
+		{
+			MethodName: "SetOnboardingState",
+			Handler:    _TenantService_SetOnboardingState_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -9,14 +9,14 @@ import (
 )
 
 func TestStopTerminalProcess_RequiresTenantContext(t *testing.T) {
-	uc := NewStopTerminalProcess(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerAgentClient{})
+	uc := NewStopTerminalProcess(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerRepository{}, &fakeDevServerAgentClient{})
 	if err := uc.Execute(context.Background(), "pty-1"); err == nil {
 		t.Fatal("expected an error when no tenant is in context")
 	}
 }
 
 func TestStopTerminalProcess_UnknownPty_ReturnsNotFoundError(t *testing.T) {
-	uc := NewStopTerminalProcess(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerAgentClient{})
+	uc := NewStopTerminalProcess(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerRepository{}, &fakeDevServerAgentClient{})
 	ctx := withTenant(context.Background(), "tenant-1")
 	if err := uc.Execute(ctx, "pty-unknown"); err == nil {
 		t.Fatal("expected an error for a pty with no terminal session row")
@@ -38,7 +38,7 @@ func TestStopTerminalProcess_SendsRealSIGINT_NotWritePtyCtrlC(t *testing.T) {
 		"pty-1": {PtyID: "pty-1", TenantID: "tenant-1", ConnectionID: "conn-1"},
 	}}
 	agent := &fakeDevServerAgentClient{}
-	uc := NewStopTerminalProcess(sessions, resolver, agent)
+	uc := NewStopTerminalProcess(sessions, resolver, &fakeDevServerRepository{}, agent)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	if err := uc.Execute(ctx, "pty-1"); err != nil {
@@ -63,7 +63,7 @@ func TestStopTerminalProcess_AgentFailurePropagates(t *testing.T) {
 		"pty-1": {PtyID: "pty-1", TenantID: "tenant-1", ConnectionID: "conn-1"},
 	}}
 	agent := &fakeDevServerAgentClient{sendSignalErr: errors.New("agent unreachable")}
-	uc := NewStopTerminalProcess(sessions, resolver, agent)
+	uc := NewStopTerminalProcess(sessions, resolver, &fakeDevServerRepository{}, agent)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	if err := uc.Execute(ctx, "pty-1"); err == nil {

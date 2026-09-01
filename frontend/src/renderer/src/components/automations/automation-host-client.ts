@@ -90,7 +90,11 @@ export async function listAutomationsForTarget(
     undefined,
     { timeoutMs: 15_000 }
   )
-  return result.automations
+  // Why: proto3 `repeated` fields marshal with `omitempty` — a tenant with
+  // zero automations gets a response with no `automations` key at all, not
+  // an empty array (live-reproduced as "Cannot read properties of undefined
+  // (reading 'some')" in AutomationsPage's refresh()).
+  return result.automations ?? []
 }
 
 export async function listAutomationRunsForTarget(
@@ -106,7 +110,9 @@ export async function listAutomationRunsForTarget(
     automationId ? { automationId } : {},
     { timeoutMs: 15_000 }
   )
-  return result.runs
+  // Why: same proto3 omitempty gap as listAutomationsForTarget above — a
+  // tenant/automation with zero runs gets no `runs` key at all.
+  return result.runs ?? []
 }
 
 export async function createAutomationForTarget(input: AutomationCreateInput): Promise<Automation> {

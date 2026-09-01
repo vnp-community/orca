@@ -52,7 +52,12 @@ func authMiddleware(v *usecase.AuthValidator, cookieValidator CookieSessionValid
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			if cookieValidator != nil {
 				if id, err := cookieValidator.ValidateCookie(r.Context(), r); err == nil {
-					next.ServeHTTP(w, r.WithContext(withIdentity(r.Context(), usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})))
+					// Role included — same bug class found live in
+					// wscompat.Registry.Dispatch (CR-DS-006 Phase 2): this
+					// literal silently dropped id.Role, which would have
+					// broken any REST route gated the same way
+					// devServer.approve/etc. are over the WS channel path.
+					next.ServeHTTP(w, r.WithContext(withIdentity(r.Context(), usecase.Identity{TenantID: id.TenantID, UserID: id.UserID, Role: id.Role})))
 					return
 				}
 			}

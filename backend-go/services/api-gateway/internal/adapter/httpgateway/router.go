@@ -103,7 +103,7 @@ func NewRouter(deps Deps) http.Handler {
 	// mountPushRoutes is unauthenticated by design (see its doc comment) —
 	// mounted here, outside the authed group below, never moved inside it.
 	if deps.NotificationClient != nil {
-		mountPushRoutes(r, deps.NotificationClient)
+		mountPushRoutes(r, deps.NotificationClient, deps.CookieValidator)
 	}
 	if deps.WSCompatHandler != nil {
 		r.Get("/ws", deps.WSCompatHandler)

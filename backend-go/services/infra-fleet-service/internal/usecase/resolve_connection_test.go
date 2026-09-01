@@ -68,6 +68,14 @@ func withTenant(ctx context.Context, tenantID string) context.Context {
 	return tenant.WithTenantID(ctx, tenantID)
 }
 
+// withAdminTenant is withTenant plus an admin role claim — CR-DS-006 Phase
+// 2's admin-gated usecases (ApproveDevServer, CreateDevServerGroup, etc.)
+// need this instead of withTenant; see requireAdmin's doc comment for why
+// an absent role must never be treated as an implicit allow.
+func withAdminTenant(ctx context.Context, tenantID string) context.Context {
+	return tenant.WithRole(withTenant(ctx, tenantID), "admin")
+}
+
 func TestResolveConnection_RequiresTenantContext(t *testing.T) {
 	uc := NewResolveConnection(&fakeConnectionResolver{})
 	_, err := uc.Execute(context.Background(), ResolveConnectionInput{ConnectionID: "conn-1"})

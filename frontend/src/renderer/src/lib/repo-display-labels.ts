@@ -3,7 +3,19 @@ type RepoDisplayLabelItem = {
   displayName: string
 }
 
+// Why the guard: a repo created through project-service's Repo model
+// ({id, projectId, url, displayName, position} — no `path` field at all)
+// can reach this helper via the legacy sidebar's tenant-wide repo.list
+// fetch (store/slices/repos.ts's fetchRepoCatalogForTarget has no project
+// filter) — the TS type here says `path: string`, but that's a lie at
+// runtime for this shape of repo. Live-reproduced: `path.replace` on
+// undefined threw, crashing the whole sidebar list (contained by an error
+// boundary, but still a real regression) the moment 2+ repos with the same
+// (or both-empty) displayName triggered the collision-labeling path below.
 function normalizePathSegments(path: string): string[] {
+  if (!path) {
+    return []
+  }
   return path.replace(/\\/g, '/').replace(/\/+$/g, '').split('/').filter(Boolean)
 }
 

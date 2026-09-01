@@ -32,6 +32,14 @@ describe('isProviderConfigured', () => {
     expect(isProviderConfigured(null)).toBe(false)
   })
 
+  it('hides a provider key the backend omitted entirely, not just an explicit null', () => {
+    // The bug (b15 crash): a backend that answers rateLimits.get with a
+    // different shape (or simply omits a provider key) decodes that key to
+    // `undefined`, not `null` — a bare `=== null` check let this fall
+    // through to `.status` on undefined and crash StatusBar.
+    expect(isProviderConfigured(undefined)).toBe(false)
+  })
+
   it('hides an unconfigured (unavailable) provider', () => {
     // The bug: Gemini OAuth off / OpenCode Go cookie unset returns a non-null
     // `unavailable` object, which previously slipped past the `!== null` gate

@@ -71,7 +71,12 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Proje
 	return out, nil
 }
 
-func (r *Repository) List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
+// List scopes to userID's own project_members rows, not just tenantID —
+// see usecase.ProjectRepository.List's doc comment (found live: a bare
+// tenant_id filter leaked every tenant member's projects to every other
+// member — no RLS guard catches this either, since project_members' own
+// tenant isolation is transitive through projects, not membership-aware).
+func (r *Repository) List(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
 	var rows pgx.Rows
 	var err error
 	if pageToken == "" {
@@ -82,18 +87,20 @@ func (r *Repository) List(ctx context.Context, tenantID, pageToken string, pageS
 		rows, err = r.pool.Query(ctx, `
 			SELECT `+projectColumns+`
 			FROM project.projects
-			WHERE tenant_id = $1
-			ORDER BY id
-			LIMIT $2
-		`, tenantID, pageSize)
+			JOIN project.project_members ON project_members.project_id = projects.id
+			WHERE projects.tenant_id = $1 AND project_members.user_id = $2
+			ORDER BY projects.id
+			LIMIT $3
+		`, tenantID, userID, pageSize)
 	} else {
 		rows, err = r.pool.Query(ctx, `
 			SELECT `+projectColumns+`
 			FROM project.projects
-			WHERE tenant_id = $1 AND id > $2
-			ORDER BY id
-			LIMIT $3
-		`, tenantID, pageToken, pageSize)
+			JOIN project.project_members ON project_members.project_id = projects.id
+			WHERE projects.tenant_id = $1 AND project_members.user_id = $2 AND projects.id > $3
+			ORDER BY projects.id
+			LIMIT $4
+		`, tenantID, userID, pageToken, pageSize)
 	}
 	if err != nil {
 		return nil, "", fmt.Errorf("postgres: query projects: %w", err)

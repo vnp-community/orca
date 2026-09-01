@@ -18,7 +18,16 @@ import (
 // pgconn error.
 const pgUniqueViolationCode = "23505"
 
-const folderWorkspaceColumns = `id, tenant_id, dev_server_id, path, name, added_by, created_at`
+// pgForeignKeyViolationCode is Postgres's SQLSTATE for a
+// foreign_key_violation — used below to map an invalid project_group_id to
+// domain.ErrProjectGroupNotFound (no app-level pre-check of group
+// existence; the FK constraint itself is the enforcement).
+const pgForeignKeyViolationCode = "23503"
+
+// COALESCE(project_group_id::text, ”) mirrors project_group_repository.go's
+// own parent_group_id/project_id convention — nullableString below is the
+// INSERT-direction inverse.
+const folderWorkspaceColumns = `id, tenant_id, dev_server_id, path, name, added_by, created_at, COALESCE(project_group_id::text, '')`
 
 // FolderWorkspaceRepository implements usecase.FolderWorkspaceRepository
 // against project.folder_workspaces. Kept as its own struct (not folded
@@ -34,17 +43,22 @@ func NewFolderWorkspaceRepository(pool *pgxpool.Pool) *FolderWorkspaceRepository
 
 func (r *FolderWorkspaceRepository) Create(ctx context.Context, fw domain.FolderWorkspace) (domain.FolderWorkspace, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO project.folder_workspaces (id, tenant_id, dev_server_id, path, name, added_by)
-		VALUES ($1, $2, $3, $4, $5, $6)
+		INSERT INTO project.folder_workspaces (id, tenant_id, dev_server_id, path, name, added_by, project_group_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)
 		RETURNING `+folderWorkspaceColumns,
-		fw.ID, fw.TenantID, fw.DevServerID, fw.Path, fw.Name, fw.AddedBy,
+		fw.ID, fw.TenantID, fw.DevServerID, fw.Path, fw.Name, fw.AddedBy, nullableString(fw.ProjectGroupID),
 	)
 
 	out, err := scanFolderWorkspace(row)
 	if err != nil {
 		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolationCode {
-			return domain.FolderWorkspace{}, domain.ErrPathAlreadyRegistered
+		if errors.As(err, &pgErr) {
+			switch pgErr.Code {
+			case pgUniqueViolationCode:
+				return domain.FolderWorkspace{}, domain.ErrPathAlreadyRegistered
+			case pgForeignKeyViolationCode:
+				return domain.FolderWorkspace{}, domain.ErrProjectGroupNotFound
+			}
 		}
 		return domain.FolderWorkspace{}, fmt.Errorf("postgres: insert folder workspace: %w", err)
 	}
@@ -167,7 +181,7 @@ func (r *FolderWorkspaceRepository) Get(ctx context.Context, id string) (*domain
 // checks errors.Is(err, pgx.ErrNoRows) against the raw scan error).
 func scanFolderWorkspace(row rowScanner) (domain.FolderWorkspace, error) {
 	var fw domain.FolderWorkspace
-	if err := row.Scan(&fw.ID, &fw.TenantID, &fw.DevServerID, &fw.Path, &fw.Name, &fw.AddedBy, &fw.CreatedAt); err != nil {
+	if err := row.Scan(&fw.ID, &fw.TenantID, &fw.DevServerID, &fw.Path, &fw.Name, &fw.AddedBy, &fw.CreatedAt, &fw.ProjectGroupID); err != nil {
 		return domain.FolderWorkspace{}, err
 	}
 	return fw, nil

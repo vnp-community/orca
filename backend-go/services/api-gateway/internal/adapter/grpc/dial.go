@@ -40,5 +40,6 @@ func AttachIdentity(ctx context.Context, id usecase.Identity) context.Context {
 	return metadata.AppendToOutgoingContext(ctx,
 		grpcmw.MetadataTenantID, id.TenantID,
 		grpcmw.MetadataUserID, id.UserID,
+		grpcmw.MetadataRole, id.Role,
 	)
 }

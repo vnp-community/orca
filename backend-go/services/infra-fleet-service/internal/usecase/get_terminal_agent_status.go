@@ -20,13 +20,14 @@ import (
 // a fabricated result" convention, since this is documented as best-effort
 // (see DevServerAgentClient.AgentStatus's FLAGGED doc comment).
 type GetTerminalAgentStatus struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	agent      DevServerAgentClient
 }
 
-func NewGetTerminalAgentStatus(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient) *GetTerminalAgentStatus {
-	return &GetTerminalAgentStatus{sessions: sessions, resolver: resolver, agent: agent}
+func NewGetTerminalAgentStatus(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient) *GetTerminalAgentStatus {
+	return &GetTerminalAgentStatus{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent}
 }
 
 func (uc *GetTerminalAgentStatus) Execute(ctx context.Context, ptyID string) (AgentStatusResult, error) {
@@ -35,7 +36,7 @@ func (uc *GetTerminalAgentStatus) Execute(ctx context.Context, ptyID string) (Ag
 		return AgentStatusResult{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver)
+	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		return AgentStatusResult{}, err
 	}

@@ -104,10 +104,19 @@ message CreateUserRequest {
   string name = 2;
   string tenant_id = 3;
   Role role = 4;
+  // password: optional. Empty means "auto-generate" — the plaintext is
+  // returned exactly once in CreateUserResponse.generated_password (never
+  // stored, never logged) since there is no invite/reset-link flow yet; the
+  // calling admin is responsible for relaying it to the new user out of
+  // band. A caller-supplied password skips generation entirely.
+  string password = 5;
 }
 
 message CreateUserResponse {
   User user = 1;
+  // generated_password is set only when the request's password field was
+  // empty — see CreateUserRequest.password's doc comment.
+  string generated_password = 2;
 }
 
 message ListUsersRequest {

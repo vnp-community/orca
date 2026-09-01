@@ -57,5 +57,20 @@ func (v *SessionValidator) ValidateToken(ctx context.Context, token string) (wsc
 		return wscompat.Identity{}, fmt.Errorf("authclient: session invalid or expired")
 	}
 	user := resp.GetUser()
-	return wscompat.Identity{TenantID: user.GetTenantId(), UserID: user.GetId()}, nil
+	return wscompat.Identity{TenantID: user.GetTenantId(), UserID: user.GetId(), Role: roleString(user.GetRole())}, nil
+}
+
+// roleString maps auth-service's proto Role enum to the lowercase strings
+// domain.Role/common/tenant.Role use — CR-DS-006 Phase 2's first real
+// consumer of auth-service's Role field past this point (previously
+// discarded here entirely, see this function's call site's history).
+func roleString(r authv1.Role) string {
+	switch r {
+	case authv1.Role_ROLE_ADMIN:
+		return "admin"
+	case authv1.Role_ROLE_USER:
+		return "user"
+	default:
+		return ""
+	}
 }

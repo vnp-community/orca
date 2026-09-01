@@ -637,8 +637,19 @@ message ForceDeleteBranchRequest {
 }
 
 message DetectWorktreesRequest  { string repo_id = 1; }
+
+// DetectedWorktreeGitInfo mirrors domain.WorktreeGitInfo — one on-disk
+// worktree's path plus enough git-level identity to build a real
+// reconciled worktree record without a second git invocation per path.
+// branch is empty for a detached HEAD.
+message DetectedWorktreeGitInfo {
+  string path = 1;
+  string head = 2;
+  string branch = 3;
+}
+
 message DetectWorktreesResponse {
-  repeated string on_disk_paths = 1; // raw `git worktree list --porcelain` result for the repo
+  repeated DetectedWorktreeGitInfo on_disk_worktrees = 1;
 }
 
 message PrefetchCreateBaseRequest  { string repo_id = 1; string base_ref = 2; }

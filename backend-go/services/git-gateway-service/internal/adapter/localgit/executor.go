@@ -507,21 +507,38 @@ func (e *Executor) FetchAndResolveRef(ctx context.Context, repoPath, ref string)
 	return strings.TrimSpace(sha), nil
 }
 
-// ListWorktreePaths runs `git worktree list --porcelain` and extracts
-// every `worktree <path>` line — the raw on-disk truth DetectWorktrees
-// needs, with no bookkeeping join.
-func (e *Executor) ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error) {
+// ListWorktreePaths runs `git worktree list --porcelain` and parses each
+// entry's path + HEAD sha + branch — the raw on-disk truth DetectWorktrees
+// needs, with no bookkeeping join. Porcelain entries are separated by a
+// blank line and always start with `worktree <path>`, followed by
+// `HEAD <sha>`, then either `branch <ref>` or a bare `detached` line — see
+// git-worktree(1)'s PORCELAIN FORMAT.
+func (e *Executor) ListWorktreePaths(ctx context.Context, repoPath string) ([]domain.WorktreeGitInfo, error) {
 	out, err := e.run(ctx, repoPath, "worktree", "list", "--porcelain")
 	if err != nil {
 		return nil, err
 	}
-	var paths []string
+	var infos []domain.WorktreeGitInfo
+	var current *domain.WorktreeGitInfo
 	for _, line := range strings.Split(out, "\n") {
-		if p, ok := strings.CutPrefix(line, "worktree "); ok {
-			paths = append(paths, p)
+		switch {
+		case strings.HasPrefix(line, "worktree "):
+			if current != nil {
+				infos = append(infos, *current)
+			}
+			current = &domain.WorktreeGitInfo{Path: strings.TrimPrefix(line, "worktree ")}
+		case current == nil:
+			// Blank/unexpected line before any `worktree` line — ignore.
+		case strings.HasPrefix(line, "HEAD "):
+			current.Head = strings.TrimPrefix(line, "HEAD ")
+		case strings.HasPrefix(line, "branch "):
+			current.Branch = strings.TrimPrefix(line, "branch ")
 		}
 	}
-	return paths, nil
+	if current != nil {
+		infos = append(infos, *current)
+	}
+	return infos, nil
 }
 
 // ForceDeleteBranch runs `git branch -D <branch>` — force delete, no

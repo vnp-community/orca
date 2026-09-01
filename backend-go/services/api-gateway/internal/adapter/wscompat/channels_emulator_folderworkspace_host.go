@@ -8,13 +8,40 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// protoTimeToRFC3339 formats a possibly-nil *timestamppb.Timestamp for the
+// wire — every camelCase view struct in this file/channels_tenant_project.go
+// uses it instead of returning the raw Timestamp (which plain encoding/json
+// would serialize as its internal {seconds, nanos} fields, not a date
+// string). Nil returns "" (falsy on the frontend), not the 1970 epoch
+// AsTime() would otherwise produce — checked on the concrete *Timestamp,
+// not an interface, so a nil pointer is actually caught (a nil pointer
+// boxed into an interface value is itself a non-nil interface).
+func protoTimeToRFC3339(t *timestamppb.Timestamp) string {
+	if t == nil {
+		return ""
+	}
+	return t.AsTime().Format(time.RFC3339)
+}
+
+// protoTimeMillis is protoTimeToRFC3339's epoch-milliseconds counterpart,
+// for view structs (projectView) whose frontend type expects a number
+// (OrcaProject.createdAt/updatedAt), not a date string.
+func protoTimeMillis(t *timestamppb.Timestamp) int64 {
+	if t == nil {
+		return 0
+	}
+	return t.AsTime().UnixMilli()
+}
 
 // registerEmulatorFolderWorkspaceHostChannels wires every channel this
 // file gives real backend-go implementations to: emulator.* (relay when a
@@ -274,6 +301,37 @@ func resolveHostCapabilities(ctx context.Context, id Identity, client infrafleet
 	return client.GetHostCapabilities(rpcCtx, &infrafleetv1.GetHostCapabilitiesRequest{ConnectionId: in.ConnectionID})
 }
 
+// folderWorkspaceView/toFolderWorkspaceView: protoc-gen-go's own
+// encoding/json struct tags are snake_case (e.g. `json:"dev_server_id"`,
+// `json:"project_group_id"`), but this envelope's Result field
+// (envelope.go) is serialized via plain encoding/json (wsjson.Write), not
+// protojson — returning the raw *projectv1.FolderWorkspace silently ships
+// dev_server_id/added_by/created_at/project_group_id (all undefined to a
+// camelCase-only frontend). Same bug class already fixed for profile.* in
+// channels_tenant_project.go (see that file's userProfileView) — found
+// live here during Phase 4b's folder-workspace grouping pass. CreatedAt is
+// formatted as RFC3339 (not epoch millis) to match
+// createFolderWorkspace/mergeCreatedFolderWorkspaceResponse's
+// `new Date(result.createdAt).getTime()` parsing on the frontend.
+type folderWorkspaceView struct {
+	ID             string `json:"id"`
+	DevServerID    string `json:"devServerId"`
+	Path           string `json:"path"`
+	Name           string `json:"name"`
+	AddedBy        string `json:"addedBy"`
+	CreatedAt      string `json:"createdAt,omitempty"`
+	ProjectGroupID string `json:"projectGroupId"`
+}
+
+func toFolderWorkspaceView(fw *projectv1.FolderWorkspace) folderWorkspaceView {
+	return folderWorkspaceView{
+		ID: fw.GetId(), DevServerID: fw.GetDevServerId(), Path: fw.GetPath(),
+		Name: fw.GetName(), AddedBy: fw.GetAddedBy(),
+		CreatedAt:      protoTimeToRFC3339(fw.GetCreatedAt()),
+		ProjectGroupID: fw.GetProjectGroupId(),
+	}
+}
+
 // ── folderWorkspace.* ─────────────────────────────────────────────────────
 //
 // Straightforward CRUD dispatch against project-service's FolderWorkspace
@@ -290,21 +348,22 @@ func resolveHostCapabilities(ctx context.Context, id Identity, client infrafleet
 func registerFolderWorkspaceChannels(r *Registry, client projectv1.ProjectServiceClient) {
 	r.Register("folderWorkspace.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
-			DevServerID string `json:"devServerId"`
-			Path        string `json:"path"`
-			Name        string `json:"name"`
+			DevServerID    string `json:"devServerId"`
+			Path           string `json:"path"`
+			Name           string `json:"name"`
+			ProjectGroupID string `json:"projectGroupId"`
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
 		resp, err := client.CreateFolderWorkspace(ctx, &projectv1.CreateFolderWorkspaceRequest{
-			DevServerId: in.DevServerID, Path: in.Path, Name: in.Name,
+			DevServerId: in.DevServerID, Path: in.Path, Name: in.Name, ProjectGroupId: in.ProjectGroupID,
 		})
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetFolderWorkspace(), nil
+		return toFolderWorkspaceView(resp.GetFolderWorkspace()), nil
 	})
 
 	r.Register("folderWorkspace.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -320,7 +379,7 @@ func registerFolderWorkspaceChannels(r *Registry, client projectv1.ProjectServic
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetFolderWorkspace(), nil
+		return toFolderWorkspaceView(resp.GetFolderWorkspace()), nil
 	})
 
 	r.Register("folderWorkspace.delete", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -342,7 +401,15 @@ func registerFolderWorkspaceChannels(r *Registry, client projectv1.ProjectServic
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetFolderWorkspaces(), nil
+		// Why {folderWorkspaces: [...]}, not a bare array: repos.ts's
+		// fetchFolderWorkspacesForTarget reads `.folderWorkspaces` off this
+		// response — matches that established wrapper shape.
+		fws := resp.GetFolderWorkspaces()
+		views := make([]folderWorkspaceView, 0, len(fws))
+		for _, fw := range fws {
+			views = append(views, toFolderWorkspaceView(fw))
+		}
+		return map[string]any{"folderWorkspaces": views}, nil
 	})
 
 	r.Register("folderWorkspace.getPathStatus", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -360,6 +427,12 @@ func registerFolderWorkspaceChannels(r *Registry, client projectv1.ProjectServic
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		// Why a view, not raw resp: existing_folder_workspace_id is the only
+		// multi-word field here (status is already a plain string, not an
+		// enum) — same camelCase bug as folderWorkspaceView above.
+		return map[string]any{
+			"status":                    resp.GetStatus(),
+			"existingFolderWorkspaceId": resp.GetExistingFolderWorkspaceId(),
+		}, nil
 	})
 }

@@ -34,6 +34,11 @@ const (
 	ProjectService_ReorderRepos_FullMethodName                 = "/orca.project.v1.ProjectService/ReorderRepos"
 	ProjectService_RemoveRepo_FullMethodName                   = "/orca.project.v1.ProjectService/RemoveRepo"
 	ProjectService_UpdateRepo_FullMethodName                   = "/orca.project.v1.ProjectService/UpdateRepo"
+	ProjectService_GetRepo_FullMethodName                      = "/orca.project.v1.ProjectService/GetRepo"
+	ProjectService_AddRepoMember_FullMethodName                = "/orca.project.v1.ProjectService/AddRepoMember"
+	ProjectService_ListRepoMembers_FullMethodName              = "/orca.project.v1.ProjectService/ListRepoMembers"
+	ProjectService_RemoveRepoMember_FullMethodName             = "/orca.project.v1.ProjectService/RemoveRepoMember"
+	ProjectService_UpdateRepoMemberRole_FullMethodName         = "/orca.project.v1.ProjectService/UpdateRepoMemberRole"
 	ProjectService_RecordWorktreeCreated_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
 	ProjectService_RecordWorktreeRemoved_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
 	ProjectService_ListWorktrees_FullMethodName                = "/orca.project.v1.ProjectService/ListWorktrees"
@@ -86,6 +91,21 @@ type ProjectServiceClient interface {
 	ReorderRepos(ctx context.Context, in *ReorderReposRequest, opts ...grpc.CallOption) (*ReorderReposResponse, error)
 	RemoveRepo(ctx context.Context, in *RemoveRepoRequest, opts ...grpc.CallOption) (*RemoveRepoResponse, error)
 	UpdateRepo(ctx context.Context, in *UpdateRepoRequest, opts ...grpc.CallOption) (*UpdateRepoResponse, error)
+	// GetRepo answers git-gateway-service's "does this repo exist, and which
+	// dev server does it live on" — ListRepos(project_id) was the only repo
+	// lookup RPC before this, unusable when a caller only has a repo_id (see
+	// git-gateway-service's project_client.go GetRepo doc comment for the
+	// confirmed gap this closes).
+	GetRepo(ctx context.Context, in *GetRepoRequest, opts ...grpc.CallOption) (*GetRepoResponse, error)
+	// repo_members — a functional-role tier (developer/lead/admin) layered on
+	// top of project membership (AddMember/ListMembers/... above): decides
+	// what a project member can do on ONE specific repo, not the project as a
+	// whole. See policy/orca-authz/repo.rego and project-service's
+	// requireRepoAccess.
+	AddRepoMember(ctx context.Context, in *AddRepoMemberRequest, opts ...grpc.CallOption) (*AddRepoMemberResponse, error)
+	ListRepoMembers(ctx context.Context, in *ListRepoMembersRequest, opts ...grpc.CallOption) (*ListRepoMembersResponse, error)
+	RemoveRepoMember(ctx context.Context, in *RemoveRepoMemberRequest, opts ...grpc.CallOption) (*RemoveRepoMemberResponse, error)
+	UpdateRepoMemberRole(ctx context.Context, in *UpdateRepoMemberRoleRequest, opts ...grpc.CallOption) (*UpdateRepoMemberRoleResponse, error)
 	// Worktree surface — metadata only, never authoritative for on-disk
 	// existence (git-gateway-service reconciles on demand, per
 	// project-service.md §4's Worktree note).
@@ -282,6 +302,56 @@ func (c *projectServiceClient) UpdateRepo(ctx context.Context, in *UpdateRepoReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateRepoResponse)
 	err := c.cc.Invoke(ctx, ProjectService_UpdateRepo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) GetRepo(ctx context.Context, in *GetRepoRequest, opts ...grpc.CallOption) (*GetRepoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRepoResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetRepo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) AddRepoMember(ctx context.Context, in *AddRepoMemberRequest, opts ...grpc.CallOption) (*AddRepoMemberResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddRepoMemberResponse)
+	err := c.cc.Invoke(ctx, ProjectService_AddRepoMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListRepoMembers(ctx context.Context, in *ListRepoMembersRequest, opts ...grpc.CallOption) (*ListRepoMembersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListRepoMembersResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListRepoMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) RemoveRepoMember(ctx context.Context, in *RemoveRepoMemberRequest, opts ...grpc.CallOption) (*RemoveRepoMemberResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveRepoMemberResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RemoveRepoMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UpdateRepoMemberRole(ctx context.Context, in *UpdateRepoMemberRoleRequest, opts ...grpc.CallOption) (*UpdateRepoMemberRoleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateRepoMemberRoleResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateRepoMemberRole_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -545,6 +615,21 @@ type ProjectServiceServer interface {
 	ReorderRepos(context.Context, *ReorderReposRequest) (*ReorderReposResponse, error)
 	RemoveRepo(context.Context, *RemoveRepoRequest) (*RemoveRepoResponse, error)
 	UpdateRepo(context.Context, *UpdateRepoRequest) (*UpdateRepoResponse, error)
+	// GetRepo answers git-gateway-service's "does this repo exist, and which
+	// dev server does it live on" — ListRepos(project_id) was the only repo
+	// lookup RPC before this, unusable when a caller only has a repo_id (see
+	// git-gateway-service's project_client.go GetRepo doc comment for the
+	// confirmed gap this closes).
+	GetRepo(context.Context, *GetRepoRequest) (*GetRepoResponse, error)
+	// repo_members — a functional-role tier (developer/lead/admin) layered on
+	// top of project membership (AddMember/ListMembers/... above): decides
+	// what a project member can do on ONE specific repo, not the project as a
+	// whole. See policy/orca-authz/repo.rego and project-service's
+	// requireRepoAccess.
+	AddRepoMember(context.Context, *AddRepoMemberRequest) (*AddRepoMemberResponse, error)
+	ListRepoMembers(context.Context, *ListRepoMembersRequest) (*ListRepoMembersResponse, error)
+	RemoveRepoMember(context.Context, *RemoveRepoMemberRequest) (*RemoveRepoMemberResponse, error)
+	UpdateRepoMemberRole(context.Context, *UpdateRepoMemberRoleRequest) (*UpdateRepoMemberRoleResponse, error)
 	// Worktree surface — metadata only, never authoritative for on-disk
 	// existence (git-gateway-service reconciles on demand, per
 	// project-service.md §4's Worktree note).
@@ -641,6 +726,21 @@ func (UnimplementedProjectServiceServer) RemoveRepo(context.Context, *RemoveRepo
 }
 func (UnimplementedProjectServiceServer) UpdateRepo(context.Context, *UpdateRepoRequest) (*UpdateRepoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateRepo not implemented")
+}
+func (UnimplementedProjectServiceServer) GetRepo(context.Context, *GetRepoRequest) (*GetRepoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRepo not implemented")
+}
+func (UnimplementedProjectServiceServer) AddRepoMember(context.Context, *AddRepoMemberRequest) (*AddRepoMemberResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddRepoMember not implemented")
+}
+func (UnimplementedProjectServiceServer) ListRepoMembers(context.Context, *ListRepoMembersRequest) (*ListRepoMembersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRepoMembers not implemented")
+}
+func (UnimplementedProjectServiceServer) RemoveRepoMember(context.Context, *RemoveRepoMemberRequest) (*RemoveRepoMemberResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveRepoMember not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateRepoMemberRole(context.Context, *UpdateRepoMemberRoleRequest) (*UpdateRepoMemberRoleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateRepoMemberRole not implemented")
 }
 func (UnimplementedProjectServiceServer) RecordWorktreeCreated(context.Context, *RecordWorktreeCreatedRequest) (*RecordWorktreeCreatedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RecordWorktreeCreated not implemented")
@@ -998,6 +1098,96 @@ func _ProjectService_UpdateRepo_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).UpdateRepo(ctx, req.(*UpdateRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_GetRepo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRepoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetRepo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetRepo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetRepo(ctx, req.(*GetRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_AddRepoMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddRepoMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).AddRepoMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_AddRepoMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).AddRepoMember(ctx, req.(*AddRepoMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListRepoMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRepoMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListRepoMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListRepoMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListRepoMembers(ctx, req.(*ListRepoMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_RemoveRepoMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveRepoMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RemoveRepoMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RemoveRepoMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RemoveRepoMember(ctx, req.(*RemoveRepoMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UpdateRepoMemberRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateRepoMemberRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateRepoMemberRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateRepoMemberRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateRepoMemberRole(ctx, req.(*UpdateRepoMemberRoleRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1482,6 +1672,26 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateRepo",
 			Handler:    _ProjectService_UpdateRepo_Handler,
+		},
+		{
+			MethodName: "GetRepo",
+			Handler:    _ProjectService_GetRepo_Handler,
+		},
+		{
+			MethodName: "AddRepoMember",
+			Handler:    _ProjectService_AddRepoMember_Handler,
+		},
+		{
+			MethodName: "ListRepoMembers",
+			Handler:    _ProjectService_ListRepoMembers_Handler,
+		},
+		{
+			MethodName: "RemoveRepoMember",
+			Handler:    _ProjectService_RemoveRepoMember_Handler,
+		},
+		{
+			MethodName: "UpdateRepoMemberRole",
+			Handler:    _ProjectService_UpdateRepoMemberRole_Handler,
 		},
 		{
 			MethodName: "RecordWorktreeCreated",

@@ -3037,8 +3037,13 @@ export function connectPanePty(
   // Why: folder workspaces can inherit their SSH target from child repos, so
   // use the shared resolver instead of only looking up repo-backed worktrees.
   const worktree = getWorktreeMapFromState(state).get(deps.worktreeId)
-  const connectionId = getConnectionId(deps.worktreeId) ?? null
   const tab = (state.tabsByWorktree[deps.worktreeId] ?? []).find((t) => t.id === deps.tabId)
+  // Why: an ephemeral setup/onboarding terminal's worktreeId has no backing
+  // repo record, so getConnectionId always returns null/undefined for it —
+  // the tab's own explicit connectionId (set by createTab's caller) is the
+  // only source of truth there. Ordinary repo-backed tabs never set this
+  // field, so this is a no-op for them and getConnectionId keeps deciding.
+  const connectionId = tab?.connectionId ?? getConnectionId(deps.worktreeId) ?? null
   const shellOverride = tab?.shellOverride
   // Why: a serve/remote-runtime pane has no SSH connectionId and a Linux cwd, so
   // the native-Windows ConPTY heuristic misfires on a Windows client and wrongly

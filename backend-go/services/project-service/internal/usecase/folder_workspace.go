@@ -44,6 +44,9 @@ type CreateFolderWorkspaceInput struct {
 	DevServerID string
 	Path        string
 	Name        string
+	// ProjectGroupID is "" for no group — the sidebar's own optional
+	// organizational concept, layered onto this dev-server-scoped entity.
+	ProjectGroupID string
 }
 
 // Create validates Path is absolute, then delegates to the repository. The
@@ -66,7 +69,7 @@ func (uc *FolderWorkspaceUseCase) Create(ctx context.Context, in CreateFolderWor
 	}
 	cleanPath := filepath.Clean(in.Path)
 
-	fw, err := domain.NewFolderWorkspace(uuid.NewString(), tenantID, in.DevServerID, cleanPath, cmp.Or(in.Name, filepath.Base(cleanPath)), userID)
+	fw, err := domain.NewFolderWorkspace(uuid.NewString(), tenantID, in.DevServerID, cleanPath, cmp.Or(in.Name, filepath.Base(cleanPath)), userID, in.ProjectGroupID)
 	if err != nil {
 		return domain.FolderWorkspace{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_FOLDER_WORKSPACE_INVALID", err.Error(), err)
 	}
@@ -75,6 +78,13 @@ func (uc *FolderWorkspaceUseCase) Create(ctx context.Context, in CreateFolderWor
 	if err != nil {
 		if errors.Is(err, domain.ErrPathAlreadyRegistered) {
 			return domain.FolderWorkspace{}, apperrors.New(apperrors.KindAlreadyExists, "PROJECT_FOLDER_WORKSPACE_PATH_TAKEN", err.Error(), err)
+		}
+		// Why ErrProjectGroupNotFound here: the repository maps a
+		// project_group_id foreign-key violation to this sentinel — no
+		// app-level pre-check of group existence, same trust-the-FK
+		// pattern AddRepo already uses for project_id.
+		if errors.Is(err, domain.ErrProjectGroupNotFound) {
+			return domain.FolderWorkspace{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_GROUP_NOT_FOUND", err.Error(), err)
 		}
 		return domain.FolderWorkspace{}, apperrors.New(apperrors.KindInternal, "PROJECT_FOLDER_WORKSPACE_CREATE_FAILED", "failed to persist folder workspace", err)
 	}

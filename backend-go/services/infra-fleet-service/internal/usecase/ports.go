@@ -36,6 +36,72 @@ type DevServerRepository interface {
 	// in the usecase layer, not this adapter, matching every other `New*`
 	// call site in this service.
 	FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (ds domain.DevServer, found bool, err error)
+	// FindByHostAndMode returns the DevServer matching host+mode for tenantID,
+	// if one has been registered yet — the direct-websocket equivalent of
+	// FindBySshTarget's find-or-create pattern (used by
+	// ResolveDirectWebSocketDevServer). Scoped by mode as well as host
+	// because relay-websocket rows also populate host with a real
+	// ws://... URL — without the mode filter, an agent's external
+	// devServerID string could theoretically collide with an unrelated
+	// relay-websocket row's host value.
+	FindByHostAndMode(ctx context.Context, tenantID, host string, mode domain.ConnectionMode) (ds domain.DevServer, found bool, err error)
+	// UpdateApprovalStatus sets a dev server's approval_status — CR-DS-006
+	// Phase 2. Returns the updated row; errors.Is(err, domain.ErrNotFound)-
+	// style not-found signaling isn't needed here (same
+	// tenant_id+id-scoped-update convention as every other mutation in this
+	// service) — implementations return a plain error when 0 rows matched.
+	UpdateApprovalStatus(ctx context.Context, tenantID, devServerID string, status domain.DevServerStatus) (domain.DevServer, error)
+	// AssignGroup sets (or clears, when groupID == "") a dev server's
+	// group_id — CR-DS-006 Phase 2.
+	AssignGroup(ctx context.Context, tenantID, devServerID, groupID string) (domain.DevServer, error)
+}
+
+// DevServerGroupRepository is the persistence port for CR-DS-006's
+// DevServerGroup tree — see docs/crs/v2/dev-server/
+// CR-DS-006-dev-server-approval-and-grouping.md §3.2.
+type DevServerGroupRepository interface {
+	Create(ctx context.Context, group domain.DevServerGroup) (domain.DevServerGroup, error)
+	// List returns every group registered for tenantID, in no particular
+	// tree order — building the hierarchy from ParentGroupID is the
+	// caller's job (same division of labor project-service's ProjectGroup
+	// list endpoint uses).
+	List(ctx context.Context, tenantID string) ([]domain.DevServerGroup, error)
+}
+
+// DevServerGroupGrantRepository is the persistence port for CR-DS-007's
+// department/team ↔ group grants — see docs/crs/v2/dev-server/
+// CR-DS-007-department-based-access-control.md.
+type DevServerGroupGrantRepository interface {
+	Create(ctx context.Context, grant domain.DevServerGroupGrant) (domain.DevServerGroupGrant, error)
+	// Delete removes a grant by id, scoped to tenantID — a grantID from a
+	// different tenant must never delete anything (same tenant-join
+	// discipline as every other tenant-scoped mutation in this service).
+	Delete(ctx context.Context, tenantID, grantID string) error
+	// ListByGroup returns every grant on exactly this group (no
+	// hierarchy/inheritance resolution — that's
+	// usecase.ListDevServersForUser's job, composed from this plus
+	// DevServerGroupRepository.List's parent_group_id chain).
+	ListByGroup(ctx context.Context, tenantID, groupID string) ([]domain.DevServerGroupGrant, error)
+	// ListAll returns every grant in tenantID — backs
+	// ListDevServerGroupGrants's "empty group_id = every grant" case.
+	ListAll(ctx context.Context, tenantID string) ([]domain.DevServerGroupGrant, error)
+}
+
+// DevServerAccessRequestRepository is the persistence port for CR-DS-008's
+// access-request flow — see docs/crs/v2/dev-server/
+// CR-DS-008-first-login-department-gate-and-access-request.md §2.3.
+type DevServerAccessRequestRepository interface {
+	Create(ctx context.Context, req domain.DevServerAccessRequest) (domain.DevServerAccessRequest, error)
+	// Get fetches a request scoped to tenantID — same tenant-join
+	// requirement as every other Get in this service.
+	Get(ctx context.Context, tenantID, id string) (domain.DevServerAccessRequest, error)
+	// ListPending returns every AccessRequestStatusPending request in
+	// tenantID — backs the admin console's review queue.
+	ListPending(ctx context.Context, tenantID string) ([]domain.DevServerAccessRequest, error)
+	// UpdateStatus resolves a request (approved/rejected) — never reverts
+	// an already-resolved request back to pending (usecase.ResolveAccessRequest
+	// enforces that, not this port).
+	UpdateStatus(ctx context.Context, tenantID, id string, status domain.AccessRequestStatus) (domain.DevServerAccessRequest, error)
 }
 
 // SshTargetRepository is the persistence port for SSH target registration.
@@ -134,6 +200,11 @@ type DevServerAgentClient interface {
 	// Health performs an agent-level reachability/handshake check, distinct
 	// from the SSH-exec-based fleet health poll that GetFleetHealth reads.
 	Health(ctx context.Context, devServer domain.DevServer) (bool, error)
+	// IsConnected is Health's cheap, side-effect-free sibling — a pure peek
+	// at whether devServerID already has a live session, never dialing one.
+	// See devserveragent.Client.IsConnected's doc comment for why this
+	// exists separately (safe to call in bulk, e.g. a dev server list).
+	IsConnected(devServerID string) bool
 
 	// --- Terminal/PTY (TASK-180..187) ---
 	// The six methods below extend the same generic-Exec transport with

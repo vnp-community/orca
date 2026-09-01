@@ -68,6 +68,38 @@ func TestConnectionMode_Valid(t *testing.T) {
 	}
 }
 
+// TestNewDevServer_DefaultsToPendingApproval guards CR-DS-006 Phase 1's
+// default: every freshly-registered dev server starts pending_approval,
+// ungrouped — an admin has not yet reviewed it (not enforced anywhere yet,
+// see that CR).
+func TestNewDevServer_DefaultsToPendingApproval(t *testing.T) {
+	ds, err := NewDevServer("ds1", "t1", "10.0.0.1", ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ds.Status != DevServerStatusPendingApproval {
+		t.Errorf("want Status=%q, got %q", DevServerStatusPendingApproval, ds.Status)
+	}
+	if ds.GroupID != "" {
+		t.Errorf("want GroupID empty (ungrouped), got %q", ds.GroupID)
+	}
+}
+
+func TestDevServerStatus_Valid(t *testing.T) {
+	valid := []DevServerStatus{DevServerStatusPendingApproval, DevServerStatusApproved, DevServerStatusRejected}
+	for _, s := range valid {
+		if !s.Valid() {
+			t.Errorf("expected %q to be valid", s)
+		}
+	}
+	invalid := []DevServerStatus{"", "bogus", "PENDING_APPROVAL"}
+	for _, s := range invalid {
+		if s.Valid() {
+			t.Errorf("expected %q to be invalid", s)
+		}
+	}
+}
+
 func TestDevServer_IsZero(t *testing.T) {
 	if !(DevServer{}).IsZero() {
 		t.Error("expected zero-value DevServer to report IsZero")

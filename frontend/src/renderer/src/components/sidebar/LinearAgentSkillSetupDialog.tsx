@@ -26,6 +26,7 @@ type LinearAgentSkillSetupDialogProps = {
   missingLabel: string
   command: string
   installedCommand: string
+  devServerId?: string | null
   terminalShellOverride?: string
   installed: boolean
   loading: boolean
@@ -46,6 +47,7 @@ export function LinearAgentSkillSetupDialog({
   missingLabel,
   command,
   installedCommand,
+  devServerId,
   terminalShellOverride,
   installed,
   loading,
@@ -136,6 +138,7 @@ export function LinearAgentSkillSetupDialog({
                 'Linear agent skill installer terminal'
               )}
               terminalWorktreeId="sidebar-linear-agent-skill-setup"
+              devServerId={devServerId}
               terminalHeightPx={240}
               terminalShellOverride={terminalShellOverride}
               installed={installed}

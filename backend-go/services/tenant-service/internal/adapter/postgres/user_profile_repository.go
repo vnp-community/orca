@@ -116,6 +116,49 @@ func (r *UserProfileRepository) ListUserIDsByCompany(ctx context.Context, compan
 	return out, rows.Err()
 }
 
+// GetOnboardingState reads userID's stored onboarding progress. Returns
+// found=false when no profile row exists at all OR the row exists but
+// onboarding_state_json is NULL (never saved) — both mean "wizard not
+// started", the caller's existing default.
+func (r *UserProfileRepository) GetOnboardingState(ctx context.Context, companyID, userID string) (string, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT onboarding_state_json FROM tenant.user_profiles
+		WHERE user_id = $1 AND company_id = $2
+	`, userID, companyID)
+
+	var stateJSON *string
+	if err := row.Scan(&stateJSON); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return "", false, nil
+		}
+		return "", false, fmt.Errorf("postgres: query onboarding state: %w", err)
+	}
+	if stateJSON == nil {
+		return "", false, nil
+	}
+	return *stateJSON, true, nil
+}
+
+// SetOnboardingState upserts ONLY onboarding_state_json — see
+// usecase.UserProfileRepository's doc comment on why this isn't routed
+// through Upsert. A brand-new row gets company_id from companyID and
+// leaves department_id/settings_json at their column defaults
+// (NULL/'{}'); an existing row's department_id/settings_json are left
+// untouched (ON CONFLICT only sets onboarding_state_json/updated_at).
+func (r *UserProfileRepository) SetOnboardingState(ctx context.Context, companyID, userID, stateJSON string) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO tenant.user_profiles (user_id, company_id, onboarding_state_json)
+		VALUES ($1, $2, $3)
+		ON CONFLICT (user_id) DO UPDATE SET
+			onboarding_state_json = EXCLUDED.onboarding_state_json,
+			updated_at            = now()
+	`, userID, companyID, stateJSON)
+	if err != nil {
+		return fmt.Errorf("postgres: set onboarding state: %w", err)
+	}
+	return nil
+}
+
 func nullableString(s string) *string {
 	if s == "" {
 		return nil

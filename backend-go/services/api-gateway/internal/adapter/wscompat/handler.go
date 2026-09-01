@@ -92,6 +92,12 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// connections — same per-connection principle as terminalStreamsContext
 	// just above.
 	ctx = binaryStreamRouterContext(ctx, newBinaryStreamRouter())
+	// terminalJSONSubscribeContext attaches a fresh, connection-scoped
+	// terminalJsonSubscribeRegistry (channels_terminal_subscribe.go) so
+	// terminal.unsubscribe can find and cancel the right terminal.subscribe
+	// call's AttachPty stream on THIS connection — same per-connection
+	// principle as terminalStreamsContext above.
+	ctx = terminalJSONSubscribeContext(ctx, newTerminalJSONSubscribeRegistry())
 
 	// writeMu serializes writes to conn — coder/websocket, like most WS
 	// libraries, does not allow concurrent writers on one connection. Reads

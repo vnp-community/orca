@@ -30,6 +30,8 @@ type Server struct {
 	tenantv1.UnimplementedTenantServiceServer
 
 	createCompany      *usecase.CreateCompany
+	getCompany         *usecase.GetCompany
+	listCompanies      *usecase.ListCompanies
 	validateTenant     *usecase.ValidateTenant
 	createDepartment   *usecase.CreateDepartment
 	setUserDepartment  *usecase.SetUserDepartment
@@ -44,10 +46,14 @@ type Server struct {
 	updateUserProfile  *usecase.UpdateUserProfile
 	listTeams          *usecase.ListTeams
 	removeTeamMember   *usecase.RemoveTeamMember
+	getOnboardingState *usecase.GetOnboardingState
+	setOnboardingState *usecase.SetOnboardingState
 }
 
 func New(
 	createCompany *usecase.CreateCompany,
+	getCompany *usecase.GetCompany,
+	listCompanies *usecase.ListCompanies,
 	validateTenant *usecase.ValidateTenant,
 	createDepartment *usecase.CreateDepartment,
 	setUserDepartment *usecase.SetUserDepartment,
@@ -62,9 +68,13 @@ func New(
 	updateUserProfile *usecase.UpdateUserProfile,
 	listTeams *usecase.ListTeams,
 	removeTeamMember *usecase.RemoveTeamMember,
+	getOnboardingState *usecase.GetOnboardingState,
+	setOnboardingState *usecase.SetOnboardingState,
 ) *Server {
 	return &Server{
 		createCompany:      createCompany,
+		getCompany:         getCompany,
+		listCompanies:      listCompanies,
 		validateTenant:     validateTenant,
 		createDepartment:   createDepartment,
 		setUserDepartment:  setUserDepartment,
@@ -79,6 +89,8 @@ func New(
 		updateUserProfile:  updateUserProfile,
 		listTeams:          listTeams,
 		removeTeamMember:   removeTeamMember,
+		getOnboardingState: getOnboardingState,
+		setOnboardingState: setOnboardingState,
 	}
 }
 
@@ -92,6 +104,53 @@ func (s *Server) CreateCompany(ctx context.Context, req *tenantv1.CreateCompanyR
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &tenantv1.CreateCompanyResponse{Company: proto}, nil
+}
+
+func (s *Server) GetCompany(ctx context.Context, req *tenantv1.GetCompanyRequest) (*tenantv1.GetCompanyResponse, error) {
+	company, err := s.getCompany.Execute(ctx, req.GetId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	proto, err := toProtoCompany(company)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.GetCompanyResponse{Company: proto}, nil
+}
+
+func (s *Server) ListCompanies(ctx context.Context, req *tenantv1.ListCompaniesRequest) (*tenantv1.ListCompaniesResponse, error) {
+	companies, err := s.listCompanies.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	protoCompanies := make([]*tenantv1.Company, 0, len(companies))
+	for _, c := range companies {
+		proto, err := toProtoCompany(c)
+		if err != nil {
+			return nil, apperrors.ToGRPCStatus(err)
+		}
+		protoCompanies = append(protoCompanies, proto)
+	}
+	return &tenantv1.ListCompaniesResponse{Companies: protoCompanies}, nil
+}
+
+func (s *Server) GetOnboardingState(ctx context.Context, req *tenantv1.GetOnboardingStateRequest) (*tenantv1.GetOnboardingStateResponse, error) {
+	result, err := s.getOnboardingState.Execute(ctx, req.GetUserId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.GetOnboardingStateResponse{StateJson: result.StateJSON, Found: result.Found}, nil
+}
+
+func (s *Server) SetOnboardingState(ctx context.Context, req *tenantv1.SetOnboardingStateRequest) (*emptypb.Empty, error) {
+	err := s.setOnboardingState.Execute(ctx, usecase.SetOnboardingStateInput{
+		UserID:    req.GetUserId(),
+		StateJSON: req.GetStateJson(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) ValidateTenant(ctx context.Context, req *tenantv1.ValidateTenantRequest) (*tenantv1.ValidateTenantResponse, error) {

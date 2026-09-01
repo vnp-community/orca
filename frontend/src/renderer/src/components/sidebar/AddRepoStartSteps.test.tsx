@@ -34,12 +34,16 @@ function renderLocalStartStep(isSshLikely: boolean): string {
   )
 }
 
-function renderServerPathStartStep(runtimeEnvironmentId: string | null): string {
+function renderServerPathStartStep(
+  runtimeEnvironmentId: string | null,
+  devServerId: string | null = null
+): string {
   return renderToStaticMarkup(
     <TooltipProvider>
       <AddRepoServerPathStartStep
         serverPath=""
         runtimeEnvironmentId={runtimeEnvironmentId}
+        devServerId={devServerId}
         isAddingServerPath={false}
         addProjectBusyLabel={null}
         onServerPathChange={vi.fn()}
@@ -377,5 +381,56 @@ describe('AddRepoServerPathStartStep', () => {
     const markup = renderServerPathStartStep(null)
 
     expect(markup).toContain('disabled=""')
+  })
+
+  it('enables server entry cards for a devServerId-only session', () => {
+    const markup = renderServerPathStartStep(null, 'ds-1')
+
+    // The 3-tile "Add a project" view's action cards were already
+    // devServerId-aware before this fix — this locks that in alongside the
+    // manual-entry regression test below.
+    expect(markup).not.toContain('disabled=""')
+  })
+
+  // Live-bug regression: the "Browse host filesystem" icon button inside
+  // the manual host-path-entry view (reached via "Or enter a host path
+  // manually") stayed disabled for a devServerId-only session — its
+  // disabled condition never checked devServerId, even though the render
+  // branch it opens (browsing && (runtimeEnvironmentId || devServerId))
+  // already supported one.
+  it('enables the manual-entry Browse button for a devServerId-only session', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+
+    await act(async () => {
+      root.render(
+        <TooltipProvider>
+          <AddRepoServerPathStartStep
+            serverPath=""
+            runtimeEnvironmentId={null}
+            devServerId="ds-1"
+            isAddingServerPath={false}
+            addProjectBusyLabel={null}
+            onServerPathChange={vi.fn()}
+            onAddServerPath={vi.fn()}
+            onOpenCloneStep={vi.fn()}
+            onOpenCreateStep={vi.fn()}
+          />
+        </TooltipProvider>
+      )
+    })
+
+    const manualEntryLink = findButton(container, 'Or enter a host path manually')
+    await act(async () => {
+      manualEntryLink.click()
+    })
+
+    const browseButton = container.querySelector('button[aria-label="Browse host filesystem"]')
+    expect(browseButton).not.toBeNull()
+    expect(browseButton?.hasAttribute('disabled')).toBe(false)
+
+    root.unmount()
+    container.remove()
   })
 })

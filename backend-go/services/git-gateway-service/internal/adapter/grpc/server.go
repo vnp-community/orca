@@ -709,11 +709,15 @@ func (s *Server) ForceDeleteBranch(ctx context.Context, req *gitgatewayv1.ForceD
 }
 
 func (s *Server) DetectWorktrees(ctx context.Context, req *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error) {
-	paths, err := s.detectWorktrees.Execute(ctx, req.GetRepoId())
+	infos, err := s.detectWorktrees.Execute(ctx, req.GetRepoId())
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &gitgatewayv1.DetectWorktreesResponse{OnDiskPaths: paths}, nil
+	out := make([]*gitgatewayv1.DetectedWorktreeGitInfo, 0, len(infos))
+	for _, info := range infos {
+		out = append(out, &gitgatewayv1.DetectedWorktreeGitInfo{Path: info.Path, Head: info.Head, Branch: info.Branch})
+	}
+	return &gitgatewayv1.DetectWorktreesResponse{OnDiskWorktrees: out}, nil
 }
 
 func (s *Server) PrefetchCreateBase(ctx context.Context, req *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error) {

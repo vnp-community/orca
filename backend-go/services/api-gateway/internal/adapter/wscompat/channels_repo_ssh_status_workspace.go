@@ -54,6 +54,41 @@ func registerRepoSshStatusWorkspaceChannels(
 	registerWorkspacePortsChannels(r, infraFleet)
 }
 
+// repoView/toRepoView: same camelCase-view fix as channels_tenant_project.go
+// (see that file's projectView doc comment for the full reasoning) —
+// projectv1.Repo's project_id is snake_case on the wire via plain
+// encoding/json, but shared/types.ts's Repo needs projectId (4b-4 threads
+// it through so per-repo actions know their owning project without a
+// second lookup).
+type repoView struct {
+	ID          string `json:"id"`
+	ProjectID   string `json:"projectId"`
+	URL         string `json:"url"`
+	DisplayName string `json:"displayName"`
+	Position    int32  `json:"position"`
+}
+
+func toRepoView(r *projectv1.Repo) repoView {
+	return repoView{
+		ID: r.GetId(), ProjectID: r.GetProjectId(), URL: r.GetUrl(),
+		DisplayName: r.GetDisplayName(), Position: r.GetPosition(),
+	}
+}
+
+// cloneResultView/initRepoResultView: git-gateway-service's CloneResponse/
+// InitRepoResponse have their own default_branch snake_case field — same
+// bug, same fix, one level removed (a different backend service's proto
+// package, not project-service's).
+type cloneResultView struct {
+	WorktreePath  string `json:"worktreePath"`
+	DefaultBranch string `json:"defaultBranch"`
+}
+
+type initRepoResultView struct {
+	Path          string `json:"path"`
+	DefaultBranch string `json:"defaultBranch"`
+}
+
 // ── repo.* ───────────────────────────────────────────────────────────────
 //
 // repo.add/list/reorder/rm/update map 1:1 onto ProjectService's
@@ -84,7 +119,7 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetRepo(), nil
+		return toRepoView(resp.GetRepo()), nil
 	})
 
 	r.Register("repo.list", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -102,7 +137,22 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetRepos(), nil
+		// Wrapped in {repos: [...]}, NOT a bare array — both call sites
+		// (frontend/src/renderer/src/web/web-preload-api.ts's repos.list AND
+		// its repo.list-for-a-runtime-environment path) do
+		// `(await callRuntimeResult<{ repos: Repo[] }>('repo.list')).repos`,
+		// matching the old TS backend's repo.ts handler:
+		// `return { repos: runtime.listRepos() }`. A bare array has no
+		// `.repos` property, so that destructure silently produced
+		// `undefined` — surfaced as "[repos] repo.list returned a non-array
+		// payload ... undefined" once the PROJECT_MEMBERSHIP_LOOKUP_FAILED
+		// bug (fixed separately) stopped masking it.
+		repos := resp.GetRepos()
+		views := make([]repoView, 0, len(repos))
+		for _, repo := range repos {
+			views = append(views, toRepoView(repo))
+		}
+		return map[string]any{"repos": views}, nil
 	})
 
 	r.Register("repo.reorder", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -163,7 +213,95 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetRepo(), nil
+		return toRepoView(resp.GetRepo()), nil
+	})
+
+	// repo.getMembers/addMember/removeMember/updateMemberRole map 1:1 onto
+	// ProjectService's ListRepoMembers/AddRepoMember/RemoveRepoMember/
+	// UpdateRepoMemberRole — the repo-scoped functional-role tier
+	// (developer/lead/admin), layered on top of project.getMembers/
+	// addMember/removeMember/updateMemberRole's project-level owner/member
+	// tier (channels_tenant_project.go). See policy/orca-authz/repo.rego.
+	r.Register("repo.getMembers", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type getArgs struct {
+			RepoID string `json:"repoId"`
+		}
+		in, err := decodeArg[getArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
+		defer cancel()
+		resp, err := project.ListRepoMembers(rpcCtx, &projectv1.ListRepoMembersRequest{RepoId: in.RepoID})
+		if err != nil {
+			return nil, err
+		}
+		return resp.GetMembers(), nil
+	})
+
+	r.Register("repo.addMember", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type addArgs struct {
+			RepoID string `json:"repoId"`
+			UserID string `json:"userId"`
+			Role   string `json:"role"`
+		}
+		in, err := decodeArg[addArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
+		defer cancel()
+		resp, err := project.AddRepoMember(rpcCtx, &projectv1.AddRepoMemberRequest{
+			RepoId: in.RepoID, UserId: in.UserID, Role: toRepoRoleArg(in.Role),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp.GetMember(), nil
+	})
+
+	r.Register("repo.removeMember", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type removeArgs struct {
+			RepoID string `json:"repoId"`
+			UserID string `json:"userId"`
+		}
+		in, err := decodeArg[removeArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
+		defer cancel()
+		if _, err := project.RemoveRepoMember(rpcCtx, &projectv1.RemoveRepoMemberRequest{
+			RepoId: in.RepoID, UserId: in.UserID,
+		}); err != nil {
+			return nil, err
+		}
+		return map[string]bool{"ok": true}, nil
+	})
+
+	r.Register("repo.updateMemberRole", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type updateArgs struct {
+			RepoID string `json:"repoId"`
+			UserID string `json:"userId"`
+			Role   string `json:"role"`
+		}
+		in, err := decodeArg[updateArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
+		defer cancel()
+		resp, err := project.UpdateRepoMemberRole(rpcCtx, &projectv1.UpdateRepoMemberRoleRequest{
+			RepoId: in.RepoID, UserId: in.UserID, Role: toRepoRoleArg(in.Role),
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp.GetMember(), nil
 	})
 
 	r.Register("repo.clone", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -188,7 +326,7 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		return cloneResultView{WorktreePath: resp.GetWorktreePath(), DefaultBranch: resp.GetDefaultBranch()}, nil
 	})
 
 	r.Register("repo.baseRefDefault", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -247,7 +385,7 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		return initRepoResultView{Path: resp.GetPath(), DefaultBranch: resp.GetDefaultBranch()}, nil
 	})
 
 	r.Register("repo.hooksCheck", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -547,6 +685,23 @@ func toWorkspacePortScanResult(openPorts []int32) map[string]any {
 		"platform":  "unknown",
 		"scannedAt": time.Now().UnixMilli(),
 		"ports":     openPorts,
+	}
+}
+
+// toRepoRoleArg maps the wscompat wire arg's repo-role string
+// ("developer" | "lead" | "admin") onto projectv1.RepoRole — mirrors
+// channels_tenant_project.go's toProjectRoleArg for the same kind of
+// string-to-enum wire mapping, one tier down.
+func toRepoRoleArg(role string) projectv1.RepoRole {
+	switch role {
+	case "developer":
+		return projectv1.RepoRole_REPO_ROLE_DEVELOPER
+	case "lead":
+		return projectv1.RepoRole_REPO_ROLE_LEAD
+	case "admin":
+		return projectv1.RepoRole_REPO_ROLE_ADMIN
+	default:
+		return projectv1.RepoRole_REPO_ROLE_UNSPECIFIED
 	}
 }
 

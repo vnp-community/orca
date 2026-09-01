@@ -15,13 +15,14 @@ import (
 // about) doesn't leave a permanently "open" row behind — mirrors this
 // codebase's general "the persisted record must not lie" discipline.
 type KillTerminalSession struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	agent      DevServerAgentClient
 }
 
-func NewKillTerminalSession(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient) *KillTerminalSession {
-	return &KillTerminalSession{sessions: sessions, resolver: resolver, agent: agent}
+func NewKillTerminalSession(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient) *KillTerminalSession {
+	return &KillTerminalSession{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent}
 }
 
 func (uc *KillTerminalSession) Execute(ctx context.Context, ptyID string) error {
@@ -30,7 +31,7 @@ func (uc *KillTerminalSession) Execute(ctx context.Context, ptyID string) error 
 		return apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver)
+	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		return err
 	}

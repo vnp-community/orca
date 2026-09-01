@@ -5,14 +5,18 @@
  * architecture where agents run on developer machines.
  */
 import type { StateCreator } from 'zustand'
-import { useShallow } from 'zustand/react/shallow'
-import { useAppStore } from '../index'
 import { markRuntimeOnboardingChecklistItem } from '../../runtime/runtime-onboarding-client'
 import type { OnboardingChecklistState } from '../../../../shared/types'
 import type { PerServerChecklistState } from '../../../../shared/dev-server-types'
 import type { AppState } from '../types'
-// Why: useAppStore is imported lazily inside each hook to avoid circular
-// dependency at module evaluation time (this file is imported by store/index.ts).
+// Why no `useAppStore` import here: this file is a store SLICE (imported by
+// store/index.ts's own composition) — importing '../index' at its top level
+// is a real circular dependency (store/index.ts -> this file -> '../index'
+// -> store/index.ts), live-reproduced as "createOnboardingChecklistSlice is
+// not a function". The two one-time settings reads below use this slice
+// creator's own `get` instead; the reactive selector hooks that genuinely
+// need `useAppStore` moved to onboarding-checklist-selectors.ts, which
+// store/index.ts never has to load.
 
 // ─── Extended state types ─────────────────────────────────────────────────────
 
@@ -25,10 +29,7 @@ export type OnboardingExtendedChecklistState = OnboardingChecklistState & {
 export type OnboardingChecklistSlice = {
   checklistState: OnboardingExtendedChecklistState
 
-  markGlobalChecklistItem: (
-    item: keyof OnboardingChecklistState,
-    value?: boolean
-  ) => void
+  markGlobalChecklistItem: (item: keyof OnboardingChecklistState, value?: boolean) => void
 
   markServerChecklistItem: (
     devServerId: string,
@@ -53,12 +54,12 @@ const DEFAULT_GLOBAL_CHECKLIST: OnboardingChecklistState = {
   addedFolder: false,
   openedFile: false,
   ranAgentOnFile: false,
-  dismissed: false,
+  dismissed: false
 }
 
 export const DEFAULT_CHECKLIST_STATE: OnboardingExtendedChecklistState = {
   ...DEFAULT_GLOBAL_CHECKLIST,
-  perServer: {},
+  perServer: {}
 }
 
 // ─── Slice creator ────────────────────────────────────────────────────────────
@@ -68,14 +69,14 @@ export const createOnboardingChecklistSlice: StateCreator<
   [],
   [],
   OnboardingChecklistSlice
-> = (set) => ({
+> = (set, get) => ({
   checklistState: DEFAULT_CHECKLIST_STATE,
 
   markGlobalChecklistItem: (item, value = true) => {
     set((state) => ({
-      checklistState: { ...state.checklistState, [item]: value },
+      checklistState: { ...state.checklistState, [item]: value }
     }))
-    void markRuntimeOnboardingChecklistItem(useAppStore.getState().settings, {
+    void markRuntimeOnboardingChecklistItem(get().settings, {
       item: item as string,
       value
     })
@@ -89,40 +90,27 @@ export const createOnboardingChecklistSlice: StateCreator<
           ...state.checklistState.perServer,
           [devServerId]: {
             ...state.checklistState.perServer?.[devServerId],
-            [item]: value,
-          },
-        },
-      },
+            [item]: value
+          }
+        }
+      }
     }))
-    void markRuntimeOnboardingChecklistItem(useAppStore.getState().settings, {
+    void markRuntimeOnboardingChecklistItem(get().settings, {
       item: item as string,
       devServerId,
-      value,
+      value
     })
   },
 
   setChecklistState: (partial) => {
     set((state) => ({
-      checklistState: { ...state.checklistState, ...partial },
+      checklistState: { ...state.checklistState, ...partial }
     }))
-  },
+  }
 })
 
 // ─── Selectors ────────────────────────────────────────────────────────────────
-
-/** Reactive selector for a specific server's per-server checklist state */
-export function useServerChecklist(devServerId: string | null): PerServerChecklistState {
-  return useAppStore(
-    useShallow((s) =>
-      devServerId ? (s.checklistState.perServer?.[devServerId] ?? {}) : {}
-    )
-  )
-}
-
-/** True when all required global items are done */
-export function useGlobalChecklistComplete(): boolean {
-  return useAppStore((s) => {
-    const cl = s.checklistState
-    return cl.choseAgent && cl.addedRepo && cl.ranFirstAgent
-  })
-}
+//
+// useServerChecklist/useGlobalChecklistComplete moved to
+// onboarding-checklist-selectors.ts (see the doc comment at this file's top
+// for why).
