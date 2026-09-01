@@ -32,12 +32,20 @@ export function useTasks(projectId: string) {
     }
     setIsLoading(true)
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    callRuntimeRpc<OrcaTask[]>(target, 'task.list', { projectId })
-      .then((fetchedTasks) => {
+    // Why {tasks, nextPageToken}, not a bare array: the Go handler
+    // (channels_automation_task.go's task.list) returns the raw
+    // ListTasksResponse proto, which JSON-marshals with its own `tasks`
+    // field — live-reproduced as "s.filter is not a function" when the
+    // whole wrapper object was stored as if it were the task array itself.
+    // `?? []` covers an empty/nil `tasks` field (proto3's nil-slice
+    // omitempty serializes as JSON null here — see automationsListView's
+    // own doc comment on the same BUG-005 gap for other list channels).
+    callRuntimeRpc<{ tasks: OrcaTask[] | null }>(target, 'task.list', { projectId })
+      .then((response) => {
         if (typeof setTasks === 'function') {
           // Since our setTasks currently replaces all tasks in the store (as per Option B flat approach),
           // We only set the tasks for the current project for now. Real world we'd append or use tasksByProject
-          setTasks(fetchedTasks)
+          setTasks(response.tasks ?? [])
         }
       })
       .catch(() => {
