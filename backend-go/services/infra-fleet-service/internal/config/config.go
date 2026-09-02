@@ -24,6 +24,12 @@ type Config struct {
 	// fail-safe: an unrecognized value should not silently widen what
 	// host-local terminal spawning is allowed.
 	ServerDeployment bool
+	// DatabaseCredentialsFile is the path a Vault Agent sidecar renders
+	// dynamic Postgres credentials to in production (see
+	// common/secrets.DatabaseCredentialsFromFile). Falls back to DATABASE_DSN
+	// (via Base) when the file doesn't exist, which is what local dev and
+	// this scaffold's testcontainers path use instead.
+	DatabaseCredentialsFile string
 }
 
 func Load() (Config, error) {
@@ -32,7 +38,8 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:             base,
-		ServerDeployment: os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		Base:                    base,
+		ServerDeployment:        os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
+		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 	}, nil
 }

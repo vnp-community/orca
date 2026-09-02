@@ -52,6 +52,13 @@ type Config struct {
 	// originate a tenant for the first admin — only used when
 	// BootstrapAdminEmail is set (see cmd/server/main.go).
 	TenantServiceAddr string
+
+	// DatabaseCredentialsFile is the path a Vault Agent sidecar renders
+	// dynamic Postgres credentials to in production (see
+	// common/secrets.DatabaseCredentialsFromFile). Falls back to DATABASE_DSN
+	// (via Base) when the file doesn't exist, which is what local dev and
+	// this scaffold's testcontainers path use instead.
+	DatabaseCredentialsFile string
 }
 
 func Load() (Config, error) {
@@ -76,15 +83,16 @@ func Load() (Config, error) {
 	}
 
 	return Config{
-		Base:                   base,
-		BcryptCost:             bcryptCost,
-		SessionTTL:             sessionTTL,
-		ServiceTokenTTL:        serviceTokenTTL,
-		OPABundlePath:          commonconfig.StringEnv("OPA_BUNDLE_PATH", "/policy/orca-authz"),
-		BootstrapCompanyName:   os.Getenv("BOOTSTRAP_COMPANY_NAME"),
-		BootstrapAdminEmail:    os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
-		BootstrapAdminPassword: os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
-		TenantServiceAddr:      commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
+		Base:                    base,
+		BcryptCost:              bcryptCost,
+		SessionTTL:              sessionTTL,
+		ServiceTokenTTL:         serviceTokenTTL,
+		OPABundlePath:           commonconfig.StringEnv("OPA_BUNDLE_PATH", "/policy/orca-authz"),
+		BootstrapCompanyName:    os.Getenv("BOOTSTRAP_COMPANY_NAME"),
+		BootstrapAdminEmail:     os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
+		BootstrapAdminPassword:  os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
+		TenantServiceAddr:       commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
+		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 	}, nil
 }
 
