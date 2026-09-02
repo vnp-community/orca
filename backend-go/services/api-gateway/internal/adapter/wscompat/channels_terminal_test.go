@@ -435,6 +435,99 @@ func TestTerminalSendChannel_UnknownPtyID_ReturnsError(t *testing.T) {
 	}
 }
 
+// TestTerminalReattachSendChannel_RecoversAfterASimulatedReconnect is the
+// core regression guard: a silent WS reconnect mints a brand-new,
+// empty terminalStreamRegistry (newTerminalTestCtx's own doc comment
+// explains why two calls to it simulate two different WS connections) —
+// terminal.send for a pty created on the OLD connection must keep failing
+// there (nothing here should paper over that), but terminal.reattachSend on
+// the NEW connection must re-register the same still-alive pty so
+// terminal.send on the new connection works.
+func TestTerminalReattachSendChannel_RecoversAfterASimulatedReconnect(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+
+	oldConnCtx := newTerminalTestCtx()
+	createSession(t, oldConnCtx, r, fake, "pty-1")
+	awaitSentFrame(t, fake.lastStream) // drain the original attach frame
+
+	newConnCtx := newTerminalTestCtx()
+	if _, err := r.Dispatch(newConnCtx, Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "x"})); err == nil {
+		t.Fatal("expected terminal.send to still fail on the new connection before reattaching")
+	}
+
+	if _, err := r.Dispatch(newConnCtx, Identity{TenantID: "tenant-1"}, "terminal.reattachSend", argsJSON(t, terminalReattachSendArgs{PtyID: "pty-1"})); err != nil {
+		t.Fatalf("unexpected terminal.reattachSend error: %v", err)
+	}
+	reattachFrame := awaitSentFrame(t, fake.lastStream)
+	attach := reattachFrame.GetAttach()
+	if attach == nil || attach.GetPtyId() != "pty-1" {
+		t.Fatalf("expected the reattach stream's first frame to be an attach frame for pty-1, got %+v", reattachFrame)
+	}
+
+	_, err := r.Dispatch(newConnCtx, Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "echo hi\n"}))
+	if err != nil {
+		t.Fatalf("unexpected error sending after reattach: %v", err)
+	}
+	sentFrame := awaitSentFrame(t, fake.lastStream)
+	input := sentFrame.GetInput()
+	if input == nil || string(input.GetData()) != "echo hi\n" {
+		t.Errorf("expected an input frame carrying %q, got %+v", "echo hi\n", sentFrame)
+	}
+}
+
+// TestTerminalReattachSendChannel_MissingPtyID_ReturnsError guards the
+// fail-closed empty-ptyId check — an empty terminal wire key must never
+// silently reattach as an empty-string registry entry.
+func TestTerminalReattachSendChannel_MissingPtyID_ReturnsError(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+
+	_, err := r.Dispatch(newTerminalTestCtx(), Identity{TenantID: "tenant-1"}, "terminal.reattachSend", argsJSON(t, terminalReattachSendArgs{}))
+	if err == nil {
+		t.Fatal("expected an error when ptyId is empty")
+	}
+	if fake.lastStream != nil {
+		t.Error("expected no AttachPty call for an empty ptyId")
+	}
+}
+
+// TestTerminalReattachSendChannel_RemovesFromRegistryOnExit guards
+// drainReattachedPtyOutput's cleanup contract: once the reattached pty
+// exits, a subsequent terminal.send for it must fail again (the registry
+// entry must not outlive the actual pty).
+func TestTerminalReattachSendChannel_RemovesFromRegistryOnExit(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+	ctx := newTerminalTestCtx()
+
+	if _, err := r.Dispatch(ctx, Identity{TenantID: "tenant-1"}, "terminal.reattachSend", argsJSON(t, terminalReattachSendArgs{PtyID: "pty-1"})); err != nil {
+		t.Fatalf("unexpected terminal.reattachSend error: %v", err)
+	}
+	awaitSentFrame(t, fake.lastStream) // drain the attach frame
+	stream := fake.lastStream
+
+	stream.recv <- &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Exited{Exited: &infrafleetv1.PtyExited{ExitCode: 0}}}
+
+	// drainReattachedPtyOutput's streams.remove(ptyID) runs asynchronously
+	// right after it observes the exit frame — poll instead of asserting
+	// immediately.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		_, err := r.Dispatch(ctx, Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "x"}))
+		if err != nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for the exited pty to be removed from the stream registry")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+}
+
 func TestTerminalResizeChannel_CallsResizeRPC(t *testing.T) {
 	var got *infrafleetv1.ResizeTerminalSessionRequest
 	fake := &fakeTerminalInfraFleetClient{

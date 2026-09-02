@@ -124,6 +124,7 @@ var errNoTerminalStreamRegistry = fmt.Errorf("wscompat: no per-connection termin
 func registerTerminalChannels(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
 	registerTerminalCreateChannel(r, client)
 	registerTerminalSendChannel(r)
+	registerTerminalReattachSendChannel(r, client)
 	registerTerminalResizeChannel(r, client)
 	registerTerminalCloseChannel(r, client)
 	registerTerminalStopChannel(r, client)
@@ -349,6 +350,91 @@ func registerTerminalSendChannel(r *Registry) {
 		}
 		return nil, nil
 	})
+}
+
+// ── terminal.reattachSend ────────────────────────────────────────────────
+//
+// terminalStreamRegistry is scoped to ONE WebSocket connection (this file's
+// package doc comment). A silent WS reconnect (network blip, idle timeout,
+// api-gateway restart/redeploy) mints a brand-new, empty registry for the
+// new connection, but remote-runtime-pty-transport.ts's plain terminal.send
+// fallback path never re-issues terminal.create after a reconnect — it just
+// keeps calling terminal.send against the same ptyId forever, permanently
+// hitting terminal.send's "no live AttachPty stream ... call terminal.create
+// first" error for a pty session that is, in reality, still alive on the
+// dev server (only this connection's own bookkeeping is gone, not the PTY
+// itself — the daemon holds live PTYs independently of any one WS
+// connection, see pty-agent-bridge.ts's own doc comment). Live-reproduced
+// on b15.openledger.vn.
+//
+// terminal.subscribe (channels_terminal_subscribe.go) already re-attaches
+// the READ side across a reconnect this same way (its own AttachPty call
+// for an existing ptyId) — this channel is the WRITE-side equivalent the
+// frontend calls once it detects that specific error, so an existing pane
+// can recover without losing its shell session (unlike calling
+// terminal.create again, which would spawn a brand new PTY via
+// SpawnTerminalSession instead of reattaching to this one).
+//
+// Registered as a plain RPC (Register, not RegisterStreamChannel): output
+// already flows to the client via its own terminal.subscribe stream, so
+// this reattach's own drain loop discards PtyServerFrame_Out entirely —
+// pushing it as a second terminal.output/terminal.subscribe.event would
+// duplicate every byte of output on screen.
+type terminalReattachSendArgs struct {
+	PtyID string `json:"terminal"`
+}
+
+func registerTerminalReattachSendChannel(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
+	r.Register("terminal.reattachSend", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		in, err := decodeArg[terminalReattachSendArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if in.PtyID == "" {
+			return nil, fmt.Errorf("wscompat: terminal.reattachSend requires a terminal (ptyId)")
+		}
+		streams := terminalStreamsFromContext(ctx)
+		if streams == nil {
+			return nil, errNoTerminalStreamRegistry
+		}
+
+		streamCtx, cancel := attachContext(id)
+		stream, err := client.AttachPty(streamCtx)
+		if err != nil {
+			cancel()
+			return nil, fmt.Errorf("wscompat: reattaching AttachPty stream for pty %q: %w", in.PtyID, err)
+		}
+		if err := stream.Send(&infrafleetv1.PtyClientFrame{
+			Frame: &infrafleetv1.PtyClientFrame_Attach{Attach: &infrafleetv1.AttachToSession{PtyId: in.PtyID}},
+		}); err != nil {
+			cancel()
+			return nil, fmt.Errorf("wscompat: sending AttachPty's reattach frame for pty %q: %w", in.PtyID, err)
+		}
+
+		entry := &terminalStreamEntry{stream: stream, cancel: cancel}
+		streams.put(in.PtyID, entry)
+		go drainReattachedPtyOutput(in.PtyID, entry, streams)
+
+		return nil, nil
+	})
+}
+
+// drainReattachedPtyOutput keeps terminal.reattachSend's stream alive and
+// its registry entry accurate — discarding output (the existing
+// terminal.subscribe stream already delivers that), but still removing
+// ptyID from streams the moment the pty actually exits or the stream itself
+// errors, exactly like drainAttachPtyOutput's cleanup contract.
+func drainReattachedPtyOutput(ptyID string, entry *terminalStreamEntry, streams *terminalStreamRegistry) {
+	defer streams.remove(ptyID)
+	for {
+		frame, err := entry.stream.Recv()
+		if err != nil {
+			return
+		}
+		if _, exited := frame.GetFrame().(*infrafleetv1.PtyServerFrame_Exited); exited {
+			return
+		}
+	}
 }
 
 // ── terminal.resize ─────────────────────────────────────────────────────

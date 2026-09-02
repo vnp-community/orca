@@ -711,6 +711,60 @@ describe('createRemoteRuntimePtyTransport', () => {
     }
   })
 
+  // Why: regression guard for a live bug found right after typed input
+  // itself started reaching terminal.send again — a silent WS reconnect
+  // (network blip, idle timeout, api-gateway restart) mints a brand-new,
+  // empty per-connection terminal-stream registry backend-side, so every
+  // terminal.send for this pane's still-alive pty fails forever with
+  // "no live AttachPty stream" until the page reloads. terminal.reattachSend
+  // re-registers the same pty (no new PTY spawned, unlike terminal.create)
+  // so a single retry after it succeeds should recover transparently.
+  it('reattaches and retries once when terminal.send reports no live AttachPty stream', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('session-auth', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+    runtimeCall.mockClear()
+
+    let sendCalls = 0
+    runtimeCall.mockImplementation(async (args: { method: string }) => {
+      if (args.method === 'terminal.send') {
+        sendCalls += 1
+        if (sendCalls === 1) {
+          return {
+            ok: false,
+            error: {
+              message:
+                'wscompat: no live AttachPty stream for pty "terminal-1" — call terminal.create first'
+            }
+          }
+        }
+        return { ok: true, result: {} }
+      }
+      return { ok: true, result: {} }
+    })
+
+    vi.useFakeTimers()
+    try {
+      expect(transport.sendInput('c')).toBe(true)
+      await vi.advanceTimersByTimeAsync(8)
+      await vi.waitFor(() => expect(sendCalls).toBe(2))
+
+      expect(runtimeCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'terminal.reattachSend',
+          params: { terminal: 'terminal-1' }
+        })
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('does not send queued input through a stale stream during remote handle replacement', async () => {
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
     const transport = createRemoteRuntimePtyTransport('env-1', {

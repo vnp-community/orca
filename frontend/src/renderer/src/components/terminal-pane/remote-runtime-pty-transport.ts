@@ -62,6 +62,19 @@ function isRemoteTerminalGoneMessage(message: string): boolean {
   )
 }
 
+// Why: a silent WS reconnect (network blip, idle timeout, api-gateway
+// restart/redeploy) mints a brand-new, empty per-connection terminal-stream
+// registry backend-side (channels_terminal.go's own package doc comment) —
+// this pane's still-alive ptyId then has no live AttachPty stream there
+// anymore, and every terminal.send for it fails with this exact message
+// forever, since nothing here ever re-issues terminal.create after a
+// reconnect. Live-reproduced on b15.openledger.vn: a terminal that was
+// already open and typing fine started rejecting every keystroke with this
+// error the moment the underlying WS reconnected mid-session.
+function isNoLiveAttachPtyStreamMessage(message: string): boolean {
+  return message.includes('no live AttachPty stream')
+}
+
 // FIX BUG-FE-PTY-001: a fresh local tab's connect() and its own host-session
 // mirror tab can both mount for one leaf during the same reconcile churn (the
 // mirror publishes before the local tab's terminal.create round-trip
@@ -436,12 +449,7 @@ export function createRemoteRuntimePtyTransport(
         }
         // Why: acknowledged sends are ordered behind any pending debounce text,
         // but they must not collapse large paste input back into one remote RPC.
-        const result = await callRuntime<{ send: RuntimeTerminalSend }>('terminal.send', {
-          terminal: targetHandle,
-          text: chunk,
-          client: { id: clientId, type: 'desktop' },
-          ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
-        })
+        const result = await sendTerminalSendAckWithReattachRetry(targetHandle, chunk)
         if (result.send.accepted !== true) {
           return false
         }
@@ -452,6 +460,33 @@ export function createRemoteRuntimePtyTransport(
       // next snapshot) rather than dead-end in a red xterm banner (#7718).
       handleRemoteTerminalError(error)
       return false
+    }
+  }
+
+  // Why a separate typed sibling of sendTerminalTextWithReattachRetry: this
+  // caller needs terminal.send's real {send:{accepted}} ack (Enter/Ctrl-C
+  // must know whether the write was actually accepted), not the fire-and-
+  // forget void the plain-typing paths use. See
+  // isNoLiveAttachPtyStreamMessage's doc comment for why the reattach retry
+  // exists at all.
+  async function sendTerminalSendAckWithReattachRetry(
+    targetHandle: string,
+    text: string
+  ): Promise<{ send: RuntimeTerminalSend }> {
+    try {
+      return await callRuntime<{ send: RuntimeTerminalSend }>(
+        'terminal.send',
+        buildTerminalSendPayload(targetHandle, text)
+      )
+    } catch (error) {
+      if (!isNoLiveAttachPtyStreamMessage(runtimeTerminalErrorMessage(error))) {
+        throw error
+      }
+      await callRuntime('terminal.reattachSend', { terminal: targetHandle })
+      return callRuntime<{ send: RuntimeTerminalSend }>(
+        'terminal.send',
+        buildTerminalSendPayload(targetHandle, text)
+      )
     }
   }
 
@@ -483,14 +518,7 @@ export function createRemoteRuntimePtyTransport(
       pendingClaimInput += text
       return
     }
-    void callRuntime('terminal.send', {
-      terminal: targetHandle,
-      text,
-      client: { id: clientId, type: 'desktop' },
-      ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
-    }).catch((error) => {
-      handleRemoteTerminalError(error)
-    })
+    void sendTerminalTextWithReattachRetry(targetHandle, text)
   })
 
   function sendViewportUpdate(cols: number, rows: number, claim = false): void {
@@ -574,6 +602,44 @@ export function createRemoteRuntimePtyTransport(
       return
     }
     storedCallbacks.onError?.(message)
+  }
+
+  function buildTerminalSendPayload(targetHandle: string, text: string): Record<string, unknown> {
+    return {
+      terminal: targetHandle,
+      text,
+      client: { id: clientId, type: 'desktop' },
+      ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
+    }
+  }
+
+  // Why a reattach-then-retry wrapper, not just calling terminal.send
+  // directly: see isNoLiveAttachPtyStreamMessage's doc comment — a silent WS
+  // reconnect leaves this pane's ptyId with no live backend-side AttachPty
+  // stream, and terminal.send alone can never recover from that (nothing
+  // re-issues terminal.create after a reconnect). terminal.reattachSend
+  // re-registers the SAME still-alive pty (it does not spawn a new one,
+  // unlike terminal.create), so a single retry after it succeeds is enough;
+  // any other error, or a reattach/retry failure, still falls through to
+  // the normal error handling.
+  async function sendTerminalTextWithReattachRetry(
+    targetHandle: string,
+    text: string
+  ): Promise<void> {
+    try {
+      await callRuntime('terminal.send', buildTerminalSendPayload(targetHandle, text))
+    } catch (error) {
+      if (!isNoLiveAttachPtyStreamMessage(runtimeTerminalErrorMessage(error))) {
+        handleRemoteTerminalError(error)
+        return
+      }
+      try {
+        await callRuntime('terminal.reattachSend', { terminal: targetHandle })
+        await callRuntime('terminal.send', buildTerminalSendPayload(targetHandle, text))
+      } catch (retryError) {
+        handleRemoteTerminalError(retryError)
+      }
+    }
   }
 
   // Why: after a transport drop the host may have re-minted this pane's
@@ -793,14 +859,7 @@ export function createRemoteRuntimePtyTransport(
       // this file's other pendingViewportClaim guard comment) — input queued
       // during the brief pre-subscribe window must still reach the wire.
       if (queuedInput && !nextStream.sendInput(queuedInput)) {
-        void callRuntime('terminal.send', {
-          terminal: subscribedHandle,
-          text: queuedInput,
-          client: { id: clientId, type: 'desktop' },
-          ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
-        }).catch((error) => {
-          handleRemoteTerminalError(error)
-        })
+        void sendTerminalTextWithReattachRetry(subscribedHandle, queuedInput)
       }
       for (const resolve of viewportClaimReadyWaiters) {
         resolve(true)
@@ -1070,14 +1129,7 @@ export function createRemoteRuntimePtyTransport(
         pendingClaimInput += text
         return true
       }
-      void callRuntime('terminal.send', {
-        terminal: targetHandle,
-        text,
-        client: { id: clientId, type: 'desktop' },
-        ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
-      }).catch((error) => {
-        handleRemoteTerminalError(error)
-      })
+      void sendTerminalTextWithReattachRetry(targetHandle, text)
       return true
     },
 
