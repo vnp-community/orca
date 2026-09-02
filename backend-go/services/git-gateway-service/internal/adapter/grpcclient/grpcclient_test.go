@@ -29,6 +29,10 @@ type fakeInfraFleetServiceClient struct {
 	relayResp *infrafleetv1.RelayResponse
 	relayErr  error
 	gotRelay  *infrafleetv1.RelayRequest
+
+	relayByDevServerResp *infrafleetv1.RelayResponse
+	relayByDevServerErr  error
+	gotRelayByDevServer  *infrafleetv1.RelayByDevServerRequest
 }
 
 func (f *fakeInfraFleetServiceClient) ResolveConnection(ctx context.Context, in *infrafleetv1.ResolveConnectionRequest, _ ...grpc.CallOption) (*infrafleetv1.ResolveConnectionResponse, error) {
@@ -45,6 +49,14 @@ func (f *fakeInfraFleetServiceClient) Relay(ctx context.Context, in *infrafleetv
 		return nil, f.relayErr
 	}
 	return f.relayResp, nil
+}
+
+func (f *fakeInfraFleetServiceClient) RelayByDevServer(ctx context.Context, in *infrafleetv1.RelayByDevServerRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
+	f.gotRelayByDevServer = in
+	if f.relayByDevServerErr != nil {
+		return nil, f.relayByDevServerErr
+	}
+	return f.relayByDevServerResp, nil
 }
 
 func ctxWithTenant(t *testing.T) context.Context {
@@ -932,5 +944,43 @@ func TestRelayExecutor_RemoveWorktree_SendsPathAndForce(t *testing.T) {
 	}
 	if params["path"] != "/repo/.worktrees/feature" || params["force"] != true {
 		t.Errorf("expected path+force params (agent-git-handler.ts's handleGitWorktreeRemove reads params.path, not params.worktreePath), got %+v", params)
+	}
+}
+
+// ── dispatchExecutorForRepo's ctx-carried DevServerID (usecase.WithDevServerID)
+// makes relay use RelayByDevServer instead of the connectionId-keyed Relay —
+// see relay's own doc comment for why: repoPath was never a valid
+// infra.connections.id, so Relay could never have resolved for any caller
+// reaching this package via dispatchExecutorForRepo. ──
+
+func TestRelayExecutor_ListWorktreePaths_WithDevServerIDInContext_UsesRelayByDevServer(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"worktrees": []map[string]any{{"path": "/repo", "head": "abc123", "branch": "main"}},
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	ctx := usecase.WithDevServerID(ctxWithTenant(t), "ds-1")
+	infos, err := r.ListWorktreePaths(ctx, "/repo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay != nil {
+		t.Error("expected the connectionId-keyed Relay RPC NOT to be called when a dev server id is in context")
+	}
+	if fake.gotRelayByDevServer == nil {
+		t.Fatal("expected RelayByDevServer to be called")
+	}
+	if fake.gotRelayByDevServer.GetDevServerId() != "ds-1" {
+		t.Errorf("expected devServerId=ds-1, got %q", fake.gotRelayByDevServer.GetDevServerId())
+	}
+	if fake.gotRelayByDevServer.GetMethod() != "git.worktree.list" {
+		t.Errorf("expected method=git.worktree.list, got %q", fake.gotRelayByDevServer.GetMethod())
+	}
+	if len(infos) != 1 || infos[0].Path != "/repo" {
+		t.Errorf("unexpected result: %+v", infos)
 	}
 }

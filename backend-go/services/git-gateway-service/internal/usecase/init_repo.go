@@ -45,6 +45,7 @@ func (uc *InitRepo) Execute(ctx context.Context, in InitRepoInput) (InitRepoResu
 
 	executor := uc.local
 	if reachable {
+		ctx = WithDevServerID(ctx, in.DevServerID)
 		executor = uc.relay
 	}
 	path, defaultBranch, err := executor.InitRepo(ctx, in.DestPath, in.DefaultBranch)

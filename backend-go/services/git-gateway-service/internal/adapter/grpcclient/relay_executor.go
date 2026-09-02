@@ -10,6 +10,7 @@ import (
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
 )
 
 // RelayExecutor implements usecase.GitExecutor and usecase.FilesystemExecutor
@@ -36,22 +37,29 @@ func NewRelayExecutor(client infrafleetv1.InfraFleetServiceClient) *RelayExecuto
 	return &RelayExecutor{client: client}
 }
 
-// relay marshals params, calls infra-fleet-service's Relay RPC for
-// connectionID/method, and unmarshals the result into out.
+// relay marshals params and calls infra-fleet-service's agent-execution
+// plane for connectionID/method, unmarshalling the result into out.
 //
-// Known gap: usecase.GitExecutor's methods only receive repoPath, not the
-// worktreeID/connectionId ConnectionResolver resolved it from (§
-// dispatchExecutor in usecase/ports.go forwards ResolvedConnection.RepoPath
-// to GitExecutor but drops ConnectionID). Every caller below therefore
-// passes its repoPath argument through as this relay's connectionID too —
-// correct only if RelayRequest.ConnectionId ends up identical to the
-// worktreeID that resolved to it, which holds today because
-// ConnectionResolver.ResolveConnection echoes worktreeID as
-// ResolvedConnection.ConnectionID but sources RepoPath from
-// infra-fleet-service's own answer (resp.GetRepoPath()) — those two need
-// not always match. Threading ConnectionID through GitExecutor's signature
-// is the real fix; not done here since ports.go is out of scope for this
-// change.
+// Fixed gap (was: "Threading ConnectionID through GitExecutor's signature
+// is the real fix; not done here"): usecase.GitExecutor's methods still
+// only receive repoPath, not a resolved connectionId — but repoPath was
+// never a valid infra.connections.id to begin with (a filesystem path
+// can't satisfy that column's uuid type), so passing it as Relay's
+// ConnectionId could never have resolved for ANY caller, live-confirmed as
+// this exact call's own root cause (INFRA_RESOLVE_FAILED, once dispatch
+// finally started reaching here at all — see PollFleetHealth's commit for
+// why it never had before). dispatchExecutorForRepo now threads the repo's
+// dev server id through ctx (usecase.WithDevServerID) instead: when
+// present, call RelayByDevServer — infra-fleet-service's purpose-built
+// bypass for "reach this dev server's agent before any infra.connections
+// row exists for it" (see usecase.RelayByDevServer's own doc comment,
+// infra-fleet-service) — rather than the connectionId-keyed Relay RPC.
+// dispatchExecutor's worktree-keyed callers (e.g. RemoveWorktree) don't set
+// this and still fall through to Relay with repoPath-as-connectionId; that
+// path is currently moot (infra.connections has zero rows system-wide, so
+// ConnectionResolver.ResolveConnection there always answers
+// Connected=false today) but remains a separate, still-open gap, not fixed
+// in this pass.
 func (r *RelayExecutor) relay(ctx context.Context, connectionID, method string, params map[string]any, out any) error {
 	ctx, err := withTenantMetadata(ctx)
 	if err != nil {
@@ -63,19 +71,33 @@ func (r *RelayExecutor) relay(ctx context.Context, connectionID, method string, 
 		return fmt.Errorf("grpcclient: marshal params for %s: %w", method, err)
 	}
 
-	resp, err := r.client.Relay(ctx, &infrafleetv1.RelayRequest{
-		ConnectionId: connectionID,
-		Method:       method,
-		ParamsJson:   string(paramsJSON),
-	})
-	if err != nil {
-		return fmt.Errorf("grpcclient: relay %s: %w", method, err)
+	var resultJSON string
+	if devServerID, ok := usecase.DevServerIDFromContext(ctx); ok {
+		resp, err := r.client.RelayByDevServer(ctx, &infrafleetv1.RelayByDevServerRequest{
+			DevServerId: devServerID,
+			Method:      method,
+			ParamsJson:  string(paramsJSON),
+		})
+		if err != nil {
+			return fmt.Errorf("grpcclient: relayByDevServer %s: %w", method, err)
+		}
+		resultJSON = resp.GetResultJson()
+	} else {
+		resp, err := r.client.Relay(ctx, &infrafleetv1.RelayRequest{
+			ConnectionId: connectionID,
+			Method:       method,
+			ParamsJson:   string(paramsJSON),
+		})
+		if err != nil {
+			return fmt.Errorf("grpcclient: relay %s: %w", method, err)
+		}
+		resultJSON = resp.GetResultJson()
 	}
 
-	if out == nil || resp.GetResultJson() == "" {
+	if out == nil || resultJSON == "" {
 		return nil
 	}
-	if err := json.Unmarshal([]byte(resp.GetResultJson()), out); err != nil {
+	if err := json.Unmarshal([]byte(resultJSON), out); err != nil {
 		return fmt.Errorf("grpcclient: unmarshal %s result: %w", method, err)
 	}
 	return nil

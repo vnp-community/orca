@@ -388,6 +388,27 @@ type SCMClient interface {
 // path. Fixed by dispatchExecutorForRepo below, which uses the same
 // DevServerReachability-based routing Clone/InitRepo already use
 // successfully instead.
+// devServerIDCtxKey/WithDevServerID/DevServerIDFromContext thread a repo's
+// dev server id from dispatch time (where it's known: DevServerReachability
+// is keyed by it) through to RelayExecutor.relay (grpcclient package),
+// which needs it to call infra-fleet-service's RelayByDevServer instead of
+// its connectionId-keyed Relay RPC — see relay_executor.go's own doc
+// comment for why Relay can't be used here: it requires a pre-existing
+// infra.connections row, and dispatchExecutorForRepo's own callers
+// (DetectWorktrees et al.) never have one (confirmed live: zero rows in
+// infra.connections, system-wide — WORKTREE_DETECT_FAILED's true root
+// cause once IsReachable started actually returning true).
+type devServerIDCtxKey struct{}
+
+func WithDevServerID(ctx context.Context, devServerID string) context.Context {
+	return context.WithValue(ctx, devServerIDCtxKey{}, devServerID)
+}
+
+func DevServerIDFromContext(ctx context.Context) (string, bool) {
+	v, _ := ctx.Value(devServerIDCtxKey{}).(string)
+	return v, v != ""
+}
+
 func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, relay GitExecutor, worktreeID string) (GitExecutor, string, error) {
 	conn, err := resolver.ResolveConnection(ctx, worktreeID)
 	if err != nil {
@@ -417,26 +438,26 @@ func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, r
 // without ever calling RebindDevServer is a valid, if degenerate, local-only
 // state.
 //
-// Known gap this does NOT close (pre-existing, also affects Clone/InitRepo
-// today): the relay branch still requires infra-fleet-service to already
-// have an infra.connections row keyed by repo.URL for RelayExecutor's own
-// connectionID-doubles-as-repoPath convention (see relay_executor.go's own
-// "Known gap" doc comment) to resolve — nothing here creates one on demand.
-// For a dev server with no live SSH/relay agent (this deployment's actual
-// mode today, confirmed via GetFleetHealth reporting no reachable sample),
-// IsReachable returns false and every call takes the local branch, so this
-// gap does not block the common case; it remains open for a genuinely
-// relay-connected dev server, same as it already was for Clone/InitRepo.
-func dispatchExecutorForRepo(ctx context.Context, reachability DevServerReachability, local, relay GitExecutor, repo domain.RepoInfo) (GitExecutor, string, error) {
+// Known gap this used to not close (fixed by this function returning ctx
+// carrying repo.DevServerID via WithDevServerID): the relay branch requires
+// infra-fleet-service to have a real dispatch target for RelayExecutor's
+// relay to use. No infra.connections row exists for these repos (confirmed
+// live: zero rows, system-wide — every repo-scoped usecase here would have
+// hit the same WORKTREE_DETECT_FAILED-style error the moment IsReachable
+// ever returned true, which it never did before the fleet-health poller was
+// implemented). RelayExecutor now uses the returned ctx's DevServerID to
+// call RelayByDevServer instead, which was purpose-built for exactly this
+// "no connections row yet" case — see its own doc comment.
+func dispatchExecutorForRepo(ctx context.Context, reachability DevServerReachability, local, relay GitExecutor, repo domain.RepoInfo) (context.Context, GitExecutor, string, error) {
 	if repo.DevServerID == "" {
-		return local, repo.URL, nil
+		return ctx, local, repo.URL, nil
 	}
 	reachable, err := reachability.IsReachable(ctx, repo.DevServerID)
 	if err != nil {
-		return nil, "", err
+		return ctx, nil, "", err
 	}
 	if reachable {
-		return relay, repo.URL, nil
+		return WithDevServerID(ctx, repo.DevServerID), relay, repo.URL, nil
 	}
-	return local, repo.URL, nil
+	return ctx, local, repo.URL, nil
 }

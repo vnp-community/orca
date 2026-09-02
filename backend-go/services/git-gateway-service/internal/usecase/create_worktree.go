@@ -48,7 +48,7 @@ func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (
 	// the raw request field — see ports.go's doc comment for why this
 	// (not dispatchExecutor/ConnectionResolver) is the correct dispatch
 	// for a repo-scoped usecase.
-	executor, repoPath, err := dispatchExecutorForRepo(ctx, uc.reachability, uc.local, uc.relay, repo)
+	ctx, executor, repoPath, err := dispatchExecutorForRepo(ctx, uc.reachability, uc.local, uc.relay, repo)
 	if err != nil {
 		return domain.WorktreeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_RESOLVE_FAILED", "failed to resolve host", err)
 	}
