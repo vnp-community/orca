@@ -189,7 +189,16 @@ export async function handlePtyCreate(
   const envShell      = typeof envOverride.SHELL     === 'string' ? envOverride.SHELL.trim()   : ''
   const shell = shellOverride || envShell || (process.env.SHELL ?? '/bin/sh')
 
-  const ptyId = `agent-pty-${nextAgentPtyId++}`
+  // Why Date.now() prefix, not just the counter: this module runs inside
+  // pty-daemon-server.ts, a separate long-lived process — but that daemon
+  // CAN restart independently (crash, VM reboot, manual kill), which resets
+  // nextAgentPtyId back to 1 while infra.terminal_sessions (postgres,
+  // pty_id PRIMARY KEY) still has rows from the daemon's previous life.
+  // Live-reproduced: INFRA_CREATE_TERMINAL_SESSION_FAILED (duplicate pty_id
+  // "agent-pty-1") the first time a fresh daemon spawned a PTY after an
+  // earlier "agent-pty-1" row from days before was already persisted. The
+  // counter alone is only unique within one daemon process's lifetime.
+  const ptyId = `agent-pty-${Date.now().toString(36)}-${nextAgentPtyId++}`
   const paneKey = typeof params.paneKey === 'string' ? params.paneKey : undefined
   const tabId   = typeof params.tabId   === 'string' ? params.tabId   : undefined
   // Why: 'provider' means the caller has no renderer terminal pane to type
