@@ -23,6 +23,7 @@ import (
 	"context"
 	"encoding/json"
 	"strings"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 
@@ -35,11 +36,20 @@ import (
 
 func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServiceClient, projectClient projectv1.ProjectServiceClient) {
 	r.Register("worktree.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// Field names/shape mirror the ONLY real callers — web-preload-api.ts's
+		// worktrees.create and worktrees.ts's createWorktree (both frontend/src)
+		// — never {projectId, repoId, branch, baseRef}, which nothing sends.
+		// project_id is deliberately not decoded here: CreateWorktree.Execute
+		// now resolves it server-side from the repo (see create_worktree.go).
 		type createArgs struct {
-			ProjectID string `json:"projectId"`
-			RepoID    string `json:"repoId"`
-			Branch    string `json:"branch"`
-			BaseRef   string `json:"baseRef"`
+			RepoID             string  `json:"repo"`
+			Name               string  `json:"name"`
+			BaseBranch         string  `json:"baseBranch"`
+			BranchNameOverride string  `json:"branchNameOverride"`
+			DisplayName        string  `json:"displayName"`
+			LinkedIssue        *int32  `json:"linkedIssue"`
+			LinkedPR           *int32  `json:"linkedPR"`
+			LinkedLinearIssue  *string `json:"linkedLinearIssue"`
 
 			// Optional lineage-capture context — see
 			// proto/orca/project/v1/project.proto's WorktreeLineageEntry doc
@@ -57,9 +67,15 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 		if err != nil {
 			return nil, err
 		}
+		// branchNameOverride wins when present — worktrees.ts's own
+		// retry-name-conflict loop retries both under this same rule.
+		branch := in.Name
+		if in.BranchNameOverride != "" {
+			branch = in.BranchNameOverride
+		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		resp, err := gitClient.CreateWorktree(ctx, &gitgatewayv1.CreateWorktreeRequest{
-			ProjectId: in.ProjectID, RepoId: in.RepoID, Branch: in.Branch, BaseRef: in.BaseRef,
+			RepoId: in.RepoID, Branch: branch, BaseRef: in.BaseBranch,
 			ParentWorktreeId:        nonEmptyPtr(in.ParentWorktreeID),
 			Origin:                  nonEmptyPtr(in.Origin),
 			CaptureSource:           nonEmptyPtr(in.CaptureSource),
@@ -71,36 +87,71 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+
+		displayName := in.DisplayName
+		if displayName == "" {
+			displayName = displayNameForDetectedWorktree(branch, resp.GetPath())
+		}
+		now := time.Now().UnixMilli()
+		// {worktree: ...} — the frontend (worktrees.ts's createWorktree) reads
+		// result.worktree.id/.path straight off this response; CreateWorktreeResponse
+		// itself only carries worktree_id/path/head_sha, so the rest of the rich
+		// client Worktree shape is filled in here from the request + safe
+		// defaults, same convention as detectedWorktreeView below.
+		return map[string]any{
+			"worktree": worktreeView{
+				ID:                resp.GetWorktreeId(),
+				RepoID:            in.RepoID,
+				DisplayName:       displayName,
+				LinkedIssue:       in.LinkedIssue,
+				LinkedPR:          in.LinkedPR,
+				LinkedLinearIssue: in.LinkedLinearIssue,
+				LastActivityAt:    now,
+				CreatedAt:         now,
+				Path:              resp.GetPath(),
+				Head:              resp.GetHeadSha(),
+				Branch:            branch,
+			},
+		}, nil
 	})
 
 	r.Register("worktree.rm", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type rmArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			Force      bool   `json:"force"`
+			// The frontend always sends toRuntimeWorktreeSelector(worktreeId)
+			// (runtime-worktree-selector.ts) under the key "worktree", never
+			// "worktreeId" — and always "id:"-prefixed.
+			Worktree string `json:"worktree"`
+			Force    bool   `json:"force"`
 		}
 		in, err := decodeArg[rmArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		if _, err := gitClient.RemoveWorktree(ctx, &gitgatewayv1.RemoveWorktreeRequest{WorktreeId: in.WorktreeID, Force: in.Force}); err != nil {
+		worktreeID := stripWorktreeSelectorPrefix(in.Worktree)
+		if _, err := gitClient.RemoveWorktree(ctx, &gitgatewayv1.RemoveWorktreeRequest{WorktreeId: worktreeID, Force: in.Force}); err != nil {
 			return nil, err
 		}
 		return map[string]bool{"ok": true}, nil
 	})
 
 	r.Register("worktree.forceDeleteBranch", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// forceDeletePreservedBranch (worktrees.ts) sends "branchName", not
+		// "branch" — expectedHead is decoded but currently unused: neither
+		// ForceDeleteBranchRequest nor ForceDeleteBranch.Execute has a
+		// head-check guard yet (a known gap, not addressed by this fix).
 		type forceDeleteArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			Branch     string `json:"branch"`
+			Worktree     string `json:"worktree"`
+			BranchName   string `json:"branchName"`
+			ExpectedHead string `json:"expectedHead"`
 		}
 		in, err := decodeArg[forceDeleteArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		if _, err := gitClient.ForceDeleteBranch(ctx, &gitgatewayv1.ForceDeleteBranchRequest{WorktreeId: in.WorktreeID, Branch: in.Branch}); err != nil {
+		worktreeID := stripWorktreeSelectorPrefix(in.Worktree)
+		if _, err := gitClient.ForceDeleteBranch(ctx, &gitgatewayv1.ForceDeleteBranchRequest{WorktreeId: worktreeID, Branch: in.BranchName}); err != nil {
 			return nil, err
 		}
 		return map[string]bool{"ok": true}, nil
@@ -158,6 +209,13 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 	})
 
 	r.Register("worktree.list", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// NOTE: ListWorktreesRequest is project-scoped only (no repo_id
+		// filter) — callers that send {repo, limit} instead of {projectId}
+		// (web-preload-api.ts's worktrees.list/listAllRuntimeWorktrees) hit a
+		// pre-existing, already-documented gap (see worktrees.ts's own
+		// "worktree.list's Go handler decodes only {projectId}" comment) this
+		// fix does not attempt to redesign; only the response's per-item
+		// shape is corrected here, matching worktree.create's reshaping.
 		type listArgs struct {
 			ProjectID string `json:"projectId"`
 		}
@@ -170,24 +228,39 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetWorktrees(), nil
+		protoWorktrees := resp.GetWorktrees()
+		views := make([]worktreeView, 0, len(protoWorktrees))
+		for _, w := range protoWorktrees {
+			views = append(views, worktreeViewFromProto(w))
+		}
+		// {worktrees: [...]} — every caller (web-preload-api.ts's list/
+		// listAllRuntimeWorktrees, worktrees.ts's legacy fallback) reads
+		// result.worktrees, not a bare array.
+		return map[string]any{"worktrees": views}, nil
 	})
 
 	r.Register("worktree.set", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// worktrees.ts always sends {worktree: "id:<uuid>", ...updates} —
+		// never "worktreeId". Only "active" is forwarded to
+		// SetWorktreeActivationRequest today; other metadata keys
+		// (displayName/comment/pushTarget/... from updateMeta's rpcUpdates
+		// spread) are decoded here but not yet persisted — a known,
+		// pre-existing gap in this RPC's scope, not introduced by this fix.
 		type setArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			Active     bool   `json:"active"`
+			Worktree string `json:"worktree"`
+			Active   bool   `json:"active"`
 		}
 		in, err := decodeArg[setArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		resp, err := projectClient.SetWorktreeActivation(ctx, &projectv1.SetWorktreeActivationRequest{WorktreeId: in.WorktreeID, Active: in.Active})
+		worktreeID := stripWorktreeSelectorPrefix(in.Worktree)
+		resp, err := projectClient.SetWorktreeActivation(ctx, &projectv1.SetWorktreeActivationRequest{WorktreeId: worktreeID, Active: in.Active})
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetWorktree(), nil
+		return map[string]any{"worktree": worktreeViewFromProto(resp.GetWorktree())}, nil
 	})
 
 	// worktree.detectedList — the one aggregation. Parallel calls, merged
@@ -285,6 +358,59 @@ func toWorktreeLineageView(e *projectv1.WorktreeLineageEntry) worktreeLineageVie
 		CreatedByTerminalHandle:  e.CreatedByTerminalHandle,
 		CreatedAt:                e.GetCreatedAtUnixMs(),
 	}
+}
+
+// worktreeView is the wire shape worktree.create/worktree.list/worktree.set
+// return — mirrors frontend/src/shared/types.ts's rich client Worktree type.
+// git-gateway-service's CreateWorktreeResponse and project-service's Worktree
+// proto message both carry far fewer fields than the client type requires;
+// every field this backend has no data source for yet gets the same safe
+// default detectedWorktreeView below already established.
+type worktreeView struct {
+	ID                string  `json:"id"`
+	RepoID            string  `json:"repoId"`
+	ProjectID         string  `json:"projectId,omitempty"`
+	DisplayName       string  `json:"displayName"`
+	Comment           string  `json:"comment"`
+	LinkedIssue       *int32  `json:"linkedIssue"`
+	LinkedPR          *int32  `json:"linkedPR"`
+	LinkedLinearIssue *string `json:"linkedLinearIssue"`
+	IsArchived        bool    `json:"isArchived"`
+	IsUnread          bool    `json:"isUnread"`
+	IsPinned          bool    `json:"isPinned"`
+	SortOrder         int32   `json:"sortOrder"`
+	LastActivityAt    int64   `json:"lastActivityAt"`
+	CreatedAt         int64   `json:"createdAt,omitempty"`
+	Path              string  `json:"path"`
+	Head              string  `json:"head"`
+	Branch            string  `json:"branch"`
+	IsBare            bool    `json:"isBare"`
+	IsMainWorktree    bool    `json:"isMainWorktree"`
+}
+
+// worktreeViewFromProto reshapes project-service's raw Worktree proto
+// message (worktree.list/worktree.set's response) into the client's rich
+// shape — same treatment worktree.create's response gets, just from a
+// different source message.
+func worktreeViewFromProto(w *projectv1.Worktree) worktreeView {
+	return worktreeView{
+		ID:             w.GetId(),
+		RepoID:         w.GetRepoId(),
+		ProjectID:      w.GetProjectId(),
+		DisplayName:    displayNameForDetectedWorktree(w.GetBranch(), w.GetPath()),
+		Path:           w.GetPath(),
+		Branch:         w.GetBranch(),
+		LastActivityAt: w.GetCreatedAtUnixMs(),
+		CreatedAt:      w.GetCreatedAtUnixMs(),
+	}
+}
+
+// stripWorktreeSelectorPrefix undoes toRuntimeWorktreeSelector's "id:" prefix
+// convention (frontend/src/renderer/src/runtime/runtime-worktree-selector.ts)
+// — every real caller of worktree.set/rm/forceDeleteBranch sends a
+// "worktree" arg through that selector, always "id:"-prefixed.
+func stripWorktreeSelectorPrefix(selector string) string {
+	return strings.TrimPrefix(selector, "id:")
 }
 
 // nonEmptyPtr returns nil for an empty string, else a pointer to it — every

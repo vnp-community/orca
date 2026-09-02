@@ -33,6 +33,33 @@ func TestCreateWorktree_HappyPath(t *testing.T) {
 	}
 }
 
+// TestCreateWorktree_UsesRepoProjectIDNotWireProjectID locks in that
+// RecordWorktreeCreated is bookkept under the repo's OWN project (resolved
+// via GetRepo), not the wire's CreateWorktreeInput.ProjectID — no real
+// caller (wscompat's worktree.create) ever sends project_id on this RPC, so
+// trusting the wire field silently recorded every worktree under an empty
+// project id.
+func TestCreateWorktree_UsesRepoProjectIDNotWireProjectID(t *testing.T) {
+	reachability := &fakeDevServerReachability{}
+	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{
+		getRepoResult:       domain.RepoInfo{URL: "/repo", ProjectID: "proj-from-repo"},
+		recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"},
+	}
+	uc := NewCreateWorktree(reachability, projects, local, relay)
+
+	// ProjectID deliberately left empty on the input, matching every real
+	// caller (wscompat's worktree.create never decodes/sends it).
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if projects.gotRecordCreatedProject != "proj-from-repo" {
+		t.Errorf("expected RecordWorktreeCreated to use the repo's own project id, got %q", projects.gotRecordCreatedProject)
+	}
+}
+
 func TestCreateWorktree_ThreadsLineageThroughToRecordWorktreeCreated(t *testing.T) {
 	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}

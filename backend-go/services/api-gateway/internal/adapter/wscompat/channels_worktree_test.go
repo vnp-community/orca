@@ -98,6 +98,11 @@ func (f *fakeProjectServiceClient) SetWorktreeActivation(ctx context.Context, in
 	return f.setWorktreeActivationFunc(ctx, in)
 }
 
+// TestWorktreeCreateChannel_Success uses the real frontend arg shape —
+// {repo, name, baseBranch} (worktrees.ts's createWorktree/web-preload-api.ts's
+// worktrees.create) — never {projectId, repoId, branch, baseRef}, which
+// nothing sends. project_id is no longer part of the wire contract at all:
+// CreateWorktree.Execute resolves it server-side from the repo.
 func TestWorktreeCreateChannel_Success(t *testing.T) {
 	var gotReq *gitgatewayv1.CreateWorktreeRequest
 	git := &fakeGitGatewayServiceClient{
@@ -111,16 +116,50 @@ func TestWorktreeCreateChannel_Success(t *testing.T) {
 	registerWorktreeChannels(r, git, project)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.create",
-		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1", "branch": "feature", "baseRef": "main"}))
+		argsJSON(t, map[string]any{"repo": "repo-1", "name": "feature", "baseBranch": "main"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotReq.GetProjectId() != "proj-1" || gotReq.GetRepoId() != "repo-1" || gotReq.GetBranch() != "feature" || gotReq.GetBaseRef() != "main" {
+	if gotReq.GetRepoId() != "repo-1" || gotReq.GetBranch() != "feature" || gotReq.GetBaseRef() != "main" {
 		t.Errorf("unexpected request: %+v", gotReq)
 	}
-	resp, ok := result.(*gitgatewayv1.CreateWorktreeResponse)
-	if !ok || resp.GetWorktreeId() != "wt-1" || resp.GetPath() != "/repo-feature" || resp.GetHeadSha() != "sha1" {
-		t.Errorf("expected response to be returned unmodified, got %+v", result)
+	out, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected a map[string]any result, got %T", result)
+	}
+	wt, ok := out["worktree"].(worktreeView)
+	if !ok || wt.ID != "wt-1" || wt.Path != "/repo-feature" || wt.Head != "sha1" || wt.Branch != "feature" || wt.RepoID != "repo-1" {
+		t.Errorf("expected a fully-shaped {worktree: {...}} response, got %+v", result)
+	}
+}
+
+// TestWorktreeCreateChannel_BranchNameOverrideWins mirrors worktrees.ts's own
+// retry-name-conflict loop: branchNameOverride, when present, is the git
+// branch name — not name.
+func TestWorktreeCreateChannel_BranchNameOverrideWins(t *testing.T) {
+	var gotReq *gitgatewayv1.CreateWorktreeRequest
+	git := &fakeGitGatewayServiceClient{
+		createWorktreeFunc: func(_ context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "wt-1", Path: "/repo-feature"}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.create",
+		argsJSON(t, map[string]any{"repo": "repo-1", "name": "worktree-name", "baseBranch": "main", "branchNameOverride": "pr-123"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetBranch() != "pr-123" {
+		t.Errorf("expected branchNameOverride to win over name, got branch=%q", gotReq.GetBranch())
+	}
+	out := result.(map[string]any)
+	wt := out["worktree"].(worktreeView)
+	if wt.Branch != "pr-123" {
+		t.Errorf("expected response branch to reflect the override, got %+v", wt)
 	}
 }
 
@@ -138,7 +177,7 @@ func TestWorktreeCreateChannel_ThreadsOptionalLineageArgs(t *testing.T) {
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.create",
 		argsJSON(t, map[string]any{
-			"projectId": "proj-1", "repoId": "repo-1", "branch": "feature", "baseRef": "main",
+			"repo": "repo-1", "name": "feature", "baseBranch": "main",
 			"parentWorktreeId": "wt-1", "origin": "orchestration", "taskId": "task_abc123",
 		}))
 	if err != nil {
@@ -165,7 +204,7 @@ func TestWorktreeCreateChannel_NoLineageArgsMeansNilFields(t *testing.T) {
 	registerWorktreeChannels(r, git, project)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.create",
-		argsJSON(t, map[string]any{"projectId": "proj-1", "repoId": "repo-1", "branch": "feature", "baseRef": "main"}))
+		argsJSON(t, map[string]any{"repo": "repo-1", "name": "feature", "baseBranch": "main"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -234,7 +273,7 @@ func TestWorktreeRmChannel_Success(t *testing.T) {
 	registerWorktreeChannels(r, git, project)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.rm",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "force": true}))
+		argsJSON(t, map[string]any{"worktree": "id:wt-1", "force": true}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -259,7 +298,7 @@ func TestWorktreeForceDeleteBranchChannel_Success(t *testing.T) {
 	registerWorktreeChannels(r, git, project)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.forceDeleteBranch",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature"}))
+		argsJSON(t, map[string]any{"worktree": "id:wt-1", "branchName": "feature", "expectedHead": "sha1"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -358,7 +397,7 @@ func TestWorktreeListChannel_CallsProjectClientNotGitClient(t *testing.T) {
 	project := &fakeProjectServiceClient{
 		listWorktreesFunc: func(_ context.Context, in *projectv1.ListWorktreesRequest) (*projectv1.ListWorktreesResponse, error) {
 			gotReq = in
-			return &projectv1.ListWorktreesResponse{Worktrees: []*projectv1.Worktree{{Id: "wt-1", Path: "/repo-feature"}}}, nil
+			return &projectv1.ListWorktreesResponse{Worktrees: []*projectv1.Worktree{{Id: "wt-1", RepoId: "repo-1", Path: "/repo-feature", Branch: "feature"}}}, nil
 		},
 	}
 	r := NewRegistry()
@@ -378,8 +417,12 @@ func TestWorktreeListChannel_CallsProjectClientNotGitClient(t *testing.T) {
 	if git.calledCreateWorktree || git.calledRemoveWorktree || git.calledDetectWorktrees {
 		t.Error("expected gitClient NOT to be involved in worktree.list")
 	}
-	worktrees, ok := result.([]*projectv1.Worktree)
-	if !ok || len(worktrees) != 1 || worktrees[0].GetId() != "wt-1" {
+	out, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected a map[string]any result (caller reads result.worktrees), got %T", result)
+	}
+	worktrees, ok := out["worktrees"].([]worktreeView)
+	if !ok || len(worktrees) != 1 || worktrees[0].ID != "wt-1" || worktrees[0].RepoID != "repo-1" || worktrees[0].Branch != "feature" {
 		t.Errorf("unexpected result: %+v", result)
 	}
 }
@@ -399,12 +442,12 @@ func TestWorktreeSetChannel_CallsProjectClientNotGitClient(t *testing.T) {
 	registerWorktreeChannels(r, git, project)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.set",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "active": true}))
+		argsJSON(t, map[string]any{"worktree": "id:wt-1", "active": true}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotReq.GetWorktreeId() != "wt-1" || !gotReq.GetActive() {
-		t.Errorf("unexpected request: %+v", gotReq)
+		t.Errorf("unexpected request: %+v (expected the id: prefix stripped)", gotReq)
 	}
 	if !project.calledSetWorktreeActivation {
 		t.Error("expected projectClient.SetWorktreeActivation to be called")
@@ -412,8 +455,12 @@ func TestWorktreeSetChannel_CallsProjectClientNotGitClient(t *testing.T) {
 	if git.calledCreateWorktree || git.calledRemoveWorktree || git.calledDetectWorktrees {
 		t.Error("expected gitClient NOT to be involved in worktree.set")
 	}
-	wt, ok := result.(*projectv1.Worktree)
-	if !ok || !wt.GetActive() {
+	out, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("expected a map[string]any result (caller reads result.worktree), got %T", result)
+	}
+	wt, ok := out["worktree"].(worktreeView)
+	if !ok || wt.ID != "wt-1" {
 		t.Errorf("unexpected result: %+v", result)
 	}
 }

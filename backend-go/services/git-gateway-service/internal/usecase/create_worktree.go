@@ -58,7 +58,11 @@ func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (
 		return domain.WorktreeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_CREATE_FAILED", "git worktree add failed", err)
 	}
 
-	worktree, err := uc.projects.RecordWorktreeCreated(ctx, in.ProjectID, in.RepoID, result.Path, in.Branch, in.Lineage)
+	// repo.ProjectID (resolved server-side via GetRepo above), not the wire's
+	// in.ProjectID: no real caller ever sends project_id on this RPC (the
+	// frontend's worktree.create only ever sends repo/name/baseBranch), so
+	// trusting it left bookkeeping recorded under an empty project id.
+	worktree, err := uc.projects.RecordWorktreeCreated(ctx, repo.ProjectID, in.RepoID, result.Path, in.Branch, in.Lineage)
 	if err != nil {
 		// Compensating step (05-data-architecture.md's saga pattern) — the
 		// git op already succeeded; project-service has no record of it.
