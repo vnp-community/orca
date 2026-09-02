@@ -870,3 +870,67 @@ func TestRelayExecutor_ImplementsFilesystemExecutorNotLocalOnly(t *testing.T) {
 	// verify section.
 	var _ usecase.FilesystemExecutor = (*RelayExecutor)(nil)
 }
+
+// ── v5.0 dotted-method-name/contract fix: the real agent's
+// agent-rpc-dispatch.ts registers these under "git.worktree.list"/
+// "git.worktree.remove" (a "v5.0" update, per its own inline comments),
+// not the stale camelCase "git.worktreeList"/"git.worktreeRemove" this
+// package called before this fix — live-reproduced as WORKTREE_DETECT_FAILED
+// on b15.openledger.vn for a genuinely-reachable dev server. ──
+
+func TestRelayExecutor_ListWorktreePaths_SendsCwdAndParsesWorktreesShape(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"worktrees": []map[string]any{
+			{"path": "/repo", "head": "abc123", "branch": "main"},
+			{"path": "/repo/.worktrees/feature", "head": "def456", "branch": "feature"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	infos, err := r.ListWorktreePaths(ctxWithTenant(t), "/repo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.worktree.list" {
+		t.Errorf("expected method=git.worktree.list, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["cwd"] != "/repo" {
+		t.Errorf("expected cwd param (agent-git-handler.ts's handleGitWorktreeList reads params.cwd, not params.repoPath), got %+v", params)
+	}
+	if len(infos) != 2 {
+		t.Fatalf("want 2 worktrees, got %d", len(infos))
+	}
+	if infos[0].Path != "/repo" || infos[0].Head != "abc123" || infos[0].Branch != "main" {
+		t.Errorf("unexpected worktree[0]: %+v", infos[0])
+	}
+	if infos[1].Path != "/repo/.worktrees/feature" || infos[1].Head != "def456" || infos[1].Branch != "feature" {
+		t.Errorf("unexpected worktree[1]: %+v", infos[1])
+	}
+}
+
+func TestRelayExecutor_RemoveWorktree_SendsPathAndForce(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: "{}"}}
+	r := NewRelayExecutor(fake)
+
+	if err := r.RemoveWorktree(ctxWithTenant(t), "/repo/.worktrees/feature", true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.worktree.remove" {
+		t.Errorf("expected method=git.worktree.remove, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["path"] != "/repo/.worktrees/feature" || params["force"] != true {
+		t.Errorf("expected path+force params (agent-git-handler.ts's handleGitWorktreeRemove reads params.path, not params.worktreePath), got %+v", params)
+	}
+}

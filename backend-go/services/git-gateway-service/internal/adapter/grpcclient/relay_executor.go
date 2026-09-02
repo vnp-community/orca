@@ -508,9 +508,18 @@ func (r *RelayExecutor) ScanSetupScriptImports(ctx context.Context, repoPath str
 	return result.ImportedPaths, err
 }
 
+// Method name and param key fixed to match the agent's real
+// git.worktree.remove handler (agent-git-handler.ts's handleGitWorktreeRemove
+// reads params.path, not params.worktreePath) — same v5.0 dotted-name/
+// contract drift as ListWorktreePaths's own fix, see that method's doc
+// comment for the full context. CreateWorktree below has the same
+// dotted-name mismatch but ALSO needs the new worktree's target path
+// computed (the agent's git.worktree.add wants an explicit "path", which
+// this call site never derives today) — left as a separate, still-open gap,
+// not fixed in this pass.
 func (r *RelayExecutor) RemoveWorktree(ctx context.Context, worktreePath string, force bool) error {
-	return r.relay(ctx, worktreePath, "git.worktreeRemove", map[string]any{
-		"worktreePath": worktreePath, "force": force,
+	return r.relay(ctx, worktreePath, "git.worktree.remove", map[string]any{
+		"path": worktreePath, "force": force,
 	}, nil)
 }
 
@@ -524,26 +533,36 @@ func (r *RelayExecutor) FetchAndResolveRef(ctx context.Context, repoPath, ref st
 	return result.SHA, err
 }
 
-// ListWorktreePaths: KNOWN GAP, not a new one this method introduces — the
-// real Dev Server Agent has no `git.worktreeList` method at all (confirmed
-// against agent/src/relay/*.ts; only test fixtures reference the name),
-// so this relay call already fails for any genuinely relay-connected dev
-// server, same as before. Kept returning bare paths with no Head/Branch
-// (that data isn't available without a working agent method to ask) —
-// enriching this is that pre-existing gap's own fix, not this one's.
+// ListWorktreePaths: the previously-documented "agent has no git.worktreeList
+// method at all" gap was stale — agent-rpc-dispatch.ts's v5.0 pass added a
+// real handler, just under a dotted method name (git.worktree.list, matching
+// its git.worktree.add/git.worktree.remove siblings) and a different
+// contract than this call originally assumed: the param is "cwd" (the
+// directory `git worktree list` runs from), not "repoPath", and the
+// response is {worktrees: [{path, head, branch, ...}]} (agent-git-handler.ts's
+// handleGitWorktreeList, backed by the same parseWorktreePorcelain this
+// service's own local executor.go uses) — not a bare {paths: string[]}.
+// Live-reproduced as WORKTREE_DETECT_FAILED for a genuinely-connected,
+// genuinely-reachable dev server once dispatchExecutorForRepo started
+// actually routing here (see PollFleetHealth's own commit message for why
+// that routing itself was previously dead).
 func (r *RelayExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]domain.WorktreeGitInfo, error) {
 	var result struct {
-		Paths []string `json:"paths"`
+		Worktrees []struct {
+			Path   string `json:"path"`
+			Head   string `json:"head"`
+			Branch string `json:"branch"`
+		} `json:"worktrees"`
 	}
-	err := r.relay(ctx, repoPath, "git.worktreeList", map[string]any{
-		"repoPath": repoPath,
+	err := r.relay(ctx, repoPath, "git.worktree.list", map[string]any{
+		"cwd": repoPath,
 	}, &result)
 	if err != nil {
 		return nil, err
 	}
-	infos := make([]domain.WorktreeGitInfo, 0, len(result.Paths))
-	for _, p := range result.Paths {
-		infos = append(infos, domain.WorktreeGitInfo{Path: p})
+	infos := make([]domain.WorktreeGitInfo, 0, len(result.Worktrees))
+	for _, w := range result.Worktrees {
+		infos = append(infos, domain.WorktreeGitInfo{Path: w.Path, Head: w.Head, Branch: w.Branch})
 	}
 	return infos, nil
 }
