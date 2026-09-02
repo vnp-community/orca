@@ -670,6 +670,47 @@ describe('createRemoteRuntimePtyTransport', () => {
     )
   })
 
+  // Why: regression guard for a live bug found right after the one above —
+  // the JSON fallback's sendInput/claimViewport are permanent no-op stubs
+  // (see remote-runtime-terminal-json-subscribe.ts's own doc comment), so
+  // its first claim-resize latches pendingViewportClaim true forever (it
+  // only clears on an actual resubscribe, which a single-generation session
+  // never hits). Before the fix, every keystroke after that point silently
+  // queued into pendingClaimInput instead of reaching terminal.send —
+  // reproduced live on b15.openledger.vn: a terminal that opens and shows
+  // its prompt but accepts no typed input at all.
+  it('still sends typed input via terminal.send for session-auth after a claim-resize', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('session-auth', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+    runtimeCall.mockClear()
+
+    vi.useFakeTimers()
+    try {
+      // Mirrors forwardPtyResize's routine claim-resize on the first
+      // xterm.onResize during normal pane mount/fit — no special mode
+      // needed to trigger it.
+      transport.resize(80, 24, { claim: true })
+
+      expect(transport.sendInput('x')).toBe(true)
+      vi.advanceTimersByTime(8)
+
+      expect(runtimeCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'terminal.send',
+          params: expect.objectContaining({ text: 'x' })
+        })
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('does not send queued input through a stale stream during remote handle replacement', async () => {
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
     const transport = createRemoteRuntimePtyTransport('env-1', {

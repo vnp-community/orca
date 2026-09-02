@@ -464,7 +464,20 @@ export function createRemoteRuntimePtyTransport(
     if (stream?.sendInput(text)) {
       return
     }
-    if (pendingViewportClaim) {
+    // Why !getCurrentMultiplexedStream(targetHandle): pendingViewportClaim
+    // alone is not a safe hold condition — the JSON/session-auth fallback
+    // transport (remote-runtime-terminal-json-subscribe.ts) has a permanent
+    // stream record whose sendInput/claimViewport are deliberate no-op stubs
+    // (that transport has no persistent input channel; callers always fall
+    // back to terminal.send below), so its first claim-resize latches
+    // pendingViewportClaim true forever — it only clears on an actual
+    // resubscribe, which this transport's single generation-1 session never
+    // hits. Without this guard, every keystroke silently queues into
+    // pendingClaimInput and never reaches terminal.send — live-reproduced:
+    // a fresh b15.openledger.vn terminal that opens fine but accepts no
+    // typed input. Mirrors sendInputAcceptedToRuntime's existing, correct
+    // guard (only hold input while truly no stream record exists yet).
+    if (pendingViewportClaim && !getCurrentMultiplexedStream(targetHandle)) {
       // Why: a claim during subscribe/reconnect has no stream record to own
       // yet. Hold its input until the stream can emit claim+input in one order.
       pendingClaimInput += text
@@ -775,8 +788,19 @@ export function createRemoteRuntimePtyTransport(
       pendingViewportClaim = false
       const queuedInput = pendingClaimInput
       pendingClaimInput = ''
-      if (queuedInput) {
-        nextStream.sendInput(queuedInput)
+      // Why the terminal.send fallback: nextStream.sendInput can legitimately
+      // be a permanent no-op (the JSON/session-auth fallback transport, see
+      // this file's other pendingViewportClaim guard comment) — input queued
+      // during the brief pre-subscribe window must still reach the wire.
+      if (queuedInput && !nextStream.sendInput(queuedInput)) {
+        void callRuntime('terminal.send', {
+          terminal: subscribedHandle,
+          text: queuedInput,
+          client: { id: clientId, type: 'desktop' },
+          ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
+        }).catch((error) => {
+          handleRemoteTerminalError(error)
+        })
       }
       for (const resolve of viewportClaimReadyWaiters) {
         resolve(true)
@@ -1038,7 +1062,11 @@ export function createRemoteRuntimePtyTransport(
       if (stream?.sendInput(text)) {
         return true
       }
-      if (pendingViewportClaim) {
+      // Why !getCurrentMultiplexedStream(targetHandle): same fix as the
+      // inputBatcher flush callback above — see its comment for the full
+      // reasoning (stuck pendingViewportClaim latch on the JSON/session-auth
+      // fallback transport).
+      if (pendingViewportClaim && !getCurrentMultiplexedStream(targetHandle)) {
         pendingClaimInput += text
         return true
       }
