@@ -25,9 +25,16 @@ import type { OrcaProject } from '../../types/workspace-types'
 // this is a narrower view of the same OrcaProject shape for the picker list.
 type OrcaProjectListItem = Pick<OrcaProject, 'id' | 'name' | 'devServerId'>
 
+type DevServerOption = { id: string; name: string }
+
 export function ProjectSwitcher() {
   const { project, switchProject, isInitializing } = useWorkspace()
   const [projects, setProjects] = useState<OrcaProjectListItem[]>([])
+  // Why: devServerId is a raw uuid (infra.dev_servers.id), not a display
+  // label — was rendered verbatim in the list (looked like "showing IDs
+  // instead of names"). Resolve it to devServer.list's own human label
+  // (e.g. "dev-01") the same way ProjectDevServerSection already does.
+  const [devServerNames, setDevServerNames] = useState<Record<string, string>>({})
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -44,6 +51,12 @@ export function ProjectSwitcher() {
   // fetch the real OrcaProject list from the backend instead of reading that field.
   useEffect(() => {
     void refetchProjects()
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    callRuntimeRpc<DevServerOption[]>(target, 'devServer.list', null)
+      .then((list) =>
+        setDevServerNames(Object.fromEntries((list ?? []).map((d) => [d.id, d.name])))
+      )
+      .catch(() => setDevServerNames({}))
   }, [])
 
   const filtered = projects.filter((p) => p.name.toLowerCase().includes(search.toLowerCase()))
@@ -69,7 +82,11 @@ export function ProjectSwitcher() {
           </Button>
         </PopoverTrigger>
         <PopoverContent className="w-72 p-0" align="start">
-          <Command>
+          {/* shouldFilter=false: this component already filters `filtered` by
+              p.name (below) — cmdk's own default filter matches against
+              CommandItem's value (p.id, a uuid), which can hide/reorder rows
+              whose id doesn't fuzzy-match a name-based query. */}
+          <Command shouldFilter={false}>
             <CommandInput
               placeholder="Search projects..."
               value={search}
@@ -95,9 +112,11 @@ export function ProjectSwitcher() {
                       size={14}
                     />
                     <span className="truncate">{p.name}</span>
-                    <span className="ml-auto text-xs text-muted-foreground shrink-0">
-                      {p.devServerId}
-                    </span>
+                    {p.devServerId && (
+                      <span className="ml-auto text-xs text-muted-foreground shrink-0">
+                        {devServerNames[p.devServerId] ?? p.devServerId}
+                      </span>
+                    )}
                   </CommandItem>
                 ))}
               </CommandGroup>

@@ -105,10 +105,15 @@ describe('ProjectSwitcher', () => {
       switchProject,
       isInitializing: false
     } as MockWorkspace)
-    vi.mocked(callRuntimeRpc).mockResolvedValue([
-      { id: 'p1', name: 'Test Project 1', devServerId: 'local' },
-      { id: 'p2', name: 'Test Project 2', devServerId: 'remote' }
-    ])
+    vi.mocked(callRuntimeRpc).mockImplementation((_target, channel: string) => {
+      if (channel === 'devServer.list') {
+        return Promise.resolve([{ id: 'remote', name: 'dev-01' }])
+      }
+      return Promise.resolve([
+        { id: 'p1', name: 'Test Project 1', devServerId: 'local' },
+        { id: 'p2', name: 'Test Project 2', devServerId: 'remote' }
+      ])
+    })
   })
 
   afterEach(cleanup)
@@ -130,6 +135,19 @@ describe('ProjectSwitcher', () => {
       render(<ProjectSwitcher />)
     })
     expect(screen.getByTestId('command-list')).toHaveTextContent('Test Project 2')
+  })
+
+  // Regression guard: the list used to render p.devServerId (a raw uuid)
+  // verbatim next to each project name — resolved to devServer.list's own
+  // human label instead.
+  it("resolves devServerId to the dev server's name via devServer.list", async () => {
+    await act(async () => {
+      render(<ProjectSwitcher />)
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('command-list')).toHaveTextContent('dev-01')
+    })
+    expect(screen.getByTestId('command-list')).not.toHaveTextContent('remote')
   })
 
   it('calls switchProject(id) when project item clicked', async () => {
