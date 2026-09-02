@@ -7,6 +7,7 @@ import type {
   RepoHookSettings
 } from '../../../../shared/types'
 import { getRepoKindLabel, isFolderRepo } from '../../../../shared/repo-kind'
+import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { Separator } from '../ui/separator'
@@ -356,14 +357,18 @@ export function RepositoryPane({
     (forceFullPaneForRepoMatch || matchesSettingsSearch(searchQuery, symlinkEntries)) ? (
       <WorktreeSymlinksSection key="symlinks" repo={repo} updateRepo={updateRepo} />
     ) : null,
-    // Why !repo.connectionId: sparse-checkout presets only take effect on
-    // local worktree creation (useComposerState.ts's own "Sparse checkout is
-    // only supported for local repos right now" gate) — a dev-server-bound
-    // repo has no backend-go support for this yet (sparsePresets.list has no
-    // channel registered at all), so rendering this section here just fired
-    // a guaranteed-failing RPC on every Settings visit for such a repo.
+    // Why getRepoExecutionHostId === local, not just !repo.connectionId:
+    // sparse-checkout presets only take effect on local worktree creation
+    // (useComposerState.ts's own "Sparse checkout is only supported for
+    // local repos right now" gate) — a dev-server-bound repo has no
+    // backend-go support for this yet (sparsePresets.list has no channel
+    // registered at all), so rendering this section here just fired a
+    // guaranteed-failing RPC on every Settings visit for such a repo.
+    // repo.connectionId alone (an SSH target id) misses repos bound via
+    // repo.devServerId instead — confirmed live: a devServerId-bound repo
+    // has connectionId === null, so that check never actually gated it.
     !isFolder &&
-    !repo.connectionId &&
+    getRepoExecutionHostId(repo) === LOCAL_EXECUTION_HOST_ID &&
     (forceFullPaneForRepoMatch || matchesSettingsSearch(searchQuery, sparsePresetEntries)) ? (
       <SparsePresetSettingsSection key="sparse-presets" repoId={repo.id} />
     ) : null,
