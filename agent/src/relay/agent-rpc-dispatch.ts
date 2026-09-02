@@ -763,6 +763,19 @@ async function route(
       }
     }
 
+    // ── host.capabilities ────────────────────────────────────────────────────
+    // TASK-070: relayed by infra-fleet-service's GetHostCapabilities usecase.
+    // See get_host_capabilities.go's doc comment for the full gap this closes.
+    case 'host.capabilities': {
+      try {
+        const { handleHostCapabilities } = await import('./agent-preflight-handler')
+        return (await handleHostCapabilities(rpc.id)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `host.capabilities unavailable: ${msg}`)
+      }
+    }
+
     // ─── cli.* (Orca ADR — server-mode CLI install on Dev Server) ───────────
     // Backend relays cli.* to the Dev Server Agent instead of running it on
     // the Orca backend container — see backend/src/main/runtime/rpc/methods/cli.ts

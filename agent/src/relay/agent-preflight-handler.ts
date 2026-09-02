@@ -150,6 +150,36 @@ export async function handleDetectWindowsTerminalCapabilities(
   }
 }
 
+// ─── host.capabilities ───────────────────────────────────────────────────────
+// TASK-070: relayed by infra-fleet-service's GetHostCapabilities usecase
+// (backend-go/services/infra-fleet-service/internal/usecase/get_host_capabilities.go)
+// via DevServerAgentClient.Exec(ctx, devServer, "host.capabilities", nil). Reuses
+// the same WSL/pwsh/git-bash probes as preflight.detectWindowsTerminalCapabilities
+// above, but returns only the 4 fields decodeHostCapabilities reads — no
+// pwshVersion/gitBashPath enrichment, since this method's only consumer ignores them.
+
+export async function handleHostCapabilities(id: string | number | null): Promise<object> {
+  const span = preflightTracer.start({ method: 'host.capabilities' })
+  const [wslAvailable, pwshResult, gitBashResult] = await Promise.all([
+    Promise.resolve(isWslAvailable()).catch(() => false),
+    checkPwsh(),
+    checkGitBash()
+  ])
+  const wslDistros =
+    wslAvailable === true ? await Promise.resolve(listWslDistros()).catch(() => []) : []
+
+  span.ok({ wslAvailable, pwshAvailable: pwshResult.pwshAvailable })
+  return {
+    jsonrpc: '2.0', id,
+    result: {
+      wslAvailable: wslAvailable === true,
+      wslDistros,
+      pwshAvailable: pwshResult.pwshAvailable,
+      gitBashAvailable: gitBashResult.gitBashAvailable
+    }
+  }
+}
+
 // ─── preflight.detectGhosttyConfig ──────────────────────────────────────────
 
 export async function handleDetectGhosttyConfig(id: string | number | null): Promise<object> {
