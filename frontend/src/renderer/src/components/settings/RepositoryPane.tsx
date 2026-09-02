@@ -356,7 +356,14 @@ export function RepositoryPane({
     (forceFullPaneForRepoMatch || matchesSettingsSearch(searchQuery, symlinkEntries)) ? (
       <WorktreeSymlinksSection key="symlinks" repo={repo} updateRepo={updateRepo} />
     ) : null,
+    // Why !repo.connectionId: sparse-checkout presets only take effect on
+    // local worktree creation (useComposerState.ts's own "Sparse checkout is
+    // only supported for local repos right now" gate) — a dev-server-bound
+    // repo has no backend-go support for this yet (sparsePresets.list has no
+    // channel registered at all), so rendering this section here just fired
+    // a guaranteed-failing RPC on every Settings visit for such a repo.
     !isFolder &&
+    !repo.connectionId &&
     (forceFullPaneForRepoMatch || matchesSettingsSearch(searchQuery, sparsePresetEntries)) ? (
       <SparsePresetSettingsSection key="sparse-presets" repoId={repo.id} />
     ) : null,
