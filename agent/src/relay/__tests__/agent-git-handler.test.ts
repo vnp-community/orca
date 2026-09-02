@@ -11,6 +11,8 @@ import {
   handleGitWorktreeList,
   handleGitWorktreeAdd,
   handleGitWorktreeRemove,
+  handleGitBaseRefDefault,
+  handleGitSearchRefs,
 } from '../agent-git-handler'
 import { setConnectionGitIdentity } from '../git-identity-registry'
 import { registerTraceSink, type TraceEvent } from '../../shared/trace'
@@ -179,6 +181,69 @@ describe('handleGitWorktreeList', () => {
   it('result or error is always set', async () => {
     const resp = await handleGitWorktreeList(1, {}, mockConfig, mockLog) as any
     expect(resp.result ?? resp.error).toBeDefined()
+  })
+})
+
+// ─── handleGitBaseRefDefault / handleGitSearchRefs — backfilled gap
+// (RelayExecutor.BaseRefDefault/SearchRefs have always called these method
+// names; the agent never had a handler for either — see agent-git-handler.ts's
+// doc comment on these two handlers) ──────────────────────────────────────────
+describe('handleGitBaseRefDefault', () => {
+  let repoDir: string
+
+  beforeEach(() => {
+    repoDir = mkdtempSync(join(tmpdir(), 'base-ref-default-test-'))
+    execSync('git init -q', { cwd: repoDir })
+    // No real remote needed to exercise this — refs/remotes/origin/HEAD is
+    // just a ref, settable directly, matching what a real `git clone` leaves
+    // behind without this test needing a live remote to fetch from.
+    execSync('git symbolic-ref refs/remotes/origin/HEAD refs/remotes/origin/main', { cwd: repoDir })
+  })
+
+  afterEach(() => {
+    rmSync(repoDir, { recursive: true, force: true })
+  })
+
+  it('resolves the short branch name from refs/remotes/origin/HEAD', async () => {
+    const resp = await handleGitBaseRefDefault(1, { repoPath: repoDir }, mockConfig, mockLog) as any
+    expect(resp.result?.ref).toBe('main')
+  })
+
+  it('returns an error, not a crash, when there is no origin/HEAD ref', async () => {
+    const bareDir = mkdtempSync(join(tmpdir(), 'base-ref-default-bare-'))
+    execSync('git init -q', { cwd: bareDir })
+    try {
+      const resp = await handleGitBaseRefDefault(1, { repoPath: bareDir }, mockConfig, mockLog) as any
+      expect(resp.error).toBeDefined()
+    } finally {
+      rmSync(bareDir, { recursive: true, force: true })
+    }
+  })
+})
+
+describe('handleGitSearchRefs', () => {
+  let repoDir: string
+
+  beforeEach(() => {
+    repoDir = mkdtempSync(join(tmpdir(), 'search-refs-test-'))
+    execSync('git init -q -b main', { cwd: repoDir })
+    execSync('git commit --allow-empty -q -m init', { cwd: repoDir })
+    execSync('git branch feature/login', { cwd: repoDir })
+    execSync('git branch feature/logout', { cwd: repoDir })
+  })
+
+  afterEach(() => {
+    rmSync(repoDir, { recursive: true, force: true })
+  })
+
+  it('returns every ref when query is empty', async () => {
+    const resp = await handleGitSearchRefs(1, { repoPath: repoDir, query: '' }, mockConfig, mockLog) as any
+    expect(resp.result?.refs).toEqual(expect.arrayContaining(['main', 'feature/login', 'feature/logout']))
+  })
+
+  it('substring-filters refs by query', async () => {
+    const resp = await handleGitSearchRefs(1, { repoPath: repoDir, query: 'log' }, mockConfig, mockLog) as any
+    expect(resp.result?.refs.sort()).toEqual(['feature/login', 'feature/logout'])
   })
 })
 

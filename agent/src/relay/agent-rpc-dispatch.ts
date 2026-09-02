@@ -878,6 +878,28 @@ async function route(
       }
     }
 
+    // ── git.baseRefDefault / git.searchRefs: backfilled gap, see
+    // agent-git-handler.ts's doc comment on these two handlers ──────────────
+    case 'git.baseRefDefault': {
+      try {
+        const { handleGitBaseRefDefault } = await import('./agent-git-handler')
+        return (await handleGitBaseRefDefault(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.baseRefDefault unavailable: ${msg}`)
+      }
+    }
+
+    case 'git.searchRefs': {
+      try {
+        const { handleGitSearchRefs } = await import('./agent-git-handler')
+        return (await handleGitSearchRefs(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `git.searchRefs unavailable: ${msg}`)
+      }
+    }
+
     // ── v5.0: git.worktree.add ───────────────────────────────────────────────
     case 'git.worktree.add': {
       try {
