@@ -78,6 +78,10 @@ func (f *fakeAdminAuthServiceClient) UpdateUserRole(ctx context.Context, in *aut
 	return nil, status.Error(codes.Unimplemented, "not used by this test")
 }
 
+func (f *fakeAdminAuthServiceClient) ListTenantMemberDirectory(ctx context.Context, in *authv1.ListTenantMemberDirectoryRequest, opts ...grpc.CallOption) (*authv1.ListTenantMemberDirectoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
 func (f *fakeAdminAuthServiceClient) RevokeSession(ctx context.Context, in *authv1.RevokeSessionRequest, opts ...grpc.CallOption) (*authv1.RevokeSessionResponse, error) {
 	if f.err != nil {
 		return nil, f.err

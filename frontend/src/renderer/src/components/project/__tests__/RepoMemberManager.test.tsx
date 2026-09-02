@@ -148,6 +148,9 @@ describe('RepoMemberManager', () => {
       if (method === 'repo.getMembers') {
         return []
       }
+      if (method === 'auth.listTenantMemberDirectory') {
+        return [{ id: 'dev-2', name: 'New Dev', email: 'dev-2@example.com' }]
+      }
       if (method === 'repo.addMember') {
         return { userId: 'dev-2', role: 'lead' }
       }

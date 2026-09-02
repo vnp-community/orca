@@ -36,6 +36,14 @@ service AuthService {
   rpc UpdateAccessPolicy(UpdateAccessPolicyRequest) returns (AccessPolicy);
   rpc DeleteAccessPolicy(DeleteAccessPolicyRequest) returns (google.protobuf.Empty);
   rpc GetAdminStats(GetAdminStatsRequest) returns (GetAdminStatsResponse);
+
+  // ListTenantMemberDirectory is the non-admin counterpart to ListUsers —
+  // any authenticated user may look up their OWN tenant's other members by
+  // name/email (member-picker UIs need this; ListUsers itself is
+  // admin-console-only). tenant_id/actor come from the caller's own
+  // identity, never a request field — there is deliberately no way to ask
+  // for another tenant's directory here.
+  rpc ListTenantMemberDirectory(ListTenantMemberDirectoryRequest) returns (ListTenantMemberDirectoryResponse);
 }
 
 enum Role {
@@ -128,6 +136,22 @@ message ListUsersRequest {
 message ListUsersResponse {
   repeated User users = 1;
   string next_page_token = 2;
+}
+
+// Deliberately empty — see ListTenantMemberDirectory's own doc comment on
+// the service definition for why tenant/actor are never request fields.
+message ListTenantMemberDirectoryRequest {}
+
+// TenantMemberDirectoryEntry is deliberately narrower than User (no role/
+// is_active/created_at) — this backs a member-picker, not an admin view.
+message TenantMemberDirectoryEntry {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+}
+
+message ListTenantMemberDirectoryResponse {
+  repeated TenantMemberDirectoryEntry members = 1;
 }
 
 message UpdateUserRoleRequest {

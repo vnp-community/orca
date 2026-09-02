@@ -159,6 +159,7 @@ func RegisterRealChannels(
 	registerTenantProjectChannels(r, tenantClient, projectClient)
 	registerWorkflowChannels(r, workflowClient)
 	registerAdminUserChannels(r, authClient, tenantClient)
+	registerAuthDirectoryChannels(r, authClient)
 }
 
 // ── annotation.* ────────────────────────────────────────────────────────

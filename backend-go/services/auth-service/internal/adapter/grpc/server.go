@@ -43,6 +43,8 @@ type Server struct {
 	updateAccessPolicy            *usecase.UpdateAccessPolicy
 	deleteAccessPolicy            *usecase.DeleteAccessPolicy
 	getAdminStats                 *usecase.GetAdminStats
+
+	listTenantMemberDirectory *usecase.ListTenantMemberDirectory
 }
 
 func New(
@@ -66,6 +68,7 @@ func New(
 	updateAccessPolicy *usecase.UpdateAccessPolicy,
 	deleteAccessPolicy *usecase.DeleteAccessPolicy,
 	getAdminStats *usecase.GetAdminStats,
+	listTenantMemberDirectory *usecase.ListTenantMemberDirectory,
 ) *Server {
 	return &Server{
 		login:             login,
@@ -89,6 +92,8 @@ func New(
 		updateAccessPolicy:            updateAccessPolicy,
 		deleteAccessPolicy:            deleteAccessPolicy,
 		getAdminStats:                 getAdminStats,
+
+		listTenantMemberDirectory: listTenantMemberDirectory,
 	}
 }
 
@@ -177,6 +182,18 @@ func (s *Server) ListUsers(ctx context.Context, req *authv1.ListUsersRequest) (*
 		users = append(users, toProtoUser(u))
 	}
 	return &authv1.ListUsersResponse{Users: users, NextPageToken: out.NextPageToken}, nil
+}
+
+func (s *Server) ListTenantMemberDirectory(ctx context.Context, _ *authv1.ListTenantMemberDirectoryRequest) (*authv1.ListTenantMemberDirectoryResponse, error) {
+	entries, err := s.listTenantMemberDirectory.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	members := make([]*authv1.TenantMemberDirectoryEntry, 0, len(entries))
+	for _, e := range entries {
+		members = append(members, &authv1.TenantMemberDirectoryEntry{Id: e.ID, Name: e.Name, Email: e.Email})
+	}
+	return &authv1.ListTenantMemberDirectoryResponse{Members: members}, nil
 }
 
 func (s *Server) UpdateUserRole(ctx context.Context, req *authv1.UpdateUserRoleRequest) (*authv1.UpdateUserRoleResponse, error) {

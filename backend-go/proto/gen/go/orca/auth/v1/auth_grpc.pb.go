@@ -40,6 +40,7 @@ const (
 	AuthService_UpdateAccessPolicy_FullMethodName            = "/orca.auth.v1.AuthService/UpdateAccessPolicy"
 	AuthService_DeleteAccessPolicy_FullMethodName            = "/orca.auth.v1.AuthService/DeleteAccessPolicy"
 	AuthService_GetAdminStats_FullMethodName                 = "/orca.auth.v1.AuthService/GetAdminStats"
+	AuthService_ListTenantMemberDirectory_FullMethodName     = "/orca.auth.v1.AuthService/ListTenantMemberDirectory"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -74,6 +75,13 @@ type AuthServiceClient interface {
 	UpdateAccessPolicy(ctx context.Context, in *UpdateAccessPolicyRequest, opts ...grpc.CallOption) (*AccessPolicy, error)
 	DeleteAccessPolicy(ctx context.Context, in *DeleteAccessPolicyRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetAdminStats(ctx context.Context, in *GetAdminStatsRequest, opts ...grpc.CallOption) (*GetAdminStatsResponse, error)
+	// ListTenantMemberDirectory is the non-admin counterpart to ListUsers —
+	// any authenticated user may look up their OWN tenant's other members by
+	// name/email (member-picker UIs need this; ListUsers itself is
+	// admin-console-only). tenant_id/actor come from the caller's own
+	// identity, never a request field — there is deliberately no way to ask
+	// for another tenant's directory here.
+	ListTenantMemberDirectory(ctx context.Context, in *ListTenantMemberDirectoryRequest, opts ...grpc.CallOption) (*ListTenantMemberDirectoryResponse, error)
 }
 
 type authServiceClient struct {
@@ -284,6 +292,16 @@ func (c *authServiceClient) GetAdminStats(ctx context.Context, in *GetAdminStats
 	return out, nil
 }
 
+func (c *authServiceClient) ListTenantMemberDirectory(ctx context.Context, in *ListTenantMemberDirectoryRequest, opts ...grpc.CallOption) (*ListTenantMemberDirectoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListTenantMemberDirectoryResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListTenantMemberDirectory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -316,6 +334,13 @@ type AuthServiceServer interface {
 	UpdateAccessPolicy(context.Context, *UpdateAccessPolicyRequest) (*AccessPolicy, error)
 	DeleteAccessPolicy(context.Context, *DeleteAccessPolicyRequest) (*emptypb.Empty, error)
 	GetAdminStats(context.Context, *GetAdminStatsRequest) (*GetAdminStatsResponse, error)
+	// ListTenantMemberDirectory is the non-admin counterpart to ListUsers —
+	// any authenticated user may look up their OWN tenant's other members by
+	// name/email (member-picker UIs need this; ListUsers itself is
+	// admin-console-only). tenant_id/actor come from the caller's own
+	// identity, never a request field — there is deliberately no way to ask
+	// for another tenant's directory here.
+	ListTenantMemberDirectory(context.Context, *ListTenantMemberDirectoryRequest) (*ListTenantMemberDirectoryResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -385,6 +410,9 @@ func (UnimplementedAuthServiceServer) DeleteAccessPolicy(context.Context, *Delet
 }
 func (UnimplementedAuthServiceServer) GetAdminStats(context.Context, *GetAdminStatsRequest) (*GetAdminStatsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAdminStats not implemented")
+}
+func (UnimplementedAuthServiceServer) ListTenantMemberDirectory(context.Context, *ListTenantMemberDirectoryRequest) (*ListTenantMemberDirectoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListTenantMemberDirectory not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -767,6 +795,24 @@ func _AuthService_GetAdminStats_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_ListTenantMemberDirectory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListTenantMemberDirectoryRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListTenantMemberDirectory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListTenantMemberDirectory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListTenantMemberDirectory(ctx, req.(*ListTenantMemberDirectoryRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -853,6 +899,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetAdminStats",
 			Handler:    _AuthService_GetAdminStats_Handler,
+		},
+		{
+			MethodName: "ListTenantMemberDirectory",
+			Handler:    _AuthService_ListTenantMemberDirectory_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -106,14 +106,35 @@ describe('MemberManager', () => {
     })
   })
 
-  // Why only userId, no displayName/email: project.proto's Member message
-  // carries just {user_id, role} — no profile fields exist to render yet.
+  // Why the raw userId here: project.proto's Member message carries just
+  // {user_id, role} — no profile fields — so a userId the directory fetch
+  // doesn't resolve (blanket-mocked to the wrong shape in this test) falls
+  // back to displaying it verbatim. See the next test for the resolved case.
   it('renders member rows keyed by userId + role', async () => {
     vi.mocked(callRuntimeRpc).mockResolvedValue([{ userId: 'u1', role: 'owner' }])
     render(<MemberManager projectId="p1" />)
     await waitFor(() => {
       expect(screen.getByTestId('member-row-u1')).toBeInTheDocument()
       expect(screen.getByText('u1')).toBeInTheDocument()
+    })
+  })
+
+  // Regression guard: MemberManager used to have no way to resolve a
+  // userId to a real name/email at all — this is the whole point of
+  // auth.listTenantMemberDirectory existing.
+  it('resolves a member row to name+email via the tenant directory', async () => {
+    vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
+      if (method === 'project.getMembers') {
+        return [{ userId: 'u1', role: 'owner' }]
+      }
+      if (method === 'auth.listTenantMemberDirectory') {
+        return [{ id: 'u1', name: 'Alice', email: 'alice@example.com' }]
+      }
+      return null
+    })
+    render(<MemberManager projectId="p1" />)
+    await waitFor(() => {
+      expect(screen.getByText('Alice (alice@example.com)')).toBeInTheDocument()
     })
   })
 
@@ -157,6 +178,9 @@ describe('MemberManager', () => {
     vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
       if (method === 'project.getMembers') {
         return []
+      }
+      if (method === 'auth.listTenantMemberDirectory') {
+        return [{ id: 'u2', name: 'New Member', email: 'u2@example.com' }]
       }
       if (method === 'project.addMember') {
         return { userId: 'u2', role: 'member' }

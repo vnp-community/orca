@@ -7,7 +7,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { Button } from '../ui/button'
-import { Input } from '../ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import {
   callRuntimeRpc,
@@ -18,6 +17,7 @@ import { useAppStore } from '../../store'
 import type { ProjectMember } from '../../types/workspace-types'
 import { toast } from 'sonner'
 import { Trash2, UserPlus } from 'lucide-react'
+import { describeMemberLabel, useTenantMemberDirectory } from '../../hooks/useTenantMemberDirectory'
 
 // Same FORBIDDEN/UNAUTHENTICATED-message pattern as CreateProjectDialog.tsx/TeamAdmin.tsx.
 function describeError(err: unknown, fallback: string): string {
@@ -31,10 +31,16 @@ function describeError(err: unknown, fallback: string): string {
 export function MemberManager({ projectId }: { projectId: string }) {
   const [members, setMembers] = useState<ProjectMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { directory } = useTenantMemberDirectory()
 
   const [newUserId, setNewUserId] = useState('')
   const [newRole, setNewRole] = useState<ProjectMember['role']>('member')
   const [adding, setAdding] = useState(false)
+
+  // Why exclude existing members: they're already added — picking one
+  // again would either no-op or (worse) look like it changes their role
+  // via the wrong control.
+  const addableDirectory = directory.filter((entry) => !members.some((m) => m.userId === entry.id))
 
   const loadMembers = useCallback(async () => {
     setIsLoading(true)
@@ -93,12 +99,24 @@ export function MemberManager({ projectId }: { projectId: string }) {
     <div className="member-manager" data-testid="member-manager">
       <div className="flex items-end gap-2 pb-3" data-testid="add-member-form">
         <div className="flex-1 grid gap-1.5">
-          <Input
-            placeholder="User ID"
-            value={newUserId}
-            onChange={(e) => setNewUserId(e.target.value)}
-            data-testid="add-member-user-id"
-          />
+          <Select value={newUserId} onValueChange={setNewUserId} data-testid="add-member-user-id">
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="Select a person…" />
+            </SelectTrigger>
+            <SelectContent>
+              {addableDirectory.length === 0 ? (
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                  No other tenant members to add.
+                </div>
+              ) : (
+                addableDirectory.map((entry) => (
+                  <SelectItem key={entry.id} value={entry.id}>
+                    {entry.name} ({entry.email})
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
         </div>
         <Select value={newRole} onValueChange={(v) => setNewRole(v as ProjectMember['role'])}>
           <SelectTrigger className="w-28 h-9 text-xs" data-testid="add-member-role">
@@ -142,7 +160,9 @@ export function MemberManager({ projectId }: { projectId: string }) {
             {members.map((member) => (
               <TableRow key={member.userId} data-testid={`member-row-${member.userId}`}>
                 <TableCell>
-                  <p className="font-medium text-sm">{member.userId}</p>
+                  <p className="font-medium text-sm">
+                    {describeMemberLabel(member.userId, directory)}
+                  </p>
                 </TableCell>
                 <TableCell>
                   <Select

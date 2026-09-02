@@ -138,6 +138,7 @@ func run() error {
 	updateAccessPolicyUC := usecase.NewUpdateAccessPolicy(repo, repo, policyPublisher, clock, opaClient)
 	deleteAccessPolicyUC := usecase.NewDeleteAccessPolicy(repo, repo, opaClient)
 	getAdminStatsUC := usecase.NewGetAdminStats(repo, repo, repo, clock, opaClient)
+	listTenantMemberDirectoryUC := usecase.NewListTenantMemberDirectory(repo)
 
 	// Runs once, before the server starts accepting traffic — see
 	// internal/usecase/bootstrap.go's doc comment for why this isn't an
@@ -179,6 +180,7 @@ func run() error {
 		deactivateUserUC, reactivateUserUC, listSessionsForUserUC, forceRevokeAllSessionsForUserUC,
 		createAccessPolicyUC, getAccessPolicyUC, listAccessPoliciesUC, updateAccessPolicyUC, deleteAccessPolicyUC,
 		getAdminStatsUC,
+		listTenantMemberDirectoryUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

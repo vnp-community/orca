@@ -9,7 +9,6 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table'
 import { Button } from '../ui/button'
-import { Input } from '../ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select'
 import {
   callRuntimeRpc,
@@ -19,6 +18,7 @@ import {
 import { useAppStore } from '../../store'
 import { toast } from 'sonner'
 import { Trash2, UserPlus } from 'lucide-react'
+import { describeMemberLabel, useTenantMemberDirectory } from '../../hooks/useTenantMemberDirectory'
 
 // Same FORBIDDEN/UNAUTHENTICATED-message pattern as MemberManager.tsx/CreateProjectDialog.tsx.
 function describeError(err: unknown, fallback: string): string {
@@ -35,10 +35,16 @@ type RepoMember = { userId: string; role: RepoRole }
 export function RepoMemberManager({ repoId }: { repoId: string }) {
   const [members, setMembers] = useState<RepoMember[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const { directory } = useTenantMemberDirectory()
 
   const [newUserId, setNewUserId] = useState('')
   const [newRole, setNewRole] = useState<RepoRole>('developer')
   const [adding, setAdding] = useState(false)
+
+  // Why exclude existing grants: they already have a functional role here —
+  // picking one again would either no-op or (worse) look like it changes
+  // their role via the wrong control.
+  const addableDirectory = directory.filter((entry) => !members.some((m) => m.userId === entry.id))
 
   const loadMembers = useCallback(async () => {
     setIsLoading(true)
@@ -106,12 +112,28 @@ export function RepoMemberManager({ repoId }: { repoId: string }) {
       </p>
       <div className="flex items-end gap-2 pb-3" data-testid="add-repo-member-form">
         <div className="flex-1 grid gap-1.5">
-          <Input
-            placeholder="User ID"
+          <Select
             value={newUserId}
-            onChange={(e) => setNewUserId(e.target.value)}
+            onValueChange={setNewUserId}
             data-testid="add-repo-member-user-id"
-          />
+          >
+            <SelectTrigger className="h-9 text-xs">
+              <SelectValue placeholder="Select a person…" />
+            </SelectTrigger>
+            <SelectContent>
+              {addableDirectory.length === 0 ? (
+                <div className="px-2 py-1.5 text-xs text-muted-foreground">
+                  No other tenant members to add.
+                </div>
+              ) : (
+                addableDirectory.map((entry) => (
+                  <SelectItem key={entry.id} value={entry.id}>
+                    {entry.name} ({entry.email})
+                  </SelectItem>
+                ))
+              )}
+            </SelectContent>
+          </Select>
         </div>
         <Select value={newRole} onValueChange={(v) => setNewRole(v as RepoRole)}>
           <SelectTrigger className="w-32 h-9 text-xs" data-testid="add-repo-member-role">
@@ -157,7 +179,9 @@ export function RepoMemberManager({ repoId }: { repoId: string }) {
             {members.map((member) => (
               <TableRow key={member.userId} data-testid={`repo-member-row-${member.userId}`}>
                 <TableCell>
-                  <p className="font-medium text-sm">{member.userId}</p>
+                  <p className="font-medium text-sm">
+                    {describeMemberLabel(member.userId, directory)}
+                  </p>
                 </TableCell>
                 <TableCell>
                   <Select
