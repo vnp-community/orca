@@ -15,9 +15,20 @@ export async function activateWorktreeFromSidebar(worktreeId: string): Promise<v
     return
   }
 
-  if (typeof window !== 'undefined' && window.api?.ephemeralVm) {
+  // Why settings.experimentalEphemeralVms, not just window.api?.ephemeralVm:
+  // the web/paired preload's fallback Proxy makes window.api.ephemeralVm
+  // truthy even when this experimental feature (default false) was never
+  // enabled — every sidebar click otherwise fired a real ephemeralVm.
+  // resumeWorkspace RPC that had nothing to resume, surfacing as a
+  // "not yet implemented" console error for users who never opted in.
+  const settings = useAppStore.getState().settings
+  if (
+    typeof window !== 'undefined' &&
+    window.api?.ephemeralVm &&
+    settings?.experimentalEphemeralVms === true
+  ) {
     try {
-      await resumeRuntimeEphemeralVmWorkspace(useAppStore.getState().settings, {
+      await resumeRuntimeEphemeralVmWorkspace(settings, {
         workspaceId: worktreeId
       })
     } catch (error) {

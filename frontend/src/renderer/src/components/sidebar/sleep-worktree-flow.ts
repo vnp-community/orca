@@ -147,8 +147,17 @@ export async function runSleepWorktrees(worktreeIds: readonly string[]): Promise
         // serializer buffers into buffersByLeafId for SSH wake to reseed
         // scrollback. See DESIGN_DOC_TERMINAL_HISTORY_FIX_V2.md §3.3.c.
         await shutdownWorktreeTerminals(worktreeId, { keepIdentifiers: true })
-        if (typeof window !== 'undefined' && window.api?.ephemeralVm) {
-          await suspendRuntimeEphemeralVmWorkspace(useAppStore.getState().settings, {
+        // Why settings.experimentalEphemeralVms, not just window.api?.ephemeralVm:
+        // see sidebar-worktree-activation.ts's resume counterpart — the web/
+        // paired preload's fallback Proxy makes window.api.ephemeralVm truthy
+        // even when this experimental feature (default false) was never enabled.
+        const settings = useAppStore.getState().settings
+        if (
+          typeof window !== 'undefined' &&
+          window.api?.ephemeralVm &&
+          settings?.experimentalEphemeralVms === true
+        ) {
+          await suspendRuntimeEphemeralVmWorkspace(settings, {
             workspaceId: worktreeId
           })
         }
