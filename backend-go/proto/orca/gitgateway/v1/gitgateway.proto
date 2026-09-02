@@ -570,10 +570,16 @@ message CloneResponse {
   string default_branch = 2;
 }
 
-message BaseRefDefaultRequest { string worktree_id = 1; }
+// repo_id routes this call through dispatchExecutorForRepo (repo-scoped
+// dispatch), matching CreateWorktree/DetectWorktrees/PrefetchCreateBase/
+// ResolvePrBase/ResolveMrBase — worktree_id is kept only so any caller that
+// still has a live worktree/connection id (none currently do) keeps working;
+// repo_id is preferred when both are set.
+message BaseRefDefaultRequest { string worktree_id = 1; string repo_id = 2; }
 message BaseRefDefaultResponse { string ref = 1; }
 
-message SearchRefsRequest { string worktree_id = 1; string query = 2; }
+// See BaseRefDefaultRequest's doc comment — same repo_id addition, same reason.
+message SearchRefsRequest { string worktree_id = 1; string query = 2; string repo_id = 3; }
 message SearchRefsResponse { repeated string refs = 1; }
 
 // InitRepo runs `git init` at dest_path on the resolved host and returns

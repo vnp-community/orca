@@ -286,11 +286,11 @@ func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
 			return &gitgatewayv1.BaseRefDefaultResponse{Ref: "main"}, nil
 		}
 		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.baseRefDefault",
-			argsJSON(t, map[string]any{"worktreeId": "wt1"}))
+			argsJSON(t, map[string]any{"repoId": "r1"}))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if gotReq.GetWorktreeId() != "wt1" {
+		if gotReq.GetRepoId() != "r1" {
 			t.Errorf("unexpected BaseRefDefaultRequest: %+v", gotReq)
 		}
 	})
@@ -302,11 +302,11 @@ func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
 			return &gitgatewayv1.SearchRefsResponse{Refs: []string{"main"}}, nil
 		}
 		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.searchRefs",
-			argsJSON(t, map[string]any{"worktreeId": "wt1", "query": "mai"}))
+			argsJSON(t, map[string]any{"repoId": "r1", "query": "mai"}))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if gotReq.GetWorktreeId() != "wt1" || gotReq.GetQuery() != "mai" {
+		if gotReq.GetRepoId() != "r1" || gotReq.GetQuery() != "mai" {
 			t.Errorf("unexpected SearchRefsRequest: %+v", gotReq)
 		}
 	})

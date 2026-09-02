@@ -19,7 +19,7 @@ export async function getRuntimeRepoBaseRefDefault(
   return callRuntimeRpc<RuntimeRepoBaseRefDefault>(
     target,
     'repo.baseRefDefault',
-    { repo: repoId },
+    { repoId },
     { timeoutMs: 15_000 }
   )
 }
@@ -40,7 +40,7 @@ export async function searchRuntimeRepoBaseRefs(
   const result = await callRuntimeRpc<{ refs: string[]; truncated: boolean }>(
     target,
     'repo.searchRefs',
-    { repo: repoId, query, limit },
+    { repoId, query, limit },
     { timeoutMs: 15_000 }
   )
   return result.refs
@@ -63,7 +63,7 @@ export async function searchRuntimeRepoBaseRefDetails(
     refs: string[]
     refDetails?: BaseRefSearchResult[]
     truncated: boolean
-  }>(target, 'repo.searchRefs', { repo: repoId, query, limit }, { timeoutMs: 15_000 })
+  }>(target, 'repo.searchRefs', { repoId, query, limit }, { timeoutMs: 15_000 })
   return result.refDetails ?? result.refs.map(legacyBaseRefSearchResult)
 }
 

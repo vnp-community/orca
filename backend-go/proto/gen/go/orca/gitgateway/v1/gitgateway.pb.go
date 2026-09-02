@@ -4312,9 +4312,15 @@ func (x *CloneResponse) GetDefaultBranch() string {
 	return ""
 }
 
+// repo_id routes this call through dispatchExecutorForRepo (repo-scoped
+// dispatch), matching CreateWorktree/DetectWorktrees/PrefetchCreateBase/
+// ResolvePrBase/ResolveMrBase — worktree_id is kept only so any caller that
+// still has a live worktree/connection id (none currently do) keeps working;
+// repo_id is preferred when both are set.
 type BaseRefDefaultRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	RepoId        string                 `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4352,6 +4358,13 @@ func (*BaseRefDefaultRequest) Descriptor() ([]byte, []int) {
 func (x *BaseRefDefaultRequest) GetWorktreeId() string {
 	if x != nil {
 		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *BaseRefDefaultRequest) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
 	}
 	return ""
 }
@@ -4400,10 +4413,12 @@ func (x *BaseRefDefaultResponse) GetRef() string {
 	return ""
 }
 
+// See BaseRefDefaultRequest's doc comment — same repo_id addition, same reason.
 type SearchRefsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
 	Query         string                 `protobuf:"bytes,2,opt,name=query,proto3" json:"query,omitempty"`
+	RepoId        string                 `protobuf:"bytes,3,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4448,6 +4463,13 @@ func (x *SearchRefsRequest) GetWorktreeId() string {
 func (x *SearchRefsRequest) GetQuery() string {
 	if x != nil {
 		return x.Query
+	}
+	return ""
+}
+
+func (x *SearchRefsRequest) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
 	}
 	return ""
 }
@@ -7132,16 +7154,18 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\tdest_path\x18\x03 \x01(\tR\bdestPath\"[\n" +
 	"\rCloneResponse\x12#\n" +
 	"\rworktree_path\x18\x01 \x01(\tR\fworktreePath\x12%\n" +
-	"\x0edefault_branch\x18\x02 \x01(\tR\rdefaultBranch\"8\n" +
+	"\x0edefault_branch\x18\x02 \x01(\tR\rdefaultBranch\"Q\n" +
 	"\x15BaseRefDefaultRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
-	"worktreeId\"*\n" +
+	"worktreeId\x12\x17\n" +
+	"\arepo_id\x18\x02 \x01(\tR\x06repoId\"*\n" +
 	"\x16BaseRefDefaultResponse\x12\x10\n" +
-	"\x03ref\x18\x01 \x01(\tR\x03ref\"J\n" +
+	"\x03ref\x18\x01 \x01(\tR\x03ref\"c\n" +
 	"\x11SearchRefsRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x14\n" +
-	"\x05query\x18\x02 \x01(\tR\x05query\"(\n" +
+	"\x05query\x18\x02 \x01(\tR\x05query\x12\x17\n" +
+	"\arepo_id\x18\x03 \x01(\tR\x06repoId\"(\n" +
 	"\x12SearchRefsResponse\x12\x12\n" +
 	"\x04refs\x18\x01 \x03(\tR\x04refs\"y\n" +
 	"\x0fInitRepoRequest\x12\"\n" +

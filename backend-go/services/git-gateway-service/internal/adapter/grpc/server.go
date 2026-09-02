@@ -626,7 +626,7 @@ func (s *Server) CopyFile(ctx context.Context, req *gitgatewayv1.CopyFileRequest
 }
 
 func (s *Server) BaseRefDefault(ctx context.Context, req *gitgatewayv1.BaseRefDefaultRequest) (*gitgatewayv1.BaseRefDefaultResponse, error) {
-	ref, err := s.baseRefDefault.Execute(ctx, usecase.BaseRefDefaultInput{WorktreeID: req.GetWorktreeId()})
+	ref, err := s.baseRefDefault.Execute(ctx, usecase.BaseRefDefaultInput{RepoID: req.GetRepoId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -634,7 +634,7 @@ func (s *Server) BaseRefDefault(ctx context.Context, req *gitgatewayv1.BaseRefDe
 }
 
 func (s *Server) SearchRefs(ctx context.Context, req *gitgatewayv1.SearchRefsRequest) (*gitgatewayv1.SearchRefsResponse, error) {
-	refs, err := s.searchRefs.Execute(ctx, usecase.SearchRefsInput{WorktreeID: req.GetWorktreeId(), Query: req.GetQuery()})
+	refs, err := s.searchRefs.Execute(ctx, usecase.SearchRefsInput{RepoID: req.GetRepoId(), Query: req.GetQuery()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}

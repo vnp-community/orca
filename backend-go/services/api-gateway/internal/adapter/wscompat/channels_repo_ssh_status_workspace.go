@@ -330,8 +330,13 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 	})
 
 	r.Register("repo.baseRefDefault", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// repoId, not worktreeId: this channel is called from repo-scoped
+		// contexts (Settings, SourceControl's default-branch hint) that have
+		// no worktree id — git-gateway-service's BaseRefDefault usecase
+		// dispatches via repo id (dispatchExecutorForRepo), see its own doc
+		// comment.
 		type baseRefDefaultArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			RepoID string `json:"repoId"`
 		}
 		in, err := decodeArg[baseRefDefaultArgs](args, 0)
 		if err != nil {
@@ -340,7 +345,7 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
 		defer cancel()
-		resp, err := git.BaseRefDefault(rpcCtx, &gitgatewayv1.BaseRefDefaultRequest{WorktreeId: in.WorktreeID})
+		resp, err := git.BaseRefDefault(rpcCtx, &gitgatewayv1.BaseRefDefaultRequest{RepoId: in.RepoID})
 		if err != nil {
 			return nil, err
 		}
@@ -348,9 +353,10 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 	})
 
 	r.Register("repo.searchRefs", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// repoId, not worktreeId — same reasoning as repo.baseRefDefault above.
 		type searchRefsArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			Query      string `json:"query"`
+			RepoID string `json:"repoId"`
+			Query  string `json:"query"`
 		}
 		in, err := decodeArg[searchRefsArgs](args, 0)
 		if err != nil {
@@ -359,7 +365,7 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
 		defer cancel()
-		resp, err := git.SearchRefs(rpcCtx, &gitgatewayv1.SearchRefsRequest{WorktreeId: in.WorktreeID, Query: in.Query})
+		resp, err := git.SearchRefs(rpcCtx, &gitgatewayv1.SearchRefsRequest{RepoId: in.RepoID, Query: in.Query})
 		if err != nil {
 			return nil, err
 		}

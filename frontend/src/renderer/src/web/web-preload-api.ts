@@ -1468,12 +1468,11 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
     },
     onCloneProgress: () => noopUnsubscribe,
     getGitUsername: () => Promise.resolve(''),
-    getBaseRefDefault: async ({ repoId }) =>
-      callRuntimeResult('repo.baseRefDefault', { repo: repoId }),
+    getBaseRefDefault: async ({ repoId }) => callRuntimeResult('repo.baseRefDefault', { repoId }),
     searchBaseRefs: async ({ repoId, query, limit }) =>
       (
         await callRuntimeResult<{ refs: string[] }>('repo.searchRefs', {
-          repo: repoId,
+          repoId,
           query,
           limit
         })
@@ -1483,7 +1482,7 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
         refs: string[]
         refDetails?: { refName: string; localBranchName: string }[]
       }>('repo.searchRefs', {
-        repo: repoId,
+        repoId,
         query,
         limit
       })
