@@ -90,6 +90,59 @@ describe('repo slice runtime routing — default project resolution', () => {
     expect(reposList).not.toHaveBeenCalled()
   })
 
+  // Regression guard: project.proto's Repo message has no dev_server_id of
+  // its own (only the owning Project does), so repo.list's wire shape
+  // (RemoteRepoView) never carries one either — settings gates like
+  // SparsePresetSettingsSection that read Repo.devServerId (via
+  // getRepoExecutionHostId) saw it as always-unset and treated every
+  // dev-server-bound repo as local, live-reproduced as a guaranteed-failing
+  // sparsePresets.list RPC on b15.openledger.vn. fetchAllRemoteRepoViews
+  // must stamp each repo with its OWNING project's devServerId.
+  it("stamps fetched repos with their owning project's devServerId", async () => {
+    runtimeEnvironmentCall.mockImplementation(async (args: { method: string }) => {
+      if (args.method === 'project.list') {
+        return {
+          id: 'rpc-project-list',
+          ok: true,
+          result: [
+            {
+              id: DEFAULT_PROJECT_ID,
+              name: 'My Repos',
+              defaultBranch: 'main',
+              devServerId: 'dev-01',
+              visibility: 'private',
+              createdAt: 1,
+              updatedAt: 1
+            }
+          ],
+          _meta: { runtimeId: 'runtime-remote' }
+        }
+      }
+      return {
+        id: 'rpc-1',
+        ok: true,
+        result: {
+          repos: [
+            {
+              id: remoteRepo.id,
+              projectId: DEFAULT_PROJECT_ID,
+              url: remoteRepo.path,
+              displayName: remoteRepo.displayName,
+              position: 0
+            }
+          ]
+        },
+        _meta: { runtimeId: 'runtime-remote' }
+      }
+    })
+    const store = createTestStore()
+    store.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
+
+    await store.getState().fetchRepos()
+
+    expect(store.getState().repos[0]?.devServerId).toBe('dev-01')
+  })
+
   it('stamps runtime-fetched SSH repos with the runtime owner', async () => {
     // Why an existing store repo, not a `connectionId` field on the mocked
     // response: RemoteRepoView (repo.list's actual wire shape) never carries

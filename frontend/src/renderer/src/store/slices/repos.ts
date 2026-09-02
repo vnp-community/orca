@@ -1064,6 +1064,13 @@ export type RemoteRepoView = {
   url: string
   displayName: string
   position: number
+  // Not part of project.proto's Repo message (dev-server binding lives on
+  // the owning Project, not the Repo) — stamped on client-side in
+  // fetchAllRemoteRepoViews from the project this repo was fetched under.
+  // Needed so mergeRepoViewIntoRepo can populate Repo.devServerId, which
+  // getRepoExecutionHostId (settings gates like SparsePresetSettingsSection's)
+  // reads to tell a dev-server-bound repo from a genuinely local one.
+  devServerId?: string
 }
 
 export function repoDisplayNameFromUrl(url: string): string {
@@ -1087,7 +1094,8 @@ export function mergeRepoViewIntoRepo(view: RemoteRepoView, existing?: Repo): Re
     path: view.url,
     displayName: view.displayName || repoDisplayNameFromUrl(view.url),
     badgeColor: existing?.badgeColor ?? '',
-    addedAt: existing?.addedAt ?? Date.now()
+    addedAt: existing?.addedAt ?? Date.now(),
+    devServerId: view.devServerId ?? existing?.devServerId
   }
 }
 
@@ -1205,7 +1213,8 @@ async function fetchAllRemoteRepoViews(
         { projectId: project.id },
         { timeoutMs: 15_000, reuseRecentCompatibilityFailure: true }
       ).then(
-        (result) => result.repos,
+        (result) =>
+          result.repos.map((repo) => ({ ...repo, devServerId: project.devServerId || undefined })),
         (err) => {
           console.error(`[repos] repo.list failed for project ${project.id}:`, err)
           return []
