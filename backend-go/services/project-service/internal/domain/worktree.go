@@ -1,6 +1,7 @@
 package domain
 
 import (
+	"encoding/json"
 	"errors"
 	"time"
 )
@@ -33,6 +34,15 @@ type Worktree struct {
 	Branch    string
 	Active    bool
 	CreatedAt time.Time
+
+	// Metadata is the opaque UI-authored WorktreeMeta blob (displayName/
+	// comment/isPinned/pushTarget/sparse*/...) — see
+	// proto/orca/project/v1/project.proto's UpdateWorktreeMetaRequest doc
+	// comment. Raw JSON, not a typed struct: this service never reads or
+	// validates individual keys, only stores/merges/returns the blob
+	// verbatim. Always valid JSON (defaults to "{}" at the Postgres column
+	// level), never nil once scanned back from a row.
+	Metadata json.RawMessage
 
 	// Lineage — explicit-capture only (nil unless this worktree was created
 	// with a captured parent context). See

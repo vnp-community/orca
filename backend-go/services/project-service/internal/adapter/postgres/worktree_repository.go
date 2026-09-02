@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -13,7 +14,7 @@ import (
 
 const worktreeColumns = `id, project_id, repo_id, path, branch, active, created_at,
 	parent_worktree_id, origin, capture_source, capture_confidence, task_id,
-	orchestration_run_id, coordinator_handle, created_by_terminal_handle`
+	orchestration_run_id, coordinator_handle, created_by_terminal_handle, metadata`
 
 // WorktreeRepository implements usecase.WorktreeRepository against
 // project.worktrees.
@@ -120,6 +121,58 @@ func (r *WorktreeRepository) RenameWorktree(ctx context.Context, worktreeID, bra
 	return out, nil
 }
 
+// UpdateWorktreeMeta shallow-merges patch (a JSON object) into the stored
+// metadata blob via Postgres jsonb's `||` operator — an explicit JSON null
+// in patch overwrites the corresponding key with null (the frontend's own
+// "clear this field" wire convention, see encodePushTargetClearForRuntimeRpc),
+// an omitted key leaves the previously-stored value untouched. patch must be
+// a JSON object, never an array/scalar — `||` on two jsonb objects merges;
+// on anything else it behaves unpredictably, so ports.go's caller contract
+// requires object shape.
+func (r *WorktreeRepository) UpdateWorktreeMeta(ctx context.Context, worktreeID string, patch json.RawMessage) (domain.Worktree, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE project.worktrees SET metadata = metadata || $1::jsonb WHERE id = $2
+		RETURNING `+worktreeColumns,
+		[]byte(patch), worktreeID,
+	)
+
+	out, err := scanWorktree(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Worktree{}, domain.ErrWorktreeNotFound
+	}
+	if err != nil {
+		return domain.Worktree{}, fmt.Errorf("postgres: update worktree metadata: %w", err)
+	}
+	return out, nil
+}
+
+// SetWorktreeLineage re-parents (or, when parentWorktreeID is nil, clears
+// the parent of) an already-created worktree. capture_confidence tracks
+// parent_worktree_id's presence the same way NewWorktree's creation-time
+// capture does (see domain.NewWorktree's doc comment) — "explicit" when a
+// parent is set, cleared alongside it when removed.
+func (r *WorktreeRepository) SetWorktreeLineage(ctx context.Context, worktreeID string, parentWorktreeID *string) (domain.Worktree, error) {
+	var captureConfidence *string
+	if parentWorktreeID != nil {
+		explicit := "explicit"
+		captureConfidence = &explicit
+	}
+	row := r.pool.QueryRow(ctx, `
+		UPDATE project.worktrees SET parent_worktree_id = $1, capture_confidence = $2 WHERE id = $3
+		RETURNING `+worktreeColumns,
+		parentWorktreeID, captureConfidence, worktreeID,
+	)
+
+	out, err := scanWorktree(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Worktree{}, domain.ErrWorktreeNotFound
+	}
+	if err != nil {
+		return domain.Worktree{}, fmt.Errorf("postgres: set worktree lineage: %w", err)
+	}
+	return out, nil
+}
+
 // scanWorktree does NOT convert pgx.ErrNoRows itself — see
 // scanProjectGroup's identical doc comment for why (every caller already
 // checks errors.Is(err, pgx.ErrNoRows) against the raw scan error).
@@ -128,7 +181,7 @@ func scanWorktree(row rowScanner) (domain.Worktree, error) {
 	if err := row.Scan(
 		&wt.ID, &wt.ProjectID, &wt.RepoID, &wt.Path, &wt.Branch, &wt.Active, &wt.CreatedAt,
 		&wt.ParentWorktreeID, &wt.Origin, &wt.CaptureSource, &wt.CaptureConfidence, &wt.TaskID,
-		&wt.OrchestrationRunID, &wt.CoordinatorHandle, &wt.CreatedByTerminalHandle,
+		&wt.OrchestrationRunID, &wt.CoordinatorHandle, &wt.CreatedByTerminalHandle, &wt.Metadata,
 	); err != nil {
 		return domain.Worktree{}, err
 	}

@@ -6,6 +6,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 )
@@ -193,6 +194,15 @@ type WorktreeRepository interface {
 	ListWorktrees(ctx context.Context, projectID string) ([]domain.Worktree, error)
 	SetWorktreeActivation(ctx context.Context, worktreeID string, active bool) (domain.Worktree, error)
 	RenameWorktree(ctx context.Context, worktreeID, branch string) (domain.Worktree, error)
+	// UpdateWorktreeMeta shallow-merges patch (a JSON object) into the
+	// worktree's stored metadata blob — see
+	// postgres.WorktreeRepository.UpdateWorktreeMeta's doc comment for the
+	// merge semantics. patch must be a JSON object (`{...}`), never an
+	// array or scalar.
+	UpdateWorktreeMeta(ctx context.Context, worktreeID string, patch json.RawMessage) (domain.Worktree, error)
+	// SetWorktreeLineage re-parents (parentWorktreeID != nil) or clears the
+	// parent of (parentWorktreeID == nil) an already-created worktree.
+	SetWorktreeLineage(ctx context.Context, worktreeID string, parentWorktreeID *string) (domain.Worktree, error)
 	// ListLineage returns every worktree with an explicitly-captured parent
 	// — this is unrelated to the "lineage/history" mentioned in
 	// RecordWorktreeRemoved's doc comment above (that one means git commit

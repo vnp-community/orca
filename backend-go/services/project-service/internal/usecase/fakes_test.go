@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -527,6 +528,8 @@ type fakeWorktreeRepository struct {
 	listErr          error
 	setActivationErr error
 	renameErr        error
+	updateMetaErr    error
+	setLineageErr    error
 	listLineageErr   error
 }
 
@@ -588,6 +591,61 @@ func (f *fakeWorktreeRepository) RenameWorktree(ctx context.Context, worktreeID,
 		return domain.Worktree{}, domain.ErrWorktreeNotFound
 	}
 	wt.Branch = branch
+	f.worktrees[worktreeID] = wt
+	return wt, nil
+}
+
+// UpdateWorktreeMeta simulates Postgres jsonb's `||` shallow merge — new
+// keys added, existing keys overwritten (including with a JSON null),
+// keys absent from patch left untouched. Mirrors
+// postgres.WorktreeRepository.UpdateWorktreeMeta's real semantics closely
+// enough for usecase-level tests; the real merge is exercised by
+// worktree_repository_test.go against a live Postgres.
+func (f *fakeWorktreeRepository) UpdateWorktreeMeta(ctx context.Context, worktreeID string, patch json.RawMessage) (domain.Worktree, error) {
+	if f.updateMetaErr != nil {
+		return domain.Worktree{}, f.updateMetaErr
+	}
+	wt, ok := f.worktrees[worktreeID]
+	if !ok {
+		return domain.Worktree{}, domain.ErrWorktreeNotFound
+	}
+	existing := map[string]any{}
+	if len(wt.Metadata) > 0 {
+		if err := json.Unmarshal(wt.Metadata, &existing); err != nil {
+			return domain.Worktree{}, err
+		}
+	}
+	var incoming map[string]any
+	if err := json.Unmarshal(patch, &incoming); err != nil {
+		return domain.Worktree{}, err
+	}
+	for k, v := range incoming {
+		existing[k] = v
+	}
+	merged, err := json.Marshal(existing)
+	if err != nil {
+		return domain.Worktree{}, err
+	}
+	wt.Metadata = merged
+	f.worktrees[worktreeID] = wt
+	return wt, nil
+}
+
+func (f *fakeWorktreeRepository) SetWorktreeLineage(ctx context.Context, worktreeID string, parentWorktreeID *string) (domain.Worktree, error) {
+	if f.setLineageErr != nil {
+		return domain.Worktree{}, f.setLineageErr
+	}
+	wt, ok := f.worktrees[worktreeID]
+	if !ok {
+		return domain.Worktree{}, domain.ErrWorktreeNotFound
+	}
+	wt.ParentWorktreeID = parentWorktreeID
+	if parentWorktreeID != nil {
+		explicit := "explicit"
+		wt.CaptureConfidence = &explicit
+	} else {
+		wt.CaptureConfidence = nil
+	}
 	f.worktrees[worktreeID] = wt
 	return wt, nil
 }

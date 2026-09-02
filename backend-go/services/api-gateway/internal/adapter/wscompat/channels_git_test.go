@@ -65,6 +65,7 @@ type fakeGitGatewayClient struct {
 	branchDiffFunc      func(ctx context.Context, in *gitgatewayv1.BranchDiffRequest) (*gitgatewayv1.FileDiffResponse, error)
 	submoduleStatusFunc func(ctx context.Context, in *gitgatewayv1.SubmoduleStatusRequest) (*gitgatewayv1.GetStatusResponse, error)
 	fetchFunc           func(ctx context.Context, in *gitgatewayv1.FetchRequest) (*gitgatewayv1.FetchResponse, error)
+	getStatusFunc       func(ctx context.Context, in *gitgatewayv1.GetStatusRequest) (*gitgatewayv1.GetStatusResponse, error)
 }
 
 func (f *fakeGitGatewayClient) CommitCompare(ctx context.Context, in *gitgatewayv1.CommitCompareRequest, _ ...grpc.CallOption) (*gitgatewayv1.CommitCompareResponse, error) {
@@ -84,6 +85,9 @@ func (f *fakeGitGatewayClient) SubmoduleStatus(ctx context.Context, in *gitgatew
 }
 func (f *fakeGitGatewayClient) Fetch(ctx context.Context, in *gitgatewayv1.FetchRequest, _ ...grpc.CallOption) (*gitgatewayv1.FetchResponse, error) {
 	return f.fetchFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) GetStatus(ctx context.Context, in *gitgatewayv1.GetStatusRequest, _ ...grpc.CallOption) (*gitgatewayv1.GetStatusResponse, error) {
+	return f.getStatusFunc(ctx, in)
 }
 
 func (f *fakeGitGatewayClient) GetDiff(ctx context.Context, in *gitgatewayv1.GetDiffRequest, _ ...grpc.CallOption) (*gitgatewayv1.GetDiffResponse, error) {
@@ -1382,5 +1386,34 @@ func TestFilesCopyChannel_KnownGapErrorPassesThrough(t *testing.T) {
 		argsJSON(t, map[string]any{"worktreeId": "wt-1", "fromPath": "a.txt", "toPath": "b.txt"}))
 	if err == nil {
 		t.Fatal("expected the known-gap error to surface as-is, not be swallowed")
+	}
+}
+
+// TestGitStatusChannel_DecodesWorktreeSelector locks in the fix for a live
+// bug: every real caller (WorkspaceContext.tsx, useGit.ts, use-code-review.ts,
+// runtime-git-client.ts, web-preload-api.ts's status) sends the worktree
+// selector under "worktree" (toRuntimeWorktreeSelector, "id:"-prefixed) —
+// never "worktreeId". The old handler decoded "worktreeId", so WorktreeId
+// was always empty and every real call tripped git-gateway-service's
+// GITGATEWAY_MISSING_WORKTREE_ID guard (confirmed live, repeating in
+// git-gateway-service's logs).
+func TestGitStatusChannel_DecodesWorktreeSelector(t *testing.T) {
+	var gotReq *gitgatewayv1.GetStatusRequest
+	fake := &fakeGitGatewayClient{
+		getStatusFunc: func(_ context.Context, in *gitgatewayv1.GetStatusRequest) (*gitgatewayv1.GetStatusResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.GetStatusResponse{}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.status",
+		argsJSON(t, map[string]any{"worktree": "id:wt-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetWorktreeId() != "wt-1" {
+		t.Errorf("WorktreeId = %q, want %q (expected the id: prefix stripped)", gotReq.GetWorktreeId(), "wt-1")
 	}
 }

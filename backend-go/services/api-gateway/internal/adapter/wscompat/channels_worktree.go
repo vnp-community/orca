@@ -22,10 +22,12 @@ package wscompat
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
@@ -210,12 +212,16 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 
 	r.Register("worktree.list", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		// NOTE: ListWorktreesRequest is project-scoped only (no repo_id
-		// filter) — callers that send {repo, limit} instead of {projectId}
-		// (web-preload-api.ts's worktrees.list/listAllRuntimeWorktrees) hit a
-		// pre-existing, already-documented gap (see worktrees.ts's own
-		// "worktree.list's Go handler decodes only {projectId}" comment) this
-		// fix does not attempt to redesign; only the response's per-item
-		// shape is corrected here, matching worktree.create's reshaping.
+		// filter) — verified NOT a genuine gap: the one real repoId-only
+		// call site (worktrees.ts's listDetectedWorktreesForRepo local-mode
+		// fallback) already has projectId in scope via repoProjectId()
+		// before it falls back to the narrower worktreesApi.list({repoId})
+		// interface, and that whole fallback path is worktrees.ts's own
+		// documented "never reachable on this deployment" case (only used
+		// when a runtime server lacks worktree.detectedList, which this one
+		// doesn't). The live path (worktree.detectedList) already scopes by
+		// repo correctly via git-gateway's DetectWorktrees(RepoId) + a
+		// path-based join — see mergeDetectedWorktrees below.
 		type listArgs struct {
 			ProjectID string `json:"projectId"`
 		}
@@ -229,9 +235,9 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 			return nil, err
 		}
 		protoWorktrees := resp.GetWorktrees()
-		views := make([]worktreeView, 0, len(protoWorktrees))
+		views := make([]map[string]any, 0, len(protoWorktrees))
 		for _, w := range protoWorktrees {
-			views = append(views, worktreeViewFromProto(w))
+			views = append(views, worktreeResponseFromProto(w))
 		}
 		// {worktrees: [...]} — every caller (web-preload-api.ts's list/
 		// listAllRuntimeWorktrees, worktrees.ts's legacy fallback) reads
@@ -239,28 +245,99 @@ func registerWorktreeChannels(r *Registry, gitClient gitgatewayv1.GitGatewayServ
 		return map[string]any{"worktrees": views}, nil
 	})
 
+	// worktree.set serves THREE distinct frontend purposes under one wire
+	// channel name (worktrees.ts's persistWorktreeMeta/
+	// setWorktreeLineageForRuntime/the activation toggle all call it) —
+	// dispatch on which top-level keys the caller actually sent, calling
+	// as many of the three usecases below as apply, rather than assuming
+	// only one shape. All three are keyed on {worktree: "id:<uuid>"} (never
+	// "worktreeId"); "active"/"parentWorktree"/"noParent" are activation/
+	// lineage fields, and every other top-level key is a WorktreeMeta
+	// partial-update patch (displayName/comment/isPinned/pushTarget/
+	// sparse*/... — frontend/src/shared/types.ts's WorktreeMeta) merged
+	// into project.worktrees' metadata JSONB column via UpdateWorktreeMeta.
+	// Previously only "active" was ever forwarded anywhere — every other
+	// field was silently decoded and dropped, even though desktop already
+	// durably persists all of them locally (orca-data.json) — see this
+	// session's CR solutions doc for the fuller design rationale.
 	r.Register("worktree.set", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		// worktrees.ts always sends {worktree: "id:<uuid>", ...updates} —
-		// never "worktreeId". Only "active" is forwarded to
-		// SetWorktreeActivationRequest today; other metadata keys
-		// (displayName/comment/pushTarget/... from updateMeta's rpcUpdates
-		// spread) are decoded here but not yet persisted — a known,
-		// pre-existing gap in this RPC's scope, not introduced by this fix.
-		type setArgs struct {
-			Worktree string `json:"worktree"`
-			Active   bool   `json:"active"`
-		}
-		in, err := decodeArg[setArgs](args, 0)
+		raw, err := decodeArg[map[string]json.RawMessage](args, 0)
 		if err != nil {
 			return nil, err
 		}
+		var worktreeSelector string
+		if v, ok := raw["worktree"]; ok {
+			if err := json.Unmarshal(v, &worktreeSelector); err != nil {
+				return nil, fmt.Errorf("decoding \"worktree\": %w", err)
+			}
+		}
+		worktreeID := stripWorktreeSelectorPrefix(worktreeSelector)
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		worktreeID := stripWorktreeSelectorPrefix(in.Worktree)
-		resp, err := projectClient.SetWorktreeActivation(ctx, &projectv1.SetWorktreeActivationRequest{WorktreeId: worktreeID, Active: in.Active})
-		if err != nil {
-			return nil, err
+
+		var current *projectv1.Worktree
+
+		if v, ok := raw["active"]; ok {
+			var active bool
+			if err := json.Unmarshal(v, &active); err != nil {
+				return nil, fmt.Errorf("decoding \"active\": %w", err)
+			}
+			resp, err := projectClient.SetWorktreeActivation(ctx, &projectv1.SetWorktreeActivationRequest{WorktreeId: worktreeID, Active: active})
+			if err != nil {
+				return nil, err
+			}
+			current = resp.GetWorktree()
 		}
-		return map[string]any{"worktree": worktreeViewFromProto(resp.GetWorktree())}, nil
+
+		parentRaw, hasParent := raw["parentWorktree"]
+		noParentRaw, hasNoParent := raw["noParent"]
+		if hasParent || hasNoParent {
+			var clearParent bool
+			if hasNoParent {
+				if err := json.Unmarshal(noParentRaw, &clearParent); err != nil {
+					return nil, fmt.Errorf("decoding \"noParent\": %w", err)
+				}
+			}
+			var parentWorktreeID *string
+			if hasParent && !clearParent {
+				var parentSelector string
+				if err := json.Unmarshal(parentRaw, &parentSelector); err != nil {
+					return nil, fmt.Errorf("decoding \"parentWorktree\": %w", err)
+				}
+				stripped := stripWorktreeSelectorPrefix(parentSelector)
+				parentWorktreeID = &stripped
+			}
+			resp, err := projectClient.SetWorktreeLineage(ctx, &projectv1.SetWorktreeLineageRequest{
+				WorktreeId:       worktreeID,
+				ParentWorktreeId: parentWorktreeID,
+				ClearParent:      clearParent,
+			})
+			if err != nil {
+				return nil, err
+			}
+			current = resp.GetWorktree()
+		}
+
+		metaPatch := make(map[string]json.RawMessage, len(raw))
+		for k, v := range raw {
+			switch k {
+			case "worktree", "active", "parentWorktree", "noParent":
+				continue
+			}
+			metaPatch[k] = v
+		}
+		if len(metaPatch) > 0 || current == nil {
+			patch, err := structFromRawJSONPatch(metaPatch)
+			if err != nil {
+				return nil, fmt.Errorf("decoding metadata patch: %w", err)
+			}
+			resp, err := projectClient.UpdateWorktreeMeta(ctx, &projectv1.UpdateWorktreeMetaRequest{WorktreeId: worktreeID, Metadata: patch})
+			if err != nil {
+				return nil, err
+			}
+			current = resp.GetWorktree()
+		}
+
+		return map[string]any{"worktree": worktreeResponseFromProto(current)}, nil
 	})
 
 	// worktree.detectedList — the one aggregation. Parallel calls, merged
@@ -388,21 +465,55 @@ type worktreeView struct {
 	IsMainWorktree    bool    `json:"isMainWorktree"`
 }
 
-// worktreeViewFromProto reshapes project-service's raw Worktree proto
+// worktreeResponseFromProto reshapes project-service's raw Worktree proto
 // message (worktree.list/worktree.set's response) into the client's rich
 // shape — same treatment worktree.create's response gets, just from a
-// different source message.
-func worktreeViewFromProto(w *projectv1.Worktree) worktreeView {
-	return worktreeView{
-		ID:             w.GetId(),
-		RepoID:         w.GetRepoId(),
-		ProjectID:      w.GetProjectId(),
-		DisplayName:    displayNameForDetectedWorktree(w.GetBranch(), w.GetPath()),
-		Path:           w.GetPath(),
-		Branch:         w.GetBranch(),
-		LastActivityAt: w.GetCreatedAtUnixMs(),
-		CreatedAt:      w.GetCreatedAtUnixMs(),
+// different source message. Unlike worktree.create's hand-built worktreeView
+// (which has no metadata to read back — see this file's worktree.create doc
+// comment), this is a map so the real persisted WorktreeMeta blob
+// (displayName/comment/isPinned/pushTarget/sparse*/...) can be spread on
+// top of the typed core-git fields — the whole reason UpdateWorktreeMeta
+// exists (see this file's worktree.set doc comment).
+func worktreeResponseFromProto(w *projectv1.Worktree) map[string]any {
+	out := map[string]any{
+		"id":        w.GetId(),
+		"repoId":    w.GetRepoId(),
+		"projectId": w.GetProjectId(),
+		"path":      w.GetPath(),
+		"branch":    w.GetBranch(),
+		// Fallback default for a worktree with no persisted displayName yet
+		// (created, or never UpdateWorktreeMeta'd, before this field
+		// existed) — same convention displayNameForDetectedWorktree
+		// already establishes elsewhere in this file; overridden below if
+		// metadata carries a real one.
+		"displayName":    displayNameForDetectedWorktree(w.GetBranch(), w.GetPath()),
+		"lastActivityAt": w.GetCreatedAtUnixMs(),
+		"createdAt":      w.GetCreatedAtUnixMs(),
 	}
+	if meta := w.GetMetadata(); meta != nil {
+		for k, v := range meta.AsMap() {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// structFromRawJSONPatch converts a worktree.set call's leftover top-level
+// keys (already-decoded json.RawMessage values, keyed by field name) into
+// the google.protobuf.Struct UpdateWorktreeMetaRequest.metadata expects —
+// re-serializing rather than hand-building preserves JSON null (the
+// frontend's explicit "clear this field" wire convention, see
+// encodePushTargetClearForRuntimeRpc) through structpb's own null handling.
+func structFromRawJSONPatch(patch map[string]json.RawMessage) (*structpb.Struct, error) {
+	b, err := json.Marshal(patch)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, err
+	}
+	return structpb.NewStruct(m)
 }
 
 // stripWorktreeSelectorPrefix undoes toRuntimeWorktreeSelector's "id:" prefix

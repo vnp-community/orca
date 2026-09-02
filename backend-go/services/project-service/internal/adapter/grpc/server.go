@@ -7,7 +7,9 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
@@ -51,6 +53,8 @@ type Server struct {
 	listWorktrees         *usecase.ListWorktrees
 	setWorktreeActivation *usecase.SetWorktreeActivation
 	renameWorktree        *usecase.RenameWorktree
+	updateWorktreeMeta    *usecase.UpdateWorktreeMeta
+	setWorktreeLineage    *usecase.SetWorktreeLineage
 	listWorktreeLineage   *usecase.ListWorktreeLineage
 
 	createProjectGroup *usecase.CreateProjectGroup
@@ -103,6 +107,8 @@ type Deps struct {
 	ListWorktrees         *usecase.ListWorktrees
 	SetWorktreeActivation *usecase.SetWorktreeActivation
 	RenameWorktree        *usecase.RenameWorktree
+	UpdateWorktreeMeta    *usecase.UpdateWorktreeMeta
+	SetWorktreeLineage    *usecase.SetWorktreeLineage
 	ListWorktreeLineage   *usecase.ListWorktreeLineage
 
 	CreateProjectGroup *usecase.CreateProjectGroup
@@ -153,6 +159,8 @@ func New(deps Deps) *Server {
 		listWorktrees:         deps.ListWorktrees,
 		setWorktreeActivation: deps.SetWorktreeActivation,
 		renameWorktree:        deps.RenameWorktree,
+		updateWorktreeMeta:    deps.UpdateWorktreeMeta,
+		setWorktreeLineage:    deps.SetWorktreeLineage,
 		listWorktreeLineage:   deps.ListWorktreeLineage,
 
 		createProjectGroup: deps.CreateProjectGroup,
@@ -459,6 +467,50 @@ func (s *Server) RenameWorktree(ctx context.Context, req *projectv1.RenameWorktr
 	return &projectv1.RenameWorktreeResponse{Worktree: toProtoWorktree(wt)}, nil
 }
 
+func (s *Server) UpdateWorktreeMeta(ctx context.Context, req *projectv1.UpdateWorktreeMetaRequest) (*projectv1.UpdateWorktreeMetaResponse, error) {
+	patch, err := fromProtoWorktreeMetadata(req.GetMetadata())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInvalidArgument, "PROJECT_WORKTREE_METADATA_INVALID", "metadata must be a JSON object", err))
+	}
+	wt, err := s.updateWorktreeMeta.Execute(ctx, usecase.UpdateWorktreeMetaInput{
+		WorktreeID: req.GetWorktreeId(),
+		Metadata:   patch,
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UpdateWorktreeMetaResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+// fromProtoWorktreeMetadata is toProtoWorktreeMetadata's inverse — nil
+// (unset) becomes "{}" (a harmless empty-patch no-op), never a nil
+// json.RawMessage.
+func fromProtoWorktreeMetadata(s *structpb.Struct) (json.RawMessage, error) {
+	if s == nil {
+		return json.RawMessage("{}"), nil
+	}
+	b, err := s.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(b), nil
+}
+
+func (s *Server) SetWorktreeLineage(ctx context.Context, req *projectv1.SetWorktreeLineageRequest) (*projectv1.SetWorktreeLineageResponse, error) {
+	var parentWorktreeID *string
+	if !req.GetClearParent() {
+		parentWorktreeID = req.ParentWorktreeId
+	}
+	wt, err := s.setWorktreeLineage.Execute(ctx, usecase.SetWorktreeLineageInput{
+		WorktreeID:       req.GetWorktreeId(),
+		ParentWorktreeID: parentWorktreeID,
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.SetWorktreeLineageResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
 func (s *Server) ListWorktreeLineage(ctx context.Context, _ *projectv1.ListWorktreeLineageRequest) (*projectv1.ListWorktreeLineageResponse, error) {
 	worktrees, err := s.listWorktreeLineage.Execute(ctx)
 	if err != nil {
@@ -717,7 +769,29 @@ func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
 		CoordinatorHandle:       wt.CoordinatorHandle,
 		CreatedByTerminalHandle: wt.CreatedByTerminalHandle,
 		CreatedAtUnixMs:         wt.CreatedAt.UnixMilli(),
+		Metadata:                toProtoWorktreeMetadata(wt.Metadata),
 	}
+}
+
+// toProtoWorktreeMetadata decodes the stored metadata JSONB blob into a
+// google.protobuf.Struct for the wire — nil for an empty/malformed blob
+// (never a hard error: the column is jsonb and every write path this
+// service owns stores a JSON object, but this is display data, not a
+// value this service validates, so a bad blob degrades to "no metadata"
+// rather than failing the whole response).
+func toProtoWorktreeMetadata(raw json.RawMessage) *structpb.Struct {
+	if len(raw) == 0 {
+		return nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil
+	}
+	s, err := structpb.NewStruct(m)
+	if err != nil {
+		return nil
+	}
+	return s
 }
 
 // toProtoWorktreeLineageEntry mirrors toProtoWorktree's lineage fields —

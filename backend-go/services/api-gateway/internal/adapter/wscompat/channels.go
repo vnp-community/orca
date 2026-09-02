@@ -301,14 +301,21 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 
 func registerGitChannels(r *Registry, client gitgatewayv1.GitGatewayServiceClient) {
 	r.Register("git.status", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// Every real caller (WorkspaceContext.tsx, useGit.ts, use-code-review.ts,
+		// runtime-git-client.ts, web-preload-api.ts's status) sends the
+		// selector under "worktree" (toRuntimeWorktreeSelector, "id:"-prefixed)
+		// — never "worktreeId". Decoding the wrong key silently left
+		// WorktreeId empty on every call, tripping git-gateway-service's
+		// GITGATEWAY_MISSING_WORKTREE_ID guard 100% of the time (found live,
+		// repeating in git-gateway-service's logs).
 		type statusArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			Worktree string `json:"worktree"`
 		}
 		in, err := decodeArg[statusArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.GetStatus(ctx, &gitgatewayv1.GetStatusRequest{WorktreeId: in.WorktreeID})
+		resp, err := client.GetStatus(ctx, &gitgatewayv1.GetStatusRequest{WorktreeId: stripWorktreeSelectorPrefix(in.Worktree)})
 		if err != nil {
 			return nil, err
 		}

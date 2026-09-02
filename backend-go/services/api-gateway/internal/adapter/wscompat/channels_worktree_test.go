@@ -76,10 +76,14 @@ type fakeProjectServiceClient struct {
 
 	listWorktreesFunc         func(ctx context.Context, in *projectv1.ListWorktreesRequest) (*projectv1.ListWorktreesResponse, error)
 	setWorktreeActivationFunc func(ctx context.Context, in *projectv1.SetWorktreeActivationRequest) (*projectv1.SetWorktreeActivationResponse, error)
+	updateWorktreeMetaFunc    func(ctx context.Context, in *projectv1.UpdateWorktreeMetaRequest) (*projectv1.UpdateWorktreeMetaResponse, error)
+	setWorktreeLineageFunc    func(ctx context.Context, in *projectv1.SetWorktreeLineageRequest) (*projectv1.SetWorktreeLineageResponse, error)
 	listWorktreeLineageFunc   func(ctx context.Context, in *projectv1.ListWorktreeLineageRequest) (*projectv1.ListWorktreeLineageResponse, error)
 
 	calledListWorktrees         bool
 	calledSetWorktreeActivation bool
+	calledUpdateWorktreeMeta    bool
+	calledSetWorktreeLineage    bool
 	calledListWorktreeLineage   bool
 }
 
@@ -96,6 +100,16 @@ func (f *fakeProjectServiceClient) ListWorktrees(ctx context.Context, in *projec
 func (f *fakeProjectServiceClient) SetWorktreeActivation(ctx context.Context, in *projectv1.SetWorktreeActivationRequest, _ ...grpc.CallOption) (*projectv1.SetWorktreeActivationResponse, error) {
 	f.calledSetWorktreeActivation = true
 	return f.setWorktreeActivationFunc(ctx, in)
+}
+
+func (f *fakeProjectServiceClient) UpdateWorktreeMeta(ctx context.Context, in *projectv1.UpdateWorktreeMetaRequest, _ ...grpc.CallOption) (*projectv1.UpdateWorktreeMetaResponse, error) {
+	f.calledUpdateWorktreeMeta = true
+	return f.updateWorktreeMetaFunc(ctx, in)
+}
+
+func (f *fakeProjectServiceClient) SetWorktreeLineage(ctx context.Context, in *projectv1.SetWorktreeLineageRequest, _ ...grpc.CallOption) (*projectv1.SetWorktreeLineageResponse, error) {
+	f.calledSetWorktreeLineage = true
+	return f.setWorktreeLineageFunc(ctx, in)
 }
 
 // TestWorktreeCreateChannel_Success uses the real frontend arg shape —
@@ -421,8 +435,8 @@ func TestWorktreeListChannel_CallsProjectClientNotGitClient(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a map[string]any result (caller reads result.worktrees), got %T", result)
 	}
-	worktrees, ok := out["worktrees"].([]worktreeView)
-	if !ok || len(worktrees) != 1 || worktrees[0].ID != "wt-1" || worktrees[0].RepoID != "repo-1" || worktrees[0].Branch != "feature" {
+	worktrees, ok := out["worktrees"].([]map[string]any)
+	if !ok || len(worktrees) != 1 || worktrees[0]["id"] != "wt-1" || worktrees[0]["repoId"] != "repo-1" || worktrees[0]["branch"] != "feature" {
 		t.Errorf("unexpected result: %+v", result)
 	}
 }
@@ -459,9 +473,108 @@ func TestWorktreeSetChannel_CallsProjectClientNotGitClient(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected a map[string]any result (caller reads result.worktree), got %T", result)
 	}
-	wt, ok := out["worktree"].(worktreeView)
-	if !ok || wt.ID != "wt-1" {
+	wt, ok := out["worktree"].(map[string]any)
+	if !ok || wt["id"] != "wt-1" {
 		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+// TestWorktreeSetChannel_PersistsMetaFields locks in Gap 1's fix:
+// worktree.set previously forwarded ONLY "active" — every other
+// WorktreeMeta field (displayName/isPinned/...) was decoded and silently
+// dropped. Sending no "active" key at all must route to
+// UpdateWorktreeMeta, not SetWorktreeActivation.
+func TestWorktreeSetChannel_PersistsMetaFields(t *testing.T) {
+	var gotReq *projectv1.UpdateWorktreeMetaRequest
+	git := &fakeGitGatewayServiceClient{}
+	project := &fakeProjectServiceClient{
+		updateWorktreeMetaFunc: func(_ context.Context, in *projectv1.UpdateWorktreeMetaRequest) (*projectv1.UpdateWorktreeMetaResponse, error) {
+			gotReq = in
+			return &projectv1.UpdateWorktreeMetaResponse{Worktree: &projectv1.Worktree{Id: "wt-1", Metadata: in.GetMetadata()}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.set",
+		argsJSON(t, map[string]any{"worktree": "id:wt-1", "displayName": "My Worktree", "isPinned": true}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !project.calledUpdateWorktreeMeta {
+		t.Fatal("expected projectClient.UpdateWorktreeMeta to be called")
+	}
+	if project.calledSetWorktreeActivation {
+		t.Error("expected SetWorktreeActivation NOT to be called when \"active\" is absent")
+	}
+	fields := gotReq.GetMetadata().AsMap()
+	if fields["displayName"] != "My Worktree" || fields["isPinned"] != true {
+		t.Errorf("unexpected metadata patch sent to project-service: %+v", fields)
+	}
+	out := result.(map[string]any)
+	wt := out["worktree"].(map[string]any)
+	if wt["displayName"] != "My Worktree" || wt["isPinned"] != true {
+		t.Errorf("expected the persisted metadata to be spread into the response, got %+v", wt)
+	}
+}
+
+// TestWorktreeSetChannel_SetsLineageParent covers
+// setWorktreeLineageForRuntime's {worktree, parentWorktree} shape.
+func TestWorktreeSetChannel_SetsLineageParent(t *testing.T) {
+	var gotReq *projectv1.SetWorktreeLineageRequest
+	git := &fakeGitGatewayServiceClient{}
+	project := &fakeProjectServiceClient{
+		setWorktreeLineageFunc: func(_ context.Context, in *projectv1.SetWorktreeLineageRequest) (*projectv1.SetWorktreeLineageResponse, error) {
+			gotReq = in
+			return &projectv1.SetWorktreeLineageResponse{Worktree: &projectv1.Worktree{Id: "wt-1", ParentWorktreeId: in.ParentWorktreeId}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.set",
+		argsJSON(t, map[string]any{"worktree": "id:wt-1", "parentWorktree": "id:parent-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !project.calledSetWorktreeLineage {
+		t.Fatal("expected projectClient.SetWorktreeLineage to be called")
+	}
+	if gotReq.GetClearParent() {
+		t.Error("expected ClearParent=false when a parentWorktree is supplied")
+	}
+	if gotReq.ParentWorktreeId == nil || *gotReq.ParentWorktreeId != "parent-1" {
+		t.Errorf("expected ParentWorktreeId=parent-1 (id: prefix stripped), got %v", gotReq.ParentWorktreeId)
+	}
+}
+
+// TestWorktreeSetChannel_ClearsLineage covers the {worktree, noParent: true}
+// shape.
+func TestWorktreeSetChannel_ClearsLineage(t *testing.T) {
+	var gotReq *projectv1.SetWorktreeLineageRequest
+	git := &fakeGitGatewayServiceClient{}
+	project := &fakeProjectServiceClient{
+		setWorktreeLineageFunc: func(_ context.Context, in *projectv1.SetWorktreeLineageRequest) (*projectv1.SetWorktreeLineageResponse, error) {
+			gotReq = in
+			return &projectv1.SetWorktreeLineageResponse{Worktree: &projectv1.Worktree{Id: "wt-1"}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.set",
+		argsJSON(t, map[string]any{"worktree": "id:wt-1", "noParent": true}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !project.calledSetWorktreeLineage {
+		t.Fatal("expected projectClient.SetWorktreeLineage to be called")
+	}
+	if !gotReq.GetClearParent() {
+		t.Error("expected ClearParent=true for noParent:true")
+	}
+	if gotReq.ParentWorktreeId != nil {
+		t.Errorf("expected ParentWorktreeId unset when clearing, got %v", gotReq.ParentWorktreeId)
 	}
 }
 

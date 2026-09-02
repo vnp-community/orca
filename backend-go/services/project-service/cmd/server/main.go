@@ -155,6 +155,8 @@ func run() error {
 	listWorktreesUC := usecase.NewListWorktrees(worktreeRepo, repo, opa)
 	setWorktreeActivationUC := usecase.NewSetWorktreeActivation(worktreeRepo)
 	renameWorktreeUC := usecase.NewRenameWorktree(worktreeRepo)
+	updateWorktreeMetaUC := usecase.NewUpdateWorktreeMeta(worktreeRepo)
+	setWorktreeLineageUC := usecase.NewSetWorktreeLineage(worktreeRepo)
 	listWorktreeLineageUC := usecase.NewListWorktreeLineage(worktreeRepo)
 
 	createProjectGroupUC := usecase.NewCreateProjectGroup(projectGroupRepo)
@@ -204,6 +206,8 @@ func run() error {
 		ListWorktrees:         listWorktreesUC,
 		SetWorktreeActivation: setWorktreeActivationUC,
 		RenameWorktree:        renameWorktreeUC,
+		UpdateWorktreeMeta:    updateWorktreeMetaUC,
+		SetWorktreeLineage:    setWorktreeLineageUC,
 		ListWorktreeLineage:   listWorktreeLineageUC,
 
 		CreateProjectGroup: createProjectGroupUC,

@@ -44,6 +44,8 @@ const (
 	ProjectService_ListWorktrees_FullMethodName                = "/orca.project.v1.ProjectService/ListWorktrees"
 	ProjectService_SetWorktreeActivation_FullMethodName        = "/orca.project.v1.ProjectService/SetWorktreeActivation"
 	ProjectService_RenameWorktree_FullMethodName               = "/orca.project.v1.ProjectService/RenameWorktree"
+	ProjectService_UpdateWorktreeMeta_FullMethodName           = "/orca.project.v1.ProjectService/UpdateWorktreeMeta"
+	ProjectService_SetWorktreeLineage_FullMethodName           = "/orca.project.v1.ProjectService/SetWorktreeLineage"
 	ProjectService_ListWorktreeLineage_FullMethodName          = "/orca.project.v1.ProjectService/ListWorktreeLineage"
 	ProjectService_CreateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/CreateProjectGroup"
 	ProjectService_UpdateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/UpdateProjectGroup"
@@ -114,6 +116,22 @@ type ProjectServiceClient interface {
 	ListWorktrees(ctx context.Context, in *ListWorktreesRequest, opts ...grpc.CallOption) (*ListWorktreesResponse, error)
 	SetWorktreeActivation(ctx context.Context, in *SetWorktreeActivationRequest, opts ...grpc.CallOption) (*SetWorktreeActivationResponse, error)
 	RenameWorktree(ctx context.Context, in *RenameWorktreeRequest, opts ...grpc.CallOption) (*RenameWorktreeResponse, error)
+	// UpdateWorktreeMeta persists the frontend's WorktreeMeta fields
+	// (displayName/comment/isPinned/pushTarget/sparse*/... — see
+	// frontend/src/shared/types.ts's WorktreeMeta) that desktop already
+	// durably persists locally (orca-data.json) but backend-go previously
+	// dropped entirely (worktree.set only ever forwarded `active`). metadata
+	// is a partial patch, merged shallowly into the stored JSON blob — an
+	// explicit JSON null clears a field, an omitted key leaves it untouched,
+	// matching the frontend's own Partial<WorktreeMeta> spread semantics.
+	// Deliberately NOT a per-field message: WorktreeMeta gains fields often
+	// and independently of this proto; a typed field per key would drift
+	// constantly and buys no real validation this backend can act on anyway.
+	UpdateWorktreeMeta(ctx context.Context, in *UpdateWorktreeMetaRequest, opts ...grpc.CallOption) (*UpdateWorktreeMetaResponse, error)
+	// SetWorktreeLineage re-parents (or clears the parent of) an
+	// already-created worktree — worktrees.ts's setWorktreeLineageForRuntime,
+	// distinct from RecordWorktreeCreated's creation-time lineage capture.
+	SetWorktreeLineage(ctx context.Context, in *SetWorktreeLineageRequest, opts ...grpc.CallOption) (*SetWorktreeLineageResponse, error)
 	// ListWorktreeLineage returns every worktree with an explicitly-captured
 	// parent (tenant-scoped via RLS, no request params — mirrors the old TS
 	// backend's worktree.lineageList, explicit-capture only per
@@ -408,6 +426,26 @@ func (c *projectServiceClient) RenameWorktree(ctx context.Context, in *RenameWor
 	return out, nil
 }
 
+func (c *projectServiceClient) UpdateWorktreeMeta(ctx context.Context, in *UpdateWorktreeMetaRequest, opts ...grpc.CallOption) (*UpdateWorktreeMetaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateWorktreeMetaResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateWorktreeMeta_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) SetWorktreeLineage(ctx context.Context, in *SetWorktreeLineageRequest, opts ...grpc.CallOption) (*SetWorktreeLineageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetWorktreeLineageResponse)
+	err := c.cc.Invoke(ctx, ProjectService_SetWorktreeLineage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *projectServiceClient) ListWorktreeLineage(ctx context.Context, in *ListWorktreeLineageRequest, opts ...grpc.CallOption) (*ListWorktreeLineageResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListWorktreeLineageResponse)
@@ -638,6 +676,22 @@ type ProjectServiceServer interface {
 	ListWorktrees(context.Context, *ListWorktreesRequest) (*ListWorktreesResponse, error)
 	SetWorktreeActivation(context.Context, *SetWorktreeActivationRequest) (*SetWorktreeActivationResponse, error)
 	RenameWorktree(context.Context, *RenameWorktreeRequest) (*RenameWorktreeResponse, error)
+	// UpdateWorktreeMeta persists the frontend's WorktreeMeta fields
+	// (displayName/comment/isPinned/pushTarget/sparse*/... — see
+	// frontend/src/shared/types.ts's WorktreeMeta) that desktop already
+	// durably persists locally (orca-data.json) but backend-go previously
+	// dropped entirely (worktree.set only ever forwarded `active`). metadata
+	// is a partial patch, merged shallowly into the stored JSON blob — an
+	// explicit JSON null clears a field, an omitted key leaves it untouched,
+	// matching the frontend's own Partial<WorktreeMeta> spread semantics.
+	// Deliberately NOT a per-field message: WorktreeMeta gains fields often
+	// and independently of this proto; a typed field per key would drift
+	// constantly and buys no real validation this backend can act on anyway.
+	UpdateWorktreeMeta(context.Context, *UpdateWorktreeMetaRequest) (*UpdateWorktreeMetaResponse, error)
+	// SetWorktreeLineage re-parents (or clears the parent of) an
+	// already-created worktree — worktrees.ts's setWorktreeLineageForRuntime,
+	// distinct from RecordWorktreeCreated's creation-time lineage capture.
+	SetWorktreeLineage(context.Context, *SetWorktreeLineageRequest) (*SetWorktreeLineageResponse, error)
 	// ListWorktreeLineage returns every worktree with an explicitly-captured
 	// parent (tenant-scoped via RLS, no request params — mirrors the old TS
 	// backend's worktree.lineageList, explicit-capture only per
@@ -756,6 +810,12 @@ func (UnimplementedProjectServiceServer) SetWorktreeActivation(context.Context, 
 }
 func (UnimplementedProjectServiceServer) RenameWorktree(context.Context, *RenameWorktreeRequest) (*RenameWorktreeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RenameWorktree not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateWorktreeMeta(context.Context, *UpdateWorktreeMetaRequest) (*UpdateWorktreeMetaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateWorktreeMeta not implemented")
+}
+func (UnimplementedProjectServiceServer) SetWorktreeLineage(context.Context, *SetWorktreeLineageRequest) (*SetWorktreeLineageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetWorktreeLineage not implemented")
 }
 func (UnimplementedProjectServiceServer) ListWorktreeLineage(context.Context, *ListWorktreeLineageRequest) (*ListWorktreeLineageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWorktreeLineage not implemented")
@@ -1282,6 +1342,42 @@ func _ProjectService_RenameWorktree_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_UpdateWorktreeMeta_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateWorktreeMetaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateWorktreeMeta(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateWorktreeMeta_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateWorktreeMeta(ctx, req.(*UpdateWorktreeMetaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_SetWorktreeLineage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetWorktreeLineageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).SetWorktreeLineage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_SetWorktreeLineage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).SetWorktreeLineage(ctx, req.(*SetWorktreeLineageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ProjectService_ListWorktreeLineage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListWorktreeLineageRequest)
 	if err := dec(in); err != nil {
@@ -1712,6 +1808,14 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RenameWorktree",
 			Handler:    _ProjectService_RenameWorktree_Handler,
+		},
+		{
+			MethodName: "UpdateWorktreeMeta",
+			Handler:    _ProjectService_UpdateWorktreeMeta_Handler,
+		},
+		{
+			MethodName: "SetWorktreeLineage",
+			Handler:    _ProjectService_SetWorktreeLineage_Handler,
 		},
 		{
 			MethodName: "ListWorktreeLineage",

@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package orca.project.v1;
 
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1;projectv1";
@@ -56,6 +57,22 @@ service ProjectService {
   rpc ListWorktrees(ListWorktreesRequest) returns (ListWorktreesResponse);
   rpc SetWorktreeActivation(SetWorktreeActivationRequest) returns (SetWorktreeActivationResponse);
   rpc RenameWorktree(RenameWorktreeRequest) returns (RenameWorktreeResponse);
+  // UpdateWorktreeMeta persists the frontend's WorktreeMeta fields
+  // (displayName/comment/isPinned/pushTarget/sparse*/... — see
+  // frontend/src/shared/types.ts's WorktreeMeta) that desktop already
+  // durably persists locally (orca-data.json) but backend-go previously
+  // dropped entirely (worktree.set only ever forwarded `active`). metadata
+  // is a partial patch, merged shallowly into the stored JSON blob — an
+  // explicit JSON null clears a field, an omitted key leaves it untouched,
+  // matching the frontend's own Partial<WorktreeMeta> spread semantics.
+  // Deliberately NOT a per-field message: WorktreeMeta gains fields often
+  // and independently of this proto; a typed field per key would drift
+  // constantly and buys no real validation this backend can act on anyway.
+  rpc UpdateWorktreeMeta(UpdateWorktreeMetaRequest) returns (UpdateWorktreeMetaResponse);
+  // SetWorktreeLineage re-parents (or clears the parent of) an
+  // already-created worktree — worktrees.ts's setWorktreeLineageForRuntime,
+  // distinct from RecordWorktreeCreated's creation-time lineage capture.
+  rpc SetWorktreeLineage(SetWorktreeLineageRequest) returns (SetWorktreeLineageResponse);
   // ListWorktreeLineage returns every worktree with an explicitly-captured
   // parent (tenant-scoped via RLS, no request params — mirrors the old TS
   // backend's worktree.lineageList, explicit-capture only per
@@ -345,6 +362,11 @@ message Worktree {
   optional string coordinator_handle = 13;
   optional string created_by_terminal_handle = 14;
   int64 created_at_unix_ms = 15;
+
+  // Opaque UI-authored metadata blob — see UpdateWorktreeMetaRequest's doc
+  // comment. Unset (nil) when a worktree has never had UpdateWorktreeMeta
+  // called for it (e.g. every worktree created before this field existed).
+  google.protobuf.Struct metadata = 16;
 }
 
 message RecordWorktreeCreatedRequest {
@@ -400,6 +422,31 @@ message RenameWorktreeRequest {
 }
 
 message RenameWorktreeResponse {
+  Worktree worktree = 1;
+}
+
+message UpdateWorktreeMetaRequest {
+  string worktree_id = 1;
+  // Partial patch, merged shallowly (Postgres jsonb `||`) into the stored
+  // metadata blob — an explicit JSON null clears a field, an omitted key
+  // leaves the previously-stored value untouched.
+  google.protobuf.Struct metadata = 2;
+}
+
+message UpdateWorktreeMetaResponse {
+  Worktree worktree = 1;
+}
+
+message SetWorktreeLineageRequest {
+  string worktree_id = 1;
+  // Unset + clear_parent=false is a no-op read-modify-write (returns the
+  // worktree unchanged); set clear_parent=true to remove an existing
+  // parent instead of supplying a new one.
+  optional string parent_worktree_id = 2;
+  bool clear_parent = 3;
+}
+
+message SetWorktreeLineageResponse {
   Worktree worktree = 1;
 }
 

@@ -343,6 +343,14 @@ func (f *fakeProjectServiceClient) RenameWorktree(_ context.Context, in *project
 	return f.renameWorktreeResp, nil
 }
 
+func (f *fakeProjectServiceClient) UpdateWorktreeMeta(_ context.Context, _ *projectv1.UpdateWorktreeMetaRequest, _ ...grpc.CallOption) (*projectv1.UpdateWorktreeMetaResponse, error) {
+	return &projectv1.UpdateWorktreeMetaResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) SetWorktreeLineage(_ context.Context, _ *projectv1.SetWorktreeLineageRequest, _ ...grpc.CallOption) (*projectv1.SetWorktreeLineageResponse, error) {
+	return &projectv1.SetWorktreeLineageResponse{}, nil
+}
+
 func (f *fakeProjectServiceClient) CreateProjectGroup(_ context.Context, in *projectv1.CreateProjectGroupRequest, _ ...grpc.CallOption) (*projectv1.CreateProjectGroupResponse, error) {
 	f.lastCreateProjectGroupReq = in
 	if f.createProjectGroupErr != nil {

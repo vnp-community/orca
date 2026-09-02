@@ -2095,6 +2095,142 @@ entry's table item #4 already flagged, now doubly confirmed) — flagged
 here rather than silently left undisclosed; a human with access to that
 host can remove `/tmp/orca-final-verify-v55` and `/tmp/orca-final-v56`.
 
+## Thirty-fifth: `worktree.set`'s metadata blob, `git.status`'s wire-key regression, and confirming `worktree.list`'s repo-scoping gap was never real
+
+Follow-up to commit 444069cd7's three known-follow-up gaps, done at your
+explicit request. Three separate items — a real design/schema change, an
+investigation that concluded "no fix needed", and a live-log regression
+found and fixed along the way.
+
+**1. `worktree.set` only ever forwarded `active` — every other WorktreeMeta
+field was silently dropped.** `worktree.set` serves THREE frontend purposes
+under one wire channel (`persistWorktreeMeta`/`setWorktreeLineageForRuntime`/
+the activation toggle, all in `worktrees.ts`), but only the third had a
+backend usecase at all.
+
+- **Design decision**: checked whether desktop treats
+  isPinned/isUnread/sortOrder/manualOrder/workspaceStatus/comment/
+  pushTarget/sparseDirectories/sparseBaseRef/sparsePresetId as pure
+  ephemeral UI state before deciding scope — it doesn't. Desktop's
+  `store.setWorktreeMeta` durably persists the ENTIRE `WorktreeMeta` object
+  (every field, `frontend/src/shared/types.ts:583-650`) to
+  `orca-data.json`, with no filtering. So backend-go giving these fields no
+  persistence at all was a real gap, not an intentional client-local
+  scoping — the fix gives real, durable, cross-device persistence to match.
+  Chose a single `metadata JSONB` column on `project.worktrees` (migration
+  `0013_worktree_metadata`) over one column per field: `WorktreeMeta` gains
+  fields often and independently of this schema, desktop already treats it
+  as an opaque per-field blob, and this backend never validates individual
+  keys — a typed column per key would need a migration on every frontend
+  addition for no real validation this backend acts on. Same JSONB-blob
+  convention as `tenant.tenants/user_profiles/team_profiles`'s
+  `settings_json`.
+- New `UpdateWorktreeMetaRequest`/`Response` RPC (project.proto) carrying a
+  `google.protobuf.Struct metadata` partial patch, shallow-merged into the
+  stored blob via Postgres jsonb's `||` operator (new keys added, existing
+  keys overwritten — including an explicit JSON `null`, matching the
+  frontend's own `encodePushTargetClearForRuntimeRpc` "null clears a field"
+  wire convention — untouched keys left alone). New `UpdateWorktreeMeta`
+  usecase (project-service), mirrors `SetWorktreeActivation`'s size/shape.
+- Lineage-setting (`setWorktreeLineageForRuntime`'s `{parentWorktree}`/
+  `{noParent}`) had no post-creation usecase at all — `RecordWorktreeCreated`
+  only captures lineage at creation time. New `SetWorktreeLineageRequest`/
+  `Response` RPC + `SetWorktreeLineage` usecase, reusing the existing
+  `parent_worktree_id`/`capture_confidence` columns from migration 0009.
+- `channels_worktree.go`'s `worktree.set` handler now decodes args as a
+  generic `map[string]json.RawMessage` and dispatches on which top-level
+  keys are present — `active` → `SetWorktreeActivation`,
+  `parentWorktree`/`noParent` → `SetWorktreeLineage`, every other key →
+  `UpdateWorktreeMeta` — calling as many as apply in one request, matching
+  the single frontend channel name's multi-purpose reality. The response
+  (`worktree.list`/`worktree.set`, both switched from the old fixed-field
+  `worktreeView` struct to a `map[string]any`-based
+  `worktreeResponseFromProto`) now spreads the persisted metadata blob on
+  top of the typed core-git fields, so a caller reading `result.worktree.
+  displayName`/`.isPinned`/etc. gets the real persisted value, not always a
+  zero default. `worktree.create`'s own response is unchanged (still a
+  hand-built echo from the request, not read back from storage) — its
+  displayName/linkedIssue/etc. args are still not persisted at creation
+  time; flagged as a follow-up, not silently dropped.
+- New real-Postgres integration tests
+  (`worktree_repository_test.go`) prove the jsonb merge/null-clear
+  semantics and the lineage set/clear round-trip against a live
+  `postgres:16-alpine` container, not just fakes.
+
+**2. `worktree.list`'s "no repo_id filter" gap — investigated and confirmed
+NOT a real gap**, per this session's own instruction to verify before
+adding a proto field. `worktree.detectedList` (the one live UI path with
+this need) already has both `projectId` and `repoId` at every real call
+site and already scopes correctly — not via a repoId filter on
+`ListWorktreesRequest`, but because `git-gateway-service`'s
+`DetectWorktrees(RepoId)` is itself repo-scoped and `mergeDetectedWorktrees`
+joins its result against project-service's (unfiltered) list by path. The
+one call site that sends `{repoId}` with no `projectId
+`(`web-preload-api.ts`'s `worktrees.list`, feeding `worktrees.ts`'s
+`listDetectedWorktreesForRepo` local-mode fallback) is explicitly documented
+by that file's own comment as unreachable on this deployment (only used
+when a runtime server lacks `worktree.detectedList`, which this one
+doesn't) — and even there, the enclosing caller already has `projectId` in
+scope via `repoProjectId()` before falling back to the narrower interface.
+No proto/schema change made; `worktree.list`'s stale gap comment updated to
+record this finding instead.
+
+**3. Live regression found mid-investigation: `git.status` decoded the
+wrong wire key, tripping `GITGATEWAY_MISSING_WORKTREE_ID` on every single
+call.** Investigating the `GITGATEWAY_MISSING_WORKTREE_ID` log noise (seen
+repeating in git-gateway-service's logs before this session's prior
+restart) found the real cause was NOT a mount-timing race as suspected —
+every frontend call site already guards on a valid worktree before firing.
+`channels.go`'s `git.status` handler decoded `worktreeId`, but every real
+caller (`WorkspaceContext.tsx`, `useGit.ts`, `use-code-review.ts`,
+`runtime-git-client.ts`, `web-preload-api.ts`'s `status`) sends the
+selector under `worktree` (`toRuntimeWorktreeSelector`, `id:`-prefixed) —
+Go's `json.Unmarshal` doesn't error on an unmatched field, so `WorktreeId`
+was empty on literally every call, 100% of the time, not intermittently.
+Fixed to decode `worktree` + `stripWorktreeSelectorPrefix`, matching the
+convention `channels_worktree.go`'s `worktree.rm`/`worktree.set` already
+established. New regression test `TestGitStatusChannel_DecodesWorktreeSelector`
+(this handler had no test coverage at all before).
+
+Also found, NOT fixed here (flagged as a separate follow-up): `repo.
+hooksCheck` and its three siblings (`repo.issueCommandRead/Write`,
+`repo.setupScriptImports`, all in `channels_repo_ssh_status_workspace.go`)
+have the same `worktreeId`-vs-caller-sends-`repo` mismatch, but it's a
+deeper design gap, not a key rename — these callers only ever have a repo
+id in scope, never a worktree id, for an RPC that's genuinely
+worktree-scoped server-side (`CheckHooks`'s `ConnectionResolver` resolves
+by worktree, not repo). A real fix needs a repo-scoped resolution path in
+git-gateway-service (e.g. resolving a repo's own default/main worktree
+server-side, since git hooks live in the shared `.git/hooks` dir regardless
+of which worktree), touching 4 usecases — out of scope for this pass.
+
+**Verification**: `go build`/`go vet`/`go test ./...` clean across
+api-gateway, project-service, and git-gateway-service (git-gateway-service
+untouched by this pass, confirmed clean regardless). New real-Postgres
+integration tests for `UpdateWorktreeMeta`/`SetWorktreeLineage`
+(`-tags=integration`, via `testcontainers` + `postgres:16-alpine`), new
+usecase unit tests, new wscompat dispatch tests
+(`TestWorktreeSetChannel_PersistsMetaFields`/`_SetsLineageParent`/
+`_ClearsLineage`) and the `git.status` regression test above — all passing.
+`mcp__gitnexus__detect_changes` reported LOW risk, zero affected execution
+flows, and confirmed git-gateway-service/desktop/frontend were correctly
+untouched (the wide `ProjectGroup`/`FolderWorkspace` symbol churn it also
+reported is `buf generate`'s usual line-shift noise across the whole
+regenerated `project.pb.go`, not a real change — same class of noise this
+session's earlier proto regens have already produced). Proto regenerated
+via `buf generate` and confirmed compiling everywhere referenced. Migration
+`0013_worktree_metadata` applied live via `docker compose run --rm
+migrate-project` on b15.openledger.vn BEFORE swapping binaries; both
+`project-service` and `api-gateway` cross-compiled
+(`CGO_ENABLED=0 GOOS=linux GOARCH=amd64`), deployed via
+scp-to-temp-then-mv-then-restart, confirmed clean restart via logs (no
+errors in either service's logs post-restart). Could not positively
+reconfirm zero-recurrence of `GITGATEWAY_MISSING_WORKTREE_ID` under live
+traffic post-deploy — no active terminal/browser session was generating
+`git.status`/`repo.hooksCheck` calls in the verification window — but the
+fix is code- and unit-test-verified, and the previously-100%-reproducing
+key mismatch is unambiguously the root cause per the wire-format read.
+
 ## Dependency order (as executed)
 
 ```
