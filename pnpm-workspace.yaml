@@ -3,3 +3,5 @@ packages:
   - 'backend'
   - 'agent'
   - 'desktop'
+  - 'emulator'
+  - 'packages/dev-agent-transport'

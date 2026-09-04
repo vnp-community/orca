@@ -388,6 +388,42 @@ describe('agent-git-handler — worktree tracing', () => {
     expect(deleteStart?.id).toBe('xyz789')
     expect(gitStart?.id).toBe('xyz789') // nối tiếp id xuống agent:git qua _trace forward
   })
+
+  // git-gateway-service's CreateWorktreeInput.BaseRef was previously silently
+  // ignored (no wire param for it at all) — this covers the new optional
+  // start-point support: the new branch is created FROM baseRef, not cwd's
+  // current HEAD.
+  it('handleGitWorktreeAdd branches from baseRef when provided, not cwd HEAD', async () => {
+    // Advance repoDir's HEAD past baseCommit — the new worktree's branch
+    // should still point at baseCommit, not this later commit.
+    const baseCommit = execSync('git rev-parse HEAD', { cwd: repoDir }).toString().trim()
+    execSync('git commit -q --allow-empty -m later', { cwd: repoDir })
+
+    const wtPath = join(repoDir, 'wt-baseref')
+    const resp = await handleGitWorktreeAdd(
+      1,
+      { path: wtPath, branch: 'feature/from-base', createBranch: true, cwd: repoDir, baseRef: baseCommit },
+      mockConfig, mockLog
+    ) as any
+    expect(resp.result).toBeDefined()
+
+    const wtHead = execSync('git rev-parse HEAD', { cwd: wtPath }).toString().trim()
+    expect(wtHead).toBe(baseCommit)
+  })
+
+  it('handleGitWorktreeAdd omits baseRef arg when not provided (defaults to cwd HEAD)', async () => {
+    const wtPath = join(repoDir, 'wt-no-baseref')
+    const resp = await handleGitWorktreeAdd(
+      1,
+      { path: wtPath, branch: 'feature/no-base', createBranch: true, cwd: repoDir },
+      mockConfig, mockLog
+    ) as any
+    expect(resp.result).toBeDefined()
+
+    const repoHead = execSync('git rev-parse HEAD', { cwd: repoDir }).toString().trim()
+    const wtHead = execSync('git rev-parse HEAD', { cwd: wtPath }).toString().trim()
+    expect(wtHead).toBe(repoHead)
+  })
 })
 
 // ─── git.exec 'commit' — per-connection identity (BUG-AG-HLD-003 parity) ─────

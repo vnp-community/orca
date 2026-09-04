@@ -13,7 +13,7 @@ import {
   type JsonRpcRequest,
   type JsonRpcResponse,
   type JsonRpcNotification
-} from './relay-protocol'
+} from 'orca-dev-agent-transport'
 
 export type MultiplexerTransport = {
   write: (data: Buffer) => void

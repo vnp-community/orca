@@ -22,8 +22,9 @@ import {
   decodeFrame,
   encodeDataFrame,
   encodeKeepaliveFrame,
-  parseJsonPayload
-} from './agent-wire'
+  parseJsonPayload,
+  MessageType
+} from 'orca-dev-agent-transport'
 import { createRpcDispatcher } from './agent-rpc-dispatch'
 import type { JsonRpcRequest } from './agent-rpc-dispatch'
 import {
@@ -31,11 +32,11 @@ import {
   AGENT_KEEPALIVE_INTERVAL_MS,
   AGENT_TIMEOUT_MS
 } from '../shared/agent-wire-protocol'
-import { MessageType } from '../main/ssh/relay-protocol'
 import { createTracer } from '../shared/trace'
 import { cleanupAllPtys } from './agent-spawner'
 import { notifyDaemonSessionClosed } from './pty-daemon-client'
 import { cleanupAgentWatches } from './fs-agent-extensions'
+import { startRemoteRuntimeSocketLiveness } from '../shared/remote-runtime-socket-liveness'
 
 const sessionTracer = createTracer('agent:session')
 
@@ -58,14 +59,19 @@ export function createSession(
   tokenOverride?: string
 ): AgentSession {
   let keepaliveTimer: ReturnType<typeof setInterval> | null = null
-  let idleWatchdogTimer: ReturnType<typeof setInterval> | null = null
   // Why: AGENT_TIMEOUT_MS ("if no frame received in 20000ms → close
   // connection") was declared as a wire-protocol constant but never actually
-  // enforced anywhere — see specs/agent/api/gaps-and-findings.md #8. Track the
-  // last time ANY frame (data or keepalive) was received so a watchdog can
-  // detect and close a connection whose peer has gone dark without a clean
-  // TCP close (e.g. a network partition), instead of leaking it forever.
-  let lastFrameReceivedAt = Date.now()
+  // enforced anywhere — see specs/agent/api/gaps-and-findings.md #8. The
+  // first fix (a bespoke lastFrameReceivedAt timer calling ws.close()) still
+  // failed to recover a genuinely half-open socket live in production for
+  // hours: close() performs the real WS closing handshake, which needs the
+  // peer to respond — a peer that's actually gone (no RST received) leaves
+  // that handshake hanging for the OS's TCP retransmission timeout. Reuse
+  // the shared liveness monitor that already solves this correctly
+  // (agent/src/shared/remote-runtime-client.ts's own connection, same
+  // failure mode) — it calls ws.terminate() instead, which tears the socket
+  // down locally without waiting on the peer.
+  let liveness: ReturnType<typeof startRemoteRuntimeSocketLiveness> | null = null
   let handshakeDone = false
   const handshakeOkCallbacks: (() => void)[] = []
   const dispatcher = createRpcDispatcher(tools, config, log)
@@ -238,18 +244,33 @@ export function createSession(
     }, AGENT_KEEPALIVE_INTERVAL_MS)
   }
 
-  function startIdleWatchdog(ws: WebSocket, span: ReturnType<typeof sessionTracer.start>): void {
-    idleWatchdogTimer = setInterval(() => {
-      if (ws.readyState !== 1 /* WebSocket.OPEN */) {
-        return
-      }
-      const idleMs = Date.now() - lastFrameReceivedAt
-      if (idleMs >= AGENT_TIMEOUT_MS) {
-        log.warn(`Idle timeout: no frame received in ${idleMs}ms (limit ${AGENT_TIMEOUT_MS}ms) — closing connection`)
-        span.fail(`idle timeout: ${idleMs}ms`, { idleMs })
-        ws.close(1001, 'idle timeout - no frames received')
-      }
-    }, AGENT_KEEPALIVE_INTERVAL_MS)
+  function startLiveness(ws: WebSocket, span: ReturnType<typeof sessionTracer.start>): void {
+    liveness = startRemoteRuntimeSocketLiveness({
+      ping: () => {
+        if (ws.readyState === 1 /* WebSocket.OPEN */) {
+          try {
+            ws.ping()
+          } catch {
+            // socket already mid-teardown — the 'close' handler settles it
+          }
+        }
+      },
+      onDead: () => {
+        // Mirrors the old watchdog's own guard: only act while the socket
+        // still believes it's open — an already-closed/closing ws (e.g. the
+        // peer sent a clean close moments before the liveness window
+        // elapsed) needs no further action here.
+        if (ws.readyState !== 1 /* WebSocket.OPEN */) {
+          return
+        }
+        log.warn(`Idle timeout: no frame/ping/pong received — terminating connection`)
+        span.fail('idle timeout (liveness monitor)')
+        // NOT ws.close() — see the `liveness` field's doc comment above for
+        // why a real half-open socket needs terminate(), not close().
+        ws.terminate()
+      },
+      options: { pingIntervalMs: AGENT_KEEPALIVE_INTERVAL_MS, livenessTimeoutMs: AGENT_TIMEOUT_MS }
+    })
   }
 
   return {
@@ -263,9 +284,8 @@ export function createSession(
         void sendHandshake(ws, wireState)
           .then(() => {
             span.step('handshake-sent')
-            lastFrameReceivedAt = Date.now()
             startKeepalive(ws, wireState)
-            startIdleWatchdog(ws, span)
+            startLiveness(ws, span)
           })
           .catch((err: unknown) => {
             const msg = err instanceof Error ? err.message : String(err)
@@ -296,8 +316,8 @@ export function createSession(
           return
         }
         // Any successfully-decoded frame (data or keepalive) counts as
-        // liveness for the idle watchdog — see startIdleWatchdog().
-        lastFrameReceivedAt = Date.now()
+        // liveness for the connection-health monitor — see startLiveness().
+        liveness?.noteActivity()
         // TEMP DIAG BUG-FE-PTY-001
         log.info(
           `[DIAG BUG-FE-PTY-001] recv frame type=${frame.type} seq=${frame.seq} ack=${frame.ack} len=${frame.length} readyState=${ws.readyState} t=${Date.now()}`
@@ -365,6 +385,14 @@ export function createSession(
         }
       })
 
+      // Why a pong handler when nothing ever explicitly waits on one: the
+      // liveness monitor's own contract counts pings/pongs as activity too
+      // (not just data frames) — startLiveness()'s ping() call above emits
+      // an RFC 6455 control-frame ping every tick, and the peer answers it
+      // automatically at the protocol layer even if the app-level KeepAlive
+      // frame stream ever stalled for some other reason.
+      ws.on('pong', () => liveness?.noteActivity())
+
       ws.on('close', (code: number, reason: Buffer) => {
         this.stop()
         const reasonStr = reason.toString()
@@ -387,9 +415,9 @@ export function createSession(
         clearInterval(keepaliveTimer)
         keepaliveTimer = null
       }
-      if (idleWatchdogTimer !== null) {
-        clearInterval(idleWatchdogTimer)
-        idleWatchdogTimer = null
+      if (liveness !== null) {
+        liveness.stop()
+        liveness = null
       }
       // ORCH-011: Kill any orphaned agent-spawned (agent.spawn) PTYs — a
       // separate PTY population from pty.create terminals, with no reattach

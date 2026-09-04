@@ -242,10 +242,16 @@ describe('handleFsStat', () => {
     expect(resp.result.mode.length).toBeGreaterThan(0)
   })
 
-  it('returns error for non-existent path', async () => {
+  it('returns PathNotFound (not the generic ServerError) for non-existent path', async () => {
+    // Regression guard: desktop's fs:pathExists handler tells "doesn't exist"
+    // apart from a real failure by this code, not by parsing the message —
+    // ServerError here made every Dev-Server-relay existence check
+    // indistinguishable from a genuine error (see fs-agent-extensions.ts's
+    // handleFsStat doc comment).
     const resp = await handleFsStat(1, { path: '/nonexistent/path/xyz-abc' }, makeConfig()) as any
     expect(resp.error).toBeDefined()
-    expect(resp.error.code).toBeDefined()
+    expect(resp.error.code).toBe(-33003)
+    expect(resp.error.message).toContain('Not found:')
   })
 
   it('returns InvalidParams for missing path param', async () => {

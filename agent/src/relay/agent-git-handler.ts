@@ -14,8 +14,8 @@
 
 import { spawn } from 'node:child_process'
 import type WebSocket from 'ws'
-import { encodeDataFrame } from './agent-wire'
-import type { WireState } from './agent-wire'
+import { encodeDataFrame } from 'orca-dev-agent-transport'
+import type { WireState } from 'orca-dev-agent-transport'
 import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
@@ -416,10 +416,11 @@ export async function handleGitWorktreeAdd(
   config: AgentConfig,
   log:    AgentLogger
 ): Promise<object> {
-  const worktreePath = typeof params.path   === 'string' ? params.path.trim()   : ''
-  const branch       = typeof params.branch === 'string' ? params.branch.trim() : ''
+  const worktreePath = typeof params.path    === 'string' ? params.path.trim()    : ''
+  const branch       = typeof params.branch  === 'string' ? params.branch.trim()  : ''
   const createBranch = params.createBranch === true
-  const cwd          = typeof params.cwd    === 'string' ? params.cwd           : config.workDir
+  const baseRef      = typeof params.baseRef === 'string' ? params.baseRef.trim() : ''
+  const cwd          = typeof params.cwd     === 'string' ? params.cwd            : config.workDir
 
   const span = Tracers.worktreeCreate.start({ path: worktreePath, branch, cwd }, resumeFrom(params))
 
@@ -443,8 +444,13 @@ export async function handleGitWorktreeAdd(
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.InvalidParams, message: msg } }
   }
 
+  // baseRef is an optional start-point for the new branch (git-gateway-
+  // service's CreateWorktreeInput.BaseRef) — only meaningful when creating a
+  // branch; omitted, `git worktree add -b` defaults to cwd's HEAD.
   const args = createBranch
-    ? ['worktree', 'add', '-b', branch, worktreePath]
+    ? (baseRef
+        ? ['worktree', 'add', '-b', branch, worktreePath, baseRef]
+        : ['worktree', 'add', '-b', branch, worktreePath])
     : ['worktree', 'add', worktreePath, branch]
 
   span.step('git-worktree-add-exec', { branch })

@@ -2,7 +2,13 @@
 // 13-byte framing header matching VS Code's PersistentProtocol wire format.
 // See design-ssh-support.md § JSON-RPC Protocol Specification.
 
-import { DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS } from '../../shared/ssh-types'
+// Mirrors DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS from agent/src/shared/ssh-types.ts.
+// Copied (not imported cross-package): ssh-types.ts is a broad SSH-target
+// management domain file (SshTarget, port forwards, etc.) used deep inside
+// agent/'s git/ssh workflow code — not itself part of the wire-protocol
+// codec, and pulling it into this package would also create a circular
+// workspace dependency (agent/ depends on this package for the codec).
+const DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS = 0
 
 export const RELAY_VERSION = '0.1.0'
 export const RELAY_SENTINEL = `ORCA-RELAY v${RELAY_VERSION} READY\n`
