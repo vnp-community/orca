@@ -2148,13 +2148,21 @@ export type PreloadApi = {
       wslDistro?: string | null
     }) => Promise<ClaudeRateLimitAccountsState>
   }
+  // devServerId (all 6 methods, added alongside distro on the WSL 3):
+  // unused on desktop (registration always targets the local machine) —
+  // kept in the type only so it mirrors frontend/src/preload/api-types.ts's
+  // cli contract exactly; see that file's doc comment for why the web build
+  // needs it.
   cli: {
-    getInstallStatus: () => Promise<CliInstallStatus>
-    install: () => Promise<CliInstallStatus>
-    remove: () => Promise<CliInstallStatus>
-    getWslInstallStatus: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
-    installWsl: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
-    removeWsl: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
+    getInstallStatus: (args?: { devServerId?: string }) => Promise<CliInstallStatus>
+    install: (args?: { devServerId?: string }) => Promise<CliInstallStatus>
+    remove: (args?: { devServerId?: string }) => Promise<CliInstallStatus>
+    getWslInstallStatus: (args?: {
+      devServerId?: string
+      distro?: string | null
+    }) => Promise<CliInstallStatus>
+    installWsl: (args?: { devServerId?: string; distro?: string | null }) => Promise<CliInstallStatus>
+    removeWsl: (args?: { devServerId?: string; distro?: string | null }) => Promise<CliInstallStatus>
   }
   agentHooks: {
     claudeStatus: () => Promise<AgentHookInstallStatus>

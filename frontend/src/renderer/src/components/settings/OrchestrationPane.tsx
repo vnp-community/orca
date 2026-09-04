@@ -124,13 +124,13 @@ export function OrchestrationPane(): React.JSX.Element {
         getPrerequisiteStatus={() =>
           activeSkillRuntime.agentRuntime?.runtime === 'wsl'
             ? getRuntimeWslCliInstallStatus(getWslCliDistroRequest(activeSkillRuntime.agentRuntime))
-            : getRuntimeCliInstallStatus()
+            : getRuntimeCliInstallStatus(devServerId ?? undefined)
         }
         onBeforeOpenTerminal={async () => {
           useAppStore.getState().recordFeatureInteraction('agent-orchestration-setup')
           await (activeSkillRuntime.agentRuntime?.runtime === 'wsl'
             ? ensureWslCliAvailableForAgentSkillTerminal(activeSkillRuntime.agentRuntime)
-            : ensureOrcaCliAvailableForAgentSkillTerminal())
+            : ensureOrcaCliAvailableForAgentSkillTerminal({ devServerId: devServerId ?? undefined }))
         }}
         actionHint={
           // Installed updates stay on the primary panel so there is only one update path.

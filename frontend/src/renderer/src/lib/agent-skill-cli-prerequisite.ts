@@ -4,6 +4,11 @@ import { translate } from '@/i18n/i18n'
 import { getRuntimeCliInstallStatus, installRuntimeCli } from '@/runtime/runtime-cli-client'
 
 type EnsureOrcaCliAvailableOptions = {
+  // Which connected Dev Server to register the CLI on — required on the web
+  // build for this to do anything but return the "unsupported in the
+  // browser" stub, see runtime-cli-client.ts's doc comment. Unused on
+  // desktop (registration always targets the local machine).
+  devServerId?: string
   onStatusChange?: (status: CliInstallStatus) => void
   registrationPromptDelayMs?: number
 }
@@ -20,11 +25,12 @@ export function isOrcaCliAvailableOnPath(status: CliInstallStatus | null | undef
 }
 
 export async function ensureOrcaCliAvailableForAgentSkillTerminal({
+  devServerId,
   onStatusChange,
   registrationPromptDelayMs = 700
 }: EnsureOrcaCliAvailableOptions = {}): Promise<CliInstallStatus | null> {
   try {
-    const status = await getRuntimeCliInstallStatus()
+    const status = await getRuntimeCliInstallStatus(devServerId)
     onStatusChange?.(status)
 
     if (!status.supported) {
@@ -36,7 +42,7 @@ export async function ensureOrcaCliAvailableForAgentSkillTerminal({
       // Why: macOS may immediately show a native authorization prompt, so the
       // user needs app-level context before that OS dialog appears.
       await showOrcaCliRegistrationPromptToast(registrationPromptDelayMs)
-      const next = await installRuntimeCli()
+      const next = await installRuntimeCli(devServerId)
       onStatusChange?.(next)
       showCliPrerequisiteWarning(next)
       return next
