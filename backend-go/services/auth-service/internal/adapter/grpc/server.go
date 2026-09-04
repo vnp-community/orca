@@ -45,6 +45,9 @@ type Server struct {
 	getAdminStats                 *usecase.GetAdminStats
 
 	listTenantMemberDirectory *usecase.ListTenantMemberDirectory
+
+	startSsoLogin    *usecase.StartSsoLogin
+	completeSsoLogin *usecase.CompleteSsoLogin
 }
 
 func New(
@@ -69,6 +72,8 @@ func New(
 	deleteAccessPolicy *usecase.DeleteAccessPolicy,
 	getAdminStats *usecase.GetAdminStats,
 	listTenantMemberDirectory *usecase.ListTenantMemberDirectory,
+	startSsoLogin *usecase.StartSsoLogin,
+	completeSsoLogin *usecase.CompleteSsoLogin,
 ) *Server {
 	return &Server{
 		login:             login,
@@ -94,6 +99,9 @@ func New(
 		getAdminStats:                 getAdminStats,
 
 		listTenantMemberDirectory: listTenantMemberDirectory,
+
+		startSsoLogin:    startSsoLogin,
+		completeSsoLogin: completeSsoLogin,
 	}
 }
 
@@ -326,6 +334,32 @@ func (s *Server) GetAdminStats(ctx context.Context, req *authv1.GetAdminStatsReq
 	}, nil
 }
 
+// StartSsoLogin/CompleteSsoLogin are unauthenticated by necessity — like
+// Login, the caller has no session yet. api-gateway's GET /auth/sso/
+// {provider} and GET /auth/callback are the only callers (see
+// auth.proto's doc comment on the RPC).
+func (s *Server) StartSsoLogin(ctx context.Context, req *authv1.StartSsoLoginRequest) (*authv1.StartSsoLoginResponse, error) {
+	out, err := s.startSsoLogin.Execute(ctx, usecase.StartSsoLoginInput{
+		Provider:    domain.SsoProvider(req.GetProvider()),
+		RedirectURI: req.GetRedirectUri(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.StartSsoLoginResponse{AuthorizationUrl: out.AuthorizationURL, State: out.State}, nil
+}
+
+func (s *Server) CompleteSsoLogin(ctx context.Context, req *authv1.CompleteSsoLoginRequest) (*authv1.CompleteSsoLoginResponse, error) {
+	out, err := s.completeSsoLogin.Execute(ctx, usecase.CompleteSsoLoginInput{
+		Code:  req.GetCode(),
+		State: req.GetState(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.CompleteSsoLoginResponse{SessionToken: out.SessionToken, User: toProtoUser(out.User)}, nil
+}
+
 func toProtoSession(s domain.Session) *authv1.Session {
 	out := &authv1.Session{
 		Id:     s.TokenHash,
@@ -385,6 +419,12 @@ func toTime(ts *timestamppb.Timestamp) time.Time {
 }
 
 func toProtoUser(u domain.User) *authv1.User {
+	// "none" for a local-password-only account (u.SsoProvider's zero
+	// value) — see domain.User.SsoProvider's doc comment.
+	provider := "none"
+	if u.SsoProvider != "" {
+		provider = string(u.SsoProvider)
+	}
 	out := &authv1.User{
 		Id:       u.ID,
 		TenantId: u.TenantID,
@@ -392,6 +432,7 @@ func toProtoUser(u domain.User) *authv1.User {
 		Name:     u.Name,
 		Role:     toProtoRole(u.Role),
 		IsActive: u.IsActive,
+		Provider: provider,
 	}
 	if !u.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(u.CreatedAt)

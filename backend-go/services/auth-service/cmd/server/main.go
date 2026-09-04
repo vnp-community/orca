@@ -31,10 +31,14 @@ import (
 	authbcrypt "github.com/stablyai/orca-go/services/auth-service/internal/adapter/bcrypt"
 	authgrpc "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpc"
 	authgrpcclient "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpcclient"
+	authoauth "github.com/stablyai/orca-go/services/auth-service/internal/adapter/oauth"
+	authoauthstate "github.com/stablyai/orca-go/services/auth-service/internal/adapter/oauthstate"
 	authopaclient "github.com/stablyai/orca-go/services/auth-service/internal/adapter/opaclient"
 	authpolicypublisher "github.com/stablyai/orca-go/services/auth-service/internal/adapter/policypublisher"
 	authpostgres "github.com/stablyai/orca-go/services/auth-service/internal/adapter/postgres"
+	authproviderregistry "github.com/stablyai/orca-go/services/auth-service/internal/adapter/providerregistry"
 	authvault "github.com/stablyai/orca-go/services/auth-service/internal/adapter/vault"
+	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
 	"github.com/stablyai/orca-go/services/auth-service/internal/usecase"
 
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
@@ -172,6 +176,70 @@ func run() error {
 		}
 	}
 
+	// --- CR-LOGIN-001 (SSO: GitHub / Google / generic OIDC) ---
+	// Each provider is registered only when its SSO_*_CLIENT_ID is set —
+	// an unconfigured provider is simply absent from the registry map, and
+	// StartSsoLogin surfaces AUTH_SSO_PROVIDER_UNSUPPORTED for it, the same
+	// "absent, not zero-valued" convention scm-integration-service's own
+	// OAuth registry uses.
+	ssoExchangers := map[domain.SsoProvider]usecase.SsoExchanger{}
+	if cfg.Sso.GitHub.ClientID != "" {
+		ssoExchangers[domain.SsoProviderGitHub] = authoauth.NewGitHub(nil, authoauth.GitHubConfig{
+			ClientID: cfg.Sso.GitHub.ClientID, ClientSecret: cfg.Sso.GitHub.ClientSecret,
+		})
+	}
+	if cfg.Sso.Google.ClientID != "" {
+		// Google's OIDC endpoints are fixed, well-known constants — its
+		// CR-LOGIN-001 env var list has no DISCOVERY_URL, unlike generic OIDC.
+		ssoExchangers[domain.SsoProviderGoogle] = authoauth.NewOidc(nil, domain.SsoProviderGoogle, authoauth.OidcConfig{
+			AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
+			TokenURL:     "https://oauth2.googleapis.com/token",
+			UserInfoURL:  "https://openidconnect.googleapis.com/v1/userinfo",
+			ClientID:     cfg.Sso.Google.ClientID, ClientSecret: cfg.Sso.Google.ClientSecret,
+		})
+	}
+	if cfg.Sso.OIDC.ClientID != "" && cfg.Sso.OidcDiscoveryURL != "" {
+		// Resolved once at startup, not per-request — see
+		// FetchDiscoveryDocument's doc comment. Fails startup loudly on an
+		// unreachable/malformed discovery document, same "fail fast, not
+		// silently degraded" posture as the Vault Transit key check above.
+		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		authorizeURL, tokenURL, userInfoURL, err := authoauth.FetchDiscoveryDocument(discoveryCtx, nil, cfg.Sso.OidcDiscoveryURL)
+		cancel()
+		if err != nil {
+			return fmt.Errorf("fetching oidc discovery document from %q: %w", cfg.Sso.OidcDiscoveryURL, err)
+		}
+		ssoExchangers[domain.SsoProviderOIDC] = authoauth.NewOidc(nil, domain.SsoProviderOIDC, authoauth.OidcConfig{
+			AuthorizeURL: authorizeURL, TokenURL: tokenURL, UserInfoURL: userInfoURL,
+			ClientID: cfg.Sso.OIDC.ClientID, ClientSecret: cfg.Sso.OIDC.ClientSecret,
+		})
+	}
+	ssoRegistry := authproviderregistry.NewSsoRegistry(ssoExchangers)
+	ssoStates := authoauthstate.New(cfg.SsoStateSecret)
+
+	// tenantResolver is only dialed when at least one SSO provider is
+	// registered — same "avoid an always-on startup dependency for a
+	// feature that isn't configured" rule Bootstrap's TenantProvisioner
+	// dial follows above.
+	var tenantResolver *authgrpcclient.TenantResolver
+	if len(ssoExchangers) > 0 {
+		tenantResolver, err = authgrpcclient.NewTenantResolver(cfg.TenantServiceAddr)
+		if err != nil {
+			return fmt.Errorf("dialing tenant-service for sso provisioning: %w", err)
+		}
+		defer func() { _ = tenantResolver.Close() }()
+	}
+
+	startSsoLoginUC := usecase.NewStartSsoLogin(ssoRegistry, ssoStates, nil)
+	// tenantResolver may be a nil-but-typed *TenantResolver here (when no
+	// provider is configured) — safe, because LoginOrProvisionSsoUser only
+	// ever reaches uc.tenants.ResolveDefaultTenant via CompleteSsoLogin,
+	// which itself only runs after SsoExchangerRegistry.Resolve succeeds
+	// for a request's provider, which requires len(ssoExchangers) > 0,
+	// which is exactly the condition tenantResolver was dialed under above.
+	loginOrProvisionSsoUserUC := usecase.NewLoginOrProvisionSsoUser(repo, repo, repo, repo, hasher, tenantResolver, clock, cfg.SessionTTL)
+	completeSsoLoginUC := usecase.NewCompleteSsoLogin(ssoRegistry, ssoStates, loginOrProvisionSsoUserUC)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	authv1.RegisterAuthServiceServer(grpcServer, authgrpc.New(
 		loginUC, logoutUC, validateSessionUC,
@@ -181,6 +249,7 @@ func run() error {
 		createAccessPolicyUC, getAccessPolicyUC, listAccessPoliciesUC, updateAccessPolicyUC, deleteAccessPolicyUC,
 		getAdminStatsUC,
 		listTenantMemberDirectoryUC,
+		startSsoLoginUC, completeSsoLoginUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

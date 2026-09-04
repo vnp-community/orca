@@ -268,13 +268,20 @@ func run() error {
 	}
 
 	router := httpgateway.NewRouter(httpgateway.Deps{
-		Logger:              logger,
-		Registry:            registry,
-		AuthValidator:       authValidator,
-		CookieValidator:     sessionValidator,
-		RateLimiter:         rateLimiter,
-		UsageClient:         usageClient,
-		AuthClient:          authClient,
+		Logger:          logger,
+		Registry:        registry,
+		AuthValidator:   authValidator,
+		CookieValidator: sessionValidator,
+		RateLimiter:     rateLimiter,
+		UsageClient:     usageClient,
+		AuthClient:      authClient,
+		SsoConfig: httpgateway.SsoRouteConfig{
+			PublicBaseURL:  cfg.PublicBaseURL,
+			AuthMode:       cfg.AuthMode,
+			GithubClientID: cfg.SsoGithubClientID,
+			GoogleClientID: cfg.SsoGoogleClientID,
+			OidcClientID:   cfg.SsoOidcClientID,
+		},
 		AnnotationClient:    annotationClient,
 		TaskClient:          taskClient,
 		GitGatewayClient:    gitClient,

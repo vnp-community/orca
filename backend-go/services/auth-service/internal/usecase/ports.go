@@ -25,6 +25,11 @@ var (
 	ErrUserAlreadyExists = errors.New("usecase: a user with this email already exists in this tenant")
 	ErrSessionNotFound   = errors.New("usecase: session not found")
 	ErrPolicyNotFound    = errors.New("usecase: access policy not found")
+	// ErrSsoIdentityNotFound is returned when no auth.sso_identities row
+	// matches a (provider, external_subject) lookup — the "this IdP
+	// identity has never logged in here before" case
+	// LoginOrProvisionSsoUser branches on.
+	ErrSsoIdentityNotFound = errors.New("usecase: sso identity not found")
 )
 
 // UserRepository is the persistence port for users. Implemented by
@@ -64,6 +69,11 @@ type UserRepository interface {
 	// Count returns the total number of users across every tenant — backs
 	// GetAdminStats's total_users field (internal/usecase/get_admin_stats.go).
 	Count(ctx context.Context) (int32, error)
+	// SetSsoProvider records provider as the given user's most recent SSO
+	// login provider — see domain.User.SsoProvider's doc comment. Called
+	// by LoginOrProvisionSsoUser on every successful SSO login, never by
+	// local-password Login.
+	SetSsoProvider(ctx context.Context, userID string, provider domain.SsoProvider) error
 }
 
 // SessionRepository is the persistence port for sessions. Only the SHA-256
@@ -162,6 +172,107 @@ type OPAClient interface {
 	// Decision reports whether actor is authorized as admin, per
 	// admin.rego's {"actor": {"id", "role"}} input contract.
 	Decision(ctx context.Context, actor domain.User) (bool, error)
+}
+
+// SsoIdentityRepository is the persistence port for auth.sso_identities.
+// Implemented by internal/adapter/postgres, mirroring UserRepository's
+// shape/conventions.
+type SsoIdentityRepository interface {
+	// FindByProviderSubject looks up the local user linked to an IdP
+	// identity — the first lookup LoginOrProvisionSsoUser performs on
+	// every SSO login. Returns an error satisfying errors.Is(err,
+	// ErrSsoIdentityNotFound) when no row matches.
+	FindByProviderSubject(ctx context.Context, provider domain.SsoProvider, externalSubject string) (domain.SsoIdentity, error)
+	// Link persists a new provider/external_subject -> user_id row —
+	// called once, either at brand-new-user provisioning or when an
+	// existing local account is claimed via a verified-email match. See
+	// login_or_provision_sso_user.go's account-collision policy.
+	Link(ctx context.Context, identity domain.SsoIdentity) error
+	// TouchLastLogin updates last_login_at for a returning identity —
+	// best-effort bookkeeping, not part of the auth decision itself.
+	TouchLastLogin(ctx context.Context, id string, at time.Time) error
+}
+
+// VerifiedSsoIdentity is what a successful provider token-exchange +
+// userinfo call yields — the trust boundary LoginOrProvisionSsoUser
+// operates on. EmailVerified drives the account-collision policy in
+// login_or_provision_sso_user.go: only a verified email may auto-link to an
+// existing local account.
+type VerifiedSsoIdentity struct {
+	Provider      domain.SsoProvider
+	Subject       string // the IdP's stable subject (GitHub numeric id as text, or OIDC "sub")
+	Email         string
+	EmailVerified bool
+	Name          string
+}
+
+// SsoExchanger performs one provider's half of the OAuth2/OIDC
+// authorization-code flow: building the authorization URL the browser is
+// redirected to (with PKCE), and exchanging a callback code for a verified
+// identity. Mirrors scm-integration-service's OAuthExchanger shape/rationale
+// — kept as its own interface so usecase/ code never imports a provider's
+// HTTP client package directly.
+type SsoExchanger interface {
+	// AuthorizationURL builds the URL to redirect the browser to. No
+	// network call — pure string construction from state/redirectURI/
+	// codeChallenge (PKCE, RFC 7636 S256).
+	AuthorizationURL(state, redirectURI, codeChallenge string) string
+	// ExchangeAndVerify calls the provider's token endpoint for real, then
+	// resolves the caller's verified identity (GitHub: GET /user +
+	// /user/emails; Google/OIDC: the provider's userinfo endpoint) — see
+	// internal/adapter/oauth's package doc comment for why this is one
+	// userinfo-REST-call shape across all three providers rather than
+	// local id_token JWT verification.
+	ExchangeAndVerify(ctx context.Context, code, redirectURI, codeVerifier string) (VerifiedSsoIdentity, error)
+}
+
+// SsoExchangerRegistry resolves which SsoExchanger to use for a given
+// provider — mirrors scm-integration-service's OAuthExchangerRegistry. A
+// provider with no configured client_id/secret is simply absent from the
+// registry; Resolve errors for it.
+type SsoExchangerRegistry interface {
+	Resolve(provider domain.SsoProvider) (SsoExchanger, error)
+}
+
+// SsoState is the payload carried by StartSsoLogin's opaque state token and
+// recovered by CompleteSsoLogin. Unlike scm-integration-service's
+// OAuthState, this carries no TenantID/UserID — SSO's Start endpoint runs
+// before any session exists, so there is no caller identity yet to bind.
+type SsoState struct {
+	Provider     domain.SsoProvider
+	RedirectURI  string
+	CodeVerifier string // PKCE verifier (RFC 7636), reproduced at token-exchange time
+	ExpiresAt    time.Time
+}
+
+// SsoStateCodec creates and verifies the state token exchanged during the
+// SSO flow. Stateless (signed, not looked up) — api-gateway owns no
+// database (see its config.go's package doc comment), so the state token
+// itself must carry everything CompleteSsoLogin needs, integrity-protected
+// against tampering. This also means any gateway instance can decode a
+// token any other instance minted, since the HMAC secret is shared config,
+// not in-memory state — required for a multi-instance deployment.
+type SsoStateCodec interface {
+	Encode(state SsoState) (string, error)
+	// Decode verifies the token's signature and expiry, returning an error
+	// for a tampered, expired, or malformed token — CompleteSsoLogin must
+	// treat any Decode error as a rejected callback, never a best-effort
+	// partial decode.
+	Decode(token string) (SsoState, error)
+}
+
+// TenantResolver resolves which tenant a brand-new SSO-provisioned user
+// belongs to. This system has no per-login tenant discriminator yet (see
+// GetUserByEmail's doc comment above) and is operationally
+// single-tenant-per-deployment today — there is no tenant-routing
+// mechanism (subdomain, workspace picker) anywhere in this codebase.
+// Implemented by internal/adapter/grpcclient against tenant-service's
+// ListCompanies RPC; ResolveDefaultTenant fails closed (an error, not a
+// guess) when zero or more than one company exists. True multi-tenant SSO
+// (workspace-scoped IdP config) is future work — see this service's
+// README "Known gaps".
+type TenantResolver interface {
+	ResolveDefaultTenant(ctx context.Context) (tenantID string, err error)
 }
 
 // TokenSigner is the port IssueServiceToken/GetJWKS sign and publish JWTs

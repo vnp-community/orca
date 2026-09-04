@@ -269,6 +269,20 @@ services:
       BOOTSTRAP_COMPANY_NAME: ${BOOTSTRAP_COMPANY_NAME:-}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      # CR-LOGIN-001 SSO (internal/adapter/oauth, internal/adapter/oauthstate)
+      # — see .env.example's "SSO" section. Every var here defaults to
+      # empty: an unset SSO_*_CLIENT_ID means that provider is simply
+      # absent from the SsoExchangerRegistry (StartSsoLogin surfaces
+      # AUTH_SSO_PROVIDER_UNSUPPORTED for it), so leaving this whole block
+      # unset is a no-op — local-password login is unaffected either way.
+      SSO_STATE_SECRET: ${SSO_STATE_SECRET:-}
+      SSO_GITHUB_CLIENT_ID: ${SSO_GITHUB_CLIENT_ID:-}
+      SSO_GITHUB_CLIENT_SECRET: ${SSO_GITHUB_CLIENT_SECRET:-}
+      SSO_GOOGLE_CLIENT_ID: ${SSO_GOOGLE_CLIENT_ID:-}
+      SSO_GOOGLE_CLIENT_SECRET: ${SSO_GOOGLE_CLIENT_SECRET:-}
+      SSO_OIDC_CLIENT_ID: ${SSO_OIDC_CLIENT_ID:-}
+      SSO_OIDC_CLIENT_SECRET: ${SSO_OIDC_CLIENT_SECRET:-}
+      SSO_OIDC_DISCOVERY_URL: ${SSO_OIDC_DISCOVERY_URL:-}
     depends_on:
       postgres: { condition: service_healthy }
       vault: { condition: service_healthy }
@@ -532,6 +546,26 @@ services:
     environment:
       <<: *go-common-env
       PUBLIC_PORT: "8081"
+      # CR-LOGIN-001 SSO (internal/adapter/httpgateway/auth_routes.go) —
+      # see .env.example's "SSO" section. PUBLIC_BASE_URL is REQUIRED for
+      # SSO to work at all: GET /auth/sso/{provider} builds redirect_uri as
+      # exactly "${PUBLIC_BASE_URL}/auth/callback", deliberately never
+      # derived from the request's Host header (see that handler's doc
+      # comment on the Host-header-injection risk this avoids) — it must
+      # match, byte-for-byte, whatever redirect URI is registered with each
+      # configured IdP. Left empty, GET /auth/sso/{provider} degrades to a
+      # 501 (same as before this feature existed) and /auth/config never
+      # advertises any provider, regardless of AUTH_MODE or the client ids
+      # below — local-password login is unaffected.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      AUTH_MODE: ${AUTH_MODE:-both}
+      # Client IDs only (never secrets — those stay auth-service-only, see
+      # SsoRouteConfig's doc comment) — gate which providers GET
+      # /auth/config advertises to the login page. Must match the
+      # SSO_*_CLIENT_ID values set on auth-service above.
+      SSO_GITHUB_CLIENT_ID: ${SSO_GITHUB_CLIENT_ID:-}
+      SSO_GOOGLE_CLIENT_ID: ${SSO_GOOGLE_CLIENT_ID:-}
+      SSO_OIDC_CLIENT_ID: ${SSO_OIDC_CLIENT_ID:-}
     ports:
       # SERVER_BIND_IP lets a specific deploy reuse a specific host port/IP
       # (e.g. to slot into an existing external gateway's hardcoded upstream

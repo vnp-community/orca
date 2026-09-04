@@ -88,14 +88,46 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
   pre-existing `IssueServiceToken` RPC was made real; see the
   "Refresh-token flow" entry below, still deferred to a later pass now that
   Epic D's signing primitive exists for it to build on.
-- **SSO is not implemented — a real product gap, not a mechanical stub.**
-  Per `auth-service.md` §9, the TS system's `GET /auth/sso/:provider`
-  always returned `501`; this redesign is supposed to implement OIDC
-  properly (authorization-code flow, provider metadata discovery, an
-  `sso_identities` table) if SSO is actually needed, as an explicit product
-  decision *before* auth-service's initial build — not something this
-  scaffold should invent. `InitiateSSO`/`HandleSSOCallback` aren't in the
-  generated proto and aren't implemented here.
+- **SSO is implemented (CR-LOGIN-001): GitHub, Google, and generic/
+  self-hosted OIDC (Keycloak-compatible).** `StartSsoLogin`/
+  `CompleteSsoLogin` RPCs, PKCE + HMAC-signed state
+  (`internal/adapter/oauthstate`), provider exchangers
+  (`internal/adapter/oauth`), and `auth.sso_identities`
+  (migration `0003`) are all real — see
+  `internal/usecase/login_or_provision_sso_user.go`'s doc comment for the
+  account-collision policy (returning identity / auto-link a verified email
+  to an existing local account / provision a brand-new user, role always
+  `RoleUser` — SSO never auto-admins). api-gateway's
+  `GET /auth/sso/{provider}` and `GET /auth/callback` are the only callers;
+  both are unauthenticated by necessity, same as `Login`.
+  **An unverified email is rejected outright, whether or not it collides
+  with an existing account** (`AUTH_SSO_EMAIL_UNVERIFIED_COLLISION` /
+  `AUTH_SSO_EMAIL_NOT_VERIFIED`) — no admin-resolution UI exists or is
+  planned for either case, by design: silently provisioning (or linking) an
+  unverified email is itself an account-takeover vector, not merely a UX
+  gap to smooth over. Concretely, before this check existed on *new*-account
+  provisioning too (not just the collision path), an attacker could
+  pre-register an SSO identity against a victim's real email at a lax/
+  unverified IdP — squatting that email in `auth.users` before the victim
+  ever signs up — so that the victim's later, genuinely verified SSO login
+  for the same email would auto-link into the attacker's pre-existing,
+  attacker-controlled account. Requiring verification at the moment an
+  email is FIRST claimed (new account or link, either one) closes that hole
+  structurally; an admin "just override it" UI would reopen the exact same
+  hole with extra steps. A user whose IdP genuinely can't verify their
+  email has no self-serve path today — that's an IdP-configuration problem
+  for them to fix, not something this service should paper over.
+  **Known gaps, not fixed here:**
+  - **Single-tenant-per-deployment only.** A brand-new SSO user's tenant is
+    resolved via `TenantResolver.ResolveDefaultTenant` (tenant-service's
+    `ListCompanies`), which fails closed unless exactly one company exists.
+    True multi-tenant SSO (workspace-scoped IdP config, a tenant hint on the
+    start URL) is future work.
+  - **`domain.User.SsoProvider` is "last used", not history.** It's
+    overwritten on every SSO login (`UserRepository.SetSsoProvider`) —
+    useful for `GET /auth/me`'s cosmetic `provider` field, not an audit
+    trail of every IdP a user has ever linked (that's what
+    `auth.sso_identities` itself is for, per-provider).
 - **OPA authorization checks are now real (Epic E).**
   `internal/usecase/authorization.go`'s `requireAdminActor` resolves the
   acting user, then calls the embedded OPA policy decision

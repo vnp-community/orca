@@ -135,6 +135,16 @@ being true at some point (build time becomes a real bottleneck),
   [`backend-go/docs/execution-plan.md`](../../backend-go/docs/execution-plan.md)).
   This deploy set makes the *infrastructure* real; it doesn't make the
   *application* feature-complete.
+- **SSO (CR-LOGIN-001) is off by default and single-tenant-only when on.**
+  Every `SSO_*`/`AUTH_MODE`/`PUBLIC_BASE_URL` var in `.env.example` is
+  optional — leaving them unset keeps local-password login working exactly
+  as before. Turning SSO on requires `PUBLIC_BASE_URL` to be this
+  deployment's real externally-reachable URL (never guessed from a request)
+  and each configured provider's redirect URI registered to match it
+  exactly. A brand-new SSO user's tenant is auto-resolved only when exactly
+  one company/tenant exists in this deployment — see
+  `backend-go/services/auth-service/README.md`'s SSO entry for the full
+  account-linking policy and remaining known gaps.
 
 ## Vault re-initialization after a host reboot
 

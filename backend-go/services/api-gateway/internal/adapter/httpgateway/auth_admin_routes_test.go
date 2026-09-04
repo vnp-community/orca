@@ -169,6 +169,14 @@ func (f *fakeAdminAuthServiceClient) GetAdminStats(ctx context.Context, in *auth
 	return f.statsResp, nil
 }
 
+func (f *fakeAdminAuthServiceClient) StartSsoLogin(ctx context.Context, in *authv1.StartSsoLoginRequest, opts ...grpc.CallOption) (*authv1.StartSsoLoginResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) CompleteSsoLogin(ctx context.Context, in *authv1.CompleteSsoLoginRequest, opts ...grpc.CallOption) (*authv1.CompleteSsoLoginResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
 var _ authv1.AuthServiceClient = (*fakeAdminAuthServiceClient)(nil)
 
 // testAuthAdminRouter mounts mountAuthAdminRoutes standalone and injects a

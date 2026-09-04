@@ -106,6 +106,17 @@ func (f *fakeUserRepository) Count(ctx context.Context) (int32, error) {
 	return int32(len(f.byID)), nil
 }
 
+func (f *fakeUserRepository) SetSsoProvider(ctx context.Context, userID string, provider domain.SsoProvider) error {
+	u, ok := f.byID[userID]
+	if !ok {
+		return nil
+	}
+	u.SsoProvider = provider
+	f.byID[userID] = u
+	f.byEmail[u.Email] = u
+	return nil
+}
+
 // fakeSessionRepository is an in-memory SessionRepository.
 type fakeSessionRepository struct {
 	byHash map[string]domain.Session
@@ -312,6 +323,66 @@ func (f *fakeTokenSigner) PublicJWKS(ctx context.Context) (jose.JSONWebKeySet, e
 		return jose.JSONWebKeySet{}, f.jwksErr
 	}
 	return f.jwks, nil
+}
+
+// fakeSsoIdentityRepository is an in-memory SsoIdentityRepository, keyed by
+// "provider|external_subject" the same way auth.sso_identities' UNIQUE
+// constraint is keyed.
+type fakeSsoIdentityRepository struct {
+	byKey map[string]domain.SsoIdentity
+
+	findCalls int
+	linkCalls int
+}
+
+func newFakeSsoIdentityRepository() *fakeSsoIdentityRepository {
+	return &fakeSsoIdentityRepository{byKey: make(map[string]domain.SsoIdentity)}
+}
+
+func ssoIdentityKey(provider domain.SsoProvider, subject string) string {
+	return string(provider) + "|" + subject
+}
+
+func (f *fakeSsoIdentityRepository) seed(identity domain.SsoIdentity) {
+	f.byKey[ssoIdentityKey(identity.Provider, identity.ExternalSubject)] = identity
+}
+
+func (f *fakeSsoIdentityRepository) FindByProviderSubject(ctx context.Context, provider domain.SsoProvider, externalSubject string) (domain.SsoIdentity, error) {
+	f.findCalls++
+	id, ok := f.byKey[ssoIdentityKey(provider, externalSubject)]
+	if !ok {
+		return domain.SsoIdentity{}, ErrSsoIdentityNotFound
+	}
+	return id, nil
+}
+
+func (f *fakeSsoIdentityRepository) Link(ctx context.Context, identity domain.SsoIdentity) error {
+	f.linkCalls++
+	f.seed(identity)
+	return nil
+}
+
+func (f *fakeSsoIdentityRepository) TouchLastLogin(ctx context.Context, id string, at time.Time) error {
+	for k, v := range f.byKey {
+		if v.ID == id {
+			v.LastLoginAt = &at
+			f.byKey[k] = v
+		}
+	}
+	return nil
+}
+
+// fakeTenantResolver is an in-memory TenantResolver.
+type fakeTenantResolver struct {
+	tenantID string
+	err      error
+}
+
+func (f *fakeTenantResolver) ResolveDefaultTenant(ctx context.Context) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.tenantID, nil
 }
 
 // fakeOPAClient backs requireAdminActor's tests without loading the real

@@ -44,6 +44,13 @@ service AuthService {
   // identity, never a request field — there is deliberately no way to ask
   // for another tenant's directory here.
   rpc ListTenantMemberDirectory(ListTenantMemberDirectoryRequest) returns (ListTenantMemberDirectoryResponse);
+
+  // --- CR-LOGIN-001 (SSO: GitHub / Google / generic OIDC) ---
+  // StartSsoLogin/CompleteSsoLogin are unauthenticated by necessity — like
+  // Login, the caller has no session yet. api-gateway's GET /auth/sso/
+  // {provider} and GET /auth/callback are the only callers.
+  rpc StartSsoLogin(StartSsoLoginRequest) returns (StartSsoLoginResponse);
+  rpc CompleteSsoLogin(CompleteSsoLoginRequest) returns (CompleteSsoLoginResponse);
 }
 
 enum Role {
@@ -60,6 +67,10 @@ message User {
   Role role = 5;
   bool is_active = 6;
   google.protobuf.Timestamp created_at = 7;
+  // provider: "none" for a local-password-only account, otherwise the sso
+  // provider ("github" | "google" | "oidc") this user last authenticated
+  // through — see CR-LOGIN-001.
+  string provider = 8;
 }
 
 message LoginRequest {
@@ -230,4 +241,25 @@ message GetAdminStatsResponse {
   int32 total_users = 1;
   int32 active_sessions = 2;
   int32 total_policies = 3;
+}
+
+// --- CR-LOGIN-001 (SSO) ---
+message StartSsoLoginRequest {
+  string provider = 1;     // "github" | "google" | "oidc"
+  string redirect_uri = 2; // api-gateway's own /auth/callback URL — never derived from a request Host header, see api-gateway's auth_routes.go
+}
+message StartSsoLoginResponse {
+  string authorization_url = 1;
+  // state is returned for symmetry/testability; api-gateway doesn't need
+  // it directly — the authorization_url already embeds it.
+  string state = 2;
+}
+
+message CompleteSsoLoginRequest {
+  string code = 1;
+  string state = 2;
+}
+message CompleteSsoLoginResponse {
+  string session_token = 1;
+  User user = 2;
 }

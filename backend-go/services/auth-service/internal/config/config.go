@@ -59,6 +59,41 @@ type Config struct {
 	// (via Base) when the file doesn't exist, which is what local dev and
 	// this scaffold's testcontainers path use instead.
 	DatabaseCredentialsFile string
+
+	// SsoStateSecret HMAC-signs the SSO flow's state token (see
+	// internal/adapter/oauthstate.Codec) — mirrors
+	// scm-integration-service's OAuthStateSecret. Empty is accepted at
+	// load time (so this scaffold still boots with SSO simply
+	// unconfigured) but produces forgeable tokens; never run with one in
+	// any real deployment.
+	SsoStateSecret string
+	// Sso holds each provider's OAuth2/OIDC client credentials + generic-
+	// OIDC endpoints — see cmd/server/main.go's composition root for how
+	// an empty ClientID means "this provider is not registered" (absent
+	// from the SsoExchangerRegistry map entirely, not a zero-value client).
+	Sso SsoProvidersConfig
+}
+
+// SsoProviderConfig is one provider's OAuth2 client credentials.
+type SsoProviderConfig struct {
+	ClientID     string
+	ClientSecret string
+}
+
+// SsoProvidersConfig configures CR-LOGIN-001's three supported providers.
+// Google's endpoints are fixed constants at the call site (main.go) — its
+// env var list (per CR-LOGIN-001) has no DISCOVERY_URL, unlike generic
+// OIDC/Keycloak, whose endpoints are resolved once at startup from
+// OidcDiscoveryURL.
+type SsoProvidersConfig struct {
+	GitHub SsoProviderConfig // SSO_GITHUB_CLIENT_ID / SSO_GITHUB_CLIENT_SECRET
+	Google SsoProviderConfig // SSO_GOOGLE_CLIENT_ID / SSO_GOOGLE_CLIENT_SECRET
+	OIDC   SsoProviderConfig // SSO_OIDC_CLIENT_ID / SSO_OIDC_CLIENT_SECRET
+	// OidcDiscoveryURL points at a generic/self-hosted OIDC provider's
+	// /.well-known/openid-configuration (e.g. Keycloak realm's discovery
+	// document). Empty means generic OIDC is not registered, independent
+	// of whether OIDC.ClientID is set.
+	OidcDiscoveryURL string
 }
 
 func Load() (Config, error) {
@@ -93,6 +128,22 @@ func Load() (Config, error) {
 		BootstrapAdminPassword:  os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
 		TenantServiceAddr:       commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
 		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
+		SsoStateSecret:          commonconfig.StringEnv("SSO_STATE_SECRET", ""),
+		Sso: SsoProvidersConfig{
+			GitHub: SsoProviderConfig{
+				ClientID:     commonconfig.StringEnv("SSO_GITHUB_CLIENT_ID", ""),
+				ClientSecret: commonconfig.StringEnv("SSO_GITHUB_CLIENT_SECRET", ""),
+			},
+			Google: SsoProviderConfig{
+				ClientID:     commonconfig.StringEnv("SSO_GOOGLE_CLIENT_ID", ""),
+				ClientSecret: commonconfig.StringEnv("SSO_GOOGLE_CLIENT_SECRET", ""),
+			},
+			OIDC: SsoProviderConfig{
+				ClientID:     commonconfig.StringEnv("SSO_OIDC_CLIENT_ID", ""),
+				ClientSecret: commonconfig.StringEnv("SSO_OIDC_CLIENT_SECRET", ""),
+			},
+			OidcDiscoveryURL: commonconfig.StringEnv("SSO_OIDC_DISCOVERY_URL", ""),
+		},
 	}, nil
 }
 

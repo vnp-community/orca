@@ -35,6 +35,11 @@ type Deps struct {
 	RateLimiter     *usecase.RateLimiter
 	UsageClient     usagev1.UsageServiceClient
 	AuthClient      authv1.AuthServiceClient
+	// SsoConfig configures the real GET /auth/sso/{provider}, GET
+	// /auth/callback, and GET /auth/config handlers (see
+	// SsoRouteConfig's doc comment) — the zero value degrades to "no SSO
+	// provider configured, local login only", never a panic.
+	SsoConfig SsoRouteConfig
 	// The remaining downstream clients below back the Phase 5 REST routes
 	// (execution-plan.md) — each wired only once its owning service was
 	// confirmed mature (real RPCs, not blanket Unimplemented), and marked
@@ -97,7 +102,7 @@ func NewRouter(deps Deps) http.Handler {
 	r := chi.NewRouter()
 
 	if deps.AuthClient != nil {
-		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator)
+		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator, deps.SsoConfig)
 	}
 	mountTraceRoutes(r)
 	// mountPushRoutes is unauthenticated by design (see its doc comment) —

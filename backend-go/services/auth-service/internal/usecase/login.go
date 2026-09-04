@@ -67,23 +67,39 @@ func (uc *Login) Execute(ctx context.Context, in LoginInput) (LoginOutput, error
 		return LoginOutput{}, apperrors.New(apperrors.KindUnauthenticated, "AUTH_INVALID_CREDENTIALS", "invalid email or password", nil)
 	}
 
-	rawToken, err := generateRandomToken(32)
+	rawToken, now, err := createSessionForUser(ctx, uc.sessions, uc.clock, uc.sessionTTL, user)
 	if err != nil {
-		return LoginOutput{}, apperrors.New(apperrors.KindInternal, "AUTH_TOKEN_GEN_FAILED", "failed to generate session token", err)
-	}
-
-	now := uc.clock.Now()
-	session, err := domain.NewSession(domain.HashSessionToken(rawToken), user.ID, user.TenantID, now, now.Add(uc.sessionTTL))
-	if err != nil {
-		return LoginOutput{}, apperrors.New(apperrors.KindInternal, "AUTH_INVALID_SESSION", err.Error(), err)
-	}
-	if err := uc.sessions.CreateSession(ctx, session); err != nil {
-		return LoginOutput{}, apperrors.New(apperrors.KindInternal, "AUTH_SESSION_CREATE_FAILED", "failed to create session", err)
+		return LoginOutput{}, err
 	}
 
 	uc.appendAuditBestEffort(ctx, user, now)
 
 	return LoginOutput{SessionToken: rawToken, User: user}, nil
+}
+
+// createSessionForUser mints a fresh opaque session token and persists its
+// hash — the one piece of Login's original logic LoginOrProvisionSsoUser
+// also needs verbatim (SSO login must produce the exact same orca_session-
+// cookie-compatible session a local login does), so it's factored out here
+// rather than duplicated. Returns the raw token (see LoginOutput's doc
+// comment on why it's the only place this value ever exists outside the
+// caller's hands) and the "now" instant used, so callers can reuse it for
+// their own audit entry without a second clock read.
+func createSessionForUser(ctx context.Context, sessions SessionRepository, clock Clock, sessionTTL time.Duration, user domain.User) (rawToken string, now time.Time, err error) {
+	rawToken, err = generateRandomToken(32)
+	if err != nil {
+		return "", time.Time{}, apperrors.New(apperrors.KindInternal, "AUTH_TOKEN_GEN_FAILED", "failed to generate session token", err)
+	}
+
+	now = clock.Now()
+	session, err := domain.NewSession(domain.HashSessionToken(rawToken), user.ID, user.TenantID, now, now.Add(sessionTTL))
+	if err != nil {
+		return "", time.Time{}, apperrors.New(apperrors.KindInternal, "AUTH_INVALID_SESSION", err.Error(), err)
+	}
+	if err := sessions.CreateSession(ctx, session); err != nil {
+		return "", time.Time{}, apperrors.New(apperrors.KindInternal, "AUTH_SESSION_CREATE_FAILED", "failed to create session", err)
+	}
+	return rawToken, now, nil
 }
 
 // appendAuditBestEffort mirrors usage-service's "the write that already
