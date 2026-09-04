@@ -299,6 +299,27 @@ func (f *fakeProjectServiceClient) UpdateRepoMemberRole(_ context.Context, _ *pr
 	return &projectv1.UpdateRepoMemberRoleResponse{}, nil
 }
 
+// LinkSourceProject/UnlinkSourceProject/ListSourceProjects/
+// GetSharedProjectData have no REST route (orcaProjects.* is only
+// reachable via wscompat's channels_orca_project_sharing.go) — minimal
+// always-succeed stubs, only to satisfy projectv1.ProjectServiceClient at
+// compile time.
+func (f *fakeProjectServiceClient) LinkSourceProject(_ context.Context, _ *projectv1.LinkSourceProjectRequest, _ ...grpc.CallOption) (*projectv1.LinkSourceProjectResponse, error) {
+	return &projectv1.LinkSourceProjectResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) UnlinkSourceProject(_ context.Context, _ *projectv1.UnlinkSourceProjectRequest, _ ...grpc.CallOption) (*projectv1.UnlinkSourceProjectResponse, error) {
+	return &projectv1.UnlinkSourceProjectResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) ListSourceProjects(_ context.Context, _ *projectv1.ListSourceProjectsRequest, _ ...grpc.CallOption) (*projectv1.ListSourceProjectsResponse, error) {
+	return &projectv1.ListSourceProjectsResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) GetSharedProjectData(_ context.Context, _ *projectv1.GetSharedProjectDataRequest, _ ...grpc.CallOption) (*projectv1.GetSharedProjectDataResponse, error) {
+	return &projectv1.GetSharedProjectDataResponse{}, nil
+}
+
 func (f *fakeProjectServiceClient) RecordWorktreeCreated(_ context.Context, in *projectv1.RecordWorktreeCreatedRequest, _ ...grpc.CallOption) (*projectv1.RecordWorktreeCreatedResponse, error) {
 	f.lastRecordWorktreeCreatedReq = in
 	if f.recordWorktreeCreatedErr != nil {

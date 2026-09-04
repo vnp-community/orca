@@ -118,6 +118,9 @@ func (f *fakeProjectRepository) UpdateProject(ctx context.Context, tenantID, pro
 	if patch.Visibility != "" {
 		p.Visibility = patch.Visibility
 	}
+	if patch.MobileEmulatorAgentID != "" {
+		p.MobileEmulatorAgentID = patch.MobileEmulatorAgentID
+	}
 	f.projects[projectID] = p
 	return p, nil
 }
@@ -1061,4 +1064,62 @@ func (f *fakeDevServerLister) Exists(ctx context.Context, tenantID, devServerID 
 		return false, f.err
 	}
 	return f.exists, nil
+}
+
+// fakeSourceProjectRepository is an in-memory usecase.SourceProjectRepository.
+type fakeSourceProjectRepository struct {
+	links map[string]domain.SourceProject // keyed by containerProjectID+"|"+sourceProjectID
+
+	linkErr   error
+	unlinkErr error
+	listErr   error
+	getErr    error
+}
+
+func newFakeSourceProjectRepository() *fakeSourceProjectRepository {
+	return &fakeSourceProjectRepository{links: map[string]domain.SourceProject{}}
+}
+
+func sourceProjectKey(containerProjectID, sourceProjectID string) string {
+	return containerProjectID + "|" + sourceProjectID
+}
+
+func (f *fakeSourceProjectRepository) Link(ctx context.Context, sp domain.SourceProject) (domain.SourceProject, error) {
+	if f.linkErr != nil {
+		return domain.SourceProject{}, f.linkErr
+	}
+	f.links[sourceProjectKey(sp.ContainerProjectID, sp.SourceProjectID)] = sp
+	return sp, nil
+}
+
+func (f *fakeSourceProjectRepository) Unlink(ctx context.Context, containerProjectID, sourceProjectID string) error {
+	if f.unlinkErr != nil {
+		return f.unlinkErr
+	}
+	delete(f.links, sourceProjectKey(containerProjectID, sourceProjectID))
+	return nil
+}
+
+func (f *fakeSourceProjectRepository) List(ctx context.Context, containerProjectID string) ([]domain.SourceProject, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []domain.SourceProject
+	for _, sp := range f.links {
+		if sp.ContainerProjectID == containerProjectID {
+			out = append(out, sp)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeSourceProjectRepository) Get(ctx context.Context, containerProjectID, sourceProjectID string) (domain.SourceProject, error) {
+	if f.getErr != nil {
+		return domain.SourceProject{}, f.getErr
+	}
+	sp, ok := f.links[sourceProjectKey(containerProjectID, sourceProjectID)]
+	if !ok {
+		return domain.SourceProject{}, domain.ErrSourceProjectNotFound
+	}
+	return sp, nil
 }

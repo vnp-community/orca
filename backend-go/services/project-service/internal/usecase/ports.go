@@ -251,6 +251,24 @@ type DevServerRelay interface {
 	Relay(ctx context.Context, connectionID, method string, paramsJSON []byte) (resultJSON []byte, err error)
 }
 
+// SourceProjectRepository is the persistence port for cross-project source
+// sharing. Implemented by internal/adapter/postgres against
+// project.source_projects (migrations/0014).
+type SourceProjectRepository interface {
+	// Link upserts the join row (linked_at bumped on a re-link) — see
+	// postgres adapter's ON CONFLICT clause.
+	Link(ctx context.Context, sp domain.SourceProject) (domain.SourceProject, error)
+	// Unlink is idempotent: deleting an absent row is a no-op, not an
+	// error — matches the legacy TS reference implementation
+	// (OrcaProjectSourceProjectService.unlinkProject).
+	Unlink(ctx context.Context, containerProjectID, sourceProjectID string) error
+	List(ctx context.Context, containerProjectID string) ([]domain.SourceProject, error)
+	// Get returns domain.ErrSourceProjectNotFound (wrapped) if no link row
+	// matches — usecase.GetSharedProjectData's "is sourceProjectID actually
+	// linked into containerProjectID" check.
+	Get(ctx context.Context, containerProjectID, sourceProjectID string) (domain.SourceProject, error)
+}
+
 // HostSetupRepository is the persistence port for the pre-project
 // dev-server-folder wizard. Implemented by internal/adapter/postgres
 // against project.project_host_setups (migrations/0007).

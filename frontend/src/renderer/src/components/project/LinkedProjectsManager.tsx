@@ -37,6 +37,11 @@ export function LinkedProjectsManager({
   const [isLoading, setIsLoading] = useState(true)
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [linking, setLinking] = useState(false)
+  // Real display names for linked projects that aren't in the caller's own
+  // `myProjects` (e.g. linked by another OrcaProject member) — resolved via
+  // orcaProjects.getProjectData, keyed by projectId. Without this, those
+  // rows fall back to a raw UUID (see the label lookup below).
+  const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({})
 
   // Project of the current user — legacy, per-user, multi-host model, already
   // in the client store (repos.ts slice). No RPC needed to list these. Read
@@ -59,7 +64,35 @@ export function LinkedProjectsManager({
         null
       )
       const mine = all.find((item) => item.orcaProject.id === orcaProjectId)
-      setSourceProjects(mine?.sourceProjects ?? [])
+      const sources = mine?.sourceProjects ?? []
+      setSourceProjects(sources)
+
+      // A linked project isn't necessarily one the caller has locally (it
+      // may have been linked by a different OrcaProject member) — resolve
+      // those via getProjectData rather than showing a raw UUID. Best
+      // effort: a resolve failure (e.g. since-revoked access) just leaves
+      // that row falling back to the UUID, same as before this fix.
+      const localIds = new Set((useAppStore.getState().projects ?? []).map((p) => p.id))
+      const unresolved = sources.filter((s) => !localIds.has(s.projectId))
+      if (unresolved.length > 0) {
+        const results = await Promise.allSettled(
+          unresolved.map((s) =>
+            callRuntimeRpc<{ project: { name: string } }>(target, 'orcaProjects.getProjectData', {
+              orcaProjectId,
+              projectId: s.projectId
+            })
+          )
+        )
+        setResolvedNames((prev) => {
+          const next = { ...prev }
+          results.forEach((result, i) => {
+            if (result.status === 'fulfilled') {
+              next[unresolved[i].projectId] = result.value.project.name
+            }
+          })
+          return next
+        })
+      }
     } catch {
       toast.error('Failed to load linked projects')
     } finally {
@@ -160,7 +193,10 @@ export function LinkedProjectsManager({
           </TableHeader>
           <TableBody>
             {sourceProjects.map((s) => {
-              const label = myProjects.find((p) => p.id === s.projectId)?.displayName ?? s.projectId
+              const label =
+                myProjects.find((p) => p.id === s.projectId)?.displayName ??
+                resolvedNames[s.projectId] ??
+                s.projectId
               return (
                 <TableRow key={s.projectId} data-testid={`linked-row-${s.projectId}`}>
                   <TableCell>
