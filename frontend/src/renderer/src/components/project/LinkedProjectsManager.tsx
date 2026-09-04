@@ -10,7 +10,11 @@ import {
   RuntimeRpcCallError
 } from '../../runtime/runtime-rpc-client'
 import { useAppStore } from '../../store'
-import type { SourceProjectRef, OrcaProjectListItemWithSources } from '../../types/workspace-types'
+import type {
+  SourceProjectRef,
+  OrcaProjectListItemWithSources,
+  OrcaProject
+} from '../../types/workspace-types'
 import { toast } from 'sonner'
 import { Link2, Trash2 } from 'lucide-react'
 
@@ -37,19 +41,23 @@ export function LinkedProjectsManager({
   const [isLoading, setIsLoading] = useState(true)
   const [selectedProjectId, setSelectedProjectId] = useState('')
   const [linking, setLinking] = useState(false)
-  // Real display names for linked projects that aren't in the caller's own
-  // `myProjects` (e.g. linked by another OrcaProject member) — resolved via
-  // orcaProjects.getProjectData, keyed by projectId. Without this, those
-  // rows fall back to a raw UUID (see the label lookup below).
+  // Real OrcaProjects the caller belongs to (excluding this container) —
+  // link-picker candidates, and the first-choice source for resolving a
+  // linked project's display name. MUST be real project-service rows (real
+  // UUIDs from orcaProjects.list), NOT the client-only "Project Host Setup"
+  // projection (useAppStore's `projects`, built by
+  // projectHostSetupProjectionFromRepos — ids like `github:owner/repo` or
+  // `repo:<repoId>`, never a project.projects UUID): sending one of those as
+  // linkSourceProject's projectId makes the backend's UUID-column lookup
+  // throw (PROJECT_MEMBERSHIP_LOOKUP_FAILED) instead of cleanly denying —
+  // confirmed live on b15.openledger.vn linking "vnp-asm".
+  const [linkableProjects, setLinkableProjects] = useState<OrcaProject[]>([])
+  // Real display names for linked projects that aren't in linkableProjects
+  // (e.g. linked by another OrcaProject member the caller doesn't also
+  // belong to) — resolved via orcaProjects.getProjectData, keyed by
+  // projectId. Without this, those rows fall back to a raw UUID.
   const [resolvedNames, setResolvedNames] = useState<Record<string, string>>({})
 
-  // Project of the current user — legacy, per-user, multi-host model, already
-  // in the client store (repos.ts slice). No RPC needed to list these. Read
-  // via getState() (not the useAppStore(selector) hook form) to match the
-  // established pattern in components/project/* (MemberManager.tsx, etc.) —
-  // this component already re-renders on load()/link()/unlink() state
-  // changes, so this stays current without a store subscription.
-  const myProjects = useAppStore.getState().projects ?? []
   const canUnlink = currentUserRole === 'owner'
 
   const load = useCallback(async () => {
@@ -67,13 +75,18 @@ export function LinkedProjectsManager({
       const sources = mine?.sourceProjects ?? []
       setSourceProjects(sources)
 
-      // A linked project isn't necessarily one the caller has locally (it
-      // may have been linked by a different OrcaProject member) — resolve
-      // those via getProjectData rather than showing a raw UUID. Best
-      // effort: a resolve failure (e.g. since-revoked access) just leaves
-      // that row falling back to the UUID, same as before this fix.
-      const localIds = new Set((useAppStore.getState().projects ?? []).map((p) => p.id))
-      const unresolved = sources.filter((s) => !localIds.has(s.projectId))
+      const myOrcaProjects = all
+        .map((item) => item.orcaProject)
+        .filter((p) => p.id !== orcaProjectId)
+      setLinkableProjects(myOrcaProjects)
+
+      // A linked project isn't necessarily one the caller also belongs to
+      // (it may have been linked by a different OrcaProject member) —
+      // resolve those via getProjectData rather than showing a raw UUID.
+      // Best effort: a resolve failure (e.g. since-revoked access) just
+      // leaves that row falling back to the UUID, same as before this fix.
+      const knownIds = new Set(myOrcaProjects.map((p) => p.id))
+      const unresolved = sources.filter((s) => !knownIds.has(s.projectId))
       if (unresolved.length > 0) {
         const results = await Promise.allSettled(
           unresolved.map((s) =>
@@ -86,8 +99,12 @@ export function LinkedProjectsManager({
         setResolvedNames((prev) => {
           const next = { ...prev }
           results.forEach((result, i) => {
-            if (result.status === 'fulfilled') {
-              next[unresolved[i].projectId] = result.value.project.name
+            // Guard against a malformed/empty response, not just a
+            // rejection — either way, that row just keeps falling back to
+            // the raw UUID rather than crashing the whole load.
+            const name = result.status === 'fulfilled' ? result.value?.project?.name : undefined
+            if (name) {
+              next[unresolved[i].projectId] = name
             }
           })
           return next
@@ -139,7 +156,7 @@ export function LinkedProjectsManager({
   // Exclude already-linked projects from the picker — linkSourceProject is
   // idempotent server-side, but there is no reason to offer a redundant pick.
   const linkedIds = new Set(sourceProjects.map((s) => s.projectId))
-  const linkableProjects = myProjects.filter((p) => !linkedIds.has(p.id))
+  const pickableProjects = linkableProjects.filter((p) => !linkedIds.has(p.id))
 
   return (
     <div className="linked-projects-manager" data-testid="linked-projects-manager">
@@ -149,14 +166,14 @@ export function LinkedProjectsManager({
             <SelectTrigger data-testid="link-project-select">
               <SelectValue
                 placeholder={
-                  linkableProjects.length === 0 ? 'No projects to link' : 'Choose a Project'
+                  pickableProjects.length === 0 ? 'No projects to link' : 'Choose a Project'
                 }
               />
             </SelectTrigger>
             <SelectContent>
-              {linkableProjects.map((p) => (
+              {pickableProjects.map((p) => (
                 <SelectItem key={p.id} value={p.id}>
-                  {p.displayName}
+                  {p.name}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -194,7 +211,7 @@ export function LinkedProjectsManager({
           <TableBody>
             {sourceProjects.map((s) => {
               const label =
-                myProjects.find((p) => p.id === s.projectId)?.displayName ??
+                linkableProjects.find((p) => p.id === s.projectId)?.name ??
                 resolvedNames[s.projectId] ??
                 s.projectId
               return (

@@ -161,6 +161,9 @@ describe('CreateProjectDialog', () => {
       if (method === 'devServer.list') {
         return devServers
       }
+      if (method === 'project.list') {
+        return []
+      }
       if (method === 'project.create') {
         return { id: 'new-p', name: 'New Project' }
       }
@@ -366,11 +369,21 @@ describe('CreateProjectDialog', () => {
   // BUG-FE-PW-002 (dialog-side wiring)
   describe('link existing project mode', () => {
     it('submit is disabled in link mode until name and a project are chosen', async () => {
-      vi.mocked(useAppStore.getState).mockReturnValue({
-        settings: {},
-        repos: [],
-        projects: [{ id: 'p1', displayName: 'Backend' }]
-      } as MockAppState)
+      // The link picker must list real OrcaProjects (project.list, real
+      // project.projects UUIDs) — NOT useAppStore's `projects` (the
+      // client-only Project Host Setup projection). See DialogMode's doc
+      // comment for why: sending that projection's id as linkSourceProject's
+      // projectId makes the backend's UUID-column lookup throw instead of
+      // cleanly denying — confirmed live on b15.openledger.vn.
+      vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
+        if (method === 'devServer.list') {
+          return devServers
+        }
+        if (method === 'project.list') {
+          return [{ id: 'p1', name: 'Backend' }]
+        }
+        return null
+      })
 
       await act(async () => {
         render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
@@ -383,27 +396,39 @@ describe('CreateProjectDialog', () => {
       fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Shared Backend' } })
       expect(submit).toBeDisabled() // still no project chosen
 
+      await waitFor(() => expect(screen.getByText('Backend')).toBeInTheDocument())
       fireEvent.change(screen.getByTestId('cp-link-project-select'), { target: { value: 'p1' } })
       await waitFor(() => expect(submit).not.toBeDisabled())
     })
 
     it('link mode calls project.create then orcaProjects.linkSourceProject — not repo.add/rebindDevServer', async () => {
-      vi.mocked(useAppStore.getState).mockReturnValue({
-        settings: {},
-        repos: [],
-        projects: [{ id: 'p1', displayName: 'Backend' }]
-      } as MockAppState)
       // callRuntimeRpc's call history isn't cleared between tests in this
       // file (only onOpenChange/onCreated are) — clear it here so the
       // "not called with repo.add/rebindDevServer" assertions below aren't
       // polluted by earlier 'new-repo' mode tests in this same file.
       vi.mocked(callRuntimeRpc).mockClear()
+      vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
+        if (method === 'devServer.list') {
+          return devServers
+        }
+        if (method === 'project.list') {
+          return [{ id: 'p1', name: 'Backend' }]
+        }
+        if (method === 'project.create') {
+          return { id: 'new-p', name: 'New Project' }
+        }
+        if (method === 'orcaProjects.linkSourceProject') {
+          return { success: true }
+        }
+        return null
+      })
 
       await act(async () => {
         render(<CreateProjectDialog open onOpenChange={onOpenChange} onCreated={onCreated} />)
       })
       fireEvent.click(screen.getByTestId('cp-mode-link'))
       fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Shared Backend' } })
+      await waitFor(() => expect(screen.getByText('Backend')).toBeInTheDocument())
       fireEvent.change(screen.getByTestId('cp-link-project-select'), { target: { value: 'p1' } })
 
       const submit = screen.getByRole('button', { name: /create project/i })
@@ -440,14 +465,12 @@ describe('CreateProjectDialog', () => {
     })
 
     it('shows an error and keeps the dialog open when linkSourceProject rejects', async () => {
-      vi.mocked(useAppStore.getState).mockReturnValue({
-        settings: {},
-        repos: [],
-        projects: [{ id: 'p1', displayName: 'Backend' }]
-      } as MockAppState)
       vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
         if (method === 'devServer.list') {
           return devServers
+        }
+        if (method === 'project.list') {
+          return [{ id: 'p1', name: 'Backend' }]
         }
         if (method === 'project.create') {
           return { id: 'new-p', name: 'New Project' }
@@ -463,6 +486,7 @@ describe('CreateProjectDialog', () => {
       })
       fireEvent.click(screen.getByTestId('cp-mode-link'))
       fireEvent.change(screen.getByLabelText('Name'), { target: { value: 'Shared Backend' } })
+      await waitFor(() => expect(screen.getByText('Backend')).toBeInTheDocument())
       fireEvent.change(screen.getByTestId('cp-link-project-select'), { target: { value: 'p1' } })
 
       const submit = screen.getByRole('button', { name: /create project/i })

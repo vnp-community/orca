@@ -128,9 +128,16 @@ describe('LinkedProjectsManager', () => {
   })
 
   it('fetches via orcaProjects.list and filters to the current orcaProjectId', async () => {
+    // p1/p2 appear as their own entries too — orcaProjects.list returns
+    // EVERY OrcaProject the caller belongs to, real project.projects rows
+    // (real UUIDs), which is also where the link picker and label
+    // resolution now source from (never useAppStore's `projects`, the
+    // client-only Project Host Setup projection — see
+    // LinkedProjectsManager.tsx's linkableProjects doc comment for why).
     vi.mocked(callRuntimeRpc).mockResolvedValue([
       { orcaProject: { id: 'op1' }, sourceProjects: [{ ownerUserId: 'u1', projectId: 'p1' }] },
-      { orcaProject: { id: 'op2' }, sourceProjects: [{ ownerUserId: 'u1', projectId: 'p2' }] }
+      { orcaProject: { id: 'op2' }, sourceProjects: [{ ownerUserId: 'u1', projectId: 'p2' }] },
+      { orcaProject: { id: 'p1', name: 'Backend' }, sourceProjects: [] }
     ])
     render(<LinkedProjectsManager orcaProjectId="op1" currentUserRole="member" />)
 
@@ -157,7 +164,9 @@ describe('LinkedProjectsManager', () => {
     vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
       if (method === 'orcaProjects.list') {
         return [
-          { orcaProject: { id: 'op1' }, sourceProjects: [{ ownerUserId: 'u1', projectId: 'p1' }] }
+          { orcaProject: { id: 'op1' }, sourceProjects: [{ ownerUserId: 'u1', projectId: 'p1' }] },
+          { orcaProject: { id: 'p1', name: 'Backend' }, sourceProjects: [] },
+          { orcaProject: { id: 'p2', name: 'Mobile App' }, sourceProjects: [] }
         ]
       }
       if (method === 'orcaProjects.linkSourceProject') {
@@ -170,7 +179,7 @@ describe('LinkedProjectsManager', () => {
 
     const select = screen.getByTestId('link-project-select') as HTMLSelectElement
     // p1 already linked — only p2 should be selectable.
-    expect(select.querySelectorAll('option')).toHaveLength(1)
+    await waitFor(() => expect(select.querySelectorAll('option')).toHaveLength(1))
 
     fireEvent.change(select, { target: { value: 'p2' } })
     fireEvent.click(screen.getByTestId('link-project-submit'))
@@ -272,7 +281,10 @@ describe('LinkedProjectsManager', () => {
     const { toast } = await import('sonner')
     vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
       if (method === 'orcaProjects.list') {
-        return [{ orcaProject: { id: 'op1' }, sourceProjects: [] }]
+        return [
+          { orcaProject: { id: 'op1' }, sourceProjects: [] },
+          { orcaProject: { id: 'p1', name: 'Backend' }, sourceProjects: [] }
+        ]
       }
       if (method === 'orcaProjects.linkSourceProject') {
         throw new Error('FORBIDDEN: not a member')
@@ -281,6 +293,7 @@ describe('LinkedProjectsManager', () => {
     })
     render(<LinkedProjectsManager orcaProjectId="op1" currentUserRole="member" />)
     await waitFor(() => expect(screen.getByTestId('linked-empty')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Backend')).toBeInTheDocument())
 
     fireEvent.change(screen.getByTestId('link-project-select'), { target: { value: 'p1' } })
     fireEvent.click(screen.getByTestId('link-project-submit'))

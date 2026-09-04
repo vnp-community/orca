@@ -29,11 +29,15 @@ type ProjectVisibility = 'private' | 'team' | 'department' | 'company'
 
 // BUG-FE-PW-001: two ways to seed a new OrcaProject — either register a fresh
 // repo path on a dev server (existing behavior, creates a brand-new Go-native
-// Repo via repo.add), or link one of the caller's own pre-existing per-user
-// Projects (sidebar, multi-host, orca-data.json-backed) into this OrcaProject
-// for sharing (orcaProjects.linkSourceProject). These are independent
-// entities — see docs/guides/authorization/asset-hierarchy-and-permission-model.md
-// "Project vs OrcaProject" — neither call creates or requires the other.
+// Repo via repo.add), or link one of the caller's own pre-existing OrcaProjects
+// into this new one for sharing (orcaProjects.linkSourceProject). The link
+// picker MUST list real OrcaProjects (project.list, real project.projects
+// UUIDs) — NOT the client-only "Project Host Setup" projection (ids like
+// `github:owner/repo`, never a project.projects row): sending one of those as
+// linkSourceProject's projectId makes the backend's UUID-column lookup throw
+// (PROJECT_MEMBERSHIP_LOOKUP_FAILED) instead of cleanly denying — confirmed
+// live on b15.openledger.vn. See docs/guides/authorization/
+// asset-hierarchy-and-permission-model.md "Project vs OrcaProject".
 type DialogMode = 'new-repo' | 'link'
 
 type CreateProjectDialogProps = {
@@ -55,6 +59,7 @@ function describeError(err: unknown, fallback: string): string {
 export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreateProjectDialogProps) {
   const [devServers, setDevServers] = useState<DevServerOption[]>([])
   const [devServersLoading, setDevServersLoading] = useState(false)
+  const [myOrcaProjects, setMyOrcaProjects] = useState<OrcaProject[]>([])
 
   const [mode, setMode] = useState<DialogMode>('new-repo')
   const [name, setName] = useState('')
@@ -67,15 +72,13 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // BUG-FE-PW-001: existing sidebar data (legacy Project/Repo model), used to
-  // (a) warn when repoPath+devServerId already exists there, and (b) list
-  // Projects the user can link in the 'link' tab. Both already live in the
-  // client store — no new RPC needed for either. Read via getState() (not the
+  // BUG-FE-PW-001: existing sidebar repo data, used to warn when
+  // repoPath+devServerId already exists there — already lives in the client
+  // store, no new RPC needed. Read via getState() (not the
   // useAppStore(selector) hook form) to match this file's existing pattern —
   // the component already re-renders on every field keystroke, so this stays
   // current without a store subscription.
   const existingRepos = useAppStore.getState().repos ?? []
-  const myProjects = useAppStore.getState().projects ?? []
 
   useEffect(() => {
     if (!open) {
@@ -87,6 +90,12 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
       .then((list) => setDevServers(list ?? []))
       .catch(() => setDevServers([]))
       .finally(() => setDevServersLoading(false))
+    // Real OrcaProjects the caller belongs to — link-picker candidates (see
+    // DialogMode's doc comment for why this must be project.list, not the
+    // client-only Project Host Setup projection).
+    callRuntimeRpc<OrcaProject[]>(target, 'project.list', null)
+      .then((list) => setMyOrcaProjects(list ?? []))
+      .catch(() => setMyOrcaProjects([]))
   }, [open])
 
   function resetForm() {
@@ -114,11 +123,12 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
 
   const duplicateRepo = mode === 'new-repo' ? findDuplicateRepo(repoPath, devServerId) : undefined
 
-  // Projects not yet linked into *some* OrcaProject aren't distinguishable
-  // here (that state lives per-OrcaProject, not on the Project itself) — the
-  // picker simply lists every Project the caller owns; linking twice into the
-  // same OrcaProject is a harmless idempotent no-op server-side.
-  const linkableProjects = myProjects
+  // OrcaProjects not yet linked into *some other* OrcaProject aren't
+  // distinguishable here (that state lives per-container, not on the
+  // project itself) — the picker simply lists every OrcaProject the caller
+  // belongs to; linking twice into the same container is a harmless
+  // idempotent no-op server-side.
+  const linkableProjects = myOrcaProjects
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -302,7 +312,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
                     <p className="text-xs text-amber-600" data-testid="cp-duplicate-repo-warning">
                       This repo is already in your sidebar ({duplicateRepo.displayName}). Creating a
                       new Project here will NOT link to that data — they will stay independent.{' '}
-                      {myProjects.length > 0 ? (
+                      {myOrcaProjects.length > 0 ? (
                         <button type="button" className="underline" onClick={() => setMode('link')}>
                           Link an existing Project instead?
                         </button>
@@ -325,7 +335,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
                   <SelectContent>
                     {linkableProjects.map((p) => (
                       <SelectItem key={p.id} value={p.id}>
-                        {p.displayName}
+                        {p.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
