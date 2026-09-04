@@ -49,6 +49,16 @@ service ProjectService {
   rpc RemoveRepoMember(RemoveRepoMemberRequest) returns (RemoveRepoMemberResponse);
   rpc UpdateRepoMemberRole(UpdateRepoMemberRoleRequest) returns (UpdateRepoMemberRoleResponse);
 
+  // sparse_presets — saved directory sets for sparse worktree creation,
+  // scoped to one repo. Ports backend/src/main/runtime/rpc/methods/
+  // sparse-presets.ts (legacy TS reference). Gated by the same
+  // repo_any_functional_role tier as repo visibility (requireRepoAccess) —
+  // these are per-repo convenience config, not a separate authorization
+  // dimension of their own.
+  rpc ListSparsePresets(ListSparsePresetsRequest) returns (ListSparsePresetsResponse);
+  rpc SaveSparsePreset(SaveSparsePresetRequest) returns (SaveSparsePresetResponse);
+  rpc RemoveSparsePreset(RemoveSparsePresetRequest) returns (RemoveSparsePresetResponse);
+
   // Worktree surface — metadata only, never authoritative for on-disk
   // existence (git-gateway-service reconciles on demand, per
   // project-service.md §4's Worktree note).
@@ -365,6 +375,45 @@ message UpdateRepoMemberRoleRequest {
 message UpdateRepoMemberRoleResponse {
   RepoMember member = 1;
 }
+
+message SparsePreset {
+  string id = 1;
+  string repo_id = 2;
+  string name = 3;
+  repeated string directories = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message ListSparsePresetsRequest {
+  string repo_id = 1;
+}
+
+message ListSparsePresetsResponse {
+  repeated SparsePreset presets = 1;
+}
+
+// SaveSparsePresetRequest upserts — an empty id creates a new preset, a
+// non-empty id updates the existing one with that id (matches the legacy
+// reference's optional `id` param exactly; see project-service's
+// SaveSparsePreset usecase doc comment).
+message SaveSparsePresetRequest {
+  string repo_id = 1;
+  string id = 2;
+  string name = 3;
+  repeated string directories = 4;
+}
+
+message SaveSparsePresetResponse {
+  SparsePreset preset = 1;
+}
+
+message RemoveSparsePresetRequest {
+  string repo_id = 1;
+  string preset_id = 2;
+}
+
+message RemoveSparsePresetResponse {}
 
 message Worktree {
   string id = 1;

@@ -179,6 +179,26 @@ type RepoRepository interface {
 	ListRepoIDsWithMembership(ctx context.Context, projectID, userID string) ([]string, error)
 }
 
+// SparsePresetRepository is the persistence port for a repo's saved sparse
+// worktree directory sets — ports backend/src/main/persistence.ts's (legacy
+// TS) getSparsePresets/saveSparsePreset/removeSparsePreset.
+type SparsePresetRepository interface {
+	// ListSparsePresets returns every preset saved for repoID.
+	ListSparsePresets(ctx context.Context, repoID string) ([]domain.SparsePreset, error)
+	// GetSparsePreset returns one preset by id, scoped to repoID. Returns
+	// domain.ErrSparsePresetNotFound (wrapped) if none matches.
+	GetSparsePreset(ctx context.Context, repoID, presetID string) (domain.SparsePreset, error)
+	// SaveSparsePreset inserts (empty preset.ID) or updates (non-empty
+	// preset.ID) a preset — the caller (usecase.SaveSparsePreset) has
+	// already resolved which case this is and set CreatedAt/UpdatedAt
+	// accordingly. Returns domain.ErrSparsePresetNotFound (wrapped) if
+	// preset.ID is non-empty but matches no existing row.
+	SaveSparsePreset(ctx context.Context, preset domain.SparsePreset) (domain.SparsePreset, error)
+	// RemoveSparsePreset deletes one preset. Returns
+	// domain.ErrSparsePresetNotFound (wrapped) if none exists.
+	RemoveSparsePreset(ctx context.Context, repoID, presetID string) error
+}
+
 // WorktreeRepository is the persistence port for a project's worktree
 // metadata. Implemented by internal/adapter/postgres against
 // project.worktrees. See domain.Worktree's doc comment: never authoritative

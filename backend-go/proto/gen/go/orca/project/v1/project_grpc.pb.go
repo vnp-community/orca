@@ -39,6 +39,9 @@ const (
 	ProjectService_ListRepoMembers_FullMethodName              = "/orca.project.v1.ProjectService/ListRepoMembers"
 	ProjectService_RemoveRepoMember_FullMethodName             = "/orca.project.v1.ProjectService/RemoveRepoMember"
 	ProjectService_UpdateRepoMemberRole_FullMethodName         = "/orca.project.v1.ProjectService/UpdateRepoMemberRole"
+	ProjectService_ListSparsePresets_FullMethodName            = "/orca.project.v1.ProjectService/ListSparsePresets"
+	ProjectService_SaveSparsePreset_FullMethodName             = "/orca.project.v1.ProjectService/SaveSparsePreset"
+	ProjectService_RemoveSparsePreset_FullMethodName           = "/orca.project.v1.ProjectService/RemoveSparsePreset"
 	ProjectService_RecordWorktreeCreated_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
 	ProjectService_RecordWorktreeRemoved_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
 	ProjectService_ListWorktrees_FullMethodName                = "/orca.project.v1.ProjectService/ListWorktrees"
@@ -112,6 +115,15 @@ type ProjectServiceClient interface {
 	ListRepoMembers(ctx context.Context, in *ListRepoMembersRequest, opts ...grpc.CallOption) (*ListRepoMembersResponse, error)
 	RemoveRepoMember(ctx context.Context, in *RemoveRepoMemberRequest, opts ...grpc.CallOption) (*RemoveRepoMemberResponse, error)
 	UpdateRepoMemberRole(ctx context.Context, in *UpdateRepoMemberRoleRequest, opts ...grpc.CallOption) (*UpdateRepoMemberRoleResponse, error)
+	// sparse_presets — saved directory sets for sparse worktree creation,
+	// scoped to one repo. Ports backend/src/main/runtime/rpc/methods/
+	// sparse-presets.ts (legacy TS reference). Gated by the same
+	// repo_any_functional_role tier as repo visibility (requireRepoAccess) —
+	// these are per-repo convenience config, not a separate authorization
+	// dimension of their own.
+	ListSparsePresets(ctx context.Context, in *ListSparsePresetsRequest, opts ...grpc.CallOption) (*ListSparsePresetsResponse, error)
+	SaveSparsePreset(ctx context.Context, in *SaveSparsePresetRequest, opts ...grpc.CallOption) (*SaveSparsePresetResponse, error)
+	RemoveSparsePreset(ctx context.Context, in *RemoveSparsePresetRequest, opts ...grpc.CallOption) (*RemoveSparsePresetResponse, error)
 	// Worktree surface — metadata only, never authoritative for on-disk
 	// existence (git-gateway-service reconciles on demand, per
 	// project-service.md §4's Worktree note).
@@ -386,6 +398,36 @@ func (c *projectServiceClient) UpdateRepoMemberRole(ctx context.Context, in *Upd
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateRepoMemberRoleResponse)
 	err := c.cc.Invoke(ctx, ProjectService_UpdateRepoMemberRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListSparsePresets(ctx context.Context, in *ListSparsePresetsRequest, opts ...grpc.CallOption) (*ListSparsePresetsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSparsePresetsResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListSparsePresets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) SaveSparsePreset(ctx context.Context, in *SaveSparsePresetRequest, opts ...grpc.CallOption) (*SaveSparsePresetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SaveSparsePresetResponse)
+	err := c.cc.Invoke(ctx, ProjectService_SaveSparsePreset_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) RemoveSparsePreset(ctx context.Context, in *RemoveSparsePresetRequest, opts ...grpc.CallOption) (*RemoveSparsePresetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveSparsePresetResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RemoveSparsePreset_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -724,6 +766,15 @@ type ProjectServiceServer interface {
 	ListRepoMembers(context.Context, *ListRepoMembersRequest) (*ListRepoMembersResponse, error)
 	RemoveRepoMember(context.Context, *RemoveRepoMemberRequest) (*RemoveRepoMemberResponse, error)
 	UpdateRepoMemberRole(context.Context, *UpdateRepoMemberRoleRequest) (*UpdateRepoMemberRoleResponse, error)
+	// sparse_presets — saved directory sets for sparse worktree creation,
+	// scoped to one repo. Ports backend/src/main/runtime/rpc/methods/
+	// sparse-presets.ts (legacy TS reference). Gated by the same
+	// repo_any_functional_role tier as repo visibility (requireRepoAccess) —
+	// these are per-repo convenience config, not a separate authorization
+	// dimension of their own.
+	ListSparsePresets(context.Context, *ListSparsePresetsRequest) (*ListSparsePresetsResponse, error)
+	SaveSparsePreset(context.Context, *SaveSparsePresetRequest) (*SaveSparsePresetResponse, error)
+	RemoveSparsePreset(context.Context, *RemoveSparsePresetRequest) (*RemoveSparsePresetResponse, error)
 	// Worktree surface — metadata only, never authoritative for on-disk
 	// existence (git-gateway-service reconciles on demand, per
 	// project-service.md §4's Worktree note).
@@ -863,6 +914,15 @@ func (UnimplementedProjectServiceServer) RemoveRepoMember(context.Context, *Remo
 }
 func (UnimplementedProjectServiceServer) UpdateRepoMemberRole(context.Context, *UpdateRepoMemberRoleRequest) (*UpdateRepoMemberRoleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateRepoMemberRole not implemented")
+}
+func (UnimplementedProjectServiceServer) ListSparsePresets(context.Context, *ListSparsePresetsRequest) (*ListSparsePresetsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSparsePresets not implemented")
+}
+func (UnimplementedProjectServiceServer) SaveSparsePreset(context.Context, *SaveSparsePresetRequest) (*SaveSparsePresetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SaveSparsePreset not implemented")
+}
+func (UnimplementedProjectServiceServer) RemoveSparsePreset(context.Context, *RemoveSparsePresetRequest) (*RemoveSparsePresetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveSparsePreset not implemented")
 }
 func (UnimplementedProjectServiceServer) RecordWorktreeCreated(context.Context, *RecordWorktreeCreatedRequest) (*RecordWorktreeCreatedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RecordWorktreeCreated not implemented")
@@ -1328,6 +1388,60 @@ func _ProjectService_UpdateRepoMemberRole_Handler(srv interface{}, ctx context.C
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).UpdateRepoMemberRole(ctx, req.(*UpdateRepoMemberRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListSparsePresets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSparsePresetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListSparsePresets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListSparsePresets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListSparsePresets(ctx, req.(*ListSparsePresetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_SaveSparsePreset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveSparsePresetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).SaveSparsePreset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_SaveSparsePreset_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).SaveSparsePreset(ctx, req.(*SaveSparsePresetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_RemoveSparsePreset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveSparsePresetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RemoveSparsePreset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RemoveSparsePreset_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RemoveSparsePreset(ctx, req.(*RemoveSparsePresetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1940,6 +2054,18 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateRepoMemberRole",
 			Handler:    _ProjectService_UpdateRepoMemberRole_Handler,
+		},
+		{
+			MethodName: "ListSparsePresets",
+			Handler:    _ProjectService_ListSparsePresets_Handler,
+		},
+		{
+			MethodName: "SaveSparsePreset",
+			Handler:    _ProjectService_SaveSparsePreset_Handler,
+		},
+		{
+			MethodName: "RemoveSparsePreset",
+			Handler:    _ProjectService_RemoveSparsePreset_Handler,
 		},
 		{
 			MethodName: "RecordWorktreeCreated",

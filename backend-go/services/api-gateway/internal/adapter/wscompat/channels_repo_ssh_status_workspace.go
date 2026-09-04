@@ -237,7 +237,11 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetMembers(), nil
+		out := make([]repoMemberView, 0, len(resp.GetMembers()))
+		for _, m := range resp.GetMembers() {
+			out = append(out, toRepoMemberView(m))
+		}
+		return out, nil
 	})
 
 	r.Register("repo.addMember", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -259,7 +263,7 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetMember(), nil
+		return toRepoMemberView(resp.GetMember()), nil
 	})
 
 	r.Register("repo.removeMember", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -301,7 +305,85 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetMember(), nil
+		return toRepoMemberView(resp.GetMember()), nil
+	})
+
+	// sparsePresets.list/save/remove map 1:1 onto ProjectService's
+	// ListSparsePresets/SaveSparsePreset/RemoveSparsePreset — saved directory
+	// sets for sparse worktree creation, scoped to one repo. Closes a
+	// genuine feature gap (not a wiring bug like most of this file): these
+	// RPCs didn't exist in backend-go at all before this pass — confirmed
+	// live on b15.openledger.vn, Project Settings > Repos tab logging
+	// "channel \"sparsePresets.list\" is not yet implemented in backend-go".
+	// Ports backend/src/main/runtime/rpc/methods/sparse-presets.ts (legacy
+	// TS reference); its `sparsePresets.subscribeChanged` streaming method
+	// is NOT ported here — no push-update UI consumer exists yet
+	// (SparsePresetSettingsSection.tsx only ever polls via a plain fetch on
+	// mount), so it would be speculative surface with nothing to verify
+	// against.
+	r.Register("sparsePresets.list", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type listArgs struct {
+			RepoID string `json:"repoId"`
+		}
+		in, err := decodeArg[listArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
+		defer cancel()
+		resp, err := project.ListSparsePresets(rpcCtx, &projectv1.ListSparsePresetsRequest{RepoId: in.RepoID})
+		if err != nil {
+			return nil, err
+		}
+		out := make([]sparsePresetView, 0, len(resp.GetPresets()))
+		for _, p := range resp.GetPresets() {
+			out = append(out, toSparsePresetView(p))
+		}
+		return out, nil
+	})
+
+	r.Register("sparsePresets.save", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type saveArgs struct {
+			RepoID      string   `json:"repoId"`
+			ID          string   `json:"id"`
+			Name        string   `json:"name"`
+			Directories []string `json:"directories"`
+		}
+		in, err := decodeArg[saveArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
+		defer cancel()
+		resp, err := project.SaveSparsePreset(rpcCtx, &projectv1.SaveSparsePresetRequest{
+			RepoId: in.RepoID, Id: in.ID, Name: in.Name, Directories: in.Directories,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return toSparsePresetView(resp.GetPreset()), nil
+	})
+
+	r.Register("sparsePresets.remove", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type removeArgs struct {
+			RepoID   string `json:"repoId"`
+			PresetID string `json:"presetId"`
+		}
+		in, err := decodeArg[removeArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
+		defer cancel()
+		if _, err := project.RemoveSparsePreset(rpcCtx, &projectv1.RemoveSparsePresetRequest{
+			RepoId: in.RepoID, PresetId: in.PresetID,
+		}); err != nil {
+			return nil, err
+		}
+		return map[string]bool{"ok": true}, nil
 	})
 
 	r.Register("repo.clone", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -708,6 +790,57 @@ func toRepoRoleArg(role string) projectv1.RepoRole {
 		return projectv1.RepoRole_REPO_ROLE_ADMIN
 	default:
 		return projectv1.RepoRole_REPO_ROLE_UNSPECIFIED
+	}
+}
+
+// fromRepoRoleArg is toRepoRoleArg's inverse — for the response side.
+func fromRepoRoleArg(role projectv1.RepoRole) string {
+	switch role {
+	case projectv1.RepoRole_REPO_ROLE_DEVELOPER:
+		return "developer"
+	case projectv1.RepoRole_REPO_ROLE_LEAD:
+		return "lead"
+	case projectv1.RepoRole_REPO_ROLE_ADMIN:
+		return "admin"
+	default:
+		return ""
+	}
+}
+
+// repoMemberView is repo.getMembers/addMember/updateMemberRole's wire shape
+// — {userId, role}, matching RepoMemberManager.tsx's RepoMember type
+// exactly. Needed because projectv1.RepoMember (the raw proto struct) was
+// being returned directly: its Role field is a protobuf enum (RepoRole
+// int32 under the hood, no custom MarshalJSON), so plain encoding/json
+// serializes it as a raw NUMBER, not the "developer"/"lead"/"admin" string
+// the frontend's <Select> compares against — confirmed live on
+// b15.openledger.vn as a permanently-blank Role column (every SelectItem's
+// string value fails to match the numeric member.role).
+type repoMemberView struct {
+	UserID string `json:"userId"`
+	Role   string `json:"role"`
+}
+
+func toRepoMemberView(m *projectv1.RepoMember) repoMemberView {
+	return repoMemberView{UserID: m.GetUserId(), Role: fromRepoRoleArg(m.GetRole())}
+}
+
+// sparsePresetView is sparsePresets.list/save's wire shape — matches
+// shared/types.ts's SparsePreset exactly (createdAt/updatedAt as epoch-ms
+// numbers, per that legacy reference type, not proto Timestamps).
+type sparsePresetView struct {
+	ID          string   `json:"id"`
+	RepoID      string   `json:"repoId"`
+	Name        string   `json:"name"`
+	Directories []string `json:"directories"`
+	CreatedAt   int64    `json:"createdAt"`
+	UpdatedAt   int64    `json:"updatedAt"`
+}
+
+func toSparsePresetView(p *projectv1.SparsePreset) sparsePresetView {
+	return sparsePresetView{
+		ID: p.GetId(), RepoID: p.GetRepoId(), Name: p.GetName(), Directories: p.GetDirectories(),
+		CreatedAt: protoTimeMillis(p.GetCreatedAt()), UpdatedAt: protoTimeMillis(p.GetUpdatedAt()),
 	}
 }
 

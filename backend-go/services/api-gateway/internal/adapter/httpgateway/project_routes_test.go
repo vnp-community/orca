@@ -320,6 +320,18 @@ func (f *fakeProjectServiceClient) GetSharedProjectData(_ context.Context, _ *pr
 	return &projectv1.GetSharedProjectDataResponse{}, nil
 }
 
+func (f *fakeProjectServiceClient) ListSparsePresets(_ context.Context, _ *projectv1.ListSparsePresetsRequest, _ ...grpc.CallOption) (*projectv1.ListSparsePresetsResponse, error) {
+	return &projectv1.ListSparsePresetsResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) SaveSparsePreset(_ context.Context, _ *projectv1.SaveSparsePresetRequest, _ ...grpc.CallOption) (*projectv1.SaveSparsePresetResponse, error) {
+	return &projectv1.SaveSparsePresetResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) RemoveSparsePreset(_ context.Context, _ *projectv1.RemoveSparsePresetRequest, _ ...grpc.CallOption) (*projectv1.RemoveSparsePresetResponse, error) {
+	return &projectv1.RemoveSparsePresetResponse{}, nil
+}
+
 func (f *fakeProjectServiceClient) RecordWorktreeCreated(_ context.Context, in *projectv1.RecordWorktreeCreatedRequest, _ ...grpc.CallOption) (*projectv1.RecordWorktreeCreatedResponse, error) {
 	f.lastRecordWorktreeCreatedReq = in
 	if f.recordWorktreeCreatedErr != nil {

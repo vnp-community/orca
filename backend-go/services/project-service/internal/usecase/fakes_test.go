@@ -1123,3 +1123,61 @@ func (f *fakeSourceProjectRepository) Get(ctx context.Context, containerProjectI
 	}
 	return sp, nil
 }
+
+// fakeSparsePresetRepository is an in-memory usecase.SparsePresetRepository.
+type fakeSparsePresetRepository struct {
+	presets map[string]domain.SparsePreset // keyed by preset id
+
+	listErr   error
+	getErr    error
+	saveErr   error
+	removeErr error
+}
+
+func newFakeSparsePresetRepository() *fakeSparsePresetRepository {
+	return &fakeSparsePresetRepository{presets: map[string]domain.SparsePreset{}}
+}
+
+func (f *fakeSparsePresetRepository) ListSparsePresets(ctx context.Context, repoID string) ([]domain.SparsePreset, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []domain.SparsePreset
+	for _, p := range f.presets {
+		if p.RepoID == repoID {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeSparsePresetRepository) GetSparsePreset(ctx context.Context, repoID, presetID string) (domain.SparsePreset, error) {
+	if f.getErr != nil {
+		return domain.SparsePreset{}, f.getErr
+	}
+	p, ok := f.presets[presetID]
+	if !ok || p.RepoID != repoID {
+		return domain.SparsePreset{}, domain.ErrSparsePresetNotFound
+	}
+	return p, nil
+}
+
+func (f *fakeSparsePresetRepository) SaveSparsePreset(ctx context.Context, preset domain.SparsePreset) (domain.SparsePreset, error) {
+	if f.saveErr != nil {
+		return domain.SparsePreset{}, f.saveErr
+	}
+	f.presets[preset.ID] = preset
+	return preset, nil
+}
+
+func (f *fakeSparsePresetRepository) RemoveSparsePreset(ctx context.Context, repoID, presetID string) error {
+	if f.removeErr != nil {
+		return f.removeErr
+	}
+	p, ok := f.presets[presetID]
+	if !ok || p.RepoID != repoID {
+		return domain.ErrSparsePresetNotFound
+	}
+	delete(f.presets, presetID)
+	return nil
+}

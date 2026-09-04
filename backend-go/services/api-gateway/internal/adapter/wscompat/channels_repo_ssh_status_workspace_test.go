@@ -33,6 +33,10 @@ type fakeRepoProjectClient struct {
 	addRepoMemberFunc        func(ctx context.Context, in *projectv1.AddRepoMemberRequest) (*projectv1.AddRepoMemberResponse, error)
 	removeRepoMemberFunc     func(ctx context.Context, in *projectv1.RemoveRepoMemberRequest) (*projectv1.RemoveRepoMemberResponse, error)
 	updateRepoMemberRoleFunc func(ctx context.Context, in *projectv1.UpdateRepoMemberRoleRequest) (*projectv1.UpdateRepoMemberRoleResponse, error)
+
+	listSparsePresetsFunc  func(ctx context.Context, in *projectv1.ListSparsePresetsRequest) (*projectv1.ListSparsePresetsResponse, error)
+	saveSparsePresetFunc   func(ctx context.Context, in *projectv1.SaveSparsePresetRequest) (*projectv1.SaveSparsePresetResponse, error)
+	removeSparsePresetFunc func(ctx context.Context, in *projectv1.RemoveSparsePresetRequest) (*projectv1.RemoveSparsePresetResponse, error)
 }
 
 func (f *fakeRepoProjectClient) AddRepo(ctx context.Context, in *projectv1.AddRepoRequest, _ ...grpc.CallOption) (*projectv1.AddRepoResponse, error) {
@@ -61,6 +65,15 @@ func (f *fakeRepoProjectClient) RemoveRepoMember(ctx context.Context, in *projec
 }
 func (f *fakeRepoProjectClient) UpdateRepoMemberRole(ctx context.Context, in *projectv1.UpdateRepoMemberRoleRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoMemberRoleResponse, error) {
 	return f.updateRepoMemberRoleFunc(ctx, in)
+}
+func (f *fakeRepoProjectClient) ListSparsePresets(ctx context.Context, in *projectv1.ListSparsePresetsRequest, _ ...grpc.CallOption) (*projectv1.ListSparsePresetsResponse, error) {
+	return f.listSparsePresetsFunc(ctx, in)
+}
+func (f *fakeRepoProjectClient) SaveSparsePreset(ctx context.Context, in *projectv1.SaveSparsePresetRequest, _ ...grpc.CallOption) (*projectv1.SaveSparsePresetResponse, error) {
+	return f.saveSparsePresetFunc(ctx, in)
+}
+func (f *fakeRepoProjectClient) RemoveSparsePreset(ctx context.Context, in *projectv1.RemoveSparsePresetRequest, _ ...grpc.CallOption) (*projectv1.RemoveSparsePresetResponse, error) {
+	return f.removeSparsePresetFunc(ctx, in)
 }
 
 // fakeRepoGitGatewayClient is a minimal test double for
@@ -402,6 +415,7 @@ func TestRegisterRepoChannels_RegistrationCoverage(t *testing.T) {
 		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.create",
 		"repo.hooksCheck", "repo.issueCommandRead", "repo.issueCommandWrite",
 		"repo.setupScriptImports",
+		"sparsePresets.list", "sparsePresets.save", "sparsePresets.remove",
 	}
 	for _, channel := range want {
 		if _, ok := r.handlers[channel]; !ok {
@@ -433,8 +447,14 @@ func TestRegisterRepoChannels_MemberChannels(t *testing.T) {
 		if gotReq.GetRepoId() != "r1" {
 			t.Errorf("unexpected ListRepoMembersRequest: %+v", gotReq)
 		}
-		members, ok := result.([]*projectv1.RepoMember)
-		if !ok || len(members) != 1 {
+		// Wire shape must be {userId, role: "developer"} — repoMemberView, not
+		// the raw *projectv1.RepoMember proto struct: that Role field is a
+		// protobuf enum with no custom MarshalJSON, so plain encoding/json
+		// would serialize it as a bare number instead of a role string,
+		// leaving RepoMemberManager.tsx's <Select> permanently unable to
+		// match any option (confirmed live on b15.openledger.vn).
+		members, ok := result.([]repoMemberView)
+		if !ok || len(members) != 1 || members[0] != (repoMemberView{UserID: "u1", Role: "developer"}) {
 			t.Errorf("unexpected result: %+v", result)
 		}
 	})
@@ -453,8 +473,8 @@ func TestRegisterRepoChannels_MemberChannels(t *testing.T) {
 		if gotReq.GetRepoId() != "r1" || gotReq.GetUserId() != "u2" || gotReq.GetRole() != projectv1.RepoRole_REPO_ROLE_DEVELOPER {
 			t.Errorf("unexpected AddRepoMemberRequest: %+v", gotReq)
 		}
-		member, ok := result.(*projectv1.RepoMember)
-		if !ok || member.GetRole() != projectv1.RepoRole_REPO_ROLE_DEVELOPER {
+		member, ok := result.(repoMemberView)
+		if !ok || member.Role != "developer" {
 			t.Errorf("unexpected result: %+v", result)
 		}
 	})
@@ -489,9 +509,82 @@ func TestRegisterRepoChannels_MemberChannels(t *testing.T) {
 		if gotReq.GetRole() != projectv1.RepoRole_REPO_ROLE_ADMIN {
 			t.Errorf("want role mapped to REPO_ROLE_ADMIN, got %v", gotReq.GetRole())
 		}
-		member, ok := result.(*projectv1.RepoMember)
-		if !ok || member.GetRole() != projectv1.RepoRole_REPO_ROLE_ADMIN {
+		member, ok := result.(repoMemberView)
+		if !ok || member.Role != "admin" {
 			t.Errorf("unexpected result: %+v", result)
+		}
+	})
+}
+
+// TestRegisterRepoChannels_SparsePresetChannels covers sparsePresets.*
+// (saved sparse-checkout directory sets, scoped to one repo) — a genuine
+// new feature this pass, not a wiring fix; confirmed live on
+// b15.openledger.vn as "channel \"sparsePresets.list\" is not yet
+// implemented in backend-go" before this.
+func TestRegisterRepoChannels_SparsePresetChannels(t *testing.T) {
+	fake := &fakeRepoProjectClient{}
+	r := NewRegistry()
+	registerRepoChannels(r, fake, &fakeRepoGitGatewayClient{})
+
+	t.Run("sparsePresets.list", func(t *testing.T) {
+		var gotReq *projectv1.ListSparsePresetsRequest
+		fake.listSparsePresetsFunc = func(ctx context.Context, in *projectv1.ListSparsePresetsRequest) (*projectv1.ListSparsePresetsResponse, error) {
+			gotReq = in
+			return &projectv1.ListSparsePresetsResponse{Presets: []*projectv1.SparsePreset{
+				{Id: "preset-1", RepoId: "r1", Name: "Backend", Directories: []string{"src", "test"}},
+			}}, nil
+		}
+		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "sparsePresets.list",
+			argsJSON(t, map[string]any{"repoId": "r1"}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRepoId() != "r1" {
+			t.Errorf("unexpected ListSparsePresetsRequest: %+v", gotReq)
+		}
+		// Wire shape must be {id, repoId, name, directories, createdAt,
+		// updatedAt} — matches shared/types.ts's SparsePreset exactly.
+		presets, ok := result.([]sparsePresetView)
+		if !ok || len(presets) != 1 || presets[0].ID != "preset-1" || presets[0].Name != "Backend" || len(presets[0].Directories) != 2 {
+			t.Errorf("unexpected result: %+v", result)
+		}
+	})
+
+	t.Run("sparsePresets.save", func(t *testing.T) {
+		var gotReq *projectv1.SaveSparsePresetRequest
+		fake.saveSparsePresetFunc = func(ctx context.Context, in *projectv1.SaveSparsePresetRequest) (*projectv1.SaveSparsePresetResponse, error) {
+			gotReq = in
+			return &projectv1.SaveSparsePresetResponse{Preset: &projectv1.SparsePreset{
+				Id: "preset-2", RepoId: in.GetRepoId(), Name: in.GetName(), Directories: in.GetDirectories(),
+			}}, nil
+		}
+		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "sparsePresets.save",
+			argsJSON(t, map[string]any{"repoId": "r1", "id": "", "name": "Frontend", "directories": []string{"web"}}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRepoId() != "r1" || gotReq.GetName() != "Frontend" {
+			t.Errorf("unexpected SaveSparsePresetRequest: %+v", gotReq)
+		}
+		preset, ok := result.(sparsePresetView)
+		if !ok || preset.ID != "preset-2" || preset.Name != "Frontend" {
+			t.Errorf("unexpected result: %+v", result)
+		}
+	})
+
+	t.Run("sparsePresets.remove", func(t *testing.T) {
+		var gotReq *projectv1.RemoveSparsePresetRequest
+		fake.removeSparsePresetFunc = func(ctx context.Context, in *projectv1.RemoveSparsePresetRequest) (*projectv1.RemoveSparsePresetResponse, error) {
+			gotReq = in
+			return &projectv1.RemoveSparsePresetResponse{}, nil
+		}
+		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "sparsePresets.remove",
+			argsJSON(t, map[string]any{"repoId": "r1", "presetId": "preset-1"}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRepoId() != "r1" || gotReq.GetPresetId() != "preset-1" {
+			t.Errorf("unexpected RemoveSparsePresetRequest: %+v", gotReq)
 		}
 	})
 }

@@ -77,6 +77,10 @@ type Server struct {
 	unlinkSourceProject  *usecase.UnlinkSourceProject
 	listSourceProjects   *usecase.ListSourceProjects
 	getSharedProjectData *usecase.GetSharedProjectData
+
+	listSparsePresets  *usecase.ListSparsePresets
+	saveSparsePreset   *usecase.SaveSparsePreset
+	removeSparsePreset *usecase.RemoveSparsePreset
 }
 
 // Deps groups every usecase Server needs — a plain constructor with 20
@@ -136,6 +140,10 @@ type Deps struct {
 	UnlinkSourceProject  *usecase.UnlinkSourceProject
 	ListSourceProjects   *usecase.ListSourceProjects
 	GetSharedProjectData *usecase.GetSharedProjectData
+
+	ListSparsePresets  *usecase.ListSparsePresets
+	SaveSparsePreset   *usecase.SaveSparsePreset
+	RemoveSparsePreset *usecase.RemoveSparsePreset
 }
 
 func New(deps Deps) *Server {
@@ -193,6 +201,10 @@ func New(deps Deps) *Server {
 		unlinkSourceProject:  deps.UnlinkSourceProject,
 		listSourceProjects:   deps.ListSourceProjects,
 		getSharedProjectData: deps.GetSharedProjectData,
+
+		listSparsePresets:  deps.ListSparsePresets,
+		saveSparsePreset:   deps.SaveSparsePreset,
+		removeSparsePreset: deps.RemoveSparsePreset,
 	}
 }
 
@@ -418,6 +430,35 @@ func (s *Server) UpdateRepoMemberRole(ctx context.Context, req *projectv1.Update
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.UpdateRepoMemberRoleResponse{Member: toProtoRepoMember(member)}, nil
+}
+
+func (s *Server) ListSparsePresets(ctx context.Context, req *projectv1.ListSparsePresetsRequest) (*projectv1.ListSparsePresetsResponse, error) {
+	presets, err := s.listSparsePresets.Execute(ctx, usecase.ListSparsePresetsInput{RepoID: req.GetRepoId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.SparsePreset, 0, len(presets))
+	for _, p := range presets {
+		out = append(out, toProtoSparsePreset(p))
+	}
+	return &projectv1.ListSparsePresetsResponse{Presets: out}, nil
+}
+
+func (s *Server) SaveSparsePreset(ctx context.Context, req *projectv1.SaveSparsePresetRequest) (*projectv1.SaveSparsePresetResponse, error) {
+	preset, err := s.saveSparsePreset.Execute(ctx, usecase.SaveSparsePresetInput{
+		RepoID: req.GetRepoId(), ID: req.GetId(), Name: req.GetName(), Directories: req.GetDirectories(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.SaveSparsePresetResponse{Preset: toProtoSparsePreset(preset)}, nil
+}
+
+func (s *Server) RemoveSparsePreset(ctx context.Context, req *projectv1.RemoveSparsePresetRequest) (*projectv1.RemoveSparsePresetResponse, error) {
+	if err := s.removeSparsePreset.Execute(ctx, usecase.RemoveSparsePresetInput{RepoID: req.GetRepoId(), PresetID: req.GetPresetId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RemoveSparsePresetResponse{}, nil
 }
 
 func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.RecordWorktreeCreatedRequest) (*projectv1.RecordWorktreeCreatedResponse, error) {
@@ -825,6 +866,17 @@ func toProtoRepoRole(r domain.RepoRole) projectv1.RepoRole {
 
 func toProtoRepoMember(m domain.RepoMember) *projectv1.RepoMember {
 	return &projectv1.RepoMember{RepoId: m.RepoID, UserId: m.UserID, Role: toProtoRepoRole(m.Role)}
+}
+
+func toProtoSparsePreset(p domain.SparsePreset) *projectv1.SparsePreset {
+	return &projectv1.SparsePreset{
+		Id:          p.ID,
+		RepoId:      p.RepoID,
+		Name:        p.Name,
+		Directories: p.Directories,
+		CreatedAt:   timestamppb.New(p.CreatedAt),
+		UpdatedAt:   timestamppb.New(p.UpdatedAt),
+	}
 }
 
 func toProtoRepo(r domain.Repo) *projectv1.Repo {

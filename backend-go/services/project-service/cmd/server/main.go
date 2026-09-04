@@ -86,6 +86,7 @@ func run() error {
 	folderWorkspaceRepo := projectpostgres.NewFolderWorkspaceRepository(pool)
 	hostSetupRepo := projectpostgres.NewHostSetupRepository(pool)
 	sourceProjectRepo := projectpostgres.NewSourceProjectRepository(pool)
+	sparsePresetRepo := projectpostgres.NewSparsePresetRepository(pool)
 
 	// Real clients — Epic C (docs/execution-plan.md §10, 2026-08-17) closed
 	// the gap these were previously stubs for. Dialed lazily (doesn't block
@@ -183,6 +184,13 @@ func run() error {
 	listSourceProjectsUC := usecase.NewListSourceProjects(sourceProjectRepo, repo, opa)
 	getSharedProjectDataUC := usecase.NewGetSharedProjectData(repo, repoRepo, worktreeRepo, sourceProjectRepo, repo, opa)
 
+	// repo (usecase.ProjectRepository) satisfies usecase.RepoMembershipRepository
+	// structurally too (via repoRepo's own GetRepoMembership) — same
+	// reasoning as every repo-scoped usecase above.
+	listSparsePresetsUC := usecase.NewListSparsePresets(sparsePresetRepo, repoRepo, repo, opa)
+	saveSparsePresetUC := usecase.NewSaveSparsePreset(sparsePresetRepo, repoRepo, repo, opa)
+	removeSparsePresetUC := usecase.NewRemoveSparsePreset(sparsePresetRepo, repoRepo, repo, opa)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{
 		CreateProject:   createProjectUC,
@@ -238,6 +246,10 @@ func run() error {
 		UnlinkSourceProject:  unlinkSourceProjectUC,
 		ListSourceProjects:   listSourceProjectsUC,
 		GetSharedProjectData: getSharedProjectDataUC,
+
+		ListSparsePresets:  listSparsePresetsUC,
+		SaveSparsePreset:   saveSparsePresetUC,
+		RemoveSparsePreset: removeSparsePresetUC,
 	}))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
