@@ -230,6 +230,44 @@ describe('LinkedProjectsManager', () => {
     await waitFor(() => expect(screen.queryByTestId('linked-row-p1')).not.toBeInTheDocument())
   })
 
+  it('resolves the display name via getProjectData for a linked project not in myProjects', async () => {
+    vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method, params) => {
+      if (method === 'orcaProjects.list') {
+        return [
+          { orcaProject: { id: 'op1' }, sourceProjects: [{ ownerUserId: 'u2', projectId: 'p99' }] }
+        ]
+      }
+      if (method === 'orcaProjects.getProjectData') {
+        expect(params).toEqual({ orcaProjectId: 'op1', projectId: 'p99' })
+        return { project: { name: 'Shared By Teammate' }, repos: [], worktrees: [] }
+      }
+      return null
+    })
+    render(<LinkedProjectsManager orcaProjectId="op1" currentUserRole="member" />)
+
+    await waitFor(() => expect(screen.getByTestId('linked-row-p99')).toBeInTheDocument())
+    await waitFor(() => expect(screen.getByText('Shared By Teammate')).toBeInTheDocument())
+    expect(screen.queryByText('p99')).not.toBeInTheDocument()
+  })
+
+  it('falls back to the raw projectId when getProjectData fails to resolve it', async () => {
+    vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {
+      if (method === 'orcaProjects.list') {
+        return [
+          { orcaProject: { id: 'op1' }, sourceProjects: [{ ownerUserId: 'u2', projectId: 'p99' }] }
+        ]
+      }
+      if (method === 'orcaProjects.getProjectData') {
+        throw new Error('FORBIDDEN: not a member')
+      }
+      return null
+    })
+    render(<LinkedProjectsManager orcaProjectId="op1" currentUserRole="member" />)
+
+    await waitFor(() => expect(screen.getByTestId('linked-row-p99')).toBeInTheDocument())
+    expect(screen.getByText('p99')).toBeInTheDocument()
+  })
+
   it('shows a friendly message on FORBIDDEN errors from link', async () => {
     const { toast } = await import('sonner')
     vi.mocked(callRuntimeRpc).mockImplementation(async (_target, method) => {

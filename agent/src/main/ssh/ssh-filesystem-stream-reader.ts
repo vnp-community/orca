@@ -1,5 +1,5 @@
 import type { SshChannelMultiplexer } from './ssh-channel-multiplexer'
-import { STREAM_CHUNK_SIZE, JsonRpcErrorCode, RelayErrorCode } from './relay-protocol'
+import { STREAM_CHUNK_SIZE, JsonRpcErrorCode, RelayErrorCode } from 'orca-dev-agent-transport'
 import type { FileReadResult } from '../providers/types'
 
 const RESULT_ENCODING_BASE64 = 'base64'

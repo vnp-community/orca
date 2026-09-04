@@ -73,7 +73,15 @@ type Project struct {
 	// service's CreateProject RPC doesn't accept a dev_server_id, so a freshly
 	// created project starts unbound.
 	DevServerID string
-	Description string
+	// MobileEmulatorAgentID — CR-DS-009 §3.2
+	// (docs/crs/v2/dev-server/CR-DS-009-mobile-emulator-agent-separation.md):
+	// a parallel, independent binding to a Mobile Emulator Agent (logical FK
+	// to an infra-fleet-service DevServer with kind=AGENT_KIND_MOBILE_EMULATOR).
+	// Unlike DevServerID, this is an ordinary UpdateProject field (see
+	// ProjectUpdatePatch below) — no active-execution guard, the two
+	// bindings are deliberately independent.
+	MobileEmulatorAgentID string
+	Description           string
 	// DefaultBranch/Visibility default to DefaultBranch/DefaultVisibility
 	// when CreateProject's request leaves them empty — never left blank in
 	// a persisted row.
@@ -91,11 +99,15 @@ type Project struct {
 // string means "leave unchanged", per project.proto's UpdateProjectRequest
 // doc comment. Deliberately has no DevServerID field — RebindDevServer (with
 // its active-execution guard) stays the sole path that may change it.
+// MobileEmulatorAgentID IS included here (unlike DevServerID) — see
+// Project.MobileEmulatorAgentID's doc comment for why the two bindings
+// don't share the same guarded-rebind requirement.
 type ProjectUpdatePatch struct {
-	Name          string
-	Description   string
-	DefaultBranch string
-	Visibility    string
+	Name                  string
+	Description           string
+	DefaultBranch         string
+	Visibility            string
+	MobileEmulatorAgentID string
 }
 
 // NewProject constructs a Project, enforcing the invariants a record must

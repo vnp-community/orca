@@ -17,6 +17,13 @@
 // annotation.{create,list,update,delete} (4), task.{create,get} (2),
 // git.{status,diff} (2), automation.runNow (1), preflight.check (1),
 // devServer.{list,add} (2), fleet.health.checkAll (1).
+// (Stale even at the time of writing relative to the real registered set —
+// this comment predates most of registerTenantProjectChannels'/this
+// package's other groups' own additions and was never updated alongside
+// them. Latest addition, for the record: orcaProjects.{list,
+// linkSourceProject,unlinkSourceProject,getProjectData} (4) —
+// channels_orca_project_sharing.go, closing the "Linked Projects" gap
+// reported live on b15.openledger.vn.)
 package wscompat
 
 import (
@@ -157,6 +164,7 @@ func RegisterRealChannels(
 	registerTeamChannels(r, tenantClient)
 	registerTerminalChannels(r, infraFleetClient)
 	registerTenantProjectChannels(r, tenantClient, projectClient)
+	registerOrcaProjectSharingChannels(r, projectClient)
 	registerWorkflowChannels(r, workflowClient)
 	registerAdminUserChannels(r, authClient, tenantClient)
 	registerAuthDirectoryChannels(r, authClient)

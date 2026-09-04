@@ -13,6 +13,16 @@ export type DevServerConnectionType =
 
 export type DevServerStatus = 'connected' | 'disconnected' | 'connecting' | 'error'
 
+// CR-DS-009: distinguishes a Dev Server Agent (git/fs/pty, package `agent/`)
+// from a Mobile Emulator Agent (device.*, package `emulator/`) registered
+// through the same DevServer registry. Maps 1:1 to backend-go's
+// infrafleet.proto AgentKind enum (AGENT_KIND_DEV_SERVER/
+// AGENT_KIND_MOBILE_EMULATOR) — see TASK-EMU-007. Optional/undefined means
+// "unknown kind" and MUST be treated as a Dev Server Agent for back-compat
+// with rows that predate this field (mirrors backend's AGENT_KIND_UNSPECIFIED
+// defaulting to dev_server), never as a Mobile Emulator Agent.
+export type AgentKind = 'dev-server' | 'mobile-emulator'
+
 export type DevServer = {
   id: string // 'ds-<uuid>'
   name: string // Human label: "MacBook Pro M3"
@@ -21,6 +31,10 @@ export type DevServer = {
   sshTargetId?: string // Links to existing SshTarget
   // relay-websocket / direct-websocket specific:
   wsUrl?: string // ws://devserver.local:6799
+  // CR-DS-009: absent on rows from a backend that doesn't send this field
+  // yet (or on local Electron dev servers, which have no Mobile Emulator
+  // Agent registry) — treat as 'dev-server'. See AgentKind's doc comment.
+  kind?: AgentKind
   // Runtime (not persisted — populated after handshake):
   status: DevServerStatus
   platform: NodeJS.Platform | null
@@ -45,6 +59,16 @@ export type DevServerInput = {
   connectionType: DevServerConnectionType
   sshTargetId?: string
   wsUrl?: string
+  // CR-DS-009: which agent registers. Omitted = 'dev-server' (back-compat —
+  // every caller before TASK-EMU-012c omitted this field entirely).
+  kind?: AgentKind
+}
+
+/** Optional filter for `devServer.list`/`devServer.listForUser` — omitted
+ *  or `undefined` returns every dev server regardless of kind, matching
+ *  backend-go's empty-filter-means-no-filter convention (TASK-EMU-007). */
+export type DevServerListFilter = {
+  kind?: AgentKind
 }
 
 export type ConnectionTestResult =

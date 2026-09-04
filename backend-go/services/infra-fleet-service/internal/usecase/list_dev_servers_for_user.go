@@ -16,6 +16,9 @@ import (
 type ListDevServersForUserInput struct {
 	DepartmentID string
 	TeamIDs      []string
+	// Kind — CR-DS-009 §3.1, same "empty = no filter" convention as
+	// ListDevServers.Execute's kind parameter.
+	Kind domain.AgentKind
 }
 
 // ListDevServersForUser is the department/team-filtered view CR-DS-007
@@ -116,6 +119,9 @@ func (uc *ListDevServersForUser) Execute(ctx context.Context, in ListDevServersF
 		}
 		if ds.GroupID == "" {
 			continue // ungrouped — admin-only, see doc comment
+		}
+		if in.Kind != "" && ds.Kind != in.Kind {
+			continue
 		}
 		if groupGrantsAccess(ds.GroupID, map[string]bool{}) {
 			out = append(out, ds)

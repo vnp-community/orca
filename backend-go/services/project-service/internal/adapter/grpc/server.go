@@ -72,6 +72,11 @@ type Server struct {
 	updateHostSetup     *usecase.UpdateHostSetup
 	deleteHostSetup     *usecase.DeleteHostSetup
 	setupExistingFolder *usecase.SetupExistingFolder
+
+	linkSourceProject    *usecase.LinkSourceProject
+	unlinkSourceProject  *usecase.UnlinkSourceProject
+	listSourceProjects   *usecase.ListSourceProjects
+	getSharedProjectData *usecase.GetSharedProjectData
 }
 
 // Deps groups every usecase Server needs — a plain constructor with 20
@@ -126,6 +131,11 @@ type Deps struct {
 	UpdateHostSetup     *usecase.UpdateHostSetup
 	DeleteHostSetup     *usecase.DeleteHostSetup
 	SetupExistingFolder *usecase.SetupExistingFolder
+
+	LinkSourceProject    *usecase.LinkSourceProject
+	UnlinkSourceProject  *usecase.UnlinkSourceProject
+	ListSourceProjects   *usecase.ListSourceProjects
+	GetSharedProjectData *usecase.GetSharedProjectData
 }
 
 func New(deps Deps) *Server {
@@ -178,6 +188,11 @@ func New(deps Deps) *Server {
 		updateHostSetup:     deps.UpdateHostSetup,
 		deleteHostSetup:     deps.DeleteHostSetup,
 		setupExistingFolder: deps.SetupExistingFolder,
+
+		linkSourceProject:    deps.LinkSourceProject,
+		unlinkSourceProject:  deps.UnlinkSourceProject,
+		listSourceProjects:   deps.ListSourceProjects,
+		getSharedProjectData: deps.GetSharedProjectData,
 	}
 }
 
@@ -282,11 +297,12 @@ func (s *Server) RebindDevServer(ctx context.Context, req *projectv1.RebindDevSe
 
 func (s *Server) UpdateProject(ctx context.Context, req *projectv1.UpdateProjectRequest) (*projectv1.UpdateProjectResponse, error) {
 	project, err := s.updateProject.Execute(ctx, usecase.UpdateProjectInput{
-		ProjectID:     req.GetProjectId(),
-		Name:          req.GetName(),
-		Description:   req.GetDescription(),
-		DefaultBranch: req.GetDefaultBranch(),
-		Visibility:    req.GetVisibility(),
+		ProjectID:             req.GetProjectId(),
+		Name:                  req.GetName(),
+		Description:           req.GetDescription(),
+		DefaultBranch:         req.GetDefaultBranch(),
+		Visibility:            req.GetVisibility(),
+		MobileEmulatorAgentID: req.GetMobileEmulatorAgentId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -666,6 +682,75 @@ func (s *Server) SetupExistingFolder(ctx context.Context, req *projectv1.SetupEx
 	return resp, nil
 }
 
+// ── orcaProjects.* — cross-project source sharing ─────────────────────────
+
+func (s *Server) LinkSourceProject(ctx context.Context, req *projectv1.LinkSourceProjectRequest) (*projectv1.LinkSourceProjectResponse, error) {
+	sp, err := s.linkSourceProject.Execute(ctx, usecase.LinkSourceProjectInput{
+		ContainerProjectID: req.GetContainerProjectId(),
+		SourceProjectID:    req.GetSourceProjectId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.LinkSourceProjectResponse{SourceProject: toProtoSourceProject(sp)}, nil
+}
+
+func (s *Server) UnlinkSourceProject(ctx context.Context, req *projectv1.UnlinkSourceProjectRequest) (*projectv1.UnlinkSourceProjectResponse, error) {
+	err := s.unlinkSourceProject.Execute(ctx, usecase.UnlinkSourceProjectInput{
+		ContainerProjectID: req.GetContainerProjectId(),
+		SourceProjectID:    req.GetSourceProjectId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UnlinkSourceProjectResponse{}, nil
+}
+
+func (s *Server) ListSourceProjects(ctx context.Context, req *projectv1.ListSourceProjectsRequest) (*projectv1.ListSourceProjectsResponse, error) {
+	list, err := s.listSourceProjects.Execute(ctx, usecase.ListSourceProjectsInput{ContainerProjectID: req.GetContainerProjectId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.SourceProject, 0, len(list))
+	for _, sp := range list {
+		out = append(out, toProtoSourceProject(sp))
+	}
+	return &projectv1.ListSourceProjectsResponse{SourceProjects: out}, nil
+}
+
+func (s *Server) GetSharedProjectData(ctx context.Context, req *projectv1.GetSharedProjectDataRequest) (*projectv1.GetSharedProjectDataResponse, error) {
+	result, err := s.getSharedProjectData.Execute(ctx, usecase.GetSharedProjectDataInput{
+		ContainerProjectID: req.GetContainerProjectId(),
+		SourceProjectID:    req.GetSourceProjectId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	repos := make([]*projectv1.Repo, 0, len(result.Repos))
+	for _, r := range result.Repos {
+		repos = append(repos, toProtoRepo(r))
+	}
+	worktrees := make([]*projectv1.Worktree, 0, len(result.Worktrees))
+	for _, wt := range result.Worktrees {
+		worktrees = append(worktrees, toProtoWorktree(wt))
+	}
+	return &projectv1.GetSharedProjectDataResponse{
+		Project:   toProtoProject(result.Project),
+		Repos:     repos,
+		Worktrees: worktrees,
+	}, nil
+}
+
+func toProtoSourceProject(sp domain.SourceProject) *projectv1.SourceProject {
+	return &projectv1.SourceProject{
+		Id:                 sp.ID,
+		ContainerProjectId: sp.ContainerProjectID,
+		SourceProjectId:    sp.SourceProjectID,
+		LinkedBy:           sp.LinkedBy,
+		LinkedAt:           timestamppb.New(sp.LinkedAt),
+	}
+}
+
 func toDomainRole(r projectv1.ProjectRole) domain.ProjectRole {
 	switch r {
 	case projectv1.ProjectRole_PROJECT_ROLE_OWNER:
@@ -692,14 +777,15 @@ func toProtoRole(r domain.ProjectRole) projectv1.ProjectRole {
 
 func toProtoProject(p domain.Project) *projectv1.Project {
 	out := &projectv1.Project{
-		Id:            p.ID,
-		TenantId:      p.TenantID,
-		Name:          p.Name,
-		DevServerId:   p.DevServerID,
-		Description:   p.Description,
-		DefaultBranch: p.DefaultBranch,
-		Visibility:    p.Visibility,
-		CreatedBy:     p.CreatedBy,
+		Id:                    p.ID,
+		TenantId:              p.TenantID,
+		Name:                  p.Name,
+		DevServerId:           p.DevServerID,
+		Description:           p.Description,
+		DefaultBranch:         p.DefaultBranch,
+		Visibility:            p.Visibility,
+		CreatedBy:             p.CreatedBy,
+		MobileEmulatorAgentId: p.MobileEmulatorAgentID,
 	}
 	if !p.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(p.CreatedAt)

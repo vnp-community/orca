@@ -163,6 +163,38 @@ func TestListDevServersForUser_NoMatchingGrantExcluded(t *testing.T) {
 	}
 }
 
+// TestListDevServersForUser_FiltersByKind is CR-DS-009 §3.1's regression —
+// same "empty kind = no filter" convention as ListDevServers.Execute.
+func TestListDevServersForUser_FiltersByKind(t *testing.T) {
+	devServer := approvedServer("ds1", "g1")
+	devServer.Kind = domain.AgentKindMobileEmulator
+	devServers := &fakeDevServerListRepository{servers: []domain.DevServer{devServer}}
+	groups := &fakeDevServerGroupRepository{byTenant: map[string][]domain.DevServerGroup{
+		"tenant-1": {{ID: "g1", TenantID: "tenant-1", Name: "Backend"}},
+	}}
+	grants := &fakeDevServerGroupGrantRepository{byTenant: map[string][]domain.DevServerGroupGrant{
+		"tenant-1": {{ID: "grant1", TenantID: "tenant-1", DevServerGroupID: "g1", GranteeKind: domain.GranteeKindDepartment, GranteeID: "dept1"}},
+	}}
+	uc := NewListDevServersForUser(devServers, groups, grants)
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	got, err := uc.Execute(ctx, ListDevServersForUserInput{DepartmentID: "dept1", Kind: domain.AgentKindDevServer})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 0 {
+		t.Errorf("expected no dev servers (kind filter excludes mobile-emulator row), got %+v", got)
+	}
+
+	got, err = uc.Execute(ctx, ListDevServersForUserInput{DepartmentID: "dept1", Kind: domain.AgentKindMobileEmulator})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != "ds1" {
+		t.Errorf("expected ds1 to be returned when kind filter matches, got %+v", got)
+	}
+}
+
 func TestListDevServersForUser_RequiresTenantContext(t *testing.T) {
 	uc := NewListDevServersForUser(&fakeDevServerListRepository{}, &fakeDevServerGroupRepository{}, &fakeDevServerGroupGrantRepository{})
 	_, err := uc.Execute(context.Background(), ListDevServersForUserInput{})

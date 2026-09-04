@@ -15,7 +15,7 @@
 //   - NEVER share a WireState between connections
 //   - decodeFrame() updates state.highestAck as a side effect
 
-import { MessageType } from '../main/ssh/relay-protocol'
+import { MessageType } from './relay-protocol'
 
 export const HEADER_SIZE = 13  // 1 (type) + 4 (seq) + 4 (ack) + 4 (length)
 

@@ -368,6 +368,11 @@ type projectView struct {
 	CreatedBy     string `json:"createdBy"`
 	CreatedAt     int64  `json:"createdAt"`
 	UpdatedAt     int64  `json:"updatedAt"`
+	// MobileEmulatorAgentID — CR-DS-009 §3.2, the parallel independent
+	// binding to DevServerID (which infra-fleet-service DevServer with
+	// kind=AGENT_KIND_MOBILE_EMULATOR this project's Mobile Emulator pane
+	// routes emulator.* control to). Empty = not bound yet.
+	MobileEmulatorAgentID string `json:"mobileEmulatorAgentId"`
 }
 
 func toProjectView(p *projectv1.Project) projectView {
@@ -376,6 +381,7 @@ func toProjectView(p *projectv1.Project) projectView {
 		DevServerID: p.GetDevServerId(), DefaultBranch: p.GetDefaultBranch(),
 		Visibility: p.GetVisibility(), CreatedBy: p.GetCreatedBy(),
 		CreatedAt: protoTimeMillis(p.GetCreatedAt()), UpdatedAt: protoTimeMillis(p.GetUpdatedAt()),
+		MobileEmulatorAgentID: p.GetMobileEmulatorAgentId(),
 	}
 }
 
@@ -532,11 +538,12 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 
 	r.Register("project.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type updateArgs struct {
-			ID            string `json:"id"`
-			Name          string `json:"name"`
-			Description   string `json:"description"`
-			DefaultBranch string `json:"defaultBranch"`
-			Visibility    string `json:"visibility"`
+			ID                    string `json:"id"`
+			Name                  string `json:"name"`
+			Description           string `json:"description"`
+			DefaultBranch         string `json:"defaultBranch"`
+			Visibility            string `json:"visibility"`
+			MobileEmulatorAgentID string `json:"mobileEmulatorAgentId"`
 		}
 		in, err := decodeArg[updateArgs](args, 0)
 		if err != nil {
@@ -548,6 +555,7 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 		resp, err := client.UpdateProject(rpcCtx, &projectv1.UpdateProjectRequest{
 			ProjectId: in.ID, Name: in.Name, Description: in.Description,
 			DefaultBranch: in.DefaultBranch, Visibility: in.Visibility,
+			MobileEmulatorAgentId: in.MobileEmulatorAgentID,
 		})
 		if err != nil {
 			return nil, err

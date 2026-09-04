@@ -22,14 +22,14 @@ import type * as nodePtyTypes from 'node-pty'
 import type WebSocket from 'ws'
 import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
-import { encodeDataFrame, createWireState } from './agent-wire'
+import { encodeDataFrame, createWireState } from 'orca-dev-agent-transport'
 import { createTracer } from '../shared/trace'
 import { Tracers } from '../shared/trace/tracers'
 import { readDecryptedKey } from './agent-credential-store'
 import { YOLO_TUI_AGENT_ARGS } from '../shared/tui-agent-permissions'
 
 const spawnerTracer = createTracer('agent:spawn')
-import type { WireState } from './agent-wire'
+import type { WireState } from 'orca-dev-agent-transport'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 
 // ─── Trace propagation helper ───────────────────────────────────────────────

@@ -85,6 +85,7 @@ func run() error {
 	projectGroupRepo := projectpostgres.NewProjectGroupRepository(pool)
 	folderWorkspaceRepo := projectpostgres.NewFolderWorkspaceRepository(pool)
 	hostSetupRepo := projectpostgres.NewHostSetupRepository(pool)
+	sourceProjectRepo := projectpostgres.NewSourceProjectRepository(pool)
 
 	// Real clients — Epic C (docs/execution-plan.md §10, 2026-08-17) closed
 	// the gap these were previously stubs for. Dialed lazily (doesn't block
@@ -175,6 +176,13 @@ func run() error {
 
 	folderWorkspaceUC := usecase.NewFolderWorkspaceUseCase(folderWorkspaceRepo)
 
+	// repo (usecase.ProjectRepository) satisfies usecase.MembershipRepository
+	// structurally — same reasoning as the repo/worktree usecases above.
+	linkSourceProjectUC := usecase.NewLinkSourceProject(sourceProjectRepo, repo, opa)
+	unlinkSourceProjectUC := usecase.NewUnlinkSourceProject(sourceProjectRepo, repo, opa)
+	listSourceProjectsUC := usecase.NewListSourceProjects(sourceProjectRepo, repo, opa)
+	getSharedProjectDataUC := usecase.NewGetSharedProjectData(repo, repoRepo, worktreeRepo, sourceProjectRepo, repo, opa)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{
 		CreateProject:   createProjectUC,
@@ -225,6 +233,11 @@ func run() error {
 		UpdateHostSetup:     updateHostSetupUC,
 		DeleteHostSetup:     deleteHostSetupUC,
 		SetupExistingFolder: setupExistingFolderUC,
+
+		LinkSourceProject:    linkSourceProjectUC,
+		UnlinkSourceProject:  unlinkSourceProjectUC,
+		ListSourceProjects:   listSourceProjectsUC,
+		GetSharedProjectData: getSharedProjectDataUC,
 	}))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

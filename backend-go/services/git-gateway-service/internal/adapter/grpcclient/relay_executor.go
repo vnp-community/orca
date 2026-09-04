@@ -94,6 +94,39 @@ func (r *RelayExecutor) relay(ctx context.Context, connectionID, method string, 
 		resultJSON = resp.GetResultJson()
 	}
 
+	// Bug found live (2026-09-02/03, worktree-create-fix follow-up): a
+	// JSON-RPC-shaped error response from the agent (e.g. handleGitWorktreeAdd's
+	// validation failures) arrives here as a perfectly normal gRPC "ok" —
+	// RelayByDevServer/Relay only fail at the gRPC layer for transport/session
+	// problems, never for the agent's own {jsonrpc, error:{...}} responses.
+	// Every caller of relay() (52 methods) was silently treating that shape as
+	// success: out==nil skipped inspecting resultJSON entirely, and even a
+	// non-nil out just leaves its zero value on a shape mismatch (Go's
+	// json.Unmarshal doesn't error on missing fields). Concretely: CreateWorktree's
+	// first call (git.worktree.add, out=nil) swallowed the real failure, then its
+	// follow-up rev-parse call failed for an unrelated reason (targetPath never
+	// existed) — the ONLY error that ever surfaced was that second, misleading one.
+	// Check for the embedded error unconditionally, before the out==nil shortcut.
+	//
+	// Code is json.Number, not string: the real agent's AgentErrorCode is a
+	// JSON-RPC numeric code (e.g. -32000, -33003 — agent/src/shared/agent-wire-protocol.ts).
+	// An earlier version of this fix typed Code as string, which made
+	// json.Unmarshal fail (number into a string field) on every real error
+	// envelope — silently falling through to "no error" again, the exact
+	// bug this block exists to close. Caught before ever reaching a live
+	// worktree.create retry; covered by TestRelayExecutor_Stat_AgentErrorEnvelope_NumericCode.
+	var envelope struct {
+		Error *struct {
+			Code    json.Number `json:"code"`
+			Message string      `json:"message"`
+		} `json:"error"`
+	}
+	if resultJSON != "" {
+		if unmarshalErr := json.Unmarshal([]byte(resultJSON), &envelope); unmarshalErr == nil && envelope.Error != nil {
+			return fmt.Errorf("grpcclient: agent rejected %s: %s (%s)", method, envelope.Error.Message, envelope.Error.Code)
+		}
+	}
+
 	if out == nil || resultJSON == "" {
 		return nil
 	}
@@ -169,19 +202,59 @@ func (r *RelayExecutor) Stage(ctx context.Context, repoPath string, paths []stri
 	return result, err
 }
 
-// CreateWorktree/RemoveWorktree/FetchAndResolveRef/ListWorktreePaths below
-// follow this file's existing relay(...) helper pattern exactly (SOL-031 /
-// TASK-193). Same best-effort-param-shape caveat this file's doc comment
-// already states for git.status/git.diff/etc. applies here — git.worktreeAdd/
-// git.worktreeRemove/git.fetchRef/git.worktreeList are not verified against
-// a real Dev Server Agent handler; reconcile before removing this note.
-
+// CreateWorktree: fixed method name (was "git.worktreeAdd" — a typo; the
+// agent only registers the dotted "git.worktree.add", matching its
+// worktree.remove/worktree.list siblings) and param shape (the agent's
+// handleGitWorktreeAdd reads params.path as the NEW worktree's destination
+// directory and params.cwd as the EXISTING repo root to run from — not a
+// single "repoPath" — and has no response body beyond git.exec's raw
+// {stdout,stderr,exitCode}, so path/HeadSHA must be computed/fetched here,
+// not unmarshalled from the agent's reply). targetPath mirrors
+// localgit.Executor.CreateWorktree's own convention (repoPath + "-" +
+// sanitized branch) so both host paths agree on where a worktree lands.
+// createBranch is always true: CreateWorktreeInput/the usecase layer has no
+// "checkout an existing branch" signal — this call always represents the
+// "Create worktree" UI flow's new-branch intent, same as localgit's own
+// CreateWorktree which unconditionally passes `-b`.
 func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef string) (domain.WorktreeCreateResult, error) {
-	var result domain.WorktreeCreateResult
-	err := r.relay(ctx, repoPath, "git.worktreeAdd", map[string]any{
-		"repoPath": repoPath, "branch": branch, "baseRef": baseRef,
-	}, &result)
-	return result, err
+	targetPath := repoPath + "-" + sanitizeBranchForRelayPath(branch)
+
+	params := map[string]any{
+		"path":         targetPath,
+		"branch":       branch,
+		"createBranch": true,
+		"cwd":          repoPath,
+	}
+	if baseRef != "" {
+		params["baseRef"] = baseRef
+	}
+	if err := r.relay(ctx, repoPath, "git.worktree.add", params, nil); err != nil {
+		return domain.WorktreeCreateResult{}, err
+	}
+
+	// The agent's git.worktree.add has no structured result to unmarshal
+	// (see doc comment above) — fetch HEAD via the already-relayed, already-
+	// whitelisted git.exec (rev-parse is in agent-git-handler.ts's
+	// ALLOWED_GIT_SUBCOMMANDS), same follow-up shape as localgit's own
+	// CreateWorktree.
+	var execResult gitExecResult
+	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
+		"args": []string{"rev-parse", "HEAD"},
+		"cwd":  targetPath,
+	}, &execResult)
+	if err != nil {
+		return domain.WorktreeCreateResult{}, err
+	}
+	return domain.WorktreeCreateResult{Path: targetPath, HeadSHA: strings.TrimSpace(execResult.Stdout)}, nil
+}
+
+// sanitizeBranchForRelayPath mirrors localgit.Executor's own
+// sanitizeBranchForPath (unexported in that package, so duplicated here —
+// same reasoning as parseForEachRefBranches' own duplicate-rather-than-share
+// comment below): replaces '/' (e.g. "feature/foo") so the worktree's
+// directory name is filesystem-safe.
+func sanitizeBranchForRelayPath(branch string) string {
+	return strings.ReplaceAll(branch, "/", "-")
 }
 
 // Unstage always relays to "git.bulkUnstage" — same reasoning as Stage

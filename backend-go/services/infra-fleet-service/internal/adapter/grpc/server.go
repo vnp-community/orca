@@ -175,6 +175,7 @@ func (s *Server) RegisterDevServer(ctx context.Context, req *infrafleetv1.Regist
 		Host:        req.GetHost(),
 		Mode:        toDomainConnectionMode(req.GetMode()),
 		SSHTargetID: req.GetSshTargetId(),
+		Kind:        toDomainAgentKind(req.GetKind()),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -206,7 +207,7 @@ func (s *Server) ResolveConnection(ctx context.Context, req *infrafleetv1.Resolv
 // ListDevServers backs the frontend's devServer.list channel (wired through
 // api-gateway's wscompat) — see usecase.ListDevServers's doc comment.
 func (s *Server) ListDevServers(ctx context.Context, req *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error) {
-	devServers, err := s.listDevServers.Execute(ctx)
+	devServers, err := s.listDevServers.Execute(ctx, toDomainAgentKind(req.GetKind()))
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -307,6 +308,7 @@ func (s *Server) ListDevServersForUser(ctx context.Context, req *infrafleetv1.Li
 	devServers, err := s.listDevServersForUser.Execute(ctx, usecase.ListDevServersForUserInput{
 		DepartmentID: req.GetDepartmentId(),
 		TeamIDs:      req.GetTeamIds(),
+		Kind:         toDomainAgentKind(req.GetKind()),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -582,6 +584,34 @@ func toProtoConnectionMode(m domain.ConnectionMode) infrafleetv1.ConnectionMode 
 	}
 }
 
+// toDomainAgentKind maps AGENT_KIND_UNSPECIFIED to "" (not
+// domain.AgentKindDevServer) — callers that need the back-compat default
+// apply it themselves (see usecase.RegisterDevServer.Execute), since a list
+// filter needs to tell "unspecified = no filter" apart from an explicit
+// dev-server-kind filter, which register's default-to-dev-server behavior
+// would otherwise mask.
+func toDomainAgentKind(k infrafleetv1.AgentKind) domain.AgentKind {
+	switch k {
+	case infrafleetv1.AgentKind_AGENT_KIND_DEV_SERVER:
+		return domain.AgentKindDevServer
+	case infrafleetv1.AgentKind_AGENT_KIND_MOBILE_EMULATOR:
+		return domain.AgentKindMobileEmulator
+	default:
+		return ""
+	}
+}
+
+func toProtoAgentKind(k domain.AgentKind) infrafleetv1.AgentKind {
+	switch k {
+	case domain.AgentKindDevServer:
+		return infrafleetv1.AgentKind_AGENT_KIND_DEV_SERVER
+	case domain.AgentKindMobileEmulator:
+		return infrafleetv1.AgentKind_AGENT_KIND_MOBILE_EMULATOR
+	default:
+		return infrafleetv1.AgentKind_AGENT_KIND_UNSPECIFIED
+	}
+}
+
 // nowUnixMs stamps DevServerAccessRequest.CreatedAtUnixMs at creation time —
 // the one place in this adapter that reads wall-clock time directly (every
 // other timestamp on the wire round-trips a domain.Time value instead).
@@ -598,6 +628,7 @@ func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 		SshTargetId:    ds.SSHTargetID,
 		ApprovalStatus: string(ds.Status),
 		GroupId:        ds.GroupID,
+		Kind:           toProtoAgentKind(ds.Kind),
 	}
 }
 

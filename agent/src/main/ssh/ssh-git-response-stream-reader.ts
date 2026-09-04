@@ -1,5 +1,5 @@
 import type { SshChannelMultiplexer } from './ssh-channel-multiplexer'
-import { RelayErrorCode, isGitResponseStreamMarker } from './relay-protocol'
+import { RelayErrorCode, isGitResponseStreamMarker } from 'orca-dev-agent-transport'
 
 const SENTINEL_STREAM_ID = -1
 

@@ -18,7 +18,7 @@ import type { AgentConfig } from './agent-config'
 import type { ToolDefinition } from './agent-tool-registry'
 import type { AgentLogger } from './agent-logger'
 import { createSession } from './agent-session'
-import { HEADER_SIZE } from './agent-wire'
+import { HEADER_SIZE } from 'orca-dev-agent-transport'
 
 /**
  * Reassembles the raw bytes of Agent Wire Protocol frames (agent-wire.ts,

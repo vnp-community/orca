@@ -20,6 +20,10 @@ type UpdateProjectInput struct {
 	Description   string
 	DefaultBranch string
 	Visibility    string
+	// MobileEmulatorAgentID — CR-DS-009 §3.2, empty = no change. See
+	// domain.Project.MobileEmulatorAgentID's doc comment for why this field
+	// (unlike DevServerID) goes through the ordinary UpdateProject path.
+	MobileEmulatorAgentID string
 }
 
 type UpdateProject struct {
@@ -49,10 +53,11 @@ func (uc *UpdateProject) Execute(ctx context.Context, in UpdateProjectInput) (do
 	}
 
 	patch := domain.ProjectUpdatePatch{
-		Name:          in.Name,
-		Description:   in.Description,
-		DefaultBranch: in.DefaultBranch,
-		Visibility:    in.Visibility,
+		Name:                  in.Name,
+		Description:           in.Description,
+		DefaultBranch:         in.DefaultBranch,
+		Visibility:            in.Visibility,
+		MobileEmulatorAgentID: in.MobileEmulatorAgentID,
 	}
 
 	updated, err := uc.repo.UpdateProject(ctx, tenantID, in.ProjectID, patch)

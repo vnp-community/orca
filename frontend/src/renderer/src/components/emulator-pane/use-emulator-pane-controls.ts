@@ -1,5 +1,6 @@
 import { useCallback, useRef, useState } from 'react'
 import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import { resolveEmulatorPaneRuntimeTarget } from './emulator-pane-runtime-target'
 import type { EmulatorDeviceVisualOrientation } from './emulator-device-frame-layout'
 import type { EmulatorGesturePoint } from './emulator-screen-gesture'
 
@@ -11,21 +12,24 @@ export function useEmulatorPaneControls(worktreeId: string, onRotateSettled?: ()
 
   const sendTap = useCallback(
     async (x: number, y: number) => {
-      await callRuntimeRpc({ kind: 'local' }, 'emulator.tap', { x, y, worktree: worktreeId })
+      const { target, projectId } = resolveEmulatorPaneRuntimeTarget(worktreeId)
+      await callRuntimeRpc(target, 'emulator.tap', { x, y, worktree: worktreeId, projectId })
     },
     [worktreeId]
   )
 
   const sendButton = useCallback(
     async (name: string) => {
-      await callRuntimeRpc({ kind: 'local' }, 'emulator.button', { name, worktree: worktreeId })
+      const { target, projectId } = resolveEmulatorPaneRuntimeTarget(worktreeId)
+      await callRuntimeRpc(target, 'emulator.button', { name, worktree: worktreeId, projectId })
     },
     [worktreeId]
   )
 
   const sendGesture = useCallback(
     async (points: EmulatorGesturePoint[]) => {
-      await callRuntimeRpc({ kind: 'local' }, 'emulator.gesture', { points, worktree: worktreeId })
+      const { target, projectId } = resolveEmulatorPaneRuntimeTarget(worktreeId)
+      await callRuntimeRpc(target, 'emulator.gesture', { points, worktree: worktreeId, projectId })
     },
     [worktreeId]
   )
@@ -33,9 +37,11 @@ export function useEmulatorPaneControls(worktreeId: string, onRotateSettled?: ()
   const sendRotate = useCallback(async () => {
     const orientation = nextRotateOrientationRef.current
     const epoch = visualOrientationEpochRef.current
-    await callRuntimeRpc({ kind: 'local' }, 'emulator.rotate', {
+    const { target, projectId } = resolveEmulatorPaneRuntimeTarget(worktreeId)
+    await callRuntimeRpc(target, 'emulator.rotate', {
       orientation,
-      worktree: worktreeId
+      worktree: worktreeId,
+      projectId
     })
     if (visualOrientationEpochRef.current !== epoch) {
       return null

@@ -7,7 +7,7 @@ import { join } from 'node:path'
 
 import { StdioWebSocketAdapter, connectStdio } from './agent-connection-stdio'
 import { createSession } from './agent-session'
-import { HEADER_SIZE, createWireState, decodeFrame, encodeDataFrame, parseJsonPayload } from './agent-wire'
+import { HEADER_SIZE, createWireState, decodeFrame, encodeDataFrame, parseJsonPayload } from 'orca-dev-agent-transport'
 import type { AgentConfig } from './agent-config'
 import type { ToolDefinition } from './agent-tool-registry'
 import type { AgentLogger } from './agent-logger'

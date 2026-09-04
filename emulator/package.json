@@ -1,0 +1,29 @@
+{
+  "name": "orca-emulator-agent",
+  "version": "0.1.0",
+  "description": "Orca Mobile Emulator Agent — device.* control relay (ADB / xcrun simctl), independent from the Dev Server Agent (see docs/crs/v2/dev-server/CR-DS-009).",
+  "homepage": "https://github.com/stablyai/orca",
+  "author": "stablyai",
+  "private": true,
+  "bin": {
+    "orca-emulator-agent": "./out/emulator.js"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "build:watch": "node build.mjs --watch",
+    "start": "node out/emulator.js",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "orca-dev-agent-transport": "workspace:*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.10",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.6.0",
+    "vitest": "^2.1.0"
+  }
+}
