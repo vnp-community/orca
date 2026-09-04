@@ -52,6 +52,27 @@ func (s DevServerStatus) Valid() bool {
 	}
 }
 
+// AgentKind distinguishes a Dev Server Agent registration from a Mobile
+// Emulator Agent registration — both share this same registry via
+// RegisterDevServer, see docs/crs/v2/dev-server/
+// CR-DS-009-mobile-emulator-agent-separation.md §3.1.
+type AgentKind string
+
+const (
+	AgentKindDevServer      AgentKind = "dev_server"
+	AgentKindMobileEmulator AgentKind = "mobile_emulator"
+)
+
+// Valid reports whether k is one of the known enum values.
+func (k AgentKind) Valid() bool {
+	switch k {
+	case AgentKindDevServer, AgentKindMobileEmulator:
+		return true
+	default:
+		return false
+	}
+}
+
 var (
 	// ErrEmptyDevServerTenant is returned when TenantID is empty — a dev
 	// server with no owning tenant is never a valid domain state.
@@ -87,6 +108,11 @@ type DevServer struct {
 	// usecase yet; GroupID empty means "ungrouped", a valid state.
 	Status  DevServerStatus
 	GroupID string
+	// Kind is CR-DS-009's Dev Server Agent vs Mobile Emulator Agent
+	// distinction — see AgentKind's doc comment. NewDevServer defaults this
+	// to AgentKindDevServer; usecase.RegisterDevServer overrides it when the
+	// caller supplies a valid explicit kind (e.g. AgentKindMobileEmulator).
+	Kind AgentKind
 }
 
 // NewDevServer constructs a DevServer, enforcing the invariants a record
@@ -113,6 +139,7 @@ func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID st
 		Mode:        mode,
 		SSHTargetID: sshTargetID,
 		Status:      DevServerStatusPendingApproval,
+		Kind:        AgentKindDevServer,
 	}, nil
 }
 

@@ -64,6 +64,10 @@ const (
 	ProjectService_UpdateHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/UpdateHostSetup"
 	ProjectService_DeleteHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/DeleteHostSetup"
 	ProjectService_SetupExistingFolder_FullMethodName          = "/orca.project.v1.ProjectService/SetupExistingFolder"
+	ProjectService_LinkSourceProject_FullMethodName            = "/orca.project.v1.ProjectService/LinkSourceProject"
+	ProjectService_UnlinkSourceProject_FullMethodName          = "/orca.project.v1.ProjectService/UnlinkSourceProject"
+	ProjectService_ListSourceProjects_FullMethodName           = "/orca.project.v1.ProjectService/ListSourceProjects"
+	ProjectService_GetSharedProjectData_FullMethodName         = "/orca.project.v1.ProjectService/GetSharedProjectData"
 )
 
 // ProjectServiceClient is the client API for ProjectService service.
@@ -166,6 +170,18 @@ type ProjectServiceClient interface {
 	UpdateHostSetup(ctx context.Context, in *UpdateHostSetupRequest, opts ...grpc.CallOption) (*UpdateHostSetupResponse, error)
 	DeleteHostSetup(ctx context.Context, in *DeleteHostSetupRequest, opts ...grpc.CallOption) (*DeleteHostSetupResponse, error)
 	SetupExistingFolder(ctx context.Context, in *SetupExistingFolderRequest, opts ...grpc.CallOption) (*SetupExistingFolderResponse, error)
+	// ── orcaProjects.* — cross-project source sharing ─────────────────────
+	// Links another Project's repos/worktrees into this Project's ("the
+	// container") shared view. Both sides are ordinary Projects — there is
+	// no separate "OrcaProject" entity in this service; the legacy Electron
+	// backend's OrcaProject IS this service's Project, and its per-user-JSON
+	// "Project" concept has no equivalent here (everything is already a
+	// real, RBAC'd row). See wscompat's channels_orca_project_sharing.go for
+	// the orcaProjects.* wire-channel names this maps to.
+	LinkSourceProject(ctx context.Context, in *LinkSourceProjectRequest, opts ...grpc.CallOption) (*LinkSourceProjectResponse, error)
+	UnlinkSourceProject(ctx context.Context, in *UnlinkSourceProjectRequest, opts ...grpc.CallOption) (*UnlinkSourceProjectResponse, error)
+	ListSourceProjects(ctx context.Context, in *ListSourceProjectsRequest, opts ...grpc.CallOption) (*ListSourceProjectsResponse, error)
+	GetSharedProjectData(ctx context.Context, in *GetSharedProjectDataRequest, opts ...grpc.CallOption) (*GetSharedProjectDataResponse, error)
 }
 
 type projectServiceClient struct {
@@ -626,6 +642,46 @@ func (c *projectServiceClient) SetupExistingFolder(ctx context.Context, in *Setu
 	return out, nil
 }
 
+func (c *projectServiceClient) LinkSourceProject(ctx context.Context, in *LinkSourceProjectRequest, opts ...grpc.CallOption) (*LinkSourceProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LinkSourceProjectResponse)
+	err := c.cc.Invoke(ctx, ProjectService_LinkSourceProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UnlinkSourceProject(ctx context.Context, in *UnlinkSourceProjectRequest, opts ...grpc.CallOption) (*UnlinkSourceProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnlinkSourceProjectResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UnlinkSourceProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListSourceProjects(ctx context.Context, in *ListSourceProjectsRequest, opts ...grpc.CallOption) (*ListSourceProjectsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSourceProjectsResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListSourceProjects_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) GetSharedProjectData(ctx context.Context, in *GetSharedProjectDataRequest, opts ...grpc.CallOption) (*GetSharedProjectDataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSharedProjectDataResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetSharedProjectData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProjectServiceServer is the server API for ProjectService service.
 // All implementations must embed UnimplementedProjectServiceServer
 // for forward compatibility.
@@ -726,6 +782,18 @@ type ProjectServiceServer interface {
 	UpdateHostSetup(context.Context, *UpdateHostSetupRequest) (*UpdateHostSetupResponse, error)
 	DeleteHostSetup(context.Context, *DeleteHostSetupRequest) (*DeleteHostSetupResponse, error)
 	SetupExistingFolder(context.Context, *SetupExistingFolderRequest) (*SetupExistingFolderResponse, error)
+	// ── orcaProjects.* — cross-project source sharing ─────────────────────
+	// Links another Project's repos/worktrees into this Project's ("the
+	// container") shared view. Both sides are ordinary Projects — there is
+	// no separate "OrcaProject" entity in this service; the legacy Electron
+	// backend's OrcaProject IS this service's Project, and its per-user-JSON
+	// "Project" concept has no equivalent here (everything is already a
+	// real, RBAC'd row). See wscompat's channels_orca_project_sharing.go for
+	// the orcaProjects.* wire-channel names this maps to.
+	LinkSourceProject(context.Context, *LinkSourceProjectRequest) (*LinkSourceProjectResponse, error)
+	UnlinkSourceProject(context.Context, *UnlinkSourceProjectRequest) (*UnlinkSourceProjectResponse, error)
+	ListSourceProjects(context.Context, *ListSourceProjectsRequest) (*ListSourceProjectsResponse, error)
+	GetSharedProjectData(context.Context, *GetSharedProjectDataRequest) (*GetSharedProjectDataResponse, error)
 	mustEmbedUnimplementedProjectServiceServer()
 }
 
@@ -870,6 +938,18 @@ func (UnimplementedProjectServiceServer) DeleteHostSetup(context.Context, *Delet
 }
 func (UnimplementedProjectServiceServer) SetupExistingFolder(context.Context, *SetupExistingFolderRequest) (*SetupExistingFolderResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetupExistingFolder not implemented")
+}
+func (UnimplementedProjectServiceServer) LinkSourceProject(context.Context, *LinkSourceProjectRequest) (*LinkSourceProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LinkSourceProject not implemented")
+}
+func (UnimplementedProjectServiceServer) UnlinkSourceProject(context.Context, *UnlinkSourceProjectRequest) (*UnlinkSourceProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnlinkSourceProject not implemented")
+}
+func (UnimplementedProjectServiceServer) ListSourceProjects(context.Context, *ListSourceProjectsRequest) (*ListSourceProjectsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSourceProjects not implemented")
+}
+func (UnimplementedProjectServiceServer) GetSharedProjectData(context.Context, *GetSharedProjectDataRequest) (*GetSharedProjectDataResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSharedProjectData not implemented")
 }
 func (UnimplementedProjectServiceServer) mustEmbedUnimplementedProjectServiceServer() {}
 func (UnimplementedProjectServiceServer) testEmbeddedByValue()                        {}
@@ -1702,6 +1782,78 @@ func _ProjectService_SetupExistingFolder_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_LinkSourceProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LinkSourceProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).LinkSourceProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_LinkSourceProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).LinkSourceProject(ctx, req.(*LinkSourceProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UnlinkSourceProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnlinkSourceProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UnlinkSourceProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UnlinkSourceProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UnlinkSourceProject(ctx, req.(*UnlinkSourceProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListSourceProjects_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSourceProjectsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListSourceProjects(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListSourceProjects_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListSourceProjects(ctx, req.(*ListSourceProjectsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_GetSharedProjectData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSharedProjectDataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetSharedProjectData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetSharedProjectData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetSharedProjectData(ctx, req.(*GetSharedProjectDataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProjectService_ServiceDesc is the grpc.ServiceDesc for ProjectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1888,6 +2040,22 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetupExistingFolder",
 			Handler:    _ProjectService_SetupExistingFolder_Handler,
+		},
+		{
+			MethodName: "LinkSourceProject",
+			Handler:    _ProjectService_LinkSourceProject_Handler,
+		},
+		{
+			MethodName: "UnlinkSourceProject",
+			Handler:    _ProjectService_UnlinkSourceProject_Handler,
+		},
+		{
+			MethodName: "ListSourceProjects",
+			Handler:    _ProjectService_ListSourceProjects_Handler,
+		},
+		{
+			MethodName: "GetSharedProjectData",
+			Handler:    _ProjectService_GetSharedProjectData_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

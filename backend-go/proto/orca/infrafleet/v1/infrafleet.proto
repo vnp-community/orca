@@ -147,6 +147,22 @@ enum ConnectionMode {
   CONNECTION_MODE_DIRECT_WEBSOCKET = 3;
 }
 
+// AgentKind distinguishes a Dev Server Agent registration (agent/, drives
+// git/fs/pty/browser on the machine holding the project's code) from a
+// Mobile Emulator Agent registration (emulator/, drives Android/iOS
+// device.* control on whichever machine has Android Studio/Xcode) — both
+// register through the same RegisterDevServer RPC and share this same
+// registry/approval/grouping infra, they just carry a different kind. See
+// docs/crs/v2/dev-server/CR-DS-009-mobile-emulator-agent-separation.md §3.1.
+// UNSPECIFIED on RegisterDevServerRequest is treated as AGENT_KIND_DEV_SERVER
+// by the usecase (back-compat default for agent/ builds that predate this
+// field and never set it).
+enum AgentKind {
+  AGENT_KIND_UNSPECIFIED = 0;
+  AGENT_KIND_DEV_SERVER = 1;
+  AGENT_KIND_MOBILE_EMULATOR = 2;
+}
+
 message DevServer {
   string id = 1;
   string tenant_id = 2;
@@ -166,6 +182,9 @@ message DevServer {
   // header comment.
   string approval_status = 6; // pending_approval | approved | rejected
   string group_id = 7;        // empty = ungrouped
+  // kind — CR-DS-009 §3.1. Every row registered before this field existed
+  // backfills to AGENT_KIND_DEV_SERVER (migrations/0011_dev_server_kind).
+  AgentKind kind = 8;
 }
 
 message RegisterDevServerRequest {
@@ -173,6 +192,9 @@ message RegisterDevServerRequest {
   string host = 2;
   ConnectionMode mode = 3;
   string ssh_target_id = 4; // required when mode=CONNECTION_MODE_RELAY_SSH
+  // kind — CR-DS-009 §3.1. AGENT_KIND_UNSPECIFIED defaults to
+  // AGENT_KIND_DEV_SERVER server-side, see AgentKind's doc comment.
+  AgentKind kind = 5;
 }
 
 message RegisterDevServerResponse {
@@ -223,6 +245,11 @@ message ListDevServersRequest {
   // tenant_id is intentionally absent — pulled from request context (see
   // RegisterDevServerInput's doc comment for the same convention), never
   // trusted from the caller.
+  // kind — CR-DS-009 §3.1: AGENT_KIND_UNSPECIFIED (the zero value) returns
+  // every dev server regardless of kind, matching this RPC's behavior
+  // before this field existed — existing callers that never set it are
+  // unaffected.
+  AgentKind kind = 1;
 }
 
 message ListDevServersResponse {
@@ -341,6 +368,9 @@ message ListDevServerGroupGrantsResponse {
 message ListDevServersForUserRequest {
   string department_id = 1; // "" if the user has none
   repeated string team_ids = 2;
+  // kind — CR-DS-009 §3.1, same "unspecified = no filter" convention as
+  // ListDevServersRequest.kind.
+  AgentKind kind = 3;
 }
 message ListDevServersForUserResponse {
   repeated DevServer dev_servers = 1;

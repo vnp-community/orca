@@ -460,6 +460,7 @@ import type {
   WindowsTerminalCapabilities,
   DevServer,
   DevServerInput,
+  DevServerListFilter,
   ConnectionTestResult,
   DevServerStatus,
   AgentTokenInfo,
@@ -2259,8 +2260,16 @@ export type PreloadApi = {
     }) => Promise<void>
   }
   devServer: {
-    /** Return all persisted dev servers (with their runtime status populated) */
-    list: () => Promise<DevServer[]>
+    /**
+     * Return all persisted dev servers (with their runtime status populated).
+     * CR-DS-009: an optional `{ kind }` filter narrows to Dev Server Agents
+     * or Mobile Emulator Agents; omitted (or unsupported by the current
+     * backend) returns every dev server, unfiltered — same convention as
+     * backend-go's empty-kind-means-no-filter (TASK-EMU-007). Desktop/local
+     * runtimes ignore this filter today (no local Mobile Emulator Agent
+     * registry exists yet) and always return the unfiltered list.
+     */
+    list: (filter?: DevServerListFilter) => Promise<DevServer[]>
     /** Add a new dev server entry (does not connect automatically) */
     add: (input: DevServerInput) => Promise<DevServer>
     /** Remove a dev server and disconnect if connected */
@@ -2329,7 +2338,7 @@ export type PreloadApi = {
      * (non-admin) user — resolves the caller's department server-side and
      * excludes ungrouped/non-approved servers.
      */
-    listForUser: () => Promise<DevServer[]>
+    listForUser: (filter?: DevServerListFilter) => Promise<DevServer[]>
     /** File an access request for a dev server group (non-admin). */
     requestAccess: (params: {
       devServerGroupId: string

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2, RefreshCw } from 'lucide-react'
 import type { GlobalSettings } from '../../../../shared/types'
 import { cn } from '@/lib/utils'
-import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
@@ -14,6 +14,8 @@ import { SearchableSetting } from './SearchableSetting'
 import { SettingsRow, SettingsSwitchRow } from './SettingsFormControls'
 import { getMobileEmulatorSearchEntries } from './mobile-emulator-search'
 import { translate } from '@/i18n/i18n'
+import { AddDevServerDialog } from '../dev-server/AddDevServerDialog'
+import { useMobileEmulatorAgents } from '../../store/slices/dev-servers-selectors'
 
 type SimulatorDeviceRow = {
   name: string
@@ -125,12 +127,26 @@ export function MobileEmulatorSettingsPane({
   const [availability, setAvailability] = useState<EmulatorAvailability | null>(null)
   const [refreshing, setRefreshing] = useState(false)
   const enabled = settings.mobileEmulatorEnabled !== false
+  // CR-DS-009 / TASK-EMU-012c: entry point for pairing a Mobile Emulator
+  // Agent — a separate machine/process from this dev server (see
+  // AddDevServerDialog's kind selector).
+  const [addAgentDialogOpen, setAddAgentDialogOpen] = useState(false)
+  const mobileEmulatorAgents = useMobileEmulatorAgents()
 
   const refreshAvailability = useCallback(async (): Promise<void> => {
     setRefreshing(true)
     try {
+      // CR-DS-009 / TASK-EMU-013: dynamic target instead of a hardcoded
+      // `{kind:'local'}` — getActiveRuntimeTarget resolves to `{kind:
+      // 'local'}` itself whenever no environment is active (the desktop
+      // default), so this is a no-op change for the common case. No
+      // projectId here: this Settings pane checks host-level SDK/Xcode
+      // availability, not a specific project's Mobile Emulator Agent —
+      // backend-go's emulator.availability channel always relays even
+      // without one (TASK-EMU-009), answering available=false honestly.
+      const target = getActiveRuntimeTarget(settings)
       const result = (await callRuntimeRpc(
-        { kind: 'local' },
+        target,
         'emulator.availability',
         {}
       )) as EmulatorAvailability
@@ -148,7 +164,7 @@ export function MobileEmulatorSettingsPane({
     } finally {
       setRefreshing(false)
     }
-  }, [])
+  }, [settings])
 
   useEffect(() => {
     void refreshAvailability()
@@ -307,6 +323,47 @@ export function MobileEmulatorSettingsPane({
           <MobileEmulatorAgentControlRow />
         </SearchableSetting>
       ) : null}
+
+      {enabled ? (
+        <SearchableSetting
+          title="Mobile Emulator Agents"
+          description="Machines that drive Android/iOS devices for this workspace's projects — independent from the dev server(s) running project code."
+        >
+          <div className="space-y-2">
+            {mobileEmulatorAgents.length > 0 ? (
+              <ul className="space-y-1">
+                {mobileEmulatorAgents.map((agent) => (
+                  <li
+                    key={agent.id}
+                    className="flex items-center justify-between rounded-md border px-3 py-1.5 text-sm"
+                  >
+                    <span>{agent.name}</span>
+                    <Badge variant="outline" className="text-[11px]">
+                      {agent.status}
+                    </Badge>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground">No Mobile Emulator Agents paired yet.</p>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setAddAgentDialogOpen(true)}
+            >
+              + Add Mobile Emulator Agent
+            </Button>
+          </div>
+        </SearchableSetting>
+      ) : null}
+
+      <AddDevServerDialog
+        open={addAgentDialogOpen}
+        onOpenChange={setAddAgentDialogOpen}
+        initialKind="mobile-emulator"
+      />
     </div>
   )
 }

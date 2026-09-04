@@ -17,6 +17,10 @@ type RegisterDevServerInput struct {
 	Host        string
 	Mode        domain.ConnectionMode
 	SSHTargetID string
+	// Kind — CR-DS-009 §3.1. Empty/invalid falls back to
+	// domain.AgentKindDevServer, the default domain.NewDevServer already
+	// applies — back-compat for agent/ builds that predate this field.
+	Kind domain.AgentKind
 }
 
 // RegisterDevServer adds a new dev host to the registry. TenantID is NOT
@@ -40,6 +44,9 @@ func (uc *RegisterDevServer) Execute(ctx context.Context, in RegisterDevServerIn
 	devServer, err := domain.NewDevServer(uuid.NewString(), tenantID, in.Host, in.Mode, in.SSHTargetID)
 	if err != nil {
 		return domain.DevServer{}, apperrors.New(apperrors.KindInvalidArgument, "INFRA_INVALID_DEV_SERVER", err.Error(), err)
+	}
+	if in.Kind.Valid() {
+		devServer.Kind = in.Kind
 	}
 
 	saved, err := uc.repo.Register(ctx, devServer)

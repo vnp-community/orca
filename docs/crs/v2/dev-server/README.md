@@ -55,6 +55,7 @@ Orca Backend Server (Control Plane)     Dev Server Agent (Data Plane)
 | [CR-DS-006](./CR-DS-006-dev-server-approval-and-grouping.md) | Dev Server Agent Approval & Grouping | P1 | CR-DS-001/002, CR-AG-004 — ✅ Hoàn tất (backend + frontend) |
 | [CR-DS-007](./CR-DS-007-department-based-access-control.md) | Department-Based Dev Server Access Control | P1 | CR-DS-006 — ✅ Hoàn tất (backend + frontend) |
 | [CR-DS-008](./CR-DS-008-first-login-department-gate-and-access-request.md) | First-Login Department Gate & Access Request Flow | P2 | CR-DS-006, CR-DS-007 — ✅ Hoàn tất (backend + frontend) |
+| [CR-DS-009](./CR-DS-009-mobile-emulator-agent-separation.md) | Mobile Emulator Agent — Tách riêng khỏi Dev Server Agent | P1 | CR-DS-001/002/003/004/006 — ✅ Phase 1-5 hoàn tất (verify xanh: `agent`/`emulator`/`packages/dev-agent-transport` test suite, `go build/vet/test` backend-go, `tsc`/`vitest`/`vite build` frontend); end-to-end thật với `infra-fleet-service` + port iOS control còn lại, xem `specs/emulator/` |
 
 ---
 

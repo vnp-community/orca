@@ -10,6 +10,10 @@ export type OrcaProject = {
   description?: string
   defaultBranch: string
   devServerId: string
+  // CR-DS-009 / TASK-EMU-008: independent from devServerId — points at a
+  // DevServer registered with kind 'mobile-emulator'. Empty/absent means
+  // "no Mobile Emulator Agent bound yet" (optional, unlike devServerId).
+  mobileEmulatorAgentId?: string
   visibility: 'private' | 'team' | 'department' | 'company'
   createdAt: number
   updatedAt: number

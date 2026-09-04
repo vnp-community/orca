@@ -6,6 +6,7 @@ import { MemberManager } from './MemberManager'
 import { RepoMemberManager } from './RepoMemberManager'
 import { LinkedProjectsManager } from './LinkedProjectsManager'
 import { ProjectDevServerSection } from './ProjectDevServerSection'
+import { ProjectMobileEmulatorAgentSection } from './ProjectMobileEmulatorAgentSection'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { useAppStore } from '../../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
@@ -95,6 +96,7 @@ export function ProjectSettings({ projectId, open, onClose }: ProjectSettingsPro
               </p>
               {/* TODO: Add name/description form fields in future tasks */}
               <ProjectDevServerSection projectId={projectId} />
+              <ProjectMobileEmulatorAgentSection projectId={projectId} />
             </div>
           </TabsContent>
 

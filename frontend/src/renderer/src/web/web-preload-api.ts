@@ -39,6 +39,7 @@ import type { SshConnectionState, SshTarget } from '../../../shared/ssh-types'
 import type {
   DevServerStatus,
   DevServer,
+  DevServerListFilter,
   ConnectionTestResult,
   DevServerAccessRequest,
   DevServerGroup,
@@ -2399,7 +2400,13 @@ function createDevServerApi(): NonNullable<Partial<PreloadApi>['devServer']> {
   }
 
   return {
-    list: () => callRuntimeResult<DevServer[]>('devServer.list'),
+    // CR-DS-009: `filter` is forwarded as-is; today's api-gateway
+    // `devServer.list` wscompat channel does not yet read a `kind` arg or
+    // return a `kind` field (TASK-EMU-009's scope stopped at emulator.*
+    // routing, not this channel) — passing it is forward-compatible and a
+    // harmless no-op until that channel is updated, never a regression.
+    list: (filter?: DevServerListFilter) =>
+      callRuntimeResult<DevServer[]>('devServer.list', filter),
 
     add: (input) => callRuntimeResult<DevServer>('devServer.add', input),
 
@@ -2462,7 +2469,7 @@ function createDevServerApi(): NonNullable<Partial<PreloadApi>['devServer']> {
       callRuntimeResult<DevServer>('devServer.reject', { devServerId: id, reason }),
     assignGroup: (id, groupId) =>
       callRuntimeResult<DevServer>('devServer.assignGroup', { devServerId: id, groupId }),
-    listForUser: async () => {
+    listForUser: async (filter?: DevServerListFilter) => {
       // Why the unwrap: devServer.listForUser's wscompat handler returns
       // {devServers: [...]}, not a bare array — same wrapped-object
       // convention as devServerGroup.list/.listGrants and
@@ -2471,9 +2478,11 @@ function createDevServerApi(): NonNullable<Partial<PreloadApi>['devServer']> {
       // bug: without this, `groups`/`devServers` etc. were the wrapper
       // object itself, and every `.map()` call downstream crashed with
       // "t.map is not a function".
+      // CR-DS-009: `filter` forwarding has the same forward-compatible,
+      // currently-a-no-op status as devServer.list above.
       const result = await callRuntimeResult<{
         devServers: DevServer[]
-      }>('devServer.listForUser')
+      }>('devServer.listForUser', filter)
       return result.devServers
     },
     requestAccess: (params) =>

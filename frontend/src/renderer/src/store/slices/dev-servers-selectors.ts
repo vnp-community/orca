@@ -40,3 +40,19 @@ export function useConnectedDevServers(): DevServer[] {
 export function useDevServerById(id: string | null): DevServer | null {
   return useAppStore((s) => (id ? (s.devServers.find((ds) => ds.id === id) ?? null) : null))
 }
+
+// CR-DS-009 / TASK-EMU-012a: split the single DevServer registry by
+// `kind` for UI that must show "Dev Servers" and "Mobile Emulator Agents"
+// as separate lists. A missing `kind` (pre-CR-DS-009 rows, or any local
+// Electron dev server — that runtime never populates this field) counts as
+// 'dev-server', matching AgentKind's own back-compat doc comment.
+
+/** Dev servers with kind 'dev-server' (or unset, back-compat) — excludes Mobile Emulator Agents. */
+export function useDevServersOnly(): DevServer[] {
+  return useAppStore(useShallow((s) => s.devServers.filter((ds) => ds.kind !== 'mobile-emulator')))
+}
+
+/** Dev servers registered as Mobile Emulator Agents (kind === 'mobile-emulator'). */
+export function useMobileEmulatorAgents(): DevServer[] {
+  return useAppStore(useShallow((s) => s.devServers.filter((ds) => ds.kind === 'mobile-emulator')))
+}

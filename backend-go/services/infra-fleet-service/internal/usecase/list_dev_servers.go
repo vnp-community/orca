@@ -20,7 +20,12 @@ func NewListDevServers(repo DevServerRepository) *ListDevServers {
 	return &ListDevServers{repo: repo}
 }
 
-func (uc *ListDevServers) Execute(ctx context.Context) ([]domain.DevServer, error) {
+// Execute lists tenantID's dev servers. kind, when non-empty, filters the
+// result to that AgentKind only (CR-DS-009 §3.1 — lets the UI split "Dev
+// Servers" from "Mobile Emulator Agents"); an empty kind returns every dev
+// server regardless of kind, matching this usecase's behavior before kind
+// existed, so existing callers are unaffected.
+func (uc *ListDevServers) Execute(ctx context.Context, kind domain.AgentKind) ([]domain.DevServer, error) {
 	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
 		return nil, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
@@ -30,5 +35,14 @@ func (uc *ListDevServers) Execute(ctx context.Context) ([]domain.DevServer, erro
 	if err != nil {
 		return nil, apperrors.New(apperrors.KindInternal, "INFRA_LIST_DEV_SERVERS_FAILED", "failed to list dev servers", err)
 	}
-	return devServers, nil
+	if kind == "" {
+		return devServers, nil
+	}
+	out := make([]domain.DevServer, 0, len(devServers))
+	for _, ds := range devServers {
+		if ds.Kind == kind {
+			out = append(out, ds)
+		}
+	}
+	return out, nil
 }

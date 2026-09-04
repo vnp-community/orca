@@ -13,7 +13,8 @@ import (
 )
 
 // fakeEmulatorHostClient is a minimal test double scoped to the emulator.*/
-// host.* RPCs this file's channel handlers call (TASK-048/TASK-070).
+// host.*/ResolveConnection RPCs this file's channel handlers call
+// (TASK-048/TASK-070/TASK-EMU-009).
 type fakeEmulatorHostClient struct {
 	infrafleetv1.InfraFleetServiceClient
 
@@ -21,8 +22,17 @@ type fakeEmulatorHostClient struct {
 	getEmulatorAvailabilityFunc func(ctx context.Context, in *infrafleetv1.GetEmulatorAvailabilityRequest) (*infrafleetv1.GetEmulatorAvailabilityResponse, error)
 	attachEmulatorSessionFunc   func(ctx context.Context, in *infrafleetv1.AttachEmulatorSessionRequest) (*infrafleetv1.EmulatorSession, error)
 	getHostCapabilitiesFunc     func(ctx context.Context, in *infrafleetv1.GetHostCapabilitiesRequest) (*infrafleetv1.GetHostCapabilitiesResponse, error)
+	resolveConnectionFunc       func(ctx context.Context, in *infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error)
 
-	lastConnectionID string
+	lastConnectionID     string
+	lastResolveConnReq   *infrafleetv1.ResolveConnectionRequest
+	resolveConnCallCount int
+}
+
+func (f *fakeEmulatorHostClient) ResolveConnection(ctx context.Context, in *infrafleetv1.ResolveConnectionRequest, _ ...grpc.CallOption) (*infrafleetv1.ResolveConnectionResponse, error) {
+	f.resolveConnCallCount++
+	f.lastResolveConnReq = in
+	return f.resolveConnectionFunc(ctx, in)
 }
 
 func (f *fakeEmulatorHostClient) ListEmulatorDevices(ctx context.Context, in *infrafleetv1.ListEmulatorDevicesRequest, _ ...grpc.CallOption) (*infrafleetv1.ListEmulatorDevicesResponse, error) {
@@ -45,11 +55,29 @@ func (f *fakeEmulatorHostClient) GetHostCapabilities(ctx context.Context, in *in
 	return f.getHostCapabilitiesFunc(ctx, in)
 }
 
-// ── emulator.* (TASK-046/TASK-048) ────────────────────────────────────────
+// ── emulator.* (TASK-046/TASK-048/TASK-EMU-009) ────────────────────────────
 
-func TestRegisterEmulatorChannels_NoConnectionID_ReturnsHonestNotSupportedError(t *testing.T) {
+// mobileEmulatorProjectClient returns a fakeProjectClient whose GetProject
+// answers projectID with mobileEmulatorAgentID bound (possibly "" — the
+// "not bound yet" case tests exercise directly).
+func mobileEmulatorProjectClient(mobileEmulatorAgentID string) *fakeProjectClient {
+	return &fakeProjectClient{
+		getProjectFunc: func(ctx context.Context, in *projectv1.GetProjectRequest) (*projectv1.GetProjectResponse, error) {
+			return &projectv1.GetProjectResponse{Project: &projectv1.Project{
+				Id: in.GetId(), MobileEmulatorAgentId: mobileEmulatorAgentID,
+			}}, nil
+		},
+	}
+}
+
+// TestRegisterEmulatorChannels_NoProjectID_ReturnsHonestNotSupportedError is
+// the "old path" TASK-EMU-009 asks to keep working: no projectId in the
+// request resolves to no connectionId (resolveEmulatorConnectionID's
+// projectID=="" short-circuit), same honest stub as before this pass's
+// connectionId->projectId contract change.
+func TestRegisterEmulatorChannels_NoProjectID_ReturnsHonestNotSupportedError(t *testing.T) {
 	r := NewRegistry()
-	registerEmulatorChannels(r, &fakeEmulatorHostClient{})
+	registerEmulatorChannels(r, &fakeProjectClient{}, &fakeEmulatorHostClient{})
 
 	channels := []string{
 		"emulator.attach", "emulator.button",
@@ -75,26 +103,56 @@ func TestRegisterEmulatorChannels_NoConnectionID_ReturnsHonestNotSupportedError(
 	}
 }
 
-// TASK-048 regression test: a connectionId present in the request must
-// prefer the relay path — proving RegisterRealChannels' "relay when
-// connection_id is present" rule for a namespace with NO local fallback
-// (unlike host.* below).
-func TestRegisterEmulatorChannels_WithConnectionID_Relays(t *testing.T) {
-	fake := &fakeEmulatorHostClient{
+// TestRegisterEmulatorChannels_ProjectWithNoMobileEmulatorAgentID_ReturnsHonestNotSupportedError
+// is the other "old path" case TASK-EMU-009 asks to keep working: a real
+// project that simply has no Mobile Emulator Agent bound yet resolves to no
+// connectionId, same honest stub — not a hard error.
+func TestRegisterEmulatorChannels_ProjectWithNoMobileEmulatorAgentID_ReturnsHonestNotSupportedError(t *testing.T) {
+	r := NewRegistry()
+	registerEmulatorChannels(r, mobileEmulatorProjectClient(""), &fakeEmulatorHostClient{})
+
+	args := argsJSON(t, map[string]any{"projectId": "proj-1"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "emulator.listDevices", args)
+	if result != nil {
+		t.Errorf("expected nil result, got %v", result)
+	}
+	if !errors.Is(err, errEmulatorNotSupported) {
+		t.Errorf("expected errEmulatorNotSupported, got %v", err)
+	}
+}
+
+// TestRegisterEmulatorChannels_WithProjectID_ResolvesAndRelays is
+// TASK-EMU-009's new-path regression, replacing the old
+// WithConnectionID_Relays test: a projectId resolves through
+// GetProject().mobileEmulatorAgentId and ResolveConnection to a real
+// connectionId, which is what actually gets forwarded to the emulator.*
+// RPC — never the client-supplied projectId itself.
+func TestRegisterEmulatorChannels_WithProjectID_ResolvesAndRelays(t *testing.T) {
+	projectClient := mobileEmulatorProjectClient("mobile-emu-agent-1")
+	infraClient := &fakeEmulatorHostClient{
+		resolveConnectionFunc: func(ctx context.Context, in *infrafleetv1.ResolveConnectionRequest) (*infrafleetv1.ResolveConnectionResponse, error) {
+			return &infrafleetv1.ResolveConnectionResponse{Connected: true, ConnectionId: "resolved-conn-1"}, nil
+		},
 		listEmulatorDevicesFunc: func(ctx context.Context, in *infrafleetv1.ListEmulatorDevicesRequest) (*infrafleetv1.ListEmulatorDevicesResponse, error) {
 			return &infrafleetv1.ListEmulatorDevicesResponse{Devices: []*infrafleetv1.EmulatorDevice{{Id: "emulator-5554"}}}, nil
 		},
 	}
 	r := NewRegistry()
-	registerEmulatorChannels(r, fake)
+	registerEmulatorChannels(r, projectClient, infraClient)
 
-	args := argsJSON(t, map[string]any{"connectionId": "conn-1"})
+	args := argsJSON(t, map[string]any{"projectId": "proj-1"})
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "emulator.listDevices", args)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if fake.lastConnectionID != "conn-1" {
-		t.Errorf("expected connectionId to be forwarded, got %q", fake.lastConnectionID)
+	if projectClient.lastGetProjectReq.GetId() != "proj-1" {
+		t.Errorf("expected projectId to reach GetProject, got %+v", projectClient.lastGetProjectReq)
+	}
+	if infraClient.lastResolveConnReq.GetDevServerId() != "mobile-emu-agent-1" {
+		t.Errorf("expected mobileEmulatorAgentId to reach ResolveConnection as dev_server_id, got %+v", infraClient.lastResolveConnReq)
+	}
+	if infraClient.lastConnectionID != "resolved-conn-1" {
+		t.Errorf("expected the RESOLVED connectionId to be forwarded, not the client-supplied projectId, got %q", infraClient.lastConnectionID)
 	}
 	devices, ok := result.([]*infrafleetv1.EmulatorDevice)
 	if !ok || len(devices) != 1 || devices[0].GetId() != "emulator-5554" {
@@ -105,14 +163,14 @@ func TestRegisterEmulatorChannels_WithConnectionID_Relays(t *testing.T) {
 // GetEmulatorAvailability has no connectionId requirement even in
 // wscompat, unlike every other emulator.* channel — see
 // registerEmulatorChannels's doc comment.
-func TestRegisterEmulatorChannels_Availability_AlwaysRelaysEvenWithoutConnectionID(t *testing.T) {
+func TestRegisterEmulatorChannels_Availability_AlwaysRelaysEvenWithoutProjectID(t *testing.T) {
 	fake := &fakeEmulatorHostClient{
 		getEmulatorAvailabilityFunc: func(ctx context.Context, in *infrafleetv1.GetEmulatorAvailabilityRequest) (*infrafleetv1.GetEmulatorAvailabilityResponse, error) {
 			return &infrafleetv1.GetEmulatorAvailabilityResponse{Available: false, Reason: "no active dev server connection"}, nil
 		},
 	}
 	r := NewRegistry()
-	registerEmulatorChannels(r, fake)
+	registerEmulatorChannels(r, &fakeProjectClient{}, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "emulator.availability", nil)
 	if err != nil {
@@ -233,12 +291,22 @@ type fakeProjectClient struct {
 	deleteFolderWorkspaceFunc      func(ctx context.Context, in *projectv1.DeleteFolderWorkspaceRequest) (*projectv1.DeleteFolderWorkspaceResponse, error)
 	listFolderWorkspacesFunc       func(ctx context.Context, in *projectv1.ListFolderWorkspacesRequest) (*projectv1.ListFolderWorkspacesResponse, error)
 	getFolderWorkspacePathStatFunc func(ctx context.Context, in *projectv1.GetFolderWorkspacePathStatusRequest) (*projectv1.GetFolderWorkspacePathStatusResponse, error)
+	// getProjectFunc backs TASK-EMU-009's resolveEmulatorConnectionID —
+	// emulator.* tests below set this; folderWorkspace.* tests never call
+	// GetProject, so they leave it nil.
+	getProjectFunc func(ctx context.Context, in *projectv1.GetProjectRequest) (*projectv1.GetProjectResponse, error)
 
-	lastCreateReq *projectv1.CreateFolderWorkspaceRequest
-	lastUpdateReq *projectv1.UpdateFolderWorkspaceRequest
-	lastDeleteReq *projectv1.DeleteFolderWorkspaceRequest
-	lastStatusReq *projectv1.GetFolderWorkspacePathStatusRequest
-	callCount     int
+	lastCreateReq     *projectv1.CreateFolderWorkspaceRequest
+	lastUpdateReq     *projectv1.UpdateFolderWorkspaceRequest
+	lastDeleteReq     *projectv1.DeleteFolderWorkspaceRequest
+	lastStatusReq     *projectv1.GetFolderWorkspacePathStatusRequest
+	lastGetProjectReq *projectv1.GetProjectRequest
+	callCount         int
+}
+
+func (f *fakeProjectClient) GetProject(ctx context.Context, in *projectv1.GetProjectRequest, _ ...grpc.CallOption) (*projectv1.GetProjectResponse, error) {
+	f.lastGetProjectReq = in
+	return f.getProjectFunc(ctx, in)
 }
 
 func (f *fakeProjectClient) CreateFolderWorkspace(ctx context.Context, in *projectv1.CreateFolderWorkspaceRequest, _ ...grpc.CallOption) (*projectv1.CreateFolderWorkspaceResponse, error) {

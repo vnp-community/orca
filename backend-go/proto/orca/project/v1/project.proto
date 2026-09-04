@@ -111,6 +111,19 @@ service ProjectService {
   rpc UpdateHostSetup(UpdateHostSetupRequest) returns (UpdateHostSetupResponse);
   rpc DeleteHostSetup(DeleteHostSetupRequest) returns (DeleteHostSetupResponse);
   rpc SetupExistingFolder(SetupExistingFolderRequest) returns (SetupExistingFolderResponse);
+
+  // ── orcaProjects.* — cross-project source sharing ─────────────────────
+  // Links another Project's repos/worktrees into this Project's ("the
+  // container") shared view. Both sides are ordinary Projects — there is
+  // no separate "OrcaProject" entity in this service; the legacy Electron
+  // backend's OrcaProject IS this service's Project, and its per-user-JSON
+  // "Project" concept has no equivalent here (everything is already a
+  // real, RBAC'd row). See wscompat's channels_orca_project_sharing.go for
+  // the orcaProjects.* wire-channel names this maps to.
+  rpc LinkSourceProject(LinkSourceProjectRequest) returns (LinkSourceProjectResponse);
+  rpc UnlinkSourceProject(UnlinkSourceProjectRequest) returns (UnlinkSourceProjectResponse);
+  rpc ListSourceProjects(ListSourceProjectsRequest) returns (ListSourceProjectsResponse);
+  rpc GetSharedProjectData(GetSharedProjectDataRequest) returns (GetSharedProjectDataResponse);
 }
 
 message Project {
@@ -124,6 +137,16 @@ message Project {
   string created_by = 8; // logical FK -> tenant-service user id
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
+  // mobile_emulator_agent_id — CR-DS-009 §3.2
+  // (docs/crs/v2/dev-server/CR-DS-009-mobile-emulator-agent-separation.md):
+  // a parallel, independent binding to dev_server_id — logical FK to an
+  // infra-fleet-service DevServer whose kind is AGENT_KIND_MOBILE_EMULATOR.
+  // Empty means no Mobile Emulator Agent bound yet. Unlike dev_server_id,
+  // updating this field goes through the ordinary UpdateProject path (see
+  // UpdateProjectRequest below), not a RebindDevServer-style guarded RPC —
+  // there is no active-execution concern tied to swapping which machine
+  // drives the emulator, the two bindings are deliberately independent.
+  string mobile_emulator_agent_id = 11;
 }
 
 message CreateProjectRequest {
@@ -219,6 +242,7 @@ message UpdateProjectRequest {
   string description = 3; // empty = no change
   string default_branch = 4; // empty = no change
   string visibility = 5; // empty = no change
+  string mobile_emulator_agent_id = 6; // empty = no change, see Project.mobile_emulator_agent_id
 }
 
 message UpdateProjectResponse {
@@ -660,4 +684,54 @@ message SetupExistingFolderRequest {
 message SetupExistingFolderResponse {
   HostSetup setup = 1;  // status now "completed" or "failed"
   Project project = 2;  // set only on success
+}
+
+// ── orcaProjects.* messages ───────────────────────────────────────────────
+
+// SourceProject is the join row linking source_project_id's repos/worktrees
+// into container_project_id's shared view. linked_by records who performed
+// the link (audit trail) — not an ownership claim on either project.
+message SourceProject {
+  string id = 1;
+  string container_project_id = 2;
+  string source_project_id = 3;
+  string linked_by = 4; // logical FK -> tenant-service user id
+  google.protobuf.Timestamp linked_at = 5;
+}
+
+message LinkSourceProjectRequest {
+  string container_project_id = 1;
+  string source_project_id = 2;
+}
+message LinkSourceProjectResponse {
+  SourceProject source_project = 1;
+}
+
+message UnlinkSourceProjectRequest {
+  string container_project_id = 1;
+  string source_project_id = 2;
+}
+message UnlinkSourceProjectResponse {}
+
+message ListSourceProjectsRequest {
+  string container_project_id = 1;
+}
+message ListSourceProjectsResponse {
+  repeated SourceProject source_projects = 1;
+}
+
+// GetSharedProjectData returns source_project_id's repos/worktrees IF (and
+// only if) it's actually linked into container_project_id — the caller
+// must be a member of container_project_id; a caller passing a
+// source_project_id that isn't linked gets the same not-authorized error
+// as a non-member (enumeration resistance — never reveals whether a given
+// source_project_id exists or is merely unlinked).
+message GetSharedProjectDataRequest {
+  string container_project_id = 1;
+  string source_project_id = 2;
+}
+message GetSharedProjectDataResponse {
+  Project project = 1;
+  repeated Repo repos = 2;
+  repeated Worktree worktrees = 3;
 }
