@@ -2175,13 +2175,22 @@ export type PreloadApi = {
       wslDistro?: string | null
     }) => Promise<ClaudeRateLimitAccountsState>
   }
+  // devServerId (all 6 methods, added alongside distro on the WSL 3): on
+  // desktop it's unused (registration always targets the local machine); on
+  // the web build it's what lets createCliApi relay to a connected Dev
+  // Server's agent (wscompat/channels_cli.go) instead of returning its
+  // "unsupported in the browser" stub — see runtime-cli-client.ts's doc
+  // comment.
   cli: {
-    getInstallStatus: () => Promise<CliInstallStatus>
-    install: () => Promise<CliInstallStatus>
-    remove: () => Promise<CliInstallStatus>
-    getWslInstallStatus: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
-    installWsl: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
-    removeWsl: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
+    getInstallStatus: (args?: { devServerId?: string }) => Promise<CliInstallStatus>
+    install: (args?: { devServerId?: string }) => Promise<CliInstallStatus>
+    remove: (args?: { devServerId?: string }) => Promise<CliInstallStatus>
+    getWslInstallStatus: (args?: {
+      devServerId?: string
+      distro?: string | null
+    }) => Promise<CliInstallStatus>
+    installWsl: (args?: { devServerId?: string; distro?: string | null }) => Promise<CliInstallStatus>
+    removeWsl: (args?: { devServerId?: string; distro?: string | null }) => Promise<CliInstallStatus>
   }
   agentHooks: {
     claudeStatus: () => Promise<AgentHookInstallStatus>

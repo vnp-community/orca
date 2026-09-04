@@ -9,6 +9,7 @@ import type {
   NativeChatReadSessionResult,
   NativeChatAppendedMessages
 } from '../../../preload/api-types'
+import type { CliInstallStatus } from '../../../shared/cli-install-types'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type { AiVaultListArgs, AiVaultListResult } from '../../../shared/ai-vault-types'
 import { buildNativeChatUnsubscribe } from '../../../shared/native-chat-stream-unsubscribe'
@@ -2873,8 +2874,14 @@ function createPreflightApi(): NonNullable<Partial<PreloadApi>['preflight']> {
   }
 }
 
-function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
-  const status = {
+// unsupportedCliStatus is the honest answer for a caller that hasn't (yet)
+// threaded a devServerId through — see relayOrStubCli below. It used to be
+// createCliApi's ONLY answer, unconditionally, which is the literal error
+// text ("CLI registration is managed on the Orca server, not in the web
+// browser.") reported live on b15.openledger.vn's Settings > Orchestration
+// Install button.
+function unsupportedCliStatus(): CliInstallStatus {
+  return {
     platform: getBrowserPlatform(),
     commandName: getBrowserPlatform() === 'linux' ? 'orca-ide' : 'orca',
     commandPath: null,
@@ -2887,15 +2894,40 @@ function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
     currentTarget: null,
     unsupportedReason: 'launch_mode_unavailable',
     detail: 'CLI registration is managed on the Orca server, not in the web browser.'
-  } as const
+  }
+}
+
+// relayOrStubCli backs every cli.* method: with a devServerId, relay to that
+// connected Dev Server's agent through backend-go's wscompat/channels_cli.go
+// (RelayByDevServer -> agent/src/relay/agent-cli-handler.ts, real
+// getInstallStatus/install/remove/getWslInstallStatus/installWsl/removeWsl —
+// nothing about registering a CLI executes in the browser or in api-gateway
+// itself, both are pure relay). Without one — every caller not yet updated
+// to pass devServerId, see runtime-cli-client.ts's doc comment — this keeps
+// the prior, honest "unsupported in the browser" stub unchanged.
+function relayOrStubCli(
+  method: string,
+  devServerId: string | undefined,
+  extraParams?: Record<string, unknown>
+): Promise<CliInstallStatus> {
+  if (!devServerId) {
+    return Promise.resolve(unsupportedCliStatus())
+  }
+  return callRuntimeResult<CliInstallStatus>(method, { devServerId, ...extraParams })
+}
+
+function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
   return {
-    getInstallStatus: () => Promise.resolve(status),
-    install: () => Promise.resolve(status),
-    remove: () => Promise.resolve(status),
-    getWslInstallStatus: (_args?: { distro?: string | null }) => Promise.resolve(status),
-    installWsl: (_args?: { distro?: string | null }) => Promise.resolve(status),
-    removeWsl: (_args?: { distro?: string | null }) => Promise.resolve(status)
-  } as NonNullable<Partial<PreloadApi>['cli']>
+    getInstallStatus: (args) => relayOrStubCli('cli.getInstallStatus', args?.devServerId),
+    install: (args) => relayOrStubCli('cli.install', args?.devServerId),
+    remove: (args) => relayOrStubCli('cli.remove', args?.devServerId),
+    getWslInstallStatus: (args) =>
+      relayOrStubCli('cli.getWslInstallStatus', args?.devServerId, { distro: args?.distro ?? null }),
+    installWsl: (args) =>
+      relayOrStubCli('cli.installWsl', args?.devServerId, { distro: args?.distro ?? null }),
+    removeWsl: (args) =>
+      relayOrStubCli('cli.removeWsl', args?.devServerId, { distro: args?.distro ?? null })
+  }
 }
 
 function createAgentHooksApi(): NonNullable<Partial<PreloadApi>['agentHooks']> {
