@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -30,6 +31,14 @@ type fakeInfraFleetServiceClient struct {
 	relayErr  error
 	gotRelay  *infrafleetv1.RelayRequest
 
+	// relayRespByMethod/gotRelayRequests support multi-call sequences (e.g.
+	// CreateWorktree's git.worktree.add then git.exec follow-up) where a
+	// single fixed relayResp/gotRelay pair can't distinguish which call is
+	// which. When relayRespByMethod is non-nil, Relay looks up by
+	// in.Method instead of returning relayResp.
+	relayRespByMethod map[string]*infrafleetv1.RelayResponse
+	gotRelayRequests  []*infrafleetv1.RelayRequest
+
 	relayByDevServerResp *infrafleetv1.RelayResponse
 	relayByDevServerErr  error
 	gotRelayByDevServer  *infrafleetv1.RelayByDevServerRequest
@@ -45,8 +54,12 @@ func (f *fakeInfraFleetServiceClient) ResolveConnection(ctx context.Context, in 
 
 func (f *fakeInfraFleetServiceClient) Relay(ctx context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
 	f.gotRelay = in
+	f.gotRelayRequests = append(f.gotRelayRequests, in)
 	if f.relayErr != nil {
 		return nil, f.relayErr
+	}
+	if f.relayRespByMethod != nil {
+		return f.relayRespByMethod[in.GetMethod()], nil
 	}
 	return f.relayResp, nil
 }
@@ -159,6 +172,37 @@ func TestRelayExecutor_GetStatus_Success(t *testing.T) {
 	}
 	if params["worktreePath"] != "/repo" {
 		t.Errorf("expected worktreePath param (real agent contract, see BUG-036/TASK-228), got %+v", params)
+	}
+}
+
+// TestRelayExecutor_Stat_AgentErrorEnvelope_NumericCode guards against a bug
+// found live in the fix this test was added for: the agent's JSON-RPC error
+// code (AgentErrorCode, agent/src/shared/agent-wire-protocol.ts) is a JSON
+// number (e.g. -33003), not a string. relay()'s envelope-detection struct
+// originally typed Code as `string`, which made json.Unmarshal fail on any
+// real error response (number into a string field) — silently falling
+// through to "no error found" and treating the agent's rejection as success,
+// the exact bug this envelope check exists to close. Must use json.Number.
+func TestRelayExecutor_Stat_AgentErrorEnvelope_NumericCode(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"error":   map[string]any{"code": -33003, "message": "Not found: /repo/missing.md"},
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)},
+	}
+	r := NewRelayExecutor(fake)
+
+	_, err = r.Stat(ctxWithTenant(t), "/repo", "missing.md")
+	if err == nil {
+		t.Fatal("expected an error for a JSON-RPC error envelope, got nil (agent rejection was silently swallowed as success)")
+	}
+	if !strings.Contains(err.Error(), "Not found: /repo/missing.md") {
+		t.Errorf("expected error to surface the agent's message, got: %v", err)
 	}
 }
 
@@ -925,6 +969,104 @@ func TestRelayExecutor_ListWorktreePaths_SendsCwdAndParsesWorktreesShape(t *test
 	}
 	if infos[1].Path != "/repo/.worktrees/feature" || infos[1].Head != "def456" || infos[1].Branch != "feature" {
 		t.Errorf("unexpected worktree[1]: %+v", infos[1])
+	}
+}
+
+// ── CreateWorktree fix: method name was "git.worktreeAdd" (typo — the agent
+// only registers the dotted "git.worktree.add"), and the param shape was
+// wrong (agent's handleGitWorktreeAdd wants params.path as the NEW
+// worktree's destination dir + params.cwd as the EXISTING repo root, not a
+// single "repoPath"). git.worktree.add's own reply has no path/HeadSHA, so
+// CreateWorktree computes the target path itself (mirrors localgit's
+// repoPath + "-" + sanitized-branch convention) and issues a git.exec
+// rev-parse HEAD follow-up for HeadSHA. ──
+
+func TestRelayExecutor_CreateWorktree_SendsCorrectMethodAndParams(t *testing.T) {
+	worktreeAddResp, err := json.Marshal(map[string]any{"stdout": "", "stderr": "", "exitCode": 0})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	revParseResp, err := json.Marshal(map[string]any{"stdout": "abc123\n", "stderr": "", "exitCode": 0})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayRespByMethod: map[string]*infrafleetv1.RelayResponse{
+		"git.worktree.add": {ResultJson: string(worktreeAddResp)},
+		"git.exec":         {ResultJson: string(revParseResp)},
+	}}
+	r := NewRelayExecutor(fake)
+
+	result, err := r.CreateWorktree(ctxWithTenant(t), "/repo", "feature/x", "origin/main")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fake.gotRelayRequests) != 2 {
+		t.Fatalf("want 2 relay calls (git.worktree.add + git.exec), got %d", len(fake.gotRelayRequests))
+	}
+
+	addReq := fake.gotRelayRequests[0]
+	if addReq.GetMethod() != "git.worktree.add" {
+		t.Errorf("expected method=git.worktree.add, got %q", addReq.GetMethod())
+	}
+	var addParams map[string]any
+	if err := json.Unmarshal([]byte(addReq.GetParamsJson()), &addParams); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	wantPath := "/repo-feature-x"
+	if addParams["path"] != wantPath {
+		t.Errorf("expected path=%q (agent-git-handler.ts's handleGitWorktreeAdd reads params.path as the new worktree's destination), got %+v", wantPath, addParams)
+	}
+	if addParams["branch"] != "feature/x" {
+		t.Errorf("expected branch=feature/x, got %+v", addParams)
+	}
+	if addParams["createBranch"] != true {
+		t.Errorf("expected createBranch=true (CreateWorktreeInput has no checkout-existing-branch signal), got %+v", addParams)
+	}
+	if addParams["cwd"] != "/repo" {
+		t.Errorf("expected cwd=/repo (the EXISTING repo root handleGitWorktreeAdd runs `git worktree add` from), got %+v", addParams)
+	}
+	if addParams["baseRef"] != "origin/main" {
+		t.Errorf("expected baseRef=origin/main, got %+v", addParams)
+	}
+
+	revParseReq := fake.gotRelayRequests[1]
+	if revParseReq.GetMethod() != "git.exec" {
+		t.Errorf("expected method=git.exec, got %q", revParseReq.GetMethod())
+	}
+	var revParseParams map[string]any
+	if err := json.Unmarshal([]byte(revParseReq.GetParamsJson()), &revParseParams); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if revParseParams["cwd"] != wantPath {
+		t.Errorf("expected rev-parse cwd=%q (the NEW worktree dir), got %+v", wantPath, revParseParams)
+	}
+
+	if result.Path != wantPath {
+		t.Errorf("expected result.Path=%q, got %q", wantPath, result.Path)
+	}
+	if result.HeadSHA != "abc123" {
+		t.Errorf("expected result.HeadSHA=abc123 (trimmed from git.exec's rev-parse HEAD stdout), got %q", result.HeadSHA)
+	}
+}
+
+func TestRelayExecutor_CreateWorktree_OmitsBaseRefWhenEmpty(t *testing.T) {
+	worktreeAddResp, _ := json.Marshal(map[string]any{"stdout": "", "stderr": "", "exitCode": 0})
+	revParseResp, _ := json.Marshal(map[string]any{"stdout": "def456\n", "stderr": "", "exitCode": 0})
+	fake := &fakeInfraFleetServiceClient{relayRespByMethod: map[string]*infrafleetv1.RelayResponse{
+		"git.worktree.add": {ResultJson: string(worktreeAddResp)},
+		"git.exec":         {ResultJson: string(revParseResp)},
+	}}
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.CreateWorktree(ctxWithTenant(t), "/repo", "plain", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var addParams map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelayRequests[0].GetParamsJson()), &addParams); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if _, ok := addParams["baseRef"]; ok {
+		t.Errorf("expected baseRef omitted when empty, got %+v", addParams)
 	}
 }
 

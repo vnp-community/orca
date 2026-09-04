@@ -55,7 +55,12 @@ func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (
 
 	result, err := executor.CreateWorktree(ctx, repoPath, in.Branch, in.BaseRef)
 	if err != nil {
-		return domain.WorktreeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_CREATE_FAILED", "git worktree add failed", err)
+		// Include err's own text in Message (not just Err, which
+		// apperrors.ToGRPCStatus never sends over the wire) — this usecase's
+		// failures are internal validation/git-state errors, not sensitive,
+		// and the generic "git worktree add failed" alone left every past
+		// live failure needing a server-side log dive to diagnose.
+		return domain.WorktreeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_CREATE_FAILED", fmt.Sprintf("git worktree add failed: %s", err), err)
 	}
 
 	// repo.ProjectID (resolved server-side via GetRepo above), not the wire's
