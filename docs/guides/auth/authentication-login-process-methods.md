@@ -12,6 +12,14 @@
 > thế cái nào (xem bảng "Hai auth mode song song" ở mục 4). `docs/hld/v1/security.md` là bản đối
 > chiếu code mới nhất (2026-08-14) và đáng tin cậy nhất cho phần đã ✅ implemented; các mục 🚧/❌
 > trong đó là thiết kế đề xuất, **chưa có trong code**.
+>
+> **Toàn bộ tài liệu này mô tả backend Node/TS cũ** (`backend/`). Kể từ khi hệ thống chuyển sang
+> **backend-go** (`backend-go/services/auth-service` + `api-gateway`, deploy thật tại
+> `b15.openledger.vn`), **SSO/OAuth2 KHÔNG còn là "⏳ Deferred Phase 2, endpoint 501"** như mục 5/10/11
+> bên dưới còn ghi (đúng cho backend TS, sai cho backend-go) — GitHub/Google/OIDC đã triển khai thật
+> qua CR-LOGIN-001. Xem [`google-sso-setup.md`](./google-sso-setup.md) (hướng dẫn setup Google SSO)
+> và `backend-go/services/auth-service/README.md`'s mục SSO (chi tiết implementation) — đừng dựa vào
+> các dòng "Chưa dùng được"/"501" bên dưới cho backend-go.
 
 ---
 

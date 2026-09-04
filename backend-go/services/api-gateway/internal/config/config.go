@@ -51,6 +51,24 @@ type Config struct {
 	RateLimitRPS   float64
 	RateLimitBurst int
 
+	// PublicBaseURL is this deployment's externally-reachable base URL
+	// (e.g. "https://app.example.com") — used ONLY to build the SSO
+	// redirect_uri (see httpgateway.handleSsoStart's doc comment), never
+	// derived from a request's Host header. Empty disables SSO entirely
+	// (GET /auth/sso/{provider} degrades to a 501, same as every other
+	// optional downstream in this config).
+	PublicBaseURL string
+	// AuthMode is "local" | "sso" | "both" (default) — see
+	// httpgateway's GET /auth/config handler doc comment.
+	AuthMode string
+	// SsoGithubClientID/SsoGoogleClientID/SsoOidcClientID gate which
+	// providers GET /auth/config advertises — see ssoRouteConfig's doc
+	// comment for why only the client id (never the secret, which stays
+	// auth-service-only) is duplicated into this gateway-side config.
+	SsoGithubClientID string
+	SsoGoogleClientID string
+	SsoOidcClientID   string
+
 	// OtherServiceAddrs holds the remaining 14 downstream services'
 	// addresses (auth, tenant, project, infra-fleet, git-gateway,
 	// scm-integration, issue-tracking, ai-provider, workflow, task,
@@ -83,6 +101,11 @@ func Load() (Config, error) {
 		InfraFleetHTTPAddr:      commonconfig.StringEnv("INFRA_FLEET_SERVICE_HTTP_ADDR", ""),
 		RateLimitRPS:            50,
 		RateLimitBurst:          100,
+		PublicBaseURL:           commonconfig.StringEnv("PUBLIC_BASE_URL", ""),
+		AuthMode:                commonconfig.StringEnv("AUTH_MODE", "both"),
+		SsoGithubClientID:       commonconfig.StringEnv("SSO_GITHUB_CLIENT_ID", ""),
+		SsoGoogleClientID:       commonconfig.StringEnv("SSO_GOOGLE_CLIENT_ID", ""),
+		SsoOidcClientID:         commonconfig.StringEnv("SSO_OIDC_CLIENT_ID", ""),
 		OtherServiceAddrs: map[string]string{
 			"auth-service":              commonconfig.StringEnv("AUTH_SERVICE_ADDR", ""),
 			"tenant-service":            commonconfig.StringEnv("TENANT_SERVICE_ADDR", ""),

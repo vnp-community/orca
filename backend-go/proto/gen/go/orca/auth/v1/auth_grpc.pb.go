@@ -41,6 +41,8 @@ const (
 	AuthService_DeleteAccessPolicy_FullMethodName            = "/orca.auth.v1.AuthService/DeleteAccessPolicy"
 	AuthService_GetAdminStats_FullMethodName                 = "/orca.auth.v1.AuthService/GetAdminStats"
 	AuthService_ListTenantMemberDirectory_FullMethodName     = "/orca.auth.v1.AuthService/ListTenantMemberDirectory"
+	AuthService_StartSsoLogin_FullMethodName                 = "/orca.auth.v1.AuthService/StartSsoLogin"
+	AuthService_CompleteSsoLogin_FullMethodName              = "/orca.auth.v1.AuthService/CompleteSsoLogin"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -82,6 +84,12 @@ type AuthServiceClient interface {
 	// identity, never a request field — there is deliberately no way to ask
 	// for another tenant's directory here.
 	ListTenantMemberDirectory(ctx context.Context, in *ListTenantMemberDirectoryRequest, opts ...grpc.CallOption) (*ListTenantMemberDirectoryResponse, error)
+	// --- CR-LOGIN-001 (SSO: GitHub / Google / generic OIDC) ---
+	// StartSsoLogin/CompleteSsoLogin are unauthenticated by necessity — like
+	// Login, the caller has no session yet. api-gateway's GET /auth/sso/
+	// {provider} and GET /auth/callback are the only callers.
+	StartSsoLogin(ctx context.Context, in *StartSsoLoginRequest, opts ...grpc.CallOption) (*StartSsoLoginResponse, error)
+	CompleteSsoLogin(ctx context.Context, in *CompleteSsoLoginRequest, opts ...grpc.CallOption) (*CompleteSsoLoginResponse, error)
 }
 
 type authServiceClient struct {
@@ -302,6 +310,26 @@ func (c *authServiceClient) ListTenantMemberDirectory(ctx context.Context, in *L
 	return out, nil
 }
 
+func (c *authServiceClient) StartSsoLogin(ctx context.Context, in *StartSsoLoginRequest, opts ...grpc.CallOption) (*StartSsoLoginResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartSsoLoginResponse)
+	err := c.cc.Invoke(ctx, AuthService_StartSsoLogin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) CompleteSsoLogin(ctx context.Context, in *CompleteSsoLoginRequest, opts ...grpc.CallOption) (*CompleteSsoLoginResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CompleteSsoLoginResponse)
+	err := c.cc.Invoke(ctx, AuthService_CompleteSsoLogin_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -341,6 +369,12 @@ type AuthServiceServer interface {
 	// identity, never a request field — there is deliberately no way to ask
 	// for another tenant's directory here.
 	ListTenantMemberDirectory(context.Context, *ListTenantMemberDirectoryRequest) (*ListTenantMemberDirectoryResponse, error)
+	// --- CR-LOGIN-001 (SSO: GitHub / Google / generic OIDC) ---
+	// StartSsoLogin/CompleteSsoLogin are unauthenticated by necessity — like
+	// Login, the caller has no session yet. api-gateway's GET /auth/sso/
+	// {provider} and GET /auth/callback are the only callers.
+	StartSsoLogin(context.Context, *StartSsoLoginRequest) (*StartSsoLoginResponse, error)
+	CompleteSsoLogin(context.Context, *CompleteSsoLoginRequest) (*CompleteSsoLoginResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -413,6 +447,12 @@ func (UnimplementedAuthServiceServer) GetAdminStats(context.Context, *GetAdminSt
 }
 func (UnimplementedAuthServiceServer) ListTenantMemberDirectory(context.Context, *ListTenantMemberDirectoryRequest) (*ListTenantMemberDirectoryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListTenantMemberDirectory not implemented")
+}
+func (UnimplementedAuthServiceServer) StartSsoLogin(context.Context, *StartSsoLoginRequest) (*StartSsoLoginResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartSsoLogin not implemented")
+}
+func (UnimplementedAuthServiceServer) CompleteSsoLogin(context.Context, *CompleteSsoLoginRequest) (*CompleteSsoLoginResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompleteSsoLogin not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -813,6 +853,42 @@ func _AuthService_ListTenantMemberDirectory_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_StartSsoLogin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartSsoLoginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).StartSsoLogin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_StartSsoLogin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).StartSsoLogin(ctx, req.(*StartSsoLoginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_CompleteSsoLogin_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteSsoLoginRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).CompleteSsoLogin(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_CompleteSsoLogin_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).CompleteSsoLogin(ctx, req.(*CompleteSsoLoginRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -903,6 +979,14 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListTenantMemberDirectory",
 			Handler:    _AuthService_ListTenantMemberDirectory_Handler,
+		},
+		{
+			MethodName: "StartSsoLogin",
+			Handler:    _AuthService_StartSsoLogin_Handler,
+		},
+		{
+			MethodName: "CompleteSsoLogin",
+			Handler:    _AuthService_CompleteSsoLogin_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

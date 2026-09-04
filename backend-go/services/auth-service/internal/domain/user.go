@@ -58,6 +58,14 @@ type User struct {
 	Role      Role
 	IsActive  bool
 	CreatedAt time.Time
+	// SsoProvider is the provider this user most recently authenticated
+	// through — empty for an account that has only ever logged in with a
+	// local password. Deliberately NOT a NewUser constructor parameter
+	// (unlike Role/IsActive): it's a mutable "last used" fact updated by
+	// UserRepository.SetSsoProvider on every successful SSO login (see
+	// internal/usecase/login_or_provision_sso_user.go), not an identity
+	// invariant fixed at creation time.
+	SsoProvider SsoProvider
 }
 
 // NewUser constructs a User, enforcing the invariants a record must satisfy

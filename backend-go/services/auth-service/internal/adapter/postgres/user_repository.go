@@ -17,6 +17,11 @@ import (
 const pgUniqueViolation = "23505"
 
 func (r *Repository) CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error) {
+	// sso_provider is never set here — a brand-new local account (via
+	// CreateUser) has no SSO login history yet, and SSO-provisioned users
+	// go through this same INSERT (LoginOrProvisionSsoUser reuses
+	// UserRepository.CreateUser) followed by an explicit SetSsoProvider
+	// call, not an inline value, so both callers share one INSERT shape.
 	_, err := r.pool.Exec(ctx, `
 		INSERT INTO auth.users (id, tenant_id, email, name, password_hash, role, is_active, created_at)
 		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
@@ -33,7 +38,7 @@ func (r *Repository) CreateUser(ctx context.Context, user domain.User, passwordH
 
 func (r *Repository) GetUserByEmail(ctx context.Context, email string) (domain.User, string, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, email, name, password_hash, role, is_active, created_at
+		SELECT id, tenant_id, email, name, password_hash, role, is_active, created_at, COALESCE(sso_provider, '')
 		FROM auth.users
 		WHERE email = $1
 	`, email)
@@ -42,7 +47,7 @@ func (r *Repository) GetUserByEmail(ctx context.Context, email string) (domain.U
 
 func (r *Repository) GetUserByID(ctx context.Context, userID string) (domain.User, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, email, name, password_hash, role, is_active, created_at
+		SELECT id, tenant_id, email, name, password_hash, role, is_active, created_at, COALESCE(sso_provider, '')
 		FROM auth.users
 		WHERE id = $1
 	`, userID)
@@ -52,7 +57,7 @@ func (r *Repository) GetUserByID(ctx context.Context, userID string) (domain.Use
 
 func (r *Repository) ListUsers(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.User, string, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, tenant_id, email, name, role, is_active, created_at
+		SELECT id, tenant_id, email, name, role, is_active, created_at, COALESCE(sso_provider, '')
 		FROM auth.users
 		WHERE tenant_id = $1 AND id::text > $2
 		ORDER BY id
@@ -66,11 +71,12 @@ func (r *Repository) ListUsers(ctx context.Context, tenantID, pageToken string, 
 	var out []domain.User
 	for rows.Next() {
 		var u domain.User
-		var role string
-		if err := rows.Scan(&u.ID, &u.TenantID, &u.Email, &u.Name, &role, &u.IsActive, &u.CreatedAt); err != nil {
+		var role, ssoProvider string
+		if err := rows.Scan(&u.ID, &u.TenantID, &u.Email, &u.Name, &role, &u.IsActive, &u.CreatedAt, &ssoProvider); err != nil {
 			return nil, "", fmt.Errorf("postgres: scan user row: %w", err)
 		}
 		u.Role = domain.Role(role)
+		u.SsoProvider = domain.SsoProvider(ssoProvider)
 		out = append(out, u)
 	}
 	if err := rows.Err(); err != nil {
@@ -88,12 +94,12 @@ func (r *Repository) UpdateUserRole(ctx context.Context, userID string, role dom
 	row := r.pool.QueryRow(ctx, `
 		UPDATE auth.users SET role = $2
 		WHERE id = $1
-		RETURNING id, tenant_id, email, name, role, is_active, created_at
+		RETURNING id, tenant_id, email, name, role, is_active, created_at, COALESCE(sso_provider, '')
 	`, userID, string(role))
 
 	var u domain.User
-	var roleStr string
-	err := row.Scan(&u.ID, &u.TenantID, &u.Email, &u.Name, &roleStr, &u.IsActive, &u.CreatedAt)
+	var roleStr, ssoProvider string
+	err := row.Scan(&u.ID, &u.TenantID, &u.Email, &u.Name, &roleStr, &u.IsActive, &u.CreatedAt, &ssoProvider)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.User{}, fmt.Errorf("postgres: update user role: %w", usecase.ErrUserNotFound)
 	}
@@ -101,7 +107,21 @@ func (r *Repository) UpdateUserRole(ctx context.Context, userID string, role dom
 		return domain.User{}, fmt.Errorf("postgres: update user role: %w", err)
 	}
 	u.Role = domain.Role(roleStr)
+	u.SsoProvider = domain.SsoProvider(ssoProvider)
 	return u, nil
+}
+
+// SetSsoProvider records provider as userID's most recent SSO login
+// provider — see domain.User.SsoProvider's doc comment. Affecting 0 rows
+// (a userID that doesn't exist) is not treated as an error, matching
+// SetActive's own idempotent-update contract; LoginOrProvisionSsoUser only
+// ever calls this for a userID it just created or read successfully.
+func (r *Repository) SetSsoProvider(ctx context.Context, userID string, provider domain.SsoProvider) error {
+	_, err := r.pool.Exec(ctx, `UPDATE auth.users SET sso_provider = $2 WHERE id = $1`, userID, string(provider))
+	if err != nil {
+		return fmt.Errorf("postgres: set user sso_provider: %w", err)
+	}
+	return nil
 }
 
 func (r *Repository) HasAnyUsers(ctx context.Context) (bool, error) {
@@ -143,8 +163,8 @@ type rowScanner interface {
 
 func scanUserWithHash(row rowScanner) (domain.User, string, error) {
 	var u domain.User
-	var role, passwordHash string
-	err := row.Scan(&u.ID, &u.TenantID, &u.Email, &u.Name, &passwordHash, &role, &u.IsActive, &u.CreatedAt)
+	var role, passwordHash, ssoProvider string
+	err := row.Scan(&u.ID, &u.TenantID, &u.Email, &u.Name, &passwordHash, &role, &u.IsActive, &u.CreatedAt, &ssoProvider)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.User{}, "", fmt.Errorf("postgres: query user: %w", usecase.ErrUserNotFound)
 	}
@@ -152,5 +172,6 @@ func scanUserWithHash(row rowScanner) (domain.User, string, error) {
 		return domain.User{}, "", fmt.Errorf("postgres: scan user row: %w", err)
 	}
 	u.Role = domain.Role(role)
+	u.SsoProvider = domain.SsoProvider(ssoProvider)
 	return u, passwordHash, nil
 }
