@@ -129,6 +129,7 @@ func RegisterRealChannels(
 	registerDevServerChannels(r, infraFleetClient)
 	registerDevServerAccessControlChannels(r, infraFleetClient, tenantClient)
 	registerFleetChannels(r, infraFleetClient)
+	registerCliChannels(r, infraFleetClient)
 	registerCrashReportChannels(r)
 	registerRateLimitChannels(r, rateLimits)
 	registerOnboardingChannels(r, infraFleetClient, tenantClient)
