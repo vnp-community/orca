@@ -229,7 +229,7 @@ const SidebarWorkspaceOptionsMenu = React.memo(function SidebarWorkspaceOptionsM
                 <span>
                   {translate(
                     'auto.components.sidebar.SidebarWorkspaceOptionsMenu.09faabd875',
-                    'Project order'
+                    'Repo Group order'
                   )}
                 </span>
                 <span className="text-[11px] font-medium text-muted-foreground">

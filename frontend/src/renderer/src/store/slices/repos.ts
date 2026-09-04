@@ -3418,7 +3418,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         ? idExistsOnOtherHost
           ? window.api.repos.removeForHost({ repoId: projectId, hostId: ownerHostId })
           : window.api.repos.remove({ repoId: projectId })
-        : callRuntimeRpc(target, 'repo.rm', { repo: projectId }, { timeoutMs: 15_000 }))
+        : callRuntimeRpc(target, 'repo.rm', { repoId: projectId }, { timeoutMs: 15_000 }))
       logRemoveProjectDiagnostic(
         `removeProject(${projectId}) removal call resolved without throwing`
       )
@@ -3659,7 +3659,16 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
                 await callRuntimeRpc<{ repo: Repo }>(
                   target,
                   'repo.update',
-                  { repo: projectId, updates: sanitizedUpdates },
+                  // Why flat {repoId, displayName}, not {repo, updates}: the Go
+                  // handler decodes {repoId, url, displayName} — a nested
+                  // `updates` object silently zeroed every field, and `repo`
+                  // isn't the key it reads either. Also why only displayName:
+                  // project.repos (backend-go's Repo entity) has no column for
+                  // RepoUpdate's other fields (badgeColor, repoIcon, etc.) —
+                  // those stay local-only/desktop-only until backend-go grows
+                  // real support for them, same as before this fix (the broken
+                  // call never persisted them either).
+                  { repoId: projectId, displayName: sanitizedUpdates.displayName ?? '' },
                   { timeoutMs: 15_000 }
                 )
               ).repo

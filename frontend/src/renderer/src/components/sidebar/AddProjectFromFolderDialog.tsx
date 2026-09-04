@@ -92,7 +92,7 @@ const AddProjectFromFolderDialog = React.memo(function AddProjectFromFolderDialo
         toast.success(
           translate(
             'auto.components.sidebar.AddProjectFromFolderDialog.e643b30398',
-            'Project added on SSH host'
+            'Repo Group added on SSH host'
           ),
           { description: repo.displayName }
         )
@@ -168,7 +168,7 @@ const AddProjectFromFolderDialog = React.memo(function AddProjectFromFolderDialo
           <DialogTitle>
             {translate(
               'auto.components.sidebar.AddProjectFromFolderDialog.7d1f51678c',
-              'Add Project'
+              'Add Repo Group'
             )}
           </DialogTitle>
           <DialogDescription>
@@ -199,7 +199,7 @@ const AddProjectFromFolderDialog = React.memo(function AddProjectFromFolderDialo
             )}
             {translate(
               'auto.components.sidebar.AddProjectFromFolderDialog.7d1f51678c',
-              'Add Project'
+              'Add Repo Group'
             )}
           </Button>
         </DialogFooter>

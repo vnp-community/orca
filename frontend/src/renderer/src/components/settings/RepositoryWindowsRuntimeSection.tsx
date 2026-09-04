@@ -44,7 +44,10 @@ export function RepositoryWindowsRuntimeSection({
 
   return (
     <SearchableSetting
-      title={translate('auto.components.settings.RepositoryPane.projectRuntime', 'Project Runtime')}
+      title={translate(
+        'auto.components.settings.RepositoryPane.projectRuntime',
+        'Repo Group Runtime'
+      )}
       description={translate(
         'auto.components.settings.RepositoryPane.projectRuntimeDescription',
         'Choose whether this project runs on Windows or WSL.'

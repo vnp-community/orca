@@ -45,7 +45,7 @@ const SidebarHeader = React.memo(function SidebarHeader({
               className="text-muted-foreground"
               aria-label={translate(
                 'auto.components.sidebar.SidebarHeader.25a95899c9',
-                'Add Project'
+                'Add Repo Group'
               )}
               onClick={() => openModal('add-repo')}
             >
@@ -53,7 +53,7 @@ const SidebarHeader = React.memo(function SidebarHeader({
             </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom" sideOffset={6}>
-            {translate('auto.components.sidebar.SidebarHeader.25a95899c9', 'Add Project')}
+            {translate('auto.components.sidebar.SidebarHeader.25a95899c9', 'Add Repo Group')}
           </TooltipContent>
         </Tooltip>
 

@@ -111,7 +111,7 @@ describe('repo slice host identity routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.update',
-      params: { repo: 'same-repo', updates: { displayName: 'Remote Renamed' } },
+      params: { repoId: 'same-repo', displayName: 'Remote Renamed' },
       timeoutMs: 15_000
     })
   })
@@ -146,9 +146,7 @@ describe('repo slice host identity routing', () => {
     }>()
     runtimeEnvironmentCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
       if (args.method === 'repo.update') {
-        const { updates } = (args as unknown as { params: { updates: { displayName: string } } })
-          .params
-        const displayName = updates.displayName
+        const { displayName } = (args as unknown as { params: { displayName: string } }).params
         if (displayName === 'Remote slow') {
           return firstUpdate.promise
         }
@@ -178,7 +176,7 @@ describe('repo slice host identity routing', () => {
         expect.objectContaining({
           selector: 'env-1',
           method: 'repo.update',
-          params: { repo: 'same-repo', updates: { displayName: 'Remote slow' } }
+          params: { repoId: 'same-repo', displayName: 'Remote slow' }
         })
       )
     })
@@ -198,7 +196,7 @@ describe('repo slice host identity routing', () => {
       expect.objectContaining({
         selector: 'env-1',
         method: 'repo.update',
-        params: { repo: 'same-repo', updates: { displayName: 'Remote queued' } }
+        params: { repoId: 'same-repo', displayName: 'Remote queued' }
       })
     )
     expect(runtimeEnvironmentCall).not.toHaveBeenCalledWith(
@@ -304,7 +302,7 @@ describe('repo slice host identity routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.rm',
-      params: { repo: 'same-repo' },
+      params: { repoId: 'same-repo' },
       timeoutMs: 15_000
     })
     expect(reposRemoveForHost).not.toHaveBeenCalled()
@@ -396,7 +394,7 @@ describe('repo slice host identity routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.rm',
-      params: { repo: 'same-repo' },
+      params: { repoId: 'same-repo' },
       timeoutMs: 15_000
     })
     expect(reposRemove).not.toHaveBeenCalled()

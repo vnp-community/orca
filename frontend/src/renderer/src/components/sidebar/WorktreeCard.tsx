@@ -1448,7 +1448,7 @@ const WorktreeCard = React.memo(function WorktreeCard({
                       )
                     : translate(
                         'auto.components.sidebar.WorktreeCard.ca74db7550',
-                        'Project on SSH host'
+                        'Repo Group on SSH host'
                       )}
                 </TooltipContent>
               </Tooltip>

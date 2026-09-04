@@ -148,15 +148,15 @@ export function RepositoryPane({
   const allEntries = getRepositoryPaneSearchEntries(repo, { isLocalWindowsProject })
   const identityEntryTitles = new Set([
     translate('auto.components.settings.repository.search.7e1e456a95', 'Display Name'),
-    translate('auto.components.settings.repository.search.b24f00294a', 'Project Icon'),
+    translate('auto.components.settings.repository.search.b24f00294a', 'Repo Group Icon'),
     translate(
       'auto.components.settings.repository.search.keepForkUpToDate',
       'Keep Fork Up to Date'
     ),
     translate('auto.components.settings.repository.search.094adbe930', 'Default Worktree Base'),
     translate('auto.components.settings.repository.search.443d127b5a', 'Worktree Location'),
-    translate('auto.components.settings.repository.search.projectRuntime', 'Project Runtime'),
-    translate('auto.components.settings.repository.search.c5266c2c9d', 'Remove Project')
+    translate('auto.components.settings.repository.search.projectRuntime', 'Repo Group Runtime'),
+    translate('auto.components.settings.repository.search.c5266c2c9d', 'Remove Repo Group')
   ])
   const identityEntries = allEntries.filter((entry) => identityEntryTitles.has(entry.title))
   const sparsePresetEntries = allEntries.filter((entry) =>
@@ -175,9 +175,9 @@ export function RepositoryPane({
   const symlinkEntries = allEntries.filter((entry) => entry.title === 'Worktree Shared Paths')
   const sourceControlAiEntries = allEntries.filter((entry) => entry.title === 'Git AI Author')
   const hostSetupEntries = allEntries.filter((entry) => entry.title === 'Available Hosts')
-  const projectRuntimeEntries = allEntries.filter((entry) => entry.title === 'Project Runtime')
+  const projectRuntimeEntries = allEntries.filter((entry) => entry.title === 'Repo Group Runtime')
   const removeProjectLabel =
-    confirmingRemove === repo.id ? 'Confirm Remove Project' : 'Remove Project'
+    confirmingRemove === repo.id ? 'Confirm Remove Repo Group' : 'Remove Repo Group'
 
   const hooksSection =
     !isFolder && (forceFullPaneForRepoMatch || matchesSettingsSearch(searchQuery, hooksEntries)) ? (
@@ -209,7 +209,7 @@ export function RepositoryPane({
             <p className="text-xs text-muted-foreground">
               {translate(
                 'auto.components.settings.RepositoryPane.b0a0c14a1c',
-                'Project-specific display details for the sidebar and tabs.'
+                'Repo-group-specific display details for the sidebar and tabs.'
               )}
             </p>
             <p className="text-xs text-muted-foreground">
@@ -228,11 +228,11 @@ export function RepositoryPane({
           <SearchableSetting
             title={translate(
               'auto.components.settings.RepositoryPane.0909e5d650',
-              'Remove Project'
+              'Remove Repo Group'
             )}
             description={translate(
               'auto.components.settings.RepositoryPane.170624bdfb',
-              'Remove this project from Orca.'
+              'Remove this repo group from Orca.'
             )}
             keywords={[repo.displayName, 'delete', 'project', 'repository']}
             className="absolute top-0 right-0 z-10 w-auto max-w-none"
@@ -262,7 +262,7 @@ export function RepositoryPane({
           title={translate('auto.components.settings.RepositoryPane.c7ef4415de', 'Display Name')}
           description={translate(
             'auto.components.settings.RepositoryPane.b0a0c14a1c',
-            'Project-specific display details for the sidebar and tabs.'
+            'Repo-group-specific display details for the sidebar and tabs.'
           )}
           keywords={[repo.displayName, repo.path, 'project name', 'repository name']}
           className="space-y-2"
@@ -281,7 +281,7 @@ export function RepositoryPane({
         </SearchableSetting>
 
         <SearchableSetting
-          title={translate('auto.components.settings.RepositoryPane.26fef02bf3', 'Project Icon')}
+          title={translate('auto.components.settings.RepositoryPane.26fef02bf3', 'Repo Group Icon')}
           description={translate(
             'auto.components.settings.RepositoryPane.e641c359de',
             'Project icon and color used in the sidebar and tabs.'

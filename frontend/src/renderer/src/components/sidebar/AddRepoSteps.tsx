@@ -196,7 +196,10 @@ export function useRemoteRepo(
         return
       }
       toast.success(
-        translate('auto.components.sidebar.AddRepoSteps.df8b0e6c22', 'Project added on SSH host'),
+        translate(
+          'auto.components.sidebar.AddRepoSteps.df8b0e6c22',
+          'Repo Group added on SSH host'
+        ),
         { description: repo.displayName }
       )
       // Why: the repo is already persisted here; if SSH refresh is temporarily

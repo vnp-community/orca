@@ -4545,7 +4545,7 @@ const VirtualizedWorktreeViewport = React.memo(function VirtualizedWorktreeViewp
                               <Trash2 className="size-3.5" />
                               {translate(
                                 'auto.components.sidebar.WorktreeList.c83968f87f',
-                                'Remove Project'
+                                'Remove Repo Group'
                               )}
                             </DropdownMenuItem>
                           </DropdownMenuContent>

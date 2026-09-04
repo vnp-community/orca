@@ -71,7 +71,7 @@ describe('repo slice runtime routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.update',
-      params: { repo: remoteRepo.id, updates: { displayName: 'Renamed' } },
+      params: { repoId: remoteRepo.id, displayName: 'Renamed' },
       timeoutMs: 15_000
     })
     expect(reposUpdate).not.toHaveBeenCalled()
@@ -527,7 +527,7 @@ describe('repo slice runtime routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.rm',
-      params: { repo: remoteRepo.id },
+      params: { repoId: remoteRepo.id },
       timeoutMs: 15_000
     })
     expect(reposRemove).not.toHaveBeenCalled()
@@ -600,7 +600,7 @@ describe('repo slice runtime routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.rm',
-      params: { repo: remoteRepo.id },
+      params: { repoId: remoteRepo.id },
       timeoutMs: 15_000
     })
     expect(reposRemove).not.toHaveBeenCalled()

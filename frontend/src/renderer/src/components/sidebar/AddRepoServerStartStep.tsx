@@ -256,7 +256,7 @@ export function AddRepoServerPathStartStep({
           >
             {translate(
               'auto.components.sidebar.AddRepoServerStartStep.8da4d1a5be',
-              'Add Git Project'
+              'Add Git Repo Group'
             )}
           </Button>
           <Button
