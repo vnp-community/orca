@@ -79,6 +79,20 @@ x-go-defaults: &go-defaults
       max-file: "3"
   networks:
     - orca-go-net
+  # mem_limit/mem_reservation: NONE of this file had any memory cap before
+  # this pass — with 17 unconstrained Go services + Postgres + Vault + NATS
+  # + frontend on one small VM, a single leaking/spiking service could (and
+  # on 172.20.2.39, did) exhaust host RAM entirely and hang the box past
+  # SSH/HTTP reachability, not just crash its own process. mem_limit turns
+  # that into a contained, cgroup-level OOM-kill of the ONE offending
+  # container — restart: unless-stopped above brings it back automatically
+  # — instead of a host-wide freeze. 128m is generous for these: small,
+  # single-purpose gRPC services, no in-process caches of consequence.
+  # Bumped explicitly below for the two services with real reason to need
+  # more (git-gateway-service, api-gateway). Classic (non-swarm) compose
+  # keys — honored by plain `docker compose up -d`, no swarm mode needed.
+  mem_limit: 128m
+  mem_reservation: 64m
 
 x-migrate-defaults: &migrate-defaults
   image: migrate/migrate:v4.17.0
@@ -88,6 +102,9 @@ x-migrate-defaults: &migrate-defaults
   depends_on:
     postgres:
       condition: service_healthy
+  # Short-lived one-shot migration runners — minimal footprint, never
+  # accumulate load.
+  mem_limit: 64m
 
 services:
   # ------------------------------------------------------------
@@ -121,6 +138,13 @@ services:
       options: { max-size: "20m", max-file: "3" }
     networks:
       - orca-go-net
+    # See x-go-defaults' doc comment above (root cause of the
+    # 172.20.2.39 host-wide hang this pass fixes) — Postgres is the one
+    # service here that genuinely needs real headroom (shared_buffers,
+    # per-connection work_mem across 17 services' pools), so it gets more
+    # than the Go services, still capped rather than unlimited.
+    mem_limit: 512m
+    mem_reservation: 256m
 
   vault:
     image: hashicorp/vault:1.17
@@ -144,6 +168,7 @@ services:
       options: { max-size: "20m", max-file: "3" }
     networks:
       - orca-go-net
+    mem_limit: 128m
 
   # Vault dev-mode auto-mounts secret/ (KV) only, never transit/ or any named
   # KV v2 mount — nothing else in this deploy set enables either, so
@@ -180,6 +205,7 @@ services:
       options: { max-size: "20m", max-file: "3" }
     networks:
       - orca-go-net
+    mem_limit: 64m # one-shot, idempotent init script — never accumulates load
 
   nats:
     image: nats:2.10-alpine
@@ -199,6 +225,7 @@ services:
       options: { max-size: "20m", max-file: "3" }
     networks:
       - orca-go-net
+    mem_limit: 128m
 
   # ------------------------------------------------------------
   # backend-go services — 15 own a database (bind-mount ./bin/<svc>/orca +
@@ -443,6 +470,12 @@ services:
     image: orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}
     container_name: orca-go-git-gateway
     read_only: false # see comment above — this service alone needs to write real git/worktree data
+    # Overrides go-defaults' 128m: real git clone/checkout/worktree-add
+    # operations on caller repos of unbounded size — the one Go service
+    # here with a genuine reason to need more than a stateless gRPC
+    # handler.
+    mem_limit: 384m
+    mem_reservation: 128m
     volumes:
       - ./bin/git-gateway-service/orca:/app/bin/orca:ro
       - git-gateway-repos:/data/repos
@@ -489,6 +522,11 @@ services:
     <<: *go-defaults
     container_name: orca-go-api-gateway
     read_only: false # writes nothing itself, but see README — kept false pending confirmation it needs no writable path; flip to true once verified
+    # Overrides go-defaults' 128m: fans out every browser session's
+    # WebSocket (wscompat) connections through this single process —
+    # more concurrent connection state than a typical backend service here.
+    mem_limit: 192m
+    mem_reservation: 96m
     volumes:
       - ./bin/api-gateway/orca:/app/bin/orca:ro
     environment:
@@ -527,6 +565,7 @@ services:
       options: { max-size: "20m", max-file: "3" }
     networks:
       - orca-go-net
+    mem_limit: 64m # static assets only, no app logic
 
   # ------------------------------------------------------------
   # Migrations — one-shot per DB-owning service, `profiles: [migrate]` so

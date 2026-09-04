@@ -116,7 +116,9 @@ being true at some point (build time becomes a real bottleneck),
   explicitly not the HA/auto-unseal setup
   [`specs/backend-go/architecture/06-secrets-vault-architecture.md`](../../specs/backend-go/architecture/06-secrets-vault-architecture.md)
   specifies for real production. Fine for a dev server; do not point real
-  tenant secrets at this.
+  tenant secrets at this. **This means `vault-init` (the one-shot service
+  that re-enables `transit/`+`credential-secrets/`) must re-run after every
+  Vault restart, including a bare host reboot — see below.**
 - **No mTLS / service mesh** — containers talk to each other in plaintext
   over the `orca-go-net` bridge network. `architecture/07-security-architecture.md`
   specifies mTLS via a service mesh for production; this Docker Compose
@@ -133,3 +135,33 @@ being true at some point (build time becomes a real bottleneck),
   [`backend-go/docs/execution-plan.md`](../../backend-go/docs/execution-plan.md)).
   This deploy set makes the *infrastructure* real; it doesn't make the
   *application* feature-complete.
+
+## Vault re-initialization after a host reboot
+
+`docker compose up -d` (the normal deploy flow, `scripts/sync-to-server.sh`)
+always re-evaluates every service, so it re-runs `vault-init` correctly on
+every deploy. A **bare host reboot with no deploy afterward does not**:
+Docker only auto-restarts containers whose restart policy says to
+(`vault` itself is `unless-stopped` and comes back — empty, per dev mode
+above — on its own), but `vault-init` is a one-shot job (`restart: "no"`)
+that already exited successfully once, so Docker never re-invokes it just
+because `vault` came back fresh. Left alone, `auth-service` and
+`credential-broker-service` crash-loop on 404s against `transit/`/
+`credential-secrets/` until someone notices and runs `vault-init` by hand
+(this happened live on 172.20.2.39 — see git history for the incident that
+prompted this section).
+
+[`systemd/orca-vault-init.service`](./systemd/orca-vault-init.service) closes
+this gap: a systemd unit that runs `docker compose run --rm vault-init`
+after `docker.service` on every boot (idempotent — safe to run again even
+when Vault already has its mounts). One-time install on the server:
+
+```bash
+sudo cp deploy/dev/systemd/orca-vault-init.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now orca-vault-init.service
+```
+
+Verify: `systemctl is-enabled orca-vault-init.service` should print
+`enabled`; `systemctl status orca-vault-init.service` / `journalctl -u
+orca-vault-init.service` show the last run's outcome.
