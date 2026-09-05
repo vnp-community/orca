@@ -13,6 +13,11 @@ const hooksCheckMock = vi.fn()
 const readIssueCommandMock = vi.fn()
 const runtimeEnvironmentCallMock = vi.fn()
 const runtimeEnvironmentTransportCallMock = vi.fn()
+// window.api.hooks.check only stays wired to the desktop-local IPC channel for
+// the explicit-hostId lane (see runtime-hooks-client.ts's doc comment on
+// checkRuntimeHooks) — every other local-target call (no hostId) now goes
+// through the unified callRuntimeRpc('local') path, i.e. window.api.runtime.call.
+const runtimeCallMock = vi.fn()
 
 function installHooksApiMock(): void {
   vi.stubGlobal('window', {
@@ -20,6 +25,9 @@ function installHooksApiMock(): void {
       hooks: {
         check: hooksCheckMock,
         readIssueCommand: readIssueCommandMock
+      },
+      runtime: {
+        call: runtimeCallMock
       },
       runtimeEnvironments: {
         call: runtimeEnvironmentTransportCallMock
@@ -57,11 +65,26 @@ describe('ensureHooksConfirmed', () => {
     readIssueCommandMock.mockReset()
     runtimeEnvironmentCallMock.mockReset()
     runtimeEnvironmentTransportCallMock.mockReset()
+    runtimeCallMock.mockReset()
     runtimeEnvironmentTransportCallMock.mockImplementation(
       (args: RuntimeEnvironmentCallRequest) => {
         return (
           createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCallMock(args)
         )
+      }
+    )
+    // Local-target repo.hooksCheck/repo.issueCommandRead calls dispatch here now;
+    // route them to the same hooksCheckMock/readIssueCommandMock fixtures the
+    // tests below configure, wrapped in the {ok, result} envelope callRuntimeRpc expects.
+    runtimeCallMock.mockImplementation(
+      async ({ method, params }: { method: string; params?: { repo: string } }) => {
+        if (method === 'repo.hooksCheck') {
+          return { ok: true, result: await hooksCheckMock(params) }
+        }
+        if (method === 'repo.issueCommandRead') {
+          return { ok: true, result: await readIssueCommandMock(params) }
+        }
+        throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
       }
     )
     clearRuntimeCompatibilityCacheForTests()
@@ -221,7 +244,15 @@ describe('ensureHooksConfirmed', () => {
     const decision = await ensureHooksConfirmed(state, 'repo-1', 'archive')
 
     expect(decision).toBe('run')
-    expect(hooksCheckMock).toHaveBeenCalledWith({ repoId: 'repo-1' })
+    // No hostId is passed here, so this goes through the unified local RPC
+    // dispatcher (window.api.runtime.call) rather than window.api.hooks.check
+    // directly — but it must still execute locally, not via the focused
+    // runtime environment, since the repo is SSH-owned.
+    expect(runtimeCallMock).toHaveBeenCalledWith({
+      method: 'repo.hooksCheck',
+      params: { repo: 'repo-1' }
+    })
+    expect(runtimeEnvironmentTransportCallMock).not.toHaveBeenCalled()
     expect(pending).toHaveLength(0)
   })
 

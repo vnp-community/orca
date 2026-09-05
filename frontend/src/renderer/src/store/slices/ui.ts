@@ -800,6 +800,7 @@ export type UISlice = {
     | 'forget-ssh-workspace'
     | 'confirm-add-project-from-folder'
     | 'confirm-non-git-folder'
+    | 'init-repo-as-git'
     | 'confirm-remove-folder'
     | 'add-repo'
     | 'quick-open'

@@ -174,12 +174,14 @@ async function executeWorktreeCreation(
       return
     }
     await cleanupEphemeralVmRuntimeForFailedCreate(preparedRequest)
-    const message = getWorkspaceCreateErrorToastMessage(formatWorkspaceCreateError(error))
+    const formattedError = formatWorkspaceCreateError(error)
+    const message = getWorkspaceCreateErrorToastMessage(formattedError)
     // Why: an error must stay on the same creation surface that owns the faux
     // tab strip, rather than falling back to stale previous-workspace tabs.
     useAppStore.getState().updatePendingWorktreeCreation(creationId, {
       status: 'error',
       error: message,
+      ...(formattedError.kind ? { errorKind: formattedError.kind } : {}),
       ...(preparedRequest.ephemeralVmRecipe ? { request } : {})
     })
     // Why: only toast when the panel isn't already showing this error (the user

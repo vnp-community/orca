@@ -113,6 +113,10 @@ export type PendingWorktreeCreation = {
    *  from create start through terminal handoff. */
   loaderVisible: boolean
   error?: string
+  /** Set when `error` matches a known, actionable failure signature — drives
+   *  an extra remedy action in WorktreeCreationPanel (e.g. "Initialize as
+   *  Git repo" for 'not-a-git-repo') alongside the generic Retry/Dismiss. */
+  errorKind?: 'not-a-git-repo'
   provisioningLog?: string
   request: WorktreeCreationRequest
 }

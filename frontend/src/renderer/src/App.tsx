@@ -346,6 +346,7 @@ const FeatureWallModal = lazy(() => import('./components/feature-wall/FeatureWal
 const FeatureTipsModal = lazy(() => import('./components/feature-tips/FeatureTipsModal'))
 const AddRepoDialog = lazy(() => import('./components/sidebar/AddRepoDialog'))
 const NonGitFolderDialog = lazy(() => import('./components/sidebar/NonGitFolderDialog'))
+const InitRepoAsGitDialog = lazy(() => import('./components/worktree-creation/InitRepoAsGitDialog'))
 const AddProjectFromFolderDialog = lazy(
   () => import('./components/sidebar/AddProjectFromFolderDialog')
 )
@@ -2607,6 +2608,16 @@ function App(): React.JSX.Element {
                   compact
                 >
                   <NonGitFolderDialog />
+                </RecoverableRenderErrorBoundary>
+              ) : null}
+              {activeModal === 'init-repo-as-git' ? (
+                <RecoverableRenderErrorBoundary
+                  boundaryId="modal.init-repo-as-git"
+                  surface="modal"
+                  resetKey
+                  compact
+                >
+                  <InitRepoAsGitDialog />
                 </RecoverableRenderErrorBoundary>
               ) : null}
               {activeModal === 'confirm-add-project-from-folder' ? (

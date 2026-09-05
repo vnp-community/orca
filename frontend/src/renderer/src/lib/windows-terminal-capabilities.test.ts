@@ -14,37 +14,73 @@ import {
   useWindowsTerminalCapabilities
 } from './windows-terminal-capabilities'
 
+// The local-target probe (readWindowsTerminalCapabilities) dispatches every
+// host.* method through callRuntimeRpc('local'), i.e. window.api.runtime.call,
+// not the per-feature window.api.wsl/pwsh/gitBash/runtime.getStatus namespaces
+// those methods also happen to back on the desktop IPC side.
+function stubLocalRuntimeCall(resultByMethod: Record<string, unknown>): ReturnType<typeof vi.fn> {
+  const runtimeCall = vi.fn(async ({ method }: { method: string }) => {
+    if (!(method in resultByMethod)) {
+      throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
+    }
+    return { ok: true, result: resultByMethod[method] }
+  })
+  vi.stubGlobal('window', { api: { runtime: { call: runtimeCall } } })
+  return runtimeCall
+}
+
+function stubLocalRuntimeCallRejecting(
+  resultByMethod: Record<string, unknown>,
+  rejectingMethod: string,
+  error: Error
+): ReturnType<typeof vi.fn> {
+  const runtimeCall = vi.fn(async ({ method }: { method: string }) => {
+    if (method === rejectingMethod) {
+      throw error
+    }
+    if (!(method in resultByMethod)) {
+      throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
+    }
+    return { ok: true, result: resultByMethod[method] }
+  })
+  vi.stubGlobal('window', { api: { runtime: { call: runtimeCall } } })
+  return runtimeCall
+}
+
+// For tests that need a per-method mock (e.g. mockResolvedValueOnce chains)
+// rather than a static result table.
+function stubLocalRuntimeCallWithMocks(mockByMethod: Record<string, () => Promise<unknown>>): void {
+  vi.stubGlobal('window', {
+    api: {
+      runtime: {
+        call: vi.fn(async ({ method }: { method: string }) => {
+          const mock = mockByMethod[method]
+          if (!mock) {
+            throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
+          }
+          return { ok: true, result: await mock() }
+        })
+      }
+    }
+  })
+}
+
 function stubTerminalCapabilityApi(args: {
   wslAvailable: boolean
   pwshAvailable: boolean
   wslDistros?: string[]
   gitBashAvailable?: boolean
   hostPlatform?: NodeJS.Platform | null
-}): {
-  wslIsAvailable: ReturnType<typeof vi.fn>
-  wslListDistros: ReturnType<typeof vi.fn>
-  pwshIsAvailable: ReturnType<typeof vi.fn>
-  isGitBashAvailable: ReturnType<typeof vi.fn>
-  runtimeGetStatus: ReturnType<typeof vi.fn>
-} {
-  const wslIsAvailable = vi.fn().mockResolvedValue(args.wslAvailable)
-  const wslListDistros = vi.fn().mockResolvedValue(args.wslDistros ?? [])
-  const pwshIsAvailable = vi.fn().mockResolvedValue(args.pwshAvailable)
-  const isGitBashAvailable = vi.fn().mockResolvedValue(args.gitBashAvailable ?? false)
-  const runtimeGetStatus = vi
-    .fn()
-    .mockResolvedValue({ hostPlatform: 'hostPlatform' in args ? args.hostPlatform : 'win32' })
-
-  vi.stubGlobal('window', {
-    api: {
-      wsl: { isAvailable: wslIsAvailable, listDistros: wslListDistros },
-      pwsh: { isAvailable: pwshIsAvailable },
-      gitBash: { isAvailable: isGitBashAvailable },
-      runtime: { getStatus: runtimeGetStatus }
-    }
+}): { runtimeCall: ReturnType<typeof vi.fn> } {
+  const runtimeCall = stubLocalRuntimeCall({
+    'host.wsl.isAvailable': args.wslAvailable,
+    'host.wsl.listDistros': args.wslDistros ?? [],
+    'host.pwsh.isAvailable': args.pwshAvailable,
+    'host.gitBash.isAvailable': args.gitBashAvailable ?? false,
+    'status.get': { hostPlatform: 'hostPlatform' in args ? args.hostPlatform : 'win32' }
   })
 
-  return { wslIsAvailable, wslListDistros, pwshIsAvailable, isGitBashAvailable, runtimeGetStatus }
+  return { runtimeCall }
 }
 
 describe('windows terminal capabilities', () => {
@@ -59,13 +95,7 @@ describe('windows terminal capabilities', () => {
   })
 
   it('shares WSL, PowerShell, and Git Bash availability between terminal UI consumers', async () => {
-    const {
-      wslIsAvailable,
-      wslListDistros,
-      pwshIsAvailable,
-      isGitBashAvailable,
-      runtimeGetStatus
-    } = stubTerminalCapabilityApi({
+    const { runtimeCall } = stubTerminalCapabilityApi({
       wslAvailable: true,
       pwshAvailable: true,
       wslDistros: ['Ubuntu'],
@@ -95,24 +125,35 @@ describe('windows terminal capabilities', () => {
     expect(getCachedWindowsTerminalCapabilities()).toEqual(expected)
 
     await loadWindowsTerminalCapabilities()
-    expect(wslIsAvailable).toHaveBeenCalledTimes(1)
-    expect(wslListDistros).toHaveBeenCalledTimes(1)
-    expect(pwshIsAvailable).toHaveBeenCalledTimes(1)
-    expect(isGitBashAvailable).toHaveBeenCalledTimes(1)
-    expect(runtimeGetStatus).toHaveBeenCalledTimes(1)
+    expect(runtimeCall).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'host.wsl.isAvailable' })
+    )
+    expect(runtimeCall).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'host.wsl.listDistros' })
+    )
+    expect(runtimeCall).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'host.pwsh.isAvailable' })
+    )
+    expect(runtimeCall).toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'host.gitBash.isAvailable' })
+    )
+    expect(runtimeCall).toHaveBeenCalledWith(expect.objectContaining({ method: 'status.get' }))
+    // Each host.* method is called exactly once despite loadWindowsTerminalCapabilities()
+    // being invoked twice above — the second call is served from cache.
+    expect(runtimeCall).toHaveBeenCalledTimes(5)
   })
 
   it('keeps WSL available when the PowerShell version probe fails', async () => {
-    const wslIsAvailable = vi.fn().mockResolvedValue(true)
-    const pwshIsAvailable = vi.fn().mockRejectedValue(new Error('pwsh probe failed'))
-    vi.stubGlobal('window', {
-      api: {
-        wsl: { isAvailable: wslIsAvailable, listDistros: vi.fn().mockResolvedValue([]) },
-        pwsh: { isAvailable: pwshIsAvailable },
-        gitBash: { isAvailable: vi.fn().mockResolvedValue(false) },
-        runtime: { getStatus: vi.fn().mockResolvedValue({ hostPlatform: 'win32' }) }
-      }
-    })
+    stubLocalRuntimeCallRejecting(
+      {
+        'host.wsl.isAvailable': true,
+        'host.wsl.listDistros': [],
+        'host.gitBash.isAvailable': false,
+        'status.get': { hostPlatform: 'win32' }
+      },
+      'host.pwsh.isAvailable',
+      new Error('pwsh probe failed')
+    )
 
     await expect(loadWindowsTerminalCapabilities()).resolves.toEqual({
       wslAvailable: true,
@@ -126,14 +167,12 @@ describe('windows terminal capabilities', () => {
 
   it('can refresh cached capabilities when WSL availability changes', async () => {
     const wslIsAvailable = vi.fn().mockResolvedValueOnce(false).mockResolvedValueOnce(true)
-    const pwshIsAvailable = vi.fn().mockResolvedValue(false)
-    vi.stubGlobal('window', {
-      api: {
-        wsl: { isAvailable: wslIsAvailable, listDistros: vi.fn().mockResolvedValue([]) },
-        pwsh: { isAvailable: pwshIsAvailable },
-        gitBash: { isAvailable: vi.fn().mockResolvedValue(false) },
-        runtime: { getStatus: vi.fn().mockResolvedValue({ hostPlatform: 'win32' }) }
-      }
+    stubLocalRuntimeCallWithMocks({
+      'host.wsl.isAvailable': wslIsAvailable,
+      'host.wsl.listDistros': vi.fn().mockResolvedValue([]),
+      'host.pwsh.isAvailable': vi.fn().mockResolvedValue(false),
+      'host.gitBash.isAvailable': vi.fn().mockResolvedValue(false),
+      'status.get': vi.fn().mockResolvedValue({ hostPlatform: 'win32' })
     })
 
     await expect(loadWindowsTerminalCapabilities()).resolves.toMatchObject({
@@ -151,14 +190,12 @@ describe('windows terminal capabilities', () => {
 
   it('re-probes when the capability cache expires', async () => {
     const wslIsAvailable = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(false)
-    const pwshIsAvailable = vi.fn().mockResolvedValue(false)
-    vi.stubGlobal('window', {
-      api: {
-        wsl: { isAvailable: wslIsAvailable, listDistros: vi.fn().mockResolvedValue([]) },
-        pwsh: { isAvailable: pwshIsAvailable },
-        gitBash: { isAvailable: vi.fn().mockResolvedValue(false) },
-        runtime: { getStatus: vi.fn().mockResolvedValue({ hostPlatform: 'win32' }) }
-      }
+    stubLocalRuntimeCallWithMocks({
+      'host.wsl.isAvailable': wslIsAvailable,
+      'host.wsl.listDistros': vi.fn().mockResolvedValue([]),
+      'host.pwsh.isAvailable': vi.fn().mockResolvedValue(false),
+      'host.gitBash.isAvailable': vi.fn().mockResolvedValue(false),
+      'status.get': vi.fn().mockResolvedValue({ hostPlatform: 'win32' })
     })
 
     await expect(loadWindowsTerminalCapabilities({ now: 1_000 })).resolves.toMatchObject({
@@ -180,16 +217,12 @@ describe('windows terminal capabilities', () => {
       .fn()
       .mockResolvedValueOnce({ hostPlatform: 'win32' })
       .mockResolvedValueOnce({ hostPlatform: 'linux' })
-    vi.stubGlobal('window', {
-      api: {
-        wsl: {
-          isAvailable: vi.fn().mockResolvedValue(false),
-          listDistros: vi.fn().mockResolvedValue([])
-        },
-        pwsh: { isAvailable: vi.fn().mockResolvedValue(false) },
-        gitBash: { isAvailable: isGitBashAvailable },
-        runtime: { getStatus: runtimeGetStatus }
-      }
+    stubLocalRuntimeCallWithMocks({
+      'host.wsl.isAvailable': vi.fn().mockResolvedValue(false),
+      'host.wsl.listDistros': vi.fn().mockResolvedValue([]),
+      'host.pwsh.isAvailable': vi.fn().mockResolvedValue(false),
+      'host.gitBash.isAvailable': isGitBashAvailable,
+      'status.get': runtimeGetStatus
     })
 
     await expect(
@@ -590,17 +623,16 @@ describe('windows terminal capabilities', () => {
   })
 
   it('keeps Git Bash unavailable when the Git Bash path probe fails', async () => {
-    const wslIsAvailable = vi.fn().mockResolvedValue(false)
-    const pwshIsAvailable = vi.fn().mockResolvedValue(false)
-    const isGitBashAvailable = vi.fn().mockRejectedValue(new Error('git bash probe failed'))
-    vi.stubGlobal('window', {
-      api: {
-        wsl: { isAvailable: wslIsAvailable, listDistros: vi.fn().mockResolvedValue([]) },
-        pwsh: { isAvailable: pwshIsAvailable },
-        gitBash: { isAvailable: isGitBashAvailable },
-        runtime: { getStatus: vi.fn().mockResolvedValue({ hostPlatform: 'win32' }) }
-      }
-    })
+    stubLocalRuntimeCallRejecting(
+      {
+        'host.wsl.isAvailable': false,
+        'host.wsl.listDistros': [],
+        'host.pwsh.isAvailable': false,
+        'status.get': { hostPlatform: 'win32' }
+      },
+      'host.gitBash.isAvailable',
+      new Error('git bash probe failed')
+    )
 
     await expect(loadWindowsTerminalCapabilities()).resolves.toEqual({
       wslAvailable: false,
