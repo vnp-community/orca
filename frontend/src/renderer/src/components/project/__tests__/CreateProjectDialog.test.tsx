@@ -167,9 +167,6 @@ describe('CreateProjectDialog', () => {
       if (method === 'project.create') {
         return { id: 'new-p', name: 'New Project' }
       }
-      if (method === 'project.rebindDevServer') {
-        return { id: 'new-p', devServerId: 'ds-1' }
-      }
       if (method === 'repo.add') {
         return { id: 'repo-1' }
       }
@@ -229,18 +226,21 @@ describe('CreateProjectDialog', () => {
       description: undefined,
       visibility: 'private'
     })
-    // The dev server binds via a follow-up rebindDevServer call...
-    expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'project.rebindDevServer', {
-      projectId: 'new-p',
-      newDevServerId: 'ds-1'
-    })
-    // ...and the repo attaches via a follow-up repo.add call, with the
-    // shape the Go handler actually decodes (projectId/url/displayName).
+    // The repo attaches via a follow-up repo.add call, with the shape the Go
+    // handler actually decodes (projectId/url/displayName) — Phase 10 gave
+    // AddRepoRequest its own devServerId, so the dev server binds directly on
+    // this same call now instead of a separate project.rebindDevServer step.
     expect(callRuntimeRpc).toHaveBeenCalledWith(expect.anything(), 'repo.add', {
       projectId: 'new-p',
       url: '/home/user/repo',
-      displayName: 'My Project'
+      displayName: 'My Project',
+      devServerId: 'ds-1'
     })
+    expect(callRuntimeRpc).not.toHaveBeenCalledWith(
+      expect.anything(),
+      'project.rebindDevServer',
+      expect.anything()
+    )
     expect(onCreated).toHaveBeenCalledWith({ id: 'new-p', name: 'New Project' })
     expect(onOpenChange).toHaveBeenCalledWith(false)
   })
@@ -253,9 +253,6 @@ describe('CreateProjectDialog', () => {
       }
       if (method === 'project.create') {
         return { id: 'new-p', name: 'New Project' }
-      }
-      if (method === 'project.rebindDevServer') {
-        return { id: 'new-p', devServerId: 'ds-1' }
       }
       if (method === 'repo.add') {
         throw new Error('repo path already registered')

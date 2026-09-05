@@ -19,6 +19,21 @@ export type OrcaProject = {
   updatedAt: number
 }
 
+// ─── Repo (a single entry in an OrcaProject's repo list) ─────────────────────
+// Mirrors repo.add/repo.list's camelCase wire view of project.repos exactly
+// (project.pb.go's Repo message). Phase 10 gave each repo its OWN
+// dev_server_id — previously only OrcaProject.devServerId existed and a
+// repo's host was only ever inferred from its project. Empty devServerId
+// means local / no dev server bound to this repo yet.
+export type Repo = {
+  id: string
+  projectId: string
+  url: string
+  displayName: string
+  position: number
+  devServerId: string
+}
+
 // Why role is only 'owner'|'member': matches project.project_members' DB
 // CHECK constraint and project.rego's action_roles exactly — this is the
 // project-level *access* tier (who's in the project at all), not the

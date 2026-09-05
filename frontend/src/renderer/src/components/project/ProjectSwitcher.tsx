@@ -19,7 +19,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover'
 import { cn } from '../../lib/utils'
 import { CreateProjectDialog } from './CreateProjectDialog'
 import { ProjectSettings } from './ProjectSettings'
-import type { OrcaProject } from '../../types/workspace-types'
+import type { OrcaProject, Repo } from '../../types/workspace-types'
 
 // project.list's wscompat handler returns the full Project proto message —
 // this is a narrower view of the same OrcaProject shape for the picker list.
@@ -35,6 +35,19 @@ export function ProjectSwitcher() {
   // instead of names"). Resolve it to devServer.list's own human label
   // (e.g. "dev-01") the same way ProjectDevServerSection already does.
   const [devServerNames, setDevServerNames] = useState<Record<string, string>>({})
+  // Phase 10 (project.repos.dev_server_id): a project can now genuinely span
+  // repos on different hosts, so `p.devServerId` alone is no longer
+  // trustworthy as "the" host once a project has more than one repo.
+  // project.list has no repo-count/host field to key off of (adding one is
+  // backend-go scope, out of reach here) — the row-level devServerId badge
+  // stays keyed off it for the common 0/1-repo case, and this map records an
+  // override per project once its repo.list resolves: a devServerId string
+  // when 2+ repos share one host, or `null` to suppress the badge entirely
+  // when they don't (or share none). Projects not present here (still
+  // loading, or the fetch failed) fall back to the legacy `p.devServerId`.
+  const [multiRepoDevServerOverride, setMultiRepoDevServerOverride] = useState<
+    Record<string, string | null>
+  >({})
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
@@ -43,15 +56,43 @@ export function ProjectSwitcher() {
   const refetchProjects = () => {
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
     return callRuntimeRpc<OrcaProjectListItem[]>(target, 'project.list', null)
-      .then((list) => setProjects(list ?? []))
-      .catch(() => setProjects([]))
+      .then((list) => {
+        const resolved = list ?? []
+        setProjects(resolved)
+        return resolved
+      })
+      .catch(() => {
+        setProjects([])
+        return []
+      })
   }
 
   // `useAppStore`'s `projects` field is session-grant string[], not OrcaProject[] —
   // fetch the real OrcaProject list from the backend instead of reading that field.
   useEffect(() => {
-    void refetchProjects()
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    void refetchProjects().then((list) => {
+      // Bounded by how many OrcaProjects the caller belongs to (small, and
+      // fetched once here rather than per keystroke/render) — acceptable
+      // fan-out for a picker list, unlike doing this per row on every render.
+      void Promise.all(
+        list.map((p) =>
+          callRuntimeRpc<{ repos: Repo[] }>(target, 'repo.list', { projectId: p.id })
+            .then((result) => ({ projectId: p.id, repos: result?.repos ?? [] }))
+            .catch(() => ({ projectId: p.id, repos: [] as Repo[] }))
+        )
+      ).then((results) => {
+        const overrides: Record<string, string | null> = {}
+        for (const { projectId, repos } of results) {
+          if (repos.length <= 1) {
+            continue // ambiguous-free case — the legacy p.devServerId fallback already covers it
+          }
+          const hostIds = new Set(repos.map((r) => r.devServerId || ''))
+          overrides[projectId] = hostIds.size === 1 ? [...hostIds][0] || null : null
+        }
+        setMultiRepoDevServerOverride(overrides)
+      })
+    })
     callRuntimeRpc<DevServerOption[]>(target, 'devServer.list', null)
       .then((list) =>
         setDevServerNames(Object.fromEntries((list ?? []).map((d) => [d.id, d.name])))
@@ -95,30 +136,41 @@ export function ProjectSwitcher() {
             <CommandList>
               <CommandEmpty>No projects found</CommandEmpty>
               <CommandGroup>
-                {filtered.map((p) => (
-                  <CommandItem
-                    key={p.id}
-                    value={p.id}
-                    onSelect={() => {
-                      switchProject(p.id)
-                      setOpen(false)
-                    }}
-                  >
-                    <Check
-                      className={cn(
-                        'mr-2 shrink-0',
-                        p.id === project?.id ? 'opacity-100' : 'opacity-0'
+                {filtered.map((p) => {
+                  // Present in the override map => a 2+-repo project whose
+                  // repos we've already resolved (a shared host id, or null
+                  // for "don't show, hosts differ/unknown"). Absent => still
+                  // loading or a 0/1-repo project, where p.devServerId alone
+                  // is unambiguous and safe to show as-is.
+                  const badgeDevServerId =
+                    p.id in multiRepoDevServerOverride
+                      ? multiRepoDevServerOverride[p.id]
+                      : p.devServerId
+                  return (
+                    <CommandItem
+                      key={p.id}
+                      value={p.id}
+                      onSelect={() => {
+                        switchProject(p.id)
+                        setOpen(false)
+                      }}
+                    >
+                      <Check
+                        className={cn(
+                          'mr-2 shrink-0',
+                          p.id === project?.id ? 'opacity-100' : 'opacity-0'
+                        )}
+                        size={14}
+                      />
+                      <span className="truncate">{p.name}</span>
+                      {badgeDevServerId && (
+                        <span className="ml-auto text-xs text-muted-foreground shrink-0">
+                          {devServerNames[badgeDevServerId] ?? badgeDevServerId}
+                        </span>
                       )}
-                      size={14}
-                    />
-                    <span className="truncate">{p.name}</span>
-                    {p.devServerId && (
-                      <span className="ml-auto text-xs text-muted-foreground shrink-0">
-                        {devServerNames[p.devServerId] ?? p.devServerId}
-                      </span>
-                    )}
-                  </CommandItem>
-                ))}
+                    </CommandItem>
+                  )
+                })}
               </CommandGroup>
               <CommandSeparator />
               <CommandItem

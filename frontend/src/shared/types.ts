@@ -118,6 +118,15 @@ export type Project = {
   sourceRepoIds: string[]
   createdAt: number
   updatedAt: number
+  /**
+   * The dev server this project's one backing repo lives on — null/undefined
+   * = local. Phase 10: a legacy Project is now always exactly one (dev
+   * server, repo) pair (see getProjectIdentityKey), so this is just
+   * repo.devServerId passed through, not a new concept. Raw id only, not a
+   * name — renderers with store access resolve a display label via
+   * useDevServerById(devServerId).
+   */
+  devServerId?: string | null
 }
 
 export type ProjectUpdateArgs = {

@@ -75,12 +75,9 @@ function getProjectModel({
   }
 }
 
-function getProjectDetail(project: Project, readySetupCount: number): string {
+function getProjectDetail(project: Project): string {
   if (project.providerIdentity) {
     return `${project.providerIdentity.owner}/${project.providerIdentity.repo}`
-  }
-  if (readySetupCount > 1) {
-    return `${readySetupCount} hosts configured`
   }
   return 'Project'
 }
@@ -92,31 +89,28 @@ export function buildNewWorkspaceProjectOptions(
   const { projects, projectHostSetups } = getProjectModel(input)
   const eligibleRepoIds = new Set(eligibleRepos.map((repo) => repo.id))
   const hostLabelById = new Map((input.hosts ?? []).map((host) => [host.id, host.label]))
-  const readySetupCountsByProjectId = new Map<string, number>()
-  const setupDirectoriesByProjectId = new Map<string, ProjectSetupDirectory[]>()
+  // A Project has at most one ready setup now (Phase 10: no cross-host merging),
+  // so we only need presence and its single directory, not a count/list.
+  const readyProjectIds = new Set<string>()
+  const setupDirectoriesByProjectId = new Map<string, ProjectSetupDirectory>()
 
   for (const setup of projectHostSetups) {
     if (setup.setupState !== 'ready' || !eligibleRepoIds.has(setup.repoId)) {
       continue
     }
-    readySetupCountsByProjectId.set(
-      setup.projectId,
-      (readySetupCountsByProjectId.get(setup.projectId) ?? 0) + 1
-    )
-    const directories = setupDirectoriesByProjectId.get(setup.projectId) ?? []
-    directories.push({ path: setup.path, hostId: setup.hostId })
-    setupDirectoriesByProjectId.set(setup.projectId, directories)
+    readyProjectIds.add(setup.projectId)
+    setupDirectoriesByProjectId.set(setup.projectId, { path: setup.path, hostId: setup.hostId })
   }
 
   const options = projects
-    .filter((project) => (readySetupCountsByProjectId.get(project.id) ?? 0) > 0)
+    .filter((project) => readyProjectIds.has(project.id))
     .map((project) => ({
       kind: 'project' as const,
       id: project.id,
       projectId: project.id,
       displayName: project.displayName,
       badgeColor: project.badgeColor,
-      detail: getProjectDetail(project, readySetupCountsByProjectId.get(project.id) ?? 0),
+      detail: getProjectDetail(project),
       detailSource: project.providerIdentity ? ('provider' as const) : ('generic' as const)
     }))
 

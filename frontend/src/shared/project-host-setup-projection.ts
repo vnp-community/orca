@@ -16,10 +16,6 @@ export type ProjectHostSetupProjection = {
   setups: ProjectHostSetup[]
 }
 
-function normalizeIdentityPart(value: string): string {
-  return value.trim().toLowerCase()
-}
-
 function getProjectProviderIdentity(
   repo: Pick<Repo, 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
 ): ProjectProviderIdentity | null {
@@ -68,23 +64,25 @@ export function isGitHubBackedRepo(
   return getProjectProviderIdentity(repo) !== null
 }
 
-export function getProjectIdentityKey(
-  repo: Pick<Repo, 'id' | 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
-): string {
-  const identity = getProjectProviderIdentity(repo)
-  if (identity) {
-    return `github:${normalizeIdentityPart(identity.owner)}/${normalizeIdentityPart(identity.repo)}`
-  }
-  const gitRemoteIdentity = getProjectGitRemoteIdentity(repo)
-  if (gitRemoteIdentity) {
-    return `git:${gitRemoteIdentity.canonicalKey}`
-  }
+/**
+ * A legacy Project's identity is now always exactly the repo it wraps
+ * (Phase 10): dev-server ownership lives on Repo, not Project, so "1
+ * Project = 1 dev server + 1 repo" is enforced simply by never merging two
+ * Repos into one Project — no git-remote/GitHub identity matching needed
+ * for grouping purposes anymore (see getProjectProviderIdentity/
+ * isGitHubBackedRepo below, kept for the unrelated "does this repo have a
+ * GitHub remote" question other UI still asks). This deliberately gives up
+ * the previous behavior of merging the same git repo checked out on
+ * multiple hosts into one card — real, tested behavior this replaces, per
+ * an explicit product decision (see Phase 10's plan doc): that flexibility
+ * was mostly just a source of ambiguous, hard-to-disambiguate sidebar/
+ * settings entries in practice.
+ */
+export function getProjectIdentityKey(repo: Pick<Repo, 'id'>): string {
   return `repo:${repo.id}`
 }
 
-function getProjectId(
-  repo: Pick<Repo, 'id' | 'upstream' | 'repoIcon' | 'gitRemoteIdentity'>
-): string {
+function getProjectId(repo: Pick<Repo, 'id'>): string {
   return getProjectIdentityKey(repo)
 }
 
@@ -113,6 +111,7 @@ function createProjectFromRepo(repo: Repo, now: number): Project {
     ...(repo.kind ? { kind: repo.kind } : {}),
     ...(identity ? { providerIdentity: identity } : {}),
     ...(gitRemoteIdentity ? { gitRemoteIdentity } : {}),
+    ...(repo.devServerId ? { devServerId: repo.devServerId } : {}),
     sourceRepoIds: [repo.id],
     createdAt: repo.addedAt || now,
     updatedAt: repo.addedAt || now

@@ -85,7 +85,7 @@ describe('project host setup projection', () => {
     expect(projection.setups[0]?.setupMethod).toBe('cloned')
   })
 
-  it('groups repo checkouts with the same provider identity under one project', () => {
+  it('keeps repo checkouts with the same provider identity as separate projects (Phase 10: one project per repo, no cross-host merging)', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'local-repo',
@@ -102,18 +102,24 @@ describe('project host setup projection', () => {
       })
     ])
 
-    expect(projection.projects).toHaveLength(1)
+    // Matching GitHub identity no longer merges repos into one Project (Phase 10):
+    // each repo always gets its own Project, one per host setup.
+    expect(projection.projects).toHaveLength(2)
     expect(projection.projects[0]).toMatchObject({
-      id: 'github:stablyai/orca',
-      sourceRepoIds: ['local-repo', 'remote-repo'],
+      id: 'repo:local-repo',
+      sourceRepoIds: ['local-repo'],
       providerIdentity: { provider: 'github', owner: 'StablyAI', repo: 'Orca' }
     })
-    expect(getProjectHostSetupsForProject(projection.setups, 'github:stablyai/orca')).toHaveLength(
-      2
-    )
+    expect(projection.projects[1]).toMatchObject({
+      id: 'repo:remote-repo',
+      sourceRepoIds: ['remote-repo'],
+      providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
+    })
+    expect(getProjectHostSetupsForProject(projection.setups, 'repo:local-repo')).toHaveLength(1)
+    expect(getProjectHostSetupsForProject(projection.setups, 'repo:remote-repo')).toHaveLength(1)
   })
 
-  it('uses GitHub repo icon metadata as a provider identity fallback', () => {
+  it('keeps repo-icon-derived provider identity from merging repos across hosts (Phase 10: one project per repo)', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'local-repo',
@@ -140,18 +146,24 @@ describe('project host setup projection', () => {
       })
     ])
 
-    expect(projection.projects).toHaveLength(1)
+    // Same GitHub-icon-derived identity still no longer merges (Phase 10):
+    // each repo keeps its own Project even though the provider identity matches.
+    expect(projection.projects).toHaveLength(2)
     expect(projection.projects[0]).toMatchObject({
-      id: 'github:stablyai/orca',
-      sourceRepoIds: ['local-repo', 'remote-repo'],
+      id: 'repo:local-repo',
+      sourceRepoIds: ['local-repo'],
       providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
     })
-    expect(getProjectHostSetupsForProject(projection.setups, 'github:stablyai/orca')).toHaveLength(
-      2
-    )
+    expect(projection.projects[1]).toMatchObject({
+      id: 'repo:remote-repo',
+      sourceRepoIds: ['remote-repo'],
+      providerIdentity: { provider: 'github', owner: 'StablyAI', repo: 'Orca' }
+    })
+    expect(getProjectHostSetupsForProject(projection.setups, 'repo:local-repo')).toHaveLength(1)
+    expect(getProjectHostSetupsForProject(projection.setups, 'repo:remote-repo')).toHaveLength(1)
   })
 
-  it('uses git remote identity as a provider identity fallback', () => {
+  it('keeps git-remote-identity-matching repos as separate projects (Phase 10: one project per repo)', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'canonical-local-repo',
@@ -176,11 +188,21 @@ describe('project host setup projection', () => {
       })
     ])
 
-    expect(projection.projects).toHaveLength(1)
+    // A shared git remote identity (or GitHub provider identity) no longer
+    // merges checkouts into one Project (Phase 10): a stale branch checkout
+    // of the same repo stays its own card, even though it resolves to the
+    // same GitHub owner/repo.
+    expect(projection.projects).toHaveLength(2)
     expect(projection.projects[0]).toMatchObject({
-      id: 'github:stablyai/orca',
+      id: 'repo:canonical-local-repo',
       displayName: 'orca',
-      sourceRepoIds: ['canonical-local-repo', 'old-branch-checkout'],
+      sourceRepoIds: ['canonical-local-repo'],
+      providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
+    })
+    expect(projection.projects[1]).toMatchObject({
+      id: 'repo:old-branch-checkout',
+      displayName: 're-enable-webgl-for-remote-runtime-terminals',
+      sourceRepoIds: ['old-branch-checkout'],
       providerIdentity: { provider: 'github', owner: 'stablyai', repo: 'orca' }
     })
   })
@@ -202,7 +224,7 @@ describe('project host setup projection', () => {
     ])
   })
 
-  it('groups same-project records across local, SSH, and runtime hosts by git remote identity', () => {
+  it('keeps same-git-remote-identity records across local, SSH, and runtime hosts as separate projects (Phase 10: one project per repo)', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'local-sample-app',
@@ -238,24 +260,40 @@ describe('project host setup projection', () => {
       })
     ])
 
-    expect(projection.projects).toHaveLength(1)
-    expect(projection.projects[0]).toMatchObject({
-      id: 'git:git.company.test/team/sample-app',
-      displayName: 'sample-app',
-      sourceRepoIds: ['local-sample-app', 'ssh-sample-app', 'runtime-sample-app'],
-      gitRemoteIdentity: {
-        canonicalKey: 'git.company.test/team/sample-app',
-        remoteName: 'origin'
-      }
-    })
+    // Previously a shared git remote identity grouped local/SSH/runtime
+    // checkouts of the same repo under one Project. Phase 10 removes that:
+    // each host's checkout is its own Project, one per repo, no cross-host
+    // merging regardless of how many hosts share the same git remote.
+    expect(projection.projects).toHaveLength(3)
+    expect(projection.projects.map((project) => project.id)).toEqual([
+      'repo:local-sample-app',
+      'repo:ssh-sample-app',
+      'repo:runtime-sample-app'
+    ])
+    for (const project of projection.projects) {
+      expect(project).toMatchObject({
+        displayName: 'sample-app',
+        gitRemoteIdentity: {
+          canonicalKey: 'git.company.test/team/sample-app',
+          remoteName: 'origin'
+        }
+      })
+    }
+    expect(projection.projects[0]?.sourceRepoIds).toEqual(['local-sample-app'])
+    expect(projection.projects[1]?.sourceRepoIds).toEqual(['ssh-sample-app'])
+    expect(projection.projects[2]?.sourceRepoIds).toEqual(['runtime-sample-app'])
     expect(projection.setups.map((setup) => setup.hostId)).toEqual([
       'local',
       'ssh:build%20server',
       'runtime:dev-container'
     ])
+    expect(getProjectHostSetupsForProject(projection.setups, 'repo:local-sample-app')).toHaveLength(
+      1
+    )
+    expect(getProjectHostSetupsForProject(projection.setups, 'repo:ssh-sample-app')).toHaveLength(1)
     expect(
-      getProjectHostSetupsForProject(projection.setups, 'git:git.company.test/team/sample-app')
-    ).toHaveLength(3)
+      getProjectHostSetupsForProject(projection.setups, 'repo:runtime-sample-app')
+    ).toHaveLength(1)
   })
 
   it('keeps same-named cross-host records separate when there is no shared repo identity', () => {
@@ -279,12 +317,15 @@ describe('project host setup projection', () => {
       })
     ])
 
-    // Why: display names are labels, not identity. A future fix needs a
-    // normalized git remote identity or an explicit user link before merging.
+    // Display names are labels, not identity, so these were already kept
+    // separate before Phase 10. Phase 10 makes this the *only* outcome now:
+    // even a shared git remote identity no longer merges records (see the
+    // git-remote-identity tests above), so this case needs no identity match
+    // to stay correct.
     expect(projection.projects).toHaveLength(3)
   })
 
-  it('does not collapse case-distinct remote paths for self-hosted git remotes', () => {
+  it('keeps case-distinct git-remote-identity repos as separate projects (Phase 10: project id is always repo-keyed)', () => {
     const projection = projectHostSetupProjectionFromRepos([
       repo({
         id: 'uppercase-repo',
@@ -309,9 +350,13 @@ describe('project host setup projection', () => {
       })
     ])
 
+    // These never shared identity (different-case canonicalKey) so they were
+    // already separate before Phase 10. Phase 10 also changes project ids to
+    // always be `repo:<id>` rather than an identity-derived `git:<key>`, since
+    // ids no longer need to disambiguate merge groups.
     expect(projection.projects.map((project) => project.id)).toEqual([
-      'git:git.company.test/Team/Sample-App',
-      'git:git.company.test/team/sample-app'
+      'repo:uppercase-repo',
+      'repo:lowercase-repo'
     ])
   })
 
@@ -339,8 +384,10 @@ describe('project host setup projection', () => {
     })
     const projection = projectHostSetupProjectionFromRepos([targetRepo])
 
+    // Phase 10: projectId is always repo-keyed now, not a GitHub-identity id,
+    // since a repo's Project is never shared with another repo's.
     expect(getProjectHostSetupWorktreeMeta(projection.setups, targetRepo)).toEqual({
-      projectId: 'github:stablyai/orca',
+      projectId: 'repo:remote-repo',
       hostId: 'ssh:openclaw%202',
       projectHostSetupId: 'remote-repo'
     })

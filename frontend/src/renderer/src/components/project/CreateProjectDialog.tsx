@@ -172,9 +172,7 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
     try {
       const target = getActiveRuntimeTarget(useAppStore.getState().settings)
       // Why devServerId/repoPath aren't sent here: CreateProjectRequest
-      // (project.proto) has neither field — a dev server binds only via
-      // RebindDevServer (its active-execution guard needs to run against a
-      // project that already exists), and a repo path only makes sense as
+      // (project.proto) has neither field — a repo path only makes sense as
       // a follow-up AddRepo call against the new project's id. Both used to
       // be sent here anyway and were silently dropped by the wscompat
       // handler — this project's dev server/repo were never actually set.
@@ -184,22 +182,18 @@ export function CreateProjectDialog({ open, onOpenChange, onCreated }: CreatePro
         visibility
       })
 
-      // The project row already exists past this point — a follow-up
-      // failure is "couldn't fully set it up", not "creation failed", so it
-      // surfaces as a toast (same reasoning as ProjectSwitcher's onCreated
-      // catch) rather than blocking onCreated/closing the dialog.
-      await callRuntimeRpc(target, 'project.rebindDevServer', {
-        projectId: project.id,
-        newDevServerId: devServerId
-      }).catch(() => {
-        toast.error(
-          'Project created, but the dev server could not be bound. Set it from Project Settings.'
-        )
-      })
+      // Phase 10 (project.repos.dev_server_id): the repo now carries its own
+      // dev-server binding, set directly here — no more separate
+      // project.rebindDevServer step before it. The project row already
+      // exists past this point — a follow-up failure is "couldn't fully set
+      // it up", not "creation failed", so it surfaces as a toast (same
+      // reasoning as ProjectSwitcher's onCreated catch) rather than blocking
+      // onCreated/closing the dialog.
       await callRuntimeRpc(target, 'repo.add', {
         projectId: project.id,
         url: repoPath.trim(),
-        displayName: name.trim()
+        displayName: name.trim(),
+        devServerId
       }).catch(() => {
         toast.error(
           'Project created, but the repo could not be added. Add it from Project Settings.'
