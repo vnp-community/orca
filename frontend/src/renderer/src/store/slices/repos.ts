@@ -384,7 +384,21 @@ function scheduleSafeAutoForkSync(get: () => AppState, repos: readonly Repo[]): 
 
 function repoWithFetchedOwner(repo: Repo, target: ReturnType<typeof getActiveRuntimeTarget>): Repo {
   if (target.kind === 'environment') {
-    return { ...repo, executionHostId: getRuntimeTargetHostId(target) }
+    // Why not always stamp getRuntimeTargetHostId(target) here: in web-client
+    // mode that now always returns LOCAL_EXECUTION_HOST_ID (Phase 10 fix for
+    // duplicate repo rows — a paired web client has no distinct "local" host,
+    // see getRuntimeTargetHostId's own doc comment). Stamping that literal
+    // 'local' onto every repo unconditionally would short-circuit
+    // getRepoExecutionHostId's own devServerId/connectionId fallback chain
+    // (it checks executionHostId FIRST), hiding a repo's real dev-server
+    // binding behind a fake "local" host — found live: Settings' "Available
+    // Hosts" showing "Local Mac" for a repo with a real dev_server_id set.
+    // Desktop/non-web environment targets still stamp it: there,
+    // getRuntimeTargetHostId(target) carries real per-environment info
+    // (`runtime:<environmentId>`), not a blanket web-mode alias.
+    return isWebClientLocation()
+      ? { ...repo, executionHostId: getRepoExecutionHostId(repo) }
+      : { ...repo, executionHostId: getRuntimeTargetHostId(target) }
   }
   if (repo.connectionId) {
     return { ...repo, executionHostId: getRepoExecutionHostId(repo) }
