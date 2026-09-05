@@ -242,9 +242,23 @@ function getKnownRepoWorktreeIds(state: AppState, projectId: string, hostId?: st
 function getRuntimeTargetHostId(
   target: ReturnType<typeof getActiveRuntimeTarget>
 ): ReturnType<typeof toRuntimeExecutionHostId> | typeof LOCAL_EXECUTION_HOST_ID {
-  return target.kind === 'environment'
-    ? toRuntimeExecutionHostId(target.environmentId)
-    : LOCAL_EXECUTION_HOST_ID
+  // Why: a paired web client (isWebClientLocation) has no distinct "local"
+  // host — {kind:'environment', environmentId:'session-auth'} and
+  // {kind:'local'} both resolve to the SAME backend connection there (see
+  // fetchReposForAllHosts' own isWebClientLocation guard on its environment
+  // loop). Tagging the environment-kind target as a separate
+  // `runtime:session-auth` host here — while the hardcoded local fetch
+  // tags the identical rows `local` — caused every repo/project-group/
+  // worktree refetched via a runtime event (reposChanged etc., which only
+  // ever fires with an environment id, never {kind:'local'}) to be
+  // APPENDED as phantom duplicates alongside the real 'local'-tagged row,
+  // rather than recognized as an update to it. Found live: Settings'
+  // repo list showing every repo twice. Unifying both to LOCAL_EXECUTION_HOST_ID
+  // in web mode makes every merge helper's hostId-keyed identity agree.
+  if (target.kind === 'environment' && !isWebClientLocation()) {
+    return toRuntimeExecutionHostId(target.environmentId)
+  }
+  return LOCAL_EXECUTION_HOST_ID
 }
 
 function getProjectSetupRuntimeTarget(
@@ -1213,8 +1227,20 @@ async function fetchAllRemoteRepoViews(
         { projectId: project.id },
         { timeoutMs: 15_000, reuseRecentCompatibilityFailure: true }
       ).then(
+        // Phase 10: repo.list's wire response already carries each repo's
+        // OWN devServerId (project.repos.dev_server_id) — trust it. Falling
+        // back to the project's legacy devServerId only covers a repo that
+        // somehow has neither (shouldn't happen post-migration-0017's
+        // backfill, but cheaper than leaving a repo looking falsely local).
+        // Previously this unconditionally overwrote every repo's real
+        // per-repo binding with the project's field, which the "AI-Ops"/
+        // "Vnp-asm" projects' devServerId can now legitimately never
+        // reflect once repos move between hosts individually.
         (result) =>
-          result.repos.map((repo) => ({ ...repo, devServerId: project.devServerId || undefined })),
+          result.repos.map((repo) => ({
+            ...repo,
+            devServerId: repo.devServerId || project.devServerId || undefined
+          })),
         (err) => {
           console.error(`[repos] repo.list failed for project ${project.id}:`, err)
           return []

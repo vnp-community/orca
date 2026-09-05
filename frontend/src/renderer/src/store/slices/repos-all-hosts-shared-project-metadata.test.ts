@@ -119,10 +119,21 @@ function configureSharedProjectCompatibilityMocks(
   return { sharedProjectId, sharedRemoteProject, remoteRepoWithIdentity }
 }
 
-function expectSharedProjectMetadata(projects: readonly Project[], sharedProjectId: string): void {
-  const sharedProject = projects.find((project) => project.id === sharedProjectId)
-  expect([...(sharedProject?.sourceRepoIds ?? [])].sort()).toEqual(['local-repo', 'remote-repo'])
-  expect(sharedProject?.localWindowsRuntimePreference).toEqual({ kind: 'windows-host' })
+// Phase 10: a legacy Project is always exactly one repo now, so local-repo and
+// remote-repo never merge into one project just because they happen to share
+// a GitHub identity. The local host's API-owned project (still persisted
+// under the old shared id in this fixture, simulating a project created
+// before Phase 10) keeps only its own repo; remote-repo gets its own
+// separately-derived `repo:remote-repo` project instead of folding into it.
+function expectLocalAndRemoteProjectsStaySeparate(
+  projects: readonly Project[],
+  sharedProjectId: string
+): void {
+  const localProject = projects.find((project) => project.id === sharedProjectId)
+  expect(localProject?.sourceRepoIds).toEqual(['local-repo'])
+  expect(localProject?.localWindowsRuntimePreference).toEqual({ kind: 'windows-host' })
+  const remoteProject = projects.find((project) => project.id === 'repo:remote-repo')
+  expect(remoteProject?.sourceRepoIds).toEqual(['remote-repo'])
 }
 
 describe('fetchReposForAllHosts — shared project metadata', () => {
@@ -213,7 +224,7 @@ describe('fetchReposForAllHosts — shared project metadata', () => {
     expect(store.getState().projects).toContainEqual(localProject)
   })
 
-  it('preserves shared project metadata when the same project id is fetched from multiple hosts', async () => {
+  it('keeps local and remote projects separate even when fetched under the same legacy shared project id (Phase 10: one project per repo)', async () => {
     const { sharedProjectId, remoteRepoWithIdentity } = configureSharedProjectCompatibilityMocks()
     const store = createTestStore()
     // Why remote-repo is pre-seeded with its provider identity, not left for
@@ -228,7 +239,12 @@ describe('fetchReposForAllHosts — shared project metadata', () => {
 
     await store.getState().fetchReposForAllHosts()
 
-    expectSharedProjectMetadata(store.getState().projects, sharedProjectId)
+    expectLocalAndRemoteProjectsStaySeparate(store.getState().projects, sharedProjectId)
+    // Both setups still report `sharedProjectId` here because that's wire
+    // metadata from this fixture's simulated pre-Phase-10 backend responses
+    // (projectHostSetup.list for both hosts) — it no longer implies the two
+    // hosts' *projects* are merged, since project derivation is always
+    // repo-keyed now regardless of what a setup's projectId says.
     expect(store.getState().projectHostSetups).toEqual(
       expect.arrayContaining([
         expect.objectContaining({
@@ -260,7 +276,7 @@ describe('fetchReposForAllHosts — shared project metadata', () => {
     ).toEqual({ kind: 'windows-host' })
   })
 
-  it('preserves shared project metadata after a runtime-only repo refresh', async () => {
+  it('keeps local and remote projects separate after a runtime-only repo refresh (Phase 10: one project per repo)', async () => {
     const { sharedProjectId, remoteRepoWithIdentity } = configureSharedProjectCompatibilityMocks()
     const store = createTestStore()
     // Why remote-repo is pre-seeded — see the identical note above: RemoteRepoView
@@ -274,7 +290,7 @@ describe('fetchReposForAllHosts — shared project metadata', () => {
     await store.getState().fetchReposForAllHosts()
     await store.getState().fetchRuntimeEnvironmentRepos('env-1')
 
-    expectSharedProjectMetadata(store.getState().projects, sharedProjectId)
+    expectLocalAndRemoteProjectsStaySeparate(store.getState().projects, sharedProjectId)
   })
 
   it('keeps the local side of a shared project when a runtime refresh removes its repos', async () => {
@@ -332,7 +348,7 @@ describe('fetchReposForAllHosts — shared project metadata', () => {
     ])
   })
 
-  it('preserves API-owned local shared projects when repo identity cannot re-derive them', async () => {
+  it('keeps the API-owned local project intact when repo identity cannot re-derive it, even after the remote repo disappears (Phase 10: local project ownership never depended on repo-identity re-derivation)', async () => {
     const { sharedProjectId, remoteRepoWithIdentity } = configureSharedProjectCompatibilityMocks({
       localRepoHasProviderIdentity: false
     })
@@ -346,7 +362,11 @@ describe('fetchReposForAllHosts — shared project metadata', () => {
     })
 
     await store.getState().fetchReposForAllHosts()
-    expectSharedProjectMetadata(store.getState().projects, sharedProjectId)
+    // Why this still holds even without a re-derivable local identity: the
+    // local host's project always comes straight from the API
+    // (projectsApi.list), never from repo-identity derivation — so it was
+    // never at risk of losing its id here, Phase 10 or not.
+    expectLocalAndRemoteProjectsStaySeparate(store.getState().projects, sharedProjectId)
     runtimeEnvironmentCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
       if (args.method === 'repo.list') {
         return {
@@ -382,10 +402,20 @@ describe('fetchReposForAllHosts — shared project metadata', () => {
 
     await store.getState().fetchRuntimeEnvironmentRepos('env-1')
 
-    expect(store.getState().projects.map((project) => project.id)).toEqual([sharedProjectId])
+    // Removing remote-repo from its host only affects ownership of the
+    // separately-derived `repo:remote-repo` project — the local API-owned
+    // project keeps its repo and preference untouched either way, confirming
+    // its ownership was never tied to repo-identity re-derivation.
     expect(
       store.getState().projects.find((project) => project.id === sharedProjectId)?.sourceRepoIds
     ).toEqual(['local-repo'])
+    expect(
+      store.getState().projects.find((project) => project.id === sharedProjectId)
+        ?.localWindowsRuntimePreference
+    ).toEqual({ kind: 'windows-host' })
+    expect(
+      store.getState().projects.some((project) => project.sourceRepoIds.includes('remote-repo'))
+    ).toBe(false)
     expect(store.getState().projectHostSetups).toEqual([
       expect.objectContaining({
         projectId: sharedProjectId,
