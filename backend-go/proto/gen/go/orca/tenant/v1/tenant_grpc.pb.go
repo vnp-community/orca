@@ -20,25 +20,29 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TenantService_CreateCompany_FullMethodName      = "/orca.tenant.v1.TenantService/CreateCompany"
-	TenantService_GetCompany_FullMethodName         = "/orca.tenant.v1.TenantService/GetCompany"
-	TenantService_ListCompanies_FullMethodName      = "/orca.tenant.v1.TenantService/ListCompanies"
-	TenantService_ValidateTenant_FullMethodName     = "/orca.tenant.v1.TenantService/ValidateTenant"
-	TenantService_CreateDepartment_FullMethodName   = "/orca.tenant.v1.TenantService/CreateDepartment"
-	TenantService_SetUserDepartment_FullMethodName  = "/orca.tenant.v1.TenantService/SetUserDepartment"
-	TenantService_GetResolvedProfile_FullMethodName = "/orca.tenant.v1.TenantService/GetResolvedProfile"
-	TenantService_CreateTeam_FullMethodName         = "/orca.tenant.v1.TenantService/CreateTeam"
-	TenantService_AddTeamMember_FullMethodName      = "/orca.tenant.v1.TenantService/AddTeamMember"
-	TenantService_ListTeamMembers_FullMethodName    = "/orca.tenant.v1.TenantService/ListTeamMembers"
-	TenantService_GetUserProfile_FullMethodName     = "/orca.tenant.v1.TenantService/GetUserProfile"
-	TenantService_ListDepartments_FullMethodName    = "/orca.tenant.v1.TenantService/ListDepartments"
-	TenantService_UpdateCompany_FullMethodName      = "/orca.tenant.v1.TenantService/UpdateCompany"
-	TenantService_UpdateDepartment_FullMethodName   = "/orca.tenant.v1.TenantService/UpdateDepartment"
-	TenantService_UpdateUserProfile_FullMethodName  = "/orca.tenant.v1.TenantService/UpdateUserProfile"
-	TenantService_ListTeams_FullMethodName          = "/orca.tenant.v1.TenantService/ListTeams"
-	TenantService_RemoveTeamMember_FullMethodName   = "/orca.tenant.v1.TenantService/RemoveTeamMember"
-	TenantService_GetOnboardingState_FullMethodName = "/orca.tenant.v1.TenantService/GetOnboardingState"
-	TenantService_SetOnboardingState_FullMethodName = "/orca.tenant.v1.TenantService/SetOnboardingState"
+	TenantService_CreateCompany_FullMethodName               = "/orca.tenant.v1.TenantService/CreateCompany"
+	TenantService_GetCompany_FullMethodName                  = "/orca.tenant.v1.TenantService/GetCompany"
+	TenantService_ListCompanies_FullMethodName               = "/orca.tenant.v1.TenantService/ListCompanies"
+	TenantService_ValidateTenant_FullMethodName              = "/orca.tenant.v1.TenantService/ValidateTenant"
+	TenantService_CreateDepartment_FullMethodName            = "/orca.tenant.v1.TenantService/CreateDepartment"
+	TenantService_SetUserDepartment_FullMethodName           = "/orca.tenant.v1.TenantService/SetUserDepartment"
+	TenantService_GetResolvedProfile_FullMethodName          = "/orca.tenant.v1.TenantService/GetResolvedProfile"
+	TenantService_CreateTeam_FullMethodName                  = "/orca.tenant.v1.TenantService/CreateTeam"
+	TenantService_AddTeamMember_FullMethodName               = "/orca.tenant.v1.TenantService/AddTeamMember"
+	TenantService_ListTeamMembers_FullMethodName             = "/orca.tenant.v1.TenantService/ListTeamMembers"
+	TenantService_GetUserProfile_FullMethodName              = "/orca.tenant.v1.TenantService/GetUserProfile"
+	TenantService_ListDepartments_FullMethodName             = "/orca.tenant.v1.TenantService/ListDepartments"
+	TenantService_UpdateCompany_FullMethodName               = "/orca.tenant.v1.TenantService/UpdateCompany"
+	TenantService_UpdateDepartment_FullMethodName            = "/orca.tenant.v1.TenantService/UpdateDepartment"
+	TenantService_UpdateUserProfile_FullMethodName           = "/orca.tenant.v1.TenantService/UpdateUserProfile"
+	TenantService_ListTeams_FullMethodName                   = "/orca.tenant.v1.TenantService/ListTeams"
+	TenantService_RemoveTeamMember_FullMethodName            = "/orca.tenant.v1.TenantService/RemoveTeamMember"
+	TenantService_GetOnboardingState_FullMethodName          = "/orca.tenant.v1.TenantService/GetOnboardingState"
+	TenantService_SetOnboardingState_FullMethodName          = "/orca.tenant.v1.TenantService/SetOnboardingState"
+	TenantService_AddCompanyEmailDomain_FullMethodName       = "/orca.tenant.v1.TenantService/AddCompanyEmailDomain"
+	TenantService_RemoveCompanyEmailDomain_FullMethodName    = "/orca.tenant.v1.TenantService/RemoveCompanyEmailDomain"
+	TenantService_ListCompanyEmailDomains_FullMethodName     = "/orca.tenant.v1.TenantService/ListCompanyEmailDomains"
+	TenantService_ResolveCompanyByEmailDomain_FullMethodName = "/orca.tenant.v1.TenantService/ResolveCompanyByEmailDomain"
 )
 
 // TenantServiceClient is the client API for TenantService service.
@@ -86,6 +90,16 @@ type TenantServiceClient interface {
 	// comment for why this is a dedicated store, not settings_json.
 	GetOnboardingState(ctx context.Context, in *GetOnboardingStateRequest, opts ...grpc.CallOption) (*GetOnboardingStateResponse, error)
 	SetOnboardingState(ctx context.Context, in *SetOnboardingStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ── Multi-tenant SSO follow-up (CR-LOGIN-001) ─────────────────────────
+	// Add/Remove/ListCompanyEmailDomains are admin-console operations (caller
+	// MUST admin-gate — see AddCompanyEmailDomain's doc comment).
+	// ResolveCompanyByEmailDomain is a system-internal read auth-service
+	// calls server-to-server to decide a brand-new SSO signup's tenant — NOT
+	// an admin-console operation, never exposed as an end-user REST route.
+	AddCompanyEmailDomain(ctx context.Context, in *AddCompanyEmailDomainRequest, opts ...grpc.CallOption) (*AddCompanyEmailDomainResponse, error)
+	RemoveCompanyEmailDomain(ctx context.Context, in *RemoveCompanyEmailDomainRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListCompanyEmailDomains(ctx context.Context, in *ListCompanyEmailDomainsRequest, opts ...grpc.CallOption) (*ListCompanyEmailDomainsResponse, error)
+	ResolveCompanyByEmailDomain(ctx context.Context, in *ResolveCompanyByEmailDomainRequest, opts ...grpc.CallOption) (*ResolveCompanyByEmailDomainResponse, error)
 }
 
 type tenantServiceClient struct {
@@ -286,6 +300,46 @@ func (c *tenantServiceClient) SetOnboardingState(ctx context.Context, in *SetOnb
 	return out, nil
 }
 
+func (c *tenantServiceClient) AddCompanyEmailDomain(ctx context.Context, in *AddCompanyEmailDomainRequest, opts ...grpc.CallOption) (*AddCompanyEmailDomainResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddCompanyEmailDomainResponse)
+	err := c.cc.Invoke(ctx, TenantService_AddCompanyEmailDomain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) RemoveCompanyEmailDomain(ctx context.Context, in *RemoveCompanyEmailDomainRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_RemoveCompanyEmailDomain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) ListCompanyEmailDomains(ctx context.Context, in *ListCompanyEmailDomainsRequest, opts ...grpc.CallOption) (*ListCompanyEmailDomainsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCompanyEmailDomainsResponse)
+	err := c.cc.Invoke(ctx, TenantService_ListCompanyEmailDomains_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) ResolveCompanyByEmailDomain(ctx context.Context, in *ResolveCompanyByEmailDomainRequest, opts ...grpc.CallOption) (*ResolveCompanyByEmailDomainResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveCompanyByEmailDomainResponse)
+	err := c.cc.Invoke(ctx, TenantService_ResolveCompanyByEmailDomain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TenantServiceServer is the server API for TenantService service.
 // All implementations must embed UnimplementedTenantServiceServer
 // for forward compatibility.
@@ -331,6 +385,16 @@ type TenantServiceServer interface {
 	// comment for why this is a dedicated store, not settings_json.
 	GetOnboardingState(context.Context, *GetOnboardingStateRequest) (*GetOnboardingStateResponse, error)
 	SetOnboardingState(context.Context, *SetOnboardingStateRequest) (*emptypb.Empty, error)
+	// ── Multi-tenant SSO follow-up (CR-LOGIN-001) ─────────────────────────
+	// Add/Remove/ListCompanyEmailDomains are admin-console operations (caller
+	// MUST admin-gate — see AddCompanyEmailDomain's doc comment).
+	// ResolveCompanyByEmailDomain is a system-internal read auth-service
+	// calls server-to-server to decide a brand-new SSO signup's tenant — NOT
+	// an admin-console operation, never exposed as an end-user REST route.
+	AddCompanyEmailDomain(context.Context, *AddCompanyEmailDomainRequest) (*AddCompanyEmailDomainResponse, error)
+	RemoveCompanyEmailDomain(context.Context, *RemoveCompanyEmailDomainRequest) (*emptypb.Empty, error)
+	ListCompanyEmailDomains(context.Context, *ListCompanyEmailDomainsRequest) (*ListCompanyEmailDomainsResponse, error)
+	ResolveCompanyByEmailDomain(context.Context, *ResolveCompanyByEmailDomainRequest) (*ResolveCompanyByEmailDomainResponse, error)
 	mustEmbedUnimplementedTenantServiceServer()
 }
 
@@ -397,6 +461,18 @@ func (UnimplementedTenantServiceServer) GetOnboardingState(context.Context, *Get
 }
 func (UnimplementedTenantServiceServer) SetOnboardingState(context.Context, *SetOnboardingStateRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetOnboardingState not implemented")
+}
+func (UnimplementedTenantServiceServer) AddCompanyEmailDomain(context.Context, *AddCompanyEmailDomainRequest) (*AddCompanyEmailDomainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddCompanyEmailDomain not implemented")
+}
+func (UnimplementedTenantServiceServer) RemoveCompanyEmailDomain(context.Context, *RemoveCompanyEmailDomainRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveCompanyEmailDomain not implemented")
+}
+func (UnimplementedTenantServiceServer) ListCompanyEmailDomains(context.Context, *ListCompanyEmailDomainsRequest) (*ListCompanyEmailDomainsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCompanyEmailDomains not implemented")
+}
+func (UnimplementedTenantServiceServer) ResolveCompanyByEmailDomain(context.Context, *ResolveCompanyByEmailDomainRequest) (*ResolveCompanyByEmailDomainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveCompanyByEmailDomain not implemented")
 }
 func (UnimplementedTenantServiceServer) mustEmbedUnimplementedTenantServiceServer() {}
 func (UnimplementedTenantServiceServer) testEmbeddedByValue()                       {}
@@ -761,6 +837,78 @@ func _TenantService_SetOnboardingState_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_AddCompanyEmailDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddCompanyEmailDomainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).AddCompanyEmailDomain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_AddCompanyEmailDomain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).AddCompanyEmailDomain(ctx, req.(*AddCompanyEmailDomainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_RemoveCompanyEmailDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveCompanyEmailDomainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).RemoveCompanyEmailDomain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_RemoveCompanyEmailDomain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).RemoveCompanyEmailDomain(ctx, req.(*RemoveCompanyEmailDomainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_ListCompanyEmailDomains_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCompanyEmailDomainsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ListCompanyEmailDomains(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ListCompanyEmailDomains_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ListCompanyEmailDomains(ctx, req.(*ListCompanyEmailDomainsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_ResolveCompanyByEmailDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveCompanyByEmailDomainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ResolveCompanyByEmailDomain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ResolveCompanyByEmailDomain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ResolveCompanyByEmailDomain(ctx, req.(*ResolveCompanyByEmailDomainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TenantService_ServiceDesc is the grpc.ServiceDesc for TenantService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -843,6 +991,22 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetOnboardingState",
 			Handler:    _TenantService_SetOnboardingState_Handler,
+		},
+		{
+			MethodName: "AddCompanyEmailDomain",
+			Handler:    _TenantService_AddCompanyEmailDomain_Handler,
+		},
+		{
+			MethodName: "RemoveCompanyEmailDomain",
+			Handler:    _TenantService_RemoveCompanyEmailDomain_Handler,
+		},
+		{
+			MethodName: "ListCompanyEmailDomains",
+			Handler:    _TenantService_ListCompanyEmailDomains_Handler,
+		},
+		{
+			MethodName: "ResolveCompanyByEmailDomain",
+			Handler:    _TenantService_ResolveCompanyByEmailDomain_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

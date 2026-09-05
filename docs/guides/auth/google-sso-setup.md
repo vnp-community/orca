@@ -208,16 +208,36 @@ họ.
 
 ---
 
-## 7. Giới hạn hiện tại — single-tenant
+## 7. Multi-tenant — gán tenant theo domain email
 
 Một user SSO **hoàn toàn mới** (chưa có `sso_identities` row, chưa có local
-account trùng email) sẽ được auto-tạo tài khoản, nhưng tenant được gán tự
-động **chỉ hoạt động khi deployment này có đúng 1 company/tenant**
-(`TenantResolver.ResolveDefaultTenant` gọi `tenant-service.ListCompanies` —
-nếu có 0 hoặc >1 company, đăng nhập bị từ chối với lỗi
-`AUTH_SSO_AMBIGUOUS_TENANT`). Với deploy `b15.openledger.vn` hiện tại (single
-tenant), điều này không phải vấn đề — chỉ ghi chú lại nếu sau này deployment
-này phục vụ nhiều tổ chức (multi-tenant) cùng lúc.
+account trùng email) được gán vào tenant theo **domain của email đã
+verified** — ví dụ `alice@vnpay.vn` → tenant nào đã đăng ký domain
+`vnpay.vn`. Nếu deployment này có **nhiều hơn 1 company** và domain của
+email chưa được đăng ký cho company nào, đăng nhập bị từ chối với lỗi
+`AUTH_SSO_UNKNOWN_ORGANIZATION` (không tự đoán tenant).
+
+Đăng ký domain cho 1 company (admin-only, hiện chưa có UI — gọi thẳng REST
+route qua session cookie admin):
+
+```bash
+curl -X POST https://b15.openledger.vn/v1/tenants/companies/<company_id>/email-domains \
+  -H "Content-Type: application/json" \
+  -b "orca_session=<cookie của admin>" \
+  -d '{"email_domain":"vnpay.vn"}'
+```
+
+Xem domain đã đăng ký cho 1 company: `GET .../companies/<company_id>/email-domains`.
+Gỡ 1 domain: `DELETE /v1/tenants/email-domains/<domain>`.
+
+Nếu deployment chỉ có **đúng 1 company** (như `b15.openledger.vn` hiện
+tại), không cần đăng ký gì cả — hệ thống tự fallback dùng company duy nhất
+đó, y hệt hành vi single-tenant trước đây.
+
+**Giới hạn còn lại:** mọi tenant hiện dùng chung **1 bộ credential
+Google/OIDC** (client ID/secret cấu hình ở mục 3) — chưa hỗ trợ mỗi tenant
+tự khai báo IdP riêng (đó là phần lớn hơn nhiều, xem
+`backend-go/services/auth-service/README.md`'s mục SSO).
 
 ---
 

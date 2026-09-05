@@ -117,12 +117,30 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
   hole with extra steps. A user whose IdP genuinely can't verify their
   email has no self-serve path today — that's an IdP-configuration problem
   for them to fix, not something this service should paper over.
-  **Known gaps, not fixed here:**
-  - **Single-tenant-per-deployment only.** A brand-new SSO user's tenant is
-    resolved via `TenantResolver.ResolveDefaultTenant` (tenant-service's
-    `ListCompanies`), which fails closed unless exactly one company exists.
-    True multi-tenant SSO (workspace-scoped IdP config, a tenant hint on the
-    start URL) is future work.
+  **Multi-tenant SSO (domain-based, shared IdP credentials):** a brand-new
+  SSO user's tenant is resolved via `TenantResolver.ResolveTenantForEmail`,
+  which calls tenant-service's `ResolveCompanyByEmailDomain` RPC against
+  the verified email's own domain (e.g. `alice@vnpay.vn` -> whichever
+  company registered `vnpay.vn` via `AddCompanyEmailDomain`). Falls back to
+  "the sole existing company" (this service's original single-tenant-only
+  behavior) when the domain isn't registered to anyone — so a deployment
+  that has never called `AddCompanyEmailDomain` keeps working exactly as
+  before. Fails closed (`AUTH_SSO_UNKNOWN_ORGANIZATION`) when neither
+  resolves. **Known gaps, not fixed here:**
+  - **One shared IdP credential set for every tenant**, by explicit design
+    choice (not a limitation to lift casually) — every company uses the
+    SAME `SSO_GOOGLE_CLIENT_ID`/etc. configured on this deployment; there is
+    no per-tenant IdP (a different Okta/Keycloak per customer) config store
+    or admin UI for one. Adding that is a materially bigger feature
+    (per-tenant client secret storage, redirect_uri disambiguation across
+    tenants) than domain-based tenant *routing*, which is what's built here.
+  - **No admin-console UI to manage email domains** — `AddCompanyEmailDomain`/
+    `RemoveCompanyEmailDomain`/`ListCompanyEmailDomains` exist as real,
+    tested tenant-service RPCs and REST routes
+    (`api-gateway`'s `POST/GET /v1/tenants/companies/{id}/email-domains`,
+    `DELETE /v1/tenants/email-domains/{domain}`), but nothing in `frontend/`
+    calls them yet — registering a domain today means calling the REST
+    route directly (e.g. via `curl` with an admin session cookie).
   - **`domain.User.SsoProvider` is "last used", not history.** It's
     overwritten on every SSO login (`UserRepository.SetSsoProvider`) —
     useful for `GET /auth/me`'s cosmetic `provider` field, not an audit

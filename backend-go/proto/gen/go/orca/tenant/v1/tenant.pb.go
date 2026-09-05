@@ -2027,6 +2027,334 @@ func (x *SetOnboardingStateRequest) GetStateJson() string {
 	return ""
 }
 
+// ── Multi-tenant SSO follow-up (CR-LOGIN-001) ───────────────────────────
+type AddCompanyEmailDomainRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CompanyId     string                 `protobuf:"bytes,1,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
+	EmailDomain   string                 `protobuf:"bytes,2,opt,name=email_domain,json=emailDomain,proto3" json:"email_domain,omitempty"` // bare domain, e.g. "vnpay.vn" — no "@", no scheme
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddCompanyEmailDomainRequest) Reset() {
+	*x = AddCompanyEmailDomainRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddCompanyEmailDomainRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddCompanyEmailDomainRequest) ProtoMessage() {}
+
+func (x *AddCompanyEmailDomainRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddCompanyEmailDomainRequest.ProtoReflect.Descriptor instead.
+func (*AddCompanyEmailDomainRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *AddCompanyEmailDomainRequest) GetCompanyId() string {
+	if x != nil {
+		return x.CompanyId
+	}
+	return ""
+}
+
+func (x *AddCompanyEmailDomainRequest) GetEmailDomain() string {
+	if x != nil {
+		return x.EmailDomain
+	}
+	return ""
+}
+
+type AddCompanyEmailDomainResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EmailDomain   string                 `protobuf:"bytes,1,opt,name=email_domain,json=emailDomain,proto3" json:"email_domain,omitempty"` // normalized (lowercased) form actually stored
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AddCompanyEmailDomainResponse) Reset() {
+	*x = AddCompanyEmailDomainResponse{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AddCompanyEmailDomainResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AddCompanyEmailDomainResponse) ProtoMessage() {}
+
+func (x *AddCompanyEmailDomainResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AddCompanyEmailDomainResponse.ProtoReflect.Descriptor instead.
+func (*AddCompanyEmailDomainResponse) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *AddCompanyEmailDomainResponse) GetEmailDomain() string {
+	if x != nil {
+		return x.EmailDomain
+	}
+	return ""
+}
+
+type RemoveCompanyEmailDomainRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EmailDomain   string                 `protobuf:"bytes,1,opt,name=email_domain,json=emailDomain,proto3" json:"email_domain,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveCompanyEmailDomainRequest) Reset() {
+	*x = RemoveCompanyEmailDomainRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[43]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveCompanyEmailDomainRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveCompanyEmailDomainRequest) ProtoMessage() {}
+
+func (x *RemoveCompanyEmailDomainRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[43]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveCompanyEmailDomainRequest.ProtoReflect.Descriptor instead.
+func (*RemoveCompanyEmailDomainRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{43}
+}
+
+func (x *RemoveCompanyEmailDomainRequest) GetEmailDomain() string {
+	if x != nil {
+		return x.EmailDomain
+	}
+	return ""
+}
+
+type ListCompanyEmailDomainsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	CompanyId     string                 `protobuf:"bytes,1,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCompanyEmailDomainsRequest) Reset() {
+	*x = ListCompanyEmailDomainsRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[44]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCompanyEmailDomainsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCompanyEmailDomainsRequest) ProtoMessage() {}
+
+func (x *ListCompanyEmailDomainsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[44]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCompanyEmailDomainsRequest.ProtoReflect.Descriptor instead.
+func (*ListCompanyEmailDomainsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{44}
+}
+
+func (x *ListCompanyEmailDomainsRequest) GetCompanyId() string {
+	if x != nil {
+		return x.CompanyId
+	}
+	return ""
+}
+
+type ListCompanyEmailDomainsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EmailDomains  []string               `protobuf:"bytes,1,rep,name=email_domains,json=emailDomains,proto3" json:"email_domains,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListCompanyEmailDomainsResponse) Reset() {
+	*x = ListCompanyEmailDomainsResponse{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[45]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListCompanyEmailDomainsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListCompanyEmailDomainsResponse) ProtoMessage() {}
+
+func (x *ListCompanyEmailDomainsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[45]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListCompanyEmailDomainsResponse.ProtoReflect.Descriptor instead.
+func (*ListCompanyEmailDomainsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{45}
+}
+
+func (x *ListCompanyEmailDomainsResponse) GetEmailDomains() []string {
+	if x != nil {
+		return x.EmailDomains
+	}
+	return nil
+}
+
+type ResolveCompanyByEmailDomainRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	EmailDomain   string                 `protobuf:"bytes,1,opt,name=email_domain,json=emailDomain,proto3" json:"email_domain,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveCompanyByEmailDomainRequest) Reset() {
+	*x = ResolveCompanyByEmailDomainRequest{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[46]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveCompanyByEmailDomainRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveCompanyByEmailDomainRequest) ProtoMessage() {}
+
+func (x *ResolveCompanyByEmailDomainRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[46]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveCompanyByEmailDomainRequest.ProtoReflect.Descriptor instead.
+func (*ResolveCompanyByEmailDomainRequest) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{46}
+}
+
+func (x *ResolveCompanyByEmailDomainRequest) GetEmailDomain() string {
+	if x != nil {
+		return x.EmailDomain
+	}
+	return ""
+}
+
+type ResolveCompanyByEmailDomainResponse struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	CompanyId string                 `protobuf:"bytes,1,opt,name=company_id,json=companyId,proto3" json:"company_id,omitempty"`
+	// found=false means no company has registered this domain — the caller
+	// (auth-service) surfaces this as "SSO isn't set up for this
+	// organization yet", never guesses a fallback tenant.
+	Found         bool `protobuf:"varint,2,opt,name=found,proto3" json:"found,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveCompanyByEmailDomainResponse) Reset() {
+	*x = ResolveCompanyByEmailDomainResponse{}
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[47]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveCompanyByEmailDomainResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveCompanyByEmailDomainResponse) ProtoMessage() {}
+
+func (x *ResolveCompanyByEmailDomainResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_tenant_v1_tenant_proto_msgTypes[47]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveCompanyByEmailDomainResponse.ProtoReflect.Descriptor instead.
+func (*ResolveCompanyByEmailDomainResponse) Descriptor() ([]byte, []int) {
+	return file_orca_tenant_v1_tenant_proto_rawDescGZIP(), []int{47}
+}
+
+func (x *ResolveCompanyByEmailDomainResponse) GetCompanyId() string {
+	if x != nil {
+		return x.CompanyId
+	}
+	return ""
+}
+
+func (x *ResolveCompanyByEmailDomainResponse) GetFound() bool {
+	if x != nil {
+		return x.Found
+	}
+	return false
+}
+
 var File_orca_tenant_v1_tenant_proto protoreflect.FileDescriptor
 
 const file_orca_tenant_v1_tenant_proto_rawDesc = "" +
@@ -2151,7 +2479,26 @@ const file_orca_tenant_v1_tenant_proto_rawDesc = "" +
 	"\x19SetOnboardingStateRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1d\n" +
 	"\n" +
-	"state_json\x18\x02 \x01(\tR\tstateJson2\xb7\x0e\n" +
+	"state_json\x18\x02 \x01(\tR\tstateJson\"`\n" +
+	"\x1cAddCompanyEmailDomainRequest\x12\x1d\n" +
+	"\n" +
+	"company_id\x18\x01 \x01(\tR\tcompanyId\x12!\n" +
+	"\femail_domain\x18\x02 \x01(\tR\vemailDomain\"B\n" +
+	"\x1dAddCompanyEmailDomainResponse\x12!\n" +
+	"\femail_domain\x18\x01 \x01(\tR\vemailDomain\"D\n" +
+	"\x1fRemoveCompanyEmailDomainRequest\x12!\n" +
+	"\femail_domain\x18\x01 \x01(\tR\vemailDomain\"?\n" +
+	"\x1eListCompanyEmailDomainsRequest\x12\x1d\n" +
+	"\n" +
+	"company_id\x18\x01 \x01(\tR\tcompanyId\"F\n" +
+	"\x1fListCompanyEmailDomainsResponse\x12#\n" +
+	"\remail_domains\x18\x01 \x03(\tR\femailDomains\"G\n" +
+	"\"ResolveCompanyByEmailDomainRequest\x12!\n" +
+	"\femail_domain\x18\x01 \x01(\tR\vemailDomain\"Z\n" +
+	"#ResolveCompanyByEmailDomainResponse\x12\x1d\n" +
+	"\n" +
+	"company_id\x18\x01 \x01(\tR\tcompanyId\x12\x14\n" +
+	"\x05found\x18\x02 \x01(\bR\x05found2\x97\x12\n" +
 	"\rTenantService\x12\\\n" +
 	"\rCreateCompany\x12$.orca.tenant.v1.CreateCompanyRequest\x1a%.orca.tenant.v1.CreateCompanyResponse\x12S\n" +
 	"\n" +
@@ -2173,7 +2520,11 @@ const file_orca_tenant_v1_tenant_proto_rawDesc = "" +
 	"\tListTeams\x12 .orca.tenant.v1.ListTeamsRequest\x1a!.orca.tenant.v1.ListTeamsResponse\x12S\n" +
 	"\x10RemoveTeamMember\x12'.orca.tenant.v1.RemoveTeamMemberRequest\x1a\x16.google.protobuf.Empty\x12k\n" +
 	"\x12GetOnboardingState\x12).orca.tenant.v1.GetOnboardingStateRequest\x1a*.orca.tenant.v1.GetOnboardingStateResponse\x12W\n" +
-	"\x12SetOnboardingState\x12).orca.tenant.v1.SetOnboardingStateRequest\x1a\x16.google.protobuf.EmptyBBZ@github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1;tenantv1b\x06proto3"
+	"\x12SetOnboardingState\x12).orca.tenant.v1.SetOnboardingStateRequest\x1a\x16.google.protobuf.Empty\x12t\n" +
+	"\x15AddCompanyEmailDomain\x12,.orca.tenant.v1.AddCompanyEmailDomainRequest\x1a-.orca.tenant.v1.AddCompanyEmailDomainResponse\x12c\n" +
+	"\x18RemoveCompanyEmailDomain\x12/.orca.tenant.v1.RemoveCompanyEmailDomainRequest\x1a\x16.google.protobuf.Empty\x12z\n" +
+	"\x17ListCompanyEmailDomains\x12..orca.tenant.v1.ListCompanyEmailDomainsRequest\x1a/.orca.tenant.v1.ListCompanyEmailDomainsResponse\x12\x86\x01\n" +
+	"\x1bResolveCompanyByEmailDomain\x122.orca.tenant.v1.ResolveCompanyByEmailDomainRequest\x1a3.orca.tenant.v1.ResolveCompanyByEmailDomainResponseBBZ@github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1;tenantv1b\x06proto3"
 
 var (
 	file_orca_tenant_v1_tenant_proto_rawDescOnce sync.Once
@@ -2187,50 +2538,57 @@ func file_orca_tenant_v1_tenant_proto_rawDescGZIP() []byte {
 	return file_orca_tenant_v1_tenant_proto_rawDescData
 }
 
-var file_orca_tenant_v1_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 41)
+var file_orca_tenant_v1_tenant_proto_msgTypes = make([]protoimpl.MessageInfo, 48)
 var file_orca_tenant_v1_tenant_proto_goTypes = []any{
-	(*Company)(nil),                    // 0: orca.tenant.v1.Company
-	(*Department)(nil),                 // 1: orca.tenant.v1.Department
-	(*CreateCompanyRequest)(nil),       // 2: orca.tenant.v1.CreateCompanyRequest
-	(*CreateCompanyResponse)(nil),      // 3: orca.tenant.v1.CreateCompanyResponse
-	(*GetCompanyRequest)(nil),          // 4: orca.tenant.v1.GetCompanyRequest
-	(*GetCompanyResponse)(nil),         // 5: orca.tenant.v1.GetCompanyResponse
-	(*ListCompaniesRequest)(nil),       // 6: orca.tenant.v1.ListCompaniesRequest
-	(*ListCompaniesResponse)(nil),      // 7: orca.tenant.v1.ListCompaniesResponse
-	(*ValidateTenantRequest)(nil),      // 8: orca.tenant.v1.ValidateTenantRequest
-	(*ValidateTenantResponse)(nil),     // 9: orca.tenant.v1.ValidateTenantResponse
-	(*CreateDepartmentRequest)(nil),    // 10: orca.tenant.v1.CreateDepartmentRequest
-	(*CreateDepartmentResponse)(nil),   // 11: orca.tenant.v1.CreateDepartmentResponse
-	(*SetUserDepartmentRequest)(nil),   // 12: orca.tenant.v1.SetUserDepartmentRequest
-	(*SetUserDepartmentResponse)(nil),  // 13: orca.tenant.v1.SetUserDepartmentResponse
-	(*GetResolvedProfileRequest)(nil),  // 14: orca.tenant.v1.GetResolvedProfileRequest
-	(*GetResolvedProfileResponse)(nil), // 15: orca.tenant.v1.GetResolvedProfileResponse
-	(*Team)(nil),                       // 16: orca.tenant.v1.Team
-	(*CreateTeamRequest)(nil),          // 17: orca.tenant.v1.CreateTeamRequest
-	(*CreateTeamResponse)(nil),         // 18: orca.tenant.v1.CreateTeamResponse
-	(*AddTeamMemberRequest)(nil),       // 19: orca.tenant.v1.AddTeamMemberRequest
-	(*AddTeamMemberResponse)(nil),      // 20: orca.tenant.v1.AddTeamMemberResponse
-	(*ListTeamMembersRequest)(nil),     // 21: orca.tenant.v1.ListTeamMembersRequest
-	(*TeamMember)(nil),                 // 22: orca.tenant.v1.TeamMember
-	(*ListTeamMembersResponse)(nil),    // 23: orca.tenant.v1.ListTeamMembersResponse
-	(*UserProfile)(nil),                // 24: orca.tenant.v1.UserProfile
-	(*GetUserProfileRequest)(nil),      // 25: orca.tenant.v1.GetUserProfileRequest
-	(*GetUserProfileResponse)(nil),     // 26: orca.tenant.v1.GetUserProfileResponse
-	(*ListDepartmentsRequest)(nil),     // 27: orca.tenant.v1.ListDepartmentsRequest
-	(*ListDepartmentsResponse)(nil),    // 28: orca.tenant.v1.ListDepartmentsResponse
-	(*UpdateCompanyRequest)(nil),       // 29: orca.tenant.v1.UpdateCompanyRequest
-	(*UpdateCompanyResponse)(nil),      // 30: orca.tenant.v1.UpdateCompanyResponse
-	(*UpdateDepartmentRequest)(nil),    // 31: orca.tenant.v1.UpdateDepartmentRequest
-	(*UpdateDepartmentResponse)(nil),   // 32: orca.tenant.v1.UpdateDepartmentResponse
-	(*UpdateUserProfileRequest)(nil),   // 33: orca.tenant.v1.UpdateUserProfileRequest
-	(*UpdateUserProfileResponse)(nil),  // 34: orca.tenant.v1.UpdateUserProfileResponse
-	(*ListTeamsRequest)(nil),           // 35: orca.tenant.v1.ListTeamsRequest
-	(*ListTeamsResponse)(nil),          // 36: orca.tenant.v1.ListTeamsResponse
-	(*RemoveTeamMemberRequest)(nil),    // 37: orca.tenant.v1.RemoveTeamMemberRequest
-	(*GetOnboardingStateRequest)(nil),  // 38: orca.tenant.v1.GetOnboardingStateRequest
-	(*GetOnboardingStateResponse)(nil), // 39: orca.tenant.v1.GetOnboardingStateResponse
-	(*SetOnboardingStateRequest)(nil),  // 40: orca.tenant.v1.SetOnboardingStateRequest
-	(*emptypb.Empty)(nil),              // 41: google.protobuf.Empty
+	(*Company)(nil),                             // 0: orca.tenant.v1.Company
+	(*Department)(nil),                          // 1: orca.tenant.v1.Department
+	(*CreateCompanyRequest)(nil),                // 2: orca.tenant.v1.CreateCompanyRequest
+	(*CreateCompanyResponse)(nil),               // 3: orca.tenant.v1.CreateCompanyResponse
+	(*GetCompanyRequest)(nil),                   // 4: orca.tenant.v1.GetCompanyRequest
+	(*GetCompanyResponse)(nil),                  // 5: orca.tenant.v1.GetCompanyResponse
+	(*ListCompaniesRequest)(nil),                // 6: orca.tenant.v1.ListCompaniesRequest
+	(*ListCompaniesResponse)(nil),               // 7: orca.tenant.v1.ListCompaniesResponse
+	(*ValidateTenantRequest)(nil),               // 8: orca.tenant.v1.ValidateTenantRequest
+	(*ValidateTenantResponse)(nil),              // 9: orca.tenant.v1.ValidateTenantResponse
+	(*CreateDepartmentRequest)(nil),             // 10: orca.tenant.v1.CreateDepartmentRequest
+	(*CreateDepartmentResponse)(nil),            // 11: orca.tenant.v1.CreateDepartmentResponse
+	(*SetUserDepartmentRequest)(nil),            // 12: orca.tenant.v1.SetUserDepartmentRequest
+	(*SetUserDepartmentResponse)(nil),           // 13: orca.tenant.v1.SetUserDepartmentResponse
+	(*GetResolvedProfileRequest)(nil),           // 14: orca.tenant.v1.GetResolvedProfileRequest
+	(*GetResolvedProfileResponse)(nil),          // 15: orca.tenant.v1.GetResolvedProfileResponse
+	(*Team)(nil),                                // 16: orca.tenant.v1.Team
+	(*CreateTeamRequest)(nil),                   // 17: orca.tenant.v1.CreateTeamRequest
+	(*CreateTeamResponse)(nil),                  // 18: orca.tenant.v1.CreateTeamResponse
+	(*AddTeamMemberRequest)(nil),                // 19: orca.tenant.v1.AddTeamMemberRequest
+	(*AddTeamMemberResponse)(nil),               // 20: orca.tenant.v1.AddTeamMemberResponse
+	(*ListTeamMembersRequest)(nil),              // 21: orca.tenant.v1.ListTeamMembersRequest
+	(*TeamMember)(nil),                          // 22: orca.tenant.v1.TeamMember
+	(*ListTeamMembersResponse)(nil),             // 23: orca.tenant.v1.ListTeamMembersResponse
+	(*UserProfile)(nil),                         // 24: orca.tenant.v1.UserProfile
+	(*GetUserProfileRequest)(nil),               // 25: orca.tenant.v1.GetUserProfileRequest
+	(*GetUserProfileResponse)(nil),              // 26: orca.tenant.v1.GetUserProfileResponse
+	(*ListDepartmentsRequest)(nil),              // 27: orca.tenant.v1.ListDepartmentsRequest
+	(*ListDepartmentsResponse)(nil),             // 28: orca.tenant.v1.ListDepartmentsResponse
+	(*UpdateCompanyRequest)(nil),                // 29: orca.tenant.v1.UpdateCompanyRequest
+	(*UpdateCompanyResponse)(nil),               // 30: orca.tenant.v1.UpdateCompanyResponse
+	(*UpdateDepartmentRequest)(nil),             // 31: orca.tenant.v1.UpdateDepartmentRequest
+	(*UpdateDepartmentResponse)(nil),            // 32: orca.tenant.v1.UpdateDepartmentResponse
+	(*UpdateUserProfileRequest)(nil),            // 33: orca.tenant.v1.UpdateUserProfileRequest
+	(*UpdateUserProfileResponse)(nil),           // 34: orca.tenant.v1.UpdateUserProfileResponse
+	(*ListTeamsRequest)(nil),                    // 35: orca.tenant.v1.ListTeamsRequest
+	(*ListTeamsResponse)(nil),                   // 36: orca.tenant.v1.ListTeamsResponse
+	(*RemoveTeamMemberRequest)(nil),             // 37: orca.tenant.v1.RemoveTeamMemberRequest
+	(*GetOnboardingStateRequest)(nil),           // 38: orca.tenant.v1.GetOnboardingStateRequest
+	(*GetOnboardingStateResponse)(nil),          // 39: orca.tenant.v1.GetOnboardingStateResponse
+	(*SetOnboardingStateRequest)(nil),           // 40: orca.tenant.v1.SetOnboardingStateRequest
+	(*AddCompanyEmailDomainRequest)(nil),        // 41: orca.tenant.v1.AddCompanyEmailDomainRequest
+	(*AddCompanyEmailDomainResponse)(nil),       // 42: orca.tenant.v1.AddCompanyEmailDomainResponse
+	(*RemoveCompanyEmailDomainRequest)(nil),     // 43: orca.tenant.v1.RemoveCompanyEmailDomainRequest
+	(*ListCompanyEmailDomainsRequest)(nil),      // 44: orca.tenant.v1.ListCompanyEmailDomainsRequest
+	(*ListCompanyEmailDomainsResponse)(nil),     // 45: orca.tenant.v1.ListCompanyEmailDomainsResponse
+	(*ResolveCompanyByEmailDomainRequest)(nil),  // 46: orca.tenant.v1.ResolveCompanyByEmailDomainRequest
+	(*ResolveCompanyByEmailDomainResponse)(nil), // 47: orca.tenant.v1.ResolveCompanyByEmailDomainResponse
+	(*emptypb.Empty)(nil),                       // 48: google.protobuf.Empty
 }
 var file_orca_tenant_v1_tenant_proto_depIdxs = []int32{
 	0,  // 0: orca.tenant.v1.CreateCompanyResponse.company:type_name -> orca.tenant.v1.Company
@@ -2264,27 +2622,35 @@ var file_orca_tenant_v1_tenant_proto_depIdxs = []int32{
 	37, // 28: orca.tenant.v1.TenantService.RemoveTeamMember:input_type -> orca.tenant.v1.RemoveTeamMemberRequest
 	38, // 29: orca.tenant.v1.TenantService.GetOnboardingState:input_type -> orca.tenant.v1.GetOnboardingStateRequest
 	40, // 30: orca.tenant.v1.TenantService.SetOnboardingState:input_type -> orca.tenant.v1.SetOnboardingStateRequest
-	3,  // 31: orca.tenant.v1.TenantService.CreateCompany:output_type -> orca.tenant.v1.CreateCompanyResponse
-	5,  // 32: orca.tenant.v1.TenantService.GetCompany:output_type -> orca.tenant.v1.GetCompanyResponse
-	7,  // 33: orca.tenant.v1.TenantService.ListCompanies:output_type -> orca.tenant.v1.ListCompaniesResponse
-	9,  // 34: orca.tenant.v1.TenantService.ValidateTenant:output_type -> orca.tenant.v1.ValidateTenantResponse
-	11, // 35: orca.tenant.v1.TenantService.CreateDepartment:output_type -> orca.tenant.v1.CreateDepartmentResponse
-	13, // 36: orca.tenant.v1.TenantService.SetUserDepartment:output_type -> orca.tenant.v1.SetUserDepartmentResponse
-	15, // 37: orca.tenant.v1.TenantService.GetResolvedProfile:output_type -> orca.tenant.v1.GetResolvedProfileResponse
-	18, // 38: orca.tenant.v1.TenantService.CreateTeam:output_type -> orca.tenant.v1.CreateTeamResponse
-	20, // 39: orca.tenant.v1.TenantService.AddTeamMember:output_type -> orca.tenant.v1.AddTeamMemberResponse
-	23, // 40: orca.tenant.v1.TenantService.ListTeamMembers:output_type -> orca.tenant.v1.ListTeamMembersResponse
-	26, // 41: orca.tenant.v1.TenantService.GetUserProfile:output_type -> orca.tenant.v1.GetUserProfileResponse
-	28, // 42: orca.tenant.v1.TenantService.ListDepartments:output_type -> orca.tenant.v1.ListDepartmentsResponse
-	30, // 43: orca.tenant.v1.TenantService.UpdateCompany:output_type -> orca.tenant.v1.UpdateCompanyResponse
-	32, // 44: orca.tenant.v1.TenantService.UpdateDepartment:output_type -> orca.tenant.v1.UpdateDepartmentResponse
-	34, // 45: orca.tenant.v1.TenantService.UpdateUserProfile:output_type -> orca.tenant.v1.UpdateUserProfileResponse
-	36, // 46: orca.tenant.v1.TenantService.ListTeams:output_type -> orca.tenant.v1.ListTeamsResponse
-	41, // 47: orca.tenant.v1.TenantService.RemoveTeamMember:output_type -> google.protobuf.Empty
-	39, // 48: orca.tenant.v1.TenantService.GetOnboardingState:output_type -> orca.tenant.v1.GetOnboardingStateResponse
-	41, // 49: orca.tenant.v1.TenantService.SetOnboardingState:output_type -> google.protobuf.Empty
-	31, // [31:50] is the sub-list for method output_type
-	12, // [12:31] is the sub-list for method input_type
+	41, // 31: orca.tenant.v1.TenantService.AddCompanyEmailDomain:input_type -> orca.tenant.v1.AddCompanyEmailDomainRequest
+	43, // 32: orca.tenant.v1.TenantService.RemoveCompanyEmailDomain:input_type -> orca.tenant.v1.RemoveCompanyEmailDomainRequest
+	44, // 33: orca.tenant.v1.TenantService.ListCompanyEmailDomains:input_type -> orca.tenant.v1.ListCompanyEmailDomainsRequest
+	46, // 34: orca.tenant.v1.TenantService.ResolveCompanyByEmailDomain:input_type -> orca.tenant.v1.ResolveCompanyByEmailDomainRequest
+	3,  // 35: orca.tenant.v1.TenantService.CreateCompany:output_type -> orca.tenant.v1.CreateCompanyResponse
+	5,  // 36: orca.tenant.v1.TenantService.GetCompany:output_type -> orca.tenant.v1.GetCompanyResponse
+	7,  // 37: orca.tenant.v1.TenantService.ListCompanies:output_type -> orca.tenant.v1.ListCompaniesResponse
+	9,  // 38: orca.tenant.v1.TenantService.ValidateTenant:output_type -> orca.tenant.v1.ValidateTenantResponse
+	11, // 39: orca.tenant.v1.TenantService.CreateDepartment:output_type -> orca.tenant.v1.CreateDepartmentResponse
+	13, // 40: orca.tenant.v1.TenantService.SetUserDepartment:output_type -> orca.tenant.v1.SetUserDepartmentResponse
+	15, // 41: orca.tenant.v1.TenantService.GetResolvedProfile:output_type -> orca.tenant.v1.GetResolvedProfileResponse
+	18, // 42: orca.tenant.v1.TenantService.CreateTeam:output_type -> orca.tenant.v1.CreateTeamResponse
+	20, // 43: orca.tenant.v1.TenantService.AddTeamMember:output_type -> orca.tenant.v1.AddTeamMemberResponse
+	23, // 44: orca.tenant.v1.TenantService.ListTeamMembers:output_type -> orca.tenant.v1.ListTeamMembersResponse
+	26, // 45: orca.tenant.v1.TenantService.GetUserProfile:output_type -> orca.tenant.v1.GetUserProfileResponse
+	28, // 46: orca.tenant.v1.TenantService.ListDepartments:output_type -> orca.tenant.v1.ListDepartmentsResponse
+	30, // 47: orca.tenant.v1.TenantService.UpdateCompany:output_type -> orca.tenant.v1.UpdateCompanyResponse
+	32, // 48: orca.tenant.v1.TenantService.UpdateDepartment:output_type -> orca.tenant.v1.UpdateDepartmentResponse
+	34, // 49: orca.tenant.v1.TenantService.UpdateUserProfile:output_type -> orca.tenant.v1.UpdateUserProfileResponse
+	36, // 50: orca.tenant.v1.TenantService.ListTeams:output_type -> orca.tenant.v1.ListTeamsResponse
+	48, // 51: orca.tenant.v1.TenantService.RemoveTeamMember:output_type -> google.protobuf.Empty
+	39, // 52: orca.tenant.v1.TenantService.GetOnboardingState:output_type -> orca.tenant.v1.GetOnboardingStateResponse
+	48, // 53: orca.tenant.v1.TenantService.SetOnboardingState:output_type -> google.protobuf.Empty
+	42, // 54: orca.tenant.v1.TenantService.AddCompanyEmailDomain:output_type -> orca.tenant.v1.AddCompanyEmailDomainResponse
+	48, // 55: orca.tenant.v1.TenantService.RemoveCompanyEmailDomain:output_type -> google.protobuf.Empty
+	45, // 56: orca.tenant.v1.TenantService.ListCompanyEmailDomains:output_type -> orca.tenant.v1.ListCompanyEmailDomainsResponse
+	47, // 57: orca.tenant.v1.TenantService.ResolveCompanyByEmailDomain:output_type -> orca.tenant.v1.ResolveCompanyByEmailDomainResponse
+	35, // [35:58] is the sub-list for method output_type
+	12, // [12:35] is the sub-list for method input_type
 	12, // [12:12] is the sub-list for extension type_name
 	12, // [12:12] is the sub-list for extension extendee
 	0,  // [0:12] is the sub-list for field type_name
@@ -2301,7 +2667,7 @@ func file_orca_tenant_v1_tenant_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_tenant_v1_tenant_proto_rawDesc), len(file_orca_tenant_v1_tenant_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   41,
+			NumMessages:   48,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

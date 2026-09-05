@@ -262,17 +262,19 @@ type SsoStateCodec interface {
 }
 
 // TenantResolver resolves which tenant a brand-new SSO-provisioned user
-// belongs to. This system has no per-login tenant discriminator yet (see
-// GetUserByEmail's doc comment above) and is operationally
-// single-tenant-per-deployment today — there is no tenant-routing
-// mechanism (subdomain, workspace picker) anywhere in this codebase.
-// Implemented by internal/adapter/grpcclient against tenant-service's
-// ListCompanies RPC; ResolveDefaultTenant fails closed (an error, not a
-// guess) when zero or more than one company exists. True multi-tenant SSO
-// (workspace-scoped IdP config) is future work — see this service's
-// README "Known gaps".
+// belongs to, given their verified email. Implemented by
+// internal/adapter/grpcclient against tenant-service's
+// ResolveCompanyByEmailDomain RPC (multi-tenant: the domain half of the
+// email, e.g. "vnpay.vn", must have been registered to a company via
+// tenant-service's AddCompanyEmailDomain admin operation), falling back to
+// the single-existing-company case for deployments that haven't registered
+// any domains yet (back-compat with this service's original
+// single-tenant-only design). Fails closed (an error, not a guess) when
+// neither resolves — no per-login tenant discriminator beyond the email's
+// own domain exists in this system (see GetUserByEmail's doc comment
+// above).
 type TenantResolver interface {
-	ResolveDefaultTenant(ctx context.Context) (tenantID string, err error)
+	ResolveTenantForEmail(ctx context.Context, email string) (tenantID string, err error)
 }
 
 // TokenSigner is the port IssueServiceToken/GetJWKS sign and publish JWTs

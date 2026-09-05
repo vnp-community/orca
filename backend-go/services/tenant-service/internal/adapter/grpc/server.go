@@ -48,6 +48,11 @@ type Server struct {
 	removeTeamMember   *usecase.RemoveTeamMember
 	getOnboardingState *usecase.GetOnboardingState
 	setOnboardingState *usecase.SetOnboardingState
+
+	addCompanyEmailDomain       *usecase.AddCompanyEmailDomain
+	removeCompanyEmailDomain    *usecase.RemoveCompanyEmailDomain
+	listCompanyEmailDomains     *usecase.ListCompanyEmailDomains
+	resolveCompanyByEmailDomain *usecase.ResolveCompanyByEmailDomain
 }
 
 func New(
@@ -70,6 +75,10 @@ func New(
 	removeTeamMember *usecase.RemoveTeamMember,
 	getOnboardingState *usecase.GetOnboardingState,
 	setOnboardingState *usecase.SetOnboardingState,
+	addCompanyEmailDomain *usecase.AddCompanyEmailDomain,
+	removeCompanyEmailDomain *usecase.RemoveCompanyEmailDomain,
+	listCompanyEmailDomains *usecase.ListCompanyEmailDomains,
+	resolveCompanyByEmailDomain *usecase.ResolveCompanyByEmailDomain,
 ) *Server {
 	return &Server{
 		createCompany:      createCompany,
@@ -91,6 +100,11 @@ func New(
 		removeTeamMember:   removeTeamMember,
 		getOnboardingState: getOnboardingState,
 		setOnboardingState: setOnboardingState,
+
+		addCompanyEmailDomain:       addCompanyEmailDomain,
+		removeCompanyEmailDomain:    removeCompanyEmailDomain,
+		listCompanyEmailDomains:     listCompanyEmailDomains,
+		resolveCompanyByEmailDomain: resolveCompanyByEmailDomain,
 	}
 }
 
@@ -357,6 +371,41 @@ func (s *Server) RemoveTeamMember(ctx context.Context, req *tenantv1.RemoveTeamM
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) AddCompanyEmailDomain(ctx context.Context, req *tenantv1.AddCompanyEmailDomainRequest) (*tenantv1.AddCompanyEmailDomainResponse, error) {
+	cd, err := s.addCompanyEmailDomain.Execute(ctx, usecase.AddCompanyEmailDomainInput{
+		CompanyID:   req.GetCompanyId(),
+		EmailDomain: req.GetEmailDomain(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.AddCompanyEmailDomainResponse{EmailDomain: cd.EmailDomain}, nil
+}
+
+func (s *Server) RemoveCompanyEmailDomain(ctx context.Context, req *tenantv1.RemoveCompanyEmailDomainRequest) (*emptypb.Empty, error) {
+	err := s.removeCompanyEmailDomain.Execute(ctx, usecase.RemoveCompanyEmailDomainInput{EmailDomain: req.GetEmailDomain()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ListCompanyEmailDomains(ctx context.Context, req *tenantv1.ListCompanyEmailDomainsRequest) (*tenantv1.ListCompanyEmailDomainsResponse, error) {
+	domains, err := s.listCompanyEmailDomains.Execute(ctx, usecase.ListCompanyEmailDomainsInput{CompanyID: req.GetCompanyId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.ListCompanyEmailDomainsResponse{EmailDomains: domains}, nil
+}
+
+func (s *Server) ResolveCompanyByEmailDomain(ctx context.Context, req *tenantv1.ResolveCompanyByEmailDomainRequest) (*tenantv1.ResolveCompanyByEmailDomainResponse, error) {
+	result, err := s.resolveCompanyByEmailDomain.Execute(ctx, usecase.ResolveCompanyByEmailDomainInput{EmailDomain: req.GetEmailDomain()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &tenantv1.ResolveCompanyByEmailDomainResponse{CompanyId: result.CompanyID, Found: result.Found}, nil
 }
 
 func toProtoUserProfile(p domain.UserProfile) (*tenantv1.UserProfile, error) {
