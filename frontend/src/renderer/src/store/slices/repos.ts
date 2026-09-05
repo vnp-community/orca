@@ -901,21 +901,42 @@ function mergeById<T extends { id: string }>(base: readonly T[], overlay: readon
   return merged
 }
 
+// Why not getRepoExecutionHostId here: that helper is display-oriented and
+// falls through to the repo's OWN (mutable, independently rebindable since
+// Phase 10) devServerId — only ssh:/runtime: tags mark a genuinely distinct
+// fetch CONNECTION; a bare 'local' or devServer:-derived tag never does (a
+// single web/local session can hold many repos bound to many different dev
+// servers). Using the display value as the merge boundary made a repo whose
+// devServerId changed underneath it (RebindRepoDevServer, or a direct DB
+// correction) look like "a different host's repo" to the next fetch and get
+// appended as a duplicate instead of updated in place — found live: Settings'
+// repo list showing every repo twice again after a repo's dev server changed.
+function getRepoConnectionBoundaryHostId(repo: Pick<Repo, 'executionHostId'>): string {
+  const tag = repo.executionHostId
+  return tag && (tag.startsWith('ssh:') || tag.startsWith('runtime:'))
+    ? tag
+    : LOCAL_EXECUTION_HOST_ID
+}
+
+function getRepoMergeIdentity(repo: Pick<Repo, 'id' | 'executionHostId'>): string {
+  return getRepoHostIdentityForParts(repo.id, getRepoConnectionBoundaryHostId(repo))
+}
+
 function mergeFetchedReposForHost(
   previous: readonly Repo[],
   fetched: Repo[],
   hostId: string
 ): Repo[] {
   const fetchedWithProjectGroups = applyInheritedProjectGroups(previous, fetched)
-  const fetchedIdentities = new Set(fetchedWithProjectGroups.map(getRepoHostIdentity))
+  const fetchedIdentities = new Set(fetchedWithProjectGroups.map(getRepoMergeIdentity))
   const preserved = previous.filter((repo) => {
-    const existingHostId = getRepoExecutionHostId(repo)
-    return existingHostId !== hostId || fetchedIdentities.has(getRepoHostIdentity(repo))
+    const existingHostId = getRepoConnectionBoundaryHostId(repo)
+    return existingHostId !== hostId || fetchedIdentities.has(getRepoMergeIdentity(repo))
   })
   const merged = [...preserved]
-  const indexByIdentity = new Map(merged.map((repo, index) => [getRepoHostIdentity(repo), index]))
+  const indexByIdentity = new Map(merged.map((repo, index) => [getRepoMergeIdentity(repo), index]))
   for (const repo of fetchedWithProjectGroups) {
-    const identity = getRepoHostIdentity(repo)
+    const identity = getRepoMergeIdentity(repo)
     const existingIndex = indexByIdentity.get(identity)
     if (existingIndex === undefined) {
       indexByIdentity.set(identity, merged.length)
