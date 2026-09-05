@@ -216,6 +216,12 @@ func (f *fakeProjectServiceClient) RebindDevServer(_ context.Context, in *projec
 	return f.rebindDevServerResp, nil
 }
 
+// RebindRepoDevServer is not exercised by this file's tests today — a
+// no-op stub is enough to satisfy projectv1.ProjectServiceClient.
+func (f *fakeProjectServiceClient) RebindRepoDevServer(_ context.Context, _ *projectv1.RebindRepoDevServerRequest, _ ...grpc.CallOption) (*projectv1.RebindRepoDevServerResponse, error) {
+	return &projectv1.RebindRepoDevServerResponse{}, nil
+}
+
 func (f *fakeProjectServiceClient) UpdateProject(_ context.Context, in *projectv1.UpdateProjectRequest, _ ...grpc.CallOption) (*projectv1.UpdateProjectResponse, error) {
 	f.lastUpdateProjectReq = in
 	if f.updateProjectErr != nil {

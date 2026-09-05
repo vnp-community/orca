@@ -100,7 +100,7 @@ func (uc *SetupExistingFolder) Execute(ctx context.Context, in SetupExistingFold
 
 	// Reuses project.repos.url to carry the absolute on-disk path — same
 	// simplification TASK-138's ImportNested applies.
-	repo, err := domain.NewRepo(uuid.NewString(), created.ID, setup.FolderPath, displayName)
+	repo, err := domain.NewRepo(uuid.NewString(), created.ID, setup.FolderPath, displayName, setup.DevServerID)
 	if err != nil {
 		_ = uc.repo.SetStatus(ctx, tenantID, in.ID, domain.HostSetupFailed)
 		return domain.HostSetup{}, domain.Project{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_INVALID_REPO", err.Error(), err)

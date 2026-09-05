@@ -23,11 +23,12 @@ import (
 type fakeRepoProjectClient struct {
 	projectv1.ProjectServiceClient
 
-	addRepoFunc      func(ctx context.Context, in *projectv1.AddRepoRequest) (*projectv1.AddRepoResponse, error)
-	listReposFunc    func(ctx context.Context, in *projectv1.ListReposRequest) (*projectv1.ListReposResponse, error)
-	reorderReposFunc func(ctx context.Context, in *projectv1.ReorderReposRequest) (*projectv1.ReorderReposResponse, error)
-	removeRepoFunc   func(ctx context.Context, in *projectv1.RemoveRepoRequest) (*projectv1.RemoveRepoResponse, error)
-	updateRepoFunc   func(ctx context.Context, in *projectv1.UpdateRepoRequest) (*projectv1.UpdateRepoResponse, error)
+	addRepoFunc             func(ctx context.Context, in *projectv1.AddRepoRequest) (*projectv1.AddRepoResponse, error)
+	listReposFunc           func(ctx context.Context, in *projectv1.ListReposRequest) (*projectv1.ListReposResponse, error)
+	reorderReposFunc        func(ctx context.Context, in *projectv1.ReorderReposRequest) (*projectv1.ReorderReposResponse, error)
+	removeRepoFunc          func(ctx context.Context, in *projectv1.RemoveRepoRequest) (*projectv1.RemoveRepoResponse, error)
+	updateRepoFunc          func(ctx context.Context, in *projectv1.UpdateRepoRequest) (*projectv1.UpdateRepoResponse, error)
+	rebindRepoDevServerFunc func(ctx context.Context, in *projectv1.RebindRepoDevServerRequest) (*projectv1.RebindRepoDevServerResponse, error)
 
 	listRepoMembersFunc      func(ctx context.Context, in *projectv1.ListRepoMembersRequest) (*projectv1.ListRepoMembersResponse, error)
 	addRepoMemberFunc        func(ctx context.Context, in *projectv1.AddRepoMemberRequest) (*projectv1.AddRepoMemberResponse, error)
@@ -53,6 +54,9 @@ func (f *fakeRepoProjectClient) RemoveRepo(ctx context.Context, in *projectv1.Re
 }
 func (f *fakeRepoProjectClient) UpdateRepo(ctx context.Context, in *projectv1.UpdateRepoRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoResponse, error) {
 	return f.updateRepoFunc(ctx, in)
+}
+func (f *fakeRepoProjectClient) RebindRepoDevServer(ctx context.Context, in *projectv1.RebindRepoDevServerRequest, _ ...grpc.CallOption) (*projectv1.RebindRepoDevServerResponse, error) {
+	return f.rebindRepoDevServerFunc(ctx, in)
 }
 func (f *fakeRepoProjectClient) ListRepoMembers(ctx context.Context, in *projectv1.ListRepoMembersRequest, _ ...grpc.CallOption) (*projectv1.ListRepoMembersResponse, error) {
 	return f.listRepoMembersFunc(ctx, in)
@@ -165,12 +169,32 @@ func TestRegisterRepoChannels_AddListReorderRmUpdate(t *testing.T) {
 			return &projectv1.AddRepoResponse{Repo: &projectv1.Repo{Id: "r1"}}, nil
 		}
 		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.add",
-			argsJSON(t, map[string]any{"projectId": "p1", "url": "https://x", "displayName": "X"}))
+			argsJSON(t, map[string]any{"projectId": "p1", "url": "https://x", "displayName": "X", "devServerId": "ds1"}))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if gotReq.GetProjectId() != "p1" || gotReq.GetUrl() != "https://x" || gotReq.GetDisplayName() != "X" {
+		if gotReq.GetProjectId() != "p1" || gotReq.GetUrl() != "https://x" || gotReq.GetDisplayName() != "X" || gotReq.GetDevServerId() != "ds1" {
 			t.Errorf("unexpected AddRepoRequest: %+v", gotReq)
+		}
+	})
+
+	t.Run("repo.rebindDevServer", func(t *testing.T) {
+		var gotReq *projectv1.RebindRepoDevServerRequest
+		fake.rebindRepoDevServerFunc = func(ctx context.Context, in *projectv1.RebindRepoDevServerRequest) (*projectv1.RebindRepoDevServerResponse, error) {
+			gotReq = in
+			return &projectv1.RebindRepoDevServerResponse{Repo: &projectv1.Repo{Id: "r1", DevServerId: "ds2"}}, nil
+		}
+		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.rebindDevServer",
+			argsJSON(t, map[string]any{"repoId": "r1", "newDevServerId": "ds2"}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRepoId() != "r1" || gotReq.GetNewDevServerId() != "ds2" {
+			t.Errorf("unexpected RebindRepoDevServerRequest: %+v", gotReq)
+		}
+		view, ok := result.(repoView)
+		if !ok || view.DevServerID != "ds2" {
+			t.Errorf("unexpected result: %+v", result)
 		}
 	})
 
@@ -410,7 +434,7 @@ func TestRegisterRepoChannels_RegistrationCoverage(t *testing.T) {
 	registerRepoChannels(r, &fakeRepoProjectClient{}, &fakeRepoGitGatewayClient{})
 
 	want := []string{
-		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update",
+		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update", "repo.rebindDevServer",
 		"repo.getMembers", "repo.addMember", "repo.removeMember", "repo.updateMemberRole",
 		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.create",
 		"repo.hooksCheck", "repo.issueCommandRead", "repo.issueCommandWrite",
@@ -804,7 +828,7 @@ func TestRegisterRepoSshStatusWorkspaceChannels_RegistersEverything(t *testing.T
 	registerRepoSshStatusWorkspaceChannels(r, &fakeRepoProjectClient{}, &fakeRepoGitGatewayClient{}, &fakeRepoSshStatusWorkspaceInfraFleetClient{})
 
 	want := []string{
-		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update",
+		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update", "repo.rebindDevServer",
 		"repo.getMembers", "repo.addMember", "repo.removeMember", "repo.updateMemberRole",
 		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.create",
 		"repo.hooksCheck", "repo.issueCommandRead", "repo.issueCommandWrite",

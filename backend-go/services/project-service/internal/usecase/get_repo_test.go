@@ -9,12 +9,15 @@ import (
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 )
 
-func TestGetRepo_ReturnsRepoAndOwningProjectsDevServerID(t *testing.T) {
+// TestGetRepo_ReturnsRepoAndItsOwnDevServerID proves GetRepo reads
+// repo.DevServerID directly rather than resolving it through the owning
+// project — the repo's dev-server binding deliberately differs from what
+// its parent project's DevServerID is, so a test that (accidentally) still
+// resolved via the project would fail here.
+func TestGetRepo_ReturnsRepoAndItsOwnDevServerID(t *testing.T) {
 	repoRepo := newFakeRepoRepository()
-	repoRepo.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "/srv/repo", DisplayName: "Repo One"}
-	projectRepo := newFakeProjectRepository()
-	projectRepo.projects["p1"] = domain.Project{ID: "p1", TenantID: "tenant-1", DevServerID: "ds-1"}
-	uc := NewGetRepo(repoRepo, projectRepo)
+	repoRepo.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "/srv/repo", DisplayName: "Repo One", DevServerID: "ds-repo"}
+	uc := NewGetRepo(repoRepo)
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	result, err := uc.Execute(ctx, GetRepoInput{RepoID: "r1"})
@@ -24,13 +27,13 @@ func TestGetRepo_ReturnsRepoAndOwningProjectsDevServerID(t *testing.T) {
 	if result.Repo.ID != "r1" || result.Repo.URL != "/srv/repo" {
 		t.Errorf("unexpected repo: %+v", result.Repo)
 	}
-	if result.DevServerID != "ds-1" {
-		t.Errorf("expected dev_server_id ds-1, got %q", result.DevServerID)
+	if result.DevServerID != "ds-repo" {
+		t.Errorf("expected dev_server_id ds-repo (the repo's own binding), got %q", result.DevServerID)
 	}
 }
 
 func TestGetRepo_RepoNotFound(t *testing.T) {
-	uc := NewGetRepo(newFakeRepoRepository(), newFakeProjectRepository())
+	uc := NewGetRepo(newFakeRepoRepository())
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, GetRepoInput{RepoID: "missing"})
@@ -38,7 +41,7 @@ func TestGetRepo_RepoNotFound(t *testing.T) {
 }
 
 func TestGetRepo_RequiresRepoID(t *testing.T) {
-	uc := NewGetRepo(newFakeRepoRepository(), newFakeProjectRepository())
+	uc := NewGetRepo(newFakeRepoRepository())
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 	_, err := uc.Execute(ctx, GetRepoInput{RepoID: ""})
@@ -46,7 +49,7 @@ func TestGetRepo_RequiresRepoID(t *testing.T) {
 }
 
 func TestGetRepo_RequiresTenant(t *testing.T) {
-	uc := NewGetRepo(newFakeRepoRepository(), newFakeProjectRepository())
+	uc := NewGetRepo(newFakeRepoRepository())
 
 	_, err := uc.Execute(context.Background(), GetRepoInput{RepoID: "r1"})
 	assertAppError(t, err, apperrors.KindUnauthenticated, "PROJECT_NO_TENANT")
@@ -59,10 +62,8 @@ func TestGetRepo_RequiresTenant(t *testing.T) {
 // gated usecases which fail closed without a user.
 func TestGetRepo_DoesNotRequireUserInContext(t *testing.T) {
 	repoRepo := newFakeRepoRepository()
-	repoRepo.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "/srv/repo"}
-	projectRepo := newFakeProjectRepository()
-	projectRepo.projects["p1"] = domain.Project{ID: "p1", TenantID: "tenant-1", DevServerID: "ds-1"}
-	uc := NewGetRepo(repoRepo, projectRepo)
+	repoRepo.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "/srv/repo", DevServerID: "ds-1"}
+	uc := NewGetRepo(repoRepo)
 
 	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
 	if _, err := uc.Execute(ctx, GetRepoInput{RepoID: "r1"}); err != nil {

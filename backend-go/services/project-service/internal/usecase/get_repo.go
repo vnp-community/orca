@@ -15,9 +15,10 @@ type GetRepoInput struct {
 
 type GetRepoResult struct {
 	Repo domain.Repo
-	// DevServerID is the repo's owning Project's dev-server binding — Repo
-	// itself has no such column (see domain.Repo's doc comment), so this
-	// resolves it via a second lookup rather than making the caller do it.
+	// DevServerID is this repo's own dev-server binding (domain.Repo.
+	// DevServerID) — Phase 10 moved dev-server ownership from the project to
+	// the repo, so this no longer needs a second lookup through the owning
+	// project.
 	DevServerID string
 }
 
@@ -36,17 +37,15 @@ type GetRepoResult struct {
 // before ever reaching git-gateway-service — re-checking membership here
 // would need a user identity this call doesn't carry.
 type GetRepo struct {
-	repos    RepoRepository
-	projects ProjectRepository
+	repos RepoRepository
 }
 
-func NewGetRepo(repos RepoRepository, projects ProjectRepository) *GetRepo {
-	return &GetRepo{repos: repos, projects: projects}
+func NewGetRepo(repos RepoRepository) *GetRepo {
+	return &GetRepo{repos: repos}
 }
 
 func (uc *GetRepo) Execute(ctx context.Context, in GetRepoInput) (GetRepoResult, error) {
-	tenantID, err := tenant.RequireTenantID(ctx)
-	if err != nil {
+	if _, err := tenant.RequireTenantID(ctx); err != nil {
 		return GetRepoResult{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err)
 	}
 	if in.RepoID == "" {
@@ -61,10 +60,5 @@ func (uc *GetRepo) Execute(ctx context.Context, in GetRepoInput) (GetRepoResult,
 		return GetRepoResult{}, apperrors.New(apperrors.KindInternal, "PROJECT_REPO_FETCH_FAILED", "failed to fetch repo", err)
 	}
 
-	project, err := uc.projects.Get(ctx, tenantID, repo.ProjectID)
-	if err != nil {
-		return GetRepoResult{}, apperrors.New(apperrors.KindInternal, "PROJECT_FETCH_FAILED", "failed to fetch repo's owning project", err)
-	}
-
-	return GetRepoResult{Repo: repo, DevServerID: project.DevServerID}, nil
+	return GetRepoResult{Repo: repo, DevServerID: repo.DevServerID}, nil
 }

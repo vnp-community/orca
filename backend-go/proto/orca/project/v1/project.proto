@@ -19,6 +19,13 @@ service ProjectService {
   rpc UpdateMemberRole(UpdateMemberRoleRequest) returns (UpdateMemberRoleResponse);
   rpc RebindDevServer(RebindDevServerRequest) returns (RebindDevServerResponse);
 
+  // RebindRepoDevServer is Phase 10's repo-scoped replacement for
+  // RebindDevServer — dev-server ownership now lives on Repo, not Project
+  // (see Repo.dev_server_id's doc comment). RebindDevServer stays wired
+  // during the deprecation window but is no longer what git-gateway-service
+  // reads for anything.
+  rpc RebindRepoDevServer(RebindRepoDevServerRequest) returns (RebindRepoDevServerResponse);
+
   // UpdateProject's field list deliberately excludes dev_server_id —
   // RebindDevServer (with its active-execution guard) stays the sole path
   // that may change it, per project-service.md §3's explicit note. An empty
@@ -246,6 +253,21 @@ message RebindDevServerResponse {
   Project project = 1;
 }
 
+// RebindRepoDevServerRequest's active-execution guard is scoped to the
+// repo's owning PROJECT (any active workflow/task anywhere in the project
+// blocks it), not just the one repo — see RebindRepoDevServer usecase's
+// doc comment for why (workflow-service/task-service's HasActiveExecutions
+// is project-scoped only today, no repo-level granularity exists yet).
+// new_dev_server_id empty = unbind (repo becomes local).
+message RebindRepoDevServerRequest {
+  string repo_id = 1;
+  string new_dev_server_id = 2;
+}
+
+message RebindRepoDevServerResponse {
+  Repo repo = 1;
+}
+
 message UpdateProjectRequest {
   string project_id = 1;
   string name = 2; // empty = no change
@@ -271,12 +293,20 @@ message Repo {
   string url = 3;
   string display_name = 4;
   int32 position = 5; // ordering within project — see ReorderRepos
+  // dev_server_id is THIS repo's own dev-server binding (Phase 10) — empty
+  // means local (no dev server). Previously only Project.dev_server_id
+  // existed; a repo's host was inferred from its project, never stated
+  // directly. See migrations/0017_repo_dev_server for the backfill.
+  string dev_server_id = 6;
 }
 
 message AddRepoRequest {
   string project_id = 1;
   string url = 2;
   string display_name = 3;
+  // dev_server_id: empty = local repo. Validated against infra-fleet when
+  // non-empty — see usecase.AddRepo.
+  string dev_server_id = 4;
 }
 
 message AddRepoResponse {
@@ -320,11 +350,12 @@ message GetRepoRequest {
 
 message GetRepoResponse {
   Repo repo = 1;
-  // dev_server_id is the repo's OWNING PROJECT's dev-server binding, not a
-  // field on Repo itself (project.repos has no such column — see
-  // domain.Repo's doc comment) — resolved server-side by joining through
-  // Repo.project_id so callers like git-gateway-service don't need a
-  // second RPC to look up the project.
+  // dev_server_id mirrors repo.dev_server_id directly (Phase 10) — kept as
+  // its own top-level field for wire compatibility with existing callers
+  // (git-gateway-service's ProjectClient.GetRepo reads this field), even
+  // though it's now redundant with Repo.dev_server_id above. Previously
+  // this was resolved via a join through the OWNING PROJECT's
+  // dev_server_id, since project.repos had no such column of its own.
   string dev_server_id = 2;
 }
 

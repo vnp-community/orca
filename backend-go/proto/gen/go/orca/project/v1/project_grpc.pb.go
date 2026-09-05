@@ -27,6 +27,7 @@ const (
 	ProjectService_RemoveMember_FullMethodName                 = "/orca.project.v1.ProjectService/RemoveMember"
 	ProjectService_UpdateMemberRole_FullMethodName             = "/orca.project.v1.ProjectService/UpdateMemberRole"
 	ProjectService_RebindDevServer_FullMethodName              = "/orca.project.v1.ProjectService/RebindDevServer"
+	ProjectService_RebindRepoDevServer_FullMethodName          = "/orca.project.v1.ProjectService/RebindRepoDevServer"
 	ProjectService_UpdateProject_FullMethodName                = "/orca.project.v1.ProjectService/UpdateProject"
 	ProjectService_DeleteProject_FullMethodName                = "/orca.project.v1.ProjectService/DeleteProject"
 	ProjectService_AddRepo_FullMethodName                      = "/orca.project.v1.ProjectService/AddRepo"
@@ -88,6 +89,12 @@ type ProjectServiceClient interface {
 	RemoveMember(ctx context.Context, in *RemoveMemberRequest, opts ...grpc.CallOption) (*RemoveMemberResponse, error)
 	UpdateMemberRole(ctx context.Context, in *UpdateMemberRoleRequest, opts ...grpc.CallOption) (*UpdateMemberRoleResponse, error)
 	RebindDevServer(ctx context.Context, in *RebindDevServerRequest, opts ...grpc.CallOption) (*RebindDevServerResponse, error)
+	// RebindRepoDevServer is Phase 10's repo-scoped replacement for
+	// RebindDevServer — dev-server ownership now lives on Repo, not Project
+	// (see Repo.dev_server_id's doc comment). RebindDevServer stays wired
+	// during the deprecation window but is no longer what git-gateway-service
+	// reads for anything.
+	RebindRepoDevServer(ctx context.Context, in *RebindRepoDevServerRequest, opts ...grpc.CallOption) (*RebindRepoDevServerResponse, error)
 	// UpdateProject's field list deliberately excludes dev_server_id —
 	// RebindDevServer (with its active-execution guard) stays the sole path
 	// that may change it, per project-service.md §3's explicit note. An empty
@@ -278,6 +285,16 @@ func (c *projectServiceClient) RebindDevServer(ctx context.Context, in *RebindDe
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RebindDevServerResponse)
 	err := c.cc.Invoke(ctx, ProjectService_RebindDevServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) RebindRepoDevServer(ctx context.Context, in *RebindRepoDevServerRequest, opts ...grpc.CallOption) (*RebindRepoDevServerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RebindRepoDevServerResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RebindRepoDevServer_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -739,6 +756,12 @@ type ProjectServiceServer interface {
 	RemoveMember(context.Context, *RemoveMemberRequest) (*RemoveMemberResponse, error)
 	UpdateMemberRole(context.Context, *UpdateMemberRoleRequest) (*UpdateMemberRoleResponse, error)
 	RebindDevServer(context.Context, *RebindDevServerRequest) (*RebindDevServerResponse, error)
+	// RebindRepoDevServer is Phase 10's repo-scoped replacement for
+	// RebindDevServer — dev-server ownership now lives on Repo, not Project
+	// (see Repo.dev_server_id's doc comment). RebindDevServer stays wired
+	// during the deprecation window but is no longer what git-gateway-service
+	// reads for anything.
+	RebindRepoDevServer(context.Context, *RebindRepoDevServerRequest) (*RebindRepoDevServerResponse, error)
 	// UpdateProject's field list deliberately excludes dev_server_id —
 	// RebindDevServer (with its active-execution guard) stays the sole path
 	// that may change it, per project-service.md §3's explicit note. An empty
@@ -878,6 +901,9 @@ func (UnimplementedProjectServiceServer) UpdateMemberRole(context.Context, *Upda
 }
 func (UnimplementedProjectServiceServer) RebindDevServer(context.Context, *RebindDevServerRequest) (*RebindDevServerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RebindDevServer not implemented")
+}
+func (UnimplementedProjectServiceServer) RebindRepoDevServer(context.Context, *RebindRepoDevServerRequest) (*RebindRepoDevServerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RebindRepoDevServer not implemented")
 }
 func (UnimplementedProjectServiceServer) UpdateProject(context.Context, *UpdateProjectRequest) (*UpdateProjectResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateProject not implemented")
@@ -1172,6 +1198,24 @@ func _ProjectService_RebindDevServer_Handler(srv interface{}, ctx context.Contex
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).RebindDevServer(ctx, req.(*RebindDevServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_RebindRepoDevServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RebindRepoDevServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RebindRepoDevServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RebindRepoDevServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RebindRepoDevServer(ctx, req.(*RebindRepoDevServerRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2006,6 +2050,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RebindDevServer",
 			Handler:    _ProjectService_RebindDevServer_Handler,
+		},
+		{
+			MethodName: "RebindRepoDevServer",
+			Handler:    _ProjectService_RebindRepoDevServer_Handler,
 		},
 		{
 			MethodName: "UpdateProject",

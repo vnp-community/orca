@@ -24,13 +24,14 @@ import (
 type Server struct {
 	projectv1.UnimplementedProjectServiceServer
 
-	createProject   *usecase.CreateProject
-	getProject      *usecase.GetProject
-	listProjects    *usecase.ListProjects
-	addMember       *usecase.AddMember
-	rebindDevServer *usecase.RebindDevServer
-	updateProject   *usecase.UpdateProject
-	deleteProject   *usecase.DeleteProject
+	createProject       *usecase.CreateProject
+	getProject          *usecase.GetProject
+	listProjects        *usecase.ListProjects
+	addMember           *usecase.AddMember
+	rebindDevServer     *usecase.RebindDevServer
+	rebindRepoDevServer *usecase.RebindRepoDevServer
+	updateProject       *usecase.UpdateProject
+	deleteProject       *usecase.DeleteProject
 
 	listMembers      *usecase.ListMembers
 	removeMember     *usecase.RemoveMember
@@ -87,13 +88,14 @@ type Server struct {
 // positional *usecase.X params would be unreadable and error-prone to call
 // correctly at the composition root, so New takes this struct instead.
 type Deps struct {
-	CreateProject   *usecase.CreateProject
-	GetProject      *usecase.GetProject
-	ListProjects    *usecase.ListProjects
-	AddMember       *usecase.AddMember
-	RebindDevServer *usecase.RebindDevServer
-	UpdateProject   *usecase.UpdateProject
-	DeleteProject   *usecase.DeleteProject
+	CreateProject       *usecase.CreateProject
+	GetProject          *usecase.GetProject
+	ListProjects        *usecase.ListProjects
+	AddMember           *usecase.AddMember
+	RebindDevServer     *usecase.RebindDevServer
+	RebindRepoDevServer *usecase.RebindRepoDevServer
+	UpdateProject       *usecase.UpdateProject
+	DeleteProject       *usecase.DeleteProject
 
 	ListMembers      *usecase.ListMembers
 	RemoveMember     *usecase.RemoveMember
@@ -148,13 +150,14 @@ type Deps struct {
 
 func New(deps Deps) *Server {
 	return &Server{
-		createProject:   deps.CreateProject,
-		getProject:      deps.GetProject,
-		listProjects:    deps.ListProjects,
-		addMember:       deps.AddMember,
-		rebindDevServer: deps.RebindDevServer,
-		updateProject:   deps.UpdateProject,
-		deleteProject:   deps.DeleteProject,
+		createProject:       deps.CreateProject,
+		getProject:          deps.GetProject,
+		listProjects:        deps.ListProjects,
+		addMember:           deps.AddMember,
+		rebindDevServer:     deps.RebindDevServer,
+		rebindRepoDevServer: deps.RebindRepoDevServer,
+		updateProject:       deps.UpdateProject,
+		deleteProject:       deps.DeleteProject,
 
 		listMembers:      deps.ListMembers,
 		removeMember:     deps.RemoveMember,
@@ -307,6 +310,17 @@ func (s *Server) RebindDevServer(ctx context.Context, req *projectv1.RebindDevSe
 	return &projectv1.RebindDevServerResponse{Project: toProtoProject(project)}, nil
 }
 
+func (s *Server) RebindRepoDevServer(ctx context.Context, req *projectv1.RebindRepoDevServerRequest) (*projectv1.RebindRepoDevServerResponse, error) {
+	repo, err := s.rebindRepoDevServer.Execute(ctx, usecase.RebindRepoDevServerInput{
+		RepoID:         req.GetRepoId(),
+		NewDevServerID: req.GetNewDevServerId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RebindRepoDevServerResponse{Repo: toProtoRepo(repo)}, nil
+}
+
 func (s *Server) UpdateProject(ctx context.Context, req *projectv1.UpdateProjectRequest) (*projectv1.UpdateProjectResponse, error) {
 	project, err := s.updateProject.Execute(ctx, usecase.UpdateProjectInput{
 		ProjectID:             req.GetProjectId(),
@@ -334,6 +348,7 @@ func (s *Server) AddRepo(ctx context.Context, req *projectv1.AddRepoRequest) (*p
 		ProjectID:   req.GetProjectId(),
 		URL:         req.GetUrl(),
 		DisplayName: req.GetDisplayName(),
+		DevServerID: req.GetDevServerId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -886,6 +901,7 @@ func toProtoRepo(r domain.Repo) *projectv1.Repo {
 		Url:         r.URL,
 		DisplayName: r.DisplayName,
 		Position:    r.Position,
+		DevServerId: r.DevServerID,
 	}
 }
 

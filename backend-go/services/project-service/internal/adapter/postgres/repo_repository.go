@@ -11,7 +11,10 @@ import (
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 )
 
-const repoColumns = `id, project_id, url, display_name, position`
+// dev_server_id is cast to text via COALESCE, same nullable-UUID pattern
+// projectColumns uses (repository.go's comment explains why: COALESCE(uuid_col, ”)
+// fails at parse time otherwise).
+const repoColumns = `id, project_id, url, display_name, position, COALESCE(dev_server_id::text, '')`
 
 // RepoRepository implements usecase.RepoRepository against project.repos.
 // Kept as its own struct (not folded into Repository) — one struct per
@@ -34,11 +37,11 @@ func NewRepoRepository(pool *pgxpool.Pool) *RepoRepository {
 // are added.
 func (r *RepoRepository) AddRepo(ctx context.Context, repo domain.Repo) (domain.Repo, error) {
 	row := r.pool.QueryRow(ctx, `
-		INSERT INTO project.repos (id, project_id, url, display_name, position)
-		SELECT $1, $2, $3, $4, COALESCE(MAX(position) + 1, 0)
+		INSERT INTO project.repos (id, project_id, url, display_name, position, dev_server_id)
+		SELECT $1, $2, $3, $4, COALESCE(MAX(position) + 1, 0), $5
 		FROM project.repos WHERE project_id = $2
 		RETURNING `+repoColumns,
-		repo.ID, repo.ProjectID, repo.URL, repo.DisplayName,
+		repo.ID, repo.ProjectID, repo.URL, repo.DisplayName, nullableString(repo.DevServerID),
 	)
 
 	out, err := scanRepo(row)
@@ -173,6 +176,29 @@ func (r *RepoRepository) Update(ctx context.Context, repo domain.Repo) (domain.R
 	return out, nil
 }
 
+// UpdateDevServerID is the ONLY write path for a repo's dev_server_id —
+// called after usecase.RebindRepoDevServer's active-execution guard has
+// already passed. Mirrors Repository.UpdateDevServerID (project-scoped) one
+// tier down.
+func (r *RepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE project.repos
+		SET dev_server_id = $2
+		WHERE id = $1
+		RETURNING `+repoColumns,
+		repoID, nullableString(devServerID),
+	)
+
+	out, err := scanRepo(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
+	if err != nil {
+		return domain.Repo{}, fmt.Errorf("postgres: update repo dev_server_id: %w", err)
+	}
+	return out, nil
+}
+
 func (r *RepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM project.repos WHERE id = $1`, repoID)
 	if err != nil {
@@ -189,7 +215,7 @@ func (r *RepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 // callers check errors.Is(err, pgx.ErrNoRows) against the raw scan error).
 func scanRepo(row rowScanner) (domain.Repo, error) {
 	var r domain.Repo
-	if err := row.Scan(&r.ID, &r.ProjectID, &r.URL, &r.DisplayName, &r.Position); err != nil {
+	if err := row.Scan(&r.ID, &r.ProjectID, &r.URL, &r.DisplayName, &r.Position, &r.DevServerID); err != nil {
 		return domain.Repo{}, err
 	}
 	return r, nil

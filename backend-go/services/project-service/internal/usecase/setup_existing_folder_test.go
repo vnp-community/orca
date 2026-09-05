@@ -81,6 +81,11 @@ func TestSetupExistingFolder_SuccessCreatesExactlyOneProjectAndRepo(t *testing.T
 	if setup.ProjectID != project.ID {
 		t.Errorf("expected setup.ProjectID=%q to match created project id %q", setup.ProjectID, project.ID)
 	}
+	for _, r := range repos.repos {
+		if r.DevServerID != "dev-1" {
+			t.Errorf("expected created repo's DevServerID=%q (from the host setup), got %q", "dev-1", r.DevServerID)
+		}
+	}
 }
 
 func TestSetupExistingFolder_RejectsAlreadyCompleted(t *testing.T) {

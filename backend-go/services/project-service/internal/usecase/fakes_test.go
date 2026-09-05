@@ -332,13 +332,14 @@ type fakeRepoRepository struct {
 	repos       map[string]domain.Repo
 	repoMembers []domain.RepoMember
 
-	addErr           error
-	listErr          error
-	listForTenantErr error
-	reorderErr       error
-	removeErr        error
-	getErr           error
-	updateErr        error
+	addErr             error
+	listErr            error
+	listForTenantErr   error
+	reorderErr         error
+	removeErr          error
+	getErr             error
+	updateErr          error
+	updateDevServerErr error
 
 	addMemberErr             error
 	getMembershipErr         error
@@ -428,6 +429,20 @@ func (f *fakeRepoRepository) Update(ctx context.Context, repo domain.Repo) (doma
 	}
 	f.repos[repo.ID] = repo
 	return repo, nil
+}
+
+// UpdateDevServerID implements usecase.RepoRepository.UpdateDevServerID.
+func (f *fakeRepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error) {
+	if f.updateDevServerErr != nil {
+		return domain.Repo{}, f.updateDevServerErr
+	}
+	r, ok := f.repos[repoID]
+	if !ok {
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
+	r.DevServerID = devServerID
+	f.repos[repoID] = r
+	return r, nil
 }
 
 func (f *fakeRepoRepository) RemoveRepo(ctx context.Context, repoID string) error {

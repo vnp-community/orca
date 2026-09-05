@@ -26,18 +26,26 @@ type Repo struct {
 	// Ordering is by position value, not contiguity: removing a repo leaves
 	// a gap deliberately rather than renumbering the rest.
 	Position int32
+	// DevServerID is THIS repo's own dev-server binding — Phase 10's fix:
+	// previously only project.projects.dev_server_id existed, so a repo's
+	// host was inferred from its project, never stated directly, and a
+	// repo actually checked out on a different host than its project's
+	// binding had no way to say so. Empty = local (no dev server). See
+	// migrations/0017_repo_dev_server for the backfill from the old
+	// project-level column.
+	DevServerID string
 }
 
 // NewRepo constructs a Repo, enforcing the invariants a catalog entry must
 // satisfy to be meaningful. Position isn't a constructor parameter — it's
 // assigned by the repository (AddRepo appends at the next available slot),
-// not chosen by the caller.
-func NewRepo(id, projectID, url, displayName string) (Repo, error) {
+// not chosen by the caller. devServerID may be empty (a local repo).
+func NewRepo(id, projectID, url, displayName, devServerID string) (Repo, error) {
 	if projectID == "" {
 		return Repo{}, ErrEmptyProjectID
 	}
 	if url == "" {
 		return Repo{}, ErrEmptyRepoURL
 	}
-	return Repo{ID: id, ProjectID: projectID, URL: url, DisplayName: displayName}, nil
+	return Repo{ID: id, ProjectID: projectID, URL: url, DisplayName: displayName, DevServerID: devServerID}, nil
 }

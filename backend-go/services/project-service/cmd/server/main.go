@@ -133,6 +133,7 @@ func run() error {
 	removeMemberUC := usecase.NewRemoveMember(repo, opa)
 	updateMemberRoleUC := usecase.NewUpdateMemberRole(repo, opa)
 	rebindDevServerUC := usecase.NewRebindDevServer(repo, workflowChecker, taskChecker, opa)
+	rebindRepoDevServerUC := usecase.NewRebindRepoDevServer(repoRepo, repo, opa, workflowChecker, taskChecker, devServerLister)
 	updateProjectUC := usecase.NewUpdateProject(repo, opa)
 	deleteProjectUC := usecase.NewDeleteProject(repo, workflowChecker, taskChecker, opa)
 
@@ -140,12 +141,12 @@ func run() error {
 	// structurally — passed as the membership-lookup port to usecases whose
 	// primary repository dependency is RepoRepository/WorktreeRepository
 	// instead. See usecase.MembershipRepository's doc comment.
-	addRepoUC := usecase.NewAddRepo(repoRepo, repo, opa)
+	addRepoUC := usecase.NewAddRepo(repoRepo, repo, opa, devServerLister)
 	listReposUC := usecase.NewListRepos(repoRepo, repo, opa)
 	reorderReposUC := usecase.NewReorderRepos(repoRepo, repo, opa)
 	removeRepoUC := usecase.NewRemoveRepo(repoRepo, repo, opa)
 	updateRepoUC := usecase.NewUpdateRepo(repoRepo, repo, opa)
-	getRepoUC := usecase.NewGetRepo(repoRepo, repo)
+	getRepoUC := usecase.NewGetRepo(repoRepo)
 
 	addRepoMemberUC := usecase.NewAddRepoMember(repoRepo, repo, opa)
 	listRepoMembersUC := usecase.NewListRepoMembers(repoRepo, repo, opa)
@@ -193,13 +194,14 @@ func run() error {
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{
-		CreateProject:   createProjectUC,
-		GetProject:      getProjectUC,
-		ListProjects:    listProjectsUC,
-		AddMember:       addMemberUC,
-		RebindDevServer: rebindDevServerUC,
-		UpdateProject:   updateProjectUC,
-		DeleteProject:   deleteProjectUC,
+		CreateProject:       createProjectUC,
+		GetProject:          getProjectUC,
+		ListProjects:        listProjectsUC,
+		AddMember:           addMemberUC,
+		RebindDevServer:     rebindDevServerUC,
+		RebindRepoDevServer: rebindRepoDevServerUC,
+		UpdateProject:       updateProjectUC,
+		DeleteProject:       deleteProjectUC,
 
 		ListMembers:      listMembersUC,
 		RemoveMember:     removeMemberUC,

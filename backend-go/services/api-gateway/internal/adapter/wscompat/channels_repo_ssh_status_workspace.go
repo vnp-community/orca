@@ -66,12 +66,16 @@ type repoView struct {
 	URL         string `json:"url"`
 	DisplayName string `json:"displayName"`
 	Position    int32  `json:"position"`
+	// DevServerID (Phase 10): this repo's own dev-server binding, empty =
+	// local. Previously only resolvable via the owning project.
+	DevServerID string `json:"devServerId"`
 }
 
 func toRepoView(r *projectv1.Repo) repoView {
 	return repoView{
 		ID: r.GetId(), ProjectID: r.GetProjectId(), URL: r.GetUrl(),
 		DisplayName: r.GetDisplayName(), Position: r.GetPosition(),
+		DevServerID: r.GetDevServerId(),
 	}
 }
 
@@ -105,6 +109,9 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 			ProjectID   string `json:"projectId"`
 			URL         string `json:"url"`
 			DisplayName string `json:"displayName"`
+			// DevServerID (Phase 10): empty = local repo, validated against
+			// infra-fleet server-side when non-empty.
+			DevServerID string `json:"devServerId"`
 		}
 		in, err := decodeArg[addArgs](args, 0)
 		if err != nil {
@@ -114,7 +121,31 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
 		defer cancel()
 		resp, err := project.AddRepo(rpcCtx, &projectv1.AddRepoRequest{
-			ProjectId: in.ProjectID, Url: in.URL, DisplayName: in.DisplayName,
+			ProjectId: in.ProjectID, Url: in.URL, DisplayName: in.DisplayName, DevServerId: in.DevServerID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return toRepoView(resp.GetRepo()), nil
+	})
+
+	// repo.rebindDevServer (Phase 10) — repo-scoped replacement for
+	// project.rebindDevServer (channels_tenant_project.go), now that
+	// dev-server ownership lives on Repo, not Project.
+	r.Register("repo.rebindDevServer", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type rebindArgs struct {
+			RepoID         string `json:"repoId"`
+			NewDevServerID string `json:"newDevServerId"`
+		}
+		in, err := decodeArg[rebindArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
+		defer cancel()
+		resp, err := project.RebindRepoDevServer(rpcCtx, &projectv1.RebindRepoDevServerRequest{
+			RepoId: in.RepoID, NewDevServerId: in.NewDevServerID,
 		})
 		if err != nil {
 			return nil, err

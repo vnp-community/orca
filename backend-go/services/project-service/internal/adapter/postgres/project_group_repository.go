@@ -146,6 +146,9 @@ func (r *ProjectGroupRepository) UpsertLeafGroupForProject(ctx context.Context, 
 // this is one hand-rolled multi-table transaction rather than composed
 // usecase calls (mirrors RepoRepository.ReorderRepos's existing
 // "one repository method owns its own multi-row transaction" convention).
+// devServerID is stamped onto both the created project and its repo —
+// Phase 10 gave repos their own dev-server binding, so the repo needs the
+// same value the project row records, not just an inherited one.
 //
 // Reuses project.repos' `url` column to store the absolute on-disk path — a
 // remote-clone-URL-shaped column reused for "this is already a folder on
@@ -179,9 +182,9 @@ func (r *ProjectGroupRepository) ImportNested(ctx context.Context, tenantID, cre
 		}
 
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO project.repos (id, project_id, url, display_name, position)
-			VALUES (gen_random_uuid(), $1, $2, $3, 0)
-		`, p.ID, c.Path, name); err != nil {
+			INSERT INTO project.repos (id, project_id, url, display_name, position, dev_server_id)
+			VALUES (gen_random_uuid(), $1, $2, $3, 0, $4)
+		`, p.ID, c.Path, name, nullableString(devServerID)); err != nil {
 			return nil, nil, fmt.Errorf("postgres: insert imported repo: %w", err)
 		}
 

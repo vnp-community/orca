@@ -154,6 +154,11 @@ type RepoRepository interface {
 	// usecase.UpdateRepo after it applies the field-mask. Returns
 	// domain.ErrRepoNotFound (wrapped) if no repo matches.
 	Update(ctx context.Context, repo domain.Repo) (domain.Repo, error)
+	// UpdateDevServerID rebinds a single repo to a new dev server — the only
+	// write path for repos.dev_server_id (see usecase.RebindRepoDevServer),
+	// analogous to ProjectRepository.UpdateDevServerID one tier down. Returns
+	// domain.ErrRepoNotFound (wrapped) if no repo matches.
+	UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error)
 
 	// ── repo_members (functional-role tier, layered on top of project_members) ──
 
