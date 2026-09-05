@@ -46,6 +46,7 @@ type Server struct {
 
 	remoteCommitURL *usecase.RemoteCommitURL
 	remoteFileURL   *usecase.RemoteFileURL
+	getRemoteURL    *usecase.GetRemoteURL
 	fetch           *usecase.Fetch
 
 	generatePullRequestFields   *usecase.GeneratePullRequestFields
@@ -120,6 +121,7 @@ func New(
 	submoduleStatus *usecase.SubmoduleStatus,
 	remoteCommitURL *usecase.RemoteCommitURL,
 	remoteFileURL *usecase.RemoteFileURL,
+	getRemoteURL *usecase.GetRemoteURL,
 	fetch *usecase.Fetch,
 	generatePullRequestFields *usecase.GeneratePullRequestFields,
 	discoverCommitMessageModels *usecase.DiscoverCommitMessageModels,
@@ -183,6 +185,7 @@ func New(
 		submoduleStatus:             submoduleStatus,
 		remoteCommitURL:             remoteCommitURL,
 		remoteFileURL:               remoteFileURL,
+		getRemoteURL:                getRemoteURL,
 		fetch:                       fetch,
 		generatePullRequestFields:   generatePullRequestFields,
 		discoverCommitMessageModels: discoverCommitMessageModels,
@@ -631,6 +634,14 @@ func (s *Server) BaseRefDefault(ctx context.Context, req *gitgatewayv1.BaseRefDe
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.BaseRefDefaultResponse{Ref: ref}, nil
+}
+
+func (s *Server) GetRemoteUrl(ctx context.Context, req *gitgatewayv1.GetRemoteUrlRequest) (*gitgatewayv1.GetRemoteUrlResponse, error) {
+	url, err := s.getRemoteURL.Execute(ctx, usecase.GetRemoteURLInput{RepoID: req.GetRepoId(), RemoteName: req.GetRemoteName()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.GetRemoteUrlResponse{Url: url}, nil
 }
 
 func (s *Server) SearchRefs(ctx context.Context, req *gitgatewayv1.SearchRefsRequest) (*gitgatewayv1.SearchRefsResponse, error) {

@@ -40,6 +40,7 @@ const (
 	GitGatewayService_RemoteCommitUrl_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/RemoteCommitUrl"
 	GitGatewayService_RemoteFileUrl_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/RemoteFileUrl"
 	GitGatewayService_Fetch_FullMethodName                       = "/orca.gitgateway.v1.GitGatewayService/Fetch"
+	GitGatewayService_GetRemoteUrl_FullMethodName                = "/orca.gitgateway.v1.GitGatewayService/GetRemoteUrl"
 	GitGatewayService_GeneratePullRequestFields_FullMethodName   = "/orca.gitgateway.v1.GitGatewayService/GeneratePullRequestFields"
 	GitGatewayService_DiscoverCommitMessageModels_FullMethodName = "/orca.gitgateway.v1.GitGatewayService/DiscoverCommitMessageModels"
 	GitGatewayService_ReadFile_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/ReadFile"
@@ -126,6 +127,15 @@ type GitGatewayServiceClient interface {
 	RemoteCommitUrl(ctx context.Context, in *RemoteCommitUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error)
 	RemoteFileUrl(ctx context.Context, in *RemoteFileUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error)
 	Fetch(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*FetchResponse, error)
+	// GetRemoteUrl returns one configured remote's raw URL (not a web
+	// permalink like RemoteCommitUrl/RemoteFileUrl) — repo-scoped, same
+	// dispatchExecutorForRepo pattern as BaseRefDefault/PrefetchCreateBase.
+	// Added for github.listWorkItems: api-gateway resolves a repo_id's
+	// GitHub owner/repo by reading its configured remote (trying "upstream"
+	// then "origin"), since project.repos.url is not reliably a git remote
+	// URL (often an on-disk path — see project-service's SetupExistingFolder/
+	// ImportNested doc comments).
+	GetRemoteUrl(ctx context.Context, in *GetRemoteUrlRequest, opts ...grpc.CallOption) (*GetRemoteUrlResponse, error)
 	// ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
 	GeneratePullRequestFields(ctx context.Context, in *GeneratePullRequestFieldsRequest, opts ...grpc.CallOption) (*GeneratePullRequestFieldsResponse, error)
 	DiscoverCommitMessageModels(ctx context.Context, in *DiscoverCommitMessageModelsRequest, opts ...grpc.CallOption) (*DiscoverCommitMessageModelsResponse, error)
@@ -398,6 +408,16 @@ func (c *gitGatewayServiceClient) Fetch(ctx context.Context, in *FetchRequest, o
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(FetchResponse)
 	err := c.cc.Invoke(ctx, GitGatewayService_Fetch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) GetRemoteUrl(ctx context.Context, in *GetRemoteUrlRequest, opts ...grpc.CallOption) (*GetRemoteUrlResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRemoteUrlResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_GetRemoteUrl_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -857,6 +877,15 @@ type GitGatewayServiceServer interface {
 	RemoteCommitUrl(context.Context, *RemoteCommitUrlRequest) (*RemoteUrlResponse, error)
 	RemoteFileUrl(context.Context, *RemoteFileUrlRequest) (*RemoteUrlResponse, error)
 	Fetch(context.Context, *FetchRequest) (*FetchResponse, error)
+	// GetRemoteUrl returns one configured remote's raw URL (not a web
+	// permalink like RemoteCommitUrl/RemoteFileUrl) — repo-scoped, same
+	// dispatchExecutorForRepo pattern as BaseRefDefault/PrefetchCreateBase.
+	// Added for github.listWorkItems: api-gateway resolves a repo_id's
+	// GitHub owner/repo by reading its configured remote (trying "upstream"
+	// then "origin"), since project.repos.url is not reliably a git remote
+	// URL (often an on-disk path — see project-service's SetupExistingFolder/
+	// ImportNested doc comments).
+	GetRemoteUrl(context.Context, *GetRemoteUrlRequest) (*GetRemoteUrlResponse, error)
 	// ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
 	GeneratePullRequestFields(context.Context, *GeneratePullRequestFieldsRequest) (*GeneratePullRequestFieldsResponse, error)
 	DiscoverCommitMessageModels(context.Context, *DiscoverCommitMessageModelsRequest) (*DiscoverCommitMessageModelsResponse, error)
@@ -994,6 +1023,9 @@ func (UnimplementedGitGatewayServiceServer) RemoteFileUrl(context.Context, *Remo
 }
 func (UnimplementedGitGatewayServiceServer) Fetch(context.Context, *FetchRequest) (*FetchResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Fetch not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) GetRemoteUrl(context.Context, *GetRemoteUrlRequest) (*GetRemoteUrlResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRemoteUrl not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) GeneratePullRequestFields(context.Context, *GeneratePullRequestFieldsRequest) (*GeneratePullRequestFieldsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GeneratePullRequestFields not implemented")
@@ -1495,6 +1527,24 @@ func _GitGatewayService_Fetch_Handler(srv interface{}, ctx context.Context, dec 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(GitGatewayServiceServer).Fetch(ctx, req.(*FetchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_GetRemoteUrl_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRemoteUrlRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).GetRemoteUrl(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_GetRemoteUrl_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).GetRemoteUrl(ctx, req.(*GetRemoteUrlRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2323,6 +2373,10 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Fetch",
 			Handler:    _GitGatewayService_Fetch_Handler,
+		},
+		{
+			MethodName: "GetRemoteUrl",
+			Handler:    _GitGatewayService_GetRemoteUrl_Handler,
 		},
 		{
 			MethodName: "GeneratePullRequestFields",

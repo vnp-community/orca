@@ -279,6 +279,20 @@ func (e *Executor) RemoteFileURL(ctx context.Context, repoPath, path, ref string
 	return base + "/blob/" + ref + "/" + path, nil
 }
 
+// RemoteURL returns remoteName's raw configured URL — no web-permalink
+// mangling, unlike RemoteCommitURL/RemoteFileURL/remoteWebBaseURL below.
+// remoteName empty defaults to "origin".
+func (e *Executor) RemoteURL(ctx context.Context, repoPath, remoteName string) (string, error) {
+	if remoteName == "" {
+		remoteName = "origin"
+	}
+	raw, err := e.run(ctx, repoPath, "remote", "get-url", remoteName)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(raw), nil
+}
+
 // remoteWebBaseURL converts `git remote get-url origin`'s SSH or HTTPS form
 // into a browsable https://<host>/<org>/<repo> base URL.
 func (e *Executor) remoteWebBaseURL(ctx context.Context, repoPath string) (string, error) {

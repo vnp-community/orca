@@ -17,8 +17,11 @@ package wscompat
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
 	"time"
 
+	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
@@ -43,8 +46,8 @@ func attachSCMIdentity(ctx context.Context, id Identity) context.Context {
 // to, against scm-integration-service's gRPC client. Called once from
 // main.go's composition root — see channels.go's RegisterRealChannels for
 // where the integration pass adds `registerSCMChannels(r, scmClient)`.
-func registerSCMChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient) {
-	registerGitHubChannels(r, client)
+func registerSCMChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient, gitClient gitgatewayv1.GitGatewayServiceClient) {
+	registerGitHubChannels(r, client, gitClient)
 	registerGitHubProjectChannels(r, client)
 	registerGitLabChannels(r, client)
 	registerHostedReviewChannels(r, client)
@@ -52,7 +55,7 @@ func registerSCMChannels(r *Registry, client scmintegrationv1.ScmIntegrationServ
 
 // ── github.* (PR/issue mutations, repo/branch resolution, auth, rate limit) ──
 
-func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient) {
+func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationServiceClient, gitClient gitgatewayv1.GitGatewayServiceClient) {
 	// github.checkOrcaStarred — the old TS backend shelled out to the local
 	// `gh` CLI (`gh api user/starred/<repo>`); scm-integration-service has no
 	// equivalent RPC (no GitHub "check if starred" call exists in
@@ -77,6 +80,67 @@ func registerGitHubChannels(r *Registry, client scmintegrationv1.ScmIntegrationS
 			return nil, err
 		}
 		return resp, nil
+	})
+
+	// github.listWorkItems — the Tasks page's GitHub issue/PR picker. Unlike
+	// every other github.* channel above, the frontend sends a real backend
+	// repoId (project.repos.id), not an owner/repo slug — see
+	// resolveGitHubOwnerRepo's doc comment for why that resolution has to
+	// happen here rather than in scm-integration-service.
+	r.Register("github.listWorkItems", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type listWorkItemsArgs struct {
+			Repo    string `json:"repo"` // repoId, despite the field name — matches the frontend's wire shape
+			Limit   int32  `json:"limit"`
+			Query   string `json:"query"`
+			Before  string `json:"before"`
+			NoCache bool   `json:"noCache"`
+		}
+		in, err := decodeArg[listWorkItemsArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		gwCtx, cancel := context.WithTimeout(attachSCMIdentity(ctx, id), scmRPCTimeout)
+		defer cancel()
+		ownerRepo, fellBack, resolveErr := resolveGitHubOwnerRepo(gwCtx, gitClient, in.Repo)
+		if resolveErr != nil {
+			// Matches the legacy backend's "surface as a result-level error,
+			// not a channel error" pattern (ListWorkItemsResult.errors) —
+			// an unresolved remote is routine (non-GitHub repo, no upstream
+			// configured yet), not a hard failure of the whole call.
+			return listWorkItemsResultView{
+				Items:   []gitHubWorkItemView{},
+				Sources: workItemSourcesView{},
+				Errors:  &workItemErrorsView{Issues: &classifiedErrorView{Type: "not_found", Message: resolveErr.Error()}},
+			}, nil
+		}
+
+		rpcCtx, rpcCancel := context.WithTimeout(attachSCMIdentity(ctx, id), scmRPCTimeout)
+		defer rpcCancel()
+		resp, err := client.ListWorkItems(rpcCtx, &scmintegrationv1.ListWorkItemsRequest{
+			TenantId: id.TenantID, Provider: scmintegrationv1.ScmProvider_SCM_PROVIDER_GITHUB,
+			Repo: ownerRepo.slug(), Limit: in.Limit, Query: in.Query, Before: in.Before, NoCache: in.NoCache,
+		})
+		if err != nil {
+			return listWorkItemsResultView{
+				Items:   []gitHubWorkItemView{},
+				Sources: workItemSourcesView{Issues: ownerRepo.view(), Prs: ownerRepo.view()},
+				Errors:  &workItemErrorsView{Issues: &classifiedErrorView{Type: "unknown", Message: err.Error()}},
+			}, nil
+		}
+
+		items := make([]gitHubWorkItemView, 0, len(resp.GetWorkItems()))
+		for _, w := range resp.GetWorkItems() {
+			items = append(items, toGitHubWorkItemView(w))
+		}
+		result := listWorkItemsResultView{
+			Items:   items,
+			Sources: workItemSourcesView{Issues: ownerRepo.view(), Prs: ownerRepo.view()},
+		}
+		if fellBack {
+			t := true
+			result.IssueSourceFellBack = &t
+		}
+		return result, nil
 	})
 
 	r.Register("github.mergePR", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -854,4 +918,158 @@ func parseWSProvider(v string) scmintegrationv1.ScmProvider {
 	default:
 		return scmintegrationv1.ScmProvider_SCM_PROVIDER_UNSPECIFIED
 	}
+}
+
+// ── github.listWorkItems support: repoId -> owner/repo resolution + view
+// structs (protoc-gen-go's own encoding/json tags are snake_case — see
+// this file's sibling channels_tenant_project.go's userProfileView comment
+// for why every github.listWorkItems response field below is a plain
+// camelCase-tagged struct, never a raw proto message). ─────────────────────
+
+type githubOwnerRepo struct {
+	Owner string
+	Repo  string
+}
+
+func (o githubOwnerRepo) slug() string { return o.Owner + "/" + o.Repo }
+
+func (o githubOwnerRepo) view() *ownerRepoView {
+	if o.Owner == "" || o.Repo == "" {
+		return nil
+	}
+	return &ownerRepoView{Owner: o.Owner, Repo: o.Repo}
+}
+
+type ownerRepoView struct {
+	Owner string `json:"owner"`
+	Repo  string `json:"repo"`
+}
+
+type classifiedErrorView struct {
+	Type    string `json:"type"`
+	Message string `json:"message"`
+}
+
+type workItemErrorsView struct {
+	Issues *classifiedErrorView `json:"issues,omitempty"`
+}
+
+type workItemSourcesView struct {
+	Issues            *ownerRepoView `json:"issues"`
+	Prs               *ownerRepoView `json:"prs"`
+	OriginCandidate   *ownerRepoView `json:"originCandidate"`
+	UpstreamCandidate *ownerRepoView `json:"upstreamCandidate"`
+}
+
+type gitHubWorkItemView struct {
+	ID        string   `json:"id"`
+	Type      string   `json:"type"`
+	Number    int32    `json:"number"`
+	Title     string   `json:"title"`
+	State     string   `json:"state"`
+	URL       string   `json:"url"`
+	Labels    []string `json:"labels"`
+	UpdatedAt string   `json:"updatedAt"`
+	Author    *string  `json:"author"`
+}
+
+type listWorkItemsResultView struct {
+	Items               []gitHubWorkItemView `json:"items"`
+	Sources             workItemSourcesView  `json:"sources"`
+	Errors              *workItemErrorsView  `json:"errors,omitempty"`
+	IssueSourceFellBack *bool                `json:"issueSourceFellBack,omitempty"`
+}
+
+func toGitHubWorkItemView(w *scmintegrationv1.WorkItem) gitHubWorkItemView {
+	view := gitHubWorkItemView{
+		ID: w.GetId(), Type: w.GetType(), Number: w.GetNumber(), Title: w.GetTitle(),
+		State: w.GetState(), URL: w.GetUrl(), Labels: w.GetLabels(), UpdatedAt: w.GetUpdatedAt(),
+	}
+	if view.Labels == nil {
+		view.Labels = []string{}
+	}
+	if author := w.GetAuthor(); author != "" {
+		view.Author = &author
+	}
+	return view
+}
+
+// resolveGitHubOwnerRepo resolves repoId's GitHub owner/repo by reading its
+// configured git remote via git-gateway-service — project.repos.url is not
+// reliably a git remote URL (see GetRemoteUrlRequest's proto doc comment),
+// so this can't just read the repo record directly the way every other
+// github.* channel's already-resolved `repo` string implies. Tries
+// "upstream" first, falls back to "origin" — same precedence as the legacy
+// desktop backend's resolveIssueSource/getIssueOwnerRepo (auto preference).
+func resolveGitHubOwnerRepo(ctx context.Context, gitClient gitgatewayv1.GitGatewayServiceClient, repoID string) (githubOwnerRepo, bool, error) {
+	if repoID == "" {
+		return githubOwnerRepo{}, false, fmt.Errorf("repo is required")
+	}
+	upstream, upstreamErr := fetchGitHubRemote(ctx, gitClient, repoID, "upstream")
+	if upstreamErr == nil {
+		return upstream, false, nil
+	}
+	origin, originErr := fetchGitHubRemote(ctx, gitClient, repoID, "origin")
+	if originErr == nil {
+		return origin, true, nil
+	}
+	return githubOwnerRepo{}, false, fmt.Errorf("no GitHub remote configured (tried upstream, origin): %w", originErr)
+}
+
+func fetchGitHubRemote(ctx context.Context, gitClient gitgatewayv1.GitGatewayServiceClient, repoID, remoteName string) (githubOwnerRepo, error) {
+	resp, err := gitClient.GetRemoteUrl(ctx, &gitgatewayv1.GetRemoteUrlRequest{RepoId: repoID, RemoteName: remoteName})
+	if err != nil {
+		return githubOwnerRepo{}, err
+	}
+	return parseGitHubOwnerRepo(resp.GetUrl())
+}
+
+// parseGitHubOwnerRepo is a Go port of the legacy desktop backend's
+// parseGitHubOwnerRepo/parseGitHubRemoteIdentity (backend/src/main/github/
+// github-remote-identity-parsing.ts) — deliberately strict: only exact host
+// "github.com" (or its documented "ssh.github.com" SSH-over-443 alias) is
+// accepted; GitHub Enterprise or non-GitHub remotes return an error rather
+// than a guessed owner/repo.
+func parseGitHubOwnerRepo(remoteURL string) (githubOwnerRepo, error) {
+	trimmed := strings.TrimSpace(remoteURL)
+	trimmed = strings.TrimSuffix(trimmed, ".git")
+
+	var host, path string
+	switch {
+	case strings.HasPrefix(trimmed, "git@"):
+		rest := strings.TrimPrefix(trimmed, "git@")
+		parts := strings.SplitN(rest, ":", 2)
+		if len(parts) != 2 {
+			return githubOwnerRepo{}, fmt.Errorf("cannot parse SSH remote %q", remoteURL)
+		}
+		host, path = parts[0], parts[1]
+	case strings.Contains(trimmed, "://"):
+		parts := strings.SplitN(trimmed, "://", 2)
+		rest := parts[1]
+		slash := strings.Index(rest, "/")
+		if slash < 0 {
+			return githubOwnerRepo{}, fmt.Errorf("cannot parse remote %q", remoteURL)
+		}
+		host, path = rest[:slash], rest[slash+1:]
+		if at := strings.LastIndex(host, "@"); at >= 0 {
+			host = host[at+1:] // strip a userinfo@ prefix, if any
+		}
+	default:
+		return githubOwnerRepo{}, fmt.Errorf("unrecognized remote URL shape %q", remoteURL)
+	}
+
+	host = strings.ToLower(host)
+	if host == "ssh.github.com" {
+		host = "github.com"
+	}
+	if host != "github.com" {
+		return githubOwnerRepo{}, fmt.Errorf("remote host %q is not github.com", host)
+	}
+
+	path = strings.Trim(path, "/")
+	segments := strings.Split(path, "/")
+	if len(segments) != 2 || segments[0] == "" || segments[1] == "" {
+		return githubOwnerRepo{}, fmt.Errorf("cannot resolve %q to an owner/repo pair", remoteURL)
+	}
+	return githubOwnerRepo{Owner: segments[0], Repo: segments[1]}, nil
 }

@@ -146,6 +146,7 @@ func run() error {
 	listIssuesUC := usecase.NewListIssues(credentials, registry)
 	createPullRequestUC := usecase.NewCreatePullRequest(credentials, registry)
 	listPullRequestsUC := usecase.NewListPullRequests(credentials, registry)
+	listWorkItemsUC := usecase.NewListWorkItems(credentials, registry)
 	getRateLimitStatusUC := usecase.NewGetRateLimitStatus(credentials, registry, rateLimitCache)
 	getAuthStatusUC := usecase.NewGetAuthStatus(credentials)
 	startOAuthFlowUC := usecase.NewStartOAuthFlow(oauthRegistry, stateCodec, nil)
@@ -200,7 +201,7 @@ func run() error {
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	scmintegrationv1.RegisterScmIntegrationServiceServer(grpcServer, scmgrpc.New(
-		listIssuesUC, createPullRequestUC, listPullRequestsUC, getRateLimitStatusUC,
+		listIssuesUC, createPullRequestUC, listPullRequestsUC, listWorkItemsUC, getRateLimitStatusUC,
 		getAuthStatusUC, startOAuthFlowUC, completeOAuthFlowUC, revokeAuthUC,
 		mergePullRequestUC, requestPullRequestReviewersUC, removePullRequestReviewersUC,
 		setPullRequestAutoMergeUC, updateIssueUC, getPullRequestForBranchUC, resolveRepoSlugUC,

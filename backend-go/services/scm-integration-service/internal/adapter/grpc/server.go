@@ -7,6 +7,7 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
@@ -24,6 +25,7 @@ type Server struct {
 	listIssues         *usecase.ListIssues
 	createPullRequest  *usecase.CreatePullRequest
 	listPullRequests   *usecase.ListPullRequests
+	listWorkItems      *usecase.ListWorkItems
 	getRateLimitStatus *usecase.GetRateLimitStatus
 	getAuthStatus      *usecase.GetAuthStatus
 	startOAuthFlow     *usecase.StartOAuthFlow
@@ -64,7 +66,7 @@ type Server struct {
 	getWorkItemDetails            *usecase.GetWorkItemDetails
 
 	// SOL-014 — hostedReview.getCreationEligibility (TASK-088).
-	checkHostedReviewEligibility *usecase.CheckHostedReviewEligibility
+	checkHostedReviewEligibility   *usecase.CheckHostedReviewEligibility
 	setIntegrationCredential       *usecase.SetIntegrationCredential
 	getIntegrationCredentialStatus *usecase.GetIntegrationCredentialStatus
 	listIntegrationCredentials     *usecase.ListIntegrationCredentials
@@ -74,6 +76,7 @@ func New(
 	listIssues *usecase.ListIssues,
 	createPullRequest *usecase.CreatePullRequest,
 	listPullRequests *usecase.ListPullRequests,
+	listWorkItems *usecase.ListWorkItems,
 	getRateLimitStatus *usecase.GetRateLimitStatus,
 	getAuthStatus *usecase.GetAuthStatus,
 	startOAuthFlow *usecase.StartOAuthFlow,
@@ -114,6 +117,7 @@ func New(
 		listIssues:         listIssues,
 		createPullRequest:  createPullRequest,
 		listPullRequests:   listPullRequests,
+		listWorkItems:      listWorkItems,
 		getRateLimitStatus: getRateLimitStatus,
 		getAuthStatus:      getAuthStatus,
 		startOAuthFlow:     startOAuthFlow,
@@ -149,7 +153,7 @@ func New(
 		resolveMergeRequestDiscussion: resolveMergeRequestDiscussion,
 		getWorkItemDetails:            getWorkItemDetails,
 
-		checkHostedReviewEligibility: checkHostedReviewEligibility,
+		checkHostedReviewEligibility:   checkHostedReviewEligibility,
 		setIntegrationCredential:       setIntegrationCredential,
 		getIntegrationCredentialStatus: getIntegrationCredentialStatus,
 		listIntegrationCredentials:     listIntegrationCredentials,
@@ -202,6 +206,26 @@ func (s *Server) ListPullRequests(ctx context.Context, req *scmintegrationv1.Lis
 		out = append(out, toProtoPullRequest(pr))
 	}
 	return &scmintegrationv1.ListPullRequestsResponse{PullRequests: out}, nil
+}
+
+func (s *Server) ListWorkItems(ctx context.Context, req *scmintegrationv1.ListWorkItemsRequest) (*scmintegrationv1.ListWorkItemsResponse, error) {
+	items, err := s.listWorkItems.Execute(ctx, usecase.ListWorkItemsInput{
+		TenantID: req.GetTenantId(),
+		Provider: toDomainProvider(req.GetProvider()),
+		Repo:     req.GetRepo(),
+		Query:    req.GetQuery(),
+		Limit:    req.GetLimit(),
+		Before:   req.GetBefore(),
+		NoCache:  req.GetNoCache(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*scmintegrationv1.WorkItem, 0, len(items))
+	for _, item := range items {
+		out = append(out, toProtoWorkItem(item))
+	}
+	return &scmintegrationv1.ListWorkItemsResponse{WorkItems: out}, nil
 }
 
 func (s *Server) GetRateLimitStatus(ctx context.Context, req *scmintegrationv1.GetRateLimitStatusRequest) (*scmintegrationv1.GetRateLimitStatusResponse, error) {
@@ -727,6 +751,20 @@ func toProtoPullRequest(pr domain.PullRequest) *scmintegrationv1.PullRequest {
 		Url:    pr.URL,
 		State:  pr.State,
 		Number: pr.Number,
+	}
+}
+
+func toProtoWorkItem(w domain.WorkItem) *scmintegrationv1.WorkItem {
+	return &scmintegrationv1.WorkItem{
+		Id:        w.ID,
+		Type:      w.Type,
+		Number:    w.Number,
+		Title:     w.Title,
+		State:     w.State,
+		Url:       w.URL,
+		Labels:    w.Labels,
+		UpdatedAt: w.UpdatedAt.Format(time.RFC3339),
+		Author:    w.Author,
 	}
 }
 

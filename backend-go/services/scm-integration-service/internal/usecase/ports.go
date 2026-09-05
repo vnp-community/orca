@@ -99,6 +99,38 @@ type IssuePatch struct {
 	Assignees    []string
 }
 
+// WorkItemFilter narrows a ListWorkItems call — a small, deliberately
+// partial subset of the legacy desktop backend's GitHub search-syntax
+// grammar (parseTaskQuery in backend/src/shared/task-query.ts): scope/
+// state/labels/assignee/author only. Explicitly NOT ported for v1 (see
+// docs/execution-plan.md's github.listWorkItems entry): "@me" (needs a
+// resolved current-user login — this service's CredentialResolver is
+// (tenantID, provider)->one shared token, not per-viewer identity),
+// review-requested:/reviewed-by:, free-text search (needs GitHub's Search
+// API, a different endpoint/response shape), and cursor pagination
+// (Before). Unrecognized/unsupported query tokens are silently ignored
+// rather than erroring, matching this codebase's established
+// documented-gap convention.
+type WorkItemFilter struct {
+	Scope    string // "all" | "issue" | "pr"
+	State    string // "open" | "closed" | "merged" | "all"
+	Labels   []string
+	Assignee string
+	Author   string
+	Limit    int
+}
+
+// WorkItemProvider is implemented only by adapters that support the
+// combined issue+PR "work items" listing feature — GitHub today. Kept as
+// its own interface (rather than a new ScmProvider method) so the other
+// four provider adapters (GitLab, Bitbucket, Azure DevOps, Gitea) don't
+// need a stub method just to keep compiling; ListWorkItems' usecase type-
+// asserts the resolved ScmProvider against this interface and returns
+// SCM_WORK_ITEMS_UNSUPPORTED for providers that don't implement it.
+type WorkItemProvider interface {
+	ListWorkItems(ctx context.Context, cred Credential, repo string, filter WorkItemFilter) ([]domain.WorkItem, error)
+}
+
 // ProviderRegistry resolves which concrete ScmProvider implementation to use
 // for a given provider enum value. cmd/server/main.go's composition root
 // registers one entry per adapter package; usecase/ code never imports a

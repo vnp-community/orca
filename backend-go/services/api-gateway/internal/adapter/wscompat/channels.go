@@ -147,7 +147,7 @@ func RegisterRealChannels(
 	registerCredentialsChannels(r, scmClient, issueTrackingClient)
 	registerIssueTrackingOrchestrationChannels(r, issueTrackingClient, orchestrationClient, infraFleetClient)
 	registerRepoSshStatusWorkspaceChannels(r, projectClient, gitClient, infraFleetClient)
-	registerSCMChannels(r, scmClient)
+	registerSCMChannels(r, scmClient, gitClient)
 	registerBrowserChannels(r, infraFleetClient)
 	registerBrowserScreencastChannel(r, infraFleetClient)
 	registerBrowserProfileChannels(r, infraFleetClient)

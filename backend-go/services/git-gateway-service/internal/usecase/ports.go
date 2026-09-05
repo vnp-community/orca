@@ -96,6 +96,12 @@ type GitExecutor interface {
 	// agent method on either side. See TASK-210's contract correction.
 	RemoteCommitURL(ctx context.Context, repoPath, sha string) (string, error)
 	RemoteFileURL(ctx context.Context, repoPath, path, ref string) (string, error)
+	// RemoteURL returns one configured remote's raw URL (e.g.
+	// "git@github.com:owner/repo.git") — unlike RemoteCommitURL/
+	// RemoteFileURL, no web-permalink construction. remoteName empty
+	// defaults to "origin". Added for GetRemoteURL (github.listWorkItems'
+	// owner/repo resolution) — see that usecase's doc comment.
+	RemoteURL(ctx context.Context, repoPath, remoteName string) (string, error)
 	// Fetch (TASK-210) runs `git fetch --prune [remote]` — the real agent
 	// always prunes and has no separate prune flag; pushTarget is optional
 	// and only its RemoteName is consulted for which remote to fetch (see

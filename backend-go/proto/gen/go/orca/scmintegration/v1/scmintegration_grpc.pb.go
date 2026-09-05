@@ -24,6 +24,7 @@ const (
 	ScmIntegrationService_CreatePullRequest_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/CreatePullRequest"
 	ScmIntegrationService_ListPullRequests_FullMethodName               = "/orca.scmintegration.v1.ScmIntegrationService/ListPullRequests"
 	ScmIntegrationService_GetRateLimitStatus_FullMethodName             = "/orca.scmintegration.v1.ScmIntegrationService/GetRateLimitStatus"
+	ScmIntegrationService_ListWorkItems_FullMethodName                  = "/orca.scmintegration.v1.ScmIntegrationService/ListWorkItems"
 	ScmIntegrationService_GetAuthStatus_FullMethodName                  = "/orca.scmintegration.v1.ScmIntegrationService/GetAuthStatus"
 	ScmIntegrationService_StartOAuthFlow_FullMethodName                 = "/orca.scmintegration.v1.ScmIntegrationService/StartOAuthFlow"
 	ScmIntegrationService_CompleteOAuthFlow_FullMethodName              = "/orca.scmintegration.v1.ScmIntegrationService/CompleteOAuthFlow"
@@ -72,6 +73,11 @@ type ScmIntegrationServiceClient interface {
 	CreatePullRequest(ctx context.Context, in *CreatePullRequestRequest, opts ...grpc.CallOption) (*CreatePullRequestResponse, error)
 	ListPullRequests(ctx context.Context, in *ListPullRequestsRequest, opts ...grpc.CallOption) (*ListPullRequestsResponse, error)
 	GetRateLimitStatus(ctx context.Context, in *GetRateLimitStatusRequest, opts ...grpc.CallOption) (*GetRateLimitStatusResponse, error)
+	// ListWorkItems backs github.listWorkItems (the Tasks page's GitHub
+	// issue/PR picker) — a combined issue+PR listing, GitHub-only for now.
+	// See ListWorkItemsRequest's doc comment for the query-syntax subset
+	// supported in this v1.
+	ListWorkItems(ctx context.Context, in *ListWorkItemsRequest, opts ...grpc.CallOption) (*ListWorkItemsResponse, error)
 	// Auth — the §9.1 decision: a standard OAuth 2.0 authorization-code web
 	// flow terminating at an api-gateway-hosted /auth/{provider}/callback, NOT
 	// the TS PTY/CLI-login mechanism (gh auth login/glab auth login) it
@@ -182,6 +188,16 @@ func (c *scmIntegrationServiceClient) GetRateLimitStatus(ctx context.Context, in
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetRateLimitStatusResponse)
 	err := c.cc.Invoke(ctx, ScmIntegrationService_GetRateLimitStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *scmIntegrationServiceClient) ListWorkItems(ctx context.Context, in *ListWorkItemsRequest, opts ...grpc.CallOption) (*ListWorkItemsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListWorkItemsResponse)
+	err := c.cc.Invoke(ctx, ScmIntegrationService_ListWorkItems_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -540,6 +556,11 @@ type ScmIntegrationServiceServer interface {
 	CreatePullRequest(context.Context, *CreatePullRequestRequest) (*CreatePullRequestResponse, error)
 	ListPullRequests(context.Context, *ListPullRequestsRequest) (*ListPullRequestsResponse, error)
 	GetRateLimitStatus(context.Context, *GetRateLimitStatusRequest) (*GetRateLimitStatusResponse, error)
+	// ListWorkItems backs github.listWorkItems (the Tasks page's GitHub
+	// issue/PR picker) — a combined issue+PR listing, GitHub-only for now.
+	// See ListWorkItemsRequest's doc comment for the query-syntax subset
+	// supported in this v1.
+	ListWorkItems(context.Context, *ListWorkItemsRequest) (*ListWorkItemsResponse, error)
 	// Auth — the §9.1 decision: a standard OAuth 2.0 authorization-code web
 	// flow terminating at an api-gateway-hosted /auth/{provider}/callback, NOT
 	// the TS PTY/CLI-login mechanism (gh auth login/glab auth login) it
@@ -627,6 +648,9 @@ func (UnimplementedScmIntegrationServiceServer) ListPullRequests(context.Context
 }
 func (UnimplementedScmIntegrationServiceServer) GetRateLimitStatus(context.Context, *GetRateLimitStatusRequest) (*GetRateLimitStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRateLimitStatus not implemented")
+}
+func (UnimplementedScmIntegrationServiceServer) ListWorkItems(context.Context, *ListWorkItemsRequest) (*ListWorkItemsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListWorkItems not implemented")
 }
 func (UnimplementedScmIntegrationServiceServer) GetAuthStatus(context.Context, *GetAuthStatusRequest) (*GetAuthStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAuthStatus not implemented")
@@ -819,6 +843,24 @@ func _ScmIntegrationService_GetRateLimitStatus_Handler(srv interface{}, ctx cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ScmIntegrationServiceServer).GetRateLimitStatus(ctx, req.(*GetRateLimitStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ScmIntegrationService_ListWorkItems_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWorkItemsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ScmIntegrationServiceServer).ListWorkItems(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ScmIntegrationService_ListWorkItems_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ScmIntegrationServiceServer).ListWorkItems(ctx, req.(*ListWorkItemsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1457,6 +1499,10 @@ var ScmIntegrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetRateLimitStatus",
 			Handler:    _ScmIntegrationService_GetRateLimitStatus_Handler,
+		},
+		{
+			MethodName: "ListWorkItems",
+			Handler:    _ScmIntegrationService_ListWorkItems_Handler,
 		},
 		{
 			MethodName: "GetAuthStatus",

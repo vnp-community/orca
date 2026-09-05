@@ -82,6 +82,10 @@ func (fakeExecutor) RemoteFileURL(context.Context, string, string, string) (stri
 	return "https://example.com/blob/main/a.txt", nil
 }
 
+func (fakeExecutor) RemoteURL(context.Context, string, string) (string, error) {
+	return "git@github.com:example/repo.git", nil
+}
+
 func (fakeExecutor) Fetch(context.Context, string, *domain.PushTargetInput) (domain.SimpleResult, error) {
 	return domain.SimpleResult{Success: true}, nil
 }
@@ -328,6 +332,7 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewSubmoduleStatus(resolver, exec, exec),
 		usecase.NewRemoteCommitURL(resolver, exec, exec),
 		usecase.NewRemoteFileURL(resolver, exec, exec),
+		usecase.NewGetRemoteURL(reachability, projects, exec, exec),
 		usecase.NewFetch(resolver, exec, exec),
 		usecase.NewGeneratePullRequestFields(resolver, getStatusUC, getDiffUC, completer),
 		usecase.NewDiscoverCommitMessageModels(fakeAIProviderResolver{}),

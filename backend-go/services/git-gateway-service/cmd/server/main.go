@@ -148,6 +148,7 @@ func run() error {
 
 	remoteCommitURLUC := usecase.NewRemoteCommitURL(resolver, local, relay)
 	remoteFileURLUC := usecase.NewRemoteFileURL(resolver, local, relay)
+	getRemoteURLUC := usecase.NewGetRemoteURL(devServerReachability, projectClient, local, relay)
 	// Fetch: TASK-227 (relay reachability) and PushTargetInput (TASK-207)
 	// are both now real, unblocking this per TASK-210's Contract correction.
 	fetchUC := usecase.NewFetch(resolver, local, relay)
@@ -206,7 +207,7 @@ func run() error {
 		stageUC, unstageUC,
 		historyUC, checkIgnoredUC, forkSyncUC, upstreamStatusUC,
 		commitCompareUC, branchCompareUC, commitDiffUC, branchDiffUC, submoduleStatusUC,
-		remoteCommitURLUC, remoteFileURLUC, fetchUC,
+		remoteCommitURLUC, remoteFileURLUC, getRemoteURLUC, fetchUC,
 		generatePullRequestFieldsUC, discoverCommitMessageModelsUC,
 		readFileUC, readFileChunkUC, readFilePreviewUC, readDirUC, writeFileUC, writeFileChunkUC,
 		createDirUC, deleteFileUC, statFileUC, searchFilesUC, listAllFilesUC, listMarkdownDocumentsUC,

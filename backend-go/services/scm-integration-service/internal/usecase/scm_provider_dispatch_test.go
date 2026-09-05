@@ -50,6 +50,21 @@ type fakeProvider struct {
 	lastCred Credential
 	lastRepo string
 	calls    int
+
+	workItems          []domain.WorkItem
+	workItemsErr       error
+	lastWorkItemFilter WorkItemFilter
+}
+
+// ListWorkItems makes fakeProvider satisfy WorkItemProvider too — used by
+// ListWorkItems' own tests to exercise the "provider supports it" path.
+func (f *fakeProvider) ListWorkItems(ctx context.Context, cred Credential, repo string, filter WorkItemFilter) ([]domain.WorkItem, error) {
+	f.lastCred, f.lastRepo, f.lastWorkItemFilter = cred, repo, filter
+	f.calls++
+	if f.workItemsErr != nil {
+		return nil, f.workItemsErr
+	}
+	return f.workItems, nil
 }
 
 func (f *fakeProvider) MergePullRequest(ctx context.Context, cred Credential, repo string, number int32, input MergePullRequestInput) (domain.PullRequest, bool, string, error) {

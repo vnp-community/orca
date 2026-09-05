@@ -15,6 +15,12 @@ service ScmIntegrationService {
   rpc ListPullRequests(ListPullRequestsRequest) returns (ListPullRequestsResponse);
   rpc GetRateLimitStatus(GetRateLimitStatusRequest) returns (GetRateLimitStatusResponse);
 
+  // ListWorkItems backs github.listWorkItems (the Tasks page's GitHub
+  // issue/PR picker) — a combined issue+PR listing, GitHub-only for now.
+  // See ListWorkItemsRequest's doc comment for the query-syntax subset
+  // supported in this v1.
+  rpc ListWorkItems(ListWorkItemsRequest) returns (ListWorkItemsResponse);
+
   // Auth — the §9.1 decision: a standard OAuth 2.0 authorization-code web
   // flow terminating at an api-gateway-hosted /auth/{provider}/callback, NOT
   // the TS PTY/CLI-login mechanism (gh auth login/glab auth login) it
@@ -151,6 +157,43 @@ message ListPullRequestsRequest {
 
 message ListPullRequestsResponse {
   repeated PullRequest pull_requests = 1;
+}
+
+// WorkItem is a combined issue-or-pull-request row — see
+// usecase.domain.WorkItem's doc comment (scm-integration-service) for the
+// full field-scoping rationale. author is empty when unknown (never a
+// placeholder). updated_at is RFC3339.
+message WorkItem {
+  string id = 1;
+  string type = 2; // "issue" | "pr"
+  int32 number = 3;
+  string title = 4;
+  string state = 5; // "open" | "closed" | "merged" | "draft"
+  string url = 6;
+  repeated string labels = 7;
+  string updated_at = 8;
+  string author = 9;
+}
+
+// ListWorkItemsRequest's query supports only a subset of the legacy
+// desktop backend's GitHub search-syntax grammar: is:issue/is:pr,
+// is:open/is:closed/is:merged, state:<x>, label:<x> (repeatable),
+// assignee:<login>, author:<login>. NOT supported in this v1 (silently
+// ignored, not an error): "@me", review-requested:/reviewed-by:, free-text
+// search, and cursor pagination (before is accepted for forward wire
+// compatibility but not yet honored).
+message ListWorkItemsRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3; // "owner/repo" — already resolved by the caller (api-gateway), not a repo_id
+  int32 limit = 4;
+  string query = 5;
+  string before = 6;
+  bool no_cache = 7;
+}
+
+message ListWorkItemsResponse {
+  repeated WorkItem work_items = 1;
 }
 
 message GetRateLimitStatusRequest {

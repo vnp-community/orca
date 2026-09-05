@@ -531,6 +531,27 @@ func (r *RelayExecutor) RemoteFileURL(ctx context.Context, repoPath, path, ref s
 	return result.URL, err
 }
 
+// RemoteURL relays via the already-whitelisted git.exec ("remote" is an
+// ALLOWED_GIT_SUBCOMMANDS entry, git-exec-validator.ts — read-only
+// subcommands only, "remote get-url" isn't in REMOTE_WRITE_SUBCOMMANDS) —
+// unlike RemoteCommitURL/RemoteFileURL, there is no dedicated
+// git.remoteUrl agent RPC (and none is needed: git.exec already covers
+// this read).
+func (r *RelayExecutor) RemoteURL(ctx context.Context, repoPath, remoteName string) (string, error) {
+	if remoteName == "" {
+		remoteName = "origin"
+	}
+	var result gitExecResult
+	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
+		"args": []string{"remote", "get-url", remoteName},
+		"cwd":  repoPath,
+	}, &result)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(result.Stdout), nil
+}
+
 // Clone and InitRepo have no repoPath/connectionId yet (they create the
 // worktree) — destPath doubles as the relay's connectionID, consistent
 // with this file's existing "repoPath doubles as connectionId" convention

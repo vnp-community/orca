@@ -49,6 +49,16 @@ service GitGatewayService {
   rpc RemoteFileUrl(RemoteFileUrlRequest) returns (RemoteUrlResponse);
   rpc Fetch(FetchRequest) returns (FetchResponse);
 
+  // GetRemoteUrl returns one configured remote's raw URL (not a web
+  // permalink like RemoteCommitUrl/RemoteFileUrl) — repo-scoped, same
+  // dispatchExecutorForRepo pattern as BaseRefDefault/PrefetchCreateBase.
+  // Added for github.listWorkItems: api-gateway resolves a repo_id's
+  // GitHub owner/repo by reading its configured remote (trying "upstream"
+  // then "origin"), since project.repos.url is not reliably a git remote
+  // URL (often an on-disk path — see project-service's SetupExistingFolder/
+  // ImportNested doc comments).
+  rpc GetRemoteUrl(GetRemoteUrlRequest) returns (GetRemoteUrlResponse);
+
   // ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
   rpc GeneratePullRequestFields(GeneratePullRequestFieldsRequest) returns (GeneratePullRequestFieldsResponse);
   rpc DiscoverCommitMessageModels(DiscoverCommitMessageModelsRequest) returns (DiscoverCommitMessageModelsResponse);
@@ -641,6 +651,12 @@ message ForceDeleteBranchRequest {
   string worktree_id = 1;
   string branch = 2;
 }
+
+// remote_name defaults to "origin" server-side when empty (see
+// GetRemoteURL usecase's doc comment) — callers needing upstream-then-
+// origin fallback semantics (github.listWorkItems) make two calls.
+message GetRemoteUrlRequest { string repo_id = 1; string remote_name = 2; }
+message GetRemoteUrlResponse { string url = 1; }
 
 message DetectWorktreesRequest  { string repo_id = 1; }
 

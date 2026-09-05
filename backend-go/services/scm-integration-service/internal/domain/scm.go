@@ -109,6 +109,39 @@ func NewPullRequest(id string, provider ScmProvider, repo, title, state, url, he
 	}, nil
 }
 
+// WorkItem is a combined issue-or-pull-request row for the "Tasks" GitHub
+// picker (github.listWorkItems) — ports the legacy desktop backend's
+// GitHubWorkItem concept (backend/src/main/github/client.ts), scoped down
+// to the fields that feature's list view actually renders. Unlike Issue/
+// PullRequest, this is deliberately GitHub-only for now (see
+// WorkItemProvider's doc comment in usecase/ports.go) rather than a fifth
+// provider-agnostic entity — GitLab/Bitbucket/etc. "work items" support is
+// a documented future gap, not modeled here yet.
+type WorkItem struct {
+	ID        string // "issue:<number>" or "pr:<number>" — synthesized, not a provider node id
+	Type      string // "issue" | "pr"
+	Number    int32
+	Title     string
+	State     string // "open" | "closed" | "merged" | "draft"
+	URL       string
+	Labels    []string
+	UpdatedAt time.Time
+	Author    string // empty = unknown (never defaulted to a placeholder)
+}
+
+// NewWorkItem enforces the same non-empty-title/url invariants as
+// NewIssue/NewPullRequest — id/type are synthesized by the caller (the
+// github adapter), not user input, so they aren't validated here.
+func NewWorkItem(id, itemType string, number int32, title, state, url string, labels []string, updatedAt time.Time, author string) (WorkItem, error) {
+	if title == "" {
+		return WorkItem{}, ErrEmptyTitle
+	}
+	return WorkItem{
+		ID: id, Type: itemType, Number: number, Title: title, State: state, URL: url,
+		Labels: labels, UpdatedAt: updatedAt, Author: author,
+	}, nil
+}
+
 // RateLimitStatus is a snapshot of one provider's rate-limit bucket for the
 // resolved credential — see §8: usecase/ code checks this before a burst of
 // calls instead of reacting to 429s after the fact. GitHub exposes separate

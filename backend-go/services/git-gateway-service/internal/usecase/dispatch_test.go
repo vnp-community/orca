@@ -41,6 +41,7 @@ type fakeGitExecutor struct {
 	calledUpstreamState          bool
 	calledRemoteCommit           bool
 	calledRemoteFile             bool
+	calledRemoteURL              bool
 	calledClone                  bool
 	calledInitRepo               bool
 	calledBaseRefDefault         bool
@@ -129,6 +130,8 @@ type fakeGitExecutor struct {
 	defaultBranch          string
 	initPath               string
 	baseRef                string
+	remoteURL              string
+	remoteURLErr           error
 	refs                   []string
 	installedHooks         []string
 	orcaHooksCurrent       bool
@@ -300,6 +303,15 @@ func (f *fakeGitExecutor) RemoteFileURL(ctx context.Context, repoPath, path, ref
 	f.calledRemoteFile = true
 	f.gotRepoPath = repoPath
 	return "https://example.com/blob/" + ref + "/" + path, nil
+}
+
+func (f *fakeGitExecutor) RemoteURL(ctx context.Context, repoPath, remoteName string) (string, error) {
+	f.calledRemoteURL = true
+	f.gotRepoPath = repoPath
+	if f.remoteURLErr != nil {
+		return "", f.remoteURLErr
+	}
+	return f.remoteURL, nil
 }
 
 func (f *fakeGitExecutor) Clone(ctx context.Context, url, destPath string) (string, string, error) {
