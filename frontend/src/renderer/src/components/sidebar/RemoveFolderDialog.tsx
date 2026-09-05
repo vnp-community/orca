@@ -63,10 +63,7 @@ const RemoveFolderDialog = React.memo(function RemoveFolderDialog() {
       <DialogContent className="max-w-sm sm:max-w-sm" showCloseButton={false}>
         <DialogHeader>
           <DialogTitle className="text-sm">
-            {translate(
-              'auto.components.sidebar.RemoveFolderDialog.b79b39d865',
-              'Remove Repo Group'
-            )}
+            {translate('auto.components.sidebar.RemoveFolderDialog.b79b39d865', 'Remove Project')}
           </DialogTitle>
           <DialogDescription className="text-xs">
             {translate(

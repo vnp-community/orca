@@ -157,7 +157,7 @@ export function GeneralPane({
         <SettingsSubsectionHeader
           title={translate(
             'auto.components.settings.GeneralPane.projectRuntime',
-            'Repo Group Runtime'
+            'Project Runtime'
           )}
           description={translate(
             'auto.components.settings.GeneralPane.projectRuntimeDescription',

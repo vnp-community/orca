@@ -36,7 +36,7 @@ function getHostMetadata(host: SidebarHostOption): string {
           )
         : translate(
             'auto.components.sidebar.SidebarWorkspaceOptionsMenu.projectSshHost',
-            'Repo Group SSH'
+            'Project SSH'
           )
     return `${presenceLabel} · ${healthLabel}`
   }
@@ -48,7 +48,7 @@ function getHostMetadata(host: SidebarHostOption): string {
         )
       : translate(
           'auto.components.sidebar.SidebarWorkspaceOptionsMenu.projectRuntimeHost',
-          'Repo Group server'
+          'Project server'
         )
   return `${presenceLabel} · ${healthLabel}`
 }

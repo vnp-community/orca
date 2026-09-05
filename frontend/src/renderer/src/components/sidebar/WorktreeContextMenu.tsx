@@ -877,7 +877,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
           </Tooltip>
           {/* Why: primary checkout rows can't be git-worktree-removed, so keep a
              disabled Delete Worktree for parity with non-primary cards and pair
-             it with the enabled Remove Repo Group action below. */}
+             it with the enabled Remove Project action below. */}
           {!isMultiContext && removesProject ? (
             <Tooltip>
               <TooltipTrigger asChild>
@@ -933,7 +933,7 @@ const WorktreeContextMenu = React.memo(function WorktreeContextMenu({
                   : removesProject
                     ? translate(
                         'auto.components.sidebar.WorktreeContextMenu.f5ac91531d',
-                        'Remove Repo Group from Orca'
+                        'Remove Project from Orca'
                       )
                     : translate('auto.components.sidebar.WorktreeContextMenu.f4475537d8', 'Delete')}
           </DropdownMenuItem>

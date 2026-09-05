@@ -43,7 +43,7 @@ export function getRepositoryPaneSearchEntries(
       ]
     },
     {
-      title: translate('auto.components.settings.repository.search.b24f00294a', 'Repo Group Icon'),
+      title: translate('auto.components.settings.repository.search.b24f00294a', 'Project Icon'),
       description: translate(
         'auto.components.settings.repository.search.a1f3a2bd47',
         'Project icon and color used in the sidebar and tabs.'
@@ -126,7 +126,7 @@ export function getRepositoryPaneSearchEntries(
           {
             title: translate(
               'auto.components.settings.repository.search.projectRuntime',
-              'Repo Group Runtime'
+              'Project Runtime'
             ),
             description: translate(
               'auto.components.settings.repository.search.projectRuntimeDescription',
@@ -164,10 +164,7 @@ export function getRepositoryPaneSearchEntries(
         ]),
     ...(isFolder ? [] : getRepositoryGitWorktreeSearchEntries(repo)),
     {
-      title: translate(
-        'auto.components.settings.repository.search.c5266c2c9d',
-        'Remove Repo Group'
-      ),
+      title: translate('auto.components.settings.repository.search.c5266c2c9d', 'Remove Project'),
       description: translate(
         'auto.components.settings.repository.search.c86478c3d8',
         'Remove this project from Orca.'
@@ -189,7 +186,7 @@ export function getRepositoryPaneSearchEntries(
       ]
     },
     {
-      title: translate('auto.components.settings.repository.search.b24f00294a', 'Repo Group Icon'),
+      title: translate('auto.components.settings.repository.search.b24f00294a', 'Project Icon'),
       description: translate(
         'auto.components.settings.repository.search.a1f3a2bd47',
         'Project icon and color used in the sidebar and tabs.'

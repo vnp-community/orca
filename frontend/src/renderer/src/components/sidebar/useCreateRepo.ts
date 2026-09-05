@@ -221,7 +221,7 @@ export function useCreateRepo(
         toast.info(
           translate(
             'auto.components.sidebar.AddRepoCreateStep.2c12db1511',
-            'Repo Group already added'
+            'Project already added'
           ),
           {
             description: repo.displayName
