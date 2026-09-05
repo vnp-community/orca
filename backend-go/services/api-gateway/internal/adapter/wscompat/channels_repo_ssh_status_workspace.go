@@ -91,6 +91,7 @@ type cloneResultView struct {
 type initRepoResultView struct {
 	Path          string `json:"path"`
 	DefaultBranch string `json:"defaultBranch"`
+	RemoteAdded   bool   `json:"remoteAdded"`
 }
 
 // ── repo.* ───────────────────────────────────────────────────────────────
@@ -490,6 +491,10 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 			DevServerID   string `json:"devServerId"`
 			DestPath      string `json:"destPath"`
 			DefaultBranch string `json:"defaultBranch"`
+			// RemoteURL/RemoteName: "Initialize as Git repo" feature's
+			// optional second step — empty RemoteURL = no remote added.
+			RemoteURL  string `json:"remoteUrl"`
+			RemoteName string `json:"remoteName"`
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
@@ -500,11 +505,14 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		defer cancel()
 		resp, err := git.InitRepo(rpcCtx, &gitgatewayv1.InitRepoRequest{
 			DevServerId: in.DevServerID, DestPath: in.DestPath, DefaultBranch: in.DefaultBranch,
+			RemoteUrl: in.RemoteURL, RemoteName: in.RemoteName,
 		})
 		if err != nil {
 			return nil, err
 		}
-		return initRepoResultView{Path: resp.GetPath(), DefaultBranch: resp.GetDefaultBranch()}, nil
+		return initRepoResultView{
+			Path: resp.GetPath(), DefaultBranch: resp.GetDefaultBranch(), RemoteAdded: resp.GetRemoteAdded(),
+		}, nil
 	})
 
 	r.Register("repo.hooksCheck", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {

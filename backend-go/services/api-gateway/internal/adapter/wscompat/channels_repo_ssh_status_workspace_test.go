@@ -364,6 +364,29 @@ func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
 		}
 	})
 
+	t.Run("repo.create with a remote URL", func(t *testing.T) {
+		var gotReq *gitgatewayv1.InitRepoRequest
+		git.initRepoFunc = func(ctx context.Context, in *gitgatewayv1.InitRepoRequest) (*gitgatewayv1.InitRepoResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.InitRepoResponse{Path: "/repo", DefaultBranch: "main", RemoteAdded: true}, nil
+		}
+		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.create",
+			argsJSON(t, map[string]any{
+				"devServerId": "ds1", "destPath": "/repo",
+				"remoteUrl": "https://example.com/org/repo.git", "remoteName": "upstream",
+			}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRemoteUrl() != "https://example.com/org/repo.git" || gotReq.GetRemoteName() != "upstream" {
+			t.Errorf("unexpected InitRepoRequest: %+v", gotReq)
+		}
+		view, ok := result.(initRepoResultView)
+		if !ok || !view.RemoteAdded {
+			t.Errorf("unexpected result: %+v", result)
+		}
+	})
+
 	t.Run("repo.hooksCheck", func(t *testing.T) {
 		var gotReq *gitgatewayv1.CheckHooksRequest
 		git.checkHooksFunc = func(ctx context.Context, in *gitgatewayv1.CheckHooksRequest) (*gitgatewayv1.CheckHooksResponse, error) {

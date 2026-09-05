@@ -601,10 +601,17 @@ message InitRepoRequest {
   string dev_server_id = 1;
   string dest_path = 2;
   string default_branch = 3; // empty = git's own default
+  // remote_url: if set, `git remote add <remote_name> <remote_url>` runs in
+  // the same call, right after `git init` — added for the "Initialize as
+  // Git repo" feature (a folder added to Orca that isn't a git repo yet).
+  // remote_name defaults to "origin" server-side when empty.
+  string remote_url = 4;
+  string remote_name = 5;
 }
 message InitRepoResponse {
   string path = 1;
   string default_branch = 2;
+  bool remote_added = 3;
 }
 
 message CheckHooksRequest { string worktree_id = 1; }

@@ -364,11 +364,12 @@ func (s *Server) Clone(ctx context.Context, req *gitgatewayv1.CloneRequest) (*gi
 func (s *Server) InitRepo(ctx context.Context, req *gitgatewayv1.InitRepoRequest) (*gitgatewayv1.InitRepoResponse, error) {
 	result, err := s.initRepo.Execute(ctx, usecase.InitRepoInput{
 		DevServerID: req.GetDevServerId(), DestPath: req.GetDestPath(), DefaultBranch: req.GetDefaultBranch(),
+		RemoteName: req.GetRemoteName(), RemoteURL: req.GetRemoteUrl(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &gitgatewayv1.InitRepoResponse{Path: result.Path, DefaultBranch: result.DefaultBranch}, nil
+	return &gitgatewayv1.InitRepoResponse{Path: result.Path, DefaultBranch: result.DefaultBranch, RemoteAdded: result.RemoteAdded}, nil
 }
 
 func (s *Server) UpstreamStatus(ctx context.Context, req *gitgatewayv1.UpstreamStatusRequest) (*gitgatewayv1.UpstreamStatusResponse, error) {

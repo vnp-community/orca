@@ -322,12 +322,12 @@ func (f *fakeGitExecutor) Clone(ctx context.Context, url, destPath string) (stri
 	return f.worktreePath, f.defaultBranch, nil
 }
 
-func (f *fakeGitExecutor) InitRepo(ctx context.Context, destPath, defaultBranch string) (string, string, error) {
+func (f *fakeGitExecutor) InitRepo(ctx context.Context, destPath, defaultBranch, remoteName, remoteURL string) (string, string, bool, error) {
 	f.calledInitRepo = true
 	if f.initRepoErr != nil {
-		return "", "", f.initRepoErr
+		return "", "", false, f.initRepoErr
 	}
-	return f.initPath, f.defaultBranch, nil
+	return f.initPath, f.defaultBranch, remoteURL != "", nil
 }
 
 func (f *fakeGitExecutor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {

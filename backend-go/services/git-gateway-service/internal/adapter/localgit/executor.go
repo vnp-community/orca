@@ -330,9 +330,13 @@ func (e *Executor) Clone(ctx context.Context, url, destPath string) (string, str
 // InitRepo runs `git init` (optionally with -b <defaultBranch>, Git 2.28+;
 // falls back to a plain `git init` + `git symbolic-ref` rename for older
 // Git per docs/reference/git-compatibility.md's 2.25 baseline) at destPath.
-func (e *Executor) InitRepo(ctx context.Context, destPath, defaultBranch string) (string, string, error) {
+// remoteURL empty = no remote added ("Initialize as Git repo" feature's
+// optional second step, done in the same call as init so the caller
+// doesn't need a follow-up round trip). remoteName defaults to "origin"
+// when empty and remoteURL is set.
+func (e *Executor) InitRepo(ctx context.Context, destPath, defaultBranch, remoteName, remoteURL string) (string, string, bool, error) {
 	if err := os.MkdirAll(destPath, 0o755); err != nil {
-		return "", "", fmt.Errorf("mkdir dest path: %w", err)
+		return "", "", false, fmt.Errorf("mkdir dest path: %w", err)
 	}
 	args := []string{"init"}
 	if defaultBranch != "" {
@@ -343,13 +347,26 @@ func (e *Executor) InitRepo(ctx context.Context, destPath, defaultBranch string)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return "", "", fmt.Errorf("git init: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return "", "", false, fmt.Errorf("git init: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
+
+	remoteAdded := false
+	if remoteURL != "" {
+		name := remoteName
+		if name == "" {
+			name = "origin"
+		}
+		if _, err := e.run(ctx, destPath, "remote", "add", name, remoteURL); err != nil {
+			return destPath, defaultBranch, false, fmt.Errorf("git remote add: %w", err)
+		}
+		remoteAdded = true
+	}
+
 	branch, err := e.run(ctx, destPath, "symbolic-ref", "--short", "HEAD")
 	if err != nil {
-		return destPath, defaultBranch, nil // best-effort: init succeeded even if branch read fails
+		return destPath, defaultBranch, remoteAdded, nil // best-effort: init succeeded even if branch read fails
 	}
-	return destPath, strings.TrimSpace(branch), nil
+	return destPath, strings.TrimSpace(branch), remoteAdded, nil
 }
 
 // BaseRefDefault resolves the remote's default branch via

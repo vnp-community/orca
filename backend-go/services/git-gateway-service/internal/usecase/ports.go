@@ -163,7 +163,8 @@ type GitExecutor interface {
 	// every other GitExecutor method, they are not called with a repoPath
 	// resolved from an existing worktreeId/connectionId. See DevServerReachability.
 	Clone(ctx context.Context, url, destPath string) (worktreePath, defaultBranch string, err error)
-	InitRepo(ctx context.Context, destPath, defaultBranch string) (path, resolvedDefaultBranch string, err error)
+	// remoteURL empty = no remote added (remoteName is ignored in that case).
+	InitRepo(ctx context.Context, destPath, defaultBranch, remoteName, remoteURL string) (path, resolvedDefaultBranch string, remoteAdded bool, err error)
 
 	BaseRefDefault(ctx context.Context, repoPath string) (ref string, err error)
 	SearchRefs(ctx context.Context, repoPath, query string) (refs []string, err error)

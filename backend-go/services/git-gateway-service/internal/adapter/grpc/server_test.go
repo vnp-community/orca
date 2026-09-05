@@ -161,8 +161,8 @@ func (fakeExecutor) Clone(context.Context, string, string) (string, string, erro
 	return "/repo/cloned", "main", nil
 }
 
-func (fakeExecutor) InitRepo(context.Context, string, string) (string, string, error) {
-	return "/repo/init", "main", nil
+func (fakeExecutor) InitRepo(context.Context, string, string, string, string) (string, string, bool, error) {
+	return "/repo/init", "main", false, nil
 }
 
 func (fakeExecutor) BaseRefDefault(context.Context, string) (string, error) {

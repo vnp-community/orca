@@ -11,11 +11,16 @@ type InitRepoInput struct {
 	DevServerID   string
 	DestPath      string
 	DefaultBranch string
+	// RemoteURL empty = no remote added ("Initialize as Git repo" feature's
+	// optional second step, done in the same call as init).
+	RemoteURL  string
+	RemoteName string
 }
 
 type InitRepoResult struct {
 	Path          string
 	DefaultBranch string
+	RemoteAdded   bool
 }
 
 // InitRepo runs `git init` at DestPath on whichever host DevServerID
@@ -48,9 +53,9 @@ func (uc *InitRepo) Execute(ctx context.Context, in InitRepoInput) (InitRepoResu
 		ctx = WithDevServerID(ctx, in.DevServerID)
 		executor = uc.relay
 	}
-	path, defaultBranch, err := executor.InitRepo(ctx, in.DestPath, in.DefaultBranch)
+	path, defaultBranch, remoteAdded, err := executor.InitRepo(ctx, in.DestPath, in.DefaultBranch, in.RemoteName, in.RemoteURL)
 	if err != nil {
 		return InitRepoResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_INIT_REPO_FAILED", "failed to init repository", err)
 	}
-	return InitRepoResult{Path: path, DefaultBranch: defaultBranch}, nil
+	return InitRepoResult{Path: path, DefaultBranch: defaultBranch, RemoteAdded: remoteAdded}, nil
 }

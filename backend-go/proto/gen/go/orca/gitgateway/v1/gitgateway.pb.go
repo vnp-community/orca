@@ -4528,6 +4528,12 @@ type InitRepoRequest struct {
 	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
 	DestPath      string                 `protobuf:"bytes,2,opt,name=dest_path,json=destPath,proto3" json:"dest_path,omitempty"`
 	DefaultBranch string                 `protobuf:"bytes,3,opt,name=default_branch,json=defaultBranch,proto3" json:"default_branch,omitempty"` // empty = git's own default
+	// remote_url: if set, `git remote add <remote_name> <remote_url>` runs in
+	// the same call, right after `git init` — added for the "Initialize as
+	// Git repo" feature (a folder added to Orca that isn't a git repo yet).
+	// remote_name defaults to "origin" server-side when empty.
+	RemoteUrl     string `protobuf:"bytes,4,opt,name=remote_url,json=remoteUrl,proto3" json:"remote_url,omitempty"`
+	RemoteName    string `protobuf:"bytes,5,opt,name=remote_name,json=remoteName,proto3" json:"remote_name,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4583,10 +4589,25 @@ func (x *InitRepoRequest) GetDefaultBranch() string {
 	return ""
 }
 
+func (x *InitRepoRequest) GetRemoteUrl() string {
+	if x != nil {
+		return x.RemoteUrl
+	}
+	return ""
+}
+
+func (x *InitRepoRequest) GetRemoteName() string {
+	if x != nil {
+		return x.RemoteName
+	}
+	return ""
+}
+
 type InitRepoResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Path          string                 `protobuf:"bytes,1,opt,name=path,proto3" json:"path,omitempty"`
 	DefaultBranch string                 `protobuf:"bytes,2,opt,name=default_branch,json=defaultBranch,proto3" json:"default_branch,omitempty"`
+	RemoteAdded   bool                   `protobuf:"varint,3,opt,name=remote_added,json=remoteAdded,proto3" json:"remote_added,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4633,6 +4654,13 @@ func (x *InitRepoResponse) GetDefaultBranch() string {
 		return x.DefaultBranch
 	}
 	return ""
+}
+
+func (x *InitRepoResponse) GetRemoteAdded() bool {
+	if x != nil {
+		return x.RemoteAdded
+	}
+	return false
 }
 
 type CheckHooksRequest struct {
@@ -7266,14 +7294,19 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\x05query\x18\x02 \x01(\tR\x05query\x12\x17\n" +
 	"\arepo_id\x18\x03 \x01(\tR\x06repoId\"(\n" +
 	"\x12SearchRefsResponse\x12\x12\n" +
-	"\x04refs\x18\x01 \x03(\tR\x04refs\"y\n" +
+	"\x04refs\x18\x01 \x03(\tR\x04refs\"\xb9\x01\n" +
 	"\x0fInitRepoRequest\x12\"\n" +
 	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12\x1b\n" +
 	"\tdest_path\x18\x02 \x01(\tR\bdestPath\x12%\n" +
-	"\x0edefault_branch\x18\x03 \x01(\tR\rdefaultBranch\"M\n" +
+	"\x0edefault_branch\x18\x03 \x01(\tR\rdefaultBranch\x12\x1d\n" +
+	"\n" +
+	"remote_url\x18\x04 \x01(\tR\tremoteUrl\x12\x1f\n" +
+	"\vremote_name\x18\x05 \x01(\tR\n" +
+	"remoteName\"p\n" +
 	"\x10InitRepoResponse\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12%\n" +
-	"\x0edefault_branch\x18\x02 \x01(\tR\rdefaultBranch\"4\n" +
+	"\x0edefault_branch\x18\x02 \x01(\tR\rdefaultBranch\x12!\n" +
+	"\fremote_added\x18\x03 \x01(\bR\vremoteAdded\"4\n" +
 	"\x11CheckHooksRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\"k\n" +

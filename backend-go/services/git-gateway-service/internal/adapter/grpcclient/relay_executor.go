@@ -567,15 +567,17 @@ func (r *RelayExecutor) Clone(ctx context.Context, url, destPath string) (string
 	return result.WorktreePath, result.DefaultBranch, err
 }
 
-func (r *RelayExecutor) InitRepo(ctx context.Context, destPath, defaultBranch string) (string, string, error) {
+func (r *RelayExecutor) InitRepo(ctx context.Context, destPath, defaultBranch, remoteName, remoteURL string) (string, string, bool, error) {
 	var result struct {
 		Path          string `json:"path"`
 		DefaultBranch string `json:"defaultBranch"`
+		RemoteAdded   bool   `json:"remoteAdded"`
 	}
 	err := r.relay(ctx, destPath, "git.init", map[string]any{
 		"destPath": destPath, "defaultBranch": defaultBranch,
+		"remoteName": remoteName, "remoteUrl": remoteURL,
 	}, &result)
-	return result.Path, result.DefaultBranch, err
+	return result.Path, result.DefaultBranch, result.RemoteAdded, err
 }
 
 func (r *RelayExecutor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {
