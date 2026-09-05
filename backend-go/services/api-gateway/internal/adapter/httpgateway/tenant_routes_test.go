@@ -191,6 +191,22 @@ func (f *fakeTenantServiceClient) RemoveTeamMember(_ context.Context, _ *tenantv
 	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
 }
 
+func (f *fakeTenantServiceClient) AddCompanyEmailDomain(_ context.Context, _ *tenantv1.AddCompanyEmailDomainRequest, _ ...grpc.CallOption) (*tenantv1.AddCompanyEmailDomainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) RemoveCompanyEmailDomain(_ context.Context, _ *tenantv1.RemoveCompanyEmailDomainRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) ListCompanyEmailDomains(_ context.Context, _ *tenantv1.ListCompanyEmailDomainsRequest, _ ...grpc.CallOption) (*tenantv1.ListCompanyEmailDomainsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) ResolveCompanyByEmailDomain(_ context.Context, _ *tenantv1.ResolveCompanyByEmailDomainRequest, _ ...grpc.CallOption) (*tenantv1.ResolveCompanyByEmailDomainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
 // tenantTestRouter mounts mountTenantRoutes standalone (router.go isn't
 // touched by this package's tests, per task instructions) and injects an
 // identity into the request context the same way authMiddleware would.

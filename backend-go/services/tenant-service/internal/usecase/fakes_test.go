@@ -108,6 +108,45 @@ func (f *fakeCompanyRepository) Update(ctx context.Context, id string, patch dom
 	return c, true, nil
 }
 
+// fakeCompanyEmailDomainRepository is an in-memory CompanyEmailDomainRepository.
+type fakeCompanyEmailDomainRepository struct {
+	byDomain map[string]string // email_domain -> company_id
+
+	resolveErr error
+}
+
+func newFakeCompanyEmailDomainRepository() *fakeCompanyEmailDomainRepository {
+	return &fakeCompanyEmailDomainRepository{byDomain: map[string]string{}}
+}
+
+func (f *fakeCompanyEmailDomainRepository) Add(ctx context.Context, companyID, emailDomain string) error {
+	f.byDomain[emailDomain] = companyID
+	return nil
+}
+
+func (f *fakeCompanyEmailDomainRepository) Remove(ctx context.Context, emailDomain string) error {
+	delete(f.byDomain, emailDomain)
+	return nil
+}
+
+func (f *fakeCompanyEmailDomainRepository) ListForCompany(ctx context.Context, companyID string) ([]string, error) {
+	var out []string
+	for d, c := range f.byDomain {
+		if c == companyID {
+			out = append(out, d)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeCompanyEmailDomainRepository) ResolveCompanyID(ctx context.Context, emailDomain string) (string, bool, error) {
+	if f.resolveErr != nil {
+		return "", false, f.resolveErr
+	}
+	companyID, ok := f.byDomain[emailDomain]
+	return companyID, ok, nil
+}
+
 type departmentKey struct{ companyID, id string }
 
 type fakeDepartmentRepository struct {

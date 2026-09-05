@@ -154,11 +154,12 @@ func (uc *LoginOrProvisionSsoUser) Execute(ctx context.Context, in VerifiedSsoId
 		return LoginOrProvisionSsoUserOutput{}, apperrors.New(apperrors.KindPermissionDenied, "AUTH_SSO_EMAIL_NOT_VERIFIED", "the identity provider did not verify this email address; verify it with your identity provider and try again, or ask an admin to create your account", nil)
 	}
 
-	// Step 5: brand-new user. Resolve which tenant it belongs to, fail
-	// closed rather than guess — see TenantResolver's doc comment.
-	tenantID, err := uc.tenants.ResolveDefaultTenant(ctx)
+	// Step 5: brand-new user. Resolve which tenant it belongs to from the
+	// verified email's domain, fail closed rather than guess — see
+	// TenantResolver's doc comment.
+	tenantID, err := uc.tenants.ResolveTenantForEmail(ctx, in.Email)
 	if err != nil {
-		return LoginOrProvisionSsoUserOutput{}, apperrors.New(apperrors.KindFailedPrecondition, "AUTH_SSO_AMBIGUOUS_TENANT", "SSO sign-up isn't available for this deployment yet; contact an admin", err)
+		return LoginOrProvisionSsoUserOutput{}, apperrors.New(apperrors.KindFailedPrecondition, "AUTH_SSO_UNKNOWN_ORGANIZATION", "your organization isn't set up for SSO sign-up yet; ask an admin to register your email domain", err)
 	}
 
 	// auth.users.password_hash is NOT NULL — an SSO-only user gets a

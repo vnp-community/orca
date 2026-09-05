@@ -79,6 +79,7 @@ func run() error {
 	departments := tenantpostgres.NewDepartmentRepository(pool)
 	profiles := tenantpostgres.NewUserProfileRepository(pool)
 	teams := tenantpostgres.NewTeamRepository(pool)
+	companyEmailDomains := tenantpostgres.NewCompanyEmailDomainRepository(pool)
 
 	// In-process LRU-with-TTL cache — a usecase-layer decorator, not
 	// baked into adapter/postgres. See tenant-service.md §6 for why this
@@ -140,6 +141,10 @@ func run() error {
 	removeTeamMemberUC := usecase.NewRemoveTeamMember(teams, profileCache, invalidationPublisher)
 	getOnboardingStateUC := usecase.NewGetOnboardingState(profiles)
 	setOnboardingStateUC := usecase.NewSetOnboardingState(profiles)
+	addCompanyEmailDomainUC := usecase.NewAddCompanyEmailDomain(companies, companyEmailDomains)
+	removeCompanyEmailDomainUC := usecase.NewRemoveCompanyEmailDomain(companyEmailDomains)
+	listCompanyEmailDomainsUC := usecase.NewListCompanyEmailDomains(companyEmailDomains)
+	resolveCompanyByEmailDomainUC := usecase.NewResolveCompanyByEmailDomain(companyEmailDomains)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	tenantv1.RegisterTenantServiceServer(grpcServer, tenantgrpc.New(
@@ -162,6 +167,10 @@ func run() error {
 		removeTeamMemberUC,
 		getOnboardingStateUC,
 		setOnboardingStateUC,
+		addCompanyEmailDomainUC,
+		removeCompanyEmailDomainUC,
+		listCompanyEmailDomainsUC,
+		resolveCompanyByEmailDomainUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

@@ -378,7 +378,7 @@ type fakeTenantResolver struct {
 	err      error
 }
 
-func (f *fakeTenantResolver) ResolveDefaultTenant(ctx context.Context) (string, error) {
+func (f *fakeTenantResolver) ResolveTenantForEmail(ctx context.Context, email string) (string, error) {
 	if f.err != nil {
 		return "", f.err
 	}

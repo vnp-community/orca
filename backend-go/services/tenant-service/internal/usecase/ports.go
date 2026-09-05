@@ -34,6 +34,33 @@ type CompanyRepository interface {
 	List(ctx context.Context) ([]domain.Company, error)
 }
 
+// CompanyEmailDomainRepository persists the email-domain -> company mapping
+// (tenant.company_email_domains) — the multi-tenant SSO follow-up to
+// CR-LOGIN-001. Every method takes/returns an already-normalized domain
+// (domain.NormalizeEmailDomain) — normalization is the usecase layer's job,
+// not this port's.
+type CompanyEmailDomainRepository interface {
+	// Add registers emailDomain as belonging to companyID. Re-adding the
+	// same (companyID, emailDomain) pair is a no-op, not an error — the
+	// usecase layer is responsible for rejecting an attempt to register a
+	// domain already claimed by a DIFFERENT company (see
+	// AddCompanyEmailDomain's doc comment); this method itself doesn't
+	// enforce that, it just persists.
+	Add(ctx context.Context, companyID, emailDomain string) error
+	// Remove deletes one domain's mapping. Removing a domain that isn't
+	// registered is a no-op, not an error.
+	Remove(ctx context.Context, emailDomain string) error
+	// ListForCompany returns every domain currently registered to
+	// companyID, for the admin-facing "what domains does this company
+	// own" view.
+	ListForCompany(ctx context.Context, companyID string) ([]string, error)
+	// ResolveCompanyID returns found=false (not an error) when no company
+	// has registered emailDomain — the "this domain isn't set up for SSO
+	// yet" case, which the caller (auth-service, via gRPC) surfaces as a
+	// clear error rather than guessing a tenant.
+	ResolveCompanyID(ctx context.Context, emailDomain string) (companyID string, found bool, err error)
+}
+
 // DepartmentRepository persists Department aggregates, always scoped by
 // companyID — see tenant-service.md §9: "never inferred from a nested
 // resource ID"; a department_id from another company must resolve as

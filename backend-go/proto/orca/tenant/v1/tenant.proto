@@ -50,6 +50,17 @@ service TenantService {
   // comment for why this is a dedicated store, not settings_json.
   rpc GetOnboardingState(GetOnboardingStateRequest) returns (GetOnboardingStateResponse);
   rpc SetOnboardingState(SetOnboardingStateRequest) returns (google.protobuf.Empty);
+
+  // ── Multi-tenant SSO follow-up (CR-LOGIN-001) ─────────────────────────
+  // Add/Remove/ListCompanyEmailDomains are admin-console operations (caller
+  // MUST admin-gate — see AddCompanyEmailDomain's doc comment).
+  // ResolveCompanyByEmailDomain is a system-internal read auth-service
+  // calls server-to-server to decide a brand-new SSO signup's tenant — NOT
+  // an admin-console operation, never exposed as an end-user REST route.
+  rpc AddCompanyEmailDomain(AddCompanyEmailDomainRequest) returns (AddCompanyEmailDomainResponse);
+  rpc RemoveCompanyEmailDomain(RemoveCompanyEmailDomainRequest) returns (google.protobuf.Empty);
+  rpc ListCompanyEmailDomains(ListCompanyEmailDomainsRequest) returns (ListCompanyEmailDomainsResponse);
+  rpc ResolveCompanyByEmailDomain(ResolveCompanyByEmailDomainRequest) returns (ResolveCompanyByEmailDomainResponse);
 }
 
 message Company {
@@ -249,4 +260,35 @@ message GetOnboardingStateResponse {
 message SetOnboardingStateRequest {
   string user_id = 1;
   string state_json = 2;
+}
+
+// ── Multi-tenant SSO follow-up (CR-LOGIN-001) ───────────────────────────
+message AddCompanyEmailDomainRequest {
+  string company_id = 1;
+  string email_domain = 2; // bare domain, e.g. "vnpay.vn" — no "@", no scheme
+}
+message AddCompanyEmailDomainResponse {
+  string email_domain = 1; // normalized (lowercased) form actually stored
+}
+
+message RemoveCompanyEmailDomainRequest {
+  string email_domain = 1;
+}
+
+message ListCompanyEmailDomainsRequest {
+  string company_id = 1;
+}
+message ListCompanyEmailDomainsResponse {
+  repeated string email_domains = 1;
+}
+
+message ResolveCompanyByEmailDomainRequest {
+  string email_domain = 1;
+}
+message ResolveCompanyByEmailDomainResponse {
+  string company_id = 1;
+  // found=false means no company has registered this domain — the caller
+  // (auth-service) surfaces this as "SSO isn't set up for this
+  // organization yet", never guesses a fallback tenant.
+  bool found = 2;
 }
