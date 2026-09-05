@@ -47,6 +47,10 @@ func (c *TaskExecutionChecker) Close() error {
 // see this type's doc comment for the one-way in_progress caveat the
 // answer is subject to today.
 func (c *TaskExecutionChecker) HasActiveExecutions(ctx context.Context, projectID string) (bool, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return false, fmt.Errorf("grpcclient: task-service HasActiveExecutions: %w", err)
+	}
 	resp, err := c.client.HasActiveExecutions(ctx, &taskv1.HasActiveExecutionsRequest{ProjectId: projectID})
 	if err != nil {
 		return false, fmt.Errorf("grpcclient: task-service HasActiveExecutions: %w", err)

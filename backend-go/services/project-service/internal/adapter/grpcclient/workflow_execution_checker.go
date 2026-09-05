@@ -42,6 +42,10 @@ func (c *WorkflowExecutionChecker) Close() error {
 // — see that RPC's proto doc comment: true iff projectID has a workflow
 // execution in a non-terminal (pending/running/paused) status.
 func (c *WorkflowExecutionChecker) HasActiveExecutions(ctx context.Context, projectID string) (bool, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return false, fmt.Errorf("grpcclient: workflow-service HasActiveExecutions: %w", err)
+	}
 	resp, err := c.client.HasActiveExecutions(ctx, &workflowv1.HasActiveExecutionsRequest{ProjectId: projectID})
 	if err != nil {
 		return false, fmt.Errorf("grpcclient: workflow-service HasActiveExecutions: %w", err)
