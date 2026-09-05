@@ -160,4 +160,18 @@ describe('web-client repo fetch: local leg vs environment leg', () => {
     expect(matches).toHaveLength(1)
     expect(matches[0]?.devServerId).toBe('test-01')
   })
+
+  // Why: fetchReposForAllHosts' {kind:'local'} leg is the FIRST fetch to run
+  // on every page load (App.tsx's boot effect) — before this fix, it always
+  // hardcoded LOCAL_EXECUTION_HOST_ID for a web client, ignoring devServerId
+  // entirely. Regression guard for "Available Hosts showing Local Mac even
+  // right after a hard refresh."
+  it('resolves executionHostId from devServerId on the very first (local-leg) load', async () => {
+    const store = createTestStore()
+
+    await store.getState().fetchReposForAllHosts()
+
+    const repo = store.getState().repos.find((r) => r.id === 'aiops-v3')
+    expect(repo?.executionHostId).toBe('devServer:test-01')
+  })
 })

@@ -403,6 +403,18 @@ function repoWithFetchedOwner(repo: Repo, target: ReturnType<typeof getActiveRun
   if (repo.connectionId) {
     return { ...repo, executionHostId: getRepoExecutionHostId(repo) }
   }
+  // Why: fetchReposForAllHosts' own {kind:'local'} leg is, for a paired web
+  // client, the SAME session-auth connection as the 'environment' branch
+  // above (there is no genuinely distinct "local" host there) — and it runs
+  // first on every page load (App.tsx's boot effect), so it must resolve a
+  // repo's real devServerId too, not hardcode LOCAL_EXECUTION_HOST_ID.
+  // Skipping this left "Available Hosts" showing "Local Mac" even right
+  // after a hard refresh, since this leg's stamp is the very first one any
+  // repo gets. A genuinely-local (Electron desktop) repo has no dev-server
+  // concept and keeps the bare 'local' fallback.
+  if (isWebClientLocation()) {
+    return { ...repo, executionHostId: getRepoExecutionHostId(repo) }
+  }
   return repo.executionHostId ? repo : { ...repo, executionHostId: LOCAL_EXECUTION_HOST_ID }
 }
 
