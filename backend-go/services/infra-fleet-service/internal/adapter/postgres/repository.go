@@ -17,6 +17,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
@@ -542,6 +543,85 @@ func (r *Repository) UpsertFleetHealth(ctx context.Context, h domain.DevServerHe
 	`, h.DevServerID, h.Reachable, h.CPUPercent, h.RAMPercent, h.DiskPercent, h.LatencyMS, status)
 	if err != nil {
 		return fmt.Errorf("postgres: upsert fleet health: %w", err)
+	}
+	return nil
+}
+
+// GetDevServerHealth returns devServerID's current (about-to-be-overwritten)
+// sample — PollFleetHealth's transition-detection read, called BEFORE
+// UpsertFleetHealth. found=false (not an error) when no sample exists yet,
+// e.g. this dev server's very first poll.
+func (r *Repository) GetDevServerHealth(ctx context.Context, devServerID string) (domain.DevServerHealth, bool, error) {
+	var h domain.DevServerHealth
+	err := r.pool.QueryRow(ctx, `
+		SELECT dev_server_id, reachable, cpu_percent, ram_percent, disk_percent, latency_ms
+		FROM infra.fleet_health
+		WHERE dev_server_id = $1
+	`, devServerID).Scan(&h.DevServerID, &h.Reachable, &h.CPUPercent, &h.RAMPercent, &h.DiskPercent, &h.LatencyMS)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.DevServerHealth{}, false, nil
+	}
+	if err != nil {
+		return domain.DevServerHealth{}, false, fmt.Errorf("postgres: query dev server health: %w", err)
+	}
+	return h, true, nil
+}
+
+// InsertOutboxEvent enqueues one row for common/outbox.Relay to publish —
+// implements usecase.OutboxWriter against infra.outbox_events
+// (migrations/0012_outbox_events).
+func (r *Repository) InsertOutboxEvent(ctx context.Context, event domain.OutboxEvent) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO infra.outbox_events (id, tenant_id, subject, occurred_at, version, payload)
+		VALUES ($1, $2, $3, $4, 1, $5)
+	`, event.ID, event.TenantID, event.Subject, event.OccurredAt, event.PayloadJSON)
+	if err != nil {
+		return fmt.Errorf("postgres: insert outbox event: %w", err)
+	}
+	return nil
+}
+
+// FetchUnpublished and MarkPublished implement common/outbox.Store — see
+// cmd/server/main.go for where the relay is wired, mirroring usage-service's
+// identical pattern (that service's own repository.go carries the same doc
+// comment on its own copies of these two methods).
+func (r *Repository) FetchUnpublished(ctx context.Context, limit int) ([]outbox.Record, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, subject, occurred_at, version, payload
+		FROM infra.outbox_events
+		WHERE published_at IS NULL
+		ORDER BY created_at
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query unpublished outbox events: %w", err)
+	}
+	defer rows.Close()
+
+	var out []outbox.Record
+	for rows.Next() {
+		var rec outbox.Record
+		if err := rows.Scan(&rec.ID, &rec.Event.TenantID, &rec.Subject, &rec.Event.OccurredAt, &rec.Event.Version, &rec.Event.Payload); err != nil {
+			return nil, fmt.Errorf("postgres: scan outbox event row: %w", err)
+		}
+		rec.Event.ID = rec.ID
+		out = append(out, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate outbox event rows: %w", err)
+	}
+	return out, nil
+}
+
+func (r *Repository) MarkPublished(ctx context.Context, ids []string) error {
+	if len(ids) == 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx, `
+		UPDATE infra.outbox_events SET published_at = now() WHERE id = ANY($1)
+	`, ids)
+	if err != nil {
+		return fmt.Errorf("postgres: mark outbox events published: %w", err)
 	}
 	return nil
 }

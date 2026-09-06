@@ -177,6 +177,18 @@ type FleetHealthPort interface {
 // specs/backend-go/services/infra-fleet-service.md §8" actually covers now.
 type FleetHealthWriter interface {
 	UpsertFleetHealth(ctx context.Context, health domain.DevServerHealth) error
+	// GetDevServerHealth returns devServerID's PREVIOUS sample (found=false
+	// if none exists yet, e.g. its first-ever poll) — read before
+	// UpsertFleetHealth overwrites it, so PollFleetHealth can detect a
+	// reachable=true -> false transition to alert on.
+	GetDevServerHealth(ctx context.Context, devServerID string) (health domain.DevServerHealth, found bool, err error)
+}
+
+// OutboxWriter enqueues a durably-committed event row for
+// common/outbox.Relay to publish — see PollFleetHealth's use on a dev
+// server's reachable=true -> false transition.
+type OutboxWriter interface {
+	InsertOutboxEvent(ctx context.Context, event domain.OutboxEvent) error
 }
 
 // FleetHealthPollerRepository lists poll targets — deliberately a separate,

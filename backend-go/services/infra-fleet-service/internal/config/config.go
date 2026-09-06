@@ -30,6 +30,11 @@ type Config struct {
 	// (via Base) when the file doesn't exist, which is what local dev and
 	// this scaffold's testcontainers path use instead.
 	DatabaseCredentialsFile string
+	// NATSURL backs the transactional-outbox relay (common/outbox.Relay) —
+	// see usage-service's identical field/usage for the pattern this mirrors.
+	// Currently only used to publish orca.infrafleet.dev_server.disconnected
+	// (see usecase.PollFleetHealth).
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -41,5 +46,6 @@ func Load() (Config, error) {
 		Base:                    base,
 		ServerDeployment:        os.Getenv("ORCA_SERVER_DEPLOYMENT") == "true",
 		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

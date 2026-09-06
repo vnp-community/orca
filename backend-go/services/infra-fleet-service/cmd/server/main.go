@@ -12,6 +12,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"sync"
 	"syscall"
 	"time"
 
@@ -20,9 +21,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
@@ -125,12 +128,43 @@ func run() error {
 	agentClient := infradevserveragent.New(agentCfg, logger, agentOpts...)
 	defer agentClient.Close()
 
+	// Transactional-outbox relay (mirrors usage-service's cmd/server/main.go
+	// exactly) — PollFleetHealth enqueues a row on a dev server's
+	// reachable=true -> false transition (see its own doc comment); this
+	// relay is what actually gets those rows to NATS. NATS being
+	// unreachable at startup is not fatal: rows still get written durably
+	// (PollFleetHealth never touches NATS directly), they just queue up
+	// unpublished until an operator restarts this process once NATS
+	// recovers — same limitation every other NATS-consuming service here
+	// already carries.
+	var outboxRelay *outbox.Relay
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, dev-server-disconnected alerts will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "INFRAFLEET", []string{"orca.infrafleet.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			outboxRelay = outbox.NewRelay(repo, pub, outbox.DefaultConfig, logger)
+		}
+	}
+
+	var outboxRelayWG sync.WaitGroup
+	if outboxRelay != nil {
+		outboxRelayWG.Add(1)
+		go func() {
+			defer outboxRelayWG.Done()
+			outboxRelay.Run(ctx)
+		}()
+	}
+
 	registerDevServerUC := usecase.NewRegisterDevServer(repo)
 	resolveDirectWebSocketDevServerUC := usecase.NewResolveDirectWebSocketDevServer(repo)
 	resolveConnectionUC := usecase.NewResolveConnection(repo)
 	createSshTargetUC := usecase.NewCreateSshTarget(sshTargetStore)
 	getFleetHealthUC := usecase.NewGetFleetHealth(repo)
-	pollFleetHealthUC := usecase.NewPollFleetHealth(repo, repo, agentClient, logger)
+	pollFleetHealthUC := usecase.NewPollFleetHealth(repo, repo, repo, agentClient, logger)
 	scanWorkspacePortsUC := usecase.NewScanWorkspacePorts(repo, agentClient)
 	listDevServersUC := usecase.NewListDevServers(repo)
 	createConnectionUC := usecase.NewCreateConnection(repo)
@@ -326,6 +360,12 @@ func run() error {
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	_ = httpServer.Shutdown(shutdownCtx)
+
+	// Wait for the outbox relay goroutine (if started) to observe ctx
+	// cancellation and return, so it doesn't outlive the rest of the
+	// server on shutdown — same pattern usage-service/notification-service's
+	// own main.go use for their background loops.
+	outboxRelayWG.Wait()
 
 	return nil
 }
