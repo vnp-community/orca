@@ -1922,9 +1922,13 @@ describe('web repos preload API', () => {
     const { installWebPreloadApi } = await import('./web-preload-api')
     installWebPreloadApi()
 
+    const sentHookSettings = {
+      mode: 'auto' as const,
+      scripts: { setup: 'pnpm install', archive: '' }
+    }
     const updated = await globals.window.api.repos.update({
       repoId: 'aiops-v3',
-      updates: { hookSettings: { scripts: { setup: 'pnpm install' } } }
+      updates: { hookSettings: sentHookSettings }
     })
 
     expect(runtimeCalls).toEqual([
@@ -1933,7 +1937,7 @@ describe('web repos preload API', () => {
         params: {
           repoId: 'aiops-v3',
           displayName: '',
-          hookSettings: JSON.stringify({ scripts: { setup: 'pnpm install' } })
+          hookSettings: JSON.stringify(sentHookSettings)
         }
       }
     ])
