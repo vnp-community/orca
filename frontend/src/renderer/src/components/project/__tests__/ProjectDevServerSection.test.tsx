@@ -17,18 +17,6 @@ vi.mock('../../../store', () => ({
   useAppStore: { getState: vi.fn().mockReturnValue({ settings: {} }) }
 }))
 
-const { switchProject, workspaceProject } = vi.hoisted(() => ({
-  switchProject: vi.fn().mockResolvedValue(undefined),
-  workspaceProject: { id: 'p1', devServerId: 'ds-1' }
-}))
-
-vi.mock('../../../context/WorkspaceContext', () => ({
-  useWorkspace: vi.fn().mockReturnValue({
-    project: workspaceProject,
-    switchProject
-  })
-}))
-
 vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 
 // Same flatten-Radix-Select-into-a-native-<select> mock as
@@ -68,10 +56,20 @@ vi.mock('../../ui/select', () => {
 
 const mockRpc = vi.mocked(callRuntimeRpc)
 
+const oneRepo = [
+  {
+    id: 'r1',
+    projectId: 'p1',
+    url: 'https://x',
+    displayName: 'my-repo',
+    position: 0,
+    devServerId: 'ds-1'
+  }
+]
+
 describe('ProjectDevServerSection', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    switchProject.mockResolvedValue(undefined)
     mockRpc.mockImplementation((_target, method) => {
       if (method === 'devServer.list') {
         return Promise.resolve([
@@ -79,41 +77,79 @@ describe('ProjectDevServerSection', () => {
           { id: 'ds-2', name: 'dev-ai', status: 'healthy' }
         ])
       }
+      if (method === 'repo.list') {
+        return Promise.resolve({ repos: [] })
+      }
       return Promise.resolve(undefined)
     })
   })
 
   afterEach(cleanup)
 
-  it('lists dev servers via devServer.list and preselects the project’s current one', async () => {
+  it('shows a no-repos note when the project has no repos yet', async () => {
     render(<ProjectDevServerSection projectId="p1" />)
 
     await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalledWith({ type: 'local' }, 'devServer.list', null)
+      expect(mockRpc).toHaveBeenCalledWith({ type: 'local' }, 'repo.list', { projectId: 'p1' })
     })
-    expect(screen.getByTestId('project-dev-server-select')).toHaveValue('ds-1')
-    // Save starts disabled since the picker already matches the current value.
-    expect(screen.getByTestId('project-dev-server-save')).toBeDisabled()
+    expect(
+      screen.getByText('Add a repo from the Repos tab to set its dev server.')
+    ).toBeInTheDocument()
   })
 
-  it('calls project.rebindDevServer with the picked dev server and refreshes the project', async () => {
+  it('lists a per-repo dev-server select via repo.list, preselecting the repo’s current binding', async () => {
+    mockRpc.mockImplementation((_target, method) => {
+      if (method === 'devServer.list') {
+        return Promise.resolve([
+          { id: 'ds-1', name: 'dev-01', status: 'healthy' },
+          { id: 'ds-2', name: 'dev-ai', status: 'healthy' }
+        ])
+      }
+      if (method === 'repo.list') {
+        return Promise.resolve({ repos: oneRepo })
+      }
+      return Promise.resolve(undefined)
+    })
+
+    render(<ProjectDevServerSection projectId="p1" />)
+
+    await waitFor(() => {
+      expect(screen.getByTestId('repo-dev-server-select-r1')).toHaveValue('ds-1')
+    })
+    // Save starts disabled since the picker already matches the current value.
+    expect(screen.getByTestId('repo-dev-server-save-r1')).toBeDisabled()
+  })
+
+  it('calls repo.rebindDevServer with the picked dev server and refreshes the repo list', async () => {
+    mockRpc.mockImplementation((_target, method) => {
+      if (method === 'devServer.list') {
+        return Promise.resolve([
+          { id: 'ds-1', name: 'dev-01', status: 'healthy' },
+          { id: 'ds-2', name: 'dev-ai', status: 'healthy' }
+        ])
+      }
+      if (method === 'repo.list') {
+        return Promise.resolve({ repos: oneRepo })
+      }
+      return Promise.resolve(undefined)
+    })
+
     render(<ProjectDevServerSection projectId="p1" />)
     await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalledWith({ type: 'local' }, 'devServer.list', null)
+      expect(screen.getByTestId('repo-dev-server-select-r1')).toHaveValue('ds-1')
     })
 
-    fireEvent.change(screen.getByTestId('project-dev-server-select'), {
+    fireEvent.change(screen.getByTestId('repo-dev-server-select-r1'), {
       target: { value: 'ds-2' }
     })
-    expect(screen.getByTestId('project-dev-server-save')).not.toBeDisabled()
-    fireEvent.click(screen.getByTestId('project-dev-server-save'))
+    expect(screen.getByTestId('repo-dev-server-save-r1')).not.toBeDisabled()
+    fireEvent.click(screen.getByTestId('repo-dev-server-save-r1'))
 
     await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalledWith({ type: 'local' }, 'project.rebindDevServer', {
-        projectId: 'p1',
+      expect(mockRpc).toHaveBeenCalledWith({ type: 'local' }, 'repo.rebindDevServer', {
+        repoId: 'r1',
         newDevServerId: 'ds-2'
       })
-      expect(switchProject).toHaveBeenCalledWith('p1')
     })
   })
 })

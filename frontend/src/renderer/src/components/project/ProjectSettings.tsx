@@ -6,6 +6,8 @@ import { MemberManager } from './MemberManager'
 import { RepoMemberManager } from './RepoMemberManager'
 import { LinkedProjectsManager } from './LinkedProjectsManager'
 import { ProjectDevServerSection } from './ProjectDevServerSection'
+import { ProjectDevServerFilterSection } from './ProjectDevServerFilterSection'
+import { ProjectRepoCandidatesSection } from './ProjectRepoCandidatesSection'
 import { ProjectMobileEmulatorAgentSection } from './ProjectMobileEmulatorAgentSection'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { useAppStore } from '../../store'
@@ -31,15 +33,26 @@ export function ProjectSettings({ projectId, open, onClose }: ProjectSettingsPro
   const [repos, setRepos] = useState<RepoListItem[]>([])
   const [selectedRepoId, setSelectedRepoId] = useState<string | null>(null)
   const [currentUserRole, setCurrentUserRole] = useState<ProjectMember['role'] | null>(null)
+  // Pure client-side filter (no RPC write) — ProjectDevServerFilterSection's
+  // selection narrows ProjectRepoCandidatesSection's "repos to add" list
+  // below. Empty set = no filter (every dev server's repos are candidates).
+  const [selectedDevServerIds, setSelectedDevServerIds] = useState<ReadonlySet<string>>(new Set())
+
+  const loadRepos = (): void => {
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    callRuntimeRpc<{ repos: RepoListItem[] }>(target, 'repo.list', { projectId })
+      .then((result) => setRepos(result.repos ?? []))
+      .catch(() => setRepos([]))
+  }
 
   useEffect(() => {
     if (!open) {
       return
     }
-    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    callRuntimeRpc<{ repos: RepoListItem[] }>(target, 'repo.list', { projectId })
-      .then((result) => setRepos(result.repos ?? []))
-      .catch(() => setRepos([]))
+    loadRepos()
+    // loadRepos reads projectId via closure — depending on it directly (not
+    // the function identity, which is recreated every render) is enough.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, projectId])
 
   // BUG-FE-PW-002 — the Linked Projects tab needs to know the viewer's own
@@ -95,6 +108,10 @@ export function ProjectSettings({ projectId, open, onClose }: ProjectSettingsPro
                 General project settings (name, description, repository bindings).
               </p>
               {/* TODO: Add name/description form fields in future tasks */}
+              <ProjectDevServerFilterSection
+                selectedDevServerIds={selectedDevServerIds}
+                onChange={setSelectedDevServerIds}
+              />
               <ProjectDevServerSection projectId={projectId} />
               <ProjectMobileEmulatorAgentSection projectId={projectId} />
             </div>
@@ -105,31 +122,48 @@ export function ProjectSettings({ projectId, open, onClose }: ProjectSettingsPro
           </TabsContent>
 
           <TabsContent value="repos" className="py-2">
-            <div className="space-y-3">
-              <p className="text-xs text-muted-foreground">
-                Pick a repo to manage its functional-role grants (developer/lead/admin) — separate
-                from project membership above.
-              </p>
-              <div className="flex flex-wrap gap-1.5" data-testid="repo-picker">
-                {repos.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No repos in this project yet.</p>
-                ) : (
-                  repos.map((r) => (
-                    <button
-                      key={r.id}
-                      type="button"
-                      data-testid={`repo-picker-item-${r.id}`}
-                      onClick={() => setSelectedRepoId(r.id)}
-                      className={`rounded-md border px-2 py-1 text-xs ${
-                        selectedRepoId === r.id ? 'border-primary bg-primary/10' : 'border-input'
-                      }`}
-                    >
-                      {r.displayName || r.url}
-                    </button>
-                  ))
-                )}
+            <div className="space-y-5">
+              <div className="space-y-2">
+                <p className="text-xs font-medium text-foreground">Add a repo</p>
+                <p className="text-xs text-muted-foreground">
+                  Attach an already-known repo to this project. Use the General tab&apos;s dev
+                  server filter to narrow the list below.
+                </p>
+                <ProjectRepoCandidatesSection
+                  projectId={projectId}
+                  existingRepoIds={new Set(repos.map((r) => r.id))}
+                  selectedDevServerIds={selectedDevServerIds}
+                  onAdded={loadRepos}
+                />
               </div>
-              {selectedRepoId ? <RepoMemberManager repoId={selectedRepoId} /> : null}
+
+              <div className="space-y-2 border-t pt-4">
+                <p className="text-xs font-medium text-foreground">Repo roles</p>
+                <p className="text-xs text-muted-foreground">
+                  Pick a repo to manage its functional-role grants (developer/lead/admin) — separate
+                  from project membership above.
+                </p>
+                <div className="flex flex-wrap gap-1.5" data-testid="repo-picker">
+                  {repos.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">No repos in this project yet.</p>
+                  ) : (
+                    repos.map((r) => (
+                      <button
+                        key={r.id}
+                        type="button"
+                        data-testid={`repo-picker-item-${r.id}`}
+                        onClick={() => setSelectedRepoId(r.id)}
+                        className={`rounded-md border px-2 py-1 text-xs ${
+                          selectedRepoId === r.id ? 'border-primary bg-primary/10' : 'border-input'
+                        }`}
+                      >
+                        {r.displayName || r.url}
+                      </button>
+                    ))
+                  )}
+                </div>
+                {selectedRepoId ? <RepoMemberManager repoId={selectedRepoId} /> : null}
+              </div>
             </div>
           </TabsContent>
 

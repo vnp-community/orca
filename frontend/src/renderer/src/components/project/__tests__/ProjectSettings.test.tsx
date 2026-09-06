@@ -56,6 +56,18 @@ vi.mock('../ProjectDevServerSection', () => ({
   )
 }))
 
+vi.mock('../ProjectDevServerFilterSection', () => ({
+  ProjectDevServerFilterSection: () => <div data-testid="project-dev-server-filter-section" />
+}))
+
+vi.mock('../ProjectRepoCandidatesSection', () => ({
+  ProjectRepoCandidatesSection: ({ projectId }: { projectId: string }) => (
+    <div data-testid="project-repo-candidates-section">
+      ProjectRepoCandidatesSection for {projectId}
+    </div>
+  )
+}))
+
 vi.mock('../../ui/dialog', () => ({
   Dialog: (p: { onOpenChange: MouseEventHandler; children: ReactNode }) => (
     <div data-testid="dialog" onClick={p.onOpenChange}>
