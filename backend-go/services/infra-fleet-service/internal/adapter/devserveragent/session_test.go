@@ -88,6 +88,119 @@ func notificationFor(t *testing.T, method, ptyID, data string, exitCode int32) J
 	return JSONRPCNotification{JSONRPC: "2.0", Method: method, Params: params}
 }
 
+// silentAfterHandshakeAgent handshakes normally, then goes completely silent
+// on every connection — never writes another frame, and never closes the
+// TCP connection either. Distinct from reconnectTestAgent (which drops the
+// connection outright, exercising handleDisconnect via a real transport
+// error): this simulates the failure mode readLoop's per-iteration
+// IdleTimeout deadline exists for — a connection that just stops sending
+// anything (no error, no close) and would otherwise hang forever.
+type silentAfterHandshakeAgent struct {
+	token     string
+	connCount atomic.Int32
+}
+
+func (a *silentAfterHandshakeAgent) handler(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/orca-relay" {
+		http.NotFound(w, r)
+		return
+	}
+	if got := r.Header.Get("Authorization"); got != "Bearer "+a.token {
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+	a.connCount.Add(1)
+
+	conn, err := websocket.Accept(w, r, nil)
+	if err != nil {
+		return
+	}
+	defer conn.CloseNow()
+	ctx := context.Background()
+
+	_, data, err := conn.Read(ctx)
+	if err != nil {
+		return
+	}
+	decoded, err := DecodeFrame(data)
+	if err != nil || decoded.Type != MessageTypeRegular {
+		return
+	}
+	var req JSONRPCRequest
+	if err := json.Unmarshal(decoded.Payload, &req); err != nil || req.Method != "agent.handshake" {
+		return
+	}
+	info := HandshakeInfo{Platform: "linux"}
+	result, _ := json.Marshal(info)
+	resp := JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: result}
+	frame, _ := EncodeJSONRPCFrame(resp, 1, decoded.ID)
+	_ = conn.Write(ctx, websocket.MessageBinary, frame)
+
+	// Go silent forever — block until the test's own cleanup tears the
+	// server down, rather than reading (which would just hang identically)
+	// or writing (which is the exact behavior under test: nothing sent).
+	<-ctx.Done()
+}
+
+// TestSession_IdleTimeout_DetectsSilentConnectionAndReconnects proves
+// readLoop's per-iteration IdleTimeout deadline (not a transport-level
+// error) is what recovers a connection that goes silent without ever
+// closing — the gap this test guards against: before this fix, readLoop's
+// single context.Background() for the whole loop meant a silent-but-still-
+// open connection blocked ReadFrame forever, so neither handleDisconnect
+// nor backgroundReconnect ever ran.
+func TestSession_IdleTimeout_DetectsSilentConnectionAndReconnects(t *testing.T) {
+	agent := &silentAfterHandshakeAgent{token: fakeAgentToken}
+	server := httptest.NewServer(http.HandlerFunc(agent.handler))
+	t.Cleanup(server.Close)
+
+	u, err := url.Parse(server.URL)
+	if err != nil {
+		t.Fatalf("parsing test server URL: %v", err)
+	}
+	host, portStr, err := net.SplitHostPort(u.Host)
+	if err != nil {
+		t.Fatalf("splitting host:port: %v", err)
+	}
+	port, err := strconv.Atoi(portStr)
+	if err != nil {
+		t.Fatalf("parsing port: %v", err)
+	}
+
+	cfg := testConfig(port, fakeAgentToken)
+	cfg.IdleTimeout = 100 * time.Millisecond
+	cfg.ReconnectBaseDelay = 10 * time.Millisecond
+	cfg.ReconnectMaxDelay = 50 * time.Millisecond
+
+	client := New(cfg, slog.Default())
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-idle-timeout", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	healthy, err := client.Health(context.Background(), devServer)
+	if err != nil {
+		t.Fatalf("Health: %v", err)
+	}
+	if !healthy {
+		t.Fatal("expected the initial connection to handshake successfully")
+	}
+
+	// The agent never sends anything after the handshake and never closes
+	// the connection — readLoop's IdleTimeout deadline must be what notices
+	// and drives a reconnect (a second connection to the fake agent).
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if agent.connCount.Load() >= 2 {
+			return
+		}
+		time.Sleep(20 * time.Millisecond)
+	}
+	t.Fatalf("session did not detect the idle connection and reconnect (connCount=%d)", agent.connCount.Load())
+}
+
 // TestSession_RouteNotification_RoutesOnlyToMatchingPtyID is a direct,
 // network-free test of the notification demux: two subscribers on the same
 // session, keyed by different ptyIds, must each see only their own

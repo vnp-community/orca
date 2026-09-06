@@ -224,11 +224,25 @@ func (s *session) runInitiatorHandshake(ctx context.Context, conn *websocket.Con
 }
 
 // readLoop decodes every subsequent frame and routes JSON-RPC responses to
-// their pending caller by ID. Runs until the transport errors/closes.
+// their pending caller by ID. Runs until the transport errors/closes, or
+// cfg.IdleTimeout elapses with no frame received at all (including
+// keepalives) — see the fresh per-iteration deadline below.
+//
+// Why a per-iteration context.WithTimeout, not one long-lived context plus a
+// separate watchdog goroutine comparing timestamps: Transport.ReadFrame's
+// own doc comment guarantees it returns once ctx is cancelled, and
+// wsTransport delegates straight to coder/websocket's conn.Read(ctx), which
+// already does exactly this (cancel → Read errors, connection torn down) —
+// no extra goroutine, no extra mutex-protected "last frame at" field, no
+// second code path to keep in sync with handleDisconnect. Was previously a
+// gap the agent side (Phase 8) had already fixed and documented as "must
+// terminate(), never rely on close() eventually timing out" — this closes
+// the mirror-image gap on the backend-go side of the same connection.
 func (s *session) readLoop(t Transport) {
-	ctx := context.Background()
 	for {
+		ctx, cancel := context.WithTimeout(context.Background(), s.cfg.IdleTimeout)
 		decoded, err := t.ReadFrame(ctx)
+		cancel()
 		if err != nil {
 			s.handleDisconnect(t, err)
 			return
