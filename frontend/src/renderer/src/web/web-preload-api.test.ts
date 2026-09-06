@@ -1880,6 +1880,65 @@ describe('web repos preload API', () => {
 
     expect(repos.find((repo) => repo.id === 'aiops-v3')?.devServerId).toBe('test-01')
   })
+
+  // Why: window.api.repos.update (this file's own separate copy of repos.ts's
+  // updateRepo action, same "keep these two copies in sync" gap as
+  // devServerId above) never sent hookSettings in repo.update's payload at
+  // all — live bug: a typed Setup Script silently never persisted for any
+  // paired-web-client repo, since every window.api.repos.update call lands
+  // here regardless of what repos.ts's own (already-fixed) updateRepo does.
+  it('sends hookSettings in repo.update and merges the confirmed value back', async () => {
+    const runtimeCalls: { method: string; params: unknown }[] = []
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
+          runtimeCalls.push({ method, params })
+          if (method === 'repo.update') {
+            return Promise.resolve({
+              id: method,
+              ok: true,
+              result: {
+                id: 'aiops-v3',
+                projectId: 'default-project',
+                url: '/opt/aiops-v3',
+                displayName: 'aiops-v3',
+                position: 0,
+                hookSettings: JSON.stringify({ scripts: { setup: 'pnpm install' } })
+              },
+              _meta: { runtimeId: 'runtime-1' }
+            })
+          }
+          return Promise.reject(
+            new Error(`unexpected method ${method} params=${JSON.stringify(params)}`)
+          )
+        }
+
+        close(): void {}
+      }
+    }))
+
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    const updated = await globals.window.api.repos.update({
+      repoId: 'aiops-v3',
+      updates: { hookSettings: { scripts: { setup: 'pnpm install' } } }
+    })
+
+    expect(runtimeCalls).toEqual([
+      {
+        method: 'repo.update',
+        params: {
+          repoId: 'aiops-v3',
+          displayName: '',
+          hookSettings: JSON.stringify({ scripts: { setup: 'pnpm install' } })
+        }
+      }
+    ])
+    expect(updated.hookSettings).toEqual({ scripts: { setup: 'pnpm install' } })
+  })
 })
 
 describe('web worktree preload API', () => {

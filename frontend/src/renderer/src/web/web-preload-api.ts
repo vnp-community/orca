@@ -1313,12 +1313,30 @@ type RemoteRepoView = {
   // was fixed there — the field never reached that resolution logic to
   // begin with.
   devServerId?: string
+  // hookSettings: JSON-encoded RepoHookSettings (project.proto's
+  // Repo.hook_settings). Same "found live" story as devServerId above —
+  // repo.update's response carries it, but this file's own copy of
+  // mergeRepoViewIntoRepo never read it, so a typed Setup Script silently
+  // never persisted for any repo whose window.api.repos.update call landed
+  // here (every paired-web-client repo — see this type's own doc comment).
+  hookSettings?: string
 }
 
 function repoDisplayNameFromUrl(url: string): string {
   const trimmed = url.replace(/\/+$/, '')
   const base = trimmed.split('/').findLast(Boolean) || trimmed || url
   return base.replace(/\.git$/, '') || base
+}
+
+function parseRepoHookSettings(raw: string | undefined): Repo['hookSettings'] | undefined {
+  if (!raw) {
+    return undefined
+  }
+  try {
+    return JSON.parse(raw) as Repo['hookSettings']
+  } catch {
+    return undefined
+  }
 }
 
 function mergeRepoViewIntoRepo(view: RemoteRepoView, existing?: Repo): Repo {
@@ -1330,7 +1348,8 @@ function mergeRepoViewIntoRepo(view: RemoteRepoView, existing?: Repo): Repo {
     displayName: view.displayName || repoDisplayNameFromUrl(view.url),
     badgeColor: existing?.badgeColor ?? '',
     addedAt: existing?.addedAt ?? Date.now(),
-    devServerId: view.devServerId ?? existing?.devServerId
+    devServerId: view.devServerId ?? existing?.devServerId,
+    hookSettings: parseRepoHookSettings(view.hookSettings) ?? existing?.hookSettings
   }
 }
 
@@ -1430,10 +1449,18 @@ function createReposApi(): NonNullable<Partial<PreloadApi>['repos']> {
       return { status: 'applied' }
     },
     update: async ({ repoId, updates }) => {
-      // Bare RemoteRepoView — see add()'s doc comment above.
+      // Bare RemoteRepoView — see add()'s doc comment above. hookSettings
+      // is explicit-presence (only sent when the caller actually touches
+      // it — an empty JSON blob is a legitimate "clear it" value, distinct
+      // from "don't touch it") — mirrors repos.ts's updateRepo action,
+      // which this file's own copy must stay in sync with (see
+      // RemoteRepoView's doc comment above).
       const view = await callRuntimeResult<RemoteRepoView>('repo.update', {
         repoId,
-        displayName: updates.displayName ?? ''
+        displayName: updates.displayName ?? '',
+        ...('hookSettings' in updates
+          ? { hookSettings: JSON.stringify(updates.hookSettings ?? {}) }
+          : {})
       })
       return mergeRepoViewIntoRepo(view)
     },
