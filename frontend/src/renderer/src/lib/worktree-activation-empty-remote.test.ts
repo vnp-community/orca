@@ -107,6 +107,10 @@ describe('empty remote worktree activation', () => {
         method: 'session.tabs.createTerminal',
         params: expect.objectContaining({
           worktree: `id:${worktree.id}`,
+          // Regression: the host's cwd resolution has no fallback of its own —
+          // an omitted cwd used to make the woke terminal start in the host
+          // user's home directory instead of the worktree's real folder.
+          cwd: WORKTREE_PATH,
           activate: true
         })
       })

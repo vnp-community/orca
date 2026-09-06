@@ -2686,11 +2686,16 @@ export function useWebSessionTabsSync(): void {
                 applyWebSessionTabsSnapshot(state, event, environmentId)
               )
             }
+            // Why: the host's cwd resolution has no fallback when omitted and
+            // ends up defaulting to the host user's home directory instead of
+            // the worktree's real folder — always pass it explicitly.
+            const activeWorktreePath = syncState.getKnownWorktreeById(activeWorktreeId)?.path
             if (!disposed && shouldBootstrapInitialTerminal) {
               requestedInitialTerminal = true
               void createWebRuntimeSessionTerminal({
                 worktreeId: activeWorktreeId,
                 environmentId,
+                cwd: activeWorktreePath,
                 activate: true
               })
             } else if (
@@ -2704,6 +2709,7 @@ export function useWebSessionTabsSync(): void {
               void createWebRuntimeSessionTerminal({
                 worktreeId: activeWorktreeId,
                 environmentId,
+                cwd: activeWorktreePath,
                 activate: true,
                 selectWorktree: false
               }).finally(() => {
