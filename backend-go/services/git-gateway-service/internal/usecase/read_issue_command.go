@@ -7,7 +7,7 @@ import (
 )
 
 type ReadIssueCommandInput struct {
-	WorktreeID string
+	RepoID string
 }
 
 type ReadIssueCommandResult struct {
@@ -15,24 +15,30 @@ type ReadIssueCommandResult struct {
 	Exists  bool
 }
 
-// ReadIssueCommand follows GetStatus's exact resolve -> dispatch -> translate shape.
+// ReadIssueCommand resolves repoID's owning host and reads its issue
+// command file. Repo-scoped — see CheckHooks' doc comment for why.
 type ReadIssueCommand struct {
-	resolver ConnectionResolver
-	local    GitExecutor
-	relay    GitExecutor
+	reachability DevServerReachability
+	projects     ProjectClient
+	local        GitExecutor
+	relay        GitExecutor
 }
 
-func NewReadIssueCommand(resolver ConnectionResolver, local, relay GitExecutor) *ReadIssueCommand {
-	return &ReadIssueCommand{resolver: resolver, local: local, relay: relay}
+func NewReadIssueCommand(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *ReadIssueCommand {
+	return &ReadIssueCommand{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 
 func (uc *ReadIssueCommand) Execute(ctx context.Context, in ReadIssueCommandInput) (ReadIssueCommandResult, error) {
-	if in.WorktreeID == "" {
-		return ReadIssueCommandResult{}, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_WORKTREE_ID", "worktree_id is required", nil)
+	if in.RepoID == "" {
+		return ReadIssueCommandResult{}, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_REPO_ID", "repo_id is required", nil)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	repo, err := uc.projects.GetRepo(ctx, in.RepoID)
 	if err != nil {
-		return ReadIssueCommandResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
+		return ReadIssueCommandResult{}, apperrors.New(apperrors.KindNotFound, "WORKTREE_REPO_NOT_FOUND", "repo does not exist", err)
+	}
+	ctx, executor, repoPath, err := dispatchExecutorForRepo(ctx, uc.reachability, uc.local, uc.relay, repo)
+	if err != nil {
+		return ReadIssueCommandResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve repo's owning host", err)
 	}
 	content, exists, err := executor.ReadIssueCommand(ctx, repoPath)
 	if err != nil {

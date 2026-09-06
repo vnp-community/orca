@@ -7,27 +7,33 @@ import (
 )
 
 type ScanSetupScriptImportsInput struct {
-	WorktreeID string
+	RepoID string
 }
 
-// ScanSetupScriptImports follows GetStatus's exact resolve -> dispatch -> translate shape.
+// ScanSetupScriptImports resolves repoID's owning host and scans its setup
+// script imports. Repo-scoped — see CheckHooks' doc comment for why.
 type ScanSetupScriptImports struct {
-	resolver ConnectionResolver
-	local    GitExecutor
-	relay    GitExecutor
+	reachability DevServerReachability
+	projects     ProjectClient
+	local        GitExecutor
+	relay        GitExecutor
 }
 
-func NewScanSetupScriptImports(resolver ConnectionResolver, local, relay GitExecutor) *ScanSetupScriptImports {
-	return &ScanSetupScriptImports{resolver: resolver, local: local, relay: relay}
+func NewScanSetupScriptImports(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *ScanSetupScriptImports {
+	return &ScanSetupScriptImports{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 
 func (uc *ScanSetupScriptImports) Execute(ctx context.Context, in ScanSetupScriptImportsInput) ([]string, error) {
-	if in.WorktreeID == "" {
-		return nil, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_WORKTREE_ID", "worktree_id is required", nil)
+	if in.RepoID == "" {
+		return nil, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_REPO_ID", "repo_id is required", nil)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	repo, err := uc.projects.GetRepo(ctx, in.RepoID)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
+		return nil, apperrors.New(apperrors.KindNotFound, "WORKTREE_REPO_NOT_FOUND", "repo does not exist", err)
+	}
+	ctx, executor, repoPath, err := dispatchExecutorForRepo(ctx, uc.reachability, uc.local, uc.relay, repo)
+	if err != nil {
+		return nil, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve repo's owning host", err)
 	}
 	paths, err := executor.ScanSetupScriptImports(ctx, repoPath)
 	if err != nil {

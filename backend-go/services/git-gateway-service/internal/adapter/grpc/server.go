@@ -654,7 +654,7 @@ func (s *Server) SearchRefs(ctx context.Context, req *gitgatewayv1.SearchRefsReq
 }
 
 func (s *Server) CheckHooks(ctx context.Context, req *gitgatewayv1.CheckHooksRequest) (*gitgatewayv1.CheckHooksResponse, error) {
-	result, err := s.checkHooks.Execute(ctx, usecase.CheckHooksInput{WorktreeID: req.GetWorktreeId()})
+	result, err := s.checkHooks.Execute(ctx, usecase.CheckHooksInput{RepoID: req.GetRepoId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -662,7 +662,7 @@ func (s *Server) CheckHooks(ctx context.Context, req *gitgatewayv1.CheckHooksReq
 }
 
 func (s *Server) ReadIssueCommand(ctx context.Context, req *gitgatewayv1.ReadIssueCommandRequest) (*gitgatewayv1.ReadIssueCommandResponse, error) {
-	result, err := s.readIssueCommand.Execute(ctx, usecase.ReadIssueCommandInput{WorktreeID: req.GetWorktreeId()})
+	result, err := s.readIssueCommand.Execute(ctx, usecase.ReadIssueCommandInput{RepoID: req.GetRepoId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -670,7 +670,7 @@ func (s *Server) ReadIssueCommand(ctx context.Context, req *gitgatewayv1.ReadIss
 }
 
 func (s *Server) WriteIssueCommand(ctx context.Context, req *gitgatewayv1.WriteIssueCommandRequest) (*emptypb.Empty, error) {
-	err := s.writeIssueCommand.Execute(ctx, usecase.WriteIssueCommandInput{WorktreeID: req.GetWorktreeId(), Content: req.GetContent()})
+	err := s.writeIssueCommand.Execute(ctx, usecase.WriteIssueCommandInput{RepoID: req.GetRepoId(), Content: req.GetContent()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -678,7 +678,7 @@ func (s *Server) WriteIssueCommand(ctx context.Context, req *gitgatewayv1.WriteI
 }
 
 func (s *Server) ScanSetupScriptImports(ctx context.Context, req *gitgatewayv1.ScanSetupScriptImportsRequest) (*gitgatewayv1.ScanSetupScriptImportsResponse, error) {
-	paths, err := s.scanSetupScriptImports.Execute(ctx, usecase.ScanSetupScriptImportsInput{WorktreeID: req.GetWorktreeId()})
+	paths, err := s.scanSetupScriptImports.Execute(ctx, usecase.ScanSetupScriptImportsInput{RepoID: req.GetRepoId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}

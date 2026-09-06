@@ -7,28 +7,34 @@ import (
 )
 
 type WriteIssueCommandInput struct {
-	WorktreeID string
-	Content    string
+	RepoID  string
+	Content string
 }
 
-// WriteIssueCommand follows GetStatus's exact resolve -> dispatch -> translate shape.
+// WriteIssueCommand resolves repoID's owning host and writes its issue
+// command file. Repo-scoped — see CheckHooks' doc comment for why.
 type WriteIssueCommand struct {
-	resolver ConnectionResolver
-	local    GitExecutor
-	relay    GitExecutor
+	reachability DevServerReachability
+	projects     ProjectClient
+	local        GitExecutor
+	relay        GitExecutor
 }
 
-func NewWriteIssueCommand(resolver ConnectionResolver, local, relay GitExecutor) *WriteIssueCommand {
-	return &WriteIssueCommand{resolver: resolver, local: local, relay: relay}
+func NewWriteIssueCommand(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *WriteIssueCommand {
+	return &WriteIssueCommand{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 
 func (uc *WriteIssueCommand) Execute(ctx context.Context, in WriteIssueCommandInput) error {
-	if in.WorktreeID == "" {
-		return apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_WORKTREE_ID", "worktree_id is required", nil)
+	if in.RepoID == "" {
+		return apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_REPO_ID", "repo_id is required", nil)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	repo, err := uc.projects.GetRepo(ctx, in.RepoID)
 	if err != nil {
-		return apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
+		return apperrors.New(apperrors.KindNotFound, "WORKTREE_REPO_NOT_FOUND", "repo does not exist", err)
+	}
+	ctx, executor, repoPath, err := dispatchExecutorForRepo(ctx, uc.reachability, uc.local, uc.relay, repo)
+	if err != nil {
+		return apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve repo's owning host", err)
 	}
 	if err := executor.WriteIssueCommand(ctx, repoPath, in.Content); err != nil {
 		return apperrors.New(apperrors.KindInternal, "GITGATEWAY_WRITE_ISSUE_COMMAND_FAILED", "failed to write issue command file", err)

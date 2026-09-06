@@ -614,15 +614,22 @@ message InitRepoResponse {
   bool remote_added = 3;
 }
 
-message CheckHooksRequest { string worktree_id = 1; }
+// repo_id routes this call through dispatchExecutorForRepo (repo-scoped
+// dispatch), matching BaseRefDefault/SearchRefs — worktree_id is kept only
+// for wire compatibility (no current caller sends it); repo_id is
+// preferred when both are set.
+message CheckHooksRequest { string worktree_id = 1; string repo_id = 2; }
 message CheckHooksResponse { repeated string installed_hooks = 1; bool orca_hooks_current = 2; }
 
-message ReadIssueCommandRequest { string worktree_id = 1; }
+// See CheckHooksRequest's doc comment — same repo_id addition, same reason.
+message ReadIssueCommandRequest { string worktree_id = 1; string repo_id = 2; }
 message ReadIssueCommandResponse { string content = 1; bool exists = 2; }
 
-message WriteIssueCommandRequest { string worktree_id = 1; string content = 2; }
+// See CheckHooksRequest's doc comment — same repo_id addition, same reason.
+message WriteIssueCommandRequest { string worktree_id = 1; string content = 2; string repo_id = 3; }
 
-message ScanSetupScriptImportsRequest { string worktree_id = 1; }
+// See CheckHooksRequest's doc comment — same repo_id addition, same reason.
+message ScanSetupScriptImportsRequest { string worktree_id = 1; string repo_id = 2; }
 message ScanSetupScriptImportsResponse { repeated string imported_paths = 1; }
 message CreateWorktreeRequest {
   string project_id = 1;

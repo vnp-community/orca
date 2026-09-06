@@ -4663,9 +4663,14 @@ func (x *InitRepoResponse) GetRemoteAdded() bool {
 	return false
 }
 
+// repo_id routes this call through dispatchExecutorForRepo (repo-scoped
+// dispatch), matching BaseRefDefault/SearchRefs — worktree_id is kept only
+// for wire compatibility (no current caller sends it); repo_id is
+// preferred when both are set.
 type CheckHooksRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	RepoId        string                 `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4703,6 +4708,13 @@ func (*CheckHooksRequest) Descriptor() ([]byte, []int) {
 func (x *CheckHooksRequest) GetWorktreeId() string {
 	if x != nil {
 		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *CheckHooksRequest) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
 	}
 	return ""
 }
@@ -4759,9 +4771,11 @@ func (x *CheckHooksResponse) GetOrcaHooksCurrent() bool {
 	return false
 }
 
+// See CheckHooksRequest's doc comment — same repo_id addition, same reason.
 type ReadIssueCommandRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	RepoId        string                 `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4799,6 +4813,13 @@ func (*ReadIssueCommandRequest) Descriptor() ([]byte, []int) {
 func (x *ReadIssueCommandRequest) GetWorktreeId() string {
 	if x != nil {
 		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ReadIssueCommandRequest) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
 	}
 	return ""
 }
@@ -4855,10 +4876,12 @@ func (x *ReadIssueCommandResponse) GetExists() bool {
 	return false
 }
 
+// See CheckHooksRequest's doc comment — same repo_id addition, same reason.
 type WriteIssueCommandRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
 	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
+	RepoId        string                 `protobuf:"bytes,3,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4907,9 +4930,18 @@ func (x *WriteIssueCommandRequest) GetContent() string {
 	return ""
 }
 
+func (x *WriteIssueCommandRequest) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
+	}
+	return ""
+}
+
+// See CheckHooksRequest's doc comment — same repo_id addition, same reason.
 type ScanSetupScriptImportsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	RepoId        string                 `protobuf:"bytes,2,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -4947,6 +4979,13 @@ func (*ScanSetupScriptImportsRequest) Descriptor() ([]byte, []int) {
 func (x *ScanSetupScriptImportsRequest) GetWorktreeId() string {
 	if x != nil {
 		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ScanSetupScriptImportsRequest) GetRepoId() string {
+	if x != nil {
+		return x.RepoId
 	}
 	return ""
 }
@@ -7306,26 +7345,30 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\x10InitRepoResponse\x12\x12\n" +
 	"\x04path\x18\x01 \x01(\tR\x04path\x12%\n" +
 	"\x0edefault_branch\x18\x02 \x01(\tR\rdefaultBranch\x12!\n" +
-	"\fremote_added\x18\x03 \x01(\bR\vremoteAdded\"4\n" +
+	"\fremote_added\x18\x03 \x01(\bR\vremoteAdded\"M\n" +
 	"\x11CheckHooksRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
-	"worktreeId\"k\n" +
+	"worktreeId\x12\x17\n" +
+	"\arepo_id\x18\x02 \x01(\tR\x06repoId\"k\n" +
 	"\x12CheckHooksResponse\x12'\n" +
 	"\x0finstalled_hooks\x18\x01 \x03(\tR\x0einstalledHooks\x12,\n" +
-	"\x12orca_hooks_current\x18\x02 \x01(\bR\x10orcaHooksCurrent\":\n" +
+	"\x12orca_hooks_current\x18\x02 \x01(\bR\x10orcaHooksCurrent\"S\n" +
 	"\x17ReadIssueCommandRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
-	"worktreeId\"L\n" +
+	"worktreeId\x12\x17\n" +
+	"\arepo_id\x18\x02 \x01(\tR\x06repoId\"L\n" +
 	"\x18ReadIssueCommandResponse\x12\x18\n" +
 	"\acontent\x18\x01 \x01(\tR\acontent\x12\x16\n" +
-	"\x06exists\x18\x02 \x01(\bR\x06exists\"U\n" +
+	"\x06exists\x18\x02 \x01(\bR\x06exists\"n\n" +
 	"\x18WriteIssueCommandRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x18\n" +
-	"\acontent\x18\x02 \x01(\tR\acontent\"@\n" +
+	"\acontent\x18\x02 \x01(\tR\acontent\x12\x17\n" +
+	"\arepo_id\x18\x03 \x01(\tR\x06repoId\"Y\n" +
 	"\x1dScanSetupScriptImportsRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
-	"worktreeId\"G\n" +
+	"worktreeId\x12\x17\n" +
+	"\arepo_id\x18\x02 \x01(\tR\x06repoId\"G\n" +
 	"\x1eScanSetupScriptImportsResponse\x12%\n" +
 	"\x0eimported_paths\x18\x01 \x03(\tR\rimportedPaths\"\xd9\x04\n" +
 	"\x15CreateWorktreeRequest\x12\x1d\n" +

@@ -541,8 +541,14 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 	})
 
 	r.Register("repo.hooksCheck", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// repo, not worktreeId: this channel is called from repo-scoped
+		// contexts (Settings' Worktree Hooks section) that have no worktree
+		// id — git-gateway-service's CheckHooks usecase dispatches via repo
+		// id (dispatchExecutorForRepo), see its own doc comment. "repo" (not
+		// "repoId") matches runtime-hooks-client.ts's existing wire shape,
+		// shared with the desktop-local repo.hooksCheck handler.
 		type hooksCheckArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			Repo string `json:"repo"`
 		}
 		in, err := decodeArg[hooksCheckArgs](args, 0)
 		if err != nil {
@@ -551,7 +557,7 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
 		defer cancel()
-		resp, err := git.CheckHooks(rpcCtx, &gitgatewayv1.CheckHooksRequest{WorktreeId: in.WorktreeID})
+		resp, err := git.CheckHooks(rpcCtx, &gitgatewayv1.CheckHooksRequest{RepoId: in.Repo})
 		if err != nil {
 			return nil, err
 		}
@@ -559,8 +565,9 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 	})
 
 	r.Register("repo.issueCommandRead", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// repo, not worktreeId — same reasoning as repo.hooksCheck above.
 		type issueCommandReadArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			Repo string `json:"repo"`
 		}
 		in, err := decodeArg[issueCommandReadArgs](args, 0)
 		if err != nil {
@@ -569,7 +576,7 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
 		defer cancel()
-		resp, err := git.ReadIssueCommand(rpcCtx, &gitgatewayv1.ReadIssueCommandRequest{WorktreeId: in.WorktreeID})
+		resp, err := git.ReadIssueCommand(rpcCtx, &gitgatewayv1.ReadIssueCommandRequest{RepoId: in.Repo})
 		if err != nil {
 			return nil, err
 		}
@@ -577,9 +584,10 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 	})
 
 	r.Register("repo.issueCommandWrite", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// repo, not worktreeId — same reasoning as repo.hooksCheck above.
 		type issueCommandWriteArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			Content    string `json:"content"`
+			Repo    string `json:"repo"`
+			Content string `json:"content"`
 		}
 		in, err := decodeArg[issueCommandWriteArgs](args, 0)
 		if err != nil {
@@ -588,13 +596,14 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
 		defer cancel()
-		_, err = git.WriteIssueCommand(rpcCtx, &gitgatewayv1.WriteIssueCommandRequest{WorktreeId: in.WorktreeID, Content: in.Content})
+		_, err = git.WriteIssueCommand(rpcCtx, &gitgatewayv1.WriteIssueCommandRequest{RepoId: in.Repo, Content: in.Content})
 		return nil, err
 	})
 
 	r.Register("repo.setupScriptImports", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// repo, not worktreeId — same reasoning as repo.hooksCheck above.
 		type setupScriptImportsArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			Repo string `json:"repo"`
 		}
 		in, err := decodeArg[setupScriptImportsArgs](args, 0)
 		if err != nil {
@@ -603,7 +612,7 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
 		defer cancel()
-		resp, err := git.ScanSetupScriptImports(rpcCtx, &gitgatewayv1.ScanSetupScriptImportsRequest{WorktreeId: in.WorktreeID})
+		resp, err := git.ScanSetupScriptImports(rpcCtx, &gitgatewayv1.ScanSetupScriptImportsRequest{RepoId: in.Repo})
 		if err != nil {
 			return nil, err
 		}

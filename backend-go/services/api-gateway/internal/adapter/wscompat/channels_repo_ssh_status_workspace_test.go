@@ -418,11 +418,11 @@ func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
 			return &gitgatewayv1.CheckHooksResponse{OrcaHooksCurrent: true}, nil
 		}
 		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.hooksCheck",
-			argsJSON(t, map[string]any{"worktreeId": "wt1"}))
+			argsJSON(t, map[string]any{"repo": "r1"}))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if gotReq.GetWorktreeId() != "wt1" {
+		if gotReq.GetRepoId() != "r1" {
 			t.Errorf("unexpected CheckHooksRequest: %+v", gotReq)
 		}
 	})
@@ -434,11 +434,11 @@ func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
 			return &gitgatewayv1.ReadIssueCommandResponse{Content: "x", Exists: true}, nil
 		}
 		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.issueCommandRead",
-			argsJSON(t, map[string]any{"worktreeId": "wt1"}))
+			argsJSON(t, map[string]any{"repo": "r1"}))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if gotReq.GetWorktreeId() != "wt1" {
+		if gotReq.GetRepoId() != "r1" {
 			t.Errorf("unexpected ReadIssueCommandRequest: %+v", gotReq)
 		}
 	})
@@ -450,11 +450,11 @@ func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
 			return &emptypb.Empty{}, nil
 		}
 		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.issueCommandWrite",
-			argsJSON(t, map[string]any{"worktreeId": "wt1", "content": "x"}))
+			argsJSON(t, map[string]any{"repo": "r1", "content": "x"}))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if gotReq.GetWorktreeId() != "wt1" || gotReq.GetContent() != "x" {
+		if gotReq.GetRepoId() != "r1" || gotReq.GetContent() != "x" {
 			t.Errorf("unexpected WriteIssueCommandRequest: %+v", gotReq)
 		}
 	})
@@ -466,11 +466,11 @@ func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
 			return &gitgatewayv1.ScanSetupScriptImportsResponse{ImportedPaths: []string{"a"}}, nil
 		}
 		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.setupScriptImports",
-			argsJSON(t, map[string]any{"worktreeId": "wt1"}))
+			argsJSON(t, map[string]any{"repo": "r1"}))
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if gotReq.GetWorktreeId() != "wt1" {
+		if gotReq.GetRepoId() != "r1" {
 			t.Errorf("unexpected ScanSetupScriptImportsRequest: %+v", gotReq)
 		}
 	})

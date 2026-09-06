@@ -370,20 +370,61 @@ func (e *Executor) InitRepo(ctx context.Context, destPath, defaultBranch, remote
 }
 
 // BaseRefDefault resolves the remote's default branch via
-// `git symbolic-ref refs/remotes/origin/HEAD` (falls back to `git remote
-// show origin`'s "HEAD branch:" line pre-Git 2.8, if that boundary ever
-// matters for this baseline).
+// `git symbolic-ref refs/remotes/origin/HEAD` — the fast, purely-local path
+// that a real `git clone` always populates.
+//
+// That ref is NEVER set by `git init` + `git remote add` (InitRepo, the
+// "Initialize as Git repo" feature) — not even after a `git fetch` — only
+// `git clone` or an explicit `git remote set-head origin -a` create it.
+// Every repo onboarded that way would otherwise fail this lookup
+// permanently. Fall back to asking the remote directly via
+// `git ls-remote --symref` (no local commit or full clone required, no
+// mutation) before giving up.
 func (e *Executor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {
 	out, err := e.run(ctx, repoPath, "symbolic-ref", "refs/remotes/origin/HEAD")
+	if err == nil {
+		return lastRefSegment(out), nil
+	}
+	branch, remoteErr := e.defaultBranchFromRemoteHead(ctx, repoPath)
+	if remoteErr == nil && branch != "" {
+		return branch, nil
+	}
+	return "", err
+}
+
+// defaultBranchFromRemoteHead asks the remote itself which branch HEAD
+// points at, via `git ls-remote --symref origin HEAD`:
+//
+//	ref: refs/heads/main	HEAD
+//	<sha>	HEAD
+func (e *Executor) defaultBranchFromRemoteHead(ctx context.Context, repoPath string) (string, error) {
+	out, err := e.run(ctx, repoPath, "ls-remote", "--symref", "origin", "HEAD")
 	if err != nil {
 		return "", err
 	}
-	// "refs/remotes/origin/main" -> "main"
-	ref := strings.TrimSpace(out)
+	const prefix = "ref: refs/heads/"
+	for _, line := range strings.Split(out, "\n") {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		rest := strings.TrimPrefix(line, prefix)
+		if idx := strings.IndexByte(rest, '\t'); idx >= 0 {
+			rest = rest[:idx]
+		}
+		if rest = strings.TrimSpace(rest); rest != "" {
+			return rest, nil
+		}
+	}
+	return "", nil
+}
+
+// lastRefSegment turns "refs/remotes/origin/main" into "main".
+func lastRefSegment(ref string) string {
+	ref = strings.TrimSpace(ref)
 	if idx := strings.LastIndex(ref, "/"); idx >= 0 {
 		ref = ref[idx+1:]
 	}
-	return ref, nil
+	return ref
 }
 
 // SearchRefs runs `git for-each-ref` filtered by query as a substring match
