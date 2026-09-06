@@ -18,26 +18,16 @@ export type InitRepoAsGitOptions = {
 
 type InitRepoResult = { path: string; defaultBranch: string; remoteAdded: boolean }
 
-/** Returns an error message on failure, or null on success (and retries the
- *  worktree creation that originally failed for creationId). */
-export async function initializeRepoAsGitAndRetry(
-  creationId: string,
+type InitRepoAsGitTargetRepo = { path: string; devServerId?: string | null }
+
+/** Shared core: runs git init (+ optional remote add) against `repo`'s own
+ *  dev-server/path. Returns an error message on failure, null on success. */
+async function runInitRepoAsGit(
+  settings: ReturnType<typeof useAppStore.getState>['settings'],
+  repo: InitRepoAsGitTargetRepo,
   options: InitRepoAsGitOptions
 ): Promise<string | null> {
-  const state = useAppStore.getState()
-  const entry = state.pendingWorktreeCreations[creationId]
-  if (!entry) {
-    return translate(
-      'auto.lib.init.repo.as.git.creationGone',
-      'This workspace creation is no longer pending.'
-    )
-  }
-  const repo = state.repos.find((candidate) => candidate.id === entry.request.repoId)
-  if (!repo) {
-    return translate('auto.lib.init.repo.as.git.repoNotFound', 'Could not find this repo.')
-  }
-
-  const target = getActiveRuntimeTarget(state.settings)
+  const target = getActiveRuntimeTarget(settings)
   if (target.kind !== 'environment') {
     return translate(
       'auto.lib.init.repo.as.git.noRuntimeTarget',
@@ -69,7 +59,48 @@ export async function initializeRepoAsGitAndRetry(
     toast.error(message)
     return message
   }
+  return null
+}
 
+/** Returns an error message on failure, or null on success (and retries the
+ *  worktree creation that originally failed for creationId). */
+export async function initializeRepoAsGitAndRetry(
+  creationId: string,
+  options: InitRepoAsGitOptions
+): Promise<string | null> {
+  const state = useAppStore.getState()
+  const entry = state.pendingWorktreeCreations[creationId]
+  if (!entry) {
+    return translate(
+      'auto.lib.init.repo.as.git.creationGone',
+      'This workspace creation is no longer pending.'
+    )
+  }
+  const repo = state.repos.find((candidate) => candidate.id === entry.request.repoId)
+  if (!repo) {
+    return translate('auto.lib.init.repo.as.git.repoNotFound', 'Could not find this repo.')
+  }
+
+  const failure = await runInitRepoAsGit(state.settings, repo, options)
+  if (failure) {
+    return failure
+  }
   retryBackgroundWorktreeCreation(creationId)
   return null
+}
+
+/** Standalone variant for a Settings-page-triggered init — no pending
+ *  worktree creation exists to retry, so the caller (RepositoryPane) is
+ *  responsible for re-running its own "is this a git repo" check on
+ *  success. Returns an error message on failure, or null on success. */
+export async function initializeRepoAsGit(
+  repoId: string,
+  options: InitRepoAsGitOptions
+): Promise<string | null> {
+  const state = useAppStore.getState()
+  const repo = state.repos.find((candidate) => candidate.id === repoId)
+  if (!repo) {
+    return translate('auto.lib.init.repo.as.git.repoNotFound', 'Could not find this repo.')
+  }
+  return runInitRepoAsGit(state.settings, repo, options)
 }

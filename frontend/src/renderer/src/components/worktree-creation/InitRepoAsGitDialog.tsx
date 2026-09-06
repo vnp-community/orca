@@ -11,15 +11,19 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAppStore } from '@/store'
-import { initializeRepoAsGitAndRetry } from '@/lib/init-repo-as-git'
+import { initializeRepoAsGit, initializeRepoAsGitAndRetry } from '@/lib/init-repo-as-git'
 import { translate } from '@/i18n/i18n'
 
-/** Opened from WorktreeCreationPanel's "Initialize as Git repo" action when
- *  a worktree-create attempt fails because the repo's folder exists but was
- *  never `git init`'d (see workspace-create-error-format.ts's
- *  'not-a-git-repo' detection). Collects an optional default branch and
- *  remote URL, runs `git init` (+ `git remote add`, same call) against the
- *  repo's own dev-server/path, then retries the original create. */
+/** Opened either from WorktreeCreationPanel's "Initialize as Git repo"
+ *  action when a worktree-create attempt fails because the repo's folder
+ *  exists but was never `git init`'d (see workspace-create-error-format.ts's
+ *  'not-a-git-repo' detection — modalData.creationId, retries the failed
+ *  create on success), or from Settings' RepositoryPane when its own
+ *  proactive check (repo-git-status-check.ts) finds the same thing with no
+ *  pending creation to retry (modalData.repoId, calls the caller's
+ *  onSuccess instead). Collects an optional default branch and remote URL,
+ *  runs `git init` (+ `git remote add`, same call) against the repo's own
+ *  dev-server/path. */
 const InitRepoAsGitDialog = React.memo(function InitRepoAsGitDialog() {
   const activeModal = useAppStore((s) => s.activeModal)
   const modalData = useAppStore((s) => s.modalData)
@@ -32,6 +36,8 @@ const InitRepoAsGitDialog = React.memo(function InitRepoAsGitDialog() {
 
   const isOpen = activeModal === 'init-repo-as-git'
   const creationId = typeof modalData.creationId === 'string' ? modalData.creationId : ''
+  const repoId = typeof modalData.repoId === 'string' ? modalData.repoId : ''
+  const onSuccess = typeof modalData.onSuccess === 'function' ? modalData.onSuccess : undefined
   const folderPath = typeof modalData.folderPath === 'string' ? modalData.folderPath : ''
 
   const reset = useCallback(() => {
@@ -53,24 +59,28 @@ const InitRepoAsGitDialog = React.memo(function InitRepoAsGitDialog() {
   )
 
   const handleInit = useCallback(async () => {
-    if (!creationId) {
+    if (!creationId && !repoId) {
       return
     }
     setSubmitting(true)
     setError(null)
-    const failure = await initializeRepoAsGitAndRetry(creationId, {
+    const options = {
       defaultBranch: defaultBranch.trim() || undefined,
       remoteUrl: remoteUrl.trim() || undefined,
       remoteName: remoteName.trim() || undefined
-    })
+    }
+    const failure = creationId
+      ? await initializeRepoAsGitAndRetry(creationId, options)
+      : await initializeRepoAsGit(repoId, options)
     setSubmitting(false)
     if (failure) {
       setError(failure)
       return
     }
+    onSuccess?.()
     closeModal()
     reset()
-  }, [creationId, defaultBranch, remoteUrl, remoteName, closeModal, reset])
+  }, [creationId, repoId, onSuccess, defaultBranch, remoteUrl, remoteName, closeModal, reset])
 
   return (
     <Dialog open={isOpen} onOpenChange={handleOpenChange}>
