@@ -1138,3 +1138,129 @@ func TestListWorktreePaths_DetachedHead_EmptyBranch(t *testing.T) {
 		t.Error("expected a non-empty HEAD sha even when detached")
 	}
 }
+
+// ─── BaseRefDefault ─────────────────────────────────────────────────────────
+
+func TestBaseRefDefault_RealCloneUsesSymbolicRef(t *testing.T) {
+	// A real `git clone` (simulated here via `git clone` off a bare repo)
+	// populates refs/remotes/origin/HEAD — the fast, purely-local path.
+	upstream := t.TempDir()
+	run := func(dir string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, out)
+		}
+		return string(out)
+	}
+	run(upstream, "init", "--bare", "-b", "main")
+
+	seed := initRepo(t)
+	run(seed, "remote", "add", "origin", upstream)
+	run(seed, "push", "origin", "main")
+
+	clone := t.TempDir()
+	cmd := exec.Command("git", "clone", upstream, clone)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git clone failed: %v\n%s", err, out)
+	}
+
+	e := New()
+	ref, err := e.BaseRefDefault(context.Background(), clone)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ref != "main" {
+		t.Errorf("expected ref=main, got %q", ref)
+	}
+}
+
+func TestBaseRefDefault_InitPlusRemoteAdd_FallsBackToLsRemote(t *testing.T) {
+	// `git init` + `git remote add` (InitRepo/"Initialize as Git repo") never
+	// sets refs/remotes/origin/HEAD, even after a fetch — the remote must be
+	// asked directly via ls-remote.
+	upstream := t.TempDir()
+	run := func(dir string, args ...string) {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		if out, err := cmd.CombinedOutput(); err != nil {
+			t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+	run(upstream, "init", "--bare", "-b", "main")
+
+	seed := initRepo(t)
+	run(seed, "remote", "add", "origin", upstream)
+	run(seed, "push", "origin", "main")
+
+	dir := t.TempDir()
+	run(dir, "init", "-b", "main")
+	run(dir, "remote", "add", "origin", upstream)
+
+	e := New()
+	ref, err := e.BaseRefDefault(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ref != "main" {
+		t.Errorf("expected ref=main (via ls-remote fallback), got %q", ref)
+	}
+}
+
+func TestBaseRefDefault_EmptyRemote_FallsBackToLocalBranch(t *testing.T) {
+	// A repo `git init`'d + `git remote add`'d before the first commit ever
+	// landed anywhere (locally or on the remote): ls-remote succeeds but
+	// returns nothing. Must fall back to the local branch git init already
+	// set up, rather than surfacing an error for a repo with genuinely no
+	// commits yet.
+	upstream := t.TempDir()
+	cmd := exec.Command("git", "init", "--bare", "-b", "main")
+	cmd.Dir = upstream
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init --bare failed: %v\n%s", err, out)
+	}
+
+	dir := t.TempDir()
+	run := func(args ...string) {
+		t.Helper()
+		c := exec.Command("git", args...)
+		c.Dir = dir
+		if out, err := c.CombinedOutput(); err != nil {
+			t.Fatalf("git %s failed: %v\n%s", strings.Join(args, " "), err, out)
+		}
+	}
+	run("init", "-b", "main")
+	run("remote", "add", "origin", upstream)
+
+	e := New()
+	ref, err := e.BaseRefDefault(context.Background(), dir)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ref != "main" {
+		t.Errorf("expected ref=main (via local HEAD fallback), got %q", ref)
+	}
+}
+
+func TestBaseRefDefault_NoRemoteAtAll_FallsBackToLocalBranch(t *testing.T) {
+	dir := t.TempDir()
+	cmd := exec.Command("git", "init", "-b", "main")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git init failed: %v\n%s", err, out)
+	}
+
+	e := New()
+	ref, err := e.BaseRefDefault(context.Background(), dir)
+	// No remote at all → currentLocalBranch fallback still resolves "main"
+	// (it only depends on local HEAD, not on a remote existing).
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ref != "main" {
+		t.Errorf("expected ref=main (via local HEAD fallback, no remote needed), got %q", ref)
+	}
+}

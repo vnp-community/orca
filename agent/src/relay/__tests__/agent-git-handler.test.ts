@@ -277,9 +277,14 @@ describe('handleGitBaseRefDefault', () => {
     expect(resp.result?.ref).toBe('main')
   })
 
-  it('returns an error, not a crash, when there is no origin/HEAD ref', async () => {
+  it('falls back to the local HEAD branch when there is no remote at all (no crash)', async () => {
+    // A repo with no origin/HEAD ref AND no remote configured — e.g. a bare
+    // `git init` with nothing pushed anywhere yet. `git symbolic-ref HEAD`
+    // still resolves (it only depends on local HEAD, not a remote), so this
+    // succeeds with the branch `git init` set up rather than erroring for a
+    // repo that legitimately has no commits/remote yet.
     const bareDir = mkdtempSync(join(tmpdir(), 'base-ref-default-bare-'))
-    execSync('git init -q', { cwd: bareDir })
+    execSync('git init -q -b main', { cwd: bareDir })
     try {
       const resp = (await handleGitBaseRefDefault(
         1,
@@ -287,9 +292,27 @@ describe('handleGitBaseRefDefault', () => {
         mockConfig,
         mockLog
       )) as GitHandlerTestResponse
-      expect(resp.error).toBeDefined()
+      expect(resp.error).toBeUndefined()
+      expect(resp.result!.ref).toBe('main')
     } finally {
       rmSync(bareDir, { recursive: true, force: true })
+    }
+  })
+
+  it('returns an error when there is no ref anywhere, not even a local HEAD', async () => {
+    // Not a git repo at all (no .git dir) — every fallback tier fails, so
+    // the original symbolic-ref error must still surface rather than crash.
+    const notARepoDir = mkdtempSync(join(tmpdir(), 'base-ref-default-not-a-repo-'))
+    try {
+      const resp = (await handleGitBaseRefDefault(
+        1,
+        { repoPath: notARepoDir },
+        mockConfig,
+        mockLog
+      )) as GitHandlerTestResponse
+      expect(resp.error).toBeDefined()
+    } finally {
+      rmSync(notARepoDir, { recursive: true, force: true })
     }
   })
 })

@@ -389,7 +389,26 @@ func (e *Executor) BaseRefDefault(ctx context.Context, repoPath string) (string,
 	if remoteErr == nil && branch != "" {
 		return branch, nil
 	}
+	// Last resort: a repo `git init`'d then `git remote add`'d (InitRepo)
+	// before its first commit ever landed either locally or on the remote —
+	// ls-remote succeeds but returns nothing (empty remote), so fall back to
+	// whatever branch `git init` already set up locally. `git symbolic-ref
+	// HEAD` resolves even with zero commits, unlike `git branch`/`git log`.
+	if localBranch, localErr := e.currentLocalBranch(ctx, repoPath); localErr == nil && localBranch != "" {
+		return localBranch, nil
+	}
 	return "", err
+}
+
+// currentLocalBranch returns the branch HEAD points at, even in a
+// freshly-`git init`'d repo with no commits yet (unlike `git branch --show-current`
+// on some git versions, `git symbolic-ref HEAD` never depends on a commit existing).
+func (e *Executor) currentLocalBranch(ctx context.Context, repoPath string) (string, error) {
+	out, err := e.run(ctx, repoPath, "symbolic-ref", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	return lastRefSegment(out), nil
 }
 
 // defaultBranchFromRemoteHead asks the remote itself which branch HEAD

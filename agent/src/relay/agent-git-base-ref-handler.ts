@@ -36,6 +36,22 @@ async function defaultBranchFromRemoteHead(cwd: string): Promise<string> {
   return ''
 }
 
+// currentLocalBranch: last-resort fallback for a repo with no
+// refs/remotes/origin/HEAD AND an empty/unreachable remote (e.g. `git init`
+// immediately after "Initialize as Git repo", before the first commit ever
+// lands either locally or on the remote) — `git symbolic-ref HEAD` still
+// resolves to the branch `git init` set up (typically "main"), even with
+// zero commits, so this always has something sensible to return rather than
+// surfacing an Internal error for a repo that legitimately has no ref yet.
+async function currentLocalBranch(cwd: string): Promise<string> {
+  const { execFile } = await import('node:child_process')
+  const { promisify } = await import('node:util')
+  const execAsync = promisify(execFile)
+  const { stdout } = await execAsync('git', ['symbolic-ref', 'HEAD'], { cwd, timeout: 10_000 })
+  // "refs/heads/main" -> "main"
+  return stdout.trim().split('/').pop() ?? ''
+}
+
 export async function handleGitBaseRefDefault(
   id: string | number | null,
   params: Record<string, unknown>,
@@ -57,11 +73,25 @@ export async function handleGitBaseRefDefault(
       log.info(`git.baseRefDefault: cwd=${cwd} ref=${ref}`)
       return { jsonrpc: '2.0', id, result: { ref } }
     } catch (symbolicRefErr: unknown) {
-      const ref = await defaultBranchFromRemoteHead(cwd)
+      let ref = ''
+      try {
+        ref = await defaultBranchFromRemoteHead(cwd)
+      } catch {
+        /* remote unreachable/empty — fall through to the local-branch fallback below */
+      }
+      if (ref) {
+        log.info(`git.baseRefDefault: cwd=${cwd} ref=${ref} (via ls-remote fallback)`)
+        return { jsonrpc: '2.0', id, result: { ref } }
+      }
+      try {
+        ref = await currentLocalBranch(cwd)
+      } catch {
+        /* no HEAD at all — genuinely not a git repo, fall through to error below */
+      }
       if (!ref) {
         throw symbolicRefErr
       }
-      log.info(`git.baseRefDefault: cwd=${cwd} ref=${ref} (via ls-remote fallback)`)
+      log.info(`git.baseRefDefault: cwd=${cwd} ref=${ref} (via local HEAD fallback)`)
       return { jsonrpc: '2.0', id, result: { ref } }
     }
   } catch (err: unknown) {
