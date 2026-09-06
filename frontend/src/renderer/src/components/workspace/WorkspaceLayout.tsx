@@ -8,21 +8,25 @@ import { OfflineBanner } from './OfflineBanner'
 import { NoProjectSelected } from './NoProjectSelected'
 import { WorkspaceSkeletonLoader } from './WorkspaceSkeletonLoader'
 import { WorkspaceTerminalPanel } from './WorkspaceTerminalPanel'
-import {
-  ResizablePanelGroup,
-  ResizablePanel,
-  ResizableHandle,
-} from '../ui/resizable'
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../ui/resizable'
 
 // Lazy loaded panels (heavy components)
-const ExplorerPanel    = lazy(() => import('./ExplorerPanel').then(m => ({ default: m.ExplorerPanel })))
-const GitPanel         = lazy(() => import('./git/GitPanel').then(m => ({ default: m.GitPanel })))
-const TaskGraphPanel   = lazy(() => import('../task/TaskGraphPanel').then(m => ({ default: m.TaskGraphPanel })))
-const WorkflowMonitor  = lazy(() => import('../workflow/WorkflowMonitor').then(m => ({ default: m.WorkflowMonitor })))
-const AgentPanel       = lazy(() => import('./AgentPanel').then(m => ({ default: m.AgentPanel })))
+const ExplorerPanel = lazy(() =>
+  import('./ExplorerPanel').then((m) => ({ default: m.ExplorerPanel }))
+)
+const GitPanel = lazy(() => import('./git/GitPanel').then((m) => ({ default: m.GitPanel })))
+const TaskGraphPanel = lazy(() =>
+  import('../task/TaskGraphPanel').then((m) => ({ default: m.TaskGraphPanel }))
+)
+const WorkflowMonitor = lazy(() =>
+  import('../workflow/WorkflowMonitor').then((m) => ({ default: m.WorkflowMonitor }))
+)
+const AgentPanel = lazy(() => import('./AgentPanel').then((m) => ({ default: m.AgentPanel })))
 // Why: reuse the main app's SSH/remote-host status segment (already lazy
 // there too) instead of a new ServerStatusBar — doc §4 step 6.
-const SshStatusSegment = lazy(() => import('../status-bar/SshStatusSegment').then(m => ({ default: m.SshStatusSegment })))
+const SshStatusSegment = lazy(() =>
+  import('../status-bar/SshStatusSegment').then((m) => ({ default: m.SshStatusSegment }))
+)
 
 type WorkspaceTab = 'git' | 'tasks' | 'workflows' | 'agent'
 
@@ -44,12 +48,16 @@ function NoWorktreeSelected() {
 
 export function WorkspaceLayout() {
   const { project, isOffline, isInitializing, switchProject, currentWorktree } = useWorkspace()
-  const [activeTab, setActiveTab]             = useState<WorkspaceTab>('git')
-  const [rightPanelVisible, setRightPanel]    = useState(true)
+  const [activeTab, setActiveTab] = useState<WorkspaceTab>('git')
+  const [rightPanelVisible, setRightPanel] = useState(true)
   const [terminalVisible, setTerminalVisible] = useState(false)
 
-  if (!project)       {return <NoProjectSelected />}
-  if (isInitializing) {return <WorkspaceSkeletonLoader />}
+  if (!project) {
+    return <NoProjectSelected />
+  }
+  if (isInitializing) {
+    return <WorkspaceSkeletonLoader />
+  }
 
   return (
     <div className="workspace-layout flex flex-col h-full" data-testid="workspace-layout">
@@ -75,14 +83,17 @@ export function WorkspaceLayout() {
         {/* Center: Tab content */}
         <ResizablePanel defaultSize={rightPanelVisible ? 50 : 80} data-testid="panel-center">
           <Suspense fallback={<WorkspaceSkeletonLoader />}>
-            {activeTab === 'git'       && <GitPanel />}
-            {activeTab === 'tasks'     && <TaskGraphPanel projectId={project.id} />}
-            {activeTab === 'workflows' && <WorkflowMonitor />}
-            {activeTab === 'agent' && (
-              currentWorktree
-                ? <AgentPanel worktreeId={currentWorktree.id} />
-                : <NoWorktreeSelected />
-            )}
+            {/* Why: mirrors the 'agent' branch below — CR-PW-001, GitPanel used to render even
+                with no worktree selected and silently fall back to a misleading "(no branch)". */}
+            {activeTab === 'git' && (currentWorktree ? <GitPanel /> : <NoWorktreeSelected />)}
+            {activeTab === 'tasks' && <TaskGraphPanel projectId={project.id} />}
+            {activeTab === 'workflows' && <WorkflowMonitor projectId={project.id} />}
+            {activeTab === 'agent' &&
+              (currentWorktree ? (
+                <AgentPanel worktreeId={currentWorktree.id} />
+              ) : (
+                <NoWorktreeSelected />
+              ))}
           </Suspense>
         </ResizablePanel>
 
@@ -103,7 +114,10 @@ export function WorkspaceLayout() {
       {/* Bottom: terminal (collapsible) — reuses the app's terminal-pane/PTY
           infra via WorkspaceTerminalPanel, not a new PTY stack (doc §4 step 5). */}
       {terminalVisible && (
-        <div className="workspace-terminal border-t h-48 overflow-auto" data-testid="terminal-panel">
+        <div
+          className="workspace-terminal border-t h-48 overflow-auto"
+          data-testid="terminal-panel"
+        >
           {currentWorktree ? (
             <WorkspaceTerminalPanel worktreeId={currentWorktree.id} />
           ) : (
@@ -115,9 +129,12 @@ export function WorkspaceLayout() {
       )}
 
       {/* Status bar */}
-      <div className="workspace-statusbar flex items-center gap-2 px-3 py-1 border-t text-xs bg-muted/50" data-testid="status-bar">
+      <div
+        className="workspace-statusbar flex items-center gap-2 px-3 py-1 border-t text-xs bg-muted/50"
+        data-testid="status-bar"
+      >
         <button
-          onClick={() => setTerminalVisible(v => !v)}
+          onClick={() => setTerminalVisible((v) => !v)}
           className="hover:text-foreground text-muted-foreground"
           data-testid="toggle-terminal"
         >
@@ -128,7 +145,7 @@ export function WorkspaceLayout() {
             <SshStatusSegment compact iconOnly={false} />
           </Suspense>
           <button
-            onClick={() => setRightPanel(v => !v)}
+            onClick={() => setRightPanel((v) => !v)}
             className="hover:text-foreground text-muted-foreground"
             data-testid="toggle-right-panel"
           >

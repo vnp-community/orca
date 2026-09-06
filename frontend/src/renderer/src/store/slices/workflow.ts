@@ -18,6 +18,8 @@ export type WorkflowSlice = {
   addTemplate(template: WorkflowDefinition): void
   updateTemplate(id: string, patch: Partial<WorkflowDefinition>): void
   removeTemplate(id: string): void
+  /** Bulk-replace after `workflow.listExecutions` (CR-PW-003) — mirrors setTemplates. */
+  setExecutions(executions: WorkflowExecution[]): void
   addExecution(execution: WorkflowExecution): void
   updateExecutionStatus(execId: string, status: WorkflowExecutionStatus): void
   setStepStatus(execId: string, stepId: string, status: StepStatus): void
@@ -31,9 +33,9 @@ export type WorkflowSlice = {
 // `set` treats a non-object return value (i.e. `undefined`, from a bare
 // `set(s => { s.templates = t })`) as a full-state REPLACE — wiping the
 // entire AppState to `undefined`. Same bug class fixed in task.ts's own
-// doc comment (BUG-FE-TASKGRAPH-SETTINGS) — this slice had it too, just
-// never live-triggered yet since WorkflowMonitor's fetches don't succeed
-// on this deployment.
+// doc comment (BUG-FE-TASKGRAPH-SETTINGS) — this slice had it too, was just
+// never live-triggered before CR-PW-003 wired WorkflowMonitor's `workflow.listExecutions`
+// fetch to `setExecutions` below.
 export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> = (set) => ({
   templates: [],
   executions: [],
@@ -48,6 +50,7 @@ export const createWorkflowSlice: StateCreator<AppState, [], [], WorkflowSlice> 
       templates: s.templates.map((t) => (t.id === id ? { ...t, ...patch } : t))
     })),
   removeTemplate: (id) => set((s) => ({ templates: s.templates.filter((t) => t.id !== id) })),
+  setExecutions: (executions) => set(() => ({ executions })),
   addExecution: (execution) => set((s) => ({ executions: [...s.executions, execution] })),
   updateExecutionStatus: (execId, status) =>
     set((s) => ({

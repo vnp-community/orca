@@ -81,8 +81,12 @@ export type FileNode = {
   isLoading?: boolean
 }
 
+// branch is optional: undefined is a legitimate state (detached HEAD, or the underlying `git
+// status` call itself failing on the host) — GitPanel tells these apart via branchUnavailable
+// instead of collapsing both into one "(no branch)" string (CR-PW-001).
 export type GitStatus = {
-  branch: string
+  branch?: string
+  branchUnavailable?: 'detached-head' | 'status-unavailable'
   aheadBy: number
   behindBy: number
   hasUncommitted: boolean

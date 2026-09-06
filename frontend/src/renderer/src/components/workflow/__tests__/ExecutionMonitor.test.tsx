@@ -33,7 +33,7 @@ describe('ExecutionMonitor', () => {
       stepStatuses: { s1: 'completed', s2: 'running' },
       streamingOutput: { e1: ['Log line 1', 'Log line 2'] },
       cancelExecution
-    } as any)
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
   })
 
   it('renders step list from execution object', () => {
@@ -62,7 +62,7 @@ describe('ExecutionMonitor', () => {
       stepStatuses: { s1: 'failed', s2: 'pending' },
       streamingOutput: {},
       cancelExecution
-    } as any)
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
     render(<ExecutionMonitor executionId="e1" />)
     const s1Row = screen.getByTestId('step-row-s1')
     expect(s1Row).toHaveTextContent('Failed')
@@ -80,7 +80,7 @@ describe('ExecutionMonitor', () => {
       stepStatuses: { s1: 'completed', s2: 'running' },
       streamingOutput: {},
       cancelExecution
-    } as any)
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
 
@@ -95,5 +95,21 @@ describe('ExecutionMonitor', () => {
   it('rootTraceId undefined → badge not rendered', () => {
     render(<ExecutionMonitor executionId="e1" />)
     expect(screen.queryByTestId('root-trace-id-badge')).not.toBeInTheDocument()
+  })
+
+  // CR-PW-004 regression: execution.status can be 'cancelled' (WorkflowExecutionStatus),
+  // which StepStatusBadge's old status map (keyed only on StepStatus) didn't handle —
+  // rendering here used to throw before the fix.
+  it("execution.status='cancelled' → header badge renders without crashing", () => {
+    vi.mocked(useWorkflowExecution).mockReturnValue({
+      execution: { ...execution, status: 'cancelled' },
+      stepStatuses: { s1: 'completed', s2: 'skipped' },
+      streamingOutput: {},
+      cancelExecution
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
+    expect(() => render(<ExecutionMonitor executionId="e1" />)).not.toThrow()
+    expect(screen.getAllByText('Cancelled')[0]).toBeInTheDocument()
+    // A cancelled execution is no longer running — no Cancel button.
+    expect(screen.queryByTestId('cancel-btn')).not.toBeInTheDocument()
   })
 })

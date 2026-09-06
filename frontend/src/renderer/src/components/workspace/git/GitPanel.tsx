@@ -2,10 +2,33 @@
 import { useState, lazy, Suspense } from 'react'
 import { useWorkspace } from '../../../context/WorkspaceContext'
 import { useGit } from '../../../hooks/useGit'
+import { useAppStore } from '../../../store'
+import { getRepoIdFromWorktreeId } from '../../../../../shared/worktree-id'
+import type { GitStatus } from '../../../types/workspace-types'
 import { StagingArea } from './StagingArea'
 import { CommitForm } from './CommitForm'
 import { toast } from 'sonner'
 import { Loader2 } from 'lucide-react'
+
+// Why (CR-PW-001): a single hardcoded "(no branch)" string used to cover 3 unrelated states
+// (RPC failure, detached HEAD, and "no worktree selected" — the last now handled by
+// WorkspaceLayout gating GitPanel behind currentWorktree). Telling them apart avoids reporting a
+// transient host/relay failure as if the repo genuinely had no branch.
+function describeBranch(gitStatus: GitStatus | null, gitStatusError: boolean): string {
+  if (gitStatusError) {
+    return 'Git status unavailable'
+  }
+  if (gitStatus?.branch) {
+    return gitStatus.branch
+  }
+  if (gitStatus?.branchUnavailable === 'detached-head') {
+    return 'Detached HEAD'
+  }
+  if (gitStatus?.branchUnavailable === 'status-unavailable') {
+    return 'Git unavailable'
+  }
+  return '—'
+}
 
 const GitHistory = lazy(() => import('./GitHistory').then((m) => ({ default: m.GitHistory })))
 const BranchManager = lazy(() =>
@@ -19,10 +42,19 @@ const PullRequestList = lazy(() =>
 type GitTab = 'changes' | 'history' | 'branches' | 'pullrequests'
 
 export function GitPanel() {
-  const { gitStatus, project, currentWorktree, emit } = useWorkspace()
+  const { gitStatus, gitStatusError, project, currentWorktree, emit } = useWorkspace()
   const { getDiff, push, isPushing } = useGit()
   const [activeTab, setActiveTab] = useState<GitTab>('changes')
   const [selectedDiff, setSelectedDiff] = useState<string | null>(null)
+
+  // Why (CR-PW-002): a project can have several repos (AssignRepoToProject); label which one
+  // this branch belongs to instead of adding a second worktree picker — Workspace intentionally
+  // reuses the sidebar's selection as its only picker (roadmap decision #8).
+  const currentRepo = useAppStore((s) =>
+    currentWorktree
+      ? s.repos.find((r) => r.id === getRepoIdFromWorktreeId(currentWorktree.id))
+      : undefined
+  )
 
   // Why (crash reported by user): this used to build its own callRuntimeRpc('git.push', …)
   // call with a {projectId, branch, remote} shape the backend has never accepted
@@ -59,7 +91,14 @@ export function GitPanel() {
     <div className="git-panel flex flex-col h-full" data-testid="git-panel">
       {/* Header: branch info + sync */}
       <div className="flex items-center gap-2 px-3 py-2 border-b bg-muted/30 text-sm">
-        <span className="font-mono text-xs font-medium">{gitStatus?.branch ?? '(no branch)'}</span>
+        {currentRepo && (
+          <span className="text-xs text-muted-foreground" data-testid="git-panel-repo-label">
+            {currentRepo.displayName}
+          </span>
+        )}
+        <span className="font-mono text-xs font-medium" data-testid="git-panel-branch">
+          {describeBranch(gitStatus, gitStatusError)}
+        </span>
         {gitStatus && (
           <span className="text-xs text-muted-foreground">
             &uarr;{gitStatus.aheadBy ?? 0} &darr;{gitStatus.behindBy ?? 0}

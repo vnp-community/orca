@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
+import type { ReactNode } from 'react'
 import { WorkspaceLayout } from '../WorkspaceLayout'
 import { useWorkspace } from '../../../context/WorkspaceContext'
 
@@ -10,30 +11,54 @@ vi.mock('../../../context/WorkspaceContext', () => ({
 }))
 
 vi.mock('../WorkspaceTabBar', () => ({
-  WorkspaceTabBar: ({ activeTab, onTabChange }: any) => (
+  WorkspaceTabBar: ({
+    activeTab,
+    onTabChange
+  }: {
+    activeTab: string
+    onTabChange: (tab: string) => void
+  }) => (
     <div data-testid="workspace-tab-bar">
       <span>{activeTab}</span>
-      <button data-testid="tab-tasks" onClick={() => onTabChange('tasks')}>Tasks</button>
-      <button data-testid="tab-git" onClick={() => onTabChange('git')}>Git</button>
-      <button data-testid="tab-agent" onClick={() => onTabChange('agent')}>Agent</button>
+      <button data-testid="tab-tasks" onClick={() => onTabChange('tasks')}>
+        Tasks
+      </button>
+      <button data-testid="tab-git" onClick={() => onTabChange('git')}>
+        Git
+      </button>
+      <button data-testid="tab-agent" onClick={() => onTabChange('agent')}>
+        Agent
+      </button>
     </div>
   )
 }))
 vi.mock('../OfflineBanner', () => ({ OfflineBanner: () => <div data-testid="offline-banner" /> }))
-vi.mock('../NoProjectSelected', () => ({ NoProjectSelected: () => <div data-testid="no-project" /> }))
-vi.mock('../WorkspaceSkeletonLoader', () => ({ WorkspaceSkeletonLoader: () => <div data-testid="skeleton-loader" /> }))
+vi.mock('../NoProjectSelected', () => ({
+  NoProjectSelected: () => <div data-testid="no-project" />
+}))
+vi.mock('../WorkspaceSkeletonLoader', () => ({
+  WorkspaceSkeletonLoader: () => <div data-testid="skeleton-loader" />
+}))
 
 vi.mock('../../ui/resizable', () => ({
-  ResizablePanelGroup: (p: any) => <div data-testid="resizable-group">{p.children}</div>,
-  ResizablePanel: (p: any) => <div data-testid={p['data-testid'] || 'resizable-panel'}>{p.children}</div>,
+  ResizablePanelGroup: (p: { children: ReactNode }) => (
+    <div data-testid="resizable-group">{p.children}</div>
+  ),
+  ResizablePanel: (p: { children: ReactNode; 'data-testid'?: string }) => (
+    <div data-testid={p['data-testid'] || 'resizable-panel'}>{p.children}</div>
+  ),
   ResizableHandle: () => <div />
 }))
 
 // Mock lazy loaded panels
 vi.mock('../ExplorerPanel', () => ({ ExplorerPanel: () => <div data-testid="explorer-panel" /> }))
 vi.mock('../git/GitPanel', () => ({ GitPanel: () => <div data-testid="git-panel" /> }))
-vi.mock('../../task/TaskGraphPanel', () => ({ TaskGraphPanel: () => <div data-testid="task-graph-panel" /> }))
-vi.mock('../../workflow/WorkflowMonitor', () => ({ WorkflowMonitor: () => <div data-testid="workflow-monitor" /> }))
+vi.mock('../../task/TaskGraphPanel', () => ({
+  TaskGraphPanel: () => <div data-testid="task-graph-panel" />
+}))
+vi.mock('../../workflow/WorkflowMonitor', () => ({
+  WorkflowMonitor: () => <div data-testid="workflow-monitor" />
+}))
 vi.mock('../AgentPanel', () => ({
   AgentPanel: ({ worktreeId }: { worktreeId: string }) => (
     <div data-testid="agent-panel" data-worktree-id={worktreeId} />
@@ -59,34 +84,62 @@ describe('WorkspaceLayout', () => {
       switchProject: vi.fn(),
       on: vi.fn().mockReturnValue(() => {}),
       emit: vi.fn()
-    } as any)
+    } as unknown as ReturnType<typeof useWorkspace>)
   })
 
   afterEach(cleanup)
 
   it('renders NoProjectSelected when project=null', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ project: null } as any)
+    vi.mocked(useWorkspace).mockReturnValue({ project: null } as unknown as ReturnType<
+      typeof useWorkspace
+    >)
     render(<WorkspaceLayout />)
     expect(screen.getByTestId('no-project')).toBeInTheDocument()
   })
 
   it('renders WorkspaceSkeletonLoader when isInitializing=true', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ project: { id: 'p1' }, isInitializing: true } as any)
+    vi.mocked(useWorkspace).mockReturnValue({
+      project: { id: 'p1' },
+      isInitializing: true
+    } as unknown as ReturnType<typeof useWorkspace>)
     render(<WorkspaceLayout />)
     expect(screen.getByTestId('skeleton-loader')).toBeInTheDocument()
   })
 
   it('renders OfflineBanner when isOffline=true', () => {
-    vi.mocked(useWorkspace).mockReturnValue({ project: { id: 'p1' }, isOffline: true, isInitializing: false } as any)
+    vi.mocked(useWorkspace).mockReturnValue({
+      project: { id: 'p1' },
+      isOffline: true,
+      isInitializing: false
+    } as unknown as ReturnType<typeof useWorkspace>)
     render(<WorkspaceLayout />)
     expect(screen.getByTestId('offline-banner')).toBeInTheDocument()
   })
 
-  it('"git" tab active → GitPanel renders', async () => {
+  // CR-PW-001: GitPanel used to render even with no worktree selected and silently fall back to
+  // a misleading "(no branch)" — it's now gated the same way the 'agent' tab already was.
+  it('"git" tab with currentWorktree → GitPanel renders', async () => {
+    vi.mocked(useWorkspace).mockReturnValue({
+      project: { id: 'p1' },
+      isOffline: false,
+      isInitializing: false,
+      currentWorktree: { id: 'wt-1', path: '/tmp/wt-1', branch: 'main', isMain: true },
+      switchProject: vi.fn(),
+      on: vi.fn().mockReturnValue(() => {}),
+      emit: vi.fn()
+    } as unknown as ReturnType<typeof useWorkspace>)
     render(<WorkspaceLayout />)
     await waitFor(() => {
       expect(screen.getByTestId('git-panel')).toBeInTheDocument()
     })
+  })
+
+  it('"git" tab with no currentWorktree → shows NoWorktreeSelected empty state', async () => {
+    render(<WorkspaceLayout />)
+    await waitFor(() => {
+      expect(screen.getByTestId('no-worktree-selected')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('git-panel')).not.toBeInTheDocument()
   })
 
   it('"tasks" tab click → shows task content', async () => {
@@ -149,6 +202,9 @@ describe('WorkspaceLayout', () => {
     } as unknown as ReturnType<typeof useWorkspace>)
     render(<WorkspaceLayout />)
     fireEvent.click(screen.getByTestId('toggle-terminal'))
-    expect(screen.getByTestId('workspace-terminal-panel')).toHaveAttribute('data-worktree-id', 'wt-1')
+    expect(screen.getByTestId('workspace-terminal-panel')).toHaveAttribute(
+      'data-worktree-id',
+      'wt-1'
+    )
   })
 })

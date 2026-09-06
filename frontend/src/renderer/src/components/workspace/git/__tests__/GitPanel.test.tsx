@@ -14,6 +14,13 @@ vi.mock('../../../../hooks/useGit', () => ({
   useGit: vi.fn()
 }))
 
+// Why: GitPanel now reads `state.repos` directly (CR-PW-002 repo label) — mock the selector
+// hook the same way TaskCard.test.tsx does, so `useAppStore(selector)` calls `selector(mockStore)`.
+const mockStore = { repos: [] as { id: string; displayName: string }[] }
+vi.mock('../../../../store', () => ({
+  useAppStore: vi.fn((selector) => selector(mockStore))
+}))
+
 // Mock child components
 vi.mock('../StagingArea', () => ({ StagingArea: () => <div data-testid="staging-area" /> }))
 vi.mock('../CommitForm', () => ({ CommitForm: () => <div data-testid="commit-form" /> }))
@@ -32,6 +39,7 @@ describe('GitPanel', () => {
   beforeEach(() => {
     cleanup()
     vi.clearAllMocks()
+    mockStore.repos = []
     push.mockResolvedValue(undefined)
     vi.mocked(useWorkspace).mockReturnValue({
       project: { id: 'p1' },
@@ -41,7 +49,8 @@ describe('GitPanel', () => {
         branch: 'feat/test',
         isMain: false
       },
-      gitStatus: { branch: 'feat/test', aheadBy: 2, behindBy: 0 },
+      gitStatus: { branch: 'feat/test', branchUnavailable: undefined, aheadBy: 2, behindBy: 0 },
+      gitStatusError: false,
       emit
     } as unknown as ReturnType<typeof useWorkspace>)
     vi.mocked(useGit).mockReturnValue({
@@ -103,5 +112,68 @@ describe('GitPanel', () => {
     await waitFor(() => {
       expect(screen.getByTestId('pull-request-list')).toBeInTheDocument()
     })
+  })
+
+  // CR-PW-001: "(no branch)" used to cover 3 unrelated states — these assert each is now labeled
+  // distinctly instead of collapsing back into that one ambiguous string.
+  describe('branch label states (CR-PW-001)', () => {
+    it('shows "Detached HEAD" when branchUnavailable is detached-head', () => {
+      vi.mocked(useWorkspace).mockReturnValue({
+        project: { id: 'p1' },
+        currentWorktree: { id: 'repo1::/repo/worktree', path: '/repo/worktree', isMain: false },
+        gitStatus: {
+          branch: undefined,
+          branchUnavailable: 'detached-head',
+          aheadBy: 0,
+          behindBy: 0
+        },
+        gitStatusError: false,
+        emit
+      } as unknown as ReturnType<typeof useWorkspace>)
+      render(<GitPanel />)
+      expect(screen.getByTestId('git-panel-branch')).toHaveTextContent('Detached HEAD')
+    })
+
+    it('shows "Git unavailable" when branchUnavailable is status-unavailable', () => {
+      vi.mocked(useWorkspace).mockReturnValue({
+        project: { id: 'p1' },
+        currentWorktree: { id: 'repo1::/repo/worktree', path: '/repo/worktree', isMain: false },
+        gitStatus: {
+          branch: undefined,
+          branchUnavailable: 'status-unavailable',
+          aheadBy: 0,
+          behindBy: 0
+        },
+        gitStatusError: false,
+        emit
+      } as unknown as ReturnType<typeof useWorkspace>)
+      render(<GitPanel />)
+      expect(screen.getByTestId('git-panel-branch')).toHaveTextContent('Git unavailable')
+    })
+
+    it('shows "Git status unavailable" when the git.status RPC itself failed', () => {
+      vi.mocked(useWorkspace).mockReturnValue({
+        project: { id: 'p1' },
+        currentWorktree: { id: 'repo1::/repo/worktree', path: '/repo/worktree', isMain: false },
+        gitStatus: null,
+        gitStatusError: true,
+        emit
+      } as unknown as ReturnType<typeof useWorkspace>)
+      render(<GitPanel />)
+      expect(screen.getByTestId('git-panel-branch')).toHaveTextContent('Git status unavailable')
+    })
+  })
+
+  // CR-PW-002: label which repo the branch belongs to when a project has more than one.
+  it('shows the repo display name next to the branch when the worktree resolves to a known repo', () => {
+    mockStore.repos = [{ id: 'repo1', displayName: 'vnp-asm' }]
+    render(<GitPanel />)
+    expect(screen.getByTestId('git-panel-repo-label')).toHaveTextContent('vnp-asm')
+  })
+
+  it('omits the repo label when the worktree does not resolve to a known repo', () => {
+    mockStore.repos = []
+    render(<GitPanel />)
+    expect(screen.queryByTestId('git-panel-repo-label')).not.toBeInTheDocument()
   })
 })
