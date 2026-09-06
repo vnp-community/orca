@@ -18,10 +18,17 @@ import (
 type fakeWorkflowServiceClient struct {
 	workflowv1.WorkflowServiceClient
 
-	executeFunc         func(ctx context.Context, in *workflowv1.ExecuteRequest) (*workflowv1.ExecuteResponse, error)
-	cancelExecutionFunc func(ctx context.Context, in *workflowv1.CancelExecutionRequest) (*workflowv1.CancelExecutionResponse, error)
-	createTemplateFunc  func(ctx context.Context, in *workflowv1.CreateTemplateRequest) (*workflowv1.CreateTemplateResponse, error)
-	updateTemplateFunc  func(ctx context.Context, in *workflowv1.UpdateTemplateRequest) (*workflowv1.UpdateTemplateResponse, error)
+	executeFunc             func(ctx context.Context, in *workflowv1.ExecuteRequest) (*workflowv1.ExecuteResponse, error)
+	cancelExecutionFunc     func(ctx context.Context, in *workflowv1.CancelExecutionRequest) (*workflowv1.CancelExecutionResponse, error)
+	createTemplateFunc      func(ctx context.Context, in *workflowv1.CreateTemplateRequest) (*workflowv1.CreateTemplateResponse, error)
+	updateTemplateFunc      func(ctx context.Context, in *workflowv1.UpdateTemplateRequest) (*workflowv1.UpdateTemplateResponse, error)
+	getExecutionFunc        func(ctx context.Context, in *workflowv1.GetExecutionRequest) (*workflowv1.GetExecutionResponse, error)
+	pauseExecutionFunc      func(ctx context.Context, in *workflowv1.PauseExecutionRequest) (*workflowv1.PauseExecutionResponse, error)
+	resumeExecutionFunc     func(ctx context.Context, in *workflowv1.ResumeExecutionRequest) (*workflowv1.ResumeExecutionResponse, error)
+	listTemplatesFunc       func(ctx context.Context, in *workflowv1.ListTemplatesRequest) (*workflowv1.ListTemplatesResponse, error)
+	resolveTemplateFunc     func(ctx context.Context, in *workflowv1.ResolveTemplateRequest) (*workflowv1.ResolveTemplateResponse, error)
+	hasActiveExecutionsFunc func(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest) (*workflowv1.HasActiveExecutionsResponse, error)
+	executeAdHocStepFunc    func(ctx context.Context, in *workflowv1.ExecuteAdHocStepRequest) (*workflowv1.ExecuteAdHocStepResponse, error)
 }
 
 func (f *fakeWorkflowServiceClient) Execute(ctx context.Context, in *workflowv1.ExecuteRequest, _ ...grpc.CallOption) (*workflowv1.ExecuteResponse, error) {
@@ -38,6 +45,34 @@ func (f *fakeWorkflowServiceClient) CreateTemplate(ctx context.Context, in *work
 
 func (f *fakeWorkflowServiceClient) UpdateTemplate(ctx context.Context, in *workflowv1.UpdateTemplateRequest, _ ...grpc.CallOption) (*workflowv1.UpdateTemplateResponse, error) {
 	return f.updateTemplateFunc(ctx, in)
+}
+
+func (f *fakeWorkflowServiceClient) GetExecution(ctx context.Context, in *workflowv1.GetExecutionRequest, _ ...grpc.CallOption) (*workflowv1.GetExecutionResponse, error) {
+	return f.getExecutionFunc(ctx, in)
+}
+
+func (f *fakeWorkflowServiceClient) PauseExecution(ctx context.Context, in *workflowv1.PauseExecutionRequest, _ ...grpc.CallOption) (*workflowv1.PauseExecutionResponse, error) {
+	return f.pauseExecutionFunc(ctx, in)
+}
+
+func (f *fakeWorkflowServiceClient) ResumeExecution(ctx context.Context, in *workflowv1.ResumeExecutionRequest, _ ...grpc.CallOption) (*workflowv1.ResumeExecutionResponse, error) {
+	return f.resumeExecutionFunc(ctx, in)
+}
+
+func (f *fakeWorkflowServiceClient) ListTemplates(ctx context.Context, in *workflowv1.ListTemplatesRequest, _ ...grpc.CallOption) (*workflowv1.ListTemplatesResponse, error) {
+	return f.listTemplatesFunc(ctx, in)
+}
+
+func (f *fakeWorkflowServiceClient) ResolveTemplate(ctx context.Context, in *workflowv1.ResolveTemplateRequest, _ ...grpc.CallOption) (*workflowv1.ResolveTemplateResponse, error) {
+	return f.resolveTemplateFunc(ctx, in)
+}
+
+func (f *fakeWorkflowServiceClient) HasActiveExecutions(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest, _ ...grpc.CallOption) (*workflowv1.HasActiveExecutionsResponse, error) {
+	return f.hasActiveExecutionsFunc(ctx, in)
+}
+
+func (f *fakeWorkflowServiceClient) ExecuteAdHocStep(ctx context.Context, in *workflowv1.ExecuteAdHocStepRequest, _ ...grpc.CallOption) (*workflowv1.ExecuteAdHocStepResponse, error) {
+	return f.executeAdHocStepFunc(ctx, in)
 }
 
 func TestWorkflowExecuteChannel_Success(t *testing.T) {
@@ -239,5 +274,245 @@ func TestWorkflowTemplateUpdateChannel_Success(t *testing.T) {
 	}
 	if gotReq.ParentTemplateId != "tmpl-parent" || gotReq.Scope != "team" {
 		t.Errorf("unexpected request: %+v", gotReq)
+	}
+}
+
+// --- CR-PW-005: the 7 previously-unregistered channels ---
+
+func TestWorkflowGetExecutionChannel_Success(t *testing.T) {
+	var gotReq *workflowv1.GetExecutionRequest
+	fake := &fakeWorkflowServiceClient{
+		getExecutionFunc: func(ctx context.Context, in *workflowv1.GetExecutionRequest) (*workflowv1.GetExecutionResponse, error) {
+			gotReq = in
+			return &workflowv1.GetExecutionResponse{Execution: &workflowv1.WorkflowExecution{Id: in.Id, Status: "running"}}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"executionId": "exec-1"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.getExecution", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	exec, ok := result.(*workflowv1.WorkflowExecution)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	if exec.Status != "running" {
+		t.Errorf("unexpected execution: %+v", exec)
+	}
+	if gotReq.Id != "exec-1" {
+		t.Errorf("want executionId forwarded as Id, got %q", gotReq.Id)
+	}
+}
+
+func TestWorkflowPauseChannel_Success(t *testing.T) {
+	var gotReq *workflowv1.PauseExecutionRequest
+	fake := &fakeWorkflowServiceClient{
+		pauseExecutionFunc: func(ctx context.Context, in *workflowv1.PauseExecutionRequest) (*workflowv1.PauseExecutionResponse, error) {
+			gotReq = in
+			return &workflowv1.PauseExecutionResponse{Execution: &workflowv1.WorkflowExecution{Id: in.Id, Status: "paused"}}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"executionId": "exec-1"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.pause", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	exec, ok := result.(*workflowv1.WorkflowExecution)
+	if !ok || exec.Status != "paused" {
+		t.Fatalf("unexpected result: %+v (type %T)", result, result)
+	}
+	if gotReq.Id != "exec-1" {
+		t.Errorf("want executionId forwarded as Id, got %q", gotReq.Id)
+	}
+}
+
+func TestWorkflowResumeChannel_Success(t *testing.T) {
+	var gotReq *workflowv1.ResumeExecutionRequest
+	fake := &fakeWorkflowServiceClient{
+		resumeExecutionFunc: func(ctx context.Context, in *workflowv1.ResumeExecutionRequest) (*workflowv1.ResumeExecutionResponse, error) {
+			gotReq = in
+			return &workflowv1.ResumeExecutionResponse{Execution: &workflowv1.WorkflowExecution{Id: in.Id, Status: "running"}}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"executionId": "exec-1"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.resume", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	exec, ok := result.(*workflowv1.WorkflowExecution)
+	if !ok || exec.Status != "running" {
+		t.Fatalf("unexpected result: %+v (type %T)", result, result)
+	}
+	if gotReq.Id != "exec-1" {
+		t.Errorf("want executionId forwarded as Id, got %q", gotReq.Id)
+	}
+}
+
+// TestWorkflowTemplateListChannel_EmptyReturnsEmptyArrayNotNull guards the
+// established list-shaped-channel convention (TASK-BE-008's
+// devServerGroup.list precedent): a nil proto slice must serialize as `[]`,
+// never `null`, so frontend code doing `.map`/`.length` on it doesn't crash.
+func TestWorkflowTemplateListChannel_EmptyReturnsEmptyArrayNotNull(t *testing.T) {
+	fake := &fakeWorkflowServiceClient{
+		listTemplatesFunc: func(ctx context.Context, in *workflowv1.ListTemplatesRequest) (*workflowv1.ListTemplatesResponse, error) {
+			return &workflowv1.ListTemplatesResponse{Templates: nil, NextPageToken: ""}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"scope": "", "pageToken": "", "pageSize": 0})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.template.list", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	templates, ok := m["templates"].([]*workflowv1.WorkflowTemplate)
+	if !ok || templates == nil || len(templates) != 0 {
+		t.Fatalf("want non-nil empty slice, got %#v", m["templates"])
+	}
+}
+
+func TestWorkflowTemplateListChannel_ForwardsScopeAndPagination(t *testing.T) {
+	var gotReq *workflowv1.ListTemplatesRequest
+	fake := &fakeWorkflowServiceClient{
+		listTemplatesFunc: func(ctx context.Context, in *workflowv1.ListTemplatesRequest) (*workflowv1.ListTemplatesResponse, error) {
+			gotReq = in
+			return &workflowv1.ListTemplatesResponse{
+				Templates:     []*workflowv1.WorkflowTemplate{{Id: "tmpl-1"}},
+				NextPageToken: "next-1",
+			}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"scope": "team", "pageToken": "tok-0", "pageSize": 20})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.template.list", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.Scope != "team" || gotReq.PageToken != "tok-0" || gotReq.PageSize != 20 {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	m, ok := result.(map[string]any)
+	if !ok || m["nextPageToken"] != "next-1" {
+		t.Fatalf("unexpected result: %#v", result)
+	}
+}
+
+func TestWorkflowTemplateResolveChannel_Success(t *testing.T) {
+	var gotReq *workflowv1.ResolveTemplateRequest
+	fake := &fakeWorkflowServiceClient{
+		resolveTemplateFunc: func(ctx context.Context, in *workflowv1.ResolveTemplateRequest) (*workflowv1.ResolveTemplateResponse, error) {
+			gotReq = in
+			return &workflowv1.ResolveTemplateResponse{
+				Template: &workflowv1.WorkflowTemplate{Id: "tmpl-leaf", DagJson: `{"steps":[]}`},
+				Chain: []*workflowv1.WorkflowTemplate{
+					{Id: "tmpl-root"}, {Id: "tmpl-leaf"},
+				},
+			}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"templateId": "tmpl-leaf"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.template.resolve", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.TemplateId != "tmpl-leaf" {
+		t.Errorf("want templateId forwarded, got %q", gotReq.TemplateId)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	chain, ok := m["chain"].([]*workflowv1.WorkflowTemplate)
+	if !ok || len(chain) != 2 {
+		t.Fatalf("want 2-element chain, got %#v", m["chain"])
+	}
+}
+
+func TestWorkflowHasActiveExecutionsChannel_Success(t *testing.T) {
+	var gotReq *workflowv1.HasActiveExecutionsRequest
+	fake := &fakeWorkflowServiceClient{
+		hasActiveExecutionsFunc: func(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest) (*workflowv1.HasActiveExecutionsResponse, error) {
+			gotReq = in
+			return &workflowv1.HasActiveExecutionsResponse{HasActive: true}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"projectId": "proj-1"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.hasActiveExecutions", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.ProjectId != "proj-1" {
+		t.Errorf("want projectId forwarded, got %q", gotReq.ProjectId)
+	}
+	m, ok := result.(map[string]any)
+	if !ok || m["hasActive"] != true {
+		t.Fatalf("unexpected result: %#v", result)
+	}
+}
+
+// TestWorkflowExecuteAdHocStepChannel_TenantIDComesFromIdentityNotArgs mirrors
+// TestWorkflowTemplateCreateChannel_TenantIDComesFromIdentityNotArgs above —
+// same regression class, different RPC (ExecuteAdHocStepRequest also carries
+// a tenant_id field).
+func TestWorkflowExecuteAdHocStepChannel_TenantIDComesFromIdentityNotArgs(t *testing.T) {
+	var gotReq *workflowv1.ExecuteAdHocStepRequest
+	fake := &fakeWorkflowServiceClient{
+		executeAdHocStepFunc: func(ctx context.Context, in *workflowv1.ExecuteAdHocStepRequest) (*workflowv1.ExecuteAdHocStepResponse, error) {
+			gotReq = in
+			return &workflowv1.ExecuteAdHocStepResponse{Result: &workflowv1.StepResult{Status: "completed", OutputJson: "{}"}}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{
+		"stepType":       "shell",
+		"stepConfigJson": `{"command":"echo hi"}`,
+		"requestId":      "req-1",
+	})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-real", UserID: "user-1"}, "workflow.executeAdHocStep", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.TenantId != "tenant-real" {
+		t.Fatalf("want TenantId from Identity (tenant-real), got %q", gotReq.TenantId)
+	}
+	if gotReq.StepType != workflowv1.StepType_STEP_TYPE_SHELL {
+		t.Errorf("want stepType SHELL parsed from %q, got %v", "shell", gotReq.StepType)
+	}
+	res, ok := result.(*workflowv1.StepResult)
+	if !ok || res.Status != "completed" {
+		t.Fatalf("unexpected result: %+v (type %T)", result, result)
 	}
 }
