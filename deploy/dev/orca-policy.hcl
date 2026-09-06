@@ -18,8 +18,15 @@
 # not tenant secret material — see vault.go's doc comment on why this is a
 # documented exception, not a violation of "only credential-broker-service
 # touches tenant secrets directly").
+# Why "create" alongside "update" on transit/encrypt/*, not just decrypt/sign/
+# verify: encrypting against a not-yet-existing key name auto-vivifies it —
+# live-verified (2026-09-07): "update" alone 403s on first use against a new
+# key name; Vault's ACL treats that auto-create as a "create" operation on
+# the encrypt path itself, separate from transit/keys/* below. Decrypt/sign/
+# verify never auto-create (they require the key to already exist), so those
+# stay "update"-only.
 path "transit/encrypt/*" {
-  capabilities = ["update"]
+  capabilities = ["create", "update"]
 }
 path "transit/decrypt/*" {
   capabilities = ["update"]
@@ -30,12 +37,11 @@ path "transit/sign/*" {
 path "transit/verify/*" {
   capabilities = ["update"]
 }
-# Transit key creation is implicit-on-first-use in this codebase (no separate
-# "create key" usecase) — encrypt/decrypt/sign/verify against a not-yet-existing
-# key name auto-vivifies it, which requires "create" alongside "update" on the
-# same paths per Vault's Transit engine semantics.
+# Explicit key management (rotate/config) — not currently called by this
+# codebase (no separate "create key" usecase), kept narrow: read for
+# introspection, update for the rare config change, no delete/list.
 path "transit/keys/*" {
-  capabilities = ["create", "update"]
+  capabilities = ["read", "update"]
 }
 
 # credential-broker-service: KV v2 read/write for ciphertext storage
