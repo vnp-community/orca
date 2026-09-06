@@ -1823,6 +1823,63 @@ describe('web repos preload API', () => {
       expect(runtimeCalls).toEqual([{ method: 'files.browseServerDir', params: { path: '~' } }])
     }
   )
+
+  // Why: mergeRepoViewIntoRepo (this file's own separate copy of
+  // repos.ts's Phase 4b fix, per this file's own "keep these two copies in
+  // sync" comment) silently dropped devServerId from repo.list's response —
+  // "Available Hosts" showed "Local Mac" for every dev-server-bound repo, and
+  // "Initialize as Git repo" failed with GITGATEWAY_MISSING_DEV_SERVER_ID,
+  // because a paired web client's ONLY repo-fetch leg runs through here
+  // (fetchReposForAllHosts' {kind:'local'} leg calls window.api.repos.list()).
+  it('carries devServerId through from repo.list into the returned Repo', async () => {
+    vi.doMock('./web-runtime-client', () => ({
+      WebRuntimeClient: class {
+        call(method: string, params?: unknown): Promise<RuntimeRpcResponse<unknown>> {
+          if (method === 'project.list') {
+            return Promise.resolve({
+              id: method,
+              ok: true,
+              result: [{ id: 'default-project', createdAt: 1 }],
+              _meta: { runtimeId: 'runtime-1' }
+            })
+          }
+          if (method === 'repo.list') {
+            return Promise.resolve({
+              id: method,
+              ok: true,
+              result: {
+                repos: [
+                  {
+                    id: 'aiops-v3',
+                    projectId: 'default-project',
+                    url: '/opt/aiops-v3',
+                    displayName: 'aiops-v3',
+                    devServerId: 'test-01',
+                    position: 0
+                  }
+                ]
+              },
+              _meta: { runtimeId: 'runtime-1' }
+            })
+          }
+          return Promise.reject(
+            new Error(`unexpected method ${method} params=${JSON.stringify(params)}`)
+          )
+        }
+
+        close(): void {}
+      }
+    }))
+
+    const globals = installBrowserGlobals('Linux')
+    await writeStoredRuntimeEnvironment(globals.storage)
+    const { installWebPreloadApi } = await import('./web-preload-api')
+    installWebPreloadApi()
+
+    const repos = await globals.window.api.repos.list()
+
+    expect(repos.find((repo) => repo.id === 'aiops-v3')?.devServerId).toBe('test-01')
+  })
 })
 
 describe('web worktree preload API', () => {

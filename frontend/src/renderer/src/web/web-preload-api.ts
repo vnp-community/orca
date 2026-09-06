@@ -1302,6 +1302,17 @@ type RemoteRepoView = {
   url: string
   displayName: string
   position: number
+  // Not part of the original pre-Phase-10 wire shape this type was copied
+  // from — repo.list's response does carry it (channels_repo_ssh_status_
+  // workspace.go's toRepoView, json tag devServerId), but this field went
+  // silently dropped here since mergeRepoViewIntoRepo below never read it.
+  // Found live: "Available Hosts" showing "Local Mac" for every repo
+  // fetched through this file's {kind:'local'} leg (the only leg a paired
+  // web client ever runs, per fetchReposForAllHosts' own isWebClientLocation
+  // guard in store/slices/repos.ts) even after devServerId-aware resolution
+  // was fixed there — the field never reached that resolution logic to
+  // begin with.
+  devServerId?: string
 }
 
 function repoDisplayNameFromUrl(url: string): string {
@@ -1318,7 +1329,8 @@ function mergeRepoViewIntoRepo(view: RemoteRepoView, existing?: Repo): Repo {
     path: view.url,
     displayName: view.displayName || repoDisplayNameFromUrl(view.url),
     badgeColor: existing?.badgeColor ?? '',
-    addedAt: existing?.addedAt ?? Date.now()
+    addedAt: existing?.addedAt ?? Date.now(),
+    devServerId: view.devServerId ?? existing?.devServerId
   }
 }
 
@@ -2922,7 +2934,9 @@ function createCliApi(): NonNullable<Partial<PreloadApi>['cli']> {
     install: (args) => relayOrStubCli('cli.install', args?.devServerId),
     remove: (args) => relayOrStubCli('cli.remove', args?.devServerId),
     getWslInstallStatus: (args) =>
-      relayOrStubCli('cli.getWslInstallStatus', args?.devServerId, { distro: args?.distro ?? null }),
+      relayOrStubCli('cli.getWslInstallStatus', args?.devServerId, {
+        distro: args?.distro ?? null
+      }),
     installWsl: (args) =>
       relayOrStubCli('cli.installWsl', args?.devServerId, { distro: args?.distro ?? null }),
     removeWsl: (args) =>
