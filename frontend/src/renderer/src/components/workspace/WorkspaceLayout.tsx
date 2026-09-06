@@ -72,7 +72,10 @@ export function WorkspaceLayout() {
 
       <ResizablePanelGroup orientation="horizontal" className="flex-1 overflow-hidden">
         {/* Left: File Explorer (always visible) */}
-        <ResizablePanel defaultSize={20} minSize={15} maxSize={35} data-testid="panel-explorer">
+        {/* Why string sizes, not numbers: react-resizable-panels v4 interprets a bare number as
+            PIXELS, not percent (only unitless strings mean percent) — passing {20} rendered a
+            20px-wide Explorer instead of 20% of the panel group. */}
+        <ResizablePanel defaultSize="20" minSize="15" maxSize="35" data-testid="panel-explorer">
           <Suspense fallback={<div className="p-2 text-xs text-muted-foreground">Loading...</div>}>
             <ExplorerPanel />
           </Suspense>
@@ -81,7 +84,7 @@ export function WorkspaceLayout() {
         <ResizableHandle />
 
         {/* Center: Tab content */}
-        <ResizablePanel defaultSize={rightPanelVisible ? 50 : 80} data-testid="panel-center">
+        <ResizablePanel defaultSize={rightPanelVisible ? '50' : '80'} data-testid="panel-center">
           <Suspense fallback={<WorkspaceSkeletonLoader />}>
             {/* Why: mirrors the 'agent' branch below — CR-PW-001, GitPanel used to render even
                 with no worktree selected and silently fall back to a misleading "(no branch)". */}
@@ -101,7 +104,7 @@ export function WorkspaceLayout() {
         {rightPanelVisible && (
           <>
             <ResizableHandle />
-            <ResizablePanel defaultSize={30} minSize={20} data-testid="panel-right">
+            <ResizablePanel defaultSize="30" minSize="20" data-testid="panel-right">
               <div className="workspace-right h-full border-l bg-muted/30 overflow-y-auto p-3 text-xs text-muted-foreground">
                 {activeTab === 'git' && <span>Git details</span>}
                 {activeTab === 'tasks' && <span>Task detail</span>}
