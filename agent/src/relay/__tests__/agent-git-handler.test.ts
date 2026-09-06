@@ -4,20 +4,27 @@ import { tmpdir } from 'node:os'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { execSync } from 'node:child_process'
+import { validateGitArgs, GitValidationError, handleGitExec } from '../agent-git-handler'
 import {
-  validateGitArgs,
-  GitValidationError,
-  handleGitExec,
   handleGitWorktreeList,
   handleGitWorktreeAdd,
-  handleGitWorktreeRemove,
-  handleGitBaseRefDefault,
-  handleGitSearchRefs,
-} from '../agent-git-handler'
+  handleGitWorktreeRemove
+} from '../agent-git-worktree-handler'
+import { handleGitBaseRefDefault, handleGitSearchRefs } from '../agent-git-base-ref-handler'
 import { setConnectionGitIdentity } from '../git-identity-registry'
 import { registerTraceSink, type TraceEvent } from '../../shared/trace'
 import type { AgentConfig } from '../agent-config'
 import type { AgentLogger } from '../agent-logger'
+
+// The handlers under test return a bare `Promise<object>` (JSON-RPC 2.0
+// response, shape varies by method) — this loosens that back down to
+// something tests can assert on without `any`.
+type GitHandlerTestResponse = {
+  jsonrpc?: string
+  id?: string | number | null
+  result?: Record<string, unknown>
+  error?: { code: number; message: string }
+}
 
 const mockConfig: AgentConfig = {
   mode: 'direct-websocket',
@@ -30,7 +37,7 @@ const mockConfig: AgentConfig = {
   toolPath: '/usr/bin',
   toolEnv: { PATH: '/usr/bin:/usr/local/bin' },
   credentialDir: '/tmp/.creds',
-  tlsRejectUnauthorized: true,
+  tlsRejectUnauthorized: true
 }
 
 const mockLog: AgentLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }
@@ -38,8 +45,20 @@ const mockLog: AgentLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), deb
 // ─── validateGitArgs — allowed subcommands ────────────────────────────────────
 describe('validateGitArgs — allowed subcommands', () => {
   it.each([
-    'status', 'diff', 'log', 'commit', 'push', 'pull', 'fetch',
-    'branch', 'checkout', 'merge', 'rebase', 'stash', 'add', 'restore',
+    'status',
+    'diff',
+    'log',
+    'commit',
+    'push',
+    'pull',
+    'fetch',
+    'branch',
+    'checkout',
+    'merge',
+    'rebase',
+    'stash',
+    'add',
+    'restore'
   ])('allows "%s"', (cmd) => {
     expect(() => validateGitArgs([cmd])).not.toThrow()
   })
@@ -61,20 +80,32 @@ describe('validateGitArgs — allowed subcommands', () => {
 describe('validateGitArgs — disallowed subcommands', () => {
   it('throws GIT_NO_SUBCOMMAND on empty args', () => {
     let err: GitValidationError | null = null
-    try { validateGitArgs([]) } catch (e) { err = e as GitValidationError }
+    try {
+      validateGitArgs([])
+    } catch (e) {
+      err = e as GitValidationError
+    }
     expect(err).toBeInstanceOf(GitValidationError)
     expect(err!.code).toBe('GIT_NO_SUBCOMMAND')
   })
 
   it('throws GIT_DISALLOWED_SUBCOMMAND for "clean"', () => {
     let err: GitValidationError | null = null
-    try { validateGitArgs(['clean', '-fd']) } catch (e) { err = e as GitValidationError }
+    try {
+      validateGitArgs(['clean', '-fd'])
+    } catch (e) {
+      err = e as GitValidationError
+    }
     expect(err!.code).toBe('GIT_DISALLOWED_SUBCOMMAND')
   })
 
   it('throws GIT_DISALLOWED_SUBCOMMAND for "bisect"', () => {
     let err: GitValidationError | null = null
-    try { validateGitArgs(['bisect']) } catch (e) { err = e as GitValidationError }
+    try {
+      validateGitArgs(['bisect'])
+    } catch (e) {
+      err = e as GitValidationError
+    }
     expect(err!.code).toBe('GIT_DISALLOWED_SUBCOMMAND')
   })
 
@@ -89,13 +120,15 @@ describe('validateGitArgs — disallowed subcommands', () => {
 
 // ─── validateGitArgs — shell metacharacter checks ────────────────────────────
 describe('validateGitArgs — shell metacharacter rejection', () => {
-  it.each(['&', '|', ';', '$', '`', '<', '>', '!'])(
-    'rejects arg containing "%s"', (char) => {
-      let err: GitValidationError | null = null
-      try { validateGitArgs(['log', `--format=${char}evil`]) } catch (e) { err = e as GitValidationError }
-      expect(err!.code).toBe('GIT_SHELL_METACHARACTER_IN_ARG')
+  it.each(['&', '|', ';', '$', '`', '<', '>', '!'])('rejects arg containing "%s"', (char) => {
+    let err: GitValidationError | null = null
+    try {
+      validateGitArgs(['log', `--format=${char}evil`])
+    } catch (e) {
+      err = e as GitValidationError
     }
-  )
+    expect(err!.code).toBe('GIT_SHELL_METACHARACTER_IN_ARG')
+  })
 
   it('rejects backslash in arg', () => {
     expect(() => validateGitArgs(['log', '--format=\\n'])).toThrow(GitValidationError)
@@ -109,19 +142,34 @@ describe('validateGitArgs — shell metacharacter rejection', () => {
 // ─── handleGitExec — validation rejection ────────────────────────────────────
 describe('handleGitExec — validation errors', () => {
   it('returns InvalidParams (-32602) for empty args', async () => {
-    const resp = await handleGitExec(1, { args: [] }, mockConfig, mockLog) as any
+    const resp = (await handleGitExec(
+      1,
+      { args: [] },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     expect(resp.error).toBeDefined()
-    expect(resp.error.code).toBe(-32602)
+    expect(resp.error!.code).toBe(-32602)
   })
 
   it('returns InvalidParams for disallowed subcommand', async () => {
-    const resp = await handleGitExec(1, { args: ['clean', '-fd'] }, mockConfig, mockLog) as any
-    expect(resp.error.code).toBe(-32602)
+    const resp = (await handleGitExec(
+      1,
+      { args: ['clean', '-fd'] },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.error!.code).toBe(-32602)
   })
 
   it('returns InvalidParams for metacharacter in arg', async () => {
-    const resp = await handleGitExec(1, { args: ['log', '--format=$HOME'] }, mockConfig, mockLog) as any
-    expect(resp.error.code).toBe(-32602)
+    const resp = (await handleGitExec(
+      1,
+      { args: ['log', '--format=$HOME'] },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.error!.code).toBe(-32602)
   })
 
   it('does NOT crash on invalid args — always returns object', async () => {
@@ -149,18 +197,28 @@ describe('validateGitArgs — worktree subcommand', () => {
 // ─── handleGitExec — integration ──────────────────────────────────────────────
 describe('handleGitExec — integration', () => {
   it('returns a defined response for "git status" in /tmp (non-git dir)', async () => {
-    const resp = await handleGitExec(1, { args: ['status'], cwd: '/tmp' }, mockConfig, mockLog) as any
+    const resp = (await handleGitExec(
+      1,
+      { args: ['status'], cwd: '/tmp' },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     expect(resp).toBeDefined()
     // non-git dir returns error (exit 128) or result — both valid
     if (resp.result !== undefined) {
-      expect(typeof resp.result.exitCode).toBe('number')
+      expect(typeof resp.result!.exitCode).toBe('number')
     } else {
-      expect(resp.error.code).toBeDefined()
+      expect(resp.error!.code).toBeDefined()
     }
   })
 
   it('result has jsonrpc 2.0 format', async () => {
-    const resp = await handleGitExec(1, { args: ['status'] }, mockConfig, mockLog) as any
+    const resp = (await handleGitExec(
+      1,
+      { args: ['status'] },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     expect(resp.jsonrpc).toBe('2.0')
     expect(resp.id).toBe(1)
   })
@@ -173,13 +231,18 @@ describe('handleGitExec — integration', () => {
 // ─── handleGitWorktreeList — validation ───────────────────────────────────────
 describe('handleGitWorktreeList', () => {
   it('returns defined response without crashing for any cwd', async () => {
-    const resp = await handleGitWorktreeList(1, { cwd: tmpdir() }, mockConfig, mockLog) as any
+    const resp = (await handleGitWorktreeList(
+      1,
+      { cwd: tmpdir() },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     expect(resp).toBeDefined()
     expect(resp.jsonrpc).toBe('2.0')
   })
 
   it('result or error is always set', async () => {
-    const resp = await handleGitWorktreeList(1, {}, mockConfig, mockLog) as any
+    const resp = (await handleGitWorktreeList(1, {}, mockConfig, mockLog)) as GitHandlerTestResponse
     expect(resp.result ?? resp.error).toBeDefined()
   })
 })
@@ -205,7 +268,12 @@ describe('handleGitBaseRefDefault', () => {
   })
 
   it('resolves the short branch name from refs/remotes/origin/HEAD', async () => {
-    const resp = await handleGitBaseRefDefault(1, { repoPath: repoDir }, mockConfig, mockLog) as any
+    const resp = (await handleGitBaseRefDefault(
+      1,
+      { repoPath: repoDir },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     expect(resp.result?.ref).toBe('main')
   })
 
@@ -213,7 +281,12 @@ describe('handleGitBaseRefDefault', () => {
     const bareDir = mkdtempSync(join(tmpdir(), 'base-ref-default-bare-'))
     execSync('git init -q', { cwd: bareDir })
     try {
-      const resp = await handleGitBaseRefDefault(1, { repoPath: bareDir }, mockConfig, mockLog) as any
+      const resp = (await handleGitBaseRefDefault(
+        1,
+        { repoPath: bareDir },
+        mockConfig,
+        mockLog
+      )) as GitHandlerTestResponse
       expect(resp.error).toBeDefined()
     } finally {
       rmSync(bareDir, { recursive: true, force: true })
@@ -237,52 +310,80 @@ describe('handleGitSearchRefs', () => {
   })
 
   it('returns every ref when query is empty', async () => {
-    const resp = await handleGitSearchRefs(1, { repoPath: repoDir, query: '' }, mockConfig, mockLog) as any
-    expect(resp.result?.refs).toEqual(expect.arrayContaining(['main', 'feature/login', 'feature/logout']))
+    const resp = (await handleGitSearchRefs(
+      1,
+      { repoPath: repoDir, query: '' },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.result?.refs).toEqual(
+      expect.arrayContaining(['main', 'feature/login', 'feature/logout'])
+    )
   })
 
   it('substring-filters refs by query', async () => {
-    const resp = await handleGitSearchRefs(1, { repoPath: repoDir, query: 'log' }, mockConfig, mockLog) as any
-    expect(resp.result?.refs.sort()).toEqual(['feature/login', 'feature/logout'])
+    const resp = (await handleGitSearchRefs(
+      1,
+      { repoPath: repoDir, query: 'log' },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect((resp.result?.refs as string[])?.sort()).toEqual(['feature/login', 'feature/logout'])
   })
 })
 
 // ─── handleGitWorktreeAdd — validation ───────────────────────────────────────
 describe('handleGitWorktreeAdd — validation', () => {
   it('returns InvalidParams when path is missing', async () => {
-    const resp = await handleGitWorktreeAdd(1, { branch: 'feature' }, mockConfig, mockLog) as any
-    expect(resp.error.code).toBe(-32602)
-    expect(resp.error.message).toContain('path')
+    const resp = (await handleGitWorktreeAdd(
+      1,
+      { branch: 'feature' },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.error!.code).toBe(-32602)
+    expect(resp.error!.message).toContain('path')
   })
 
   it('returns InvalidParams when branch is missing', async () => {
-    const resp = await handleGitWorktreeAdd(1, { path: '/tmp/wt' }, mockConfig, mockLog) as any
-    expect(resp.error.code).toBe(-32602)
-    expect(resp.error.message).toContain('branch')
+    const resp = (await handleGitWorktreeAdd(
+      1,
+      { path: '/tmp/wt' },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.error!.code).toBe(-32602)
+    expect(resp.error!.message).toContain('branch')
   })
 
   it('returns InvalidParams for path with shell metachar', async () => {
-    const resp = await handleGitWorktreeAdd(1,
+    const resp = (await handleGitWorktreeAdd(
+      1,
       { path: '/tmp/wt;rm -rf /', branch: 'feature' },
-      mockConfig, mockLog
-    ) as any
-    expect(resp.error.code).toBe(-32602)
-    expect(resp.error.message).toContain('Unsafe')
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.error!.code).toBe(-32602)
+    expect(resp.error!.message).toContain('Unsafe')
   })
 
   it('returns InvalidParams for branch with $', async () => {
-    const resp = await handleGitWorktreeAdd(1,
+    const resp = (await handleGitWorktreeAdd(
+      1,
       { path: '/tmp/wt', branch: '$HOME/evil' },
-      mockConfig, mockLog
-    ) as any
-    expect(resp.error.code).toBe(-32602)
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.error!.code).toBe(-32602)
   })
 
   it('returns defined response for valid params (no crash even without git repo)', async () => {
-    const resp = await handleGitWorktreeAdd(1,
+    const resp = (await handleGitWorktreeAdd(
+      1,
       { path: '/tmp/wt-test', branch: 'feature-xyz', cwd: tmpdir() },
-      mockConfig, mockLog
-    ) as any
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     expect(resp.jsonrpc).toBe('2.0')
     expect(resp.result ?? resp.error).toBeDefined()
   })
@@ -291,35 +392,46 @@ describe('handleGitWorktreeAdd — validation', () => {
 // ─── handleGitWorktreeRemove — validation ─────────────────────────────────────
 describe('handleGitWorktreeRemove — validation', () => {
   it('returns InvalidParams when path is missing', async () => {
-    const resp = await handleGitWorktreeRemove(1, {}, mockConfig, mockLog) as any
-    expect(resp.error.code).toBe(-32602)
-    expect(resp.error.message).toContain('path')
+    const resp = (await handleGitWorktreeRemove(
+      1,
+      {},
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.error!.code).toBe(-32602)
+    expect(resp.error!.message).toContain('path')
   })
 
   it('returns InvalidParams for path containing |', async () => {
-    const resp = await handleGitWorktreeRemove(1,
+    const resp = (await handleGitWorktreeRemove(
+      1,
       { path: '/tmp/wt|evil' },
-      mockConfig, mockLog
-    ) as any
-    expect(resp.error.code).toBe(-32602)
-    expect(resp.error.message).toContain('Unsafe')
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.error!.code).toBe(-32602)
+    expect(resp.error!.message).toContain('Unsafe')
   })
 
   it('passes force flag to git command (no validation error)', async () => {
-    const resp = await handleGitWorktreeRemove(1,
+    const resp = (await handleGitWorktreeRemove(
+      1,
       { path: '/tmp/nonexistent-wt', force: true, cwd: tmpdir() },
-      mockConfig, mockLog
-    ) as any
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     // Should fail at git execution (wt doesn't exist) but not at validation
     expect(resp.jsonrpc).toBe('2.0')
     expect(resp.result ?? resp.error).toBeDefined()
   })
 
   it('response always has jsonrpc 2.0 format', async () => {
-    const resp = await handleGitWorktreeRemove(1,
+    const resp = (await handleGitWorktreeRemove(
+      1,
       { path: '/tmp/wt-remove-test', cwd: tmpdir() },
-      mockConfig, mockLog
-    ) as any
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     expect(resp.jsonrpc).toBe('2.0')
     expect(resp.id).toBe(1)
   })
@@ -349,42 +461,60 @@ describe('agent-git-handler — worktree tracing', () => {
 
   it('handleGitWorktreeAdd emits worktree:create span with ok() on success', async () => {
     const wtPath = join(repoDir, 'wt1')
-    const resp = await handleGitWorktreeAdd(
-      1, { path: wtPath, branch: 'feature/x', createBranch: true, cwd: repoDir }, mockConfig, mockLog
-    ) as any
+    const resp = (await handleGitWorktreeAdd(
+      1,
+      { path: wtPath, branch: 'feature/x', createBranch: true, cwd: repoDir },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     expect(resp.result).toBeDefined()
-    const ok = events.find(e => e.flow === 'worktree:create' && e.level === 'ok')
+    const ok = events.find((e) => e.flow === 'worktree:create' && e.level === 'ok')
     expect(ok).toBeDefined()
     expect(ok?.fields.path).toBe(wtPath)
   })
 
   it('handleGitWorktreeAdd emits fail() when path/branch missing', async () => {
     await handleGitWorktreeAdd(1, {}, mockConfig, mockLog)
-    const fail = events.find(e => e.flow === 'worktree:create' && e.level === 'fail')
+    const fail = events.find((e) => e.flow === 'worktree:create' && e.level === 'fail')
     expect(fail).toBeDefined()
   })
 
   it('resumes span id from params._trace.id when present', async () => {
-    await handleGitWorktreeAdd(1, { path: '/tmp/wt1', branch: 'x', _trace: { id: 'abc123' } }, mockConfig, mockLog)
-    const start = events.find(e => e.flow === 'worktree:create' && e.level === 'start')
+    await handleGitWorktreeAdd(
+      1,
+      { path: '/tmp/wt1', branch: 'x', _trace: { id: 'abc123' } },
+      mockConfig,
+      mockLog
+    )
+    const start = events.find((e) => e.flow === 'worktree:create' && e.level === 'start')
     expect(start?.id).toBe('abc123')
   })
 
   it('generates a new span id when params._trace is absent (backward-compat)', async () => {
     await handleGitWorktreeAdd(1, { path: '/tmp/wt1', branch: 'x' }, mockConfig, mockLog)
-    const start = events.find(e => e.flow === 'worktree:create' && e.level === 'start')
+    const start = events.find((e) => e.flow === 'worktree:create' && e.level === 'start')
     expect(start?.id).toBeDefined()
     expect(start?.id).not.toBe('abc123')
   })
 
   it('handleGitWorktreeRemove emits worktree:delete span, forwards id to nested agent:git span', async () => {
     const wtPath = join(repoDir, 'wt2')
-    await handleGitWorktreeAdd(1, { path: wtPath, branch: 'feature/y', createBranch: true, cwd: repoDir }, mockConfig, mockLog)
+    await handleGitWorktreeAdd(
+      1,
+      { path: wtPath, branch: 'feature/y', createBranch: true, cwd: repoDir },
+      mockConfig,
+      mockLog
+    )
     events = []
 
-    await handleGitWorktreeRemove(2, { path: wtPath, cwd: repoDir, _trace: { id: 'xyz789' } }, mockConfig, mockLog)
-    const deleteStart = events.find(e => e.flow === 'worktree:delete' && e.level === 'start')
-    const gitStart     = events.find(e => e.flow === 'agent:git' && e.level === 'start')
+    await handleGitWorktreeRemove(
+      2,
+      { path: wtPath, cwd: repoDir, _trace: { id: 'xyz789' } },
+      mockConfig,
+      mockLog
+    )
+    const deleteStart = events.find((e) => e.flow === 'worktree:delete' && e.level === 'start')
+    const gitStart = events.find((e) => e.flow === 'agent:git' && e.level === 'start')
     expect(deleteStart?.id).toBe('xyz789')
     expect(gitStart?.id).toBe('xyz789') // nối tiếp id xuống agent:git qua _trace forward
   })
@@ -400,11 +530,18 @@ describe('agent-git-handler — worktree tracing', () => {
     execSync('git commit -q --allow-empty -m later', { cwd: repoDir })
 
     const wtPath = join(repoDir, 'wt-baseref')
-    const resp = await handleGitWorktreeAdd(
+    const resp = (await handleGitWorktreeAdd(
       1,
-      { path: wtPath, branch: 'feature/from-base', createBranch: true, cwd: repoDir, baseRef: baseCommit },
-      mockConfig, mockLog
-    ) as any
+      {
+        path: wtPath,
+        branch: 'feature/from-base',
+        createBranch: true,
+        cwd: repoDir,
+        baseRef: baseCommit
+      },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     expect(resp.result).toBeDefined()
 
     const wtHead = execSync('git rev-parse HEAD', { cwd: wtPath }).toString().trim()
@@ -413,11 +550,12 @@ describe('agent-git-handler — worktree tracing', () => {
 
   it('handleGitWorktreeAdd omits baseRef arg when not provided (defaults to cwd HEAD)', async () => {
     const wtPath = join(repoDir, 'wt-no-baseref')
-    const resp = await handleGitWorktreeAdd(
+    const resp = (await handleGitWorktreeAdd(
       1,
       { path: wtPath, branch: 'feature/no-base', createBranch: true, cwd: repoDir },
-      mockConfig, mockLog
-    ) as any
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
     expect(resp.result).toBeDefined()
 
     const repoHead = execSync('git rev-parse HEAD', { cwd: repoDir }).toString().trim()
@@ -449,20 +587,27 @@ describe('agent-git-handler — commit identity injection', () => {
     const ws = {} as never
     setConnectionGitIdentity(ws, { name: 'Ada Lovelace', email: 'ada@example.com' })
 
-    const resp = await handleGitExec(
-      1, { args: ['commit', '--allow-empty', '-m', 'test'], cwd: repoDir }, mockConfig, mockLog, ws
-    ) as any
-    expect(resp.result.exitCode).toBe(0)
+    const resp = (await handleGitExec(
+      1,
+      { args: ['commit', '--allow-empty', '-m', 'test'], cwd: repoDir },
+      mockConfig,
+      mockLog,
+      ws
+    )) as GitHandlerTestResponse
+    expect(resp.result!.exitCode).toBe(0)
 
     const author = execSync("git log -1 --format='%an|%ae'", { cwd: repoDir }).toString().trim()
     expect(author).toBe('Ada Lovelace|ada@example.com')
   })
 
   it('falls back to the ambient env when no ws is passed (backward-compatible)', async () => {
-    const resp = await handleGitExec(
-      1, { args: ['commit', '--allow-empty', '-m', 'test'], cwd: repoDir }, mockConfig, mockLog
-    ) as any
-    expect(resp.result.exitCode).toBe(0)
+    const resp = (await handleGitExec(
+      1,
+      { args: ['commit', '--allow-empty', '-m', 'test'], cwd: repoDir },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.result!.exitCode).toBe(0)
 
     const author = execSync("git log -1 --format='%an|%ae'", { cwd: repoDir }).toString().trim()
     expect(author).toBe('Repo Default|repo-default@example.com')
@@ -472,10 +617,13 @@ describe('agent-git-handler — commit identity injection', () => {
     const otherWs = {} as never
     setConnectionGitIdentity(otherWs, { name: 'Someone Else', email: 'else@example.com' })
 
-    const resp = await handleGitExec(
-      1, { args: ['commit', '--allow-empty', '-m', 'test'], cwd: repoDir }, mockConfig, mockLog
-    ) as any
-    expect(resp.result.exitCode).toBe(0)
+    const resp = (await handleGitExec(
+      1,
+      { args: ['commit', '--allow-empty', '-m', 'test'], cwd: repoDir },
+      mockConfig,
+      mockLog
+    )) as GitHandlerTestResponse
+    expect(resp.result!.exitCode).toBe(0)
 
     const author = execSync("git log -1 --format='%an|%ae'", { cwd: repoDir }).toString().trim()
     expect(author).not.toContain('Someone Else')

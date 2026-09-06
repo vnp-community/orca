@@ -168,7 +168,7 @@ export async function dispatchGitRpc(
     // ── v5.0: git.worktree.list ──────────────────────────────────────────────
     case 'git.worktree.list': {
       try {
-        const { handleGitWorktreeList } = await import('./agent-git-handler')
+        const { handleGitWorktreeList } = await import('./agent-git-worktree-handler')
         return (await handleGitWorktreeList(
           rpc.id,
           rpc.params ?? {},
@@ -189,7 +189,7 @@ export async function dispatchGitRpc(
     // agent-git-handler.ts's doc comment on these two handlers ──────────────
     case 'git.baseRefDefault': {
       try {
-        const { handleGitBaseRefDefault } = await import('./agent-git-handler')
+        const { handleGitBaseRefDefault } = await import('./agent-git-base-ref-handler')
         return (await handleGitBaseRefDefault(
           rpc.id,
           rpc.params ?? {},
@@ -208,7 +208,7 @@ export async function dispatchGitRpc(
 
     case 'git.searchRefs': {
       try {
-        const { handleGitSearchRefs } = await import('./agent-git-handler')
+        const { handleGitSearchRefs } = await import('./agent-git-base-ref-handler')
         return (await handleGitSearchRefs(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -219,7 +219,7 @@ export async function dispatchGitRpc(
     // ── v5.0: git.worktree.add ───────────────────────────────────────────────
     case 'git.worktree.add': {
       try {
-        const { handleGitWorktreeAdd } = await import('./agent-git-handler')
+        const { handleGitWorktreeAdd } = await import('./agent-git-worktree-handler')
         return (await handleGitWorktreeAdd(
           rpc.id,
           rpc.params ?? {},
@@ -235,7 +235,7 @@ export async function dispatchGitRpc(
     // ── v5.0: git.worktree.remove ────────────────────────────────────────────
     case 'git.worktree.remove': {
       try {
-        const { handleGitWorktreeRemove } = await import('./agent-git-handler')
+        const { handleGitWorktreeRemove } = await import('./agent-git-worktree-handler')
         return (await handleGitWorktreeRemove(
           rpc.id,
           rpc.params ?? {},
