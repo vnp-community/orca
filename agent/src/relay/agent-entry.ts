@@ -31,7 +31,7 @@ process.on('uncaughtException', (err) => {
   process.stderr.write(`[DIAG BUG-FE-PTY-001] uncaughtException: ${err?.stack ?? err}\n`)
 })
 process.on('unhandledRejection', (reason) => {
-  const detail = reason instanceof Error ? reason.stack ?? reason.message : String(reason)
+  const detail = reason instanceof Error ? (reason.stack ?? reason.message) : String(reason)
   process.stderr.write(`[DIAG BUG-FE-PTY-001] unhandledRejection: ${detail}\n`)
 })
 
@@ -62,7 +62,7 @@ async function main(): Promise<void> {
     log.info(`DevServerId: ${config.devServerId}  |  WorkDir: ${config.workDir}`)
     log.info('Discovering tools...')
     const tools = await discoverTools(config)
-    log.info(`Tools ready: ${tools.length} (${tools.map(t => t.name).join(', ')})`)
+    log.info(`Tools ready: ${tools.length} (${tools.map((t) => t.name).join(', ')})`)
     await connectStdio(config, tools, log)
     return
   }
@@ -71,11 +71,13 @@ async function main(): Promise<void> {
   const log = createAgentLogger(config.logLevel)
 
   log.info('Orca Dev Agent v2.1.0')
-  log.info(`Mode: ${config.mode}  |  DevServerId: ${config.devServerId}  |  WorkDir: ${config.workDir}`)
+  log.info(
+    `Mode: ${config.mode}  |  DevServerId: ${config.devServerId}  |  WorkDir: ${config.workDir}`
+  )
 
   log.info('Discovering tools...')
   const tools = await discoverTools(config)
-  log.info(`Tools ready: ${tools.length} (${tools.map(t => t.name).join(', ')})`)
+  log.info(`Tools ready: ${tools.length} (${tools.map((t) => t.name).join(', ')})`)
 
   // Register clean shutdown handlers.
   // Why no PTY cleanup here anymore: terminal (pty.create) PTYs live in the
@@ -84,19 +86,32 @@ async function main(): Promise<void> {
   // live in THIS process and have no reattach concept, get cleaned up here.
   const shutdown = (signal: string): void => {
     log.info(`Shutting down (${signal})`)
+    // Why a hard-timeout fallback: a live incident on test-01 (2026-09-06)
+    // showed this handler's log line firing on SIGTERM yet the process
+    // still alive 20+ minutes later (confirmed via systemd's own "Unit
+    // process ... remains running after unit stopped" and `ps`) — leaving
+    // two agent.js processes racing for the same DEV_SERVER_ID after a
+    // `systemctl restart`. Root cause not fully isolated (this handler and
+    // agent-connection-direct.ts's own SIGTERM listener both look
+    // individually sound), so this guarantees the process always dies
+    // within a bounded time regardless of what else is holding the event
+    // loop open — `systemctl restart` must always leave exactly one agent
+    // process behind.
+    const forceExitTimer = setTimeout(() => process.exit(0), 3_000)
+    forceExitTimer.unref()
     import('./fs-agent-extensions')
       .then((m) => m.cleanupAgentWatches())
-      .catch(() => { /* best effort — still exit */ })
+      .catch(() => {
+        /* best effort — still exit */
+      })
       .finally(() => process.exit(0))
   }
-  process.on('SIGINT',  () => shutdown('SIGINT'))
+  process.on('SIGINT', () => shutdown('SIGINT'))
   process.on('SIGTERM', () => shutdown('SIGTERM'))
 
-  if (config.mode === 'relay-websocket') {
-    await listenRelay(config, tools, log)
-  } else {
-    await connectDirect(config, tools, log)
-  }
+  await (config.mode === 'relay-websocket'
+    ? listenRelay(config, tools, log)
+    : connectDirect(config, tools, log))
 }
 
 main().catch((err: unknown) => {

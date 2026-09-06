@@ -25,6 +25,7 @@ import { encodeDataFrame } from 'orca-dev-agent-transport'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 import { createTracer } from '../shared/trace'
 import { dispatchGitRpc } from './agent-rpc-dispatch-git'
+import { dispatchGitHooksRpc } from './agent-rpc-dispatch-git-hooks'
 import { dispatchGitStatusRpc } from './agent-rpc-dispatch-git-status'
 import { dispatchFsRpc } from './agent-rpc-dispatch-fs'
 import { dispatchScmRpc } from './agent-rpc-dispatch-scm'
@@ -299,6 +300,11 @@ async function route(
   const fromGit = await dispatchGitRpc(rpc, config, log, ws, state)
   if (fromGit !== null) {
     return fromGit
+  }
+
+  const fromGitHooks = await dispatchGitHooksRpc(rpc, config, log)
+  if (fromGitHooks !== null) {
+    return fromGitHooks
   }
 
   const fromGitStatus = await dispatchGitStatusRpc(rpc, ws)

@@ -216,6 +216,9 @@ export async function dispatchGitRpc(
       }
     }
 
+    // ── git.checkHooks / git.readIssueCommand / git.writeIssueCommand /
+    // git.scanSetupScriptImports: see agent-rpc-dispatch-git-hooks.ts ────────
+
     // ── v5.0: git.worktree.add ───────────────────────────────────────────────
     case 'git.worktree.add': {
       try {
