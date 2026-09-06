@@ -11,11 +11,15 @@ import (
 
 // UpdateRepoInput mirrors the gRPC request 1:1 — empty URL/DisplayName
 // means "no change," same field-mask convention UpdateProject already
-// uses (project.proto's UpdateProjectRequest doc comment).
+// uses (project.proto's UpdateProjectRequest doc comment). HookSettings
+// uses explicit presence (nil pointer) instead, since an empty JSON blob
+// is a legitimate value (the user cleared all local scripts) that must be
+// distinguishable from "this request doesn't touch hook_settings at all."
 type UpdateRepoInput struct {
-	RepoID      string
-	URL         string
-	DisplayName string
+	RepoID       string
+	URL          string
+	DisplayName  string
+	HookSettings *string
 }
 
 // UpdateRepo applies a field-masked edit to a repo's url/display_name.
@@ -59,6 +63,9 @@ func (uc *UpdateRepo) Execute(ctx context.Context, in UpdateRepoInput) (domain.R
 	}
 	if in.DisplayName != "" {
 		repo.DisplayName = in.DisplayName
+	}
+	if in.HookSettings != nil {
+		repo.HookSettings = *in.HookSettings
 	}
 
 	updated, err := uc.repo.Update(ctx, repo)

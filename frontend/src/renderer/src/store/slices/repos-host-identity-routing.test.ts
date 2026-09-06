@@ -89,10 +89,18 @@ beforeEach(() => {
 
 describe('repo slice host identity routing', () => {
   it('updates only the focused host row when repo ids are duplicated across hosts', async () => {
+    // repo.update's real wire response is a bare repoView (RemoteRepoView),
+    // never wrapped in `{ repo: ... }` — see channels_repo_ssh_status_workspace.go.
     runtimeEnvironmentCall.mockResolvedValue({
       id: 'rpc-duplicate-update',
       ok: true,
-      result: { repo: { ...remoteDuplicate, displayName: 'Remote Renamed' } },
+      result: {
+        id: remoteDuplicate.id,
+        projectId: '',
+        url: remoteDuplicate.path,
+        displayName: 'Remote Renamed',
+        position: 0
+      },
       _meta: { runtimeId: 'runtime-remote' }
     })
     const store = createTestStore()
@@ -141,7 +149,7 @@ describe('repo slice host identity routing', () => {
     const firstUpdate = deferred<{
       id: string
       ok: true
-      result: { repo: Repo }
+      result: { id: string; projectId: string; url: string; displayName: string; position: number }
       _meta: { runtimeId: string }
     }>()
     runtimeEnvironmentCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
@@ -153,7 +161,13 @@ describe('repo slice host identity routing', () => {
         return Promise.resolve({
           id: 'rpc-queued-update',
           ok: true,
-          result: { repo: { ...remoteDuplicate, displayName } },
+          result: {
+            id: remoteDuplicate.id,
+            projectId: '',
+            url: remoteDuplicate.path,
+            displayName,
+            position: 0
+          },
           _meta: { runtimeId: 'runtime-remote' }
         })
       }
@@ -186,7 +200,13 @@ describe('repo slice host identity routing', () => {
     firstUpdate.resolve({
       id: 'rpc-first-update',
       ok: true,
-      result: { repo: { ...remoteDuplicate, displayName: 'Remote slow' } },
+      result: {
+        id: remoteDuplicate.id,
+        projectId: '',
+        url: remoteDuplicate.path,
+        displayName: 'Remote slow',
+        position: 0
+      },
       _meta: { runtimeId: 'runtime-remote' }
     })
 

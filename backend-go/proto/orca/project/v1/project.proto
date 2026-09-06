@@ -303,6 +303,11 @@ message Repo {
   // existed; a repo's host was inferred from its project, never stated
   // directly. See migrations/0017_repo_dev_server for the backfill.
   string dev_server_id = 6;
+  // hook_settings is an opaque JSON blob (structure owned by the frontend's
+  // RepoHookSettings type — Setup/Archive scripts + run/startup/command-
+  // source policies) — project-service stores and returns it verbatim,
+  // never parses it. Empty = never set. See migrations/0018_repo_hook_settings.
+  string hook_settings = 7;
 }
 
 message AddRepoRequest {
@@ -343,6 +348,11 @@ message UpdateRepoRequest {
   string repo_id = 1;
   string url = 2;          // empty = no change
   string display_name = 3; // empty = no change
+  // optional (proto3 explicit presence), not "empty = no change" like the
+  // fields above — hook_settings can legitimately be set to an empty JSON
+  // object (e.g. the user cleared all local scripts), which must be
+  // distinguishable from "this request doesn't touch hook_settings at all".
+  optional string hook_settings = 4;
 }
 
 message UpdateRepoResponse {

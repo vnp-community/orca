@@ -52,10 +52,18 @@ describe('repo slice runtime routing', () => {
   })
 
   it('updates repos through the active remote runtime environment', async () => {
+    // repo.update's real wire response is a bare repoView (RemoteRepoView),
+    // never wrapped in `{ repo: ... }` — see channels_repo_ssh_status_workspace.go.
     runtimeEnvironmentCall.mockResolvedValue({
       id: 'rpc-2',
       ok: true,
-      result: { repo: { ...remoteRepo, displayName: 'Renamed' } },
+      result: {
+        id: remoteRepo.id,
+        projectId: '',
+        url: remoteRepo.path,
+        displayName: 'Renamed',
+        position: 0
+      },
       _meta: { runtimeId: 'runtime-remote' }
     })
     const store = createTestStore()

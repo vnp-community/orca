@@ -1,0 +1,14 @@
+-- Add durable, per-repo storage for RepoHookSettings (Setup Script /
+-- Archive Script + related run/startup/command-source policies).
+--
+-- Live bug: for a dev-server-hosted repo (kind:'environment'), the web
+-- client's repo.update RPC never included hookSettings at all — no proto
+-- field, no domain field, no column anywhere in backend-go — so a typed
+-- Setup Script was silently dropped the moment the autosave round-trip's
+-- (hookSettings-less) response overwrote the in-memory repo. Confirmed via
+-- a full grep sweep: zero references to hook_settings/HookSettings existed
+-- anywhere in backend-go before this migration. Stored as JSONB (an opaque
+-- blob from this service's point of view, structure owned by the
+-- frontend's RepoHookSettings type) rather than normalized columns, since
+-- project-service has no need to query/filter on its contents.
+ALTER TABLE project.repos ADD COLUMN hook_settings JSONB;

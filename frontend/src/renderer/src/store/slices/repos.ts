@@ -11,6 +11,7 @@ import type {
   Project,
   ProjectUpdateArgs,
   Repo,
+  RepoHookSettings,
   ProjectGroup,
   ProjectHostSetup,
   FolderWorkspace,
@@ -1132,6 +1133,10 @@ export type RemoteRepoView = {
   // getRepoExecutionHostId (settings gates like SparsePresetSettingsSection's)
   // reads to tell a dev-server-bound repo from a genuinely local one.
   devServerId?: string
+  // hookSettings: JSON-encoded RepoHookSettings (project.proto's
+  // Repo.hook_settings — an opaque blob backend-go stores/returns verbatim).
+  // Empty/absent = never set. See migrations/0018_repo_hook_settings.
+  hookSettings?: string
 }
 
 export function repoDisplayNameFromUrl(url: string): string {
@@ -1148,15 +1153,39 @@ export function repoDisplayNameFromUrl(url: string): string {
 // mergeCreatedFolderWorkspaceResponse's "backend response is a partial
 // record" pattern.
 export function mergeRepoViewIntoRepo(view: RemoteRepoView, existing?: Repo): Repo {
+  // Why fall back to `existing` per-field rather than trust `view` fully:
+  // callers that still expect the pre-fix `{ repo: RemoteRepoView }`
+  // response shape (a real bug this function's fix exposed — see repo.update's
+  // call site) pass a `view` with every field undefined; defaulting to
+  // `existing` here keeps that a no-op merge instead of a crash/data-loss.
+  const path = view.url || existing?.path || ''
   return {
     ...existing,
-    id: view.id,
-    projectId: view.projectId,
-    path: view.url,
-    displayName: view.displayName || repoDisplayNameFromUrl(view.url),
+    id: view.id || existing?.id || '',
+    projectId: view.projectId || existing?.projectId,
+    path,
+    displayName: view.displayName || existing?.displayName || repoDisplayNameFromUrl(path),
     badgeColor: existing?.badgeColor ?? '',
     addedAt: existing?.addedAt ?? Date.now(),
-    devServerId: view.devServerId ?? existing?.devServerId
+    devServerId: view.devServerId ?? existing?.devServerId,
+    hookSettings: parseRepoHookSettings(view.hookSettings) ?? existing?.hookSettings
+  }
+}
+
+// parseRepoHookSettings: view.hookSettings is an opaque JSON string from
+// the wire (see RemoteRepoView's doc comment) — undefined/empty means "the
+// server has nothing stored," not "clear the local value," so callers fall
+// back to the existing local value in that case. A malformed blob (should
+// never happen — backend-go never parses this, only round-trips it) fails
+// open the same way, rather than throwing and losing the rest of the merge.
+function parseRepoHookSettings(raw: string | undefined): RepoHookSettings | undefined {
+  if (!raw) {
+    return undefined
+  }
+  try {
+    return JSON.parse(raw) as RepoHookSettings
+  } catch {
+    return undefined
   }
 }
 
@@ -3725,26 +3754,46 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       try {
         const sanitizedUpdates = sanitizeRepoUpdate(updates)
         const target = ownerTarget
+        // Local/desktop: window.api.repos.update already applies the FULL
+        // sanitizedUpdates server-side and returns the authoritative
+        // record — used as-is below (unchanged from before this fix).
         const updatedRepo =
           target.kind === 'local'
             ? await window.api.repos.update({ repoId: projectId, updates: sanitizedUpdates })
-            : (
-                await callRuntimeRpc<{ repo: Repo }>(
-                  target,
-                  'repo.update',
-                  // Why flat {repoId, displayName}, not {repo, updates}: the Go
-                  // handler decodes {repoId, url, displayName} — a nested
-                  // `updates` object silently zeroed every field, and `repo`
-                  // isn't the key it reads either. Also why only displayName:
-                  // project.repos (backend-go's Repo entity) has no column for
-                  // RepoUpdate's other fields (badgeColor, repoIcon, etc.) —
-                  // those stay local-only/desktop-only until backend-go grows
-                  // real support for them, same as before this fix (the broken
-                  // call never persisted them either).
-                  { repoId: projectId, displayName: sanitizedUpdates.displayName ?? '' },
-                  { timeoutMs: 15_000 }
-                )
-              ).repo
+            : undefined
+        // Remote/environment: project.repos only has columns for
+        // url/display_name/hook_settings (migrations/0018_repo_hook_settings)
+        // — every other field (badgeColor, repoIcon, worktreeBasePath, ...)
+        // stays local-only, so this response is authoritative ONLY for the
+        // fields it carries, never a full substitute for the manual merge
+        // below (applied as an overlay on top of it, not instead of it).
+        //
+        // Why flat {repoId, displayName, hookSettings}, not {repo, updates}:
+        // the Go handler decodes {repoId, url, displayName, hookSettings} —
+        // a nested `updates` object silently zeroed every field, and `repo`
+        // isn't the key it reads either.
+        //
+        // Response shape: this channel, like every repo.* mutation channel,
+        // returns a bare repoView (RemoteRepoView), NOT `{ repo: Repo }` —
+        // an earlier version of this call used the wrong shape and always
+        // got `undefined` back, silently discarding this response entirely
+        // (harmless before hook_settings had a column to lose; not harmless
+        // now).
+        const confirmedEnvironmentView =
+          target.kind === 'local'
+            ? undefined
+            : await callRuntimeRpc<RemoteRepoView>(
+                target,
+                'repo.update',
+                {
+                  repoId: projectId,
+                  displayName: sanitizedUpdates.displayName ?? '',
+                  ...('hookSettings' in sanitizedUpdates
+                    ? { hookSettings: JSON.stringify(sanitizedUpdates.hookSettings ?? {}) }
+                    : {})
+                },
+                { timeoutMs: 15_000 }
+              )
         set((s) => {
           const nextRepos = s.repos.map((r) => {
             const matchesOwner = ownerHasExplicitHost
@@ -3778,6 +3827,12 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
               mergedRepo = repoWithoutSuppression
             } else if (externalWorktreeDiscoverySuppressedAt !== undefined) {
               mergedRepo = { ...mergedRepo, externalWorktreeDiscoverySuppressedAt }
+            }
+            if (confirmedEnvironmentView) {
+              mergedRepo = repoWithFetchedOwner(
+                mergeRepoViewIntoRepo(confirmedEnvironmentView, mergedRepo),
+                target
+              )
             }
             return mergedRepo
           })

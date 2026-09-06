@@ -390,9 +390,10 @@ func (s *Server) RemoveRepo(ctx context.Context, req *projectv1.RemoveRepoReques
 
 func (s *Server) UpdateRepo(ctx context.Context, req *projectv1.UpdateRepoRequest) (*projectv1.UpdateRepoResponse, error) {
 	repo, err := s.updateRepo.Execute(ctx, usecase.UpdateRepoInput{
-		RepoID:      req.GetRepoId(),
-		URL:         req.GetUrl(),
-		DisplayName: req.GetDisplayName(),
+		RepoID:       req.GetRepoId(),
+		URL:          req.GetUrl(),
+		DisplayName:  req.GetDisplayName(),
+		HookSettings: req.HookSettings,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -910,12 +911,13 @@ func toProtoSparsePreset(p domain.SparsePreset) *projectv1.SparsePreset {
 
 func toProtoRepo(r domain.Repo) *projectv1.Repo {
 	return &projectv1.Repo{
-		Id:          r.ID,
-		ProjectId:   r.ProjectID,
-		Url:         r.URL,
-		DisplayName: r.DisplayName,
-		Position:    r.Position,
-		DevServerId: r.DevServerID,
+		Id:           r.ID,
+		ProjectId:    r.ProjectID,
+		Url:          r.URL,
+		DisplayName:  r.DisplayName,
+		Position:     r.Position,
+		DevServerId:  r.DevServerID,
+		HookSettings: r.HookSettings,
 	}
 }
 

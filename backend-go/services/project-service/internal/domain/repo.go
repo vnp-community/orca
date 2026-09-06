@@ -41,6 +41,10 @@ type Repo struct {
 	// migrations/0017_repo_dev_server for the backfill from the old
 	// project-level column.
 	DevServerID string
+	// HookSettings is an opaque JSON blob (structure owned by the frontend's
+	// RepoHookSettings type) — project-service stores/returns it verbatim,
+	// never parses it. Empty = never set. See migrations/0018_repo_hook_settings.
+	HookSettings string
 }
 
 // NewRepo constructs a Repo, enforcing the invariants a catalog entry must

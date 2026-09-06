@@ -1425,7 +1425,12 @@ type Repo struct {
 	// means local (no dev server). Previously only Project.dev_server_id
 	// existed; a repo's host was inferred from its project, never stated
 	// directly. See migrations/0017_repo_dev_server for the backfill.
-	DevServerId   string `protobuf:"bytes,6,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	DevServerId string `protobuf:"bytes,6,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	// hook_settings is an opaque JSON blob (structure owned by the frontend's
+	// RepoHookSettings type — Setup/Archive scripts + run/startup/command-
+	// source policies) — project-service stores and returns it verbatim,
+	// never parses it. Empty = never set. See migrations/0018_repo_hook_settings.
+	HookSettings  string `protobuf:"bytes,7,opt,name=hook_settings,json=hookSettings,proto3" json:"hook_settings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1498,6 +1503,13 @@ func (x *Repo) GetPosition() int32 {
 func (x *Repo) GetDevServerId() string {
 	if x != nil {
 		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *Repo) GetHookSettings() string {
+	if x != nil {
+		return x.HookSettings
 	}
 	return ""
 }
@@ -1873,10 +1885,15 @@ func (*RemoveRepoResponse) Descriptor() ([]byte, []int) {
 }
 
 type UpdateRepoRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RepoId        string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
-	Url           string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`                                    // empty = no change
-	DisplayName   string                 `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"` // empty = no change
+	state       protoimpl.MessageState `protogen:"open.v1"`
+	RepoId      string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
+	Url         string                 `protobuf:"bytes,2,opt,name=url,proto3" json:"url,omitempty"`                                    // empty = no change
+	DisplayName string                 `protobuf:"bytes,3,opt,name=display_name,json=displayName,proto3" json:"display_name,omitempty"` // empty = no change
+	// optional (proto3 explicit presence), not "empty = no change" like the
+	// fields above — hook_settings can legitimately be set to an empty JSON
+	// object (e.g. the user cleared all local scripts), which must be
+	// distinguishable from "this request doesn't touch hook_settings at all".
+	HookSettings  *string `protobuf:"bytes,4,opt,name=hook_settings,json=hookSettings,proto3,oneof" json:"hook_settings,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1928,6 +1945,13 @@ func (x *UpdateRepoRequest) GetUrl() string {
 func (x *UpdateRepoRequest) GetDisplayName() string {
 	if x != nil {
 		return x.DisplayName
+	}
+	return ""
+}
+
+func (x *UpdateRepoRequest) GetHookSettings() string {
+	if x != nil && x.HookSettings != nil {
+		return *x.HookSettings
 	}
 	return ""
 }
@@ -6599,7 +6623,7 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\x14DeleteProjectRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\"\x17\n" +
-	"\x15DeleteProjectResponse\"\xaa\x01\n" +
+	"\x15DeleteProjectResponse\"\xcf\x01\n" +
 	"\x04Repo\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -6607,7 +6631,8 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\x03url\x18\x03 \x01(\tR\x03url\x12!\n" +
 	"\fdisplay_name\x18\x04 \x01(\tR\vdisplayName\x12\x1a\n" +
 	"\bposition\x18\x05 \x01(\x05R\bposition\x12\"\n" +
-	"\rdev_server_id\x18\x06 \x01(\tR\vdevServerId\"\x88\x01\n" +
+	"\rdev_server_id\x18\x06 \x01(\tR\vdevServerId\x12#\n" +
+	"\rhook_settings\x18\a \x01(\tR\fhookSettings\"\x88\x01\n" +
 	"\x0eAddRepoRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x10\n" +
@@ -6628,11 +6653,13 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\x14ReorderReposResponse\",\n" +
 	"\x11RemoveRepoRequest\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\"\x14\n" +
-	"\x12RemoveRepoResponse\"a\n" +
+	"\x12RemoveRepoResponse\"\x9d\x01\n" +
 	"\x11UpdateRepoRequest\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x10\n" +
 	"\x03url\x18\x02 \x01(\tR\x03url\x12!\n" +
-	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\"?\n" +
+	"\fdisplay_name\x18\x03 \x01(\tR\vdisplayName\x12(\n" +
+	"\rhook_settings\x18\x04 \x01(\tH\x00R\fhookSettings\x88\x01\x01B\x10\n" +
+	"\x0e_hook_settings\"?\n" +
 	"\x12UpdateRepoResponse\x12)\n" +
 	"\x04repo\x18\x01 \x01(\v2\x15.orca.project.v1.RepoR\x04repo\"a\n" +
 	"\x1aAssignRepoToProjectRequest\x12\x17\n" +
@@ -7337,6 +7364,7 @@ func file_orca_project_v1_project_proto_init() {
 	if File_orca_project_v1_project_proto != nil {
 		return
 	}
+	file_orca_project_v1_project_proto_msgTypes[33].OneofWrappers = []any{}
 	file_orca_project_v1_project_proto_msgTypes[55].OneofWrappers = []any{}
 	file_orca_project_v1_project_proto_msgTypes[56].OneofWrappers = []any{}
 	file_orca_project_v1_project_proto_msgTypes[68].OneofWrappers = []any{}

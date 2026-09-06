@@ -69,13 +69,17 @@ type repoView struct {
 	// DevServerID (Phase 10): this repo's own dev-server binding, empty =
 	// local. Previously only resolvable via the owning project.
 	DevServerID string `json:"devServerId"`
+	// HookSettings: opaque JSON blob (frontend's RepoHookSettings shape),
+	// empty = never set. See project.proto's Repo.hook_settings doc comment.
+	HookSettings string `json:"hookSettings"`
 }
 
 func toRepoView(r *projectv1.Repo) repoView {
 	return repoView{
 		ID: r.GetId(), ProjectID: r.GetProjectId(), URL: r.GetUrl(),
 		DisplayName: r.GetDisplayName(), Position: r.GetPosition(),
-		DevServerID: r.GetDevServerId(),
+		DevServerID:  r.GetDevServerId(),
+		HookSettings: r.GetHookSettings(),
 	}
 }
 
@@ -228,9 +232,15 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 
 	r.Register("repo.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type updateArgs struct {
-			RepoID      string `json:"repoId"`
-			URL         string `json:"url"`
-			DisplayName string `json:"displayName"`
+			RepoID       string  `json:"repoId"`
+			URL          string  `json:"url"`
+			DisplayName  string  `json:"displayName"`
+			// *string (not string): explicit presence, matching
+			// UpdateRepoRequest.hook_settings' proto3 `optional` — a
+			// present-but-empty value (`""`) is a real "clear it" request,
+			// distinct from the field being absent ("don't touch it").
+			// encoding/json leaves this nil when the key is missing or null.
+			HookSettings *string `json:"hookSettings"`
 		}
 		in, err := decodeArg[updateArgs](args, 0)
 		if err != nil {
@@ -240,7 +250,7 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
 		defer cancel()
 		resp, err := project.UpdateRepo(rpcCtx, &projectv1.UpdateRepoRequest{
-			RepoId: in.RepoID, Url: in.URL, DisplayName: in.DisplayName,
+			RepoId: in.RepoID, Url: in.URL, DisplayName: in.DisplayName, HookSettings: in.HookSettings,
 		})
 		if err != nil {
 			return nil, err

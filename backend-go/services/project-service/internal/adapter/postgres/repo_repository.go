@@ -11,10 +11,11 @@ import (
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 )
 
-// dev_server_id is cast to text via COALESCE, same nullable-UUID pattern
-// projectColumns uses (repository.go's comment explains why: COALESCE(uuid_col, ”)
-// fails at parse time otherwise).
-const repoColumns = `id, project_id, url, display_name, position, COALESCE(dev_server_id::text, '')`
+// dev_server_id and hook_settings are cast to text via COALESCE, same
+// nullable-column pattern projectColumns uses (repository.go's comment
+// explains why: COALESCE(uuid_col, '') fails at parse time otherwise —
+// jsonb has the identical NULL-vs-empty-string parse issue).
+const repoColumns = `id, project_id, url, display_name, position, COALESCE(dev_server_id::text, ''), COALESCE(hook_settings::text, '')`
 
 // RepoRepository implements usecase.RepoRepository against project.repos.
 // Kept as its own struct (not folded into Repository) — one struct per
@@ -155,15 +156,19 @@ func (r *RepoRepository) GetRepo(ctx context.Context, repoID string) (domain.Rep
 	return out, nil
 }
 
-// Update persists repo's current url/display_name — used by
-// usecase.UpdateRepo after it applies the field-mask.
+// Update persists repo's current url/display_name/hook_settings — used by
+// usecase.UpdateRepo after it applies the field-mask. hook_settings is
+// written from whatever repo.HookSettings already holds by the time this
+// is called (the usecase either left it as GetRepo's fetched value —
+// no-op — or overwrote it with the request's new value), same convention
+// url/display_name already use here.
 func (r *RepoRepository) Update(ctx context.Context, repo domain.Repo) (domain.Repo, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE project.repos
-		SET url = $2, display_name = $3
+		SET url = $2, display_name = $3, hook_settings = $4::jsonb
 		WHERE id = $1
 		RETURNING `+repoColumns,
-		repo.ID, repo.URL, repo.DisplayName,
+		repo.ID, repo.URL, repo.DisplayName, nullableString(repo.HookSettings),
 	)
 
 	out, err := scanRepo(row)
@@ -281,7 +286,9 @@ func (r *RepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 // callers check errors.Is(err, pgx.ErrNoRows) against the raw scan error).
 func scanRepo(row rowScanner) (domain.Repo, error) {
 	var r domain.Repo
-	if err := row.Scan(&r.ID, &r.ProjectID, &r.URL, &r.DisplayName, &r.Position, &r.DevServerID); err != nil {
+	if err := row.Scan(
+		&r.ID, &r.ProjectID, &r.URL, &r.DisplayName, &r.Position, &r.DevServerID, &r.HookSettings,
+	); err != nil {
 		return domain.Repo{}, err
 	}
 	return r, nil
