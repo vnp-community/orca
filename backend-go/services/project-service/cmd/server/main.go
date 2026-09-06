@@ -147,6 +147,7 @@ func run() error {
 	removeRepoUC := usecase.NewRemoveRepo(repoRepo, repo, opa)
 	updateRepoUC := usecase.NewUpdateRepo(repoRepo, repo, opa)
 	getRepoUC := usecase.NewGetRepo(repoRepo)
+	assignRepoToProjectUC := usecase.NewAssignRepoToProject(repoRepo, repo, opa)
 
 	addRepoMemberUC := usecase.NewAddRepoMember(repoRepo, repo, opa)
 	listRepoMembersUC := usecase.NewListRepoMembers(repoRepo, repo, opa)
@@ -207,12 +208,13 @@ func run() error {
 		RemoveMember:     removeMemberUC,
 		UpdateMemberRole: updateMemberRoleUC,
 
-		AddRepo:      addRepoUC,
-		ListRepos:    listReposUC,
-		ReorderRepos: reorderReposUC,
-		RemoveRepo:   removeRepoUC,
-		UpdateRepo:   updateRepoUC,
-		GetRepo:      getRepoUC,
+		AddRepo:             addRepoUC,
+		ListRepos:           listReposUC,
+		ReorderRepos:        reorderReposUC,
+		RemoveRepo:          removeRepoUC,
+		UpdateRepo:          updateRepoUC,
+		GetRepo:             getRepoUC,
+		AssignRepoToProject: assignRepoToProjectUC,
 
 		AddRepoMember:        addRepoMemberUC,
 		ListRepoMembers:      listRepoMembersUC,

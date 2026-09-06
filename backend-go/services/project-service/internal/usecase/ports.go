@@ -159,6 +159,12 @@ type RepoRepository interface {
 	// analogous to ProjectRepository.UpdateDevServerID one tier down. Returns
 	// domain.ErrRepoNotFound (wrapped) if no repo matches.
 	UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error)
+	// ReassignProject moves repo into a different project, appending it at
+	// the end of that project's list (same position convention AddRepo uses
+	// for a brand-new repo) — the only write path for
+	// usecase.AssignRepoToProject. Returns domain.ErrRepoNotFound (wrapped)
+	// if no repo matches.
+	ReassignProject(ctx context.Context, repoID, targetProjectID string) (domain.Repo, error)
 
 	// ── repo_members (functional-role tier, layered on top of project_members) ──
 

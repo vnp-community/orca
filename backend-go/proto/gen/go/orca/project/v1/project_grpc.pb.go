@@ -35,6 +35,7 @@ const (
 	ProjectService_ReorderRepos_FullMethodName                 = "/orca.project.v1.ProjectService/ReorderRepos"
 	ProjectService_RemoveRepo_FullMethodName                   = "/orca.project.v1.ProjectService/RemoveRepo"
 	ProjectService_UpdateRepo_FullMethodName                   = "/orca.project.v1.ProjectService/UpdateRepo"
+	ProjectService_AssignRepoToProject_FullMethodName          = "/orca.project.v1.ProjectService/AssignRepoToProject"
 	ProjectService_GetRepo_FullMethodName                      = "/orca.project.v1.ProjectService/GetRepo"
 	ProjectService_AddRepoMember_FullMethodName                = "/orca.project.v1.ProjectService/AddRepoMember"
 	ProjectService_ListRepoMembers_FullMethodName              = "/orca.project.v1.ProjectService/ListRepoMembers"
@@ -107,6 +108,11 @@ type ProjectServiceClient interface {
 	ReorderRepos(ctx context.Context, in *ReorderReposRequest, opts ...grpc.CallOption) (*ReorderReposResponse, error)
 	RemoveRepo(ctx context.Context, in *RemoveRepoRequest, opts ...grpc.CallOption) (*RemoveRepoResponse, error)
 	UpdateRepo(ctx context.Context, in *UpdateRepoRequest, opts ...grpc.CallOption) (*UpdateRepoResponse, error)
+	// AssignRepoToProject moves an EXISTING repo (already in some other
+	// project) into a different project — distinct from AddRepo, which
+	// always creates a brand-new repo row. Backs Project Settings' "Repos"
+	// tab candidate picker (attach an already-known repo to this project).
+	AssignRepoToProject(ctx context.Context, in *AssignRepoToProjectRequest, opts ...grpc.CallOption) (*AssignRepoToProjectResponse, error)
 	// GetRepo answers git-gateway-service's "does this repo exist, and which
 	// dev server does it live on" — ListRepos(project_id) was the only repo
 	// lookup RPC before this, unusable when a caller only has a repo_id (see
@@ -365,6 +371,16 @@ func (c *projectServiceClient) UpdateRepo(ctx context.Context, in *UpdateRepoReq
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateRepoResponse)
 	err := c.cc.Invoke(ctx, ProjectService_UpdateRepo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) AssignRepoToProject(ctx context.Context, in *AssignRepoToProjectRequest, opts ...grpc.CallOption) (*AssignRepoToProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssignRepoToProjectResponse)
+	err := c.cc.Invoke(ctx, ProjectService_AssignRepoToProject_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -774,6 +790,11 @@ type ProjectServiceServer interface {
 	ReorderRepos(context.Context, *ReorderReposRequest) (*ReorderReposResponse, error)
 	RemoveRepo(context.Context, *RemoveRepoRequest) (*RemoveRepoResponse, error)
 	UpdateRepo(context.Context, *UpdateRepoRequest) (*UpdateRepoResponse, error)
+	// AssignRepoToProject moves an EXISTING repo (already in some other
+	// project) into a different project — distinct from AddRepo, which
+	// always creates a brand-new repo row. Backs Project Settings' "Repos"
+	// tab candidate picker (attach an already-known repo to this project).
+	AssignRepoToProject(context.Context, *AssignRepoToProjectRequest) (*AssignRepoToProjectResponse, error)
 	// GetRepo answers git-gateway-service's "does this repo exist, and which
 	// dev server does it live on" — ListRepos(project_id) was the only repo
 	// lookup RPC before this, unusable when a caller only has a repo_id (see
@@ -925,6 +946,9 @@ func (UnimplementedProjectServiceServer) RemoveRepo(context.Context, *RemoveRepo
 }
 func (UnimplementedProjectServiceServer) UpdateRepo(context.Context, *UpdateRepoRequest) (*UpdateRepoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateRepo not implemented")
+}
+func (UnimplementedProjectServiceServer) AssignRepoToProject(context.Context, *AssignRepoToProjectRequest) (*AssignRepoToProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AssignRepoToProject not implemented")
 }
 func (UnimplementedProjectServiceServer) GetRepo(context.Context, *GetRepoRequest) (*GetRepoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetRepo not implemented")
@@ -1342,6 +1366,24 @@ func _ProjectService_UpdateRepo_Handler(srv interface{}, ctx context.Context, de
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).UpdateRepo(ctx, req.(*UpdateRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_AssignRepoToProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssignRepoToProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).AssignRepoToProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_AssignRepoToProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).AssignRepoToProject(ctx, req.(*AssignRepoToProjectRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2082,6 +2124,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdateRepo",
 			Handler:    _ProjectService_UpdateRepo_Handler,
+		},
+		{
+			MethodName: "AssignRepoToProject",
+			Handler:    _ProjectService_AssignRepoToProject_Handler,
 		},
 		{
 			MethodName: "GetRepo",

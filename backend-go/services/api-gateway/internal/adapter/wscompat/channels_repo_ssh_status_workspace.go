@@ -248,6 +248,31 @@ func registerRepoChannels(r *Registry, project projectv1.ProjectServiceClient, g
 		return toRepoView(resp.GetRepo()), nil
 	})
 
+	// repo.assignToProject moves an EXISTING repo into a different project —
+	// Project Settings' "Repos" tab candidate picker (attach an
+	// already-known repo to an OrcaProject), distinct from repo.add/create
+	// (always creates a brand-new repo).
+	r.Register("repo.assignToProject", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type assignArgs struct {
+			RepoID          string `json:"repoId"`
+			TargetProjectID string `json:"targetProjectId"`
+		}
+		in, err := decodeArg[assignArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		rpcCtx, cancel := context.WithTimeout(ctx, repoSSHStatusWorkspaceRPCTimeout)
+		defer cancel()
+		resp, err := project.AssignRepoToProject(rpcCtx, &projectv1.AssignRepoToProjectRequest{
+			RepoId: in.RepoID, TargetProjectId: in.TargetProjectID,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return toRepoView(resp.GetRepo()), nil
+	})
+
 	// repo.getMembers/addMember/removeMember/updateMemberRole map 1:1 onto
 	// ProjectService's ListRepoMembers/AddRepoMember/RemoveRepoMember/
 	// UpdateRepoMemberRole — the repo-scoped functional-role tier

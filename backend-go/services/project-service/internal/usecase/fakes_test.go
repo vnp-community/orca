@@ -340,6 +340,7 @@ type fakeRepoRepository struct {
 	getErr             error
 	updateErr          error
 	updateDevServerErr error
+	reassignErr        error
 
 	addMemberErr             error
 	getMembershipErr         error
@@ -441,6 +442,26 @@ func (f *fakeRepoRepository) UpdateDevServerID(ctx context.Context, repoID, devS
 		return domain.Repo{}, domain.ErrRepoNotFound
 	}
 	r.DevServerID = devServerID
+	f.repos[repoID] = r
+	return r, nil
+}
+
+func (f *fakeRepoRepository) ReassignProject(ctx context.Context, repoID, targetProjectID string) (domain.Repo, error) {
+	if f.reassignErr != nil {
+		return domain.Repo{}, f.reassignErr
+	}
+	r, ok := f.repos[repoID]
+	if !ok {
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
+	next := int32(0)
+	for _, other := range f.repos {
+		if other.ProjectID == targetProjectID && other.Position >= next {
+			next = other.Position + 1
+		}
+	}
+	r.ProjectID = targetProjectID
+	r.Position = next
 	f.repos[repoID] = r
 	return r, nil
 }

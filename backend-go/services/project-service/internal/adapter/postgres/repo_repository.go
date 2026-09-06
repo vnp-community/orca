@@ -199,6 +199,32 @@ func (r *RepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServe
 	return out, nil
 }
 
+// ReassignProject moves repo to a different project — the only write path
+// for usecase.AssignRepoToProject. Mirrors AddRepo's own position
+// assignment (append at the end of the target project's list); the
+// subquery reads project.repos as of statement start, so the row being
+// moved (still recorded under its OLD project_id at that point) never
+// perturbs its own target MAX(position).
+func (r *RepoRepository) ReassignProject(ctx context.Context, repoID, targetProjectID string) (domain.Repo, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE project.repos
+		SET project_id = $2,
+		    position = COALESCE((SELECT MAX(position) + 1 FROM project.repos WHERE project_id = $2), 0)
+		WHERE id = $1
+		RETURNING `+repoColumns,
+		repoID, targetProjectID,
+	)
+
+	out, err := scanRepo(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
+	if err != nil {
+		return domain.Repo{}, fmt.Errorf("postgres: reassign repo project: %w", err)
+	}
+	return out, nil
+}
+
 func (r *RepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 	tag, err := r.pool.Exec(ctx, `DELETE FROM project.repos WHERE id = $1`, repoID)
 	if err != nil {

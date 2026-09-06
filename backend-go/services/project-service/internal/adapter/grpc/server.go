@@ -37,12 +37,13 @@ type Server struct {
 	removeMember     *usecase.RemoveMember
 	updateMemberRole *usecase.UpdateMemberRole
 
-	addRepo      *usecase.AddRepo
-	listRepos    *usecase.ListRepos
-	reorderRepos *usecase.ReorderRepos
-	removeRepo   *usecase.RemoveRepo
-	updateRepo   *usecase.UpdateRepo
-	getRepo      *usecase.GetRepo
+	addRepo             *usecase.AddRepo
+	listRepos           *usecase.ListRepos
+	reorderRepos        *usecase.ReorderRepos
+	removeRepo          *usecase.RemoveRepo
+	updateRepo          *usecase.UpdateRepo
+	getRepo             *usecase.GetRepo
+	assignRepoToProject *usecase.AssignRepoToProject
 
 	addRepoMember        *usecase.AddRepoMember
 	listRepoMembers      *usecase.ListRepoMembers
@@ -101,12 +102,13 @@ type Deps struct {
 	RemoveMember     *usecase.RemoveMember
 	UpdateMemberRole *usecase.UpdateMemberRole
 
-	AddRepo      *usecase.AddRepo
-	ListRepos    *usecase.ListRepos
-	ReorderRepos *usecase.ReorderRepos
-	RemoveRepo   *usecase.RemoveRepo
-	UpdateRepo   *usecase.UpdateRepo
-	GetRepo      *usecase.GetRepo
+	AddRepo             *usecase.AddRepo
+	ListRepos           *usecase.ListRepos
+	ReorderRepos        *usecase.ReorderRepos
+	RemoveRepo          *usecase.RemoveRepo
+	UpdateRepo          *usecase.UpdateRepo
+	GetRepo             *usecase.GetRepo
+	AssignRepoToProject *usecase.AssignRepoToProject
 
 	AddRepoMember        *usecase.AddRepoMember
 	ListRepoMembers      *usecase.ListRepoMembers
@@ -163,12 +165,13 @@ func New(deps Deps) *Server {
 		removeMember:     deps.RemoveMember,
 		updateMemberRole: deps.UpdateMemberRole,
 
-		addRepo:      deps.AddRepo,
-		listRepos:    deps.ListRepos,
-		reorderRepos: deps.ReorderRepos,
-		removeRepo:   deps.RemoveRepo,
-		updateRepo:   deps.UpdateRepo,
-		getRepo:      deps.GetRepo,
+		addRepo:             deps.AddRepo,
+		listRepos:           deps.ListRepos,
+		reorderRepos:        deps.ReorderRepos,
+		removeRepo:          deps.RemoveRepo,
+		updateRepo:          deps.UpdateRepo,
+		getRepo:             deps.GetRepo,
+		assignRepoToProject: deps.AssignRepoToProject,
 
 		addRepoMember:        deps.AddRepoMember,
 		listRepoMembers:      deps.ListRepoMembers,
@@ -395,6 +398,17 @@ func (s *Server) UpdateRepo(ctx context.Context, req *projectv1.UpdateRepoReques
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.UpdateRepoResponse{Repo: toProtoRepo(repo)}, nil
+}
+
+func (s *Server) AssignRepoToProject(ctx context.Context, req *projectv1.AssignRepoToProjectRequest) (*projectv1.AssignRepoToProjectResponse, error) {
+	repo, err := s.assignRepoToProject.Execute(ctx, usecase.AssignRepoToProjectInput{
+		RepoID:          req.GetRepoId(),
+		TargetProjectID: req.GetTargetProjectId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.AssignRepoToProjectResponse{Repo: toProtoRepo(repo)}, nil
 }
 
 func (s *Server) GetRepo(ctx context.Context, req *projectv1.GetRepoRequest) (*projectv1.GetRepoResponse, error) {

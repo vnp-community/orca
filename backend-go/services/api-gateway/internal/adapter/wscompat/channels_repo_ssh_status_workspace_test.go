@@ -28,6 +28,7 @@ type fakeRepoProjectClient struct {
 	reorderReposFunc        func(ctx context.Context, in *projectv1.ReorderReposRequest) (*projectv1.ReorderReposResponse, error)
 	removeRepoFunc          func(ctx context.Context, in *projectv1.RemoveRepoRequest) (*projectv1.RemoveRepoResponse, error)
 	updateRepoFunc          func(ctx context.Context, in *projectv1.UpdateRepoRequest) (*projectv1.UpdateRepoResponse, error)
+	assignRepoToProjectFunc func(ctx context.Context, in *projectv1.AssignRepoToProjectRequest) (*projectv1.AssignRepoToProjectResponse, error)
 	rebindRepoDevServerFunc func(ctx context.Context, in *projectv1.RebindRepoDevServerRequest) (*projectv1.RebindRepoDevServerResponse, error)
 
 	listRepoMembersFunc      func(ctx context.Context, in *projectv1.ListRepoMembersRequest) (*projectv1.ListRepoMembersResponse, error)
@@ -54,6 +55,9 @@ func (f *fakeRepoProjectClient) RemoveRepo(ctx context.Context, in *projectv1.Re
 }
 func (f *fakeRepoProjectClient) UpdateRepo(ctx context.Context, in *projectv1.UpdateRepoRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoResponse, error) {
 	return f.updateRepoFunc(ctx, in)
+}
+func (f *fakeRepoProjectClient) AssignRepoToProject(ctx context.Context, in *projectv1.AssignRepoToProjectRequest, _ ...grpc.CallOption) (*projectv1.AssignRepoToProjectResponse, error) {
+	return f.assignRepoToProjectFunc(ctx, in)
 }
 func (f *fakeRepoProjectClient) RebindRepoDevServer(ctx context.Context, in *projectv1.RebindRepoDevServerRequest, _ ...grpc.CallOption) (*projectv1.RebindRepoDevServerResponse, error) {
 	return f.rebindRepoDevServerFunc(ctx, in)
@@ -293,6 +297,26 @@ func TestRegisterRepoChannels_AddListReorderRmUpdate(t *testing.T) {
 			t.Errorf("unexpected result: %+v", result)
 		}
 	})
+
+	t.Run("repo.assignToProject", func(t *testing.T) {
+		var gotReq *projectv1.AssignRepoToProjectRequest
+		fake.assignRepoToProjectFunc = func(ctx context.Context, in *projectv1.AssignRepoToProjectRequest) (*projectv1.AssignRepoToProjectResponse, error) {
+			gotReq = in
+			return &projectv1.AssignRepoToProjectResponse{Repo: &projectv1.Repo{Id: "r1", ProjectId: "target"}}, nil
+		}
+		result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "repo.assignToProject",
+			argsJSON(t, map[string]any{"repoId": "r1", "targetProjectId": "target"}))
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if gotReq.GetRepoId() != "r1" || gotReq.GetTargetProjectId() != "target" {
+			t.Errorf("unexpected AssignRepoToProjectRequest: %+v", gotReq)
+		}
+		repo, ok := result.(repoView)
+		if !ok || repo.ProjectID != "target" {
+			t.Errorf("unexpected result: %+v", result)
+		}
+	})
 }
 
 func TestRegisterRepoChannels_GitGatewayOwnedMethods(t *testing.T) {
@@ -457,7 +481,7 @@ func TestRegisterRepoChannels_RegistrationCoverage(t *testing.T) {
 	registerRepoChannels(r, &fakeRepoProjectClient{}, &fakeRepoGitGatewayClient{})
 
 	want := []string{
-		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update", "repo.rebindDevServer",
+		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update", "repo.assignToProject", "repo.rebindDevServer",
 		"repo.getMembers", "repo.addMember", "repo.removeMember", "repo.updateMemberRole",
 		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.create",
 		"repo.hooksCheck", "repo.issueCommandRead", "repo.issueCommandWrite",
@@ -851,7 +875,7 @@ func TestRegisterRepoSshStatusWorkspaceChannels_RegistersEverything(t *testing.T
 	registerRepoSshStatusWorkspaceChannels(r, &fakeRepoProjectClient{}, &fakeRepoGitGatewayClient{}, &fakeRepoSshStatusWorkspaceInfraFleetClient{})
 
 	want := []string{
-		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update", "repo.rebindDevServer",
+		"repo.add", "repo.list", "repo.reorder", "repo.rm", "repo.update", "repo.assignToProject", "repo.rebindDevServer",
 		"repo.getMembers", "repo.addMember", "repo.removeMember", "repo.updateMemberRole",
 		"repo.clone", "repo.baseRefDefault", "repo.searchRefs", "repo.create",
 		"repo.hooksCheck", "repo.issueCommandRead", "repo.issueCommandWrite",

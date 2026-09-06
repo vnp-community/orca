@@ -39,6 +39,11 @@ service ProjectService {
   rpc ReorderRepos(ReorderReposRequest) returns (ReorderReposResponse);
   rpc RemoveRepo(RemoveRepoRequest) returns (RemoveRepoResponse);
   rpc UpdateRepo(UpdateRepoRequest) returns (UpdateRepoResponse);
+  // AssignRepoToProject moves an EXISTING repo (already in some other
+  // project) into a different project — distinct from AddRepo, which
+  // always creates a brand-new repo row. Backs Project Settings' "Repos"
+  // tab candidate picker (attach an already-known repo to this project).
+  rpc AssignRepoToProject(AssignRepoToProjectRequest) returns (AssignRepoToProjectResponse);
   // GetRepo answers git-gateway-service's "does this repo exist, and which
   // dev server does it live on" — ListRepos(project_id) was the only repo
   // lookup RPC before this, unusable when a caller only has a repo_id (see
@@ -341,6 +346,15 @@ message UpdateRepoRequest {
 }
 
 message UpdateRepoResponse {
+  Repo repo = 1;
+}
+
+message AssignRepoToProjectRequest {
+  string repo_id = 1;
+  string target_project_id = 2;
+}
+
+message AssignRepoToProjectResponse {
   Repo repo = 1;
 }
 

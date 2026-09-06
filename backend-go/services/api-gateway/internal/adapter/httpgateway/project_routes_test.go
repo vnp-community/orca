@@ -297,6 +297,12 @@ func (f *fakeProjectServiceClient) ListRepoMembers(_ context.Context, _ *project
 	return &projectv1.ListRepoMembersResponse{}, nil
 }
 
+// AssignRepoToProject has no REST route — same reasoning as
+// RemoveRepoMember/UpdateRepoMemberRole below (wscompat-only surface).
+func (f *fakeProjectServiceClient) AssignRepoToProject(_ context.Context, _ *projectv1.AssignRepoToProjectRequest, _ ...grpc.CallOption) (*projectv1.AssignRepoToProjectResponse, error) {
+	return &projectv1.AssignRepoToProjectResponse{}, nil
+}
+
 func (f *fakeProjectServiceClient) RemoveRepoMember(_ context.Context, _ *projectv1.RemoveRepoMemberRequest, _ ...grpc.CallOption) (*projectv1.RemoveRepoMemberResponse, error) {
 	return &projectv1.RemoveRepoMemberResponse{}, nil
 }
