@@ -26,7 +26,14 @@ C4 Model mô tả kiến trúc phần mềm qua 4 mức độ trừu tượng:
 | — | [deployment.md](./deployment.md) | Deployment trên các platform (macOS, Windows, Linux, Docker) |
 | — | [security.md](./security.md) | Security model, auth, E2E encryption, multi-user trust |
 
-Tất cả các đường dẫn trên đều tương đối trong `docs/hld/v1/`. Lưu ý: đây là bộ tài liệu C4 phân tầng L1–L4; kiến trúc **hiện hành, đã kiểm chứng qua audit** nằm ở `docs/hld/backend-server-architecture.md`, `docs/hld/dev-server-architecture.md`, `docs/hld/web-server-architecture.md` (thư mục gốc `docs/hld/`, không phải `docs/hld/v1/`).
+Tất cả các đường dẫn trên đều tương đối trong `docs/hld/v1/`. Lưu ý: đây là bộ tài liệu C4 phân tầng L1–L4, mô tả riêng backend **TypeScript** (`backend/`+`desktop/`); kiến trúc **hiện hành, đã kiểm chứng qua audit** cho backend TS nằm ở `docs/hld/backend-server-architecture.md`, `docs/hld/dev-server-architecture.md`, `docs/hld/web-server-architecture.md` (thư mục gốc `docs/hld/`, không phải `docs/hld/v1/`).
+
+> **2026-09-06:** Bộ tài liệu C4 này (và 3 file gốc kể trên) **không mô tả `backend-go/`** — một bản viết
+> lại Go microservices (17 service, gRPC, Postgres-per-service, Vault) của cùng Control Plane, chạy
+> **song song** với backend TS mà toàn bộ `docs/hld/v1/` mô tả. Xem
+> [`docs/hld/backend-go-architecture.md`](../backend-go-architecture.md) cho kiến trúc backend-go, và
+> [`docs/adrs/v2/ADR-022`](../../adrs/v2/ADR-022-wscompat-protocol-bridge.md)–[`ADR-024`](../../adrs/v2/ADR-024-dual-workflow-engines-migration.md)
+> cho các quyết định kiến trúc tương ứng.
 
 ---
 

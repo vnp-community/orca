@@ -12,6 +12,16 @@
 >
 > Từ v4.0, mọi phần còn mô tả vision "v6.0" được đánh dấu rõ **🚧 Proposed, chưa triển khai** thay vì trình bày như hiện trạng — đúng quy ước status-marker của tài liệu này.
 
+> **2026-09-06:** Mọi nội dung trong tài liệu này (Dev Server Agent, `agent/src/relay/*`, 3 connection
+> mode, wire protocol 13-byte) mô tả **execution plane**, và giữ nguyên **không đổi** kể cả khi Control
+> Plane phía trên chuyển từ TS `backend/` sang backend Go mới (`backend-go/`) — xem
+> [`backend-go-architecture.md §7`](./backend-go-architecture.md#7-backend-go--dev-server-agent-execution-plane--không-đổi).
+> `infra-fleet-service`/`git-gateway-service` (2 service Go duy nhất nói chuyện với Agent) được thiết kế
+> để giữ nguyên đúng giao thức mô tả trong file này ("Option A" theo
+> `specs/backend-go/tdd/architecture/08-inter-service-communication.md`) thay vì đổi sang gRPC streaming
+> — 🚧 quyết định đã ghi lại, nhưng phiên rà soát 2026-09-06 **chưa đọc code Go client thật** của 2
+> service đó để xác nhận implementation khớp 100% với protocol mô tả ở §5 bên dưới.
+
 ---
 
 ## 1. Dev Server là gì?
