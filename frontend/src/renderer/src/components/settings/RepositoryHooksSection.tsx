@@ -765,6 +765,7 @@ export function RepositoryHooksSection({
   const hookSettingsDraftRef = useRef(hookSettingsDraft)
   hookSettingsDraftRef.current = hookSettingsDraft
   const localCommandsRepoIdRef = useRef(repo.id)
+  const lastSeenRepoHookSettingsRef = useRef(repo.hookSettings)
   const localCommandsDraftDirtyRef = useRef(false)
   const localCommandsAutosaveTimerRef = useRef<number | null>(null)
   const persistRef = useRef(onUpdateHookSettings)
@@ -882,15 +883,28 @@ export function RepositoryHooksSection({
 
     if (isSameRepo) {
       localCommandsPersistForRepoRef.current = onUpdateHookSettings
-      if (!localCommandsDraftDirtyRef.current) {
+      // Why the extra `repo.hookSettings` reference check (not just the
+      // dirty flag): this effect also re-runs whenever `onUpdateHookSettings`
+      // gets a new identity, which an unmemoized caller can produce on any
+      // unrelated parent re-render — including in the brief window right
+      // after this component's own debounced autosave clears the dirty flag
+      // but before the store's `repo.hookSettings` has caught up with what
+      // was just saved. Without this, that stale value could resync over
+      // (silently wipe) text the user just typed.
+      if (
+        !localCommandsDraftDirtyRef.current &&
+        lastSeenRepoHookSettingsRef.current !== repo.hookSettings
+      ) {
         syncHookSettingsDraft(next)
       }
+      lastSeenRepoHookSettingsRef.current = repo.hookSettings
       return
     }
 
     flushScriptDraft(localCommandsPersistForRepoRef.current)
     localCommandsRepoIdRef.current = repo.id
     localCommandsPersistForRepoRef.current = onUpdateHookSettings
+    lastSeenRepoHookSettingsRef.current = repo.hookSettings
     hookSettingsDraftRef.current = next
     setHookSettingsDraft(next)
   }, [flushScriptDraft, onUpdateHookSettings, repo.id, repo.hookSettings, syncHookSettingsDraft])

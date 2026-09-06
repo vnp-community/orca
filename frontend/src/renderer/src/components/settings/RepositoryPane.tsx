@@ -121,11 +121,20 @@ export function RepositoryPane({
     setConfirmingRemove(repoId)
   }
 
-  const updateSelectedRepoHookSettings = (nextSettings: RepoHookSettings) => {
-    updateRepo(repo.id, {
-      hookSettings: nextSettings
-    })
-  }
+  // Why useCallback: an unmemoized function here got a new identity on
+  // every RepositoryPane render (e.g. live terminal/agent-status updates
+  // unrelated to this section) — RepositoryHooksSection.tsx passes this as
+  // an effect dependency, so an unstable identity re-ran that effect mid-
+  // typing and could resync the draft from a not-yet-updated store value,
+  // wiping text the user had just typed into the Setup Script textarea.
+  const updateSelectedRepoHookSettings = useCallback(
+    (nextSettings: RepoHookSettings) => {
+      updateRepo(repo.id, {
+        hookSettings: nextSettings
+      })
+    },
+    [repo.id, updateRepo]
+  )
 
   const handleCopyTemplate = async () => {
     // Why: the missing-`orca.yaml` state is a migration aid, so copying the shared-template
