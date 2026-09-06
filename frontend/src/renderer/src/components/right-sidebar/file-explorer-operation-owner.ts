@@ -140,6 +140,16 @@ function operationOwnerFromHostId(hostId: ExecutionHostId): FileExplorerOperatio
       return { kind: 'ssh', connectionId: parsed.targetId }
     case 'runtime':
       return { kind: 'runtime', environmentId: parsed.environmentId }
+    // Why: FileExplorerOperationOwner has no 'devServer' variant yet (Quick
+    // Open/File Explorer were never wired for Phase 10's per-repo dev-server
+    // binding) — falling out of this switch with no case returned `undefined`
+    // as the whole owner, crashing getFileExplorerOperationRoute's own
+    // switch on `owner.kind` the first time a real worktree resolved to a
+    // devServer: host (found live: "+ New tab" on a dev-server-bound repo).
+    // 'unresolved' matches how the non-fast-path branch above already
+    // treats dev-server-hosted worktrees (its connectionId/
+    // explicitRuntimeEnvironmentId helpers don't recognize devServer either).
+    case 'devServer':
     case undefined:
       return { kind: 'unresolved' }
   }
