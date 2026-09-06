@@ -161,10 +161,15 @@ type RepoRepository interface {
 	UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error)
 	// ReassignProject moves repo into a different project, appending it at
 	// the end of that project's list (same position convention AddRepo uses
-	// for a brand-new repo) — the only write path for
-	// usecase.AssignRepoToProject. Returns domain.ErrRepoNotFound (wrapped)
-	// if no repo matches.
-	ReassignProject(ctx context.Context, repoID, targetProjectID string) (domain.Repo, error)
+	// for a brand-new repo) and clearing any repo_members grants (scoped to
+	// the OLD project's trust, must not silently carry over) — the only
+	// write path for usecase.AssignRepoToProject. The write is conditioned
+	// on fromProjectID still matching (guards the TOCTOU window between the
+	// caller's authorization check and this write): returns
+	// domain.ErrRepoNotFound if no repo matches at all, or
+	// domain.ErrRepoProjectChanged if the repo exists but its project_id no
+	// longer matches fromProjectID (a concurrent move raced this one).
+	ReassignProject(ctx context.Context, repoID, fromProjectID, targetProjectID string) (domain.Repo, error)
 
 	// ── repo_members (functional-role tier, layered on top of project_members) ──
 

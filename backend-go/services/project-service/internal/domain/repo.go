@@ -10,6 +10,13 @@ var (
 	// a lookup/remove targets a repo that doesn't exist — usecase/ maps this
 	// to apperrors.KindNotFound.
 	ErrRepoNotFound = errors.New("domain: repo not found")
+	// ErrRepoProjectChanged is the sentinel adapter/postgres's ReassignProject
+	// returns (wrapped) when the repo's project_id no longer matches the
+	// value the caller was authorized against (a concurrent move raced this
+	// one) — usecase.AssignRepoToProject maps this to
+	// apperrors.KindFailedPrecondition, distinct from ErrRepoNotFound (the
+	// repo does exist, just not where the authorization check assumed).
+	ErrRepoProjectChanged = errors.New("domain: repo's project changed concurrently")
 )
 
 // Repo is a project's repository catalog entry — metadata only (url,

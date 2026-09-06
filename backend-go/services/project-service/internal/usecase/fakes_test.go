@@ -446,13 +446,16 @@ func (f *fakeRepoRepository) UpdateDevServerID(ctx context.Context, repoID, devS
 	return r, nil
 }
 
-func (f *fakeRepoRepository) ReassignProject(ctx context.Context, repoID, targetProjectID string) (domain.Repo, error) {
+func (f *fakeRepoRepository) ReassignProject(ctx context.Context, repoID, fromProjectID, targetProjectID string) (domain.Repo, error) {
 	if f.reassignErr != nil {
 		return domain.Repo{}, f.reassignErr
 	}
 	r, ok := f.repos[repoID]
 	if !ok {
 		return domain.Repo{}, domain.ErrRepoNotFound
+	}
+	if r.ProjectID != fromProjectID {
+		return domain.Repo{}, domain.ErrRepoProjectChanged
 	}
 	next := int32(0)
 	for _, other := range f.repos {
@@ -463,6 +466,15 @@ func (f *fakeRepoRepository) ReassignProject(ctx context.Context, repoID, target
 	r.ProjectID = targetProjectID
 	r.Position = next
 	f.repos[repoID] = r
+	// Mirrors the real ReassignProject's repo_members cleanup — grants
+	// scoped to the old project's trust must not survive the move.
+	remaining := f.repoMembers[:0]
+	for _, m := range f.repoMembers {
+		if m.RepoID != repoID {
+			remaining = append(remaining, m)
+		}
+	}
+	f.repoMembers = remaining
 	return r, nil
 }
 

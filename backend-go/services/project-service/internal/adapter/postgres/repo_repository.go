@@ -205,22 +205,62 @@ func (r *RepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServe
 // subquery reads project.repos as of statement start, so the row being
 // moved (still recorded under its OLD project_id at that point) never
 // perturbs its own target MAX(position).
-func (r *RepoRepository) ReassignProject(ctx context.Context, repoID, targetProjectID string) (domain.Repo, error) {
-	row := r.pool.QueryRow(ctx, `
+//
+// The UPDATE is conditioned on `project_id = fromProjectID` — the value
+// the caller was authorized against — closing a TOCTOU window: without
+// it, a second concurrent move could legitimately change the repo's
+// project between the caller's authorization check and this write, and
+// this write would otherwise blindly stomp project_id regardless. Zero
+// rows affected because the repo doesn't exist at all vs. because its
+// project_id already changed are distinguished (ErrRepoNotFound vs.
+// ErrRepoProjectChanged) so the caller doesn't get a misleading "not
+// found" for a repo that does exist, just not where authorization assumed.
+//
+// repo_members is cleared for repoID in the same transaction — those
+// grants were scoped to whoever the repo's OLD project's owner trusted
+// with a functional role; letting them silently survive into the new
+// project's (different) ownership would be a real privilege leak. See
+// usecase.AssignRepoToProject's doc comment for the source-project
+// owner-only authorization bar this pairs with.
+func (r *RepoRepository) ReassignProject(ctx context.Context, repoID, fromProjectID, targetProjectID string) (domain.Repo, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return domain.Repo{}, fmt.Errorf("postgres: begin reassign repo project transaction: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE project.repos
 		SET project_id = $2,
 		    position = COALESCE((SELECT MAX(position) + 1 FROM project.repos WHERE project_id = $2), 0)
-		WHERE id = $1
-		RETURNING `+repoColumns,
-		repoID, targetProjectID,
-	)
-
-	out, err := scanRepo(row)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.Repo{}, domain.ErrRepoNotFound
-	}
+		WHERE id = $1 AND project_id = $3
+	`, repoID, targetProjectID, fromProjectID)
 	if err != nil {
 		return domain.Repo{}, fmt.Errorf("postgres: reassign repo project: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		var exists bool
+		if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM project.repos WHERE id = $1)`, repoID).Scan(&exists); err != nil {
+			return domain.Repo{}, fmt.Errorf("postgres: check repo existence after failed reassign: %w", err)
+		}
+		if exists {
+			return domain.Repo{}, domain.ErrRepoProjectChanged
+		}
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
+
+	if _, err := tx.Exec(ctx, `DELETE FROM project.repo_members WHERE repo_id = $1`, repoID); err != nil {
+		return domain.Repo{}, fmt.Errorf("postgres: clear repo members on reassign: %w", err)
+	}
+
+	row := tx.QueryRow(ctx, `SELECT `+repoColumns+` FROM project.repos WHERE id = $1`, repoID)
+	out, err := scanRepo(row)
+	if err != nil {
+		return domain.Repo{}, fmt.Errorf("postgres: scan reassigned repo: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return domain.Repo{}, fmt.Errorf("postgres: commit reassign repo project transaction: %w", err)
 	}
 	return out, nil
 }
