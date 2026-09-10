@@ -114,6 +114,20 @@ type SshTargetRepository interface {
 	// List returns every SSH target registered for tenantID — backs
 	// ssh.listTargets/ssh.getUserAccount.
 	List(ctx context.Context, tenantID string) ([]domain.SshTarget, error)
+	// Delete removes an SSH target scoped to tenantID — used by
+	// DeleteSshTarget's compensating-rollback path in BulkProvisionFleet
+	// (CR-FLEET-001) when RegisterDevServer fails after CreateSshTarget
+	// already succeeded.
+	Delete(ctx context.Context, tenantID, id string) error
+}
+
+// TerraformRunner runs `terraform apply` on a registered control dev
+// server (via its agent) and returns `terraform output -json`'s raw
+// content — CR-FLEET-002's Hướng A. Orca never runs terraform itself;
+// it orchestrates the agent that does, mirroring how EphemeralVmRelay
+// dispatches vm.provision instead of exec'ing locally.
+type TerraformRunner interface {
+	Apply(ctx context.Context, controlDevServer domain.DevServer, workingDir, varsFile string) (outputJSON string, err error)
 }
 
 // ConnectionRepository is the persistence port for the write side of
@@ -494,8 +508,11 @@ type EphemeralVmSshTargetRepository interface {
 
 // EphemeralVmRecipeSshTarget mirrors frontend/src/shared/ephemeral-vm-recipes.ts's
 // EphemeralVmRecipeSshTargetSchema field-for-field (BE-SOL-EVM-002 §6's
-// cross-check — configHost/portForwards deliberately omitted, see
-// infrafleet.proto's EphemeralVmRecipeSshTarget message doc comment).
+// cross-check — configHost deliberately omitted, display-only field never
+// consumed here). PortForwards was ALSO deliberately omitted until
+// CR-EVM-008/TASK-BE-EVM-021 — see infrafleet.proto's
+// EphemeralVmRecipeSshTarget message doc comment for the field it now maps
+// to.
 type EphemeralVmRecipeSshTarget struct {
 	Label                   string
 	Host                    string
@@ -507,6 +524,16 @@ type EphemeralVmRecipeSshTarget struct {
 	ProxyCommand            string
 	JumpHost                string
 	RelayGracePeriodSeconds int32
+	PortForwards            []PortForward
+}
+
+// PortForward mirrors frontend/src/shared/ssh-types.ts's SavedPortForward
+// field-for-field — see infrafleet.proto's PortForward message.
+type PortForward struct {
+	LocalPort  int32
+	RemoteHost string
+	RemotePort int32
+	Label      string
 }
 
 // ScreencastParams carries browser.screencastStart's request fields —
@@ -640,4 +667,19 @@ type TerminalSessionRepository interface {
 	// Idempotent: a connection with no open sessions closes zero rows, not
 	// an error.
 	CloseAllForConnection(ctx context.Context, tenantID, connectionID string, closedAt time.Time) error
+}
+
+// FleetDefinitionRepository is the persistence port for CR-FLEET-003's
+// FleetDefinition CRUD — infra.fleet_definitions (migration 0018,
+// TASK-BE-FLEET-011).
+type FleetDefinitionRepository interface {
+	Create(ctx context.Context, def domain.FleetDefinition) (domain.FleetDefinition, error)
+	// Update applies optimistic locking: def.Version is the NEW version
+	// (already incremented by the caller) — the adapter's WHERE clause
+	// matches the OLD version (def.Version-1) so a concurrent writer's
+	// stale Update loses instead of silently clobbering. 0 rows affected
+	// surfaces as domain.ErrFleetDefinitionVersionConflict.
+	Update(ctx context.Context, def domain.FleetDefinition) (domain.FleetDefinition, error)
+	Get(ctx context.Context, tenantID, id string) (domain.FleetDefinition, error)
+	List(ctx context.Context, tenantID string) ([]domain.FleetDefinition, error)
 }

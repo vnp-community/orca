@@ -211,7 +211,7 @@ func run() error {
 	// convention relayFS's comment above documents.
 	watchWorktreeFilesUC := usecase.NewWatchWorktreeFiles(resolver, relay)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
 		getStatusUC, getDiffUC, commitUC, pushUC, pullUC, generateCommitMessageUC,
 		stageUC, unstageUC,

@@ -258,6 +258,16 @@ func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.S
 	return target, nil
 }
 
+// Delete removes the ssh_targets row scoped to tenantID — used by
+// usecase.DeleteSshTarget's compensating-rollback path.
+func (s *SshTargetStore) Delete(ctx context.Context, tenantID, id string) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM infra.ssh_targets WHERE id = $1 AND tenant_id = $2`, id, tenantID)
+	if err != nil {
+		return fmt.Errorf("postgres: delete ssh target: %w", err)
+	}
+	return nil
+}
+
 // ResolveConnection is the storage-backed half of THE core coordination
 // primitive — see usecase.ConnectionResolver's doc comment.
 //

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 
@@ -25,7 +26,7 @@ type DevServerRelay struct {
 // (grpc.NewClient doesn't block on connect), same convention as every
 // other outbound client in this package.
 func NewDevServerRelay(addr string) (*DevServerRelay, error) {
-	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return nil, fmt.Errorf("grpcclient: dial infra-fleet-service at %q: %w", addr, err)
 	}

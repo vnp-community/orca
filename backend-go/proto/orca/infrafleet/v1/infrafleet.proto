@@ -14,6 +14,40 @@ service InfraFleetService {
   rpc RegisterDevServer(RegisterDevServerRequest) returns (RegisterDevServerResponse);
   rpc ResolveConnection(ResolveConnectionRequest) returns (ResolveConnectionResponse);
   rpc CreateSshTarget(CreateSshTargetRequest) returns (CreateSshTargetResponse);
+  // BulkProvisionFleet fans out CreateSshTarget+RegisterDevServer over every
+  // server in a FleetSpec (CR-FLEET-001) — server-streaming so the caller
+  // gets a BulkProvisionFleetEvent per server as it completes, mirroring
+  // StreamVmProvision's "N steps, want progress" convention. No tenant_id
+  // field on the request — see ListDevServersRequest's doc comment for the
+  // same convention: tenantID always comes from tenant.RequireTenantID(ctx),
+  // never a caller-supplied field.
+  rpc BulkProvisionFleet(BulkProvisionFleetRequest) returns (stream BulkProvisionFleetEvent);
+  // ApplyTerraformPlan runs `terraform apply` on a registered control dev
+  // server via its agent (CR-FLEET-002 §"Hướng A") and streams back its
+  // outcome — server-streaming to mirror StreamVmProvision's convention,
+  // though today usecase.ApplyTerraformPlan sends exactly one terminal
+  // "result" event (no live stdout/stderr progress yet — see
+  // ApplyTerraformPlanEvent's doc comment for the known MVP limitation).
+  rpc ApplyTerraformPlan(ApplyTerraformPlanRequest) returns (stream ApplyTerraformPlanEvent);
+  // --- FleetDefinition CRUD (CR-FLEET-003) — the persisted source of truth
+  // a fleet's BulkProvisionFleet/ApplyTerraformPlan runs are driven from,
+  // distinct from those one-shot RPCs themselves. No tenant_id field on any
+  // request here — same convention as BulkProvisionFleetRequest above.
+  rpc CreateFleetDefinition(CreateFleetDefinitionRequest) returns (FleetDefinitionProto);
+  rpc UpdateFleetDefinition(UpdateFleetDefinitionRequest) returns (FleetDefinitionProto);
+  rpc GetFleetDefinition(GetFleetDefinitionRequest) returns (FleetDefinitionProto);
+  rpc ListFleetDefinitions(ListFleetDefinitionsRequest) returns (ListFleetDefinitionsResponse);
+  // ExportFleetDefinitionYaml serializes a saved FleetDefinition back into
+  // orca-fleet.yaml's FleetConfigSchema shape — see
+  // usecase.ExportFleetDefinitionYaml's doc comment for the round-trip AC
+  // and its known TASK-BE-FLEET-005-shaped gap.
+  rpc ExportFleetDefinitionYaml(ExportFleetDefinitionYamlRequest) returns (ExportFleetDefinitionYamlResponse);
+  // DeployFleetDefinition coordinates BulkProvisionFleet (CR-FLEET-001) and
+  // ApplyTerraformPlan (CR-FLEET-002) for one saved FleetDefinition — see
+  // usecase.DeployFleetDefinition's doc comment. Reuses BulkProvisionFleetEvent
+  // (TASK-BE-FLEET-003) rather than defining a new event type — the
+  // underlying provisioning result shape is identical either way.
+  rpc DeployFleetDefinition(DeployFleetDefinitionRequest) returns (stream BulkProvisionFleetEvent);
   rpc GetFleetHealth(GetFleetHealthRequest) returns (GetFleetHealthResponse);
   rpc ScanWorkspacePorts(ScanWorkspacePortsRequest) returns (ScanWorkspacePortsResponse);
   // ListDevServers backs the frontend's devServer.list channel — the
@@ -279,6 +313,15 @@ message VmProvisionResult {
 //    which is explicitly out of scope here (§5: the "ssh" branch is
 //    pass-through only, never dialed — see BE-SOL-EVM-004/CR-EVM-005).
 //    Add it to this message when that task wires a real dial.
+// PortForward mirrors frontend's SavedPortForward (frontend/src/shared/ssh-types.ts)
+// field-for-field — see CR-EVM-008/TASK-BE-EVM-020.
+message PortForward {
+  int32 local_port = 1;
+  string remote_host = 2;
+  int32 remote_port = 3;
+  string label = 4;
+}
+
 message EphemeralVmRecipeSshTarget {
   string label = 1;
   string host = 2;
@@ -290,6 +333,11 @@ message EphemeralVmRecipeSshTarget {
   string proxy_command = 8;
   string jump_host = 9;
   int32 relay_grace_period_seconds = 10;
+  // port_forwards — CR-EVM-008/TASK-BE-EVM-020. Previously decoded and
+  // deliberately dropped at ports.go/devserveragent/client.go (no proto
+  // field existed to carry it through) — now wired end to end, see
+  // TASK-BE-EVM-021/022 and agent's TASK-AG-EVM-011 (Hướng A).
+  repeated PortForward port_forwards = 11;
 }
 
 message DevServer {
@@ -661,6 +709,111 @@ message CreateSshTargetRequest {
 
 message CreateSshTargetResponse {
   string ssh_target_id = 1;
+}
+
+// FleetSpecServerProto is one server entry in a BulkProvisionFleet request —
+// wire shape for usecase.FleetSpecServer (CR-FLEET-001).
+message FleetSpecServerProto {
+  string host = 1;
+  string user_name = 2;
+  string vault_ssh_role = 3;
+  // kind — same AgentKind enum RegisterDevServerRequest.kind uses (real
+  // field type verified in server.go before writing this proto; task's
+  // original sketch of a plain string was wrong).
+  AgentKind kind = 4;
+}
+
+message BulkProvisionFleetRequest {
+  repeated FleetSpecServerProto servers = 1;
+  int32 concurrency = 2; // 0 = use usecase default (5)
+}
+
+message BulkProvisionFleetEvent {
+  string host = 1;
+  enum Status {
+    PENDING = 0;
+    SUCCEEDED = 1;
+    FAILED = 2;
+  }
+  Status status = 2;
+  string dev_server_id = 3;
+  string error = 4;
+}
+
+message ApplyTerraformPlanRequest {
+  string control_dev_server_id = 1;
+  string working_dir = 2;
+  string vars_file = 3;
+}
+
+// ProvisionConfigProto mirrors domain.ProvisionConfig — unset (nil message)
+// on FleetDefinitionProto means the definition only registers pre-existing
+// hosts, no new infrastructure is created.
+message ProvisionConfigProto {
+  string iac = 1;
+  string working_dir = 2;
+  string vars_file = 3;
+}
+
+message FleetDefinitionProto {
+  string id = 1;
+  string name = 2;
+  int32 version = 3;
+  repeated FleetSpecServerProto servers = 4;
+  ProvisionConfigProto provision = 5;
+  string created_by = 6;
+  string created_at = 7;
+  string updated_at = 8;
+}
+
+message CreateFleetDefinitionRequest {
+  string name = 1;
+  repeated FleetSpecServerProto servers = 2;
+  ProvisionConfigProto provision = 3;
+}
+
+message UpdateFleetDefinitionRequest {
+  string id = 1;
+  repeated FleetSpecServerProto servers = 2;
+  ProvisionConfigProto provision = 3;
+}
+
+message GetFleetDefinitionRequest {
+  string id = 1;
+}
+
+message ListFleetDefinitionsRequest {}
+
+message ListFleetDefinitionsResponse {
+  repeated FleetDefinitionProto definitions = 1;
+}
+
+message ExportFleetDefinitionYamlRequest {
+  string id = 1;
+}
+
+message ExportFleetDefinitionYamlResponse {
+  string yaml_content = 1;
+}
+
+message DeployFleetDefinitionRequest {
+  string fleet_definition_id = 1;
+  // control_dev_server_id — required only when the definition has a
+  // provision config (nil provision means register-only, no Terraform run).
+  string control_dev_server_id = 2;
+}
+
+// ApplyTerraformPlanEvent — type is "result" or "error" today (not the full
+// "stdout"|"stderr"|"result"|"error" set VmProvisionEvent supports):
+// usecase.ApplyTerraformPlan.Execute (TASK-BE-FLEET-006) returns only after
+// terraform apply+output both finish, with no per-chunk emit callback —
+// live progress streaming would need that usecase's signature extended
+// first (known MVP limitation, not a silent gap).
+message ApplyTerraformPlanEvent {
+  string type = 1; // "result" | "error"
+  string chunk = 2;
+  string output_json = 3; // populated when type == "result"
+  string error_msg = 4;
 }
 
 message GetFleetHealthRequest {

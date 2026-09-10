@@ -17,6 +17,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
+	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -30,10 +32,14 @@ import (
 	svcconfig "github.com/stablyai/orca-go/services/notification-service/internal/config"
 
 	notificationbroadcaster "github.com/stablyai/orca-go/services/notification-service/internal/adapter/broadcaster"
+	notificationcredentialbroker "github.com/stablyai/orca-go/services/notification-service/internal/adapter/credentialbroker"
 	notificationeventbus "github.com/stablyai/orca-go/services/notification-service/internal/adapter/eventbus"
+	webpushsender "github.com/stablyai/orca-go/services/notification-service/internal/adapter/external/webpush"
 	notificationgrpc "github.com/stablyai/orca-go/services/notification-service/internal/adapter/grpc"
 	notificationpostgres "github.com/stablyai/orca-go/services/notification-service/internal/adapter/postgres"
+	notificationpushgateway "github.com/stablyai/orca-go/services/notification-service/internal/adapter/pushgateway"
 	notificationvaultsigner "github.com/stablyai/orca-go/services/notification-service/internal/adapter/vaultsigner"
+	"github.com/stablyai/orca-go/services/notification-service/internal/domain"
 	"github.com/stablyai/orca-go/services/notification-service/internal/usecase"
 
 	notificationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1"
@@ -61,7 +67,21 @@ func run() error {
 	logger := logging.New(cfg.ServiceName, version)
 	slog.SetDefault(logger)
 
-	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
+	// NATS connect moved ahead of tracing.Init (TASK-BE-FFT-008) so pub
+	// exists in time to pass to tracing.WithTraceEventPublisher. Same
+	// non-fatal degrade posture notification-service already had:
+	// continues without event consumption when NATS is down at startup.
+	pub, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, continuing without event consumption", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.*.trace.span"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure TRACE jetstream stream", slog.Any("error", err))
+		}
+	}
+
+	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint, tracing.WithTraceEventPublisher(pub))
 	if err != nil {
 		return fmt.Errorf("initializing tracing: %w", err)
 	}
@@ -90,24 +110,47 @@ func run() error {
 	// clear error at call time if credential-broker-service is actually
 	// unreachable, same graceful-degradation shape the previous direct-Vault
 	// version had.
-	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
 	}
 	defer func() { _ = brokerConn.Close() }()
 	signer := notificationvaultsigner.New(brokerConn)
+	// pushCredentials reuses brokerConn — same connection already dialed
+	// for signer above, not a second dial to credential-broker-service
+	// (BE-MOBILE-SOL-001 §1.1).
+	pushCredentials := notificationcredentialbroker.New(brokerConn)
 
 	subscribeUC := usecase.NewSubscribe(repo)
 	unregisterPushSubscriptionUC := usecase.NewUnregisterPushSubscription(repo)
 	getVapidPublicKeyUC := usecase.NewGetVapidPublicKey(repo)
-	handleIncomingEventUC := usecase.NewHandleIncomingEvent(broadcast, repo, logger)
+	listNotificationsUC := usecase.NewListNotifications(repo)
+	markAsReadUC := usecase.NewMarkAsRead(repo, broadcast)
+	markAllAsReadUC := usecase.NewMarkAllAsRead(repo, broadcast)
+	getUnreadCountUC := usecase.NewGetUnreadCount(repo)
+	webpushSender := webpushsender.New(nil)
+	deliverPushUC := usecase.NewDeliverPush(repo, repo, signer, webpushSender, cfg.VapidContactURI, logger)
+
+	// http2-enabled client shared by both APNs and FCM senders — both
+	// speak HTTP/2 (APNs requires it; FCM's HTTP v1 API accepts HTTP/1.1
+	// but works fine over HTTP/2 too).
+	pushHTTPClient := &http.Client{
+		Transport: &http2.Transport{},
+		Timeout:   10 * time.Second,
+	}
+	apnsSender := notificationpushgateway.NewAPNsSender(pushCredentials, pushHTTPClient, "com.stably.orca.mobile")
+	fcmSender := notificationpushgateway.NewFCMSender(pushCredentials, pushHTTPClient)
+	deliverMobilePushUC := usecase.NewDeliverMobilePush(repo, map[domain.Channel]usecase.PushSender{
+		domain.ChannelIOS:     apnsSender,
+		domain.ChannelAndroid: fcmSender,
+	}, logger)
+
+	handleIncomingEventUC := usecase.NewHandleIncomingEvent(broadcast, repo, repo, deliverPushUC, deliverMobilePushUC, logger)
 
 	var consumerWG sync.WaitGroup
-	_, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
-	if err != nil {
-		logger.WarnContext(ctx, "eventbus unavailable, continuing without event consumption", slog.Any("error", err))
-	} else {
-		defer func() { _ = closeBus() }()
+	// cons already connected above (TASK-BE-FFT-008) — nil here iff
+	// eventbus.Connect failed, same non-fatal degrade as before.
+	if cons != nil {
 		consumerAdapter := notificationeventbus.New(cons, handleIncomingEventUC)
 		consumerWG.Add(1)
 		go func() {
@@ -120,8 +163,12 @@ func run() error {
 		}()
 	}
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
-	notificationv1.RegisterNotificationServiceServer(grpcServer, notificationgrpc.New(subscribeUC, unregisterPushSubscriptionUC, getVapidPublicKeyUC, broadcast, signer))
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
+	notificationv1.RegisterNotificationServiceServer(grpcServer, notificationgrpc.New(
+		subscribeUC, unregisterPushSubscriptionUC, getVapidPublicKeyUC,
+		listNotificationsUC, markAsReadUC, markAllAsReadUC, getUnreadCountUC,
+		broadcast, signer,
+	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	healthSrv := health.New()

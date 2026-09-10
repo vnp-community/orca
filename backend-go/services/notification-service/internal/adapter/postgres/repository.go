@@ -9,8 +9,10 @@ package postgres
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -108,6 +110,17 @@ func (r *Repository) DeleteByEndpoint(ctx context.Context, endpoint string) erro
 	return nil
 }
 
+// MarkExpired sets status='expired' for endpoint. UPDATE affecting 0 rows
+// is not an error — idempotent by design (see
+// usecase.SubscriptionRepository's doc comment).
+func (r *Repository) MarkExpired(ctx context.Context, endpoint string) error {
+	_, err := r.pool.Exec(ctx, `UPDATE notification.push_subscriptions SET status = 'expired', updated_at = now() WHERE endpoint = $1`, endpoint)
+	if err != nil {
+		return fmt.Errorf("postgres: mark push subscription expired: %w", err)
+	}
+	return nil
+}
+
 // GetPublicKey returns the tenant's active VAPID key metadata row.
 // Returns domain.ErrNoActiveVapidKey (not a raw pgx error) when none
 // exists, so usecase/ can map it to a NotFound status without depending
@@ -153,4 +166,173 @@ func (r *Repository) MarkProcessed(ctx context.Context, eventID, subject string)
 		return false, fmt.Errorf("postgres: mark event processed: %w", err)
 	}
 	return tag.RowsAffected() == 0, nil
+}
+
+// SaveNotificationEvent persists 1 row per event.RecipientUserIDs entry via
+// a single pgx.Batch round-trip — RecipientUserIDs can have multiple
+// entries (e.g. an automation run notifying several people), so this
+// avoids N separate Exec round-trips. Named SaveNotificationEvent, not
+// Save, because Repository already has a Save(ctx, domain.PushSubscription)
+// method for SubscriptionRepository — see usecase.NotificationRepository's
+// doc comment.
+func (r *Repository) SaveNotificationEvent(ctx context.Context, event domain.NotificationEvent) error {
+	batch := &pgx.Batch{}
+	for _, userID := range event.RecipientUserIDs {
+		batch.Queue(`
+			INSERT INTO notification.notification_events (
+				id, tenant_id, recipient_user_id, source_event_id, source_subject,
+				type, title, body, deep_link, severity, is_read, created_at
+			) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,false,$11)
+		`, event.ID, event.TenantID, userID, event.SourceEventID, event.SourceSubject,
+			event.Type, event.Title, event.Body, event.DeepLink, string(event.Severity), event.CreatedAt)
+	}
+	br := r.pool.SendBatch(ctx, batch)
+	defer br.Close()
+	for range event.RecipientUserIDs {
+		if _, err := br.Exec(); err != nil {
+			return fmt.Errorf("postgres: insert notification_events row: %w", err)
+		}
+	}
+	return nil
+}
+
+// notificationListDefaultLimit is used when the caller passes limit <= 0 —
+// guards against a malformed/zero LIMIT reaching Postgres as an error
+// rather than a sane default page size.
+const notificationListDefaultLimit = 20
+
+// ListByRecipient returns cursor-paginated notification_events rows for
+// tenantID+userID, newest first, hitting
+// idx_notification_events_recipient_unread (tenant_id, recipient_user_id,
+// is_read, created_at DESC). Keyset pagination on (created_at DESC, id
+// DESC) — not OFFSET — so paging deep into a growing table never rescans
+// skipped rows.
+func (r *Repository) ListByRecipient(ctx context.Context, tenantID, userID, cursor string, limit int32, unreadOnly bool) ([]domain.NotificationEvent, string, error) {
+	if limit <= 0 {
+		limit = notificationListDefaultLimit
+	}
+
+	args := []any{tenantID, userID}
+	var query strings.Builder
+	query.WriteString(`
+		SELECT id, tenant_id, recipient_user_id, source_event_id, source_subject,
+		       type, title, body, deep_link, severity, is_read, read_at, created_at
+		FROM notification.notification_events
+		WHERE tenant_id = $1 AND recipient_user_id = $2
+	`)
+	if unreadOnly {
+		query.WriteString(" AND is_read = false")
+	}
+	if cursor != "" {
+		cursorCreatedAt, cursorID, err := decodeCursor(cursor)
+		if err != nil {
+			return nil, "", err
+		}
+		args = append(args, cursorCreatedAt, cursorID)
+		query.WriteString(fmt.Sprintf(" AND (created_at, id) < ($%d, $%d::uuid)", len(args)-1, len(args)))
+	}
+	args = append(args, limit+1) // fetch 1 extra row to know whether a next page exists
+	query.WriteString(fmt.Sprintf(" ORDER BY created_at DESC, id DESC LIMIT $%d", len(args)))
+
+	rows, err := r.pool.Query(ctx, query.String(), args...)
+	if err != nil {
+		return nil, "", fmt.Errorf("postgres: query notification events: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.NotificationEvent
+	for rows.Next() {
+		var e domain.NotificationEvent
+		var recipientUserID, severity string
+		var deepLink *string
+		var readAt *time.Time
+		if err := rows.Scan(&e.ID, &e.TenantID, &recipientUserID, &e.SourceEventID, &e.SourceSubject,
+			&e.Type, &e.Title, &e.Body, &deepLink, &severity, &e.IsRead, &readAt, &e.CreatedAt); err != nil {
+			return nil, "", fmt.Errorf("postgres: scan notification event row: %w", err)
+		}
+		e.RecipientUserIDs = []string{recipientUserID}
+		e.Severity = domain.Severity(severity)
+		if deepLink != nil {
+			e.DeepLink = *deepLink
+		}
+		e.ReadAt = readAt
+		out = append(out, e)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("postgres: iterate notification event rows: %w", err)
+	}
+
+	var nextCursor string
+	if int32(len(out)) > limit {
+		last := out[limit-1]
+		nextCursor = encodeCursor(last.CreatedAt, last.ID)
+		out = out[:limit]
+	}
+	return out, nextCursor, nil
+}
+
+// MarkAsRead sets is_read=true, read_at=now() for notificationID scoped to
+// tenantID+userID. 0 rows affected (already read, or wrong id/user/tenant)
+// is not an error — idempotent by design, mirrors DeleteByEndpoint.
+func (r *Repository) MarkAsRead(ctx context.Context, tenantID, userID, notificationID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE notification.notification_events
+		SET is_read = true, read_at = now()
+		WHERE tenant_id = $1 AND recipient_user_id = $2 AND id = $3 AND is_read = false
+	`, tenantID, userID, notificationID)
+	if err != nil {
+		return fmt.Errorf("postgres: mark notification as read: %w", err)
+	}
+	return nil
+}
+
+// MarkAllAsRead sets is_read=true, read_at=now() for every unread row of
+// tenantID+userID; returns the number of rows updated (0 is not an error).
+func (r *Repository) MarkAllAsRead(ctx context.Context, tenantID, userID string) (int64, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE notification.notification_events
+		SET is_read = true, read_at = now()
+		WHERE tenant_id = $1 AND recipient_user_id = $2 AND is_read = false
+	`, tenantID, userID)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: mark all notifications as read: %w", err)
+	}
+	return tag.RowsAffected(), nil
+}
+
+// CountUnread returns the count of is_read=false rows for tenantID+userID.
+func (r *Repository) CountUnread(ctx context.Context, tenantID, userID string) (int64, error) {
+	var count int64
+	err := r.pool.QueryRow(ctx, `
+		SELECT count(*) FROM notification.notification_events
+		WHERE tenant_id = $1 AND recipient_user_id = $2 AND is_read = false
+	`, tenantID, userID).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: count unread notifications: %w", err)
+	}
+	return count, nil
+}
+
+// encodeCursor/decodeCursor implement ListByRecipient's opaque keyset
+// cursor as "<rfc3339nano>|<id>", base64url-wrapped so the wire value stays
+// opaque to callers per NotificationRepository's doc comment.
+func encodeCursor(createdAt time.Time, id string) string {
+	raw := createdAt.Format(time.RFC3339Nano) + "|" + id
+	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+}
+
+func decodeCursor(cursor string) (time.Time, string, error) {
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return time.Time{}, "", domain.ErrInvalidCursor
+	}
+	parts := strings.SplitN(string(raw), "|", 2)
+	if len(parts) != 2 || parts[1] == "" {
+		return time.Time{}, "", domain.ErrInvalidCursor
+	}
+	ts, err := time.Parse(time.RFC3339Nano, parts[0])
+	if err != nil {
+		return time.Time{}, "", domain.ErrInvalidCursor
+	}
+	return ts, parts[1], nil
 }

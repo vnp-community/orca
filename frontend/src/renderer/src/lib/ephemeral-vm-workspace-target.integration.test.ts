@@ -49,7 +49,16 @@ describe('prepareEphemeralVmWorkspaceTarget failure paths', () => {
     runtimeEnvironmentCall.mockReset()
     vi.stubGlobal('window', {
       api: {
-        ephemeralVm: { provision, cleanup },
+        ephemeralVm: {
+          provision,
+          cleanup,
+          doctor: vi.fn().mockResolvedValue({
+            recipeId: 'cloud-sandbox',
+            repoPath: '/repo',
+            ok: true,
+            checks: []
+          })
+        },
         runtimeEnvironments: { call: runtimeEnvironmentCall }
       }
     })

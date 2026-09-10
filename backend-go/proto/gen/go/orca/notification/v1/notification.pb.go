@@ -28,6 +28,8 @@ type SubscribeRequest struct {
 	Endpoint      string                 `protobuf:"bytes,2,opt,name=endpoint,proto3" json:"endpoint,omitempty"`
 	P256DhKey     string                 `protobuf:"bytes,3,opt,name=p256dh_key,json=p256dhKey,proto3" json:"p256dh_key,omitempty"`
 	AuthKey       string                 `protobuf:"bytes,4,opt,name=auth_key,json=authKey,proto3" json:"auth_key,omitempty"`
+	Channel       string                 `protobuf:"bytes,5,opt,name=channel,proto3" json:"channel,omitempty"`                            // "web" (default when empty) | "ios" | "android"
+	DeviceLabel   string                 `protobuf:"bytes,6,opt,name=device_label,json=deviceLabel,proto3" json:"device_label,omitempty"` // optional, shown in the "Paired Devices" UI
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -86,6 +88,20 @@ func (x *SubscribeRequest) GetP256DhKey() string {
 func (x *SubscribeRequest) GetAuthKey() string {
 	if x != nil {
 		return x.AuthKey
+	}
+	return ""
+}
+
+func (x *SubscribeRequest) GetChannel() string {
+	if x != nil {
+		return x.Channel
+	}
+	return ""
+}
+
+func (x *SubscribeRequest) GetDeviceLabel() string {
+	if x != nil {
+		return x.DeviceLabel
 	}
 	return ""
 }
@@ -362,17 +378,423 @@ func (x *NotificationServiceStreamNotificationsResponse) GetPayloadJson() string
 	return ""
 }
 
+type ListNotificationsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"` // resolved server-side from authenticated identity by api-gateway — never trust a client-supplied user_id for a DIFFERENT user
+	Cursor        string                 `protobuf:"bytes,2,opt,name=cursor,proto3" json:"cursor,omitempty"`               // opaque; empty = first page
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`
+	UnreadOnly    bool                   `protobuf:"varint,4,opt,name=unread_only,json=unreadOnly,proto3" json:"unread_only,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNotificationsRequest) Reset() {
+	*x = ListNotificationsRequest{}
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNotificationsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNotificationsRequest) ProtoMessage() {}
+
+func (x *ListNotificationsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNotificationsRequest.ProtoReflect.Descriptor instead.
+func (*ListNotificationsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_notification_v1_notification_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ListNotificationsRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ListNotificationsRequest) GetCursor() string {
+	if x != nil {
+		return x.Cursor
+	}
+	return ""
+}
+
+func (x *ListNotificationsRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+func (x *ListNotificationsRequest) GetUnreadOnly() bool {
+	if x != nil {
+		return x.UnreadOnly
+	}
+	return false
+}
+
+type Notification struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Type          string                 `protobuf:"bytes,2,opt,name=type,proto3" json:"type,omitempty"`
+	Title         string                 `protobuf:"bytes,3,opt,name=title,proto3" json:"title,omitempty"`
+	Body          string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
+	DeepLink      string                 `protobuf:"bytes,5,opt,name=deep_link,json=deepLink,proto3" json:"deep_link,omitempty"`
+	Severity      string                 `protobuf:"bytes,6,opt,name=severity,proto3" json:"severity,omitempty"`
+	IsRead        bool                   `protobuf:"varint,7,opt,name=is_read,json=isRead,proto3" json:"is_read,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,8,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"` // RFC3339
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *Notification) Reset() {
+	*x = Notification{}
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Notification) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Notification) ProtoMessage() {}
+
+func (x *Notification) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Notification.ProtoReflect.Descriptor instead.
+func (*Notification) Descriptor() ([]byte, []int) {
+	return file_orca_notification_v1_notification_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *Notification) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Notification) GetType() string {
+	if x != nil {
+		return x.Type
+	}
+	return ""
+}
+
+func (x *Notification) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *Notification) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *Notification) GetDeepLink() string {
+	if x != nil {
+		return x.DeepLink
+	}
+	return ""
+}
+
+func (x *Notification) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+func (x *Notification) GetIsRead() bool {
+	if x != nil {
+		return x.IsRead
+	}
+	return false
+}
+
+func (x *Notification) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+type ListNotificationsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Notifications []*Notification        `protobuf:"bytes,1,rep,name=notifications,proto3" json:"notifications,omitempty"`
+	NextCursor    string                 `protobuf:"bytes,2,opt,name=next_cursor,json=nextCursor,proto3" json:"next_cursor,omitempty"` // empty when there is no next page
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListNotificationsResponse) Reset() {
+	*x = ListNotificationsResponse{}
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListNotificationsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListNotificationsResponse) ProtoMessage() {}
+
+func (x *ListNotificationsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListNotificationsResponse.ProtoReflect.Descriptor instead.
+func (*ListNotificationsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_notification_v1_notification_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *ListNotificationsResponse) GetNotifications() []*Notification {
+	if x != nil {
+		return x.Notifications
+	}
+	return nil
+}
+
+func (x *ListNotificationsResponse) GetNextCursor() string {
+	if x != nil {
+		return x.NextCursor
+	}
+	return ""
+}
+
+type MarkAsReadRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	UserId         string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	NotificationId string                 `protobuf:"bytes,2,opt,name=notification_id,json=notificationId,proto3" json:"notification_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *MarkAsReadRequest) Reset() {
+	*x = MarkAsReadRequest{}
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkAsReadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkAsReadRequest) ProtoMessage() {}
+
+func (x *MarkAsReadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkAsReadRequest.ProtoReflect.Descriptor instead.
+func (*MarkAsReadRequest) Descriptor() ([]byte, []int) {
+	return file_orca_notification_v1_notification_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *MarkAsReadRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *MarkAsReadRequest) GetNotificationId() string {
+	if x != nil {
+		return x.NotificationId
+	}
+	return ""
+}
+
+type MarkAllAsReadRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkAllAsReadRequest) Reset() {
+	*x = MarkAllAsReadRequest{}
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkAllAsReadRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkAllAsReadRequest) ProtoMessage() {}
+
+func (x *MarkAllAsReadRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkAllAsReadRequest.ProtoReflect.Descriptor instead.
+func (*MarkAllAsReadRequest) Descriptor() ([]byte, []int) {
+	return file_orca_notification_v1_notification_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *MarkAllAsReadRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type GetUnreadCountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	UserId        string                 `protobuf:"bytes,1,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUnreadCountRequest) Reset() {
+	*x = GetUnreadCountRequest{}
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUnreadCountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUnreadCountRequest) ProtoMessage() {}
+
+func (x *GetUnreadCountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUnreadCountRequest.ProtoReflect.Descriptor instead.
+func (*GetUnreadCountRequest) Descriptor() ([]byte, []int) {
+	return file_orca_notification_v1_notification_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *GetUnreadCountRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+type GetUnreadCountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Count         int64                  `protobuf:"varint,1,opt,name=count,proto3" json:"count,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetUnreadCountResponse) Reset() {
+	*x = GetUnreadCountResponse{}
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetUnreadCountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetUnreadCountResponse) ProtoMessage() {}
+
+func (x *GetUnreadCountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_notification_v1_notification_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetUnreadCountResponse.ProtoReflect.Descriptor instead.
+func (*GetUnreadCountResponse) Descriptor() ([]byte, []int) {
+	return file_orca_notification_v1_notification_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *GetUnreadCountResponse) GetCount() int64 {
+	if x != nil {
+		return x.Count
+	}
+	return 0
+}
+
 var File_orca_notification_v1_notification_proto protoreflect.FileDescriptor
 
 const file_orca_notification_v1_notification_proto_rawDesc = "" +
 	"\n" +
-	"'orca/notification/v1/notification.proto\x12\x14orca.notification.v1\x1a\x1bgoogle/protobuf/empty.proto\"\x81\x01\n" +
+	"'orca/notification/v1/notification.proto\x12\x14orca.notification.v1\x1a\x1bgoogle/protobuf/empty.proto\"\xbe\x01\n" +
 	"\x10SubscribeRequest\x12\x17\n" +
 	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x1a\n" +
 	"\bendpoint\x18\x02 \x01(\tR\bendpoint\x12\x1d\n" +
 	"\n" +
 	"p256dh_key\x18\x03 \x01(\tR\tp256dhKey\x12\x19\n" +
-	"\bauth_key\x18\x04 \x01(\tR\aauthKey\"<\n" +
+	"\bauth_key\x18\x04 \x01(\tR\aauthKey\x12\x18\n" +
+	"\achannel\x18\x05 \x01(\tR\achannel\x12!\n" +
+	"\fdevice_label\x18\x06 \x01(\tR\vdeviceLabel\"<\n" +
 	"\x11SubscribeResponse\x12'\n" +
 	"\x0fsubscription_id\x18\x01 \x01(\tR\x0esubscriptionId\"?\n" +
 	"!UnregisterPushSubscriptionRequest\x12\x1a\n" +
@@ -386,12 +808,46 @@ const file_orca_notification_v1_notification_proto_rawDesc = "" +
 	".NotificationServiceStreamNotificationsResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
 	"\x04type\x18\x02 \x01(\tR\x04type\x12!\n" +
-	"\fpayload_json\x18\x03 \x01(\tR\vpayloadJson2\xea\x03\n" +
+	"\fpayload_json\x18\x03 \x01(\tR\vpayloadJson\"\x82\x01\n" +
+	"\x18ListNotificationsRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12\x16\n" +
+	"\x06cursor\x18\x02 \x01(\tR\x06cursor\x12\x14\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\x12\x1f\n" +
+	"\vunread_only\x18\x04 \x01(\bR\n" +
+	"unreadOnly\"\xcd\x01\n" +
+	"\fNotification\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04type\x18\x02 \x01(\tR\x04type\x12\x14\n" +
+	"\x05title\x18\x03 \x01(\tR\x05title\x12\x12\n" +
+	"\x04body\x18\x04 \x01(\tR\x04body\x12\x1b\n" +
+	"\tdeep_link\x18\x05 \x01(\tR\bdeepLink\x12\x1a\n" +
+	"\bseverity\x18\x06 \x01(\tR\bseverity\x12\x17\n" +
+	"\ais_read\x18\a \x01(\bR\x06isRead\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\b \x01(\tR\tcreatedAt\"\x86\x01\n" +
+	"\x19ListNotificationsResponse\x12H\n" +
+	"\rnotifications\x18\x01 \x03(\v2\".orca.notification.v1.NotificationR\rnotifications\x12\x1f\n" +
+	"\vnext_cursor\x18\x02 \x01(\tR\n" +
+	"nextCursor\"U\n" +
+	"\x11MarkAsReadRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\x12'\n" +
+	"\x0fnotification_id\x18\x02 \x01(\tR\x0enotificationId\"/\n" +
+	"\x14MarkAllAsReadRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\"0\n" +
+	"\x15GetUnreadCountRequest\x12\x17\n" +
+	"\auser_id\x18\x01 \x01(\tR\x06userId\".\n" +
+	"\x16GetUnreadCountResponse\x12\x14\n" +
+	"\x05count\x18\x01 \x01(\x03R\x05count2\xf1\x06\n" +
 	"\x13NotificationService\x12\\\n" +
 	"\tSubscribe\x12&.orca.notification.v1.SubscribeRequest\x1a'.orca.notification.v1.SubscribeResponse\x12m\n" +
 	"\x1aUnregisterPushSubscription\x127.orca.notification.v1.UnregisterPushSubscriptionRequest\x1a\x16.google.protobuf.Empty\x12t\n" +
 	"\x11GetVapidPublicKey\x12..orca.notification.v1.GetVapidPublicKeyRequest\x1a/.orca.notification.v1.GetVapidPublicKeyResponse\x12\x8f\x01\n" +
-	"\x13StreamNotifications\x120.orca.notification.v1.StreamNotificationsRequest\x1aD.orca.notification.v1.NotificationServiceStreamNotificationsResponse0\x01BNZLgithub.com/stablyai/orca-go/proto/gen/go/orca/notification/v1;notificationv1b\x06proto3"
+	"\x13StreamNotifications\x120.orca.notification.v1.StreamNotificationsRequest\x1aD.orca.notification.v1.NotificationServiceStreamNotificationsResponse0\x01\x12t\n" +
+	"\x11ListNotifications\x12..orca.notification.v1.ListNotificationsRequest\x1a/.orca.notification.v1.ListNotificationsResponse\x12M\n" +
+	"\n" +
+	"MarkAsRead\x12'.orca.notification.v1.MarkAsReadRequest\x1a\x16.google.protobuf.Empty\x12S\n" +
+	"\rMarkAllAsRead\x12*.orca.notification.v1.MarkAllAsReadRequest\x1a\x16.google.protobuf.Empty\x12k\n" +
+	"\x0eGetUnreadCount\x12+.orca.notification.v1.GetUnreadCountRequest\x1a,.orca.notification.v1.GetUnreadCountResponseBNZLgithub.com/stablyai/orca-go/proto/gen/go/orca/notification/v1;notificationv1b\x06proto3"
 
 var (
 	file_orca_notification_v1_notification_proto_rawDescOnce sync.Once
@@ -405,7 +861,7 @@ func file_orca_notification_v1_notification_proto_rawDescGZIP() []byte {
 	return file_orca_notification_v1_notification_proto_rawDescData
 }
 
-var file_orca_notification_v1_notification_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_orca_notification_v1_notification_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
 var file_orca_notification_v1_notification_proto_goTypes = []any{
 	(*SubscribeRequest)(nil),                               // 0: orca.notification.v1.SubscribeRequest
 	(*SubscribeResponse)(nil),                              // 1: orca.notification.v1.SubscribeResponse
@@ -414,22 +870,38 @@ var file_orca_notification_v1_notification_proto_goTypes = []any{
 	(*GetVapidPublicKeyResponse)(nil),                      // 4: orca.notification.v1.GetVapidPublicKeyResponse
 	(*StreamNotificationsRequest)(nil),                     // 5: orca.notification.v1.StreamNotificationsRequest
 	(*NotificationServiceStreamNotificationsResponse)(nil), // 6: orca.notification.v1.NotificationServiceStreamNotificationsResponse
-	(*emptypb.Empty)(nil),                                  // 7: google.protobuf.Empty
+	(*ListNotificationsRequest)(nil),                       // 7: orca.notification.v1.ListNotificationsRequest
+	(*Notification)(nil),                                   // 8: orca.notification.v1.Notification
+	(*ListNotificationsResponse)(nil),                      // 9: orca.notification.v1.ListNotificationsResponse
+	(*MarkAsReadRequest)(nil),                              // 10: orca.notification.v1.MarkAsReadRequest
+	(*MarkAllAsReadRequest)(nil),                           // 11: orca.notification.v1.MarkAllAsReadRequest
+	(*GetUnreadCountRequest)(nil),                          // 12: orca.notification.v1.GetUnreadCountRequest
+	(*GetUnreadCountResponse)(nil),                         // 13: orca.notification.v1.GetUnreadCountResponse
+	(*emptypb.Empty)(nil),                                  // 14: google.protobuf.Empty
 }
 var file_orca_notification_v1_notification_proto_depIdxs = []int32{
-	0, // 0: orca.notification.v1.NotificationService.Subscribe:input_type -> orca.notification.v1.SubscribeRequest
-	2, // 1: orca.notification.v1.NotificationService.UnregisterPushSubscription:input_type -> orca.notification.v1.UnregisterPushSubscriptionRequest
-	3, // 2: orca.notification.v1.NotificationService.GetVapidPublicKey:input_type -> orca.notification.v1.GetVapidPublicKeyRequest
-	5, // 3: orca.notification.v1.NotificationService.StreamNotifications:input_type -> orca.notification.v1.StreamNotificationsRequest
-	1, // 4: orca.notification.v1.NotificationService.Subscribe:output_type -> orca.notification.v1.SubscribeResponse
-	7, // 5: orca.notification.v1.NotificationService.UnregisterPushSubscription:output_type -> google.protobuf.Empty
-	4, // 6: orca.notification.v1.NotificationService.GetVapidPublicKey:output_type -> orca.notification.v1.GetVapidPublicKeyResponse
-	6, // 7: orca.notification.v1.NotificationService.StreamNotifications:output_type -> orca.notification.v1.NotificationServiceStreamNotificationsResponse
-	4, // [4:8] is the sub-list for method output_type
-	0, // [0:4] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	8,  // 0: orca.notification.v1.ListNotificationsResponse.notifications:type_name -> orca.notification.v1.Notification
+	0,  // 1: orca.notification.v1.NotificationService.Subscribe:input_type -> orca.notification.v1.SubscribeRequest
+	2,  // 2: orca.notification.v1.NotificationService.UnregisterPushSubscription:input_type -> orca.notification.v1.UnregisterPushSubscriptionRequest
+	3,  // 3: orca.notification.v1.NotificationService.GetVapidPublicKey:input_type -> orca.notification.v1.GetVapidPublicKeyRequest
+	5,  // 4: orca.notification.v1.NotificationService.StreamNotifications:input_type -> orca.notification.v1.StreamNotificationsRequest
+	7,  // 5: orca.notification.v1.NotificationService.ListNotifications:input_type -> orca.notification.v1.ListNotificationsRequest
+	10, // 6: orca.notification.v1.NotificationService.MarkAsRead:input_type -> orca.notification.v1.MarkAsReadRequest
+	11, // 7: orca.notification.v1.NotificationService.MarkAllAsRead:input_type -> orca.notification.v1.MarkAllAsReadRequest
+	12, // 8: orca.notification.v1.NotificationService.GetUnreadCount:input_type -> orca.notification.v1.GetUnreadCountRequest
+	1,  // 9: orca.notification.v1.NotificationService.Subscribe:output_type -> orca.notification.v1.SubscribeResponse
+	14, // 10: orca.notification.v1.NotificationService.UnregisterPushSubscription:output_type -> google.protobuf.Empty
+	4,  // 11: orca.notification.v1.NotificationService.GetVapidPublicKey:output_type -> orca.notification.v1.GetVapidPublicKeyResponse
+	6,  // 12: orca.notification.v1.NotificationService.StreamNotifications:output_type -> orca.notification.v1.NotificationServiceStreamNotificationsResponse
+	9,  // 13: orca.notification.v1.NotificationService.ListNotifications:output_type -> orca.notification.v1.ListNotificationsResponse
+	14, // 14: orca.notification.v1.NotificationService.MarkAsRead:output_type -> google.protobuf.Empty
+	14, // 15: orca.notification.v1.NotificationService.MarkAllAsRead:output_type -> google.protobuf.Empty
+	13, // 16: orca.notification.v1.NotificationService.GetUnreadCount:output_type -> orca.notification.v1.GetUnreadCountResponse
+	9,  // [9:17] is the sub-list for method output_type
+	1,  // [1:9] is the sub-list for method input_type
+	1,  // [1:1] is the sub-list for extension type_name
+	1,  // [1:1] is the sub-list for extension extendee
+	0,  // [0:1] is the sub-list for field type_name
 }
 
 func init() { file_orca_notification_v1_notification_proto_init() }
@@ -443,7 +915,7 @@ func file_orca_notification_v1_notification_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_notification_v1_notification_proto_rawDesc), len(file_orca_notification_v1_notification_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   7,
+			NumMessages:   14,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

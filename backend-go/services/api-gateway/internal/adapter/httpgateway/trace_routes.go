@@ -7,6 +7,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
+// traceStreamHeartbeatInterval is a var (not a literal in mountTraceRoutes)
+// solely so trace_routes_test.go can shrink it for
+// TestMountTraceRoutes_HeartbeatStillFiresWithNoEvents without waiting a
+// real 15s — production always runs at the 15s default.
+var traceStreamHeartbeatInterval = 15 * time.Second
+
 // mountTraceRoutes serves GET /api/trace-stream — the SSE endpoint
 // frontend/src/shared/trace/browser.ts's startSseClient() connects an
 // EventSource to at app boot (main-web-bootstrap.tsx's initBrowserTrace()),
@@ -21,14 +27,12 @@ import (
 // stance (trace-sse-routes.ts's isAuthorized() comment) — mounted outside
 // authMiddleware in router.go, same group as /auth/local and /ws.
 //
-// Known gap: this only keeps the connection alive (heartbeats) — it does
-// NOT forward any real trace/debug events yet, since backend-go has no
-// equivalent to the old backend's global registerTraceSink() fan-out.
-// TracePanel will show a live-but-empty stream rather than the 404 that
-// was breaking EventSource's connection state before this existed. Wiring
-// real event forwarding (e.g. from common/eventbus) is tracked as a
-// follow-up in docs/execution-plan.md, not attempted here.
-func mountTraceRoutes(mux chi.Router) {
+// Forwards real F40 TraceEvent JSON delivered via broadcast — fed by this
+// replica's own NATS SubscribeEphemeral loop (main.go, CR-FFT-002/003):
+// each api-gateway replica independently fans NATS trace-span events out
+// to its own locally-connected SSE clients, the same per-replica fan-out
+// shape as notification-service's cross-replica broadcaster.
+func mountTraceRoutes(mux chi.Router, broadcast *TraceBroadcast) {
 	mux.Get("/api/trace-stream", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			writeJSONError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "GET only")
@@ -51,7 +55,10 @@ func mountTraceRoutes(mux chi.Router) {
 		_, _ = w.Write([]byte(": connected\n\n"))
 		flusher.Flush()
 
-		ticker := time.NewTicker(15 * time.Second)
+		ch, unsubscribe := broadcast.Subscribe()
+		defer unsubscribe()
+
+		ticker := time.NewTicker(traceStreamHeartbeatInterval)
 		defer ticker.Stop()
 
 		ctx := r.Context()
@@ -59,6 +66,11 @@ func mountTraceRoutes(mux chi.Router) {
 			select {
 			case <-ctx.Done():
 				return
+			case raw := <-ch:
+				if _, err := w.Write(append(append([]byte("data: "), raw...), '\n', '\n')); err != nil {
+					return
+				}
+				flusher.Flush()
 			case <-ticker.C:
 				if _, err := w.Write([]byte(": heartbeat\n\n")); err != nil {
 					return

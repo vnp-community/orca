@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS daily_rollups;
+DROP TABLE IF EXISTS sessions;

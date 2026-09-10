@@ -61,7 +61,22 @@ func run() error {
 	logger := logging.New(cfg.ServiceName, version)
 	slog.SetDefault(logger)
 
-	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
+	// NATS connect moved ahead of tracing.Init (TASK-BE-FFT-008) so pub
+	// exists in time to pass to tracing.WithTraceEventPublisher. Same
+	// non-fatal degrade-to-no-NATS posture tenant-service already had: an
+	// unreachable NATS here must not be fatal (§3 Phase 4 — "do this last,
+	// everything depends on it").
+	pub, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, profile-cache invalidation stays TTL-bounded only", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.*.trace.span"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure TRACE jetstream stream", slog.Any("error", err))
+		}
+	}
+
+	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint, tracing.WithTraceEventPublisher(pub))
 	if err != nil {
 		return fmt.Errorf("initializing tracing: %w", err)
 	}
@@ -111,11 +126,9 @@ func run() error {
 	// unreachable, same degrade posture as invalidationPublisher.
 	var starNagVisibilityPublisher usecase.StarNagVisibilityPublisher
 	var consumerWG sync.WaitGroup
-	pub, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
-	if err != nil {
-		logger.WarnContext(ctx, "eventbus unavailable, profile-cache invalidation stays TTL-bounded only", slog.Any("error", err))
-	} else {
-		defer func() { _ = closeBus() }()
+	// pub/cons already connected above (TASK-BE-FFT-008) — pub is nil here
+	// iff eventbus.Connect failed, same non-fatal degrade as before.
+	if pub != nil {
 		if err := pub.EnsureStream(ctx, tenanteventbus.StreamName, []string{"orca.tenant.>"}); err != nil {
 			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
 		} else {
@@ -193,7 +206,7 @@ func run() error {
 	prepareStarNagAgentValueMomentUC := usecase.NewPrepareStarNagAgentValueMoment(starNagRepo, starCheck)
 	showPreparedStarNagAgentValueMomentUC := usecase.NewShowPreparedStarNagAgentValueMoment(starNagRepo, starNagVisibilityPublisher)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	tenantv1.RegisterTenantServiceServer(grpcServer, tenantgrpc.New(
 		createCompanyUC,
 		getCompanyUC,

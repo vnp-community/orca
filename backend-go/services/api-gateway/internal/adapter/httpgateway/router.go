@@ -85,6 +85,14 @@ type Deps struct {
 	// Agent has no user session cookie to present. Nil is valid — the
 	// routes are simply not mounted (see Config.InfraFleetHTTPAddr).
 	AgentProxyHandler http.Handler
+	// TraceBroadcast feeds mountTraceRoutes' real event forwarding
+	// (TASK-BE-FFT-010) — main.go (TASK-BE-FFT-011) constructs one via
+	// NewTraceBroadcast, feeds it from a NATS SubscribeEphemeral loop, and
+	// sets this field before calling NewRouter. Nil is valid (e.g. a test
+	// harness, or before TASK-BE-FFT-011 lands): NewRouter falls back to a
+	// standalone instance so /api/trace-stream still connects and
+	// heartbeats correctly, it just never receives real events.
+	TraceBroadcast *TraceBroadcast
 }
 
 // NewRouter builds api-gateway's chi router. Three route groups, in order:
@@ -104,7 +112,11 @@ func NewRouter(deps Deps) http.Handler {
 	if deps.AuthClient != nil {
 		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator, deps.SsoConfig)
 	}
-	mountTraceRoutes(r)
+	traceBroadcast := deps.TraceBroadcast
+	if traceBroadcast == nil {
+		traceBroadcast = NewTraceBroadcast()
+	}
+	mountTraceRoutes(r, traceBroadcast)
 	// mountPushRoutes is unauthenticated by design (see its doc comment) —
 	// mounted here, outside the authed group below, never moved inside it.
 	if deps.NotificationClient != nil {
@@ -133,6 +145,7 @@ func NewRouter(deps Deps) http.Handler {
 		if deps.AuthClient != nil {
 			mountAuthAdminRoutes(authed, deps.AuthClient)
 			mountAdminRoutes(authed, deps.AuthClient)
+			mountCliTokenRoutes(authed, deps.AuthClient) // MỚI — CR-CLI-002/TASK-BE-CLI-003
 		}
 		if deps.AnnotationClient != nil {
 			mountAnnotationRoutes(authed, deps.AnnotationClient)

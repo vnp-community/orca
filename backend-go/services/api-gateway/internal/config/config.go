@@ -79,6 +79,11 @@ type Config struct {
 	// so adding a real client later is a one-line change in main.go, not a
 	// config struct edit.
 	OtherServiceAddrs map[string]string
+
+	// NATSURL is api-gateway's first NATS connection (TASK-BE-FFT-008) —
+	// used only to publish CR-FFT-002 TraceEvent spans onto the TRACE
+	// stream, not for any domain event (api-gateway owns no outbox).
+	NATSURL string
 }
 
 // Load reads api-gateway's configuration from the environment.
@@ -122,6 +127,7 @@ func Load() (Config, error) {
 			"annotation-service":        commonconfig.StringEnv("ANNOTATION_SERVICE_ADDR", ""),
 			"credential-broker-service": commonconfig.StringEnv("CREDENTIAL_BROKER_SERVICE_ADDR", ""),
 		},
+		NATSURL: commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }
 

@@ -37,6 +37,7 @@ import { dispatchMiscRpc } from './agent-rpc-dispatch-misc'
 import { dispatchCliRpc } from './agent-rpc-dispatch-cli'
 import { dispatchAccountsRpc } from './agent-rpc-dispatch-accounts'
 import { dispatchVmRpc } from './agent-rpc-dispatch-vm'
+import { dispatchTerraformRpc } from './agent-rpc-dispatch-terraform'
 import { dispatchHiddenTargetRpc } from './agent-rpc-dispatch-hidden-target'
 
 const rpcTracer = createTracer('agent:rpc')
@@ -364,6 +365,11 @@ async function route(
   const fromVm = await dispatchVmRpc(rpc, ws, state)
   if (fromVm !== null) {
     return fromVm
+  }
+
+  const fromTerraform = await dispatchTerraformRpc(rpc)
+  if (fromTerraform !== null) {
+    return fromTerraform
   }
 
   const fromHiddenTarget = await dispatchHiddenTargetRpc(rpc)

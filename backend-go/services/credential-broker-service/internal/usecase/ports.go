@@ -65,6 +65,14 @@ type SecretStore interface {
 	// of the same name exactly (parameter order, return shape).
 	TransitEncrypt(ctx context.Context, keyName string, plaintext []byte) (ciphertext string, err error)
 	TransitDecrypt(ctx context.Context, keyName string, ciphertext string) (plaintext []byte, err error)
+	// TransitSign mirrors common/secrets.Client.TransitSign exactly — a
+	// genuinely different Vault Transit operation from TransitEncrypt
+	// (transit/sign/<key>, not transit/encrypt/<key>): it returns an
+	// asymmetric-key signature over input, not recoverable ciphertext.
+	// Added for SignVapidPayload (RFC 8292 VAPID JWTs need a real ES256
+	// signature a push service can verify, not Vault's opaque
+	// "vault:v1:..." encrypt wire format) — see that usecase's fix note.
+	TransitSign(ctx context.Context, keyName string, input []byte) (signature string, err error)
 	// KVWrite/KVRead mirror common/secrets.Client's methods of the same
 	// name exactly.
 	KVWrite(ctx context.Context, mount, path string, data map[string]any) error

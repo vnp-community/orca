@@ -18,6 +18,13 @@ type Config struct {
 	// exception to "no service but credential-broker-service touches
 	// Vault directly."
 	CredentialBrokerAddr string
+	// VapidContactURI is the "sub" claim RFC 8292 §2 requires every VAPID
+	// JWT to carry — a contactable mailto:/https: URI for this deployment's
+	// operator, NOT a per-tenant or per-event value. Configurable rather
+	// than hardcoded (TASK-BE-NOTIF-011) because it's operator-identifying
+	// contact info a self-hosted deployment must be able to set to its own
+	// address, not Orca's.
+	VapidContactURI string
 }
 
 func Load() (Config, error) {
@@ -29,5 +36,6 @@ func Load() (Config, error) {
 		Base:                 base,
 		NATSURL:              commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		CredentialBrokerAddr: commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
+		VapidContactURI:      commonconfig.StringEnv("VAPID_CONTACT_URI", "mailto:support@orca.dev"),
 	}, nil
 }

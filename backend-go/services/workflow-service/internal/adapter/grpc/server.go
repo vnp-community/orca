@@ -193,6 +193,8 @@ func toDomainStepType(t workflowv1.StepType) domain.StepType {
 		return domain.StepTypeWebhook
 	case workflowv1.StepType_STEP_TYPE_CONDITION:
 		return domain.StepTypeCondition
+	case workflowv1.StepType_STEP_TYPE_COMMIT_PUSH:
+		return domain.StepTypeCommitPush
 	default:
 		return domain.StepTypeUnspecified
 	}

@@ -158,15 +158,28 @@ func (r *Repository) GetDailyRollup(ctx context.Context, tenantID, userID string
 }
 
 func (r *Repository) ListSessions(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.UsageSession, string, error) {
+	// $2 must bind as a single, unambiguous type under pgx's extended query
+	// protocol. Comparing it to both '' (text) and user_id (uuid) in the
+	// same statement made Postgres reject the query outright ("operator
+	// does not exist: uuid = text") the moment a real value was bound —
+	// TASK-BE-DB-003 caught this against real Postgres (testcontainers
+	// masked it because that suite never previously ran on a real
+	// database). Passing untyped nil for "no filter" instead of ""
+	// resolves $2's type purely from `user_id = $2::uuid`, with no
+	// conflicting inference.
+	var userIDParam any
+	if userID != "" {
+		userIDParam = userID
+	}
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, tenant_id, user_id, provider, worktree_id,
 		       input_tokens, output_tokens, cache_read_tokens, cache_write_tokens,
 		       cost_usd, started_at, ended_at, request_id
 		FROM usage.sessions
-		WHERE tenant_id = $1 AND ($2 = '' OR user_id = $2) AND id > $3
+		WHERE tenant_id = $1 AND ($2::uuid IS NULL OR user_id = $2::uuid) AND id > $3
 		ORDER BY id
 		LIMIT $4
-	`, tenantID, userID, pageToken, pageSize)
+	`, tenantID, userIDParam, pageToken, pageSize)
 	if err != nil {
 		return nil, "", fmt.Errorf("postgres: query sessions: %w", err)
 	}
@@ -176,7 +189,15 @@ func (r *Repository) ListSessions(ctx context.Context, tenantID, userID, pageTok
 	for rows.Next() {
 		var s domain.UsageSession
 		var provider string
-		var started, ended time.Time
+		var started time.Time
+		// ended_at is nullable (a session may still be in progress) —
+		// SaveSession already writes NULL for it via nullableTime(s.EndedAt)
+		// when EndedAt is the zero value; scanning it back needs the same
+		// nil-aware handling, or pgx rejects a NULL column value outright
+		// ("cannot scan NULL into *time.Time"). domain.UsageSession still
+		// represents "not ended" as the zero time.Time, so a nil ended
+		// collapses back to that, not a pointer field on the domain type.
+		var ended *time.Time
 		if err := rows.Scan(&s.ID, &s.TenantID, &s.UserID, &provider, &s.WorktreeID,
 			&s.InputTokens, &s.OutputTokens, &s.CacheReadTokens, &s.CacheWriteTokens,
 			&s.CostUSD, &started, &ended, &s.RequestID); err != nil {
@@ -184,7 +205,9 @@ func (r *Repository) ListSessions(ctx context.Context, tenantID, userID, pageTok
 		}
 		s.Provider = domain.Provider(provider)
 		s.StartedAt = started
-		s.EndedAt = ended
+		if ended != nil {
+			s.EndedAt = *ended
+		}
 		out = append(out, s)
 	}
 	if err := rows.Err(); err != nil {

@@ -88,7 +88,7 @@ func run() error {
 	listActiveDispatchContextsForUserUC := usecase.NewListActiveDispatchContextsForUser(repo)
 	failDispatchUC := usecase.NewFailDispatch(repo)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	orchestrationv1.RegisterOrchestrationServiceServer(grpcServer, orchgrpc.New(
 		createDispatchContextUC, createGateUC, resolveGateUC, updateTaskStatusAndPromoteUC, getDispatchContextForTaskUC,
 		listActiveDispatchContextsForUserUC, failDispatchUC,

@@ -23,6 +23,14 @@ const (
 	InfraFleetService_RegisterDevServer_FullMethodName           = "/orca.infrafleet.v1.InfraFleetService/RegisterDevServer"
 	InfraFleetService_ResolveConnection_FullMethodName           = "/orca.infrafleet.v1.InfraFleetService/ResolveConnection"
 	InfraFleetService_CreateSshTarget_FullMethodName             = "/orca.infrafleet.v1.InfraFleetService/CreateSshTarget"
+	InfraFleetService_BulkProvisionFleet_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/BulkProvisionFleet"
+	InfraFleetService_ApplyTerraformPlan_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ApplyTerraformPlan"
+	InfraFleetService_CreateFleetDefinition_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/CreateFleetDefinition"
+	InfraFleetService_UpdateFleetDefinition_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/UpdateFleetDefinition"
+	InfraFleetService_GetFleetDefinition_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/GetFleetDefinition"
+	InfraFleetService_ListFleetDefinitions_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/ListFleetDefinitions"
+	InfraFleetService_ExportFleetDefinitionYaml_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/ExportFleetDefinitionYaml"
+	InfraFleetService_DeployFleetDefinition_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/DeployFleetDefinition"
 	InfraFleetService_GetFleetHealth_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/GetFleetHealth"
 	InfraFleetService_ScanWorkspacePorts_FullMethodName          = "/orca.infrafleet.v1.InfraFleetService/ScanWorkspacePorts"
 	InfraFleetService_ListDevServers_FullMethodName              = "/orca.infrafleet.v1.InfraFleetService/ListDevServers"
@@ -91,6 +99,40 @@ type InfraFleetServiceClient interface {
 	RegisterDevServer(ctx context.Context, in *RegisterDevServerRequest, opts ...grpc.CallOption) (*RegisterDevServerResponse, error)
 	ResolveConnection(ctx context.Context, in *ResolveConnectionRequest, opts ...grpc.CallOption) (*ResolveConnectionResponse, error)
 	CreateSshTarget(ctx context.Context, in *CreateSshTargetRequest, opts ...grpc.CallOption) (*CreateSshTargetResponse, error)
+	// BulkProvisionFleet fans out CreateSshTarget+RegisterDevServer over every
+	// server in a FleetSpec (CR-FLEET-001) — server-streaming so the caller
+	// gets a BulkProvisionFleetEvent per server as it completes, mirroring
+	// StreamVmProvision's "N steps, want progress" convention. No tenant_id
+	// field on the request — see ListDevServersRequest's doc comment for the
+	// same convention: tenantID always comes from tenant.RequireTenantID(ctx),
+	// never a caller-supplied field.
+	BulkProvisionFleet(ctx context.Context, in *BulkProvisionFleetRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BulkProvisionFleetEvent], error)
+	// ApplyTerraformPlan runs `terraform apply` on a registered control dev
+	// server via its agent (CR-FLEET-002 §"Hướng A") and streams back its
+	// outcome — server-streaming to mirror StreamVmProvision's convention,
+	// though today usecase.ApplyTerraformPlan sends exactly one terminal
+	// "result" event (no live stdout/stderr progress yet — see
+	// ApplyTerraformPlanEvent's doc comment for the known MVP limitation).
+	ApplyTerraformPlan(ctx context.Context, in *ApplyTerraformPlanRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ApplyTerraformPlanEvent], error)
+	// --- FleetDefinition CRUD (CR-FLEET-003) — the persisted source of truth
+	// a fleet's BulkProvisionFleet/ApplyTerraformPlan runs are driven from,
+	// distinct from those one-shot RPCs themselves. No tenant_id field on any
+	// request here — same convention as BulkProvisionFleetRequest above.
+	CreateFleetDefinition(ctx context.Context, in *CreateFleetDefinitionRequest, opts ...grpc.CallOption) (*FleetDefinitionProto, error)
+	UpdateFleetDefinition(ctx context.Context, in *UpdateFleetDefinitionRequest, opts ...grpc.CallOption) (*FleetDefinitionProto, error)
+	GetFleetDefinition(ctx context.Context, in *GetFleetDefinitionRequest, opts ...grpc.CallOption) (*FleetDefinitionProto, error)
+	ListFleetDefinitions(ctx context.Context, in *ListFleetDefinitionsRequest, opts ...grpc.CallOption) (*ListFleetDefinitionsResponse, error)
+	// ExportFleetDefinitionYaml serializes a saved FleetDefinition back into
+	// orca-fleet.yaml's FleetConfigSchema shape — see
+	// usecase.ExportFleetDefinitionYaml's doc comment for the round-trip AC
+	// and its known TASK-BE-FLEET-005-shaped gap.
+	ExportFleetDefinitionYaml(ctx context.Context, in *ExportFleetDefinitionYamlRequest, opts ...grpc.CallOption) (*ExportFleetDefinitionYamlResponse, error)
+	// DeployFleetDefinition coordinates BulkProvisionFleet (CR-FLEET-001) and
+	// ApplyTerraformPlan (CR-FLEET-002) for one saved FleetDefinition — see
+	// usecase.DeployFleetDefinition's doc comment. Reuses BulkProvisionFleetEvent
+	// (TASK-BE-FLEET-003) rather than defining a new event type — the
+	// underlying provisioning result shape is identical either way.
+	DeployFleetDefinition(ctx context.Context, in *DeployFleetDefinitionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BulkProvisionFleetEvent], error)
 	GetFleetHealth(ctx context.Context, in *GetFleetHealthRequest, opts ...grpc.CallOption) (*GetFleetHealthResponse, error)
 	ScanWorkspacePorts(ctx context.Context, in *ScanWorkspacePortsRequest, opts ...grpc.CallOption) (*ScanWorkspacePortsResponse, error)
 	// ListDevServers backs the frontend's devServer.list channel — the
@@ -301,6 +343,113 @@ func (c *infraFleetServiceClient) CreateSshTarget(ctx context.Context, in *Creat
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) BulkProvisionFleet(ctx context.Context, in *BulkProvisionFleetRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BulkProvisionFleetEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_BulkProvisionFleet_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[BulkProvisionFleetRequest, BulkProvisionFleetEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_BulkProvisionFleetClient = grpc.ServerStreamingClient[BulkProvisionFleetEvent]
+
+func (c *infraFleetServiceClient) ApplyTerraformPlan(ctx context.Context, in *ApplyTerraformPlanRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ApplyTerraformPlanEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[1], InfraFleetService_ApplyTerraformPlan_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ApplyTerraformPlanRequest, ApplyTerraformPlanEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_ApplyTerraformPlanClient = grpc.ServerStreamingClient[ApplyTerraformPlanEvent]
+
+func (c *infraFleetServiceClient) CreateFleetDefinition(ctx context.Context, in *CreateFleetDefinitionRequest, opts ...grpc.CallOption) (*FleetDefinitionProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FleetDefinitionProto)
+	err := c.cc.Invoke(ctx, InfraFleetService_CreateFleetDefinition_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) UpdateFleetDefinition(ctx context.Context, in *UpdateFleetDefinitionRequest, opts ...grpc.CallOption) (*FleetDefinitionProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FleetDefinitionProto)
+	err := c.cc.Invoke(ctx, InfraFleetService_UpdateFleetDefinition_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) GetFleetDefinition(ctx context.Context, in *GetFleetDefinitionRequest, opts ...grpc.CallOption) (*FleetDefinitionProto, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FleetDefinitionProto)
+	err := c.cc.Invoke(ctx, InfraFleetService_GetFleetDefinition_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ListFleetDefinitions(ctx context.Context, in *ListFleetDefinitionsRequest, opts ...grpc.CallOption) (*ListFleetDefinitionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListFleetDefinitionsResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListFleetDefinitions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) ExportFleetDefinitionYaml(ctx context.Context, in *ExportFleetDefinitionYamlRequest, opts ...grpc.CallOption) (*ExportFleetDefinitionYamlResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ExportFleetDefinitionYamlResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ExportFleetDefinitionYaml_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) DeployFleetDefinition(ctx context.Context, in *DeployFleetDefinitionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[BulkProvisionFleetEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[2], InfraFleetService_DeployFleetDefinition_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[DeployFleetDefinitionRequest, BulkProvisionFleetEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_DeployFleetDefinitionClient = grpc.ServerStreamingClient[BulkProvisionFleetEvent]
+
 func (c *infraFleetServiceClient) GetFleetHealth(ctx context.Context, in *GetFleetHealthRequest, opts ...grpc.CallOption) (*GetFleetHealthResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetFleetHealthResponse)
@@ -483,7 +632,7 @@ func (c *infraFleetServiceClient) RelayByDevServer(ctx context.Context, in *Rela
 
 func (c *infraFleetServiceClient) StreamFileChanges(ctx context.Context, in *StreamFileChangesRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FileChangeEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[0], InfraFleetService_StreamFileChanges_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[3], InfraFleetService_StreamFileChanges_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -662,7 +811,7 @@ func (c *infraFleetServiceClient) InspectTerminalProcess(ctx context.Context, in
 
 func (c *infraFleetServiceClient) AttachPty(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PtyClientFrame, PtyServerFrame], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[1], InfraFleetService_AttachPty_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[4], InfraFleetService_AttachPty_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -675,7 +824,7 @@ type InfraFleetService_AttachPtyClient = grpc.BidiStreamingClient[PtyClientFrame
 
 func (c *infraFleetServiceClient) AttachScreencast(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ScreencastClientFrame, ScreencastServerFrame], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[2], InfraFleetService_AttachScreencast_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[5], InfraFleetService_AttachScreencast_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -858,7 +1007,7 @@ func (c *infraFleetServiceClient) CleanupEphemeralVmWorkspace(ctx context.Contex
 
 func (c *infraFleetServiceClient) StreamVmProvision(ctx context.Context, in *StreamVmProvisionRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[VmProvisionEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[3], InfraFleetService_StreamVmProvision_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &InfraFleetService_ServiceDesc.Streams[6], InfraFleetService_StreamVmProvision_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -886,6 +1035,40 @@ type InfraFleetServiceServer interface {
 	RegisterDevServer(context.Context, *RegisterDevServerRequest) (*RegisterDevServerResponse, error)
 	ResolveConnection(context.Context, *ResolveConnectionRequest) (*ResolveConnectionResponse, error)
 	CreateSshTarget(context.Context, *CreateSshTargetRequest) (*CreateSshTargetResponse, error)
+	// BulkProvisionFleet fans out CreateSshTarget+RegisterDevServer over every
+	// server in a FleetSpec (CR-FLEET-001) — server-streaming so the caller
+	// gets a BulkProvisionFleetEvent per server as it completes, mirroring
+	// StreamVmProvision's "N steps, want progress" convention. No tenant_id
+	// field on the request — see ListDevServersRequest's doc comment for the
+	// same convention: tenantID always comes from tenant.RequireTenantID(ctx),
+	// never a caller-supplied field.
+	BulkProvisionFleet(*BulkProvisionFleetRequest, grpc.ServerStreamingServer[BulkProvisionFleetEvent]) error
+	// ApplyTerraformPlan runs `terraform apply` on a registered control dev
+	// server via its agent (CR-FLEET-002 §"Hướng A") and streams back its
+	// outcome — server-streaming to mirror StreamVmProvision's convention,
+	// though today usecase.ApplyTerraformPlan sends exactly one terminal
+	// "result" event (no live stdout/stderr progress yet — see
+	// ApplyTerraformPlanEvent's doc comment for the known MVP limitation).
+	ApplyTerraformPlan(*ApplyTerraformPlanRequest, grpc.ServerStreamingServer[ApplyTerraformPlanEvent]) error
+	// --- FleetDefinition CRUD (CR-FLEET-003) — the persisted source of truth
+	// a fleet's BulkProvisionFleet/ApplyTerraformPlan runs are driven from,
+	// distinct from those one-shot RPCs themselves. No tenant_id field on any
+	// request here — same convention as BulkProvisionFleetRequest above.
+	CreateFleetDefinition(context.Context, *CreateFleetDefinitionRequest) (*FleetDefinitionProto, error)
+	UpdateFleetDefinition(context.Context, *UpdateFleetDefinitionRequest) (*FleetDefinitionProto, error)
+	GetFleetDefinition(context.Context, *GetFleetDefinitionRequest) (*FleetDefinitionProto, error)
+	ListFleetDefinitions(context.Context, *ListFleetDefinitionsRequest) (*ListFleetDefinitionsResponse, error)
+	// ExportFleetDefinitionYaml serializes a saved FleetDefinition back into
+	// orca-fleet.yaml's FleetConfigSchema shape — see
+	// usecase.ExportFleetDefinitionYaml's doc comment for the round-trip AC
+	// and its known TASK-BE-FLEET-005-shaped gap.
+	ExportFleetDefinitionYaml(context.Context, *ExportFleetDefinitionYamlRequest) (*ExportFleetDefinitionYamlResponse, error)
+	// DeployFleetDefinition coordinates BulkProvisionFleet (CR-FLEET-001) and
+	// ApplyTerraformPlan (CR-FLEET-002) for one saved FleetDefinition — see
+	// usecase.DeployFleetDefinition's doc comment. Reuses BulkProvisionFleetEvent
+	// (TASK-BE-FLEET-003) rather than defining a new event type — the
+	// underlying provisioning result shape is identical either way.
+	DeployFleetDefinition(*DeployFleetDefinitionRequest, grpc.ServerStreamingServer[BulkProvisionFleetEvent]) error
 	GetFleetHealth(context.Context, *GetFleetHealthRequest) (*GetFleetHealthResponse, error)
 	ScanWorkspacePorts(context.Context, *ScanWorkspacePortsRequest) (*ScanWorkspacePortsResponse, error)
 	// ListDevServers backs the frontend's devServer.list channel — the
@@ -1074,6 +1257,30 @@ func (UnimplementedInfraFleetServiceServer) ResolveConnection(context.Context, *
 }
 func (UnimplementedInfraFleetServiceServer) CreateSshTarget(context.Context, *CreateSshTargetRequest) (*CreateSshTargetResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateSshTarget not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) BulkProvisionFleet(*BulkProvisionFleetRequest, grpc.ServerStreamingServer[BulkProvisionFleetEvent]) error {
+	return status.Error(codes.Unimplemented, "method BulkProvisionFleet not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ApplyTerraformPlan(*ApplyTerraformPlanRequest, grpc.ServerStreamingServer[ApplyTerraformPlanEvent]) error {
+	return status.Error(codes.Unimplemented, "method ApplyTerraformPlan not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) CreateFleetDefinition(context.Context, *CreateFleetDefinitionRequest) (*FleetDefinitionProto, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateFleetDefinition not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) UpdateFleetDefinition(context.Context, *UpdateFleetDefinitionRequest) (*FleetDefinitionProto, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateFleetDefinition not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) GetFleetDefinition(context.Context, *GetFleetDefinitionRequest) (*FleetDefinitionProto, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetFleetDefinition not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListFleetDefinitions(context.Context, *ListFleetDefinitionsRequest) (*ListFleetDefinitionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListFleetDefinitions not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ExportFleetDefinitionYaml(context.Context, *ExportFleetDefinitionYamlRequest) (*ExportFleetDefinitionYamlResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ExportFleetDefinitionYaml not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) DeployFleetDefinition(*DeployFleetDefinitionRequest, grpc.ServerStreamingServer[BulkProvisionFleetEvent]) error {
+	return status.Error(codes.Unimplemented, "method DeployFleetDefinition not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) GetFleetHealth(context.Context, *GetFleetHealthRequest) (*GetFleetHealthResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetFleetHealth not implemented")
@@ -1314,6 +1521,129 @@ func _InfraFleetService_CreateSshTarget_Handler(srv interface{}, ctx context.Con
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _InfraFleetService_BulkProvisionFleet_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(BulkProvisionFleetRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(InfraFleetServiceServer).BulkProvisionFleet(m, &grpc.GenericServerStream[BulkProvisionFleetRequest, BulkProvisionFleetEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_BulkProvisionFleetServer = grpc.ServerStreamingServer[BulkProvisionFleetEvent]
+
+func _InfraFleetService_ApplyTerraformPlan_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ApplyTerraformPlanRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(InfraFleetServiceServer).ApplyTerraformPlan(m, &grpc.GenericServerStream[ApplyTerraformPlanRequest, ApplyTerraformPlanEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_ApplyTerraformPlanServer = grpc.ServerStreamingServer[ApplyTerraformPlanEvent]
+
+func _InfraFleetService_CreateFleetDefinition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateFleetDefinitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).CreateFleetDefinition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_CreateFleetDefinition_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).CreateFleetDefinition(ctx, req.(*CreateFleetDefinitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_UpdateFleetDefinition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateFleetDefinitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).UpdateFleetDefinition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_UpdateFleetDefinition_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).UpdateFleetDefinition(ctx, req.(*UpdateFleetDefinitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_GetFleetDefinition_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetFleetDefinitionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).GetFleetDefinition(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_GetFleetDefinition_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).GetFleetDefinition(ctx, req.(*GetFleetDefinitionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ListFleetDefinitions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListFleetDefinitionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListFleetDefinitions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListFleetDefinitions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListFleetDefinitions(ctx, req.(*ListFleetDefinitionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_ExportFleetDefinitionYaml_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ExportFleetDefinitionYamlRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ExportFleetDefinitionYaml(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ExportFleetDefinitionYaml_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ExportFleetDefinitionYaml(ctx, req.(*ExportFleetDefinitionYamlRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_DeployFleetDefinition_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(DeployFleetDefinitionRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(InfraFleetServiceServer).DeployFleetDefinition(m, &grpc.GenericServerStream[DeployFleetDefinitionRequest, BulkProvisionFleetEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type InfraFleetService_DeployFleetDefinitionServer = grpc.ServerStreamingServer[BulkProvisionFleetEvent]
 
 func _InfraFleetService_GetFleetHealth_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetFleetHealthRequest)
@@ -2289,6 +2619,26 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _InfraFleetService_CreateSshTarget_Handler,
 		},
 		{
+			MethodName: "CreateFleetDefinition",
+			Handler:    _InfraFleetService_CreateFleetDefinition_Handler,
+		},
+		{
+			MethodName: "UpdateFleetDefinition",
+			Handler:    _InfraFleetService_UpdateFleetDefinition_Handler,
+		},
+		{
+			MethodName: "GetFleetDefinition",
+			Handler:    _InfraFleetService_GetFleetDefinition_Handler,
+		},
+		{
+			MethodName: "ListFleetDefinitions",
+			Handler:    _InfraFleetService_ListFleetDefinitions_Handler,
+		},
+		{
+			MethodName: "ExportFleetDefinitionYaml",
+			Handler:    _InfraFleetService_ExportFleetDefinitionYaml_Handler,
+		},
+		{
 			MethodName: "GetFleetHealth",
 			Handler:    _InfraFleetService_GetFleetHealth_Handler,
 		},
@@ -2494,6 +2844,21 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "BulkProvisionFleet",
+			Handler:       _InfraFleetService_BulkProvisionFleet_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "ApplyTerraformPlan",
+			Handler:       _InfraFleetService_ApplyTerraformPlan_Handler,
+			ServerStreams: true,
+		},
+		{
+			StreamName:    "DeployFleetDefinition",
+			Handler:       _InfraFleetService_DeployFleetDefinition_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "StreamFileChanges",
 			Handler:       _InfraFleetService_StreamFileChanges_Handler,

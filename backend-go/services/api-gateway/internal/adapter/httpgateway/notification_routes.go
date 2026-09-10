@@ -3,6 +3,7 @@ package httpgateway
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 
 	"github.com/go-chi/chi/v5"
 
@@ -12,17 +13,109 @@ import (
 	notificationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1"
 )
 
-// mountNotificationRoutes wires the two real unary RPCs of
-// notification-service's REST surface — Subscribe and GetVapidPublicKey.
-// StreamNotifications is deliberately NOT mounted here: it's a
-// server-streaming RPC already served for real at GET /v1/notifications/stream
-// by a dedicated WS bridge (see router.go's mounting order, which makes that
-// literal path win over anything registered under this prefix).
+// mountNotificationRoutes wires notification-service's REST surface —
+// Subscribe/GetVapidPublicKey (soft-identity, mirrors mountPushRoutes'
+// unauthenticated use case), plus 4 authenticated CR-NOTIF-001 routes for
+// reading/managing a caller's own notification history: List, MarkAsRead,
+// MarkAllAsRead, GetUnreadCount. StreamNotifications is deliberately NOT
+// mounted here: it's a server-streaming RPC already served for real at GET
+// /v1/notifications/stream by a dedicated WS bridge (see router.go's
+// mounting order, which makes that literal path win over anything
+// registered under this prefix).
 func mountNotificationRoutes(r chi.Router, client notificationv1.NotificationServiceClient) {
 	r.Route("/v1/notifications", func(sub chi.Router) {
 		sub.Post("/subscribe", handleSubscribe(client, nil))
 		sub.Get("/vapid-public-key", handleGetVapidPublicKey(client, nil))
+		sub.Get("/", handleListNotifications(client))
+		sub.Post("/{id}/read", handleMarkAsRead(client))
+		sub.Post("/read-all", handleMarkAllAsRead(client))
+		sub.Get("/unread-count", handleGetUnreadCount(client))
 	})
+}
+
+// requireIdentity is the fail-closed counterpart to resolveSoftIdentity —
+// used by the 4 CR-NOTIF-001 routes below, which (unlike
+// Subscribe/GetVapidPublicKey) have no legitimate unauthenticated caller:
+// reading or mutating another person's notification history must never be
+// allowed anonymously. Returns ok=false (caller must have already written
+// the 401 response) when there is no resolved identity.
+func requireIdentity(w http.ResponseWriter, r *http.Request) (usecase.Identity, bool) {
+	identity := resolveSoftIdentity(r, nil)
+	if identity.UserID == "" {
+		writeJSONError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "no authenticated session")
+		return usecase.Identity{}, false
+	}
+	return identity, true
+}
+
+func handleListNotifications(client notificationv1.NotificationServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := requireIdentity(w, r)
+		if !ok {
+			return
+		}
+		q := r.URL.Query()
+		limit, _ := strconv.Atoi(q.Get("limit"))
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		resp, err := client.ListNotifications(ctx, &notificationv1.ListNotificationsRequest{
+			UserId:     identity.UserID,
+			Cursor:     q.Get("cursor"),
+			Limit:      int32(limit),
+			UnreadOnly: q.Get("unread_only") == "true",
+		})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+func handleMarkAsRead(client notificationv1.NotificationServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := requireIdentity(w, r)
+		if !ok {
+			return
+		}
+		notificationID := chi.URLParam(r, "id")
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		if _, err := client.MarkAsRead(ctx, &notificationv1.MarkAsReadRequest{UserId: identity.UserID, NotificationId: notificationID}); err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handleMarkAllAsRead(client notificationv1.NotificationServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := requireIdentity(w, r)
+		if !ok {
+			return
+		}
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		if _, err := client.MarkAllAsRead(ctx, &notificationv1.MarkAllAsReadRequest{UserId: identity.UserID}); err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
+	}
+}
+
+func handleGetUnreadCount(client notificationv1.NotificationServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, ok := requireIdentity(w, r)
+		if !ok {
+			return
+		}
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		resp, err := client.GetUnreadCount(ctx, &notificationv1.GetUnreadCountRequest{UserId: identity.UserID})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
 }
 
 // subscribeRequestBody is the REST request shape for POST
@@ -30,9 +123,11 @@ func mountNotificationRoutes(r chi.Router, client notificationv1.NotificationSer
 // from the validated Identity, never trusted from the request body, per
 // api-gateway.md §9.
 type subscribeRequestBody struct {
-	Endpoint  string `json:"endpoint"`
-	P256dhKey string `json:"p256dh_key"`
-	AuthKey   string `json:"auth_key"`
+	Endpoint    string `json:"endpoint"`
+	P256dhKey   string `json:"p256dh_key"`
+	AuthKey     string `json:"auth_key"`
+	Channel     string `json:"channel"` // empty == "web", does not change existing callers' behavior
+	DeviceLabel string `json:"device_label"`
 }
 
 // resolveSoftIdentity reads the identity a prior authMiddleware run already
@@ -75,10 +170,12 @@ func handleSubscribe(client notificationv1.NotificationServiceClient, cookieVali
 
 		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
 		resp, err := client.Subscribe(ctx, &notificationv1.SubscribeRequest{
-			UserId:    identity.UserID,
-			Endpoint:  body.Endpoint,
-			P256DhKey: body.P256dhKey,
-			AuthKey:   body.AuthKey,
+			UserId:      identity.UserID,
+			Endpoint:    body.Endpoint,
+			P256DhKey:   body.P256dhKey,
+			AuthKey:     body.AuthKey,
+			Channel:     body.Channel,
+			DeviceLabel: body.DeviceLabel,
 		})
 		if err != nil {
 			writeGRPCError(w, err)

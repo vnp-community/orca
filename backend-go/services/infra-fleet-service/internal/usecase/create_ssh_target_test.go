@@ -24,6 +24,11 @@ type fakeSshTargetRepository struct {
 	// used by list_ssh_targets_test.go.
 	targets map[string][]domain.SshTarget
 	listErr error
+
+	// deleted records (tenantID, id) pairs passed to Delete, and deleteErr
+	// drives its fake answer — used by delete_ssh_target_test.go.
+	deleted   [][2]string
+	deleteErr error
 }
 
 func (f *fakeSshTargetRepository) Create(ctx context.Context, target domain.SshTarget) (domain.SshTarget, error) {
@@ -50,6 +55,15 @@ func (f *fakeSshTargetRepository) List(ctx context.Context, tenantID string) ([]
 		return nil, f.listErr
 	}
 	return f.targets[tenantID], nil
+}
+
+// Delete implements usecase.SshTargetRepository.Delete.
+func (f *fakeSshTargetRepository) Delete(ctx context.Context, tenantID, id string) error {
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	f.deleted = append(f.deleted, [2]string{tenantID, id})
+	return nil
 }
 
 func TestCreateSshTarget_RequiresTenantContext(t *testing.T) {

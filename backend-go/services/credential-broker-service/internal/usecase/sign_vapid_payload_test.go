@@ -5,6 +5,14 @@ import (
 	"testing"
 )
 
+// TestSignVapidPayload_SignsViaTransit is a regression guard for a real bug
+// found while implementing TASK-BE-NOTIF-010: this usecase used to call
+// store.TransitEncrypt (Vault's transit/encrypt — opaque ciphertext, not a
+// verifiable signature) instead of store.TransitSign (transit/sign — an
+// actual asymmetric-key signature, what RFC 8292 VAPID needs). The fake's
+// TransitSign output ("sig:...") is deliberately shaped differently from
+// TransitEncrypt's ("vault:v1:...") so this test fails loudly if the
+// usecase ever regresses back to calling the wrong method.
 func TestSignVapidPayload_SignsViaTransit(t *testing.T) {
 	rec := &callRecorder{}
 	store := newFakeSecretStore(rec)
@@ -16,12 +24,12 @@ func TestSignVapidPayload_SignsViaTransit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	want := "vault:v1:vapid-signing-tenant-1:vapid-jwt-payload"
+	want := "sig:vapid-signing-tenant-1:vapid-jwt-payload"
 	if sig != want {
 		t.Errorf("got %q, want %q", sig, want)
 	}
-	if len(rec.snapshot()) != 1 || rec.snapshot()[0] != "store.TransitEncrypt" {
-		t.Errorf("expected exactly one store.TransitEncrypt call, got %v", rec.snapshot())
+	if len(rec.snapshot()) != 1 || rec.snapshot()[0] != "store.TransitSign" {
+		t.Errorf("expected exactly one store.TransitSign call, got %v", rec.snapshot())
 	}
 }
 
@@ -41,7 +49,7 @@ func TestSignVapidPayload_RequiresTenantAndPayload(t *testing.T) {
 func TestSignVapidPayload_TransitErrorWrapped(t *testing.T) {
 	rec := &callRecorder{}
 	store := newFakeSecretStore(rec)
-	store.encryptErr = context.DeadlineExceeded
+	store.signErr = context.DeadlineExceeded
 
 	uc := NewSignVapidPayload(store)
 	_, err := uc.Execute(context.Background(), SignVapidPayloadInput{TenantID: "tenant-1", Payload: []byte("x")})

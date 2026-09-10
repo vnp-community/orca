@@ -17,6 +17,7 @@ type framePayload struct {
 	Body     string `json:"body"`
 	DeepLink string `json:"deep_link,omitempty"`
 	Severity string `json:"severity"`
+	IsRead   bool   `json:"is_read"`
 }
 
 // framePayloadJSON marshals e's user-facing fields to JSON for the wire
@@ -29,6 +30,7 @@ func framePayloadJSON(e domain.NotificationEvent) string {
 		Body:     e.Body,
 		DeepLink: e.DeepLink,
 		Severity: string(e.Severity),
+		IsRead:   e.IsRead,
 	})
 	if err != nil {
 		slog.Warn("failed to marshal notification frame payload", slog.Any("error", err))

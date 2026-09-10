@@ -11,6 +11,8 @@ import (
 	"log/slog"
 	"os"
 
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/stablyai/orca-go/common/tenant"
 )
 
@@ -45,6 +47,12 @@ func (h *correlatingHandler) Handle(ctx context.Context, record slog.Record) err
 	}
 	if uid, ok := tenant.UserID(ctx); ok {
 		record.AddAttrs(slog.String("user_id", uid))
+	}
+	if sc := trace.SpanContextFromContext(ctx); sc.IsValid() {
+		record.AddAttrs(
+			slog.String("trace_id", sc.TraceID().String()),
+			slog.String("span_id", sc.SpanID().String()),
+		)
 	}
 	return h.inner.Handle(ctx, record)
 }
