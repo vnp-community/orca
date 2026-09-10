@@ -23,6 +23,73 @@ import (
 	"github.com/stablyai/orca-go/services/automation-service/internal/usecase"
 )
 
+// ── actions_json / action_results_json (de)serialization — CR-AUTO-002/TASK-BE-AUTO-003 ──
+
+// actionRow/actionResultRow are the JSONB wire shapes actions_json/
+// action_results_json store — snake_case to match automation.proto's
+// AutomationAction/ActionResult field names 1:1, so a future sqlc/direct
+// JSON-column read from another tool sees the same shape the proto layer
+// does.
+type actionRow struct {
+	ID                string `json:"id"`
+	Type              string `json:"type"`
+	ConfigJSON        string `json:"config_json"`
+	ContinueOnFailure bool   `json:"continue_on_failure"`
+}
+
+type actionResultRow struct {
+	ActionID   string `json:"action_id"`
+	Status     string `json:"status"`
+	OutputJSON string `json:"output_json"`
+	Error      string `json:"error"`
+}
+
+func marshalActions(actions []domain.AutomationAction) ([]byte, error) {
+	rows := make([]actionRow, len(actions))
+	for i, a := range actions {
+		rows[i] = actionRow{ID: a.ID, Type: string(a.Type), ConfigJSON: a.ConfigJSON, ContinueOnFailure: a.ContinueOnFailure}
+	}
+	return json.Marshal(rows)
+}
+
+func unmarshalActions(raw []byte) ([]domain.AutomationAction, error) {
+	var rows []actionRow
+	if err := json.Unmarshal(raw, &rows); err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	out := make([]domain.AutomationAction, len(rows))
+	for i, r := range rows {
+		out[i] = domain.AutomationAction{ID: r.ID, Type: domain.AutomationActionType(r.Type), ConfigJSON: r.ConfigJSON, ContinueOnFailure: r.ContinueOnFailure}
+	}
+	return out, nil
+}
+
+func marshalActionResults(results []domain.ActionResult) ([]byte, error) {
+	rows := make([]actionResultRow, len(results))
+	for i, r := range results {
+		rows[i] = actionResultRow{ActionID: r.ActionID, Status: r.Status, OutputJSON: r.OutputJSON, Error: r.Error}
+	}
+	return json.Marshal(rows)
+}
+
+func unmarshalActionResults(raw []byte) ([]domain.ActionResult, error) {
+	var rows []actionResultRow
+	if err := json.Unmarshal(raw, &rows); err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	out := make([]domain.ActionResult, len(rows))
+	for i, r := range rows {
+		out[i] = domain.ActionResult{ActionID: r.ActionID, Status: r.Status, OutputJSON: r.OutputJSON, Error: r.Error}
+	}
+	return out, nil
+}
+
 // AutomationRepository implements usecase.AutomationRepository against
 // Postgres via pgx — hand-written SQL (see architecture/04-tech-stack.md:
 // sqlc codegen is the eventual target, this scaffold hand-writes the
@@ -38,6 +105,7 @@ func NewAutomationRepository(pool *pgxpool.Pool) *AutomationRepository {
 
 const automationColumns = `id, tenant_id, project_id, name, rrule, dtstart, step_type, step_config_json,
 	actions_json, enabled, timezone, trigger_type, trigger_event, trigger_filter_json,
+	max_run_history, run_timeout_seconds, running_run_id, running_since,
 	next_run_at, created_at, updated_at`
 
 func (r *AutomationRepository) Create(ctx context.Context, a domain.Automation) error {
@@ -53,11 +121,13 @@ func (r *AutomationRepository) Create(ctx context.Context, a domain.Automation) 
 		INSERT INTO automation.automations (
 			id, tenant_id, project_id, name, rrule, dtstart, step_type, step_config_json,
 			actions_json, enabled, timezone, trigger_type, trigger_event, trigger_filter_json,
+			max_run_history, run_timeout_seconds,
 			next_run_at, created_at, updated_at
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
 	`,
 		a.ID, a.TenantID, nullableString(a.ProjectID), a.Name, a.RRule, a.DTStart, string(a.StepType), a.StepConfigJSON,
 		actionsJSON, a.Enabled, a.Timezone, string(a.TriggerType), nullableString(string(a.TriggerEvent)), filterJSON,
+		a.MaxRunHistory, a.RunTimeoutSeconds,
 		nullableTime(a.NextRunAt), a.CreatedAt, a.UpdatedAt,
 	)
 	if err != nil {
@@ -135,10 +205,12 @@ func (r *AutomationRepository) Update(ctx context.Context, tenantID string, a do
 		UPDATE automation.automations
 		SET name = $3, rrule = $4, step_type = $5, step_config_json = $6,
 		    enabled = $7, timezone = $8, dtstart = $9, project_id = $10, actions_json = $11,
-		    trigger_type = $12, trigger_event = $13, trigger_filter_json = $14, updated_at = now()
+		    trigger_type = $12, trigger_event = $13, trigger_filter_json = $14,
+		    max_run_history = $15, run_timeout_seconds = $16, updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, a.ID, a.Name, a.RRule, string(a.StepType), a.StepConfigJSON, a.Enabled, a.Timezone, a.DTStart,
-		nullableString(a.ProjectID), actionsJSON, string(a.TriggerType), nullableString(string(a.TriggerEvent)), filterJSON)
+		nullableString(a.ProjectID), actionsJSON, string(a.TriggerType), nullableString(string(a.TriggerEvent)), filterJSON,
+		a.MaxRunHistory, a.RunTimeoutSeconds)
 	if err != nil {
 		return fmt.Errorf("postgres: update automation: %w", err)
 	}
@@ -232,6 +304,40 @@ func (r *AutomationRepository) ListEventTriggered(ctx context.Context, tenantID 
 	return out, nil
 }
 
+// AcquireRunLock implements usecase.AutomationRepository.AcquireRunLock — a
+// single conditional UPDATE (no separate SELECT+UPDATE) so the check and
+// claim are atomic under concurrent callers: two racing acquires for the
+// same automation can't both see "unlocked" and both succeed, since
+// Postgres serializes concurrent UPDATEs to the same row.
+func (r *AutomationRepository) AcquireRunLock(ctx context.Context, tenantID, automationID, runID string, ttl time.Duration) (bool, error) {
+	tag, err := r.pool.Exec(ctx, `
+		UPDATE automation.automations
+		SET running_run_id = $1, running_since = now()
+		WHERE tenant_id = $2 AND id = $3
+		  AND (running_run_id IS NULL OR running_since < now() - make_interval(secs => $4))
+	`, runID, tenantID, automationID, ttl.Seconds())
+	if err != nil {
+		return false, fmt.Errorf("postgres: acquire run lock: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}
+
+// ReleaseRunLock implements usecase.AutomationRepository.ReleaseRunLock —
+// the `running_run_id = $3` guard means a lock already reclaimed by a newer
+// run (past its TTL) is left alone, not clobbered by a late release from
+// the run that used to hold it.
+func (r *AutomationRepository) ReleaseRunLock(ctx context.Context, tenantID, automationID, runID string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE automation.automations
+		SET running_run_id = NULL, running_since = NULL
+		WHERE tenant_id = $1 AND id = $2 AND running_run_id = $3
+	`, tenantID, automationID, runID)
+	if err != nil {
+		return fmt.Errorf("postgres: release run lock: %w", err)
+	}
+	return nil
+}
+
 // ClaimDue implements usecase.DueAutomationClaimer — see that port's doc
 // comment for why the returned batch's transaction stays open across
 // dispatch. The query intentionally has no tenant filter: the scheduler
@@ -314,15 +420,20 @@ func (b *claimedBatch) Rollback(ctx context.Context) error {
 	return nil
 }
 
+// scanAutomation scans a row selected via automationColumns — column order
+// must match that constant exactly.
 func scanAutomation(row rowScanner) (domain.Automation, error) {
 	var a domain.Automation
 	var stepType, triggerType string
 	var projectID, triggerEvent, triggerFilterJSON *string
-	var actionsJSON string
+	var actionsJSON []byte
+	var runningRunID *string
+	var runningSince *time.Time
 	var nextRunAt *time.Time
 	if err := row.Scan(
 		&a.ID, &a.TenantID, &projectID, &a.Name, &a.RRule, &a.DTStart, &stepType, &a.StepConfigJSON,
 		&actionsJSON, &a.Enabled, &a.Timezone, &triggerType, &triggerEvent, &triggerFilterJSON,
+		&a.MaxRunHistory, &a.RunTimeoutSeconds, &runningRunID, &runningSince,
 		&nextRunAt, &a.CreatedAt, &a.UpdatedAt,
 	); err != nil {
 		return domain.Automation{}, err
@@ -347,46 +458,16 @@ func scanAutomation(row rowScanner) (domain.Automation, error) {
 		}
 		a.TriggerFilter = filter
 	}
+	if runningRunID != nil {
+		a.RunningRunID = *runningRunID
+	}
+	if runningSince != nil {
+		a.RunningSince = *runningSince
+	}
 	if nextRunAt != nil {
 		a.NextRunAt = *nextRunAt
 	}
 	return a, nil
-}
-
-// actionRow is actions_json's on-disk shape — kept separate from
-// domain.AutomationAction so domain/ stays free of serialization concerns
-// (architecture/03-clean-architecture-guidelines.md).
-type actionRow struct {
-	StepType       string `json:"step_type"`
-	StepConfigJSON string `json:"step_config_json"`
-	OnFailure      string `json:"on_failure"`
-}
-
-func marshalActions(actions []domain.AutomationAction) (string, error) {
-	rows := make([]actionRow, len(actions))
-	for i, a := range actions {
-		rows[i] = actionRow{StepType: string(a.StepType), StepConfigJSON: a.StepConfigJSON, OnFailure: string(a.OnFailure)}
-	}
-	b, err := json.Marshal(rows)
-	if err != nil {
-		return "", err
-	}
-	return string(b), nil
-}
-
-func unmarshalActions(raw string) ([]domain.AutomationAction, error) {
-	if raw == "" {
-		return nil, nil
-	}
-	var rows []actionRow
-	if err := json.Unmarshal([]byte(raw), &rows); err != nil {
-		return nil, err
-	}
-	out := make([]domain.AutomationAction, len(rows))
-	for i, r := range rows {
-		out[i] = domain.AutomationAction{StepType: domain.StepType(r.StepType), StepConfigJSON: r.StepConfigJSON, OnFailure: domain.OnFailurePolicy(r.OnFailure)}
-	}
-	return out, nil
 }
 
 func marshalTriggerFilter(f *domain.TriggerFilter) (*string, error) {
@@ -481,7 +562,6 @@ func (r *AutomationRunRepository) UpdateStatus(ctx context.Context, run domain.A
 	if err != nil {
 		return fmt.Errorf("postgres: marshal action_results: %w", err)
 	}
-
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("postgres: begin update-status tx: %w", err)
@@ -645,6 +725,29 @@ func (r *AutomationRunRepository) MarkPublished(ctx context.Context, ids []strin
 	return nil
 }
 
+// PruneRuns implements usecase.AutomationRunRepository.PruneRuns — deletes
+// automationID's runs beyond the maxRuns most recent by created_at in one
+// statement (subquery-based "keep newest N" rather than a separate
+// count+offset round trip).
+func (r *AutomationRunRepository) PruneRuns(ctx context.Context, tenantID, automationID string, maxRuns int32) error {
+	if maxRuns <= 0 {
+		return nil
+	}
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM automation.automation_runs
+		WHERE tenant_id = $1 AND automation_id = $2 AND id NOT IN (
+			SELECT id FROM automation.automation_runs
+			WHERE tenant_id = $1 AND automation_id = $2
+			ORDER BY created_at DESC
+			LIMIT $3
+		)
+	`, tenantID, automationID, maxRuns)
+	if err != nil {
+		return fmt.Errorf("postgres: prune automation runs: %w", err)
+	}
+	return nil
+}
+
 // rowScanner abstracts over pgx.Row and pgx.Rows, which share the same
 // Scan signature — lets scanRun serve both FindByRequestID and
 // ListByAutomation without duplicating the column list.
@@ -652,48 +755,13 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
-type actionResultRow struct {
-	Index        int    `json:"index"`
-	Status       string `json:"status"`
-	OutputJSON   string `json:"output_json"`
-	ErrorMessage string `json:"error_message"`
-}
-
-func marshalActionResults(results []domain.ActionResult) (*string, error) {
-	if len(results) == 0 {
-		return nil, nil
-	}
-	rows := make([]actionResultRow, len(results))
-	for i, r := range results {
-		rows[i] = actionResultRow{Index: r.Index, Status: r.Status, OutputJSON: r.OutputJSON, ErrorMessage: r.ErrorMessage}
-	}
-	b, err := json.Marshal(rows)
-	if err != nil {
-		return nil, err
-	}
-	s := string(b)
-	return &s, nil
-}
-
-func unmarshalActionResults(raw *string) ([]domain.ActionResult, error) {
-	if raw == nil || *raw == "" {
-		return nil, nil
-	}
-	var rows []actionResultRow
-	if err := json.Unmarshal([]byte(*raw), &rows); err != nil {
-		return nil, err
-	}
-	out := make([]domain.ActionResult, len(rows))
-	for i, r := range rows {
-		out[i] = domain.ActionResult{Index: r.Index, Status: r.Status, OutputJSON: r.OutputJSON, ErrorMessage: r.ErrorMessage}
-	}
-	return out, nil
-}
-
+// scanRun scans a row selected via runColumns — column order must match
+// that constant exactly.
 func scanRun(row rowScanner) (domain.AutomationRun, error) {
 	var run domain.AutomationRun
 	var status, stepType, trigger string
-	var outputJSON, errorMessage, actionResultsJSON *string
+	var outputJSON, errorMessage *string
+	var actionResultsJSON []byte
 	var startedAt, completedAt *time.Time
 	if err := row.Scan(
 		&run.ID, &run.AutomationID, &run.TenantID, &run.RequestID, &status, &stepType, &trigger, &run.StepConfigJSON,
@@ -712,7 +780,7 @@ func scanRun(row rowScanner) (domain.AutomationRun, error) {
 	}
 	results, err := unmarshalActionResults(actionResultsJSON)
 	if err != nil {
-		return domain.AutomationRun{}, fmt.Errorf("unmarshal action_results_json: %w", err)
+		return domain.AutomationRun{}, fmt.Errorf("postgres: unmarshal action_results_json: %w", err)
 	}
 	run.ActionResults = results
 	if startedAt != nil {

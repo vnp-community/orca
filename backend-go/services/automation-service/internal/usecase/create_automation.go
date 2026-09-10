@@ -25,17 +25,20 @@ type CreateAutomationInput struct {
 	Name      string
 	RRule     string
 	ProjectID string // BR-AT-02; empty = unscoped
-	// Actions is the preferred way to specify what this automation runs —
-	// BR-AT-01. StepType/StepConfigJSON below are the deprecated
-	// single-step back-compat path, used only when Actions is empty.
-	Actions        []domain.AutomationAction
-	StepType       domain.StepType
-	StepConfigJSON string
-	DTStart        string // RFC3339; empty = defaults to now
-	Timezone       string // IANA tz name; empty = UTC
-	TriggerType    domain.TriggerType
-	TriggerEvent   domain.EventName
-	TriggerFilter  *domain.TriggerFilter
+	// Actions — CR-AUTO-002/TASK-BE-AUTO-005. Preferred over StepType/
+	// StepConfigJSON when non-empty (see resolveActions). A caller MAY
+	// populate both (e.g. a legacy StepConfigJSON kept for reference) —
+	// Actions always wins at dispatch time.
+	Actions           []domain.AutomationAction
+	StepType          domain.StepType
+	StepConfigJSON    string
+	DTStart           string // RFC3339; empty = defaults to now
+	Timezone          string // IANA tz name; empty = UTC
+	TriggerType       domain.TriggerType
+	TriggerEvent      domain.EventName
+	TriggerFilter     *domain.TriggerFilter
+	MaxRunHistory     int32 // CR-AUTO-007; 0 = default (100)
+	RunTimeoutSeconds int32 // CR-AUTO-007; 0 = default (7200)
 }
 
 // CreateAutomation is automation-service's definition-creation path.
@@ -93,15 +96,26 @@ func (uc *CreateAutomation) Execute(ctx context.Context, in CreateAutomationInpu
 	// New automations default enabled=true — the generated
 	// CreateAutomationRequest has no enabled field (Automation does; see
 	// automation.proto), so there is nothing on the wire to read here.
+	//
+	// CR-AUTO-002: NewAutomation's ErrEmptyStepConfig invariant predates
+	// Actions — deliberately NOT relaxed (keeps the constructor's existing
+	// test coverage and every other call site untouched, per "minimize
+	// changes"). An actions-only automation (no legacy step) satisfies the
+	// invariant with a harmless "{}" placeholder instead — resolveActions
+	// always prefers Actions over StepConfigJSON when Actions is non-empty,
+	// so this placeholder is never actually read at dispatch time.
+	stepConfigForValidation := in.StepConfigJSON
+	if stepConfigForValidation == "" && len(in.Actions) > 0 {
+		stepConfigForValidation = "{}"
+	}
 	automation, err := domain.NewAutomation(domain.NewAutomationParams{
 		ID:             uuid.NewString(),
 		TenantID:       tenantID,
 		ProjectID:      in.ProjectID,
 		Name:           in.Name,
 		RRule:          in.RRule,
-		Actions:        in.Actions,
 		StepType:       in.StepType,
-		StepConfigJSON: in.StepConfigJSON,
+		StepConfigJSON: stepConfigForValidation,
 		DTStart:        dtstart,
 		Timezone:       timezone,
 		Enabled:        true,
@@ -113,6 +127,9 @@ func (uc *CreateAutomation) Execute(ctx context.Context, in CreateAutomationInpu
 	if err != nil {
 		return domain.Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID", err.Error(), err)
 	}
+	automation.Actions = in.Actions
+	automation.MaxRunHistory = in.MaxRunHistory
+	automation.RunTimeoutSeconds = in.RunTimeoutSeconds
 
 	// BR-AT-10/BR-AT-04 — reject a create that would introduce a cycle in
 	// the event-triggered automation graph. Only meaningful for

@@ -8,19 +8,20 @@ import (
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
 )
 
-// actionToEvents is the fixed, closed mapping from an action's StepType to
-// the event(s) it could emit — mirrors EventName's closed set. Modeled on
-// workflow-service's BuildWaves/ErrCyclicDependency precedent (BR-AT-10).
+// actionToEvents is the fixed, closed mapping from an action's
+// AutomationActionType to the event(s) it could emit — mirrors EventName's
+// closed set. Modeled on workflow-service's BuildWaves/ErrCyclicDependency
+// precedent (BR-AT-10).
 //
-// Only StepTypeAgent maps to a real event today (agent:completed/
-// agent:error) — this service's StepType set is the closed 5-value one
-// (agent/shell/notification/webhook/condition; see domain/automation.go).
-// worktree:created/pr:merged/issue:assigned have no corresponding StepType
-// in that set yet (a dedicated create-worktree/create-pr step type doesn't
-// exist), so they add no edges — the same "commit/notify/cleanup emit none
-// of the 5 documented events" case SOL-AT-03 already calls out.
-var actionToEvents = map[domain.StepType][]domain.EventName{
-	domain.StepTypeAgent: {domain.EventAgentCompleted, domain.EventAgentError},
+// Only RunAgent and CreateWorktree map to a real event today — the other
+// action types (CommitPush/CreatePR/SendNotification/RunScript) have no
+// corresponding EventName in the closed 5-value set (SOL-AT-03): CreatePR's
+// natural counterpart would be a PR-created event, not EventPRMerged (a
+// different, externally-triggered lifecycle point), so it adds no edges,
+// same as commit/notify/run_script.
+var actionToEvents = map[domain.AutomationActionType][]domain.EventName{
+	domain.AutomationActionTypeRunAgent:       {domain.EventAgentCompleted, domain.EventAgentError},
+	domain.AutomationActionTypeCreateWorktree: {domain.EventWorktreeCreated},
 }
 
 // DetectTriggerCycle builds a directed graph over tenantID's event-triggered
@@ -45,7 +46,7 @@ func DetectTriggerCycle(ctx context.Context, repo AutomationRepository, tenantID
 	}
 	for _, a := range nodes {
 		for _, action := range a.Actions {
-			for _, ev := range actionToEvents[action.StepType] {
+			for _, ev := range actionToEvents[action.Type] {
 				graph[a.ID] = append(graph[a.ID], byEvent[ev]...)
 			}
 		}

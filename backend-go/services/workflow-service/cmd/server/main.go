@@ -163,6 +163,8 @@ func run() error {
 	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient, resolver, provider, profileResolver, projectContextResolver))
 	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient, resolver))
 	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient, resolver))
+	// CR-AUTO-003/TASK-BE-AUTO-005
+	registry.Register(domain.StepTypeCommitPush, infrafleetclient.NewGitCommitPushExecutor(infraFleetClient))
 	registry.Register(domain.StepTypeAction, stepexecutors.NewActionExecutor())
 	// Two-phase init: ParallelExecutor needs a reference back to the SAME
 	// registry it's about to be registered into (to recursively resolve
@@ -226,7 +228,7 @@ func run() error {
 		return fmt.Errorf("recovering in-flight workflow executions: %w", err)
 	}
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	workflowv1.RegisterWorkflowServiceServer(grpcServer, workflowgrpc.New(
 		createTemplateUC, executeUC, getExecutionUC, pauseExecutionUC, resumeExecutionUC, executeAdHocStepUC, hasActiveExecutionsUC,
 		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC, cloneTemplateUC,

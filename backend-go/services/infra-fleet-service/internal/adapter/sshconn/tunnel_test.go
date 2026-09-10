@@ -11,11 +11,11 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
-// startEchoServer starts a minimal local TCP echo listener — the "remote"
+// startTunnelEchoServer starts a minimal local TCP echo listener — the "remote"
 // service the tunnel forwards to (dialed via the fake SSH server's
 // direct-tcpip channel support, itself a real proxy — see connector_test.go's
 // handleDirectTCPIP).
-func startEchoServer(t *testing.T) int {
+func startTunnelEchoServer(t *testing.T) int {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -61,11 +61,11 @@ func mustPort(t *testing.T, addr string) int {
 	return port
 }
 
-// freeLocalPort finds an OS-assigned free port by briefly binding then
+// freeTunnelLocalPort finds an OS-assigned free port by briefly binding then
 // releasing it — Tunnel's local listener rebinds this exact port a moment
 // later. Small TOCTOU window, acceptable for tests (same pattern
 // portalloc.Allocator's own probe-then-bind uses in production).
-func freeLocalPort(t *testing.T) (int, string) {
+func freeTunnelLocalPort(t *testing.T) (int, string) {
 	t.Helper()
 	ln, err := net.Listen("tcp", "127.0.0.1:0")
 	if err != nil {
@@ -97,12 +97,12 @@ func dialFakeSSHTarget(t *testing.T, ca *fakeCA, server *fakeSSHServer, targetID
 func TestTunnel_ForwardsBytesRoundTrip(t *testing.T) {
 	ca := newFakeCA(t)
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
-	echoPort := startEchoServer(t)
+	echoPort := startTunnelEchoServer(t)
 
 	conn := dialFakeSSHTarget(t, ca, server, "target-tunnel-1")
 	defer func() { _ = conn.Close() }()
 
-	localPort, localAddr := freeLocalPort(t)
+	localPort, localAddr := freeTunnelLocalPort(t)
 	tunnel, err := conn.Forward(localPort, echoPort)
 	if err != nil {
 		t.Fatalf("Forward: %v", err)
@@ -132,12 +132,12 @@ func TestTunnel_ForwardsBytesRoundTrip(t *testing.T) {
 func TestTunnel_CloseStopsAcceptingNewConnections(t *testing.T) {
 	ca := newFakeCA(t)
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
-	echoPort := startEchoServer(t)
+	echoPort := startTunnelEchoServer(t)
 
 	conn := dialFakeSSHTarget(t, ca, server, "target-tunnel-2")
 	defer func() { _ = conn.Close() }()
 
-	localPort, localAddr := freeLocalPort(t)
+	localPort, localAddr := freeTunnelLocalPort(t)
 	tunnel, err := conn.Forward(localPort, echoPort)
 	if err != nil {
 		t.Fatalf("Forward: %v", err)
@@ -159,12 +159,12 @@ func TestTunnel_CloseStopsAcceptingNewConnections(t *testing.T) {
 func TestTunnel_ClosesInFlightCopiesWithoutLeaking(t *testing.T) {
 	ca := newFakeCA(t)
 	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy")
-	echoPort := startEchoServer(t)
+	echoPort := startTunnelEchoServer(t)
 
 	conn := dialFakeSSHTarget(t, ca, server, "target-tunnel-3")
 	defer func() { _ = conn.Close() }()
 
-	localPort, localAddr := freeLocalPort(t)
+	localPort, localAddr := freeTunnelLocalPort(t)
 	tunnel, err := conn.Forward(localPort, echoPort)
 	if err != nil {
 		t.Fatalf("Forward: %v", err)

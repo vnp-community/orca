@@ -34,6 +34,11 @@ const (
 	StepType_STEP_TYPE_CLEANUP_WORKTREES StepType = 6 // BL-AT-04
 	StepType_STEP_TYPE_ACTION            StepType = 7
 	StepType_STEP_TYPE_PARALLEL          StepType = 8
+	// STEP_TYPE_COMMIT_PUSH — CR-AUTO-003/TASK-BE-AUTO-005. automation-service's
+	// AutomationAction "commit_push" dispatches here via ExecuteAdHocStep, the
+	// same cross-service call every other automation action step type uses —
+	// see infrafleetclient.GitCommitPushExecutor.
+	StepType_STEP_TYPE_COMMIT_PUSH StepType = 9
 )
 
 // Enum value maps for StepType.
@@ -48,6 +53,7 @@ var (
 		6: "STEP_TYPE_CLEANUP_WORKTREES",
 		7: "STEP_TYPE_ACTION",
 		8: "STEP_TYPE_PARALLEL",
+		9: "STEP_TYPE_COMMIT_PUSH",
 	}
 	StepType_value = map[string]int32{
 		"STEP_TYPE_UNSPECIFIED":       0,
@@ -59,6 +65,7 @@ var (
 		"STEP_TYPE_CLEANUP_WORKTREES": 6,
 		"STEP_TYPE_ACTION":            7,
 		"STEP_TYPE_PARALLEL":          8,
+		"STEP_TYPE_COMMIT_PUSH":       9,
 	}
 )
 
@@ -2745,7 +2752,7 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\x14RateTemplateResponse\x12\x1d\n" +
 	"\n" +
 	"rating_sum\x18\x01 \x01(\x05R\tratingSum\x12!\n" +
-	"\frating_count\x18\x02 \x01(\x05R\vratingCount*\xea\x01\n" +
+	"\frating_count\x18\x02 \x01(\x05R\vratingCount*\x85\x02\n" +
 	"\bStepType\x12\x19\n" +
 	"\x15STEP_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fSTEP_TYPE_AGENT\x10\x01\x12\x13\n" +
@@ -2755,7 +2762,8 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\x13STEP_TYPE_CONDITION\x10\x05\x12\x1f\n" +
 	"\x1bSTEP_TYPE_CLEANUP_WORKTREES\x10\x06\x12\x14\n" +
 	"\x10STEP_TYPE_ACTION\x10\a\x12\x16\n" +
-	"\x12STEP_TYPE_PARALLEL\x10\b2\x92\x10\n" +
+	"\x12STEP_TYPE_PARALLEL\x10\b\x12\x19\n" +
+	"\x15STEP_TYPE_COMMIT_PUSH\x10\t2\x92\x10\n" +
 	"\x0fWorkflowService\x12c\n" +
 	"\x0eCreateTemplate\x12'.orca.workflow.v1.CreateTemplateRequest\x1a(.orca.workflow.v1.CreateTemplateResponse\x12c\n" +
 	"\x0eUpdateTemplate\x12'.orca.workflow.v1.UpdateTemplateRequest\x1a(.orca.workflow.v1.UpdateTemplateResponse\x12N\n" +

@@ -50,6 +50,7 @@ type fakeAutomationServiceClient struct {
 	handleExternalTriggerErr     error
 	lastHandleExternalTriggerReq *automationv1.HandleExternalTriggerRequest
 
+	// TASK-BE-AUTO-012
 	listAutomationsResp    *automationv1.ListAutomationsResponse
 	listAutomationsErr     error
 	lastListAutomationsReq *automationv1.ListAutomationsRequest
@@ -100,6 +101,7 @@ func (f *fakeAutomationServiceClient) HandleExternalTrigger(ctx context.Context,
 	return f.handleExternalTriggerResp, nil
 }
 
+// TASK-BE-AUTO-012
 func (f *fakeAutomationServiceClient) ListAutomations(ctx context.Context, in *automationv1.ListAutomationsRequest, _ ...grpc.CallOption) (*automationv1.ListAutomationsResponse, error) {
 	f.lastCtx = ctx
 	f.lastListAutomationsReq = in
@@ -296,6 +298,8 @@ func TestHandleHandleExternalTrigger_SuccessRoundTrip(t *testing.T) {
 	}
 }
 
+// TASK-BE-AUTO-012
+
 func TestHandleListAutomations_SuccessRoundTrip(t *testing.T) {
 	client := &fakeAutomationServiceClient{
 		listAutomationsResp: &automationv1.ListAutomationsResponse{
@@ -307,15 +311,29 @@ func TestHandleListAutomations_SuccessRoundTrip(t *testing.T) {
 	}
 	router := testAutomationRouter(client)
 
-	req := requestWithIdentity(http.MethodGet, "/v1/automations/?page_size=10", nil, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+	req := requestWithIdentity(http.MethodGet, "/v1/automations/?page_size=10&page_token=abc", nil, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
-	if client.lastListAutomationsReq == nil || client.lastListAutomationsReq.TenantId != "tenant-1" || client.lastListAutomationsReq.PageSize != 10 {
+	if client.lastListAutomationsReq == nil {
+		t.Fatal("expected ListAutomations to be called")
+	}
+	if client.lastListAutomationsReq.TenantId != "tenant-1" {
+		t.Fatalf("TenantId = %q, want %q (must come from identity, not query param)", client.lastListAutomationsReq.TenantId, "tenant-1")
+	}
+	if client.lastListAutomationsReq.PageSize != 10 || client.lastListAutomationsReq.PageToken != "abc" {
 		t.Fatalf("unexpected ListAutomations request: %+v", client.lastListAutomationsReq)
+	}
+
+	var got automationv1.ListAutomationsResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("unmarshal response: %v; body=%s", err, rec.Body.String())
+	}
+	if len(got.Automations) != 1 || got.Automations[0].Id != "auto-1" {
+		t.Fatalf("unexpected response body: %+v", &got)
 	}
 }
 
@@ -327,8 +345,12 @@ func TestHandleUpdateAutomation_PartialEditOnlySetsProvidedFields(t *testing.T) 
 	}
 	router := testAutomationRouter(client)
 
-	body, _ := json.Marshal(map[string]any{"enabled": false})
-	req := requestWithIdentity(http.MethodPatch, "/v1/automations/auto-1", body, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+	// Only "enabled" is present — every other field must arrive as a nil
+	// wrapper (== "no change"), not an empty StringValue (== "clear this
+	// field"). This is the whole reason UpdateAutomationRequest uses
+	// wrapper types instead of full-replace semantics.
+	rawBody := []byte(`{"enabled":false}`)
+	req := requestWithIdentity(http.MethodPatch, "/v1/automations/auto-1", rawBody, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
 	rec := httptest.NewRecorder()
 	router.ServeHTTP(rec, req)
 
@@ -339,17 +361,44 @@ func TestHandleUpdateAutomation_PartialEditOnlySetsProvidedFields(t *testing.T) 
 		t.Fatal("expected UpdateAutomation to be called")
 	}
 	if client.lastUpdateAutomationReq.Id != "auto-1" || client.lastUpdateAutomationReq.TenantId != "tenant-1" {
-		t.Fatalf("unexpected id/tenant on UpdateAutomation request: %+v", client.lastUpdateAutomationReq)
+		t.Fatalf("unexpected id/tenant: %+v", client.lastUpdateAutomationReq)
 	}
-	if client.lastUpdateAutomationReq.Enabled == nil || client.lastUpdateAutomationReq.Enabled.Value != false {
+	if client.lastUpdateAutomationReq.Enabled == nil || client.lastUpdateAutomationReq.Enabled.GetValue() != false {
 		t.Fatalf("Enabled = %v, want wrapped false", client.lastUpdateAutomationReq.Enabled)
 	}
 	if client.lastUpdateAutomationReq.Name != nil {
-		t.Fatalf("Name = %v, want nil (not present in request body)", client.lastUpdateAutomationReq.Name)
+		t.Fatalf("Name = %v, want nil (field not present in request body)", client.lastUpdateAutomationReq.Name)
+	}
+	if client.lastUpdateAutomationReq.Rrule != nil {
+		t.Fatalf("Rrule = %v, want nil (field not present in request body)", client.lastUpdateAutomationReq.Rrule)
 	}
 }
 
-func TestHandleDeleteAutomation_SuccessRoundTrip(t *testing.T) {
+func TestHandleUpdateAutomation_SetsStepTypeWhenProvided(t *testing.T) {
+	client := &fakeAutomationServiceClient{
+		updateAutomationResp: &automationv1.UpdateAutomationResponse{
+			Automation: &automationv1.Automation{Id: "auto-1"},
+		},
+	}
+	router := testAutomationRouter(client)
+
+	body, _ := json.Marshal(updateAutomationRequestBody{Name: strPtr("renamed"), StepType: strPtr("shell")})
+	req := requestWithIdentity(http.MethodPatch, "/v1/automations/auto-1", body, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if client.lastUpdateAutomationReq.Name == nil || client.lastUpdateAutomationReq.Name.GetValue() != "renamed" {
+		t.Fatalf("Name = %v, want wrapped %q", client.lastUpdateAutomationReq.Name, "renamed")
+	}
+	if client.lastUpdateAutomationReq.StepType != workflowv1.StepType_STEP_TYPE_SHELL {
+		t.Fatalf("StepType = %v, want %v", client.lastUpdateAutomationReq.StepType, workflowv1.StepType_STEP_TYPE_SHELL)
+	}
+}
+
+func TestHandleDeleteAutomation_SuccessReturnsNoContent(t *testing.T) {
 	client := &fakeAutomationServiceClient{}
 	router := testAutomationRouter(client)
 
@@ -379,3 +428,5 @@ func TestHandleDeleteAutomation_GRPCErrorMapsToHTTPStatus(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusNotFound, rec.Body.String())
 	}
 }
+
+func strPtr(s string) *string { return &s }

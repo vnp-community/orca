@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -32,6 +33,7 @@ import (
 
 	automationeventbus "github.com/stablyai/orca-go/services/automation-service/internal/adapter/eventbus"
 	automationgrpc "github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpc/interceptors"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpcclient"
 	automationpostgres "github.com/stablyai/orca-go/services/automation-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/scheduler"
@@ -88,15 +90,28 @@ func run() error {
 	// deploys terminate mTLS via the service mesh sidecar, per
 	// architecture/07-security-architecture.md, not a disabled-security
 	// choice made in application code.
-	workflowConn, err := grpc.NewClient(cfg.WorkflowServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	workflowConn, err := grpc.NewClient(cfg.WorkflowServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing workflow-service at %s: %w", cfg.WorkflowServiceAddr, err)
 	}
 	defer func() { _ = workflowConn.Close() }()
 	workflowExecutor := grpcclient.New(workflowConn)
 
+	// CR-AUTO-003/TASK-BE-AUTO-006 + TASK-BE-AUTO-004's rewire: RunNow now
+	// dispatches through ExecuteAutomationChain internally (see
+	// usecase.NewRunNow's doc comment), so create_pr action dispatch needs
+	// a real PullRequestCreator here — same insecure-transport-credentials
+	// local-dev/scaffold convention as workflowConn above (production
+	// terminates mTLS via the service mesh sidecar).
+	scmConn, err := grpc.NewClient(cfg.ScmIntegrationServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	if err != nil {
+		return fmt.Errorf("dialing scm-integration-service at %s: %w", cfg.ScmIntegrationServiceAddr, err)
+	}
+	defer func() { _ = scmConn.Close() }()
+	pullRequestCreator := grpcclient.NewScmClient(scmConn)
+
 	createAutomationUC := usecase.NewCreateAutomation(automationRepo)
-	runNowUC := usecase.NewRunNow(automationRepo, runRepo, workflowExecutor)
+	runNowUC := usecase.NewRunNow(automationRepo, runRepo, workflowExecutor, usecase.WithPullRequestCreator(pullRequestCreator))
 	listRunsUC := usecase.NewListRuns(runRepo)
 	handleExternalTriggerUC := usecase.NewHandleExternalTrigger(runNowUC)
 	listAutomationsUC := usecase.NewListAutomations(automationRepo)
@@ -105,7 +120,17 @@ func run() error {
 	writeCleanupReportUC := usecase.NewWriteCleanupReport(runRepo)
 	handleEventTriggerUC := usecase.NewHandleEventTrigger(automationRepo, runNowUC, logger)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	// TASK-BE-AUTO-008: a second ChainUnaryInterceptor option composes with
+	// grpcmw.ChainUnary's (grpc-go appends chainUnaryInts across multiple
+	// options, executed in registration order) — this stays
+	// automation-service-local, not a common/grpcmw change, matching
+	// credential-broker-service's precedent of not extending the shared
+	// interceptor stack for a single service's own gate.
+	grpcServer := grpc.NewServer(
+		grpcmw.ChainUnary(logger),
+		grpc.ChainUnaryInterceptor(interceptors.RequireTenantForExternalTrigger()),
+		grpcmw.StatsHandler(),
+	)
 	automationv1.RegisterAutomationServiceServer(grpcServer, automationgrpc.New(
 		createAutomationUC, runNowUC, listRunsUC, handleExternalTriggerUC,
 		listAutomationsUC, updateAutomationUC, deleteAutomationUC, writeCleanupReportUC,

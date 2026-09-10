@@ -60,6 +60,14 @@ func (f *fakeAutomationRepository) ListEventTriggered(ctx context.Context, tenan
 	return nil, nil
 }
 
+func (f *fakeAutomationRepository) AcquireRunLock(ctx context.Context, tenantID, automationID, runID string, ttl time.Duration) (bool, error) {
+	return true, nil
+}
+
+func (f *fakeAutomationRepository) ReleaseRunLock(ctx context.Context, tenantID, automationID, runID string) error {
+	return nil
+}
+
 type fakeAutomationRunRepository struct {
 	byID map[string]domain.AutomationRun
 }
@@ -101,6 +109,10 @@ func (f *fakeAutomationRunRepository) PruneOldRuns(ctx context.Context, tenantID
 }
 
 func (f *fakeAutomationRunRepository) WriteCleanupReport(ctx context.Context, tenantID, runID string, entries []domain.CleanupLogEntry) error {
+	return nil
+}
+
+func (f *fakeAutomationRunRepository) PruneRuns(ctx context.Context, tenantID, automationID string, maxRuns int32) error {
 	return nil
 }
 

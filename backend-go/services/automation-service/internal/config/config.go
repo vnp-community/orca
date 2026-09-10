@@ -29,6 +29,11 @@ type Config struct {
 	// — the cross-service call RunNow exists to make, see
 	// specs/backend-go/services/automation-service.md §2/§7.
 	WorkflowServiceAddr string
+	// ScmIntegrationServiceAddr is the gRPC address of scm-integration-service,
+	// dialed by internal/adapter/grpcclient.ScmClient (usecase.PullRequestCreator)
+	// — CR-AUTO-003/TASK-BE-AUTO-006, same dedicated-field convention as
+	// WorkflowServiceAddr rather than api-gateway's OtherServiceAddrs map.
+	ScmIntegrationServiceAddr string
 	// SchedulerInterval is how often internal/adapter/scheduler's ticker
 	// loop checks for due automations.
 	SchedulerInterval time.Duration
@@ -57,9 +62,15 @@ func Load() (Config, error) {
 	return Config{
 		Base:                base,
 		WorkflowServiceAddr: commonconfig.StringEnv("WORKFLOW_SERVICE_ADDR", "localhost:9091"),
-		SchedulerInterval:   interval,
-		SchedulerBatchSize:  batchSize,
-		NATSURL:             commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		// "localhost:9092" is a local-dev placeholder only (no docker-compose
+		// entry or documented port for scm-integration-service exists yet to
+		// confirm against) — every real deployment must set
+		// SCM_INTEGRATION_SERVICE_ADDR explicitly, same as api-gateway's own
+		// config does (no default there at all).
+		ScmIntegrationServiceAddr: commonconfig.StringEnv("SCM_INTEGRATION_SERVICE_ADDR", "localhost:9092"),
+		SchedulerInterval:         interval,
+		SchedulerBatchSize:        batchSize,
+		NATSURL:                   commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }
 

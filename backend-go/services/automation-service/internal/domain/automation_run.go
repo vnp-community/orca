@@ -70,17 +70,6 @@ var (
 	ErrInvalidTransition = errors.New("domain: invalid automation run status transition")
 )
 
-// ActionResult is the outcome of one action in an automation's chain —
-// SOL-AT-01's per-action result schema, recorded so a multi-action run's
-// history shows which step(s) succeeded/failed, not just the run's overall
-// terminal status.
-type ActionResult struct {
-	Index        int
-	Status       string // "succeeded" | "failed"
-	OutputJSON   string
-	ErrorMessage string
-}
-
 // AutomationRun is one dispatch of an Automation — bookkeeping only. The
 // actual step execution happens on workflow-service's side; this record
 // tracks the outcome workflow-service reported back synchronously.
@@ -99,10 +88,14 @@ type AutomationRun struct {
 	StepConfigJSON string
 	OutputJSON     string
 	ErrorMessage   string
-	ActionResults  []ActionResult
 	CreatedAt      time.Time
 	StartedAt      time.Time
 	CompletedAt    time.Time
+	// ActionResults — CR-AUTO-002/TASK-BE-AUTO-003. Per-action outcome, set
+	// directly by the usecase layer as ExecuteAutomationChain dispatches
+	// each action (TASK-BE-AUTO-004) — mirrors Automation.Actions'
+	// post-construction-assignment convention.
+	ActionResults []ActionResult
 }
 
 // NewPendingRun constructs a freshly-created AutomationRun in the Pending

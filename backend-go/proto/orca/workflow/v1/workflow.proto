@@ -95,6 +95,11 @@ enum StepType {
   STEP_TYPE_CLEANUP_WORKTREES = 6; // BL-AT-04
   STEP_TYPE_ACTION = 7;
   STEP_TYPE_PARALLEL = 8;
+  // STEP_TYPE_COMMIT_PUSH — CR-AUTO-003/TASK-BE-AUTO-005. automation-service's
+  // AutomationAction "commit_push" dispatches here via ExecuteAdHocStep, the
+  // same cross-service call every other automation action step type uses —
+  // see infrafleetclient.GitCommitPushExecutor.
+  STEP_TYPE_COMMIT_PUSH = 9;
 }
 
 message WorkflowTemplate {
