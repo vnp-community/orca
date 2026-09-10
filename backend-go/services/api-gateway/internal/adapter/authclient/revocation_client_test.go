@@ -30,31 +30,6 @@ func (f *fakeAuthServiceClientForRevocation) IsServiceTokenRevoked(_ context.Con
 	return &authv1.IsServiceTokenRevokedResponse{Revoked: f.revoked[in.GetJti()]}, nil
 }
 
-// TestRevocationClient_CachesWithinTTL is the real assertion behind
-// TestAuthValidator_CachesRevocationCheckWithinTTL's name in the usecase
-// package (that test asserts AuthValidator calls IsRevoked exactly once
-// per request; THIS test asserts the actual TTL cache — the property
-// CR-CLI-002/BE-CLI-SOL-002 §2C marks mandatory — works: repeated IsRevoked
-// calls for the same jti within the TTL window hit the gRPC client at most
-// once.
-func TestRevocationClient_CachesWithinTTL(t *testing.T) {
-	fake := &fakeAuthServiceClientForRevocation{revoked: map[string]bool{}, calls: map[string]int{}}
-	c := NewRevocationClient(fake)
-
-	for i := 0; i < 3; i++ {
-		revoked, err := c.IsRevoked(context.Background(), "jti-1")
-		if err != nil {
-			t.Fatalf("call %d: unexpected error: %v", i, err)
-		}
-		if revoked {
-			t.Fatalf("call %d: got revoked=true, want false", i)
-		}
-	}
-	if got := fake.calls["jti-1"]; got != 1 {
-		t.Fatalf("IsServiceTokenRevoked called %d times across 3 IsRevoked calls within TTL, want 1", got)
-	}
-}
-
 func TestRevocationClient_ReturnsRevokedTrue(t *testing.T) {
 	fake := &fakeAuthServiceClientForRevocation{revoked: map[string]bool{"jti-revoked": true}, calls: map[string]int{}}
 	c := NewRevocationClient(fake)

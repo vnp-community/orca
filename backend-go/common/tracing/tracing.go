@@ -25,7 +25,6 @@ import (
 // cmd/server/main.go.
 type Shutdown func(context.Context) error
 
-<<<<<<< HEAD
 // Option configures Init beyond its required serviceName/otlpEndpoint args.
 type Option func(*initConfig)
 
@@ -44,25 +43,6 @@ type initConfig struct {
 // posture in this scaffold.
 func WithTraceEventPublisher(pub *eventbus.Publisher) Option {
 	return func(c *initConfig) { c.eventPublisher = pub }
-=======
-// Option configures optional Init behavior beyond the exporter — see
-// WithTraceEventPublisher. Omitting every Option keeps the existing 17
-// call sites' exporter-only behavior unchanged.
-type Option func(*initOptions)
-
-type initOptions struct {
-	tracePublisher *eventbus.Publisher
-}
-
-// WithTraceEventPublisher wires the CR-FFT-002 trace-event bridge: every
-// span this service creates is also published as a TraceEvent (see
-// trace_event.go) onto NATS via TraceEventSpanProcessor. Only the 6
-// services already NATS-connected pass this (CR-FFT-002's deliberately
-// limited rollout, not a general convention) — every other call site
-// keeps calling Init with no options.
-func WithTraceEventPublisher(pub *eventbus.Publisher) Option {
-	return func(o *initOptions) { o.tracePublisher = pub }
->>>>>>> feat/team-rbac-implementation
 }
 
 // Init installs a TracerProvider tagged with the service name. When
@@ -73,15 +53,9 @@ func WithTraceEventPublisher(pub *eventbus.Publisher) Option {
 // otlptracegrpc.New only opens the client; it doesn't dial eagerly, so a
 // service still starts cleanly even if the collector is briefly unreachable.
 func Init(ctx context.Context, serviceName, otlpEndpoint string, opts ...Option) (Shutdown, error) {
-<<<<<<< HEAD
 	cfg := initConfig{serviceName: serviceName}
 	for _, opt := range opts {
 		opt(&cfg)
-=======
-	var o initOptions
-	for _, opt := range opts {
-		opt(&o)
->>>>>>> feat/team-rbac-implementation
 	}
 
 	res, err := resource.New(ctx, resource.WithAttributes(
@@ -103,21 +77,15 @@ func Init(ctx context.Context, serviceName, otlpEndpoint string, opts ...Option)
 		}
 		tpOpts = append(tpOpts, sdktrace.WithBatcher(exporter))
 	}
-<<<<<<< HEAD
 	if cfg.eventPublisher != nil {
 		tpOpts = append(tpOpts, sdktrace.WithSpanProcessor(newEventPublishingProcessor(cfg.eventPublisher, serviceName)))
-=======
-	if o.tracePublisher != nil {
-		tpOpts = append(tpOpts, sdktrace.WithSpanProcessor(
-			NewTraceEventSpanProcessor(serviceName, o.tracePublisher)))
->>>>>>> feat/team-rbac-implementation
 	}
 
 	tp := sdktrace.NewTracerProvider(tpOpts...)
 	otel.SetTracerProvider(tp)
 	// Without this, the default no-op propagator never writes/reads the W3C
 	// traceparent header, so spans never link across a gRPC hop even though
-	// each service creates one (CR-FFT-001).
+	// each service creates one (CR-FFT-001/TASK-BE-FFT-002).
 	otel.SetTextMapPropagator(propagation.TraceContext{})
 
 	return func(ctx context.Context) error {

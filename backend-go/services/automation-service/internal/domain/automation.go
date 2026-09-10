@@ -24,13 +24,10 @@ const (
 	StepTypeNotification StepType = "notification"
 	StepTypeWebhook      StepType = "webhook"
 	StepTypeCondition    StepType = "condition"
-<<<<<<< HEAD
 	// StepTypeCleanupWorktrees lets an automation dispatch BL-AT-04's bulk
 	// worktree-cleanup step on a schedule — mirrors
 	// workflow-service.domain.StepTypeCleanupWorktrees.
 	StepTypeCleanupWorktrees StepType = "cleanup_worktrees"
-=======
->>>>>>> feat/team-rbac-implementation
 	// StepTypeCommitPush — CR-AUTO-003/TASK-BE-AUTO-005. See
 	// workflow-service's domain.StepTypeCommitPush (this const is the same
 	// duplication-not-import convention this whole block's doc comment
@@ -40,11 +37,7 @@ const (
 
 func (s StepType) Valid() bool {
 	switch s {
-<<<<<<< HEAD
 	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition, StepTypeCleanupWorktrees, StepTypeCommitPush:
-=======
-	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition, StepTypeCommitPush:
->>>>>>> feat/team-rbac-implementation
 		return true
 	default:
 		return false
@@ -172,7 +165,6 @@ type ActionResult struct {
 	Status     string // running|completed|failed|skipped
 	OutputJSON string
 	Error      string
-<<<<<<< HEAD
 }
 
 // NewAutomationParams bundles NewAutomation's inputs. A params struct
@@ -198,8 +190,6 @@ type NewAutomationParams struct {
 	TriggerType    TriggerType // optional; empty = TriggerTypeCron
 	TriggerEvent   EventName   // required (one of the 5 documented names) iff TriggerType == TriggerTypeEvent
 	TriggerFilter  *TriggerFilter
-=======
->>>>>>> feat/team-rbac-implementation
 }
 
 // NewAutomation constructs an Automation, enforcing the invariants a

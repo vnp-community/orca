@@ -7,18 +7,12 @@ require (
 	github.com/jackc/pgx/v5 v5.10.0
 	github.com/stablyai/orca-go/common v0.0.0
 	github.com/stablyai/orca-go/proto v0.0.0
-<<<<<<< HEAD
 	golang.org/x/crypto v0.55.0
-=======
-	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.69.0
-	golang.org/x/oauth2 v0.36.0
->>>>>>> feat/team-rbac-implementation
 	google.golang.org/grpc v1.83.0
 	google.golang.org/protobuf v1.36.12
 )
 
 require (
-	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	dario.cat/mergo v1.0.2 // indirect
 	github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c // indirect
 	github.com/Microsoft/go-winio v0.6.2 // indirect

@@ -85,19 +85,9 @@ type Deps struct {
 	// Agent has no user session cookie to present. Nil is valid — the
 	// routes are simply not mounted (see Config.InfraFleetHTTPAddr).
 	AgentProxyHandler http.Handler
-<<<<<<< HEAD
 	// TraceBroadcast feeds /api/trace-stream real backend spans (see
 	// trace_routes.go's doc comment) — nil is valid (NewRouter falls back
 	// to an empty hub), matching every other optional Deps field's posture.
-=======
-	// TraceBroadcast feeds mountTraceRoutes' real event forwarding
-	// (TASK-BE-FFT-010) — main.go (TASK-BE-FFT-011) constructs one via
-	// NewTraceBroadcast, feeds it from a NATS SubscribeEphemeral loop, and
-	// sets this field before calling NewRouter. Nil is valid (e.g. a test
-	// harness, or before TASK-BE-FFT-011 lands): NewRouter falls back to a
-	// standalone instance so /api/trace-stream still connects and
-	// heartbeats correctly, it just never receives real events.
->>>>>>> feat/team-rbac-implementation
 	TraceBroadcast *TraceBroadcast
 }
 
@@ -123,15 +113,7 @@ func NewRouter(deps Deps) http.Handler {
 		loginRateLimiter := usecase.NewRateLimiter(10.0/60.0, 10)
 		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator, loginRateLimiter, deps.SsoConfig)
 	}
-<<<<<<< HEAD
 	mountTraceRoutes(r, deps.TraceBroadcast)
-=======
-	traceBroadcast := deps.TraceBroadcast
-	if traceBroadcast == nil {
-		traceBroadcast = NewTraceBroadcast()
-	}
-	mountTraceRoutes(r, traceBroadcast)
->>>>>>> feat/team-rbac-implementation
 	// mountPushRoutes is unauthenticated by design (see its doc comment) —
 	// mounted here, outside the authed group below, never moved inside it.
 	if deps.NotificationClient != nil {
@@ -173,11 +155,7 @@ func NewRouter(deps Deps) http.Handler {
 		if deps.AuthClient != nil {
 			mountAuthAdminRoutes(authed, deps.AuthClient)
 			mountAdminRoutes(authed, deps.AuthClient)
-<<<<<<< HEAD
 			mountPairingRoutes(authed, deps.AuthClient)
-=======
-			mountCliTokenRoutes(authed, deps.AuthClient) // MỚI — CR-CLI-002/TASK-BE-CLI-003
->>>>>>> feat/team-rbac-implementation
 		}
 		if deps.AnnotationClient != nil {
 			mountAnnotationRoutes(authed, deps.AnnotationClient, deps.GitGatewayClient)

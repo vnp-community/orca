@@ -160,7 +160,6 @@ func run() error {
 	registry := stepexecutors.NewRegistry()
 	registry.Register(domain.StepTypeCondition, stepexecutors.NewConditionExecutor())
 	registry.Register(domain.StepTypeWebhook, stepexecutors.NewWebhookExecutor(cfg.WebhookAllowlistHosts, &http.Client{Timeout: 30 * time.Second}))
-<<<<<<< HEAD
 	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient, resolver, provider, profileResolver, projectContextResolver))
 	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient, resolver))
 	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient, resolver))
@@ -195,13 +194,6 @@ func run() error {
 	gitGatewayClient := serviceclients.NewGitGatewayClient(gitgatewayv1.NewGitGatewayServiceClient(gitGatewayConn))
 	cleanupAuditClient := serviceclients.NewCleanupAuditClient(automationv1.NewAutomationServiceClient(automationConn))
 	registry.Register(domain.StepTypeCleanupWorktrees, usecase.NewCleanupWorktreesStepExecutor(cleanupProjectClient, gitGatewayClient, cleanupAuditClient))
-=======
-	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient))
-	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient))
-	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient))
-	// CR-AUTO-003/TASK-BE-AUTO-005
-	registry.Register(domain.StepTypeCommitPush, infrafleetclient.NewGitCommitPushExecutor(infraFleetClient))
->>>>>>> feat/team-rbac-implementation
 
 	createTemplateUC := usecase.NewCreateTemplate(repo)
 	executeUC := usecase.NewExecute(repo, repo, repo, registry)

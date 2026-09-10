@@ -228,13 +228,9 @@ func (c *Connector) buildClientConfig(ctx context.Context, hop domain.SshTarget)
 
 // Connection wraps a live, authenticated SSH connection to one target.
 type Connection struct {
-<<<<<<< HEAD
 	client   *ssh.Client
 	closeCh  chan struct{}
 	closeOne sync.Once
-=======
-	client *ssh.Client
->>>>>>> feat/team-rbac-implementation
 	// forwardListeners — CR-EVM-008/TASK-BE-EVM-022. Closed by Close()
 	// alongside client, so a forward never outlives the connection it
 	// tunnels through.
@@ -316,10 +312,7 @@ func (conn *Connection) StartKeepAlive(ctx context.Context, interval time.Durati
 // Close closes the underlying SSH connection and stops any running
 // keepalive loop.
 func (conn *Connection) Close() error {
-<<<<<<< HEAD
 	conn.closeOne.Do(func() { close(conn.closeCh) })
-=======
->>>>>>> feat/team-rbac-implementation
 	for _, l := range conn.forwardListeners {
 		_ = l.Close()
 	}

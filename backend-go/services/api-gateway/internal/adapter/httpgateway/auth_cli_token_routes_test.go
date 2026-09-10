@@ -177,6 +177,27 @@ func (f *fakeCliTokenAuthServiceClient) UpdateSsoGroupMapping(ctx context.Contex
 func (f *fakeCliTokenAuthServiceClient) ListSsoGroupMapping(ctx context.Context, in *authv1.ListSsoGroupMappingRequest, opts ...grpc.CallOption) (*authv1.ListSsoGroupMappingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by this test")
 }
+func (f *fakeCliTokenAuthServiceClient) CompleteDevicePairing(ctx context.Context, in *authv1.CompleteDevicePairingRequest, opts ...grpc.CallOption) (*authv1.CompleteDevicePairingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+func (f *fakeCliTokenAuthServiceClient) ListSessions(ctx context.Context, in *authv1.ListSessionsRequest, opts ...grpc.CallOption) (*authv1.ListSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+func (f *fakeCliTokenAuthServiceClient) UpdateUser(ctx context.Context, in *authv1.UpdateUserRequest, opts ...grpc.CallOption) (*authv1.UpdateUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+func (f *fakeCliTokenAuthServiceClient) InitiateDevicePairing(ctx context.Context, in *authv1.InitiateDevicePairingRequest, opts ...grpc.CallOption) (*authv1.InitiateDevicePairingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+func (f *fakeCliTokenAuthServiceClient) ListPairedDevices(ctx context.Context, in *authv1.ListPairedDevicesRequest, opts ...grpc.CallOption) (*authv1.ListPairedDevicesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+func (f *fakeCliTokenAuthServiceClient) UnpairDevice(ctx context.Context, in *authv1.UnpairDeviceRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+func (f *fakeCliTokenAuthServiceClient) ResolveDeviceSharedSecret(ctx context.Context, in *authv1.ResolveDeviceSharedSecretRequest, opts ...grpc.CallOption) (*authv1.ResolveDeviceSharedSecretResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
 
 var _ authv1.AuthServiceClient = (*fakeCliTokenAuthServiceClient)(nil)
 

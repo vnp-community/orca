@@ -5,16 +5,13 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/jackc/pgx/v5/pgconn"
-
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
-// orderTracingTerraformRunner is a usecase.TerraformRunner that appends to a
-// shared trace on Apply — used only by
+// orderTracingTerraformRunner is a TerraformRunner that appends to a shared
+// trace on Apply — used only by
 // TestDeployFleetDefinition_ProvisionNotNil_CallsApplyTerraformPlanBeforeBulkProvisionFleet
-// to prove call ordering directly (not just indirectly via
-// ApplyTerraformPlanFails_DoesNotCallBulkProvisionFleet).
+// to prove call ordering directly.
 type orderTracingTerraformRunner struct {
 	trace      *[]string
 	outputJSON string
@@ -29,34 +26,34 @@ func (r *orderTracingTerraformRunner) Apply(ctx context.Context, controlDevServe
 	return r.outputJSON, nil
 }
 
-// orderTracingDevServerRepository wraps bulkFakeDevServerRepository's
-// Register with the same shared trace, for the same ordering test.
-type orderTracingDevServerRepository struct {
-	*bulkFakeDevServerRepository
+// orderTracingProvisioner wraps fakeProvisioner's Provision with the same
+// shared trace, for the same ordering test.
+type orderTracingProvisioner struct {
+	*fakeProvisioner
 	trace *[]string
 }
 
-func (r *orderTracingDevServerRepository) Register(ctx context.Context, ds domain.DevServer) (domain.DevServer, error) {
-	*r.trace = append(*r.trace, "register:"+ds.Host)
-	return r.bulkFakeDevServerRepository.Register(ctx, ds)
+func (p *orderTracingProvisioner) Provision(ctx context.Context, devServer domain.DevServer) (HandshakeInfo, bool, error) {
+	*p.trace = append(*p.trace, "provision:"+devServer.Host)
+	return p.fakeProvisioner.Provision(ctx, devServer)
 }
 
-func newDeployFleetDefinitionForTest(fleetRepo *fakeFleetDefinitionRepository, controlDevRepo *fakeDevServerRepository, runner *fakeTerraformRunner, sshRepo *bulkFakeSshTargetRepository, devRepo *bulkFakeDevServerRepository) *DeployFleetDefinition {
+func newDeployFleetDefinitionForTest(fleetRepo *fakeFleetDefinitionRepository, controlDevRepo *fakeDevServerRepository, runner *fakeTerraformRunner, sshRepo *fakeSshTargetRepository, devRepo *fakeDevServerRepository, provisioner *fakeProvisioner) *DeployFleetDefinition {
 	applyTerraformPlan := NewApplyTerraformPlan(controlDevRepo, runner)
-	bulkProvisionFleet := NewBulkProvisionFleet(NewCreateSshTarget(sshRepo), NewRegisterDevServer(devRepo), NewDeleteSshTarget(sshRepo))
-	return NewDeployFleetDefinition(fleetRepo, applyTerraformPlan, bulkProvisionFleet)
+	bulkProvisionFleet := NewBulkProvisionFleet(sshRepo, devRepo, provisioner)
+	return NewDeployFleetDefinition(fleetRepo, sshRepo, applyTerraformPlan, bulkProvisionFleet)
 }
 
 func TestDeployFleetDefinition_NotFound_ReturnsNotFoundError(t *testing.T) {
-	uc := newDeployFleetDefinitionForTest(&fakeFleetDefinitionRepository{}, &fakeDevServerRepository{}, &fakeTerraformRunner{}, &bulkFakeSshTargetRepository{}, &bulkFakeDevServerRepository{})
+	uc := newDeployFleetDefinitionForTest(&fakeFleetDefinitionRepository{}, &fakeDevServerRepository{}, &fakeTerraformRunner{}, &fakeSshTargetRepository{}, &fakeDevServerRepository{}, &fakeProvisioner{})
 	ctx := withTenant(context.Background(), "tenant-1")
-	_, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "unknown"}, nil)
+	_, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "unknown"})
 	if err == nil {
 		t.Fatal("expected a not-found error")
 	}
 }
 
-func TestDeployFleetDefinition_ProvisionNil_BehavesLikeBulkProvisionFleetDirectly(t *testing.T) {
+func TestDeployFleetDefinition_ProvisionNil_UpsertsThenBulkProvisions(t *testing.T) {
 	fleetRepo := &fakeFleetDefinitionRepository{byID: map[string]domain.FleetDefinition{
 		fleetDefKey("tenant-1", "def-1"): {
 			ID: "def-1", TenantID: "tenant-1", Name: "fleet-1",
@@ -64,20 +61,24 @@ func TestDeployFleetDefinition_ProvisionNil_BehavesLikeBulkProvisionFleetDirectl
 			Provision: nil,
 		},
 	}}
-	sshRepo := &bulkFakeSshTargetRepository{}
-	devRepo := &bulkFakeDevServerRepository{}
-	uc := newDeployFleetDefinitionForTest(fleetRepo, &fakeDevServerRepository{}, &fakeTerraformRunner{}, sshRepo, devRepo)
+	sshRepo := &fakeSshTargetRepository{}
+	devRepo := &fakeDevServerRepository{}
+	provisioner := &fakeProvisioner{}
+	uc := newDeployFleetDefinitionForTest(fleetRepo, &fakeDevServerRepository{}, &fakeTerraformRunner{}, sshRepo, devRepo, provisioner)
 
 	ctx := withTenant(context.Background(), "tenant-1")
-	result, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1"}, nil)
+	result, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result.Results) != 1 || result.Results[0].Status != "SUCCEEDED" || result.Results[0].Host != "h1" {
-		t.Fatalf("expected 1 SUCCEEDED result for h1, got %+v", result.Results)
+	if result.Success != 1 || len(result.Outcomes) != 1 || result.Outcomes[0].Host != "h1" {
+		t.Fatalf("expected 1 successful outcome for h1, got %+v", result)
+	}
+	if len(sshRepo.upserted) != 1 || sshRepo.upserted[0].Host != "h1" || sshRepo.upserted[0].Project != "fleetdef:def-1" {
+		t.Fatalf("expected h1 upserted with project fleetdef:def-1, got %+v", sshRepo.upserted)
 	}
 	if len(devRepo.registered) != 1 {
-		t.Errorf("expected exactly 1 dev server registered (the pre-existing one), got %d", len(devRepo.registered))
+		t.Errorf("expected exactly 1 dev server registered, got %d", len(devRepo.registered))
 	}
 }
 
@@ -89,10 +90,10 @@ func TestDeployFleetDefinition_ProvisionNotNil_MissingControlDevServerID_Returns
 			Provision: &domain.ProvisionConfig{IaC: "terraform", WorkingDir: "/infra"},
 		},
 	}}
-	uc := newDeployFleetDefinitionForTest(fleetRepo, &fakeDevServerRepository{}, &fakeTerraformRunner{}, &bulkFakeSshTargetRepository{}, &bulkFakeDevServerRepository{})
+	uc := newDeployFleetDefinitionForTest(fleetRepo, &fakeDevServerRepository{}, &fakeTerraformRunner{}, &fakeSshTargetRepository{}, &fakeDevServerRepository{}, &fakeProvisioner{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
-	_, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1"}, nil) // no ControlDevServerID
+	_, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1"}) // no ControlDevServerID
 	if err == nil {
 		t.Fatal("expected an error when Provision != nil and ControlDevServerID is empty")
 	}
@@ -108,19 +109,21 @@ func TestDeployFleetDefinition_ProvisionNotNil_CallsApplyTerraformPlanBeforeBulk
 	}}
 	controlDevRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"control-1": {ID: "control-1"}}}
 	runner := &orderTracingTerraformRunner{trace: &trace, outputJSON: `{"instance_hosts":{"value":["10.0.0.1"]}}`}
-	devRepo := &orderTracingDevServerRepository{bulkFakeDevServerRepository: &bulkFakeDevServerRepository{}, trace: &trace}
+	sshRepo := &fakeSshTargetRepository{}
+	devRepo := &fakeDevServerRepository{}
+	provisioner := &orderTracingProvisioner{fakeProvisioner: &fakeProvisioner{}, trace: &trace}
 
 	applyTerraformPlan := NewApplyTerraformPlan(controlDevRepo, runner)
-	bulkProvisionFleet := NewBulkProvisionFleet(NewCreateSshTarget(&bulkFakeSshTargetRepository{}), NewRegisterDevServer(devRepo), NewDeleteSshTarget(&bulkFakeSshTargetRepository{}))
-	uc := NewDeployFleetDefinition(fleetRepo, applyTerraformPlan, bulkProvisionFleet)
+	bulkProvisionFleet := NewBulkProvisionFleet(sshRepo, devRepo, provisioner)
+	uc := NewDeployFleetDefinition(fleetRepo, sshRepo, applyTerraformPlan, bulkProvisionFleet)
 
 	ctx := withTenant(context.Background(), "tenant-1")
-	_, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1", ControlDevServerID: "control-1"}, nil)
+	_, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1", ControlDevServerID: "control-1"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(trace) != 2 || trace[0] != "terraform" || trace[1] != "register:10.0.0.1" {
-		t.Errorf("expected terraform to run before register, got trace: %v", trace)
+	if len(trace) != 2 || trace[0] != "terraform" || trace[1] != "provision:10.0.0.1" {
+		t.Errorf("expected terraform to run before provision, got trace: %v", trace)
 	}
 }
 
@@ -134,28 +137,26 @@ func TestDeployFleetDefinition_MixedServers_ExistingAndTerraformCreated(t *testi
 	}}
 	controlDevRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"control-1": {ID: "control-1"}}}
 	runner := &fakeTerraformRunner{outputJSON: `{"instance_hosts":{"value":["tf-1","tf-2"]}}`}
-	sshRepo := &bulkFakeSshTargetRepository{}
-	devRepo := &bulkFakeDevServerRepository{}
-	uc := newDeployFleetDefinitionForTest(fleetRepo, controlDevRepo, runner, sshRepo, devRepo)
+	sshRepo := &fakeSshTargetRepository{}
+	devRepo := &fakeDevServerRepository{}
+	provisioner := &fakeProvisioner{}
+	uc := newDeployFleetDefinitionForTest(fleetRepo, controlDevRepo, runner, sshRepo, devRepo, provisioner)
 
 	ctx := withTenant(context.Background(), "tenant-1")
-	result, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1", ControlDevServerID: "control-1"}, nil)
+	result, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1", ControlDevServerID: "control-1"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(result.Results) != 3 {
-		t.Fatalf("expected 1 existing + 2 terraform-created = 3 results, got %d: %+v", len(result.Results), result.Results)
+	if len(result.Outcomes) != 3 || result.Success != 3 {
+		t.Fatalf("expected 1 existing + 2 terraform-created = 3 successful outcomes, got %+v", result)
 	}
 	hosts := map[string]bool{}
-	for _, r := range result.Results {
-		hosts[r.Host] = true
-		if r.Status != "SUCCEEDED" {
-			t.Errorf("host %q: expected SUCCEEDED, got %q", r.Host, r.Status)
-		}
+	for _, o := range result.Outcomes {
+		hosts[o.Host] = true
 	}
 	for _, want := range []string{"existing-1", "tf-1", "tf-2"} {
 		if !hosts[want] {
-			t.Errorf("expected host %q in results, got %+v", want, result.Results)
+			t.Errorf("expected host %q in outcomes, got %+v", want, result.Outcomes)
 		}
 	}
 }
@@ -170,21 +171,21 @@ func TestDeployFleetDefinition_ApplyTerraformPlanFails_DoesNotCallBulkProvisionF
 	}}
 	controlDevRepo := &fakeDevServerRepository{byID: map[string]domain.DevServer{"control-1": {ID: "control-1"}}}
 	runner := &fakeTerraformRunner{applyErr: errors.New("terraform apply failed")}
-	sshRepo := &bulkFakeSshTargetRepository{}
-	devRepo := &bulkFakeDevServerRepository{}
-	uc := newDeployFleetDefinitionForTest(fleetRepo, controlDevRepo, runner, sshRepo, devRepo)
+	sshRepo := &fakeSshTargetRepository{}
+	devRepo := &fakeDevServerRepository{}
+	uc := newDeployFleetDefinitionForTest(fleetRepo, controlDevRepo, runner, sshRepo, devRepo, &fakeProvisioner{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
-	_, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1", ControlDevServerID: "control-1"}, nil)
+	_, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1", ControlDevServerID: "control-1"})
 	if err == nil {
 		t.Fatal("expected the terraform failure to propagate")
 	}
-	if len(devRepo.registered) != 0 || len(sshRepo.created) != 0 {
-		t.Errorf("expected BulkProvisionFleet to never run (0 registrations/ssh targets), got %d registered, %d ssh targets", len(devRepo.registered), len(sshRepo.created))
+	if len(devRepo.registered) != 0 || len(sshRepo.upserted) != 0 {
+		t.Errorf("expected BulkProvisionFleet to never run (0 registrations/upserts), got %d registered, %d upserted", len(devRepo.registered), len(sshRepo.upserted))
 	}
 }
 
-func TestDeployFleetDefinition_RunTwice_SameID_NoIdempotencyRegression(t *testing.T) {
+func TestDeployFleetDefinition_RunTwice_SameID_ReUpsertsSameHost(t *testing.T) {
 	fleetRepo := &fakeFleetDefinitionRepository{byID: map[string]domain.FleetDefinition{
 		fleetDefKey("tenant-1", "def-1"): {
 			ID: "def-1", TenantID: "tenant-1", Name: "fleet-1",
@@ -192,29 +193,25 @@ func TestDeployFleetDefinition_RunTwice_SameID_NoIdempotencyRegression(t *testin
 			Provision: nil,
 		},
 	}}
-	sshRepo := &bulkFakeSshTargetRepository{}
-	devRepo := &bulkFakeDevServerRepository{}
-	uc := newDeployFleetDefinitionForTest(fleetRepo, &fakeDevServerRepository{}, &fakeTerraformRunner{}, sshRepo, devRepo)
+	sshRepo := &fakeSshTargetRepository{}
+	devRepo := &fakeDevServerRepository{}
+	provisioner := &fakeProvisioner{}
+	uc := newDeployFleetDefinitionForTest(fleetRepo, &fakeDevServerRepository{}, &fakeTerraformRunner{}, sshRepo, devRepo, provisioner)
 	ctx := withTenant(context.Background(), "tenant-1")
 
-	if _, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1"}, nil); err != nil {
+	if _, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1"}); err != nil {
 		t.Fatalf("first run: unexpected error: %v", err)
 	}
-
-	// Simulate migration 0017's (tenant_id, host) unique constraint kicking
-	// in on the 2nd run for the same host — the exact *pgconn.PgError shape
-	// isUniqueViolation (bulk_provision_fleet.go) checks for, same fixture
-	// TestBulkProvisionFleet_DuplicateHost_ReturnsAlreadyExistsNotFailed uses.
-	sshRepo.errForHost = map[string]error{"h1": &pgconn.PgError{Code: "23505", Message: "duplicate key"}}
-
-	result, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1"}, nil)
+	result, err := uc.Execute(ctx, DeployFleetDefinitionInput{FleetDefinitionID: "def-1"})
 	if err != nil {
 		t.Fatalf("second run: unexpected error: %v", err)
 	}
-	if len(result.Results) != 1 || result.Results[0].Status != "SUCCEEDED" || result.Results[0].Error != "already_exists" {
-		t.Fatalf("expected {Status: SUCCEEDED, Error: already_exists} on re-run, got %+v", result.Results)
+	// Upsert (not Create) means a re-deploy of the same host never hits a
+	// unique-constraint error — both runs report success for h1.
+	if result.Success != 1 || len(result.Outcomes) != 1 || result.Outcomes[0].Host != "h1" {
+		t.Fatalf("expected h1 to succeed again on re-run, got %+v", result)
 	}
-	if len(devRepo.registered) != 1 {
-		t.Errorf("expected only the first run's registration to exist (no duplicate dev server), got %d", len(devRepo.registered))
+	if len(sshRepo.upserted) != 2 {
+		t.Errorf("expected 2 Upsert calls (one per run) for the same host, got %d", len(sshRepo.upserted))
 	}
 }

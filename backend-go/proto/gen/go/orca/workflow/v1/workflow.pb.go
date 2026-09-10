@@ -25,7 +25,6 @@ const (
 type StepType int32
 
 const (
-<<<<<<< HEAD
 	StepType_STEP_TYPE_UNSPECIFIED       StepType = 0
 	StepType_STEP_TYPE_AGENT             StepType = 1
 	StepType_STEP_TYPE_SHELL             StepType = 2
@@ -35,23 +34,11 @@ const (
 	StepType_STEP_TYPE_CLEANUP_WORKTREES StepType = 6 // BL-AT-04
 	StepType_STEP_TYPE_ACTION            StepType = 7
 	StepType_STEP_TYPE_PARALLEL          StepType = 8
-=======
-	StepType_STEP_TYPE_UNSPECIFIED  StepType = 0
-	StepType_STEP_TYPE_AGENT        StepType = 1
-	StepType_STEP_TYPE_SHELL        StepType = 2
-	StepType_STEP_TYPE_NOTIFICATION StepType = 3
-	StepType_STEP_TYPE_WEBHOOK      StepType = 4
-	StepType_STEP_TYPE_CONDITION    StepType = 5
->>>>>>> feat/team-rbac-implementation
 	// STEP_TYPE_COMMIT_PUSH — CR-AUTO-003/TASK-BE-AUTO-005. automation-service's
 	// AutomationAction "commit_push" dispatches here via ExecuteAdHocStep, the
 	// same cross-service call every other automation action step type uses —
 	// see infrafleetclient.GitCommitPushExecutor.
-<<<<<<< HEAD
 	StepType_STEP_TYPE_COMMIT_PUSH StepType = 9
-=======
-	StepType_STEP_TYPE_COMMIT_PUSH StepType = 6
->>>>>>> feat/team-rbac-implementation
 )
 
 // Enum value maps for StepType.
@@ -63,7 +50,6 @@ var (
 		3: "STEP_TYPE_NOTIFICATION",
 		4: "STEP_TYPE_WEBHOOK",
 		5: "STEP_TYPE_CONDITION",
-<<<<<<< HEAD
 		6: "STEP_TYPE_CLEANUP_WORKTREES",
 		7: "STEP_TYPE_ACTION",
 		8: "STEP_TYPE_PARALLEL",
@@ -80,18 +66,6 @@ var (
 		"STEP_TYPE_ACTION":            7,
 		"STEP_TYPE_PARALLEL":          8,
 		"STEP_TYPE_COMMIT_PUSH":       9,
-=======
-		6: "STEP_TYPE_COMMIT_PUSH",
-	}
-	StepType_value = map[string]int32{
-		"STEP_TYPE_UNSPECIFIED":  0,
-		"STEP_TYPE_AGENT":        1,
-		"STEP_TYPE_SHELL":        2,
-		"STEP_TYPE_NOTIFICATION": 3,
-		"STEP_TYPE_WEBHOOK":      4,
-		"STEP_TYPE_CONDITION":    5,
-		"STEP_TYPE_COMMIT_PUSH":  6,
->>>>>>> feat/team-rbac-implementation
 	}
 )
 
@@ -2725,7 +2699,6 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	" \x01(\tR\x0finjectStepsJson\x12*\n" +
 	"\x11remove_steps_json\x18\v \x01(\tR\x0fremoveStepsJson\"X\n" +
 	"\x16UpdateTemplateResponse\x12>\n" +
-<<<<<<< HEAD
 	"\btemplate\x18\x01 \x01(\v2\".orca.workflow.v1.WorkflowTemplateR\btemplate\"`\n" +
 	"\x16PublishTemplateRequest\x12\x1f\n" +
 	"\vtemplate_id\x18\x01 \x01(\tR\n" +
@@ -2780,25 +2753,17 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\n" +
 	"rating_sum\x18\x01 \x01(\x05R\tratingSum\x12!\n" +
 	"\frating_count\x18\x02 \x01(\x05R\vratingCount*\x85\x02\n" +
-=======
-	"\btemplate\x18\x01 \x01(\v2\".orca.workflow.v1.WorkflowTemplateR\btemplate*\xb6\x01\n" +
->>>>>>> feat/team-rbac-implementation
 	"\bStepType\x12\x19\n" +
 	"\x15STEP_TYPE_UNSPECIFIED\x10\x00\x12\x13\n" +
 	"\x0fSTEP_TYPE_AGENT\x10\x01\x12\x13\n" +
 	"\x0fSTEP_TYPE_SHELL\x10\x02\x12\x1a\n" +
 	"\x16STEP_TYPE_NOTIFICATION\x10\x03\x12\x15\n" +
 	"\x11STEP_TYPE_WEBHOOK\x10\x04\x12\x17\n" +
-<<<<<<< HEAD
 	"\x13STEP_TYPE_CONDITION\x10\x05\x12\x1f\n" +
 	"\x1bSTEP_TYPE_CLEANUP_WORKTREES\x10\x06\x12\x14\n" +
 	"\x10STEP_TYPE_ACTION\x10\a\x12\x16\n" +
 	"\x12STEP_TYPE_PARALLEL\x10\b\x12\x19\n" +
 	"\x15STEP_TYPE_COMMIT_PUSH\x10\t2\x92\x10\n" +
-=======
-	"\x13STEP_TYPE_CONDITION\x10\x05\x12\x19\n" +
-	"\x15STEP_TYPE_COMMIT_PUSH\x10\x062\xe8\b\n" +
->>>>>>> feat/team-rbac-implementation
 	"\x0fWorkflowService\x12c\n" +
 	"\x0eCreateTemplate\x12'.orca.workflow.v1.CreateTemplateRequest\x1a(.orca.workflow.v1.CreateTemplateResponse\x12c\n" +
 	"\x0eUpdateTemplate\x12'.orca.workflow.v1.UpdateTemplateRequest\x1a(.orca.workflow.v1.UpdateTemplateResponse\x12N\n" +

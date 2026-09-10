@@ -111,7 +111,6 @@ func (r *Repository) DeleteByEndpoint(ctx context.Context, endpoint string) erro
 	return nil
 }
 
-<<<<<<< HEAD
 // DeviceIDFor returns the paired mobile device id associated with a push
 // subscription, or "" if none is paired (a standard Web Push subscription
 // with no BL-MB-01 mobile pairing).
@@ -128,17 +127,6 @@ func (r *Repository) DeviceIDFor(ctx context.Context, subscriptionID string) (st
 		return "", nil
 	}
 	return *deviceID, nil
-=======
-// MarkExpired sets status='expired' for endpoint. UPDATE affecting 0 rows
-// is not an error — idempotent by design (see
-// usecase.SubscriptionRepository's doc comment).
-func (r *Repository) MarkExpired(ctx context.Context, endpoint string) error {
-	_, err := r.pool.Exec(ctx, `UPDATE notification.push_subscriptions SET status = 'expired', updated_at = now() WHERE endpoint = $1`, endpoint)
-	if err != nil {
-		return fmt.Errorf("postgres: mark push subscription expired: %w", err)
-	}
-	return nil
->>>>>>> feat/team-rbac-implementation
 }
 
 // GetPublicKey returns the tenant's active VAPID key metadata row.
@@ -188,13 +176,11 @@ func (r *Repository) MarkProcessed(ctx context.Context, eventID, subject string)
 	return tag.RowsAffected() == 0, nil
 }
 
-// SaveNotificationEvent persists 1 row per event.RecipientUserIDs entry via
-// a single pgx.Batch round-trip — RecipientUserIDs can have multiple
-// entries (e.g. an automation run notifying several people), so this
-// avoids N separate Exec round-trips. Named SaveNotificationEvent, not
-// Save, because Repository already has a Save(ctx, domain.PushSubscription)
-// method for SubscriptionRepository — see usecase.NotificationRepository's
-// doc comment.
+// SaveNotificationEvent persists 1 row per event.RecipientUserIDs entry —
+// implements usecase.NotificationRepository.SaveNotificationEvent. Named
+// SaveNotificationEvent, not Save, because Repository already has a
+// Save(ctx, domain.PushSubscription) method for SubscriptionRepository —
+// see usecase.NotificationRepository's doc comment.
 func (r *Repository) SaveNotificationEvent(ctx context.Context, event domain.NotificationEvent) error {
 	batch := &pgx.Batch{}
 	for _, userID := range event.RecipientUserIDs {

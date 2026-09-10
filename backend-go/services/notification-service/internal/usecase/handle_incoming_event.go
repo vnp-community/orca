@@ -32,9 +32,12 @@ type HandleIncomingEventInput struct {
 // or claims authority over the source fact (§2) — it only derives an
 // ephemeral, user-facing artifact from it.
 type HandleIncomingEvent struct {
-<<<<<<< HEAD
 	broadcaster     NotificationBroadcaster
 	processedEvents ProcessedEventRepository
+	// notifications persists the unread-state row (CR-NOTIF-001,
+	// TASK-BE-NOTIF-003) — nil-safe, same convention as deliverPush, so a
+	// test that only cares about WS fan-out doesn't need to wire it.
+	notifications NotificationRepository
 	// deliverPush is nil-safe (BL-MB-02 push pipeline is additive to the
 	// pre-existing WS-only broadcast path) — a nil deliverPush just skips
 	// push delivery entirely, e.g. in a test that only cares about WS
@@ -43,29 +46,11 @@ type HandleIncomingEvent struct {
 	logger      *slog.Logger
 }
 
-func NewHandleIncomingEvent(broadcaster NotificationBroadcaster, processedEvents ProcessedEventRepository, deliverPush *DeliverPush, logger *slog.Logger) *HandleIncomingEvent {
+func NewHandleIncomingEvent(broadcaster NotificationBroadcaster, processedEvents ProcessedEventRepository, notifications NotificationRepository, deliverPush *DeliverPush, logger *slog.Logger) *HandleIncomingEvent {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	return &HandleIncomingEvent{broadcaster: broadcaster, processedEvents: processedEvents, deliverPush: deliverPush, logger: logger}
-=======
-	broadcaster       NotificationBroadcaster
-	processedEvents   ProcessedEventRepository
-	notifications     NotificationRepository
-	deliverPush       *DeliverPush       // Web Push/VAPID (CR-NOTIF-001)
-	deliverMobilePush *DeliverMobilePush // APNs/FCM native mobile push (CR-MOBILE-001) — see that file's naming note
-	logger            *slog.Logger
-}
-
-func NewHandleIncomingEvent(broadcaster NotificationBroadcaster, processedEvents ProcessedEventRepository, notifications NotificationRepository, deliverPush *DeliverPush, deliverMobilePush *DeliverMobilePush, logger *slog.Logger) *HandleIncomingEvent {
-	if logger == nil {
-		logger = slog.Default()
-	}
-	return &HandleIncomingEvent{
-		broadcaster: broadcaster, processedEvents: processedEvents, notifications: notifications,
-		deliverPush: deliverPush, deliverMobilePush: deliverMobilePush, logger: logger,
-	}
->>>>>>> feat/team-rbac-implementation
+	return &HandleIncomingEvent{broadcaster: broadcaster, processedEvents: processedEvents, notifications: notifications, deliverPush: deliverPush, logger: logger}
 }
 
 // Execute translates in into a NotificationEvent and broadcasts it. A
@@ -109,16 +94,21 @@ func (uc *HandleIncomingEvent) Execute(ctx context.Context, in HandleIncomingEve
 		return apperrors.New(apperrors.KindInternal, "NOTIFICATION_TRANSLATE_FAILED", "failed to translate event", err)
 	}
 
-	// Save before Broadcast: a crash between the two leaves a persisted
-	// record (recoverable via ListNotifications), not a live-push nobody
-	// can retrieve later — see notification-service.md CR-NOTIF-001 mục B.
-	if err := uc.notifications.SaveNotificationEvent(ctx, event); err != nil {
-		return apperrors.New(apperrors.KindInternal, "NOTIFICATION_PERSIST_FAILED", "failed to persist notification event", err)
+	// Persist BEFORE Broadcast (TASK-BE-NOTIF-003) — a crash between the
+	// two leaves a persisted-but-not-yet-broadcast record (recoverable via
+	// ListNotifications on next load), never a broadcast-but-lost one. A
+	// persistence failure is logged, not fatal — the WS/push paths below
+	// still complete, matching this usecase's "a downstream hiccup must
+	// never NAK the whole event" posture.
+	if uc.notifications != nil {
+		if err := uc.notifications.SaveNotificationEvent(ctx, event); err != nil {
+			uc.logger.WarnContext(ctx, "failed to persist notification event",
+				slog.String("subject", in.Subject), slog.String("event_id", in.EventID), slog.Any("error", err))
+		}
 	}
 
 	uc.broadcaster.Broadcast(ctx, event)
 
-<<<<<<< HEAD
 	// Push delivery (BL-MB-02) is best-effort and additive to WS fan-out
 	// above — a push-delivery hiccup must never NAK the whole event back
 	// into JetStream redelivery (DeliverPush.Execute already never
@@ -131,20 +121,5 @@ func (uc *HandleIncomingEvent) Execute(ctx context.Context, in HandleIncomingEve
 		}
 	}
 
-=======
-	// Push delivery failure must not NAK the JetStream message — WS
-	// fan-out already succeeded, which is enough to consider the event
-	// "handled"; a push failure is logged, not retried via redelivery.
-	// Both push usecases gate on event.Channels internally (see their own
-	// Execute doc comments) — called unconditionally here, independent of
-	// each other so a Web Push failure never blocks mobile push or vice
-	// versa (CR-MOBILE-001's acceptance criterion).
-	if err := uc.deliverPush.Execute(ctx, event); err != nil {
-		uc.logger.ErrorContext(ctx, "deliver push failed", slog.String("event_id", in.EventID), slog.Any("error", err))
-	}
-	if err := uc.deliverMobilePush.Execute(ctx, event); err != nil {
-		uc.logger.ErrorContext(ctx, "deliver mobile push failed", slog.String("event_id", in.EventID), slog.Any("error", err))
-	}
->>>>>>> feat/team-rbac-implementation
 	return nil
 }

@@ -46,15 +46,18 @@ type Config struct {
 	// an empty host.
 	InfraFleetHTTPAddr string
 
-	// NATSURL is the shared eventbus connection string — dialed by both
+	// NATSURL is the shared eventbus connection string — dialed by
 	// agent.subscribeStatus (TASK-AG-05-06, forwards infra-fleet-service's
-	// agent.statusChanged/agent.rateLimited events to the renderer) and the
+	// agent.statusChanged/agent.rateLimited events to the renderer), the
 	// workspace-event bridge (TASK-PW-04-07/SOL-PW-04, forwards task/
-	// workflow-service outbox events). Same env var / default as
-	// notification-service's own NATS_URL, since all three dial the same
-	// NATS cluster. Empty/unreachable degrades each consumer independently
+	// workflow-service outbox events), and api-gateway's own first NATS
+	// connection for publishing/subscribing CR-FFT-002 TraceEvent spans on
+	// the TRACE stream (TASK-BE-FFT-008/011). Same env var / default as
+	// notification-service's own NATS_URL, since all dial the same NATS
+	// cluster. Empty/unreachable degrades each consumer independently
 	// (closed-immediately channel for agent.subscribeStatus, a startup
-	// warning for the workspace bridge) rather than crashing api-gateway.
+	// warning for the workspace bridge / trace publishing) rather than
+	// crashing api-gateway.
 	NATSURL string
 
 	// RateLimitRPS/RateLimitBurst configure the per-tenant in-memory
@@ -90,11 +93,6 @@ type Config struct {
 	// so adding a real client later is a one-line change in main.go, not a
 	// config struct edit.
 	OtherServiceAddrs map[string]string
-
-	// NATSURL is api-gateway's first NATS connection (TASK-BE-FFT-008) —
-	// used only to publish CR-FFT-002 TraceEvent spans onto the TRACE
-	// stream, not for any domain event (api-gateway owns no outbox).
-	NATSURL string
 }
 
 // Load reads api-gateway's configuration from the environment.
@@ -139,7 +137,6 @@ func Load() (Config, error) {
 			"annotation-service":        commonconfig.StringEnv("ANNOTATION_SERVICE_ADDR", ""),
 			"credential-broker-service": commonconfig.StringEnv("CREDENTIAL_BROKER_SERVICE_ADDR", ""),
 		},
-		NATSURL: commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }
 

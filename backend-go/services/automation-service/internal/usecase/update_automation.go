@@ -22,10 +22,7 @@ type UpdateAutomationInput struct {
 	Enabled        *bool
 	Dtstart        *time.Time
 	Timezone       *string
-<<<<<<< HEAD
 	ProjectID      *string
-=======
->>>>>>> feat/team-rbac-implementation
 	// Actions — CR-AUTO-002/TASK-BE-AUTO-005. nil = not being changed
 	// (same field-mask convention as every other pointer field here); a
 	// non-nil, possibly-empty slice DOES replace the chain (an explicit
@@ -33,7 +30,6 @@ type UpdateAutomationInput struct {
 	// — see automation.proto's AutomationActionList doc comment for why
 	// this needed its own wrapper message).
 	Actions           *[]domain.AutomationAction
-<<<<<<< HEAD
 	TriggerType       *domain.TriggerType
 	TriggerEvent      *domain.EventName
 	MaxRunHistory     *int32 // CR-AUTO-007
@@ -42,10 +38,6 @@ type UpdateAutomationInput struct {
 	// "" = clear the filter, non-empty = replace it (parsed via
 	// domain.ParseTriggerFilter).
 	TriggerFilterJSON *string
-=======
-	MaxRunHistory     *int32 // CR-AUTO-007
-	RunTimeoutSeconds *int32 // CR-AUTO-007
->>>>>>> feat/team-rbac-implementation
 }
 
 // UpdateAutomation persists a partial edit of an existing Automation.
@@ -92,12 +84,9 @@ func (uc *UpdateAutomation) Execute(ctx context.Context, in UpdateAutomationInpu
 	if in.Timezone != nil {
 		next.Timezone = *in.Timezone
 	}
-<<<<<<< HEAD
 	if in.ProjectID != nil {
 		next.ProjectID = *in.ProjectID
 	}
-=======
->>>>>>> feat/team-rbac-implementation
 	if in.Actions != nil {
 		next.Actions = *in.Actions
 	}
@@ -107,7 +96,6 @@ func (uc *UpdateAutomation) Execute(ctx context.Context, in UpdateAutomationInpu
 	if in.RunTimeoutSeconds != nil {
 		next.RunTimeoutSeconds = *in.RunTimeoutSeconds
 	}
-<<<<<<< HEAD
 	if in.TriggerType != nil {
 		next.TriggerType = *in.TriggerType
 	}
@@ -127,13 +115,6 @@ func (uc *UpdateAutomation) Execute(ctx context.Context, in UpdateAutomationInpu
 	// from the merged fields. A syntactically valid-at-create rule doesn't
 	// stay valid-by-construction after an in-place field edit, so this
 	// re-validates on every update.
-=======
-	// domain.Automation has no standalone Validate method — reuse
-	// NewAutomation's invariant checks (non-empty name/rrule/step config,
-	// rrule parses as RFC 5545) by rebuilding from the merged fields. A
-	// syntactically valid-at-create rule doesn't stay valid-by-construction
-	// after an in-place field edit, so this re-validates on every update.
->>>>>>> feat/team-rbac-implementation
 	// CR-AUTO-002: same "{}" placeholder as CreateAutomation.Execute when
 	// Actions covers what StepConfigJSON would otherwise be required for —
 	// see that usecase's doc comment for why NewAutomation itself isn't
@@ -142,7 +123,6 @@ func (uc *UpdateAutomation) Execute(ctx context.Context, in UpdateAutomationInpu
 	if stepConfigForValidation == "" && len(next.Actions) > 0 {
 		stepConfigForValidation = "{}"
 	}
-<<<<<<< HEAD
 	rebuilt, err := domain.NewAutomation(domain.NewAutomationParams{
 		ID:             next.ID,
 		TenantID:       next.TenantID,
@@ -159,9 +139,6 @@ func (uc *UpdateAutomation) Execute(ctx context.Context, in UpdateAutomationInpu
 		TriggerEvent:   next.TriggerEvent,
 		TriggerFilter:  next.TriggerFilter,
 	})
-=======
-	rebuilt, err := domain.NewAutomation(next.ID, next.TenantID, next.Name, next.RRule, next.StepType, stepConfigForValidation, next.DTStart, next.Timezone, next.Enabled, next.CreatedAt)
->>>>>>> feat/team-rbac-implementation
 	if err != nil {
 		return domain.Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID", err.Error(), err)
 	}

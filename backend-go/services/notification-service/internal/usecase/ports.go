@@ -6,7 +6,6 @@ package usecase
 
 import (
 	"context"
-	"errors"
 
 	"github.com/stablyai/orca-go/services/notification-service/internal/domain"
 )
@@ -27,32 +26,10 @@ type SubscriptionRepository interface {
 	// with no matching row affects 0 rows and is NOT an error — the
 	// unregister operation is idempotent by design.
 	DeleteByEndpoint(ctx context.Context, endpoint string) error
-<<<<<<< HEAD
 	// DeviceIDFor returns the paired mobile device id (SOL-MB-01) a push
 	// subscription is associated with, or "" if none — a standard Web
 	// Push subscription with no mobile-companion pairing.
 	DeviceIDFor(ctx context.Context, subscriptionID string) (string, error)
-=======
-	// MarkExpired sets status='expired' for endpoint — called when a Web
-	// Push send returns 404/410, so a future event doesn't retry a dead
-	// endpoint. Idempotent: marking an already-expired/nonexistent endpoint
-	// affects 0 rows and is NOT an error, same rule as DeleteByEndpoint.
-	MarkExpired(ctx context.Context, endpoint string) error
-}
-
-// WebPushSender sends one already-encrypted Web Push message to one
-// subscription's endpoint. Implemented by internal/adapter/external/webpush
-// (TASK-BE-NOTIF-010) — this port only knows "send bytes, get back whether
-// the endpoint is dead", not the RFC 8291/8292 mechanics.
-type WebPushSender interface {
-	// Send POSTs payload (already RFC-8291-encrypted) to sub.Endpoint with
-	// vapidAuthHeader as the Authorization header. expired=true means the
-	// push service returned 404/410 — the endpoint is gone, the caller
-	// must not retry it and should call SubscriptionRepository.MarkExpired.
-	// Any other non-2xx status or transport error is returned as err
-	// (expired=false) — a transient failure, not "this subscription is dead".
-	Send(ctx context.Context, sub domain.PushSubscription, vapidAuthHeader string, payload []byte) (expired bool, err error)
->>>>>>> feat/team-rbac-implementation
 }
 
 // VapidKeyRepository is the persistence port for VAPID public-key
@@ -114,7 +91,6 @@ type NotificationBroadcaster interface {
 	Broadcast(ctx context.Context, event domain.NotificationEvent)
 }
 
-<<<<<<< HEAD
 // BufferedNotificationRepository is the persistence port for BR-MB-07's
 // offline push buffering (mobile companion app) — implemented by
 // internal/adapter/postgres.BufferedNotificationStore against
@@ -146,7 +122,7 @@ type NotificationPreferenceRepository interface {
 	// postgres implementation's doc comment.
 	IsEnabled(ctx context.Context, tenantID, userID, eventType, channel string) (bool, error)
 }
-=======
+
 // NotificationRepository is the persistence port for notification_events —
 // the audit/unread-state store CR-NOTIF-001 adds. Every method takes
 // tenantID + userID explicitly (never trusts a bare notificationID) so a
@@ -179,35 +155,3 @@ type NotificationRepository interface {
 	// tenantID+userID.
 	CountUnread(ctx context.Context, tenantID, userID string) (int64, error)
 }
-
-// PushCredentialResolver fetches this tenant's APNs/FCM credential
-// material via credential-broker-service (CREDENTIAL_CATEGORY_SERVICE_SECRET
-// — already defined in credentialbroker.proto and handled by that
-// service's grpc/server.go, but exercised by no caller before this).
-// Distinct from VaultSigner: that port signs a VAPID JWT for Web Push;
-// this one returns raw credential bytes for a different protocol
-// entirely (APNs JWT ES256 / FCM OAuth2 service-account) — see
-// notification-service.md §9's updated credential-storage section.
-type PushCredentialResolver interface {
-	// Resolve returns the opaque credential blob stored for
-	// (tenantID, ownerID) — ownerID is "apns" or "fcm". The blob's shape
-	// is adapter-owned (see internal/adapter/pushgateway): apns_sender.go
-	// JSON-decodes it as {team_id, key_id, private_key_pem}; fcm_sender.go
-	// treats it as the raw FCM service-account JSON as-is.
-	Resolve(ctx context.Context, tenantID, ownerID string) ([]byte, error)
-}
-
-// PushSender delivers event to one ios/android push subscription — the
-// sole difference between APNsSender and FCMSender is which third-party
-// wire protocol they speak; DeliverPush (mobile companion, CR-MOBILE-001)
-// picks one by subscription.Channel via a map, not a type switch.
-type PushSender interface {
-	Send(ctx context.Context, sub domain.PushSubscription, event domain.NotificationEvent) error
-}
-
-// ErrDeviceTokenInvalid is returned by PushSender.Send when the
-// third-party service reports the device token/endpoint no longer
-// accepts pushes (APNs 410/BadDeviceToken, FCM 404/UNREGISTERED).
-// DeliverPush treats this as "call MarkExpired", never a generic error.
-var ErrDeviceTokenInvalid = errors.New("usecase: device token no longer valid")
->>>>>>> feat/team-rbac-implementation

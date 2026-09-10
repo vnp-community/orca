@@ -27,10 +27,6 @@ type Server struct {
 	subscribe                  *usecase.Subscribe
 	unregisterPushSubscription *usecase.UnregisterPushSubscription
 	getVapidPublicKey          *usecase.GetVapidPublicKey
-	listNotifications          *usecase.ListNotifications
-	markAsRead                 *usecase.MarkAsRead
-	markAllAsRead              *usecase.MarkAllAsRead
-	getUnreadCount             *usecase.GetUnreadCount
 	broadcaster                usecase.NotificationBroadcaster
 	// signer backs GetVapidPublicKey's sibling web-push signing path,
 	// actually invoked now by usecase.DeliverPush (BL-MB-02,
@@ -40,45 +36,47 @@ type Server struct {
 	// StreamNotifications reconnect, before the live broadcast loop starts
 	// (TASK-MB-02-08).
 	buffer usecase.BufferedNotificationRepository
+
+	// listNotifications/markAsRead/markAllAsRead/getUnreadCount back
+	// CR-NOTIF-001's unread-state RPCs (TASK-BE-NOTIF-005/006).
+	listNotifications *usecase.ListNotifications
+	markAsRead        *usecase.MarkAsRead
+	markAllAsRead     *usecase.MarkAllAsRead
+	getUnreadCount    *usecase.GetUnreadCount
 }
 
-<<<<<<< HEAD
-func New(subscribe *usecase.Subscribe, unregisterPushSubscription *usecase.UnregisterPushSubscription, getVapidPublicKey *usecase.GetVapidPublicKey, broadcaster usecase.NotificationBroadcaster, signer usecase.VaultSigner, buffer usecase.BufferedNotificationRepository) *Server {
-=======
 func New(
 	subscribe *usecase.Subscribe,
 	unregisterPushSubscription *usecase.UnregisterPushSubscription,
 	getVapidPublicKey *usecase.GetVapidPublicKey,
+	broadcaster usecase.NotificationBroadcaster,
+	signer usecase.VaultSigner,
+	buffer usecase.BufferedNotificationRepository,
 	listNotifications *usecase.ListNotifications,
 	markAsRead *usecase.MarkAsRead,
 	markAllAsRead *usecase.MarkAllAsRead,
 	getUnreadCount *usecase.GetUnreadCount,
-	broadcaster usecase.NotificationBroadcaster,
-	signer usecase.VaultSigner,
 ) *Server {
->>>>>>> feat/team-rbac-implementation
 	return &Server{
 		subscribe:                  subscribe,
 		unregisterPushSubscription: unregisterPushSubscription,
 		getVapidPublicKey:          getVapidPublicKey,
+		broadcaster:                broadcaster,
+		signer:                     signer,
+		buffer:                     buffer,
 		listNotifications:          listNotifications,
 		markAsRead:                 markAsRead,
 		markAllAsRead:              markAllAsRead,
 		getUnreadCount:             getUnreadCount,
-		broadcaster:                broadcaster,
-		signer:                     signer,
-		buffer:                     buffer,
 	}
 }
 
 func (s *Server) Subscribe(ctx context.Context, req *notificationv1.SubscribeRequest) (*notificationv1.SubscribeResponse, error) {
 	sub, err := s.subscribe.Execute(ctx, usecase.SubscribeInput{
-		UserID:      req.GetUserId(),
-		Endpoint:    req.GetEndpoint(),
-		P256dhKey:   req.GetP256DhKey(),
-		AuthKey:     req.GetAuthKey(),
-		Channel:     req.GetChannel(),
-		DeviceLabel: req.GetDeviceLabel(),
+		UserID:    req.GetUserId(),
+		Endpoint:  req.GetEndpoint(),
+		P256dhKey: req.GetP256DhKey(),
+		AuthKey:   req.GetAuthKey(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)

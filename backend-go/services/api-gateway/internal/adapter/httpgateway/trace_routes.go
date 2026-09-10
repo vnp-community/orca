@@ -8,9 +8,8 @@ import (
 )
 
 // traceStreamHeartbeatInterval is a var (not a literal in mountTraceRoutes)
-// solely so trace_routes_test.go can shrink it for
-// TestMountTraceRoutes_HeartbeatStillFiresWithNoEvents without waiting a
-// real 15s — production always runs at the 15s default.
+// so trace_routes_test.go can shrink it to make the heartbeat-write test
+// fast instead of waiting a real 15s.
 var traceStreamHeartbeatInterval = 15 * time.Second
 
 // mountTraceRoutes serves GET /api/trace-stream — the SSE endpoint
@@ -27,7 +26,6 @@ var traceStreamHeartbeatInterval = 15 * time.Second
 // stance (trace-sse-routes.ts's isAuthorized() comment) — mounted outside
 // authMiddleware in router.go, same group as /auth/local and /ws.
 //
-<<<<<<< HEAD
 // broadcast forwards real backend spans (TASK-BE-FFT-009/010) — every
 // currently-connected client subscribes to the same *TraceBroadcast hub
 // cmd/server/main.go feeds from the TRACE JetStream stream. frontend's
@@ -37,14 +35,6 @@ func mountTraceRoutes(mux chi.Router, broadcast *TraceBroadcast) {
 	if broadcast == nil {
 		broadcast = NewTraceBroadcast()
 	}
-=======
-// Forwards real F40 TraceEvent JSON delivered via broadcast — fed by this
-// replica's own NATS SubscribeEphemeral loop (main.go, CR-FFT-002/003):
-// each api-gateway replica independently fans NATS trace-span events out
-// to its own locally-connected SSE clients, the same per-replica fan-out
-// shape as notification-service's cross-replica broadcaster.
-func mountTraceRoutes(mux chi.Router, broadcast *TraceBroadcast) {
->>>>>>> feat/team-rbac-implementation
 	mux.Get("/api/trace-stream", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			writeJSONError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "GET only")
@@ -67,17 +57,10 @@ func mountTraceRoutes(mux chi.Router, broadcast *TraceBroadcast) {
 		_, _ = w.Write([]byte(": connected\n\n"))
 		flusher.Flush()
 
-<<<<<<< HEAD
 		events, unsubscribe := broadcast.Subscribe()
 		defer unsubscribe()
 
-		ticker := time.NewTicker(15 * time.Second)
-=======
-		ch, unsubscribe := broadcast.Subscribe()
-		defer unsubscribe()
-
 		ticker := time.NewTicker(traceStreamHeartbeatInterval)
->>>>>>> feat/team-rbac-implementation
 		defer ticker.Stop()
 
 		ctx := r.Context()
@@ -85,7 +68,6 @@ func mountTraceRoutes(mux chi.Router, broadcast *TraceBroadcast) {
 			select {
 			case <-ctx.Done():
 				return
-<<<<<<< HEAD
 			case payload := <-events:
 				if _, err := w.Write([]byte("data: ")); err != nil {
 					return
@@ -94,10 +76,6 @@ func mountTraceRoutes(mux chi.Router, broadcast *TraceBroadcast) {
 					return
 				}
 				if _, err := w.Write([]byte("\n\n")); err != nil {
-=======
-			case raw := <-ch:
-				if _, err := w.Write(append(append([]byte("data: "), raw...), '\n', '\n')); err != nil {
->>>>>>> feat/team-rbac-implementation
 					return
 				}
 				flusher.Flush()

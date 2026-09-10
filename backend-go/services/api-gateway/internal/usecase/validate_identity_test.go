@@ -279,19 +279,14 @@ func TestAuthValidator_RevokedTokenRejected(t *testing.T) {
 	}
 }
 
-// TestAuthValidator_CachesRevocationCheckWithinTTL asserts the mandatory
-// TTL cache property (CR-CLI-002/BE-CLI-SOL-002 §2C) end-to-end at the
-// layer that actually implements it — authclient.RevocationClient — not
-// here: this package (usecase) cannot import authclient without creating
-// an import cycle (authclient's session_validator.go imports wscompat,
-// which imports usecase for *usecase.AuthValidator — see wscompat.Handler's
-// BearerAuth field, TASK-BE-CLI-001). See
-// authclient.TestRevocationClient_CachesWithinTTL for the real assertion
-// against production caching code, backed by a fake
-// authv1.AuthServiceClient. What IS verified here, at this layer, is that
-// AuthValidator.Validate calls v.Revocation.IsRevoked exactly once per
-// Validate call (never more, never speculatively) — the precondition that
-// makes RevocationClient's own cache effective at all.
+// TestAuthValidator_CachesRevocationCheckWithinTTL's name is historical —
+// authclient.RevocationClient deliberately has NO TTL cache (see that
+// type's own doc comment: a revocation must be observed immediately, so
+// every IsRevoked call is a live RPC, unlike JWKSClient's key-set cache).
+// What IS verified here is that AuthValidator.Validate calls
+// v.Revocation.IsRevoked exactly once per Validate call (never more, never
+// speculatively) — a real property regardless of what the Revocation
+// implementation itself does with that call.
 func TestAuthValidator_CachesRevocationCheckWithinTTL(t *testing.T) {
 	token, jwks := tokenWithJTI(t, "tenant-1", "user-1", "jti-cached", time.Now().Add(time.Hour))
 	v := NewAuthValidator(jwks)

@@ -11,9 +11,8 @@ import (
 func seedIssuedToken(t *testing.T, repo *fakeServiceTokenRepository, jti, userID string) {
 	t.Helper()
 	now := time.Now()
-	tok, err := domain.NewIssuedServiceToken(jti, userID, "orca-cli", now, now.Add(15*time.Minute))
-	if err != nil {
-		t.Fatalf("building issued token: %v", err)
+	tok := domain.IssuedServiceToken{
+		JTI: jti, UserID: userID, Audience: "orca-cli", IssuedAt: now, ExpiresAt: now.Add(15 * time.Minute),
 	}
 	if err := repo.RecordIssuedToken(context.Background(), tok); err != nil {
 		t.Fatalf("seeding issued token: %v", err)
@@ -27,6 +26,8 @@ func seedIssuedToken(t *testing.T, repo *fakeServiceTokenRepository, jti, userID
 func TestRevokeCliToken_TokenRejectedAfterRevoke(t *testing.T) {
 	repo := newFakeServiceTokenRepository()
 	users := newFakeUserRepository()
+	u, _ := domain.NewUser("u1", "t1", "alice@example.com", "Alice", domain.RoleUser, true, time.Now())
+	users.seed(u, "irrelevant-hash")
 	seedIssuedToken(t, repo, "jti-1", "u1")
 
 	uc := NewRevokeCliToken(users, repo, &fakeAuditRepository{}, &fakeClock{now: time.Now()})
@@ -111,8 +112,11 @@ func TestRevokeCliToken_RecordsAuditEntry(t *testing.T) {
 	if entry.TenantID != "t1" {
 		t.Errorf("TenantID = %q, want %q", entry.TenantID, "t1")
 	}
-	if entry.Target != "jti-1" {
-		t.Errorf("Target = %q, want %q", entry.Target, "jti-1")
+	if entry.TargetID != "jti-1" {
+		t.Errorf("TargetID = %q, want %q", entry.TargetID, "jti-1")
+	}
+	if entry.TargetType != "service_token" {
+		t.Errorf("TargetType = %q, want %q", entry.TargetType, "service_token")
 	}
 }
 

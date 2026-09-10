@@ -113,7 +113,6 @@ func (r *AutomationRepository) Create(ctx context.Context, a domain.Automation) 
 	if err != nil {
 		return fmt.Errorf("postgres: marshal actions: %w", err)
 	}
-<<<<<<< HEAD
 	filterJSON, err := marshalTriggerFilter(a.TriggerFilter)
 	if err != nil {
 		return fmt.Errorf("postgres: marshal trigger filter: %w", err)
@@ -131,15 +130,6 @@ func (r *AutomationRepository) Create(ctx context.Context, a domain.Automation) 
 		a.MaxRunHistory, a.RunTimeoutSeconds,
 		nullableTime(a.NextRunAt), a.CreatedAt, a.UpdatedAt,
 	)
-=======
-	_, err = r.pool.Exec(ctx, `
-		INSERT INTO automation.automations (
-			id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at,
-			actions_json, max_run_history, run_timeout_seconds
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-	`, a.ID, a.TenantID, a.Name, a.RRule, a.DTStart, string(a.StepType), a.StepConfigJSON, a.Enabled, a.Timezone, nullableTime(a.NextRunAt), a.CreatedAt, a.UpdatedAt,
-		actionsJSON, a.MaxRunHistory, a.RunTimeoutSeconds)
->>>>>>> feat/team-rbac-implementation
 	if err != nil {
 		return fmt.Errorf("postgres: insert automation: %w", err)
 	}
@@ -148,12 +138,7 @@ func (r *AutomationRepository) Create(ctx context.Context, a domain.Automation) 
 
 func (r *AutomationRepository) Get(ctx context.Context, tenantID, id string) (domain.Automation, error) {
 	row := r.pool.QueryRow(ctx, `
-<<<<<<< HEAD
 		SELECT `+automationColumns+`
-=======
-		SELECT id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at,
-		       actions_json, max_run_history, run_timeout_seconds, running_run_id, running_since
->>>>>>> feat/team-rbac-implementation
 		FROM automation.automations
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
@@ -174,12 +159,7 @@ func (r *AutomationRepository) List(ctx context.Context, tenantID, pageToken str
 		pageSize = 50
 	}
 	rows, err := r.pool.Query(ctx, `
-<<<<<<< HEAD
 		SELECT `+automationColumns+`
-=======
-		SELECT id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at,
-		       actions_json, max_run_history, run_timeout_seconds, running_run_id, running_since
->>>>>>> feat/team-rbac-implementation
 		FROM automation.automations
 		WHERE tenant_id = $1 AND ($2 = '' OR id > $2::uuid)
 		ORDER BY id
@@ -217,7 +197,6 @@ func (r *AutomationRepository) Update(ctx context.Context, tenantID string, a do
 	if err != nil {
 		return fmt.Errorf("postgres: marshal actions: %w", err)
 	}
-<<<<<<< HEAD
 	filterJSON, err := marshalTriggerFilter(a.TriggerFilter)
 	if err != nil {
 		return fmt.Errorf("postgres: marshal trigger filter: %w", err)
@@ -232,16 +211,6 @@ func (r *AutomationRepository) Update(ctx context.Context, tenantID string, a do
 	`, tenantID, a.ID, a.Name, a.RRule, string(a.StepType), a.StepConfigJSON, a.Enabled, a.Timezone, a.DTStart,
 		nullableString(a.ProjectID), actionsJSON, string(a.TriggerType), nullableString(string(a.TriggerEvent)), filterJSON,
 		a.MaxRunHistory, a.RunTimeoutSeconds)
-=======
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE automation.automations
-		SET name = $3, rrule = $4, step_type = $5, step_config_json = $6,
-		    enabled = $7, timezone = $8, dtstart = $9, updated_at = now(),
-		    actions_json = $10, max_run_history = $11, run_timeout_seconds = $12
-		WHERE tenant_id = $1 AND id = $2
-	`, tenantID, a.ID, a.Name, a.RRule, string(a.StepType), a.StepConfigJSON, a.Enabled, a.Timezone, a.DTStart,
-		actionsJSON, a.MaxRunHistory, a.RunTimeoutSeconds)
->>>>>>> feat/team-rbac-implementation
 	if err != nil {
 		return fmt.Errorf("postgres: update automation: %w", err)
 	}
@@ -265,7 +234,6 @@ func (r *AutomationRepository) Delete(ctx context.Context, tenantID, id string) 
 	return nil
 }
 
-<<<<<<< HEAD
 // CountByProject returns the number of automations for tenantID scoped to
 // projectID — backs BR-AT-02's per-project cap.
 func (r *AutomationRepository) CountByProject(ctx context.Context, tenantID, projectID string) (int, error) {
@@ -336,8 +304,6 @@ func (r *AutomationRepository) ListEventTriggered(ctx context.Context, tenantID 
 	return out, nil
 }
 
-=======
->>>>>>> feat/team-rbac-implementation
 // AcquireRunLock implements usecase.AutomationRepository.AcquireRunLock — a
 // single conditional UPDATE (no separate SELECT+UPDATE) so the check and
 // claim are atomic under concurrent callers: two racing acquires for the
@@ -386,12 +352,7 @@ func (r *AutomationRepository) ClaimDue(ctx context.Context, now time.Time, limi
 	}
 
 	rows, err := tx.Query(ctx, `
-<<<<<<< HEAD
 		SELECT `+automationColumns+`
-=======
-		SELECT id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at,
-		       actions_json, max_run_history, run_timeout_seconds, running_run_id, running_since
->>>>>>> feat/team-rbac-implementation
 		FROM automation.automations
 		WHERE enabled = true AND next_run_at IS NOT NULL AND next_run_at <= $1
 		ORDER BY next_run_at
@@ -469,20 +430,11 @@ func scanAutomation(row rowScanner) (domain.Automation, error) {
 	var runningRunID *string
 	var runningSince *time.Time
 	var nextRunAt *time.Time
-	var actionsJSON []byte
-	var runningRunID *string
-	var runningSince *time.Time
 	if err := row.Scan(
-<<<<<<< HEAD
 		&a.ID, &a.TenantID, &projectID, &a.Name, &a.RRule, &a.DTStart, &stepType, &a.StepConfigJSON,
 		&actionsJSON, &a.Enabled, &a.Timezone, &triggerType, &triggerEvent, &triggerFilterJSON,
 		&a.MaxRunHistory, &a.RunTimeoutSeconds, &runningRunID, &runningSince,
 		&nextRunAt, &a.CreatedAt, &a.UpdatedAt,
-=======
-		&a.ID, &a.TenantID, &a.Name, &a.RRule, &a.DTStart, &stepType, &a.StepConfigJSON,
-		&a.Enabled, &a.Timezone, &nextRunAt, &a.CreatedAt, &a.UpdatedAt,
-		&actionsJSON, &a.MaxRunHistory, &a.RunTimeoutSeconds, &runningRunID, &runningSince,
->>>>>>> feat/team-rbac-implementation
 	); err != nil {
 		return domain.Automation{}, err
 	}
@@ -514,17 +466,6 @@ func scanAutomation(row rowScanner) (domain.Automation, error) {
 	}
 	if nextRunAt != nil {
 		a.NextRunAt = *nextRunAt
-	}
-	actions, err := unmarshalActions(actionsJSON)
-	if err != nil {
-		return domain.Automation{}, fmt.Errorf("postgres: unmarshal actions_json: %w", err)
-	}
-	a.Actions = actions
-	if runningRunID != nil {
-		a.RunningRunID = *runningRunID
-	}
-	if runningSince != nil {
-		a.RunningSince = *runningSince
 	}
 	return a, nil
 }
@@ -563,20 +504,11 @@ func (r *AutomationRunRepository) Create(ctx context.Context, run domain.Automat
 	_, err = r.pool.Exec(ctx, `
 		INSERT INTO automation.automation_runs (
 			id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
-<<<<<<< HEAD
 			output_json, error_message, action_results_json, created_at, started_at, completed_at
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 	`,
 		run.ID, run.AutomationID, run.TenantID, run.RequestID, string(run.Status), string(run.StepType), string(run.Trigger), run.StepConfigJSON,
 		nullableString(run.OutputJSON), nullableString(run.ErrorMessage), actionResultsJSON, run.CreatedAt, nullableTime(run.StartedAt), nullableTime(run.CompletedAt),
-=======
-			output_json, error_message, created_at, started_at, completed_at, action_results_json
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
-	`,
-		run.ID, run.AutomationID, run.TenantID, run.RequestID, string(run.Status), string(run.StepType), string(run.Trigger), run.StepConfigJSON,
-		nullableString(run.OutputJSON), nullableString(run.ErrorMessage), run.CreatedAt, nullableTime(run.StartedAt), nullableTime(run.CompletedAt),
-		actionResultsJSON,
->>>>>>> feat/team-rbac-implementation
 	)
 	if err != nil {
 		return fmt.Errorf("postgres: insert automation run: %w", err)
@@ -586,12 +518,7 @@ func (r *AutomationRunRepository) Create(ctx context.Context, run domain.Automat
 
 func (r *AutomationRunRepository) FindByRequestID(ctx context.Context, tenantID, automationID, requestID string) (domain.AutomationRun, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-<<<<<<< HEAD
 		SELECT `+runColumns+`
-=======
-		SELECT id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
-		       output_json, error_message, created_at, started_at, completed_at, action_results_json
->>>>>>> feat/team-rbac-implementation
 		FROM automation.automation_runs
 		WHERE tenant_id = $1 AND automation_id = $2 AND request_id = $3
 	`, tenantID, automationID, requestID)
@@ -635,7 +562,6 @@ func (r *AutomationRunRepository) UpdateStatus(ctx context.Context, run domain.A
 	if err != nil {
 		return fmt.Errorf("postgres: marshal action_results: %w", err)
 	}
-<<<<<<< HEAD
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return fmt.Errorf("postgres: begin update-status tx: %w", err)
@@ -648,14 +574,6 @@ func (r *AutomationRunRepository) UpdateStatus(ctx context.Context, run domain.A
 		WHERE id = $7 AND tenant_id = $8
 	`, string(run.Status), nullableString(run.OutputJSON), nullableString(run.ErrorMessage), actionResultsJSON,
 		nullableTime(run.StartedAt), nullableTime(run.CompletedAt), run.ID, run.TenantID)
-=======
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE automation.automation_runs
-		SET status = $1, output_json = $2, error_message = $3, started_at = $4, completed_at = $5, action_results_json = $8
-		WHERE id = $6 AND tenant_id = $7
-	`, string(run.Status), nullableString(run.OutputJSON), nullableString(run.ErrorMessage),
-		nullableTime(run.StartedAt), nullableTime(run.CompletedAt), run.ID, run.TenantID, actionResultsJSON)
->>>>>>> feat/team-rbac-implementation
 	if err != nil {
 		if isUniqueViolation(err, "idx_automation_runs_one_running") {
 			return usecase.ErrConcurrentRunActive
@@ -687,12 +605,7 @@ func (r *AutomationRunRepository) ListByAutomation(ctx context.Context, tenantID
 	// $n::uuid` guard AutomationRepository.List already uses for pageToken,
 	// applied to both optional filters here.
 	rows, err := r.pool.Query(ctx, `
-<<<<<<< HEAD
 		SELECT `+runColumns+`
-=======
-		SELECT id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
-		       output_json, error_message, created_at, started_at, completed_at, action_results_json
->>>>>>> feat/team-rbac-implementation
 		FROM automation.automation_runs
 		WHERE tenant_id = $1
 		  AND ($2 = '' OR automation_id = $2::uuid)
@@ -724,7 +637,6 @@ func (r *AutomationRunRepository) ListByAutomation(ctx context.Context, tenantID
 	return out, next, nil
 }
 
-<<<<<<< HEAD
 // PruneOldRuns deletes every automation_runs row for automationID beyond
 // the `keep` most recent (by created_at DESC) — BR-AT-07.
 func (r *AutomationRunRepository) PruneOldRuns(ctx context.Context, tenantID, automationID string, keep int) error {
@@ -813,8 +725,6 @@ func (r *AutomationRunRepository) MarkPublished(ctx context.Context, ids []strin
 	return nil
 }
 
-=======
->>>>>>> feat/team-rbac-implementation
 // PruneRuns implements usecase.AutomationRunRepository.PruneRuns — deletes
 // automationID's runs beyond the maxRuns most recent by created_at in one
 // statement (subquery-based "keep newest N" rather than a separate
@@ -853,14 +763,9 @@ func scanRun(row rowScanner) (domain.AutomationRun, error) {
 	var outputJSON, errorMessage *string
 	var actionResultsJSON []byte
 	var startedAt, completedAt *time.Time
-	var actionResultsJSON []byte
 	if err := row.Scan(
 		&run.ID, &run.AutomationID, &run.TenantID, &run.RequestID, &status, &stepType, &trigger, &run.StepConfigJSON,
-<<<<<<< HEAD
 		&outputJSON, &errorMessage, &actionResultsJSON, &run.CreatedAt, &startedAt, &completedAt,
-=======
-		&outputJSON, &errorMessage, &run.CreatedAt, &startedAt, &completedAt, &actionResultsJSON,
->>>>>>> feat/team-rbac-implementation
 	); err != nil {
 		return domain.AutomationRun{}, err
 	}
@@ -884,11 +789,6 @@ func scanRun(row rowScanner) (domain.AutomationRun, error) {
 	if completedAt != nil {
 		run.CompletedAt = *completedAt
 	}
-	actionResults, err := unmarshalActionResults(actionResultsJSON)
-	if err != nil {
-		return domain.AutomationRun{}, fmt.Errorf("postgres: unmarshal action_results_json: %w", err)
-	}
-	run.ActionResults = actionResults
 	return run, nil
 }
 

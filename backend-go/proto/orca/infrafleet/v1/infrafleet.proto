@@ -422,7 +422,6 @@ message VmProvisionResult {
 //    which is explicitly out of scope here (§5: the "ssh" branch is
 //    pass-through only, never dialed — see BE-SOL-EVM-004/CR-EVM-005).
 //    Add it to this message when that task wires a real dial.
-<<<<<<< HEAD
 // RecipePortForward mirrors frontend's SavedPortForward
 // (frontend/src/shared/ssh-types.ts) field-for-field — see
 // CR-EVM-008/TASK-BE-EVM-020. Named distinctly from PortForward below (the
@@ -430,11 +429,6 @@ message VmProvisionResult {
 // name, different concepts: this one is a recipe-supplied config value with
 // no CRUD lifecycle of its own.
 message RecipePortForward {
-=======
-// PortForward mirrors frontend's SavedPortForward (frontend/src/shared/ssh-types.ts)
-// field-for-field — see CR-EVM-008/TASK-BE-EVM-020.
-message PortForward {
->>>>>>> feat/team-rbac-implementation
   int32 local_port = 1;
   string remote_host = 2;
   int32 remote_port = 3;
@@ -456,11 +450,7 @@ message EphemeralVmRecipeSshTarget {
   // deliberately dropped at ports.go/devserveragent/client.go (no proto
   // field existed to carry it through) — now wired end to end, see
   // TASK-BE-EVM-021/022 and agent's TASK-AG-EVM-011 (Hướng A).
-<<<<<<< HEAD
   repeated RecipePortForward port_forwards = 11;
-=======
-  repeated PortForward port_forwards = 11;
->>>>>>> feat/team-rbac-implementation
 }
 
 message DevServer {

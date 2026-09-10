@@ -328,17 +328,12 @@ func toDomainStepType(t workflowv1.StepType) domain.StepType {
 		return domain.StepTypeWebhook
 	case workflowv1.StepType_STEP_TYPE_CONDITION:
 		return domain.StepTypeCondition
-<<<<<<< HEAD
 	case workflowv1.StepType_STEP_TYPE_CLEANUP_WORKTREES:
 		return domain.StepTypeCleanupWorktrees
 	case workflowv1.StepType_STEP_TYPE_ACTION:
 		return domain.StepTypeAction
 	case workflowv1.StepType_STEP_TYPE_PARALLEL:
 		return domain.StepTypeParallel
-=======
-	case workflowv1.StepType_STEP_TYPE_COMMIT_PUSH:
-		return domain.StepTypeCommitPush
->>>>>>> feat/team-rbac-implementation
 	default:
 		return domain.StepTypeUnspecified
 	}
