@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (proto)
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** TASK-FLEET-02-06 (adds `DevServer.status`; this task adds the sibling platform fields to the same message — coordinate field numbers)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — DevServer.status already claimed field 6 (not 8/9 as drafted); platform/arch/node_version/agent_version use the actual next-free 7-10. RegisterDevServerRequest.relay_port=5 matched exactly. Added DetectDevServerAgents/CheckDevServerPreflight RPCs + messages. Also updated toProtoDevServer to populate the new fields (was previously silently dropping them). `go build ./proto/...` and full service build/test clean.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `notification-service`
 **File:** `backend-go/services/notification-service/internal/adapter/eventbus/consumer.go`
 **Depends on:** TASK-PRF-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — PROJECT/orca.project.devserver.changed subject binding + subjectRules entry added; consumer_test.go regression guard passes
 
 ---
 

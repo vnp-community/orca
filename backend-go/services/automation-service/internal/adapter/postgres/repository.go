@@ -14,8 +14,11 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 
+	"github.com/stablyai/orca-go/common/outbox"
+	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
 	"github.com/stablyai/orca-go/services/automation-service/internal/usecase"
 )
@@ -100,18 +103,33 @@ func NewAutomationRepository(pool *pgxpool.Pool) *AutomationRepository {
 	return &AutomationRepository{pool: pool}
 }
 
+const automationColumns = `id, tenant_id, project_id, name, rrule, dtstart, step_type, step_config_json,
+	actions_json, enabled, timezone, trigger_type, trigger_event, trigger_filter_json,
+	max_run_history, run_timeout_seconds, running_run_id, running_since,
+	next_run_at, created_at, updated_at`
+
 func (r *AutomationRepository) Create(ctx context.Context, a domain.Automation) error {
 	actionsJSON, err := marshalActions(a.Actions)
 	if err != nil {
 		return fmt.Errorf("postgres: marshal actions: %w", err)
 	}
+	filterJSON, err := marshalTriggerFilter(a.TriggerFilter)
+	if err != nil {
+		return fmt.Errorf("postgres: marshal trigger filter: %w", err)
+	}
 	_, err = r.pool.Exec(ctx, `
 		INSERT INTO automation.automations (
-			id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at,
-			actions_json, max_run_history, run_timeout_seconds
-		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15)
-	`, a.ID, a.TenantID, a.Name, a.RRule, a.DTStart, string(a.StepType), a.StepConfigJSON, a.Enabled, a.Timezone, nullableTime(a.NextRunAt), a.CreatedAt, a.UpdatedAt,
-		actionsJSON, a.MaxRunHistory, a.RunTimeoutSeconds)
+			id, tenant_id, project_id, name, rrule, dtstart, step_type, step_config_json,
+			actions_json, enabled, timezone, trigger_type, trigger_event, trigger_filter_json,
+			max_run_history, run_timeout_seconds,
+			next_run_at, created_at, updated_at
+		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+	`,
+		a.ID, a.TenantID, nullableString(a.ProjectID), a.Name, a.RRule, a.DTStart, string(a.StepType), a.StepConfigJSON,
+		actionsJSON, a.Enabled, a.Timezone, string(a.TriggerType), nullableString(string(a.TriggerEvent)), filterJSON,
+		a.MaxRunHistory, a.RunTimeoutSeconds,
+		nullableTime(a.NextRunAt), a.CreatedAt, a.UpdatedAt,
+	)
 	if err != nil {
 		return fmt.Errorf("postgres: insert automation: %w", err)
 	}
@@ -120,8 +138,7 @@ func (r *AutomationRepository) Create(ctx context.Context, a domain.Automation) 
 
 func (r *AutomationRepository) Get(ctx context.Context, tenantID, id string) (domain.Automation, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at,
-		       actions_json, max_run_history, run_timeout_seconds, running_run_id, running_since
+		SELECT `+automationColumns+`
 		FROM automation.automations
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
@@ -142,8 +159,7 @@ func (r *AutomationRepository) List(ctx context.Context, tenantID, pageToken str
 		pageSize = 50
 	}
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at,
-		       actions_json, max_run_history, run_timeout_seconds, running_run_id, running_since
+		SELECT `+automationColumns+`
 		FROM automation.automations
 		WHERE tenant_id = $1 AND ($2 = '' OR id > $2::uuid)
 		ORDER BY id
@@ -181,14 +197,20 @@ func (r *AutomationRepository) Update(ctx context.Context, tenantID string, a do
 	if err != nil {
 		return fmt.Errorf("postgres: marshal actions: %w", err)
 	}
+	filterJSON, err := marshalTriggerFilter(a.TriggerFilter)
+	if err != nil {
+		return fmt.Errorf("postgres: marshal trigger filter: %w", err)
+	}
 	tag, err := r.pool.Exec(ctx, `
 		UPDATE automation.automations
 		SET name = $3, rrule = $4, step_type = $5, step_config_json = $6,
-		    enabled = $7, timezone = $8, dtstart = $9, updated_at = now(),
-		    actions_json = $10, max_run_history = $11, run_timeout_seconds = $12
+		    enabled = $7, timezone = $8, dtstart = $9, project_id = $10, actions_json = $11,
+		    trigger_type = $12, trigger_event = $13, trigger_filter_json = $14,
+		    max_run_history = $15, run_timeout_seconds = $16, updated_at = now()
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, a.ID, a.Name, a.RRule, string(a.StepType), a.StepConfigJSON, a.Enabled, a.Timezone, a.DTStart,
-		actionsJSON, a.MaxRunHistory, a.RunTimeoutSeconds)
+		nullableString(a.ProjectID), actionsJSON, string(a.TriggerType), nullableString(string(a.TriggerEvent)), filterJSON,
+		a.MaxRunHistory, a.RunTimeoutSeconds)
 	if err != nil {
 		return fmt.Errorf("postgres: update automation: %w", err)
 	}
@@ -210,6 +232,76 @@ func (r *AutomationRepository) Delete(ctx context.Context, tenantID, id string) 
 		return fmt.Errorf("postgres: automation %s not found for tenant %s", id, tenantID)
 	}
 	return nil
+}
+
+// CountByProject returns the number of automations for tenantID scoped to
+// projectID — backs BR-AT-02's per-project cap.
+func (r *AutomationRepository) CountByProject(ctx context.Context, tenantID, projectID string) (int, error) {
+	var count int
+	err := r.pool.QueryRow(ctx,
+		`SELECT COUNT(*) FROM automation.automations WHERE tenant_id = $1 AND project_id = $2`,
+		tenantID, projectID,
+	).Scan(&count)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: count automations by project: %w", err)
+	}
+	return count, nil
+}
+
+// ListByTrigger returns enabled automations for tenantID whose trigger_type
+// is 'event' and trigger_event matches eventName — backs event dispatch.
+func (r *AutomationRepository) ListByTrigger(ctx context.Context, tenantID string, eventName domain.EventName) ([]domain.Automation, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT `+automationColumns+`
+		FROM automation.automations
+		WHERE tenant_id = $1 AND trigger_type = 'event' AND trigger_event = $2 AND enabled = true
+	`, tenantID, string(eventName))
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query automations by trigger: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Automation
+	for rows.Next() {
+		a, err := scanAutomation(rows)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: scan automation row: %w", err)
+		}
+		out = append(out, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate automation rows: %w", err)
+	}
+	return out, nil
+}
+
+// ListEventTriggered returns every event-triggered automation for tenantID
+// (regardless of enabled) — backs DetectTriggerCycle's graph build
+// (BR-AT-10): a disabled automation can still be re-enabled later, so it
+// must still count as a node in the cycle graph.
+func (r *AutomationRepository) ListEventTriggered(ctx context.Context, tenantID string) ([]domain.Automation, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT `+automationColumns+`
+		FROM automation.automations
+		WHERE tenant_id = $1 AND trigger_type = 'event'
+	`, tenantID)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query event-triggered automations: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Automation
+	for rows.Next() {
+		a, err := scanAutomation(rows)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: scan automation row: %w", err)
+		}
+		out = append(out, a)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate automation rows: %w", err)
+	}
+	return out, nil
 }
 
 // AcquireRunLock implements usecase.AutomationRepository.AcquireRunLock — a
@@ -260,8 +352,7 @@ func (r *AutomationRepository) ClaimDue(ctx context.Context, now time.Time, limi
 	}
 
 	rows, err := tx.Query(ctx, `
-		SELECT id, tenant_id, name, rrule, dtstart, step_type, step_config_json, enabled, timezone, next_run_at, created_at, updated_at,
-		       actions_json, max_run_history, run_timeout_seconds, running_run_id, running_since
+		SELECT `+automationColumns+`
 		FROM automation.automations
 		WHERE enabled = true AND next_run_at IS NOT NULL AND next_run_at <= $1
 		ORDER BY next_run_at
@@ -329,45 +420,80 @@ func (b *claimedBatch) Rollback(ctx context.Context) error {
 	return nil
 }
 
+// scanAutomation scans a row selected via automationColumns — column order
+// must match that constant exactly.
 func scanAutomation(row rowScanner) (domain.Automation, error) {
 	var a domain.Automation
-	var stepType string
-	var nextRunAt *time.Time
+	var stepType, triggerType string
+	var projectID, triggerEvent, triggerFilterJSON *string
 	var actionsJSON []byte
 	var runningRunID *string
 	var runningSince *time.Time
+	var nextRunAt *time.Time
 	if err := row.Scan(
-		&a.ID, &a.TenantID, &a.Name, &a.RRule, &a.DTStart, &stepType, &a.StepConfigJSON,
-		&a.Enabled, &a.Timezone, &nextRunAt, &a.CreatedAt, &a.UpdatedAt,
-		&actionsJSON, &a.MaxRunHistory, &a.RunTimeoutSeconds, &runningRunID, &runningSince,
+		&a.ID, &a.TenantID, &projectID, &a.Name, &a.RRule, &a.DTStart, &stepType, &a.StepConfigJSON,
+		&actionsJSON, &a.Enabled, &a.Timezone, &triggerType, &triggerEvent, &triggerFilterJSON,
+		&a.MaxRunHistory, &a.RunTimeoutSeconds, &runningRunID, &runningSince,
+		&nextRunAt, &a.CreatedAt, &a.UpdatedAt,
 	); err != nil {
 		return domain.Automation{}, err
 	}
 	a.StepType = domain.StepType(stepType)
-	if nextRunAt != nil {
-		a.NextRunAt = *nextRunAt
+	if projectID != nil {
+		a.ProjectID = *projectID
 	}
 	actions, err := unmarshalActions(actionsJSON)
 	if err != nil {
 		return domain.Automation{}, fmt.Errorf("postgres: unmarshal actions_json: %w", err)
 	}
 	a.Actions = actions
+	a.TriggerType = domain.TriggerType(triggerType)
+	if triggerEvent != nil {
+		a.TriggerEvent = domain.EventName(*triggerEvent)
+	}
+	if triggerFilterJSON != nil {
+		filter, err := domain.ParseTriggerFilter(*triggerFilterJSON)
+		if err != nil {
+			return domain.Automation{}, fmt.Errorf("postgres: unmarshal trigger_filter_json: %w", err)
+		}
+		a.TriggerFilter = filter
+	}
 	if runningRunID != nil {
 		a.RunningRunID = *runningRunID
 	}
 	if runningSince != nil {
 		a.RunningSince = *runningSince
 	}
+	if nextRunAt != nil {
+		a.NextRunAt = *nextRunAt
+	}
 	return a, nil
+}
+
+func marshalTriggerFilter(f *domain.TriggerFilter) (*string, error) {
+	if f == nil {
+		return nil, nil
+	}
+	b, err := json.Marshal(f)
+	if err != nil {
+		return nil, err
+	}
+	s := string(b)
+	return &s, nil
 }
 
 // AutomationRunRepository implements usecase.AutomationRunRepository.
 type AutomationRunRepository struct {
-	pool *pgxpool.Pool
+	pool      *pgxpool.Pool
+	publisher *eventbus.RunCompletedPublisher
 }
 
-func NewAutomationRunRepository(pool *pgxpool.Pool) *AutomationRunRepository {
-	return &AutomationRunRepository{pool: pool}
+// NewAutomationRunRepository wires publisher — the transactional-outbox
+// writer used inside UpdateStatus for terminal transitions (BR: never a
+// bare post-hoc publish call). A nil publisher is accepted for tests/
+// call-sites that don't need the outbox side effect.
+func NewAutomationRunRepository(pool *pgxpool.Pool, publisher *eventbus.RunCompletedPublisher) *AutomationRunRepository {
+	return &AutomationRunRepository{pool: pool, publisher: publisher}
 }
 
 func (r *AutomationRunRepository) Create(ctx context.Context, run domain.AutomationRun) error {
@@ -378,12 +504,11 @@ func (r *AutomationRunRepository) Create(ctx context.Context, run domain.Automat
 	_, err = r.pool.Exec(ctx, `
 		INSERT INTO automation.automation_runs (
 			id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
-			output_json, error_message, created_at, started_at, completed_at, action_results_json
+			output_json, error_message, action_results_json, created_at, started_at, completed_at
 		) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)
 	`,
 		run.ID, run.AutomationID, run.TenantID, run.RequestID, string(run.Status), string(run.StepType), string(run.Trigger), run.StepConfigJSON,
-		nullableString(run.OutputJSON), nullableString(run.ErrorMessage), run.CreatedAt, nullableTime(run.StartedAt), nullableTime(run.CompletedAt),
-		actionResultsJSON,
+		nullableString(run.OutputJSON), nullableString(run.ErrorMessage), actionResultsJSON, run.CreatedAt, nullableTime(run.StartedAt), nullableTime(run.CompletedAt),
 	)
 	if err != nil {
 		return fmt.Errorf("postgres: insert automation run: %w", err)
@@ -393,8 +518,7 @@ func (r *AutomationRunRepository) Create(ctx context.Context, run domain.Automat
 
 func (r *AutomationRunRepository) FindByRequestID(ctx context.Context, tenantID, automationID, requestID string) (domain.AutomationRun, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
-		       output_json, error_message, created_at, started_at, completed_at, action_results_json
+		SELECT `+runColumns+`
 		FROM automation.automation_runs
 		WHERE tenant_id = $1 AND automation_id = $2 AND request_id = $3
 	`, tenantID, automationID, requestID)
@@ -409,22 +533,65 @@ func (r *AutomationRunRepository) FindByRequestID(ctx context.Context, tenantID,
 	return run, true, nil
 }
 
+// FindRunning returns the currently-running run for automationID, if any —
+// backed by idx_automation_runs_one_running.
+func (r *AutomationRunRepository) FindRunning(ctx context.Context, tenantID, automationID string) (domain.AutomationRun, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT `+runColumns+`
+		FROM automation.automation_runs
+		WHERE tenant_id = $1 AND automation_id = $2 AND status = 'running'
+		LIMIT 1
+	`, tenantID, automationID)
+
+	run, err := scanRun(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.AutomationRun{}, false, nil
+	}
+	if err != nil {
+		return domain.AutomationRun{}, false, fmt.Errorf("postgres: query running automation run: %w", err)
+	}
+	return run, true, nil
+}
+
+// UpdateStatus persists a run's status transition inside a transaction —
+// for a terminal transition (Terminal() == true), the same transaction also
+// writes the orca.automation.run.completed outbox entry, per the
+// transactional-outbox convention (never a bare post-hoc publish call).
 func (r *AutomationRunRepository) UpdateStatus(ctx context.Context, run domain.AutomationRun) error {
 	actionResultsJSON, err := marshalActionResults(run.ActionResults)
 	if err != nil {
 		return fmt.Errorf("postgres: marshal action_results: %w", err)
 	}
-	tag, err := r.pool.Exec(ctx, `
-		UPDATE automation.automation_runs
-		SET status = $1, output_json = $2, error_message = $3, started_at = $4, completed_at = $5, action_results_json = $8
-		WHERE id = $6 AND tenant_id = $7
-	`, string(run.Status), nullableString(run.OutputJSON), nullableString(run.ErrorMessage),
-		nullableTime(run.StartedAt), nullableTime(run.CompletedAt), run.ID, run.TenantID, actionResultsJSON)
+	tx, err := r.pool.Begin(ctx)
 	if err != nil {
+		return fmt.Errorf("postgres: begin update-status tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }() // no-op after a successful Commit
+
+	tag, err := tx.Exec(ctx, `
+		UPDATE automation.automation_runs
+		SET status = $1, output_json = $2, error_message = $3, action_results_json = $4, started_at = $5, completed_at = $6
+		WHERE id = $7 AND tenant_id = $8
+	`, string(run.Status), nullableString(run.OutputJSON), nullableString(run.ErrorMessage), actionResultsJSON,
+		nullableTime(run.StartedAt), nullableTime(run.CompletedAt), run.ID, run.TenantID)
+	if err != nil {
+		if isUniqueViolation(err, "idx_automation_runs_one_running") {
+			return usecase.ErrConcurrentRunActive
+		}
 		return fmt.Errorf("postgres: update automation run status: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("postgres: automation run %s not found for tenant %s", run.ID, run.TenantID)
+	}
+
+	if run.Status.Terminal() && r.publisher != nil {
+		if err := r.publisher.PublishRunCompleted(ctx, tx, run); err != nil {
+			return fmt.Errorf("postgres: publish run-completed outbox entry: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("postgres: commit update-status tx: %w", err)
 	}
 	return nil
 }
@@ -438,8 +605,7 @@ func (r *AutomationRunRepository) ListByAutomation(ctx context.Context, tenantID
 	// $n::uuid` guard AutomationRepository.List already uses for pageToken,
 	// applied to both optional filters here.
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
-		       output_json, error_message, created_at, started_at, completed_at, action_results_json
+		SELECT `+runColumns+`
 		FROM automation.automation_runs
 		WHERE tenant_id = $1
 		  AND ($2 = '' OR automation_id = $2::uuid)
@@ -469,6 +635,94 @@ func (r *AutomationRunRepository) ListByAutomation(ctx context.Context, tenantID
 		next = out[len(out)-1].ID
 	}
 	return out, next, nil
+}
+
+// PruneOldRuns deletes every automation_runs row for automationID beyond
+// the `keep` most recent (by created_at DESC) — BR-AT-07.
+func (r *AutomationRunRepository) PruneOldRuns(ctx context.Context, tenantID, automationID string, keep int) error {
+	_, err := r.pool.Exec(ctx, `
+		DELETE FROM automation.automation_runs
+		WHERE tenant_id = $1 AND automation_id = $2
+		  AND id NOT IN (
+		    SELECT id FROM automation.automation_runs
+		    WHERE tenant_id = $1 AND automation_id = $2
+		    ORDER BY created_at DESC
+		    LIMIT $3
+		  )`,
+		tenantID, automationID, keep,
+	)
+	if err != nil {
+		return fmt.Errorf("postgres: prune old automation runs: %w", err)
+	}
+	return nil
+}
+
+// WriteCleanupReport persists one worktree_cleanup_log row per entry —
+// BR-AT-14's per-worktree, per-reason audit trail. A single batched
+// multi-row INSERT.
+func (r *AutomationRunRepository) WriteCleanupReport(ctx context.Context, tenantID, runID string, entries []domain.CleanupLogEntry) error {
+	if len(entries) == 0 {
+		return nil
+	}
+	batch := &pgx.Batch{}
+	for _, e := range entries {
+		batch.Queue(`
+			INSERT INTO automation.worktree_cleanup_log (tenant_id, run_id, worktree_id, action, reason)
+			VALUES ($1, $2, $3, $4, $5)
+		`, tenantID, runID, e.WorktreeID, e.Action, nullableString(e.Reason))
+	}
+	br := r.pool.SendBatch(ctx, batch)
+	defer br.Close()
+	for range entries {
+		if _, err := br.Exec(); err != nil {
+			return fmt.Errorf("postgres: insert worktree_cleanup_log row: %w", err)
+		}
+	}
+	return nil
+}
+
+const runColumns = `id, automation_id, tenant_id, request_id, status, step_type, trigger, step_config_json,
+	output_json, error_message, action_results_json, created_at, started_at, completed_at`
+
+// FetchUnpublished and MarkPublished implement common/outbox.Store — polled
+// by the common/outbox.Relay wired in cmd/server/main.go, which actually
+// delivers each row to NATS JetStream.
+func (r *AutomationRunRepository) FetchUnpublished(ctx context.Context, limit int) ([]outbox.Record, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, subject, occurred_at, version, payload
+		FROM automation.outbox_events
+		WHERE published_at IS NULL
+		ORDER BY created_at
+		LIMIT $1
+	`, limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query unpublished outbox events: %w", err)
+	}
+	defer rows.Close()
+
+	var out []outbox.Record
+	for rows.Next() {
+		var rec outbox.Record
+		var payload []byte
+		if err := rows.Scan(&rec.ID, &rec.Event.TenantID, &rec.Subject, &rec.Event.OccurredAt, &rec.Event.Version, &payload); err != nil {
+			return nil, fmt.Errorf("postgres: scan outbox event row: %w", err)
+		}
+		rec.Event.ID = rec.ID
+		rec.Event.Payload = payload
+		out = append(out, rec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate outbox event rows: %w", err)
+	}
+	return out, nil
+}
+
+func (r *AutomationRunRepository) MarkPublished(ctx context.Context, ids []string) error {
+	_, err := r.pool.Exec(ctx, `UPDATE automation.outbox_events SET published_at = now() WHERE id = ANY($1)`, ids)
+	if err != nil {
+		return fmt.Errorf("postgres: mark outbox events published: %w", err)
+	}
+	return nil
 }
 
 // PruneRuns implements usecase.AutomationRunRepository.PruneRuns — deletes
@@ -501,15 +755,17 @@ type rowScanner interface {
 	Scan(dest ...any) error
 }
 
+// scanRun scans a row selected via runColumns — column order must match
+// that constant exactly.
 func scanRun(row rowScanner) (domain.AutomationRun, error) {
 	var run domain.AutomationRun
 	var status, stepType, trigger string
 	var outputJSON, errorMessage *string
-	var startedAt, completedAt *time.Time
 	var actionResultsJSON []byte
+	var startedAt, completedAt *time.Time
 	if err := row.Scan(
 		&run.ID, &run.AutomationID, &run.TenantID, &run.RequestID, &status, &stepType, &trigger, &run.StepConfigJSON,
-		&outputJSON, &errorMessage, &run.CreatedAt, &startedAt, &completedAt, &actionResultsJSON,
+		&outputJSON, &errorMessage, &actionResultsJSON, &run.CreatedAt, &startedAt, &completedAt,
 	); err != nil {
 		return domain.AutomationRun{}, err
 	}
@@ -522,17 +778,17 @@ func scanRun(row rowScanner) (domain.AutomationRun, error) {
 	if errorMessage != nil {
 		run.ErrorMessage = *errorMessage
 	}
+	results, err := unmarshalActionResults(actionResultsJSON)
+	if err != nil {
+		return domain.AutomationRun{}, fmt.Errorf("postgres: unmarshal action_results_json: %w", err)
+	}
+	run.ActionResults = results
 	if startedAt != nil {
 		run.StartedAt = *startedAt
 	}
 	if completedAt != nil {
 		run.CompletedAt = *completedAt
 	}
-	actionResults, err := unmarshalActionResults(actionResultsJSON)
-	if err != nil {
-		return domain.AutomationRun{}, fmt.Errorf("postgres: unmarshal action_results_json: %w", err)
-	}
-	run.ActionResults = actionResults
 	return run, nil
 }
 
@@ -548,4 +804,20 @@ func nullableString(s string) *string {
 		return nil
 	}
 	return &s
+}
+
+// isUniqueViolation reports whether err is a Postgres unique_violation
+// (23505) on the named constraint/index — used to distinguish "a
+// concurrent dispatch already claimed this" from a real failure, both for
+// the (tenant_id, request_id) idempotency index and
+// idx_automation_runs_one_running (BR-AT-08).
+func isUniqueViolation(err error, constraintName string) bool {
+	var pgErr *pgconn.PgError
+	if !errors.As(err, &pgErr) {
+		return false
+	}
+	if pgErr.Code != "23505" {
+		return false
+	}
+	return constraintName == "" || pgErr.ConstraintName == constraintName
 }

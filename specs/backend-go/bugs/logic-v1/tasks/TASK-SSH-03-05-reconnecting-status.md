@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/connection.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — domain.Connection.Status/usecase.SshState/proto GetSshStateResponse carry "reconnecting"; TestGetSshState_ReconnectingStatus passes`
 
 ---
 

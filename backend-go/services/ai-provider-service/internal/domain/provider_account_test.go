@@ -33,12 +33,40 @@ func TestNewProviderAccount_ValidatesInvariants(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			_, err := NewProviderAccount("acc-1", tt.tenantID, tt.provider, tt.status, "cred-ref-1",
-				tt.scope, tt.userID, tt.projectID, "", nil, now, now)
+				tt.scope, tt.userID, tt.projectID, "", "", "", "", 0, nil, false, nil, "", nil, now, now)
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
 			if tt.wantErr != nil && err != tt.wantErr {
 				t.Fatalf("expected %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestNewProviderAccount_QuotaLimitTooLow(t *testing.T) {
+	now := time.Now()
+	tests := []struct {
+		name    string
+		quota   int
+		wantErr bool
+	}{
+		{"1 is too low", 1, true},
+		{"500 is too low", 500, true},
+		{"999 is too low", 999, true},
+		{"0 means unlimited, allowed", 0, false},
+		{"1000 is the floor, allowed", 1000, false},
+		{"50000 is allowed", 50000, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewProviderAccount("acc-1", "t1", ProviderTypeAnthropic, AccountStatusActive, "cred-ref-1",
+				ScopeServer, "", "", "", "", "", "", tt.quota, nil, false, nil, "", nil, now, now)
+			if tt.wantErr && err != ErrQuotaLimitTooLow {
+				t.Fatalf("expected ErrQuotaLimitTooLow, got %v", err)
+			}
+			if !tt.wantErr && err != nil {
+				t.Fatalf("expected no error, got %v", err)
 			}
 		})
 	}
@@ -51,7 +79,7 @@ func TestProviderAccount_HasNoSecretField(t *testing.T) {
 	// gets caught in review, even though Go can't enforce it at compile time.
 	now := time.Now()
 	acc, err := NewProviderAccount("acc-1", "t1", ProviderTypeAnthropic, AccountStatusActive,
-		"cred-ref-1", ScopeServer, "", "", "", nil, now, now)
+		"cred-ref-1", ScopeServer, "", "", "", "", "", "", 0, nil, false, nil, "", nil, now, now)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -63,13 +91,38 @@ func TestProviderAccount_HasNoSecretField(t *testing.T) {
 func TestProviderAccount_Resolvable(t *testing.T) {
 	now := time.Now()
 	for _, status := range []AccountStatus{AccountStatusPending, AccountStatusActive, AccountStatusRotating, AccountStatusRevoked, AccountStatusError} {
-		acc, err := NewProviderAccount("acc-1", "t1", ProviderTypeAnthropic, status, "cred-ref-1", ScopeServer, "", "", "", nil, now, now)
+		acc, err := NewProviderAccount("acc-1", "t1", ProviderTypeAnthropic, status, "cred-ref-1",
+			ScopeServer, "", "", "", "", "", "", 0, nil, false, nil, "", nil, now, now)
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
 		want := status == AccountStatusActive
 		if got := acc.Resolvable(); got != want {
 			t.Errorf("status %q: Resolvable() = %v, want %v", status, got, want)
+		}
+	}
+}
+
+// TestProviderAccount_Resolvable_ExcludesAllHealthFailures is a regression
+// guard: excluding health failures never needs a second check anywhere else
+// in the codebase — Resolvable()'s existing one-line status check already
+// covers every HealthDetail value, including nil, once the health-check job
+// flips Status to AccountStatusError.
+func TestProviderAccount_Resolvable_ExcludesAllHealthFailures(t *testing.T) {
+	healthy := HealthDetailHealthy
+	degraded := HealthDetailDegraded
+	quotaExceeded := HealthDetailQuotaExceeded
+	invalidKey := HealthDetailInvalidKey
+	unreachable := HealthDetailUnreachable
+
+	for _, detail := range []*string{nil, &healthy, &degraded, &quotaExceeded, &invalidKey, &unreachable} {
+		acc := ProviderAccount{Status: AccountStatusError, HealthDetail: detail}
+		if acc.Resolvable() {
+			label := "nil"
+			if detail != nil {
+				label = *detail
+			}
+			t.Errorf("HealthDetail=%v: expected Resolvable() to be false for AccountStatusError", label)
 		}
 	}
 }

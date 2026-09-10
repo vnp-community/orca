@@ -21,16 +21,20 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/ai-provider-service/internal/config"
 
+	aiprovidereventbus "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/eventbus"
 	aiprovidergrpc "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/grpc"
 	aiprovidergrpcclient "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/grpcclient"
 	aiproviderpostgres "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/postgres"
+	aiproviderscheduler "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/scheduler"
 	"github.com/stablyai/orca-go/services/ai-provider-service/internal/usecase"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
@@ -74,6 +78,33 @@ func run() error {
 	}
 	defer pool.Close()
 
+	healthSrv := health.New()
+	healthSrv.Register("postgres", func() error {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		return pool.Ping(ctx)
+	})
+
+	// Best-effort rate-limit event publish (SOL-MB-02,
+	// TASK-MB-02-04) — notification-service consumes
+	// orca.aiprovider.account.rate_limited. Unreachable NATS must not be
+	// fatal: TestConnection degrades to skipping the publish (see its
+	// Execute), same graceful-degradation shape as tenant-service's
+	// profile-cache invalidation publisher.
+	var rateLimitEvents usecase.RateLimitEventPublisher
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, rate-limit events will not be published", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "AIPROVIDER", []string{"orca.aiprovider.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			rateLimitEvents = aiprovidereventbus.New(pub)
+			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
+		}
+	}
+
 	repo := aiproviderpostgres.New(pool)
 
 	// Real credential-broker-service connection — Epic B
@@ -100,7 +131,7 @@ func run() error {
 	defer func() { _ = infraFleetConn.Close() }()
 	infraFleet := aiprovidergrpcclient.NewInfraFleetClient(infraFleetConn)
 
-	createAccountUC := usecase.NewCreateAccount(repo, broker, uuid.NewString, nil)
+	createAccountUC := usecase.NewCreateAccount(repo, broker, infraFleet, uuid.NewString, nil)
 	resolveProviderUC := usecase.NewResolveProvider(repo)
 	rotateKeyUC := usecase.NewRotateKey(repo, broker)
 	getUsageTodayUC := usecase.NewGetUsageToday(repo, nil)
@@ -108,21 +139,47 @@ func run() error {
 	updateAccountUC := usecase.NewUpdateAccount(repo)
 	deleteAccountUC := usecase.NewDeleteAccount(repo)
 	writeCredentialUC := usecase.NewWriteCredential(repo, broker)
-	testConnectionUC := usecase.NewTestConnection(repo, infraFleet)
+	testConnectionUC := usecase.NewTestConnection(repo, infraFleet, rateLimitEvents)
+	reconcileHealthUC := usecase.NewReconcileProviderHealth(repo, infraFleet, repo, nil)
+	recordTokenUsageUC := usecase.NewRecordTokenUsage(repo, repo, repo, nil)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	aiproviderv1.RegisterAiProviderServiceServer(grpcServer, aiprovidergrpc.New(
 		createAccountUC, resolveProviderUC, rotateKeyUC, getUsageTodayUC,
 		listAccountsUC, updateAccountUC, deleteAccountUC, writeCredentialUC, testConnectionUC,
+		recordTokenUsageUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
+	// Health-check ticker (ai-provider-service.md §8) — every replica runs
+	// one; no leader election needed, ClaimDue's FOR UPDATE SKIP LOCKED is
+	// what prevents double-firing across replicas.
+	healthCheckTicker := aiproviderscheduler.New(reconcileHealthUC, 15*time.Minute, 50, logger)
+	go healthCheckTicker.Run(ctx)
+
+	// Transactional-outbox relay (mirrors usage-service's cmd/server/main.go
+	// wiring): CreateAccount durably enqueues an outbox row in the SAME
+	// Postgres transaction as the account insert (internal/adapter/postgres.
+	// Repository.Create) — this relay is what actually gets those rows to
+	// NATS. If NATS is unreachable at startup, rows still get written
+	// durably; they just queue up unpublished until an operator restarts
+	// this process once NATS recovers. A separate connection from the
+	// rate-limit-event publisher above since the two use distinct streams.
+	var relay *outbox.Relay
+	outboxPub, _, closeOutboxBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeOutboxBus() }()
+		if err := outboxPub.EnsureStream(ctx, "AI_PROVIDER", []string{"orca.ai_provider.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
+		} else {
+			relay = outbox.NewRelay(repo, outboxPub, outbox.DefaultConfig, logger)
+		}
+	}
+	if relay != nil {
+		go relay.Run(ctx)
+	}
 
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),

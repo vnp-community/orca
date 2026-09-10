@@ -23,8 +23,12 @@ import rego.v1
 # per grant_resolution.go) is mirrored here as a widening/narrowing action
 # set, not re-derived.
 level_actions := {
-	"owner": {"read", "write", "execute", "admin"},
-	"admin": {"read", "write", "execute", "admin"},
+	# "manage" (added by TASK-TG-03-01) is the action Grant/RevokeGrant/
+	# ListGrants require — only owner/admin may write a grant on a task
+	# they can already administer; a plain "user"-level grantee still
+	# cannot re-grant access to others.
+	"owner": {"read", "write", "execute", "admin", "manage"},
+	"admin": {"read", "write", "execute", "admin", "manage"},
 	"user": {"read", "write", "execute"},
 	"team": {"read", "write"},
 	"company": {"read"},

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/launch.go`
 **Depends on:** TASK-SSH-02-05
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — launch() now returns (*sshExecTransport, *diagnosticStderr, error) with session.Stderr wired to the capped buffer; TestLaunch_ReturnsACappedStderrBuffer passes`
 
 ---
 

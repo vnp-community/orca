@@ -23,6 +23,12 @@ type ResolveConnectionOutput struct {
 	// without conflating it with DevServer.ID, a different id space.
 	ConnectionID string
 	WorktreeID   string
+	// NodeVersion is the connected session's self-reported Node.js version
+	// (TASK-INT-03-02) — empty when Connected is false, when Sessions is
+	// nil, or when the live session predates this field. Never populated
+	// by any resolver other than Sessions (see HandshakeInfoProvider's doc
+	// comment).
+	NodeVersion string
 	// HiddenTargetID (TASK-BE-EVM-018, BE-SOL-EVM-004 §4/§6c) is set ONLY
 	// when WorktreeID is attached (ephemeralVm.attachWorkspace) to an
 	// ephemeral VM runtime whose ConnectionType is "ssh" — by convention,
@@ -52,6 +58,10 @@ type ResolveConnectionInput struct {
 // usecase. See Execute's HiddenTargetID population for the lookup itself.
 type ResolveConnection struct {
 	resolver ConnectionResolver
+	// Sessions is optional (nil by default) — set directly by the
+	// composition root when a live-session Node-version enrichment is
+	// available (TASK-INT-03-02). See HandshakeInfoProvider's doc comment.
+	Sessions HandshakeInfoProvider
 	runtimes EphemeralVmRuntimeRepository
 }
 
@@ -87,10 +97,16 @@ func (uc *ResolveConnection) Execute(ctx context.Context, in ResolveConnectionIn
 	if err != nil {
 		return ResolveConnectionOutput{}, apperrors.New(apperrors.KindInternal, "INFRA_RESOLVE_FAILED", "failed to resolve connection", err)
 	}
-	return ResolveConnectionOutput{
+	out := ResolveConnectionOutput{
 		Connected: connected, DevServer: devServer, ConnectionID: conn.ID, RepoPath: conn.RepoPath, WorktreeID: conn.WorktreeID,
 		HiddenTargetID: uc.resolveHiddenTargetID(ctx, tenantID, conn.WorktreeID),
-	}, nil
+	}
+	if connected && uc.Sessions != nil {
+		if v, ok := uc.Sessions.NodeVersionFor(devServer.ID); ok {
+			out.NodeVersion = v
+		}
+	}
+	return out, nil
 }
 
 // resolveHiddenTargetID (TASK-BE-EVM-018, BE-SOL-EVM-004 §4/§6c) answers

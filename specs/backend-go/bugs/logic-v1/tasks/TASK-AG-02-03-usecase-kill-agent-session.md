@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/kill_agent_session.go` (new), `backend-go/services/infra-fleet-service/internal/usecase/ports.go`
 **Depends on:** TASK-AG-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — WriteActivityChecker port + KillAgentSession usecase implemented (fail-open, nil-safe); kill_agent_session_test.go covers agent-call-fails-still-marks-stopped, busy-blocks, checker-error-fails-open, and nil-checker-proceeds — all passing.
 
 ---
 

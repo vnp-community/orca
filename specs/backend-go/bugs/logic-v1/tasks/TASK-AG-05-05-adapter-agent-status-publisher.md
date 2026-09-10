@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/eventbus/agent_status_publisher.go` (new), `backend-go/services/infra-fleet-service/migrations/0009_agent_status_outbox.up.sql` (new)
 **Depends on:** TASK-AG-05-03
-**Status:** `[ ]` TODO — implements a deliberate, flagged deviation from `08-inter-service-communication.md`'s "publishing always goes through the outbox" rule; needs explicit sign-off (see Context), not silent application
+**Status:** `[x]` DONE — migrations/0009_agent_status_outbox.{up,down}.sql, adapter/eventbus/agent_status_publisher.go (AgentStatusPublisher: direct-publish statusChanged, outbox-relay rateLimited — the flagged deviation from outbox-always, sign-off tracked at the Context section, not re-litigated here), and adapter/postgres/agent_rate_limited_outbox_repository.go (AgentRateLimitedOutboxStore) implemented exactly as specced. `go build`/`go vet` clean. main.go's outbox.NewRelay/eventbus.Connect wiring is TASK-AG-05-06 (out of this batch's scope, per this task's own Changes-to-make section).
 
 ---
 

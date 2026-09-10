@@ -445,6 +445,7 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 			Name          string `json:"name"`
 			Description   string `json:"description"`
 			DevServerID   string `json:"devServerId"`
+			RepoPath      string `json:"repoPath"` // NEW — wasn't decoded at all before
 			DefaultBranch string `json:"defaultBranch"`
 			Visibility    string `json:"visibility"`
 		}
@@ -458,6 +459,7 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 		resp, err := client.CreateProject(rpcCtx, &projectv1.CreateProjectRequest{
 			TenantId: id.TenantID, Name: in.Name, Description: in.Description,
 			DefaultBranch: in.DefaultBranch, Visibility: in.Visibility,
+			DevServerId: in.DevServerID, RepoPath: in.RepoPath, // NEW
 		})
 		if err != nil {
 			return nil, err

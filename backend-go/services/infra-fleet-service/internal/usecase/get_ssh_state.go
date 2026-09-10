@@ -14,6 +14,7 @@ type SshStateInput struct {
 
 type SshState struct {
 	Connected    bool
+	Status       string // "" | "established" | "degraded" | "reconnecting" | "closed"
 	ConnectionID string
 	LastActivity *time.Time
 }
@@ -46,5 +47,10 @@ func (uc *GetSshState) Execute(ctx context.Context, in SshStateInput) (SshState,
 	if err != nil || !found {
 		return SshState{Connected: false}, err
 	}
-	return SshState{Connected: true, ConnectionID: conn.ID, LastActivity: conn.LastActivityAt}, nil
+	return SshState{
+		Connected:    conn.Status != "reconnecting" && conn.Status != "closed",
+		Status:       conn.Status,
+		ConnectionID: conn.ID,
+		LastActivity: conn.LastActivityAt,
+	}, nil
 }

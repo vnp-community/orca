@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"log/slog"
 	"testing"
 	"time"
@@ -11,6 +12,11 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
+func discardLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
+
+// fakePollerRepository is an in-memory FleetHealthPollerRepository.
 type fakePollerRepository struct {
 	devServers []domain.DevServer
 	listErr    error
@@ -23,12 +29,13 @@ func (f *fakePollerRepository) ListAllDevServers(ctx context.Context) ([]domain.
 	return f.devServers, nil
 }
 
+// fakeFleetHealthWriter is an in-memory FleetHealthWriter.
 type fakeFleetHealthWriter struct {
 	written   []domain.DevServerHealth
 	upsertErr error
 	// previous seeds GetDevServerHealth's return per dev server — set
-	// before Execute to simulate "this dev server was already reachable
-	// last poll."
+	// before Execute to simulate "this dev server was already
+	// reachable/at some status last poll."
 	previous map[string]domain.DevServerHealth
 	getErr   error
 }
@@ -49,6 +56,7 @@ func (f *fakeFleetHealthWriter) GetDevServerHealth(ctx context.Context, devServe
 	return h, ok, nil
 }
 
+// fakeOutboxWriter is an in-memory OutboxWriter.
 type fakeOutboxWriter struct {
 	inserted  []domain.OutboxEvent
 	insertErr error
@@ -62,13 +70,306 @@ func (f *fakeOutboxWriter) InsertOutboxEvent(ctx context.Context, event domain.O
 	return nil
 }
 
+// fakePollLock is an in-memory PollLockPort — denyList makes TryLock report
+// locked=false for specific devServerIDs (simulating "another replica
+// already holds this lock").
+type fakePollLock struct {
+	denyList map[string]bool
+	unlocked []string
+}
+
+func (f *fakePollLock) TryLock(ctx context.Context, devServerID string) (bool, func(), error) {
+	if f.denyList[devServerID] {
+		return false, nil, nil
+	}
+	return true, func() {
+		f.unlocked = append(f.unlocked, devServerID)
+	}, nil
+}
+
+// fakeHealthEventPublisher/fakeWebhookAlerter record every call for
+// assertions on call count.
+type statusChangeCall struct {
+	devServerID string
+	from, to    domain.HealthStatus
+}
+
+type fakeHealthEventPublisher struct {
+	calls []statusChangeCall
+}
+
+func (f *fakeHealthEventPublisher) PublishStatusChange(ctx context.Context, ds domain.DevServer, from, to domain.HealthStatus) {
+	f.calls = append(f.calls, statusChangeCall{devServerID: ds.ID, from: from, to: to})
+}
+
+type fakeWebhookAlerter struct {
+	calls []statusChangeCall
+}
+
+func (f *fakeWebhookAlerter) NotifyStatusChange(ctx context.Context, ds domain.DevServer, from, to domain.HealthStatus, sample domain.DevServerHealth) {
+	f.calls = append(f.calls, statusChangeCall{devServerID: ds.ID, from: from, to: to})
+}
+
+// fakeMetricsCollector is an in-memory MetricsCollector.
+type fakeMetricsCollector struct {
+	updates []domain.DevServerHealth
+}
+
+func (f *fakeMetricsCollector) Update(devServerID, host string, sample domain.DevServerHealth) {
+	f.updates = append(f.updates, sample)
+}
+
+func healthyExecResult() map[string]any {
+	return map[string]any{
+		"stdout": "cpu  100 0 50 850 0 0 0 0 0 0\n---\nMem: 1000 300 700 0 0 700\n---\nFilesystem 1024-blocks Used Available Capacity Mounted-on\n/dev/sda1 1000 100 900 10% /\n",
+	}
+}
+
 func devServerForPollTest(t *testing.T, id string) domain.DevServer {
 	t.Helper()
-	ds, err := domain.NewDevServer(id, "tenant-1", "10.0.0.1", domain.ConnectionModeDirectWebSocket, "")
+	ds, err := domain.NewDevServer(id, "tenant-1", "10.0.0.1", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
 	return ds
+}
+
+func TestPollFleetHealth_HealthyServerWritesOneUpsert(t *testing.T) {
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
+	repo := &fakePollerRepository{devServers: []domain.DevServer{ds}}
+	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
+	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
+	lock := &fakePollLock{}
+	events := &fakeHealthEventPublisher{}
+	webhook := &fakeWebhookAlerter{}
+
+	uc := NewPollFleetHealth(repo, health, nil, agent, lock, nil, nil, events, webhook, nil, discardLogger())
+	if err := uc.Execute(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(health.written) != 1 {
+		t.Fatalf("expected exactly 1 UpsertFleetHealth call, got %d", len(health.written))
+	}
+	if health.written[0].Status != domain.HealthStatusHealthy {
+		t.Errorf("expected status=healthy, got %q", health.written[0].Status)
+	}
+	if len(events.calls) != 0 || len(webhook.calls) != 0 {
+		t.Errorf("expected no status-change calls on a first-ever sample, got events=%d webhook=%d", len(events.calls), len(webhook.calls))
+	}
+}
+
+func TestPollFleetHealth_UpdatesMetricsCollectorWhenPresent(t *testing.T) {
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
+	repo := &fakePollerRepository{devServers: []domain.DevServer{ds}}
+	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
+	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
+	lock := &fakePollLock{}
+	events := &fakeHealthEventPublisher{}
+	webhook := &fakeWebhookAlerter{}
+	collector := &fakeMetricsCollector{}
+
+	uc := NewPollFleetHealth(repo, health, nil, agent, lock, nil, nil, events, webhook, collector, discardLogger())
+	if err := uc.Execute(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(collector.updates) != 1 || collector.updates[0].Status != domain.HealthStatusHealthy {
+		t.Errorf("expected exactly 1 collector.Update call with status=healthy, got %+v", collector.updates)
+	}
+}
+
+// TestPollFleetHealth_NilCollectorNeverPanics covers the every-other-test's
+// implicit nil-collector coverage explicitly — PollFleetHealth must work
+// fine before TASK-FLEET-03-08's metrics wiring lands anywhere that
+// constructs it without one.
+func TestPollFleetHealth_NilCollectorNeverPanics(t *testing.T) {
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
+	repo := &fakePollerRepository{devServers: []domain.DevServer{ds}}
+	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
+	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
+	uc := NewPollFleetHealth(repo, health, nil, agent, &fakePollLock{}, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, discardLogger())
+	if err := uc.Execute(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestPollFleetHealth_StatusTransitionTriggersExactlyOneEventAndWebhookCall(t *testing.T) {
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
+	repo := &fakePollerRepository{devServers: []domain.DevServer{ds}}
+	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{
+		"ds1": {DevServerID: "ds1", Status: domain.HealthStatusHealthy},
+	}}
+	// Degraded via high CPU (jiffies chosen so busy/total > 80%).
+	agent := &fakeDevServerAgentClient{healthy: true, execResult: map[string]any{
+		"stdout": "cpu  900 0 0 100 0 0 0 0 0 0\n---\nMem: 1000 300 700 0 0 700\n---\nFilesystem 1024-blocks Used Available Capacity Mounted-on\n/dev/sda1 1000 100 900 10% /\n",
+	}}
+	lock := &fakePollLock{}
+	events := &fakeHealthEventPublisher{}
+	webhook := &fakeWebhookAlerter{}
+
+	uc := NewPollFleetHealth(repo, health, nil, agent, lock, nil, nil, events, webhook, nil, discardLogger())
+	if err := uc.Execute(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(health.written) != 1 || health.written[0].Status != domain.HealthStatusDegraded {
+		t.Fatalf("expected 1 upsert with status=degraded, got %+v", health.written)
+	}
+	if len(events.calls) != 1 {
+		t.Fatalf("expected exactly 1 PublishStatusChange call, got %d", len(events.calls))
+	}
+	if events.calls[0].from != domain.HealthStatusHealthy || events.calls[0].to != domain.HealthStatusDegraded {
+		t.Errorf("unexpected status-change call: %+v", events.calls[0])
+	}
+	if len(webhook.calls) != 1 {
+		t.Fatalf("expected exactly 1 NotifyStatusChange call, got %d", len(webhook.calls))
+	}
+}
+
+func TestPollFleetHealth_NoTransitionTriggersNoEventOrWebhookCall(t *testing.T) {
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
+	repo := &fakePollerRepository{devServers: []domain.DevServer{ds}}
+	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{
+		"ds1": {DevServerID: "ds1", Status: domain.HealthStatusHealthy},
+	}}
+	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
+	lock := &fakePollLock{}
+	events := &fakeHealthEventPublisher{}
+	webhook := &fakeWebhookAlerter{}
+
+	uc := NewPollFleetHealth(repo, health, nil, agent, lock, nil, nil, events, webhook, nil, discardLogger())
+	if err := uc.Execute(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(events.calls) != 0 || len(webhook.calls) != 0 {
+		t.Errorf("expected no status-change calls when status is unchanged, got events=%d webhook=%d", len(events.calls), len(webhook.calls))
+	}
+}
+
+func TestPollFleetHealth_LockedFalseSkipsAgentCallsEntirely(t *testing.T) {
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
+	repo := &fakePollerRepository{devServers: []domain.DevServer{ds}}
+	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
+	agent := &fakeDevServerAgentClient{healthy: true, execResult: healthyExecResult()}
+	lock := &fakePollLock{denyList: map[string]bool{"ds1": true}}
+	events := &fakeHealthEventPublisher{}
+	webhook := &fakeWebhookAlerter{}
+
+	uc := NewPollFleetHealth(repo, health, nil, agent, lock, nil, nil, events, webhook, nil, discardLogger())
+	if err := uc.Execute(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(health.written) != 0 {
+		t.Errorf("expected zero UpsertFleetHealth calls when TryLock returns locked=false, got %d", len(health.written))
+	}
+	agent.mu.Lock()
+	execCalls := len(agent.execCalls)
+	agent.mu.Unlock()
+	if execCalls != 0 {
+		t.Errorf("expected zero agent.Exec calls when TryLock returns locked=false, got %d", execCalls)
+	}
+}
+
+func TestPollFleetHealth_UnreachableServerRecordsUnreachableStatus(t *testing.T) {
+	ds, _ := domain.NewDevServer("ds1", "t1", "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
+	repo := &fakePollerRepository{devServers: []domain.DevServer{ds}}
+	health := &fakeFleetHealthWriter{previous: map[string]domain.DevServerHealth{}}
+	agent := &fakeDevServerAgentClient{healthy: false, healthErr: errors.New("connection refused")}
+	lock := &fakePollLock{}
+	events := &fakeHealthEventPublisher{}
+	webhook := &fakeWebhookAlerter{}
+
+	uc := NewPollFleetHealth(repo, health, nil, agent, lock, nil, nil, events, webhook, nil, discardLogger())
+	if err := uc.Execute(context.Background()); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(health.written) != 1 || health.written[0].Status != domain.HealthStatusUnreachable {
+		t.Fatalf("expected 1 upsert with status=unreachable, got %+v", health.written)
+	}
+	agent.mu.Lock()
+	execCalls := len(agent.execCalls)
+	agent.mu.Unlock()
+	if execCalls != 0 {
+		t.Errorf("expected agent.Exec to be skipped when unreachable, got %d calls", execCalls)
+	}
+}
+
+func TestParseFleetMetrics(t *testing.T) {
+	tests := []struct {
+		name     string
+		stdout   string
+		wantCPU  float64
+		wantRAM  float64
+		wantDisk float64
+	}{
+		{
+			name:     "well-formed output",
+			stdout:   "cpu  100 0 50 850 0 0 0 0 0 0\n---\nMem: 1000 300 700 0 0 700\n---\nFilesystem 1024-blocks Used Available Capacity Mounted-on\n/dev/sda1 1000 100 900 10% /\n",
+			wantCPU:  15, // (100+50) busy out of 1000 total = 15%
+			wantRAM:  30, // 300/1000
+			wantDisk: 10,
+		},
+		{
+			name:     "malformed stat line degrades to zero, not a panic",
+			stdout:   "not-a-valid-stat-line\n---\nMem: 1000 300 700 0 0 700\n---\nFilesystem 1024-blocks Used Available Capacity Mounted-on\n/dev/sda1 1000 100 900 10% /\n",
+			wantCPU:  0,
+			wantRAM:  30,
+			wantDisk: 10,
+		},
+		{
+			name:     "malformed free output degrades to zero",
+			stdout:   "cpu  100 0 50 850 0 0 0 0 0 0\n---\ngarbage\n---\nFilesystem 1024-blocks Used Available Capacity Mounted-on\n/dev/sda1 1000 100 900 10% /\n",
+			wantCPU:  15,
+			wantRAM:  0,
+			wantDisk: 10,
+		},
+		{
+			name:     "malformed df output degrades to zero",
+			stdout:   "cpu  100 0 50 850 0 0 0 0 0 0\n---\nMem: 1000 300 700 0 0 700\n---\ngarbage\n",
+			wantCPU:  15,
+			wantRAM:  30,
+			wantDisk: 0,
+		},
+		{
+			name:     "empty stdout never panics",
+			stdout:   "",
+			wantCPU:  0,
+			wantRAM:  0,
+			wantDisk: 0,
+		},
+		{
+			name:     "missing stdout key never panics",
+			stdout:   "",
+			wantCPU:  0,
+			wantRAM:  0,
+			wantDisk: 0,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cpu, ram, disk := parseFleetMetrics(map[string]any{"stdout": tt.stdout})
+			if cpu != tt.wantCPU {
+				t.Errorf("cpu = %v, want %v", cpu, tt.wantCPU)
+			}
+			if ram != tt.wantRAM {
+				t.Errorf("ram = %v, want %v", ram, tt.wantRAM)
+			}
+			if disk != tt.wantDisk {
+				t.Errorf("disk = %v, want %v", disk, tt.wantDisk)
+			}
+		})
+	}
+}
+
+func TestParseFleetMetrics_MissingStdoutKeyNeverPanics(t *testing.T) {
+	cpu, ram, disk := parseFleetMetrics(map[string]any{})
+	if cpu != 0 || ram != 0 || disk != 0 {
+		t.Errorf("expected all zeros for a result with no stdout key, got cpu=%v ram=%v disk=%v", cpu, ram, disk)
+	}
 }
 
 // TestPollFleetHealth_WritesReachableSampleForEachDevServer is the live-bug
@@ -83,7 +384,7 @@ func TestPollFleetHealth_WritesReachableSampleForEachDevServer(t *testing.T) {
 	writer := &fakeFleetHealthWriter{}
 	agent := &fakeDevServerAgentClient{healthy: true}
 
-	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -104,7 +405,7 @@ func TestPollFleetHealth_RecordsUnreachableWhenHealthCheckFails(t *testing.T) {
 	writer := &fakeFleetHealthWriter{}
 	agent := &fakeDevServerAgentClient{healthErr: errors.New("dial failed")}
 
-	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -124,7 +425,7 @@ func TestPollFleetHealth_OneDevServerWriteFailureDoesNotStopTheRest(t *testing.T
 	writer := &fakeFleetHealthWriter{upsertErr: errors.New("db down")}
 	agent := &fakeDevServerAgentClient{healthy: true}
 
-	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("a per-dev-server write failure must not fail the whole poll: %v", err)
 	}
@@ -135,7 +436,7 @@ func TestPollFleetHealth_ListFailurePropagates(t *testing.T) {
 	writer := &fakeFleetHealthWriter{}
 	agent := &fakeDevServerAgentClient{healthy: true}
 
-	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err == nil {
 		t.Fatal("expected the list failure to propagate")
 	}
@@ -154,7 +455,7 @@ func TestPollFleetHealth_ReachableToUnreachableTransition_EnqueuesOneAlert(t *te
 	outboxW := &fakeOutboxWriter{}
 	agent := &fakeDevServerAgentClient{healthErr: errors.New("dial failed")}
 
-	uc := NewPollFleetHealth(repo, writer, outboxW, agent, nil, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, outboxW, agent, nil, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -190,7 +491,7 @@ func TestPollFleetHealth_RepeatedUnreachableSamples_DoNotReAlert(t *testing.T) {
 	outboxW := &fakeOutboxWriter{}
 	agent := &fakeDevServerAgentClient{healthErr: errors.New("still down")}
 
-	uc := NewPollFleetHealth(repo, writer, outboxW, agent, nil, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, outboxW, agent, nil, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -211,7 +512,7 @@ func TestPollFleetHealth_UnreachableToReachable_DoesNotAlert(t *testing.T) {
 	outboxW := &fakeOutboxWriter{}
 	agent := &fakeDevServerAgentClient{healthy: true}
 
-	uc := NewPollFleetHealth(repo, writer, outboxW, agent, nil, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, outboxW, agent, nil, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -232,7 +533,7 @@ func TestPollFleetHealth_FirstEverPoll_NoPreviousSample_DoesNotAlert(t *testing.
 	outboxW := &fakeOutboxWriter{}
 	agent := &fakeDevServerAgentClient{healthErr: errors.New("dial failed")}
 
-	uc := NewPollFleetHealth(repo, writer, outboxW, agent, nil, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, outboxW, agent, nil, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -253,7 +554,7 @@ func TestPollFleetHealth_NilOutboxWriter_StillWritesSampleWithoutPanicking(t *te
 	}
 	agent := &fakeDevServerAgentClient{healthErr: errors.New("dial failed")}
 
-	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, nil, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -280,7 +581,7 @@ func TestPollFleetHealth_ReachableToUnreachableTransition_MarksActiveConnectionD
 		activeConn: domain.Connection{ID: "conn-1", TenantID: ds.TenantID, DevServerID: ds.ID, Status: domain.ConnectionStatusEstablished, GracePeriodSeconds: 300},
 	}
 
-	uc := NewPollFleetHealth(repo, writer, nil, agent, conns, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, conns, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -317,7 +618,7 @@ func TestPollFleetHealth_UnreachableToReachable_ReestablishesActiveConnection(t 
 		},
 	}
 
-	uc := NewPollFleetHealth(repo, writer, nil, agent, conns, nil, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, conns, nil, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -362,7 +663,7 @@ func TestMarkDegraded_DoesNotCloseTerminalSessions(t *testing.T) {
 		},
 	}
 
-	uc := NewPollFleetHealth(repo, writer, nil, agent, conns, sessions, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, conns, sessions, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -410,7 +711,7 @@ func TestCloseAfterGracePeriodExpiry_ClosesAllTerminalSessionsForConnection(t *t
 		},
 	}
 
-	uc := NewPollFleetHealth(repo, writer, nil, agent, conns, sessions, slog.Default())
+	uc := NewPollFleetHealth(repo, writer, nil, agent, nil, conns, sessions, &fakeHealthEventPublisher{}, &fakeWebhookAlerter{}, nil, slog.Default())
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

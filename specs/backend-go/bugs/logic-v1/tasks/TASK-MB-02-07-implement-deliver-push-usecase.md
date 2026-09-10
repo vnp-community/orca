@@ -5,7 +5,7 @@
 **Service:** `notification-service`
 **File:** `backend-go/services/notification-service/internal/usecase/deliver_push.go` (new), `backend-go/services/notification-service/internal/adapter/grpcclient/authclient/device_secret_resolver.go` (new)
 **Depends on:** TASK-MB-02-05, TASK-MB-02-06, SOL-MB-01 (auth-service `ResolveDeviceSharedSecret`, TASK-MB-01-06/07)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `DeliverPush` usecase implemented (web/VAPID + paired-device NaCl E2E seal + buffering + preferences), `authclient.DeviceSecretResolver` (real gRPC client to auth-service's `ResolveDeviceSharedSecret`), `nacl.Sealer` (real `secretbox`-based `E2ESealer`, round-trip-tested against `secretbox.Open`), wired into `HandleIncomingEvent` (previously WS-only) and `cmd/server/main.go`. `signer usecase.VaultSigner` is now actually invoked (previously wired-but-unused). Unit tests cover all 5 Verify-section scenarios (no-paired-device signs without sealing; paired-device seals-then-signs, ciphertext non-nil; delivery failure buffers once, success doesn't; disabled preference skips delivery) — all pass.
 
 ---
 

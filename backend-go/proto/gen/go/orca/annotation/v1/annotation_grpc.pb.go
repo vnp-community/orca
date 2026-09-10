@@ -19,10 +19,11 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	AnnotationService_CreateAnnotation_FullMethodName = "/orca.annotation.v1.AnnotationService/CreateAnnotation"
-	AnnotationService_ListAnnotations_FullMethodName  = "/orca.annotation.v1.AnnotationService/ListAnnotations"
-	AnnotationService_UpdateAnnotation_FullMethodName = "/orca.annotation.v1.AnnotationService/UpdateAnnotation"
-	AnnotationService_DeleteAnnotation_FullMethodName = "/orca.annotation.v1.AnnotationService/DeleteAnnotation"
+	AnnotationService_CreateAnnotation_FullMethodName    = "/orca.annotation.v1.AnnotationService/CreateAnnotation"
+	AnnotationService_ListAnnotations_FullMethodName     = "/orca.annotation.v1.AnnotationService/ListAnnotations"
+	AnnotationService_UpdateAnnotation_FullMethodName    = "/orca.annotation.v1.AnnotationService/UpdateAnnotation"
+	AnnotationService_DeleteAnnotation_FullMethodName    = "/orca.annotation.v1.AnnotationService/DeleteAnnotation"
+	AnnotationService_MarkAnnotationsSent_FullMethodName = "/orca.annotation.v1.AnnotationService/MarkAnnotationsSent"
 )
 
 // AnnotationServiceClient is the client API for AnnotationService service.
@@ -36,6 +37,7 @@ type AnnotationServiceClient interface {
 	ListAnnotations(ctx context.Context, in *ListAnnotationsRequest, opts ...grpc.CallOption) (*ListAnnotationsResponse, error)
 	UpdateAnnotation(ctx context.Context, in *UpdateAnnotationRequest, opts ...grpc.CallOption) (*UpdateAnnotationResponse, error)
 	DeleteAnnotation(ctx context.Context, in *DeleteAnnotationRequest, opts ...grpc.CallOption) (*DeleteAnnotationResponse, error)
+	MarkAnnotationsSent(ctx context.Context, in *MarkAnnotationsSentRequest, opts ...grpc.CallOption) (*MarkAnnotationsSentResponse, error)
 }
 
 type annotationServiceClient struct {
@@ -86,6 +88,16 @@ func (c *annotationServiceClient) DeleteAnnotation(ctx context.Context, in *Dele
 	return out, nil
 }
 
+func (c *annotationServiceClient) MarkAnnotationsSent(ctx context.Context, in *MarkAnnotationsSentRequest, opts ...grpc.CallOption) (*MarkAnnotationsSentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(MarkAnnotationsSentResponse)
+	err := c.cc.Invoke(ctx, AnnotationService_MarkAnnotationsSent_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AnnotationServiceServer is the server API for AnnotationService service.
 // All implementations must embed UnimplementedAnnotationServiceServer
 // for forward compatibility.
@@ -97,6 +109,7 @@ type AnnotationServiceServer interface {
 	ListAnnotations(context.Context, *ListAnnotationsRequest) (*ListAnnotationsResponse, error)
 	UpdateAnnotation(context.Context, *UpdateAnnotationRequest) (*UpdateAnnotationResponse, error)
 	DeleteAnnotation(context.Context, *DeleteAnnotationRequest) (*DeleteAnnotationResponse, error)
+	MarkAnnotationsSent(context.Context, *MarkAnnotationsSentRequest) (*MarkAnnotationsSentResponse, error)
 	mustEmbedUnimplementedAnnotationServiceServer()
 }
 
@@ -118,6 +131,9 @@ func (UnimplementedAnnotationServiceServer) UpdateAnnotation(context.Context, *U
 }
 func (UnimplementedAnnotationServiceServer) DeleteAnnotation(context.Context, *DeleteAnnotationRequest) (*DeleteAnnotationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteAnnotation not implemented")
+}
+func (UnimplementedAnnotationServiceServer) MarkAnnotationsSent(context.Context, *MarkAnnotationsSentRequest) (*MarkAnnotationsSentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method MarkAnnotationsSent not implemented")
 }
 func (UnimplementedAnnotationServiceServer) mustEmbedUnimplementedAnnotationServiceServer() {}
 func (UnimplementedAnnotationServiceServer) testEmbeddedByValue()                           {}
@@ -212,6 +228,24 @@ func _AnnotationService_DeleteAnnotation_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AnnotationService_MarkAnnotationsSent_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MarkAnnotationsSentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AnnotationServiceServer).MarkAnnotationsSent(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AnnotationService_MarkAnnotationsSent_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AnnotationServiceServer).MarkAnnotationsSent(ctx, req.(*MarkAnnotationsSentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AnnotationService_ServiceDesc is the grpc.ServiceDesc for AnnotationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -234,6 +268,10 @@ var AnnotationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "DeleteAnnotation",
 			Handler:    _AnnotationService_DeleteAnnotation_Handler,
+		},
+		{
+			MethodName: "MarkAnnotationsSent",
+			Handler:    _AnnotationService_MarkAnnotationsSent_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

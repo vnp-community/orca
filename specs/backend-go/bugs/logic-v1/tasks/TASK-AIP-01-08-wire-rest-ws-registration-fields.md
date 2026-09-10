@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service` (+ `api-gateway`)
 **File:** `backend-go/services/ai-provider-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-AIP-01-04, TASK-AIP-01-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — grpc/server.go's CreateAccount+toProtoAccount already wired (Phase 1, commit 99ffee469); this task added the REST (`createAccountRequestBody`, `handleCreateAccount`) and WS (`handleAiProviderCreate`'s `createArgs`) field threading, plus round-trip tests in ai_provider_routes_test.go and channels_ai_provider_test.go — all pass.
 
 ---
 

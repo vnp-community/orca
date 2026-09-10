@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/usecase/get_mobile_worktree_status.go`, `backend-go/services/project-service/internal/adapter/grpcclient/infra_fleet_terminal_status_resolver.go`
 **Depends on:** TASK-MB-04-03, TASK-MB-04-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented `InfraFleetTerminalStatusResolver` (`ListSessionsForDevServer` + `GetAgentStatus`, using `ResolveConnectionResponse.GetConnectionId()` per the confirmed field), `TerminalStatusResolver` added to `ports.go`, `GetMobileWorktreeStatus` usecase composes worktree+project+terminal data; `go build`/`go vet` clean; new tests in `get_mobile_worktree_status_test.go` cover no-dev-server (listed, empty fields), idle, matched-session composition, degraded-dev-server "unknown", and one-call-per-shared-dev-server dedup — all pass.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`
 **Depends on:** TASK-TG-01-01 (both touch `task.proto` — land after to avoid conflicting field-number allocation)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — GrantRequest.expires_at, GrantResponse.id, ResolvePermissionRequest.action, RevokeGrant/ListGrants RPCs + Grant message all added; buf generate + buf breaking (vs origin/main) clean.
 
 ---
 

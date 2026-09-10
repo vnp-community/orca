@@ -5,7 +5,7 @@
 **Service:** `auth-service` (domain)
 **File:** `backend-go/services/auth-service/internal/domain/session.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `LastSeenAt/IP/UserAgent` + `WithClientInfo`; `TestSession_WithClientInfo` and full domain/usecase test suite pass.
 
 ---
 

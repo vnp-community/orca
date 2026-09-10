@@ -41,7 +41,7 @@ func TestProjectExecutionResolver_NotConnected(t *testing.T) {
 	fake := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false}}
 	r := NewProjectExecutionResolver(fake)
 
-	connID, worktreePath, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
+	connID, worktreePath, _, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -60,10 +60,10 @@ func TestProjectExecutionResolver_NotConnected(t *testing.T) {
 }
 
 func TestProjectExecutionResolver_Connected(t *testing.T) {
-	fake := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: true, RepoPath: "/srv/worktrees/p1"}}
+	fake := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: true, RepoPath: "/srv/worktrees/p1", WorktreeId: "wt-1"}}
 	r := NewProjectExecutionResolver(fake)
 
-	connID, worktreePath, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
+	connID, worktreePath, worktreeID, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -73,13 +73,16 @@ func TestProjectExecutionResolver_Connected(t *testing.T) {
 	if worktreePath != "/srv/worktrees/p1" {
 		t.Errorf("expected worktreePath to pass through from repo_path, got %q", worktreePath)
 	}
+	if worktreeID != "wt-1" {
+		t.Errorf("expected worktreeID to pass through from worktree_id, got %q", worktreeID)
+	}
 }
 
 func TestProjectExecutionResolver_NoTenantInContext(t *testing.T) {
 	fake := &fakeInfraFleetServiceClient{}
 	r := NewProjectExecutionResolver(fake)
 
-	if _, _, _, err := r.ResolveConnection(context.Background(), "", "p1"); !errors.Is(err, tenant.ErrNoTenant) {
+	if _, _, _, _, err := r.ResolveConnection(context.Background(), "", "p1"); !errors.Is(err, tenant.ErrNoTenant) {
 		t.Errorf("expected tenant.ErrNoTenant, got %v", err)
 	}
 	if fake.gotResolveConnection != nil {

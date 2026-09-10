@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-PW-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — grpc.Server.ReadDir copies SizeBytes to wire response; TestReadDir_TranslatesSizeBytes + wscompat TestFilesReadDirChannel_ReturnsUnwrappedEntries (SizeBytes assertion) pass
 
 ---
 

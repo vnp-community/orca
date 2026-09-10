@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `backend-go/services/tenant-service/internal/usecase/update_user_profile.go`
 **Depends on:** TASK-PRF-01-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Self-service actorID==UserID check + ValidateUserSettings wired; no audit field added (deliberate); tests green
 
 ---
 

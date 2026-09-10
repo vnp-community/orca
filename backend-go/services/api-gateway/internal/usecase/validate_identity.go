@@ -16,6 +16,9 @@ import (
 type Identity struct {
 	TenantID string
 	UserID   string
+	// DeviceID is non-empty only for a mobile-paired-device JWT (SOL-MB-01)
+	// — read from the token's device_id claim, see jwtauth.Claims.DeviceID.
+	DeviceID string
 	// Role is the caller's global role ("admin"/"user") — added for
 	// CR-DS-006 Phase 2, and now populated on both auth paths: the
 	// cookie/session path (authclient.SessionValidator) and, since
@@ -135,7 +138,7 @@ func (v *AuthValidator) Validate(r *http.Request) (Identity, error) {
 		}
 	}
 
-	return Identity{TenantID: claims.TenantID, UserID: claims.Subject, Role: claims.Role}, nil
+	return Identity{TenantID: claims.TenantID, UserID: claims.Subject, DeviceID: claims.DeviceID, Role: claims.Role}, nil
 }
 
 func bearerToken(r *http.Request) string {

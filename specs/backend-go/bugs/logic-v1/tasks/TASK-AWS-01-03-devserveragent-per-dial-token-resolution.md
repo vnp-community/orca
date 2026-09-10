@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/config.go`, `client.go`, `session.go`
 **Depends on:** TASK-AWS-01-02, TASK-AWS-03-04, TASK-AWS-03-05
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — removed `Config.Token`/`ORCA_AGENT_TOKEN`; added `Client.AgentTokenSource`/`WithAgentTokens`, `session.tokenSource`, updated `connect`/`backgroundReconnect` to resolve per-dial; wired `agentTokenSource` composition-root adapter (over `agentTokenStore` + `credentialBrokerClient`) into main.go; 3 new regression tests (no-token fails without dialing, two DevServers produce two distinct Authorization headers, revoked token's next dial fails closed with no reconnect) all green; `grep ORCA_AGENT_TOKEN` returns nothing.
 
 ---
 

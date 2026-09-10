@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/usecase/resolve_template.go`
 **Depends on:** TASK-WF-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `resolveEffectiveTemplate` replaced with field-level deepMerge (`parseSteps`/`removeSteps`/`applyOverrides`/`parseInjectSteps`/`mergeConfigOneLevel`); `ResolveTemplate.Execute` now builds the effective `WorkflowTemplate` from the leaf's own identity + merged dag_json. Updated `TestResolveTemplate_EmptyLeafInheritsFromParent`'s assertion (steps content, not ancestor-row identity — deliberate per the new "effective view of the requested template" semantics) and added override/remove/inject/regression/cyclic-merge table tests in `resolve_template_test.go`. `go build ./... && go vet ./... && go test ./...` green; `go test ./internal/usecase/... -run TestResolveTemplate -race` passes (10/10).
 
 ---
 

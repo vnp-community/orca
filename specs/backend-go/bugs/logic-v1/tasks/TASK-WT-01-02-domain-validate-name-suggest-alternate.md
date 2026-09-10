@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/domain/worktree_name.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Created worktree_name.go with ValidateWorktreeName/SuggestAlternateName; go build clean, unit tests added and passing.
 
 ---
 

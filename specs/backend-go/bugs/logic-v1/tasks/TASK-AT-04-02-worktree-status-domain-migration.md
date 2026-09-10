@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/domain/worktree.go`, `backend-go/services/project-service/internal/adapter/postgres/worktree_repository.go` (+ migration)
 **Depends on:** TASK-AT-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain.WorktreeStatus + Worktree.Status added; migration 0009_worktree_status; ListWorktrees(statusIn, olderThan) implemented in repository+usecase+grpc server; integration-tested (filters + unfiltered-unchanged regression guard).
 
 ---
 

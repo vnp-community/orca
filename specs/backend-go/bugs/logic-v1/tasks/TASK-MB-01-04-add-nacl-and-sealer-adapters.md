@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `backend-go/services/auth-service/internal/adapter/nacl/box.go`, `backend-go/services/auth-service/internal/adapter/vault/shared_secret_sealer.go`
 **Depends on:** TASK-MB-01-02
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `nacl.KeyExchanger`/`vault.SharedSecretSealer` adapters + ports added, `Ensure` wired into `main.go` startup; round-trip test `TestSharedSecret_RoundTrip` passes (`go test ./internal/adapter/nacl/...`).
 
 ---
 

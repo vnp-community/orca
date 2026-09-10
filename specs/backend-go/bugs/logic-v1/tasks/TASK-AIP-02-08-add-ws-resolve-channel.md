@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_ai_provider.go`
 **Depends on:** TASK-AIP-02-01, TASK-AIP-02-05, TASK-AIP-02-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — registered `aiProvider.resolve` and added `handleAiProviderResolve` in channels_ai_provider.go; added `TestAiProviderResolveChannel_Success`/`_PropagatesError` to channels_ai_provider_test.go (matches `-run TestAiProviderResolve`) — both pass.
 
 ---
 

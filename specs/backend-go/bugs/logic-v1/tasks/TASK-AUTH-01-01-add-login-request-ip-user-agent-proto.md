@@ -5,7 +5,7 @@
 **Service:** `auth-service` (proto)
 **File:** `backend-go/proto/orca/auth/v1/auth.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `ip`/`user_agent` to `LoginRequest`, regenerated via `make proto-gen`; `go build ./proto/...` clean, accessors `GetIp()`/`GetUserAgent()` present.
 
 ---
 

@@ -11,28 +11,16 @@ import (
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
 )
 
-// RunNowInput mirrors RunNowRequest (proto/orca/automation/v1/automation.proto),
-// plus Trigger — not on the wire message itself, set by each caller: the
-// gRPC RunNow handler passes RunTriggerManual, internal/adapter/scheduler
-// passes RunTriggerScheduled, HandleExternalTrigger passes
-// RunTriggerExternal. Left empty, it defaults to RunTriggerManual (see
-// Execute) so existing manual-only callers don't need to change.
-type RunNowInput struct {
-	AutomationID string
-	RequestID    string // idempotency key — see automation-service.md §8
-	Trigger      domain.RunTrigger
-}
-
 // RunNow is THE core interactor of this service — see
 // specs/backend-go/services/automation-service.md §2/§6. It is the only
-// code path (scheduler ticks and direct RunNow calls both funnel through
-// it) that dispatches a run, and it does so by delegating to
-// ExecuteAutomationChain (TASK-BE-AUTO-004's rewire — see that type's own
-// doc comment, updated alongside this change), which in turn calls
-// workflow-service.ExecuteAdHocStep over real gRPC (WorkflowStepExecutor)
-// per action, never executing anything locally. This closes TS Gap 3: TS's
-// automation.runNow had no working dispatcher and every triggered run
-// resolved skipped_unavailable.
+// code path (scheduler ticks, direct RunNow calls, and event-triggered
+// dispatches all funnel through it) that dispatches a run, and it does so
+// by delegating to ExecuteAutomationChain (TASK-BE-AUTO-004's rewire — see
+// that type's own doc comment, updated alongside this change), which in
+// turn calls workflow-service.ExecuteAdHocStep over real gRPC
+// (WorkflowStepExecutor) per action, never executing anything locally. This
+// closes TS Gap 3: TS's automation.runNow had no working dispatcher and
+// every triggered run resolved skipped_unavailable.
 //
 // Before this rewire, RunNow.Execute called ExecuteAdHocStep directly and
 // returned a Go error whenever that call itself failed (transport-level),
@@ -94,6 +82,19 @@ func NewRunNow(automations AutomationRepository, runs AutomationRunRepository, e
 	}
 }
 
+// RunNowInput mirrors RunNowRequest (proto/orca/automation/v1/automation.proto),
+// plus Trigger — not on the wire message itself, set by each caller: the
+// gRPC RunNow handler passes RunTriggerManual, internal/adapter/scheduler
+// passes RunTriggerScheduled, HandleEventTrigger passes RunTriggerEvent,
+// HandleExternalTrigger passes RunTriggerExternal. Left empty, it defaults
+// to RunTriggerManual (see Execute) so existing manual-only callers don't
+// need to change.
+type RunNowInput struct {
+	AutomationID string
+	RequestID    string // idempotency key — see automation-service.md §8
+	Trigger      domain.RunTrigger
+}
+
 func (uc *RunNow) Execute(ctx context.Context, in RunNowInput) (domain.AutomationRun, error) {
 	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
@@ -117,12 +118,9 @@ func (uc *RunNow) Execute(ctx context.Context, in RunNowInput) (domain.Automatio
 		return existing, nil
 	}
 
-	// step_type is now a first-class stored column on Automation (migration
-	// 0002) rather than a key inside step_config_json — see
-	// domain.NewAutomation's doc comment. It's already guaranteed valid
-	// (NewAutomation defaults StepTypeUnspecified to StepTypeAgent at
-	// creation time), but default again defensively here in case a row
-	// predates that migration and still has an empty step_type.
+	// step_type/step_config_json mirror Actions[0] (see
+	// domain.NewAutomation) — kept for AutomationRun's own back-compat
+	// top-level fields.
 	stepType := automation.StepType
 	if !stepType.Valid() {
 		stepType = domain.StepTypeAgent

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/generate_agent_prompt.go` (new), `backend-go/services/task-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-TG-02-01, TASK-TG-02-04, TASK-TG-02-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — GenerateAgentPrompt usecase + gRPC handler added and wired in main.go; AIDecompose/AIApply handlers finished for their widened shapes; go test ./internal/usecase/... -run TestGenerateAgentPrompt and ./internal/adapter/grpc/... both pass.
 
 ---
 

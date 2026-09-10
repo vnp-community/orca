@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/adapter/grpcclient/relay_executor.go`
 **Depends on:** TASK-PW-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — RelayExecutor implements the 5 methods via git.exec; 6 new contract tests assert exact args slices sent, incl. conflict detection from stderr
 
 ---
 

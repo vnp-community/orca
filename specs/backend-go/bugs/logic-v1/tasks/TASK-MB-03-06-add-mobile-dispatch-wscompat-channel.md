@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_mobile_dispatch.go` (new), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go`, `backend-go/services/api-gateway/cmd/server/main.go`
 **Depends on:** TASK-MB-03-05, SOL-MB-01 (`ResolveDeviceSharedSecret`, TASK-MB-01-06/07), SOL-MB-02's `authclient` (TASK-MB-02-07)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `Identity.DeviceID` (registry.go) plus threaded it in `usecase.AuthValidator.Validate`'s JWT claim read (httpgateway's `usecase.Identity.DeviceID`, from `jwtauth.Claims.DeviceID`) — the only existing validated-JWT construction site; `channels_mobile_dispatch.go` (mobile.dispatch, `errNotAMobileSession`, `DeviceSecretResolver`), shared `mobile_envelope.go` (`unsealMobilePayload`/`sealMobileEnvelope`, used by both MB-03-06 and MB-04-06), `authclient.DeviceSecretResolver` (real `ResolveDeviceSharedSecret` client), wired `wscompat.RegisterMobileChannels` into `cmd/server/main.go`; `go build`/`go vet` clean; `channels_mobile_dispatch_test.go` covers no-DeviceID rejection (zero calls), malformed-ciphertext (DispatchPrompt never called), and full encrypt/decrypt round-trip — all pass.
 
 ---
 

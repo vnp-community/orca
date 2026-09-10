@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (proto is shared, `backend-go/proto/`)
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — 3 RPCs + messages added, `buf generate` regenerated stubs cleanly, `go build ./proto/...` passes; `buf breaking` against `.git#branch=main` not runnable in this worktree (this repo's `main` predates `backend-go/` entirely — confirmed via `git ls-tree main`), verified additive-only by diff instead.
 
 ---
 

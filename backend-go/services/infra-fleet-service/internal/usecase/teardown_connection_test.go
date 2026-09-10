@@ -11,6 +11,30 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
+// TestTeardownConnection_CancelsReconnectLoop is BR-SSH-13's core
+// regression, preserved across the merge into the richer confirmed-logout
+// TeardownConnection: an explicit teardown must stop any in-flight
+// relaySSHReconnect/backgroundReconnect loop for the connection's dev
+// server, not just close the DB row.
+func TestTeardownConnection_CancelsReconnectLoop(t *testing.T) {
+	conn := domain.Connection{ID: "conn-1", TenantID: "tenant-1", DevServerID: "ds-1", Status: domain.ConnectionStatusEstablished}
+	resolver := &fakeConnectionResolver{
+		byConnectionID: map[string]domain.DevServer{"conn-1": {ID: "ds-1", TenantID: "tenant-1"}},
+		connByID:       map[string]domain.Connection{"conn-1": conn},
+	}
+	agent := &fakeDevServerAgentClient{}
+
+	uc := NewTeardownConnection(resolver, &fakeConnectionRepository{}, &fakeTerminalSessionRepository{}, agent)
+	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	if err := uc.Execute(ctx, "conn-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(agent.cancelReconnectCalls) != 1 || agent.cancelReconnectCalls[0] != "ds-1" {
+		t.Errorf("expected CancelReconnect(ds-1) to be called, got %+v", agent.cancelReconnectCalls)
+	}
+}
+
 // TestExplicitTeardownBypassesGracePeriod is TASK-BE-STORAGE-012's core
 // regression: a degraded connection whose grace_period_seconds is nowhere
 // near expiring must still close immediately when TeardownConnection is

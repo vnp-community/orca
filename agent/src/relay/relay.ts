@@ -43,6 +43,7 @@ import { PreflightHandler } from './preflight-handler'
 import { FsDirectoryBrowserHandler } from './fs-handler-directory-browse'
 import { ExternalAutomationsHandler } from './external-automations-handler'
 import { PortScanHandler } from './port-scan-handler'
+import { PortKillHandler } from './port-kill-handler'
 import { AgentExecHandler } from './agent-exec-handler'
 import { WorkspaceSessionHandler } from './workspace-session-handler'
 import { endpointDirForRelaySocket, RelayAgentHookServer } from './agent-hook-server'
@@ -64,6 +65,9 @@ import { pickRemoteCliEnv } from './remote-cli-env'
 import { relayLogLine } from './relay-diagnostic-log'
 import { remoteCliRequestTimeoutMs } from './remote-cli-timeout'
 import { shouldReadRemoteCliStdin } from './remote-cli-stdin'
+import { loadAgentConfig } from './agent-config'
+import type { AgentLogger } from './agent-logger'
+import { registerAuthStatusHandlers } from './relay-auth-status-handlers'
 
 const DEFAULT_GRACE_MS = DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS * 1000
 const SOCK_NAME = 'relay.sock'
@@ -466,6 +470,28 @@ async function main(): Promise<void> {
     return { resolvedPath: inputPath }
   })
 
+  // ── github.auth.status / gitlab.auth.status ─────────────────────────
+  // Why: infra-fleet-service.md §10 flags Part A (agent-rpc-dispatch.ts)
+  // and Part B (this dispatcher) as two independently-implemented RPC
+  // surfaces that frequently diverge in method names — these two methods
+  // were implemented only in Part A until now (TASK-INT-01-02/SOL-INT-01).
+  // relay.ts has no long-lived AgentConfig of its own (unlike the WS-mode
+  // entry point); loadAgentConfig's stdio-mode branch was written for
+  // exactly this process, so calling it once here is cheap and correct.
+  // Logging goes through relayLogLine (a rotated file), never
+  // console.log/AgentLogger's console-backed implementation — writing to
+  // stdout here would corrupt this process's framed stdio protocol in
+  // --stdio (relay-ssh) mode. See relay-auth-status-handlers.ts for the
+  // registration itself (extracted so it's unit-testable).
+  const authStatusConfig = loadAgentConfig()
+  const authStatusLogger: AgentLogger = {
+    info: (...a) => relayLogLine(`[relay] ${a.join(' ')}`),
+    warn: (...a) => relayLogLine(`[relay] WARN ${a.join(' ')}`),
+    error: (...a) => relayLogLine(`[relay] ERROR ${a.join(' ')}`),
+    debug: (...a) => relayLogLine(`[relay] DEBUG ${a.join(' ')}`)
+  }
+  registerAuthStatusHandlers(dispatcher, authStatusConfig, authStatusLogger)
+
   const ptyHandler = new PtyHandler(dispatcher, graceTimeMs)
   const fsHandler = new FsHandler(dispatcher, context)
   const gitHandler = new GitHandler(dispatcher, context)
@@ -485,6 +511,9 @@ async function main(): Promise<void> {
 
   const _portScanHandler = new PortScanHandler(dispatcher)
   void _portScanHandler
+
+  const _portKillHandler = new PortKillHandler(dispatcher)
+  void _portKillHandler
 
   const _agentExecHandler = new AgentExecHandler(dispatcher)
   void _agentExecHandler

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/adapter/grpcclient/simple_executor.go`
 **Depends on:** TASK-TG-01-04 (`Description`/`AIContext`/`PromptTemplate` fields)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — buildExecutePrompt now assembles PromptTemplate-or-generic-opener + Description/AIContext/parent/completedDeps sections, each cleanly omitted when absent; SimpleExecutor gained an edges usecase.EdgeRepository field and resolves parent (via GetAncestors) + completed depends_on targets (via ListFrom + per-dep Get, Status==StatusDone) before dispatch — both best-effort, a lookup failure degrades the prompt rather than failing dispatch. agentExecPromptParams.Env now always carries ORCA_TASK_ID/ORCA_PROJECT_ID. `go test ./services/task-service/internal/adapter/grpcclient/... -run 'TestSimpleExecutor|TestBuildExecutePrompt'` passes (17/17: golden-output cases for each optional section, env-map assertion, and an integration-level completed-deps-thread-into-prompt check); every backend-go service builds clean.
 
 ---
 

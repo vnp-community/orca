@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (sshrelay adapter)
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/prereq.go` (new), `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/provisioner.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — implemented checkPrerequisites (Node>=22/Git>=2.25/disk>=5GB, no semver dep needed, custom minimal version comparator) + integrated into Provisioner.Provision. Deviation: exposed the result via a new side-channel method `LastPrereqResult(devServerID)` (like TASK-FLEET-04-02's LastHandshakeInfo pattern) rather than returning ErrPrerequisitesNotMet directly from Provision — a non-nil error there makes devserveragent.Client.getOrProvisionSession discard the (successfully deployed) transport, which would leak the connection and defeat "does not abort the pipeline". TestCheckPrerequisites_* (real fake-SSH-server end-to-end) + TestParseAndCompareVersion/TestParseDiskKB (pure unit) all pass.
 
 ---
 

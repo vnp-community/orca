@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/ports.go`
 **Depends on:** TASK-TM-03-02 (domain type)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — TerminalScrollbackSnapshotRepository + Clock/RealClock added to ports.go; `go build`/`go vet` clean.
 
 ---
 

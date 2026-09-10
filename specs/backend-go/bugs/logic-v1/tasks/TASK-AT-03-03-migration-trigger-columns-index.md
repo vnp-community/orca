@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/adapter/postgres/repository.go` (+ new migration file), `backend-go/services/automation-service/internal/usecase/ports.go`
 **Depends on:** TASK-AT-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0005_trigger_columns adds trigger_type/trigger_event/trigger_filter_json + idx_automations_trigger; ListByTrigger implemented + integration-tested.
 
 ---
 

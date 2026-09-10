@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/session.go`
 **Depends on:** TASK-SSH-03-04
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — Provisioner.Reattach, devserveragent managedMode/SshReattacher/relaySSHReconnect, Client.WithRelaySSH wiring; TestSession_RelaySSHReconnect_* pass`
 
 ---
 

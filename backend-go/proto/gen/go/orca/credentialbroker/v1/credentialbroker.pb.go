@@ -30,6 +30,13 @@ const (
 	CredentialCategory_CREDENTIAL_CATEGORY_AI_PROVIDER_KEY     CredentialCategory = 3
 	CredentialCategory_CREDENTIAL_CATEGORY_SSH                 CredentialCategory = 4
 	CredentialCategory_CREDENTIAL_CATEGORY_SERVICE_SECRET      CredentialCategory = 5
+	// CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN is a relay-websocket
+	// Authorization: Bearer token infra-fleet-service presents outbound to a
+	// dev server's agent-connection-relay.ts WebSocket server — see
+	// specs/backend-go/bugs/logic-v1/solutions/SOL-AWS-01-relay-websocket-per-devserver-token.md.
+	// Mapped to Vault KV v2 (static, versioned secret) — the closest existing
+	// category by shape, not something Vault signs fresh per connection.
+	CredentialCategory_CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN CredentialCategory = 6
 )
 
 // Enum value maps for CredentialCategory.
@@ -41,14 +48,16 @@ var (
 		3: "CREDENTIAL_CATEGORY_AI_PROVIDER_KEY",
 		4: "CREDENTIAL_CATEGORY_SSH",
 		5: "CREDENTIAL_CATEGORY_SERVICE_SECRET",
+		6: "CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN",
 	}
 	CredentialCategory_value = map[string]int32{
-		"CREDENTIAL_CATEGORY_UNSPECIFIED":         0,
-		"CREDENTIAL_CATEGORY_SCM_OAUTH":           1,
-		"CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH": 2,
-		"CREDENTIAL_CATEGORY_AI_PROVIDER_KEY":     3,
-		"CREDENTIAL_CATEGORY_SSH":                 4,
-		"CREDENTIAL_CATEGORY_SERVICE_SECRET":      5,
+		"CREDENTIAL_CATEGORY_UNSPECIFIED":            0,
+		"CREDENTIAL_CATEGORY_SCM_OAUTH":              1,
+		"CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH":    2,
+		"CREDENTIAL_CATEGORY_AI_PROVIDER_KEY":        3,
+		"CREDENTIAL_CATEGORY_SSH":                    4,
+		"CREDENTIAL_CATEGORY_SERVICE_SECRET":         5,
+		"CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN": 6,
 	}
 )
 
@@ -1222,14 +1231,15 @@ const file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc = "" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12H\n" +
 	"\bcategory\x18\x02 \x01(\x0e2,.orca.credentialbroker.v1.CredentialCategoryR\bcategory\"s\n" +
 	"!ListCredentialsByCategoryResponse\x12N\n" +
-	"\vcredentials\x18\x01 \x03(\v2,.orca.credentialbroker.v1.CredentialMetadataR\vcredentials*\xf7\x01\n" +
+	"\vcredentials\x18\x01 \x03(\v2,.orca.credentialbroker.v1.CredentialMetadataR\vcredentials*\xa7\x02\n" +
 	"\x12CredentialCategory\x12#\n" +
 	"\x1fCREDENTIAL_CATEGORY_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dCREDENTIAL_CATEGORY_SCM_OAUTH\x10\x01\x12+\n" +
 	"'CREDENTIAL_CATEGORY_ISSUE_TRACKER_OAUTH\x10\x02\x12'\n" +
 	"#CREDENTIAL_CATEGORY_AI_PROVIDER_KEY\x10\x03\x12\x1b\n" +
 	"\x17CREDENTIAL_CATEGORY_SSH\x10\x04\x12&\n" +
-	"\"CREDENTIAL_CATEGORY_SERVICE_SECRET\x10\x052\xe7\n" +
+	"\"CREDENTIAL_CATEGORY_SERVICE_SECRET\x10\x05\x12.\n" +
+	"*CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN\x10\x062\xe7\n" +
 	"\n" +
 	"\x17CredentialBrokerService\x12v\n" +
 	"\x0fWriteCredential\x120.orca.credentialbroker.v1.WriteCredentialRequest\x1a1.orca.credentialbroker.v1.WriteCredentialResponse\x12|\n" +

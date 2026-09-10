@@ -4,7 +4,10 @@
 // database, no gRPC, no framework.
 package domain
 
-import "errors"
+import (
+	"errors"
+	"time"
+)
 
 // ConnectionMode is the transport this service uses to reach a DevServer —
 // mirrors orca.infrafleet.v1.ConnectionMode and TS's provider registry
@@ -154,14 +157,35 @@ type DevServer struct {
 	// distinction — see AgentKind's doc comment. NewDevServer defaults this
 	// to AgentKindDevServer; usecase.RegisterDevServer overrides it when the
 	// caller supplies a valid explicit kind (e.g. AgentKindMobileEmulator).
-	Kind AgentKind
+	Kind        AgentKind
+	Platform    string
+	Arch        string
+	NodeVersion string
+	// AgentVersion is the dev server agent's reported build version — used by
+	// ResumeAgentSession (BR-AG-09) to detect a resume against a different
+	// agent build than the one a session was originally spawned with. Sourced
+	// from the agent's handshake (see adapter/devserveragent's HandshakeInfo)
+	// when a caller populates it; empty when unknown, which callers must
+	// treat as "skip the version check" rather than a mismatch.
+	AgentVersion      string
+	LastProvisionedAt *time.Time
+	// Tags is free-form, tenant-scoped (e.g. "gpu", "region:us-east") —
+	// backs the "fleet:tag:<tag>" dispatch-target shape
+	// workflow-service.md §7/TASK-WF-02-02 resolves against
+	// ListDevServersByTag, and BL-PRF-03's allowedServerTags match target.
+	Tags []string
 }
 
 // NewDevServer constructs a DevServer, enforcing the invariants a record
 // must satisfy to be meaningful — this is where "infra-fleet-service owns
 // this data's correctness" actually lives, not scattered validation in the
-// gRPC handler.
-func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID string) (DevServer, error) {
+// gRPC handler. Status defaults to DevServerStatusPendingApproval (CR-DS-006:
+// an admin has not yet reviewed it) — registration alone doesn't grant
+// access. HealthStatus is deliberately left unset here (relies on the
+// dev_servers.status column's own DB DEFAULT — see DevServerHealthStatus's
+// doc comment); provisioning/health outcomes are persisted later via
+// DevServerRepository.UpdateProvisionResult, not at registration time.
+func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID string, tags []string) (DevServer, error) {
 	if tenantID == "" {
 		return DevServer{}, ErrEmptyDevServerTenant
 	}
@@ -182,12 +206,14 @@ func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID st
 		SSHTargetID: sshTargetID,
 		Status:      DevServerStatusPendingApproval,
 		Kind:        AgentKindDevServer,
+		Tags:        tags,
 	}, nil
 }
 
 // IsZero reports whether ds is the zero-value DevServer — used by
 // ResolveConnection's not-found branch to signal "no dev server", distinct
-// from a real DevServer with a coincidentally empty field.
+// from a real DevServer with a coincidentally empty field. Field-by-field
+// (rather than == DevServer{}) since Tags ([]string) isn't comparable.
 func (ds DevServer) IsZero() bool {
-	return ds == DevServer{}
+	return ds.ID == "" && ds.TenantID == "" && ds.Host == "" && ds.Mode == "" && ds.SSHTargetID == "" && len(ds.Tags) == 0
 }

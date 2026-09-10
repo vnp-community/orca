@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/agentwsserver/server.go`
 **Depends on:** TASK-AWS-02-01
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `rejectVersion`/`handshakeFailedCode` added, wired into `handleConnection`; 4 new server_test.go cases (below-min rejected, no-version fails open, at-min succeeds, message contains both versions) all green; no 4001-4004 codes present.
 
 ---
 

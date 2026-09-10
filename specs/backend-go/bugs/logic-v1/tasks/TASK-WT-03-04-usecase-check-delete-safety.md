@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/check_worktree_delete_safety.go` (new)
 **Depends on:** TASK-WT-03-01, TASK-WT-03-02, TASK-WT-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Created check_worktree_delete_safety.go + domain.DeleteSafetyReport, gRPC handler, wired into server.go + main.go (positional New(...), not a Deps struct — this service's actual convention differs from project-service's). go build+test clean.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service` + `api-gateway`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/remove_worktree_test.go`
 **Depends on:** TASK-WT-03-04, TASK-WT-03-05, TASK-WT-03-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — check_worktree_delete_safety_test.go (new), remove_worktree_test.go's 5 named cases, infraclient/terminal_sessions_test.go (new), and 2 wscompat channel tests all added; every listed `go test` command passes
 
 ---
 

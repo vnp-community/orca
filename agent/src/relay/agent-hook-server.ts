@@ -351,6 +351,7 @@ export class RelayAgentHookServer {
       ...(event.launchToken ? { launchToken: event.launchToken } : {}),
       tabId: event.tabId,
       worktreeId: event.worktreeId,
+      ptyId: event.ptyId,
       connectionId: null,
       hasExplicitPrompt: event.hasExplicitPrompt,
       promptInteractionKey: event.promptInteractionKey,

@@ -24,6 +24,7 @@ import (
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/policy"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/tenant-service/internal/config"
@@ -31,6 +32,7 @@ import (
 	tenantcache "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/cache"
 	tenanteventbus "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/eventbus"
 	tenantgrpc "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/grpc"
+	tenantopaclient "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/opaclient"
 	tenantpostgres "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/tenant-service/internal/adapter/scmstarcheck"
 	"github.com/stablyai/orca-go/services/tenant-service/internal/usecase"
@@ -81,6 +83,7 @@ func run() error {
 	departments := tenantpostgres.NewDepartmentRepository(pool)
 	profiles := tenantpostgres.NewUserProfileRepository(pool)
 	teams := tenantpostgres.NewTeamRepository(pool)
+	opa := tenantopaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
 	companyEmailDomains := tenantpostgres.NewCompanyEmailDomainRepository(pool)
 	workspaceSessions := tenantpostgres.NewUserWorkspaceSessionRepository(pool)
 	starNagRepo := tenantpostgres.NewStarNagStateRepository(pool)
@@ -104,10 +107,11 @@ func run() error {
 	// (§3 Phase 4 — "do this last, everything depends on it"), so it degrades
 	// to today's TTL-bounded-only staleness instead of crash-looping.
 	var invalidationPublisher usecase.CacheInvalidationPublisher
+	var auditPublisher usecase.AuditPublisher
 	// starNagVisibilityPublisher is set from the SAME underlying
-	// *tenanteventbus.Publisher instance invalidationPublisher uses when
-	// NATS is reachable (one struct implements both interfaces) — see
-	// TASK-014. Also nil (best-effort push skipped) when NATS is
+	// *tenanteventbus.Publisher instance invalidationPublisher/auditPublisher
+	// use when NATS is reachable (one struct implements all three ports) —
+	// see TASK-014. Also nil (best-effort push skipped) when NATS is
 	// unreachable, same degrade posture as invalidationPublisher.
 	var starNagVisibilityPublisher usecase.StarNagVisibilityPublisher
 	var consumerWG sync.WaitGroup
@@ -121,6 +125,7 @@ func run() error {
 		} else {
 			sharedPublisher := tenanteventbus.New(pub)
 			invalidationPublisher = sharedPublisher
+			auditPublisher = sharedPublisher
 			starNagVisibilityPublisher = sharedPublisher
 			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
 
@@ -137,20 +142,20 @@ func run() error {
 	getCompanyUC := usecase.NewGetCompany(companies)
 	listCompaniesUC := usecase.NewListCompanies(companies)
 	validateTenantUC := usecase.NewValidateTenant(companies)
-	createDepartmentUC := usecase.NewCreateDepartment(companies, departments)
+	createDepartmentUC := usecase.NewCreateDepartment(companies, departments, opa, auditPublisher)
 	setUserDepartmentUC := usecase.NewSetUserDepartment(departments, profiles, profileCache, invalidationPublisher)
 	baseGetResolvedProfileUC := usecase.NewGetResolvedProfile(companies, departments, profiles, teams)
 	getResolvedProfileUC := usecase.NewCachedGetResolvedProfile(baseGetResolvedProfileUC, profileCache, usecase.DefaultProfileCacheTTL)
 	createTeamUC := usecase.NewCreateTeam(companies, teams)
 	addTeamMemberUC := usecase.NewAddTeamMember(teams, profileCache, invalidationPublisher)
 	listTeamMembersUC := usecase.NewListTeamMembers(teams)
+	listTeamsForUserUC := usecase.NewListTeamsForUser(teams)
 	getUserProfileUC := usecase.NewGetUserProfile(profiles)
 	listDepartmentsUC := usecase.NewListDepartments(departments)
-	updateCompanyUC := usecase.NewUpdateCompany(companies, profiles, profileCache, invalidationPublisher)
-	updateDepartmentUC := usecase.NewUpdateDepartment(departments, profiles, profileCache, invalidationPublisher)
+	updateCompanyUC := usecase.NewUpdateCompany(companies, profiles, profileCache, invalidationPublisher, opa, auditPublisher)
+	updateDepartmentUC := usecase.NewUpdateDepartment(departments, profiles, profileCache, invalidationPublisher, opa, auditPublisher)
 	updateUserProfileUC := usecase.NewUpdateUserProfile(profiles, profileCache, invalidationPublisher)
 	listTeamsUC := usecase.NewListTeams(teams)
-	listTeamsForUserUC := usecase.NewListTeamsForUser(teams)
 	removeTeamMemberUC := usecase.NewRemoveTeamMember(teams, profileCache, invalidationPublisher)
 	getOnboardingStateUC := usecase.NewGetOnboardingState(profiles)
 	setOnboardingStateUC := usecase.NewSetOnboardingState(profiles)
@@ -205,13 +210,13 @@ func run() error {
 		createTeamUC,
 		addTeamMemberUC,
 		listTeamMembersUC,
+		listTeamsForUserUC,
 		getUserProfileUC,
 		listDepartmentsUC,
 		updateCompanyUC,
 		updateDepartmentUC,
 		updateUserProfileUC,
 		listTeamsUC,
-		listTeamsForUserUC,
 		removeTeamMemberUC,
 		getOnboardingStateUC,
 		setOnboardingStateUC,

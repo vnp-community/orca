@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/branch_name.go` (new), `backend-go/services/git-gateway-service/internal/usecase/agent_prompt.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — branch_name.go (generateBranchName/BR-PI-04) + agent_prompt.go (buildAgentPrompt/BR-PI-05) added, no adapter deps.`
 
 ---
 

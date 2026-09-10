@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/ai_apply.go`
 **Depends on:** TASK-TG-02-04, TASK-TG-01-07 (transaction-scoped `AddEdge` auto-block), TASK-TG-01-04 (`UpdateAIPlanJSON`)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — AIApply adds a second dependency-edge pass (resolving DependsOnIndices to real Task.IDs) + persists raw_ai_response to ai_plan_json, all inside the existing TxRunner transaction via the addEdgeWithinTx helper (TASK-TG-01-07); go test ./internal/usecase/... -run TestAIApply passes (dependency edges, out-of-range skip, ai_plan_json persistence, rollback extended to the dependency pass).
 
 ---
 

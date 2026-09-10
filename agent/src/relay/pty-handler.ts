@@ -717,11 +717,15 @@ export class PtyHandler {
         startupCommandDelivery:
           params.startupCommandDelivery === 'shell-ready' ? 'shell-ready' : undefined
       })
+    // BR-TM-13 — opt-in shell-integration bootstrap (OSC 133). Defaults to
+    // false: existing callers that don't set it see no behavior change.
+    const shellIntegration = params.shellIntegration === true
     // Why: renderer- and provider-delivered startup commands both use this
     // marker; the side responsible for delivery also strips it from output.
     const shellLaunch = getRelayShellLaunchConfig(shell, spawnEnv, process.platform, {
       terminalWindowsWslDistro,
-      emitReadyMarker: shouldEmitShellReadyMarker
+      emitReadyMarker: shouldEmitShellReadyMarker,
+      shellIntegration
     })
 
     // Why: SSH exec channels give the relay a minimal environment without

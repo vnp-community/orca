@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `backend-go/services/auth-service/internal/usecase/initiate_device_pairing.go`, `backend-go/services/auth-service/internal/usecase/complete_device_pairing.go`
 **Depends on:** TASK-MB-01-02, TASK-MB-01-03, TASK-MB-01-04
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `InitiateDevicePairing`/`CompleteDevicePairing` implemented (token minting done directly via `TokenSigner` + a `DeviceID` claim added to `jwtauth.Claims`, since no generic `IssueToken` usecase exists in this codebase — see doc comment in complete_device_pairing.go); all 4 requested test cases pass (`go test -run 'InitiateDevicePairing|CompleteDevicePairing'`).
 
 ---
 

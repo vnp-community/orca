@@ -48,6 +48,9 @@ type fakeTenantServiceClient struct {
 	listTeamMembersResp *tenantv1.ListTeamMembersResponse
 	listTeamMembersErr  error
 
+	listTeamsForUserResp *tenantv1.ListTeamsForUserResponse
+	listTeamsForUserErr  error
+
 	getUserProfileResp *tenantv1.GetUserProfileResponse
 	getUserProfileErr  error
 
@@ -145,6 +148,13 @@ func (f *fakeTenantServiceClient) ListTeamMembers(_ context.Context, _ *tenantv1
 	return f.listTeamMembersResp, nil
 }
 
+func (f *fakeTenantServiceClient) ListTeamsForUser(_ context.Context, _ *tenantv1.ListTeamsForUserRequest, _ ...grpc.CallOption) (*tenantv1.ListTeamsForUserResponse, error) {
+	if f.listTeamsForUserErr != nil {
+		return nil, f.listTeamsForUserErr
+	}
+	return f.listTeamsForUserResp, nil
+}
+
 func (f *fakeTenantServiceClient) GetUserProfile(_ context.Context, _ *tenantv1.GetUserProfileRequest, _ ...grpc.CallOption) (*tenantv1.GetUserProfileResponse, error) {
 	if f.getUserProfileErr != nil {
 		return nil, f.getUserProfileErr
@@ -188,12 +198,6 @@ func (f *fakeTenantServiceClient) ListTeams(_ context.Context, _ *tenantv1.ListT
 }
 
 func (f *fakeTenantServiceClient) RemoveTeamMember(_ context.Context, _ *tenantv1.RemoveTeamMemberRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
-}
-
-// ListTeamsForUser (BUG-013, TASK-039/040/041) — not exercised by any route
-// in this file's tests either, same as ListTeams/RemoveTeamMember above.
-func (f *fakeTenantServiceClient) ListTeamsForUser(_ context.Context, _ *tenantv1.ListTeamsForUserRequest, _ ...grpc.CallOption) (*tenantv1.ListTeamsForUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
 }
 

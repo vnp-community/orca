@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — StartAgentSession RPC + AgentSession/StartAgentSessionRequest messages added to infrafleet.proto; `buf generate` regenerated stubs cleanly, `go build ./proto/...` passes.
 
 ---
 

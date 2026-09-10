@@ -32,7 +32,12 @@ func TestLogin_SucceedsAndCreatesSession(t *testing.T) {
 	seedActiveUser(t, users, hasher, "u1", "t1", "alice@example.com", "correct-password", domain.RoleUser)
 
 	uc := NewLogin(users, sessions, audit, hasher, clock, time.Hour)
-	out, err := uc.Execute(context.Background(), LoginInput{Email: "alice@example.com", Password: "correct-password"})
+	out, err := uc.Execute(context.Background(), LoginInput{
+		Email:     "alice@example.com",
+		Password:  "correct-password",
+		IP:        "203.0.113.7",
+		UserAgent: "test-agent/1.0",
+	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -49,6 +54,12 @@ func TestLogin_SucceedsAndCreatesSession(t *testing.T) {
 	}
 	if stored.UserID != "u1" {
 		t.Errorf("expected stored session for u1, got %s", stored.UserID)
+	}
+	if stored.IP != "203.0.113.7" {
+		t.Errorf("expected stored session IP to match LoginInput.IP, got %q", stored.IP)
+	}
+	if stored.UserAgent != "test-agent/1.0" {
+		t.Errorf("expected stored session UserAgent to match LoginInput.UserAgent, got %q", stored.UserAgent)
 	}
 	if len(audit.entries) != 1 || audit.entries[0].Action != "user.login" {
 		t.Errorf("expected one user.login audit entry, got %+v", audit.entries)
@@ -72,16 +83,19 @@ func TestLogin_WrongPasswordFails(t *testing.T) {
 	if len(sessions.byHash) != 0 {
 		t.Error("expected no session to be created on failed login")
 	}
+	assertSingleLoginFailAudit(t, audit)
 }
 
 func TestLogin_UnknownEmailFails(t *testing.T) {
 	users := newFakeUserRepository()
-	uc := NewLogin(users, newFakeSessionRepository(), &fakeAuditRepository{}, fakeHasher{}, &fakeClock{now: time.Now()}, time.Hour)
+	audit := &fakeAuditRepository{}
+	uc := NewLogin(users, newFakeSessionRepository(), audit, fakeHasher{}, &fakeClock{now: time.Now()}, time.Hour)
 
-	_, err := uc.Execute(context.Background(), LoginInput{Email: "nobody@example.com", Password: "whatever"})
+	_, err := uc.Execute(context.Background(), LoginInput{Email: "nobody@example.com", Password: "whatever1"})
 	if err == nil {
 		t.Fatal("expected an error for an unknown email")
 	}
+	assertSingleLoginFailAudit(t, audit)
 }
 
 func TestLogin_DeactivatedAccountFails(t *testing.T) {
@@ -94,11 +108,35 @@ func TestLogin_DeactivatedAccountFails(t *testing.T) {
 	hash, _ := hasher.Hash("correct-password")
 	users.seed(u, hash)
 
-	uc := NewLogin(users, newFakeSessionRepository(), &fakeAuditRepository{}, hasher, &fakeClock{now: time.Now()}, time.Hour)
+	audit := &fakeAuditRepository{}
+	uc := NewLogin(users, newFakeSessionRepository(), audit, hasher, &fakeClock{now: time.Now()}, time.Hour)
 	_, err = uc.Execute(context.Background(), LoginInput{Email: "alice@example.com", Password: "correct-password"})
 	if err == nil {
 		t.Fatal("expected an error for a deactivated account")
 	}
+	assertSingleLoginFailAudit(t, audit)
+}
+
+func TestLogin_InvalidFormatFails(t *testing.T) {
+	audit := &fakeAuditRepository{}
+	uc := NewLogin(newFakeUserRepository(), newFakeSessionRepository(), audit, fakeHasher{}, &fakeClock{now: time.Now()}, time.Hour)
+
+	// Missing "@" in the email — fails the format pre-check before any user
+	// lookup happens.
+	_, err := uc.Execute(context.Background(), LoginInput{Email: "not-an-email", Password: "whatever1"})
+	if err == nil {
+		t.Fatal("expected an error for an invalid email format")
+	}
+	assertSingleLoginFailAudit(t, audit)
+
+	// Password shorter than 8 chars.
+	audit = &fakeAuditRepository{}
+	uc = NewLogin(newFakeUserRepository(), newFakeSessionRepository(), audit, fakeHasher{}, &fakeClock{now: time.Now()}, time.Hour)
+	_, err = uc.Execute(context.Background(), LoginInput{Email: "alice@example.com", Password: "short"})
+	if err == nil {
+		t.Fatal("expected an error for a too-short password")
+	}
+	assertSingleLoginFailAudit(t, audit)
 }
 
 func TestLogin_RequiresEmailAndPassword(t *testing.T) {
@@ -109,5 +147,14 @@ func TestLogin_RequiresEmailAndPassword(t *testing.T) {
 	}
 	if _, err := uc.Execute(context.Background(), LoginInput{Email: "a@example.com", Password: ""}); err == nil {
 		t.Error("expected an error for empty password")
+	}
+}
+
+// assertSingleLoginFailAudit checks that exactly one login.fail entry was
+// written — every failure branch of Login.Execute must audit best-effort.
+func assertSingleLoginFailAudit(t *testing.T, audit *fakeAuditRepository) {
+	t.Helper()
+	if len(audit.entries) != 1 || audit.entries[0].Action != "login.fail" {
+		t.Errorf("expected exactly one login.fail audit entry, got %+v", audit.entries)
 	}
 }

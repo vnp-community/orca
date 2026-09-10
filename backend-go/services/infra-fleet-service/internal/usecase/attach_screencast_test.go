@@ -50,7 +50,7 @@ func TestAttachScreencast_NoConnectionBoundToWorktree_ReturnsError(t *testing.T)
 // ResolveConnectionByWorktree rather than a pre-existing session lookup).
 func seedWorktreeConnection(t *testing.T, resolver *fakeConnectionResolver, worktreeID, connectionID string) {
 	t.Helper()
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

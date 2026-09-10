@@ -5,7 +5,7 @@
 **Service:** `auth-service` (grpc adapter)
 **File:** `backend-go/services/auth-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-AUTH-04-01, TASK-AUTH-04-03, TASK-AUTH-04-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — wired `ListSessions`/`UpdateUser` handlers (reusing existing `toDomainRole` helper), added fields to `Server`+`New()`, wired the two usecases in `main.go`; `TestServer_ListSessions`/`TestServer_UpdateUser_PartialRequestOnlySetsGivenFields` pass; full auth-service suite green under `-race`.
 
 ---
 

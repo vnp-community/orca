@@ -93,6 +93,11 @@ type Project struct {
 	CreatedBy string
 	CreatedAt time.Time
 	UpdatedAt time.Time
+	// IssueStatusSyncEnabled is BR-PI-06's durable per-project opt-out for
+	// issue-status-sync's worktree/PR lifecycle event consumption —
+	// defaults to true in NewProject (sync is on unless a project
+	// explicitly turns it off via UpdateProject).
+	IssueStatusSyncEnabled bool
 }
 
 // ProjectUpdatePatch carries UpdateProject's field-mask semantics: an empty
@@ -103,10 +108,16 @@ type Project struct {
 // Project.MobileEmulatorAgentID's doc comment for why the two bindings
 // don't share the same guarded-rebind requirement.
 type ProjectUpdatePatch struct {
-	Name                  string
-	Description           string
-	DefaultBranch         string
-	Visibility            string
+	Name          string
+	Description   string
+	DefaultBranch string
+	Visibility    string
+	// IssueStatusSyncEnabled is presence-based (nil = no change), unlike
+	// the string fields above — "" can't mean no-change for a bool
+	// (BR-PI-06/TASK-PI-02-06).
+	IssueStatusSyncEnabled *bool
+	// MobileEmulatorAgentID is empty-string-means-no-change, like the other
+	// string fields — CR-DS-009 §3.2.
 	MobileEmulatorAgentID string
 }
 
@@ -124,7 +135,7 @@ func NewProject(id, tenantID, name, devServerID string) (Project, error) {
 	if name == "" {
 		return Project{}, ErrEmptyName
 	}
-	return Project{ID: id, TenantID: tenantID, Name: name, DevServerID: devServerID}, nil
+	return Project{ID: id, TenantID: tenantID, Name: name, DevServerID: devServerID, IssueStatusSyncEnabled: true}, nil
 }
 
 // Rebind returns a copy of p pointed at a new dev server — a pure,
@@ -137,4 +148,12 @@ func (p Project) Rebind(newDevServerID string) (Project, error) {
 	}
 	p.DevServerID = newDevServerID
 	return p, nil
+}
+
+// ProjectContext is GetProjectContext's read-only view — a subset of
+// Project plus a best-effort-resolved dev server hostname, per
+// project-service.md §2's Boundary decision.
+type ProjectContext struct {
+	ProjectID, ProjectName, Description     string
+	RepoURL, DevServerID, DevServerHostname string
 }

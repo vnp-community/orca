@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 
 	"github.com/stablyai/orca-go/common/tenant"
@@ -11,8 +12,14 @@ import (
 
 // fakeStepExecutor is an in-memory domain.StepExecutor — the "test against
 // fakes, not real infra" pattern from
-// specs/backend-go/standards/testing-strategy.md's unit-test section.
+// specs/backend-go/standards/testing-strategy.md's unit-test section. A
+// single instance is commonly registered for one StepType and invoked
+// concurrently by multiple steps within a wave (see wave_dispatcher_test.go),
+// so its bookkeeping fields are mutex-guarded — TASK-WF-02-06 found this
+// unguarded, causing a data race under -race whenever a test dispatched
+// more than one step through the same fake concurrently.
 type fakeStepExecutor struct {
+	mu          sync.Mutex
 	result      domain.StepResult
 	err         error
 	lastConfig  string
@@ -20,12 +27,15 @@ type fakeStepExecutor struct {
 }
 
 func (f *fakeStepExecutor) Execute(ctx context.Context, stepConfigJSON string) (domain.StepResult, error) {
+	f.mu.Lock()
 	f.invocations++
 	f.lastConfig = stepConfigJSON
-	if f.err != nil {
-		return domain.StepResult{}, f.err
+	result, err := f.result, f.err
+	f.mu.Unlock()
+	if err != nil {
+		return domain.StepResult{}, err
 	}
-	return f.result, nil
+	return result, nil
 }
 
 // fakeRegistry is an in-memory StepExecutorRegistry.
@@ -45,8 +55,11 @@ func (r *fakeRegistry) Resolve(stepType domain.StepType) (domain.StepExecutor, e
 	return e, nil
 }
 
+// withTenantContext attaches both tenant and acting-user identity — a fixed
+// user id is fine here since these usecase tests only care that a user is
+// present (e.g. CreateTemplate's OwnerID), not who specifically.
 func withTenantContext(ctx context.Context, tenantID string) context.Context {
-	return tenant.WithTenantID(ctx, tenantID)
+	return tenant.WithUserID(tenant.WithTenantID(ctx, tenantID), "user-1")
 }
 
 func TestExecuteAdHocStep_ResolvesAndCallsExecutor(t *testing.T) {

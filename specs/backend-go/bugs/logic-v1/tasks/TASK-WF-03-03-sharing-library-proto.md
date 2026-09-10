@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/proto/orca/workflow/v1/workflow.proto`
 **Depends on:** TASK-WF-01-03 (appends to the same `WorkflowTemplate` message SOL-WF-01 extends — land that proto change first to avoid a merge conflict on the message body)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `WorkflowTemplate` extended with `visibility`/`share_token`/`rating_sum`/`rating_count` (16-19, exactly the next free numbers); added `google/protobuf/timestamp.proto` import; `PublishTemplate`/`ListPendingApprovals`/`ResolveApproval`/`GenerateShareLink`/`PreviewSharedTemplate`/`ImportSharedTemplate`/`RateTemplate` RPCs + all their messages; `ListTemplatesRequest` gained `query`/`tags`/`sort`. All additive. `make proto-gen` regenerated stubs; `go build ./...` clean for `proto`, `workflow-service`, `api-gateway`. (Same `buf breaking` git-ref caveat as prior proto tasks — verified additivity by inspection: only new field numbers/messages/RPCs.) Note: `toProtoTemplate`/`toProtoStepType` etc. don't yet surface the new fields — that's TASK-WF-03-05/06's wiring scope, not this one's.
 
 ---
 

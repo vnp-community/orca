@@ -7,6 +7,8 @@ package domain
 import (
 	"errors"
 	"time"
+
+	"github.com/stablyai/orca-go/common/apperrors"
 )
 
 // StepType mirrors workflow-service's StepType enum (see workflow.proto) —
@@ -22,6 +24,10 @@ const (
 	StepTypeNotification StepType = "notification"
 	StepTypeWebhook      StepType = "webhook"
 	StepTypeCondition    StepType = "condition"
+	// StepTypeCleanupWorktrees lets an automation dispatch BL-AT-04's bulk
+	// worktree-cleanup step on a schedule — mirrors
+	// workflow-service.domain.StepTypeCleanupWorktrees.
+	StepTypeCleanupWorktrees StepType = "cleanup_worktrees"
 	// StepTypeCommitPush — CR-AUTO-003/TASK-BE-AUTO-005. See
 	// workflow-service's domain.StepTypeCommitPush (this const is the same
 	// duplication-not-import convention this whole block's doc comment
@@ -31,7 +37,7 @@ const (
 
 func (s StepType) Valid() bool {
 	switch s {
-	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition, StepTypeCommitPush:
+	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition, StepTypeCleanupWorktrees, StepTypeCommitPush:
 		return true
 	default:
 		return false
@@ -54,6 +60,10 @@ var (
 	ErrInvalidRRule = errors.New("domain: rrule is not a valid RFC 5545 recurrence rule")
 	// ErrEmptyStepConfig guards against an automation with nothing to
 	// execute — RunNow would have no step to delegate to workflow-service.
+	// CR-AUTO-002: this invariant predates the Actions chain and is
+	// deliberately NOT relaxed here — an Actions-only automation (no legacy
+	// single step) satisfies it with a harmless "{}" placeholder at the
+	// usecase layer instead (see CreateAutomation.Execute).
 	ErrEmptyStepConfig = errors.New("domain: step_config_json is required")
 )
 
@@ -64,13 +74,18 @@ var (
 type Automation struct {
 	ID       string
 	TenantID string
-	Name     string
-	RRule    string
+	// ProjectID is a logical FK -> project-service.projects; empty means
+	// unscoped (back-compat with pre-project-cap rows) — BR-AT-02.
+	ProjectID string
+	Name      string
+	RRule     string
 	// StepType is now a first-class column (migration 0002) rather than a
 	// key inside StepConfigJSON — see the former ParseStepType note this
 	// replaces. Both internal/adapter/grpcclient (calling workflow-service)
 	// and internal/adapter/grpc (translating the wire Automation message,
 	// which reuses workflow-service's own StepType enum) map to/from this.
+	// DEPRECATED as of CR-AUTO-002: kept for automation rows created before
+	// `Actions` existed — see resolveActions in internal/usecase.
 	StepType       StepType
 	StepConfigJSON string
 	DTStart        time.Time
@@ -82,6 +97,13 @@ type Automation struct {
 	// (WHERE enabled AND next_run_at <= now()) — a disabled automation is
 	// never claimed even if its next_run_at is in the past.
 	Enabled bool
+	// TriggerType/TriggerEvent/TriggerFilter — BR-AT-09/BL-AT-03's
+	// trigger schema. TriggerType defaults to TriggerTypeCron (back-compat
+	// with rrule-only rows); TriggerEvent/TriggerFilter are only meaningful
+	// when TriggerType == TriggerTypeEvent.
+	TriggerType   TriggerType
+	TriggerEvent  EventName
+	TriggerFilter *TriggerFilter
 	// NextRunAt is the next time the scheduler should dispatch this
 	// automation; zero means "no further occurrences" (an exhausted
 	// COUNT/UNTIL-bounded rule) or "not yet computed". Advanced by
@@ -145,48 +167,98 @@ type ActionResult struct {
 	Error      string
 }
 
+// NewAutomationParams bundles NewAutomation's inputs. A params struct
+// rather than positional args — BR-AT-02's ProjectID and BR-AT-09's trigger
+// fields stacked on top of the original 10 params would otherwise make an
+// unreadable positional call.
+type NewAutomationParams struct {
+	ID        string
+	TenantID  string
+	ProjectID string // optional; empty = unscoped (back-compat) — BR-AT-02
+	Name      string
+	RRule     string
+	// StepType/StepConfigJSON are the legacy single-step path — see
+	// Automation.StepType's doc comment. Actions (CR-AUTO-002) is set by the
+	// caller directly on the returned Automation, not validated here — see
+	// this file's ErrEmptyStepConfig doc comment for why.
+	StepType       StepType
+	StepConfigJSON string
+	DTStart        time.Time
+	Timezone       string // optional; empty = UTC
+	Enabled        bool
+	CreatedAt      time.Time
+	TriggerType    TriggerType // optional; empty = TriggerTypeCron
+	TriggerEvent   EventName   // required (one of the 5 documented names) iff TriggerType == TriggerTypeEvent
+	TriggerFilter  *TriggerFilter
+}
+
 // NewAutomation constructs an Automation, enforcing the invariants a
 // definition must satisfy to be dispatchable — including that RRule parses,
 // so a malformed recurrence string is rejected at creation time rather than
-// discovered later by the scheduler loop. stepType defaults to
-// StepTypeAgent and timezone to "UTC" when unspecified, so every Automation
+// discovered later by the scheduler loop. StepType defaults to
+// StepTypeAgent and Timezone to "UTC" when unspecified, so every Automation
 // this constructor returns is already structurally valid for dispatch —
 // callers never need a second defaulting pass. NextRunAt is left zero;
 // usecase.CreateAutomation computes it from the resulting RecurrenceRule.
-func NewAutomation(id, tenantID, name, rrule string, stepType StepType, stepConfigJSON string, dtstart time.Time, timezone string, enabled bool, createdAt time.Time) (Automation, error) {
-	if tenantID == "" {
+// Actions/MaxRunHistory/RunTimeoutSeconds (CR-AUTO-002/007) are NOT set
+// here — the caller (usecase.CreateAutomation) sets them directly on the
+// returned Automation, mirroring NextRunAt's own post-construction
+// convention.
+func NewAutomation(p NewAutomationParams) (Automation, error) {
+	if p.TenantID == "" {
 		return Automation{}, ErrEmptyTenant
 	}
-	if name == "" {
+	if p.Name == "" {
 		return Automation{}, ErrEmptyName
 	}
-	if rrule == "" {
+	if p.RRule == "" {
 		return Automation{}, ErrEmptyRRule
 	}
-	if stepConfigJSON == "" {
+	if p.StepConfigJSON == "" {
 		return Automation{}, ErrEmptyStepConfig
 	}
-	if _, err := NewRecurrenceRule(rrule, dtstart); err != nil {
+	if _, err := NewRecurrenceRule(p.RRule, p.DTStart); err != nil {
 		return Automation{}, err
 	}
+
+	stepType := p.StepType
 	if !stepType.Valid() {
 		stepType = StepTypeAgent
 	}
+
+	trigger := p.TriggerType
+	if trigger == "" {
+		trigger = TriggerTypeCron // back-compat default
+	}
+	if trigger == TriggerTypeEvent {
+		if !p.TriggerEvent.Valid() {
+			return Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID_TRIGGER_EVENT", "trigger_event must be one of the 5 documented event names", nil)
+		}
+	} else if p.TriggerEvent != "" {
+		return Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_UNEXPECTED_TRIGGER_EVENT", "trigger_event must be empty unless trigger_type=event", nil)
+	}
+
+	timezone := p.Timezone
 	if timezone == "" {
 		timezone = "UTC"
 	}
+
 	return Automation{
-		ID:             id,
-		TenantID:       tenantID,
-		Name:           name,
-		RRule:          rrule,
+		ID:             p.ID,
+		TenantID:       p.TenantID,
+		ProjectID:      p.ProjectID,
+		Name:           p.Name,
+		RRule:          p.RRule,
 		StepType:       stepType,
-		StepConfigJSON: stepConfigJSON,
-		DTStart:        dtstart,
+		StepConfigJSON: p.StepConfigJSON,
+		DTStart:        p.DTStart,
 		Timezone:       timezone,
-		Enabled:        enabled,
-		CreatedAt:      createdAt,
-		UpdatedAt:      createdAt,
+		Enabled:        p.Enabled,
+		TriggerType:    trigger,
+		TriggerEvent:   p.TriggerEvent,
+		TriggerFilter:  p.TriggerFilter,
+		CreatedAt:      p.CreatedAt,
+		UpdatedAt:      p.CreatedAt,
 	}, nil
 }
 

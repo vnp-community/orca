@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/auth_routes.go`
 **Depends on:** none (`auth-service`'s `IssueServiceToken` RPC already exists and is wired at `backend-go/services/auth-service/internal/adapter/grpc/server.go:127`)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added `POST /auth/cli-token` route + 2 new tests in `auth_routes_test.go`; `go build ./services/api-gateway/...` and `go test ./services/api-gateway/... -run TestAuth -v` all pass.
 
 ---
 

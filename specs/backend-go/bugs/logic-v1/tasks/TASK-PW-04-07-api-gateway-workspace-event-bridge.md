@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/workspace_events.go` (new), `backend-go/services/api-gateway/cmd/server/main.go`
 **Depends on:** TASK-PW-04-04, TASK-PW-04-06
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — WorkspaceEventBus + workspace.subscribe channel + RunWorkspaceEventBridge (task.statuschanged + workflow.execution.completed/.failed, 3 SubscribeEphemeral subscriptions) wired in workspace_events.go; main.go dials commoneventbus.Connect(cfg.NATSURL) with graceful degradation; 6 tests pass covering per-project filtering and ctx-cancel unsubscribe.
 
 ---
 

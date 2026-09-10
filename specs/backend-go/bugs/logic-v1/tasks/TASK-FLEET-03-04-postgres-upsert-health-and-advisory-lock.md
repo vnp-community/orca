@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (postgres adapter)
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/postgres/repository.go`
 **Depends on:** TASK-FLEET-03-02, TASK-FLEET-03-03
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — ListAllForPolling was already implemented in TASK-FLEET-03-03's pass (with intermediate string vars for the mode/status scan, consistent with this file's existing Get/List convention). Added UpsertFleetHealth/GetPrevious/TryLock. Real testcontainers-Postgres tests: TestUpsertFleetHealthAndGetPrevious (upsert-by-PK round trip), TestTryLock_MutualExclusionAndReleaseAllowsReacquire (exactly-one-of-two-concurrent-locks-succeeds, reacquire after unlock), TestListAllForPolling_IsCrossTenant all pass. Pre-existing flaky/order-dependent failures (TestRepository_ResolveConnection_FoundAndNotFound, TestRepository_List_FiltersByTenant under container-count contention) confirmed unrelated — pass individually.
 
 ---
 

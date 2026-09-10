@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/ports.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — ListAccountsFilter.ProviderType added; go build/vet clean.`
 
 ---
 

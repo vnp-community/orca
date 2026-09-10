@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/usecase/publish_template.go` (new)
 **Depends on:** TASK-WF-03-04, TASK-WF-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `publish_template.go`/`resolve_approval.go` implement the owner/admin gate, escalate-to-company approval creation, and atomic approve-applies-VisibilityCompany transaction; wired into `cmd/server/main.go` + `adapter/grpc/server.go` (new `internal/adapter/opachecker` client against auth-service) plus a `list_pending_approvals.go` usecase for the proto's `ListPendingApprovals` RPC. `publish_template_test.go`/`resolve_approval_test.go` added (non-owner rejected, owner direct-apply, lead creates pending approval, admin direct-apply, duplicate-pending conflict via `domain.ErrApprovalAlreadyPending`, non-admin resolve rejected, approve applies `VisibilityCompany` atomically, reject leaves visibility unchanged, injected mid-tx failure rolls back both writes, not-found). `go build ./services/workflow-service/...` clean; `go test ./services/workflow-service/internal/usecase/... -run 'TestPublishTemplate|TestResolveApproval'` all pass.
 
 ---
 

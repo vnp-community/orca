@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** TASK-AG-03-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — SwitchAgentAccount RPC + SwitchAgentAccountRequest message added to infrafleet.proto; `buf generate` + `go build ./proto/...` clean.
 
 ---
 

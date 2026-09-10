@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/infra_routes.go`
 **Depends on:** TASK-CLI-02-04
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added `/v1/worktrees/{worktreeId}/agent/{status,wait,send,snapshot}` routes + 9 new tests (404-without-downstream-call regression guards, success round trips, truncated-header behavior); `go build ./services/api-gateway/...` and `go test ./services/api-gateway/... -run TestMountInfraRoutes -v` all pass.
 
 ---
 

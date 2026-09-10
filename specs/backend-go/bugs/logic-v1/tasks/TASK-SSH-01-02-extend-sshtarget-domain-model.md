@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/ssh_target.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — domain.SshTarget + NewSshTarget carry Port/KnownHostsFingerprint/JumpHostTargetID, port 0 defaults to 22, tests pass`
 
 ---
 

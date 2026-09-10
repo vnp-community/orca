@@ -54,7 +54,7 @@ func TestRepository_CreateAndListAnnotations_FiltersByTenant(t *testing.T) {
 	now := time.Now()
 
 	anchor1 := domain.Anchor{RepoID: "repo-1", FilePath: "main.go", Line: 10, Ref: "abc"}
-	a1, err := domain.NewAnnotation("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333", anchor1, "comment 1", false, "req-1", now, now)
+	a1, err := domain.NewAnnotation("11111111-1111-1111-1111-111111111111", "22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333", anchor1, "comment 1", "", false, "req-1", now, now)
 	if err != nil {
 		t.Fatalf("building annotation: %v", err)
 	}
@@ -63,7 +63,7 @@ func TestRepository_CreateAndListAnnotations_FiltersByTenant(t *testing.T) {
 	}
 
 	anchor2 := domain.Anchor{RepoID: "repo-1", FilePath: "main.go", Line: 20, Ref: "abc"}
-	a2, err := domain.NewAnnotation("44444444-4444-4444-4444-444444444444", "55555555-5555-5555-5555-555555555555", "33333333-3333-3333-3333-333333333333", anchor2, "comment 2", false, "req-2", now, now)
+	a2, err := domain.NewAnnotation("44444444-4444-4444-4444-444444444444", "55555555-5555-5555-5555-555555555555", "33333333-3333-3333-3333-333333333333", anchor2, "comment 2", "", false, "req-2", now, now)
 	if err != nil {
 		t.Fatalf("building annotation: %v", err)
 	}
@@ -110,7 +110,7 @@ func TestRepository_FindByRequestID_RoundTripsAndScopesToTenant(t *testing.T) {
 	now := time.Now()
 
 	anchor := domain.Anchor{RepoID: "repo-1", FilePath: "main.go", Line: 10, Ref: "abc"}
-	a, err := domain.NewAnnotation("66666666-6666-6666-6666-666666666666", "22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333", anchor, "comment", false, "req-findme", now, now)
+	a, err := domain.NewAnnotation("66666666-6666-6666-6666-666666666666", "22222222-2222-2222-2222-222222222222", "33333333-3333-3333-3333-333333333333", anchor, "comment", "", false, "req-findme", now, now)
 	if err != nil {
 		t.Fatalf("building annotation: %v", err)
 	}
@@ -142,5 +142,55 @@ func TestRepository_FindByRequestID_RoundTripsAndScopesToTenant(t *testing.T) {
 	}
 	if ok {
 		t.Error("expected no match for an unknown request_id")
+	}
+}
+
+// TestRepository_MarkSent_UpdatesExactlyGivenIDsAndSkipsMissing exercises
+// MarkSent (TASK-CR-02-06) against a real Postgres: it must update exactly
+// the given ids in one query and silently skip a nonexistent id.
+func TestRepository_MarkSent_UpdatesExactlyGivenIDsAndSkipsMissing(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	now := time.Now()
+	tenantID := "22222222-2222-2222-2222-222222222222"
+
+	anchor1 := domain.Anchor{RepoID: "repo-1", FilePath: "main.go", Line: 10, Ref: "abc"}
+	a1, err := domain.NewAnnotation("77777777-7777-7777-7777-777777777771", tenantID, "33333333-3333-3333-3333-333333333333", anchor1, "comment 1", "", false, "req-mark-1", now, now)
+	if err != nil {
+		t.Fatalf("building annotation: %v", err)
+	}
+	if _, err := repo.CreateAnnotation(ctx, a1); err != nil {
+		t.Fatalf("create annotation: %v", err)
+	}
+
+	anchor2 := domain.Anchor{RepoID: "repo-1", FilePath: "main.go", Line: 20, Ref: "abc"}
+	a2, err := domain.NewAnnotation("77777777-7777-7777-7777-777777777772", tenantID, "33333333-3333-3333-3333-333333333333", anchor2, "comment 2", "", false, "req-mark-2", now, now)
+	if err != nil {
+		t.Fatalf("building annotation: %v", err)
+	}
+	if _, err := repo.CreateAnnotation(ctx, a2); err != nil {
+		t.Fatalf("create annotation: %v", err)
+	}
+
+	sentAt := time.Now().UTC()
+	// Include one nonexistent id — must be silently skipped, not an error.
+	updated, err := repo.MarkSent(ctx, tenantID, []string{a1.ID, "99999999-9999-9999-9999-999999999999"}, sentAt)
+	if err != nil {
+		t.Fatalf("mark sent: %v", err)
+	}
+	if len(updated) != 1 || updated[0].ID != a1.ID {
+		t.Fatalf("expected exactly a1 to be updated, got %+v", updated)
+	}
+	if !updated[0].SentToAgent || updated[0].SentAt == nil {
+		t.Errorf("expected SentToAgent=true and SentAt set, got %+v", updated[0])
+	}
+
+	// a2 must remain untouched.
+	a2After, err := repo.GetAnnotation(ctx, tenantID, a2.ID)
+	if err != nil {
+		t.Fatalf("get a2: %v", err)
+	}
+	if a2After.SentToAgent {
+		t.Error("expected a2 to remain unsent")
 	}
 }

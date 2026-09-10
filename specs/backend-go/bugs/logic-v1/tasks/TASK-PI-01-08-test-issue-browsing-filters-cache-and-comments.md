@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service` + `api-gateway`
 **File:** `services/scm-integration-service/internal/usecase/list_issues_test.go`, `list_issue_comments_test.go` (new), `get_linked_pull_requests_for_issue_test.go` (new), `services/api-gateway/internal/adapter/httpgateway/scm_routes_test.go`, `services/api-gateway/internal/adapter/wscompat/channels_scm_test.go`
 **Depends on:** TASK-PI-01-03, TASK-PI-01-04, TASK-PI-01-05, TASK-PI-01-06, TASK-PI-01-07
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — list_issues_test.go (filter regression guard, cache hit/miss/expired, force_refresh bypass, cache read/write errors non-fatal, backoff retry + non-transient short-circuit), list_issue_comments_test.go, get_linked_pull_requests_for_issue_test.go all new; scm_routes_test.go/channels_scm_test.go extended for filters+refresh+new comments route/channel.`
 
 ---
 

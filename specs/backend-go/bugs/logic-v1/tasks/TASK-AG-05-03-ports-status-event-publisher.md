@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/ports.go`, `backend-go/services/infra-fleet-service/internal/adapter/postgres/agent_session_repository.go`
 **Depends on:** TASK-AG-01-02, TASK-AG-01-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — AgentStatusEventPublisher port + AgentSessionRepository.MarkStoppedWithStatus added to ports.go; AgentSessionStore.MarkStoppedWithStatus implemented in agent_session_repository.go. `go build`/`go vet` clean (dedicated test folded into agent_output_classifier_test.go's exit-event cases, which exercise MarkStoppedWithStatus directly).
 
 ---
 

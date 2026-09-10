@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/adapter/eventbus/consumer.go` (new), `backend-go/services/automation-service/cmd/server/main.go`
 **Depends on:** TASK-AT-03-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — adapter/eventbus/consumer.go: durable Subscribe (not ephemeral) over the 5 subjects, exhaustive subjectToEventName; wired into cmd/server/main.go alongside the outbox relay.
 
 ---
 

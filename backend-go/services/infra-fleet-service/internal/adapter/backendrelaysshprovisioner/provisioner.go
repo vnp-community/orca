@@ -142,7 +142,7 @@ func (p *Provisioner) Provision(ctx context.Context, tenantID, runtimeID string,
 	// ConnectionModeRelaySSH (see dev_server.go's ErrMissingSSHTargetForRelaySSH);
 	// it is never looked up through usecase.SshTargetRepository for this
 	// dev server, only through the per-call SingleTargetResolver above.
-	devServer, err := domain.NewDevServer(p.newID(), tenantID, target.Host, domain.ConnectionModeRelaySSH, "ephemeral:"+runtimeID)
+	devServer, err := domain.NewDevServer(p.newID(), tenantID, target.Host, domain.ConnectionModeRelaySSH, "ephemeral:"+runtimeID, nil)
 	if err != nil {
 		return "", fmt.Errorf("backendrelaysshprovisioner: constructing dev server: %w", err)
 	}

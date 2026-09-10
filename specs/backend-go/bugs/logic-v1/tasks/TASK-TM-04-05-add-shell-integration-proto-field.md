@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (proto is shared, `backend-go/proto/`)
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — shell_integration (field 6) added to SpawnTerminalSessionRequest; `buf generate` regenerated stubs, `go build ./proto/...` clean. `buf breaking` against main not runnable in this worktree (see TASK-TM-03-03's note); verified additive-only by diff.
 
 ---
 

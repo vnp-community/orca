@@ -21,7 +21,7 @@ func TestKillTerminalSession_StillWorksIndependentlyOfConnectionStatus(t *testin
 		domain.ConnectionStatusClosed,
 	} {
 		t.Run(status, func(t *testing.T) {
-			ds, err := domain.NewDevServer("ds-1", "tenant-1", "10.0.0.5", domain.ConnectionModeDirectWebSocket, "")
+			ds, err := domain.NewDevServer("ds-1", "tenant-1", "10.0.0.5", domain.ConnectionModeDirectWebSocket, "", nil)
 			if err != nil {
 				t.Fatalf("building dev server: %v", err)
 			}

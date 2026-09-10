@@ -5,7 +5,7 @@
 **Service:** `auth-service` (postgres adapter)
 **File:** `backend-go/services/auth-service/internal/adapter/postgres/audit_repository.go`
 **Depends on:** TASK-AUTH-05-01, TASK-AUTH-05-02, TASK-AUTH-05-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `Append`/`Query` handle new columns + `AuditQueryFilter`; fixed spec's `ip_address::text` to `host(ip_address)` (same `/32` bug as sessions); integration tests confirm metadata/IP round-trip and action/actor_id/to filters, isolated and combined.
 
 ---
 

@@ -66,6 +66,7 @@ import (
 
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/common/testutil"
+	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpcclient"
 	automationpostgres "github.com/stablyai/orca-go/services/automation-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/automation-service/internal/domain"
@@ -127,7 +128,7 @@ func newRealPostgresAutomationRepository(t *testing.T) (*automationpostgres.Auto
 		t.Fatalf("connecting to postgres: %v", err)
 	}
 	t.Cleanup(pool.Close)
-	return automationpostgres.NewAutomationRepository(pool), automationpostgres.NewAutomationRunRepository(pool)
+	return automationpostgres.NewAutomationRepository(pool), automationpostgres.NewAutomationRunRepository(pool, eventbus.NewRunCompletedPublisher())
 }
 
 // realWorkflowServiceAddr returns a gRPC address for a genuinely live

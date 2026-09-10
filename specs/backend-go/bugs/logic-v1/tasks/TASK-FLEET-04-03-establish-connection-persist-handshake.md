@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (usecase)
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/establish_connection.go`
 **Depends on:** TASK-FLEET-02-01 (domain fields), TASK-FLEET-02-03 (`UpdateProvisionResult`), TASK-FLEET-04-02 (`LastHandshakeInfo`)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added LastHandshakeInfo to usecase.DevServerAgentClient (implemented by devserveragent.Client, converting devserveragent.HandshakeInfo -> usecase.HandshakeInfo at the boundary) and persist-after-Health() call in EstablishConnection. Tests cover successful persist (right platform/arch/version fields) and ok=false-skips-without-erroring. Full suite + `-race` pass.
 
 ---
 

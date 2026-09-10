@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/pairing_routes.go`, `backend-go/services/api-gateway/internal/adapter/httpgateway/router.go`
 **Depends on:** TASK-MB-01-07
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `pairing_routes.go` (3 authed handlers + unauthenticated `CompleteDevicePairing`), `pairingRateLimitMiddleware` (keys on remote addr, disjoint "pairing:" bucket prefix on the shared `RateLimiter`) in `middleware.go`, wired both mount points in `router.go` per the precedent; `go build`/`go vet` clean; `pairing_routes_test.go` covers `TestCompleteDevicePairing_NoAuthRequired`, `TestCompleteDevicePairing_ErrorsShareIdenticalShape` (invalid/expired/used all map to identical status+body), plus Initiate/List/Unpair success paths — all pass.
 
 ---
 

@@ -24,6 +24,7 @@ const (
 	OrchestrationService_ResolveGate_FullMethodName                       = "/orca.orchestration.v1.OrchestrationService/ResolveGate"
 	OrchestrationService_UpdateTaskStatusAndPromote_FullMethodName        = "/orca.orchestration.v1.OrchestrationService/UpdateTaskStatusAndPromote"
 	OrchestrationService_GetDispatchContextForTask_FullMethodName         = "/orca.orchestration.v1.OrchestrationService/GetDispatchContextForTask"
+	OrchestrationService_StartCoordinatorRun_FullMethodName               = "/orca.orchestration.v1.OrchestrationService/StartCoordinatorRun"
 	OrchestrationService_ListActiveDispatchContextsForUser_FullMethodName = "/orca.orchestration.v1.OrchestrationService/ListActiveDispatchContextsForUser"
 	OrchestrationService_FailDispatch_FullMethodName                      = "/orca.orchestration.v1.OrchestrationService/FailDispatch"
 )
@@ -49,6 +50,13 @@ type OrchestrationServiceClient interface {
 	// terminal was this task dispatched to." See SOL-018 for the "not a
 	// missing assignee_handle field, a missing read RPC" distinction.
 	GetDispatchContextForTask(ctx context.Context, in *GetDispatchContextForTaskRequest, opts ...grpc.CallOption) (*GetDispatchContextForTaskResponse, error)
+	// StartCoordinatorRun is task-service's entry point into the complex
+	// execution path (task-service.md §3.1/§7): starts a coordinator_run for
+	// a subtree of tasks and returns immediately — this call does NOT block
+	// for the DAG to finish. orchestration-service calls back into
+	// task-service (ReportTaskExecutionResult) to report the terminal
+	// result; it never blocks task-service synchronously for it.
+	StartCoordinatorRun(ctx context.Context, in *StartCoordinatorRunRequest, opts ...grpc.CallOption) (*StartCoordinatorRunResponse, error)
 	// ListActiveDispatchContextsForUser: every non-terminal dispatch context
 	// for the calling user (tenant/user from identity, not a request field).
 	// Added for CR-STORAGE-006/007 — see
@@ -125,6 +133,16 @@ func (c *orchestrationServiceClient) GetDispatchContextForTask(ctx context.Conte
 	return out, nil
 }
 
+func (c *orchestrationServiceClient) StartCoordinatorRun(ctx context.Context, in *StartCoordinatorRunRequest, opts ...grpc.CallOption) (*StartCoordinatorRunResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StartCoordinatorRunResponse)
+	err := c.cc.Invoke(ctx, OrchestrationService_StartCoordinatorRun_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *orchestrationServiceClient) ListActiveDispatchContextsForUser(ctx context.Context, in *ListActiveDispatchContextsForUserRequest, opts ...grpc.CallOption) (*ListActiveDispatchContextsForUserResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListActiveDispatchContextsForUserResponse)
@@ -166,6 +184,13 @@ type OrchestrationServiceServer interface {
 	// terminal was this task dispatched to." See SOL-018 for the "not a
 	// missing assignee_handle field, a missing read RPC" distinction.
 	GetDispatchContextForTask(context.Context, *GetDispatchContextForTaskRequest) (*GetDispatchContextForTaskResponse, error)
+	// StartCoordinatorRun is task-service's entry point into the complex
+	// execution path (task-service.md §3.1/§7): starts a coordinator_run for
+	// a subtree of tasks and returns immediately — this call does NOT block
+	// for the DAG to finish. orchestration-service calls back into
+	// task-service (ReportTaskExecutionResult) to report the terminal
+	// result; it never blocks task-service synchronously for it.
+	StartCoordinatorRun(context.Context, *StartCoordinatorRunRequest) (*StartCoordinatorRunResponse, error)
 	// ListActiveDispatchContextsForUser: every non-terminal dispatch context
 	// for the calling user (tenant/user from identity, not a request field).
 	// Added for CR-STORAGE-006/007 — see
@@ -206,6 +231,9 @@ func (UnimplementedOrchestrationServiceServer) UpdateTaskStatusAndPromote(contex
 }
 func (UnimplementedOrchestrationServiceServer) GetDispatchContextForTask(context.Context, *GetDispatchContextForTaskRequest) (*GetDispatchContextForTaskResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetDispatchContextForTask not implemented")
+}
+func (UnimplementedOrchestrationServiceServer) StartCoordinatorRun(context.Context, *StartCoordinatorRunRequest) (*StartCoordinatorRunResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StartCoordinatorRun not implemented")
 }
 func (UnimplementedOrchestrationServiceServer) ListActiveDispatchContextsForUser(context.Context, *ListActiveDispatchContextsForUserRequest) (*ListActiveDispatchContextsForUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListActiveDispatchContextsForUser not implemented")
@@ -324,6 +352,24 @@ func _OrchestrationService_GetDispatchContextForTask_Handler(srv interface{}, ct
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestrationService_StartCoordinatorRun_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StartCoordinatorRunRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestrationServiceServer).StartCoordinatorRun(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestrationService_StartCoordinatorRun_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestrationServiceServer).StartCoordinatorRun(ctx, req.(*StartCoordinatorRunRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _OrchestrationService_ListActiveDispatchContextsForUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListActiveDispatchContextsForUserRequest)
 	if err := dec(in); err != nil {
@@ -386,6 +432,10 @@ var OrchestrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetDispatchContextForTask",
 			Handler:    _OrchestrationService_GetDispatchContextForTask_Handler,
+		},
+		{
+			MethodName: "StartCoordinatorRun",
+			Handler:    _OrchestrationService_StartCoordinatorRun_Handler,
 		},
 		{
 			MethodName: "ListActiveDispatchContextsForUser",

@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `backend-go/services/auth-service/internal/usecase/list_paired_devices.go`, `backend-go/services/auth-service/internal/usecase/unpair_device.go`, `backend-go/services/auth-service/internal/usecase/resolve_device_shared_secret.go`
 **Depends on:** TASK-MB-01-02, TASK-MB-01-03, TASK-MB-01-04
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `ListPairedDevices`/`UnpairDevice`/`ResolveDeviceSharedSecret` implemented; "unpair then resolve → AUTH_DEVICE_NOT_FOUND, sealer.Decrypt not called" test passes (`go test -run 'ListPairedDevices|UnpairDevice|ResolveDeviceSharedSecret'`).
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/test_connection.go`, `backend-go/services/ai-provider-service/internal/adapter/eventbus/publisher.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `go build`/`go vet`/`go test ./services/ai-provider-service/...` all pass; new tests assert `PublishRateLimited` is called once with `{account_id, provider, user_id, reset_at_unix_ms}` when the relay result has `rateLimited: true`, and not called when it doesn't.
 
 ---
 

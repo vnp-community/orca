@@ -99,7 +99,8 @@ func (uc *CreateUser) Execute(ctx context.Context, in CreateUserInput) (CreateUs
 		return CreateUserOutput{}, apperrors.New(apperrors.KindInternal, "AUTH_USER_CREATE_FAILED", "failed to create user", err)
 	}
 
-	if entry, err := domain.NewAuditEntry(uuid.NewString(), created.TenantID, actor.ID, "user.created", created.ID, domain.OutcomeAllowed, "", now); err == nil {
+	if entry, err := domain.NewAuditEntry(uuid.NewString(), created.TenantID, actor.ID, "user.created", "", "user", created.ID,
+		map[string]any{"targetEmail": created.Email, "role": string(created.Role)}, domain.OutcomeAllowed, "", now); err == nil {
 		_ = uc.audit.Append(ctx, entry)
 	}
 

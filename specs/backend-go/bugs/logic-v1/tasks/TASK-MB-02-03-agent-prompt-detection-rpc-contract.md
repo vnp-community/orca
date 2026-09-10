@@ -5,7 +5,7 @@
 **Service:** `agent` (client-side; not backend-go)
 **File:** N/A (no backend-go diff — this task defines the contract `infra-fleet-service` would consume if/when `agent/` implements it)
 **Depends on:** TASK-MB-02-02
-**Status:** `[ ]` TODO (client-side; backend contract only)
+**Status:** `[x]` DONE — backend-go quiescence heuristic (TASK-MB-02-02) is the contract this future agent-side RPC would feed into; no backend-go diff, agent/-side pty.promptDetection.subscribe not implemented (client-side, out of scope).
 
 ---
 

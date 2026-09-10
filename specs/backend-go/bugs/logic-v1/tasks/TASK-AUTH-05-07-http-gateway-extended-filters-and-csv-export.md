@@ -5,7 +5,7 @@
 **Service:** `api-gateway` (httpgateway)
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/auth_admin_routes.go`, `backend-go/services/api-gateway/internal/adapter/httpgateway/admin_routes.go`
 **Depends on:** TASK-AUTH-05-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `handleQueryAuditLog` now forwards `action`/`userId`(→`ActorId`)/`to`; new `GET /admin/api/audit/export` (`handleExportAuditLog`) streams paginated `QueryAuditLog` results as CSV; tests in `auth_admin_routes_test.go`/`admin_routes_test.go` pass (filters, malformed `to` → 400, header row, multi-page no-dup/no-missing rows).
 
 ---
 

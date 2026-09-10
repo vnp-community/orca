@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 // GrantLevel is task-service's permission tier. Unlike the design doc's
 // sketch schema (grantee_type ∈ {user,team,company} as a field separate
 // from a 3-value level), the generated proto's GrantLevel enum
@@ -52,10 +54,12 @@ func (l GrantLevel) priority() int {
 // task. ApplyTree=true means the grant is inherited by the task's
 // descendant subtree during ancestor-walk resolution (§4.1).
 type Grant struct {
+	ID        string // new — needed by RevokeGrant
 	TaskID    string
 	SubjectID string
 	Level     GrantLevel
 	ApplyTree bool
+	ExpiresAt *time.Time // new — nil = never expires
 }
 
 // CallerIdentity is the resolved-identity input to grant resolution: the

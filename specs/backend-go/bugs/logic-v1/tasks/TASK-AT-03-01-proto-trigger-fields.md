@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/proto/orca/automation/v1/automation.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — automation.proto: TriggerType enum + trigger_type/trigger_event/trigger_filter_json added to Automation+Create/UpdateRequest; buf generate + go build clean.
 
 ---
 

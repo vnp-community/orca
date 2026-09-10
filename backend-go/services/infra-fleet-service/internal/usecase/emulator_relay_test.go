@@ -11,7 +11,7 @@ import (
 
 func testEmulatorDevServer(t *testing.T) domain.DevServer {
 	t.Helper()
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

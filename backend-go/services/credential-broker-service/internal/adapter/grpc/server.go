@@ -227,6 +227,8 @@ func toDomainCategory(c credentialbrokerv1.CredentialCategory) domain.Category {
 		return domain.CategorySsh
 	case credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_SERVICE_SECRET:
 		return domain.CategoryServiceSecret
+	case credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN:
+		return domain.CategoryDevServerAgentToken
 	default:
 		return ""
 	}
@@ -244,6 +246,8 @@ func toProtoCategory(c domain.Category) credentialbrokerv1.CredentialCategory {
 		return credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_SSH
 	case domain.CategoryServiceSecret:
 		return credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_SERVICE_SECRET
+	case domain.CategoryDevServerAgentToken:
+		return credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN
 	default:
 		return credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_UNSPECIFIED
 	}

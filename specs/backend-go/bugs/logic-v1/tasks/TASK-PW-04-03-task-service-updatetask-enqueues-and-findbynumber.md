@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/update_task.go`, `backend-go/services/task-service/internal/usecase/find_task_by_number.go` (new), `backend-go/services/task-service/internal/usecase/create_task.go`
 **Depends on:** TASK-PW-04-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — UpdateTask enqueues orca.task.task.statuschanged always + orca.task.task.completed on transition into done; FindTaskByNumber usecase added; CreateTask/Update wired to real task_number; unit + integration tests pass
 
 ---
 

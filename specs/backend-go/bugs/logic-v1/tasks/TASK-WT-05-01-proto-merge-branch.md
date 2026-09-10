@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/proto/orca/gitgateway/v1/gitgateway.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added MergeBranch RPC + messages; FastForwardResponse/FastForwardResult gained result_sha; localgit+relay FastForward updated. buf generate + go build clean.
 
 ---
 

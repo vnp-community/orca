@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `backend-go/services/auth-service/migrations/0003_device_pairing.up.sql`, `backend-go/services/auth-service/internal/adapter/postgres/pairing_session_repository.go`, `backend-go/services/auth-service/internal/adapter/postgres/paired_device_repository.go`
 **Depends on:** TASK-MB-01-02
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — migration 0003 + `PairingSessionStore`/`PairedDeviceStore` repos + ports added; `go build`/`go vet` clean (integration-tagged repository tests match existing postgres-adapter convention — no DB in this environment, `go test ./internal/adapter/postgres/...` shows "no test files" same as sibling repos).
 
 ---
 

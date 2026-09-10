@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/adapter/postgres/repository.go`
 **Depends on:** TASK-AIP-01-01, TASK-AIP-01-02, TASK-AIP-01-03
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — transactional Create+outbox, FetchUnpublished/MarkPublished, scanAccount extended, main.go outbox relay wired; 6 integration tests (default-demotion, unique-index rejection, tx rollback, label round-trip, outbox contract) all pass against real Postgres.`
 
 ---
 

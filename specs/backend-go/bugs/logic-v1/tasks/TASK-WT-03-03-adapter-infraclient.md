@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/adapter/infraclient/terminal_sessions.go` (new)
 **Depends on:** TASK-WT-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Created infraclient/terminal_sessions.go implementing TerminalSessionLister against infrafleetv1 (field names confirmed against real proto); go build clean.
 
 ---
 

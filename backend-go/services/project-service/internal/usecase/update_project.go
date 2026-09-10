@@ -20,6 +20,9 @@ type UpdateProjectInput struct {
 	Description   string
 	DefaultBranch string
 	Visibility    string
+	// IssueStatusSyncEnabled is presence-based (nil = no change) — see
+	// domain.ProjectUpdatePatch's doc comment.
+	IssueStatusSyncEnabled *bool
 	// MobileEmulatorAgentID — CR-DS-009 §3.2, empty = no change. See
 	// domain.Project.MobileEmulatorAgentID's doc comment for why this field
 	// (unlike DevServerID) goes through the ordinary UpdateProject path.
@@ -53,11 +56,12 @@ func (uc *UpdateProject) Execute(ctx context.Context, in UpdateProjectInput) (do
 	}
 
 	patch := domain.ProjectUpdatePatch{
-		Name:                  in.Name,
-		Description:           in.Description,
-		DefaultBranch:         in.DefaultBranch,
-		Visibility:            in.Visibility,
-		MobileEmulatorAgentID: in.MobileEmulatorAgentID,
+		Name:                   in.Name,
+		Description:            in.Description,
+		DefaultBranch:          in.DefaultBranch,
+		Visibility:             in.Visibility,
+		IssueStatusSyncEnabled: in.IssueStatusSyncEnabled,
+		MobileEmulatorAgentID:  in.MobileEmulatorAgentID,
 	}
 
 	updated, err := uc.repo.UpdateProject(ctx, tenantID, in.ProjectID, patch)

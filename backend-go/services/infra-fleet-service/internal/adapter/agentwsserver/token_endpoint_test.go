@@ -211,6 +211,15 @@ func (f *fakeResolverRepo) FindByHostAndMode(ctx context.Context, tenantID, host
 func (f *fakeResolverRepo) UpdateApprovalStatus(context.Context, string, string, domain.DevServerStatus) (domain.DevServer, error) {
 	return domain.DevServer{}, nil
 }
+func (f *fakeResolverRepo) ListAllForPolling(context.Context) ([]domain.DevServer, error) {
+	return nil, nil
+}
+func (f *fakeResolverRepo) ListByTag(context.Context, string, string) ([]domain.DevServer, error) {
+	return nil, nil
+}
+func (f *fakeResolverRepo) UpdateProvisionResult(context.Context, string, string, domain.DevServerHealthStatus, usecase.HandshakeInfo, time.Time) error {
+	return nil
+}
 func (f *fakeResolverRepo) AssignGroup(context.Context, string, string, string) (domain.DevServer, error) {
 	return domain.DevServer{}, nil
 }

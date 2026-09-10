@@ -34,3 +34,12 @@ type DepartmentSettingsPatch struct {
 	Name         string
 	SettingsJSON string
 }
+
+// ValidateDepartmentSettings rejects a "security" top-level key — see
+// ErrSecurityLockedToCompany in company.go.
+func ValidateDepartmentSettings(s Settings) error {
+	if _, present := s["security"]; present {
+		return ErrSecurityLockedToCompany
+	}
+	return nil
+}

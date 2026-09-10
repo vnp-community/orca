@@ -3,10 +3,12 @@ package bitbucket
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/usecase"
 )
 
@@ -240,5 +242,73 @@ func TestGetRateLimitStatus_NonOKStatusIsAnError(t *testing.T) {
 	_, err := client.GetRateLimitStatus(context.Background(), usecase.Credential{Token: "bad-token"})
 	if err == nil {
 		t.Fatal("expected an error for a non-200 response")
+	}
+}
+
+// TestCreatePullRequest_DraftReturnsCapabilityUnsupported asserts Draft:
+// true returns an error satisfying errors.Is(err,
+// domain.ErrCapabilityUnsupported) without making any HTTP call —
+// Bitbucket Cloud's PR API has no draft concept (BR-CR-20).
+func TestCreatePullRequest_DraftReturnsCapabilityUnsupported(t *testing.T) {
+	called := false
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		called = true
+		w.WriteHeader(http.StatusCreated)
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, err := client.CreatePullRequest(context.Background(), usecase.Credential{Token: "tok"}, "a/b", usecase.CreatePullRequestInput{Title: "t", HeadBranch: "h", BaseBranch: "b", Draft: true})
+	if !errors.Is(err, domain.ErrCapabilityUnsupported) {
+		t.Fatalf("expected an error satisfying errors.Is(err, domain.ErrCapabilityUnsupported), got %v", err)
+	}
+	if called {
+		t.Error("expected zero HTTP calls for a draft request against Bitbucket")
+	}
+}
+
+func TestGetRepoFileContent_Found(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("* @alice\n"))
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	content, found, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found || content != "* @alice\n" {
+		t.Errorf("expected found=true content=%q, got found=%v content=%q", "* @alice\n", found, content)
+	}
+}
+
+func TestGetRepoFileContent_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, found, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err != nil {
+		t.Fatalf("expected no error on 404, got %v", err)
+	}
+	if found {
+		t.Error("expected found=false on 404")
+	}
+}
+
+func TestGetRepoFileContent_NonOKNonNotFoundIsAnError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, _, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err == nil {
+		t.Fatal("expected an error for a non-200/404 response")
 	}
 }

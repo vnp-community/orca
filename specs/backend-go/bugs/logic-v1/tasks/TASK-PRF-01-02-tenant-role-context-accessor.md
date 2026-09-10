@@ -5,7 +5,7 @@
 **Service:** `tenant-service` (edits a `common/` package shared by every service)
 **File:** `backend-go/common/tenant/tenant.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Role/WithRole added to common/tenant; tenant_test.go round-trip + absent-context tests pass
 
 ---
 

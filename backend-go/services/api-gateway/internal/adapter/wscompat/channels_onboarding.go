@@ -466,10 +466,12 @@ type remotePreflightStatusView struct {
 // onboardingGetPreflightStatus relays to the AGENT's own preflight.check
 // (Contract B: full gh/glab/git install+auth+identity probe on the dev
 // server's host OS) — a DIFFERENT RPC namespace than this file's sibling
-// channels.go's local, hardcoded preflight.check (which answers a
-// different question: whether backend-go itself can talk to GitHub/GitLab
-// via gh/glab — see BUG-010's own emphasis on this exact confusion risk).
-// Do not alias the two.
+// channels.go's preflight.check (SOL-INT-03: a local+relay-merged
+// []usecase.PreflightCheckResult set over infra-fleet-service's own
+// GetFleetHealth/ScanWorkspacePorts/Relay RPCs), which answers a different
+// question: whether backend-go's own connectivity/tooling checks pass, not
+// what's installed on the dev server's host OS — see BUG-010's own emphasis
+// on this exact confusion risk. Do not alias the two.
 //
 // No server-side cache in this implementation: the old TS backend's
 // preflightCache lived in Electron's single-instance main process;

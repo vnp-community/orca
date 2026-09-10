@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/record_token_usage.go` (new)
 **Depends on:** TASK-AIP-03-03, TASK-AIP-03-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — record_token_usage.go added, MarkQuotaWarningSent + UpdateStatusInput.HealthDetail added; all 3 requested tests pass.`
 
 ---
 

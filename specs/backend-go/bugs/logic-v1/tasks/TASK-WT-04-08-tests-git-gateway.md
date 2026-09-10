@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/compare_worktrees_test.go` (new)
 **Depends on:** TASK-WT-04-04, TASK-WT-04-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added TestCreateWorktree_ForwardsBaseRefToRecordWorktreeCreated + full compare_worktrees_test.go (5 cases incl. fail-fast contrast comment vs SOL-WT-02). git-gateway grpc/server_test.go gained CompareWorktrees/CheckWorktreeDeleteSafety/RemoveWorktree/MergeBranch contract tests; project-service grpc/server_test.go created (new file) with GetWorktree contract tests. go test clean across both services.
 
 ---
 

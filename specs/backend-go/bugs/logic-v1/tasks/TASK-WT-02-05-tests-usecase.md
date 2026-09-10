@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/usecase/fan_out_create_worktrees_test.go` (new)
 **Depends on:** TASK-WT-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — fan_out_create_worktrees_test.go created with all 6 cases; `go test ./internal/usecase/... -run FanOutCreateWorktrees -race` passes
 
 ---
 

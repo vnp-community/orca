@@ -5,7 +5,7 @@
 **Service:** `notification-service`
 **File:** `backend-go/services/notification-service/migrations/0003_mobile_buffering_preferences.up.sql`, `backend-go/services/notification-service/internal/adapter/postgres/buffered_notification_repository.go`, `backend-go/services/notification-service/internal/adapter/postgres/notification_preference_repository.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0003 (buffered_notifications + notification_preferences, RLS enabled) + 0004 (push_subscriptions.device_id); `BufferedNotificationStore`/`NotificationPreferenceStore` implemented with real SQL (transactional 50-cap eviction, atomic upsert); both new ports added to `usecase/ports.go`. Verified against a real Postgres via testcontainers (`go test -tags=integration`): 50-cap eviction, MarkDelivered exclusion, IsEnabled default-true/explicit-opt-out/upsert-overwrite all pass. Found and fixed a real bug during integration testing: the JSONB insert needed an explicit `::jsonb` cast.
 
 ---
 

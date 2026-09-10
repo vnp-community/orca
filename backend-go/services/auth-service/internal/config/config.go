@@ -24,6 +24,18 @@ type Config struct {
 	// valid before "exp" — see internal/usecase/issue_service_token.go.
 	ServiceTokenTTL time.Duration
 
+	// DeviceAccessTokenTTL is how long the access JWT CompleteDevicePairing
+	// mints stays valid before "exp" — see
+	// internal/usecase/complete_device_pairing.go.
+	DeviceAccessTokenTTL time.Duration
+
+	// ServerAddress is api-gateway's public base URL, echoed back in
+	// InitiateDevicePairingResponse so the mobile client knows where to
+	// dial CompleteDevicePairing — see SOL-MB-01's "server-mode adaptation"
+	// rationale (this desktop-originated pairing flow has no LAN-discovery
+	// step to fall back on).
+	ServerAddress string
+
 	// OPABundlePath points requireAdminActor's OPA client
 	// (internal/adapter/opaclient, via common/policy.Evaluator) at the
 	// orca-authz Rego bundle on disk. Defaults to the bundle's location
@@ -55,6 +67,13 @@ type Config struct {
 	BootstrapCompanyName   string
 	BootstrapAdminEmail    string
 	BootstrapAdminPassword string
+
+	// NATSURL is where cmd/server/main.go's natsconsumer.AuditIngestConsumer
+	// (TASK-AUTH-05-08) connects to durably subscribe to infra-fleet-service's
+	// ssh.connect outbox stream — see usage-service/notification-service's
+	// internal/config.Config.NATSURL for the same field on the reference
+	// eventbus-consuming services.
+	NATSURL string
 
 	// TenantServiceAddr is where bootstrap.go's TenantProvisioner dials to
 	// originate a tenant for the first admin — only used when
@@ -125,16 +144,27 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	// DefaultDeviceAccessTokenTTL mirrors SessionTTL's default — a paired
+	// mobile device is a long-lived client, not a short-lived
+	// service-to-service call (unlike ServiceTokenTTL's 15m default).
+	deviceAccessTokenTTL, err := durationEnv("DEVICE_ACCESS_TOKEN_TTL", 24*time.Hour)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		Base:                    base,
 		BcryptCost:              bcryptCost,
 		SessionTTL:              sessionTTL,
 		ServiceTokenTTL:         serviceTokenTTL,
-		OPABundlePath:           commonconfig.StringEnv("OPA_BUNDLE_PATH", "/policy/orca-authz"),
+		DeviceAccessTokenTTL:    deviceAccessTokenTTL,
+		ServerAddress:           commonconfig.StringEnv("SERVER_ADDRESS", ""),
+		OPABundlePath:           commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 		DisablePolicyPublish:    boolEnv("OPA_POLICY_PUBLISH_DISABLED", false),
 		BootstrapCompanyName:    os.Getenv("BOOTSTRAP_COMPANY_NAME"),
 		BootstrapAdminEmail:     os.Getenv("BOOTSTRAP_ADMIN_EMAIL"),
 		BootstrapAdminPassword:  os.Getenv("BOOTSTRAP_ADMIN_PASSWORD"),
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		TenantServiceAddr:       commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
 		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 		SsoStateSecret:          commonconfig.StringEnv("SSO_STATE_SECRET", ""),

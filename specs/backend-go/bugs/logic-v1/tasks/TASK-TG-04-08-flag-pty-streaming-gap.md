@@ -5,7 +5,7 @@
 **Service:** `agent/` (Dev Server Agent), `infra-fleet-service`, `task-service` (all three, cross-repo)
 **File:** none — this task produces no code change; it is a scope record
 **Depends on:** TASK-TG-04-03 (the synchronous `SimpleExecutor.Execute` this gap sits on top of)
-**Status:** `[ ]` TODO — **blocked**: cannot be completed as a `task-service`-only change; requires its own design pass once prioritized
+**Status:** `[ ]` BLOCKED — cross-repo gap (`agent/` + `infra-fleet-service` + `task-service`); cannot be completed as a `task-service`-only change, requires its own design pass once prioritized
 
 ---
 

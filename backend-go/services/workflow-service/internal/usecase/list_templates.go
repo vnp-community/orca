@@ -9,7 +9,16 @@ import (
 )
 
 type ListTemplatesInput struct {
-	Scope     string // optional filter, empty = all scopes
+	Scope string // optional filter, empty = all scopes
+	// Query is a full-text filter against name/description
+	// (idx_templates_fts) — empty means no query filter.
+	Query string
+	// Tags is an AND-filter: every listed tag must be present on a
+	// matching template, not any (empty means no tag filter).
+	Tags []string
+	// Sort selects the ordering: "" (default, id order) | "trending"
+	// (usage_count DESC, rating_sum DESC) | "recent" (updated_at DESC).
+	Sort      string
 	PageToken string
 	PageSize  int32
 }
@@ -39,13 +48,18 @@ func (uc *ListTemplates) Execute(ctx context.Context, in ListTemplatesInput) (Li
 	if in.Scope != "" && !domain.Scope(in.Scope).Valid() {
 		return ListTemplatesOutput{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_SCOPE", "invalid scope filter", nil)
 	}
+	switch in.Sort {
+	case "", "trending", "recent":
+	default:
+		return ListTemplatesOutput{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_SORT", `sort must be "trending", "recent", or empty`, nil)
+	}
 
 	pageSize := in.PageSize
 	if pageSize <= 0 || pageSize > 200 {
 		pageSize = 50
 	}
 
-	templates, next, err := uc.repo.ListTemplates(ctx, tenantID, in.Scope, in.PageToken, pageSize)
+	templates, next, err := uc.repo.ListTemplates(ctx, tenantID, in.Scope, in.Query, in.Tags, in.Sort, in.PageToken, pageSize)
 	if err != nil {
 		return ListTemplatesOutput{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_TEMPLATE_LIST_FAILED", "failed to list workflow templates", err)
 	}

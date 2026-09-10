@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/attach_pty.go`, `backend-go/services/infra-fleet-service/internal/adapter/eventbus/publisher.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented `internal/adapter/eventbus/publisher.go` (new), `usecase.LifecycleEventPublisher` port in `ports.go`, `AttachPty`'s shared `*sync.Map` `liveStates` registry + `publishExitEvent` (agent_completed/agent_error on exit, best-effort/nil-safe), and `cmd/server/main.go` NATS/JetStream wiring (`INFRA` stream, `orca.infra.>` subjects, graceful degrade when NATS unavailable). `TestAttachPty_RelaysAgentOutputAndExit`/`TestAttachPty_ExitCodeZero_PublishesAgentCompleted` cover exactly-one-publish for both exit codes and no-publish-on-Output; `go build`/`go vet`/`go test -race` all green for `services/infra-fleet-service/...`.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/terminal_scrollback_snapshot.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — internal/domain/terminal_scrollback_snapshot.go created; `go build`/`go vet` clean.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/get_terminal_agent_status.go`, `backend-go/services/infra-fleet-service/internal/domain/terminal_session.go`, `backend-go/services/infra-fleet-service/migrations/0007_terminal_session_created_by.up.sql`
 **Depends on:** TASK-MB-02-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added migration `0007_terminal_session_created_by.{up,down}.sql`, `domain.TerminalSession.CreatedByUserID` (threaded from `tenant.UserID(ctx)` in `SpawnTerminalSession`, through `TerminalSessionStore.Create`/`Get`/`List`/`scanTerminalSession`), and `GetTerminalAgentStatus`'s real quiescence check against the shared `liveStates` `*sync.Map` (3s threshold), publishing `agent_waiting` exactly once per transition via `ptyLiveState.readyNotified` debounce. `TestGetTerminalAgentStatus_NoLiveStateEntry_RegressionGuard`, `..._QuiescentOutput_ReadyForInputAndPublishesOnce` (covers the no-republish-while-quiescent debounce), and `..._AgentStatusError_DegradesToZeroValue` all pass; `go build`/`go vet`/`go test -race` green for `services/infra-fleet-service/...`.
 
 ---
 

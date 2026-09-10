@@ -23,7 +23,11 @@ import (
 // field for the same downstream service.
 type Config struct {
 	commonconfig.Base
-	NATSURL                   string
+	NATSURL string
+	// OPABundlePath points requireCompanyAdmin/requireDepartmentAccess's OPA
+	// client at policy/orca-authz — same convention as project-service's own
+	// OPABundlePath, for identical override behavior in every service.
+	OPABundlePath             string
 	ScmIntegrationServiceAddr string
 }
 
@@ -35,6 +39,7 @@ func Load() (Config, error) {
 	return Config{
 		Base:                      base,
 		NATSURL:                   commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		OPABundlePath:             commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 		ScmIntegrationServiceAddr: commonconfig.StringEnv("SCM_INTEGRATION_SERVICE_ADDR", "scm-integration-service:9090"),
 	}, nil
 }

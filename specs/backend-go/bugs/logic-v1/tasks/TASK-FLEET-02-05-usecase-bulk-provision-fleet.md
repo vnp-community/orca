@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (usecase)
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/bulk_provision_fleet.go` (new)
 **Depends on:** TASK-FLEET-02-01, TASK-FLEET-02-03, TASK-FLEET-02-04
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — implemented BulkProvisionFleet (fan-out, bounded concurrency, 3x retry, project filter, status write). Deviation from pseudocode: usecase.Provisioner port signature is `Provision(ctx, devServer) (HandshakeInfo, prereqsMet bool, err error)` instead of relying on `errors.Is(err, sshrelay.ErrPrerequisitesNotMet)` — matches TASK-FLEET-02-04's side-channel design (a non-nil Provision error there would make devserveragent.Client discard a live transport). Added adapter/sshrelay.BulkProvisioner to bridge sshrelay.Provisioner into this port. All tests (concurrency bound, retry exhaustion, prereq-shortfall-no-retry, project filter, idempotent rerun, tenant requirement) pass under `-race`.
 
 ---
 

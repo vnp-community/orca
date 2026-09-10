@@ -17,6 +17,11 @@ type RegisterDevServerInput struct {
 	Host        string
 	Mode        domain.ConnectionMode
 	SSHTargetID string
+	// Tags is free-form, tenant-scoped (e.g. "gpu", "region:us-east") —
+	// backs the "fleet:tag:<tag>" dispatch-target shape ListDevServersByTag
+	// resolves against (TASK-WF-02-02/04), and BL-PRF-03's allowedServerTags
+	// match target.
+	Tags []string
 	// Kind — CR-DS-009 §3.1. Empty/invalid falls back to
 	// domain.AgentKindDevServer, the default domain.NewDevServer already
 	// applies — back-compat for agent/ builds that predate this field.
@@ -41,7 +46,7 @@ func (uc *RegisterDevServer) Execute(ctx context.Context, in RegisterDevServerIn
 		return domain.DevServer{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	devServer, err := domain.NewDevServer(uuid.NewString(), tenantID, in.Host, in.Mode, in.SSHTargetID)
+	devServer, err := domain.NewDevServer(uuid.NewString(), tenantID, in.Host, in.Mode, in.SSHTargetID, in.Tags)
 	if err != nil {
 		return domain.DevServer{}, apperrors.New(apperrors.KindInvalidArgument, "INFRA_INVALID_DEV_SERVER", err.Error(), err)
 	}

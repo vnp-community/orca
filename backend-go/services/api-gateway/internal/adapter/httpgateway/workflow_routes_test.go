@@ -131,6 +131,48 @@ func (f *fakeWorkflowServiceClient) HasActiveExecutions(_ context.Context, _ *wo
 	return f.hasActiveExecutionsResp, nil
 }
 
+// CloneTemplate/PublishTemplate/ListPendingApprovals/ResolveApproval/
+// GenerateShareLink/PreviewSharedTemplate/ImportSharedTemplate/
+// RateTemplate/StreamExecutionEvents (TASK-WF-01-03/02-01/03-03): no route
+// in this file's tests exercises any of these yet, so each exists only to
+// satisfy the workflowv1.WorkflowServiceClient interface this fake must
+// implement in full — same convention as UpdateTemplate above.
+func (f *fakeWorkflowServiceClient) CloneTemplate(_ context.Context, _ *workflowv1.CloneTemplateRequest, _ ...grpc.CallOption) (*workflowv1.CloneTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+func (f *fakeWorkflowServiceClient) PublishTemplate(_ context.Context, _ *workflowv1.PublishTemplateRequest, _ ...grpc.CallOption) (*workflowv1.WorkflowTemplate, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+func (f *fakeWorkflowServiceClient) ListPendingApprovals(_ context.Context, _ *workflowv1.ListPendingApprovalsRequest, _ ...grpc.CallOption) (*workflowv1.ListPendingApprovalsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+func (f *fakeWorkflowServiceClient) ResolveApproval(_ context.Context, _ *workflowv1.ResolveApprovalRequest, _ ...grpc.CallOption) (*workflowv1.Approval, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+func (f *fakeWorkflowServiceClient) GenerateShareLink(_ context.Context, _ *workflowv1.GenerateShareLinkRequest, _ ...grpc.CallOption) (*workflowv1.GenerateShareLinkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+func (f *fakeWorkflowServiceClient) PreviewSharedTemplate(_ context.Context, _ *workflowv1.PreviewSharedTemplateRequest, _ ...grpc.CallOption) (*workflowv1.SharedTemplatePreview, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+func (f *fakeWorkflowServiceClient) ImportSharedTemplate(_ context.Context, _ *workflowv1.ImportSharedTemplateRequest, _ ...grpc.CallOption) (*workflowv1.WorkflowTemplate, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+func (f *fakeWorkflowServiceClient) RateTemplate(_ context.Context, _ *workflowv1.RateTemplateRequest, _ ...grpc.CallOption) (*workflowv1.RateTemplateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+func (f *fakeWorkflowServiceClient) StreamExecutionEvents(_ context.Context, _ *workflowv1.StreamExecutionEventsRequest, _ ...grpc.CallOption) (grpc.ServerStreamingClient[workflowv1.ExecutionEvent], error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
 // workflowTestRouter mounts mountWorkflowRoutes standalone (router.go isn't
 // touched by this package's tests, per task instructions).
 func workflowTestRouter(client workflowv1.WorkflowServiceClient) chi.Router {

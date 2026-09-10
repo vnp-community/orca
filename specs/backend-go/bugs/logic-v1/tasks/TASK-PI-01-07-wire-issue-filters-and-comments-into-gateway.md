@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/scm_routes.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels_scm.go`
 **Depends on:** TASK-PI-01-01, TASK-PI-01-03, TASK-PI-01-05, TASK-PI-01-06
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — GET /v1/scm/issues now forwards state/assignee/label(repeat)/milestone/refresh; new GET /v1/scm/issues/{number}/comments route (repo as query param, matching /v1/scm/issues' own convention); github.issues/github.issueComments/gitlab.issues WS channels added (gitlab.issueComments deliberately omitted — ListIssueCommentsBySlug is GitHub-Projects-v2-only).`
 
 ---
 

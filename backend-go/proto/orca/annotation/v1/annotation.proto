@@ -13,6 +13,13 @@ service AnnotationService {
   rpc ListAnnotations(ListAnnotationsRequest) returns (ListAnnotationsResponse);
   rpc UpdateAnnotation(UpdateAnnotationRequest) returns (UpdateAnnotationResponse);
   rpc DeleteAnnotation(DeleteAnnotationRequest) returns (DeleteAnnotationResponse);
+  rpc MarkAnnotationsSent(MarkAnnotationsSentRequest) returns (MarkAnnotationsSentResponse);
+}
+
+enum Side {
+  SIDE_UNSPECIFIED = 0; // non-diff comment (plain file/line note) — BR-CR-05 only applies to diff review
+  SIDE_OLD = 1;
+  SIDE_NEW = 2;
 }
 
 message Anchor {
@@ -20,6 +27,9 @@ message Anchor {
   string file_path = 2;
   int32 line = 3;
   string ref = 4; // commit sha or branch, best-effort
+  string worktree_id = 5;  // NEW — optional; scope addition, see SOL-CR-02 rationale
+  int32 end_line = 6;      // NEW — 0 or == line means single-line; must be >= line (BR-CR-06)
+  Side side = 7;           // NEW — BR-CR-05
 }
 
 message Annotation {
@@ -31,12 +41,16 @@ message Annotation {
   bool resolved = 6;
   google.protobuf.Timestamp created_at = 7;
   google.protobuf.Timestamp updated_at = 8;
+  string original_code = 9;               // NEW — BL-CR-02 DiffComment.originalCode
+  bool sent_to_agent = 10;                // NEW — distinct from `resolved` (BR-CR-08)
+  google.protobuf.Timestamp sent_at = 11; // NEW — nil until MarkAnnotationsSent
 }
 
 message CreateAnnotationRequest {
   Anchor anchor = 1;
   string content = 2;
   string request_id = 3;
+  string original_code = 4; // NEW
 }
 
 message CreateAnnotationResponse {
@@ -48,6 +62,8 @@ message ListAnnotationsRequest {
   string file_path = 2; // optional filter
   string page_token = 3;
   int32 page_size = 4;
+  string worktree_id = 5;          // NEW — optional filter, alternative to repo_id+file_path
+  optional bool sent_to_agent = 6; // NEW — lets a caller ask for only-unsent (SOL-CR-03's send flow)
 }
 
 message ListAnnotationsResponse {
@@ -67,6 +83,15 @@ message UpdateAnnotationResponse {
 
 message DeleteAnnotationRequest {
   string id = 1;
+  bool confirmed = 2; // NEW — BR-CR-08; see TASK-CR-02-05
 }
 
 message DeleteAnnotationResponse {}
+
+message MarkAnnotationsSentRequest {
+  repeated string ids = 1;
+}
+
+message MarkAnnotationsSentResponse {
+  repeated Annotation annotations = 1;
+}

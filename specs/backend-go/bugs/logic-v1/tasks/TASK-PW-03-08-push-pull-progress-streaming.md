@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`, `infra-fleet-service`, `api-gateway`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/relay.go`, `backend-go/services/git-gateway-service/internal/usecase/push_stream.go`, `backend-go/services/git-gateway-service/internal/usecase/pull_stream.go`
 **Depends on:** TASK-PW-03-01, TASK-PW-03-02, TASK-PW-03-03
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — infra-fleet-service RelayStream RPC (proto+session.go multi-frame demux+ExecStream) + git-gateway-service StreamingGitExecutor (localgit os/exec pipe, grpcclient relay, PushStream/PullStream usecases+grpc handlers) + api-gateway git.push.progress/git.pull.progress wscompat channels, all building and tested; relay-ssh short-circuits before any executor call (verified by test).
 
 ---
 

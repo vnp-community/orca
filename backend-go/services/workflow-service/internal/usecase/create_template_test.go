@@ -58,7 +58,7 @@ func TestCreateTemplate_SelfParentRejected(t *testing.T) {
 	// the domain invariant directly (domain.NewWorkflowTemplate), confirming
 	// it's real and reachable, not that this usecase can trigger it via
 	// normal input.
-	_, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "self", `{"steps":[]}`, domain.ScopePersonal, "tmpl-1")
+	_, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "self", `{"steps":[]}`, domain.ScopePersonal, "tmpl-1", "owner-1")
 	if err == nil {
 		t.Fatal("expected an error constructing a template that parents itself")
 	}

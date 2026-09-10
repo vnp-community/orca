@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/create_worktree.go`
 **Depends on:** TASK-CLI-01-01 (proto field), TASK-CLI-01-02 (project-service lookup RPC)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — idempotency short-circuit added to `CreateWorktree.Execute`; `TestCreateWorktree_IdempotencyKeyMatch_ReturnsExistingWithoutExecutorCall` passes (zero `GitExecutor.CreateWorktree` calls, zero `RecordWorktreeCreated` calls).
 
 ---
 

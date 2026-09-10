@@ -2,7 +2,6 @@ package wscompat
 
 import (
 	"context"
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -12,6 +11,8 @@ import (
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
+
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
 
 // fakeTenantServiceClientForOnboarding is a minimal fake local to this test
@@ -227,7 +228,7 @@ func TestOnboardingGetPreflightStatus_IsNotLocalPreflightCheck(t *testing.T) {
 	}
 	r := NewRegistry()
 	registerOnboardingChannels(r, fake, nil)
-	registerPreflightChannels(r)
+	registerPreflightChannels(r, fake)
 
 	onboardingResult, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "onboarding.getPreflightStatus",
 		argsJSON(t, map[string]any{"devServerId": "ds-1"}))
@@ -239,9 +240,15 @@ func TestOnboardingGetPreflightStatus_IsNotLocalPreflightCheck(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	onboardingGh := string(onboardingResult.(remotePreflightStatusView).Gh)
-	localGh, _ := json.Marshal(localResult.(map[string]any)["gh"])
-	if onboardingGh == string(localGh) {
-		t.Fatal("onboarding.getPreflightStatus must NOT return the same gh status as the local preflight.check channel — they answer different questions (agent host OS vs. backend-go's own OAuth-vs-CLI design)")
+
+	localChecks, ok := localResult.([]usecase.PreflightCheckResult)
+	if !ok {
+		t.Fatalf("preflight.check must return []usecase.PreflightCheckResult, got %T", localResult)
+	}
+	for _, c := range localChecks {
+		if c.ID == "gh" || c.ID == "github-cli-auth" {
+			t.Fatalf("preflight.check (local, no connectionId) must NOT report a gh-auth status itself — that is onboarding.getPreflightStatus's job (agent host OS answer, got %s here), got check id %q from the local/relay-merged channel", onboardingGh, c.ID)
+		}
 	}
 }
 

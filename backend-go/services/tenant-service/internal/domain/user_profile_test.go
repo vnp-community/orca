@@ -36,3 +36,28 @@ func TestNewUserProfile_AllowsEmptyDepartmentID(t *testing.T) {
 		t.Errorf("expected empty DepartmentID (company-only inheritance), got %q", profile.DepartmentID)
 	}
 }
+
+func TestValidateUserSettings(t *testing.T) {
+	tests := []struct {
+		name    string
+		s       Settings
+		wantErr error
+	}{
+		{"absent fields no-op", Settings{}, nil},
+		{"security rejected", Settings{"security": Settings{"sessionTimeoutHours": float64(24)}}, ErrSecurityLockedToCompany},
+		{"integrations githubOrg rejected", Settings{"integrations": Settings{"githubOrg": "acme"}}, ErrIntegrationsGithubOrgLocked},
+		{"other integrations key allowed", Settings{"integrations": Settings{"slackWebhook": "url"}}, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateUserSettings(tt.s)
+			if tt.wantErr == nil && err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+			if tt.wantErr != nil && err != tt.wantErr {
+				t.Fatalf("expected %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}

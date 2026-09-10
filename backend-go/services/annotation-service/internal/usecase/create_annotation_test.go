@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/annotation-service/internal/domain"
@@ -19,6 +20,11 @@ type fakeRepository struct {
 	getErr    error
 	updateErr error
 	deleteErr error
+
+	markSentErr   error
+	markSentCalls int
+
+	deleteCalls int
 
 	byID map[string]domain.Annotation
 }
@@ -101,6 +107,7 @@ func (f *fakeRepository) UpdateAnnotation(ctx context.Context, tenantID, id, con
 }
 
 func (f *fakeRepository) DeleteAnnotation(ctx context.Context, tenantID, id string) error {
+	f.deleteCalls++
 	if f.deleteErr != nil {
 		return f.deleteErr
 	}
@@ -119,6 +126,27 @@ func (f *fakeRepository) FindByRequestID(ctx context.Context, tenantID, requestI
 		}
 	}
 	return domain.Annotation{}, false, nil
+}
+
+func (f *fakeRepository) MarkSent(ctx context.Context, tenantID string, ids []string, sentAt time.Time) ([]domain.Annotation, error) {
+	if f.markSentErr != nil {
+		return nil, f.markSentErr
+	}
+	f.markSentCalls++
+	idSet := make(map[string]bool, len(ids))
+	for _, id := range ids {
+		idSet[id] = true
+	}
+	var out []domain.Annotation
+	for id, a := range f.byID {
+		if a.TenantID != tenantID || !idSet[id] {
+			continue
+		}
+		a = a.MarkSent(sentAt)
+		f.byID[id] = a
+		out = append(out, a)
+	}
+	return out, nil
 }
 
 func withIdentity(ctx context.Context, tenantID, userID string) context.Context {
@@ -193,6 +221,50 @@ func TestCreateAnnotation_SavesWithTenantAndAuthorFromContext(t *testing.T) {
 	}
 	if len(repo.created) != 1 {
 		t.Fatalf("expected 1 created annotation, got %d", len(repo.created))
+	}
+}
+
+// TestCreateAnnotation_RoundTripsNewFields asserts WorktreeID/EndLine/Side/
+// OriginalCode pass through to the persisted domain.Annotation unchanged —
+// see TASK-CR-02-04.
+func TestCreateAnnotation_RoundTripsNewFields(t *testing.T) {
+	repo := newFakeRepository()
+	uc := NewCreateAnnotation(repo)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	got, err := uc.Execute(ctx, CreateAnnotationInput{
+		RepoID:       "repo-1",
+		WorktreeID:   "worktree-1",
+		FilePath:     "main.go",
+		Line:         10,
+		EndLine:      15,
+		Side:         domain.SideNew,
+		Ref:          "abc123",
+		Content:      "nit: rename this",
+		OriginalCode: "func Foo() {}",
+		RequestID:    "req-1",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Anchor.WorktreeID != "worktree-1" {
+		t.Errorf("expected WorktreeID to round-trip, got %q", got.Anchor.WorktreeID)
+	}
+	if got.Anchor.EndLine != 15 {
+		t.Errorf("expected EndLine to round-trip, got %d", got.Anchor.EndLine)
+	}
+	if got.Anchor.Side != domain.SideNew {
+		t.Errorf("expected Side to round-trip, got %v", got.Anchor.Side)
+	}
+	if got.OriginalCode != "func Foo() {}" {
+		t.Errorf("expected OriginalCode to round-trip, got %q", got.OriginalCode)
+	}
+	if len(repo.created) != 1 {
+		t.Fatalf("expected 1 persisted annotation, got %d", len(repo.created))
+	}
+	persisted := repo.created[0]
+	if persisted.Anchor.WorktreeID != "worktree-1" || persisted.Anchor.EndLine != 15 || persisted.Anchor.Side != domain.SideNew || persisted.OriginalCode != "func Foo() {}" {
+		t.Errorf("expected persisted annotation to carry the new fields unchanged, got %+v", persisted)
 	}
 }
 

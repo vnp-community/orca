@@ -5,7 +5,7 @@
 **Service:** `auth-service` (postgres adapter)
 **File:** `backend-go/services/auth-service/internal/adapter/postgres/session_repository.go`
 **Depends on:** TASK-AUTH-02-01, TASK-AUTH-02-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — implemented `TouchLastSeen`/`DeleteExpiredBefore`, extended scans; fixed spec's `ip::text` (which prints `/32` for inet — verified against real Postgres) to `host(ip)`; integration tests (`-tags=integration`, testcontainers) pass against real Postgres 16 — `TestSessionRepository_RoundTripsClientInfo/TouchLastSeen/DeleteExpiredBefore`.
 
 ---
 

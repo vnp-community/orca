@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (usecase port + postgres adapter)
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/ports.go`, `backend-go/services/infra-fleet-service/internal/adapter/postgres/ssh_target_store.go`
 **Depends on:** TASK-FLEET-01-02 (unique index), TASK-FLEET-01-03 (domain fields)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added Upsert/GetByHostUser to SshTargetRepository port + SshTargetStore (in existing repository.go, not a new file); fake updated; `TestSshTargetStore_Upsert` (real testcontainers Postgres) passes. Pre-existing unrelated failures in TestRepository_ResolveConnection_FoundAndNotFound/TestRepository_RegisterAndGet_PersistsSSHTargetID confirmed present on baseline (not caused by this change).
 
 ---
 

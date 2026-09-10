@@ -15,6 +15,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -27,6 +28,7 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/ephemeralsshconn"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/sshrelay"
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
 // The fake SSH server below mirrors adapter/sshrelay/provisioner_test.go's
@@ -45,6 +47,12 @@ type fakeSSHServer struct {
 	// addition) — TOFU tests need it to compute the SAME SHA256
 	// fingerprint ssh.FingerprintSHA256 derives client-side.
 	hostPub ssh.PublicKey
+	// detachedStarted tracks whether a "--detach --sock-path" exec has run
+	// — mirrors sshrelay/provisioner_test.go's fakeSSHServer field of the
+	// same name; see that file's doc comment for why a later `test -S`
+	// (reattach's liveness probe) must observe this before answering
+	// "alive".
+	detachedStarted atomic.Bool
 }
 
 // hostKeyFingerprint returns this server's real host key's SHA256
@@ -217,7 +225,18 @@ func (s *fakeSSHServer) handleExec(t *testing.T, channel ssh.Channel, cmd string
 		}
 		_, _ = channel.Write([]byte(hexSum))
 		exitStatus(channel, 0)
-	case strings.Contains(cmd, "--stdio"):
+	case strings.Contains(cmd, "--detach"):
+		// launch.go's detach-start command — see sshrelay/provisioner_test.go's
+		// identical case for why this just flips a flag.
+		s.detachedStarted.Store(true)
+		exitStatus(channel, 0)
+	case strings.HasPrefix(cmd, "test -S"):
+		// launch.go/reattach's liveness probe: `test -S <sockPath> && echo alive`.
+		if s.detachedStarted.Load() {
+			_, _ = channel.Write([]byte("alive"))
+		}
+		exitStatus(channel, 0)
+	case strings.Contains(cmd, "--connect"), strings.Contains(cmd, "--stdio"):
 		s.runFakeAgentHandshake(t, channel)
 	default:
 		exitStatus(channel, 0)
@@ -306,6 +325,15 @@ func (f *fakeDevServers) UpdateApprovalStatus(context.Context, string, string, d
 func (f *fakeDevServers) AssignGroup(context.Context, string, string, string) (domain.DevServer, error) {
 	return domain.DevServer{}, nil
 }
+func (f *fakeDevServers) UpdateProvisionResult(context.Context, string, string, domain.DevServerHealthStatus, usecase.HandshakeInfo, time.Time) error {
+	return nil
+}
+func (f *fakeDevServers) ListAllForPolling(context.Context) ([]domain.DevServer, error) {
+	return nil, nil
+}
+func (f *fakeDevServers) ListByTag(context.Context, string, string) ([]domain.DevServer, error) {
+	return nil, nil
+}
 
 type fakeConnections struct {
 	created []domain.Connection
@@ -327,6 +355,9 @@ func (f *fakeConnections) GetActiveByDevServer(context.Context, string, string) 
 	return domain.Connection{}, false, nil
 }
 func (f *fakeConnections) UpdateStatus(context.Context, string, domain.Connection) error { return nil }
+func (f *fakeConnections) CreateConnectionWithOutbox(_ context.Context, conn domain.Connection, event domain.OutboxEvent) (domain.Connection, error) {
+	return f.CreateConnection(context.Background(), conn)
+}
 
 type fakeRuntimes struct {
 	setEnvironmentIDCalls []struct{ tenantID, runtimeID, environmentID string }
@@ -636,7 +667,7 @@ func TestBackendRelaySshProvisioner_ReadsCredentialFileFromSourceDevServer(t *te
 	agentClient := devserveragent.New(devserveragent.DefaultConfig(), slog.Default())
 	t.Cleanup(agentClient.Close)
 
-	sourceDevServer, err := domain.NewDevServer("source-ds-1", "tenant-1", "source-host", domain.ConnectionModeDirectWebSocket, "")
+	sourceDevServer, err := domain.NewDevServer("source-ds-1", "tenant-1", "source-host", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -722,7 +753,7 @@ func TestBackendRelaySshProvisioner_IdentityAgentSocket_SkipsCredentialFileRead(
 
 	// Deliberately NOT attached to agentClient — no live session exists for
 	// this dev server at all.
-	sourceDevServer, err := domain.NewDevServer("source-ds-2", "tenant-1", "source-host-2", domain.ConnectionModeDirectWebSocket, "")
+	sourceDevServer, err := domain.NewDevServer("source-ds-2", "tenant-1", "source-host-2", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

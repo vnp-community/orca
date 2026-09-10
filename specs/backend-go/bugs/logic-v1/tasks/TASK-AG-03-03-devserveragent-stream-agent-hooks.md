@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/session.go`, `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/client.go`
 **Depends on:** TASK-AG-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — session.go's routeNotification dispatches agent.hook to routeAgentHookNotification (unkeyed fan-out, hookMu/hookSubs), decoding worktreeId/ptyId/providerSession; client.go's StreamAgentHooks wraps it into usecase.AgentHookEvent. agent_methods_test.go's TestStreamAgentHooks_DecodesAndDeliversProviderSession covers both a providerSession-bearing and a providerSession-absent notification — passing.
 
 ---
 

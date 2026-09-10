@@ -235,6 +235,58 @@ func (DevServerAccessRequestStatus) EnumDescriptor() ([]byte, []int) {
 	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{3}
 }
 
+type DispatchPromptResponse_Outcome int32
+
+const (
+	DispatchPromptResponse_OUTCOME_UNSPECIFIED         DispatchPromptResponse_Outcome = 0
+	DispatchPromptResponse_INJECTED_IMMEDIATELY        DispatchPromptResponse_Outcome = 1 // BR-MB-09: agent was idle/waiting, written straight to the PTY
+	DispatchPromptResponse_QUEUED                      DispatchPromptResponse_Outcome = 2 // BR-MB-10: agent running, held for later
+	DispatchPromptResponse_REJECTED_NEEDS_CONFIRMATION DispatchPromptResponse_Outcome = 3 // BR-MB-12: a prompt is already queued and overwrite=false
+)
+
+// Enum value maps for DispatchPromptResponse_Outcome.
+var (
+	DispatchPromptResponse_Outcome_name = map[int32]string{
+		0: "OUTCOME_UNSPECIFIED",
+		1: "INJECTED_IMMEDIATELY",
+		2: "QUEUED",
+		3: "REJECTED_NEEDS_CONFIRMATION",
+	}
+	DispatchPromptResponse_Outcome_value = map[string]int32{
+		"OUTCOME_UNSPECIFIED":         0,
+		"INJECTED_IMMEDIATELY":        1,
+		"QUEUED":                      2,
+		"REJECTED_NEEDS_CONFIRMATION": 3,
+	}
+)
+
+func (x DispatchPromptResponse_Outcome) Enum() *DispatchPromptResponse_Outcome {
+	p := new(DispatchPromptResponse_Outcome)
+	*p = x
+	return p
+}
+
+func (x DispatchPromptResponse_Outcome) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (DispatchPromptResponse_Outcome) Descriptor() protoreflect.EnumDescriptor {
+	return file_orca_infrafleet_v1_infrafleet_proto_enumTypes[4].Descriptor()
+}
+
+func (DispatchPromptResponse_Outcome) Type() protoreflect.EnumType {
+	return &file_orca_infrafleet_v1_infrafleet_proto_enumTypes[4]
+}
+
+func (x DispatchPromptResponse_Outcome) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use DispatchPromptResponse_Outcome.Descriptor instead.
+func (DispatchPromptResponse_Outcome) EnumDescriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{174, 0}
+}
+
 // ListEphemeralVmRuntimesRequest carries no fields — tenant scoping comes
 // from the caller's gRPC metadata via tenant.RequireTenantID, the same
 // convention EmulatorRelay's methods use.
@@ -883,9 +935,13 @@ func (x *VmProvisionResult) GetSshTarget() *EphemeralVmRecipeSshTarget {
 //     pass-through only, never dialed — see BE-SOL-EVM-004/CR-EVM-005).
 //     Add it to this message when that task wires a real dial.
 //
-// PortForward mirrors frontend's SavedPortForward (frontend/src/shared/ssh-types.ts)
-// field-for-field — see CR-EVM-008/TASK-BE-EVM-020.
-type PortForward struct {
+// RecipePortForward mirrors frontend's SavedPortForward
+// (frontend/src/shared/ssh-types.ts) field-for-field — see
+// CR-EVM-008/TASK-BE-EVM-020. Named distinctly from PortForward below (the
+// auto-port-forwarding feature's DB-row shape, SOL-SSH-04) — same English
+// name, different concepts: this one is a recipe-supplied config value with
+// no CRUD lifecycle of its own.
+type RecipePortForward struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	LocalPort     int32                  `protobuf:"varint,1,opt,name=local_port,json=localPort,proto3" json:"local_port,omitempty"`
 	RemoteHost    string                 `protobuf:"bytes,2,opt,name=remote_host,json=remoteHost,proto3" json:"remote_host,omitempty"`
@@ -895,20 +951,20 @@ type PortForward struct {
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *PortForward) Reset() {
-	*x = PortForward{}
+func (x *RecipePortForward) Reset() {
+	*x = RecipePortForward{}
 	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *PortForward) String() string {
+func (x *RecipePortForward) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*PortForward) ProtoMessage() {}
+func (*RecipePortForward) ProtoMessage() {}
 
-func (x *PortForward) ProtoReflect() protoreflect.Message {
+func (x *RecipePortForward) ProtoReflect() protoreflect.Message {
 	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -920,33 +976,33 @@ func (x *PortForward) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use PortForward.ProtoReflect.Descriptor instead.
-func (*PortForward) Descriptor() ([]byte, []int) {
+// Deprecated: Use RecipePortForward.ProtoReflect.Descriptor instead.
+func (*RecipePortForward) Descriptor() ([]byte, []int) {
 	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{10}
 }
 
-func (x *PortForward) GetLocalPort() int32 {
+func (x *RecipePortForward) GetLocalPort() int32 {
 	if x != nil {
 		return x.LocalPort
 	}
 	return 0
 }
 
-func (x *PortForward) GetRemoteHost() string {
+func (x *RecipePortForward) GetRemoteHost() string {
 	if x != nil {
 		return x.RemoteHost
 	}
 	return ""
 }
 
-func (x *PortForward) GetRemotePort() int32 {
+func (x *RecipePortForward) GetRemotePort() int32 {
 	if x != nil {
 		return x.RemotePort
 	}
 	return 0
 }
 
-func (x *PortForward) GetLabel() string {
+func (x *RecipePortForward) GetLabel() string {
 	if x != nil {
 		return x.Label
 	}
@@ -969,7 +1025,7 @@ type EphemeralVmRecipeSshTarget struct {
 	// deliberately dropped at ports.go/devserveragent/client.go (no proto
 	// field existed to carry it through) — now wired end to end, see
 	// TASK-BE-EVM-021/022 and agent's TASK-AG-EVM-011 (Hướng A).
-	PortForwards  []*PortForward `protobuf:"bytes,11,rep,name=port_forwards,json=portForwards,proto3" json:"port_forwards,omitempty"`
+	PortForwards  []*RecipePortForward `protobuf:"bytes,11,rep,name=port_forwards,json=portForwards,proto3" json:"port_forwards,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1074,7 +1130,7 @@ func (x *EphemeralVmRecipeSshTarget) GetRelayGracePeriodSeconds() int32 {
 	return 0
 }
 
-func (x *EphemeralVmRecipeSshTarget) GetPortForwards() []*PortForward {
+func (x *EphemeralVmRecipeSshTarget) GetPortForwards() []*RecipePortForward {
 	if x != nil {
 		return x.PortForwards
 	}
@@ -1104,15 +1160,27 @@ type DevServer struct {
 	// kind — CR-DS-009 §3.1. Every row registered before this field existed
 	// backfills to AGENT_KIND_DEV_SERVER (migrations/0011_dev_server_kind).
 	Kind AgentKind `protobuf:"varint,8,opt,name=kind,proto3,enum=orca.infrafleet.v1.AgentKind" json:"kind,omitempty"`
-	// health_status is the coarse connectivity/health state named "status" in
-	// the column comment on approval_status above — read from that same
-	// pre-existing infra.dev_servers.status column, exposed here for the
-	// first time. "pending" (the column default) | "healthy" | "degraded" |
-	// "unhealthy". See
+	// health_status is domain.DevServerHealthStatus verbatim: pending|healthy|
+	// degraded|unhealthy — see BulkProvisionFleet's doc comment
+	// (SOL-FLEET-02) and
 	// docs/backlog/BACKLOG-007-dev-server-bootstrap-status-proto-field.md
 	// (option 2: reuse this coarse status for bootstrap.ts instead of adding
-	// a dedicated per-step bootstrap field).
-	HealthStatus  string `protobuf:"bytes,9,opt,name=health_status,json=healthStatus,proto3" json:"health_status,omitempty"`
+	// a dedicated per-step bootstrap field). Distinct from approval_status
+	// above (admin approval, not connectivity/health) — see
+	// domain.DevServerHealthStatus's doc comment.
+	HealthStatus string `protobuf:"bytes,9,opt,name=health_status,json=healthStatus,proto3" json:"health_status,omitempty"`
+	// platform/arch/node_version/agent_version are handshake-derived facts
+	// (SOL-FLEET-04) — the same columns SOL-FLEET-02's BulkProvisionFleet
+	// also persists into (domain.DevServer), see
+	// usecase.DevServerRepository.UpdateProvisionResult.
+	Platform     string `protobuf:"bytes,10,opt,name=platform,proto3" json:"platform,omitempty"`
+	Arch         string `protobuf:"bytes,11,opt,name=arch,proto3" json:"arch,omitempty"`
+	NodeVersion  string `protobuf:"bytes,12,opt,name=node_version,json=nodeVersion,proto3" json:"node_version,omitempty"`
+	AgentVersion string `protobuf:"bytes,13,opt,name=agent_version,json=agentVersion,proto3" json:"agent_version,omitempty"`
+	// tags is free-form, tenant-scoped (e.g. "gpu", "region:us-east"); also
+	// BL-PRF-03's allowedServerTags match target and WF's ListDevServersByTag
+	// dispatch-target key.
+	Tags          []string `protobuf:"bytes,14,rep,name=tags,proto3" json:"tags,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1210,15 +1278,54 @@ func (x *DevServer) GetHealthStatus() string {
 	return ""
 }
 
+func (x *DevServer) GetPlatform() string {
+	if x != nil {
+		return x.Platform
+	}
+	return ""
+}
+
+func (x *DevServer) GetArch() string {
+	if x != nil {
+		return x.Arch
+	}
+	return ""
+}
+
+func (x *DevServer) GetNodeVersion() string {
+	if x != nil {
+		return x.NodeVersion
+	}
+	return ""
+}
+
+func (x *DevServer) GetAgentVersion() string {
+	if x != nil {
+		return x.AgentVersion
+	}
+	return ""
+}
+
+func (x *DevServer) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type RegisterDevServerRequest struct {
 	state       protoimpl.MessageState `protogen:"open.v1"`
 	TenantId    string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	Host        string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
 	Mode        ConnectionMode         `protobuf:"varint,3,opt,name=mode,proto3,enum=orca.infrafleet.v1.ConnectionMode" json:"mode,omitempty"`
 	SshTargetId string                 `protobuf:"bytes,4,opt,name=ssh_target_id,json=sshTargetId,proto3" json:"ssh_target_id,omitempty"` // required when mode=CONNECTION_MODE_RELAY_SSH
+	// relay_port: 0 = no daemon port — foreground stdio session, honest
+	// placeholder until agent/ gains a daemon (see TASK-FLEET-02-08).
+	RelayPort int32    `protobuf:"varint,5,opt,name=relay_port,json=relayPort,proto3" json:"relay_port,omitempty"`
+	Tags      []string `protobuf:"bytes,6,rep,name=tags,proto3" json:"tags,omitempty"` // BL-PRF-03's allowedServerTags match target
 	// kind — CR-DS-009 §3.1. AGENT_KIND_UNSPECIFIED defaults to
 	// AGENT_KIND_DEV_SERVER server-side, see AgentKind's doc comment.
-	Kind          AgentKind `protobuf:"varint,5,opt,name=kind,proto3,enum=orca.infrafleet.v1.AgentKind" json:"kind,omitempty"`
+	Kind          AgentKind `protobuf:"varint,7,opt,name=kind,proto3,enum=orca.infrafleet.v1.AgentKind" json:"kind,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1279,6 +1386,20 @@ func (x *RegisterDevServerRequest) GetSshTargetId() string {
 		return x.SshTargetId
 	}
 	return ""
+}
+
+func (x *RegisterDevServerRequest) GetRelayPort() int32 {
+	if x != nil {
+		return x.RelayPort
+	}
+	return 0
+}
+
+func (x *RegisterDevServerRequest) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
 }
 
 func (x *RegisterDevServerRequest) GetKind() AgentKind {
@@ -1425,6 +1546,11 @@ type ResolveConnectionResponse struct {
 	// valid Relay connection_id without re-deriving it from DevServer.id,
 	// which is a different id space (dev_servers.id, not connections.id).
 	ConnectionId string `protobuf:"bytes,5,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	// node_version is the connected session's self-reported Node.js version
+	// (devserveragent.HandshakeInfo.NodeVersion, captured at handshake time)
+	// — empty when connected is false or the session predates this field.
+	// Added for SOL-INT-03's preflight merge; not populated by any other RPC.
+	NodeVersion string `protobuf:"bytes,6,opt,name=node_version,json=nodeVersion,proto3" json:"node_version,omitempty"`
 	// hidden_target_id (TASK-BE-EVM-018, BE-SOL-EVM-004 §4/§6c) is set ONLY
 	// when this connection's worktree is attached to an ephemeral VM runtime
 	// whose connection_type is "ssh" (Hướng A, agent-outbound) — by
@@ -1435,7 +1561,7 @@ type ResolveConnectionResponse struct {
 	// 3 in BE-SOL-EVM-004's "Quyết định đã chốt"). git-gateway-service's
 	// RelayExecutor uses this to pick a "<method>ViaHiddenTarget" agent
 	// method instead of the normal one (TASK-BE-EVM-015).
-	HiddenTargetId string `protobuf:"bytes,6,opt,name=hidden_target_id,json=hiddenTargetId,proto3" json:"hidden_target_id,omitempty"`
+	HiddenTargetId string `protobuf:"bytes,7,opt,name=hidden_target_id,json=hiddenTargetId,proto3" json:"hidden_target_id,omitempty"`
 	unknownFields  protoimpl.UnknownFields
 	sizeCache      protoimpl.SizeCache
 }
@@ -1501,6 +1627,13 @@ func (x *ResolveConnectionResponse) GetWorktreeId() string {
 func (x *ResolveConnectionResponse) GetConnectionId() string {
 	if x != nil {
 		return x.ConnectionId
+	}
+	return ""
+}
+
+func (x *ResolveConnectionResponse) GetNodeVersion() string {
+	if x != nil {
+		return x.NodeVersion
 	}
 	return ""
 }
@@ -1607,6 +1740,102 @@ func (x *ListDevServersResponse) GetDevServers() []*DevServer {
 	return nil
 }
 
+type ListDevServersByTagRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tag           string                 `protobuf:"bytes,1,opt,name=tag,proto3" json:"tag,omitempty"`
+	HealthyOnly   bool                   `protobuf:"varint,2,opt,name=healthy_only,json=healthyOnly,proto3" json:"healthy_only,omitempty"` // filters against GetFleetHealth's own reachability check
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDevServersByTagRequest) Reset() {
+	*x = ListDevServersByTagRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDevServersByTagRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDevServersByTagRequest) ProtoMessage() {}
+
+func (x *ListDevServersByTagRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDevServersByTagRequest.ProtoReflect.Descriptor instead.
+func (*ListDevServersByTagRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListDevServersByTagRequest) GetTag() string {
+	if x != nil {
+		return x.Tag
+	}
+	return ""
+}
+
+func (x *ListDevServersByTagRequest) GetHealthyOnly() bool {
+	if x != nil {
+		return x.HealthyOnly
+	}
+	return false
+}
+
+type ListDevServersByTagResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServers    []*DevServer           `protobuf:"bytes,1,rep,name=dev_servers,json=devServers,proto3" json:"dev_servers,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListDevServersByTagResponse) Reset() {
+	*x = ListDevServersByTagResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListDevServersByTagResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListDevServersByTagResponse) ProtoMessage() {}
+
+func (x *ListDevServersByTagResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListDevServersByTagResponse.ProtoReflect.Descriptor instead.
+func (*ListDevServersByTagResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ListDevServersByTagResponse) GetDevServers() []*DevServer {
+	if x != nil {
+		return x.DevServers
+	}
+	return nil
+}
+
 type DevServerGroup struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -1619,7 +1848,7 @@ type DevServerGroup struct {
 
 func (x *DevServerGroup) Reset() {
 	*x = DevServerGroup{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[19]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[21]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1631,7 +1860,7 @@ func (x *DevServerGroup) String() string {
 func (*DevServerGroup) ProtoMessage() {}
 
 func (x *DevServerGroup) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[19]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[21]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1644,7 +1873,7 @@ func (x *DevServerGroup) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DevServerGroup.ProtoReflect.Descriptor instead.
 func (*DevServerGroup) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{19}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{21}
 }
 
 func (x *DevServerGroup) GetId() string {
@@ -1689,7 +1918,7 @@ type ApproveDevServerRequest struct {
 
 func (x *ApproveDevServerRequest) Reset() {
 	*x = ApproveDevServerRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[20]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[22]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1701,7 +1930,7 @@ func (x *ApproveDevServerRequest) String() string {
 func (*ApproveDevServerRequest) ProtoMessage() {}
 
 func (x *ApproveDevServerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[20]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[22]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1714,7 +1943,7 @@ func (x *ApproveDevServerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveDevServerRequest.ProtoReflect.Descriptor instead.
 func (*ApproveDevServerRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{20}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{22}
 }
 
 func (x *ApproveDevServerRequest) GetDevServerId() string {
@@ -1733,7 +1962,7 @@ type ApproveDevServerResponse struct {
 
 func (x *ApproveDevServerResponse) Reset() {
 	*x = ApproveDevServerResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[21]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[23]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1745,7 +1974,7 @@ func (x *ApproveDevServerResponse) String() string {
 func (*ApproveDevServerResponse) ProtoMessage() {}
 
 func (x *ApproveDevServerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[21]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[23]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1758,7 +1987,7 @@ func (x *ApproveDevServerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ApproveDevServerResponse.ProtoReflect.Descriptor instead.
 func (*ApproveDevServerResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{21}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{23}
 }
 
 func (x *ApproveDevServerResponse) GetDevServer() *DevServer {
@@ -1778,7 +2007,7 @@ type RejectDevServerRequest struct {
 
 func (x *RejectDevServerRequest) Reset() {
 	*x = RejectDevServerRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[22]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[24]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1790,7 +2019,7 @@ func (x *RejectDevServerRequest) String() string {
 func (*RejectDevServerRequest) ProtoMessage() {}
 
 func (x *RejectDevServerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[22]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[24]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1803,7 +2032,7 @@ func (x *RejectDevServerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejectDevServerRequest.ProtoReflect.Descriptor instead.
 func (*RejectDevServerRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{22}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{24}
 }
 
 func (x *RejectDevServerRequest) GetDevServerId() string {
@@ -1829,7 +2058,7 @@ type RejectDevServerResponse struct {
 
 func (x *RejectDevServerResponse) Reset() {
 	*x = RejectDevServerResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[23]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[25]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1841,7 +2070,7 @@ func (x *RejectDevServerResponse) String() string {
 func (*RejectDevServerResponse) ProtoMessage() {}
 
 func (x *RejectDevServerResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[23]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[25]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1854,7 +2083,7 @@ func (x *RejectDevServerResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RejectDevServerResponse.ProtoReflect.Descriptor instead.
 func (*RejectDevServerResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{23}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{25}
 }
 
 func (x *RejectDevServerResponse) GetDevServer() *DevServer {
@@ -1874,7 +2103,7 @@ type AssignDevServerGroupRequest struct {
 
 func (x *AssignDevServerGroupRequest) Reset() {
 	*x = AssignDevServerGroupRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[24]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[26]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1886,7 +2115,7 @@ func (x *AssignDevServerGroupRequest) String() string {
 func (*AssignDevServerGroupRequest) ProtoMessage() {}
 
 func (x *AssignDevServerGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[24]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[26]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1899,7 +2128,7 @@ func (x *AssignDevServerGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssignDevServerGroupRequest.ProtoReflect.Descriptor instead.
 func (*AssignDevServerGroupRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{24}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{26}
 }
 
 func (x *AssignDevServerGroupRequest) GetDevServerId() string {
@@ -1925,7 +2154,7 @@ type AssignDevServerGroupResponse struct {
 
 func (x *AssignDevServerGroupResponse) Reset() {
 	*x = AssignDevServerGroupResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[25]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[27]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1937,7 +2166,7 @@ func (x *AssignDevServerGroupResponse) String() string {
 func (*AssignDevServerGroupResponse) ProtoMessage() {}
 
 func (x *AssignDevServerGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[25]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[27]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1950,7 +2179,7 @@ func (x *AssignDevServerGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AssignDevServerGroupResponse.ProtoReflect.Descriptor instead.
 func (*AssignDevServerGroupResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{25}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{27}
 }
 
 func (x *AssignDevServerGroupResponse) GetDevServer() *DevServer {
@@ -1970,7 +2199,7 @@ type CreateDevServerGroupRequest struct {
 
 func (x *CreateDevServerGroupRequest) Reset() {
 	*x = CreateDevServerGroupRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[26]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[28]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1982,7 +2211,7 @@ func (x *CreateDevServerGroupRequest) String() string {
 func (*CreateDevServerGroupRequest) ProtoMessage() {}
 
 func (x *CreateDevServerGroupRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[26]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[28]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1995,7 +2224,7 @@ func (x *CreateDevServerGroupRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDevServerGroupRequest.ProtoReflect.Descriptor instead.
 func (*CreateDevServerGroupRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{26}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{28}
 }
 
 func (x *CreateDevServerGroupRequest) GetName() string {
@@ -2021,7 +2250,7 @@ type CreateDevServerGroupResponse struct {
 
 func (x *CreateDevServerGroupResponse) Reset() {
 	*x = CreateDevServerGroupResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[27]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[29]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2033,7 +2262,7 @@ func (x *CreateDevServerGroupResponse) String() string {
 func (*CreateDevServerGroupResponse) ProtoMessage() {}
 
 func (x *CreateDevServerGroupResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[27]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[29]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2046,7 +2275,7 @@ func (x *CreateDevServerGroupResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDevServerGroupResponse.ProtoReflect.Descriptor instead.
 func (*CreateDevServerGroupResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{27}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{29}
 }
 
 func (x *CreateDevServerGroupResponse) GetGroup() *DevServerGroup {
@@ -2064,7 +2293,7 @@ type ListDevServerGroupsRequest struct {
 
 func (x *ListDevServerGroupsRequest) Reset() {
 	*x = ListDevServerGroupsRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[28]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[30]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2076,7 +2305,7 @@ func (x *ListDevServerGroupsRequest) String() string {
 func (*ListDevServerGroupsRequest) ProtoMessage() {}
 
 func (x *ListDevServerGroupsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[28]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[30]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2089,7 +2318,7 @@ func (x *ListDevServerGroupsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevServerGroupsRequest.ProtoReflect.Descriptor instead.
 func (*ListDevServerGroupsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{28}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{30}
 }
 
 type ListDevServerGroupsResponse struct {
@@ -2101,7 +2330,7 @@ type ListDevServerGroupsResponse struct {
 
 func (x *ListDevServerGroupsResponse) Reset() {
 	*x = ListDevServerGroupsResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[29]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[31]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2113,7 +2342,7 @@ func (x *ListDevServerGroupsResponse) String() string {
 func (*ListDevServerGroupsResponse) ProtoMessage() {}
 
 func (x *ListDevServerGroupsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[29]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[31]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2126,7 +2355,7 @@ func (x *ListDevServerGroupsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevServerGroupsResponse.ProtoReflect.Descriptor instead.
 func (*ListDevServerGroupsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{29}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{31}
 }
 
 func (x *ListDevServerGroupsResponse) GetGroups() []*DevServerGroup {
@@ -2149,7 +2378,7 @@ type DevServerGroupGrant struct {
 
 func (x *DevServerGroupGrant) Reset() {
 	*x = DevServerGroupGrant{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[30]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[32]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2161,7 +2390,7 @@ func (x *DevServerGroupGrant) String() string {
 func (*DevServerGroupGrant) ProtoMessage() {}
 
 func (x *DevServerGroupGrant) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[30]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[32]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2174,7 +2403,7 @@ func (x *DevServerGroupGrant) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DevServerGroupGrant.ProtoReflect.Descriptor instead.
 func (*DevServerGroupGrant) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{30}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{32}
 }
 
 func (x *DevServerGroupGrant) GetId() string {
@@ -2224,7 +2453,7 @@ type GrantDevServerGroupAccessRequest struct {
 
 func (x *GrantDevServerGroupAccessRequest) Reset() {
 	*x = GrantDevServerGroupAccessRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[31]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[33]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2236,7 +2465,7 @@ func (x *GrantDevServerGroupAccessRequest) String() string {
 func (*GrantDevServerGroupAccessRequest) ProtoMessage() {}
 
 func (x *GrantDevServerGroupAccessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[31]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[33]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2249,7 +2478,7 @@ func (x *GrantDevServerGroupAccessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GrantDevServerGroupAccessRequest.ProtoReflect.Descriptor instead.
 func (*GrantDevServerGroupAccessRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{31}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{33}
 }
 
 func (x *GrantDevServerGroupAccessRequest) GetDevServerGroupId() string {
@@ -2282,7 +2511,7 @@ type GrantDevServerGroupAccessResponse struct {
 
 func (x *GrantDevServerGroupAccessResponse) Reset() {
 	*x = GrantDevServerGroupAccessResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[32]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[34]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2294,7 +2523,7 @@ func (x *GrantDevServerGroupAccessResponse) String() string {
 func (*GrantDevServerGroupAccessResponse) ProtoMessage() {}
 
 func (x *GrantDevServerGroupAccessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[32]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[34]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2307,7 +2536,7 @@ func (x *GrantDevServerGroupAccessResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GrantDevServerGroupAccessResponse.ProtoReflect.Descriptor instead.
 func (*GrantDevServerGroupAccessResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{32}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{34}
 }
 
 func (x *GrantDevServerGroupAccessResponse) GetGrant() *DevServerGroupGrant {
@@ -2326,7 +2555,7 @@ type RevokeDevServerGroupAccessRequest struct {
 
 func (x *RevokeDevServerGroupAccessRequest) Reset() {
 	*x = RevokeDevServerGroupAccessRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[33]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[35]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2338,7 +2567,7 @@ func (x *RevokeDevServerGroupAccessRequest) String() string {
 func (*RevokeDevServerGroupAccessRequest) ProtoMessage() {}
 
 func (x *RevokeDevServerGroupAccessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[33]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[35]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2351,7 +2580,7 @@ func (x *RevokeDevServerGroupAccessRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use RevokeDevServerGroupAccessRequest.ProtoReflect.Descriptor instead.
 func (*RevokeDevServerGroupAccessRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{33}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{35}
 }
 
 func (x *RevokeDevServerGroupAccessRequest) GetGrantId() string {
@@ -2369,7 +2598,7 @@ type RevokeDevServerGroupAccessResponse struct {
 
 func (x *RevokeDevServerGroupAccessResponse) Reset() {
 	*x = RevokeDevServerGroupAccessResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[34]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[36]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2381,7 +2610,7 @@ func (x *RevokeDevServerGroupAccessResponse) String() string {
 func (*RevokeDevServerGroupAccessResponse) ProtoMessage() {}
 
 func (x *RevokeDevServerGroupAccessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[34]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[36]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2394,7 +2623,7 @@ func (x *RevokeDevServerGroupAccessResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use RevokeDevServerGroupAccessResponse.ProtoReflect.Descriptor instead.
 func (*RevokeDevServerGroupAccessResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{34}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{36}
 }
 
 type ListDevServerGroupGrantsRequest struct {
@@ -2406,7 +2635,7 @@ type ListDevServerGroupGrantsRequest struct {
 
 func (x *ListDevServerGroupGrantsRequest) Reset() {
 	*x = ListDevServerGroupGrantsRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[35]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[37]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2418,7 +2647,7 @@ func (x *ListDevServerGroupGrantsRequest) String() string {
 func (*ListDevServerGroupGrantsRequest) ProtoMessage() {}
 
 func (x *ListDevServerGroupGrantsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[35]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[37]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2431,7 +2660,7 @@ func (x *ListDevServerGroupGrantsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevServerGroupGrantsRequest.ProtoReflect.Descriptor instead.
 func (*ListDevServerGroupGrantsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{35}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{37}
 }
 
 func (x *ListDevServerGroupGrantsRequest) GetDevServerGroupId() string {
@@ -2450,7 +2679,7 @@ type ListDevServerGroupGrantsResponse struct {
 
 func (x *ListDevServerGroupGrantsResponse) Reset() {
 	*x = ListDevServerGroupGrantsResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[36]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2462,7 +2691,7 @@ func (x *ListDevServerGroupGrantsResponse) String() string {
 func (*ListDevServerGroupGrantsResponse) ProtoMessage() {}
 
 func (x *ListDevServerGroupGrantsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[36]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2475,7 +2704,7 @@ func (x *ListDevServerGroupGrantsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevServerGroupGrantsResponse.ProtoReflect.Descriptor instead.
 func (*ListDevServerGroupGrantsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{36}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *ListDevServerGroupGrantsResponse) GetGrants() []*DevServerGroupGrant {
@@ -2507,7 +2736,7 @@ type ListDevServersForUserRequest struct {
 
 func (x *ListDevServersForUserRequest) Reset() {
 	*x = ListDevServersForUserRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[37]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2519,7 +2748,7 @@ func (x *ListDevServersForUserRequest) String() string {
 func (*ListDevServersForUserRequest) ProtoMessage() {}
 
 func (x *ListDevServersForUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[37]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2532,7 +2761,7 @@ func (x *ListDevServersForUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevServersForUserRequest.ProtoReflect.Descriptor instead.
 func (*ListDevServersForUserRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{37}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *ListDevServersForUserRequest) GetDepartmentId() string {
@@ -2565,7 +2794,7 @@ type ListDevServersForUserResponse struct {
 
 func (x *ListDevServersForUserResponse) Reset() {
 	*x = ListDevServersForUserResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[38]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2577,7 +2806,7 @@ func (x *ListDevServersForUserResponse) String() string {
 func (*ListDevServersForUserResponse) ProtoMessage() {}
 
 func (x *ListDevServersForUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[38]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2590,7 +2819,7 @@ func (x *ListDevServersForUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListDevServersForUserResponse.ProtoReflect.Descriptor instead.
 func (*ListDevServersForUserResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{38}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *ListDevServersForUserResponse) GetDevServers() []*DevServer {
@@ -2623,7 +2852,7 @@ type DevServerAccessRequest struct {
 
 func (x *DevServerAccessRequest) Reset() {
 	*x = DevServerAccessRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[39]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2635,7 +2864,7 @@ func (x *DevServerAccessRequest) String() string {
 func (*DevServerAccessRequest) ProtoMessage() {}
 
 func (x *DevServerAccessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[39]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2648,7 +2877,7 @@ func (x *DevServerAccessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DevServerAccessRequest.ProtoReflect.Descriptor instead.
 func (*DevServerAccessRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{39}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *DevServerAccessRequest) GetId() string {
@@ -2731,7 +2960,7 @@ type CreateAccessRequestRequest struct {
 
 func (x *CreateAccessRequestRequest) Reset() {
 	*x = CreateAccessRequestRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[40]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2743,7 +2972,7 @@ func (x *CreateAccessRequestRequest) String() string {
 func (*CreateAccessRequestRequest) ProtoMessage() {}
 
 func (x *CreateAccessRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[40]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2756,7 +2985,7 @@ func (x *CreateAccessRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAccessRequestRequest.ProtoReflect.Descriptor instead.
 func (*CreateAccessRequestRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{40}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *CreateAccessRequestRequest) GetDevServerGroupId() string {
@@ -2796,7 +3025,7 @@ type CreateAccessRequestResponse struct {
 
 func (x *CreateAccessRequestResponse) Reset() {
 	*x = CreateAccessRequestResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[41]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2808,7 +3037,7 @@ func (x *CreateAccessRequestResponse) String() string {
 func (*CreateAccessRequestResponse) ProtoMessage() {}
 
 func (x *CreateAccessRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[41]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2821,7 +3050,7 @@ func (x *CreateAccessRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateAccessRequestResponse.ProtoReflect.Descriptor instead.
 func (*CreateAccessRequestResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{41}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *CreateAccessRequestResponse) GetRequest() *DevServerAccessRequest {
@@ -2840,7 +3069,7 @@ type ListPendingAccessRequestsRequest struct {
 
 func (x *ListPendingAccessRequestsRequest) Reset() {
 	*x = ListPendingAccessRequestsRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[42]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2852,7 +3081,7 @@ func (x *ListPendingAccessRequestsRequest) String() string {
 func (*ListPendingAccessRequestsRequest) ProtoMessage() {}
 
 func (x *ListPendingAccessRequestsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[42]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2865,7 +3094,7 @@ func (x *ListPendingAccessRequestsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListPendingAccessRequestsRequest.ProtoReflect.Descriptor instead.
 func (*ListPendingAccessRequestsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{42}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{44}
 }
 
 type ListPendingAccessRequestsResponse struct {
@@ -2877,7 +3106,7 @@ type ListPendingAccessRequestsResponse struct {
 
 func (x *ListPendingAccessRequestsResponse) Reset() {
 	*x = ListPendingAccessRequestsResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[43]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2889,7 +3118,7 @@ func (x *ListPendingAccessRequestsResponse) String() string {
 func (*ListPendingAccessRequestsResponse) ProtoMessage() {}
 
 func (x *ListPendingAccessRequestsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[43]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2902,7 +3131,7 @@ func (x *ListPendingAccessRequestsResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use ListPendingAccessRequestsResponse.ProtoReflect.Descriptor instead.
 func (*ListPendingAccessRequestsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{43}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *ListPendingAccessRequestsResponse) GetRequests() []*DevServerAccessRequest {
@@ -2922,7 +3151,7 @@ type ResolveAccessRequestRequest struct {
 
 func (x *ResolveAccessRequestRequest) Reset() {
 	*x = ResolveAccessRequestRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[44]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2934,7 +3163,7 @@ func (x *ResolveAccessRequestRequest) String() string {
 func (*ResolveAccessRequestRequest) ProtoMessage() {}
 
 func (x *ResolveAccessRequestRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[44]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2947,7 +3176,7 @@ func (x *ResolveAccessRequestRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveAccessRequestRequest.ProtoReflect.Descriptor instead.
 func (*ResolveAccessRequestRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{44}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ResolveAccessRequestRequest) GetRequestId() string {
@@ -2976,7 +3205,7 @@ type ResolveAccessRequestResponse struct {
 
 func (x *ResolveAccessRequestResponse) Reset() {
 	*x = ResolveAccessRequestResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[45]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2988,7 +3217,7 @@ func (x *ResolveAccessRequestResponse) String() string {
 func (*ResolveAccessRequestResponse) ProtoMessage() {}
 
 func (x *ResolveAccessRequestResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[45]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3001,7 +3230,7 @@ func (x *ResolveAccessRequestResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveAccessRequestResponse.ProtoReflect.Descriptor instead.
 func (*ResolveAccessRequestResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{45}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *ResolveAccessRequestResponse) GetRequest() *DevServerAccessRequest {
@@ -3029,7 +3258,7 @@ type CreateConnectionRequest struct {
 
 func (x *CreateConnectionRequest) Reset() {
 	*x = CreateConnectionRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[46]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3041,7 +3270,7 @@ func (x *CreateConnectionRequest) String() string {
 func (*CreateConnectionRequest) ProtoMessage() {}
 
 func (x *CreateConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[46]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3054,7 +3283,7 @@ func (x *CreateConnectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateConnectionRequest.ProtoReflect.Descriptor instead.
 func (*CreateConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{46}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *CreateConnectionRequest) GetDevServerId() string {
@@ -3087,7 +3316,7 @@ type CreateConnectionResponse struct {
 
 func (x *CreateConnectionResponse) Reset() {
 	*x = CreateConnectionResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[47]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3099,7 +3328,7 @@ func (x *CreateConnectionResponse) String() string {
 func (*CreateConnectionResponse) ProtoMessage() {}
 
 func (x *CreateConnectionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[47]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3112,7 +3341,7 @@ func (x *CreateConnectionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateConnectionResponse.ProtoReflect.Descriptor instead.
 func (*CreateConnectionResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{47}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *CreateConnectionResponse) GetConnectionId() string {
@@ -3137,7 +3366,7 @@ type RelayRequest struct {
 
 func (x *RelayRequest) Reset() {
 	*x = RelayRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[48]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3149,7 +3378,7 @@ func (x *RelayRequest) String() string {
 func (*RelayRequest) ProtoMessage() {}
 
 func (x *RelayRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[48]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3162,7 +3391,7 @@ func (x *RelayRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayRequest.ProtoReflect.Descriptor instead.
 func (*RelayRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{48}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *RelayRequest) GetConnectionId() string {
@@ -3196,7 +3425,7 @@ type RelayResponse struct {
 
 func (x *RelayResponse) Reset() {
 	*x = RelayResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[49]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3208,7 +3437,7 @@ func (x *RelayResponse) String() string {
 func (*RelayResponse) ProtoMessage() {}
 
 func (x *RelayResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[49]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3221,12 +3450,121 @@ func (x *RelayResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayResponse.ProtoReflect.Descriptor instead.
 func (*RelayResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{49}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *RelayResponse) GetResultJson() string {
 	if x != nil {
 		return x.ResultJson
+	}
+	return ""
+}
+
+type RelayStreamRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	Method        string                 `protobuf:"bytes,2,opt,name=method,proto3" json:"method,omitempty"`
+	ParamsJson    string                 `protobuf:"bytes,3,opt,name=params_json,json=paramsJson,proto3" json:"params_json,omitempty"` // same JSON-encoded-object convention as RelayRequest.params_json
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RelayStreamRequest) Reset() {
+	*x = RelayStreamRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[52]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelayStreamRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelayStreamRequest) ProtoMessage() {}
+
+func (x *RelayStreamRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[52]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelayStreamRequest.ProtoReflect.Descriptor instead.
+func (*RelayStreamRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{52}
+}
+
+func (x *RelayStreamRequest) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+func (x *RelayStreamRequest) GetMethod() string {
+	if x != nil {
+		return x.Method
+	}
+	return ""
+}
+
+func (x *RelayStreamRequest) GetParamsJson() string {
+	if x != nil {
+		return x.ParamsJson
+	}
+	return ""
+}
+
+type RelayStreamFrame struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// frame_json is one streamed JSON-RPC response frame's result,
+	// JSON-encoded verbatim (e.g. git.execStream's
+	// {type:'stream.chunk',line,source?} / {type:'stream.end',exitCode}) —
+	// git-gateway-service's grpcclient adapter decodes this into a
+	// domain.GitProgressLine, this RPC itself stays method-agnostic like Relay.
+	FrameJson     string `protobuf:"bytes,1,opt,name=frame_json,json=frameJson,proto3" json:"frame_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RelayStreamFrame) Reset() {
+	*x = RelayStreamFrame{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[53]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelayStreamFrame) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelayStreamFrame) ProtoMessage() {}
+
+func (x *RelayStreamFrame) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[53]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelayStreamFrame.ProtoReflect.Descriptor instead.
+func (*RelayStreamFrame) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{53}
+}
+
+func (x *RelayStreamFrame) GetFrameJson() string {
+	if x != nil {
+		return x.FrameJson
 	}
 	return ""
 }
@@ -3243,7 +3581,7 @@ type RelayByDevServerRequest struct {
 
 func (x *RelayByDevServerRequest) Reset() {
 	*x = RelayByDevServerRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[50]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[54]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3255,7 +3593,7 @@ func (x *RelayByDevServerRequest) String() string {
 func (*RelayByDevServerRequest) ProtoMessage() {}
 
 func (x *RelayByDevServerRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[50]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[54]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3268,7 +3606,7 @@ func (x *RelayByDevServerRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RelayByDevServerRequest.ProtoReflect.Descriptor instead.
 func (*RelayByDevServerRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{50}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{54}
 }
 
 func (x *RelayByDevServerRequest) GetDevServerId() string {
@@ -3309,7 +3647,7 @@ type StreamFileChangesRequest struct {
 
 func (x *StreamFileChangesRequest) Reset() {
 	*x = StreamFileChangesRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[51]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[55]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3321,7 +3659,7 @@ func (x *StreamFileChangesRequest) String() string {
 func (*StreamFileChangesRequest) ProtoMessage() {}
 
 func (x *StreamFileChangesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[51]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[55]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3334,7 +3672,7 @@ func (x *StreamFileChangesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StreamFileChangesRequest.ProtoReflect.Descriptor instead.
 func (*StreamFileChangesRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{51}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{55}
 }
 
 func (x *StreamFileChangesRequest) GetConnectionId() string {
@@ -3378,7 +3716,7 @@ type FileChangeEvent struct {
 
 func (x *FileChangeEvent) Reset() {
 	*x = FileChangeEvent{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[52]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[56]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3390,7 +3728,7 @@ func (x *FileChangeEvent) String() string {
 func (*FileChangeEvent) ProtoMessage() {}
 
 func (x *FileChangeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[52]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[56]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3403,7 +3741,7 @@ func (x *FileChangeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileChangeEvent.ProtoReflect.Descriptor instead.
 func (*FileChangeEvent) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{52}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{56}
 }
 
 func (x *FileChangeEvent) GetKind() string {
@@ -3443,7 +3781,7 @@ type IsDevServerConnectedRequest struct {
 
 func (x *IsDevServerConnectedRequest) Reset() {
 	*x = IsDevServerConnectedRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[53]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[57]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3455,7 +3793,7 @@ func (x *IsDevServerConnectedRequest) String() string {
 func (*IsDevServerConnectedRequest) ProtoMessage() {}
 
 func (x *IsDevServerConnectedRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[53]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[57]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3468,7 +3806,7 @@ func (x *IsDevServerConnectedRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsDevServerConnectedRequest.ProtoReflect.Descriptor instead.
 func (*IsDevServerConnectedRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{53}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{57}
 }
 
 func (x *IsDevServerConnectedRequest) GetDevServerId() string {
@@ -3487,7 +3825,7 @@ type IsDevServerConnectedResponse struct {
 
 func (x *IsDevServerConnectedResponse) Reset() {
 	*x = IsDevServerConnectedResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[54]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[58]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3499,7 +3837,7 @@ func (x *IsDevServerConnectedResponse) String() string {
 func (*IsDevServerConnectedResponse) ProtoMessage() {}
 
 func (x *IsDevServerConnectedResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[54]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[58]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3512,7 +3850,7 @@ func (x *IsDevServerConnectedResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use IsDevServerConnectedResponse.ProtoReflect.Descriptor instead.
 func (*IsDevServerConnectedResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{54}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{58}
 }
 
 func (x *IsDevServerConnectedResponse) GetConnected() bool {
@@ -3523,18 +3861,21 @@ func (x *IsDevServerConnectedResponse) GetConnected() bool {
 }
 
 type CreateSshTargetRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TenantId      string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	Host          string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
-	User          string                 `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
-	VaultSshRole  string                 `protobuf:"bytes,4,opt,name=vault_ssh_role,json=vaultSshRole,proto3" json:"vault_ssh_role,omitempty"` // Vault SSH secrets engine role for cert issuance
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	TenantId              string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Host                  string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	User                  string                 `protobuf:"bytes,3,opt,name=user,proto3" json:"user,omitempty"`
+	VaultSshRole          string                 `protobuf:"bytes,4,opt,name=vault_ssh_role,json=vaultSshRole,proto3" json:"vault_ssh_role,omitempty"`                            // Vault SSH secrets engine role for cert issuance
+	Port                  int32                  `protobuf:"varint,5,opt,name=port,proto3" json:"port,omitempty"`                                                                 // 0 = default to 22, mirrors domain.NewSshTarget
+	KnownHostsFingerprint string                 `protobuf:"bytes,6,opt,name=known_hosts_fingerprint,json=knownHostsFingerprint,proto3" json:"known_hosts_fingerprint,omitempty"` // optional; "" = unverified (documented gap)
+	JumpHostTargetId      string                 `protobuf:"bytes,7,opt,name=jump_host_target_id,json=jumpHostTargetId,proto3" json:"jump_host_target_id,omitempty"`              // optional; "" = no jump host
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *CreateSshTargetRequest) Reset() {
 	*x = CreateSshTargetRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[55]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[59]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3546,7 +3887,7 @@ func (x *CreateSshTargetRequest) String() string {
 func (*CreateSshTargetRequest) ProtoMessage() {}
 
 func (x *CreateSshTargetRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[55]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[59]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3559,7 +3900,7 @@ func (x *CreateSshTargetRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSshTargetRequest.ProtoReflect.Descriptor instead.
 func (*CreateSshTargetRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{55}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{59}
 }
 
 func (x *CreateSshTargetRequest) GetTenantId() string {
@@ -3590,6 +3931,27 @@ func (x *CreateSshTargetRequest) GetVaultSshRole() string {
 	return ""
 }
 
+func (x *CreateSshTargetRequest) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *CreateSshTargetRequest) GetKnownHostsFingerprint() string {
+	if x != nil {
+		return x.KnownHostsFingerprint
+	}
+	return ""
+}
+
+func (x *CreateSshTargetRequest) GetJumpHostTargetId() string {
+	if x != nil {
+		return x.JumpHostTargetId
+	}
+	return ""
+}
+
 type CreateSshTargetResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SshTargetId   string                 `protobuf:"bytes,1,opt,name=ssh_target_id,json=sshTargetId,proto3" json:"ssh_target_id,omitempty"`
@@ -3599,7 +3961,7 @@ type CreateSshTargetResponse struct {
 
 func (x *CreateSshTargetResponse) Reset() {
 	*x = CreateSshTargetResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[56]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[60]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3611,7 +3973,7 @@ func (x *CreateSshTargetResponse) String() string {
 func (*CreateSshTargetResponse) ProtoMessage() {}
 
 func (x *CreateSshTargetResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[56]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[60]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3624,7 +3986,7 @@ func (x *CreateSshTargetResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateSshTargetResponse.ProtoReflect.Descriptor instead.
 func (*CreateSshTargetResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{56}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{60}
 }
 
 func (x *CreateSshTargetResponse) GetSshTargetId() string {
@@ -3643,7 +4005,7 @@ type GetFleetHealthRequest struct {
 
 func (x *GetFleetHealthRequest) Reset() {
 	*x = GetFleetHealthRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[57]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[61]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3655,7 +4017,7 @@ func (x *GetFleetHealthRequest) String() string {
 func (*GetFleetHealthRequest) ProtoMessage() {}
 
 func (x *GetFleetHealthRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[57]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[61]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3668,7 +4030,7 @@ func (x *GetFleetHealthRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFleetHealthRequest.ProtoReflect.Descriptor instead.
 func (*GetFleetHealthRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{57}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{61}
 }
 
 func (x *GetFleetHealthRequest) GetTenantId() string {
@@ -3692,7 +4054,7 @@ type DevServerHealth struct {
 
 func (x *DevServerHealth) Reset() {
 	*x = DevServerHealth{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[58]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[62]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3704,7 +4066,7 @@ func (x *DevServerHealth) String() string {
 func (*DevServerHealth) ProtoMessage() {}
 
 func (x *DevServerHealth) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[58]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[62]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3717,7 +4079,7 @@ func (x *DevServerHealth) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DevServerHealth.ProtoReflect.Descriptor instead.
 func (*DevServerHealth) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{58}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{62}
 }
 
 func (x *DevServerHealth) GetDevServerId() string {
@@ -3771,7 +4133,7 @@ type GetFleetHealthResponse struct {
 
 func (x *GetFleetHealthResponse) Reset() {
 	*x = GetFleetHealthResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[59]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[63]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3783,7 +4145,7 @@ func (x *GetFleetHealthResponse) String() string {
 func (*GetFleetHealthResponse) ProtoMessage() {}
 
 func (x *GetFleetHealthResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[59]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[63]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3796,7 +4158,7 @@ func (x *GetFleetHealthResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetFleetHealthResponse.ProtoReflect.Descriptor instead.
 func (*GetFleetHealthResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{59}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{63}
 }
 
 func (x *GetFleetHealthResponse) GetStatuses() []*DevServerHealth {
@@ -3816,7 +4178,7 @@ type ScanWorkspacePortsRequest struct {
 
 func (x *ScanWorkspacePortsRequest) Reset() {
 	*x = ScanWorkspacePortsRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[60]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[64]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3828,7 +4190,7 @@ func (x *ScanWorkspacePortsRequest) String() string {
 func (*ScanWorkspacePortsRequest) ProtoMessage() {}
 
 func (x *ScanWorkspacePortsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[60]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[64]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3841,7 +4203,7 @@ func (x *ScanWorkspacePortsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScanWorkspacePortsRequest.ProtoReflect.Descriptor instead.
 func (*ScanWorkspacePortsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{60}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{64}
 }
 
 func (x *ScanWorkspacePortsRequest) GetConnectionId() string {
@@ -3858,16 +4220,84 @@ func (x *ScanWorkspacePortsRequest) GetWorktreeId() string {
 	return ""
 }
 
+type DetectedPortProto struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Port          int32                  `protobuf:"varint,1,opt,name=port,proto3" json:"port,omitempty"`
+	Host          string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	Pid           int32                  `protobuf:"varint,3,opt,name=pid,proto3" json:"pid,omitempty"`
+	ProcessName   string                 `protobuf:"bytes,4,opt,name=process_name,json=processName,proto3" json:"process_name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DetectedPortProto) Reset() {
+	*x = DetectedPortProto{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[65]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DetectedPortProto) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DetectedPortProto) ProtoMessage() {}
+
+func (x *DetectedPortProto) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[65]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DetectedPortProto.ProtoReflect.Descriptor instead.
+func (*DetectedPortProto) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{65}
+}
+
+func (x *DetectedPortProto) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *DetectedPortProto) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *DetectedPortProto) GetPid() int32 {
+	if x != nil {
+		return x.Pid
+	}
+	return 0
+}
+
+func (x *DetectedPortProto) GetProcessName() string {
+	if x != nil {
+		return x.ProcessName
+	}
+	return ""
+}
+
 type ScanWorkspacePortsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	OpenPorts     []int32                `protobuf:"varint,1,rep,packed,name=open_ports,json=openPorts,proto3" json:"open_ports,omitempty"`
+	Ports         []*DetectedPortProto   `protobuf:"bytes,1,rep,name=ports,proto3" json:"ports,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ScanWorkspacePortsResponse) Reset() {
 	*x = ScanWorkspacePortsResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[61]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[66]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3879,7 +4309,7 @@ func (x *ScanWorkspacePortsResponse) String() string {
 func (*ScanWorkspacePortsResponse) ProtoMessage() {}
 
 func (x *ScanWorkspacePortsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[61]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[66]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3892,12 +4322,12 @@ func (x *ScanWorkspacePortsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScanWorkspacePortsResponse.ProtoReflect.Descriptor instead.
 func (*ScanWorkspacePortsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{61}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{66}
 }
 
-func (x *ScanWorkspacePortsResponse) GetOpenPorts() []int32 {
+func (x *ScanWorkspacePortsResponse) GetPorts() []*DetectedPortProto {
 	if x != nil {
-		return x.OpenPorts
+		return x.Ports
 	}
 	return nil
 }
@@ -3914,7 +4344,7 @@ type KillWorkspacePortRequest struct {
 
 func (x *KillWorkspacePortRequest) Reset() {
 	*x = KillWorkspacePortRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[62]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[67]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3926,7 +4356,7 @@ func (x *KillWorkspacePortRequest) String() string {
 func (*KillWorkspacePortRequest) ProtoMessage() {}
 
 func (x *KillWorkspacePortRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[62]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[67]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3939,7 +4369,7 @@ func (x *KillWorkspacePortRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KillWorkspacePortRequest.ProtoReflect.Descriptor instead.
 func (*KillWorkspacePortRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{62}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{67}
 }
 
 func (x *KillWorkspacePortRequest) GetConnectionId() string {
@@ -3970,6 +4400,370 @@ func (x *KillWorkspacePortRequest) GetPort() int32 {
 	return 0
 }
 
+type PortForward struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ConnectionId  string                 `protobuf:"bytes,2,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	LocalPort     int32                  `protobuf:"varint,3,opt,name=local_port,json=localPort,proto3" json:"local_port,omitempty"`
+	RemotePort    int32                  `protobuf:"varint,4,opt,name=remote_port,json=remotePort,proto3" json:"remote_port,omitempty"`
+	ProcessName   string                 `protobuf:"bytes,5,opt,name=process_name,json=processName,proto3" json:"process_name,omitempty"`
+	Status        string                 `protobuf:"bytes,6,opt,name=status,proto3" json:"status,omitempty"` // "active" | "closed"
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortForward) Reset() {
+	*x = PortForward{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[68]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortForward) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortForward) ProtoMessage() {}
+
+func (x *PortForward) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[68]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortForward.ProtoReflect.Descriptor instead.
+func (*PortForward) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{68}
+}
+
+func (x *PortForward) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *PortForward) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+func (x *PortForward) GetLocalPort() int32 {
+	if x != nil {
+		return x.LocalPort
+	}
+	return 0
+}
+
+func (x *PortForward) GetRemotePort() int32 {
+	if x != nil {
+		return x.RemotePort
+	}
+	return 0
+}
+
+func (x *PortForward) GetProcessName() string {
+	if x != nil {
+		return x.ProcessName
+	}
+	return ""
+}
+
+func (x *PortForward) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+type CreatePortForwardRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	RemotePort    int32                  `protobuf:"varint,2,opt,name=remote_port,json=remotePort,proto3" json:"remote_port,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreatePortForwardRequest) Reset() {
+	*x = CreatePortForwardRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[69]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreatePortForwardRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreatePortForwardRequest) ProtoMessage() {}
+
+func (x *CreatePortForwardRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[69]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreatePortForwardRequest.ProtoReflect.Descriptor instead.
+func (*CreatePortForwardRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{69}
+}
+
+func (x *CreatePortForwardRequest) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+func (x *CreatePortForwardRequest) GetRemotePort() int32 {
+	if x != nil {
+		return x.RemotePort
+	}
+	return 0
+}
+
+type ListPortForwardsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPortForwardsRequest) Reset() {
+	*x = ListPortForwardsRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[70]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPortForwardsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPortForwardsRequest) ProtoMessage() {}
+
+func (x *ListPortForwardsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[70]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPortForwardsRequest.ProtoReflect.Descriptor instead.
+func (*ListPortForwardsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{70}
+}
+
+func (x *ListPortForwardsRequest) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+type ListPortForwardsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PortForwards  []*PortForward         `protobuf:"bytes,1,rep,name=port_forwards,json=portForwards,proto3" json:"port_forwards,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPortForwardsResponse) Reset() {
+	*x = ListPortForwardsResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[71]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPortForwardsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPortForwardsResponse) ProtoMessage() {}
+
+func (x *ListPortForwardsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[71]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPortForwardsResponse.ProtoReflect.Descriptor instead.
+func (*ListPortForwardsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{71}
+}
+
+func (x *ListPortForwardsResponse) GetPortForwards() []*PortForward {
+	if x != nil {
+		return x.PortForwards
+	}
+	return nil
+}
+
+type DeletePortForwardRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeletePortForwardRequest) Reset() {
+	*x = DeletePortForwardRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[72]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeletePortForwardRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeletePortForwardRequest) ProtoMessage() {}
+
+func (x *DeletePortForwardRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[72]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeletePortForwardRequest.ProtoReflect.Descriptor instead.
+func (*DeletePortForwardRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{72}
+}
+
+func (x *DeletePortForwardRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type StreamPortForwardEventsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StreamPortForwardEventsRequest) Reset() {
+	*x = StreamPortForwardEventsRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[73]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StreamPortForwardEventsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StreamPortForwardEventsRequest) ProtoMessage() {}
+
+func (x *StreamPortForwardEventsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[73]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StreamPortForwardEventsRequest.ProtoReflect.Descriptor instead.
+func (*StreamPortForwardEventsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{73}
+}
+
+func (x *StreamPortForwardEventsRequest) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+type PortForwardEvent struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"` // "opened" | "closed"
+	Forward       *PortForward           `protobuf:"bytes,2,opt,name=forward,proto3" json:"forward,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortForwardEvent) Reset() {
+	*x = PortForwardEvent{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[74]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortForwardEvent) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortForwardEvent) ProtoMessage() {}
+
+func (x *PortForwardEvent) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[74]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortForwardEvent.ProtoReflect.Descriptor instead.
+func (*PortForwardEvent) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{74}
+}
+
+func (x *PortForwardEvent) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *PortForwardEvent) GetForward() *PortForward {
+	if x != nil {
+		return x.Forward
+	}
+	return nil
+}
+
 type KillWorkspacePortResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
@@ -3980,7 +4774,7 @@ type KillWorkspacePortResponse struct {
 
 func (x *KillWorkspacePortResponse) Reset() {
 	*x = KillWorkspacePortResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[63]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[75]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3992,7 +4786,7 @@ func (x *KillWorkspacePortResponse) String() string {
 func (*KillWorkspacePortResponse) ProtoMessage() {}
 
 func (x *KillWorkspacePortResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[63]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[75]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4005,7 +4799,7 @@ func (x *KillWorkspacePortResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KillWorkspacePortResponse.ProtoReflect.Descriptor instead.
 func (*KillWorkspacePortResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{63}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{75}
 }
 
 func (x *KillWorkspacePortResponse) GetOk() bool {
@@ -4023,19 +4817,24 @@ func (x *KillWorkspacePortResponse) GetReason() string {
 }
 
 type SshTarget struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	TenantId      string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	Host          string                 `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
-	User          string                 `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
-	VaultSshRole  string                 `protobuf:"bytes,5,opt,name=vault_ssh_role,json=vaultSshRole,proto3" json:"vault_ssh_role,omitempty"` // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state                 protoimpl.MessageState `protogen:"open.v1"`
+	Id                    string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TenantId              string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Host                  string                 `protobuf:"bytes,3,opt,name=host,proto3" json:"host,omitempty"`
+	User                  string                 `protobuf:"bytes,4,opt,name=user,proto3" json:"user,omitempty"`
+	VaultSshRole          string                 `protobuf:"bytes,5,opt,name=vault_ssh_role,json=vaultSshRole,proto3" json:"vault_ssh_role,omitempty"` // a Vault role pointer, never key material — safe to return (infra-fleet-service.md §9)
+	Port                  int32                  `protobuf:"varint,6,opt,name=port,proto3" json:"port,omitempty"`
+	KnownHostsFingerprint string                 `protobuf:"bytes,7,opt,name=known_hosts_fingerprint,json=knownHostsFingerprint,proto3" json:"known_hosts_fingerprint,omitempty"`
+	JumpHostTargetId      string                 `protobuf:"bytes,8,opt,name=jump_host_target_id,json=jumpHostTargetId,proto3" json:"jump_host_target_id,omitempty"`
+	Project               string                 `protobuf:"bytes,9,opt,name=project,proto3" json:"project,omitempty"` // "" = ungrouped
+	Tags                  []string               `protobuf:"bytes,10,rep,name=tags,proto3" json:"tags,omitempty"`
+	unknownFields         protoimpl.UnknownFields
+	sizeCache             protoimpl.SizeCache
 }
 
 func (x *SshTarget) Reset() {
 	*x = SshTarget{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[64]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[76]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4047,7 +4846,7 @@ func (x *SshTarget) String() string {
 func (*SshTarget) ProtoMessage() {}
 
 func (x *SshTarget) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[64]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[76]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4060,7 +4859,7 @@ func (x *SshTarget) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SshTarget.ProtoReflect.Descriptor instead.
 func (*SshTarget) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{64}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{76}
 }
 
 func (x *SshTarget) GetId() string {
@@ -4098,6 +4897,41 @@ func (x *SshTarget) GetVaultSshRole() string {
 	return ""
 }
 
+func (x *SshTarget) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *SshTarget) GetKnownHostsFingerprint() string {
+	if x != nil {
+		return x.KnownHostsFingerprint
+	}
+	return ""
+}
+
+func (x *SshTarget) GetJumpHostTargetId() string {
+	if x != nil {
+		return x.JumpHostTargetId
+	}
+	return ""
+}
+
+func (x *SshTarget) GetProject() string {
+	if x != nil {
+		return x.Project
+	}
+	return ""
+}
+
+func (x *SshTarget) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
 type ListSshTargetsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -4106,7 +4940,7 @@ type ListSshTargetsRequest struct {
 
 func (x *ListSshTargetsRequest) Reset() {
 	*x = ListSshTargetsRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[65]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[77]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4118,7 +4952,7 @@ func (x *ListSshTargetsRequest) String() string {
 func (*ListSshTargetsRequest) ProtoMessage() {}
 
 func (x *ListSshTargetsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[65]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[77]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4131,7 +4965,7 @@ func (x *ListSshTargetsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSshTargetsRequest.ProtoReflect.Descriptor instead.
 func (*ListSshTargetsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{65}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{77}
 }
 
 type ListSshTargetsResponse struct {
@@ -4143,7 +4977,7 @@ type ListSshTargetsResponse struct {
 
 func (x *ListSshTargetsResponse) Reset() {
 	*x = ListSshTargetsResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[66]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[78]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4155,7 +4989,7 @@ func (x *ListSshTargetsResponse) String() string {
 func (*ListSshTargetsResponse) ProtoMessage() {}
 
 func (x *ListSshTargetsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[66]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[78]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4168,7 +5002,7 @@ func (x *ListSshTargetsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListSshTargetsResponse.ProtoReflect.Descriptor instead.
 func (*ListSshTargetsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{66}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{78}
 }
 
 func (x *ListSshTargetsResponse) GetSshTargets() []*SshTarget {
@@ -4187,7 +5021,7 @@ type GetSshStateRequest struct {
 
 func (x *GetSshStateRequest) Reset() {
 	*x = GetSshStateRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[67]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[79]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4199,7 +5033,7 @@ func (x *GetSshStateRequest) String() string {
 func (*GetSshStateRequest) ProtoMessage() {}
 
 func (x *GetSshStateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[67]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[79]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4212,7 +5046,7 @@ func (x *GetSshStateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSshStateRequest.ProtoReflect.Descriptor instead.
 func (*GetSshStateRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{67}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{79}
 }
 
 func (x *GetSshStateRequest) GetSshTargetId() string {
@@ -4227,13 +5061,14 @@ type GetSshStateResponse struct {
 	Connected          bool                   `protobuf:"varint,1,opt,name=connected,proto3" json:"connected,omitempty"`
 	ConnectionId       string                 `protobuf:"bytes,2,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`                        // empty when not connected
 	LastActivityUnixMs int64                  `protobuf:"varint,3,opt,name=last_activity_unix_ms,json=lastActivityUnixMs,proto3" json:"last_activity_unix_ms,omitempty"` // 0 when not connected or never active
+	Status             string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`                                                        // "" | "established" | "degraded" | "reconnecting" | "closed"
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
 
 func (x *GetSshStateResponse) Reset() {
 	*x = GetSshStateResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[68]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[80]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4245,7 +5080,7 @@ func (x *GetSshStateResponse) String() string {
 func (*GetSshStateResponse) ProtoMessage() {}
 
 func (x *GetSshStateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[68]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[80]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4258,7 +5093,7 @@ func (x *GetSshStateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetSshStateResponse.ProtoReflect.Descriptor instead.
 func (*GetSshStateResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{68}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{80}
 }
 
 func (x *GetSshStateResponse) GetConnected() bool {
@@ -4282,6 +5117,13 @@ func (x *GetSshStateResponse) GetLastActivityUnixMs() int64 {
 	return 0
 }
 
+func (x *GetSshStateResponse) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
 type EstablishConnectionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	SshTargetId   string                 `protobuf:"bytes,1,opt,name=ssh_target_id,json=sshTargetId,proto3" json:"ssh_target_id,omitempty"`
@@ -4291,7 +5133,7 @@ type EstablishConnectionRequest struct {
 
 func (x *EstablishConnectionRequest) Reset() {
 	*x = EstablishConnectionRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[69]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[81]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4303,7 +5145,7 @@ func (x *EstablishConnectionRequest) String() string {
 func (*EstablishConnectionRequest) ProtoMessage() {}
 
 func (x *EstablishConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[69]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[81]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4316,7 +5158,7 @@ func (x *EstablishConnectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EstablishConnectionRequest.ProtoReflect.Descriptor instead.
 func (*EstablishConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{69}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{81}
 }
 
 func (x *EstablishConnectionRequest) GetSshTargetId() string {
@@ -4338,7 +5180,7 @@ type Connection struct {
 
 func (x *Connection) Reset() {
 	*x = Connection{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[70]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[82]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4350,7 +5192,7 @@ func (x *Connection) String() string {
 func (*Connection) ProtoMessage() {}
 
 func (x *Connection) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[70]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[82]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4363,7 +5205,7 @@ func (x *Connection) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use Connection.ProtoReflect.Descriptor instead.
 func (*Connection) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{70}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{82}
 }
 
 func (x *Connection) GetId() string {
@@ -4406,7 +5248,7 @@ type GetFleetConnectivitySummaryRequest struct {
 
 func (x *GetFleetConnectivitySummaryRequest) Reset() {
 	*x = GetFleetConnectivitySummaryRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[71]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[83]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4418,7 +5260,7 @@ func (x *GetFleetConnectivitySummaryRequest) String() string {
 func (*GetFleetConnectivitySummaryRequest) ProtoMessage() {}
 
 func (x *GetFleetConnectivitySummaryRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[71]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[83]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4431,7 +5273,7 @@ func (x *GetFleetConnectivitySummaryRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GetFleetConnectivitySummaryRequest.ProtoReflect.Descriptor instead.
 func (*GetFleetConnectivitySummaryRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{71}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{83}
 }
 
 // ConnectionHealthEntry mirrors one infra.connections row's health-relevant
@@ -4449,7 +5291,7 @@ type ConnectionHealthEntry struct {
 
 func (x *ConnectionHealthEntry) Reset() {
 	*x = ConnectionHealthEntry{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[72]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[84]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4461,7 +5303,7 @@ func (x *ConnectionHealthEntry) String() string {
 func (*ConnectionHealthEntry) ProtoMessage() {}
 
 func (x *ConnectionHealthEntry) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[72]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[84]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4474,7 +5316,7 @@ func (x *ConnectionHealthEntry) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ConnectionHealthEntry.ProtoReflect.Descriptor instead.
 func (*ConnectionHealthEntry) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{72}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{84}
 }
 
 func (x *ConnectionHealthEntry) GetConnectionId() string {
@@ -4521,7 +5363,7 @@ type GetFleetConnectivitySummaryResponse struct {
 
 func (x *GetFleetConnectivitySummaryResponse) Reset() {
 	*x = GetFleetConnectivitySummaryResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[73]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[85]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4533,7 +5375,7 @@ func (x *GetFleetConnectivitySummaryResponse) String() string {
 func (*GetFleetConnectivitySummaryResponse) ProtoMessage() {}
 
 func (x *GetFleetConnectivitySummaryResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[73]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[85]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4546,7 +5388,7 @@ func (x *GetFleetConnectivitySummaryResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use GetFleetConnectivitySummaryResponse.ProtoReflect.Descriptor instead.
 func (*GetFleetConnectivitySummaryResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{73}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{85}
 }
 
 func (x *GetFleetConnectivitySummaryResponse) GetConnections() []*ConnectionHealthEntry {
@@ -4557,19 +5399,34 @@ func (x *GetFleetConnectivitySummaryResponse) GetConnections() []*ConnectionHeal
 }
 
 type SpawnTerminalSessionRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"` // empty = host-local; rejected in server-deployment mode, see usecase.SpawnTerminalSession
-	Cwd           string                 `protobuf:"bytes,2,opt,name=cwd,proto3" json:"cwd,omitempty"`
-	Shell         string                 `protobuf:"bytes,3,opt,name=shell,proto3" json:"shell,omitempty"` // optional; agent applies its own default if empty
-	Cols          int32                  `protobuf:"varint,4,opt,name=cols,proto3" json:"cols,omitempty"`
-	Rows          int32                  `protobuf:"varint,5,opt,name=rows,proto3" json:"rows,omitempty"`
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"` // empty = host-local; rejected in server-deployment mode, see usecase.SpawnTerminalSession
+	Cwd          string                 `protobuf:"bytes,2,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	Shell        string                 `protobuf:"bytes,3,opt,name=shell,proto3" json:"shell,omitempty"` // optional; agent applies its own default if empty
+	Cols         int32                  `protobuf:"varint,4,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows         int32                  `protobuf:"varint,5,opt,name=rows,proto3" json:"rows,omitempty"`
+	// BR-TM-13 — opt-in shell-integration bootstrap (OSC 133). Forwarded
+	// unexamined to the agent's pty.create; see SOL-TM-04. Defaults to
+	// false — existing callers that don't set it see no behavior change.
+	ShellIntegration bool `protobuf:"varint,6,opt,name=shell_integration,json=shellIntegration,proto3" json:"shell_integration,omitempty"`
+	// command, when set, is the initial command line the spawned shell runs
+	// (agent's pty.create `command` param) instead of an interactive shell
+	// prompt — added for github.startAuthLogin/gitlab.startAuthLogin
+	// (TASK-INT-01-01), which spawn `gh auth login`/`glab auth login`
+	// directly rather than typing it into an interactive shell.
+	Command string `protobuf:"bytes,7,opt,name=command,proto3" json:"command,omitempty"`
+	// user_id engages pty-handler.ts's per-user GH_CONFIG_DIR/GLAB_CONFIG_DIR
+	// env isolation for a `gh `/`glab `-prefixed command — see
+	// pty-handler.ts:680-699. Always set from the caller's authenticated
+	// identity server-side (wscompat), never trusted from client args.
+	UserId        string `protobuf:"bytes,8,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *SpawnTerminalSessionRequest) Reset() {
 	*x = SpawnTerminalSessionRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[74]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[86]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4581,7 +5438,7 @@ func (x *SpawnTerminalSessionRequest) String() string {
 func (*SpawnTerminalSessionRequest) ProtoMessage() {}
 
 func (x *SpawnTerminalSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[74]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[86]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4594,7 +5451,7 @@ func (x *SpawnTerminalSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpawnTerminalSessionRequest.ProtoReflect.Descriptor instead.
 func (*SpawnTerminalSessionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{74}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{86}
 }
 
 func (x *SpawnTerminalSessionRequest) GetConnectionId() string {
@@ -4632,6 +5489,27 @@ func (x *SpawnTerminalSessionRequest) GetRows() int32 {
 	return 0
 }
 
+func (x *SpawnTerminalSessionRequest) GetShellIntegration() bool {
+	if x != nil {
+		return x.ShellIntegration
+	}
+	return false
+}
+
+func (x *SpawnTerminalSessionRequest) GetCommand() string {
+	if x != nil {
+		return x.Command
+	}
+	return ""
+}
+
+func (x *SpawnTerminalSessionRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
 type SpawnTerminalSessionResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Session       *TerminalSession       `protobuf:"bytes,1,opt,name=session,proto3" json:"session,omitempty"`
@@ -4641,7 +5519,7 @@ type SpawnTerminalSessionResponse struct {
 
 func (x *SpawnTerminalSessionResponse) Reset() {
 	*x = SpawnTerminalSessionResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[75]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[87]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4653,7 +5531,7 @@ func (x *SpawnTerminalSessionResponse) String() string {
 func (*SpawnTerminalSessionResponse) ProtoMessage() {}
 
 func (x *SpawnTerminalSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[75]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[87]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4666,7 +5544,7 @@ func (x *SpawnTerminalSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SpawnTerminalSessionResponse.ProtoReflect.Descriptor instead.
 func (*SpawnTerminalSessionResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{75}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{87}
 }
 
 func (x *SpawnTerminalSessionResponse) GetSession() *TerminalSession {
@@ -4683,13 +5561,14 @@ type TerminalSession struct {
 	Cwd                string                 `protobuf:"bytes,3,opt,name=cwd,proto3" json:"cwd,omitempty"`
 	CreatedAtUnixMs    int64                  `protobuf:"varint,4,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
 	LastActiveAtUnixMs int64                  `protobuf:"varint,5,opt,name=last_active_at_unix_ms,json=lastActiveAtUnixMs,proto3" json:"last_active_at_unix_ms,omitempty"`
+	LastOutputPreview  string                 `protobuf:"bytes,6,opt,name=last_output_preview,json=lastOutputPreview,proto3" json:"last_output_preview,omitempty"` // BR-MB-15: truncated to 500 chars server-side, never a raw dump — see terminal_session.go's TruncatedForMobile
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
 
 func (x *TerminalSession) Reset() {
 	*x = TerminalSession{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[76]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[88]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4701,7 +5580,7 @@ func (x *TerminalSession) String() string {
 func (*TerminalSession) ProtoMessage() {}
 
 func (x *TerminalSession) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[76]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[88]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4714,7 +5593,7 @@ func (x *TerminalSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TerminalSession.ProtoReflect.Descriptor instead.
 func (*TerminalSession) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{76}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{88}
 }
 
 func (x *TerminalSession) GetPtyId() string {
@@ -4752,6 +5631,277 @@ func (x *TerminalSession) GetLastActiveAtUnixMs() int64 {
 	return 0
 }
 
+func (x *TerminalSession) GetLastOutputPreview() string {
+	if x != nil {
+		return x.LastOutputPreview
+	}
+	return ""
+}
+
+type SaveTerminalScrollbackSnapshotRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	PaneKey       string                 `protobuf:"bytes,2,opt,name=pane_key,json=paneKey,proto3" json:"pane_key,omitempty"`
+	Cols          int32                  `protobuf:"varint,3,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows          int32                  `protobuf:"varint,4,opt,name=rows,proto3" json:"rows,omitempty"`
+	Data          []byte                 `protobuf:"bytes,5,opt,name=data,proto3" json:"data,omitempty"` // raw ANSI text, NOT pre-gzipped by the caller — usecase compresses it
+	LastTitle     string                 `protobuf:"bytes,6,opt,name=last_title,json=lastTitle,proto3" json:"last_title,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SaveTerminalScrollbackSnapshotRequest) Reset() {
+	*x = SaveTerminalScrollbackSnapshotRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[89]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SaveTerminalScrollbackSnapshotRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SaveTerminalScrollbackSnapshotRequest) ProtoMessage() {}
+
+func (x *SaveTerminalScrollbackSnapshotRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[89]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SaveTerminalScrollbackSnapshotRequest.ProtoReflect.Descriptor instead.
+func (*SaveTerminalScrollbackSnapshotRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{89}
+}
+
+func (x *SaveTerminalScrollbackSnapshotRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *SaveTerminalScrollbackSnapshotRequest) GetPaneKey() string {
+	if x != nil {
+		return x.PaneKey
+	}
+	return ""
+}
+
+func (x *SaveTerminalScrollbackSnapshotRequest) GetCols() int32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+func (x *SaveTerminalScrollbackSnapshotRequest) GetRows() int32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+func (x *SaveTerminalScrollbackSnapshotRequest) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *SaveTerminalScrollbackSnapshotRequest) GetLastTitle() string {
+	if x != nil {
+		return x.LastTitle
+	}
+	return ""
+}
+
+type GetTerminalScrollbackSnapshotRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	PaneKey       string                 `protobuf:"bytes,2,opt,name=pane_key,json=paneKey,proto3" json:"pane_key,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTerminalScrollbackSnapshotRequest) Reset() {
+	*x = GetTerminalScrollbackSnapshotRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[90]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTerminalScrollbackSnapshotRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTerminalScrollbackSnapshotRequest) ProtoMessage() {}
+
+func (x *GetTerminalScrollbackSnapshotRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[90]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTerminalScrollbackSnapshotRequest.ProtoReflect.Descriptor instead.
+func (*GetTerminalScrollbackSnapshotRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{90}
+}
+
+func (x *GetTerminalScrollbackSnapshotRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *GetTerminalScrollbackSnapshotRequest) GetPaneKey() string {
+	if x != nil {
+		return x.PaneKey
+	}
+	return ""
+}
+
+type GetTerminalScrollbackSnapshotResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Found           bool                   `protobuf:"varint,1,opt,name=found,proto3" json:"found,omitempty"`
+	Cols            int32                  `protobuf:"varint,2,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows            int32                  `protobuf:"varint,3,opt,name=rows,proto3" json:"rows,omitempty"`
+	Data            []byte                 `protobuf:"bytes,4,opt,name=data,proto3" json:"data,omitempty"` // decompressed
+	LastTitle       string                 `protobuf:"bytes,5,opt,name=last_title,json=lastTitle,proto3" json:"last_title,omitempty"`
+	UpdatedAtUnixMs int64                  `protobuf:"varint,6,opt,name=updated_at_unix_ms,json=updatedAtUnixMs,proto3" json:"updated_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetTerminalScrollbackSnapshotResponse) Reset() {
+	*x = GetTerminalScrollbackSnapshotResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[91]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTerminalScrollbackSnapshotResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTerminalScrollbackSnapshotResponse) ProtoMessage() {}
+
+func (x *GetTerminalScrollbackSnapshotResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[91]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTerminalScrollbackSnapshotResponse.ProtoReflect.Descriptor instead.
+func (*GetTerminalScrollbackSnapshotResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{91}
+}
+
+func (x *GetTerminalScrollbackSnapshotResponse) GetFound() bool {
+	if x != nil {
+		return x.Found
+	}
+	return false
+}
+
+func (x *GetTerminalScrollbackSnapshotResponse) GetCols() int32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+func (x *GetTerminalScrollbackSnapshotResponse) GetRows() int32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+func (x *GetTerminalScrollbackSnapshotResponse) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+func (x *GetTerminalScrollbackSnapshotResponse) GetLastTitle() string {
+	if x != nil {
+		return x.LastTitle
+	}
+	return ""
+}
+
+func (x *GetTerminalScrollbackSnapshotResponse) GetUpdatedAtUnixMs() int64 {
+	if x != nil {
+		return x.UpdatedAtUnixMs
+	}
+	return 0
+}
+
+type DeleteTerminalScrollbackSnapshotsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DeleteTerminalScrollbackSnapshotsRequest) Reset() {
+	*x = DeleteTerminalScrollbackSnapshotsRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[92]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DeleteTerminalScrollbackSnapshotsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DeleteTerminalScrollbackSnapshotsRequest) ProtoMessage() {}
+
+func (x *DeleteTerminalScrollbackSnapshotsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[92]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DeleteTerminalScrollbackSnapshotsRequest.ProtoReflect.Descriptor instead.
+func (*DeleteTerminalScrollbackSnapshotsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{92}
+}
+
+func (x *DeleteTerminalScrollbackSnapshotsRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
 type ResizeTerminalSessionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PtyId         string                 `protobuf:"bytes,1,opt,name=pty_id,json=ptyId,proto3" json:"pty_id,omitempty"`
@@ -4763,7 +5913,7 @@ type ResizeTerminalSessionRequest struct {
 
 func (x *ResizeTerminalSessionRequest) Reset() {
 	*x = ResizeTerminalSessionRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[77]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[93]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4775,7 +5925,7 @@ func (x *ResizeTerminalSessionRequest) String() string {
 func (*ResizeTerminalSessionRequest) ProtoMessage() {}
 
 func (x *ResizeTerminalSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[77]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[93]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4788,7 +5938,7 @@ func (x *ResizeTerminalSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResizeTerminalSessionRequest.ProtoReflect.Descriptor instead.
 func (*ResizeTerminalSessionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{77}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{93}
 }
 
 func (x *ResizeTerminalSessionRequest) GetPtyId() string {
@@ -4823,7 +5973,7 @@ type TeardownConnectionRequest struct {
 
 func (x *TeardownConnectionRequest) Reset() {
 	*x = TeardownConnectionRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[78]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[94]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4835,7 +5985,7 @@ func (x *TeardownConnectionRequest) String() string {
 func (*TeardownConnectionRequest) ProtoMessage() {}
 
 func (x *TeardownConnectionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[78]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[94]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4848,7 +5998,7 @@ func (x *TeardownConnectionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TeardownConnectionRequest.ProtoReflect.Descriptor instead.
 func (*TeardownConnectionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{78}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{94}
 }
 
 func (x *TeardownConnectionRequest) GetConnectionId() string {
@@ -4867,7 +6017,7 @@ type KillTerminalSessionRequest struct {
 
 func (x *KillTerminalSessionRequest) Reset() {
 	*x = KillTerminalSessionRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[79]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[95]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4879,7 +6029,7 @@ func (x *KillTerminalSessionRequest) String() string {
 func (*KillTerminalSessionRequest) ProtoMessage() {}
 
 func (x *KillTerminalSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[79]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[95]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4892,7 +6042,7 @@ func (x *KillTerminalSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use KillTerminalSessionRequest.ProtoReflect.Descriptor instead.
 func (*KillTerminalSessionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{79}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{95}
 }
 
 func (x *KillTerminalSessionRequest) GetPtyId() string {
@@ -4911,7 +6061,7 @@ type StopTerminalProcessRequest struct {
 
 func (x *StopTerminalProcessRequest) Reset() {
 	*x = StopTerminalProcessRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[80]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[96]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4923,7 +6073,7 @@ func (x *StopTerminalProcessRequest) String() string {
 func (*StopTerminalProcessRequest) ProtoMessage() {}
 
 func (x *StopTerminalProcessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[80]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[96]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4936,7 +6086,7 @@ func (x *StopTerminalProcessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopTerminalProcessRequest.ProtoReflect.Descriptor instead.
 func (*StopTerminalProcessRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{80}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{96}
 }
 
 func (x *StopTerminalProcessRequest) GetPtyId() string {
@@ -4955,7 +6105,7 @@ type ListTerminalSessionsRequest struct {
 
 func (x *ListTerminalSessionsRequest) Reset() {
 	*x = ListTerminalSessionsRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[81]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[97]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -4967,7 +6117,7 @@ func (x *ListTerminalSessionsRequest) String() string {
 func (*ListTerminalSessionsRequest) ProtoMessage() {}
 
 func (x *ListTerminalSessionsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[81]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[97]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -4980,7 +6130,7 @@ func (x *ListTerminalSessionsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTerminalSessionsRequest.ProtoReflect.Descriptor instead.
 func (*ListTerminalSessionsRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{81}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{97}
 }
 
 func (x *ListTerminalSessionsRequest) GetConnectionId() string {
@@ -4999,7 +6149,7 @@ type ListTerminalSessionsResponse struct {
 
 func (x *ListTerminalSessionsResponse) Reset() {
 	*x = ListTerminalSessionsResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[82]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[98]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5011,7 +6161,7 @@ func (x *ListTerminalSessionsResponse) String() string {
 func (*ListTerminalSessionsResponse) ProtoMessage() {}
 
 func (x *ListTerminalSessionsResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[82]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[98]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5024,7 +6174,7 @@ func (x *ListTerminalSessionsResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListTerminalSessionsResponse.ProtoReflect.Descriptor instead.
 func (*ListTerminalSessionsResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{82}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{98}
 }
 
 func (x *ListTerminalSessionsResponse) GetSessions() []*TerminalSession {
@@ -5044,7 +6194,7 @@ type WaitTerminalSessionRequest struct {
 
 func (x *WaitTerminalSessionRequest) Reset() {
 	*x = WaitTerminalSessionRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[83]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5056,7 +6206,7 @@ func (x *WaitTerminalSessionRequest) String() string {
 func (*WaitTerminalSessionRequest) ProtoMessage() {}
 
 func (x *WaitTerminalSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[83]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5069,7 +6219,7 @@ func (x *WaitTerminalSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WaitTerminalSessionRequest.ProtoReflect.Descriptor instead.
 func (*WaitTerminalSessionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{83}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *WaitTerminalSessionRequest) GetPtyId() string {
@@ -5097,7 +6247,7 @@ type WaitTerminalSessionResponse struct {
 
 func (x *WaitTerminalSessionResponse) Reset() {
 	*x = WaitTerminalSessionResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[84]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[100]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5109,7 +6259,7 @@ func (x *WaitTerminalSessionResponse) String() string {
 func (*WaitTerminalSessionResponse) ProtoMessage() {}
 
 func (x *WaitTerminalSessionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[84]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[100]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5122,7 +6272,7 @@ func (x *WaitTerminalSessionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use WaitTerminalSessionResponse.ProtoReflect.Descriptor instead.
 func (*WaitTerminalSessionResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{84}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{100}
 }
 
 func (x *WaitTerminalSessionResponse) GetExited() bool {
@@ -5155,7 +6305,7 @@ type FocusTerminalSessionRequest struct {
 
 func (x *FocusTerminalSessionRequest) Reset() {
 	*x = FocusTerminalSessionRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[85]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[101]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5167,7 +6317,7 @@ func (x *FocusTerminalSessionRequest) String() string {
 func (*FocusTerminalSessionRequest) ProtoMessage() {}
 
 func (x *FocusTerminalSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[85]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[101]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5180,7 +6330,7 @@ func (x *FocusTerminalSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FocusTerminalSessionRequest.ProtoReflect.Descriptor instead.
 func (*FocusTerminalSessionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{85}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{101}
 }
 
 func (x *FocusTerminalSessionRequest) GetPtyId() string {
@@ -5199,7 +6349,7 @@ type GetTerminalAgentStatusRequest struct {
 
 func (x *GetTerminalAgentStatusRequest) Reset() {
 	*x = GetTerminalAgentStatusRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[86]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[102]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5211,7 +6361,7 @@ func (x *GetTerminalAgentStatusRequest) String() string {
 func (*GetTerminalAgentStatusRequest) ProtoMessage() {}
 
 func (x *GetTerminalAgentStatusRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[86]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[102]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5224,7 +6374,7 @@ func (x *GetTerminalAgentStatusRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTerminalAgentStatusRequest.ProtoReflect.Descriptor instead.
 func (*GetTerminalAgentStatusRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{86}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{102}
 }
 
 func (x *GetTerminalAgentStatusRequest) GetPtyId() string {
@@ -5235,17 +6385,18 @@ func (x *GetTerminalAgentStatusRequest) GetPtyId() string {
 }
 
 type GetTerminalAgentStatusResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AgentRunning  bool                   `protobuf:"varint,1,opt,name=agent_running,json=agentRunning,proto3" json:"agent_running,omitempty"`      // answers both terminal.agentStatus and terminal.isRunningAgent
-	AgentKind     string                 `protobuf:"bytes,2,opt,name=agent_kind,json=agentKind,proto3" json:"agent_kind,omitempty"`                // best-effort, e.g. "claude" | "codex" | "" if unknown
-	ReadyForInput bool                   `protobuf:"varint,3,opt,name=ready_for_input,json=readyForInput,proto3" json:"ready_for_input,omitempty"` // agentStatus's richer question: is it idle-and-ready, not just alive
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	AgentRunning      bool                   `protobuf:"varint,1,opt,name=agent_running,json=agentRunning,proto3" json:"agent_running,omitempty"`                 // answers both terminal.agentStatus and terminal.isRunningAgent
+	AgentKind         string                 `protobuf:"bytes,2,opt,name=agent_kind,json=agentKind,proto3" json:"agent_kind,omitempty"`                           // best-effort, e.g. "claude" | "codex" | "" if unknown
+	ReadyForInput     bool                   `protobuf:"varint,3,opt,name=ready_for_input,json=readyForInput,proto3" json:"ready_for_input,omitempty"`            // agentStatus's richer question: is it idle-and-ready, not just alive
+	LastOutputPreview string                 `protobuf:"bytes,4,opt,name=last_output_preview,json=lastOutputPreview,proto3" json:"last_output_preview,omitempty"` // BR-MB-15: truncated to 500 chars server-side, never a raw dump
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
 }
 
 func (x *GetTerminalAgentStatusResponse) Reset() {
 	*x = GetTerminalAgentStatusResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[87]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[103]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5257,7 +6408,7 @@ func (x *GetTerminalAgentStatusResponse) String() string {
 func (*GetTerminalAgentStatusResponse) ProtoMessage() {}
 
 func (x *GetTerminalAgentStatusResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[87]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[103]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5270,7 +6421,7 @@ func (x *GetTerminalAgentStatusResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetTerminalAgentStatusResponse.ProtoReflect.Descriptor instead.
 func (*GetTerminalAgentStatusResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{87}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{103}
 }
 
 func (x *GetTerminalAgentStatusResponse) GetAgentRunning() bool {
@@ -5294,6 +6445,257 @@ func (x *GetTerminalAgentStatusResponse) GetReadyForInput() bool {
 	return false
 }
 
+func (x *GetTerminalAgentStatusResponse) GetLastOutputPreview() string {
+	if x != nil {
+		return x.LastOutputPreview
+	}
+	return ""
+}
+
+type GetAgentTerminalSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	WorktreeId    string                 `protobuf:"bytes,1,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAgentTerminalSessionRequest) Reset() {
+	*x = GetAgentTerminalSessionRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[104]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAgentTerminalSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAgentTerminalSessionRequest) ProtoMessage() {}
+
+func (x *GetAgentTerminalSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[104]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAgentTerminalSessionRequest.ProtoReflect.Descriptor instead.
+func (*GetAgentTerminalSessionRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{104}
+}
+
+func (x *GetAgentTerminalSessionRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+type GetAgentTerminalSessionResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Found         bool                   `protobuf:"varint,1,opt,name=found,proto3" json:"found,omitempty"`
+	Session       *TerminalSession       `protobuf:"bytes,2,opt,name=session,proto3" json:"session,omitempty"` // unset when found=false
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAgentTerminalSessionResponse) Reset() {
+	*x = GetAgentTerminalSessionResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[105]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAgentTerminalSessionResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAgentTerminalSessionResponse) ProtoMessage() {}
+
+func (x *GetAgentTerminalSessionResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[105]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAgentTerminalSessionResponse.ProtoReflect.Descriptor instead.
+func (*GetAgentTerminalSessionResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{105}
+}
+
+func (x *GetAgentTerminalSessionResponse) GetFound() bool {
+	if x != nil {
+		return x.Found
+	}
+	return false
+}
+
+func (x *GetAgentTerminalSessionResponse) GetSession() *TerminalSession {
+	if x != nil {
+		return x.Session
+	}
+	return nil
+}
+
+type SendTerminalInputRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PtyId         string                 `protobuf:"bytes,1,opt,name=pty_id,json=ptyId,proto3" json:"pty_id,omitempty"`
+	Data          []byte                 `protobuf:"bytes,2,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SendTerminalInputRequest) Reset() {
+	*x = SendTerminalInputRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[106]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SendTerminalInputRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SendTerminalInputRequest) ProtoMessage() {}
+
+func (x *SendTerminalInputRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[106]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SendTerminalInputRequest.ProtoReflect.Descriptor instead.
+func (*SendTerminalInputRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{106}
+}
+
+func (x *SendTerminalInputRequest) GetPtyId() string {
+	if x != nil {
+		return x.PtyId
+	}
+	return ""
+}
+
+func (x *SendTerminalInputRequest) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type GetTerminalScrollbackRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PtyId         string                 `protobuf:"bytes,1,opt,name=pty_id,json=ptyId,proto3" json:"pty_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTerminalScrollbackRequest) Reset() {
+	*x = GetTerminalScrollbackRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[107]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTerminalScrollbackRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTerminalScrollbackRequest) ProtoMessage() {}
+
+func (x *GetTerminalScrollbackRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[107]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTerminalScrollbackRequest.ProtoReflect.Descriptor instead.
+func (*GetTerminalScrollbackRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{107}
+}
+
+func (x *GetTerminalScrollbackRequest) GetPtyId() string {
+	if x != nil {
+		return x.PtyId
+	}
+	return ""
+}
+
+type GetTerminalScrollbackResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Text          string                 `protobuf:"bytes,1,opt,name=text,proto3" json:"text,omitempty"`
+	Truncated     bool                   `protobuf:"varint,2,opt,name=truncated,proto3" json:"truncated,omitempty"` // true if the retention bound already dropped
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetTerminalScrollbackResponse) Reset() {
+	*x = GetTerminalScrollbackResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[108]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetTerminalScrollbackResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetTerminalScrollbackResponse) ProtoMessage() {}
+
+func (x *GetTerminalScrollbackResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[108]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetTerminalScrollbackResponse.ProtoReflect.Descriptor instead.
+func (*GetTerminalScrollbackResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{108}
+}
+
+func (x *GetTerminalScrollbackResponse) GetText() string {
+	if x != nil {
+		return x.Text
+	}
+	return ""
+}
+
+func (x *GetTerminalScrollbackResponse) GetTruncated() bool {
+	if x != nil {
+		return x.Truncated
+	}
+	return false
+}
+
 type InspectTerminalProcessRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PtyId         string                 `protobuf:"bytes,1,opt,name=pty_id,json=ptyId,proto3" json:"pty_id,omitempty"`
@@ -5303,7 +6705,7 @@ type InspectTerminalProcessRequest struct {
 
 func (x *InspectTerminalProcessRequest) Reset() {
 	*x = InspectTerminalProcessRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[88]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[109]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5315,7 +6717,7 @@ func (x *InspectTerminalProcessRequest) String() string {
 func (*InspectTerminalProcessRequest) ProtoMessage() {}
 
 func (x *InspectTerminalProcessRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[88]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[109]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5328,7 +6730,7 @@ func (x *InspectTerminalProcessRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InspectTerminalProcessRequest.ProtoReflect.Descriptor instead.
 func (*InspectTerminalProcessRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{88}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{109}
 }
 
 func (x *InspectTerminalProcessRequest) GetPtyId() string {
@@ -5350,7 +6752,7 @@ type InspectTerminalProcessResponse struct {
 
 func (x *InspectTerminalProcessResponse) Reset() {
 	*x = InspectTerminalProcessResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[89]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[110]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5362,7 +6764,7 @@ func (x *InspectTerminalProcessResponse) String() string {
 func (*InspectTerminalProcessResponse) ProtoMessage() {}
 
 func (x *InspectTerminalProcessResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[89]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[110]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5375,7 +6777,7 @@ func (x *InspectTerminalProcessResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use InspectTerminalProcessResponse.ProtoReflect.Descriptor instead.
 func (*InspectTerminalProcessResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{89}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{110}
 }
 
 func (x *InspectTerminalProcessResponse) GetKnown() bool {
@@ -5420,7 +6822,7 @@ type PtyClientFrame struct {
 
 func (x *PtyClientFrame) Reset() {
 	*x = PtyClientFrame{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[90]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[111]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5432,7 +6834,7 @@ func (x *PtyClientFrame) String() string {
 func (*PtyClientFrame) ProtoMessage() {}
 
 func (x *PtyClientFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[90]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[111]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5445,7 +6847,7 @@ func (x *PtyClientFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PtyClientFrame.ProtoReflect.Descriptor instead.
 func (*PtyClientFrame) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{90}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{111}
 }
 
 func (x *PtyClientFrame) GetFrame() isPtyClientFrame_Frame {
@@ -5513,7 +6915,7 @@ type AttachToSession struct {
 
 func (x *AttachToSession) Reset() {
 	*x = AttachToSession{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[91]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[112]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5525,7 +6927,7 @@ func (x *AttachToSession) String() string {
 func (*AttachToSession) ProtoMessage() {}
 
 func (x *AttachToSession) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[91]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[112]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5538,7 +6940,7 @@ func (x *AttachToSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttachToSession.ProtoReflect.Descriptor instead.
 func (*AttachToSession) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{91}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{112}
 }
 
 func (x *AttachToSession) GetPtyId() string {
@@ -5557,7 +6959,7 @@ type PtyInput struct {
 
 func (x *PtyInput) Reset() {
 	*x = PtyInput{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[92]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[113]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5569,7 +6971,7 @@ func (x *PtyInput) String() string {
 func (*PtyInput) ProtoMessage() {}
 
 func (x *PtyInput) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[92]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[113]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5582,7 +6984,7 @@ func (x *PtyInput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PtyInput.ProtoReflect.Descriptor instead.
 func (*PtyInput) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{92}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{113}
 }
 
 func (x *PtyInput) GetData() []byte {
@@ -5602,7 +7004,7 @@ type PtyResize struct {
 
 func (x *PtyResize) Reset() {
 	*x = PtyResize{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[93]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[114]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5614,7 +7016,7 @@ func (x *PtyResize) String() string {
 func (*PtyResize) ProtoMessage() {}
 
 func (x *PtyResize) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[93]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[114]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5627,7 +7029,7 @@ func (x *PtyResize) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PtyResize.ProtoReflect.Descriptor instead.
 func (*PtyResize) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{93}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{114}
 }
 
 func (x *PtyResize) GetCols() int32 {
@@ -5657,7 +7059,7 @@ type PtyServerFrame struct {
 
 func (x *PtyServerFrame) Reset() {
 	*x = PtyServerFrame{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[94]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[115]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5669,7 +7071,7 @@ func (x *PtyServerFrame) String() string {
 func (*PtyServerFrame) ProtoMessage() {}
 
 func (x *PtyServerFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[94]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[115]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5682,7 +7084,7 @@ func (x *PtyServerFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PtyServerFrame.ProtoReflect.Descriptor instead.
 func (*PtyServerFrame) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{94}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{115}
 }
 
 func (x *PtyServerFrame) GetFrame() isPtyServerFrame_Frame {
@@ -5735,7 +7137,7 @@ type PtyOutput struct {
 
 func (x *PtyOutput) Reset() {
 	*x = PtyOutput{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[95]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[116]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5747,7 +7149,7 @@ func (x *PtyOutput) String() string {
 func (*PtyOutput) ProtoMessage() {}
 
 func (x *PtyOutput) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[95]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[116]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5760,7 +7162,7 @@ func (x *PtyOutput) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PtyOutput.ProtoReflect.Descriptor instead.
 func (*PtyOutput) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{95}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{116}
 }
 
 func (x *PtyOutput) GetData() []byte {
@@ -5779,7 +7181,7 @@ type PtyExited struct {
 
 func (x *PtyExited) Reset() {
 	*x = PtyExited{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[96]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[117]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5791,7 +7193,7 @@ func (x *PtyExited) String() string {
 func (*PtyExited) ProtoMessage() {}
 
 func (x *PtyExited) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[96]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[117]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5804,7 +7206,7 @@ func (x *PtyExited) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use PtyExited.ProtoReflect.Descriptor instead.
 func (*PtyExited) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{96}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{117}
 }
 
 func (x *PtyExited) GetExitCode() int32 {
@@ -5827,7 +7229,7 @@ type ScreencastClientFrame struct {
 
 func (x *ScreencastClientFrame) Reset() {
 	*x = ScreencastClientFrame{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[97]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[118]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5839,7 +7241,7 @@ func (x *ScreencastClientFrame) String() string {
 func (*ScreencastClientFrame) ProtoMessage() {}
 
 func (x *ScreencastClientFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[97]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[118]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5852,7 +7254,7 @@ func (x *ScreencastClientFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreencastClientFrame.ProtoReflect.Descriptor instead.
 func (*ScreencastClientFrame) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{97}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{118}
 }
 
 func (x *ScreencastClientFrame) GetFrame() isScreencastClientFrame_Frame {
@@ -5921,7 +7323,7 @@ type StartScreencast struct {
 
 func (x *StartScreencast) Reset() {
 	*x = StartScreencast{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[98]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[119]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5933,7 +7335,7 @@ func (x *StartScreencast) String() string {
 func (*StartScreencast) ProtoMessage() {}
 
 func (x *StartScreencast) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[98]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[119]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5946,7 +7348,7 @@ func (x *StartScreencast) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StartScreencast.ProtoReflect.Descriptor instead.
 func (*StartScreencast) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{98}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{119}
 }
 
 func (x *StartScreencast) GetWorktreeId() string {
@@ -6041,7 +7443,7 @@ type StopScreencast struct {
 
 func (x *StopScreencast) Reset() {
 	*x = StopScreencast{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[99]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[120]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6053,7 +7455,7 @@ func (x *StopScreencast) String() string {
 func (*StopScreencast) ProtoMessage() {}
 
 func (x *StopScreencast) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[99]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[120]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6066,7 +7468,7 @@ func (x *StopScreencast) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StopScreencast.ProtoReflect.Descriptor instead.
 func (*StopScreencast) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{99}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{120}
 }
 
 type ScreencastServerFrame struct {
@@ -6084,7 +7486,7 @@ type ScreencastServerFrame struct {
 
 func (x *ScreencastServerFrame) Reset() {
 	*x = ScreencastServerFrame{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[100]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[121]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6096,7 +7498,7 @@ func (x *ScreencastServerFrame) String() string {
 func (*ScreencastServerFrame) ProtoMessage() {}
 
 func (x *ScreencastServerFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[100]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[121]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6109,7 +7511,7 @@ func (x *ScreencastServerFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreencastServerFrame.ProtoReflect.Descriptor instead.
 func (*ScreencastServerFrame) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{100}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{121}
 }
 
 func (x *ScreencastServerFrame) GetFrame() isScreencastServerFrame_Frame {
@@ -6194,7 +7596,7 @@ type ScreencastReady struct {
 
 func (x *ScreencastReady) Reset() {
 	*x = ScreencastReady{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[101]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[122]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6206,7 +7608,7 @@ func (x *ScreencastReady) String() string {
 func (*ScreencastReady) ProtoMessage() {}
 
 func (x *ScreencastReady) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[101]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[122]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6219,7 +7621,7 @@ func (x *ScreencastReady) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreencastReady.ProtoReflect.Descriptor instead.
 func (*ScreencastReady) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{101}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{122}
 }
 
 func (x *ScreencastReady) GetSubscriptionId() string {
@@ -6252,7 +7654,7 @@ type ScreencastFrame struct {
 
 func (x *ScreencastFrame) Reset() {
 	*x = ScreencastFrame{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[102]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[123]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6264,7 +7666,7 @@ func (x *ScreencastFrame) String() string {
 func (*ScreencastFrame) ProtoMessage() {}
 
 func (x *ScreencastFrame) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[102]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[123]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6277,7 +7679,7 @@ func (x *ScreencastFrame) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreencastFrame.ProtoReflect.Descriptor instead.
 func (*ScreencastFrame) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{102}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{123}
 }
 
 func (x *ScreencastFrame) GetData() []byte {
@@ -6295,7 +7697,7 @@ type ScreencastEnded struct {
 
 func (x *ScreencastEnded) Reset() {
 	*x = ScreencastEnded{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[103]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[124]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6307,7 +7709,7 @@ func (x *ScreencastEnded) String() string {
 func (*ScreencastEnded) ProtoMessage() {}
 
 func (x *ScreencastEnded) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[103]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[124]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6320,7 +7722,7 @@ func (x *ScreencastEnded) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreencastEnded.ProtoReflect.Descriptor instead.
 func (*ScreencastEnded) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{103}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{124}
 }
 
 type ScreencastError struct {
@@ -6332,7 +7734,7 @@ type ScreencastError struct {
 
 func (x *ScreencastError) Reset() {
 	*x = ScreencastError{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[104]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[125]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6344,7 +7746,7 @@ func (x *ScreencastError) String() string {
 func (*ScreencastError) ProtoMessage() {}
 
 func (x *ScreencastError) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[104]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[125]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6357,7 +7759,7 @@ func (x *ScreencastError) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ScreencastError.ProtoReflect.Descriptor instead.
 func (*ScreencastError) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{104}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{125}
 }
 
 func (x *ScreencastError) GetMessage() string {
@@ -6382,7 +7784,7 @@ type BrowserProfile struct {
 
 func (x *BrowserProfile) Reset() {
 	*x = BrowserProfile{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[105]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[126]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6394,7 +7796,7 @@ func (x *BrowserProfile) String() string {
 func (*BrowserProfile) ProtoMessage() {}
 
 func (x *BrowserProfile) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[105]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[126]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6407,7 +7809,7 @@ func (x *BrowserProfile) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BrowserProfile.ProtoReflect.Descriptor instead.
 func (*BrowserProfile) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{105}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{126}
 }
 
 func (x *BrowserProfile) GetId() string {
@@ -6468,7 +7870,7 @@ type ListBrowserProfilesRequest struct {
 
 func (x *ListBrowserProfilesRequest) Reset() {
 	*x = ListBrowserProfilesRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[106]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[127]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6480,7 +7882,7 @@ func (x *ListBrowserProfilesRequest) String() string {
 func (*ListBrowserProfilesRequest) ProtoMessage() {}
 
 func (x *ListBrowserProfilesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[106]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[127]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6493,7 +7895,7 @@ func (x *ListBrowserProfilesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBrowserProfilesRequest.ProtoReflect.Descriptor instead.
 func (*ListBrowserProfilesRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{106}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{127}
 }
 
 func (x *ListBrowserProfilesRequest) GetDevServerId() string {
@@ -6512,7 +7914,7 @@ type ListBrowserProfilesResponse struct {
 
 func (x *ListBrowserProfilesResponse) Reset() {
 	*x = ListBrowserProfilesResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[107]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[128]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6524,7 +7926,7 @@ func (x *ListBrowserProfilesResponse) String() string {
 func (*ListBrowserProfilesResponse) ProtoMessage() {}
 
 func (x *ListBrowserProfilesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[107]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[128]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6537,7 +7939,7 @@ func (x *ListBrowserProfilesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListBrowserProfilesResponse.ProtoReflect.Descriptor instead.
 func (*ListBrowserProfilesResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{107}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{128}
 }
 
 func (x *ListBrowserProfilesResponse) GetProfiles() []*BrowserProfile {
@@ -6559,7 +7961,7 @@ type CreateBrowserProfileRequest struct {
 
 func (x *CreateBrowserProfileRequest) Reset() {
 	*x = CreateBrowserProfileRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[108]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[129]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6571,7 +7973,7 @@ func (x *CreateBrowserProfileRequest) String() string {
 func (*CreateBrowserProfileRequest) ProtoMessage() {}
 
 func (x *CreateBrowserProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[108]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[129]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6584,7 +7986,7 @@ func (x *CreateBrowserProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateBrowserProfileRequest.ProtoReflect.Descriptor instead.
 func (*CreateBrowserProfileRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{108}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{129}
 }
 
 func (x *CreateBrowserProfileRequest) GetDevServerId() string {
@@ -6624,7 +8026,7 @@ type CreateBrowserProfileResponse struct {
 
 func (x *CreateBrowserProfileResponse) Reset() {
 	*x = CreateBrowserProfileResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[109]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[130]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6636,7 +8038,7 @@ func (x *CreateBrowserProfileResponse) String() string {
 func (*CreateBrowserProfileResponse) ProtoMessage() {}
 
 func (x *CreateBrowserProfileResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[109]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[130]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6649,7 +8051,7 @@ func (x *CreateBrowserProfileResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateBrowserProfileResponse.ProtoReflect.Descriptor instead.
 func (*CreateBrowserProfileResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{109}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{130}
 }
 
 func (x *CreateBrowserProfileResponse) GetProfile() *BrowserProfile {
@@ -6668,7 +8070,7 @@ type DeleteBrowserProfileRequest struct {
 
 func (x *DeleteBrowserProfileRequest) Reset() {
 	*x = DeleteBrowserProfileRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[110]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[131]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6680,7 +8082,7 @@ func (x *DeleteBrowserProfileRequest) String() string {
 func (*DeleteBrowserProfileRequest) ProtoMessage() {}
 
 func (x *DeleteBrowserProfileRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[110]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[131]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6693,7 +8095,7 @@ func (x *DeleteBrowserProfileRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DeleteBrowserProfileRequest.ProtoReflect.Descriptor instead.
 func (*DeleteBrowserProfileRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{110}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{131}
 }
 
 func (x *DeleteBrowserProfileRequest) GetId() string {
@@ -6715,7 +8117,7 @@ type EmulatorDevice struct {
 
 func (x *EmulatorDevice) Reset() {
 	*x = EmulatorDevice{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[111]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[132]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6727,7 +8129,7 @@ func (x *EmulatorDevice) String() string {
 func (*EmulatorDevice) ProtoMessage() {}
 
 func (x *EmulatorDevice) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[111]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[132]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6740,7 +8142,7 @@ func (x *EmulatorDevice) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EmulatorDevice.ProtoReflect.Descriptor instead.
 func (*EmulatorDevice) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{111}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{132}
 }
 
 func (x *EmulatorDevice) GetId() string {
@@ -6780,7 +8182,7 @@ type ListEmulatorDevicesRequest struct {
 
 func (x *ListEmulatorDevicesRequest) Reset() {
 	*x = ListEmulatorDevicesRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[112]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[133]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6792,7 +8194,7 @@ func (x *ListEmulatorDevicesRequest) String() string {
 func (*ListEmulatorDevicesRequest) ProtoMessage() {}
 
 func (x *ListEmulatorDevicesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[112]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[133]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6805,7 +8207,7 @@ func (x *ListEmulatorDevicesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEmulatorDevicesRequest.ProtoReflect.Descriptor instead.
 func (*ListEmulatorDevicesRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{112}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{133}
 }
 
 func (x *ListEmulatorDevicesRequest) GetConnectionId() string {
@@ -6824,7 +8226,7 @@ type ListEmulatorDevicesResponse struct {
 
 func (x *ListEmulatorDevicesResponse) Reset() {
 	*x = ListEmulatorDevicesResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[113]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[134]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6836,7 +8238,7 @@ func (x *ListEmulatorDevicesResponse) String() string {
 func (*ListEmulatorDevicesResponse) ProtoMessage() {}
 
 func (x *ListEmulatorDevicesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[113]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[134]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6849,7 +8251,7 @@ func (x *ListEmulatorDevicesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ListEmulatorDevicesResponse.ProtoReflect.Descriptor instead.
 func (*ListEmulatorDevicesResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{113}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{134}
 }
 
 func (x *ListEmulatorDevicesResponse) GetDevices() []*EmulatorDevice {
@@ -6868,7 +8270,7 @@ type GetEmulatorAvailabilityRequest struct {
 
 func (x *GetEmulatorAvailabilityRequest) Reset() {
 	*x = GetEmulatorAvailabilityRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[114]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[135]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6880,7 +8282,7 @@ func (x *GetEmulatorAvailabilityRequest) String() string {
 func (*GetEmulatorAvailabilityRequest) ProtoMessage() {}
 
 func (x *GetEmulatorAvailabilityRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[114]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[135]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6893,7 +8295,7 @@ func (x *GetEmulatorAvailabilityRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetEmulatorAvailabilityRequest.ProtoReflect.Descriptor instead.
 func (*GetEmulatorAvailabilityRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{114}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{135}
 }
 
 func (x *GetEmulatorAvailabilityRequest) GetConnectionId() string {
@@ -6913,7 +8315,7 @@ type GetEmulatorAvailabilityResponse struct {
 
 func (x *GetEmulatorAvailabilityResponse) Reset() {
 	*x = GetEmulatorAvailabilityResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[115]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[136]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6925,7 +8327,7 @@ func (x *GetEmulatorAvailabilityResponse) String() string {
 func (*GetEmulatorAvailabilityResponse) ProtoMessage() {}
 
 func (x *GetEmulatorAvailabilityResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[115]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[136]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6938,7 +8340,7 @@ func (x *GetEmulatorAvailabilityResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetEmulatorAvailabilityResponse.ProtoReflect.Descriptor instead.
 func (*GetEmulatorAvailabilityResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{115}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{136}
 }
 
 func (x *GetEmulatorAvailabilityResponse) GetAvailable() bool {
@@ -6967,7 +8369,7 @@ type EmulatorSession struct {
 
 func (x *EmulatorSession) Reset() {
 	*x = EmulatorSession{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[116]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[137]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -6979,7 +8381,7 @@ func (x *EmulatorSession) String() string {
 func (*EmulatorSession) ProtoMessage() {}
 
 func (x *EmulatorSession) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[116]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[137]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -6992,7 +8394,7 @@ func (x *EmulatorSession) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use EmulatorSession.ProtoReflect.Descriptor instead.
 func (*EmulatorSession) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{116}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{137}
 }
 
 func (x *EmulatorSession) GetSessionId() string {
@@ -7033,7 +8435,7 @@ type AttachEmulatorSessionRequest struct {
 
 func (x *AttachEmulatorSessionRequest) Reset() {
 	*x = AttachEmulatorSessionRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[117]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[138]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7045,7 +8447,7 @@ func (x *AttachEmulatorSessionRequest) String() string {
 func (*AttachEmulatorSessionRequest) ProtoMessage() {}
 
 func (x *AttachEmulatorSessionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[117]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[138]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7058,7 +8460,7 @@ func (x *AttachEmulatorSessionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use AttachEmulatorSessionRequest.ProtoReflect.Descriptor instead.
 func (*AttachEmulatorSessionRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{117}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{138}
 }
 
 func (x *AttachEmulatorSessionRequest) GetConnectionId() string {
@@ -7087,7 +8489,7 @@ type SendEmulatorTapRequest struct {
 
 func (x *SendEmulatorTapRequest) Reset() {
 	*x = SendEmulatorTapRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[118]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[139]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7099,7 +8501,7 @@ func (x *SendEmulatorTapRequest) String() string {
 func (*SendEmulatorTapRequest) ProtoMessage() {}
 
 func (x *SendEmulatorTapRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[118]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[139]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7112,7 +8514,7 @@ func (x *SendEmulatorTapRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendEmulatorTapRequest.ProtoReflect.Descriptor instead.
 func (*SendEmulatorTapRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{118}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{139}
 }
 
 func (x *SendEmulatorTapRequest) GetConnectionId() string {
@@ -7158,7 +8560,7 @@ type SendEmulatorGestureRequest struct {
 
 func (x *SendEmulatorGestureRequest) Reset() {
 	*x = SendEmulatorGestureRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[119]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[140]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7170,7 +8572,7 @@ func (x *SendEmulatorGestureRequest) String() string {
 func (*SendEmulatorGestureRequest) ProtoMessage() {}
 
 func (x *SendEmulatorGestureRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[119]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[140]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7183,7 +8585,7 @@ func (x *SendEmulatorGestureRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendEmulatorGestureRequest.ProtoReflect.Descriptor instead.
 func (*SendEmulatorGestureRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{119}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{140}
 }
 
 func (x *SendEmulatorGestureRequest) GetConnectionId() string {
@@ -7246,7 +8648,7 @@ type SendEmulatorButtonRequest struct {
 
 func (x *SendEmulatorButtonRequest) Reset() {
 	*x = SendEmulatorButtonRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[120]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[141]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7258,7 +8660,7 @@ func (x *SendEmulatorButtonRequest) String() string {
 func (*SendEmulatorButtonRequest) ProtoMessage() {}
 
 func (x *SendEmulatorButtonRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[120]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[141]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7271,7 +8673,7 @@ func (x *SendEmulatorButtonRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendEmulatorButtonRequest.ProtoReflect.Descriptor instead.
 func (*SendEmulatorButtonRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{120}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{141}
 }
 
 func (x *SendEmulatorButtonRequest) GetConnectionId() string {
@@ -7306,7 +8708,7 @@ type RotateEmulatorRequest struct {
 
 func (x *RotateEmulatorRequest) Reset() {
 	*x = RotateEmulatorRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[121]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[142]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7318,7 +8720,7 @@ func (x *RotateEmulatorRequest) String() string {
 func (*RotateEmulatorRequest) ProtoMessage() {}
 
 func (x *RotateEmulatorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[121]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[142]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7331,7 +8733,7 @@ func (x *RotateEmulatorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use RotateEmulatorRequest.ProtoReflect.Descriptor instead.
 func (*RotateEmulatorRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{121}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{142}
 }
 
 func (x *RotateEmulatorRequest) GetConnectionId() string {
@@ -7365,7 +8767,7 @@ type ShutdownEmulatorRequest struct {
 
 func (x *ShutdownEmulatorRequest) Reset() {
 	*x = ShutdownEmulatorRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[122]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[143]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7377,7 +8779,7 @@ func (x *ShutdownEmulatorRequest) String() string {
 func (*ShutdownEmulatorRequest) ProtoMessage() {}
 
 func (x *ShutdownEmulatorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[122]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[143]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7390,7 +8792,7 @@ func (x *ShutdownEmulatorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ShutdownEmulatorRequest.ProtoReflect.Descriptor instead.
 func (*ShutdownEmulatorRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{122}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{143}
 }
 
 func (x *ShutdownEmulatorRequest) GetConnectionId() string {
@@ -7416,7 +8818,7 @@ type GetHostCapabilitiesRequest struct {
 
 func (x *GetHostCapabilitiesRequest) Reset() {
 	*x = GetHostCapabilitiesRequest{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[123]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[144]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7428,7 +8830,7 @@ func (x *GetHostCapabilitiesRequest) String() string {
 func (*GetHostCapabilitiesRequest) ProtoMessage() {}
 
 func (x *GetHostCapabilitiesRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[123]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[144]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7441,7 +8843,7 @@ func (x *GetHostCapabilitiesRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHostCapabilitiesRequest.ProtoReflect.Descriptor instead.
 func (*GetHostCapabilitiesRequest) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{123}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{144}
 }
 
 func (x *GetHostCapabilitiesRequest) GetConnectionId() string {
@@ -7463,7 +8865,7 @@ type GetHostCapabilitiesResponse struct {
 
 func (x *GetHostCapabilitiesResponse) Reset() {
 	*x = GetHostCapabilitiesResponse{}
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[124]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[145]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -7475,7 +8877,7 @@ func (x *GetHostCapabilitiesResponse) String() string {
 func (*GetHostCapabilitiesResponse) ProtoMessage() {}
 
 func (x *GetHostCapabilitiesResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[124]
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[145]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -7488,7 +8890,7 @@ func (x *GetHostCapabilitiesResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetHostCapabilitiesResponse.ProtoReflect.Descriptor instead.
 func (*GetHostCapabilitiesResponse) Descriptor() ([]byte, []int) {
-	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{124}
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{145}
 }
 
 func (x *GetHostCapabilitiesResponse) GetWslAvailable() bool {
@@ -7517,6 +8919,1954 @@ func (x *GetHostCapabilitiesResponse) GetGitBashAvailable() bool {
 		return x.GitBashAvailable
 	}
 	return false
+}
+
+type FleetServerInput struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	User          string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	VaultSshRole  string                 `protobuf:"bytes,3,opt,name=vault_ssh_role,json=vaultSshRole,proto3" json:"vault_ssh_role,omitempty"`
+	Project       string                 `protobuf:"bytes,4,opt,name=project,proto3" json:"project,omitempty"`
+	Tags          []string               `protobuf:"bytes,5,rep,name=tags,proto3" json:"tags,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FleetServerInput) Reset() {
+	*x = FleetServerInput{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[146]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FleetServerInput) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FleetServerInput) ProtoMessage() {}
+
+func (x *FleetServerInput) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[146]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FleetServerInput.ProtoReflect.Descriptor instead.
+func (*FleetServerInput) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{146}
+}
+
+func (x *FleetServerInput) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *FleetServerInput) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *FleetServerInput) GetVaultSshRole() string {
+	if x != nil {
+		return x.VaultSshRole
+	}
+	return ""
+}
+
+func (x *FleetServerInput) GetProject() string {
+	if x != nil {
+		return x.Project
+	}
+	return ""
+}
+
+func (x *FleetServerInput) GetTags() []string {
+	if x != nil {
+		return x.Tags
+	}
+	return nil
+}
+
+type ImportFleetInventoryRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Servers       []*FleetServerInput    `protobuf:"bytes,1,rep,name=servers,proto3" json:"servers,omitempty"`
+	DryRun        bool                   `protobuf:"varint,2,opt,name=dry_run,json=dryRun,proto3" json:"dry_run,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportFleetInventoryRequest) Reset() {
+	*x = ImportFleetInventoryRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[147]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportFleetInventoryRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportFleetInventoryRequest) ProtoMessage() {}
+
+func (x *ImportFleetInventoryRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[147]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportFleetInventoryRequest.ProtoReflect.Descriptor instead.
+func (*ImportFleetInventoryRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{147}
+}
+
+func (x *ImportFleetInventoryRequest) GetServers() []*FleetServerInput {
+	if x != nil {
+		return x.Servers
+	}
+	return nil
+}
+
+func (x *ImportFleetInventoryRequest) GetDryRun() bool {
+	if x != nil {
+		return x.DryRun
+	}
+	return false
+}
+
+type ImportFleetInventoryError struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Host          string                 `protobuf:"bytes,1,opt,name=host,proto3" json:"host,omitempty"`
+	User          string                 `protobuf:"bytes,2,opt,name=user,proto3" json:"user,omitempty"`
+	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportFleetInventoryError) Reset() {
+	*x = ImportFleetInventoryError{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[148]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportFleetInventoryError) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportFleetInventoryError) ProtoMessage() {}
+
+func (x *ImportFleetInventoryError) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[148]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportFleetInventoryError.ProtoReflect.Descriptor instead.
+func (*ImportFleetInventoryError) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{148}
+}
+
+func (x *ImportFleetInventoryError) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *ImportFleetInventoryError) GetUser() string {
+	if x != nil {
+		return x.User
+	}
+	return ""
+}
+
+func (x *ImportFleetInventoryError) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type ImportFleetInventoryResponse struct {
+	state         protoimpl.MessageState       `protogen:"open.v1"`
+	Imported      int32                        `protobuf:"varint,1,opt,name=imported,proto3" json:"imported,omitempty"`
+	Updated       int32                        `protobuf:"varint,2,opt,name=updated,proto3" json:"updated,omitempty"`
+	Skipped       int32                        `protobuf:"varint,3,opt,name=skipped,proto3" json:"skipped,omitempty"`
+	Errors        []*ImportFleetInventoryError `protobuf:"bytes,4,rep,name=errors,proto3" json:"errors,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ImportFleetInventoryResponse) Reset() {
+	*x = ImportFleetInventoryResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[149]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ImportFleetInventoryResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ImportFleetInventoryResponse) ProtoMessage() {}
+
+func (x *ImportFleetInventoryResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[149]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ImportFleetInventoryResponse.ProtoReflect.Descriptor instead.
+func (*ImportFleetInventoryResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{149}
+}
+
+func (x *ImportFleetInventoryResponse) GetImported() int32 {
+	if x != nil {
+		return x.Imported
+	}
+	return 0
+}
+
+func (x *ImportFleetInventoryResponse) GetUpdated() int32 {
+	if x != nil {
+		return x.Updated
+	}
+	return 0
+}
+
+func (x *ImportFleetInventoryResponse) GetSkipped() int32 {
+	if x != nil {
+		return x.Skipped
+	}
+	return 0
+}
+
+func (x *ImportFleetInventoryResponse) GetErrors() []*ImportFleetInventoryError {
+	if x != nil {
+		return x.Errors
+	}
+	return nil
+}
+
+type BulkProvisionFleetRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Project       string                 `protobuf:"bytes,1,opt,name=project,proto3" json:"project,omitempty"`          // "" = all
+	Concurrency   int32                  `protobuf:"varint,2,opt,name=concurrency,proto3" json:"concurrency,omitempty"` // 0 = default 5
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BulkProvisionFleetRequest) Reset() {
+	*x = BulkProvisionFleetRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[150]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BulkProvisionFleetRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BulkProvisionFleetRequest) ProtoMessage() {}
+
+func (x *BulkProvisionFleetRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[150]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BulkProvisionFleetRequest.ProtoReflect.Descriptor instead.
+func (*BulkProvisionFleetRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{150}
+}
+
+func (x *BulkProvisionFleetRequest) GetProject() string {
+	if x != nil {
+		return x.Project
+	}
+	return ""
+}
+
+func (x *BulkProvisionFleetRequest) GetConcurrency() int32 {
+	if x != nil {
+		return x.Concurrency
+	}
+	return 0
+}
+
+type ProvisionOutcome struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	Host          string                 `protobuf:"bytes,2,opt,name=host,proto3" json:"host,omitempty"`
+	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"`
+	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ProvisionOutcome) Reset() {
+	*x = ProvisionOutcome{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[151]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ProvisionOutcome) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ProvisionOutcome) ProtoMessage() {}
+
+func (x *ProvisionOutcome) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[151]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ProvisionOutcome.ProtoReflect.Descriptor instead.
+func (*ProvisionOutcome) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{151}
+}
+
+func (x *ProvisionOutcome) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *ProvisionOutcome) GetHost() string {
+	if x != nil {
+		return x.Host
+	}
+	return ""
+}
+
+func (x *ProvisionOutcome) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ProvisionOutcome) GetError() string {
+	if x != nil {
+		return x.Error
+	}
+	return ""
+}
+
+type BulkProvisionFleetResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Success       int32                  `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
+	Failed        int32                  `protobuf:"varint,2,opt,name=failed,proto3" json:"failed,omitempty"`
+	Skipped       int32                  `protobuf:"varint,3,opt,name=skipped,proto3" json:"skipped,omitempty"`
+	Outcomes      []*ProvisionOutcome    `protobuf:"bytes,4,rep,name=outcomes,proto3" json:"outcomes,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BulkProvisionFleetResponse) Reset() {
+	*x = BulkProvisionFleetResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[152]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BulkProvisionFleetResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BulkProvisionFleetResponse) ProtoMessage() {}
+
+func (x *BulkProvisionFleetResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[152]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BulkProvisionFleetResponse.ProtoReflect.Descriptor instead.
+func (*BulkProvisionFleetResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{152}
+}
+
+func (x *BulkProvisionFleetResponse) GetSuccess() int32 {
+	if x != nil {
+		return x.Success
+	}
+	return 0
+}
+
+func (x *BulkProvisionFleetResponse) GetFailed() int32 {
+	if x != nil {
+		return x.Failed
+	}
+	return 0
+}
+
+func (x *BulkProvisionFleetResponse) GetSkipped() int32 {
+	if x != nil {
+		return x.Skipped
+	}
+	return 0
+}
+
+func (x *BulkProvisionFleetResponse) GetOutcomes() []*ProvisionOutcome {
+	if x != nil {
+		return x.Outcomes
+	}
+	return nil
+}
+
+type AgentProbe struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	Id                  string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Cmd                 string                 `protobuf:"bytes,2,opt,name=cmd,proto3" json:"cmd,omitempty"`
+	RequiredCommands    []string               `protobuf:"bytes,3,rep,name=required_commands,json=requiredCommands,proto3" json:"required_commands,omitempty"`
+	UnsupportedRuntimes []string               `protobuf:"bytes,4,rep,name=unsupported_runtimes,json=unsupportedRuntimes,proto3" json:"unsupported_runtimes,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *AgentProbe) Reset() {
+	*x = AgentProbe{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[153]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentProbe) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentProbe) ProtoMessage() {}
+
+func (x *AgentProbe) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[153]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentProbe.ProtoReflect.Descriptor instead.
+func (*AgentProbe) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{153}
+}
+
+func (x *AgentProbe) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AgentProbe) GetCmd() string {
+	if x != nil {
+		return x.Cmd
+	}
+	return ""
+}
+
+func (x *AgentProbe) GetRequiredCommands() []string {
+	if x != nil {
+		return x.RequiredCommands
+	}
+	return nil
+}
+
+func (x *AgentProbe) GetUnsupportedRuntimes() []string {
+	if x != nil {
+		return x.UnsupportedRuntimes
+	}
+	return nil
+}
+
+type DetectDevServerAgentsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	Commands      []*AgentProbe          `protobuf:"bytes,2,rep,name=commands,proto3" json:"commands,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DetectDevServerAgentsRequest) Reset() {
+	*x = DetectDevServerAgentsRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[154]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DetectDevServerAgentsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DetectDevServerAgentsRequest) ProtoMessage() {}
+
+func (x *DetectDevServerAgentsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[154]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DetectDevServerAgentsRequest.ProtoReflect.Descriptor instead.
+func (*DetectDevServerAgentsRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{154}
+}
+
+func (x *DetectDevServerAgentsRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *DetectDevServerAgentsRequest) GetCommands() []*AgentProbe {
+	if x != nil {
+		return x.Commands
+	}
+	return nil
+}
+
+type DetectDevServerAgentsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Agents        []string               `protobuf:"bytes,1,rep,name=agents,proto3" json:"agents,omitempty"`
+	Platform      string                 `protobuf:"bytes,2,opt,name=platform,proto3" json:"platform,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DetectDevServerAgentsResponse) Reset() {
+	*x = DetectDevServerAgentsResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[155]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DetectDevServerAgentsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DetectDevServerAgentsResponse) ProtoMessage() {}
+
+func (x *DetectDevServerAgentsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[155]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DetectDevServerAgentsResponse.ProtoReflect.Descriptor instead.
+func (*DetectDevServerAgentsResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{155}
+}
+
+func (x *DetectDevServerAgentsResponse) GetAgents() []string {
+	if x != nil {
+		return x.Agents
+	}
+	return nil
+}
+
+func (x *DetectDevServerAgentsResponse) GetPlatform() string {
+	if x != nil {
+		return x.Platform
+	}
+	return ""
+}
+
+type CheckDevServerPreflightRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	ProbePort     int32                  `protobuf:"varint,2,opt,name=probe_port,json=probePort,proto3" json:"probe_port,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckDevServerPreflightRequest) Reset() {
+	*x = CheckDevServerPreflightRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[156]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckDevServerPreflightRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckDevServerPreflightRequest) ProtoMessage() {}
+
+func (x *CheckDevServerPreflightRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[156]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckDevServerPreflightRequest.ProtoReflect.Descriptor instead.
+func (*CheckDevServerPreflightRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{156}
+}
+
+func (x *CheckDevServerPreflightRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *CheckDevServerPreflightRequest) GetProbePort() int32 {
+	if x != nil {
+		return x.ProbePort
+	}
+	return 0
+}
+
+type CheckResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Installed     bool                   `protobuf:"varint,1,opt,name=installed,proto3" json:"installed,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
+	MeetsMin      bool                   `protobuf:"varint,3,opt,name=meets_min,json=meetsMin,proto3" json:"meets_min,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckResult) Reset() {
+	*x = CheckResult{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[157]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckResult) ProtoMessage() {}
+
+func (x *CheckResult) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[157]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckResult.ProtoReflect.Descriptor instead.
+func (*CheckResult) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{157}
+}
+
+func (x *CheckResult) GetInstalled() bool {
+	if x != nil {
+		return x.Installed
+	}
+	return false
+}
+
+func (x *CheckResult) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *CheckResult) GetMeetsMin() bool {
+	if x != nil {
+		return x.MeetsMin
+	}
+	return false
+}
+
+type DiskCheckResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	FreeGb        float64                `protobuf:"fixed64,1,opt,name=free_gb,json=freeGb,proto3" json:"free_gb,omitempty"`
+	MeetsMin      bool                   `protobuf:"varint,2,opt,name=meets_min,json=meetsMin,proto3" json:"meets_min,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DiskCheckResult) Reset() {
+	*x = DiskCheckResult{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[158]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DiskCheckResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DiskCheckResult) ProtoMessage() {}
+
+func (x *DiskCheckResult) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[158]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DiskCheckResult.ProtoReflect.Descriptor instead.
+func (*DiskCheckResult) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{158}
+}
+
+func (x *DiskCheckResult) GetFreeGb() float64 {
+	if x != nil {
+		return x.FreeGb
+	}
+	return 0
+}
+
+func (x *DiskCheckResult) GetMeetsMin() bool {
+	if x != nil {
+		return x.MeetsMin
+	}
+	return false
+}
+
+type PortCheckResult struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Port          int32                  `protobuf:"varint,1,opt,name=port,proto3" json:"port,omitempty"`
+	Available     bool                   `protobuf:"varint,2,opt,name=available,proto3" json:"available,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortCheckResult) Reset() {
+	*x = PortCheckResult{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[159]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortCheckResult) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortCheckResult) ProtoMessage() {}
+
+func (x *PortCheckResult) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[159]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortCheckResult.ProtoReflect.Descriptor instead.
+func (*PortCheckResult) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{159}
+}
+
+func (x *PortCheckResult) GetPort() int32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *PortCheckResult) GetAvailable() bool {
+	if x != nil {
+		return x.Available
+	}
+	return false
+}
+
+type CheckDevServerPreflightResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Git           *CheckResult           `protobuf:"bytes,1,opt,name=git,proto3" json:"git,omitempty"`
+	Node          *CheckResult           `protobuf:"bytes,2,opt,name=node,proto3" json:"node,omitempty"`
+	Disk          *DiskCheckResult       `protobuf:"bytes,3,opt,name=disk,proto3" json:"disk,omitempty"`
+	Port          *PortCheckResult       `protobuf:"bytes,4,opt,name=port,proto3" json:"port,omitempty"`
+	Gh            *CheckResult           `protobuf:"bytes,5,opt,name=gh,proto3" json:"gh,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CheckDevServerPreflightResponse) Reset() {
+	*x = CheckDevServerPreflightResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[160]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CheckDevServerPreflightResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CheckDevServerPreflightResponse) ProtoMessage() {}
+
+func (x *CheckDevServerPreflightResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[160]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CheckDevServerPreflightResponse.ProtoReflect.Descriptor instead.
+func (*CheckDevServerPreflightResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{160}
+}
+
+func (x *CheckDevServerPreflightResponse) GetGit() *CheckResult {
+	if x != nil {
+		return x.Git
+	}
+	return nil
+}
+
+func (x *CheckDevServerPreflightResponse) GetNode() *CheckResult {
+	if x != nil {
+		return x.Node
+	}
+	return nil
+}
+
+func (x *CheckDevServerPreflightResponse) GetDisk() *DiskCheckResult {
+	if x != nil {
+		return x.Disk
+	}
+	return nil
+}
+
+func (x *CheckDevServerPreflightResponse) GetPort() *PortCheckResult {
+	if x != nil {
+		return x.Port
+	}
+	return nil
+}
+
+func (x *CheckDevServerPreflightResponse) GetGh() *CheckResult {
+	if x != nil {
+		return x.Gh
+	}
+	return nil
+}
+
+type CreateAgentTokenRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	Name          string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateAgentTokenRequest) Reset() {
+	*x = CreateAgentTokenRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[161]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAgentTokenRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAgentTokenRequest) ProtoMessage() {}
+
+func (x *CreateAgentTokenRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[161]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAgentTokenRequest.ProtoReflect.Descriptor instead.
+func (*CreateAgentTokenRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{161}
+}
+
+func (x *CreateAgentTokenRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *CreateAgentTokenRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type CreateAgentTokenResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Token           string                 `protobuf:"bytes,2,opt,name=token,proto3" json:"token,omitempty"` // plaintext — shown once, never returned again
+	Name            string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	CreatedAtUnixMs int64                  `protobuf:"varint,4,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *CreateAgentTokenResponse) Reset() {
+	*x = CreateAgentTokenResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[162]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateAgentTokenResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateAgentTokenResponse) ProtoMessage() {}
+
+func (x *CreateAgentTokenResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[162]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateAgentTokenResponse.ProtoReflect.Descriptor instead.
+func (*CreateAgentTokenResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{162}
+}
+
+func (x *CreateAgentTokenResponse) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CreateAgentTokenResponse) GetToken() string {
+	if x != nil {
+		return x.Token
+	}
+	return ""
+}
+
+func (x *CreateAgentTokenResponse) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *CreateAgentTokenResponse) GetCreatedAtUnixMs() int64 {
+	if x != nil {
+		return x.CreatedAtUnixMs
+	}
+	return 0
+}
+
+type AgentTokenSummary struct {
+	state            protoimpl.MessageState `protogen:"open.v1"`
+	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Name             string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	CreatedAtUnixMs  int64                  `protobuf:"varint,3,opt,name=created_at_unix_ms,json=createdAtUnixMs,proto3" json:"created_at_unix_ms,omitempty"`
+	LastUsedAtUnixMs *int64                 `protobuf:"varint,4,opt,name=last_used_at_unix_ms,json=lastUsedAtUnixMs,proto3,oneof" json:"last_used_at_unix_ms,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *AgentTokenSummary) Reset() {
+	*x = AgentTokenSummary{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[163]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentTokenSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentTokenSummary) ProtoMessage() {}
+
+func (x *AgentTokenSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[163]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentTokenSummary.ProtoReflect.Descriptor instead.
+func (*AgentTokenSummary) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{163}
+}
+
+func (x *AgentTokenSummary) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AgentTokenSummary) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AgentTokenSummary) GetCreatedAtUnixMs() int64 {
+	if x != nil {
+		return x.CreatedAtUnixMs
+	}
+	return 0
+}
+
+func (x *AgentTokenSummary) GetLastUsedAtUnixMs() int64 {
+	if x != nil && x.LastUsedAtUnixMs != nil {
+		return *x.LastUsedAtUnixMs
+	}
+	return 0
+}
+
+type ListAgentTokensRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentTokensRequest) Reset() {
+	*x = ListAgentTokensRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[164]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentTokensRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentTokensRequest) ProtoMessage() {}
+
+func (x *ListAgentTokensRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[164]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentTokensRequest.ProtoReflect.Descriptor instead.
+func (*ListAgentTokensRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{164}
+}
+
+func (x *ListAgentTokensRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+type ListAgentTokensResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Tokens        []*AgentTokenSummary   `protobuf:"bytes,1,rep,name=tokens,proto3" json:"tokens,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAgentTokensResponse) Reset() {
+	*x = ListAgentTokensResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[165]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAgentTokensResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAgentTokensResponse) ProtoMessage() {}
+
+func (x *ListAgentTokensResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[165]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAgentTokensResponse.ProtoReflect.Descriptor instead.
+func (*ListAgentTokensResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{165}
+}
+
+func (x *ListAgentTokensResponse) GetTokens() []*AgentTokenSummary {
+	if x != nil {
+		return x.Tokens
+	}
+	return nil
+}
+
+type RevokeAgentTokenRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	DevServerId   string                 `protobuf:"bytes,1,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"`
+	Id            string                 `protobuf:"bytes,2,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RevokeAgentTokenRequest) Reset() {
+	*x = RevokeAgentTokenRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[166]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RevokeAgentTokenRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RevokeAgentTokenRequest) ProtoMessage() {}
+
+func (x *RevokeAgentTokenRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[166]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RevokeAgentTokenRequest.ProtoReflect.Descriptor instead.
+func (*RevokeAgentTokenRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{166}
+}
+
+func (x *RevokeAgentTokenRequest) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *RevokeAgentTokenRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type StartAgentSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"` // -> DevServer, same resolution as SpawnTerminalSession
+	WorktreeId    string                 `protobuf:"bytes,2,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`       // logical FK -> project-service; BR-AG-01 scope key
+	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`                   // BR-AG-01: one agent per worktree PER USER
+	Cwd           string                 `protobuf:"bytes,4,opt,name=cwd,proto3" json:"cwd,omitempty"`                                       // worktree path on the dev server
+	ModelId       string                 `protobuf:"bytes,5,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`                // e.g. "claude", "gpt-4o", "gemini", "opencode", "ollama"
+	AccountId     string                 `protobuf:"bytes,6,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`          // ai_provider.accounts.id — from aiProvider.resolve; "" for localInference models
+	TrustPreset   string                 `protobuf:"bytes,7,opt,name=trust_preset,json=trustPreset,proto3" json:"trust_preset,omitempty"`    // "standard" | "full" | "none" — forwarded as-is, applied agent-side as CLI args
+	Cols          int32                  `protobuf:"varint,8,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows          int32                  `protobuf:"varint,9,opt,name=rows,proto3" json:"rows,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartAgentSessionRequest) Reset() {
+	*x = StartAgentSessionRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[167]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartAgentSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartAgentSessionRequest) ProtoMessage() {}
+
+func (x *StartAgentSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[167]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartAgentSessionRequest.ProtoReflect.Descriptor instead.
+func (*StartAgentSessionRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{167}
+}
+
+func (x *StartAgentSessionRequest) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+func (x *StartAgentSessionRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *StartAgentSessionRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *StartAgentSessionRequest) GetCwd() string {
+	if x != nil {
+		return x.Cwd
+	}
+	return ""
+}
+
+func (x *StartAgentSessionRequest) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+func (x *StartAgentSessionRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *StartAgentSessionRequest) GetTrustPreset() string {
+	if x != nil {
+		return x.TrustPreset
+	}
+	return ""
+}
+
+func (x *StartAgentSessionRequest) GetCols() int32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+func (x *StartAgentSessionRequest) GetRows() int32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+type AgentSession struct {
+	state              protoimpl.MessageState `protogen:"open.v1"`
+	Id                 string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // sessionId — agent_sessions.id
+	PtyId              string                 `protobuf:"bytes,2,opt,name=pty_id,json=ptyId,proto3" json:"pty_id,omitempty"`
+	ConnectionId       string                 `protobuf:"bytes,3,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"` // -> DevServer, same resolution key as TerminalSession.connection_id
+	WorktreeId         string                 `protobuf:"bytes,4,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	DevServerId        string                 `protobuf:"bytes,5,opt,name=dev_server_id,json=devServerId,proto3" json:"dev_server_id,omitempty"` // snapshot of the dev server resolved at spawn time, for display only
+	UserId             string                 `protobuf:"bytes,6,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ModelId            string                 `protobuf:"bytes,7,opt,name=model_id,json=modelId,proto3" json:"model_id,omitempty"`
+	AccountId          string                 `protobuf:"bytes,8,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Status             string                 `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"` // spawning|idle|running|waiting|completed|error|stopped — see TASK-AG-05-*
+	StartedAtUnixMs    int64                  `protobuf:"varint,10,opt,name=started_at_unix_ms,json=startedAtUnixMs,proto3" json:"started_at_unix_ms,omitempty"`
+	LastActiveAtUnixMs int64                  `protobuf:"varint,11,opt,name=last_active_at_unix_ms,json=lastActiveAtUnixMs,proto3" json:"last_active_at_unix_ms,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
+}
+
+func (x *AgentSession) Reset() {
+	*x = AgentSession{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[168]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AgentSession) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AgentSession) ProtoMessage() {}
+
+func (x *AgentSession) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[168]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AgentSession.ProtoReflect.Descriptor instead.
+func (*AgentSession) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{168}
+}
+
+func (x *AgentSession) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *AgentSession) GetPtyId() string {
+	if x != nil {
+		return x.PtyId
+	}
+	return ""
+}
+
+func (x *AgentSession) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+func (x *AgentSession) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *AgentSession) GetDevServerId() string {
+	if x != nil {
+		return x.DevServerId
+	}
+	return ""
+}
+
+func (x *AgentSession) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *AgentSession) GetModelId() string {
+	if x != nil {
+		return x.ModelId
+	}
+	return ""
+}
+
+func (x *AgentSession) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *AgentSession) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AgentSession) GetStartedAtUnixMs() int64 {
+	if x != nil {
+		return x.StartedAtUnixMs
+	}
+	return 0
+}
+
+func (x *AgentSession) GetLastActiveAtUnixMs() int64 {
+	if x != nil {
+		return x.LastActiveAtUnixMs
+	}
+	return 0
+}
+
+type StopAgentSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StopAgentSessionRequest) Reset() {
+	*x = StopAgentSessionRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[169]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StopAgentSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StopAgentSessionRequest) ProtoMessage() {}
+
+func (x *StopAgentSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[169]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StopAgentSessionRequest.ProtoReflect.Descriptor instead.
+func (*StopAgentSessionRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{169}
+}
+
+func (x *StopAgentSessionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+type KillAgentSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	SessionId     string                 `protobuf:"bytes,1,opt,name=session_id,json=sessionId,proto3" json:"session_id,omitempty"`
+	Signal        string                 `protobuf:"bytes,2,opt,name=signal,proto3" json:"signal,omitempty"` // "SIGTERM" | "SIGKILL", default SIGKILL — mirrors agent.kill's own default
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *KillAgentSessionRequest) Reset() {
+	*x = KillAgentSessionRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[170]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *KillAgentSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*KillAgentSessionRequest) ProtoMessage() {}
+
+func (x *KillAgentSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[170]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use KillAgentSessionRequest.ProtoReflect.Descriptor instead.
+func (*KillAgentSessionRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{170}
+}
+
+func (x *KillAgentSessionRequest) GetSessionId() string {
+	if x != nil {
+		return x.SessionId
+	}
+	return ""
+}
+
+func (x *KillAgentSessionRequest) GetSignal() string {
+	if x != nil {
+		return x.Signal
+	}
+	return ""
+}
+
+type ResumeAgentSessionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	WorktreeId    string                 `protobuf:"bytes,2,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	Cwd           string                 `protobuf:"bytes,4,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	Cols          int32                  `protobuf:"varint,5,opt,name=cols,proto3" json:"cols,omitempty"`
+	Rows          int32                  `protobuf:"varint,6,opt,name=rows,proto3" json:"rows,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResumeAgentSessionRequest) Reset() {
+	*x = ResumeAgentSessionRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[171]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResumeAgentSessionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResumeAgentSessionRequest) ProtoMessage() {}
+
+func (x *ResumeAgentSessionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[171]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResumeAgentSessionRequest.ProtoReflect.Descriptor instead.
+func (*ResumeAgentSessionRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{171}
+}
+
+func (x *ResumeAgentSessionRequest) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+func (x *ResumeAgentSessionRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ResumeAgentSessionRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *ResumeAgentSessionRequest) GetCwd() string {
+	if x != nil {
+		return x.Cwd
+	}
+	return ""
+}
+
+func (x *ResumeAgentSessionRequest) GetCols() int32 {
+	if x != nil {
+		return x.Cols
+	}
+	return 0
+}
+
+func (x *ResumeAgentSessionRequest) GetRows() int32 {
+	if x != nil {
+		return x.Rows
+	}
+	return 0
+}
+
+type SwitchAgentAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	ConnectionId  string                 `protobuf:"bytes,1,opt,name=connection_id,json=connectionId,proto3" json:"connection_id,omitempty"`
+	WorktreeId    string                 `protobuf:"bytes,2,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
+	UserId        string                 `protobuf:"bytes,3,opt,name=user_id,json=userId,proto3" json:"user_id,omitempty"`
+	ProjectId     string                 `protobuf:"bytes,4,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"` // threaded into ResolveProvider's cascade exclusion
+	Cwd           string                 `protobuf:"bytes,5,opt,name=cwd,proto3" json:"cwd,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SwitchAgentAccountRequest) Reset() {
+	*x = SwitchAgentAccountRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[172]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SwitchAgentAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SwitchAgentAccountRequest) ProtoMessage() {}
+
+func (x *SwitchAgentAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[172]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SwitchAgentAccountRequest.ProtoReflect.Descriptor instead.
+func (*SwitchAgentAccountRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{172}
+}
+
+func (x *SwitchAgentAccountRequest) GetConnectionId() string {
+	if x != nil {
+		return x.ConnectionId
+	}
+	return ""
+}
+
+func (x *SwitchAgentAccountRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *SwitchAgentAccountRequest) GetUserId() string {
+	if x != nil {
+		return x.UserId
+	}
+	return ""
+}
+
+func (x *SwitchAgentAccountRequest) GetProjectId() string {
+	if x != nil {
+		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *SwitchAgentAccountRequest) GetCwd() string {
+	if x != nil {
+		return x.Cwd
+	}
+	return ""
+}
+
+type DispatchPromptRequest struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	PtyId                string                 `protobuf:"bytes,1,opt,name=pty_id,json=ptyId,proto3" json:"pty_id,omitempty"`
+	Prompt               string                 `protobuf:"bytes,2,opt,name=prompt,proto3" json:"prompt,omitempty"`                                                             // already decrypted by the caller (api-gateway) before this RPC
+	Overwrite            bool                   `protobuf:"varint,3,opt,name=overwrite,proto3" json:"overwrite,omitempty"`                                                      // BR-MB-12: true only on a caller's explicit confirmation of a second dispatch
+	DispatchedByDeviceId string                 `protobuf:"bytes,4,opt,name=dispatched_by_device_id,json=dispatchedByDeviceId,proto3" json:"dispatched_by_device_id,omitempty"` // audit/attribution — which paired mobile device sent this
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *DispatchPromptRequest) Reset() {
+	*x = DispatchPromptRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[173]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DispatchPromptRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DispatchPromptRequest) ProtoMessage() {}
+
+func (x *DispatchPromptRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[173]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DispatchPromptRequest.ProtoReflect.Descriptor instead.
+func (*DispatchPromptRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{173}
+}
+
+func (x *DispatchPromptRequest) GetPtyId() string {
+	if x != nil {
+		return x.PtyId
+	}
+	return ""
+}
+
+func (x *DispatchPromptRequest) GetPrompt() string {
+	if x != nil {
+		return x.Prompt
+	}
+	return ""
+}
+
+func (x *DispatchPromptRequest) GetOverwrite() bool {
+	if x != nil {
+		return x.Overwrite
+	}
+	return false
+}
+
+func (x *DispatchPromptRequest) GetDispatchedByDeviceId() string {
+	if x != nil {
+		return x.DispatchedByDeviceId
+	}
+	return ""
+}
+
+type DispatchPromptResponse struct {
+	state                       protoimpl.MessageState         `protogen:"open.v1"`
+	Outcome                     DispatchPromptResponse_Outcome `protobuf:"varint,1,opt,name=outcome,proto3,enum=orca.infrafleet.v1.DispatchPromptResponse_Outcome" json:"outcome,omitempty"`
+	ExistingQueuedPromptPreview string                         `protobuf:"bytes,2,opt,name=existing_queued_prompt_preview,json=existingQueuedPromptPreview,proto3" json:"existing_queued_prompt_preview,omitempty"` // populated only for REJECTED_NEEDS_CONFIRMATION
+	unknownFields               protoimpl.UnknownFields
+	sizeCache                   protoimpl.SizeCache
+}
+
+func (x *DispatchPromptResponse) Reset() {
+	*x = DispatchPromptResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[174]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DispatchPromptResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DispatchPromptResponse) ProtoMessage() {}
+
+func (x *DispatchPromptResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[174]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DispatchPromptResponse.ProtoReflect.Descriptor instead.
+func (*DispatchPromptResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{174}
+}
+
+func (x *DispatchPromptResponse) GetOutcome() DispatchPromptResponse_Outcome {
+	if x != nil {
+		return x.Outcome
+	}
+	return DispatchPromptResponse_OUTCOME_UNSPECIFIED
+}
+
+func (x *DispatchPromptResponse) GetExistingQueuedPromptPreview() string {
+	if x != nil {
+		return x.ExistingQueuedPromptPreview
+	}
+	return ""
+}
+
+type GetQueuedPromptRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	PtyId         string                 `protobuf:"bytes,1,opt,name=pty_id,json=ptyId,proto3" json:"pty_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetQueuedPromptRequest) Reset() {
+	*x = GetQueuedPromptRequest{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[175]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetQueuedPromptRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetQueuedPromptRequest) ProtoMessage() {}
+
+func (x *GetQueuedPromptRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[175]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetQueuedPromptRequest.ProtoReflect.Descriptor instead.
+func (*GetQueuedPromptRequest) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{175}
+}
+
+func (x *GetQueuedPromptRequest) GetPtyId() string {
+	if x != nil {
+		return x.PtyId
+	}
+	return ""
+}
+
+type GetQueuedPromptResponse struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	HasQueuedPrompt bool                   `protobuf:"varint,1,opt,name=has_queued_prompt,json=hasQueuedPrompt,proto3" json:"has_queued_prompt,omitempty"`
+	Prompt          string                 `protobuf:"bytes,2,opt,name=prompt,proto3" json:"prompt,omitempty"`
+	QueuedAtUnixMs  int64                  `protobuf:"varint,3,opt,name=queued_at_unix_ms,json=queuedAtUnixMs,proto3" json:"queued_at_unix_ms,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GetQueuedPromptResponse) Reset() {
+	*x = GetQueuedPromptResponse{}
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[176]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetQueuedPromptResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetQueuedPromptResponse) ProtoMessage() {}
+
+func (x *GetQueuedPromptResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_infrafleet_v1_infrafleet_proto_msgTypes[176]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetQueuedPromptResponse.ProtoReflect.Descriptor instead.
+func (*GetQueuedPromptResponse) Descriptor() ([]byte, []int) {
+	return file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP(), []int{176}
+}
+
+func (x *GetQueuedPromptResponse) GetHasQueuedPrompt() bool {
+	if x != nil {
+		return x.HasQueuedPrompt
+	}
+	return false
+}
+
+func (x *GetQueuedPromptResponse) GetPrompt() string {
+	if x != nil {
+		return x.Prompt
+	}
+	return ""
+}
+
+func (x *GetQueuedPromptResponse) GetQueuedAtUnixMs() int64 {
+	if x != nil {
+		return x.QueuedAtUnixMs
+	}
+	return 0
 }
 
 var File_orca_infrafleet_v1_infrafleet_proto protoreflect.FileDescriptor
@@ -7574,15 +10924,15 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\fpairing_code\x18\x02 \x01(\tR\vpairingCode\x12!\n" +
 	"\fproject_root\x18\x03 \x01(\tR\vprojectRoot\x12M\n" +
 	"\n" +
-	"ssh_target\x18\x04 \x01(\v2..orca.infrafleet.v1.EphemeralVmRecipeSshTargetR\tsshTarget\"\x84\x01\n" +
-	"\vPortForward\x12\x1d\n" +
+	"ssh_target\x18\x04 \x01(\v2..orca.infrafleet.v1.EphemeralVmRecipeSshTargetR\tsshTarget\"\x8a\x01\n" +
+	"\x11RecipePortForward\x12\x1d\n" +
 	"\n" +
 	"local_port\x18\x01 \x01(\x05R\tlocalPort\x12\x1f\n" +
 	"\vremote_host\x18\x02 \x01(\tR\n" +
 	"remoteHost\x12\x1f\n" +
 	"\vremote_port\x18\x03 \x01(\x05R\n" +
 	"remotePort\x12\x14\n" +
-	"\x05label\x18\x04 \x01(\tR\x05label\"\xb0\x03\n" +
+	"\x05label\x18\x04 \x01(\tR\x05label\"\xb6\x03\n" +
 	"\x1aEphemeralVmRecipeSshTarget\x12\x14\n" +
 	"\x05label\x18\x01 \x01(\tR\x05label\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x12\n" +
@@ -7594,8 +10944,8 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\rproxy_command\x18\b \x01(\tR\fproxyCommand\x12\x1b\n" +
 	"\tjump_host\x18\t \x01(\tR\bjumpHost\x12;\n" +
 	"\x1arelay_grace_period_seconds\x18\n" +
-	" \x01(\x05R\x17relayGracePeriodSeconds\x12D\n" +
-	"\rport_forwards\x18\v \x03(\v2\x1f.orca.infrafleet.v1.PortForwardR\fportForwards\"\xc4\x02\n" +
+	" \x01(\x05R\x17relayGracePeriodSeconds\x12J\n" +
+	"\rport_forwards\x18\v \x03(\v2%.orca.infrafleet.v1.RecipePortForwardR\fportForwards\"\xd0\x03\n" +
 	"\tDevServer\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
@@ -7605,13 +10955,22 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x0fapproval_status\x18\x06 \x01(\tR\x0eapprovalStatus\x12\x19\n" +
 	"\bgroup_id\x18\a \x01(\tR\agroupId\x121\n" +
 	"\x04kind\x18\b \x01(\x0e2\x1d.orca.infrafleet.v1.AgentKindR\x04kind\x12#\n" +
-	"\rhealth_status\x18\t \x01(\tR\fhealthStatus\"\xda\x01\n" +
+	"\rhealth_status\x18\t \x01(\tR\fhealthStatus\x12\x1a\n" +
+	"\bplatform\x18\n" +
+	" \x01(\tR\bplatform\x12\x12\n" +
+	"\x04arch\x18\v \x01(\tR\x04arch\x12!\n" +
+	"\fnode_version\x18\f \x01(\tR\vnodeVersion\x12#\n" +
+	"\ragent_version\x18\r \x01(\tR\fagentVersion\x12\x12\n" +
+	"\x04tags\x18\x0e \x03(\tR\x04tags\"\x8d\x02\n" +
 	"\x18RegisterDevServerRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x126\n" +
 	"\x04mode\x18\x03 \x01(\x0e2\".orca.infrafleet.v1.ConnectionModeR\x04mode\x12\"\n" +
-	"\rssh_target_id\x18\x04 \x01(\tR\vsshTargetId\x121\n" +
-	"\x04kind\x18\x05 \x01(\x0e2\x1d.orca.infrafleet.v1.AgentKindR\x04kind\"Y\n" +
+	"\rssh_target_id\x18\x04 \x01(\tR\vsshTargetId\x12\x1d\n" +
+	"\n" +
+	"relay_port\x18\x05 \x01(\x05R\trelayPort\x12\x12\n" +
+	"\x04tags\x18\x06 \x03(\tR\x04tags\x121\n" +
+	"\x04kind\x18\a \x01(\x0e2\x1d.orca.infrafleet.v1.AgentKindR\x04kind\"Y\n" +
 	"\x19RegisterDevServerResponse\x12<\n" +
 	"\n" +
 	"dev_server\x18\x01 \x01(\v2\x1d.orca.infrafleet.v1.DevServerR\tdevServer\"\x84\x01\n" +
@@ -7619,7 +10978,7 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\"\n" +
 	"\rdev_server_id\x18\x02 \x01(\tR\vdevServerId\x12\x1f\n" +
 	"\vworktree_id\x18\x03 \x01(\tR\n" +
-	"worktreeId\"\x84\x02\n" +
+	"worktreeId\"\xa7\x02\n" +
 	"\x19ResolveConnectionResponse\x12\x1c\n" +
 	"\tconnected\x18\x01 \x01(\bR\tconnected\x12<\n" +
 	"\n" +
@@ -7627,11 +10986,18 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\trepo_path\x18\x03 \x01(\tR\brepoPath\x12\x1f\n" +
 	"\vworktree_id\x18\x04 \x01(\tR\n" +
 	"worktreeId\x12#\n" +
-	"\rconnection_id\x18\x05 \x01(\tR\fconnectionId\x12(\n" +
-	"\x10hidden_target_id\x18\x06 \x01(\tR\x0ehiddenTargetId\"J\n" +
+	"\rconnection_id\x18\x05 \x01(\tR\fconnectionId\x12!\n" +
+	"\fnode_version\x18\x06 \x01(\tR\vnodeVersion\x12(\n" +
+	"\x10hidden_target_id\x18\a \x01(\tR\x0ehiddenTargetId\"J\n" +
 	"\x15ListDevServersRequest\x121\n" +
 	"\x04kind\x18\x01 \x01(\x0e2\x1d.orca.infrafleet.v1.AgentKindR\x04kind\"X\n" +
 	"\x16ListDevServersResponse\x12>\n" +
+	"\vdev_servers\x18\x01 \x03(\v2\x1d.orca.infrafleet.v1.DevServerR\n" +
+	"devServers\"Q\n" +
+	"\x1aListDevServersByTagRequest\x12\x10\n" +
+	"\x03tag\x18\x01 \x01(\tR\x03tag\x12!\n" +
+	"\fhealthy_only\x18\x02 \x01(\bR\vhealthyOnly\"]\n" +
+	"\x1bListDevServersByTagResponse\x12>\n" +
 	"\vdev_servers\x18\x01 \x03(\v2\x1d.orca.infrafleet.v1.DevServerR\n" +
 	"devServers\"y\n" +
 	"\x0eDevServerGroup\x12\x0e\n" +
@@ -7735,7 +11101,15 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"paramsJson\"0\n" +
 	"\rRelayResponse\x12\x1f\n" +
 	"\vresult_json\x18\x01 \x01(\tR\n" +
-	"resultJson\"v\n" +
+	"resultJson\"r\n" +
+	"\x12RelayStreamRequest\x12#\n" +
+	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x16\n" +
+	"\x06method\x18\x02 \x01(\tR\x06method\x12\x1f\n" +
+	"\vparams_json\x18\x03 \x01(\tR\n" +
+	"paramsJson\"1\n" +
+	"\x10RelayStreamFrame\x12\x1d\n" +
+	"\n" +
+	"frame_json\x18\x01 \x01(\tR\tframeJson\"v\n" +
 	"\x17RelayByDevServerRequest\x12\"\n" +
 	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12\x16\n" +
 	"\x06method\x18\x02 \x01(\tR\x06method\x12\x1f\n" +
@@ -7753,12 +11127,15 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x1bIsDevServerConnectedRequest\x12\"\n" +
 	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\"<\n" +
 	"\x1cIsDevServerConnectedResponse\x12\x1c\n" +
-	"\tconnected\x18\x01 \x01(\bR\tconnected\"\x83\x01\n" +
+	"\tconnected\x18\x01 \x01(\bR\tconnected\"\xfe\x01\n" +
 	"\x16CreateSshTargetRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04host\x18\x02 \x01(\tR\x04host\x12\x12\n" +
 	"\x04user\x18\x03 \x01(\tR\x04user\x12$\n" +
-	"\x0evault_ssh_role\x18\x04 \x01(\tR\fvaultSshRole\"=\n" +
+	"\x0evault_ssh_role\x18\x04 \x01(\tR\fvaultSshRole\x12\x12\n" +
+	"\x04port\x18\x05 \x01(\x05R\x04port\x126\n" +
+	"\x17known_hosts_fingerprint\x18\x06 \x01(\tR\x15knownHostsFingerprint\x12-\n" +
+	"\x13jump_host_target_id\x18\a \x01(\tR\x10jumpHostTargetId\"=\n" +
 	"\x17CreateSshTargetResponse\x12\"\n" +
 	"\rssh_target_id\x18\x01 \x01(\tR\vsshTargetId\"4\n" +
 	"\x15GetFleetHealthRequest\x12\x1b\n" +
@@ -7778,35 +11155,70 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x19ScanWorkspacePortsRequest\x12#\n" +
 	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x1f\n" +
 	"\vworktree_id\x18\x02 \x01(\tR\n" +
-	"worktreeId\";\n" +
-	"\x1aScanWorkspacePortsResponse\x12\x1d\n" +
-	"\n" +
-	"open_ports\x18\x01 \x03(\x05R\topenPorts\"\x86\x01\n" +
+	"worktreeId\"p\n" +
+	"\x11DetectedPortProto\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\x05R\x04port\x12\x12\n" +
+	"\x04host\x18\x02 \x01(\tR\x04host\x12\x10\n" +
+	"\x03pid\x18\x03 \x01(\x05R\x03pid\x12!\n" +
+	"\fprocess_name\x18\x04 \x01(\tR\vprocessName\"Y\n" +
+	"\x1aScanWorkspacePortsResponse\x12;\n" +
+	"\x05ports\x18\x01 \x03(\v2%.orca.infrafleet.v1.DetectedPortProtoR\x05ports\"\x86\x01\n" +
 	"\x18KillWorkspacePortRequest\x12#\n" +
 	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x1f\n" +
 	"\vworktree_id\x18\x02 \x01(\tR\n" +
 	"worktreeId\x12\x10\n" +
 	"\x03pid\x18\x03 \x01(\x05R\x03pid\x12\x12\n" +
-	"\x04port\x18\x04 \x01(\x05R\x04port\"C\n" +
+	"\x04port\x18\x04 \x01(\x05R\x04port\"\xbd\x01\n" +
+	"\vPortForward\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rconnection_id\x18\x02 \x01(\tR\fconnectionId\x12\x1d\n" +
+	"\n" +
+	"local_port\x18\x03 \x01(\x05R\tlocalPort\x12\x1f\n" +
+	"\vremote_port\x18\x04 \x01(\x05R\n" +
+	"remotePort\x12!\n" +
+	"\fprocess_name\x18\x05 \x01(\tR\vprocessName\x12\x16\n" +
+	"\x06status\x18\x06 \x01(\tR\x06status\"`\n" +
+	"\x18CreatePortForwardRequest\x12#\n" +
+	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x1f\n" +
+	"\vremote_port\x18\x02 \x01(\x05R\n" +
+	"remotePort\">\n" +
+	"\x17ListPortForwardsRequest\x12#\n" +
+	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\"`\n" +
+	"\x18ListPortForwardsResponse\x12D\n" +
+	"\rport_forwards\x18\x01 \x03(\v2\x1f.orca.infrafleet.v1.PortForwardR\fportForwards\"*\n" +
+	"\x18DeletePortForwardRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"E\n" +
+	"\x1eStreamPortForwardEventsRequest\x12#\n" +
+	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\"a\n" +
+	"\x10PortForwardEvent\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x129\n" +
+	"\aforward\x18\x02 \x01(\v2\x1f.orca.infrafleet.v1.PortForwardR\aforward\"C\n" +
 	"\x19KillWorkspacePortResponse\x12\x0e\n" +
 	"\x02ok\x18\x01 \x01(\bR\x02ok\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\x86\x01\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xaf\x02\n" +
 	"\tSshTarget\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04host\x18\x03 \x01(\tR\x04host\x12\x12\n" +
 	"\x04user\x18\x04 \x01(\tR\x04user\x12$\n" +
-	"\x0evault_ssh_role\x18\x05 \x01(\tR\fvaultSshRole\"\x17\n" +
+	"\x0evault_ssh_role\x18\x05 \x01(\tR\fvaultSshRole\x12\x12\n" +
+	"\x04port\x18\x06 \x01(\x05R\x04port\x126\n" +
+	"\x17known_hosts_fingerprint\x18\a \x01(\tR\x15knownHostsFingerprint\x12-\n" +
+	"\x13jump_host_target_id\x18\b \x01(\tR\x10jumpHostTargetId\x12\x18\n" +
+	"\aproject\x18\t \x01(\tR\aproject\x12\x12\n" +
+	"\x04tags\x18\n" +
+	" \x03(\tR\x04tags\"\x17\n" +
 	"\x15ListSshTargetsRequest\"X\n" +
 	"\x16ListSshTargetsResponse\x12>\n" +
 	"\vssh_targets\x18\x01 \x03(\v2\x1d.orca.infrafleet.v1.SshTargetR\n" +
 	"sshTargets\"8\n" +
 	"\x12GetSshStateRequest\x12\"\n" +
-	"\rssh_target_id\x18\x01 \x01(\tR\vsshTargetId\"\x8b\x01\n" +
+	"\rssh_target_id\x18\x01 \x01(\tR\vsshTargetId\"\xa3\x01\n" +
 	"\x13GetSshStateResponse\x12\x1c\n" +
 	"\tconnected\x18\x01 \x01(\bR\tconnected\x12#\n" +
 	"\rconnection_id\x18\x02 \x01(\tR\fconnectionId\x121\n" +
-	"\x15last_activity_unix_ms\x18\x03 \x01(\x03R\x12lastActivityUnixMs\"@\n" +
+	"\x15last_activity_unix_ms\x18\x03 \x01(\x03R\x12lastActivityUnixMs\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\"@\n" +
 	"\x1aEstablishConnectionRequest\x12\"\n" +
 	"\rssh_target_id\x18\x01 \x01(\tR\vsshTargetId\"\x8d\x01\n" +
 	"\n" +
@@ -7823,21 +11235,49 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x10last_activity_at\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\x0elastActivityAt\x12A\n" +
 	"\x0edegraded_since\x18\x05 \x01(\v2\x1a.google.protobuf.TimestampR\rdegradedSince\"r\n" +
 	"#GetFleetConnectivitySummaryResponse\x12K\n" +
-	"\vconnections\x18\x01 \x03(\v2).orca.infrafleet.v1.ConnectionHealthEntryR\vconnections\"\x92\x01\n" +
+	"\vconnections\x18\x01 \x03(\v2).orca.infrafleet.v1.ConnectionHealthEntryR\vconnections\"\xf2\x01\n" +
 	"\x1bSpawnTerminalSessionRequest\x12#\n" +
 	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x10\n" +
 	"\x03cwd\x18\x02 \x01(\tR\x03cwd\x12\x14\n" +
 	"\x05shell\x18\x03 \x01(\tR\x05shell\x12\x12\n" +
 	"\x04cols\x18\x04 \x01(\x05R\x04cols\x12\x12\n" +
-	"\x04rows\x18\x05 \x01(\x05R\x04rows\"]\n" +
+	"\x04rows\x18\x05 \x01(\x05R\x04rows\x12+\n" +
+	"\x11shell_integration\x18\x06 \x01(\bR\x10shellIntegration\x12\x18\n" +
+	"\acommand\x18\a \x01(\tR\acommand\x12\x17\n" +
+	"\auser_id\x18\b \x01(\tR\x06userId\"]\n" +
 	"\x1cSpawnTerminalSessionResponse\x12=\n" +
-	"\asession\x18\x01 \x01(\v2#.orca.infrafleet.v1.TerminalSessionR\asession\"\xc0\x01\n" +
+	"\asession\x18\x01 \x01(\v2#.orca.infrafleet.v1.TerminalSessionR\asession\"\xf0\x01\n" +
 	"\x0fTerminalSession\x12\x15\n" +
 	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\x12#\n" +
 	"\rconnection_id\x18\x02 \x01(\tR\fconnectionId\x12\x10\n" +
 	"\x03cwd\x18\x03 \x01(\tR\x03cwd\x12+\n" +
 	"\x12created_at_unix_ms\x18\x04 \x01(\x03R\x0fcreatedAtUnixMs\x122\n" +
-	"\x16last_active_at_unix_ms\x18\x05 \x01(\x03R\x12lastActiveAtUnixMs\"]\n" +
+	"\x16last_active_at_unix_ms\x18\x05 \x01(\x03R\x12lastActiveAtUnixMs\x12.\n" +
+	"\x13last_output_preview\x18\x06 \x01(\tR\x11lastOutputPreview\"\xbe\x01\n" +
+	"%SaveTerminalScrollbackSnapshotRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x19\n" +
+	"\bpane_key\x18\x02 \x01(\tR\apaneKey\x12\x12\n" +
+	"\x04cols\x18\x03 \x01(\x05R\x04cols\x12\x12\n" +
+	"\x04rows\x18\x04 \x01(\x05R\x04rows\x12\x12\n" +
+	"\x04data\x18\x05 \x01(\fR\x04data\x12\x1d\n" +
+	"\n" +
+	"last_title\x18\x06 \x01(\tR\tlastTitle\"b\n" +
+	"$GetTerminalScrollbackSnapshotRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\x12\x19\n" +
+	"\bpane_key\x18\x02 \x01(\tR\apaneKey\"\xc5\x01\n" +
+	"%GetTerminalScrollbackSnapshotResponse\x12\x14\n" +
+	"\x05found\x18\x01 \x01(\bR\x05found\x12\x12\n" +
+	"\x04cols\x18\x02 \x01(\x05R\x04cols\x12\x12\n" +
+	"\x04rows\x18\x03 \x01(\x05R\x04rows\x12\x12\n" +
+	"\x04data\x18\x04 \x01(\fR\x04data\x12\x1d\n" +
+	"\n" +
+	"last_title\x18\x05 \x01(\tR\tlastTitle\x12+\n" +
+	"\x12updated_at_unix_ms\x18\x06 \x01(\x03R\x0fupdatedAtUnixMs\"K\n" +
+	"(DeleteTerminalScrollbackSnapshotsRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\"]\n" +
 	"\x1cResizeTerminalSessionRequest\x12\x15\n" +
 	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\x12\x12\n" +
 	"\x04cols\x18\x02 \x01(\x05R\x04cols\x12\x12\n" +
@@ -7863,12 +11303,27 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x1bFocusTerminalSessionRequest\x12\x15\n" +
 	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"6\n" +
 	"\x1dGetTerminalAgentStatusRequest\x12\x15\n" +
-	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"\x8c\x01\n" +
+	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"\xbc\x01\n" +
 	"\x1eGetTerminalAgentStatusResponse\x12#\n" +
 	"\ragent_running\x18\x01 \x01(\bR\fagentRunning\x12\x1d\n" +
 	"\n" +
 	"agent_kind\x18\x02 \x01(\tR\tagentKind\x12&\n" +
-	"\x0fready_for_input\x18\x03 \x01(\bR\rreadyForInput\"6\n" +
+	"\x0fready_for_input\x18\x03 \x01(\bR\rreadyForInput\x12.\n" +
+	"\x13last_output_preview\x18\x04 \x01(\tR\x11lastOutputPreview\"A\n" +
+	"\x1eGetAgentTerminalSessionRequest\x12\x1f\n" +
+	"\vworktree_id\x18\x01 \x01(\tR\n" +
+	"worktreeId\"v\n" +
+	"\x1fGetAgentTerminalSessionResponse\x12\x14\n" +
+	"\x05found\x18\x01 \x01(\bR\x05found\x12=\n" +
+	"\asession\x18\x02 \x01(\v2#.orca.infrafleet.v1.TerminalSessionR\asession\"E\n" +
+	"\x18SendTerminalInputRequest\x12\x15\n" +
+	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\x12\x12\n" +
+	"\x04data\x18\x02 \x01(\fR\x04data\"5\n" +
+	"\x1cGetTerminalScrollbackRequest\x12\x15\n" +
+	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"Q\n" +
+	"\x1dGetTerminalScrollbackResponse\x12\x12\n" +
+	"\x04text\x18\x01 \x01(\tR\x04text\x12\x1c\n" +
+	"\ttruncated\x18\x02 \x01(\bR\ttruncated\"6\n" +
 	"\x1dInspectTerminalProcessRequest\x12\x15\n" +
 	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"t\n" +
 	"\x1eInspectTerminalProcessResponse\x12\x14\n" +
@@ -8020,7 +11475,161 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\vwsl_distros\x18\x02 \x03(\tR\n" +
 	"wslDistros\x12%\n" +
 	"\x0epwsh_available\x18\x03 \x01(\bR\rpwshAvailable\x12,\n" +
-	"\x12git_bash_available\x18\x04 \x01(\bR\x10gitBashAvailable*\x9b\x01\n" +
+	"\x12git_bash_available\x18\x04 \x01(\bR\x10gitBashAvailable\"\x8e\x01\n" +
+	"\x10FleetServerInput\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
+	"\x04user\x18\x02 \x01(\tR\x04user\x12$\n" +
+	"\x0evault_ssh_role\x18\x03 \x01(\tR\fvaultSshRole\x12\x18\n" +
+	"\aproject\x18\x04 \x01(\tR\aproject\x12\x12\n" +
+	"\x04tags\x18\x05 \x03(\tR\x04tags\"v\n" +
+	"\x1bImportFleetInventoryRequest\x12>\n" +
+	"\aservers\x18\x01 \x03(\v2$.orca.infrafleet.v1.FleetServerInputR\aservers\x12\x17\n" +
+	"\adry_run\x18\x02 \x01(\bR\x06dryRun\"[\n" +
+	"\x19ImportFleetInventoryError\x12\x12\n" +
+	"\x04host\x18\x01 \x01(\tR\x04host\x12\x12\n" +
+	"\x04user\x18\x02 \x01(\tR\x04user\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"\xb5\x01\n" +
+	"\x1cImportFleetInventoryResponse\x12\x1a\n" +
+	"\bimported\x18\x01 \x01(\x05R\bimported\x12\x18\n" +
+	"\aupdated\x18\x02 \x01(\x05R\aupdated\x12\x18\n" +
+	"\askipped\x18\x03 \x01(\x05R\askipped\x12E\n" +
+	"\x06errors\x18\x04 \x03(\v2-.orca.infrafleet.v1.ImportFleetInventoryErrorR\x06errors\"W\n" +
+	"\x19BulkProvisionFleetRequest\x12\x18\n" +
+	"\aproject\x18\x01 \x01(\tR\aproject\x12 \n" +
+	"\vconcurrency\x18\x02 \x01(\x05R\vconcurrency\"x\n" +
+	"\x10ProvisionOutcome\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12\x12\n" +
+	"\x04host\x18\x02 \x01(\tR\x04host\x12\x16\n" +
+	"\x06status\x18\x03 \x01(\tR\x06status\x12\x14\n" +
+	"\x05error\x18\x04 \x01(\tR\x05error\"\xaa\x01\n" +
+	"\x1aBulkProvisionFleetResponse\x12\x18\n" +
+	"\asuccess\x18\x01 \x01(\x05R\asuccess\x12\x16\n" +
+	"\x06failed\x18\x02 \x01(\x05R\x06failed\x12\x18\n" +
+	"\askipped\x18\x03 \x01(\x05R\askipped\x12@\n" +
+	"\boutcomes\x18\x04 \x03(\v2$.orca.infrafleet.v1.ProvisionOutcomeR\boutcomes\"\x8e\x01\n" +
+	"\n" +
+	"AgentProbe\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x10\n" +
+	"\x03cmd\x18\x02 \x01(\tR\x03cmd\x12+\n" +
+	"\x11required_commands\x18\x03 \x03(\tR\x10requiredCommands\x121\n" +
+	"\x14unsupported_runtimes\x18\x04 \x03(\tR\x13unsupportedRuntimes\"~\n" +
+	"\x1cDetectDevServerAgentsRequest\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12:\n" +
+	"\bcommands\x18\x02 \x03(\v2\x1e.orca.infrafleet.v1.AgentProbeR\bcommands\"S\n" +
+	"\x1dDetectDevServerAgentsResponse\x12\x16\n" +
+	"\x06agents\x18\x01 \x03(\tR\x06agents\x12\x1a\n" +
+	"\bplatform\x18\x02 \x01(\tR\bplatform\"c\n" +
+	"\x1eCheckDevServerPreflightRequest\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12\x1d\n" +
+	"\n" +
+	"probe_port\x18\x02 \x01(\x05R\tprobePort\"b\n" +
+	"\vCheckResult\x12\x1c\n" +
+	"\tinstalled\x18\x01 \x01(\bR\tinstalled\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\x12\x1b\n" +
+	"\tmeets_min\x18\x03 \x01(\bR\bmeetsMin\"G\n" +
+	"\x0fDiskCheckResult\x12\x17\n" +
+	"\afree_gb\x18\x01 \x01(\x01R\x06freeGb\x12\x1b\n" +
+	"\tmeets_min\x18\x02 \x01(\bR\bmeetsMin\"C\n" +
+	"\x0fPortCheckResult\x12\x12\n" +
+	"\x04port\x18\x01 \x01(\x05R\x04port\x12\x1c\n" +
+	"\tavailable\x18\x02 \x01(\bR\tavailable\"\xac\x02\n" +
+	"\x1fCheckDevServerPreflightResponse\x121\n" +
+	"\x03git\x18\x01 \x01(\v2\x1f.orca.infrafleet.v1.CheckResultR\x03git\x123\n" +
+	"\x04node\x18\x02 \x01(\v2\x1f.orca.infrafleet.v1.CheckResultR\x04node\x127\n" +
+	"\x04disk\x18\x03 \x01(\v2#.orca.infrafleet.v1.DiskCheckResultR\x04disk\x127\n" +
+	"\x04port\x18\x04 \x01(\v2#.orca.infrafleet.v1.PortCheckResultR\x04port\x12/\n" +
+	"\x02gh\x18\x05 \x01(\v2\x1f.orca.infrafleet.v1.CheckResultR\x02gh\"Q\n" +
+	"\x17CreateAgentTokenRequest\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"\x81\x01\n" +
+	"\x18CreateAgentTokenResponse\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x14\n" +
+	"\x05token\x18\x02 \x01(\tR\x05token\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12+\n" +
+	"\x12created_at_unix_ms\x18\x04 \x01(\x03R\x0fcreatedAtUnixMs\"\xb2\x01\n" +
+	"\x11AgentTokenSummary\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\x12+\n" +
+	"\x12created_at_unix_ms\x18\x03 \x01(\x03R\x0fcreatedAtUnixMs\x123\n" +
+	"\x14last_used_at_unix_ms\x18\x04 \x01(\x03H\x00R\x10lastUsedAtUnixMs\x88\x01\x01B\x17\n" +
+	"\x15_last_used_at_unix_ms\"<\n" +
+	"\x16ListAgentTokensRequest\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\"X\n" +
+	"\x17ListAgentTokensResponse\x12=\n" +
+	"\x06tokens\x18\x01 \x03(\v2%.orca.infrafleet.v1.AgentTokenSummaryR\x06tokens\"M\n" +
+	"\x17RevokeAgentTokenRequest\x12\"\n" +
+	"\rdev_server_id\x18\x01 \x01(\tR\vdevServerId\x12\x0e\n" +
+	"\x02id\x18\x02 \x01(\tR\x02id\"\x90\x02\n" +
+	"\x18StartAgentSessionRequest\x12#\n" +
+	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x1f\n" +
+	"\vworktree_id\x18\x02 \x01(\tR\n" +
+	"worktreeId\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x10\n" +
+	"\x03cwd\x18\x04 \x01(\tR\x03cwd\x12\x19\n" +
+	"\bmodel_id\x18\x05 \x01(\tR\amodelId\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x06 \x01(\tR\taccountId\x12!\n" +
+	"\ftrust_preset\x18\a \x01(\tR\vtrustPreset\x12\x12\n" +
+	"\x04cols\x18\b \x01(\x05R\x04cols\x12\x12\n" +
+	"\x04rows\x18\t \x01(\x05R\x04rows\"\xeb\x02\n" +
+	"\fAgentSession\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x15\n" +
+	"\x06pty_id\x18\x02 \x01(\tR\x05ptyId\x12#\n" +
+	"\rconnection_id\x18\x03 \x01(\tR\fconnectionId\x12\x1f\n" +
+	"\vworktree_id\x18\x04 \x01(\tR\n" +
+	"worktreeId\x12\"\n" +
+	"\rdev_server_id\x18\x05 \x01(\tR\vdevServerId\x12\x17\n" +
+	"\auser_id\x18\x06 \x01(\tR\x06userId\x12\x19\n" +
+	"\bmodel_id\x18\a \x01(\tR\amodelId\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\b \x01(\tR\taccountId\x12\x16\n" +
+	"\x06status\x18\t \x01(\tR\x06status\x12+\n" +
+	"\x12started_at_unix_ms\x18\n" +
+	" \x01(\x03R\x0fstartedAtUnixMs\x122\n" +
+	"\x16last_active_at_unix_ms\x18\v \x01(\x03R\x12lastActiveAtUnixMs\"8\n" +
+	"\x17StopAgentSessionRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\"P\n" +
+	"\x17KillAgentSessionRequest\x12\x1d\n" +
+	"\n" +
+	"session_id\x18\x01 \x01(\tR\tsessionId\x12\x16\n" +
+	"\x06signal\x18\x02 \x01(\tR\x06signal\"\xb4\x01\n" +
+	"\x19ResumeAgentSessionRequest\x12#\n" +
+	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x1f\n" +
+	"\vworktree_id\x18\x02 \x01(\tR\n" +
+	"worktreeId\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x10\n" +
+	"\x03cwd\x18\x04 \x01(\tR\x03cwd\x12\x12\n" +
+	"\x04cols\x18\x05 \x01(\x05R\x04cols\x12\x12\n" +
+	"\x04rows\x18\x06 \x01(\x05R\x04rows\"\xab\x01\n" +
+	"\x19SwitchAgentAccountRequest\x12#\n" +
+	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\x12\x1f\n" +
+	"\vworktree_id\x18\x02 \x01(\tR\n" +
+	"worktreeId\x12\x17\n" +
+	"\auser_id\x18\x03 \x01(\tR\x06userId\x12\x1d\n" +
+	"\n" +
+	"project_id\x18\x04 \x01(\tR\tprojectId\x12\x10\n" +
+	"\x03cwd\x18\x05 \x01(\tR\x03cwd\"\x9b\x01\n" +
+	"\x15DispatchPromptRequest\x12\x15\n" +
+	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\x12\x16\n" +
+	"\x06prompt\x18\x02 \x01(\tR\x06prompt\x12\x1c\n" +
+	"\toverwrite\x18\x03 \x01(\bR\toverwrite\x125\n" +
+	"\x17dispatched_by_device_id\x18\x04 \x01(\tR\x14dispatchedByDeviceId\"\x96\x02\n" +
+	"\x16DispatchPromptResponse\x12L\n" +
+	"\aoutcome\x18\x01 \x01(\x0e22.orca.infrafleet.v1.DispatchPromptResponse.OutcomeR\aoutcome\x12C\n" +
+	"\x1eexisting_queued_prompt_preview\x18\x02 \x01(\tR\x1bexistingQueuedPromptPreview\"i\n" +
+	"\aOutcome\x12\x17\n" +
+	"\x13OUTCOME_UNSPECIFIED\x10\x00\x12\x18\n" +
+	"\x14INJECTED_IMMEDIATELY\x10\x01\x12\n" +
+	"\n" +
+	"\x06QUEUED\x10\x02\x12\x1f\n" +
+	"\x1bREJECTED_NEEDS_CONFIRMATION\x10\x03\"/\n" +
+	"\x16GetQueuedPromptRequest\x12\x15\n" +
+	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"\x88\x01\n" +
+	"\x17GetQueuedPromptResponse\x12*\n" +
+	"\x11has_queued_prompt\x18\x01 \x01(\bR\x0fhasQueuedPrompt\x12\x16\n" +
+	"\x06prompt\x18\x02 \x01(\tR\x06prompt\x12)\n" +
+	"\x11queued_at_unix_ms\x18\x03 \x01(\x03R\x0equeuedAtUnixMs*\x9b\x01\n" +
 	"\x0eConnectionMode\x12\x1f\n" +
 	"\x1bCONNECTION_MODE_UNSPECIFIED\x10\x00\x12\x1d\n" +
 	"\x19CONNECTION_MODE_RELAY_SSH\x10\x01\x12#\n" +
@@ -8038,14 +11647,15 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	",DEV_SERVER_ACCESS_REQUEST_STATUS_UNSPECIFIED\x10\x00\x12,\n" +
 	"(DEV_SERVER_ACCESS_REQUEST_STATUS_PENDING\x10\x01\x12-\n" +
 	")DEV_SERVER_ACCESS_REQUEST_STATUS_APPROVED\x10\x02\x12-\n" +
-	")DEV_SERVER_ACCESS_REQUEST_STATUS_REJECTED\x10\x032\xc13\n" +
+	")DEV_SERVER_ACCESS_REQUEST_STATUS_REJECTED\x10\x032\x83J\n" +
 	"\x11InfraFleetService\x12p\n" +
 	"\x11RegisterDevServer\x12,.orca.infrafleet.v1.RegisterDevServerRequest\x1a-.orca.infrafleet.v1.RegisterDevServerResponse\x12p\n" +
 	"\x11ResolveConnection\x12,.orca.infrafleet.v1.ResolveConnectionRequest\x1a-.orca.infrafleet.v1.ResolveConnectionResponse\x12j\n" +
 	"\x0fCreateSshTarget\x12*.orca.infrafleet.v1.CreateSshTargetRequest\x1a+.orca.infrafleet.v1.CreateSshTargetResponse\x12g\n" +
 	"\x0eGetFleetHealth\x12).orca.infrafleet.v1.GetFleetHealthRequest\x1a*.orca.infrafleet.v1.GetFleetHealthResponse\x12s\n" +
 	"\x12ScanWorkspacePorts\x12-.orca.infrafleet.v1.ScanWorkspacePortsRequest\x1a..orca.infrafleet.v1.ScanWorkspacePortsResponse\x12g\n" +
-	"\x0eListDevServers\x12).orca.infrafleet.v1.ListDevServersRequest\x1a*.orca.infrafleet.v1.ListDevServersResponse\x12m\n" +
+	"\x0eListDevServers\x12).orca.infrafleet.v1.ListDevServersRequest\x1a*.orca.infrafleet.v1.ListDevServersResponse\x12v\n" +
+	"\x13ListDevServersByTag\x12..orca.infrafleet.v1.ListDevServersByTagRequest\x1a/.orca.infrafleet.v1.ListDevServersByTagResponse\x12m\n" +
 	"\x10ApproveDevServer\x12+.orca.infrafleet.v1.ApproveDevServerRequest\x1a,.orca.infrafleet.v1.ApproveDevServerResponse\x12j\n" +
 	"\x0fRejectDevServer\x12*.orca.infrafleet.v1.RejectDevServerRequest\x1a+.orca.infrafleet.v1.RejectDevServerResponse\x12y\n" +
 	"\x14AssignDevServerGroup\x12/.orca.infrafleet.v1.AssignDevServerGroupRequest\x1a0.orca.infrafleet.v1.AssignDevServerGroupResponse\x12y\n" +
@@ -8059,16 +11669,24 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x19ListPendingAccessRequests\x124.orca.infrafleet.v1.ListPendingAccessRequestsRequest\x1a5.orca.infrafleet.v1.ListPendingAccessRequestsResponse\x12y\n" +
 	"\x14ResolveAccessRequest\x12/.orca.infrafleet.v1.ResolveAccessRequestRequest\x1a0.orca.infrafleet.v1.ResolveAccessRequestResponse\x12m\n" +
 	"\x10CreateConnection\x12+.orca.infrafleet.v1.CreateConnectionRequest\x1a,.orca.infrafleet.v1.CreateConnectionResponse\x12L\n" +
-	"\x05Relay\x12 .orca.infrafleet.v1.RelayRequest\x1a!.orca.infrafleet.v1.RelayResponse\x12b\n" +
+	"\x05Relay\x12 .orca.infrafleet.v1.RelayRequest\x1a!.orca.infrafleet.v1.RelayResponse\x12]\n" +
+	"\vRelayStream\x12&.orca.infrafleet.v1.RelayStreamRequest\x1a$.orca.infrafleet.v1.RelayStreamFrame0\x01\x12b\n" +
 	"\x10RelayByDevServer\x12+.orca.infrafleet.v1.RelayByDevServerRequest\x1a!.orca.infrafleet.v1.RelayResponse\x12h\n" +
 	"\x11StreamFileChanges\x12,.orca.infrafleet.v1.StreamFileChangesRequest\x1a#.orca.infrafleet.v1.FileChangeEvent0\x01\x12y\n" +
 	"\x14IsDevServerConnected\x12/.orca.infrafleet.v1.IsDevServerConnectedRequest\x1a0.orca.infrafleet.v1.IsDevServerConnectedResponse\x12g\n" +
 	"\x0eListSshTargets\x12).orca.infrafleet.v1.ListSshTargetsRequest\x1a*.orca.infrafleet.v1.ListSshTargetsResponse\x12^\n" +
 	"\vGetSshState\x12&.orca.infrafleet.v1.GetSshStateRequest\x1a'.orca.infrafleet.v1.GetSshStateResponse\x12\x8e\x01\n" +
 	"\x1bGetFleetConnectivitySummary\x126.orca.infrafleet.v1.GetFleetConnectivitySummaryRequest\x1a7.orca.infrafleet.v1.GetFleetConnectivitySummaryResponse\x12e\n" +
-	"\x13EstablishConnection\x12..orca.infrafleet.v1.EstablishConnectionRequest\x1a\x1e.orca.infrafleet.v1.Connection\x12p\n" +
-	"\x11KillWorkspacePort\x12,.orca.infrafleet.v1.KillWorkspacePortRequest\x1a-.orca.infrafleet.v1.KillWorkspacePortResponse\x12[\n" +
-	"\x12TeardownConnection\x12-.orca.infrafleet.v1.TeardownConnectionRequest\x1a\x16.google.protobuf.Empty\x12y\n" +
+	"\x13EstablishConnection\x12..orca.infrafleet.v1.EstablishConnectionRequest\x1a\x1e.orca.infrafleet.v1.Connection\x12[\n" +
+	"\x12TeardownConnection\x12-.orca.infrafleet.v1.TeardownConnectionRequest\x1a\x16.google.protobuf.Empty\x12p\n" +
+	"\x11KillWorkspacePort\x12,.orca.infrafleet.v1.KillWorkspacePortRequest\x1a-.orca.infrafleet.v1.KillWorkspacePortResponse\x12m\n" +
+	"\x10CreateAgentToken\x12+.orca.infrafleet.v1.CreateAgentTokenRequest\x1a,.orca.infrafleet.v1.CreateAgentTokenResponse\x12j\n" +
+	"\x0fListAgentTokens\x12*.orca.infrafleet.v1.ListAgentTokensRequest\x1a+.orca.infrafleet.v1.ListAgentTokensResponse\x12W\n" +
+	"\x10RevokeAgentToken\x12+.orca.infrafleet.v1.RevokeAgentTokenRequest\x1a\x16.google.protobuf.Empty\x12b\n" +
+	"\x11CreatePortForward\x12,.orca.infrafleet.v1.CreatePortForwardRequest\x1a\x1f.orca.infrafleet.v1.PortForward\x12m\n" +
+	"\x10ListPortForwards\x12+.orca.infrafleet.v1.ListPortForwardsRequest\x1a,.orca.infrafleet.v1.ListPortForwardsResponse\x12Y\n" +
+	"\x11DeletePortForward\x12,.orca.infrafleet.v1.DeletePortForwardRequest\x1a\x16.google.protobuf.Empty\x12u\n" +
+	"\x17StreamPortForwardEvents\x122.orca.infrafleet.v1.StreamPortForwardEventsRequest\x1a$.orca.infrafleet.v1.PortForwardEvent0\x01\x12y\n" +
 	"\x14SpawnTerminalSession\x12/.orca.infrafleet.v1.SpawnTerminalSessionRequest\x1a0.orca.infrafleet.v1.SpawnTerminalSessionResponse\x12a\n" +
 	"\x15ResizeTerminalSession\x120.orca.infrafleet.v1.ResizeTerminalSessionRequest\x1a\x16.google.protobuf.Empty\x12]\n" +
 	"\x13KillTerminalSession\x12..orca.infrafleet.v1.KillTerminalSessionRequest\x1a\x16.google.protobuf.Empty\x12]\n" +
@@ -8077,7 +11695,15 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x13WaitTerminalSession\x12..orca.infrafleet.v1.WaitTerminalSessionRequest\x1a/.orca.infrafleet.v1.WaitTerminalSessionResponse\x12_\n" +
 	"\x14FocusTerminalSession\x12/.orca.infrafleet.v1.FocusTerminalSessionRequest\x1a\x16.google.protobuf.Empty\x12\x7f\n" +
 	"\x16GetTerminalAgentStatus\x121.orca.infrafleet.v1.GetTerminalAgentStatusRequest\x1a2.orca.infrafleet.v1.GetTerminalAgentStatusResponse\x12\x7f\n" +
-	"\x16InspectTerminalProcess\x121.orca.infrafleet.v1.InspectTerminalProcessRequest\x1a2.orca.infrafleet.v1.InspectTerminalProcessResponse\x12W\n" +
+	"\x16InspectTerminalProcess\x121.orca.infrafleet.v1.InspectTerminalProcessRequest\x1a2.orca.infrafleet.v1.InspectTerminalProcessResponse\x12s\n" +
+	"\x1eSaveTerminalScrollbackSnapshot\x129.orca.infrafleet.v1.SaveTerminalScrollbackSnapshotRequest\x1a\x16.google.protobuf.Empty\x12\x94\x01\n" +
+	"\x1dGetTerminalScrollbackSnapshot\x128.orca.infrafleet.v1.GetTerminalScrollbackSnapshotRequest\x1a9.orca.infrafleet.v1.GetTerminalScrollbackSnapshotResponse\x12y\n" +
+	"!DeleteTerminalScrollbackSnapshots\x12<.orca.infrafleet.v1.DeleteTerminalScrollbackSnapshotsRequest\x1a\x16.google.protobuf.Empty\x12\x82\x01\n" +
+	"\x17GetAgentTerminalSession\x122.orca.infrafleet.v1.GetAgentTerminalSessionRequest\x1a3.orca.infrafleet.v1.GetAgentTerminalSessionResponse\x12Y\n" +
+	"\x11SendTerminalInput\x12,.orca.infrafleet.v1.SendTerminalInputRequest\x1a\x16.google.protobuf.Empty\x12|\n" +
+	"\x15GetTerminalScrollback\x120.orca.infrafleet.v1.GetTerminalScrollbackRequest\x1a1.orca.infrafleet.v1.GetTerminalScrollbackResponse\x12g\n" +
+	"\x0eDispatchPrompt\x12).orca.infrafleet.v1.DispatchPromptRequest\x1a*.orca.infrafleet.v1.DispatchPromptResponse\x12j\n" +
+	"\x0fGetQueuedPrompt\x12*.orca.infrafleet.v1.GetQueuedPromptRequest\x1a+.orca.infrafleet.v1.GetQueuedPromptResponse\x12W\n" +
 	"\tAttachPty\x12\".orca.infrafleet.v1.PtyClientFrame\x1a\".orca.infrafleet.v1.PtyServerFrame(\x010\x01\x12l\n" +
 	"\x10AttachScreencast\x12).orca.infrafleet.v1.ScreencastClientFrame\x1a).orca.infrafleet.v1.ScreencastServerFrame(\x010\x01\x12v\n" +
 	"\x13ListBrowserProfiles\x12..orca.infrafleet.v1.ListBrowserProfilesRequest\x1a/.orca.infrafleet.v1.ListBrowserProfilesResponse\x12y\n" +
@@ -8091,7 +11717,16 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x12SendEmulatorButton\x12-.orca.infrafleet.v1.SendEmulatorButtonRequest\x1a\x16.google.protobuf.Empty\x12S\n" +
 	"\x0eRotateEmulator\x12).orca.infrafleet.v1.RotateEmulatorRequest\x1a\x16.google.protobuf.Empty\x12W\n" +
 	"\x10ShutdownEmulator\x12+.orca.infrafleet.v1.ShutdownEmulatorRequest\x1a\x16.google.protobuf.Empty\x12v\n" +
-	"\x13GetHostCapabilities\x12..orca.infrafleet.v1.GetHostCapabilitiesRequest\x1a/.orca.infrafleet.v1.GetHostCapabilitiesResponse\x12\x82\x01\n" +
+	"\x13GetHostCapabilities\x12..orca.infrafleet.v1.GetHostCapabilitiesRequest\x1a/.orca.infrafleet.v1.GetHostCapabilitiesResponse\x12y\n" +
+	"\x14ImportFleetInventory\x12/.orca.infrafleet.v1.ImportFleetInventoryRequest\x1a0.orca.infrafleet.v1.ImportFleetInventoryResponse\x12s\n" +
+	"\x12BulkProvisionFleet\x12-.orca.infrafleet.v1.BulkProvisionFleetRequest\x1a..orca.infrafleet.v1.BulkProvisionFleetResponse\x12|\n" +
+	"\x15DetectDevServerAgents\x120.orca.infrafleet.v1.DetectDevServerAgentsRequest\x1a1.orca.infrafleet.v1.DetectDevServerAgentsResponse\x12\x82\x01\n" +
+	"\x17CheckDevServerPreflight\x122.orca.infrafleet.v1.CheckDevServerPreflightRequest\x1a3.orca.infrafleet.v1.CheckDevServerPreflightResponse\x12c\n" +
+	"\x11StartAgentSession\x12,.orca.infrafleet.v1.StartAgentSessionRequest\x1a .orca.infrafleet.v1.AgentSession\x12W\n" +
+	"\x10StopAgentSession\x12+.orca.infrafleet.v1.StopAgentSessionRequest\x1a\x16.google.protobuf.Empty\x12W\n" +
+	"\x10KillAgentSession\x12+.orca.infrafleet.v1.KillAgentSessionRequest\x1a\x16.google.protobuf.Empty\x12e\n" +
+	"\x12ResumeAgentSession\x12-.orca.infrafleet.v1.ResumeAgentSessionRequest\x1a .orca.infrafleet.v1.AgentSession\x12e\n" +
+	"\x12SwitchAgentAccount\x12-.orca.infrafleet.v1.SwitchAgentAccountRequest\x1a .orca.infrafleet.v1.AgentSession\x12\x82\x01\n" +
 	"\x17ListEphemeralVmRuntimes\x122.orca.infrafleet.v1.ListEphemeralVmRuntimesRequest\x1a3.orca.infrafleet.v1.ListEphemeralVmRuntimesResponse\x12{\n" +
 	"\x1aAttachEphemeralVmWorkspace\x125.orca.infrafleet.v1.AttachEphemeralVmWorkspaceRequest\x1a&.orca.infrafleet.v1.EphemeralVmRuntime\x12}\n" +
 	"\x1bSuspendEphemeralVmWorkspace\x126.orca.infrafleet.v1.SuspendEphemeralVmWorkspaceRequest\x1a&.orca.infrafleet.v1.EphemeralVmRuntime\x12{\n" +
@@ -8111,317 +11746,438 @@ func file_orca_infrafleet_v1_infrafleet_proto_rawDescGZIP() []byte {
 	return file_orca_infrafleet_v1_infrafleet_proto_rawDescData
 }
 
-var file_orca_infrafleet_v1_infrafleet_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_orca_infrafleet_v1_infrafleet_proto_msgTypes = make([]protoimpl.MessageInfo, 125)
+var file_orca_infrafleet_v1_infrafleet_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
+var file_orca_infrafleet_v1_infrafleet_proto_msgTypes = make([]protoimpl.MessageInfo, 177)
 var file_orca_infrafleet_v1_infrafleet_proto_goTypes = []any{
-	(ConnectionMode)(0),                         // 0: orca.infrafleet.v1.ConnectionMode
-	(AgentKind)(0),                              // 1: orca.infrafleet.v1.AgentKind
-	(DevServerGroupGranteeKind)(0),              // 2: orca.infrafleet.v1.DevServerGroupGranteeKind
-	(DevServerAccessRequestStatus)(0),           // 3: orca.infrafleet.v1.DevServerAccessRequestStatus
-	(*ListEphemeralVmRuntimesRequest)(nil),      // 4: orca.infrafleet.v1.ListEphemeralVmRuntimesRequest
-	(*ListEphemeralVmRuntimesResponse)(nil),     // 5: orca.infrafleet.v1.ListEphemeralVmRuntimesResponse
-	(*EphemeralVmRuntime)(nil),                  // 6: orca.infrafleet.v1.EphemeralVmRuntime
-	(*AttachEphemeralVmWorkspaceRequest)(nil),   // 7: orca.infrafleet.v1.AttachEphemeralVmWorkspaceRequest
-	(*SuspendEphemeralVmWorkspaceRequest)(nil),  // 8: orca.infrafleet.v1.SuspendEphemeralVmWorkspaceRequest
-	(*ResumeEphemeralVmWorkspaceRequest)(nil),   // 9: orca.infrafleet.v1.ResumeEphemeralVmWorkspaceRequest
-	(*CleanupEphemeralVmWorkspaceRequest)(nil),  // 10: orca.infrafleet.v1.CleanupEphemeralVmWorkspaceRequest
-	(*StreamVmProvisionRequest)(nil),            // 11: orca.infrafleet.v1.StreamVmProvisionRequest
-	(*VmProvisionEvent)(nil),                    // 12: orca.infrafleet.v1.VmProvisionEvent
-	(*VmProvisionResult)(nil),                   // 13: orca.infrafleet.v1.VmProvisionResult
-	(*PortForward)(nil),                         // 14: orca.infrafleet.v1.PortForward
-	(*EphemeralVmRecipeSshTarget)(nil),          // 15: orca.infrafleet.v1.EphemeralVmRecipeSshTarget
-	(*DevServer)(nil),                           // 16: orca.infrafleet.v1.DevServer
-	(*RegisterDevServerRequest)(nil),            // 17: orca.infrafleet.v1.RegisterDevServerRequest
-	(*RegisterDevServerResponse)(nil),           // 18: orca.infrafleet.v1.RegisterDevServerResponse
-	(*ResolveConnectionRequest)(nil),            // 19: orca.infrafleet.v1.ResolveConnectionRequest
-	(*ResolveConnectionResponse)(nil),           // 20: orca.infrafleet.v1.ResolveConnectionResponse
-	(*ListDevServersRequest)(nil),               // 21: orca.infrafleet.v1.ListDevServersRequest
-	(*ListDevServersResponse)(nil),              // 22: orca.infrafleet.v1.ListDevServersResponse
-	(*DevServerGroup)(nil),                      // 23: orca.infrafleet.v1.DevServerGroup
-	(*ApproveDevServerRequest)(nil),             // 24: orca.infrafleet.v1.ApproveDevServerRequest
-	(*ApproveDevServerResponse)(nil),            // 25: orca.infrafleet.v1.ApproveDevServerResponse
-	(*RejectDevServerRequest)(nil),              // 26: orca.infrafleet.v1.RejectDevServerRequest
-	(*RejectDevServerResponse)(nil),             // 27: orca.infrafleet.v1.RejectDevServerResponse
-	(*AssignDevServerGroupRequest)(nil),         // 28: orca.infrafleet.v1.AssignDevServerGroupRequest
-	(*AssignDevServerGroupResponse)(nil),        // 29: orca.infrafleet.v1.AssignDevServerGroupResponse
-	(*CreateDevServerGroupRequest)(nil),         // 30: orca.infrafleet.v1.CreateDevServerGroupRequest
-	(*CreateDevServerGroupResponse)(nil),        // 31: orca.infrafleet.v1.CreateDevServerGroupResponse
-	(*ListDevServerGroupsRequest)(nil),          // 32: orca.infrafleet.v1.ListDevServerGroupsRequest
-	(*ListDevServerGroupsResponse)(nil),         // 33: orca.infrafleet.v1.ListDevServerGroupsResponse
-	(*DevServerGroupGrant)(nil),                 // 34: orca.infrafleet.v1.DevServerGroupGrant
-	(*GrantDevServerGroupAccessRequest)(nil),    // 35: orca.infrafleet.v1.GrantDevServerGroupAccessRequest
-	(*GrantDevServerGroupAccessResponse)(nil),   // 36: orca.infrafleet.v1.GrantDevServerGroupAccessResponse
-	(*RevokeDevServerGroupAccessRequest)(nil),   // 37: orca.infrafleet.v1.RevokeDevServerGroupAccessRequest
-	(*RevokeDevServerGroupAccessResponse)(nil),  // 38: orca.infrafleet.v1.RevokeDevServerGroupAccessResponse
-	(*ListDevServerGroupGrantsRequest)(nil),     // 39: orca.infrafleet.v1.ListDevServerGroupGrantsRequest
-	(*ListDevServerGroupGrantsResponse)(nil),    // 40: orca.infrafleet.v1.ListDevServerGroupGrantsResponse
-	(*ListDevServersForUserRequest)(nil),        // 41: orca.infrafleet.v1.ListDevServersForUserRequest
-	(*ListDevServersForUserResponse)(nil),       // 42: orca.infrafleet.v1.ListDevServersForUserResponse
-	(*DevServerAccessRequest)(nil),              // 43: orca.infrafleet.v1.DevServerAccessRequest
-	(*CreateAccessRequestRequest)(nil),          // 44: orca.infrafleet.v1.CreateAccessRequestRequest
-	(*CreateAccessRequestResponse)(nil),         // 45: orca.infrafleet.v1.CreateAccessRequestResponse
-	(*ListPendingAccessRequestsRequest)(nil),    // 46: orca.infrafleet.v1.ListPendingAccessRequestsRequest
-	(*ListPendingAccessRequestsResponse)(nil),   // 47: orca.infrafleet.v1.ListPendingAccessRequestsResponse
-	(*ResolveAccessRequestRequest)(nil),         // 48: orca.infrafleet.v1.ResolveAccessRequestRequest
-	(*ResolveAccessRequestResponse)(nil),        // 49: orca.infrafleet.v1.ResolveAccessRequestResponse
-	(*CreateConnectionRequest)(nil),             // 50: orca.infrafleet.v1.CreateConnectionRequest
-	(*CreateConnectionResponse)(nil),            // 51: orca.infrafleet.v1.CreateConnectionResponse
-	(*RelayRequest)(nil),                        // 52: orca.infrafleet.v1.RelayRequest
-	(*RelayResponse)(nil),                       // 53: orca.infrafleet.v1.RelayResponse
-	(*RelayByDevServerRequest)(nil),             // 54: orca.infrafleet.v1.RelayByDevServerRequest
-	(*StreamFileChangesRequest)(nil),            // 55: orca.infrafleet.v1.StreamFileChangesRequest
-	(*FileChangeEvent)(nil),                     // 56: orca.infrafleet.v1.FileChangeEvent
-	(*IsDevServerConnectedRequest)(nil),         // 57: orca.infrafleet.v1.IsDevServerConnectedRequest
-	(*IsDevServerConnectedResponse)(nil),        // 58: orca.infrafleet.v1.IsDevServerConnectedResponse
-	(*CreateSshTargetRequest)(nil),              // 59: orca.infrafleet.v1.CreateSshTargetRequest
-	(*CreateSshTargetResponse)(nil),             // 60: orca.infrafleet.v1.CreateSshTargetResponse
-	(*GetFleetHealthRequest)(nil),               // 61: orca.infrafleet.v1.GetFleetHealthRequest
-	(*DevServerHealth)(nil),                     // 62: orca.infrafleet.v1.DevServerHealth
-	(*GetFleetHealthResponse)(nil),              // 63: orca.infrafleet.v1.GetFleetHealthResponse
-	(*ScanWorkspacePortsRequest)(nil),           // 64: orca.infrafleet.v1.ScanWorkspacePortsRequest
-	(*ScanWorkspacePortsResponse)(nil),          // 65: orca.infrafleet.v1.ScanWorkspacePortsResponse
-	(*KillWorkspacePortRequest)(nil),            // 66: orca.infrafleet.v1.KillWorkspacePortRequest
-	(*KillWorkspacePortResponse)(nil),           // 67: orca.infrafleet.v1.KillWorkspacePortResponse
-	(*SshTarget)(nil),                           // 68: orca.infrafleet.v1.SshTarget
-	(*ListSshTargetsRequest)(nil),               // 69: orca.infrafleet.v1.ListSshTargetsRequest
-	(*ListSshTargetsResponse)(nil),              // 70: orca.infrafleet.v1.ListSshTargetsResponse
-	(*GetSshStateRequest)(nil),                  // 71: orca.infrafleet.v1.GetSshStateRequest
-	(*GetSshStateResponse)(nil),                 // 72: orca.infrafleet.v1.GetSshStateResponse
-	(*EstablishConnectionRequest)(nil),          // 73: orca.infrafleet.v1.EstablishConnectionRequest
-	(*Connection)(nil),                          // 74: orca.infrafleet.v1.Connection
-	(*GetFleetConnectivitySummaryRequest)(nil),  // 75: orca.infrafleet.v1.GetFleetConnectivitySummaryRequest
-	(*ConnectionHealthEntry)(nil),               // 76: orca.infrafleet.v1.ConnectionHealthEntry
-	(*GetFleetConnectivitySummaryResponse)(nil), // 77: orca.infrafleet.v1.GetFleetConnectivitySummaryResponse
-	(*SpawnTerminalSessionRequest)(nil),         // 78: orca.infrafleet.v1.SpawnTerminalSessionRequest
-	(*SpawnTerminalSessionResponse)(nil),        // 79: orca.infrafleet.v1.SpawnTerminalSessionResponse
-	(*TerminalSession)(nil),                     // 80: orca.infrafleet.v1.TerminalSession
-	(*ResizeTerminalSessionRequest)(nil),        // 81: orca.infrafleet.v1.ResizeTerminalSessionRequest
-	(*TeardownConnectionRequest)(nil),           // 82: orca.infrafleet.v1.TeardownConnectionRequest
-	(*KillTerminalSessionRequest)(nil),          // 83: orca.infrafleet.v1.KillTerminalSessionRequest
-	(*StopTerminalProcessRequest)(nil),          // 84: orca.infrafleet.v1.StopTerminalProcessRequest
-	(*ListTerminalSessionsRequest)(nil),         // 85: orca.infrafleet.v1.ListTerminalSessionsRequest
-	(*ListTerminalSessionsResponse)(nil),        // 86: orca.infrafleet.v1.ListTerminalSessionsResponse
-	(*WaitTerminalSessionRequest)(nil),          // 87: orca.infrafleet.v1.WaitTerminalSessionRequest
-	(*WaitTerminalSessionResponse)(nil),         // 88: orca.infrafleet.v1.WaitTerminalSessionResponse
-	(*FocusTerminalSessionRequest)(nil),         // 89: orca.infrafleet.v1.FocusTerminalSessionRequest
-	(*GetTerminalAgentStatusRequest)(nil),       // 90: orca.infrafleet.v1.GetTerminalAgentStatusRequest
-	(*GetTerminalAgentStatusResponse)(nil),      // 91: orca.infrafleet.v1.GetTerminalAgentStatusResponse
-	(*InspectTerminalProcessRequest)(nil),       // 92: orca.infrafleet.v1.InspectTerminalProcessRequest
-	(*InspectTerminalProcessResponse)(nil),      // 93: orca.infrafleet.v1.InspectTerminalProcessResponse
-	(*PtyClientFrame)(nil),                      // 94: orca.infrafleet.v1.PtyClientFrame
-	(*AttachToSession)(nil),                     // 95: orca.infrafleet.v1.AttachToSession
-	(*PtyInput)(nil),                            // 96: orca.infrafleet.v1.PtyInput
-	(*PtyResize)(nil),                           // 97: orca.infrafleet.v1.PtyResize
-	(*PtyServerFrame)(nil),                      // 98: orca.infrafleet.v1.PtyServerFrame
-	(*PtyOutput)(nil),                           // 99: orca.infrafleet.v1.PtyOutput
-	(*PtyExited)(nil),                           // 100: orca.infrafleet.v1.PtyExited
-	(*ScreencastClientFrame)(nil),               // 101: orca.infrafleet.v1.ScreencastClientFrame
-	(*StartScreencast)(nil),                     // 102: orca.infrafleet.v1.StartScreencast
-	(*StopScreencast)(nil),                      // 103: orca.infrafleet.v1.StopScreencast
-	(*ScreencastServerFrame)(nil),               // 104: orca.infrafleet.v1.ScreencastServerFrame
-	(*ScreencastReady)(nil),                     // 105: orca.infrafleet.v1.ScreencastReady
-	(*ScreencastFrame)(nil),                     // 106: orca.infrafleet.v1.ScreencastFrame
-	(*ScreencastEnded)(nil),                     // 107: orca.infrafleet.v1.ScreencastEnded
-	(*ScreencastError)(nil),                     // 108: orca.infrafleet.v1.ScreencastError
-	(*BrowserProfile)(nil),                      // 109: orca.infrafleet.v1.BrowserProfile
-	(*ListBrowserProfilesRequest)(nil),          // 110: orca.infrafleet.v1.ListBrowserProfilesRequest
-	(*ListBrowserProfilesResponse)(nil),         // 111: orca.infrafleet.v1.ListBrowserProfilesResponse
-	(*CreateBrowserProfileRequest)(nil),         // 112: orca.infrafleet.v1.CreateBrowserProfileRequest
-	(*CreateBrowserProfileResponse)(nil),        // 113: orca.infrafleet.v1.CreateBrowserProfileResponse
-	(*DeleteBrowserProfileRequest)(nil),         // 114: orca.infrafleet.v1.DeleteBrowserProfileRequest
-	(*EmulatorDevice)(nil),                      // 115: orca.infrafleet.v1.EmulatorDevice
-	(*ListEmulatorDevicesRequest)(nil),          // 116: orca.infrafleet.v1.ListEmulatorDevicesRequest
-	(*ListEmulatorDevicesResponse)(nil),         // 117: orca.infrafleet.v1.ListEmulatorDevicesResponse
-	(*GetEmulatorAvailabilityRequest)(nil),      // 118: orca.infrafleet.v1.GetEmulatorAvailabilityRequest
-	(*GetEmulatorAvailabilityResponse)(nil),     // 119: orca.infrafleet.v1.GetEmulatorAvailabilityResponse
-	(*EmulatorSession)(nil),                     // 120: orca.infrafleet.v1.EmulatorSession
-	(*AttachEmulatorSessionRequest)(nil),        // 121: orca.infrafleet.v1.AttachEmulatorSessionRequest
-	(*SendEmulatorTapRequest)(nil),              // 122: orca.infrafleet.v1.SendEmulatorTapRequest
-	(*SendEmulatorGestureRequest)(nil),          // 123: orca.infrafleet.v1.SendEmulatorGestureRequest
-	(*SendEmulatorButtonRequest)(nil),           // 124: orca.infrafleet.v1.SendEmulatorButtonRequest
-	(*RotateEmulatorRequest)(nil),               // 125: orca.infrafleet.v1.RotateEmulatorRequest
-	(*ShutdownEmulatorRequest)(nil),             // 126: orca.infrafleet.v1.ShutdownEmulatorRequest
-	(*GetHostCapabilitiesRequest)(nil),          // 127: orca.infrafleet.v1.GetHostCapabilitiesRequest
-	(*GetHostCapabilitiesResponse)(nil),         // 128: orca.infrafleet.v1.GetHostCapabilitiesResponse
-	(*timestamppb.Timestamp)(nil),               // 129: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),                       // 130: google.protobuf.Empty
+	(ConnectionMode)(0),                              // 0: orca.infrafleet.v1.ConnectionMode
+	(AgentKind)(0),                                   // 1: orca.infrafleet.v1.AgentKind
+	(DevServerGroupGranteeKind)(0),                   // 2: orca.infrafleet.v1.DevServerGroupGranteeKind
+	(DevServerAccessRequestStatus)(0),                // 3: orca.infrafleet.v1.DevServerAccessRequestStatus
+	(DispatchPromptResponse_Outcome)(0),              // 4: orca.infrafleet.v1.DispatchPromptResponse.Outcome
+	(*ListEphemeralVmRuntimesRequest)(nil),           // 5: orca.infrafleet.v1.ListEphemeralVmRuntimesRequest
+	(*ListEphemeralVmRuntimesResponse)(nil),          // 6: orca.infrafleet.v1.ListEphemeralVmRuntimesResponse
+	(*EphemeralVmRuntime)(nil),                       // 7: orca.infrafleet.v1.EphemeralVmRuntime
+	(*AttachEphemeralVmWorkspaceRequest)(nil),        // 8: orca.infrafleet.v1.AttachEphemeralVmWorkspaceRequest
+	(*SuspendEphemeralVmWorkspaceRequest)(nil),       // 9: orca.infrafleet.v1.SuspendEphemeralVmWorkspaceRequest
+	(*ResumeEphemeralVmWorkspaceRequest)(nil),        // 10: orca.infrafleet.v1.ResumeEphemeralVmWorkspaceRequest
+	(*CleanupEphemeralVmWorkspaceRequest)(nil),       // 11: orca.infrafleet.v1.CleanupEphemeralVmWorkspaceRequest
+	(*StreamVmProvisionRequest)(nil),                 // 12: orca.infrafleet.v1.StreamVmProvisionRequest
+	(*VmProvisionEvent)(nil),                         // 13: orca.infrafleet.v1.VmProvisionEvent
+	(*VmProvisionResult)(nil),                        // 14: orca.infrafleet.v1.VmProvisionResult
+	(*RecipePortForward)(nil),                        // 15: orca.infrafleet.v1.RecipePortForward
+	(*EphemeralVmRecipeSshTarget)(nil),               // 16: orca.infrafleet.v1.EphemeralVmRecipeSshTarget
+	(*DevServer)(nil),                                // 17: orca.infrafleet.v1.DevServer
+	(*RegisterDevServerRequest)(nil),                 // 18: orca.infrafleet.v1.RegisterDevServerRequest
+	(*RegisterDevServerResponse)(nil),                // 19: orca.infrafleet.v1.RegisterDevServerResponse
+	(*ResolveConnectionRequest)(nil),                 // 20: orca.infrafleet.v1.ResolveConnectionRequest
+	(*ResolveConnectionResponse)(nil),                // 21: orca.infrafleet.v1.ResolveConnectionResponse
+	(*ListDevServersRequest)(nil),                    // 22: orca.infrafleet.v1.ListDevServersRequest
+	(*ListDevServersResponse)(nil),                   // 23: orca.infrafleet.v1.ListDevServersResponse
+	(*ListDevServersByTagRequest)(nil),               // 24: orca.infrafleet.v1.ListDevServersByTagRequest
+	(*ListDevServersByTagResponse)(nil),              // 25: orca.infrafleet.v1.ListDevServersByTagResponse
+	(*DevServerGroup)(nil),                           // 26: orca.infrafleet.v1.DevServerGroup
+	(*ApproveDevServerRequest)(nil),                  // 27: orca.infrafleet.v1.ApproveDevServerRequest
+	(*ApproveDevServerResponse)(nil),                 // 28: orca.infrafleet.v1.ApproveDevServerResponse
+	(*RejectDevServerRequest)(nil),                   // 29: orca.infrafleet.v1.RejectDevServerRequest
+	(*RejectDevServerResponse)(nil),                  // 30: orca.infrafleet.v1.RejectDevServerResponse
+	(*AssignDevServerGroupRequest)(nil),              // 31: orca.infrafleet.v1.AssignDevServerGroupRequest
+	(*AssignDevServerGroupResponse)(nil),             // 32: orca.infrafleet.v1.AssignDevServerGroupResponse
+	(*CreateDevServerGroupRequest)(nil),              // 33: orca.infrafleet.v1.CreateDevServerGroupRequest
+	(*CreateDevServerGroupResponse)(nil),             // 34: orca.infrafleet.v1.CreateDevServerGroupResponse
+	(*ListDevServerGroupsRequest)(nil),               // 35: orca.infrafleet.v1.ListDevServerGroupsRequest
+	(*ListDevServerGroupsResponse)(nil),              // 36: orca.infrafleet.v1.ListDevServerGroupsResponse
+	(*DevServerGroupGrant)(nil),                      // 37: orca.infrafleet.v1.DevServerGroupGrant
+	(*GrantDevServerGroupAccessRequest)(nil),         // 38: orca.infrafleet.v1.GrantDevServerGroupAccessRequest
+	(*GrantDevServerGroupAccessResponse)(nil),        // 39: orca.infrafleet.v1.GrantDevServerGroupAccessResponse
+	(*RevokeDevServerGroupAccessRequest)(nil),        // 40: orca.infrafleet.v1.RevokeDevServerGroupAccessRequest
+	(*RevokeDevServerGroupAccessResponse)(nil),       // 41: orca.infrafleet.v1.RevokeDevServerGroupAccessResponse
+	(*ListDevServerGroupGrantsRequest)(nil),          // 42: orca.infrafleet.v1.ListDevServerGroupGrantsRequest
+	(*ListDevServerGroupGrantsResponse)(nil),         // 43: orca.infrafleet.v1.ListDevServerGroupGrantsResponse
+	(*ListDevServersForUserRequest)(nil),             // 44: orca.infrafleet.v1.ListDevServersForUserRequest
+	(*ListDevServersForUserResponse)(nil),            // 45: orca.infrafleet.v1.ListDevServersForUserResponse
+	(*DevServerAccessRequest)(nil),                   // 46: orca.infrafleet.v1.DevServerAccessRequest
+	(*CreateAccessRequestRequest)(nil),               // 47: orca.infrafleet.v1.CreateAccessRequestRequest
+	(*CreateAccessRequestResponse)(nil),              // 48: orca.infrafleet.v1.CreateAccessRequestResponse
+	(*ListPendingAccessRequestsRequest)(nil),         // 49: orca.infrafleet.v1.ListPendingAccessRequestsRequest
+	(*ListPendingAccessRequestsResponse)(nil),        // 50: orca.infrafleet.v1.ListPendingAccessRequestsResponse
+	(*ResolveAccessRequestRequest)(nil),              // 51: orca.infrafleet.v1.ResolveAccessRequestRequest
+	(*ResolveAccessRequestResponse)(nil),             // 52: orca.infrafleet.v1.ResolveAccessRequestResponse
+	(*CreateConnectionRequest)(nil),                  // 53: orca.infrafleet.v1.CreateConnectionRequest
+	(*CreateConnectionResponse)(nil),                 // 54: orca.infrafleet.v1.CreateConnectionResponse
+	(*RelayRequest)(nil),                             // 55: orca.infrafleet.v1.RelayRequest
+	(*RelayResponse)(nil),                            // 56: orca.infrafleet.v1.RelayResponse
+	(*RelayStreamRequest)(nil),                       // 57: orca.infrafleet.v1.RelayStreamRequest
+	(*RelayStreamFrame)(nil),                         // 58: orca.infrafleet.v1.RelayStreamFrame
+	(*RelayByDevServerRequest)(nil),                  // 59: orca.infrafleet.v1.RelayByDevServerRequest
+	(*StreamFileChangesRequest)(nil),                 // 60: orca.infrafleet.v1.StreamFileChangesRequest
+	(*FileChangeEvent)(nil),                          // 61: orca.infrafleet.v1.FileChangeEvent
+	(*IsDevServerConnectedRequest)(nil),              // 62: orca.infrafleet.v1.IsDevServerConnectedRequest
+	(*IsDevServerConnectedResponse)(nil),             // 63: orca.infrafleet.v1.IsDevServerConnectedResponse
+	(*CreateSshTargetRequest)(nil),                   // 64: orca.infrafleet.v1.CreateSshTargetRequest
+	(*CreateSshTargetResponse)(nil),                  // 65: orca.infrafleet.v1.CreateSshTargetResponse
+	(*GetFleetHealthRequest)(nil),                    // 66: orca.infrafleet.v1.GetFleetHealthRequest
+	(*DevServerHealth)(nil),                          // 67: orca.infrafleet.v1.DevServerHealth
+	(*GetFleetHealthResponse)(nil),                   // 68: orca.infrafleet.v1.GetFleetHealthResponse
+	(*ScanWorkspacePortsRequest)(nil),                // 69: orca.infrafleet.v1.ScanWorkspacePortsRequest
+	(*DetectedPortProto)(nil),                        // 70: orca.infrafleet.v1.DetectedPortProto
+	(*ScanWorkspacePortsResponse)(nil),               // 71: orca.infrafleet.v1.ScanWorkspacePortsResponse
+	(*KillWorkspacePortRequest)(nil),                 // 72: orca.infrafleet.v1.KillWorkspacePortRequest
+	(*PortForward)(nil),                              // 73: orca.infrafleet.v1.PortForward
+	(*CreatePortForwardRequest)(nil),                 // 74: orca.infrafleet.v1.CreatePortForwardRequest
+	(*ListPortForwardsRequest)(nil),                  // 75: orca.infrafleet.v1.ListPortForwardsRequest
+	(*ListPortForwardsResponse)(nil),                 // 76: orca.infrafleet.v1.ListPortForwardsResponse
+	(*DeletePortForwardRequest)(nil),                 // 77: orca.infrafleet.v1.DeletePortForwardRequest
+	(*StreamPortForwardEventsRequest)(nil),           // 78: orca.infrafleet.v1.StreamPortForwardEventsRequest
+	(*PortForwardEvent)(nil),                         // 79: orca.infrafleet.v1.PortForwardEvent
+	(*KillWorkspacePortResponse)(nil),                // 80: orca.infrafleet.v1.KillWorkspacePortResponse
+	(*SshTarget)(nil),                                // 81: orca.infrafleet.v1.SshTarget
+	(*ListSshTargetsRequest)(nil),                    // 82: orca.infrafleet.v1.ListSshTargetsRequest
+	(*ListSshTargetsResponse)(nil),                   // 83: orca.infrafleet.v1.ListSshTargetsResponse
+	(*GetSshStateRequest)(nil),                       // 84: orca.infrafleet.v1.GetSshStateRequest
+	(*GetSshStateResponse)(nil),                      // 85: orca.infrafleet.v1.GetSshStateResponse
+	(*EstablishConnectionRequest)(nil),               // 86: orca.infrafleet.v1.EstablishConnectionRequest
+	(*Connection)(nil),                               // 87: orca.infrafleet.v1.Connection
+	(*GetFleetConnectivitySummaryRequest)(nil),       // 88: orca.infrafleet.v1.GetFleetConnectivitySummaryRequest
+	(*ConnectionHealthEntry)(nil),                    // 89: orca.infrafleet.v1.ConnectionHealthEntry
+	(*GetFleetConnectivitySummaryResponse)(nil),      // 90: orca.infrafleet.v1.GetFleetConnectivitySummaryResponse
+	(*SpawnTerminalSessionRequest)(nil),              // 91: orca.infrafleet.v1.SpawnTerminalSessionRequest
+	(*SpawnTerminalSessionResponse)(nil),             // 92: orca.infrafleet.v1.SpawnTerminalSessionResponse
+	(*TerminalSession)(nil),                          // 93: orca.infrafleet.v1.TerminalSession
+	(*SaveTerminalScrollbackSnapshotRequest)(nil),    // 94: orca.infrafleet.v1.SaveTerminalScrollbackSnapshotRequest
+	(*GetTerminalScrollbackSnapshotRequest)(nil),     // 95: orca.infrafleet.v1.GetTerminalScrollbackSnapshotRequest
+	(*GetTerminalScrollbackSnapshotResponse)(nil),    // 96: orca.infrafleet.v1.GetTerminalScrollbackSnapshotResponse
+	(*DeleteTerminalScrollbackSnapshotsRequest)(nil), // 97: orca.infrafleet.v1.DeleteTerminalScrollbackSnapshotsRequest
+	(*ResizeTerminalSessionRequest)(nil),             // 98: orca.infrafleet.v1.ResizeTerminalSessionRequest
+	(*TeardownConnectionRequest)(nil),                // 99: orca.infrafleet.v1.TeardownConnectionRequest
+	(*KillTerminalSessionRequest)(nil),               // 100: orca.infrafleet.v1.KillTerminalSessionRequest
+	(*StopTerminalProcessRequest)(nil),               // 101: orca.infrafleet.v1.StopTerminalProcessRequest
+	(*ListTerminalSessionsRequest)(nil),              // 102: orca.infrafleet.v1.ListTerminalSessionsRequest
+	(*ListTerminalSessionsResponse)(nil),             // 103: orca.infrafleet.v1.ListTerminalSessionsResponse
+	(*WaitTerminalSessionRequest)(nil),               // 104: orca.infrafleet.v1.WaitTerminalSessionRequest
+	(*WaitTerminalSessionResponse)(nil),              // 105: orca.infrafleet.v1.WaitTerminalSessionResponse
+	(*FocusTerminalSessionRequest)(nil),              // 106: orca.infrafleet.v1.FocusTerminalSessionRequest
+	(*GetTerminalAgentStatusRequest)(nil),            // 107: orca.infrafleet.v1.GetTerminalAgentStatusRequest
+	(*GetTerminalAgentStatusResponse)(nil),           // 108: orca.infrafleet.v1.GetTerminalAgentStatusResponse
+	(*GetAgentTerminalSessionRequest)(nil),           // 109: orca.infrafleet.v1.GetAgentTerminalSessionRequest
+	(*GetAgentTerminalSessionResponse)(nil),          // 110: orca.infrafleet.v1.GetAgentTerminalSessionResponse
+	(*SendTerminalInputRequest)(nil),                 // 111: orca.infrafleet.v1.SendTerminalInputRequest
+	(*GetTerminalScrollbackRequest)(nil),             // 112: orca.infrafleet.v1.GetTerminalScrollbackRequest
+	(*GetTerminalScrollbackResponse)(nil),            // 113: orca.infrafleet.v1.GetTerminalScrollbackResponse
+	(*InspectTerminalProcessRequest)(nil),            // 114: orca.infrafleet.v1.InspectTerminalProcessRequest
+	(*InspectTerminalProcessResponse)(nil),           // 115: orca.infrafleet.v1.InspectTerminalProcessResponse
+	(*PtyClientFrame)(nil),                           // 116: orca.infrafleet.v1.PtyClientFrame
+	(*AttachToSession)(nil),                          // 117: orca.infrafleet.v1.AttachToSession
+	(*PtyInput)(nil),                                 // 118: orca.infrafleet.v1.PtyInput
+	(*PtyResize)(nil),                                // 119: orca.infrafleet.v1.PtyResize
+	(*PtyServerFrame)(nil),                           // 120: orca.infrafleet.v1.PtyServerFrame
+	(*PtyOutput)(nil),                                // 121: orca.infrafleet.v1.PtyOutput
+	(*PtyExited)(nil),                                // 122: orca.infrafleet.v1.PtyExited
+	(*ScreencastClientFrame)(nil),                    // 123: orca.infrafleet.v1.ScreencastClientFrame
+	(*StartScreencast)(nil),                          // 124: orca.infrafleet.v1.StartScreencast
+	(*StopScreencast)(nil),                           // 125: orca.infrafleet.v1.StopScreencast
+	(*ScreencastServerFrame)(nil),                    // 126: orca.infrafleet.v1.ScreencastServerFrame
+	(*ScreencastReady)(nil),                          // 127: orca.infrafleet.v1.ScreencastReady
+	(*ScreencastFrame)(nil),                          // 128: orca.infrafleet.v1.ScreencastFrame
+	(*ScreencastEnded)(nil),                          // 129: orca.infrafleet.v1.ScreencastEnded
+	(*ScreencastError)(nil),                          // 130: orca.infrafleet.v1.ScreencastError
+	(*BrowserProfile)(nil),                           // 131: orca.infrafleet.v1.BrowserProfile
+	(*ListBrowserProfilesRequest)(nil),               // 132: orca.infrafleet.v1.ListBrowserProfilesRequest
+	(*ListBrowserProfilesResponse)(nil),              // 133: orca.infrafleet.v1.ListBrowserProfilesResponse
+	(*CreateBrowserProfileRequest)(nil),              // 134: orca.infrafleet.v1.CreateBrowserProfileRequest
+	(*CreateBrowserProfileResponse)(nil),             // 135: orca.infrafleet.v1.CreateBrowserProfileResponse
+	(*DeleteBrowserProfileRequest)(nil),              // 136: orca.infrafleet.v1.DeleteBrowserProfileRequest
+	(*EmulatorDevice)(nil),                           // 137: orca.infrafleet.v1.EmulatorDevice
+	(*ListEmulatorDevicesRequest)(nil),               // 138: orca.infrafleet.v1.ListEmulatorDevicesRequest
+	(*ListEmulatorDevicesResponse)(nil),              // 139: orca.infrafleet.v1.ListEmulatorDevicesResponse
+	(*GetEmulatorAvailabilityRequest)(nil),           // 140: orca.infrafleet.v1.GetEmulatorAvailabilityRequest
+	(*GetEmulatorAvailabilityResponse)(nil),          // 141: orca.infrafleet.v1.GetEmulatorAvailabilityResponse
+	(*EmulatorSession)(nil),                          // 142: orca.infrafleet.v1.EmulatorSession
+	(*AttachEmulatorSessionRequest)(nil),             // 143: orca.infrafleet.v1.AttachEmulatorSessionRequest
+	(*SendEmulatorTapRequest)(nil),                   // 144: orca.infrafleet.v1.SendEmulatorTapRequest
+	(*SendEmulatorGestureRequest)(nil),               // 145: orca.infrafleet.v1.SendEmulatorGestureRequest
+	(*SendEmulatorButtonRequest)(nil),                // 146: orca.infrafleet.v1.SendEmulatorButtonRequest
+	(*RotateEmulatorRequest)(nil),                    // 147: orca.infrafleet.v1.RotateEmulatorRequest
+	(*ShutdownEmulatorRequest)(nil),                  // 148: orca.infrafleet.v1.ShutdownEmulatorRequest
+	(*GetHostCapabilitiesRequest)(nil),               // 149: orca.infrafleet.v1.GetHostCapabilitiesRequest
+	(*GetHostCapabilitiesResponse)(nil),              // 150: orca.infrafleet.v1.GetHostCapabilitiesResponse
+	(*FleetServerInput)(nil),                         // 151: orca.infrafleet.v1.FleetServerInput
+	(*ImportFleetInventoryRequest)(nil),              // 152: orca.infrafleet.v1.ImportFleetInventoryRequest
+	(*ImportFleetInventoryError)(nil),                // 153: orca.infrafleet.v1.ImportFleetInventoryError
+	(*ImportFleetInventoryResponse)(nil),             // 154: orca.infrafleet.v1.ImportFleetInventoryResponse
+	(*BulkProvisionFleetRequest)(nil),                // 155: orca.infrafleet.v1.BulkProvisionFleetRequest
+	(*ProvisionOutcome)(nil),                         // 156: orca.infrafleet.v1.ProvisionOutcome
+	(*BulkProvisionFleetResponse)(nil),               // 157: orca.infrafleet.v1.BulkProvisionFleetResponse
+	(*AgentProbe)(nil),                               // 158: orca.infrafleet.v1.AgentProbe
+	(*DetectDevServerAgentsRequest)(nil),             // 159: orca.infrafleet.v1.DetectDevServerAgentsRequest
+	(*DetectDevServerAgentsResponse)(nil),            // 160: orca.infrafleet.v1.DetectDevServerAgentsResponse
+	(*CheckDevServerPreflightRequest)(nil),           // 161: orca.infrafleet.v1.CheckDevServerPreflightRequest
+	(*CheckResult)(nil),                              // 162: orca.infrafleet.v1.CheckResult
+	(*DiskCheckResult)(nil),                          // 163: orca.infrafleet.v1.DiskCheckResult
+	(*PortCheckResult)(nil),                          // 164: orca.infrafleet.v1.PortCheckResult
+	(*CheckDevServerPreflightResponse)(nil),          // 165: orca.infrafleet.v1.CheckDevServerPreflightResponse
+	(*CreateAgentTokenRequest)(nil),                  // 166: orca.infrafleet.v1.CreateAgentTokenRequest
+	(*CreateAgentTokenResponse)(nil),                 // 167: orca.infrafleet.v1.CreateAgentTokenResponse
+	(*AgentTokenSummary)(nil),                        // 168: orca.infrafleet.v1.AgentTokenSummary
+	(*ListAgentTokensRequest)(nil),                   // 169: orca.infrafleet.v1.ListAgentTokensRequest
+	(*ListAgentTokensResponse)(nil),                  // 170: orca.infrafleet.v1.ListAgentTokensResponse
+	(*RevokeAgentTokenRequest)(nil),                  // 171: orca.infrafleet.v1.RevokeAgentTokenRequest
+	(*StartAgentSessionRequest)(nil),                 // 172: orca.infrafleet.v1.StartAgentSessionRequest
+	(*AgentSession)(nil),                             // 173: orca.infrafleet.v1.AgentSession
+	(*StopAgentSessionRequest)(nil),                  // 174: orca.infrafleet.v1.StopAgentSessionRequest
+	(*KillAgentSessionRequest)(nil),                  // 175: orca.infrafleet.v1.KillAgentSessionRequest
+	(*ResumeAgentSessionRequest)(nil),                // 176: orca.infrafleet.v1.ResumeAgentSessionRequest
+	(*SwitchAgentAccountRequest)(nil),                // 177: orca.infrafleet.v1.SwitchAgentAccountRequest
+	(*DispatchPromptRequest)(nil),                    // 178: orca.infrafleet.v1.DispatchPromptRequest
+	(*DispatchPromptResponse)(nil),                   // 179: orca.infrafleet.v1.DispatchPromptResponse
+	(*GetQueuedPromptRequest)(nil),                   // 180: orca.infrafleet.v1.GetQueuedPromptRequest
+	(*GetQueuedPromptResponse)(nil),                  // 181: orca.infrafleet.v1.GetQueuedPromptResponse
+	(*timestamppb.Timestamp)(nil),                    // 182: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),                            // 183: google.protobuf.Empty
 }
 var file_orca_infrafleet_v1_infrafleet_proto_depIdxs = []int32{
-	6,   // 0: orca.infrafleet.v1.ListEphemeralVmRuntimesResponse.runtimes:type_name -> orca.infrafleet.v1.EphemeralVmRuntime
-	129, // 1: orca.infrafleet.v1.EphemeralVmRuntime.created_at:type_name -> google.protobuf.Timestamp
-	129, // 2: orca.infrafleet.v1.EphemeralVmRuntime.updated_at:type_name -> google.protobuf.Timestamp
-	13,  // 3: orca.infrafleet.v1.VmProvisionEvent.result:type_name -> orca.infrafleet.v1.VmProvisionResult
-	15,  // 4: orca.infrafleet.v1.VmProvisionResult.ssh_target:type_name -> orca.infrafleet.v1.EphemeralVmRecipeSshTarget
-	14,  // 5: orca.infrafleet.v1.EphemeralVmRecipeSshTarget.port_forwards:type_name -> orca.infrafleet.v1.PortForward
+	7,   // 0: orca.infrafleet.v1.ListEphemeralVmRuntimesResponse.runtimes:type_name -> orca.infrafleet.v1.EphemeralVmRuntime
+	182, // 1: orca.infrafleet.v1.EphemeralVmRuntime.created_at:type_name -> google.protobuf.Timestamp
+	182, // 2: orca.infrafleet.v1.EphemeralVmRuntime.updated_at:type_name -> google.protobuf.Timestamp
+	14,  // 3: orca.infrafleet.v1.VmProvisionEvent.result:type_name -> orca.infrafleet.v1.VmProvisionResult
+	16,  // 4: orca.infrafleet.v1.VmProvisionResult.ssh_target:type_name -> orca.infrafleet.v1.EphemeralVmRecipeSshTarget
+	15,  // 5: orca.infrafleet.v1.EphemeralVmRecipeSshTarget.port_forwards:type_name -> orca.infrafleet.v1.RecipePortForward
 	0,   // 6: orca.infrafleet.v1.DevServer.mode:type_name -> orca.infrafleet.v1.ConnectionMode
 	1,   // 7: orca.infrafleet.v1.DevServer.kind:type_name -> orca.infrafleet.v1.AgentKind
 	0,   // 8: orca.infrafleet.v1.RegisterDevServerRequest.mode:type_name -> orca.infrafleet.v1.ConnectionMode
 	1,   // 9: orca.infrafleet.v1.RegisterDevServerRequest.kind:type_name -> orca.infrafleet.v1.AgentKind
-	16,  // 10: orca.infrafleet.v1.RegisterDevServerResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
-	16,  // 11: orca.infrafleet.v1.ResolveConnectionResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
+	17,  // 10: orca.infrafleet.v1.RegisterDevServerResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
+	17,  // 11: orca.infrafleet.v1.ResolveConnectionResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
 	1,   // 12: orca.infrafleet.v1.ListDevServersRequest.kind:type_name -> orca.infrafleet.v1.AgentKind
-	16,  // 13: orca.infrafleet.v1.ListDevServersResponse.dev_servers:type_name -> orca.infrafleet.v1.DevServer
-	16,  // 14: orca.infrafleet.v1.ApproveDevServerResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
-	16,  // 15: orca.infrafleet.v1.RejectDevServerResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
-	16,  // 16: orca.infrafleet.v1.AssignDevServerGroupResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
-	23,  // 17: orca.infrafleet.v1.CreateDevServerGroupResponse.group:type_name -> orca.infrafleet.v1.DevServerGroup
-	23,  // 18: orca.infrafleet.v1.ListDevServerGroupsResponse.groups:type_name -> orca.infrafleet.v1.DevServerGroup
-	2,   // 19: orca.infrafleet.v1.DevServerGroupGrant.grantee_kind:type_name -> orca.infrafleet.v1.DevServerGroupGranteeKind
-	2,   // 20: orca.infrafleet.v1.GrantDevServerGroupAccessRequest.grantee_kind:type_name -> orca.infrafleet.v1.DevServerGroupGranteeKind
-	34,  // 21: orca.infrafleet.v1.GrantDevServerGroupAccessResponse.grant:type_name -> orca.infrafleet.v1.DevServerGroupGrant
-	34,  // 22: orca.infrafleet.v1.ListDevServerGroupGrantsResponse.grants:type_name -> orca.infrafleet.v1.DevServerGroupGrant
-	1,   // 23: orca.infrafleet.v1.ListDevServersForUserRequest.kind:type_name -> orca.infrafleet.v1.AgentKind
-	16,  // 24: orca.infrafleet.v1.ListDevServersForUserResponse.dev_servers:type_name -> orca.infrafleet.v1.DevServer
-	3,   // 25: orca.infrafleet.v1.DevServerAccessRequest.status:type_name -> orca.infrafleet.v1.DevServerAccessRequestStatus
-	2,   // 26: orca.infrafleet.v1.DevServerAccessRequest.grantee_kind:type_name -> orca.infrafleet.v1.DevServerGroupGranteeKind
-	2,   // 27: orca.infrafleet.v1.CreateAccessRequestRequest.grantee_kind:type_name -> orca.infrafleet.v1.DevServerGroupGranteeKind
-	43,  // 28: orca.infrafleet.v1.CreateAccessRequestResponse.request:type_name -> orca.infrafleet.v1.DevServerAccessRequest
-	43,  // 29: orca.infrafleet.v1.ListPendingAccessRequestsResponse.requests:type_name -> orca.infrafleet.v1.DevServerAccessRequest
-	43,  // 30: orca.infrafleet.v1.ResolveAccessRequestResponse.request:type_name -> orca.infrafleet.v1.DevServerAccessRequest
-	34,  // 31: orca.infrafleet.v1.ResolveAccessRequestResponse.grant:type_name -> orca.infrafleet.v1.DevServerGroupGrant
-	62,  // 32: orca.infrafleet.v1.GetFleetHealthResponse.statuses:type_name -> orca.infrafleet.v1.DevServerHealth
-	68,  // 33: orca.infrafleet.v1.ListSshTargetsResponse.ssh_targets:type_name -> orca.infrafleet.v1.SshTarget
-	129, // 34: orca.infrafleet.v1.ConnectionHealthEntry.last_activity_at:type_name -> google.protobuf.Timestamp
-	129, // 35: orca.infrafleet.v1.ConnectionHealthEntry.degraded_since:type_name -> google.protobuf.Timestamp
-	76,  // 36: orca.infrafleet.v1.GetFleetConnectivitySummaryResponse.connections:type_name -> orca.infrafleet.v1.ConnectionHealthEntry
-	80,  // 37: orca.infrafleet.v1.SpawnTerminalSessionResponse.session:type_name -> orca.infrafleet.v1.TerminalSession
-	80,  // 38: orca.infrafleet.v1.ListTerminalSessionsResponse.sessions:type_name -> orca.infrafleet.v1.TerminalSession
-	95,  // 39: orca.infrafleet.v1.PtyClientFrame.attach:type_name -> orca.infrafleet.v1.AttachToSession
-	96,  // 40: orca.infrafleet.v1.PtyClientFrame.input:type_name -> orca.infrafleet.v1.PtyInput
-	97,  // 41: orca.infrafleet.v1.PtyClientFrame.resize:type_name -> orca.infrafleet.v1.PtyResize
-	99,  // 42: orca.infrafleet.v1.PtyServerFrame.out:type_name -> orca.infrafleet.v1.PtyOutput
-	100, // 43: orca.infrafleet.v1.PtyServerFrame.exited:type_name -> orca.infrafleet.v1.PtyExited
-	102, // 44: orca.infrafleet.v1.ScreencastClientFrame.start:type_name -> orca.infrafleet.v1.StartScreencast
-	103, // 45: orca.infrafleet.v1.ScreencastClientFrame.stop:type_name -> orca.infrafleet.v1.StopScreencast
-	105, // 46: orca.infrafleet.v1.ScreencastServerFrame.ready:type_name -> orca.infrafleet.v1.ScreencastReady
-	106, // 47: orca.infrafleet.v1.ScreencastServerFrame.frame_data:type_name -> orca.infrafleet.v1.ScreencastFrame
-	107, // 48: orca.infrafleet.v1.ScreencastServerFrame.ended:type_name -> orca.infrafleet.v1.ScreencastEnded
-	108, // 49: orca.infrafleet.v1.ScreencastServerFrame.error:type_name -> orca.infrafleet.v1.ScreencastError
-	129, // 50: orca.infrafleet.v1.BrowserProfile.created_at:type_name -> google.protobuf.Timestamp
-	109, // 51: orca.infrafleet.v1.ListBrowserProfilesResponse.profiles:type_name -> orca.infrafleet.v1.BrowserProfile
-	109, // 52: orca.infrafleet.v1.CreateBrowserProfileResponse.profile:type_name -> orca.infrafleet.v1.BrowserProfile
-	115, // 53: orca.infrafleet.v1.ListEmulatorDevicesResponse.devices:type_name -> orca.infrafleet.v1.EmulatorDevice
-	17,  // 54: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:input_type -> orca.infrafleet.v1.RegisterDevServerRequest
-	19,  // 55: orca.infrafleet.v1.InfraFleetService.ResolveConnection:input_type -> orca.infrafleet.v1.ResolveConnectionRequest
-	59,  // 56: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:input_type -> orca.infrafleet.v1.CreateSshTargetRequest
-	61,  // 57: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:input_type -> orca.infrafleet.v1.GetFleetHealthRequest
-	64,  // 58: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:input_type -> orca.infrafleet.v1.ScanWorkspacePortsRequest
-	21,  // 59: orca.infrafleet.v1.InfraFleetService.ListDevServers:input_type -> orca.infrafleet.v1.ListDevServersRequest
-	24,  // 60: orca.infrafleet.v1.InfraFleetService.ApproveDevServer:input_type -> orca.infrafleet.v1.ApproveDevServerRequest
-	26,  // 61: orca.infrafleet.v1.InfraFleetService.RejectDevServer:input_type -> orca.infrafleet.v1.RejectDevServerRequest
-	28,  // 62: orca.infrafleet.v1.InfraFleetService.AssignDevServerGroup:input_type -> orca.infrafleet.v1.AssignDevServerGroupRequest
-	30,  // 63: orca.infrafleet.v1.InfraFleetService.CreateDevServerGroup:input_type -> orca.infrafleet.v1.CreateDevServerGroupRequest
-	32,  // 64: orca.infrafleet.v1.InfraFleetService.ListDevServerGroups:input_type -> orca.infrafleet.v1.ListDevServerGroupsRequest
-	35,  // 65: orca.infrafleet.v1.InfraFleetService.GrantDevServerGroupAccess:input_type -> orca.infrafleet.v1.GrantDevServerGroupAccessRequest
-	37,  // 66: orca.infrafleet.v1.InfraFleetService.RevokeDevServerGroupAccess:input_type -> orca.infrafleet.v1.RevokeDevServerGroupAccessRequest
-	39,  // 67: orca.infrafleet.v1.InfraFleetService.ListDevServerGroupGrants:input_type -> orca.infrafleet.v1.ListDevServerGroupGrantsRequest
-	41,  // 68: orca.infrafleet.v1.InfraFleetService.ListDevServersForUser:input_type -> orca.infrafleet.v1.ListDevServersForUserRequest
-	44,  // 69: orca.infrafleet.v1.InfraFleetService.CreateAccessRequest:input_type -> orca.infrafleet.v1.CreateAccessRequestRequest
-	46,  // 70: orca.infrafleet.v1.InfraFleetService.ListPendingAccessRequests:input_type -> orca.infrafleet.v1.ListPendingAccessRequestsRequest
-	48,  // 71: orca.infrafleet.v1.InfraFleetService.ResolveAccessRequest:input_type -> orca.infrafleet.v1.ResolveAccessRequestRequest
-	50,  // 72: orca.infrafleet.v1.InfraFleetService.CreateConnection:input_type -> orca.infrafleet.v1.CreateConnectionRequest
-	52,  // 73: orca.infrafleet.v1.InfraFleetService.Relay:input_type -> orca.infrafleet.v1.RelayRequest
-	54,  // 74: orca.infrafleet.v1.InfraFleetService.RelayByDevServer:input_type -> orca.infrafleet.v1.RelayByDevServerRequest
-	55,  // 75: orca.infrafleet.v1.InfraFleetService.StreamFileChanges:input_type -> orca.infrafleet.v1.StreamFileChangesRequest
-	57,  // 76: orca.infrafleet.v1.InfraFleetService.IsDevServerConnected:input_type -> orca.infrafleet.v1.IsDevServerConnectedRequest
-	69,  // 77: orca.infrafleet.v1.InfraFleetService.ListSshTargets:input_type -> orca.infrafleet.v1.ListSshTargetsRequest
-	71,  // 78: orca.infrafleet.v1.InfraFleetService.GetSshState:input_type -> orca.infrafleet.v1.GetSshStateRequest
-	75,  // 79: orca.infrafleet.v1.InfraFleetService.GetFleetConnectivitySummary:input_type -> orca.infrafleet.v1.GetFleetConnectivitySummaryRequest
-	73,  // 80: orca.infrafleet.v1.InfraFleetService.EstablishConnection:input_type -> orca.infrafleet.v1.EstablishConnectionRequest
-	66,  // 81: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:input_type -> orca.infrafleet.v1.KillWorkspacePortRequest
-	82,  // 82: orca.infrafleet.v1.InfraFleetService.TeardownConnection:input_type -> orca.infrafleet.v1.TeardownConnectionRequest
-	78,  // 83: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:input_type -> orca.infrafleet.v1.SpawnTerminalSessionRequest
-	81,  // 84: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:input_type -> orca.infrafleet.v1.ResizeTerminalSessionRequest
-	83,  // 85: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:input_type -> orca.infrafleet.v1.KillTerminalSessionRequest
-	84,  // 86: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:input_type -> orca.infrafleet.v1.StopTerminalProcessRequest
-	85,  // 87: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:input_type -> orca.infrafleet.v1.ListTerminalSessionsRequest
-	87,  // 88: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:input_type -> orca.infrafleet.v1.WaitTerminalSessionRequest
-	89,  // 89: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:input_type -> orca.infrafleet.v1.FocusTerminalSessionRequest
-	90,  // 90: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:input_type -> orca.infrafleet.v1.GetTerminalAgentStatusRequest
-	92,  // 91: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:input_type -> orca.infrafleet.v1.InspectTerminalProcessRequest
-	94,  // 92: orca.infrafleet.v1.InfraFleetService.AttachPty:input_type -> orca.infrafleet.v1.PtyClientFrame
-	101, // 93: orca.infrafleet.v1.InfraFleetService.AttachScreencast:input_type -> orca.infrafleet.v1.ScreencastClientFrame
-	110, // 94: orca.infrafleet.v1.InfraFleetService.ListBrowserProfiles:input_type -> orca.infrafleet.v1.ListBrowserProfilesRequest
-	112, // 95: orca.infrafleet.v1.InfraFleetService.CreateBrowserProfile:input_type -> orca.infrafleet.v1.CreateBrowserProfileRequest
-	114, // 96: orca.infrafleet.v1.InfraFleetService.DeleteBrowserProfile:input_type -> orca.infrafleet.v1.DeleteBrowserProfileRequest
-	116, // 97: orca.infrafleet.v1.InfraFleetService.ListEmulatorDevices:input_type -> orca.infrafleet.v1.ListEmulatorDevicesRequest
-	118, // 98: orca.infrafleet.v1.InfraFleetService.GetEmulatorAvailability:input_type -> orca.infrafleet.v1.GetEmulatorAvailabilityRequest
-	121, // 99: orca.infrafleet.v1.InfraFleetService.AttachEmulatorSession:input_type -> orca.infrafleet.v1.AttachEmulatorSessionRequest
-	122, // 100: orca.infrafleet.v1.InfraFleetService.SendEmulatorTap:input_type -> orca.infrafleet.v1.SendEmulatorTapRequest
-	123, // 101: orca.infrafleet.v1.InfraFleetService.SendEmulatorGesture:input_type -> orca.infrafleet.v1.SendEmulatorGestureRequest
-	124, // 102: orca.infrafleet.v1.InfraFleetService.SendEmulatorButton:input_type -> orca.infrafleet.v1.SendEmulatorButtonRequest
-	125, // 103: orca.infrafleet.v1.InfraFleetService.RotateEmulator:input_type -> orca.infrafleet.v1.RotateEmulatorRequest
-	126, // 104: orca.infrafleet.v1.InfraFleetService.ShutdownEmulator:input_type -> orca.infrafleet.v1.ShutdownEmulatorRequest
-	127, // 105: orca.infrafleet.v1.InfraFleetService.GetHostCapabilities:input_type -> orca.infrafleet.v1.GetHostCapabilitiesRequest
-	4,   // 106: orca.infrafleet.v1.InfraFleetService.ListEphemeralVmRuntimes:input_type -> orca.infrafleet.v1.ListEphemeralVmRuntimesRequest
-	7,   // 107: orca.infrafleet.v1.InfraFleetService.AttachEphemeralVmWorkspace:input_type -> orca.infrafleet.v1.AttachEphemeralVmWorkspaceRequest
-	8,   // 108: orca.infrafleet.v1.InfraFleetService.SuspendEphemeralVmWorkspace:input_type -> orca.infrafleet.v1.SuspendEphemeralVmWorkspaceRequest
-	9,   // 109: orca.infrafleet.v1.InfraFleetService.ResumeEphemeralVmWorkspace:input_type -> orca.infrafleet.v1.ResumeEphemeralVmWorkspaceRequest
-	10,  // 110: orca.infrafleet.v1.InfraFleetService.CleanupEphemeralVmWorkspace:input_type -> orca.infrafleet.v1.CleanupEphemeralVmWorkspaceRequest
-	11,  // 111: orca.infrafleet.v1.InfraFleetService.StreamVmProvision:input_type -> orca.infrafleet.v1.StreamVmProvisionRequest
-	18,  // 112: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:output_type -> orca.infrafleet.v1.RegisterDevServerResponse
-	20,  // 113: orca.infrafleet.v1.InfraFleetService.ResolveConnection:output_type -> orca.infrafleet.v1.ResolveConnectionResponse
-	60,  // 114: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:output_type -> orca.infrafleet.v1.CreateSshTargetResponse
-	63,  // 115: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:output_type -> orca.infrafleet.v1.GetFleetHealthResponse
-	65,  // 116: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:output_type -> orca.infrafleet.v1.ScanWorkspacePortsResponse
-	22,  // 117: orca.infrafleet.v1.InfraFleetService.ListDevServers:output_type -> orca.infrafleet.v1.ListDevServersResponse
-	25,  // 118: orca.infrafleet.v1.InfraFleetService.ApproveDevServer:output_type -> orca.infrafleet.v1.ApproveDevServerResponse
-	27,  // 119: orca.infrafleet.v1.InfraFleetService.RejectDevServer:output_type -> orca.infrafleet.v1.RejectDevServerResponse
-	29,  // 120: orca.infrafleet.v1.InfraFleetService.AssignDevServerGroup:output_type -> orca.infrafleet.v1.AssignDevServerGroupResponse
-	31,  // 121: orca.infrafleet.v1.InfraFleetService.CreateDevServerGroup:output_type -> orca.infrafleet.v1.CreateDevServerGroupResponse
-	33,  // 122: orca.infrafleet.v1.InfraFleetService.ListDevServerGroups:output_type -> orca.infrafleet.v1.ListDevServerGroupsResponse
-	36,  // 123: orca.infrafleet.v1.InfraFleetService.GrantDevServerGroupAccess:output_type -> orca.infrafleet.v1.GrantDevServerGroupAccessResponse
-	38,  // 124: orca.infrafleet.v1.InfraFleetService.RevokeDevServerGroupAccess:output_type -> orca.infrafleet.v1.RevokeDevServerGroupAccessResponse
-	40,  // 125: orca.infrafleet.v1.InfraFleetService.ListDevServerGroupGrants:output_type -> orca.infrafleet.v1.ListDevServerGroupGrantsResponse
-	42,  // 126: orca.infrafleet.v1.InfraFleetService.ListDevServersForUser:output_type -> orca.infrafleet.v1.ListDevServersForUserResponse
-	45,  // 127: orca.infrafleet.v1.InfraFleetService.CreateAccessRequest:output_type -> orca.infrafleet.v1.CreateAccessRequestResponse
-	47,  // 128: orca.infrafleet.v1.InfraFleetService.ListPendingAccessRequests:output_type -> orca.infrafleet.v1.ListPendingAccessRequestsResponse
-	49,  // 129: orca.infrafleet.v1.InfraFleetService.ResolveAccessRequest:output_type -> orca.infrafleet.v1.ResolveAccessRequestResponse
-	51,  // 130: orca.infrafleet.v1.InfraFleetService.CreateConnection:output_type -> orca.infrafleet.v1.CreateConnectionResponse
-	53,  // 131: orca.infrafleet.v1.InfraFleetService.Relay:output_type -> orca.infrafleet.v1.RelayResponse
-	53,  // 132: orca.infrafleet.v1.InfraFleetService.RelayByDevServer:output_type -> orca.infrafleet.v1.RelayResponse
-	56,  // 133: orca.infrafleet.v1.InfraFleetService.StreamFileChanges:output_type -> orca.infrafleet.v1.FileChangeEvent
-	58,  // 134: orca.infrafleet.v1.InfraFleetService.IsDevServerConnected:output_type -> orca.infrafleet.v1.IsDevServerConnectedResponse
-	70,  // 135: orca.infrafleet.v1.InfraFleetService.ListSshTargets:output_type -> orca.infrafleet.v1.ListSshTargetsResponse
-	72,  // 136: orca.infrafleet.v1.InfraFleetService.GetSshState:output_type -> orca.infrafleet.v1.GetSshStateResponse
-	77,  // 137: orca.infrafleet.v1.InfraFleetService.GetFleetConnectivitySummary:output_type -> orca.infrafleet.v1.GetFleetConnectivitySummaryResponse
-	74,  // 138: orca.infrafleet.v1.InfraFleetService.EstablishConnection:output_type -> orca.infrafleet.v1.Connection
-	67,  // 139: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:output_type -> orca.infrafleet.v1.KillWorkspacePortResponse
-	130, // 140: orca.infrafleet.v1.InfraFleetService.TeardownConnection:output_type -> google.protobuf.Empty
-	79,  // 141: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:output_type -> orca.infrafleet.v1.SpawnTerminalSessionResponse
-	130, // 142: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:output_type -> google.protobuf.Empty
-	130, // 143: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:output_type -> google.protobuf.Empty
-	130, // 144: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:output_type -> google.protobuf.Empty
-	86,  // 145: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:output_type -> orca.infrafleet.v1.ListTerminalSessionsResponse
-	88,  // 146: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:output_type -> orca.infrafleet.v1.WaitTerminalSessionResponse
-	130, // 147: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:output_type -> google.protobuf.Empty
-	91,  // 148: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:output_type -> orca.infrafleet.v1.GetTerminalAgentStatusResponse
-	93,  // 149: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:output_type -> orca.infrafleet.v1.InspectTerminalProcessResponse
-	98,  // 150: orca.infrafleet.v1.InfraFleetService.AttachPty:output_type -> orca.infrafleet.v1.PtyServerFrame
-	104, // 151: orca.infrafleet.v1.InfraFleetService.AttachScreencast:output_type -> orca.infrafleet.v1.ScreencastServerFrame
-	111, // 152: orca.infrafleet.v1.InfraFleetService.ListBrowserProfiles:output_type -> orca.infrafleet.v1.ListBrowserProfilesResponse
-	113, // 153: orca.infrafleet.v1.InfraFleetService.CreateBrowserProfile:output_type -> orca.infrafleet.v1.CreateBrowserProfileResponse
-	130, // 154: orca.infrafleet.v1.InfraFleetService.DeleteBrowserProfile:output_type -> google.protobuf.Empty
-	117, // 155: orca.infrafleet.v1.InfraFleetService.ListEmulatorDevices:output_type -> orca.infrafleet.v1.ListEmulatorDevicesResponse
-	119, // 156: orca.infrafleet.v1.InfraFleetService.GetEmulatorAvailability:output_type -> orca.infrafleet.v1.GetEmulatorAvailabilityResponse
-	120, // 157: orca.infrafleet.v1.InfraFleetService.AttachEmulatorSession:output_type -> orca.infrafleet.v1.EmulatorSession
-	130, // 158: orca.infrafleet.v1.InfraFleetService.SendEmulatorTap:output_type -> google.protobuf.Empty
-	130, // 159: orca.infrafleet.v1.InfraFleetService.SendEmulatorGesture:output_type -> google.protobuf.Empty
-	130, // 160: orca.infrafleet.v1.InfraFleetService.SendEmulatorButton:output_type -> google.protobuf.Empty
-	130, // 161: orca.infrafleet.v1.InfraFleetService.RotateEmulator:output_type -> google.protobuf.Empty
-	130, // 162: orca.infrafleet.v1.InfraFleetService.ShutdownEmulator:output_type -> google.protobuf.Empty
-	128, // 163: orca.infrafleet.v1.InfraFleetService.GetHostCapabilities:output_type -> orca.infrafleet.v1.GetHostCapabilitiesResponse
-	5,   // 164: orca.infrafleet.v1.InfraFleetService.ListEphemeralVmRuntimes:output_type -> orca.infrafleet.v1.ListEphemeralVmRuntimesResponse
-	6,   // 165: orca.infrafleet.v1.InfraFleetService.AttachEphemeralVmWorkspace:output_type -> orca.infrafleet.v1.EphemeralVmRuntime
-	6,   // 166: orca.infrafleet.v1.InfraFleetService.SuspendEphemeralVmWorkspace:output_type -> orca.infrafleet.v1.EphemeralVmRuntime
-	6,   // 167: orca.infrafleet.v1.InfraFleetService.ResumeEphemeralVmWorkspace:output_type -> orca.infrafleet.v1.EphemeralVmRuntime
-	6,   // 168: orca.infrafleet.v1.InfraFleetService.CleanupEphemeralVmWorkspace:output_type -> orca.infrafleet.v1.EphemeralVmRuntime
-	12,  // 169: orca.infrafleet.v1.InfraFleetService.StreamVmProvision:output_type -> orca.infrafleet.v1.VmProvisionEvent
-	112, // [112:170] is the sub-list for method output_type
-	54,  // [54:112] is the sub-list for method input_type
-	54,  // [54:54] is the sub-list for extension type_name
-	54,  // [54:54] is the sub-list for extension extendee
-	0,   // [0:54] is the sub-list for field type_name
+	17,  // 13: orca.infrafleet.v1.ListDevServersResponse.dev_servers:type_name -> orca.infrafleet.v1.DevServer
+	17,  // 14: orca.infrafleet.v1.ListDevServersByTagResponse.dev_servers:type_name -> orca.infrafleet.v1.DevServer
+	17,  // 15: orca.infrafleet.v1.ApproveDevServerResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
+	17,  // 16: orca.infrafleet.v1.RejectDevServerResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
+	17,  // 17: orca.infrafleet.v1.AssignDevServerGroupResponse.dev_server:type_name -> orca.infrafleet.v1.DevServer
+	26,  // 18: orca.infrafleet.v1.CreateDevServerGroupResponse.group:type_name -> orca.infrafleet.v1.DevServerGroup
+	26,  // 19: orca.infrafleet.v1.ListDevServerGroupsResponse.groups:type_name -> orca.infrafleet.v1.DevServerGroup
+	2,   // 20: orca.infrafleet.v1.DevServerGroupGrant.grantee_kind:type_name -> orca.infrafleet.v1.DevServerGroupGranteeKind
+	2,   // 21: orca.infrafleet.v1.GrantDevServerGroupAccessRequest.grantee_kind:type_name -> orca.infrafleet.v1.DevServerGroupGranteeKind
+	37,  // 22: orca.infrafleet.v1.GrantDevServerGroupAccessResponse.grant:type_name -> orca.infrafleet.v1.DevServerGroupGrant
+	37,  // 23: orca.infrafleet.v1.ListDevServerGroupGrantsResponse.grants:type_name -> orca.infrafleet.v1.DevServerGroupGrant
+	1,   // 24: orca.infrafleet.v1.ListDevServersForUserRequest.kind:type_name -> orca.infrafleet.v1.AgentKind
+	17,  // 25: orca.infrafleet.v1.ListDevServersForUserResponse.dev_servers:type_name -> orca.infrafleet.v1.DevServer
+	3,   // 26: orca.infrafleet.v1.DevServerAccessRequest.status:type_name -> orca.infrafleet.v1.DevServerAccessRequestStatus
+	2,   // 27: orca.infrafleet.v1.DevServerAccessRequest.grantee_kind:type_name -> orca.infrafleet.v1.DevServerGroupGranteeKind
+	2,   // 28: orca.infrafleet.v1.CreateAccessRequestRequest.grantee_kind:type_name -> orca.infrafleet.v1.DevServerGroupGranteeKind
+	46,  // 29: orca.infrafleet.v1.CreateAccessRequestResponse.request:type_name -> orca.infrafleet.v1.DevServerAccessRequest
+	46,  // 30: orca.infrafleet.v1.ListPendingAccessRequestsResponse.requests:type_name -> orca.infrafleet.v1.DevServerAccessRequest
+	46,  // 31: orca.infrafleet.v1.ResolveAccessRequestResponse.request:type_name -> orca.infrafleet.v1.DevServerAccessRequest
+	37,  // 32: orca.infrafleet.v1.ResolveAccessRequestResponse.grant:type_name -> orca.infrafleet.v1.DevServerGroupGrant
+	67,  // 33: orca.infrafleet.v1.GetFleetHealthResponse.statuses:type_name -> orca.infrafleet.v1.DevServerHealth
+	70,  // 34: orca.infrafleet.v1.ScanWorkspacePortsResponse.ports:type_name -> orca.infrafleet.v1.DetectedPortProto
+	73,  // 35: orca.infrafleet.v1.ListPortForwardsResponse.port_forwards:type_name -> orca.infrafleet.v1.PortForward
+	73,  // 36: orca.infrafleet.v1.PortForwardEvent.forward:type_name -> orca.infrafleet.v1.PortForward
+	81,  // 37: orca.infrafleet.v1.ListSshTargetsResponse.ssh_targets:type_name -> orca.infrafleet.v1.SshTarget
+	182, // 38: orca.infrafleet.v1.ConnectionHealthEntry.last_activity_at:type_name -> google.protobuf.Timestamp
+	182, // 39: orca.infrafleet.v1.ConnectionHealthEntry.degraded_since:type_name -> google.protobuf.Timestamp
+	89,  // 40: orca.infrafleet.v1.GetFleetConnectivitySummaryResponse.connections:type_name -> orca.infrafleet.v1.ConnectionHealthEntry
+	93,  // 41: orca.infrafleet.v1.SpawnTerminalSessionResponse.session:type_name -> orca.infrafleet.v1.TerminalSession
+	93,  // 42: orca.infrafleet.v1.ListTerminalSessionsResponse.sessions:type_name -> orca.infrafleet.v1.TerminalSession
+	93,  // 43: orca.infrafleet.v1.GetAgentTerminalSessionResponse.session:type_name -> orca.infrafleet.v1.TerminalSession
+	117, // 44: orca.infrafleet.v1.PtyClientFrame.attach:type_name -> orca.infrafleet.v1.AttachToSession
+	118, // 45: orca.infrafleet.v1.PtyClientFrame.input:type_name -> orca.infrafleet.v1.PtyInput
+	119, // 46: orca.infrafleet.v1.PtyClientFrame.resize:type_name -> orca.infrafleet.v1.PtyResize
+	121, // 47: orca.infrafleet.v1.PtyServerFrame.out:type_name -> orca.infrafleet.v1.PtyOutput
+	122, // 48: orca.infrafleet.v1.PtyServerFrame.exited:type_name -> orca.infrafleet.v1.PtyExited
+	124, // 49: orca.infrafleet.v1.ScreencastClientFrame.start:type_name -> orca.infrafleet.v1.StartScreencast
+	125, // 50: orca.infrafleet.v1.ScreencastClientFrame.stop:type_name -> orca.infrafleet.v1.StopScreencast
+	127, // 51: orca.infrafleet.v1.ScreencastServerFrame.ready:type_name -> orca.infrafleet.v1.ScreencastReady
+	128, // 52: orca.infrafleet.v1.ScreencastServerFrame.frame_data:type_name -> orca.infrafleet.v1.ScreencastFrame
+	129, // 53: orca.infrafleet.v1.ScreencastServerFrame.ended:type_name -> orca.infrafleet.v1.ScreencastEnded
+	130, // 54: orca.infrafleet.v1.ScreencastServerFrame.error:type_name -> orca.infrafleet.v1.ScreencastError
+	182, // 55: orca.infrafleet.v1.BrowserProfile.created_at:type_name -> google.protobuf.Timestamp
+	131, // 56: orca.infrafleet.v1.ListBrowserProfilesResponse.profiles:type_name -> orca.infrafleet.v1.BrowserProfile
+	131, // 57: orca.infrafleet.v1.CreateBrowserProfileResponse.profile:type_name -> orca.infrafleet.v1.BrowserProfile
+	137, // 58: orca.infrafleet.v1.ListEmulatorDevicesResponse.devices:type_name -> orca.infrafleet.v1.EmulatorDevice
+	151, // 59: orca.infrafleet.v1.ImportFleetInventoryRequest.servers:type_name -> orca.infrafleet.v1.FleetServerInput
+	153, // 60: orca.infrafleet.v1.ImportFleetInventoryResponse.errors:type_name -> orca.infrafleet.v1.ImportFleetInventoryError
+	156, // 61: orca.infrafleet.v1.BulkProvisionFleetResponse.outcomes:type_name -> orca.infrafleet.v1.ProvisionOutcome
+	158, // 62: orca.infrafleet.v1.DetectDevServerAgentsRequest.commands:type_name -> orca.infrafleet.v1.AgentProbe
+	162, // 63: orca.infrafleet.v1.CheckDevServerPreflightResponse.git:type_name -> orca.infrafleet.v1.CheckResult
+	162, // 64: orca.infrafleet.v1.CheckDevServerPreflightResponse.node:type_name -> orca.infrafleet.v1.CheckResult
+	163, // 65: orca.infrafleet.v1.CheckDevServerPreflightResponse.disk:type_name -> orca.infrafleet.v1.DiskCheckResult
+	164, // 66: orca.infrafleet.v1.CheckDevServerPreflightResponse.port:type_name -> orca.infrafleet.v1.PortCheckResult
+	162, // 67: orca.infrafleet.v1.CheckDevServerPreflightResponse.gh:type_name -> orca.infrafleet.v1.CheckResult
+	168, // 68: orca.infrafleet.v1.ListAgentTokensResponse.tokens:type_name -> orca.infrafleet.v1.AgentTokenSummary
+	4,   // 69: orca.infrafleet.v1.DispatchPromptResponse.outcome:type_name -> orca.infrafleet.v1.DispatchPromptResponse.Outcome
+	18,  // 70: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:input_type -> orca.infrafleet.v1.RegisterDevServerRequest
+	20,  // 71: orca.infrafleet.v1.InfraFleetService.ResolveConnection:input_type -> orca.infrafleet.v1.ResolveConnectionRequest
+	64,  // 72: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:input_type -> orca.infrafleet.v1.CreateSshTargetRequest
+	66,  // 73: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:input_type -> orca.infrafleet.v1.GetFleetHealthRequest
+	69,  // 74: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:input_type -> orca.infrafleet.v1.ScanWorkspacePortsRequest
+	22,  // 75: orca.infrafleet.v1.InfraFleetService.ListDevServers:input_type -> orca.infrafleet.v1.ListDevServersRequest
+	24,  // 76: orca.infrafleet.v1.InfraFleetService.ListDevServersByTag:input_type -> orca.infrafleet.v1.ListDevServersByTagRequest
+	27,  // 77: orca.infrafleet.v1.InfraFleetService.ApproveDevServer:input_type -> orca.infrafleet.v1.ApproveDevServerRequest
+	29,  // 78: orca.infrafleet.v1.InfraFleetService.RejectDevServer:input_type -> orca.infrafleet.v1.RejectDevServerRequest
+	31,  // 79: orca.infrafleet.v1.InfraFleetService.AssignDevServerGroup:input_type -> orca.infrafleet.v1.AssignDevServerGroupRequest
+	33,  // 80: orca.infrafleet.v1.InfraFleetService.CreateDevServerGroup:input_type -> orca.infrafleet.v1.CreateDevServerGroupRequest
+	35,  // 81: orca.infrafleet.v1.InfraFleetService.ListDevServerGroups:input_type -> orca.infrafleet.v1.ListDevServerGroupsRequest
+	38,  // 82: orca.infrafleet.v1.InfraFleetService.GrantDevServerGroupAccess:input_type -> orca.infrafleet.v1.GrantDevServerGroupAccessRequest
+	40,  // 83: orca.infrafleet.v1.InfraFleetService.RevokeDevServerGroupAccess:input_type -> orca.infrafleet.v1.RevokeDevServerGroupAccessRequest
+	42,  // 84: orca.infrafleet.v1.InfraFleetService.ListDevServerGroupGrants:input_type -> orca.infrafleet.v1.ListDevServerGroupGrantsRequest
+	44,  // 85: orca.infrafleet.v1.InfraFleetService.ListDevServersForUser:input_type -> orca.infrafleet.v1.ListDevServersForUserRequest
+	47,  // 86: orca.infrafleet.v1.InfraFleetService.CreateAccessRequest:input_type -> orca.infrafleet.v1.CreateAccessRequestRequest
+	49,  // 87: orca.infrafleet.v1.InfraFleetService.ListPendingAccessRequests:input_type -> orca.infrafleet.v1.ListPendingAccessRequestsRequest
+	51,  // 88: orca.infrafleet.v1.InfraFleetService.ResolveAccessRequest:input_type -> orca.infrafleet.v1.ResolveAccessRequestRequest
+	53,  // 89: orca.infrafleet.v1.InfraFleetService.CreateConnection:input_type -> orca.infrafleet.v1.CreateConnectionRequest
+	55,  // 90: orca.infrafleet.v1.InfraFleetService.Relay:input_type -> orca.infrafleet.v1.RelayRequest
+	57,  // 91: orca.infrafleet.v1.InfraFleetService.RelayStream:input_type -> orca.infrafleet.v1.RelayStreamRequest
+	59,  // 92: orca.infrafleet.v1.InfraFleetService.RelayByDevServer:input_type -> orca.infrafleet.v1.RelayByDevServerRequest
+	60,  // 93: orca.infrafleet.v1.InfraFleetService.StreamFileChanges:input_type -> orca.infrafleet.v1.StreamFileChangesRequest
+	62,  // 94: orca.infrafleet.v1.InfraFleetService.IsDevServerConnected:input_type -> orca.infrafleet.v1.IsDevServerConnectedRequest
+	82,  // 95: orca.infrafleet.v1.InfraFleetService.ListSshTargets:input_type -> orca.infrafleet.v1.ListSshTargetsRequest
+	84,  // 96: orca.infrafleet.v1.InfraFleetService.GetSshState:input_type -> orca.infrafleet.v1.GetSshStateRequest
+	88,  // 97: orca.infrafleet.v1.InfraFleetService.GetFleetConnectivitySummary:input_type -> orca.infrafleet.v1.GetFleetConnectivitySummaryRequest
+	86,  // 98: orca.infrafleet.v1.InfraFleetService.EstablishConnection:input_type -> orca.infrafleet.v1.EstablishConnectionRequest
+	99,  // 99: orca.infrafleet.v1.InfraFleetService.TeardownConnection:input_type -> orca.infrafleet.v1.TeardownConnectionRequest
+	72,  // 100: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:input_type -> orca.infrafleet.v1.KillWorkspacePortRequest
+	166, // 101: orca.infrafleet.v1.InfraFleetService.CreateAgentToken:input_type -> orca.infrafleet.v1.CreateAgentTokenRequest
+	169, // 102: orca.infrafleet.v1.InfraFleetService.ListAgentTokens:input_type -> orca.infrafleet.v1.ListAgentTokensRequest
+	171, // 103: orca.infrafleet.v1.InfraFleetService.RevokeAgentToken:input_type -> orca.infrafleet.v1.RevokeAgentTokenRequest
+	74,  // 104: orca.infrafleet.v1.InfraFleetService.CreatePortForward:input_type -> orca.infrafleet.v1.CreatePortForwardRequest
+	75,  // 105: orca.infrafleet.v1.InfraFleetService.ListPortForwards:input_type -> orca.infrafleet.v1.ListPortForwardsRequest
+	77,  // 106: orca.infrafleet.v1.InfraFleetService.DeletePortForward:input_type -> orca.infrafleet.v1.DeletePortForwardRequest
+	78,  // 107: orca.infrafleet.v1.InfraFleetService.StreamPortForwardEvents:input_type -> orca.infrafleet.v1.StreamPortForwardEventsRequest
+	91,  // 108: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:input_type -> orca.infrafleet.v1.SpawnTerminalSessionRequest
+	98,  // 109: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:input_type -> orca.infrafleet.v1.ResizeTerminalSessionRequest
+	100, // 110: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:input_type -> orca.infrafleet.v1.KillTerminalSessionRequest
+	101, // 111: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:input_type -> orca.infrafleet.v1.StopTerminalProcessRequest
+	102, // 112: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:input_type -> orca.infrafleet.v1.ListTerminalSessionsRequest
+	104, // 113: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:input_type -> orca.infrafleet.v1.WaitTerminalSessionRequest
+	106, // 114: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:input_type -> orca.infrafleet.v1.FocusTerminalSessionRequest
+	107, // 115: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:input_type -> orca.infrafleet.v1.GetTerminalAgentStatusRequest
+	114, // 116: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:input_type -> orca.infrafleet.v1.InspectTerminalProcessRequest
+	94,  // 117: orca.infrafleet.v1.InfraFleetService.SaveTerminalScrollbackSnapshot:input_type -> orca.infrafleet.v1.SaveTerminalScrollbackSnapshotRequest
+	95,  // 118: orca.infrafleet.v1.InfraFleetService.GetTerminalScrollbackSnapshot:input_type -> orca.infrafleet.v1.GetTerminalScrollbackSnapshotRequest
+	97,  // 119: orca.infrafleet.v1.InfraFleetService.DeleteTerminalScrollbackSnapshots:input_type -> orca.infrafleet.v1.DeleteTerminalScrollbackSnapshotsRequest
+	109, // 120: orca.infrafleet.v1.InfraFleetService.GetAgentTerminalSession:input_type -> orca.infrafleet.v1.GetAgentTerminalSessionRequest
+	111, // 121: orca.infrafleet.v1.InfraFleetService.SendTerminalInput:input_type -> orca.infrafleet.v1.SendTerminalInputRequest
+	112, // 122: orca.infrafleet.v1.InfraFleetService.GetTerminalScrollback:input_type -> orca.infrafleet.v1.GetTerminalScrollbackRequest
+	178, // 123: orca.infrafleet.v1.InfraFleetService.DispatchPrompt:input_type -> orca.infrafleet.v1.DispatchPromptRequest
+	180, // 124: orca.infrafleet.v1.InfraFleetService.GetQueuedPrompt:input_type -> orca.infrafleet.v1.GetQueuedPromptRequest
+	116, // 125: orca.infrafleet.v1.InfraFleetService.AttachPty:input_type -> orca.infrafleet.v1.PtyClientFrame
+	123, // 126: orca.infrafleet.v1.InfraFleetService.AttachScreencast:input_type -> orca.infrafleet.v1.ScreencastClientFrame
+	132, // 127: orca.infrafleet.v1.InfraFleetService.ListBrowserProfiles:input_type -> orca.infrafleet.v1.ListBrowserProfilesRequest
+	134, // 128: orca.infrafleet.v1.InfraFleetService.CreateBrowserProfile:input_type -> orca.infrafleet.v1.CreateBrowserProfileRequest
+	136, // 129: orca.infrafleet.v1.InfraFleetService.DeleteBrowserProfile:input_type -> orca.infrafleet.v1.DeleteBrowserProfileRequest
+	138, // 130: orca.infrafleet.v1.InfraFleetService.ListEmulatorDevices:input_type -> orca.infrafleet.v1.ListEmulatorDevicesRequest
+	140, // 131: orca.infrafleet.v1.InfraFleetService.GetEmulatorAvailability:input_type -> orca.infrafleet.v1.GetEmulatorAvailabilityRequest
+	143, // 132: orca.infrafleet.v1.InfraFleetService.AttachEmulatorSession:input_type -> orca.infrafleet.v1.AttachEmulatorSessionRequest
+	144, // 133: orca.infrafleet.v1.InfraFleetService.SendEmulatorTap:input_type -> orca.infrafleet.v1.SendEmulatorTapRequest
+	145, // 134: orca.infrafleet.v1.InfraFleetService.SendEmulatorGesture:input_type -> orca.infrafleet.v1.SendEmulatorGestureRequest
+	146, // 135: orca.infrafleet.v1.InfraFleetService.SendEmulatorButton:input_type -> orca.infrafleet.v1.SendEmulatorButtonRequest
+	147, // 136: orca.infrafleet.v1.InfraFleetService.RotateEmulator:input_type -> orca.infrafleet.v1.RotateEmulatorRequest
+	148, // 137: orca.infrafleet.v1.InfraFleetService.ShutdownEmulator:input_type -> orca.infrafleet.v1.ShutdownEmulatorRequest
+	149, // 138: orca.infrafleet.v1.InfraFleetService.GetHostCapabilities:input_type -> orca.infrafleet.v1.GetHostCapabilitiesRequest
+	152, // 139: orca.infrafleet.v1.InfraFleetService.ImportFleetInventory:input_type -> orca.infrafleet.v1.ImportFleetInventoryRequest
+	155, // 140: orca.infrafleet.v1.InfraFleetService.BulkProvisionFleet:input_type -> orca.infrafleet.v1.BulkProvisionFleetRequest
+	159, // 141: orca.infrafleet.v1.InfraFleetService.DetectDevServerAgents:input_type -> orca.infrafleet.v1.DetectDevServerAgentsRequest
+	161, // 142: orca.infrafleet.v1.InfraFleetService.CheckDevServerPreflight:input_type -> orca.infrafleet.v1.CheckDevServerPreflightRequest
+	172, // 143: orca.infrafleet.v1.InfraFleetService.StartAgentSession:input_type -> orca.infrafleet.v1.StartAgentSessionRequest
+	174, // 144: orca.infrafleet.v1.InfraFleetService.StopAgentSession:input_type -> orca.infrafleet.v1.StopAgentSessionRequest
+	175, // 145: orca.infrafleet.v1.InfraFleetService.KillAgentSession:input_type -> orca.infrafleet.v1.KillAgentSessionRequest
+	176, // 146: orca.infrafleet.v1.InfraFleetService.ResumeAgentSession:input_type -> orca.infrafleet.v1.ResumeAgentSessionRequest
+	177, // 147: orca.infrafleet.v1.InfraFleetService.SwitchAgentAccount:input_type -> orca.infrafleet.v1.SwitchAgentAccountRequest
+	5,   // 148: orca.infrafleet.v1.InfraFleetService.ListEphemeralVmRuntimes:input_type -> orca.infrafleet.v1.ListEphemeralVmRuntimesRequest
+	8,   // 149: orca.infrafleet.v1.InfraFleetService.AttachEphemeralVmWorkspace:input_type -> orca.infrafleet.v1.AttachEphemeralVmWorkspaceRequest
+	9,   // 150: orca.infrafleet.v1.InfraFleetService.SuspendEphemeralVmWorkspace:input_type -> orca.infrafleet.v1.SuspendEphemeralVmWorkspaceRequest
+	10,  // 151: orca.infrafleet.v1.InfraFleetService.ResumeEphemeralVmWorkspace:input_type -> orca.infrafleet.v1.ResumeEphemeralVmWorkspaceRequest
+	11,  // 152: orca.infrafleet.v1.InfraFleetService.CleanupEphemeralVmWorkspace:input_type -> orca.infrafleet.v1.CleanupEphemeralVmWorkspaceRequest
+	12,  // 153: orca.infrafleet.v1.InfraFleetService.StreamVmProvision:input_type -> orca.infrafleet.v1.StreamVmProvisionRequest
+	19,  // 154: orca.infrafleet.v1.InfraFleetService.RegisterDevServer:output_type -> orca.infrafleet.v1.RegisterDevServerResponse
+	21,  // 155: orca.infrafleet.v1.InfraFleetService.ResolveConnection:output_type -> orca.infrafleet.v1.ResolveConnectionResponse
+	65,  // 156: orca.infrafleet.v1.InfraFleetService.CreateSshTarget:output_type -> orca.infrafleet.v1.CreateSshTargetResponse
+	68,  // 157: orca.infrafleet.v1.InfraFleetService.GetFleetHealth:output_type -> orca.infrafleet.v1.GetFleetHealthResponse
+	71,  // 158: orca.infrafleet.v1.InfraFleetService.ScanWorkspacePorts:output_type -> orca.infrafleet.v1.ScanWorkspacePortsResponse
+	23,  // 159: orca.infrafleet.v1.InfraFleetService.ListDevServers:output_type -> orca.infrafleet.v1.ListDevServersResponse
+	25,  // 160: orca.infrafleet.v1.InfraFleetService.ListDevServersByTag:output_type -> orca.infrafleet.v1.ListDevServersByTagResponse
+	28,  // 161: orca.infrafleet.v1.InfraFleetService.ApproveDevServer:output_type -> orca.infrafleet.v1.ApproveDevServerResponse
+	30,  // 162: orca.infrafleet.v1.InfraFleetService.RejectDevServer:output_type -> orca.infrafleet.v1.RejectDevServerResponse
+	32,  // 163: orca.infrafleet.v1.InfraFleetService.AssignDevServerGroup:output_type -> orca.infrafleet.v1.AssignDevServerGroupResponse
+	34,  // 164: orca.infrafleet.v1.InfraFleetService.CreateDevServerGroup:output_type -> orca.infrafleet.v1.CreateDevServerGroupResponse
+	36,  // 165: orca.infrafleet.v1.InfraFleetService.ListDevServerGroups:output_type -> orca.infrafleet.v1.ListDevServerGroupsResponse
+	39,  // 166: orca.infrafleet.v1.InfraFleetService.GrantDevServerGroupAccess:output_type -> orca.infrafleet.v1.GrantDevServerGroupAccessResponse
+	41,  // 167: orca.infrafleet.v1.InfraFleetService.RevokeDevServerGroupAccess:output_type -> orca.infrafleet.v1.RevokeDevServerGroupAccessResponse
+	43,  // 168: orca.infrafleet.v1.InfraFleetService.ListDevServerGroupGrants:output_type -> orca.infrafleet.v1.ListDevServerGroupGrantsResponse
+	45,  // 169: orca.infrafleet.v1.InfraFleetService.ListDevServersForUser:output_type -> orca.infrafleet.v1.ListDevServersForUserResponse
+	48,  // 170: orca.infrafleet.v1.InfraFleetService.CreateAccessRequest:output_type -> orca.infrafleet.v1.CreateAccessRequestResponse
+	50,  // 171: orca.infrafleet.v1.InfraFleetService.ListPendingAccessRequests:output_type -> orca.infrafleet.v1.ListPendingAccessRequestsResponse
+	52,  // 172: orca.infrafleet.v1.InfraFleetService.ResolveAccessRequest:output_type -> orca.infrafleet.v1.ResolveAccessRequestResponse
+	54,  // 173: orca.infrafleet.v1.InfraFleetService.CreateConnection:output_type -> orca.infrafleet.v1.CreateConnectionResponse
+	56,  // 174: orca.infrafleet.v1.InfraFleetService.Relay:output_type -> orca.infrafleet.v1.RelayResponse
+	58,  // 175: orca.infrafleet.v1.InfraFleetService.RelayStream:output_type -> orca.infrafleet.v1.RelayStreamFrame
+	56,  // 176: orca.infrafleet.v1.InfraFleetService.RelayByDevServer:output_type -> orca.infrafleet.v1.RelayResponse
+	61,  // 177: orca.infrafleet.v1.InfraFleetService.StreamFileChanges:output_type -> orca.infrafleet.v1.FileChangeEvent
+	63,  // 178: orca.infrafleet.v1.InfraFleetService.IsDevServerConnected:output_type -> orca.infrafleet.v1.IsDevServerConnectedResponse
+	83,  // 179: orca.infrafleet.v1.InfraFleetService.ListSshTargets:output_type -> orca.infrafleet.v1.ListSshTargetsResponse
+	85,  // 180: orca.infrafleet.v1.InfraFleetService.GetSshState:output_type -> orca.infrafleet.v1.GetSshStateResponse
+	90,  // 181: orca.infrafleet.v1.InfraFleetService.GetFleetConnectivitySummary:output_type -> orca.infrafleet.v1.GetFleetConnectivitySummaryResponse
+	87,  // 182: orca.infrafleet.v1.InfraFleetService.EstablishConnection:output_type -> orca.infrafleet.v1.Connection
+	183, // 183: orca.infrafleet.v1.InfraFleetService.TeardownConnection:output_type -> google.protobuf.Empty
+	80,  // 184: orca.infrafleet.v1.InfraFleetService.KillWorkspacePort:output_type -> orca.infrafleet.v1.KillWorkspacePortResponse
+	167, // 185: orca.infrafleet.v1.InfraFleetService.CreateAgentToken:output_type -> orca.infrafleet.v1.CreateAgentTokenResponse
+	170, // 186: orca.infrafleet.v1.InfraFleetService.ListAgentTokens:output_type -> orca.infrafleet.v1.ListAgentTokensResponse
+	183, // 187: orca.infrafleet.v1.InfraFleetService.RevokeAgentToken:output_type -> google.protobuf.Empty
+	73,  // 188: orca.infrafleet.v1.InfraFleetService.CreatePortForward:output_type -> orca.infrafleet.v1.PortForward
+	76,  // 189: orca.infrafleet.v1.InfraFleetService.ListPortForwards:output_type -> orca.infrafleet.v1.ListPortForwardsResponse
+	183, // 190: orca.infrafleet.v1.InfraFleetService.DeletePortForward:output_type -> google.protobuf.Empty
+	79,  // 191: orca.infrafleet.v1.InfraFleetService.StreamPortForwardEvents:output_type -> orca.infrafleet.v1.PortForwardEvent
+	92,  // 192: orca.infrafleet.v1.InfraFleetService.SpawnTerminalSession:output_type -> orca.infrafleet.v1.SpawnTerminalSessionResponse
+	183, // 193: orca.infrafleet.v1.InfraFleetService.ResizeTerminalSession:output_type -> google.protobuf.Empty
+	183, // 194: orca.infrafleet.v1.InfraFleetService.KillTerminalSession:output_type -> google.protobuf.Empty
+	183, // 195: orca.infrafleet.v1.InfraFleetService.StopTerminalProcess:output_type -> google.protobuf.Empty
+	103, // 196: orca.infrafleet.v1.InfraFleetService.ListTerminalSessions:output_type -> orca.infrafleet.v1.ListTerminalSessionsResponse
+	105, // 197: orca.infrafleet.v1.InfraFleetService.WaitTerminalSession:output_type -> orca.infrafleet.v1.WaitTerminalSessionResponse
+	183, // 198: orca.infrafleet.v1.InfraFleetService.FocusTerminalSession:output_type -> google.protobuf.Empty
+	108, // 199: orca.infrafleet.v1.InfraFleetService.GetTerminalAgentStatus:output_type -> orca.infrafleet.v1.GetTerminalAgentStatusResponse
+	115, // 200: orca.infrafleet.v1.InfraFleetService.InspectTerminalProcess:output_type -> orca.infrafleet.v1.InspectTerminalProcessResponse
+	183, // 201: orca.infrafleet.v1.InfraFleetService.SaveTerminalScrollbackSnapshot:output_type -> google.protobuf.Empty
+	96,  // 202: orca.infrafleet.v1.InfraFleetService.GetTerminalScrollbackSnapshot:output_type -> orca.infrafleet.v1.GetTerminalScrollbackSnapshotResponse
+	183, // 203: orca.infrafleet.v1.InfraFleetService.DeleteTerminalScrollbackSnapshots:output_type -> google.protobuf.Empty
+	110, // 204: orca.infrafleet.v1.InfraFleetService.GetAgentTerminalSession:output_type -> orca.infrafleet.v1.GetAgentTerminalSessionResponse
+	183, // 205: orca.infrafleet.v1.InfraFleetService.SendTerminalInput:output_type -> google.protobuf.Empty
+	113, // 206: orca.infrafleet.v1.InfraFleetService.GetTerminalScrollback:output_type -> orca.infrafleet.v1.GetTerminalScrollbackResponse
+	179, // 207: orca.infrafleet.v1.InfraFleetService.DispatchPrompt:output_type -> orca.infrafleet.v1.DispatchPromptResponse
+	181, // 208: orca.infrafleet.v1.InfraFleetService.GetQueuedPrompt:output_type -> orca.infrafleet.v1.GetQueuedPromptResponse
+	120, // 209: orca.infrafleet.v1.InfraFleetService.AttachPty:output_type -> orca.infrafleet.v1.PtyServerFrame
+	126, // 210: orca.infrafleet.v1.InfraFleetService.AttachScreencast:output_type -> orca.infrafleet.v1.ScreencastServerFrame
+	133, // 211: orca.infrafleet.v1.InfraFleetService.ListBrowserProfiles:output_type -> orca.infrafleet.v1.ListBrowserProfilesResponse
+	135, // 212: orca.infrafleet.v1.InfraFleetService.CreateBrowserProfile:output_type -> orca.infrafleet.v1.CreateBrowserProfileResponse
+	183, // 213: orca.infrafleet.v1.InfraFleetService.DeleteBrowserProfile:output_type -> google.protobuf.Empty
+	139, // 214: orca.infrafleet.v1.InfraFleetService.ListEmulatorDevices:output_type -> orca.infrafleet.v1.ListEmulatorDevicesResponse
+	141, // 215: orca.infrafleet.v1.InfraFleetService.GetEmulatorAvailability:output_type -> orca.infrafleet.v1.GetEmulatorAvailabilityResponse
+	142, // 216: orca.infrafleet.v1.InfraFleetService.AttachEmulatorSession:output_type -> orca.infrafleet.v1.EmulatorSession
+	183, // 217: orca.infrafleet.v1.InfraFleetService.SendEmulatorTap:output_type -> google.protobuf.Empty
+	183, // 218: orca.infrafleet.v1.InfraFleetService.SendEmulatorGesture:output_type -> google.protobuf.Empty
+	183, // 219: orca.infrafleet.v1.InfraFleetService.SendEmulatorButton:output_type -> google.protobuf.Empty
+	183, // 220: orca.infrafleet.v1.InfraFleetService.RotateEmulator:output_type -> google.protobuf.Empty
+	183, // 221: orca.infrafleet.v1.InfraFleetService.ShutdownEmulator:output_type -> google.protobuf.Empty
+	150, // 222: orca.infrafleet.v1.InfraFleetService.GetHostCapabilities:output_type -> orca.infrafleet.v1.GetHostCapabilitiesResponse
+	154, // 223: orca.infrafleet.v1.InfraFleetService.ImportFleetInventory:output_type -> orca.infrafleet.v1.ImportFleetInventoryResponse
+	157, // 224: orca.infrafleet.v1.InfraFleetService.BulkProvisionFleet:output_type -> orca.infrafleet.v1.BulkProvisionFleetResponse
+	160, // 225: orca.infrafleet.v1.InfraFleetService.DetectDevServerAgents:output_type -> orca.infrafleet.v1.DetectDevServerAgentsResponse
+	165, // 226: orca.infrafleet.v1.InfraFleetService.CheckDevServerPreflight:output_type -> orca.infrafleet.v1.CheckDevServerPreflightResponse
+	173, // 227: orca.infrafleet.v1.InfraFleetService.StartAgentSession:output_type -> orca.infrafleet.v1.AgentSession
+	183, // 228: orca.infrafleet.v1.InfraFleetService.StopAgentSession:output_type -> google.protobuf.Empty
+	183, // 229: orca.infrafleet.v1.InfraFleetService.KillAgentSession:output_type -> google.protobuf.Empty
+	173, // 230: orca.infrafleet.v1.InfraFleetService.ResumeAgentSession:output_type -> orca.infrafleet.v1.AgentSession
+	173, // 231: orca.infrafleet.v1.InfraFleetService.SwitchAgentAccount:output_type -> orca.infrafleet.v1.AgentSession
+	6,   // 232: orca.infrafleet.v1.InfraFleetService.ListEphemeralVmRuntimes:output_type -> orca.infrafleet.v1.ListEphemeralVmRuntimesResponse
+	7,   // 233: orca.infrafleet.v1.InfraFleetService.AttachEphemeralVmWorkspace:output_type -> orca.infrafleet.v1.EphemeralVmRuntime
+	7,   // 234: orca.infrafleet.v1.InfraFleetService.SuspendEphemeralVmWorkspace:output_type -> orca.infrafleet.v1.EphemeralVmRuntime
+	7,   // 235: orca.infrafleet.v1.InfraFleetService.ResumeEphemeralVmWorkspace:output_type -> orca.infrafleet.v1.EphemeralVmRuntime
+	7,   // 236: orca.infrafleet.v1.InfraFleetService.CleanupEphemeralVmWorkspace:output_type -> orca.infrafleet.v1.EphemeralVmRuntime
+	13,  // 237: orca.infrafleet.v1.InfraFleetService.StreamVmProvision:output_type -> orca.infrafleet.v1.VmProvisionEvent
+	154, // [154:238] is the sub-list for method output_type
+	70,  // [70:154] is the sub-list for method input_type
+	70,  // [70:70] is the sub-list for extension type_name
+	70,  // [70:70] is the sub-list for extension extendee
+	0,   // [0:70] is the sub-list for field type_name
 }
 
 func init() { file_orca_infrafleet_v1_infrafleet_proto_init() }
@@ -8429,33 +12185,34 @@ func file_orca_infrafleet_v1_infrafleet_proto_init() {
 	if File_orca_infrafleet_v1_infrafleet_proto != nil {
 		return
 	}
-	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[90].OneofWrappers = []any{
+	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[111].OneofWrappers = []any{
 		(*PtyClientFrame_Attach)(nil),
 		(*PtyClientFrame_Input)(nil),
 		(*PtyClientFrame_Resize)(nil),
 	}
-	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[94].OneofWrappers = []any{
+	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[115].OneofWrappers = []any{
 		(*PtyServerFrame_Out)(nil),
 		(*PtyServerFrame_Exited)(nil),
 	}
-	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[97].OneofWrappers = []any{
+	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[118].OneofWrappers = []any{
 		(*ScreencastClientFrame_Start)(nil),
 		(*ScreencastClientFrame_Stop)(nil),
 	}
-	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[98].OneofWrappers = []any{}
-	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[100].OneofWrappers = []any{
+	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[119].OneofWrappers = []any{}
+	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[121].OneofWrappers = []any{
 		(*ScreencastServerFrame_Ready)(nil),
 		(*ScreencastServerFrame_FrameData)(nil),
 		(*ScreencastServerFrame_Ended)(nil),
 		(*ScreencastServerFrame_Error)(nil),
 	}
+	file_orca_infrafleet_v1_infrafleet_proto_msgTypes[163].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_infrafleet_v1_infrafleet_proto_rawDesc), len(file_orca_infrafleet_v1_infrafleet_proto_rawDesc)),
-			NumEnums:      4,
-			NumMessages:   125,
+			NumEnums:      5,
+			NumMessages:   177,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -5,7 +5,7 @@
 **Service:** `orca-cli`
 **File:** `backend-go/cmd/orca-cli/internal/localdaemon/pidfile.go`
 **Depends on:** TASK-CLI-01-06 (scaffold — establishes the module)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added localdaemon/{pidfile,process_unix,process_windows}.go (x/sys pinned at v0.47.0, matching the repo's existing pin) + pidfile_test.go (round-trip, corrupt/empty/missing file, definitively-dead child PID); builds for both linux and `GOOS=windows`; `go test ./cmd/orca-cli/internal/localdaemon/... -run TestPidfile -v` passes.
 
 ---
 

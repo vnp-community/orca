@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/proto/orca/gitgateway/v1/gitgateway.proto`
 **Depends on:** TASK-WT-04-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added CompareWorktrees RPC + messages to gitgateway.proto; ProjectClient.GetWorktree + domain.WorktreeInfo; grpcclient implementation. buf generate + go build clean.
 
 ---
 

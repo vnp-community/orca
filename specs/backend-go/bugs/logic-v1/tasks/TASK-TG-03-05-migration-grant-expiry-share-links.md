@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/migrations/0004_grant_expiry_and_public_link.up.sql` (new)
 **Depends on:** TASK-TG-01-02 (this is migration `0004`, sequential after TG-01's `0003`)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0004 created (up/down); verified full up/down/up cycle against a real Postgres 16 container — task_grants.expires_at + task_share_links (RLS enabled, revoked_at soft-delete) both confirmed via \d.
 
 ---
 

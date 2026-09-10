@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/terminal_session.go`, `backend-go/services/infra-fleet-service/internal/usecase/attach_pty.go`, `backend-go/services/infra-fleet-service/internal/usecase/get_terminal_agent_status.go`
 **Depends on:** TASK-MB-02-01 (`AttachPty`'s output-relay hook + `ptyLiveState` registry), TASK-MB-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `ptyLiveState.lastOutput` ring buffer + `appendOutput`/`domain.TruncatedForMobile` implemented; `GetTerminalAgentStatus`/`ListTerminalSessions`/`SpawnTerminalSession` responses now populate `LastOutputPreview`; new unit tests in `terminal_session_test.go`, `attach_pty_test.go`, `get_terminal_agent_status_test.go` all pass.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (devserveragent adapter)
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/client.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — session.attachTransport already stored HandshakeInfo (task's premise about it possibly discarding it did not hold); added session.handshakeInfoSnapshot() + Client.LastHandshakeInfo(devServerID). Note: Client.mu is a plain sync.Mutex, not RWMutex — used Lock/Unlock, not RLock/RUnlock as the task's pseudocode assumed. Tests cover handshaked-session-returns-info and unknown-dev-server-returns-false; pass.
 
 ---
 

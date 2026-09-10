@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_worktree.go`
 **Depends on:** TASK-PI-02-05
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — worktree.createFromIssue channel added next to worktree.create, translates flat args into CreateWorktreeFromIssueRequest's oneof (ScmIssueRef vs TrackerIssueRef) with pre-flight validation per provider group.`
 
 ---
 

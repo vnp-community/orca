@@ -15,188 +15,207 @@ const SYSTEM_PORTS_TO_EXCLUDE = new Set([22])
 
 const MAX_DETECTED_PORTS = 50
 
+/**
+ * detectListeningPorts is the free-function core of ports.detect's scan
+ * logic — extracted out of PortScanHandler (a thin dispatcher-registration
+ * wrapper around this) so port-kill-handler.ts's pidOwnsPort check can reuse
+ * the exact same detection instead of re-parsing /proc or re-implementing
+ * the Windows path.
+ */
+export async function detectListeningPorts(signal?: AbortSignal): Promise<DetectedPort[]> {
+  if (process.platform === 'linux') {
+    return scanLinuxListeningPorts()
+  }
+  if (process.platform === 'win32') {
+    return scanWindowsListeningPorts(signal)
+  }
+  return []
+}
+
 export class PortScanHandler {
   constructor(dispatcher: RelayDispatcher) {
     dispatcher.onRequest('ports.detect', async (_params, context: RequestContext) => {
-      if (process.platform === 'linux') {
-        return {
-          ports: await this.scanLinuxListeningPorts(),
-          platform: process.platform
-        }
-      }
-      if (process.platform === 'win32') {
-        return {
-          ports: await scanWindowsListeningPorts(context.signal),
-          platform: process.platform
-        }
-      }
       return {
-        ports: [],
+        ports: await detectListeningPorts(context.signal),
         platform: process.platform
       }
     })
   }
+}
 
-  private async scanLinuxListeningPorts(): Promise<DetectedPort[]> {
-    const [tcp4, tcp6] = await Promise.all([
-      this.readProcNet('/proc/net/tcp'),
-      this.readProcNet('/proc/net/tcp6')
-    ])
+/**
+ * handlePortsDetect is ports.detect's entry point on the live JSON-RPC
+ * switch dispatcher (agent-rpc-dispatch.ts) — the actual wire path
+ * infra-fleet-service's sshrelay/devserveragent relay to (TASK-SSH-04-01).
+ * PortScanHandler above registers the SAME "ports.detect" method name on
+ * dispatcher.ts's separate RelayDispatcher class-based mechanism; both call
+ * detectListeningPorts so neither implementation drifts from the other.
+ */
+export async function handlePortsDetect(
+  id: string | number | null,
+  _params: Record<string, unknown>
+): Promise<{ jsonrpc: '2.0'; id: string | number | null; result: { ports: DetectedPort[]; platform: string } }> {
+  return {
+    jsonrpc: '2.0',
+    id,
+    result: { ports: await detectListeningPorts(), platform: process.platform }
+  }
+}
 
-    const listeningSockets = [...tcp4, ...tcp6]
-    if (listeningSockets.length === 0) {
-      return []
-    }
+async function scanLinuxListeningPorts(): Promise<DetectedPort[]> {
+  const [tcp4, tcp6] = await Promise.all([readProcNet('/proc/net/tcp'), readProcNet('/proc/net/tcp6')])
 
-    const inodeSet = new Set(listeningSockets.map((s) => s.inode))
-    const inodeToPid = await this.mapInodesToPids(inodeSet)
-
-    const seen = new Set<string>()
-    const results: DetectedPort[] = []
-    const relayPid = process.pid
-    const relayParentPid = process.ppid
-
-    for (const socket of listeningSockets) {
-      const key = `${socket.host}:${socket.port}`
-      if (seen.has(key)) {
-        continue
-      }
-      seen.add(key)
-
-      if (SYSTEM_PORTS_TO_EXCLUDE.has(socket.port)) {
-        continue
-      }
-
-      const pid = inodeToPid.get(socket.inode)
-      if (pid === relayPid || pid === relayParentPid) {
-        continue
-      }
-
-      const processName = pid != null ? await this.getProcessName(pid) : undefined
-
-      if (processName === 'sshd') {
-        continue
-      }
-
-      results.push({
-        port: socket.port,
-        host: socket.host,
-        pid: pid ?? undefined,
-        processName
-      })
-    }
-
-    // Why: sort before capping so the visible set is deterministic (lowest
-    // port numbers first) regardless of /proc enumeration order.
-    results.sort((a, b) => a.port - b.port)
-    return results.slice(0, MAX_DETECTED_PORTS)
+  const listeningSockets = [...tcp4, ...tcp6]
+  if (listeningSockets.length === 0) {
+    return []
   }
 
-  private async readProcNet(
-    path: string
-  ): Promise<{ port: number; host: string; inode: number }[]> {
-    let content: string
-    try {
-      content = await readFile(path, 'utf-8')
-    } catch {
-      return []
+  const inodeSet = new Set(listeningSockets.map((s) => s.inode))
+  const inodeToPid = await mapInodesToPids(inodeSet)
+
+  const seen = new Set<string>()
+  const results: DetectedPort[] = []
+  const relayPid = process.pid
+  const relayParentPid = process.ppid
+
+  for (const socket of listeningSockets) {
+    const key = `${socket.host}:${socket.port}`
+    if (seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+
+    if (SYSTEM_PORTS_TO_EXCLUDE.has(socket.port)) {
+      continue
     }
 
-    const lines = content.split('\n')
-    const results: { port: number; host: string; inode: number }[] = []
-
-    for (let i = 1; i < lines.length; i++) {
-      const fields = getProcessOutputFields(lines[i], 10)
-      if (fields.length < 10) {
-        continue
-      }
-
-      // State field (index 3): 0A = TCP_LISTEN
-      if (fields[3] !== '0A') {
-        continue
-      }
-
-      const localAddress = fields[1]
-      const parsed = parseHexAddress(localAddress)
-      if (!parsed) {
-        continue
-      }
-
-      const inode = Number.parseInt(fields[9], 10)
-      if (Number.isNaN(inode) || inode === 0) {
-        continue
-      }
-
-      results.push({ port: parsed.port, host: parsed.host, inode })
+    const pid = inodeToPid.get(socket.inode)
+    if (pid === relayPid || pid === relayParentPid) {
+      continue
     }
 
-    return results
+    const processName = pid != null ? await getProcessName(pid) : undefined
+
+    if (processName === 'sshd') {
+      continue
+    }
+
+    results.push({
+      port: socket.port,
+      host: socket.host,
+      pid: pid ?? undefined,
+      processName
+    })
   }
 
-  private async mapInodesToPids(inodes: Set<number>): Promise<Map<number, number>> {
-    const result = new Map<number, number>()
-    if (inodes.size === 0) {
-      return result
+  // Why: sort before capping so the visible set is deterministic (lowest
+  // port numbers first) regardless of /proc enumeration order.
+  results.sort((a, b) => a.port - b.port)
+  return results.slice(0, MAX_DETECTED_PORTS)
+}
+
+async function readProcNet(path: string): Promise<{ port: number; host: string; inode: number }[]> {
+  let content: string
+  try {
+    content = await readFile(path, 'utf-8')
+  } catch {
+    return []
+  }
+
+  const lines = content.split('\n')
+  const results: { port: number; host: string; inode: number }[] = []
+
+  for (let i = 1; i < lines.length; i++) {
+    const fields = getProcessOutputFields(lines[i], 10)
+    if (fields.length < 10) {
+      continue
     }
 
-    let pids: string[]
+    // State field (index 3): 0A = TCP_LISTEN
+    if (fields[3] !== '0A') {
+      continue
+    }
+
+    const localAddress = fields[1]
+    const parsed = parseHexAddress(localAddress)
+    if (!parsed) {
+      continue
+    }
+
+    const inode = Number.parseInt(fields[9], 10)
+    if (Number.isNaN(inode) || inode === 0) {
+      continue
+    }
+
+    results.push({ port: parsed.port, host: parsed.host, inode })
+  }
+
+  return results
+}
+
+async function mapInodesToPids(inodes: Set<number>): Promise<Map<number, number>> {
+  const result = new Map<number, number>()
+  if (inodes.size === 0) {
+    return result
+  }
+
+  let pids: string[]
+  try {
+    pids = (await readdir('/proc')).filter((name) => /^\d+$/.test(name))
+  } catch {
+    return result
+  }
+
+  for (const pidStr of pids) {
+    const fdDir = `/proc/${pidStr}/fd`
+    let fds: string[]
     try {
-      pids = (await readdir('/proc')).filter((name) => /^\d+$/.test(name))
+      fds = await readdir(fdDir)
     } catch {
-      return result
+      continue
     }
 
-    for (const pidStr of pids) {
-      const fdDir = `/proc/${pidStr}/fd`
-      let fds: string[]
+    const pid = Number.parseInt(pidStr, 10)
+
+    for (const fd of fds) {
+      let link: string
       try {
-        fds = await readdir(fdDir)
+        link = await readlink(`${fdDir}/${fd}`)
       } catch {
         continue
       }
 
-      const pid = Number.parseInt(pidStr, 10)
+      const match = link.match(/^socket:\[(\d+)\]$/)
+      if (!match) {
+        continue
+      }
 
-      for (const fd of fds) {
-        let link: string
-        try {
-          link = await readlink(`${fdDir}/${fd}`)
-        } catch {
-          continue
-        }
-
-        const match = link.match(/^socket:\[(\d+)\]$/)
-        if (!match) {
-          continue
-        }
-
-        const inode = Number.parseInt(match[1], 10)
-        if (inodes.has(inode)) {
-          result.set(inode, pid)
-        }
+      const inode = Number.parseInt(match[1], 10)
+      if (inodes.has(inode)) {
+        result.set(inode, pid)
       }
     }
-
-    return result
   }
 
-  private async getProcessName(pid: number): Promise<string | undefined> {
-    try {
-      const cmdline = await readFile(`/proc/${pid}/cmdline`, 'utf-8')
-      if (!cmdline) {
-        return undefined
-      }
+  return result
+}
 
-      const exe = cmdline.split('\0')[0]
-      if (!exe) {
-        return undefined
-      }
-
-      const parts = exe.split('/')
-      return parts.at(-1)
-    } catch {
+async function getProcessName(pid: number): Promise<string | undefined> {
+  try {
+    const cmdline = await readFile(`/proc/${pid}/cmdline`, 'utf-8')
+    if (!cmdline) {
       return undefined
     }
+
+    const exe = cmdline.split('\0')[0]
+    if (!exe) {
+      return undefined
+    }
+
+    const parts = exe.split('/')
+    return parts.at(-1)
+  } catch {
+    return undefined
   }
 }
 

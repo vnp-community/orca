@@ -19,6 +19,13 @@ import (
 type Identity struct {
 	TenantID string
 	UserID   string
+	// DeviceID is non-empty only for a mobile-paired-device JWT (SOL-MB-01,
+	// minted by auth-service's CompleteDevicePairing/IssueToken.ExecuteForDevice)
+	// — required by every mobile.* channel (channels_mobile_dispatch.go,
+	// channels_mobile_status.go). A plain browser session's Identity never
+	// carries one, so mobile.* channels stay unreachable from a browser
+	// session.
+	DeviceID string
 	// Role is the caller's global role ("admin"/"user") — populated only by
 	// authclient.SessionValidator's cookie/session path (the browser/web
 	// path every wscompat call goes through), never by the bearer-JWT

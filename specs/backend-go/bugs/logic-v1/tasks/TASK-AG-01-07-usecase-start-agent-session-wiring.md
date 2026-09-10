@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/start_agent_session.go` (new)
 **Depends on:** TASK-AG-01-02, TASK-AG-01-04, TASK-AG-01-05, TASK-AG-01-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — StartAgentSession usecase + translateAgentSpawnError (TASK-AG-01-04's mapping) implemented; gRPC StartAgentSession handler + toProtoAgentSession added to server.go; full main.go composition-root wiring (agentSessionStore, startAgentSessionUC, passed into grpc.New). start_agent_session_test.go covers resolved-connection happy path, ErrAgentAlreadyRunning cleanup-kill, credential-injection-unavailable mapping, and unresolved-connection — all passing.
 
 ---
 

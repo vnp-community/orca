@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/get_linked_pull_requests_for_issue.go` (new), `internal/usecase/ports.go`, `internal/adapter/github/client.go`, `internal/adapter/gitlab/client.go`
 **Depends on:** TASK-PI-01-01
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — GetLinkedPullRequestsForIssue usecase + GitHub(timeline)/GitLab(related_merge_requests) adapters; other providers degrade (nil,false,nil).`
 
 ---
 

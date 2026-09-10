@@ -5,7 +5,7 @@
 **Service:** new `orca-cli` binary (`backend-go/cmd/orca-cli/`)
 **File:** `backend-go/cmd/orca-cli/go.mod`
 **Depends on:** none (this scaffolding compiles standalone; TASK-CLI-01-07 wires it to the real routes)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — created `backend-go/cmd/orca-cli` module (go.mod, internal/config/credentials.go, internal/apiclient/{client,errors}.go), added to `go.work`; builds standalone and from workspace root.
 
 ---
 

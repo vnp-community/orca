@@ -5,7 +5,7 @@
 **Service:** `auth-service` (domain)
 **File:** `backend-go/services/auth-service/internal/domain/audit.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `AuditEntry`/`NewAuditEntry` split into `TargetType`/`TargetID`/`Metadata`/`IPAddress`; domain package builds+tests pass standalone (`usecase` package intentionally non-building until TASK-AUTH-05-05, as expected).
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/usecase/ports.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — WorktreeCreator/AgentSpawner/PromptInjector appended to ports.go; api-gateway builds clean
 
 ---
 

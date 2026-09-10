@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/osc133_scanner.go` (new)
 **Depends on:** TASK-AG-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain/osc133_scanner.go (Osc133Scanner, direct port of the TS carry-buffer algorithm) implemented; osc133_scanner_test.go covers BEL/ST termination, prefix-split-across-chunks, terminator-split-across-chunks, exit-code present/absent/malformed, and Reset — all passing.
 
 ---
 

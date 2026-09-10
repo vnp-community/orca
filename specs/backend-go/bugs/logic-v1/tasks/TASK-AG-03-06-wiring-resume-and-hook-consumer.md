@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` + `api-gateway`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`, `backend-go/services/infra-fleet-service/cmd/server/main.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels_agent.go`
 **Depends on:** TASK-AG-03-04, TASK-AG-03-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `ResumeAgentSession` grpc handler was already wired (Phase 1); added `ensureHookConsumer` callback threaded into `StartAgentSession` (fires once per `ResolveConnection` success, covering both Start and the delegated Resume path) + main.go's per-dev-server dedup map/goroutine + `agent.resume` wscompat channel. `TestStartAgentSession_CallsEnsureHookConsumerAfterResolvingConnection` and `TestAgentResumeChannel_*` pass.
 
 ---
 

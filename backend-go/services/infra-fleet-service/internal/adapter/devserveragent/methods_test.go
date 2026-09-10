@@ -2,7 +2,6 @@ package devserveragent
 
 import (
 	"context"
-	"log/slog"
 	"testing"
 	"time"
 
@@ -16,10 +15,10 @@ func TestClientSpawnPtySucceedsAgainstFakeAgent(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-1", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-1", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -44,10 +43,10 @@ func TestClientSpawnPty_MissingIDInResponse_ReturnsClearError(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-missing-id", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-missing-id", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -55,6 +54,65 @@ func TestClientSpawnPty_MissingIDInResponse_ReturnsClearError(t *testing.T) {
 	result, err := client.SpawnPty(context.Background(), devServer, usecase.SpawnPtyInput{Cwd: "/repo"})
 	if err == nil {
 		t.Fatalf("expected an error for a pty.create response missing id, got result=%+v", result)
+	}
+}
+
+// TestClientSpawnPty_ShellIntegration_ForwardedToParams is TASK-TM-04-06's
+// regression guard: BR-TM-13's opt-in flag must actually reach pty.create's
+// params — infra-fleet-service never inspects it, only forwards it.
+func TestClientSpawnPty_ShellIntegration_ForwardedToParams(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{
+		"pty.create": map[string]any{"id": "pty-si", "cols": 80, "rows": 24, "cwd": "/work", "shell": "powershell.exe"},
+	}}
+	host, port := startFakeAgent(t, agent)
+
+	client := newTestClientWithToken(port, fakeAgentToken)
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-shell-integration", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	if _, err := client.SpawnPty(context.Background(), devServer, usecase.SpawnPtyInput{Cwd: "/repo", ShellIntegration: true}); err != nil {
+		t.Fatalf("SpawnPty: %v", err)
+	}
+
+	params := agent.lastParams(t, "pty.create")
+	got, ok := params["shellIntegration"]
+	if !ok {
+		t.Fatal("expected pty.create params to include shellIntegration")
+	}
+	if got != true {
+		t.Errorf("expected shellIntegration=true, got %v", got)
+	}
+}
+
+// TestClientSpawnPty_ShellIntegrationDefaultFalse_OmittedFromParams confirms
+// existing callers that don't set ShellIntegration see no behavior change —
+// the param is omitted entirely (not sent as false), matching every other
+// optional field in this method.
+func TestClientSpawnPty_ShellIntegrationDefaultFalse_OmittedFromParams(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{
+		"pty.create": map[string]any{"id": "pty-default", "cols": 80, "rows": 24, "cwd": "/work", "shell": "/bin/bash"},
+	}}
+	host, port := startFakeAgent(t, agent)
+
+	client := newTestClientWithToken(port, fakeAgentToken)
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-default", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	if _, err := client.SpawnPty(context.Background(), devServer, usecase.SpawnPtyInput{Cwd: "/repo"}); err != nil {
+		t.Fatalf("SpawnPty: %v", err)
+	}
+
+	params := agent.lastParams(t, "pty.create")
+	if _, ok := params["shellIntegration"]; ok {
+		t.Errorf("expected shellIntegration to be omitted when unset, got %v", params["shellIntegration"])
 	}
 }
 
@@ -71,10 +129,10 @@ func TestClientWriteResizeKillPty_SendsExpectedParams(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-params", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-params", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -112,10 +170,10 @@ func TestClientWriteResizeKillPty_CallExpectedMethods(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-2", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-2", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -142,10 +200,10 @@ func TestClientSendSignal_SendsExpectedParams(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-signal", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-signal", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -167,10 +225,10 @@ func TestClientSendSignal_RejectsUnknownSignal_WithoutACall(t *testing.T) {
 	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-signal-bad", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-signal-bad", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -189,10 +247,10 @@ func TestClientAgentStatusAndInspectProcess_FromListProcesses(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-3", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-3", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -238,10 +296,10 @@ func TestClientStreamPty_RoutesDataAndExitNotifications(t *testing.T) {
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-4", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-4", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -301,10 +359,10 @@ func TestClientStreamPty_TwoConcurrentSubscriptions_EachGetsOwnEvents(t *testing
 	}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-5", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-5", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -365,10 +423,10 @@ func TestClientStreamPty_ContextCancellationClosesOutputChannel(t *testing.T) {
 	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
 	host, port := startFakeAgent(t, agent)
 
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-6", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-6", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -389,5 +447,76 @@ func TestClientStreamPty_ContextCancellationClosesOutputChannel(t *testing.T) {
 		}
 	case <-time.After(2 * time.Second):
 		t.Fatal("timed out waiting for events channel to close after ctx cancellation")
+	}
+}
+
+// TestClientExecStream_DeliversFramesInOrderThenCloses is TASK-PW-03-08's
+// regression guard on Client.ExecStream: multiple response frames replying
+// to the SAME request id (git.execStream's real wire shape, unlike
+// StreamPty's out-of-band notification demux) must arrive in order and the
+// output channel must close once the stream.end-typed terminal frame is
+// observed.
+func TestClientExecStream_DeliversFramesInOrderThenCloses(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, streamResults: map[string][]any{
+		"git.execStream": {
+			map[string]any{"type": "stream.chunk", "line": "Enumerating objects: 3, done.", "source": "stderr"},
+			map[string]any{"type": "stream.chunk", "line": "Writing objects: 100% (3/3)", "source": "stderr"},
+			map[string]any{"type": "stream.end", "exitCode": 0},
+		},
+	}}
+	host, port := startFakeAgent(t, agent)
+
+	client := newTestClientWithToken(port, fakeAgentToken)
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-execstream", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	frames, unsubscribe, err := client.ExecStream(context.Background(), devServer, "git.execStream", map[string]any{"args": []string{"push"}})
+	if err != nil {
+		t.Fatalf("ExecStream: %v", err)
+	}
+	defer unsubscribe()
+
+	var got []map[string]any
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case frame, ok := <-frames:
+			if !ok {
+				if len(got) != 3 {
+					t.Fatalf("channel closed after %d frames, want 3: %+v", len(got), got)
+				}
+				if got[0]["line"] != "Enumerating objects: 3, done." {
+					t.Errorf("unexpected first frame: %+v", got[0])
+				}
+				if got[2]["type"] != "stream.end" {
+					t.Errorf("expected last frame to be the stream.end terminator, got %+v", got[2])
+				}
+				return
+			}
+			got = append(got, frame)
+		case <-deadline:
+			t.Fatalf("timed out waiting for the frames channel to close (got %d frames so far: %+v)", len(got), got)
+		}
+	}
+}
+
+// TestClientExecStream_RelaySSHModeErrors mirrors StreamPty's own
+// relay-ssh restriction — no persistent session exists to stream over.
+func TestClientExecStream_RelaySSHModeErrors(t *testing.T) {
+	client := newTestClientWithToken(0, fakeAgentToken)
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-ssh", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "target-1", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	_, _, err = client.ExecStream(context.Background(), devServer, "git.execStream", nil)
+	if err == nil {
+		t.Fatal("expected an error for relay-ssh mode")
 	}
 }

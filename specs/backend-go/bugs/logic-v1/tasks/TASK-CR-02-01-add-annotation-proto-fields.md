@@ -5,7 +5,7 @@
 **Service:** `annotation-service`
 **File:** `backend-go/proto/orca/annotation/v1/annotation.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — annotation.proto updated with Side enum, Anchor/Annotation/CreateAnnotationRequest/ListAnnotationsRequest/DeleteAnnotationRequest fields and MarkAnnotationsSent RPC; buf generate + buf breaking (against origin/main) clean, go build ./proto/... passes
 
 ---
 

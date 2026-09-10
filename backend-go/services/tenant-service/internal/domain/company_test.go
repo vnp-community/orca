@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"errors"
+	"testing"
+)
 
 func TestNewCompany_ValidatesInvariants(t *testing.T) {
 	tests := []struct {
@@ -27,6 +30,39 @@ func TestNewCompany_ValidatesInvariants(t *testing.T) {
 				return
 			}
 			if err != tt.wantErr {
+				t.Fatalf("expected %v, got %v", tt.wantErr, err)
+			}
+		})
+	}
+}
+
+func TestValidateCompanySettings(t *testing.T) {
+	tests := []struct {
+		name    string
+		s       Settings
+		wantErr error
+	}{
+		{"no agent/security section", Settings{}, nil},
+		{"approved model", Settings{"agent": Settings{"approvedModels": []any{"claude-opus-4-5", "codex"}}}, nil},
+		{"unapproved model", Settings{"agent": Settings{"approvedModels": []any{"gpt-99"}}}, ErrUnsupportedModel},
+		{"timeout in range", Settings{"security": Settings{"sessionTimeoutHours": float64(24)}}, nil},
+		{"timeout at lower bound", Settings{"security": Settings{"sessionTimeoutHours": float64(1)}}, nil},
+		{"timeout at upper bound", Settings{"security": Settings{"sessionTimeoutHours": float64(168)}}, nil},
+		{"timeout below range", Settings{"security": Settings{"sessionTimeoutHours": float64(0)}}, ErrSessionTimeoutRange},
+		{"timeout above range", Settings{"security": Settings{"sessionTimeoutHours": float64(169)}}, ErrSessionTimeoutRange},
+		{"security absent field is no-op", Settings{"security": Settings{}}, nil},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := ValidateCompanySettings(tt.s)
+			if tt.wantErr == nil {
+				if err != nil {
+					t.Fatalf("expected no error, got %v", err)
+				}
+				return
+			}
+			if !errors.Is(err, tt.wantErr) {
 				t.Fatalf("expected %v, got %v", tt.wantErr, err)
 			}
 		})

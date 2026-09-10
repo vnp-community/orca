@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/ports.go`, `backend-go/services/scm-integration-service/internal/domain/scm.go`
 **Depends on:** TASK-CR-05-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain.ErrCapabilityUnsupported + PullRequest.Draft added; ports.go CreatePullRequestInput.Draft + ScmProvider.GetRepoFileContent added; domain+usecase packages compile in isolation
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `auth-service` (usecase)
 **File:** `backend-go/services/auth-service/internal/usecase/login.go`, `logout.go`, `create_user.go`, `deactivate_user.go`, `reactivate_user.go`, `update_user_role.go`, `revoke_session.go`, `force_revoke_all_sessions.go`, `bootstrap.go`
 **Depends on:** TASK-AUTH-05-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — updated all 9 listed call sites plus `update_user.go` (new since this table was written, TASK-AUTH-04-04); corrected `logout.go`/`revoke_session.go` to target `"session"`/tokenHash per the table (previously targeted the user, a pre-existing inconsistency); full `auth-service` build + `go test -race ./services/auth-service/...` green.
 
 ---
 

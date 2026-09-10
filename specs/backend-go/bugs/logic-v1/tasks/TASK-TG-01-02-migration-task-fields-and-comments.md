@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/migrations/0003_task_fields_and_comments.up.sql` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0003 created (up/down); widened tasks columns + status CHECK; verified via testcontainers up/down/up cycle in later postgres tests.
 
 ---
 

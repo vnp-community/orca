@@ -12,7 +12,7 @@ func TestRotateKey_RotatesCredentialRefAndSetsStatusRotating(t *testing.T) {
 	repo := newFakeAccountRepository()
 	now := time.Now()
 	acc, err := domain.NewProviderAccount("acc-1", "tenant-1", domain.ProviderTypeAnthropic, domain.AccountStatusActive,
-		"cred-ref-old", domain.ScopeServer, "", "", "", nil, now, now)
+		"cred-ref-old", domain.ScopeServer, "", "", "", "", "", "", 0, nil, false, nil, "", nil, now, now)
 	if err != nil {
 		t.Fatalf("building account: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestRotateKey_PropagatesBrokerFailure(t *testing.T) {
 	repo := newFakeAccountRepository()
 	now := time.Now()
 	acc, _ := domain.NewProviderAccount("acc-1", "tenant-1", domain.ProviderTypeAnthropic, domain.AccountStatusActive,
-		"cred-ref-old", domain.ScopeServer, "", "", "", nil, now, now)
+		"cred-ref-old", domain.ScopeServer, "", "", "", "", "", "", 0, nil, false, nil, "", nil, now, now)
 	_ = repo.Create(context.Background(), acc)
 
 	broker := &fakeCredentialBroker{rotateErr: errBoom}

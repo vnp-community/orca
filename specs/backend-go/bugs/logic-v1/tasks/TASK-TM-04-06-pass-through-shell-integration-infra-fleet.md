@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/spawn_terminal_session.go`
 **Depends on:** TASK-TM-04-05 (proto field)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ShellIntegration threaded through SpawnPtyInput/SpawnTerminalSessionInput/gRPC handler/pty.create params; `go test -run TestSpawnTerminalSession -v` (8/8) and `go test ./internal/adapter/devserveragent/...` (all incl. 2 new ShellIntegration cases) pass.
 
 ---
 

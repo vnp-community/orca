@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/ports.go`
 **Depends on:** TASK-PI-01-01
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — IssueFilter extended, IssueListCache/BackoffExecutor ports added to ports.go.`
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `auth-service` (usecase + postgres)
 **File:** `backend-go/services/auth-service/internal/usecase/list_sessions.go` (new), `backend-go/services/auth-service/internal/usecase/ports.go`, `backend-go/services/auth-service/internal/adapter/postgres/session_repository.go`
 **Depends on:** TASK-AUTH-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `domain.SessionWithUser`, `SessionRepository.ListForTenant` (port+postgres, using `host(ip)` not `ip::text`), `ListSessions` usecase; unit tests confirm tenant-scoping via `actor.TenantID` and admin-gate denial; integration test `TestSessionRepository_ListForTenant` passes against real Postgres (tenant isolation + pagination).
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/proto/orca/workflow/v1/workflow.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `WorkflowTemplate`/`CreateTemplateRequest`/`UpdateTemplateRequest` extended additively, `CloneTemplate` RPC + request/response messages added; `make proto-gen` regenerated stubs; `go build ./...` clean for `proto`, `workflow-service`, and `api-gateway`. `buf breaking` itself couldn't resolve `.git#branch=main` in this detached worktree checkout (same as the Makefile's own `proto-lint` target, which already tolerates this with `|| true`) — verified additivity by inspection instead: only new field numbers/messages/RPC, nothing renumbered or removed.
 
 ---
 

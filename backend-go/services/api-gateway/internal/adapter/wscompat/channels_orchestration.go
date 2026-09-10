@@ -72,9 +72,9 @@ func registerOrchestrationChannels(r *Registry, client orchestrationv1.Orchestra
 		if err != nil {
 			return nil, err
 		}
-		views := make([]agentSessionView, 0, len(resp.GetDispatchContexts()))
+		views := make([]activeDispatchContextView, 0, len(resp.GetDispatchContexts()))
 		for _, dc := range resp.GetDispatchContexts() {
-			views = append(views, agentSessionView{
+			views = append(views, activeDispatchContextView{
 				ID:                  dc.GetId(),
 				OrchestrationTaskID: dc.GetOrchestrationTaskId(),
 				AssigneeHandle:      dc.GetHandle(),
@@ -87,12 +87,12 @@ func registerOrchestrationChannels(r *Registry, client orchestrationv1.Orchestra
 	})
 }
 
-// agentSessionView is agentSession.listActive's wire shape — camelCase,
+// activeDispatchContextView is agentSession.listActive's wire shape — camelCase,
 // explicit struct rather than the raw proto message (per BE-SOL-001's
 // documented finding: protoc-gen-go's plain encoding/json struct tags are
 // snake_case, and this wscompat envelope serializes via plain
 // encoding/json, not protojson).
-type agentSessionView struct {
+type activeDispatchContextView struct {
 	ID                  string `json:"id"`
 	OrchestrationTaskID string `json:"orchestrationTaskId"`
 	AssigneeHandle      string `json:"assigneeHandle"`

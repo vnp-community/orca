@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/ports.go`
 **Depends on:** TASK-WT-05-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added GitExecutor.MergeBranch + domain.MergeResult; go build clean once localgit/relay/fakes implement it (done together with WT-05-03 rather than as a temporary stub, since both landed in this same pass).
 
 ---
 

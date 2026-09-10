@@ -115,6 +115,76 @@ describe('getRelayShellLaunchConfig', () => {
     })
   })
 
+  it('omits the OSC 133 bootstrap for PowerShell/pwsh when shellIntegration is false or unset (unchanged default behavior)', () => {
+    for (const shellPath of [
+      'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
+    ]) {
+      expect(getRelayShellLaunchConfig(shellPath, { HOME: homeDir }, 'win32')).toEqual({
+        args: ['-NoLogo'],
+        env: {}
+      })
+      expect(
+        getRelayShellLaunchConfig(shellPath, { HOME: homeDir }, 'win32', { shellIntegration: false })
+      ).toEqual({
+        args: ['-NoLogo'],
+        env: {}
+      })
+    }
+  })
+
+  it('injects the OSC 133 bootstrap for PowerShell/pwsh when shellIntegration is true', () => {
+    for (const shellPath of [
+      'C:\\Windows\\System32\\WindowsPowerShell\\v1.0\\powershell.exe',
+      'C:\\Program Files\\PowerShell\\7\\pwsh.exe'
+    ]) {
+      const config = getRelayShellLaunchConfig(shellPath, { HOME: homeDir }, 'win32', {
+        shellIntegration: true
+      })
+      expect(config.env).toEqual({})
+      expect(config.args[0]).toBe('-NoLogo')
+      expect(config.args[1]).toBe('-NoExit')
+      expect(config.args[2]).toBe('-EncodedCommand')
+      const encoded = config.args[3]
+      const decoded = Buffer.from(encoded, 'base64').toString('utf16le')
+      expect(decoded).toContain(']133;A')
+      expect(decoded).toContain(']133;C')
+    }
+  })
+
+  it('leaves cmd.exe/wsl.exe args unaffected by shellIntegration', () => {
+    expect(
+      getRelayShellLaunchConfig('C:\\Windows\\System32\\cmd.exe', { HOME: homeDir }, 'win32', {
+        shellIntegration: true
+      })
+    ).toEqual({ args: [], env: {} })
+    expect(
+      getRelayShellLaunchConfig('C:\\Windows\\System32\\wsl.exe', { HOME: homeDir }, 'win32', {
+        shellIntegration: true,
+        terminalWindowsWslDistro: 'Ubuntu'
+      })
+    ).toEqual({ args: ['-d', 'Ubuntu'], env: {} })
+  })
+
+  it('leaves POSIX platform shapes unaffected by shellIntegration', () => {
+    expect(
+      getRelayShellLaunchConfig('/usr/bin/pwsh', { HOME: homeDir }, 'linux', {
+        shellIntegration: true
+      })
+    ).toEqual({
+      args: ['-l'],
+      env: {}
+    })
+    expect(
+      getRelayShellLaunchConfig('/usr/bin/pwsh', { HOME: homeDir }, 'darwin', {
+        shellIntegration: true
+      })
+    ).toEqual({
+      args: ['-l'],
+      env: {}
+    })
+  })
+
   it('keeps PowerShell Core on POSIX remotes as a login shell', () => {
     expect(getRelayShellLaunchConfig('/usr/bin/pwsh', { HOME: homeDir }, 'linux')).toEqual({
       args: ['-l'],

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/version_check.go` (new)
 **Depends on:** TASK-SSH-02-01
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — version_check.go's remoteVersionAndPresence added; TestRemoteVersionAndPresence_* pass`
 
 ---
 

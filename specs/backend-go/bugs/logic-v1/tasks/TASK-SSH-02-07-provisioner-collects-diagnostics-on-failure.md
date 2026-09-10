@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshrelay/provisioner.go`
 **Depends on:** TASK-SSH-02-04, TASK-SSH-02-06
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — Provision's handshake-failure path appends collectDiagnostics' output; TestProvision_HandshakeTimeout_IncludesDiagnostics passes`
 
 ---
 

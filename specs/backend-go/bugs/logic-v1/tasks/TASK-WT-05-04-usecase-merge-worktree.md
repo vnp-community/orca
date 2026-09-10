@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/merge_worktree_into_base.go` (new)
 **Depends on:** TASK-WT-05-02, TASK-WT-05-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Created merge_worktree_into_base.go (BR-WT-16/17) + dispatchKeyForRepo repo: prefix; ConnectionResolver.ResolveConnection updated to strip the repo: prefix. gRPC handler wired via positional New(...) in main.go. go build+test clean.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/adapter/localgit/executor.go`
 **Depends on:** TASK-PW-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — localgit.Executor implements MergeBranch/StashPush/StashPop/CreateBranch/DeleteBranch against real temp git repos; 7 new integration tests pass incl. genuine-conflict and unmerged-branch-delete-fails cases
 
 ---
 

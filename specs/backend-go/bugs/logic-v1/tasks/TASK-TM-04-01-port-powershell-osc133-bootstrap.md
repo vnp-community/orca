@@ -5,7 +5,7 @@
 **Service:** agent/ (Dev Server Agent)
 **File:** `agent/src/relay/pty-osc133-bootstrap.ts`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — agent/src/relay/pty-osc133-bootstrap.ts ported verbatim + smoke test added; `npx vitest run src/relay/pty-osc133-bootstrap.test.ts` — 3/3 pass. `npx tsc --noEmit` has pre-existing, unrelated TS6307 "file not in project" noise across this tsconfig (its `include` list already excludes files pre-existing code imports, e.g. `pty-shell-launch.ts`'s own `omp-shell-wrapper` import) — confirmed present before this change and not introduced by it.
 
 ---
 

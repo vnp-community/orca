@@ -5,7 +5,7 @@
 **Service:** `auth-service`
 **File:** `backend-go/services/auth-service/internal/adapter/grpc/server.go`, `backend-go/services/auth-service/cmd/server/main.go`
 **Depends on:** TASK-MB-01-05, TASK-MB-01-06
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — 5 pairing usecases wired into `grpc.Server`/`cmd/server/main.go`; `go build`/`go vet`/`go test ./services/auth-service/...` clean.
 
 ---
 

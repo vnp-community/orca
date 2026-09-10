@@ -28,6 +28,47 @@ func mountGitRoutes(r chi.Router, client gitgatewayv1.GitGatewayServiceClient) {
 		sub.Post("/pull", handleGitPull(client))
 		sub.Post("/commit-message", handleGenerateGitCommitMessage(client))
 	})
+	// New: top-level, not nested under /v1/git — the resource is a
+	// worktree, not a git operation, matching project_routes.go's existing
+	// /v1/projects/{id}/worktrees naming for the bookkeeping-only view.
+	r.Post("/v1/worktrees", handleCreateWorktree(client))
+}
+
+// createWorktreeRequestBody is the REST request shape for POST
+// /v1/worktrees — see gitCommitRequestBody's doc comment on why
+// tenant_id/user_id are absent.
+type createWorktreeRequestBody struct {
+	ProjectID      string `json:"project_id"`
+	RepoID         string `json:"repo_id"`
+	Branch         string `json:"branch"`
+	BaseRef        string `json:"base_ref"`
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+func handleCreateWorktree(client gitgatewayv1.GitGatewayServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+
+		var body createWorktreeRequestBody
+		if !decodeJSONBody(w, r, &body) {
+			return
+		}
+		if body.ProjectID == "" || body.RepoID == "" || body.Branch == "" {
+			writeJSONError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "project_id, repo_id, and branch are required")
+			return
+		}
+
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		resp, err := client.CreateWorktree(ctx, &gitgatewayv1.CreateWorktreeRequest{
+			ProjectId: body.ProjectID, RepoId: body.RepoID, Branch: body.Branch,
+			BaseRef: body.BaseRef, IdempotencyKey: &body.IdempotencyKey,
+		})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, resp)
+	}
 }
 
 func handleGetGitStatus(client gitgatewayv1.GitGatewayServiceClient) http.HandlerFunc {

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/save_terminal_scrollback_snapshot.go`
 **Depends on:** TASK-TM-03-04 (repository port)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — save_terminal_scrollback_snapshot.go + test added (happy path, over-cap, missing-key); `go test -run TestSaveTerminalScrollbackSnapshot` — 3/3 pass.
 
 ---
 

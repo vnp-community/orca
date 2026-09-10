@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/record_agent_hook_provider_session.go` (new), `backend-go/services/infra-fleet-service/cmd/server/main.go`
 **Depends on:** TASK-AG-03-02, TASK-AG-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — RecordAgentHookProviderSession implemented, extended beyond spec to also prefer the exact GetByPtyID join (TASK-AG-03-07) over the worktree fallback once agent/ sends a ptyId. record_agent_hook_provider_session_test.go covers no-providerSession no-op, no-active-session no-op, and happy-path — all passing. Run()'s per-dev-server-connection startup wiring is TASK-AG-03-06 (out of this batch's scope).
 
 ---
 

@@ -51,7 +51,7 @@ func TestGetHostCapabilities_ConnectionIDNotResolved_ReturnsHonestFalseWithoutRe
 // the no-connection case) a connection IS bound and driving it is a real,
 // failed attempt worth surfacing, not something to paper over.
 func TestGetHostCapabilities_AgentMethodNotFound_TranslatesToFailedPrecondition(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestGetHostCapabilities_AgentMethodNotFound_TranslatesToFailedPrecondition(
 }
 
 func TestGetHostCapabilities_AgentOtherError_IsInternal(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -97,7 +97,7 @@ func TestGetHostCapabilities_AgentOtherError_IsInternal(t *testing.T) {
 }
 
 func TestGetHostCapabilities_Success_DecodesFullResult(t *testing.T) {
-	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1")
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

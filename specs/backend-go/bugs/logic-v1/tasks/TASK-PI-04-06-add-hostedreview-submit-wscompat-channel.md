@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_scm.go`
 **Depends on:** TASK-PI-04-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — hostedReview.submit channel added next to hostedReview.getCreationEligibility, same drain-all-pages + BR-PI-10 fail-fast composition as pr_review_routes.go's SubmitPullRequestReview; registerSCMChannels/registerHostedReviewChannels threaded an annotationClient param.`
 
 ---
 

@@ -23,6 +23,14 @@ service OrchestrationService {
   // missing assignee_handle field, a missing read RPC" distinction.
   rpc GetDispatchContextForTask(GetDispatchContextForTaskRequest) returns (GetDispatchContextForTaskResponse);
 
+  // StartCoordinatorRun is task-service's entry point into the complex
+  // execution path (task-service.md §3.1/§7): starts a coordinator_run for
+  // a subtree of tasks and returns immediately — this call does NOT block
+  // for the DAG to finish. orchestration-service calls back into
+  // task-service (ReportTaskExecutionResult) to report the terminal
+  // result; it never blocks task-service synchronously for it.
+  rpc StartCoordinatorRun(StartCoordinatorRunRequest) returns (StartCoordinatorRunResponse);
+
   // ListActiveDispatchContextsForUser: every non-terminal dispatch context
   // for the calling user (tenant/user from identity, not a request field).
   // Added for CR-STORAGE-006/007 — see
@@ -40,6 +48,23 @@ service OrchestrationService {
   // trip the circuit breaker" rule. See
   // docs/backlog/BACKLOG-009-orchestration-service-fail-dispatch-missing.md.
   rpc FailDispatch(FailDispatchRequest) returns (FailDispatchResponse);
+}
+
+message OrchestrationTaskSpec {
+  string temp_id = 1; // task-service's own Task.ID, carried as a reference — NOT the primary key here (distinct id spaces, §2.1)
+  string title = 2;
+  string prompt = 3;         // description or prompt_template, whichever the caller resolved
+  repeated string deps = 4;  // temp_ids of sibling nodes in THIS SAME request this node depends on
+}
+
+message StartCoordinatorRunRequest {
+  string tenant_id = 1;
+  string origin_task_id = 2; // task-service's root Task.ID for this dispatch
+  string worktree_id = 3;
+  repeated OrchestrationTaskSpec tasks = 4;
+}
+message StartCoordinatorRunResponse {
+  string id = 1; // the new coordinator_run's id — task-service's "logical FK" (active_execution_id)
 }
 
 message DispatchContext {

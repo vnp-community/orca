@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_scm.go`
 **Depends on:** TASK-CR-05-06, TASK-CR-05-07
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — hostedReview.create forwards draft/linkedIssueNumber (*int32, unset stays nil — no live frontend call site sends it yet) and now returns the whole CreatePullRequestResponse; hostedReview.suggestReviewers wired. All TestHostedReview* cases pass.
 
 ---
 

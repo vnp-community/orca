@@ -57,6 +57,28 @@ func TestSession_IsValid(t *testing.T) {
 	}
 }
 
+func TestSession_WithClientInfo(t *testing.T) {
+	now := time.Now()
+	s, err := NewSession("hash1", "u1", "t1", now, now.Add(time.Hour))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	withInfo := s.WithClientInfo("203.0.113.7", "test-agent/1.0")
+	if withInfo.IP != "203.0.113.7" {
+		t.Errorf("expected IP to be set, got %q", withInfo.IP)
+	}
+	if withInfo.UserAgent != "test-agent/1.0" {
+		t.Errorf("expected UserAgent to be set, got %q", withInfo.UserAgent)
+	}
+	if withInfo.TokenHash != s.TokenHash || withInfo.UserID != s.UserID || withInfo.TenantID != s.TenantID {
+		t.Error("expected WithClientInfo to leave other fields untouched")
+	}
+	if s.IP != "" || s.UserAgent != "" {
+		t.Error("expected WithClientInfo not to mutate the receiver (value semantics)")
+	}
+}
+
 func TestHashSessionToken_IsDeterministicAndDistinct(t *testing.T) {
 	h1 := HashSessionToken("raw-token-a")
 	h2 := HashSessionToken("raw-token-a")

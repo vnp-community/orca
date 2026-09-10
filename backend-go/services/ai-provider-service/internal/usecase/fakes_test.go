@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/stablyai/orca-go/common/tenant"
+	"github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/eventbus"
 	"github.com/stablyai/orca-go/services/ai-provider-service/internal/domain"
 )
 
@@ -36,6 +37,17 @@ type fakeAccountRepository struct {
 	deleteErr           error
 	lastDeleteTenantID  string
 	lastDeleteAccountID string
+
+	// markQuotaWarningSentErr/lastQuotaWarningAccountID/lastQuotaWarningDay
+	// back record_token_usage_test.go.
+	markQuotaWarningSentErr   error
+	lastQuotaWarningAccountID string
+	lastQuotaWarningDay       time.Time
+
+	// lastUpdateStatusInput records UpdateStatus's last input — asserted by
+	// record_token_usage_test.go / reconcile_provider_health_test.go.
+	lastUpdateStatusInput UpdateStatusInput
+	updateStatusErr       error
 }
 
 func newFakeAccountRepository() *fakeAccountRepository {
@@ -83,17 +95,27 @@ func (f *fakeAccountRepository) List(ctx context.Context, filter ListAccountsFil
 		if filter.DevServerID != "" && acc.DevServerID != filter.DevServerID {
 			continue
 		}
+		if filter.ProviderType != "" && acc.ProviderType != filter.ProviderType {
+			continue
+		}
 		out = append(out, acc)
 	}
 	return out, nil
 }
 
 func (f *fakeAccountRepository) UpdateStatus(ctx context.Context, in UpdateStatusInput) (domain.ProviderAccount, error) {
+	f.lastUpdateStatusInput = in
+	if f.updateStatusErr != nil {
+		return domain.ProviderAccount{}, f.updateStatusErr
+	}
 	acc, ok := f.accounts[in.AccountID]
 	if !ok || acc.TenantID != in.TenantID {
 		return domain.ProviderAccount{}, domain.ErrAccountNotFound
 	}
 	acc.Status = in.Status
+	if in.HealthDetail != nil {
+		acc.HealthDetail = in.HealthDetail
+	}
 	if in.CredentialRef != "" {
 		acc.CredentialRef = in.CredentialRef
 	}
@@ -102,6 +124,24 @@ func (f *fakeAccountRepository) UpdateStatus(ctx context.Context, in UpdateStatu
 	}
 	f.accounts[in.AccountID] = acc
 	return acc, nil
+}
+
+// MarkQuotaWarningSent implements usecase.ProviderAccountRepository —
+// records the call and, when the account is known, sets
+// QuotaWarningSentDate on it (record_token_usage_test.go's idempotency
+// assertions read this back via Get).
+func (f *fakeAccountRepository) MarkQuotaWarningSent(ctx context.Context, tenantID, accountID string, day time.Time) error {
+	f.lastQuotaWarningAccountID = accountID
+	f.lastQuotaWarningDay = day
+	if f.markQuotaWarningSentErr != nil {
+		return f.markQuotaWarningSentErr
+	}
+	if acc, ok := f.accounts[accountID]; ok && acc.TenantID == tenantID {
+		d := day
+		acc.QuotaWarningSentDate = &d
+		f.accounts[accountID] = acc
+	}
+	return nil
 }
 
 // Update implements usecase.ProviderAccountRepository.Update — records the
@@ -139,7 +179,14 @@ func (f *fakeAccountRepository) Delete(ctx context.Context, tenantID, accountID 
 
 // fakeUsageRepository is an in-memory UsageRepository.
 type fakeUsageRepository struct {
-	states map[string]domain.QuotaState // keyed by accountID
+	states        map[string]domain.QuotaState // keyed by accountID
+	incrementErr  error
+	lastIncrement struct {
+		tenantID, accountID      string
+		day                      time.Time
+		tokensUsed, requestCount int64
+		costUSD                  float64
+	}
 }
 
 func (f *fakeUsageRepository) GetToday(ctx context.Context, tenantID, accountID string, day time.Time) (domain.QuotaState, error) {
@@ -147,6 +194,101 @@ func (f *fakeUsageRepository) GetToday(ctx context.Context, tenantID, accountID 
 		return state, nil
 	}
 	return domain.QuotaState{AccountID: accountID, Date: day}, nil
+}
+
+// IncrementUsage implements usecase.UsageRepository — additive, in-memory.
+func (f *fakeUsageRepository) IncrementUsage(ctx context.Context, tenantID, accountID string, day time.Time, tokensUsed, requestCount int64, costUSD float64) (domain.QuotaState, error) {
+	f.lastIncrement.tenantID, f.lastIncrement.accountID = tenantID, accountID
+	f.lastIncrement.day = day
+	f.lastIncrement.tokensUsed, f.lastIncrement.requestCount, f.lastIncrement.costUSD = tokensUsed, requestCount, costUSD
+	if f.incrementErr != nil {
+		return domain.QuotaState{}, f.incrementErr
+	}
+	if f.states == nil {
+		f.states = make(map[string]domain.QuotaState)
+	}
+	state := f.states[accountID]
+	state.AccountID = accountID
+	state.Date = day
+	state.TokensUsed += tokensUsed
+	state.RequestCount += requestCount
+	state.CostUSD += costUSD
+	f.states[accountID] = state
+	return state, nil
+}
+
+// fakeOutboxEnqueuer is an in-memory OutboxEnqueuer — backs
+// reconcile_provider_health_test.go / record_token_usage_test.go.
+type fakeOutboxEnqueuer struct {
+	enqueueErr error
+	enqueued   []struct {
+		subject  string
+		tenantID string
+		payload  map[string]any
+	}
+}
+
+func (f *fakeOutboxEnqueuer) Enqueue(ctx context.Context, subject string, tenantID string, payload map[string]any) error {
+	if f.enqueueErr != nil {
+		return f.enqueueErr
+	}
+	f.enqueued = append(f.enqueued, struct {
+		subject  string
+		tenantID string
+		payload  map[string]any
+	}{subject, tenantID, payload})
+	return nil
+}
+
+// fakeHealthCheckBatch/fakeHealthCheckClaimer back
+// reconcile_provider_health_test.go.
+type fakeHealthCheckBatch struct {
+	accounts    []domain.ProviderAccount
+	recordErr   error
+	committed   bool
+	rolledBack  bool
+	recordCalls []domain.ProviderAccount
+}
+
+func (b *fakeHealthCheckBatch) Accounts() []domain.ProviderAccount { return b.accounts }
+
+func (b *fakeHealthCheckBatch) RecordResult(ctx context.Context, accountID string, status domain.AccountStatus, healthDetail *string, latencyMs *int, checkedAt time.Time) error {
+	if b.recordErr != nil {
+		return b.recordErr
+	}
+	for i, acc := range b.accounts {
+		if acc.ID == accountID {
+			b.accounts[i].Status = status
+			b.accounts[i].HealthDetail = healthDetail
+			b.accounts[i].LatencyMs = latencyMs
+			b.recordCalls = append(b.recordCalls, b.accounts[i])
+		}
+	}
+	return nil
+}
+
+func (b *fakeHealthCheckBatch) Commit(ctx context.Context) error {
+	b.committed = true
+	return nil
+}
+
+func (b *fakeHealthCheckBatch) Rollback(ctx context.Context) error {
+	if !b.committed {
+		b.rolledBack = true
+	}
+	return nil
+}
+
+type fakeHealthCheckClaimer struct {
+	batch    *fakeHealthCheckBatch
+	claimErr error
+}
+
+func (f *fakeHealthCheckClaimer) ClaimDue(ctx context.Context, now time.Time, staleness time.Duration, limit int32) (ClaimedHealthCheckBatch, error) {
+	if f.claimErr != nil {
+		return nil, f.claimErr
+	}
+	return f.batch, nil
 }
 
 // fakeCredentialBroker is an in-memory CredentialBrokerClient — never
@@ -161,6 +303,12 @@ type fakeCredentialBroker struct {
 	// write_credential_test.go (TASK-030) to verify the owner_id derivation
 	// mirrors CreateAccount's.
 	lastWriteOwnerID string
+
+	// revokeErr/lastRevokedRef back create_account_test.go's test-before-save
+	// gate assertions (TASK-AIP-01-06).
+	revokeErr       error
+	lastRevokedRef  string
+	revokeCallCount int
 }
 
 func (f *fakeCredentialBroker) WriteCredential(ctx context.Context, in WriteCredentialInput) (CredentialRef, error) {
@@ -186,6 +334,15 @@ func (f *fakeCredentialBroker) ResolveCredential(ctx context.Context, credential
 	return CredentialRef{ID: credentialRef, Status: "active"}, nil
 }
 
+func (f *fakeCredentialBroker) RevokeCredential(ctx context.Context, credentialRef string) error {
+	f.lastRevokedRef = credentialRef
+	f.revokeCallCount++
+	if f.revokeErr != nil {
+		return f.revokeErr
+	}
+	return nil
+}
+
 // fakeInfraFleetClient is an in-memory InfraFleetClient — backs
 // test_connection_test.go (TASK-030).
 type fakeInfraFleetClient struct {
@@ -205,6 +362,24 @@ func (f *fakeInfraFleetClient) Relay(ctx context.Context, devServerID, method st
 		return nil, f.relayErr
 	}
 	return f.relayResult, nil
+}
+
+// fakeRateLimitEventPublisher is an in-memory RateLimitEventPublisher —
+// backs test_connection_test.go's rate-limit publish assertions
+// (TASK-MB-02-04).
+type fakeRateLimitEventPublisher struct {
+	publishErr error
+
+	calls        int
+	lastTenantID string
+	lastPayload  eventbus.RateLimitPayload
+}
+
+func (f *fakeRateLimitEventPublisher) PublishRateLimited(ctx context.Context, tenantID string, payload eventbus.RateLimitPayload) error {
+	f.calls++
+	f.lastTenantID = tenantID
+	f.lastPayload = payload
+	return f.publishErr
 }
 
 var errBoom = errors.New("boom")

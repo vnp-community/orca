@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/session.go`
 **Depends on:** TASK-SSH-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — HandshakeInfo.SockPath added; Provision threads ctx into launch and records sockPath on the returned HandshakeInfo`
 
 ---
 

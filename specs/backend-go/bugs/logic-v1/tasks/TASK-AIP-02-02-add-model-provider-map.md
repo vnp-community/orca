@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/model_provider_map.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — model_provider_map.go added; TestDetectProviderFromModel passes (5 cases).`
 
 ---
 

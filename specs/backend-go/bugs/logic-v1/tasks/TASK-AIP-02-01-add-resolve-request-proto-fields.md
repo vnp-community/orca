@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service` proto
 **File:** `backend-go/proto/orca/aiprovider/v1/aiprovider.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — dev_server_id/model_hint/account_id/scoped_ref added to ResolveProviderRequest; go build ./proto/... clean.`
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/create_agent_token.go`, `list_agent_tokens.go`, `revoke_agent_token.go` (new)
 **Depends on:** TASK-AWS-03-03, TASK-AWS-03-04, TASK-AWS-01-01, TASK-AWS-01-02
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `create_agent_token.go`/`list_agent_tokens.go`/`revoke_agent_token.go` created verbatim per spec; fakes + tests added (11th-token-rejected, direct-websocket hash-only, relay-websocket credential-ref-only, relay-ssh rejected, revoke closes session exactly once, error propagation); all green.
 
 ---
 

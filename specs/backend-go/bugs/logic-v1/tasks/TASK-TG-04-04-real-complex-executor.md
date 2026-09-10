@@ -5,7 +5,7 @@
 **Service:** `task-service` (client) + `orchestration-service` (new RPC — **larger gap than the solution assumed**: `orchestration.proto` currently has NO run-creation RPC at all, not even a stub)
 **File:** `backend-go/proto/orca/orchestration/v1/orchestration.proto`, `backend-go/services/task-service/internal/adapter/grpcclient/complex_executor.go`
 **Depends on:** TASK-TG-01-06 (`GetSubtree` for `buildOrchestrationSpec`)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — Added StartCoordinatorRun RPC + OrchestrationTaskSpec/StartCoordinatorRunRequest/Response to orchestration.proto (regenerated); real ComplexExecutor (grpcclient) dials orchestration-service and translates task-service's subtree into a temp-id-based DAG spec via buildOrchestrationSpec; ComplexExecutor port signature widened to take worktreeID; wired into main.go replacing StubComplexExecutor (kept as a fallback type). Flagged dependency: orchestration-service's own StartCoordinatorRun handler is out of scope here — calling it before that handler lands fails at dial/call time, not compile time. `go build ./proto/... ./services/task-service/...` and every other backend-go service clean; `go test ./services/task-service/internal/adapter/grpcclient/... -run TestComplexExecutor` passes (3/3: spec-building with correct temp-id deps, subtree-fetch-error-never-calls-RPC, RPC-error-propagates).
 
 ---
 

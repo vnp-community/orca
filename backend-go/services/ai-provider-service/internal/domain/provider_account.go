@@ -107,6 +107,10 @@ var (
 	// ErrAccountNotFound is returned by the repository/usecase layer when no
 	// account matches a lookup.
 	ErrAccountNotFound = errors.New("domain: provider account not found")
+	// ErrQuotaLimitTooLow — BL-AIP-01's field-level rule: quota_limit_day must
+	// be either 0 (unlimited) or >= 1000; anything in between is almost always
+	// a units mistake (per-request vs. per-day) worth catching at write time.
+	ErrQuotaLimitTooLow = errors.New("domain: quota_limit_day must be 0 (unlimited) or >= 1000")
 )
 
 // NoProviderReason distinguishes why ResolveProvider found no usable
@@ -140,18 +144,52 @@ func (e *ErrNoProviderAvailable) Error() string {
 // resolves, never a key. A database dump of this service must never yield a
 // usable credential (ai-provider-service.md §1).
 type ProviderAccount struct {
-	ID                 string
-	TenantID           string
-	ProviderType       ProviderType
-	Status             AccountStatus
-	CredentialRef      string // credential-broker-service metadata id — NEVER a secret value
-	Scope              AccountScope
-	UserID             string // set iff Scope == ScopeUser
-	ProjectID          string // set iff Scope == ScopeProject
-	DevServerID        string // which dev server holds this account's pushed ciphertext; empty until first push (§9)
-	RotationGraceUntil *time.Time
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                   string
+	TenantID             string
+	ProviderType         ProviderType
+	Status               AccountStatus
+	CredentialRef        string // credential-broker-service metadata id — NEVER a secret value
+	Scope                AccountScope
+	UserID               string // set iff Scope == ScopeUser
+	ProjectID            string // set iff Scope == ScopeProject
+	DevServerID          string // which dev server holds this account's pushed ciphertext; empty until first push (§9)
+	Label                string // "name" in BL-AIP-01's terms
+	ModelHint            string
+	BaseURL              string
+	QuotaLimitDay        int      // 0 = unlimited
+	Models               []string // allowed-model allow-list (BUG-AIP-02 dependency)
+	IsDefault            bool
+	LastHealthCheckAt    *time.Time // written by the health-check job (reconcile_provider_health.go)
+	CreatedBy            string
+	LatencyMs            *int       // written by the health-check job
+	HealthDetail         *string    // "healthy"|"degraded"|"quota_exceeded"|"invalid_key"|"unreachable"|nil (never checked)
+	QuotaWarningSentDate *time.Time // UTC calendar day, nil = not sent today
+	RotationGraceUntil   *time.Time
+	CreatedAt            time.Time
+	UpdatedAt            time.Time
+}
+
+// HealthDetail* — typed constants mirroring the CHECK constraint added in
+// migrations/0005_health_and_usage_writes.up.sql, used instead of bare
+// strings at every call site.
+const (
+	HealthDetailHealthy       = "healthy"
+	HealthDetailDegraded      = "degraded"
+	HealthDetailQuotaExceeded = "quota_exceeded"
+	HealthDetailInvalidKey    = "invalid_key"
+	HealthDetailUnreachable   = "unreachable"
+)
+
+// HealthDetailOrEmpty returns a.HealthDetail's value, or "" if nil — a small
+// convenience so callers comparing against the constants above don't each
+// need their own nil-check. Exported (rather than the unexported
+// derefHealthDetail some earlier drafts of this task used) because
+// reconcile_provider_health.go, in the usecase package, needs to call it.
+func (a ProviderAccount) HealthDetailOrEmpty() string {
+	if a.HealthDetail == nil {
+		return ""
+	}
+	return *a.HealthDetail
 }
 
 // NewProviderAccount constructs a ProviderAccount, enforcing the invariants
@@ -167,6 +205,12 @@ func NewProviderAccount(
 	scope AccountScope,
 	userID, projectID string,
 	devServerID string,
+	label, modelHint, baseURL string,
+	quotaLimitDay int,
+	models []string,
+	isDefault bool,
+	lastHealthCheckAt *time.Time,
+	createdBy string,
 	rotationGraceUntil *time.Time,
 	createdAt, updatedAt time.Time,
 ) (ProviderAccount, error) {
@@ -196,19 +240,16 @@ func NewProviderAccount(
 			return ProviderAccount{}, ErrInvalidScopeRef
 		}
 	}
+	if quotaLimitDay != 0 && quotaLimitDay < 1000 {
+		return ProviderAccount{}, ErrQuotaLimitTooLow
+	}
 	return ProviderAccount{
-		ID:                 id,
-		TenantID:           tenantID,
-		ProviderType:       providerType,
-		Status:             status,
-		CredentialRef:      credentialRef,
-		Scope:              scope,
-		UserID:             userID,
-		ProjectID:          projectID,
-		DevServerID:        devServerID,
-		RotationGraceUntil: rotationGraceUntil,
-		CreatedAt:          createdAt,
-		UpdatedAt:          updatedAt,
+		ID: id, TenantID: tenantID, ProviderType: providerType, Status: status,
+		CredentialRef: credentialRef, Scope: scope, UserID: userID, ProjectID: projectID,
+		DevServerID: devServerID, Label: label, ModelHint: modelHint, BaseURL: baseURL,
+		QuotaLimitDay: quotaLimitDay, Models: models, IsDefault: isDefault,
+		LastHealthCheckAt: lastHealthCheckAt, CreatedBy: createdBy,
+		RotationGraceUntil: rotationGraceUntil, CreatedAt: createdAt, UpdatedAt: updatedAt,
 	}, nil
 }
 
@@ -227,6 +268,7 @@ type QuotaState struct {
 	Date         time.Time // truncated to UTC midnight
 	CostUSD      float64
 	RequestCount int64
+	TokensUsed   int64 // matches ai_provider.usage.tokens_used
 }
 
 // DayKey truncates a timestamp to the UTC calendar day usage.usage buckets by.

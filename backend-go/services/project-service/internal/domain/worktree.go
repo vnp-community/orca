@@ -20,6 +20,28 @@ var (
 	ErrWorktreeNotFound = errors.New("domain: worktree not found")
 )
 
+// WorktreeStatus is a worktree's lifecycle status — orthogonal to Active
+// (activation_state): a worktree can be "completed" yet still Active, or
+// "active" yet deactivated. BL-AT-04's cleanup_worktrees step filters on
+// this, not on Active.
+type WorktreeStatus string
+
+const (
+	WorktreeStatusActive    WorktreeStatus = "active"
+	WorktreeStatusCompleted WorktreeStatus = "completed"
+	WorktreeStatusError     WorktreeStatus = "error"
+	WorktreeStatusStopped   WorktreeStatus = "stopped"
+)
+
+func (s WorktreeStatus) Valid() bool {
+	switch s {
+	case WorktreeStatusActive, WorktreeStatusCompleted, WorktreeStatusError, WorktreeStatusStopped:
+		return true
+	default:
+		return false
+	}
+}
+
 // Worktree is metadata about a git worktree — explicitly NOT authoritative
 // for whether it still exists on disk. git-gateway-service performs the
 // real `git worktree add/remove` on the Dev Server Agent and writes this
@@ -34,6 +56,19 @@ type Worktree struct {
 	Branch    string
 	Active    bool
 	CreatedAt time.Time
+
+	IdempotencyKey *string // BR-CLI-01: caller-supplied dedupe key, nil when not set
+
+	// LinkedIssueProvider/LinkedIssueRef carry BR-PI-06's linked-issue
+	// reference through to the worktree.created/worktree.deleted outbox
+	// events (SOL-PI-03) — empty means "no linked issue".
+	LinkedIssueProvider string
+	LinkedIssueRef      string
+
+	// Status is orthogonal to Active — see WorktreeStatus's doc comment.
+	Status WorktreeStatus
+
+	BaseRef *string // NEW (SOL-WT-04) — the branch/tag/sha this worktree was created from; nil for worktrees created before this backfill
 
 	// Metadata is the opaque UI-authored WorktreeMeta blob (displayName/
 	// comment/isPinned/pushTarget/sparse*/...) — see
@@ -75,10 +110,11 @@ type WorktreeLineageCapture struct {
 
 // NewWorktree constructs a Worktree, enforcing the invariants a metadata
 // record must satisfy to be meaningful. A freshly recorded worktree starts
-// Active — RecordWorktreeCreated is only ever called after the real `git
-// worktree add` already succeeded, so there is no "created but inactive"
-// state to represent at construction time.
-func NewWorktree(id, projectID, repoID, path, branch string, lineage WorktreeLineageCapture) (Worktree, error) {
+// Active and WorktreeStatusActive — RecordWorktreeCreated is only ever
+// called after the real `git worktree add` already succeeded, so there is
+// no "created but inactive"/"created but not yet active-status" state to
+// represent at construction time.
+func NewWorktree(id, projectID, repoID, path, branch, idempotencyKey, baseRef string, lineage WorktreeLineageCapture) (Worktree, error) {
 	if projectID == "" {
 		return Worktree{}, ErrEmptyProjectID
 	}
@@ -93,6 +129,10 @@ func NewWorktree(id, projectID, repoID, path, branch string, lineage WorktreeLin
 	}
 	wt := Worktree{
 		ID: id, ProjectID: projectID, RepoID: repoID, Path: path, Branch: branch, Active: true,
+		IdempotencyKey: nonEmptyPtr(idempotencyKey),
+		Status:         WorktreeStatusActive,
+		BaseRef:        nonEmptyPtr(baseRef),
+
 		ParentWorktreeID:        nonEmptyPtr(lineage.ParentWorktreeID),
 		Origin:                  nonEmptyPtr(lineage.Origin),
 		CaptureSource:           nonEmptyPtr(lineage.CaptureSource),
@@ -113,8 +153,9 @@ func NewWorktree(id, projectID, repoID, path, branch string, lineage WorktreeLin
 }
 
 // nonEmptyPtr returns nil for an empty string, else a pointer to it — the
-// idiom every optional string lineage field uses to distinguish "not
-// supplied" from a genuinely empty value.
+// idiom every optional string field this package models as "unset" rather
+// than "empty" uses to distinguish "not supplied" from a genuinely empty
+// value.
 func nonEmptyPtr(s string) *string {
 	if s == "" {
 		return nil

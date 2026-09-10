@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/adapter/postgres/issue_list_cache.go` (new), `backend-go/services/scm-integration-service/migrations/0002_issue_list_cache.up.sql` (new)
 **Depends on:** TASK-PI-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — issue_list_cache Postgres adapter + migrations/0002, wired in main.go.`
 
 ---
 

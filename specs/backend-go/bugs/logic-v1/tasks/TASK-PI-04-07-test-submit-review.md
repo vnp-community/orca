@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service` + `api-gateway`
 **File:** `services/scm-integration-service/internal/usecase/submit_review_test.go` (new), `internal/adapter/github/client_test.go`, `internal/adapter/gitlab/client_test.go`, `services/api-gateway/internal/adapter/httpgateway/pr_review_routes_test.go` (new), `services/api-gateway/internal/adapter/wscompat/channels_scm_test.go`
 **Depends on:** TASK-PI-04-02, TASK-PI-04-03, TASK-PI-04-04, TASK-PI-04-05, TASK-PI-04-06
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — submit_review_test.go (BR-PI-10 empty-comments, BR-PI-11 unspecified->request_changes), github/client_test.go SubmitReview payload-shape test (3 review types), gitlab/client_test.go (discussion-then-approve order, discussion-failure-stops-before-approve/note), pr_review_routes_test.go (zero-annotation 400, multi-page drain, ReviewComment/Anchor contract test), channels_scm_test.go hostedReview.submit (success + no-annotations) all new.`
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/migrations/0007_agent_sessions.up.sql` (new) + `.down.sql`
 **Depends on:** none (can land in parallel with TASK-AG-01-01/02)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migrations/0007_agent_sessions.{up,down}.sql added (agent_sessions table, BR-AG-01 partial unique index, worktree-recency index, RLS policy); exercised transitively by agent_session_repository_test.go's `-tags=integration` suite (real Postgres via testcontainers), all passing.
 
 ---
 

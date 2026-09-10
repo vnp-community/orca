@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/codeowners.go` (new), `backend-go/services/scm-integration-service/internal/usecase/codeowners_test.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — codeowners.go created (ParseCodeowners, MatchOwners, matchesCodeownersPattern); codeowners_test.go covers globs/comments/blanks/last-match-wins, all passing
 
 ---
 

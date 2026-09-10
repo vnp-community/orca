@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `backend-go/services/tenant-service/internal/domain/company.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ValidateCompanySettings/ValidateDepartmentSettings/ValidateUserSettings added + table tests pass (go test ./services/tenant-service/internal/domain/... -run Validate)
 
 ---
 

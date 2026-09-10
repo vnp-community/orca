@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/postgres/agent_token_repository.go` (new)
 **Depends on:** TASK-AWS-03-01, TASK-AWS-03-03
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `AgentTokenStore` created verbatim per spec, `var _ usecase.AgentTokenRepository = (*AgentTokenStore)(nil)` compiles; wired into main.go (`agentTokenStore`, consumed by TASK-AWS-03-05/06/07); `go build`/`go vet` clean. No live Postgres available in this worktree for the RLS/exclusion integration test — left for a follow-up with a test DB.
 
 ---
 

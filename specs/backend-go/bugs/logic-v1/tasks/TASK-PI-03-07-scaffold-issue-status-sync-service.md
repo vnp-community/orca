@@ -5,7 +5,7 @@
 **Service:** `issue-status-sync` (NEW — 18th service)
 **File:** `backend-go/services/issue-status-sync/cmd/server/main.go` (new), `internal/domain/` (new), `internal/usecase/ports.go` (new), `internal/usecase/sync_issue_status.go` (new), `internal/adapter/eventbus/subscriber.go` (new), `internal/adapter/postgres/processed_events.go` (new), `internal/adapter/grpcclient/` (new), `migrations/0001_processed_events.up.sql` (new), `go.mod` (new)
 **Depends on:** TASK-PI-03-03, TASK-PI-03-05, TASK-PI-02-02, TASK-PI-02-06
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE (built despite sign-off flag, per explicit instruction) — new 18th service scaffolded for real: consumer (adapter/eventbus), retry (BR-PI-08, 3 attempts), dedup (processed_events), grpcclient adapters, migrations/0001. No inbound RPC surface (pure consumer) — see cmd/server/main.go's package doc comment.`
 
 ---
 

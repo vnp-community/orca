@@ -5,7 +5,7 @@
 **Service:** `auth-service` (usecase)
 **File:** `backend-go/services/auth-service/internal/usecase/login.go`
 **Depends on:** TASK-AUTH-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `Login.Execute` calls `session.WithClientInfo(in.IP, in.UserAgent)` before `CreateSession`; `TestLogin_SucceedsAndCreatesSession` asserts the stored session's IP/UserAgent.
 
 ---
 

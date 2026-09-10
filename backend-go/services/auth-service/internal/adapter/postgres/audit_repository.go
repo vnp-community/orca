@@ -2,10 +2,13 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
-	"time"
+	"strconv"
+	"strings"
 
 	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
+	"github.com/stablyai/orca-go/services/auth-service/internal/usecase"
 )
 
 // Append inserts an audit entry. No Update/Delete method exists on this
@@ -13,46 +16,73 @@ import (
 // comment) and, in production, at the database-permission level too (see
 // migrations/0001_init.up.sql's comment on auth.audit_log).
 func (r *Repository) Append(ctx context.Context, entry domain.AuditEntry) error {
-	var actorID any
+	metadataJSON, err := json.Marshal(entry.Metadata)
+	if err != nil {
+		return fmt.Errorf("postgres: marshal audit metadata: %w", err)
+	}
+	var actorID, ip any
 	if entry.ActorID != "" {
 		actorID = entry.ActorID
+	}
+	if entry.IPAddress != "" {
+		ip = entry.IPAddress
 	}
 	outcome := entry.Outcome
 	if outcome == "" {
 		outcome = domain.OutcomeAllowed // matches domain.NewAuditEntry's own backward-compatible default
 	}
-	var ipAddress any
-	if entry.IPAddress != "" {
-		ipAddress = entry.IPAddress
-	}
-	_, err := r.pool.Exec(ctx, `
-		INSERT INTO auth.audit_log (id, tenant_id, actor_id, action, target, occurred_at, outcome, ip_address)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
-	`, entry.ID, entry.TenantID, actorID, entry.Action, entry.Target, entry.OccurredAt, string(outcome), ipAddress)
+	_, err = r.pool.Exec(ctx, `
+		INSERT INTO auth.audit_log (id, tenant_id, actor_id, action, target, target_type, target_id, metadata, outcome, ip_address, occurred_at)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+	`, entry.ID, entry.TenantID, actorID, entry.Action, entry.Target, entry.TargetType, entry.TargetID, metadataJSON, string(outcome), ip, entry.OccurredAt)
 	if err != nil {
 		return fmt.Errorf("postgres: insert audit entry: %w", err)
 	}
 	return nil
 }
 
-// Query returns entries for tenantID at or after since, optionally narrowed
-// by actorID/action/outcome — empty string ("" for actorID/action,
-// domain.Outcome("") for outcome) means "no filter" on that dimension,
-// matching this codebase's established empty-means-no-filter convention
-// (TASK-BE-015; see e.g. ListAnnotations' filePath parameter). Passing all
-// three empty preserves the exact query this method ran before these
-// filters existed.
-func (r *Repository) Query(ctx context.Context, tenantID string, since time.Time, actorID, action string, outcome domain.Outcome, pageToken string, pageSize int32) ([]domain.AuditEntry, string, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT id, tenant_id, COALESCE(actor_id::text, ''), action, target, occurred_at, outcome, COALESCE(host(ip_address), '')
+// Query builds a WHERE clause incrementally — tenant_id + occurred_at >=
+// since always present; to/action/actor_id/outcome added only when
+// non-empty/non-zero (TASK-BE-015/016; empty-means-no-filter, matching this
+// codebase's established convention — see e.g. ListAnnotations' filePath
+// parameter).
+func (r *Repository) Query(ctx context.Context, filter usecase.AuditQueryFilter, pageToken string, pageSize int32) ([]domain.AuditEntry, string, error) {
+	clauses := []string{"tenant_id = $1", "occurred_at >= $2", "id::text > $3"}
+	args := []any{filter.TenantID, filter.Since, pageToken}
+
+	if !filter.To.IsZero() {
+		args = append(args, filter.To)
+		clauses = append(clauses, "occurred_at <= $"+strconv.Itoa(len(args)))
+	}
+	if filter.Action != "" {
+		args = append(args, filter.Action)
+		clauses = append(clauses, "action = $"+strconv.Itoa(len(args)))
+	}
+	if filter.ActorID != "" {
+		args = append(args, filter.ActorID)
+		clauses = append(clauses, "actor_id = $"+strconv.Itoa(len(args)))
+	}
+	if filter.Outcome != "" {
+		args = append(args, string(filter.Outcome))
+		clauses = append(clauses, "outcome = $"+strconv.Itoa(len(args)))
+	}
+	args = append(args, pageSize)
+	limitPos := len(args)
+
+	// host(ip_address), not ip_address::text — casting inet to text keeps
+	// the /32 netmask suffix (e.g. "203.0.113.7/32"); host() strips it.
+	// Same fix as session_repository.go's ip column scans.
+	query := fmt.Sprintf(`
+		SELECT id, tenant_id, COALESCE(actor_id::text, ''), action, target,
+		       COALESCE(target_type, ''), COALESCE(target_id, ''), metadata,
+		       outcome, COALESCE(host(ip_address), ''), occurred_at
 		FROM auth.audit_log
-		WHERE tenant_id = $1 AND occurred_at >= $2 AND id::text > $3
-		  AND ($4 = '' OR actor_id::text = $4)
-		  AND ($5 = '' OR action = $5)
-		  AND ($6 = '' OR outcome = $6)
+		WHERE %s
 		ORDER BY id
-		LIMIT $7
-	`, tenantID, since, pageToken, actorID, action, string(outcome), pageSize)
+		LIMIT $%d
+	`, strings.Join(clauses, " AND "), limitPos)
+
+	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
 		return nil, "", fmt.Errorf("postgres: query audit log: %w", err)
 	}
@@ -61,9 +91,14 @@ func (r *Repository) Query(ctx context.Context, tenantID string, since time.Time
 	var out []domain.AuditEntry
 	for rows.Next() {
 		var e domain.AuditEntry
+		var metadataJSON []byte
 		var outcome string
-		if err := rows.Scan(&e.ID, &e.TenantID, &e.ActorID, &e.Action, &e.Target, &e.OccurredAt, &outcome, &e.IPAddress); err != nil {
+		if err := rows.Scan(&e.ID, &e.TenantID, &e.ActorID, &e.Action, &e.Target,
+			&e.TargetType, &e.TargetID, &metadataJSON, &outcome, &e.IPAddress, &e.OccurredAt); err != nil {
 			return nil, "", fmt.Errorf("postgres: scan audit log row: %w", err)
+		}
+		if err := json.Unmarshal(metadataJSON, &e.Metadata); err != nil {
+			return nil, "", fmt.Errorf("postgres: unmarshal audit metadata: %w", err)
 		}
 		e.Outcome = domain.Outcome(outcome)
 		out = append(out, e)

@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/adapter/postgres/repository.go` (+ migration), `backend-go/services/automation-service/internal/usecase/ports.go`, `backend-go/services/automation-service/internal/usecase/run_now.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0004 adds idx_automation_runs_one_running; FindRunning + usecase.ErrConcurrentRunActive sentinel wired through UpdateStatus; integration-tested (second running row rejected, terminal frees the slot).
 
 ---
 

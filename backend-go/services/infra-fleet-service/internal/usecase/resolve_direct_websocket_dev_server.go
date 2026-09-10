@@ -59,7 +59,7 @@ func (uc *ResolveDirectWebSocketDevServer) Execute(ctx context.Context, in Resol
 		return existing, nil
 	}
 
-	devServer, err := domain.NewDevServer(uuid.NewString(), in.TenantID, in.DevServerID, domain.ConnectionModeDirectWebSocket, "")
+	devServer, err := domain.NewDevServer(uuid.NewString(), in.TenantID, in.DevServerID, domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		return domain.DevServer{}, apperrors.New(apperrors.KindInternal, "INFRA_DEV_SERVER_CONSTRUCT_FAILED", "failed to construct dev server for agent token", err)
 	}

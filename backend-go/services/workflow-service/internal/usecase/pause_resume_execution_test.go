@@ -24,6 +24,11 @@ type fakeExecutionRepository struct {
 	// to observe "the background dispatch goroutine reached its final
 	// status update" without polling or sleeping.
 	onUpdate func(domain.WorkflowExecution)
+	// lastUpdateEvent records the event passed to the most recent
+	// UpdateExecution call — SOL-PW-04's regression guard for "a terminal
+	// transition enqueues exactly one outbox event; Pause/Resume/Cancel/
+	// ad-hoc-step enqueue none".
+	lastUpdateEvent *domain.OutboxEvent
 }
 
 func newFakeExecutionRepository() *fakeExecutionRepository {
@@ -50,8 +55,9 @@ func (f *fakeExecutionRepository) GetExecution(ctx context.Context, tenantID, id
 	return e, nil
 }
 
-func (f *fakeExecutionRepository) UpdateExecution(ctx context.Context, exec domain.WorkflowExecution) error {
+func (f *fakeExecutionRepository) UpdateExecution(ctx context.Context, exec domain.WorkflowExecution, event *domain.OutboxEvent) error {
 	f.mu.Lock()
+	f.lastUpdateEvent = event
 	if f.updateErr != nil {
 		f.mu.Unlock()
 		return f.updateErr

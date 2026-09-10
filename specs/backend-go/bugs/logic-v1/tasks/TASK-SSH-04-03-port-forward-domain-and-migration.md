@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/port_forward.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — domain.PortForward + migration 0008 + PortForwardRepository port + postgres.PortForwardStore added`
 
 ---
 

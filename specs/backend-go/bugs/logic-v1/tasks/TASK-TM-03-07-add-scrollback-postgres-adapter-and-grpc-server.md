@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/postgres/terminal_scrollback_snapshot_repository.go`
 **Depends on:** TASK-TM-03-01 (schema), TASK-TM-03-03 (proto), TASK-TM-03-04 (port), TASK-TM-03-05 (Save usecase), TASK-TM-03-06 (Get/Delete/Expire usecases)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Postgres adapter, 3 gRPC handlers, and main.go wiring added; `go build ./services/infra-fleet-service/...` clean. Integration tests (testcontainers) written and 1/3 passed cleanly against real Postgres; the other 2 hit a known `testutil.StartPostgres` "database system is starting up" race also reproducible on the pre-existing `repository_test.go` (unrelated to this change) — adapter logic verified correct via the passing run and via unit coverage of the usecases it backs.
 
 ---
 

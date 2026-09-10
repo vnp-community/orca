@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
+	"github.com/stablyai/orca-go/services/auth-service/internal/usecase"
 )
 
 // TestRepository_AuditLog_RoundTripsOutcomeAndIPAddress is TASK-BE-015's
@@ -23,7 +24,7 @@ func TestRepository_AuditLog_RoundTripsOutcomeAndIPAddress(t *testing.T) {
 	ctx := context.Background()
 
 	tenantID := uuid.NewString()
-	e, err := domain.NewAuditEntry(uuid.NewString(), tenantID, uuid.NewString(), "user.login", "target-1", domain.OutcomeDenied, "203.0.113.7", time.Now())
+	e, err := domain.NewAuditEntry(uuid.NewString(), tenantID, uuid.NewString(), "user.login", "", "user", "target-1", nil, domain.OutcomeDenied, "203.0.113.7", time.Now())
 	if err != nil {
 		t.Fatalf("building audit entry: %v", err)
 	}
@@ -31,7 +32,7 @@ func TestRepository_AuditLog_RoundTripsOutcomeAndIPAddress(t *testing.T) {
 		t.Fatalf("append: %v", err)
 	}
 
-	entries, _, err := repo.Query(ctx, tenantID, time.Time{}, "", "", "", "", 50)
+	entries, _, err := repo.Query(ctx, usecase.AuditQueryFilter{TenantID: tenantID}, "", 50)
 	if err != nil {
 		t.Fatalf("query: %v", err)
 	}
@@ -60,7 +61,7 @@ func TestRepository_AuditLog_QueryFiltersByActorActionOutcome(t *testing.T) {
 	now := time.Now()
 
 	seed := func(actorID, action string, outcome domain.Outcome) domain.AuditEntry {
-		e, err := domain.NewAuditEntry(uuid.NewString(), tenantID, actorID, action, "target", outcome, "", now)
+		e, err := domain.NewAuditEntry(uuid.NewString(), tenantID, actorID, action, "", "user", "target", nil, outcome, "", now)
 		if err != nil {
 			t.Fatalf("building audit entry: %v", err)
 		}
@@ -94,7 +95,7 @@ func TestRepository_AuditLog_QueryFiltersByActorActionOutcome(t *testing.T) {
 	}
 
 	t.Run("filter by actor_id alone", func(t *testing.T) {
-		entries, _, err := repo.Query(ctx, tenantID, time.Time{}, actorA, "", "", "", 50)
+		entries, _, err := repo.Query(ctx, usecase.AuditQueryFilter{TenantID: tenantID, ActorID: actorA}, "", 50)
 		if err != nil {
 			t.Fatalf("query: %v", err)
 		}
@@ -102,7 +103,7 @@ func TestRepository_AuditLog_QueryFiltersByActorActionOutcome(t *testing.T) {
 	})
 
 	t.Run("filter by action alone", func(t *testing.T) {
-		entries, _, err := repo.Query(ctx, tenantID, time.Time{}, "", "user.login", "", "", 50)
+		entries, _, err := repo.Query(ctx, usecase.AuditQueryFilter{TenantID: tenantID, Action: "user.login"}, "", 50)
 		if err != nil {
 			t.Fatalf("query: %v", err)
 		}
@@ -110,7 +111,7 @@ func TestRepository_AuditLog_QueryFiltersByActorActionOutcome(t *testing.T) {
 	})
 
 	t.Run("filter by outcome alone", func(t *testing.T) {
-		entries, _, err := repo.Query(ctx, tenantID, time.Time{}, "", "", domain.OutcomeDenied, "", 50)
+		entries, _, err := repo.Query(ctx, usecase.AuditQueryFilter{TenantID: tenantID, Outcome: domain.OutcomeDenied}, "", 50)
 		if err != nil {
 			t.Fatalf("query: %v", err)
 		}
@@ -118,7 +119,7 @@ func TestRepository_AuditLog_QueryFiltersByActorActionOutcome(t *testing.T) {
 	})
 
 	t.Run("filters combined", func(t *testing.T) {
-		entries, _, err := repo.Query(ctx, tenantID, time.Time{}, actorA, "project.delete", domain.OutcomeDenied, "", 50)
+		entries, _, err := repo.Query(ctx, usecase.AuditQueryFilter{TenantID: tenantID, ActorID: actorA, Action: "project.delete", Outcome: domain.OutcomeDenied}, "", 50)
 		if err != nil {
 			t.Fatalf("query: %v", err)
 		}
@@ -126,7 +127,7 @@ func TestRepository_AuditLog_QueryFiltersByActorActionOutcome(t *testing.T) {
 	})
 
 	t.Run("no filters preserves prior no-filter behavior", func(t *testing.T) {
-		entries, _, err := repo.Query(ctx, tenantID, time.Time{}, "", "", "", "", 50)
+		entries, _, err := repo.Query(ctx, usecase.AuditQueryFilter{TenantID: tenantID}, "", 50)
 		if err != nil {
 			t.Fatalf("query: %v", err)
 		}

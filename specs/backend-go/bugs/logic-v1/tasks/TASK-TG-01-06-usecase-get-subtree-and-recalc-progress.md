@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/get_subtree.go` (new), `backend-go/services/task-service/internal/usecase/recalculate_progress.go` (new)
 **Depends on:** TASK-TG-01-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — usecase.GetSubtree (batched per-node grant filter) + usecase.RecalculateProgress (bottom-up batched write) added; go test ./internal/usecase/... -run TestGetSubtree\|TestRecalculateProgress passes (mid-tree-exclude/independent-child-included + 3-level cascade cases).
 
 ---
 

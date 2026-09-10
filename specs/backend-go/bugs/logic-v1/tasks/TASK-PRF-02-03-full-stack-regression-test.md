@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `backend-go/services/tenant-service/internal/usecase/get_resolved_profile_test.go`
 **Depends on:** TASK-PRF-02-01, TASK-PRF-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — combined regression test added to get_resolved_profile_test.go; full tenant-service suite green
 
 ---
 

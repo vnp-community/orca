@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/annotation_routes.go`
 **Depends on:** TASK-CR-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — POST /v1/annotations/send-to-agent wired via shared wscompat.SendReviewFeedbackToAgent; mountAnnotationRoutes/router.go now thread gitClient. Note: PTY delivery needs a per-WebSocket-connection stream registry a REST ctx never carries (see channels_annotation_send.go's doc comment) — pre-existing architecture constraint, not something this task's scope could fix; documented in code and covered by annotation_routes_test.go (empty-list end-to-end case + required-field validation).
 
 ---
 

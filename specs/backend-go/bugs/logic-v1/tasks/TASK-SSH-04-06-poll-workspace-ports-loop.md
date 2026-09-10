@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/poll_workspace_ports.go` (new)
 **Depends on:** TASK-SSH-04-01, TASK-SSH-04-03, TASK-SSH-04-04, TASK-SSH-04-05
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — usecase.PollWorkspacePorts + PortAllocator/TunnelOpener/Tunnel/PortForwardEventPublisher ports added; TestPollWorkspacePorts_* pass (new port opens+publishes, disappearing port tears down+publishes, transient scan error leaves tunnels untouched, ctx cancellation tears down all). NOTE: wiring Run() to start automatically from EstablishConnection's success path (spawn on success, cancel via TeardownConnection) is NOT done — no existing seam exposes a raw sshconn.Connection/TunnelOpener from devserveragent.Client for production wiring, and this wasn't covered by this task's own Verify section (usecase-level only); flagging as a follow-up, not silently skipped.`
 
 ---
 

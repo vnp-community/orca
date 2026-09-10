@@ -28,7 +28,12 @@ func StartPostgres(t *testing.T, dbName string) string {
 			"POSTGRES_PASSWORD": "orca",
 			"POSTGRES_DB":       dbName,
 		},
-		WaitingFor: wait.ForListeningPort("5432/tcp"),
+		// Postgres logs "ready to accept connections" twice on first boot
+		// (initdb's throwaway instance, then the real server) — waiting on
+		// the listening port alone races that first, temporary listener and
+		// intermittently hands back a DSN the server isn't actually serving
+		// yet ("the database system is starting up").
+		WaitingFor: wait.ForLog("database system is ready to accept connections").WithOccurrence(2),
 	}
 	container, err := testcontainers.GenericContainer(ctx, testcontainers.GenericContainerRequest{
 		ContainerRequest: req,

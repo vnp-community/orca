@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/diff_composer.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — diff_composer.go split into gatherFullDiff/gatherFullDiffFromStatus; GeneratePullRequestFields call site unaffected, existing tests pass
 
 ---
 

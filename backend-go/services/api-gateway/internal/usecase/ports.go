@@ -26,3 +26,37 @@ type JWKSClient interface {
 type RateLimitStore interface {
 	Allow(ctx context.Context, tenantID string) (bool, error)
 }
+
+// WorktreeCreator wraps git-gateway-service's already-real CreateWorktree
+// RPC — see SOL-WT-01 for its validated shape. This saga only needs the
+// project_id/repo_id/branch/base_ref subset.
+type WorktreeCreator interface {
+	CreateWorktree(ctx context.Context, projectID, repoID, branch, baseRef string) (worktreeID, path, headSHA string, err error)
+}
+
+// AgentSpawner composes project-service.GetProjectContext +
+// infra-fleet-service's ResolveConnection/SpawnTerminalSession — "starting
+// an agent" in this architecture is spawning a PTY running the agent's CLI
+// command (business-capabilities.md's project.agentSpawn -> agent.exec
+// framing).
+type AgentSpawner interface {
+	SpawnAgentTerminal(ctx context.Context, projectID, worktreePath, agentType string) (ptyID, connectionID string, err error)
+}
+
+// PromptInjector wraps infra-fleet-service's AttachPty bidirectional stream
+// — opens it, sends AttachToSession{pty_id} then PtyInput{data: prompt},
+// closes.
+type PromptInjector interface {
+	InjectPrompt(ctx context.Context, connectionID, ptyID, prompt string) error
+}
+
+// RevocationChecker checks whether a verified JWT's jti has been revoked
+// (CR-CLI-002/TASK-BE-CLI-005) — see AuthValidator.Revocation's doc comment
+// for the nil-tolerant, fail-closed contract every caller must honor.
+// Implemented by internal/adapter/authclient.RevocationClient against
+// auth-service's IsServiceTokenRevoked RPC.
+type RevocationChecker interface {
+	// IsRevoked reports whether jti has been revoked. An unknown jti (never
+	// existed) reports false, not an error.
+	IsRevoked(ctx context.Context, jti string) (bool, error)
+}

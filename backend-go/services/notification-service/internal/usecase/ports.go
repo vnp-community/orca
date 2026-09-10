@@ -26,6 +26,10 @@ type SubscriptionRepository interface {
 	// with no matching row affects 0 rows and is NOT an error — the
 	// unregister operation is idempotent by design.
 	DeleteByEndpoint(ctx context.Context, endpoint string) error
+	// DeviceIDFor returns the paired mobile device id (SOL-MB-01) a push
+	// subscription is associated with, or "" if none — a standard Web
+	// Push subscription with no mobile-companion pairing.
+	DeviceIDFor(ctx context.Context, subscriptionID string) (string, error)
 }
 
 // VapidKeyRepository is the persistence port for VAPID public-key
@@ -85,4 +89,36 @@ type NotificationBroadcaster interface {
 	// subscription simply doesn't receive it — no offline WS replay
 	// queue, per notification-service.md §2.
 	Broadcast(ctx context.Context, event domain.NotificationEvent)
+}
+
+// BufferedNotificationRepository is the persistence port for BR-MB-07's
+// offline push buffering (mobile companion app) — implemented by
+// internal/adapter/postgres.BufferedNotificationStore against
+// notification.buffered_notifications (migrations/0003).
+type BufferedNotificationRepository interface {
+	// Enqueue buffers eventJSON for one subscription, evicting the oldest
+	// undelivered row once the per-subscription count exceeds 50
+	// (BR-MB-07's cap — enforced inside the implementation, not by callers).
+	Enqueue(ctx context.Context, tenantID, userID, subscriptionID string, eventJSON []byte) error
+	// ListPending returns userID's undelivered buffered notifications,
+	// oldest first — used by StreamNotifications to drain the backlog on
+	// reconnect, before entering the live broadcast loop.
+	ListPending(ctx context.Context, tenantID, userID string) ([]domain.BufferedNotification, error)
+	// MarkDelivered sets delivered_at for the given row ids after a
+	// successful StreamNotifications send.
+	MarkDelivered(ctx context.Context, ids []string) error
+}
+
+// NotificationPreferenceRepository is the persistence port for BR-MB-08's
+// per-event-type/per-channel opt-out preferences — implemented by
+// internal/adapter/postgres.NotificationPreferenceStore against
+// notification.notification_preferences (migrations/0003). This is an
+// amendment to notification-service.md §2's stated non-goal ("per-user
+// notification preferences... out of scope") — flagged for reconciliation,
+// not silently overridden.
+type NotificationPreferenceRepository interface {
+	// IsEnabled reports whether a user wants eventType delivered over
+	// channel. Absence of a row means enabled (default-on) — see the
+	// postgres implementation's doc comment.
+	IsEnabled(ctx context.Context, tenantID, userID, eventType, channel string) (bool, error)
 }

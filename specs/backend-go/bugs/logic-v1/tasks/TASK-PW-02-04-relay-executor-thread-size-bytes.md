@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/adapter/grpcclient/relay_executor.go`
 **Depends on:** TASK-PW-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — RelayExecutor.ReadDir now decodes the agent's real FileTreeNode shape (name/type/size) via an explicit intermediate struct, not the generic tag unmarshal; TestReadDir_MapsAgentFileTreeNodeShape passes
 
 ---
 

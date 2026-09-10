@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/migrations/0003_task_outbox_and_number.up.sql`, `backend-go/services/task-service/internal/adapter/postgres/repository.go`, `backend-go/services/task-service/internal/domain/outbox.go` (new)
 **Depends on:** TASK-PW-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0003 (task_number/worktree_id/pr_url columns, task_number_seq, task.outbox_events); domain.OutboxEvent added; Repository.Update/Create/FindByNumber/FetchUnpublished/MarkPublished implemented; integration tests pass (TestRepository_Create_AssignsNonZeroTaskNumber, TestRepository_Update_WithEvents_WritesOutboxRowsInSameTransaction, etc.)
 
 ---
 

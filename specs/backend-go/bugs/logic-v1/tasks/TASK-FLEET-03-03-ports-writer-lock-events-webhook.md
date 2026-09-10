@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (usecase ports)
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/ports.go`
 **Depends on:** TASK-FLEET-03-01
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added FleetHealthWriter/PollLockPort/HealthEventPublisher/WebhookAlerter ports + DevServerRepository.ListAllForPolling; implemented ListAllForPolling on Repository (cross-tenant, includes status) + both fakes. Full build/vet/test clean.
 
 ---
 

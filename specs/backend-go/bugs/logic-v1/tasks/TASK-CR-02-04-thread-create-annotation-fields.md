@@ -5,7 +5,7 @@
 **Service:** `annotation-service`
 **File:** `backend-go/services/annotation-service/internal/usecase/create_annotation.go`, `backend-go/services/annotation-service/internal/adapter/postgres/repository.go`
 **Depends on:** TASK-CR-02-02, TASK-CR-02-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — CreateAnnotationInput extended, postgres repository INSERT/SELECT/RETURNING updated to 18-column shape with nullString/scanAnnotation; usecase + postgres integration tests updated, TestCreateAnnotation_RoundTripsNewFields added and passing
 
 ---
 

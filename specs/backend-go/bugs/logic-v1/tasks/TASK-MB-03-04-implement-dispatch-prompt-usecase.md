@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/dispatch_prompt.go`, `backend-go/services/infra-fleet-service/internal/usecase/get_queued_prompt.go`
 **Depends on:** TASK-MB-03-02, TASK-MB-03-03, TASK-MB-02-02 (`ReadyForInput` quiescence signal + shared `liveStates` registry)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `DispatchPrompt`/`GetQueuedPrompt` usecases implemented; `GetTerminalAgentStatus`'s ready-transition branch drains the queue via `GetAndDelete`+`WritePty`. All described test cases pass (`INJECTED_IMMEDIATELY`/`QUEUED`/`REJECTED_NEEDS_CONFIRMATION`/overwrite/ready-transition drain regression guard).
 
 ---
 

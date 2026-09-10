@@ -5,7 +5,7 @@
 **Service:** `api-gateway` (consumer already built elsewhere — see Depends on)
 **File:** none (no file in this task's own scope)
 **Depends on:** TASK-PW-04-07
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — dependency-tracking placeholder closed now that TASK-PW-04-07 shipped (workspace.subscribe + task.statuschanged/workflow.execution.completed/.failed bridge, all tests passing). No code in this task's own scope. Manual/E2E confirmation that a live task-status-change event reaches a connected frontend session's workspace.refreshFileTree call is still outside this backend-go worktree's verification surface — flagging for a follow-up manual check rather than claiming it here.
 
 ---
 

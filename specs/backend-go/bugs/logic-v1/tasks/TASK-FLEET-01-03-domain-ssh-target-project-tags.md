@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (domain)
 **File:** `backend-go/services/infra-fleet-service/internal/domain/ssh_target.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added Project/Tags fields, extended NewSshTarget signature, updated all call sites; `go test ./internal/domain/... -run TestNewSshTarget` passes.
 
 ---
 

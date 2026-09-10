@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/create_account.go`
 **Depends on:** TASK-AIP-01-03, TASK-AIP-01-05
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — CreateAccount rewired with dev_server_id gate, label uniqueness, test-before-save + revoke rollback; all 4 requested tests added and passing.`
 
 ---
 

@@ -44,7 +44,7 @@ func (uc *PauseExecution) Execute(ctx context.Context, in PauseExecutionInput) (
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindFailedPrecondition, "WORKFLOW_CANNOT_PAUSE", err.Error(), err)
 	}
 
-	if err := uc.executions.UpdateExecution(ctx, exec); err != nil {
+	if err := uc.executions.UpdateExecution(ctx, exec, nil); err != nil {
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_EXECUTION_UPDATE_FAILED", "failed to persist paused execution", err)
 	}
 

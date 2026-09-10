@@ -14,17 +14,19 @@ type AddEdgeInput struct {
 	Kind       domain.EdgeKind
 }
 
-// AddEdge is task-service's edge-mutation usecase — the one place
-// domain.DetectCycle gets called, per task-service.md §4/§8. Only
-// depends_on edges are cycle-checked: parent_child's single-parent
-// invariant is a different, DB-enforced constraint (unique index on
-// to_task_id), not a cycle in the sense TaskDAGValidator guards against.
+// AddEdge is task-service's edge-mutation usecase. Runs the cycle check
+// (depends_on only) and the write in ONE transaction via TxRunner, closing
+// README.md's "known gap": a SELECT ... FOR UPDATE over the depends_on edge
+// set (EdgeRepository.ListByKindForUpdate) closes the race the prior
+// two-call (ListByKind then Add) shape allowed. Also implements auto-block:
+// adding "from depends_on to" means "from must wait for to" — if `to` isn't
+// Done/Cancelled, `from` transitions to StatusBlocked.
 type AddEdge struct {
-	edges EdgeRepository
+	txRunner TxRunner
 }
 
-func NewAddEdge(edges EdgeRepository) *AddEdge {
-	return &AddEdge{edges: edges}
+func NewAddEdge(txRunner TxRunner) *AddEdge {
+	return &AddEdge{txRunner: txRunner}
 }
 
 func (uc *AddEdge) Execute(ctx context.Context, in AddEdgeInput) (domain.TaskEdge, error) {
@@ -32,29 +34,52 @@ func (uc *AddEdge) Execute(ctx context.Context, in AddEdgeInput) (domain.TaskEdg
 	if err != nil {
 		return domain.TaskEdge{}, apperrors.New(apperrors.KindUnauthenticated, "TASK_NO_TENANT", "no tenant in request context", err)
 	}
-
 	edge, err := domain.NewTaskEdge(in.FromTaskID, in.ToTaskID, in.Kind)
 	if err != nil {
 		return domain.TaskEdge{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_EDGE_INVALID", err.Error(), err)
 	}
 
-	if edge.Kind == domain.EdgeKindDependsOn {
-		// NOTE: fetching the existing edge set and then writing the new one
-		// is two separate calls, not one transaction — task-service.md §8
-		// requires the cycle check and the write to be atomic so a
-		// concurrent AddEdge can't slip a cycle in between. Not wired in
-		// this scaffold; see this service's README's "known gaps" section.
-		existing, err := uc.edges.ListByKind(ctx, tenantID, domain.EdgeKindDependsOn)
-		if err != nil {
-			return domain.TaskEdge{}, apperrors.New(apperrors.KindInternal, "TASK_EDGE_LIST_FAILED", "failed to list existing edges for cycle check", err)
-		}
-		if domain.DetectCycle(existing, edge) {
-			return domain.TaskEdge{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_CYCLIC_DEPENDENCY", domain.ErrCyclicDependency.Error(), domain.ErrCyclicDependency)
-		}
-	}
-
-	if err := uc.edges.Add(ctx, tenantID, edge); err != nil {
-		return domain.TaskEdge{}, apperrors.New(apperrors.KindInternal, "TASK_EDGE_ADD_FAILED", "failed to persist edge", err)
+	err = uc.txRunner.RunInTx(ctx, func(ctx context.Context, tasks TaskRepository, edges EdgeRepository) error {
+		return addEdgeWithinTx(ctx, tenantID, tasks, edges, edge)
+	})
+	if err != nil {
+		return domain.TaskEdge{}, err
 	}
 	return edge, nil
+}
+
+// addEdgeWithinTx is the cycle-check + write + auto-block core, factored
+// out so it can run against an ALREADY-open transaction's TaskRepository/
+// EdgeRepository pair — AddEdge.Execute calls it via TxRunner.RunInTx;
+// AIApply's own RunInTx-scoped subtask loop (ai_apply.go) calls it
+// directly, since Repository.RunInTx always begins a fresh transaction
+// against the pool (not the currently-open pgx.Tx) — nesting a second
+// RunInTx call there would silently open an unrelated transaction and
+// break AIApply's all-or-nothing guarantee.
+func addEdgeWithinTx(ctx context.Context, tenantID string, tasks TaskRepository, edges EdgeRepository, edge domain.TaskEdge) error {
+	if edge.Kind == domain.EdgeKindDependsOn {
+		existing, err := edges.ListByKindForUpdate(ctx, tenantID, domain.EdgeKindDependsOn)
+		if err != nil {
+			return apperrors.New(apperrors.KindInternal, "TASK_EDGE_LIST_FAILED", "failed to list existing edges for cycle check", err)
+		}
+		if domain.DetectCycle(existing, edge) {
+			return apperrors.New(apperrors.KindFailedPrecondition, "TASK_CYCLIC_DEPENDENCY", domain.ErrCyclicDependency.Error(), domain.ErrCyclicDependency)
+		}
+	}
+	if err := edges.Add(ctx, tenantID, edge); err != nil {
+		return apperrors.New(apperrors.KindInternal, "TASK_EDGE_ADD_FAILED", "failed to persist edge", err)
+	}
+
+	if edge.Kind == domain.EdgeKindDependsOn {
+		dep, err := tasks.Get(ctx, tenantID, edge.ToTaskID)
+		if err != nil {
+			return apperrors.New(apperrors.KindInternal, "TASK_EDGE_DEP_LOOKUP_FAILED", "failed to load dependency task", err)
+		}
+		if dep.Status != domain.StatusDone && dep.Status != domain.StatusCancelled {
+			if err := tasks.UpdateStatus(ctx, tenantID, edge.FromTaskID, domain.StatusBlocked); err != nil {
+				return apperrors.New(apperrors.KindInternal, "TASK_EDGE_AUTO_BLOCK_FAILED", "failed to auto-block dependent task", err)
+			}
+		}
+	}
+	return nil
 }

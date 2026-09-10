@@ -49,7 +49,7 @@ func (uc *AppendAuditEntry) Execute(ctx context.Context, in AppendAuditEntryInpu
 		return apperrors.New(apperrors.KindInvalidArgument, "AUTH_AUDIT_NO_ACTION", "action is required", nil)
 	}
 
-	entry, err := domain.NewAuditEntry(uuid.NewString(), in.TenantID, in.ActorID, in.Action, in.Target, domain.Outcome(in.Outcome), in.IPAddress, uc.clock.Now())
+	entry, err := domain.NewAuditEntry(uuid.NewString(), in.TenantID, in.ActorID, in.Action, in.Target, "", "", nil, domain.Outcome(in.Outcome), in.IPAddress, uc.clock.Now())
 	if err != nil {
 		return apperrors.New(apperrors.KindInvalidArgument, "AUTH_AUDIT_INVALID_ENTRY", err.Error(), err)
 	}

@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/usecase/cleanup_worktrees_step_executor.go` (new)
 **Depends on:** TASK-AT-04-02, TASK-AT-04-03, TASK-AT-04-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — usecase/cleanup_worktrees_step_executor.go registered as workflow-service's 6th StepExecutor (STEP_TYPE_CLEANUP_WORKTREES); new adapter/serviceclients dials project/git-gateway/automation-service; force=false,allow_open_pr=false unconditional; unit-tested (mixed batch, dry-run, empty-run-id, audit-failure-is-best-effort).
 
 ---
 

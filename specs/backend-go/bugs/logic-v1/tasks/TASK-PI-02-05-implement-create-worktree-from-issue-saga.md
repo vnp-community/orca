@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/create_worktree_from_issue.go` (new)
 **Depends on:** TASK-PI-02-01, TASK-PI-02-03, TASK-PI-02-04
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — CreateWorktreeFromIssue saga implemented, wired into grpc/server.go + main.go; ProjectClient.IsIssueStatusSyncEnabled added.`
 
 ---
 

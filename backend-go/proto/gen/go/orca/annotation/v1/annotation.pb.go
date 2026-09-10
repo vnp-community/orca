@@ -22,12 +22,64 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Side int32
+
+const (
+	Side_SIDE_UNSPECIFIED Side = 0 // non-diff comment (plain file/line note) — BR-CR-05 only applies to diff review
+	Side_SIDE_OLD         Side = 1
+	Side_SIDE_NEW         Side = 2
+)
+
+// Enum value maps for Side.
+var (
+	Side_name = map[int32]string{
+		0: "SIDE_UNSPECIFIED",
+		1: "SIDE_OLD",
+		2: "SIDE_NEW",
+	}
+	Side_value = map[string]int32{
+		"SIDE_UNSPECIFIED": 0,
+		"SIDE_OLD":         1,
+		"SIDE_NEW":         2,
+	}
+)
+
+func (x Side) Enum() *Side {
+	p := new(Side)
+	*p = x
+	return p
+}
+
+func (x Side) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Side) Descriptor() protoreflect.EnumDescriptor {
+	return file_orca_annotation_v1_annotation_proto_enumTypes[0].Descriptor()
+}
+
+func (Side) Type() protoreflect.EnumType {
+	return &file_orca_annotation_v1_annotation_proto_enumTypes[0]
+}
+
+func (x Side) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Side.Descriptor instead.
+func (Side) EnumDescriptor() ([]byte, []int) {
+	return file_orca_annotation_v1_annotation_proto_rawDescGZIP(), []int{0}
+}
+
 type Anchor struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RepoId        string                 `protobuf:"bytes,1,opt,name=repo_id,json=repoId,proto3" json:"repo_id,omitempty"`
 	FilePath      string                 `protobuf:"bytes,2,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"`
 	Line          int32                  `protobuf:"varint,3,opt,name=line,proto3" json:"line,omitempty"`
-	Ref           string                 `protobuf:"bytes,4,opt,name=ref,proto3" json:"ref,omitempty"` // commit sha or branch, best-effort
+	Ref           string                 `protobuf:"bytes,4,opt,name=ref,proto3" json:"ref,omitempty"`                                 // commit sha or branch, best-effort
+	WorktreeId    string                 `protobuf:"bytes,5,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"` // NEW — optional; scope addition, see SOL-CR-02 rationale
+	EndLine       int32                  `protobuf:"varint,6,opt,name=end_line,json=endLine,proto3" json:"end_line,omitempty"`         // NEW — 0 or == line means single-line; must be >= line (BR-CR-06)
+	Side          Side                   `protobuf:"varint,7,opt,name=side,proto3,enum=orca.annotation.v1.Side" json:"side,omitempty"` // NEW — BR-CR-05
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -90,6 +142,27 @@ func (x *Anchor) GetRef() string {
 	return ""
 }
 
+func (x *Anchor) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *Anchor) GetEndLine() int32 {
+	if x != nil {
+		return x.EndLine
+	}
+	return 0
+}
+
+func (x *Anchor) GetSide() Side {
+	if x != nil {
+		return x.Side
+	}
+	return Side_SIDE_UNSPECIFIED
+}
+
 type Annotation struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -100,6 +173,9 @@ type Annotation struct {
 	Resolved      bool                   `protobuf:"varint,6,opt,name=resolved,proto3" json:"resolved,omitempty"`
 	CreatedAt     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
 	UpdatedAt     *timestamppb.Timestamp `protobuf:"bytes,8,opt,name=updated_at,json=updatedAt,proto3" json:"updated_at,omitempty"`
+	OriginalCode  string                 `protobuf:"bytes,9,opt,name=original_code,json=originalCode,proto3" json:"original_code,omitempty"`  // NEW — BL-CR-02 DiffComment.originalCode
+	SentToAgent   bool                   `protobuf:"varint,10,opt,name=sent_to_agent,json=sentToAgent,proto3" json:"sent_to_agent,omitempty"` // NEW — distinct from `resolved` (BR-CR-08)
+	SentAt        *timestamppb.Timestamp `protobuf:"bytes,11,opt,name=sent_at,json=sentAt,proto3" json:"sent_at,omitempty"`                   // NEW — nil until MarkAnnotationsSent
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -190,11 +266,33 @@ func (x *Annotation) GetUpdatedAt() *timestamppb.Timestamp {
 	return nil
 }
 
+func (x *Annotation) GetOriginalCode() string {
+	if x != nil {
+		return x.OriginalCode
+	}
+	return ""
+}
+
+func (x *Annotation) GetSentToAgent() bool {
+	if x != nil {
+		return x.SentToAgent
+	}
+	return false
+}
+
+func (x *Annotation) GetSentAt() *timestamppb.Timestamp {
+	if x != nil {
+		return x.SentAt
+	}
+	return nil
+}
+
 type CreateAnnotationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Anchor        *Anchor                `protobuf:"bytes,1,opt,name=anchor,proto3" json:"anchor,omitempty"`
 	Content       string                 `protobuf:"bytes,2,opt,name=content,proto3" json:"content,omitempty"`
 	RequestId     string                 `protobuf:"bytes,3,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	OriginalCode  string                 `protobuf:"bytes,4,opt,name=original_code,json=originalCode,proto3" json:"original_code,omitempty"` // NEW
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -250,6 +348,13 @@ func (x *CreateAnnotationRequest) GetRequestId() string {
 	return ""
 }
 
+func (x *CreateAnnotationRequest) GetOriginalCode() string {
+	if x != nil {
+		return x.OriginalCode
+	}
+	return ""
+}
+
 type CreateAnnotationResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Annotation    *Annotation            `protobuf:"bytes,1,opt,name=annotation,proto3" json:"annotation,omitempty"`
@@ -300,6 +405,8 @@ type ListAnnotationsRequest struct {
 	FilePath      string                 `protobuf:"bytes,2,opt,name=file_path,json=filePath,proto3" json:"file_path,omitempty"` // optional filter
 	PageToken     string                 `protobuf:"bytes,3,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
 	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	WorktreeId    string                 `protobuf:"bytes,5,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`             // NEW — optional filter, alternative to repo_id+file_path
+	SentToAgent   *bool                  `protobuf:"varint,6,opt,name=sent_to_agent,json=sentToAgent,proto3,oneof" json:"sent_to_agent,omitempty"` // NEW — lets a caller ask for only-unsent (SOL-CR-03's send flow)
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -360,6 +467,20 @@ func (x *ListAnnotationsRequest) GetPageSize() int32 {
 		return x.PageSize
 	}
 	return 0
+}
+
+func (x *ListAnnotationsRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *ListAnnotationsRequest) GetSentToAgent() bool {
+	if x != nil && x.SentToAgent != nil {
+		return *x.SentToAgent
+	}
+	return false
 }
 
 type ListAnnotationsResponse struct {
@@ -521,6 +642,7 @@ func (x *UpdateAnnotationResponse) GetAnnotation() *Annotation {
 type DeleteAnnotationRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Confirmed     bool                   `protobuf:"varint,2,opt,name=confirmed,proto3" json:"confirmed,omitempty"` // NEW — BR-CR-08; see TASK-CR-02-05
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -562,6 +684,13 @@ func (x *DeleteAnnotationRequest) GetId() string {
 	return ""
 }
 
+func (x *DeleteAnnotationRequest) GetConfirmed() bool {
+	if x != nil {
+		return x.Confirmed
+	}
+	return false
+}
+
 type DeleteAnnotationResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	unknownFields protoimpl.UnknownFields
@@ -598,16 +727,108 @@ func (*DeleteAnnotationResponse) Descriptor() ([]byte, []int) {
 	return file_orca_annotation_v1_annotation_proto_rawDescGZIP(), []int{9}
 }
 
+type MarkAnnotationsSentRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Ids           []string               `protobuf:"bytes,1,rep,name=ids,proto3" json:"ids,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkAnnotationsSentRequest) Reset() {
+	*x = MarkAnnotationsSentRequest{}
+	mi := &file_orca_annotation_v1_annotation_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkAnnotationsSentRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkAnnotationsSentRequest) ProtoMessage() {}
+
+func (x *MarkAnnotationsSentRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_annotation_v1_annotation_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkAnnotationsSentRequest.ProtoReflect.Descriptor instead.
+func (*MarkAnnotationsSentRequest) Descriptor() ([]byte, []int) {
+	return file_orca_annotation_v1_annotation_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *MarkAnnotationsSentRequest) GetIds() []string {
+	if x != nil {
+		return x.Ids
+	}
+	return nil
+}
+
+type MarkAnnotationsSentResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Annotations   []*Annotation          `protobuf:"bytes,1,rep,name=annotations,proto3" json:"annotations,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *MarkAnnotationsSentResponse) Reset() {
+	*x = MarkAnnotationsSentResponse{}
+	mi := &file_orca_annotation_v1_annotation_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *MarkAnnotationsSentResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*MarkAnnotationsSentResponse) ProtoMessage() {}
+
+func (x *MarkAnnotationsSentResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_annotation_v1_annotation_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use MarkAnnotationsSentResponse.ProtoReflect.Descriptor instead.
+func (*MarkAnnotationsSentResponse) Descriptor() ([]byte, []int) {
+	return file_orca_annotation_v1_annotation_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *MarkAnnotationsSentResponse) GetAnnotations() []*Annotation {
+	if x != nil {
+		return x.Annotations
+	}
+	return nil
+}
+
 var File_orca_annotation_v1_annotation_proto protoreflect.FileDescriptor
 
 const file_orca_annotation_v1_annotation_proto_rawDesc = "" +
 	"\n" +
-	"#orca/annotation/v1/annotation.proto\x12\x12orca.annotation.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"d\n" +
+	"#orca/annotation/v1/annotation.proto\x12\x12orca.annotation.v1\x1a\x1fgoogle/protobuf/timestamp.proto\"\xce\x01\n" +
 	"\x06Anchor\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x1b\n" +
 	"\tfile_path\x18\x02 \x01(\tR\bfilePath\x12\x12\n" +
 	"\x04line\x18\x03 \x01(\x05R\x04line\x12\x10\n" +
-	"\x03ref\x18\x04 \x01(\tR\x03ref\"\xb6\x02\n" +
+	"\x03ref\x18\x04 \x01(\tR\x03ref\x12\x1f\n" +
+	"\vworktree_id\x18\x05 \x01(\tR\n" +
+	"worktreeId\x12\x19\n" +
+	"\bend_line\x18\x06 \x01(\x05R\aendLine\x12,\n" +
+	"\x04side\x18\a \x01(\x0e2\x18.orca.annotation.v1.SideR\x04side\"\xb4\x03\n" +
 	"\n" +
 	"Annotation\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
@@ -619,22 +840,31 @@ const file_orca_annotation_v1_annotation_proto_rawDesc = "" +
 	"\n" +
 	"created_at\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\tcreatedAt\x129\n" +
 	"\n" +
-	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\"\x86\x01\n" +
+	"updated_at\x18\b \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x12#\n" +
+	"\roriginal_code\x18\t \x01(\tR\foriginalCode\x12\"\n" +
+	"\rsent_to_agent\x18\n" +
+	" \x01(\bR\vsentToAgent\x123\n" +
+	"\asent_at\x18\v \x01(\v2\x1a.google.protobuf.TimestampR\x06sentAt\"\xab\x01\n" +
 	"\x17CreateAnnotationRequest\x122\n" +
 	"\x06anchor\x18\x01 \x01(\v2\x1a.orca.annotation.v1.AnchorR\x06anchor\x12\x18\n" +
 	"\acontent\x18\x02 \x01(\tR\acontent\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x03 \x01(\tR\trequestId\"Z\n" +
+	"request_id\x18\x03 \x01(\tR\trequestId\x12#\n" +
+	"\roriginal_code\x18\x04 \x01(\tR\foriginalCode\"Z\n" +
 	"\x18CreateAnnotationResponse\x12>\n" +
 	"\n" +
 	"annotation\x18\x01 \x01(\v2\x1e.orca.annotation.v1.AnnotationR\n" +
-	"annotation\"\x8a\x01\n" +
+	"annotation\"\xe6\x01\n" +
 	"\x16ListAnnotationsRequest\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x1b\n" +
 	"\tfile_path\x18\x02 \x01(\tR\bfilePath\x12\x1d\n" +
 	"\n" +
 	"page_token\x18\x03 \x01(\tR\tpageToken\x12\x1b\n" +
-	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\"\x83\x01\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12\x1f\n" +
+	"\vworktree_id\x18\x05 \x01(\tR\n" +
+	"worktreeId\x12'\n" +
+	"\rsent_to_agent\x18\x06 \x01(\bH\x00R\vsentToAgent\x88\x01\x01B\x10\n" +
+	"\x0e_sent_to_agent\"\x83\x01\n" +
 	"\x17ListAnnotationsResponse\x12@\n" +
 	"\vannotations\x18\x01 \x03(\v2\x1e.orca.annotation.v1.AnnotationR\vannotations\x12&\n" +
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"_\n" +
@@ -645,15 +875,25 @@ const file_orca_annotation_v1_annotation_proto_rawDesc = "" +
 	"\x18UpdateAnnotationResponse\x12>\n" +
 	"\n" +
 	"annotation\x18\x01 \x01(\v2\x1e.orca.annotation.v1.AnnotationR\n" +
-	"annotation\")\n" +
+	"annotation\"G\n" +
 	"\x17DeleteAnnotationRequest\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\x1a\n" +
-	"\x18DeleteAnnotationResponse2\xcc\x03\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n" +
+	"\tconfirmed\x18\x02 \x01(\bR\tconfirmed\"\x1a\n" +
+	"\x18DeleteAnnotationResponse\".\n" +
+	"\x1aMarkAnnotationsSentRequest\x12\x10\n" +
+	"\x03ids\x18\x01 \x03(\tR\x03ids\"_\n" +
+	"\x1bMarkAnnotationsSentResponse\x12@\n" +
+	"\vannotations\x18\x01 \x03(\v2\x1e.orca.annotation.v1.AnnotationR\vannotations*8\n" +
+	"\x04Side\x12\x14\n" +
+	"\x10SIDE_UNSPECIFIED\x10\x00\x12\f\n" +
+	"\bSIDE_OLD\x10\x01\x12\f\n" +
+	"\bSIDE_NEW\x10\x022\xc4\x04\n" +
 	"\x11AnnotationService\x12m\n" +
 	"\x10CreateAnnotation\x12+.orca.annotation.v1.CreateAnnotationRequest\x1a,.orca.annotation.v1.CreateAnnotationResponse\x12j\n" +
 	"\x0fListAnnotations\x12*.orca.annotation.v1.ListAnnotationsRequest\x1a+.orca.annotation.v1.ListAnnotationsResponse\x12m\n" +
 	"\x10UpdateAnnotation\x12+.orca.annotation.v1.UpdateAnnotationRequest\x1a,.orca.annotation.v1.UpdateAnnotationResponse\x12m\n" +
-	"\x10DeleteAnnotation\x12+.orca.annotation.v1.DeleteAnnotationRequest\x1a,.orca.annotation.v1.DeleteAnnotationResponseBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1;annotationv1b\x06proto3"
+	"\x10DeleteAnnotation\x12+.orca.annotation.v1.DeleteAnnotationRequest\x1a,.orca.annotation.v1.DeleteAnnotationResponse\x12v\n" +
+	"\x13MarkAnnotationsSent\x12..orca.annotation.v1.MarkAnnotationsSentRequest\x1a/.orca.annotation.v1.MarkAnnotationsSentResponseBJZHgithub.com/stablyai/orca-go/proto/gen/go/orca/annotation/v1;annotationv1b\x06proto3"
 
 var (
 	file_orca_annotation_v1_annotation_proto_rawDescOnce sync.Once
@@ -667,41 +907,50 @@ func file_orca_annotation_v1_annotation_proto_rawDescGZIP() []byte {
 	return file_orca_annotation_v1_annotation_proto_rawDescData
 }
 
-var file_orca_annotation_v1_annotation_proto_msgTypes = make([]protoimpl.MessageInfo, 10)
+var file_orca_annotation_v1_annotation_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_orca_annotation_v1_annotation_proto_msgTypes = make([]protoimpl.MessageInfo, 12)
 var file_orca_annotation_v1_annotation_proto_goTypes = []any{
-	(*Anchor)(nil),                   // 0: orca.annotation.v1.Anchor
-	(*Annotation)(nil),               // 1: orca.annotation.v1.Annotation
-	(*CreateAnnotationRequest)(nil),  // 2: orca.annotation.v1.CreateAnnotationRequest
-	(*CreateAnnotationResponse)(nil), // 3: orca.annotation.v1.CreateAnnotationResponse
-	(*ListAnnotationsRequest)(nil),   // 4: orca.annotation.v1.ListAnnotationsRequest
-	(*ListAnnotationsResponse)(nil),  // 5: orca.annotation.v1.ListAnnotationsResponse
-	(*UpdateAnnotationRequest)(nil),  // 6: orca.annotation.v1.UpdateAnnotationRequest
-	(*UpdateAnnotationResponse)(nil), // 7: orca.annotation.v1.UpdateAnnotationResponse
-	(*DeleteAnnotationRequest)(nil),  // 8: orca.annotation.v1.DeleteAnnotationRequest
-	(*DeleteAnnotationResponse)(nil), // 9: orca.annotation.v1.DeleteAnnotationResponse
-	(*timestamppb.Timestamp)(nil),    // 10: google.protobuf.Timestamp
+	(Side)(0),                           // 0: orca.annotation.v1.Side
+	(*Anchor)(nil),                      // 1: orca.annotation.v1.Anchor
+	(*Annotation)(nil),                  // 2: orca.annotation.v1.Annotation
+	(*CreateAnnotationRequest)(nil),     // 3: orca.annotation.v1.CreateAnnotationRequest
+	(*CreateAnnotationResponse)(nil),    // 4: orca.annotation.v1.CreateAnnotationResponse
+	(*ListAnnotationsRequest)(nil),      // 5: orca.annotation.v1.ListAnnotationsRequest
+	(*ListAnnotationsResponse)(nil),     // 6: orca.annotation.v1.ListAnnotationsResponse
+	(*UpdateAnnotationRequest)(nil),     // 7: orca.annotation.v1.UpdateAnnotationRequest
+	(*UpdateAnnotationResponse)(nil),    // 8: orca.annotation.v1.UpdateAnnotationResponse
+	(*DeleteAnnotationRequest)(nil),     // 9: orca.annotation.v1.DeleteAnnotationRequest
+	(*DeleteAnnotationResponse)(nil),    // 10: orca.annotation.v1.DeleteAnnotationResponse
+	(*MarkAnnotationsSentRequest)(nil),  // 11: orca.annotation.v1.MarkAnnotationsSentRequest
+	(*MarkAnnotationsSentResponse)(nil), // 12: orca.annotation.v1.MarkAnnotationsSentResponse
+	(*timestamppb.Timestamp)(nil),       // 13: google.protobuf.Timestamp
 }
 var file_orca_annotation_v1_annotation_proto_depIdxs = []int32{
-	0,  // 0: orca.annotation.v1.Annotation.anchor:type_name -> orca.annotation.v1.Anchor
-	10, // 1: orca.annotation.v1.Annotation.created_at:type_name -> google.protobuf.Timestamp
-	10, // 2: orca.annotation.v1.Annotation.updated_at:type_name -> google.protobuf.Timestamp
-	0,  // 3: orca.annotation.v1.CreateAnnotationRequest.anchor:type_name -> orca.annotation.v1.Anchor
-	1,  // 4: orca.annotation.v1.CreateAnnotationResponse.annotation:type_name -> orca.annotation.v1.Annotation
-	1,  // 5: orca.annotation.v1.ListAnnotationsResponse.annotations:type_name -> orca.annotation.v1.Annotation
-	1,  // 6: orca.annotation.v1.UpdateAnnotationResponse.annotation:type_name -> orca.annotation.v1.Annotation
-	2,  // 7: orca.annotation.v1.AnnotationService.CreateAnnotation:input_type -> orca.annotation.v1.CreateAnnotationRequest
-	4,  // 8: orca.annotation.v1.AnnotationService.ListAnnotations:input_type -> orca.annotation.v1.ListAnnotationsRequest
-	6,  // 9: orca.annotation.v1.AnnotationService.UpdateAnnotation:input_type -> orca.annotation.v1.UpdateAnnotationRequest
-	8,  // 10: orca.annotation.v1.AnnotationService.DeleteAnnotation:input_type -> orca.annotation.v1.DeleteAnnotationRequest
-	3,  // 11: orca.annotation.v1.AnnotationService.CreateAnnotation:output_type -> orca.annotation.v1.CreateAnnotationResponse
-	5,  // 12: orca.annotation.v1.AnnotationService.ListAnnotations:output_type -> orca.annotation.v1.ListAnnotationsResponse
-	7,  // 13: orca.annotation.v1.AnnotationService.UpdateAnnotation:output_type -> orca.annotation.v1.UpdateAnnotationResponse
-	9,  // 14: orca.annotation.v1.AnnotationService.DeleteAnnotation:output_type -> orca.annotation.v1.DeleteAnnotationResponse
-	11, // [11:15] is the sub-list for method output_type
-	7,  // [7:11] is the sub-list for method input_type
-	7,  // [7:7] is the sub-list for extension type_name
-	7,  // [7:7] is the sub-list for extension extendee
-	0,  // [0:7] is the sub-list for field type_name
+	0,  // 0: orca.annotation.v1.Anchor.side:type_name -> orca.annotation.v1.Side
+	1,  // 1: orca.annotation.v1.Annotation.anchor:type_name -> orca.annotation.v1.Anchor
+	13, // 2: orca.annotation.v1.Annotation.created_at:type_name -> google.protobuf.Timestamp
+	13, // 3: orca.annotation.v1.Annotation.updated_at:type_name -> google.protobuf.Timestamp
+	13, // 4: orca.annotation.v1.Annotation.sent_at:type_name -> google.protobuf.Timestamp
+	1,  // 5: orca.annotation.v1.CreateAnnotationRequest.anchor:type_name -> orca.annotation.v1.Anchor
+	2,  // 6: orca.annotation.v1.CreateAnnotationResponse.annotation:type_name -> orca.annotation.v1.Annotation
+	2,  // 7: orca.annotation.v1.ListAnnotationsResponse.annotations:type_name -> orca.annotation.v1.Annotation
+	2,  // 8: orca.annotation.v1.UpdateAnnotationResponse.annotation:type_name -> orca.annotation.v1.Annotation
+	2,  // 9: orca.annotation.v1.MarkAnnotationsSentResponse.annotations:type_name -> orca.annotation.v1.Annotation
+	3,  // 10: orca.annotation.v1.AnnotationService.CreateAnnotation:input_type -> orca.annotation.v1.CreateAnnotationRequest
+	5,  // 11: orca.annotation.v1.AnnotationService.ListAnnotations:input_type -> orca.annotation.v1.ListAnnotationsRequest
+	7,  // 12: orca.annotation.v1.AnnotationService.UpdateAnnotation:input_type -> orca.annotation.v1.UpdateAnnotationRequest
+	9,  // 13: orca.annotation.v1.AnnotationService.DeleteAnnotation:input_type -> orca.annotation.v1.DeleteAnnotationRequest
+	11, // 14: orca.annotation.v1.AnnotationService.MarkAnnotationsSent:input_type -> orca.annotation.v1.MarkAnnotationsSentRequest
+	4,  // 15: orca.annotation.v1.AnnotationService.CreateAnnotation:output_type -> orca.annotation.v1.CreateAnnotationResponse
+	6,  // 16: orca.annotation.v1.AnnotationService.ListAnnotations:output_type -> orca.annotation.v1.ListAnnotationsResponse
+	8,  // 17: orca.annotation.v1.AnnotationService.UpdateAnnotation:output_type -> orca.annotation.v1.UpdateAnnotationResponse
+	10, // 18: orca.annotation.v1.AnnotationService.DeleteAnnotation:output_type -> orca.annotation.v1.DeleteAnnotationResponse
+	12, // 19: orca.annotation.v1.AnnotationService.MarkAnnotationsSent:output_type -> orca.annotation.v1.MarkAnnotationsSentResponse
+	15, // [15:20] is the sub-list for method output_type
+	10, // [10:15] is the sub-list for method input_type
+	10, // [10:10] is the sub-list for extension type_name
+	10, // [10:10] is the sub-list for extension extendee
+	0,  // [0:10] is the sub-list for field type_name
 }
 
 func init() { file_orca_annotation_v1_annotation_proto_init() }
@@ -709,18 +958,20 @@ func file_orca_annotation_v1_annotation_proto_init() {
 	if File_orca_annotation_v1_annotation_proto != nil {
 		return
 	}
+	file_orca_annotation_v1_annotation_proto_msgTypes[4].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_annotation_v1_annotation_proto_rawDesc), len(file_orca_annotation_v1_annotation_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   10,
+			NumEnums:      1,
+			NumMessages:   12,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_orca_annotation_v1_annotation_proto_goTypes,
 		DependencyIndexes: file_orca_annotation_v1_annotation_proto_depIdxs,
+		EnumInfos:         file_orca_annotation_v1_annotation_proto_enumTypes,
 		MessageInfos:      file_orca_annotation_v1_annotation_proto_msgTypes,
 	}.Build()
 	File_orca_annotation_v1_annotation_proto = out.File

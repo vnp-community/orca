@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` + `api-gateway`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels_agent.go`
 **Depends on:** TASK-AG-04-01, TASK-AG-04-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `SwitchAgentAccount` grpc handler was already wired (Phase 1); added `agent.switchAccount` wscompat channel to `channels_agent.go`, sharing the `attachAgentPtyStream` helper with `agent.start`/`agent.resume`. `TestAgentSwitchAccountChannel_SwitchesAndOpensAttachPtyStream` passes.
 
 ---
 

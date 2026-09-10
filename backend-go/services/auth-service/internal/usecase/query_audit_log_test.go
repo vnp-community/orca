@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
 )
@@ -25,8 +26,9 @@ func TestQueryAuditLog_DeniedWhenOPADecisionIsFalse(t *testing.T) {
 func TestQueryAuditLog_AllowedWhenOPADecisionIsTrue(t *testing.T) {
 	users := newFakeUserRepository()
 	seedActiveUser(t, users, fakeHasher{}, "admin1", "t1", "admin@example.com", "pw", domain.RoleAdmin)
+	now := time.Now()
 	audit := &fakeAuditRepository{entries: []domain.AuditEntry{
-		{ID: "e1", TenantID: "t1", ActorID: "admin1", Action: "user.created", Target: "u2"},
+		{ID: "e1", TenantID: "t1", ActorID: "admin1", Action: "user.created", TargetType: "user", TargetID: "u2", OccurredAt: now},
 	}}
 
 	opa := &fakeOPAClient{allow: true}
@@ -38,6 +40,39 @@ func TestQueryAuditLog_AllowedWhenOPADecisionIsTrue(t *testing.T) {
 	}
 	if len(out.Entries) != 1 {
 		t.Errorf("expected 1 audit entry, got %d", len(out.Entries))
+	}
+}
+
+func TestQueryAuditLog_ForwardsExtendedFilters(t *testing.T) {
+	users := newFakeUserRepository()
+	seedActiveUser(t, users, fakeHasher{}, "admin1", "t1", "admin@example.com", "pw", domain.RoleAdmin)
+
+	now := time.Now()
+	audit := &fakeAuditRepository{entries: []domain.AuditEntry{
+		{ID: "e1", TenantID: "t1", ActorID: "admin1", Action: "user.created", TargetType: "user", TargetID: "u2", OccurredAt: now},
+		{ID: "e2", TenantID: "t1", ActorID: "admin1", Action: "user.deactivated", TargetType: "user", TargetID: "u3", OccurredAt: now},
+		{ID: "e3", TenantID: "t1", ActorID: "other-admin", Action: "user.created", TargetType: "user", TargetID: "u4", OccurredAt: now},
+	}}
+
+	opa := &fakeOPAClient{allow: true}
+	uc := NewQueryAuditLog(users, audit, opa)
+	ctx := withActor(context.Background(), "t1", "admin1")
+
+	out, err := uc.Execute(ctx, QueryAuditLogInput{TenantID: "t1", Action: "user.created", ActorID: "admin1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Entries) != 1 || out.Entries[0].ID != "e1" {
+		t.Errorf("expected only e1 to match action+actor_id filters, got %+v", out.Entries)
+	}
+
+	// `to` in the past excludes every entry (all seeded at `now`).
+	out, err = uc.Execute(ctx, QueryAuditLogInput{TenantID: "t1", To: now.Add(-time.Hour)})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(out.Entries) != 0 {
+		t.Errorf("expected no entries past the `to` bound, got %+v", out.Entries)
 	}
 }
 

@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/adapter/github/client.go`, `.../gitlab/client.go`, `.../gitea/client.go`, `.../azuredevops/client.go`, `.../bitbucket/client.go`
 **Depends on:** TASK-CR-05-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Draft threaded through CreatePullRequest for github/gitlab/gitea/azuredevops (native fields) and bitbucket (ErrCapabilityUnsupported guard); per-adapter Draft tests added and passing
 
 ---
 

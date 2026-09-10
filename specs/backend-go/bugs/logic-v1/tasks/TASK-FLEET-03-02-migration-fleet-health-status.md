@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (postgres migration)
 **File:** `backend-go/services/infra-fleet-service/migrations/0009_fleet_health_status.up.sql` (new, plus matching `.down.sql`)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added 0009 up/down migration (0008 taken by TASK-FLEET-02-02); no duplicate numbering. infra.fleet_health.dev_server_id is already the PK, confirmed usable as the upsert conflict target for TASK-FLEET-03-04.
 
 ---
 

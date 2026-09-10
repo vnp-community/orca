@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/grpcclient/aiprovider_client.go` (new), `backend-go/services/infra-fleet-service/internal/usecase/switch_agent_account.go` (new), `backend-go/services/infra-fleet-service/cmd/server/main.go`
 **Depends on:** TASK-AG-01-02, TASK-AG-02-03, TASK-AG-03-04, TASK-AG-04-02
-**Status:** `[ ]` TODO — every path ends in `StartAgentSession`/`ResumeAgentSession`, so a switch to a keyed provider inherits TASK-AG-01-04's credential blocker unchanged (see TASK-AG-04-05); switching between two `localInference` accounts is unaffected
+**Status:** `[x]` DONE — infra-fleet-service's AIProviderResolver grpcclient (+ Dial helper) and SwitchAgentAccount saga usecase implemented exactly as specced; ai-provider-service dial + full main.go wiring (AIProviderServiceAddr config, switchAgentAccountUC passed into grpc.New alongside the StartAgentSession/KillAgentSession/ResumeAgentSession chain). switch_agent_account_test.go covers happy-path-different-account, no-alternate-account, resume-succeeds, kill-fails-aborts-before-resolve, and TASK-AG-04-05's credential-injection-blocker-inherits case — all passing.
 
 ---
 

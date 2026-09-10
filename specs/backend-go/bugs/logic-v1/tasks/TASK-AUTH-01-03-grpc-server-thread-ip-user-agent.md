@@ -5,7 +5,7 @@
 **Service:** `auth-service` (grpc adapter)
 **File:** `backend-go/services/auth-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-AUTH-01-01, TASK-AUTH-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `Server.Login` threads `req.GetIp()`/`req.GetUserAgent()` into `LoginInput`; new `server_test.go` (`TestServer_Login`, `TestServer_Login_WrongPasswordWritesFailureAudit`) passes.
 
 ---
 

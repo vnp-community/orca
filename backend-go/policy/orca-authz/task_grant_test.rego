@@ -29,3 +29,25 @@ test_unspecified_level_denied if {
 test_unknown_action_denied if {
 	not allow with input as {"level": "owner", "action": "delete_tenant"}
 }
+
+# TASK-TG-03-01: Grant/RevokeGrant/ListGrants require "manage" — only
+# owner/admin may write a grant on a task they can already administer.
+test_owner_can_manage if {
+	allow with input as {"level": "owner", "action": "manage"}
+}
+
+test_admin_can_manage if {
+	allow with input as {"level": "admin", "action": "manage"}
+}
+
+test_user_cannot_manage if {
+	not allow with input as {"level": "user", "action": "manage"}
+}
+
+test_team_cannot_manage if {
+	not allow with input as {"level": "team", "action": "manage"}
+}
+
+test_company_cannot_manage if {
+	not allow with input as {"level": "company", "action": "manage"}
+}

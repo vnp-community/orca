@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service` (proto)
 **File:** `backend-go/proto/orca/gitgateway/v1/gitgateway.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added `optional string idempotency_key = 5` to `CreateWorktreeRequest`, regenerated stubs (`go build ./proto/...` clean, `IdempotencyKey *string` present); `buf breaking` could not run in this worktree (buf's git-clone diff needs a real `.git` dir, worktrees only have a gitlink file) but the change is purely additive.
 
 ---
 

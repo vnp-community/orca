@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/proto/orca/project/v1/project.proto`
 **Depends on:** TASK-MB-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `GetMobileWorktreeStatus` RPC + `GetMobileWorktreeStatusRequest`/`Response`/`MobileWorktreeStatus` messages to `project.proto`; `buf generate` regenerated stubs; `go build ./proto/...` passes.
 
 ---
 

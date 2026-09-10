@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
@@ -33,6 +34,15 @@ func (f *fakeDevServerListRepository) UpdateApprovalStatus(ctx context.Context, 
 }
 func (f *fakeDevServerListRepository) AssignGroup(ctx context.Context, tenantID, devServerID, groupID string) (domain.DevServer, error) {
 	return domain.DevServer{}, nil
+}
+func (f *fakeDevServerListRepository) ListAllForPolling(ctx context.Context) ([]domain.DevServer, error) {
+	return nil, nil
+}
+func (f *fakeDevServerListRepository) ListByTag(ctx context.Context, tenantID, tag string) ([]domain.DevServer, error) {
+	return nil, nil
+}
+func (f *fakeDevServerListRepository) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerHealthStatus, info HandshakeInfo, provisionedAt time.Time) error {
+	return nil
 }
 
 func approvedServer(id, groupID string) domain.DevServer {

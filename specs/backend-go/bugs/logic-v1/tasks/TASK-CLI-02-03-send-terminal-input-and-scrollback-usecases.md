@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/send_terminal_input.go`, `get_terminal_scrollback.go`
 **Depends on:** TASK-CLI-02-01
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — both usecases added (added an unexported, test-overridable `drainWindow` field on `GetTerminalScrollback` so its tests don't sleep the real 500ms), wired into `cmd/server/main.go`; all verify-listed cases pass (exact-byte write, unknown-pty `INFRA_TERMINAL_NOT_FOUND`, ordered chunk assembly, exit-event exclusion, bounded drain window).
 
 ---
 

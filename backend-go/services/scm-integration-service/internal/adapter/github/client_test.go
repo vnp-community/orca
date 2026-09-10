@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/usecase"
 )
 
@@ -193,5 +194,153 @@ func TestCreatePullRequest_NonCreatedStatusIsAnError(t *testing.T) {
 	_, err := client.CreatePullRequest(context.Background(), usecase.Credential{Token: "tok"}, "a/b", usecase.CreatePullRequestInput{Title: "t", HeadBranch: "h", BaseBranch: "b"})
 	if err == nil {
 		t.Fatal("expected an error for a non-201 response")
+	}
+}
+
+// TestCreatePullRequest_DraftSerializesIntoPayload asserts Draft: true
+// serializes into the "draft" JSON field — BR-CR-20.
+func TestCreatePullRequest_DraftSerializesIntoPayload(t *testing.T) {
+	var gotBody map[string]any
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		_ = json.NewDecoder(r.Body).Decode(&gotBody)
+		w.WriteHeader(http.StatusCreated)
+		_ = json.NewEncoder(w).Encode(map[string]any{
+			"number": 9, "title": "wip", "state": "open",
+			"html_url": "https://github.com/octocat/hello-world/pull/9", "draft": true,
+		})
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	pr, err := client.CreatePullRequest(context.Background(), usecase.Credential{Token: "tok"}, "a/b", usecase.CreatePullRequestInput{Title: "t", HeadBranch: "h", BaseBranch: "b", Draft: true})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if draft, ok := gotBody["draft"].(bool); !ok || !draft {
+		t.Errorf("expected draft:true in the request payload, got %v", gotBody["draft"])
+	}
+	if !pr.Draft {
+		t.Error("expected the echoed PullRequest.Draft to be true")
+	}
+}
+
+func TestGetRepoFileContent_Found(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write([]byte("* @alice\n"))
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	content, found, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !found || content != "* @alice\n" {
+		t.Errorf("expected found=true content=%q, got found=%v content=%q", "* @alice\n", found, content)
+	}
+}
+
+func TestGetRepoFileContent_NotFound(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusNotFound)
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, found, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err != nil {
+		t.Fatalf("expected no error on 404, got %v", err)
+	}
+	if found {
+		t.Error("expected found=false on 404")
+	}
+}
+
+func TestGetRepoFileContent_NonOKNonNotFoundIsAnError(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusInternalServerError)
+	}))
+	defer server.Close()
+
+	client := New(server.Client(), server.URL)
+	_, _, err := client.GetRepoFileContent(context.Background(), usecase.Credential{Token: "tok"}, "a/b", "CODEOWNERS", "main")
+	if err == nil {
+		t.Fatal("expected an error for a non-200/404 response")
+	}
+}
+
+// TestClient_SubmitReview_BuildsExactPayloadShape asserts the exact
+// event/comments[].path/line/body request body GitHub's Reviews API
+// expects, for each of the three review types (BUG-PI-04/TASK-PI-04-07).
+func TestClient_SubmitReview_BuildsExactPayloadShape(t *testing.T) {
+	tests := []struct {
+		name      string
+		in        domain.ReviewInput
+		wantEvent string
+	}{
+		{
+			name:      "comment",
+			in:        domain.ReviewInput{Type: domain.ReviewTypeComment, Summary: "looks fine", Comments: []domain.ReviewComment{{Path: "a.go", Line: 10, Body: "nit"}}},
+			wantEvent: "COMMENT",
+		},
+		{
+			name:      "approve",
+			in:        domain.ReviewInput{Type: domain.ReviewTypeApprove, Summary: "ship it", Comments: []domain.ReviewComment{{Path: "b.go", Line: 20, Body: "great"}}},
+			wantEvent: "APPROVE",
+		},
+		{
+			name:      "request_changes",
+			in:        domain.ReviewInput{Type: domain.ReviewTypeRequestChanges, Summary: "needs work", Comments: []domain.ReviewComment{{Path: "c.go", Line: 30, Body: "fix this"}}},
+			wantEvent: "REQUEST_CHANGES",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var gotMethod, gotPath string
+			var gotBody map[string]any
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				gotMethod = r.Method
+				gotPath = r.URL.Path
+				_ = json.NewDecoder(r.Body).Decode(&gotBody)
+				w.Header().Set("Content-Type", "application/json")
+				_ = json.NewEncoder(w).Encode(map[string]any{
+					"id": 99, "state": tt.wantEvent, "user": map[string]any{"login": "octocat"},
+					"submitted_at": "2024-01-01T00:00:00Z", "html_url": "https://github.com/o/r/pull/1#review-99",
+				})
+			}))
+			defer server.Close()
+
+			client := New(server.Client(), server.URL)
+			review, err := client.SubmitReview(context.Background(), usecase.Credential{Token: "gho_faketoken"}, "o/r", 1, tt.in)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			if gotMethod != http.MethodPost {
+				t.Errorf("expected POST, got %s", gotMethod)
+			}
+			if gotPath != "/repos/o/r/pulls/1/reviews" {
+				t.Errorf("unexpected request path: %s", gotPath)
+			}
+			if gotBody["event"] != tt.wantEvent {
+				t.Errorf("event = %v, want %v", gotBody["event"], tt.wantEvent)
+			}
+			if gotBody["body"] != tt.in.Summary {
+				t.Errorf("body = %v, want %v", gotBody["body"], tt.in.Summary)
+			}
+			comments, ok := gotBody["comments"].([]any)
+			if !ok || len(comments) != 1 {
+				t.Fatalf("expected exactly one comment in the request body, got %v", gotBody["comments"])
+			}
+			c := comments[0].(map[string]any)
+			if c["path"] != tt.in.Comments[0].Path || int32(c["line"].(float64)) != tt.in.Comments[0].Line || c["body"] != tt.in.Comments[0].Body {
+				t.Errorf("unexpected comment shape: %+v", c)
+			}
+			if review.ID != "99" || review.ReviewerID != "octocat" {
+				t.Errorf("unexpected review: %+v", review)
+			}
+		})
 	}
 }

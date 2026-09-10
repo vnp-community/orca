@@ -5,7 +5,7 @@
 **Service:** `agent/` (not backend-go)
 **File:** `agent/src/relay/agent-connection-relay.ts`, `agent/src/relay/relay.ts`, and a new CLI entrypoint (TBD — likely `agent/src/relay/relay-daemon.ts` or similar)
 **Depends on:** none (independent of the backend-go tasks in this set; those substitute an interim handshake-based liveness check instead of waiting on this)
-**Status:** `[ ]` BLOCKED — requires `agent/` engineering; the TypeScript daemon/HTTP-health surface this task needs does not exist anywhere in `agent/src` today
+**Status:** [x] DONE (partial, per explicit project-owner override of this task's own "do not implement" default) — implemented a real, tested, minimal daemon/health primitive as 3 new standalone modules: `agent/src/relay/relay-daemon-pidfile.ts` (PID file write/read/remove/liveness), `agent/src/relay/relay-daemon-health-server.ts` (loopback HTTP `GET /health`, mirrors agent-hook-server.ts's binding pattern), `agent/src/relay/relay-daemon.ts` (`--daemon` flag parsing, parent-side detached spawn mirroring pty-daemon-client.ts's spawnDaemon, child-side runRelayDaemon wiring PID file + health server + SIGTERM/SIGINT cleanup). NOT wired into relay.ts's existing PTY/dispatcher runtime or build.mjs — that integration (deciding whether agent.js's Part A dispatcher or a revived relay.js --detached mode owns this, then updating sshrelay.Provisioner's deploy step) is genuine follow-up engineering out of scope for this pass, same as the original blocked-task's own scoping. 25 new tests pass (`npx vitest run` — real detached process was not tested, but real HTTP server + real PID file I/O + real process liveness checks were); `tsc --noEmit` and `oxlint` clean on the new files.
 
 ---
 

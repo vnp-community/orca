@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/stablyai/orca-go/services/tenant-service/internal/domain"
@@ -149,6 +150,75 @@ func TestCachedGetResolvedProfile_PropagatesBaseError(t *testing.T) {
 	}
 	if cache.setCalls != 0 {
 		t.Errorf("expected a failed resolution to never populate the cache, got %d sets", cache.setCalls)
+	}
+}
+
+// TestGetResolvedProfile_CombinesApprovedModelsFallbackAndAllowedServerTagsWithExistingMerge
+// is a regression guard against a future edit to ResolveProfile's call
+// order breaking the interaction between the SOL-PRF-02 additions
+// (approvedModels fallback, allowedServerTags intersection) and the
+// pre-existing merge steps (security lock, pathAdditions concatenation) —
+// see TASK-PRF-02-03.
+func TestGetResolvedProfile_CombinesApprovedModelsFallbackAndAllowedServerTagsWithExistingMerge(t *testing.T) {
+	companies := newFakeCompanyRepository()
+	departments := newFakeDepartmentRepository()
+	profiles := newFakeUserProfileRepository()
+	teams := newFakeTeamRepository()
+
+	company := mustCompany(t, "company-1", "Acme", domain.Settings{
+		"security": domain.Settings{"sessionTimeoutHours": float64(24)},
+		"shell":    domain.Settings{"pathAdditions": []any{"/company/bin"}},
+		"agent":    domain.Settings{"approvedModels": []any{"claude-opus-4-5"}},
+		"fleet":    domain.Settings{"allowedServerTags": []any{"gpu", "eu"}},
+	})
+	_, _ = companies.Create(context.Background(), company)
+
+	department := mustDepartment(t, "dept-1", "company-1", "Engineering", domain.Settings{
+		"shell": domain.Settings{"pathAdditions": []any{"/dept/bin"}},
+		"fleet": domain.Settings{"allowedServerTags": []any{"gpu"}},
+	})
+	_, _ = departments.Create(context.Background(), department)
+
+	profile := mustUserProfile(t, "user-1", "company-1", "dept-1", domain.Settings{
+		"agent": domain.Settings{"preferredModel": "gemini"},
+	})
+	_ = profiles.Upsert(context.Background(), profile)
+
+	uc := NewGetResolvedProfile(companies, departments, profiles, teams)
+	ctx := withTenant(context.Background(), "company-1")
+
+	got, err := uc.Execute(ctx, "user-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	security := got.Settings["security"].(domain.Settings)
+	if security["sessionTimeoutHours"] != float64(24) || len(security) != 1 {
+		t.Errorf("expected security to equal company's value only, got %+v", security)
+	}
+
+	shell := got.Settings["shell"].(domain.Settings)
+	pathAdditions := shell["pathAdditions"].([]any)
+	if len(pathAdditions) != 2 || pathAdditions[0] != "/company/bin" || pathAdditions[1] != "/dept/bin" {
+		t.Errorf("expected pathAdditions=[/company/bin, /dept/bin] in that order, got %v", pathAdditions)
+	}
+
+	agent := got.Settings["agent"].(domain.Settings)
+	if agent["preferredModel"] != "claude-opus-4-5" {
+		t.Errorf("expected approvedModels fallback to fire, forcing preferredModel to claude-opus-4-5, got %v", agent["preferredModel"])
+	}
+	if agent["_modelFallbackReason"] == nil || agent["_modelFallbackReason"] == "" {
+		t.Error("expected _modelFallbackReason to be set")
+	}
+
+	fleet := got.Settings["fleet"].(domain.Settings)
+	tags := fleet["allowedServerTags"].([]any)
+	if !reflect.DeepEqual(tags, []any{"gpu"}) {
+		t.Errorf("expected department to narrow company's allowedServerTags to [gpu], got %v", tags)
+	}
+
+	if got.Sources["agent.preferredModel"] != domain.SourceCompany {
+		t.Errorf("expected agent.preferredModel source overwritten to %q (fallback), not %q, got %q", domain.SourceCompany, domain.SourceUser, got.Sources["agent.preferredModel"])
 	}
 }
 

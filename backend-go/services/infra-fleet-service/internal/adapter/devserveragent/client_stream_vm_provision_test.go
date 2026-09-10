@@ -3,7 +3,6 @@ package devserveragent
 import (
 	"context"
 	"errors"
-	"log/slog"
 	"testing"
 	"time"
 
@@ -16,7 +15,7 @@ import (
 // package equivalent, just local to this package's tests.
 func vmProvisionTestDevServer(t *testing.T, host string) domain.DevServer {
 	t.Helper()
-	ds, err := domain.NewDevServer("ds-vmprov", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer("ds-vmprov", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -57,7 +56,7 @@ func TestStreamVmProvision_DemuxesStdoutStderrChunks(t *testing.T) {
 		}},
 	}}
 	host, port := startFakeAgent(t, agent)
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	events, unsubscribe, err := client.StreamVmProvision(context.Background(), vmProvisionTestDevServer(t, host), usecase.VmProvisionParams{
@@ -104,7 +103,7 @@ func TestStreamVmProvision_EmitsResultEventOnStreamEnd(t *testing.T) {
 			}},
 		}}
 		host, port := startFakeAgent(t, agent)
-		client := New(testConfig(port, fakeAgentToken), slog.Default())
+		client := newTestClientWithToken(port, fakeAgentToken)
 		t.Cleanup(client.Close)
 
 		events, unsubscribe, err := client.StreamVmProvision(context.Background(), vmProvisionTestDevServer(t, host), usecase.VmProvisionParams{RecipeID: "r1", RuntimeID: "rt1"})
@@ -147,7 +146,7 @@ func TestStreamVmProvision_EmitsResultEventOnStreamEnd(t *testing.T) {
 			}},
 		}}
 		host, port := startFakeAgent(t, agent)
-		client := New(testConfig(port, fakeAgentToken), slog.Default())
+		client := newTestClientWithToken(port, fakeAgentToken)
 		t.Cleanup(client.Close)
 
 		events, unsubscribe, err := client.StreamVmProvision(context.Background(), vmProvisionTestDevServer(t, host), usecase.VmProvisionParams{RecipeID: "r1", RuntimeID: "rt1"})
@@ -195,7 +194,7 @@ func TestStreamVmProvision_EmitsErrorEventOnNonZeroExit(t *testing.T) {
 			{"type": "stream.end", "exitCode": 1},
 		}}
 		host, port := startFakeAgent(t, agent)
-		client := New(testConfig(port, fakeAgentToken), slog.Default())
+		client := newTestClientWithToken(port, fakeAgentToken)
 		t.Cleanup(client.Close)
 
 		events, unsubscribe, err := client.StreamVmProvision(context.Background(), vmProvisionTestDevServer(t, host), usecase.VmProvisionParams{RecipeID: "r1", RuntimeID: "rt1"})
@@ -216,7 +215,7 @@ func TestStreamVmProvision_EmitsErrorEventOnNonZeroExit(t *testing.T) {
 			{"type": "stream.end", "exitCode": -1, "error": "recipe process spawn failed: ENOENT"},
 		}}
 		host, port := startFakeAgent(t, agent)
-		client := New(testConfig(port, fakeAgentToken), slog.Default())
+		client := newTestClientWithToken(port, fakeAgentToken)
 		t.Cleanup(client.Close)
 
 		events, unsubscribe, err := client.StreamVmProvision(context.Background(), vmProvisionTestDevServer(t, host), usecase.VmProvisionParams{RecipeID: "r1", RuntimeID: "rt1"})
@@ -239,7 +238,7 @@ func TestStreamVmProvision_EmitsErrorEventOnNonZeroExit(t *testing.T) {
 			}},
 		}}
 		host, port := startFakeAgent(t, agent)
-		client := New(testConfig(port, fakeAgentToken), slog.Default())
+		client := newTestClientWithToken(port, fakeAgentToken)
 		t.Cleanup(client.Close)
 
 		events, unsubscribe, err := client.StreamVmProvision(context.Background(), vmProvisionTestDevServer(t, host), usecase.VmProvisionParams{RecipeID: "r1", RuntimeID: "rt1"})
@@ -268,7 +267,7 @@ func TestStreamVmProvision_UnsubscribeStopsDemux(t *testing.T) {
 		// would ever arrive, exercising the early-cancellation path.
 	}}
 	host, port := startFakeAgent(t, agent)
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	events, unsubscribe, err := client.StreamVmProvision(context.Background(), vmProvisionTestDevServer(t, host), usecase.VmProvisionParams{RecipeID: "r1", RuntimeID: "rt1"})
@@ -315,7 +314,7 @@ func TestStreamVmProvision_UnsubscribeStopsDemux(t *testing.T) {
 func TestStreamVmProvision_AgentMethodNotFoundReturnsTypedError(t *testing.T) {
 	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}} // no vm.provision registered
 	host, port := startFakeAgent(t, agent)
-	client := New(testConfig(port, fakeAgentToken), slog.Default())
+	client := newTestClientWithToken(port, fakeAgentToken)
 	t.Cleanup(client.Close)
 
 	events, unsubscribe, err := client.StreamVmProvision(context.Background(), vmProvisionTestDevServer(t, host), usecase.VmProvisionParams{RecipeID: "r1", RuntimeID: "rt1"})

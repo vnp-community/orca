@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/adapter/postgres/` (+ migration), `backend-go/proto/orca/automation/v1/automation.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0006_worktree_cleanup_log; WriteCleanupReport RPC + usecase + repository method (batched multi-row INSERT); integration-tested round-trip.
 
 ---
 

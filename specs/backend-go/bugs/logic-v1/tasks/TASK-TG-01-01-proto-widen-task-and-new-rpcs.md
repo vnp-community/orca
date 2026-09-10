@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — proto widened (Task+CRUD msgs+4 new RPCs), buf generate clean, buf breaking (vs origin/main) reports zero breaking changes.
 
 ---
 

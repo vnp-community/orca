@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/generate_commit_message_test.go`
 **Depends on:** TASK-CR-04-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — generate_commit_message_test.go added with all 5 required regression cases (threshold skip/full-diff, issue-ref append/no-dup, history-failure degrade) plus fakeGitExecutor.statusResult override; all TestGenerateCommitMessage_* pass, full package test suite green
 
 ---
 

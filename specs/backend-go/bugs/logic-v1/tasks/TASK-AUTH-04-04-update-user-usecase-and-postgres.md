@@ -5,7 +5,7 @@
 **Service:** `auth-service` (usecase + postgres)
 **File:** `backend-go/services/auth-service/internal/usecase/update_user.go` (new), `backend-go/services/auth-service/internal/usecase/ports.go`, `backend-go/services/auth-service/internal/adapter/postgres/user_repository.go`
 **Depends on:** TASK-AUTH-04-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `UserRepository.UpdateUser` (port+postgres COALESCE update) and `UpdateUser` usecase; unit tests (partial update, invalid email/role, non-admin denial) and postgres integration tests (COALESCE preserves untouched fields, nonexistent user) pass.
 
 ---
 

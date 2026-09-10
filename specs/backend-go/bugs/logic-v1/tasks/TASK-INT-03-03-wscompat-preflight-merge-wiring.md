@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-INT-03-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — registerPreflightChannels rewritten to fan out GetFleetHealth/ScanWorkspacePorts/Relay and merge via usecase.MergePreflightStatuses; wired with infraFleetClient in RegisterRealChannels. Replaced the 2 now-stale hardcoded-shape tests in channels_test.go with: no-connectionId is local-only (zero RPC calls), GetFleetHealth failure yields relay-connectivity warning + git still present, and a relay-ssh-style auth-status failure yields per-check skip for github/gitlab-cli-auth while disk-space/port-availability still return ok and every result has a non-empty Source. All pass.
 
 ---
 

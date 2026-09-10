@@ -5,7 +5,7 @@
 **Service:** `orca-cli`
 **File:** `backend-go/cmd/orca-cli/internal/command/worktree_create.go`
 **Depends on:** TASK-CLI-01-04 (REST route), TASK-CLI-01-05 (auth route), TASK-CLI-01-06 (scaffold)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — implemented apiclient/{auth,worktree}.go, output/output.go, command/{worktree_create,root}.go + main.go; added worktree_create_test.go (idempotency stability/override, agent-spawn-failure exit-0, missing-flags exit-2-no-HTTP, --json shape); `go build ./cmd/orca-cli/...` and `go test ./cmd/orca-cli/... -v` pass from both the module and workspace root.
 
 ---
 

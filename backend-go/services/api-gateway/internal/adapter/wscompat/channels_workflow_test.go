@@ -29,6 +29,8 @@ type fakeWorkflowServiceClient struct {
 	resolveTemplateFunc     func(ctx context.Context, in *workflowv1.ResolveTemplateRequest) (*workflowv1.ResolveTemplateResponse, error)
 	hasActiveExecutionsFunc func(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest) (*workflowv1.HasActiveExecutionsResponse, error)
 	executeAdHocStepFunc    func(ctx context.Context, in *workflowv1.ExecuteAdHocStepRequest) (*workflowv1.ExecuteAdHocStepResponse, error)
+
+	lastRequest *workflowv1.HasActiveExecutionsRequest
 }
 
 func (f *fakeWorkflowServiceClient) Execute(ctx context.Context, in *workflowv1.ExecuteRequest, _ ...grpc.CallOption) (*workflowv1.ExecuteResponse, error) {
@@ -68,7 +70,11 @@ func (f *fakeWorkflowServiceClient) ResolveTemplate(ctx context.Context, in *wor
 }
 
 func (f *fakeWorkflowServiceClient) HasActiveExecutions(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest, _ ...grpc.CallOption) (*workflowv1.HasActiveExecutionsResponse, error) {
-	return f.hasActiveExecutionsFunc(ctx, in)
+	f.lastRequest = in
+	if f.hasActiveExecutionsFunc != nil {
+		return f.hasActiveExecutionsFunc(ctx, in)
+	}
+	return &workflowv1.HasActiveExecutionsResponse{HasActive: true}, nil
 }
 
 func (f *fakeWorkflowServiceClient) ExecuteAdHocStep(ctx context.Context, in *workflowv1.ExecuteAdHocStepRequest, _ ...grpc.CallOption) (*workflowv1.ExecuteAdHocStepResponse, error) {
@@ -277,6 +283,38 @@ func TestWorkflowTemplateUpdateChannel_Success(t *testing.T) {
 	}
 }
 
+// TestRegisterWorkflowChannels_HasActiveExecutions is a regression guard on
+// two fronts: the response envelope key must be hasActiveExecutions (not
+// the wire field name has_active), and tenant metadata must be attached to
+// the outbound ctx — a missing AttachIdentity here would let one tenant's
+// workspace-switch query another tenant's execution state.
+func TestRegisterWorkflowChannels_HasActiveExecutions(t *testing.T) {
+	fake := &fakeWorkflowServiceClient{
+		hasActiveExecutionsFunc: func(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest) (*workflowv1.HasActiveExecutionsResponse, error) {
+			return &workflowv1.HasActiveExecutionsResponse{HasActive: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"projectId": "p1"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "workflow.hasActiveExecutions", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	got, ok := result.(map[string]bool)
+	if !ok {
+		t.Fatalf("unexpected result type %T", result)
+	}
+	if want := map[string]bool{"hasActiveExecutions": true}; got["hasActiveExecutions"] != want["hasActiveExecutions"] {
+		t.Errorf("unexpected result: %+v", got)
+	}
+	if fake.lastRequest.GetProjectId() != "p1" {
+		t.Errorf("want projectId p1 forwarded, got %q", fake.lastRequest.GetProjectId())
+	}
+}
+
 // --- CR-PW-005: the 7 previously-unregistered channels ---
 
 func TestWorkflowGetExecutionChannel_Success(t *testing.T) {
@@ -451,32 +489,6 @@ func TestWorkflowTemplateResolveChannel_Success(t *testing.T) {
 	chain, ok := m["chain"].([]*workflowv1.WorkflowTemplate)
 	if !ok || len(chain) != 2 {
 		t.Fatalf("want 2-element chain, got %#v", m["chain"])
-	}
-}
-
-func TestWorkflowHasActiveExecutionsChannel_Success(t *testing.T) {
-	var gotReq *workflowv1.HasActiveExecutionsRequest
-	fake := &fakeWorkflowServiceClient{
-		hasActiveExecutionsFunc: func(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest) (*workflowv1.HasActiveExecutionsResponse, error) {
-			gotReq = in
-			return &workflowv1.HasActiveExecutionsResponse{HasActive: true}, nil
-		},
-	}
-
-	r := NewRegistry()
-	registerWorkflowChannels(r, fake)
-
-	args := argsJSON(t, map[string]any{"projectId": "proj-1"})
-	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.hasActiveExecutions", args)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if gotReq.ProjectId != "proj-1" {
-		t.Errorf("want projectId forwarded, got %q", gotReq.ProjectId)
-	}
-	m, ok := result.(map[string]any)
-	if !ok || m["hasActive"] != true {
-		t.Fatalf("unexpected result: %#v", result)
 	}
 }
 

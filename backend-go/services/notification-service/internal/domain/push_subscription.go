@@ -74,9 +74,14 @@ type PushSubscription struct {
 	AuthKey     *string
 	DeviceLabel string
 	Status      SubscriptionStatus
-	LastUsedAt  time.Time
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	// DeviceID is the paired mobile device (SOL-MB-01) this subscription is
+	// associated with, or nil for a standard (non-paired) Web Push
+	// subscription — DeliverPush uses it to resolve a shared secret for
+	// the E2E-sealed push payload (BL-MB-02).
+	DeviceID   *string
+	LastUsedAt time.Time
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
 }
 
 // NewPushSubscription constructs a PushSubscription, enforcing the

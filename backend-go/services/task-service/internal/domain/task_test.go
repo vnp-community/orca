@@ -80,3 +80,38 @@ func TestTask_SetStatus_RejectsTransitionIntoInProgress(t *testing.T) {
 		t.Fatalf("expected ErrCannotSetInProgress, got %v", err)
 	}
 }
+
+// TestTask_SetStatus_AllowsBlockedAndReview locks in TASK-TG-01-03's new
+// status values participating in the same permissive transition matrix as
+// every other non-terminal, non-in_progress status.
+func TestTask_SetStatus_AllowsBlockedAndReview(t *testing.T) {
+	open, err := NewTask("t1", "tenant-1", "Title", StatusOpen, "", "")
+	if err != nil {
+		t.Fatalf("unexpected error building task: %v", err)
+	}
+
+	blocked, err := open.SetStatus(StatusBlocked)
+	if err != nil {
+		t.Fatalf("unexpected error transitioning to blocked: %v", err)
+	}
+	if blocked.Status != StatusBlocked {
+		t.Errorf("expected status %q, got %q", StatusBlocked, blocked.Status)
+	}
+
+	review, err := blocked.SetStatus(StatusReview)
+	if err != nil {
+		t.Fatalf("unexpected error transitioning to review: %v", err)
+	}
+	if review.Status != StatusReview {
+		t.Errorf("expected status %q, got %q", StatusReview, review.Status)
+	}
+}
+
+func TestNewTask_AcceptsBlockedAndReviewAsInitialStatus(t *testing.T) {
+	if _, err := NewTask("t1", "tenant-1", "Title", StatusBlocked, "", ""); err != nil {
+		t.Fatalf("unexpected error with initial status blocked: %v", err)
+	}
+	if _, err := NewTask("t1", "tenant-1", "Title", StatusReview, "", ""); err != nil {
+		t.Fatalf("unexpected error with initial status review: %v", err)
+	}
+}

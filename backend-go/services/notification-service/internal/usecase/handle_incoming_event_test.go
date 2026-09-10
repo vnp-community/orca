@@ -47,7 +47,7 @@ func (f *fakeProcessedEventRepository) MarkProcessed(ctx context.Context, eventI
 
 func TestHandleIncomingEvent_TranslatesAndBroadcasts(t *testing.T) {
 	b := &fakeBroadcaster{}
-	uc := NewHandleIncomingEvent(b, &fakeProcessedEventRepository{}, nil)
+	uc := NewHandleIncomingEvent(b, &fakeProcessedEventRepository{}, nil, nil)
 
 	err := uc.Execute(context.Background(), HandleIncomingEventInput{
 		EventID:    "evt-1",
@@ -70,7 +70,7 @@ func TestHandleIncomingEvent_TranslatesAndBroadcasts(t *testing.T) {
 
 func TestHandleIncomingEvent_NoRecipientsIsANoOpNotAnError(t *testing.T) {
 	b := &fakeBroadcaster{}
-	uc := NewHandleIncomingEvent(b, &fakeProcessedEventRepository{}, nil)
+	uc := NewHandleIncomingEvent(b, &fakeProcessedEventRepository{}, nil, nil)
 
 	err := uc.Execute(context.Background(), HandleIncomingEventInput{
 		EventID: "evt-1", TenantID: "tenant-1", Subject: "orca.task.task.completed",
@@ -86,7 +86,7 @@ func TestHandleIncomingEvent_NoRecipientsIsANoOpNotAnError(t *testing.T) {
 
 func TestHandleIncomingEvent_MalformedPayloadReturnsError(t *testing.T) {
 	b := &fakeBroadcaster{}
-	uc := NewHandleIncomingEvent(b, &fakeProcessedEventRepository{}, nil)
+	uc := NewHandleIncomingEvent(b, &fakeProcessedEventRepository{}, nil, nil)
 
 	err := uc.Execute(context.Background(), HandleIncomingEventInput{
 		EventID: "evt-1", TenantID: "tenant-1", Subject: "orca.task.task.completed",
@@ -104,7 +104,7 @@ func TestHandleIncomingEvent_MalformedPayloadReturnsError(t *testing.T) {
 func TestHandleIncomingEvent_RedeliveryOfSameEventIDIsANoOp(t *testing.T) {
 	b := &fakeBroadcaster{}
 	dedup := &fakeProcessedEventRepository{}
-	uc := NewHandleIncomingEvent(b, dedup, nil)
+	uc := NewHandleIncomingEvent(b, dedup, nil, nil)
 
 	input := HandleIncomingEventInput{
 		EventID:    "evt-redelivered",
@@ -141,7 +141,7 @@ func TestHandleIncomingEvent_RedeliveryOfSameEventIDIsANoOp(t *testing.T) {
 func TestHandleIncomingEvent_DifferentEventIDsBothProcess(t *testing.T) {
 	b := &fakeBroadcaster{}
 	dedup := &fakeProcessedEventRepository{}
-	uc := NewHandleIncomingEvent(b, dedup, nil)
+	uc := NewHandleIncomingEvent(b, dedup, nil, nil)
 
 	for _, eventID := range []string{"evt-a", "evt-b"} {
 		err := uc.Execute(context.Background(), HandleIncomingEventInput{

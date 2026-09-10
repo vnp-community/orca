@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `backend-go/policy/orca-authz/tenant.rego`
 **Depends on:** TASK-PRF-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — tenant.rego + opaclient + authorization.go added; opa test 11/11, go build clean
 
 ---
 

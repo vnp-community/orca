@@ -5,7 +5,7 @@
 **Service:** `auth-service` (postgres migration)
 **File:** `backend-go/services/auth-service/migrations/0003_sessions_last_seen_ip_ua.up.sql` (+ `.down.sql`)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `0003_sessions_last_seen_ip_ua.{up,down}.sql` following the `0001`/`0002` naming convention; no local Postgres available to apply, SQL reviewed for correctness.
 
 ---
 

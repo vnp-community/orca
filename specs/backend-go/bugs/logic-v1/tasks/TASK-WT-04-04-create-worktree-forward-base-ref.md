@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/create_worktree.go`
 **Depends on:** TASK-WT-04-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ProjectClient.RecordWorktreeCreated gained baseRef param (grpcclient + ports.go); create_worktree.go forwards in.BaseRef. go build+test clean; TestCreateWorktree_ForwardsBaseRefToRecordWorktreeCreated added.
 
 ---
 

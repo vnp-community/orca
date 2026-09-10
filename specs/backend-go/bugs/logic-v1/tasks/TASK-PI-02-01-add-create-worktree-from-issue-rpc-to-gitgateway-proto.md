@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/proto/orca/gitgateway/v1/gitgateway.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — CreateWorktreeFromIssue RPC + ScmIssueRef/TrackerIssueRef messages added to gitgateway.proto, buf generate clean.`
 
 ---
 

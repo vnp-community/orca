@@ -100,7 +100,7 @@ func (uc *GetSharedProjectData) Execute(ctx context.Context, in GetSharedProject
 		return GetSharedProjectDataResult{}, apperrors.New(apperrors.KindInternal, "PROJECT_LIST_REPOS_FAILED", "failed to list source project's repos", err)
 	}
 
-	worktrees, err := uc.worktrees.ListWorktrees(ctx, in.SourceProjectID)
+	worktrees, err := uc.worktrees.ListWorktrees(ctx, in.SourceProjectID, nil, nil)
 	if err != nil {
 		return GetSharedProjectDataResult{}, apperrors.New(apperrors.KindInternal, "PROJECT_LIST_WORKTREES_FAILED", "failed to list source project's worktrees", err)
 	}

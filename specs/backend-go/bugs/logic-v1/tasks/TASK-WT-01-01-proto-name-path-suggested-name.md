@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/proto/orca/gitgateway/v1/gitgateway.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added name/path (fields 5/6) + suggested_name (field 4) to CreateWorktree messages (real proto only had fields 1-4, not 1-11 as spec assumed); buf generate + go build ./proto/... clean.
 
 ---
 

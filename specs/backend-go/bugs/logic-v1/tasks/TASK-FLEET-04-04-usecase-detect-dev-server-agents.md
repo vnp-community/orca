@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (usecase)
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/detect_dev_server_agents.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — implemented verbatim, with two corrections: added json tags to AgentProbe (id/cmd/requiredCommands/unsupportedRuntimes) to match agent/src/relay/preflight-handler.ts's AgentDetectionCommand wire shape (Go struct without tags would have serialized as ID/Cmd/... instead), and used apperrors.KindInternal not the nonexistent apperrors.KindUnavailable (matching this service's own established convention for agent-Exec failures, e.g. ScanWorkspacePorts/KillWorkspacePort's INFRA_AGENT_EXEC_FAILED). All tests pass.
 
 ---
 

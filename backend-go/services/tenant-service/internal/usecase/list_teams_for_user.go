@@ -12,12 +12,16 @@ type ListTeamsForUserInput struct {
 	UserID string
 }
 
-// ListTeamsForUser answers "which teams is this user in" — the RPC
-// devServer.listForUser's handler doc comment names as missing
-// (channels_dev_server_access_control.go:279-284, BUG-013). Thin: reuses
-// TeamRepository.ListUserTeamLayers, the same indexed
+// ListTeamsForUser answers the user->teams direction TeamScopeResolver
+// (task-service) needs, and is also the RPC devServer.listForUser's handler
+// doc comment names as missing (channels_dev_server_access_control.go:
+// 279-284, BUG-013) — tenant-service's existing RPC surface only offers
+// company->teams (ListTeams) and team->members (ListTeamMembers), which
+// would force an N+1 fan-out to answer this from the client side. Thin:
+// reuses TeamRepository.ListUserTeamLayers, the same indexed
 // (tenant.team_members.user_id) query GetResolvedProfile already runs for
-// its team settings-layer — no new repository method.
+// its team settings-layer — no new repository method (see TASK-TG-03-02's
+// Context).
 type ListTeamsForUser struct {
 	teams TeamRepository
 }

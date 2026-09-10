@@ -39,13 +39,13 @@ type Server struct {
 	createTeam         *usecase.CreateTeam
 	addTeamMember      *usecase.AddTeamMember
 	listTeamMembers    *usecase.ListTeamMembers
+	listTeamsForUser   *usecase.ListTeamsForUser
 	getUserProfile     *usecase.GetUserProfile
 	listDepartments    *usecase.ListDepartments
 	updateCompany      *usecase.UpdateCompany
 	updateDepartment   *usecase.UpdateDepartment
 	updateUserProfile  *usecase.UpdateUserProfile
 	listTeams          *usecase.ListTeams
-	listTeamsForUser   *usecase.ListTeamsForUser
 	removeTeamMember   *usecase.RemoveTeamMember
 	getOnboardingState *usecase.GetOnboardingState
 	setOnboardingState *usecase.SetOnboardingState
@@ -83,13 +83,13 @@ func New(
 	createTeam *usecase.CreateTeam,
 	addTeamMember *usecase.AddTeamMember,
 	listTeamMembers *usecase.ListTeamMembers,
+	listTeamsForUser *usecase.ListTeamsForUser,
 	getUserProfile *usecase.GetUserProfile,
 	listDepartments *usecase.ListDepartments,
 	updateCompany *usecase.UpdateCompany,
 	updateDepartment *usecase.UpdateDepartment,
 	updateUserProfile *usecase.UpdateUserProfile,
 	listTeams *usecase.ListTeams,
-	listTeamsForUser *usecase.ListTeamsForUser,
 	removeTeamMember *usecase.RemoveTeamMember,
 	getOnboardingState *usecase.GetOnboardingState,
 	setOnboardingState *usecase.SetOnboardingState,
@@ -123,13 +123,13 @@ func New(
 		createTeam:         createTeam,
 		addTeamMember:      addTeamMember,
 		listTeamMembers:    listTeamMembers,
+		listTeamsForUser:   listTeamsForUser,
 		getUserProfile:     getUserProfile,
 		listDepartments:    listDepartments,
 		updateCompany:      updateCompany,
 		updateDepartment:   updateDepartment,
 		updateUserProfile:  updateUserProfile,
 		listTeams:          listTeams,
-		listTeamsForUser:   listTeamsForUser,
 		removeTeamMember:   removeTeamMember,
 		getOnboardingState: getOnboardingState,
 		setOnboardingState: setOnboardingState,

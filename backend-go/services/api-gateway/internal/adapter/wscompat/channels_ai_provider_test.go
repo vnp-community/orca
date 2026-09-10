@@ -25,6 +25,7 @@ type fakeAiProviderClient struct {
 	deleteAccountFunc   func(ctx context.Context, in *aiproviderv1.DeleteAccountRequest) (*emptypb.Empty, error)
 	writeCredentialFunc func(ctx context.Context, in *aiproviderv1.WriteCredentialRequest) (*aiproviderv1.WriteCredentialResponse, error)
 	testConnectionFunc  func(ctx context.Context, in *aiproviderv1.TestConnectionRequest) (*aiproviderv1.TestConnectionResponse, error)
+	resolveProviderFunc func(ctx context.Context, in *aiproviderv1.ResolveProviderRequest) (*aiproviderv1.ResolveProviderResponse, error)
 }
 
 func (f *fakeAiProviderClient) CreateAccount(ctx context.Context, in *aiproviderv1.CreateAccountRequest, _ ...grpc.CallOption) (*aiproviderv1.CreateAccountResponse, error) {
@@ -51,6 +52,10 @@ func (f *fakeAiProviderClient) TestConnection(ctx context.Context, in *aiprovide
 	return f.testConnectionFunc(ctx, in)
 }
 
+func (f *fakeAiProviderClient) ResolveProvider(ctx context.Context, in *aiproviderv1.ResolveProviderRequest, _ ...grpc.CallOption) (*aiproviderv1.ResolveProviderResponse, error) {
+	return f.resolveProviderFunc(ctx, in)
+}
+
 func mustArgs(t *testing.T, v any) []json.RawMessage {
 	t.Helper()
 	b, err := json.Marshal(v)
@@ -74,7 +79,11 @@ func TestAiProviderCreateChannel_Success(t *testing.T) {
 	r := NewRegistry()
 	registerAiProviderChannels(r, client)
 
-	args := mustArgs(t, map[string]any{"type": "PROVIDER_TYPE_ANTHROPIC"})
+	args := mustArgs(t, map[string]any{
+		"type": "PROVIDER_TYPE_ANTHROPIC", "devServerId": "ds-1", "label": "My Key",
+		"modelHint": "claude-opus", "baseUrl": "http://localhost:11434",
+		"quotaLimitDay": 100, "models": []string{"claude-opus", "claude-sonnet"}, "isDefault": true,
+	})
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "aiProvider.create", args)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -88,6 +97,11 @@ func TestAiProviderCreateChannel_Success(t *testing.T) {
 	}
 	if gotReq.GetType() != aiproviderv1.ProviderType_PROVIDER_TYPE_ANTHROPIC {
 		t.Errorf("Type = %v, want PROVIDER_TYPE_ANTHROPIC", gotReq.GetType())
+	}
+	if gotReq.GetDevServerId() != "ds-1" || gotReq.GetLabel() != "My Key" || gotReq.GetModelHint() != "claude-opus" ||
+		gotReq.GetBaseUrl() != "http://localhost:11434" || gotReq.GetQuotaLimitDay() != 100 ||
+		len(gotReq.GetModels()) != 2 || !gotReq.GetIsDefault() {
+		t.Errorf("registration fields not threaded through: %+v", gotReq)
 	}
 	tenant, user := outgoingTenantUser(gotCtx)
 	if tenant != "t1" || user != "u1" {
@@ -336,6 +350,62 @@ func TestAiProviderTestConnectionChannel_PropagatesError(t *testing.T) {
 
 	args := mustArgs(t, map[string]any{"accountId": "acct-1"})
 	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "aiProvider.testConnection", args); err == nil {
+		t.Fatal("expected error to propagate")
+	}
+}
+
+// TestAiProviderResolveChannel_Success asserts aiProvider.resolve
+// (TASK-AIP-02-08) is registered, decodes args, and forwards the request's
+// fields + the response's account field verbatim — following
+// TestAiProviderCreateChannel_Success's shape.
+func TestAiProviderResolveChannel_Success(t *testing.T) {
+	var gotCtx context.Context
+	var gotReq *aiproviderv1.ResolveProviderRequest
+	client := &fakeAiProviderClient{
+		resolveProviderFunc: func(ctx context.Context, in *aiproviderv1.ResolveProviderRequest) (*aiproviderv1.ResolveProviderResponse, error) {
+			gotCtx, gotReq = ctx, in
+			return &aiproviderv1.ResolveProviderResponse{
+				Account: &aiproviderv1.ProviderAccount{Id: "acct-9", TenantId: "t1"},
+			}, nil
+		},
+	}
+	r := NewRegistry()
+	registerAiProviderChannels(r, client)
+
+	args := mustArgs(t, map[string]any{
+		"userId": "u1", "projectId": "proj-1", "devServerId": "ds-1",
+		"modelHint": "claude-opus", "accountId": "acct-9", "scopedRef": "server:ds-1:acct-9",
+	})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, "aiProvider.resolve", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	account, ok := result.(*aiproviderv1.ProviderAccount)
+	if !ok || account.GetId() != "acct-9" {
+		t.Fatalf("result = %#v, want ProviderAccount{Id: acct-9}", result)
+	}
+	if gotReq.GetTenantId() != "t1" || gotReq.GetUserId() != "u1" || gotReq.GetProjectId() != "proj-1" ||
+		gotReq.GetDevServerId() != "ds-1" || gotReq.GetModelHint() != "claude-opus" ||
+		gotReq.GetAccountId() != "acct-9" || gotReq.GetScopedRef() != "server:ds-1:acct-9" {
+		t.Errorf("unexpected ResolveProviderRequest: %+v", gotReq)
+	}
+	tenant, user := outgoingTenantUser(gotCtx)
+	if tenant != "t1" || user != "u1" {
+		t.Errorf("AttachIdentity metadata = (%q,%q), want (t1,u1)", tenant, user)
+	}
+}
+
+func TestAiProviderResolveChannel_PropagatesError(t *testing.T) {
+	client := &fakeAiProviderClient{
+		resolveProviderFunc: func(context.Context, *aiproviderv1.ResolveProviderRequest) (*aiproviderv1.ResolveProviderResponse, error) {
+			return nil, errors.New("no account available")
+		},
+	}
+	r := NewRegistry()
+	registerAiProviderChannels(r, client)
+
+	args := mustArgs(t, map[string]any{"userId": "u1"})
+	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "aiProvider.resolve", args); err == nil {
 		t.Fatal("expected error to propagate")
 	}
 }

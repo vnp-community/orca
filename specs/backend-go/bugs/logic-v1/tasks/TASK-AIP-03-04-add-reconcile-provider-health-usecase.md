@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/reconcile_provider_health.go` (new)
 **Depends on:** TASK-AIP-03-03, TASK-AIP-01-05 (reuses `verifyConnection`), TASK-AIP-SHARED-01
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — reconcile_provider_health.go added (HealthDetailOrEmpty naming, per this task's own tie-break note); all 5 requested tests + a claim-error-propagation test pass.`
 
 ---
 

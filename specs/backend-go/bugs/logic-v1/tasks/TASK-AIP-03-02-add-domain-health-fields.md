@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/domain/provider_account.go`
 **Depends on:** TASK-AIP-03-01, TASK-AIP-01-03 (this task's struct literal builds on TASK-AIP-01-03's field additions)
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — LatencyMs/HealthDetail/QuotaWarningSentDate + HealthDetail* consts + HealthDetailOrEmpty() added; QuotaState.TokensUsed added; TestProviderAccount_Resolvable_ExcludesAllHealthFailures passes.`
 
 ---
 

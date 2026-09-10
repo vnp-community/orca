@@ -47,11 +47,13 @@ const (
 	ProjectService_RecordWorktreeCreated_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
 	ProjectService_RecordWorktreeRemoved_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
 	ProjectService_ListWorktrees_FullMethodName                = "/orca.project.v1.ProjectService/ListWorktrees"
+	ProjectService_GetWorktree_FullMethodName                  = "/orca.project.v1.ProjectService/GetWorktree"
 	ProjectService_SetWorktreeActivation_FullMethodName        = "/orca.project.v1.ProjectService/SetWorktreeActivation"
 	ProjectService_RenameWorktree_FullMethodName               = "/orca.project.v1.ProjectService/RenameWorktree"
 	ProjectService_UpdateWorktreeMeta_FullMethodName           = "/orca.project.v1.ProjectService/UpdateWorktreeMeta"
 	ProjectService_SetWorktreeLineage_FullMethodName           = "/orca.project.v1.ProjectService/SetWorktreeLineage"
 	ProjectService_ListWorktreeLineage_FullMethodName          = "/orca.project.v1.ProjectService/ListWorktreeLineage"
+	ProjectService_GetWorktreeByIdempotencyKey_FullMethodName  = "/orca.project.v1.ProjectService/GetWorktreeByIdempotencyKey"
 	ProjectService_CreateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/CreateProjectGroup"
 	ProjectService_UpdateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/UpdateProjectGroup"
 	ProjectService_DeleteProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/DeleteProjectGroup"
@@ -69,6 +71,8 @@ const (
 	ProjectService_UpdateHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/UpdateHostSetup"
 	ProjectService_DeleteHostSetup_FullMethodName              = "/orca.project.v1.ProjectService/DeleteHostSetup"
 	ProjectService_SetupExistingFolder_FullMethodName          = "/orca.project.v1.ProjectService/SetupExistingFolder"
+	ProjectService_GetProjectContext_FullMethodName            = "/orca.project.v1.ProjectService/GetProjectContext"
+	ProjectService_GetMobileWorktreeStatus_FullMethodName      = "/orca.project.v1.ProjectService/GetMobileWorktreeStatus"
 	ProjectService_LinkSourceProject_FullMethodName            = "/orca.project.v1.ProjectService/LinkSourceProject"
 	ProjectService_UnlinkSourceProject_FullMethodName          = "/orca.project.v1.ProjectService/UnlinkSourceProject"
 	ProjectService_ListSourceProjects_FullMethodName           = "/orca.project.v1.ProjectService/ListSourceProjects"
@@ -143,6 +147,11 @@ type ProjectServiceClient interface {
 	RecordWorktreeCreated(ctx context.Context, in *RecordWorktreeCreatedRequest, opts ...grpc.CallOption) (*RecordWorktreeCreatedResponse, error)
 	RecordWorktreeRemoved(ctx context.Context, in *RecordWorktreeRemovedRequest, opts ...grpc.CallOption) (*RecordWorktreeRemovedResponse, error)
 	ListWorktrees(ctx context.Context, in *ListWorktreesRequest, opts ...grpc.CallOption) (*ListWorktreesResponse, error)
+	// NEW (SOL-WT-04) — single-worktree lookup, the same class of gap SOL-031
+	// already flagged for GetRepo ("project.proto has no single-repo-by-id
+	// lookup RPC"). CompareWorktrees (git-gateway-service) uses this to look
+	// up each compared worktree's repo_id/branch/base_ref.
+	GetWorktree(ctx context.Context, in *GetWorktreeRequest, opts ...grpc.CallOption) (*Worktree, error)
 	SetWorktreeActivation(ctx context.Context, in *SetWorktreeActivationRequest, opts ...grpc.CallOption) (*SetWorktreeActivationResponse, error)
 	RenameWorktree(ctx context.Context, in *RenameWorktreeRequest, opts ...grpc.CallOption) (*RenameWorktreeResponse, error)
 	// UpdateWorktreeMeta persists the frontend's WorktreeMeta fields
@@ -166,6 +175,10 @@ type ProjectServiceClient interface {
 	// backend's worktree.lineageList, explicit-capture only per
 	// docs/execution-plan.md's frontend-compatibility-layer coverage table).
 	ListWorktreeLineage(ctx context.Context, in *ListWorktreeLineageRequest, opts ...grpc.CallOption) (*ListWorktreeLineageResponse, error)
+	// GetWorktreeByIdempotencyKey backs BR-CLI-01 — git-gateway-service's
+	// CreateWorktree saga calls this before running `git worktree add`.
+	// found=false means "no dedupe match yet", not an error.
+	GetWorktreeByIdempotencyKey(ctx context.Context, in *GetWorktreeByIdempotencyKeyRequest, opts ...grpc.CallOption) (*GetWorktreeByIdempotencyKeyResponse, error)
 	// ProjectGroup surface — self-referential tree via parent_group_id, per
 	// project-service.md §4.
 	CreateProjectGroup(ctx context.Context, in *CreateProjectGroupRequest, opts ...grpc.CallOption) (*CreateProjectGroupResponse, error)
@@ -195,6 +208,17 @@ type ProjectServiceClient interface {
 	UpdateHostSetup(ctx context.Context, in *UpdateHostSetupRequest, opts ...grpc.CallOption) (*UpdateHostSetupResponse, error)
 	DeleteHostSetup(ctx context.Context, in *DeleteHostSetupRequest, opts ...grpc.CallOption) (*DeleteHostSetupResponse, error)
 	SetupExistingFolder(ctx context.Context, in *SetupExistingFolderRequest, opts ...grpc.CallOption) (*SetupExistingFolderResponse, error)
+	// GetProjectContext is project-service.md §2's Boundary-decision RPC:
+	// the read-only project-context lookup workflow-service/task-service call
+	// to build an agent-spawn env/preamble — a two-step saga (resolve context
+	// here, then call the execution-owning service), not a synchronous
+	// cross-service execution call.
+	GetProjectContext(ctx context.Context, in *GetProjectContextRequest, opts ...grpc.CallOption) (*ProjectContext, error)
+	// GetMobileWorktreeStatus is the ONE composed-read call BL-MB-04 reduces
+	// to — project-service already depends on infra-fleet-service (dev-server
+	// binding validation), so this extends that existing edge rather than
+	// adding a new cross-service dependency.
+	GetMobileWorktreeStatus(ctx context.Context, in *GetMobileWorktreeStatusRequest, opts ...grpc.CallOption) (*GetMobileWorktreeStatusResponse, error)
 	// ── orcaProjects.* — cross-project source sharing ─────────────────────
 	// Links another Project's repos/worktrees into this Project's ("the
 	// container") shared view. Both sides are ordinary Projects — there is
@@ -497,6 +521,16 @@ func (c *projectServiceClient) ListWorktrees(ctx context.Context, in *ListWorktr
 	return out, nil
 }
 
+func (c *projectServiceClient) GetWorktree(ctx context.Context, in *GetWorktreeRequest, opts ...grpc.CallOption) (*Worktree, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(Worktree)
+	err := c.cc.Invoke(ctx, ProjectService_GetWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *projectServiceClient) SetWorktreeActivation(ctx context.Context, in *SetWorktreeActivationRequest, opts ...grpc.CallOption) (*SetWorktreeActivationResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(SetWorktreeActivationResponse)
@@ -541,6 +575,16 @@ func (c *projectServiceClient) ListWorktreeLineage(ctx context.Context, in *List
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListWorktreeLineageResponse)
 	err := c.cc.Invoke(ctx, ProjectService_ListWorktreeLineage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) GetWorktreeByIdempotencyKey(ctx context.Context, in *GetWorktreeByIdempotencyKeyRequest, opts ...grpc.CallOption) (*GetWorktreeByIdempotencyKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetWorktreeByIdempotencyKeyResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetWorktreeByIdempotencyKey_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -717,6 +761,26 @@ func (c *projectServiceClient) SetupExistingFolder(ctx context.Context, in *Setu
 	return out, nil
 }
 
+func (c *projectServiceClient) GetProjectContext(ctx context.Context, in *GetProjectContextRequest, opts ...grpc.CallOption) (*ProjectContext, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ProjectContext)
+	err := c.cc.Invoke(ctx, ProjectService_GetProjectContext_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) GetMobileWorktreeStatus(ctx context.Context, in *GetMobileWorktreeStatusRequest, opts ...grpc.CallOption) (*GetMobileWorktreeStatusResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMobileWorktreeStatusResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetMobileWorktreeStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *projectServiceClient) LinkSourceProject(ctx context.Context, in *LinkSourceProjectRequest, opts ...grpc.CallOption) (*LinkSourceProjectResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(LinkSourceProjectResponse)
@@ -825,6 +889,11 @@ type ProjectServiceServer interface {
 	RecordWorktreeCreated(context.Context, *RecordWorktreeCreatedRequest) (*RecordWorktreeCreatedResponse, error)
 	RecordWorktreeRemoved(context.Context, *RecordWorktreeRemovedRequest) (*RecordWorktreeRemovedResponse, error)
 	ListWorktrees(context.Context, *ListWorktreesRequest) (*ListWorktreesResponse, error)
+	// NEW (SOL-WT-04) — single-worktree lookup, the same class of gap SOL-031
+	// already flagged for GetRepo ("project.proto has no single-repo-by-id
+	// lookup RPC"). CompareWorktrees (git-gateway-service) uses this to look
+	// up each compared worktree's repo_id/branch/base_ref.
+	GetWorktree(context.Context, *GetWorktreeRequest) (*Worktree, error)
 	SetWorktreeActivation(context.Context, *SetWorktreeActivationRequest) (*SetWorktreeActivationResponse, error)
 	RenameWorktree(context.Context, *RenameWorktreeRequest) (*RenameWorktreeResponse, error)
 	// UpdateWorktreeMeta persists the frontend's WorktreeMeta fields
@@ -848,6 +917,10 @@ type ProjectServiceServer interface {
 	// backend's worktree.lineageList, explicit-capture only per
 	// docs/execution-plan.md's frontend-compatibility-layer coverage table).
 	ListWorktreeLineage(context.Context, *ListWorktreeLineageRequest) (*ListWorktreeLineageResponse, error)
+	// GetWorktreeByIdempotencyKey backs BR-CLI-01 — git-gateway-service's
+	// CreateWorktree saga calls this before running `git worktree add`.
+	// found=false means "no dedupe match yet", not an error.
+	GetWorktreeByIdempotencyKey(context.Context, *GetWorktreeByIdempotencyKeyRequest) (*GetWorktreeByIdempotencyKeyResponse, error)
 	// ProjectGroup surface — self-referential tree via parent_group_id, per
 	// project-service.md §4.
 	CreateProjectGroup(context.Context, *CreateProjectGroupRequest) (*CreateProjectGroupResponse, error)
@@ -877,6 +950,17 @@ type ProjectServiceServer interface {
 	UpdateHostSetup(context.Context, *UpdateHostSetupRequest) (*UpdateHostSetupResponse, error)
 	DeleteHostSetup(context.Context, *DeleteHostSetupRequest) (*DeleteHostSetupResponse, error)
 	SetupExistingFolder(context.Context, *SetupExistingFolderRequest) (*SetupExistingFolderResponse, error)
+	// GetProjectContext is project-service.md §2's Boundary-decision RPC:
+	// the read-only project-context lookup workflow-service/task-service call
+	// to build an agent-spawn env/preamble — a two-step saga (resolve context
+	// here, then call the execution-owning service), not a synchronous
+	// cross-service execution call.
+	GetProjectContext(context.Context, *GetProjectContextRequest) (*ProjectContext, error)
+	// GetMobileWorktreeStatus is the ONE composed-read call BL-MB-04 reduces
+	// to — project-service already depends on infra-fleet-service (dev-server
+	// binding validation), so this extends that existing edge rather than
+	// adding a new cross-service dependency.
+	GetMobileWorktreeStatus(context.Context, *GetMobileWorktreeStatusRequest) (*GetMobileWorktreeStatusResponse, error)
 	// ── orcaProjects.* — cross-project source sharing ─────────────────────
 	// Links another Project's repos/worktrees into this Project's ("the
 	// container") shared view. Both sides are ordinary Projects — there is
@@ -983,6 +1067,9 @@ func (UnimplementedProjectServiceServer) RecordWorktreeRemoved(context.Context, 
 func (UnimplementedProjectServiceServer) ListWorktrees(context.Context, *ListWorktreesRequest) (*ListWorktreesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWorktrees not implemented")
 }
+func (UnimplementedProjectServiceServer) GetWorktree(context.Context, *GetWorktreeRequest) (*Worktree, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWorktree not implemented")
+}
 func (UnimplementedProjectServiceServer) SetWorktreeActivation(context.Context, *SetWorktreeActivationRequest) (*SetWorktreeActivationResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetWorktreeActivation not implemented")
 }
@@ -997,6 +1084,9 @@ func (UnimplementedProjectServiceServer) SetWorktreeLineage(context.Context, *Se
 }
 func (UnimplementedProjectServiceServer) ListWorktreeLineage(context.Context, *ListWorktreeLineageRequest) (*ListWorktreeLineageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListWorktreeLineage not implemented")
+}
+func (UnimplementedProjectServiceServer) GetWorktreeByIdempotencyKey(context.Context, *GetWorktreeByIdempotencyKeyRequest) (*GetWorktreeByIdempotencyKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWorktreeByIdempotencyKey not implemented")
 }
 func (UnimplementedProjectServiceServer) CreateProjectGroup(context.Context, *CreateProjectGroupRequest) (*CreateProjectGroupResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateProjectGroup not implemented")
@@ -1048,6 +1138,12 @@ func (UnimplementedProjectServiceServer) DeleteHostSetup(context.Context, *Delet
 }
 func (UnimplementedProjectServiceServer) SetupExistingFolder(context.Context, *SetupExistingFolderRequest) (*SetupExistingFolderResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SetupExistingFolder not implemented")
+}
+func (UnimplementedProjectServiceServer) GetProjectContext(context.Context, *GetProjectContextRequest) (*ProjectContext, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetProjectContext not implemented")
+}
+func (UnimplementedProjectServiceServer) GetMobileWorktreeStatus(context.Context, *GetMobileWorktreeStatusRequest) (*GetMobileWorktreeStatusResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMobileWorktreeStatus not implemented")
 }
 func (UnimplementedProjectServiceServer) LinkSourceProject(context.Context, *LinkSourceProjectRequest) (*LinkSourceProjectResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method LinkSourceProject not implemented")
@@ -1586,6 +1682,24 @@ func _ProjectService_ListWorktrees_Handler(srv interface{}, ctx context.Context,
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_GetWorktree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorktreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetWorktree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetWorktree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetWorktree(ctx, req.(*GetWorktreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ProjectService_SetWorktreeActivation_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SetWorktreeActivationRequest)
 	if err := dec(in); err != nil {
@@ -1672,6 +1786,24 @@ func _ProjectService_ListWorktreeLineage_Handler(srv interface{}, ctx context.Co
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).ListWorktreeLineage(ctx, req.(*ListWorktreeLineageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_GetWorktreeByIdempotencyKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorktreeByIdempotencyKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetWorktreeByIdempotencyKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetWorktreeByIdempotencyKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetWorktreeByIdempotencyKey(ctx, req.(*GetWorktreeByIdempotencyKeyRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1982,6 +2114,42 @@ func _ProjectService_SetupExistingFolder_Handler(srv interface{}, ctx context.Co
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_GetProjectContext_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetProjectContextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetProjectContext(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetProjectContext_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetProjectContext(ctx, req.(*GetProjectContextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_GetMobileWorktreeStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMobileWorktreeStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetMobileWorktreeStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetMobileWorktreeStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetMobileWorktreeStatus(ctx, req.(*GetMobileWorktreeStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ProjectService_LinkSourceProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(LinkSourceProjectRequest)
 	if err := dec(in); err != nil {
@@ -2174,6 +2342,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ProjectService_ListWorktrees_Handler,
 		},
 		{
+			MethodName: "GetWorktree",
+			Handler:    _ProjectService_GetWorktree_Handler,
+		},
+		{
 			MethodName: "SetWorktreeActivation",
 			Handler:    _ProjectService_SetWorktreeActivation_Handler,
 		},
@@ -2192,6 +2364,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListWorktreeLineage",
 			Handler:    _ProjectService_ListWorktreeLineage_Handler,
+		},
+		{
+			MethodName: "GetWorktreeByIdempotencyKey",
+			Handler:    _ProjectService_GetWorktreeByIdempotencyKey_Handler,
 		},
 		{
 			MethodName: "CreateProjectGroup",
@@ -2260,6 +2436,14 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SetupExistingFolder",
 			Handler:    _ProjectService_SetupExistingFolder_Handler,
+		},
+		{
+			MethodName: "GetProjectContext",
+			Handler:    _ProjectService_GetProjectContext_Handler,
+		},
+		{
+			MethodName: "GetMobileWorktreeStatus",
+			Handler:    _ProjectService_GetMobileWorktreeStatus_Handler,
 		},
 		{
 			MethodName: "LinkSourceProject",

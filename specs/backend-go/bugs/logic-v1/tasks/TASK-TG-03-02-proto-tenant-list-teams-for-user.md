@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `backend-go/proto/orca/tenant/v1/tenant.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ListTeamsForUser RPC added to tenant.proto (buf generate + buf breaking vs origin/main clean); ListTeamsForUser usecase reuses TeamRepository.ListUserTeamLayers, wired into tenant-service grpc server + main.go. go test ./internal/usecase/... -run TestListTeamsForUser passes.
 
 ---
 

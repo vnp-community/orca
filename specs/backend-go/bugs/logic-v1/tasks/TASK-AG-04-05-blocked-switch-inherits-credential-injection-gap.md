@@ -5,7 +5,7 @@
 **Service:** `agent/` (cross-repo) — same root cause as TASK-AG-01-04, restated here because BL-AG-04's whole premise is switching *because* the current provider is rate limited
 **File:** none (documentation/verification task — no new backend-go code beyond what TASK-AG-04-03 already ships)
 **Depends on:** TASK-AG-01-04, TASK-AG-04-03
-**Status:** `[ ]` BLOCKED — needs `agent/` Vault Transit support first (same blocker as TASK-AG-01-04, not a second instance to fix independently)
+**Status:** `[ ]` BLOCKED — same gate as TASK-AG-01-04 (not a second instance to fix independently). The regression-test proof this task asks for is done: `TestSwitchAgentAccount_InheritsCredentialInjectionBlocker` (`switch_agent_account_test.go`) asserts the saga surfaces `INFRA_AGENT_CREDENTIAL_INJECTION_UNAVAILABLE`, not an opaque internal error, and passes. Status stays BLOCKED because TASK-AG-01-04's own gate (a real `agent/` Vault Transit decrypt implementation + tracking issue + scope sign-off) is still unmet — this task's Status is explicitly tied to that one, per its own doc comment.
 
 ---
 

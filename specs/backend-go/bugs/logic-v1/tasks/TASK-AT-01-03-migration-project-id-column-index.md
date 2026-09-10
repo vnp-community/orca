@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/adapter/postgres/repository.go` (+ new migration file)
 **Depends on:** TASK-AT-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0003_project_and_actions adds project_id/actions_json + idx_automations_project; CountByProject implemented + integration-tested (no cross-project leakage).
 
 ---
 

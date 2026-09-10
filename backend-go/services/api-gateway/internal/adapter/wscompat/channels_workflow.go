@@ -235,7 +235,7 @@ func registerWorkflowChannels(r *Registry, client workflowv1.WorkflowServiceClie
 		if err != nil {
 			return nil, err
 		}
-		return map[string]any{"hasActive": resp.GetHasActive()}, nil
+		return map[string]bool{"hasActiveExecutions": resp.GetHasActive()}, nil
 	})
 
 	// workflow.executeAdHocStep: TenantId always comes from Identity, never

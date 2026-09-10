@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/migrations/0010_worktree_base_ref.up.sql`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Migration 0009_worktree_base_ref (0009 not 0010 — 0010 taken by outbox in this batch); project.proto Worktree.base_ref=7, RecordWorktreeCreatedRequest.base_ref=5, GetWorktreeRequest + GetWorktree RPC (real proto only had fields 1-6/1-4, not 1-15/1-11 as spec assumed). buf generate + go build clean.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/domain/task.go`
 **Depends on:** none (pure domain, no proto/DB dependency to compile)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain.Task widened, StatusBlocked/StatusReview added, TaskComment + CalculateProgress created; go test ./internal/domain/... passes (new task_test.go/task_comment_test.go/progress_test.go cases).
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `task.hasActiveExecutions` channel wired in channels.go (no AttachIdentity, matches task.create/get convention); TestRegisterTaskChannels_HasActiveExecutions passes alongside TestTaskCreateGetChannels_StillRegistered.
 
 ---
 

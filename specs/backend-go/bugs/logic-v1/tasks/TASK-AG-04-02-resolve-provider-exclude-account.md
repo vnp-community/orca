@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/usecase/resolve_provider.go`, `backend-go/proto/orca/aiprovider/v1/aiprovider.proto`, `backend-go/services/ai-provider-service/internal/adapter/grpc/server.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ResolveProviderInput.ExcludeAccountID + firstResolvable's exclude guard implemented; ResolveProviderRequest.exclude_account_id added to aiprovider.proto, threaded through the gRPC handler. resolve_provider_test.go extended with exclude-skips-tier and exclude-all-tiers-no-provider-available cases — all passing, existing cascade-order tests unchanged.
 
 ---
 

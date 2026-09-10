@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/pr_review_routes.go` (new)
 **Depends on:** TASK-PI-04-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — pr_review_routes.go new: POST /v1/scm/pull-requests/{prNumber}/reviews drains all ListAnnotations pages, BR-PI-10 fail-fast before any scm-integration-service call, maps to ReviewComment, calls SubmitReview. Mounted in router.go guarded on both SCMClient and AnnotationClient.`
 
 ---
 

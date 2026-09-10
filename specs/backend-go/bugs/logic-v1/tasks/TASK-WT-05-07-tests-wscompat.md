@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_worktree_test.go`
 **Depends on:** TASK-WT-05-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — TestWorktreeMerge_HappyPath/_ConflictedMerge_NeverCallsRemoveWorktree_EvenWithCleanupIDsSet/_CleanupOneFails_OthersStillRemoved_MergeResponseStillReturned added; all pass
 
 ---
 

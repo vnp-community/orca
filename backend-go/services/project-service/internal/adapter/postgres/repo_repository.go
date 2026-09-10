@@ -13,7 +13,7 @@ import (
 
 // dev_server_id and hook_settings are cast to text via COALESCE, same
 // nullable-column pattern projectColumns uses (repository.go's comment
-// explains why: COALESCE(uuid_col, '') fails at parse time otherwise —
+// explains why: COALESCE(uuid_col, ”) fails at parse time otherwise —
 // jsonb has the identical NULL-vs-empty-string parse issue).
 const repoColumns = `id, project_id, url, display_name, position, COALESCE(dev_server_id::text, ''), COALESCE(hook_settings::text, '')`
 

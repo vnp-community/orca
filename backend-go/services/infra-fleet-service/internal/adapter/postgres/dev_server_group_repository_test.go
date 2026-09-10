@@ -96,7 +96,7 @@ func TestRepository_RegisterAndGet_PersistsStatusAndGroupID(t *testing.T) {
 		t.Fatalf("creating group: %v", err)
 	}
 
-	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.1", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer(testDevServer1, testTenant1, "10.0.0.1", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -128,7 +128,7 @@ func TestRepository_UpdateApprovalStatus_And_AssignGroup(t *testing.T) {
 		t.Fatalf("creating group: %v", err)
 	}
 
-	ds, err := domain.NewDevServer(testDevServer2, testTenant1, "10.0.0.2", domain.ConnectionModeRelayWebSocket, "")
+	ds, err := domain.NewDevServer(testDevServer2, testTenant1, "10.0.0.2", domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

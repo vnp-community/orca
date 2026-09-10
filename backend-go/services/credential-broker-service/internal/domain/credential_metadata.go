@@ -29,12 +29,15 @@ const (
 	CategoryAiProviderKey     Category = "ai_provider_key"
 	CategorySsh               Category = "ssh"
 	CategoryServiceSecret     Category = "service_secret"
+	// CategoryDevServerAgentToken mirrors
+	// CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN — see SOL-AWS-01.
+	CategoryDevServerAgentToken Category = "dev_server_agent_token"
 )
 
 // Valid reports whether c is one of the known category values.
 func (c Category) Valid() bool {
 	switch c {
-	case CategoryScmOAuth, CategoryIssueTrackerOAuth, CategoryAiProviderKey, CategorySsh, CategoryServiceSecret:
+	case CategoryScmOAuth, CategoryIssueTrackerOAuth, CategoryAiProviderKey, CategorySsh, CategoryServiceSecret, CategoryDevServerAgentToken:
 		return true
 	default:
 		return false

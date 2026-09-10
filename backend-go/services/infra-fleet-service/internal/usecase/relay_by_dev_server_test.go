@@ -52,7 +52,7 @@ func TestRelayByDevServer_DevServerNotFound(t *testing.T) {
 // browsing — this usecase never touches infra.connections at all, and
 // fails only on the agent's OWN live-session state.
 func TestRelayByDevServer_NotConnected(t *testing.T) {
-	ds, err := domain.NewDevServer("ds-1", "tenant-1", "10.0.0.5", domain.ConnectionModeDirectWebSocket, "")
+	ds, err := domain.NewDevServer("ds-1", "tenant-1", "10.0.0.5", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}
@@ -69,7 +69,7 @@ func TestRelayByDevServer_NotConnected(t *testing.T) {
 }
 
 func TestRelayByDevServer_ConnectedRelaysToAgent(t *testing.T) {
-	ds, err := domain.NewDevServer("ds-1", "tenant-1", "10.0.0.5", domain.ConnectionModeDirectWebSocket, "")
+	ds, err := domain.NewDevServer("ds-1", "tenant-1", "10.0.0.5", domain.ConnectionModeDirectWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("building dev server: %v", err)
 	}

@@ -34,17 +34,17 @@ func NewProjectExecutionResolver(client infrafleetv1.InfraFleetServiceClient) *P
 // ResolveConnectionResponse.repo_path: "Callers like git-gateway-service's
 // RelayExecutor need repo_path alongside dev_server to know which path to
 // operate on").
-func (p *ProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, bool, error) {
+func (p *ProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, string, bool, error) {
 	ctx, err := withTenantMetadata(ctx)
 	if err != nil {
-		return "", "", false, err
+		return "", "", "", false, err
 	}
 	resp, err := p.client.ResolveConnection(ctx, &infrafleetv1.ResolveConnectionRequest{ConnectionId: projectID})
 	if err != nil {
-		return "", "", false, fmt.Errorf("grpcclient: ResolveConnection(%q): %w", projectID, err)
+		return "", "", "", false, fmt.Errorf("grpcclient: ResolveConnection(%q): %w", projectID, err)
 	}
 	if !resp.GetConnected() {
-		return "", "", false, nil
+		return "", "", "", false, nil
 	}
-	return projectID, resp.GetRepoPath(), true, nil
+	return projectID, resp.GetRepoPath(), resp.GetWorktreeId(), true, nil
 }

@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/commit_message_prompt.go` (new), `backend-go/services/git-gateway-service/internal/usecase/commit_message_prompt_test.go` (new)
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — commit_message_prompt.go created (extractIssueRef, buildCommitMessagePrompt, statsOnlySummary, maxFullDiffFiles); commit_message_prompt_test.go passing
 
 ---
 

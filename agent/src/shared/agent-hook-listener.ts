@@ -234,6 +234,13 @@ export type AgentHookEventPayload = {
   launchToken?: string
   tabId?: string
   worktreeId?: string
+  /** Dev Server Agent's own pty registry id for the process that fired this
+   *  hook (ORCA_PTY_ID, stamped by agent-spawner.ts for agent.spawn-launched
+   *  processes — see TASK-AG-03-07). Undefined for a plain renderer-launched
+   *  terminal pane, which has no agent_sessions row to correlate against.
+   *  Exact join key for infra-fleet-service's AgentSession, closing the race
+   *  the worktreeId-based correlation fallback (TASK-AG-03-05) cannot. */
+  ptyId?: string
   /** Identifies the SSH connection the event arrived on, or null for local.
    *  Stamped only on the remote-ingest path (Orca's `ingestRemote`); the
    *  HTTP path always sets null because it cannot know which mux a request
@@ -3681,6 +3688,7 @@ export function normalizeHookPayload(
   }
   const worktreeId = readStringField(record, 'worktreeId')
   const launchToken = readStringField(record, 'launchToken')
+  const ptyId = readStringField(record, 'ptyId')
 
   const hookPayloadRecord = hookPayload as Record<string, unknown>
   let promptInteractionKey: string | undefined
@@ -3820,6 +3828,7 @@ export function normalizeHookPayload(
         launchToken,
         tabId,
         worktreeId,
+        ptyId,
         connectionId: null,
         hasExplicitPrompt:
           source === 'amp'

@@ -1,6 +1,9 @@
 package domain
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 func TestResolveGrant_FindsGrantOnTargetTaskItself(t *testing.T) {
 	caller := CallerIdentity{UserID: "user-1"}
@@ -9,7 +12,7 @@ func TestResolveGrant_FindsGrantOnTargetTaskItself(t *testing.T) {
 		"task-1": {{TaskID: "task-1", SubjectID: "user-1", Level: GrantLevelAdmin, ApplyTree: false}},
 	}
 
-	level, found := ResolveGrant(chain, grants, caller, 0)
+	level, found := ResolveGrant(chain, grants, caller, 0, time.Now())
 	if !found {
 		t.Fatal("expected a grant to be found")
 	}
@@ -28,7 +31,7 @@ func TestResolveGrant_TargetTaskGrantAppliesEvenWithoutApplyTree(t *testing.T) {
 		"task-1": {{TaskID: "task-1", SubjectID: "user-1", Level: GrantLevelUser, ApplyTree: false}},
 	}
 
-	level, found := ResolveGrant(chain, grants, caller, 0)
+	level, found := ResolveGrant(chain, grants, caller, 0, time.Now())
 	if !found || level != GrantLevelUser {
 		t.Fatalf("expected GrantLevelUser found=true, got %v found=%v", level, found)
 	}
@@ -44,7 +47,7 @@ func TestResolveGrant_FallsThroughMultipleAncestorLevels(t *testing.T) {
 		"grandparent": {{TaskID: "grandparent", SubjectID: "user-1", Level: GrantLevelUser, ApplyTree: true}},
 	}
 
-	level, found := ResolveGrant(chain, grants, caller, 0)
+	level, found := ResolveGrant(chain, grants, caller, 0, time.Now())
 	if !found {
 		t.Fatal("expected the grandparent's inherited grant to be found")
 	}
@@ -63,7 +66,7 @@ func TestResolveGrant_ApplyTreeFalseStopsInheritance(t *testing.T) {
 		"parent": {{TaskID: "parent", SubjectID: "user-1", Level: GrantLevelOwner, ApplyTree: false}},
 	}
 
-	_, found := ResolveGrant(chain, grants, caller, 0)
+	_, found := ResolveGrant(chain, grants, caller, 0, time.Now())
 	if found {
 		t.Error("expected apply_tree=false on an ancestor to NOT be inherited")
 	}
@@ -80,7 +83,7 @@ func TestResolveGrant_ApplyTreeFalseAtOneAncestorDoesNotBlockADeeperOne(t *testi
 		"grandparent": {{TaskID: "grandparent", SubjectID: "user-1", Level: GrantLevelAdmin, ApplyTree: true}},
 	}
 
-	level, found := ResolveGrant(chain, grants, caller, 0)
+	level, found := ResolveGrant(chain, grants, caller, 0, time.Now())
 	if !found || level != GrantLevelAdmin {
 		t.Fatalf("expected GrantLevelAdmin found=true, got %v found=%v", level, found)
 	}
@@ -97,7 +100,7 @@ func TestResolveGrant_PriorityWinsOverProximity(t *testing.T) {
 		"grandparent": {{TaskID: "grandparent", SubjectID: "user-1", Level: GrantLevelOwner, ApplyTree: true}},
 	}
 
-	level, found := ResolveGrant(chain, grants, caller, 0)
+	level, found := ResolveGrant(chain, grants, caller, 0, time.Now())
 	if !found || level != GrantLevelOwner {
 		t.Fatalf("expected the distant owner grant to win, got %v found=%v", level, found)
 	}
@@ -110,7 +113,7 @@ func TestResolveGrant_TeamGrantResolvedViaCallerTeamIDs(t *testing.T) {
 		"task-1": {{TaskID: "task-1", SubjectID: "team-a", Level: GrantLevelTeam, ApplyTree: false}},
 	}
 
-	level, found := ResolveGrant(chain, grants, caller, 0)
+	level, found := ResolveGrant(chain, grants, caller, 0, time.Now())
 	if !found || level != GrantLevelTeam {
 		t.Fatalf("expected GrantLevelTeam found=true, got %v found=%v", level, found)
 	}
@@ -123,7 +126,7 @@ func TestResolveGrant_NoMatchAnywhereDefaultsToDeny(t *testing.T) {
 		"parent": {{TaskID: "parent", SubjectID: "someone-else", Level: GrantLevelOwner, ApplyTree: true}},
 	}
 
-	level, found := ResolveGrant(chain, grants, caller, 0)
+	level, found := ResolveGrant(chain, grants, caller, 0, time.Now())
 	if found {
 		t.Errorf("expected no match, got level=%v", level)
 	}
@@ -141,7 +144,7 @@ func TestResolveGrant_MaxDepthGuardStopsTheWalk(t *testing.T) {
 		"great-grandparent": {{TaskID: "great-grandparent", SubjectID: "user-1", Level: GrantLevelOwner, ApplyTree: true}},
 	}
 
-	_, found := ResolveGrant(chain, grants, caller, 2)
+	_, found := ResolveGrant(chain, grants, caller, 2, time.Now())
 	if found {
 		t.Error("expected the max-depth guard to prevent finding a grant beyond the cap")
 	}
@@ -157,8 +160,83 @@ func TestResolveGrant_BestOfMultipleCandidatesAtSameTask(t *testing.T) {
 		},
 	}
 
-	level, found := ResolveGrant(chain, grants, caller, 0)
+	level, found := ResolveGrant(chain, grants, caller, 0, time.Now())
 	if !found || level != GrantLevelAdmin {
 		t.Fatalf("expected GrantLevelAdmin (higher priority than team), got %v found=%v", level, found)
+	}
+}
+
+// TestResolveGrant_ExpiredNonInheritedGrantOnTargetTask_Ignored: an expired
+// grant directly on the target task must be ignored — expiry applies
+// regardless of ApplyTree.
+func TestResolveGrant_ExpiredNonInheritedGrantOnTargetTask_Ignored(t *testing.T) {
+	now := time.Now()
+	past := now.Add(-time.Hour)
+	caller := CallerIdentity{UserID: "user-1"}
+	chain := []string{"task-1"}
+	grants := map[string][]Grant{
+		"task-1": {{TaskID: "task-1", SubjectID: "user-1", Level: GrantLevelOwner, ApplyTree: false, ExpiresAt: &past}},
+	}
+
+	_, found := ResolveGrant(chain, grants, caller, 0, now)
+	if found {
+		t.Error("expected an expired grant on the target task to be ignored")
+	}
+}
+
+// TestResolveGrant_ExpiredApplyTreeAncestorGrant_IgnoredButFreshOneAtSameDepthWins:
+// an expired ApplyTree=true ancestor grant is ignored, but a non-expired
+// one at the SAME depth still resolves.
+func TestResolveGrant_ExpiredApplyTreeAncestorGrant_IgnoredButFreshOneAtSameDepthWins(t *testing.T) {
+	now := time.Now()
+	past := now.Add(-time.Hour)
+	future := now.Add(time.Hour)
+	caller := CallerIdentity{UserID: "user-1"}
+	chain := []string{"task-1", "parent"}
+	grants := map[string][]Grant{
+		"parent": {
+			{TaskID: "parent", SubjectID: "user-1", Level: GrantLevelOwner, ApplyTree: true, ExpiresAt: &past},
+			{TaskID: "parent", SubjectID: "user-1", Level: GrantLevelUser, ApplyTree: true, ExpiresAt: &future},
+		},
+	}
+
+	level, found := ResolveGrant(chain, grants, caller, 0, now)
+	if !found {
+		t.Fatal("expected the non-expired ancestor grant to still be found")
+	}
+	if level != GrantLevelUser {
+		t.Errorf("expected GrantLevelUser (the non-expired grant, not the expired Owner one), got %v", level)
+	}
+}
+
+// TestResolveGrant_NowExactlyEqualToExpiresAt_CountsAsExpired is the
+// explicit boundary test: !After, not !Before — now == expires_at counts as
+// expired.
+func TestResolveGrant_NowExactlyEqualToExpiresAt_CountsAsExpired(t *testing.T) {
+	now := time.Now()
+	caller := CallerIdentity{UserID: "user-1"}
+	chain := []string{"task-1"}
+	grants := map[string][]Grant{
+		"task-1": {{TaskID: "task-1", SubjectID: "user-1", Level: GrantLevelOwner, ApplyTree: false, ExpiresAt: &now}},
+	}
+
+	_, found := ResolveGrant(chain, grants, caller, 0, now)
+	if found {
+		t.Error("expected now == expires_at to count as expired")
+	}
+}
+
+// TestResolveGrant_NilExpiresAt_NeverExpires confirms the zero-value
+// (nil ExpiresAt) grant is unaffected by the expiry filter.
+func TestResolveGrant_NilExpiresAt_NeverExpires(t *testing.T) {
+	caller := CallerIdentity{UserID: "user-1"}
+	chain := []string{"task-1"}
+	grants := map[string][]Grant{
+		"task-1": {{TaskID: "task-1", SubjectID: "user-1", Level: GrantLevelOwner, ApplyTree: false}},
+	}
+
+	level, found := ResolveGrant(chain, grants, caller, 0, time.Now())
+	if !found || level != GrantLevelOwner {
+		t.Fatalf("expected a nil-ExpiresAt grant to never expire, got %v found=%v", level, found)
 	}
 }

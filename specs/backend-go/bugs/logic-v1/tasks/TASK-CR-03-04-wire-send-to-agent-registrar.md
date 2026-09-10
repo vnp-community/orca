@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** TASK-CR-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — registerAnnotationSendChannel wired into RegisterRealChannels after registerAnnotationChannels; TestRegisterRealChannels_RegistersAnnotationSendToAgent passes.
 
 ---
 

@@ -42,6 +42,12 @@ type Config struct {
 	// base-branch lookups (SOL-031 / TASK-193) — a new outbound dependency
 	// edge this service didn't have before this batch.
 	SCMIntegrationServiceAddr string
+	// IssueTrackingServiceAddr is where IssueTrackingSourceClient dials
+	// issue-tracking-service's GetIssue RPC — CreateWorktreeFromIssue's
+	// tracker_issue half of its oneof issue_source (SOL-PI-02), a new
+	// outbound dependency edge (git --> issue) this service didn't have
+	// before this batch.
+	IssueTrackingServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -55,5 +61,6 @@ func Load() (Config, error) {
 		ProjectServiceAddr:        commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
 		AIProviderServiceAddr:     commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 		SCMIntegrationServiceAddr: commonconfig.StringEnv("SCM_INTEGRATION_SERVICE_ADDR", "scm-integration-service:9090"),
+		IssueTrackingServiceAddr:  commonconfig.StringEnv("ISSUE_TRACKING_SERVICE_ADDR", "issue-tracking-service:9090"),
 	}, nil
 }

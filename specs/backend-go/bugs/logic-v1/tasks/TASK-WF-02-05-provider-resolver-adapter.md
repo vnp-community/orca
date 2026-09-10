@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/adapter/providerresolver/resolver.go` (new)
 **Depends on:** TASK-WF-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — new `internal/adapter/providerresolver` package: pinned-account path validates active status via `ListAccounts` (errors, never falls back to cascade, on inactive/unknown/list-failure); unpinned path delegates to `ResolveProvider`, erroring if it resolves no account (rather than silently returning ""). Wired into `AgentExecutor` (`agentExecParams` gained `AccountID`/`Model`); `cmd/server/main.go` dials `ai-provider-service` (new `AI_PROVIDER_SERVICE_ADDR` config) and wires `providerresolver.New`. Since `TASK-WF-02-06`'s `ExecutionContext` (this task's stated source for userID/projectID) doesn't exist yet in dependency order, added `tenant.WithProjectID`/`tenant.ProjectID` to `common/tenant` (mirroring existing `WithUserID`/`UserID`) and read both via `ctx` in `AgentExecutor.Execute` — best-effort empty today, will be populated once TASK-WF-02-06's waveDispatcher enriches the dispatch ctx (documented in code). New `resolver_test.go`: pin-wins-over-cascade, pinned-inactive/unknown-errors-without-fallback, list-failure-propagates, no-pin-delegates-with-right-scope, cascade-no-account-errors, empty-pin-treated-as-no-pin (7/7 pass). `go build/vet/test` green for workflow-service, api-gateway, git-gateway-service, project-service (the last two build against `common/tenant`, confirming the additive change is safe).
 
 ---
 

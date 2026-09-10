@@ -5,7 +5,7 @@
 **Service:** `project-service`, `scm-integration-service`, `issue-status-sync`
 **File:** `services/project-service/internal/adapter/postgres/worktree_repository_test.go`, `services/project-service/internal/usecase/record_worktree_created_test.go`, `record_worktree_removed_test.go` (new), `services/scm-integration-service/internal/usecase/create_pull_request_test.go`, `receive_webhook_test.go` (new), `services/issue-status-sync/internal/usecase/sync_issue_status_test.go` (new)
 **Depends on:** TASK-PI-03-03, TASK-PI-03-05, TASK-PI-03-06, TASK-PI-03-07
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE (unit-test scope) — record_worktree_created/removed_test.go assert outbox payload+had_open_pr; sync_issue_status_test.go covers dedup/empty-link/sync-disabled/retry/give-up/mapping-table. receive_webhook_test.go now added (TASK-PI-03-06 completed this batch — bad-signature-before-dedup, duplicate-no-second-enqueue, non-merge-recorded-not-enqueued, plus merge/record-failure/enqueue-failure cases). STILL NOT done: create_pull_request outbox-failure-non-fatal test and the optional testcontainers-NATS E2E — both remain out of this batch's scope.`
 
 ---
 

@@ -32,22 +32,43 @@ var (
 	// isn't visible to the calling tenant) — usecase/ maps this to
 	// apperrors.KindNotFound.
 	ErrAnnotationNotFound = errors.New("domain: annotation not found")
+
+	// ErrEndLineBeforeLine is returned by NewAnchor when EndLine is set and
+	// is less than Line — a range that ends before it starts is never a
+	// valid domain state.
+	ErrEndLineBeforeLine = errors.New("domain: end_line must not be before line")
+)
+
+// Side identifies which half of a diff an annotation is anchored to.
+// SideUnspecified is a legitimate state for a non-diff comment (a plain
+// file/line note outside diff-review context) — NewAnchor does not reject
+// it.
+type Side int32
+
+const (
+	SideUnspecified Side = iota
+	SideOld
+	SideNew
 )
 
 // Anchor is the value object describing where a comment points: a specific
 // file+line in a repository, resolved against a commit/ref so a later diff
 // rebase doesn't silently misattach it. See annotation-service.md §4.
 type Anchor struct {
-	RepoID   string
-	FilePath string
-	Line     int32
-	Ref      string
+	RepoID     string
+	WorktreeID string // optional; empty = not worktree-scoped (existing callers)
+	FilePath   string
+	Line       int32
+	EndLine    int32 // 0 treated as == Line; BR-CR-06
+	Side       Side
+	Ref        string
 }
 
 // NewAnchor constructs an Anchor, enforcing the invariants a location
-// reference must satisfy to be meaningful: a non-empty repo and file, and a
-// non-negative line number.
-func NewAnchor(repoID, filePath string, line int32, ref string) (Anchor, error) {
+// reference must satisfy to be meaningful: a non-empty repo and file, a
+// non-negative line number, and (when set) an end_line that isn't before
+// line.
+func NewAnchor(repoID, worktreeID, filePath string, line, endLine int32, side Side, ref string) (Anchor, error) {
 	if repoID == "" {
 		return Anchor{}, ErrEmptyRepoID
 	}
@@ -57,22 +78,40 @@ func NewAnchor(repoID, filePath string, line int32, ref string) (Anchor, error) 
 	if line < 0 {
 		return Anchor{}, ErrNegativeLine
 	}
-	return Anchor{RepoID: repoID, FilePath: filePath, Line: line, Ref: ref}, nil
+	if endLine != 0 && endLine < line {
+		return Anchor{}, ErrEndLineBeforeLine
+	}
+	return Anchor{
+		RepoID: repoID, WorktreeID: worktreeID, FilePath: filePath,
+		Line: line, EndLine: endLine, Side: side, Ref: ref,
+	}, nil
 }
 
 // Annotation is one inline code-review comment anchored to a file+line —
 // see annotation-service.md §4. It is a logical reference, not a copy of
 // reviewed content: this service never owns or caches diff/file content.
 type Annotation struct {
-	ID        string
-	TenantID  string
-	AuthorID  string
-	Anchor    Anchor
-	Content   string
-	Resolved  bool
-	RequestID string // idempotency key, see standards/api-design-guidelines.md
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID           string
+	TenantID     string
+	AuthorID     string
+	Anchor       Anchor
+	Content      string
+	OriginalCode string // NEW — BL-CR-02 DiffComment.originalCode
+	Resolved     bool
+	SentToAgent  bool       // NEW — distinct from Resolved (BR-CR-08)
+	SentAt       *time.Time // NEW
+	RequestID    string     // idempotency key, see standards/api-design-guidelines.md
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+// MarkSent returns a copy of a with SentToAgent=true and SentAt=&at — pure,
+// like the rest of domain/, called from mark_annotations_sent.go
+// (TASK-CR-02-06).
+func (a Annotation) MarkSent(at time.Time) Annotation {
+	a.SentToAgent = true
+	a.SentAt = &at
+	return a
 }
 
 // NewAnnotation constructs an Annotation, enforcing the invariants a
@@ -82,7 +121,7 @@ type Annotation struct {
 func NewAnnotation(
 	id, tenantID, authorID string,
 	anchor Anchor,
-	content string,
+	content, originalCode string,
 	resolved bool,
 	requestID string,
 	createdAt, updatedAt time.Time,
@@ -96,18 +135,13 @@ func NewAnnotation(
 	if requestID == "" {
 		return Annotation{}, ErrEmptyRequestID
 	}
-	if _, err := NewAnchor(anchor.RepoID, anchor.FilePath, anchor.Line, anchor.Ref); err != nil {
+	if _, err := NewAnchor(anchor.RepoID, anchor.WorktreeID, anchor.FilePath, anchor.Line, anchor.EndLine, anchor.Side, anchor.Ref); err != nil {
 		return Annotation{}, err
 	}
 	return Annotation{
-		ID:        id,
-		TenantID:  tenantID,
-		AuthorID:  authorID,
-		Anchor:    anchor,
-		Content:   content,
-		Resolved:  resolved,
-		RequestID: requestID,
-		CreatedAt: createdAt,
-		UpdatedAt: updatedAt,
+		ID: id, TenantID: tenantID, AuthorID: authorID,
+		Anchor: anchor, Content: content, OriginalCode: originalCode,
+		Resolved: resolved, RequestID: requestID,
+		CreatedAt: createdAt, UpdatedAt: updatedAt,
 	}, nil
 }

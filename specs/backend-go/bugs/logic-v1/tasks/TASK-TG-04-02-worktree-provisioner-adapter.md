@@ -5,7 +5,7 @@
 **Service:** `task-service` (client) + `git-gateway-service` (existing `CreateWorktree` RPC, reused as-is)
 **File:** `backend-go/services/task-service/internal/adapter/grpcclient/worktree_provisioner.go` (new)
 **Depends on:** TASK-TG-01-01 (`Task.WorktreeID` field)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — WorktreeProvisioner adapter added; the open repo_id-resolution question resolved by having the adapter itself call project-service.ListRepos and use the first repo by position (project-service allows multiple repos per project). Not yet wired into main.go (that's TASK-TG-04-03's job, layering ExecuteTask's worktree step on top). go test ./internal/adapter/grpcclient/... -run TestWorktreeProvisioner passes (reuse-existing, create-new, no-repos-configured cases).
 
 ---
 

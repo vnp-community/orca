@@ -270,6 +270,59 @@ export async function handleTestConnection(
   return handleHealthCheck(id, params, config, log)
 }
 
+// ── ai.testProviderConnection ──────────────────────────────────────────
+// Called by ai-provider-service's verifyConnection (backend-go) — see
+// specs/backend-go/bugs/logic-v1/tasks/TASK-AIP-SHARED-01-add-agent-test-connection-rpc.md.
+// Distinct from ai.provider.testConnection (accountId-keyed, delegates to
+// handleHealthCheck): this method is keyed by credentialRef + providerType
+// and returns {success, message} to match backend-go's ConnectionTestResult
+// exactly, not the {ok, latencyMs, note} shape the older method uses.
+export async function handleTestProviderConnection(
+  id: string | number | null,
+  params: Record<string, unknown>,
+  config: AgentConfig,
+  log: AgentLogger
+): Promise<object> {
+  const credentialRef = typeof params.credentialRef === 'string' ? params.credentialRef : ''
+  const providerType   = typeof params.providerType  === 'string' ? params.providerType  : ''
+
+  if (!credentialRef || !providerType) {
+    return {
+      jsonrpc: '2.0', id,
+      error: { code: AgentErrorCode.InvalidParams, message: 'Missing required params: credentialRef, providerType' },
+    }
+  }
+
+  const span = credTracer.start({ method: 'ai.testProviderConnection', providerType })
+
+  // credentialRef is a credential-broker-service pointer; this agent's local
+  // credential store is still keyed by accountId (ai.provider.writeCredential),
+  // and the ciphertext-push path (PushCiphertext) that would make credentialRef
+  // resolvable locally isn't implemented yet. Treating credentialRef as the
+  // local store key is a best-effort stand-in — if nothing is found, that's
+  // not necessarily "no credential", so it does NOT fail the check outright,
+  // it just skips straight to the reachability probe below.
+  const credResult = await handleReadCredential(id, { accountId: credentialRef }, config, log) as { error?: unknown }
+  const credentialFound = !credResult.error
+
+  const reachability = await checkProviderReachabilityDetailed(providerType)
+  log.info(`ai.testProviderConnection: providerType=${providerType} credentialFound=${credentialFound} ok=${reachability.ok} note=${reachability.note}`)
+
+  if (reachability.ok) {
+    span.ok({ providerType, note: reachability.note })
+  } else {
+    span.fail(reachability.note, { providerType })
+  }
+
+  return {
+    jsonrpc: '2.0', id,
+    result: {
+      success: reachability.ok,
+      message: credentialFound ? reachability.note : `${reachability.note} (credential not found locally for this ref — ciphertext-push path not yet implemented)`,
+    },
+  }
+}
+
 // AIP-001: Structured reachability check — returns ok, note, and optional HTTP statusCode
 const PROVIDER_HEALTH_URLS: Record<string, string> = {
   anthropic: 'https://api.anthropic.com',

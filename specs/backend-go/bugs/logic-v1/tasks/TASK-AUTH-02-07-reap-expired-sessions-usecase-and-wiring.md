@@ -5,7 +5,7 @@
 **Service:** `auth-service` (usecase + cmd/server)
 **File:** `backend-go/services/auth-service/internal/usecase/reap_expired_sessions.go` (new), `backend-go/services/auth-service/cmd/server/main.go`
 **Depends on:** TASK-AUTH-02-03, TASK-AUTH-02-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `ReapExpiredSessions` usecase + hourly ticker in `main.go` (7-day retention); `reap_expired_sessions_test.go` (cutoff computation, error propagation) passes.
 
 ---
 

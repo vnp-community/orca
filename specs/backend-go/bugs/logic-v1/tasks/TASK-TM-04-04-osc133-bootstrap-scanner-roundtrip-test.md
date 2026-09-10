@@ -5,7 +5,7 @@
 **Service:** agent/ (Dev Server Agent)
 **File:** `agent/src/relay/pty-osc133-bootstrap-scanner.test.ts`
 **Depends on:** TASK-TM-04-01 (bootstrap export)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — pty-osc133-bootstrap-scanner.test.ts added; `npx vitest run src/relay/pty-osc133-bootstrap-scanner.test.ts` — 2/2 pass.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/execute_task.go`
 **Depends on:** none — this fix stands alone against the current `ExecuteTask` shape
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — ExecuteTask now runs the 'execute' permission pre-check + complexity determination BEFORE writing StatusInProgress, and reverts to the previous status on dispatch failure (no more permanently-stuck in_progress task). go test ./internal/usecase/... -run TestExecuteTask passes, including new revert-on-failure and permission-denied-never-writes-status regression tests.
 
 ---
 

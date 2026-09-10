@@ -5,7 +5,7 @@
 **Service:** n/a (documentation — no backend-go code)
 **File:** `docs/logic/agent-ws/BL-AWS-02-direct-websocket.md`
 **Depends on:** TASK-AWS-02-02, TASK-AWS-02-03
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — rewrote handshake sequence, close-code disambiguation, and examples to match `agentwsserver/server.go`/`agent-connection-direct.ts`; grep for `handshake-request`/`4001-4004` returns nothing.
 
 ---
 

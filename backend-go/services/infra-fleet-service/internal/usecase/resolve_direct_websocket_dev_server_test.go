@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
@@ -27,7 +28,7 @@ func TestResolveDirectWebSocketDevServer_ReusesExistingRow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got != existing {
+	if !reflect.DeepEqual(got, existing) {
 		t.Fatalf("want existing row returned unchanged, got %+v", got)
 	}
 	if repo.registerCalled {

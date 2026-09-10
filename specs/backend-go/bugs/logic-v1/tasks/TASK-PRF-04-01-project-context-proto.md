@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/proto/orca/project/v1/project.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — GetProjectContext RPC + GetProjectContextRequest/ProjectContext messages added; buf generate + breaking clean; full workspace build clean
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `api-gateway` (httpgateway)
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/auth_admin_routes.go`
 **Depends on:** TASK-AUTH-04-01, TASK-AUTH-04-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `createUserRequestBody` gained `Password`, forwarded verbatim into `CreateUserRequest.Password`; `TestAuthAdminRoutes_CreateUserForwardsPassword` asserts the fake client receives the exact plaintext.
 
 ---
 

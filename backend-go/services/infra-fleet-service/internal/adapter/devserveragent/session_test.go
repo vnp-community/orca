@@ -167,15 +167,15 @@ func TestSession_IdleTimeout_DetectsSilentConnectionAndReconnects(t *testing.T) 
 		t.Fatalf("parsing port: %v", err)
 	}
 
-	cfg := testConfig(port, fakeAgentToken)
+	cfg := testConfig(port)
 	cfg.IdleTimeout = 100 * time.Millisecond
 	cfg.ReconnectBaseDelay = 10 * time.Millisecond
 	cfg.ReconnectMaxDelay = 50 * time.Millisecond
 
-	client := New(cfg, slog.Default())
+	client := New(cfg, slog.Default(), WithAgentTokens(fakeStaticTokenSource{token: fakeAgentToken}))
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-idle-timeout", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-idle-timeout", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}
@@ -309,14 +309,14 @@ func TestSession_BackgroundReconnect_RecoversAfterDropWithoutCallerRetry(t *test
 		t.Fatalf("parsing port: %v", err)
 	}
 
-	cfg := testConfig(port, fakeAgentToken)
+	cfg := testConfig(port)
 	cfg.ReconnectBaseDelay = 10 * time.Millisecond
 	cfg.ReconnectMaxDelay = 50 * time.Millisecond
 
-	client := New(cfg, slog.Default())
+	client := New(cfg, slog.Default(), WithAgentTokens(fakeStaticTokenSource{token: fakeAgentToken}))
 	t.Cleanup(client.Close)
 
-	devServer, err := domain.NewDevServer("ds-reconnect", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "")
+	devServer, err := domain.NewDevServer("ds-reconnect", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
 	if err != nil {
 		t.Fatalf("NewDevServer: %v", err)
 	}

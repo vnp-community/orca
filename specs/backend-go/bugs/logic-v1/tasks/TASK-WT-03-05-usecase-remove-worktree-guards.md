@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/remove_worktree.go`
 **Depends on:** TASK-WT-03-01, TASK-WT-03-02, TASK-WT-03-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — remove_worktree.go rewritten with BR-WT-09/10 guards + agent-kill step; gRPC handler updated for RemoveWorktreeResponse; wired terminalSessionLister in main.go. go build+test clean; remove_worktree_test.go updated for new signature + added uncommitted-changes-rejects-without-force case.
 
 ---
 

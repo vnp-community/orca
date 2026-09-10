@@ -27,20 +27,24 @@ type Server struct {
 	unregisterPushSubscription *usecase.UnregisterPushSubscription
 	getVapidPublicKey          *usecase.GetVapidPublicKey
 	broadcaster                usecase.NotificationBroadcaster
-	// signer is wired for the future DeliverPush usecase
-	// (mobile push delivery via APNs/FCM, notification-service.md §6's
-	// deliver_push.go) — not yet called from any RPC path in this
-	// scaffold. See this service's README "Known gaps".
+	// signer backs GetVapidPublicKey's sibling web-push signing path,
+	// actually invoked now by usecase.DeliverPush (BL-MB-02,
+	// TASK-MB-02-07) — no longer "wired but never called".
 	signer usecase.VaultSigner
+	// buffer drains BR-MB-07's offline-buffered notifications on
+	// StreamNotifications reconnect, before the live broadcast loop starts
+	// (TASK-MB-02-08).
+	buffer usecase.BufferedNotificationRepository
 }
 
-func New(subscribe *usecase.Subscribe, unregisterPushSubscription *usecase.UnregisterPushSubscription, getVapidPublicKey *usecase.GetVapidPublicKey, broadcaster usecase.NotificationBroadcaster, signer usecase.VaultSigner) *Server {
+func New(subscribe *usecase.Subscribe, unregisterPushSubscription *usecase.UnregisterPushSubscription, getVapidPublicKey *usecase.GetVapidPublicKey, broadcaster usecase.NotificationBroadcaster, signer usecase.VaultSigner, buffer usecase.BufferedNotificationRepository) *Server {
 	return &Server{
 		subscribe:                  subscribe,
 		unregisterPushSubscription: unregisterPushSubscription,
 		getVapidPublicKey:          getVapidPublicKey,
 		broadcaster:                broadcaster,
 		signer:                     signer,
+		buffer:                     buffer,
 	}
 }
 
@@ -88,6 +92,26 @@ func (s *Server) StreamNotifications(req *notificationv1.StreamNotificationsRequ
 	userID := req.GetUserId()
 	if userID == "" {
 		return apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInvalidArgument, "NOTIFICATION_NO_USER", "user_id is required", nil))
+	}
+
+	// Drain BR-MB-07's offline-buffered backlog before the live loop
+	// starts (TASK-MB-02-08) — a mobile client reconnecting after being
+	// offline sees everything it missed, oldest first, then live events.
+	// A drain failure degrades to "nothing drained this reconnect", never
+	// a stream error — a missed backlog isn't worth failing the whole
+	// connection over.
+	if s.buffer != nil {
+		if pending, err := s.buffer.ListPending(ctx, tenantID, userID); err == nil {
+			delivered := make([]string, 0, len(pending))
+			for _, row := range pending {
+				if err := stream.Send(toProtoFrame(row.Event)); err == nil {
+					delivered = append(delivered, row.ID)
+				}
+			}
+			if len(delivered) > 0 {
+				_ = s.buffer.MarkDelivered(ctx, delivered)
+			}
+		}
 	}
 
 	ch, unsubscribe := s.broadcaster.Subscribe(ctx, tenantID, userID)

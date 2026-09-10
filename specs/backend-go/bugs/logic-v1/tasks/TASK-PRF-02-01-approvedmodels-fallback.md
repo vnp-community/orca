@@ -5,7 +5,7 @@
 **Service:** `tenant-service`
 **File:** `backend-go/services/tenant-service/internal/domain/profile_resolution.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — applyApprovedModelsFallback added + wired into ResolveProfile; unit tests green
 
 ---
 

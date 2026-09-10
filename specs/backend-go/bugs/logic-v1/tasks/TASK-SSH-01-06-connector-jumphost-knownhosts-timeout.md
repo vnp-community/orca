@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/sshconn/connector.go`
 **Depends on:** TASK-SSH-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — jumphost.go (resolveJumpChain, hostKeyCallback, ErrUnreachableHost) + Connect rewritten to dial per-target port through jump chain with known-hosts verification; new tests (jump-host dial, known-hosts mismatch, unreachable-host typed error) pass`
 
 ---
 

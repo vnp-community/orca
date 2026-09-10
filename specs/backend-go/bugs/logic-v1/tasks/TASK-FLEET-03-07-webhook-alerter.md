@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (webhook adapter)
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/webhook/alerter.go` (new)
 **Depends on:** TASK-FLEET-03-03
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — implemented webhook.Alerter verbatim to spec. Tests cover exact JSON shape (via httptest.Server), empty-URL-disabled, 500-response-does-not-propagate, and unreachable-server-does-not-propagate. All pass.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `auth-service` (usecase port)
 **File:** `backend-go/services/auth-service/internal/usecase/ports.go`
 **Depends on:** TASK-AUTH-02-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `TouchLastSeen`/`DeleteExpiredBefore` to `SessionRepository` port (build breaks downstream until 02-04, as expected).
 
 ---
 

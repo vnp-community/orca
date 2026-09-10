@@ -85,15 +85,21 @@ type Deps struct {
 	// Agent has no user session cookie to present. Nil is valid — the
 	// routes are simply not mounted (see Config.InfraFleetHTTPAddr).
 	AgentProxyHandler http.Handler
+	// TraceBroadcast feeds /api/trace-stream real backend spans (see
+	// trace_routes.go's doc comment) — nil is valid (NewRouter falls back
+	// to an empty hub), matching every other optional Deps field's posture.
+	TraceBroadcast *TraceBroadcast
 }
 
 // NewRouter builds api-gateway's chi router. Three route groups, in order:
 //  1. Unauthenticated: POST /auth/local (login itself can't require a
 //     session — that would be circular), GET /ws (auth handled inside
 //     wscompat.Handler, once at upgrade, not per-HTTP-request — matching
-//     the old backend's WsSessionRouter design), and GET /agent + /api/
+//     the old backend's WsSessionRouter design), GET /agent + /api/
 //     agent-token (auth handled inside infra-fleet-service, see
-//     AgentProxyHandler's doc comment above).
+//     AgentProxyHandler's doc comment above), and POST /v1/scm/webhooks/
+//     {provider} (auth is the provider's own webhook signature, verified
+//     inside scm-integration-service — see mountSCMWebhookRoutes).
 //  2. Authenticated: everything else (/v1/*, including the real
 //     usage-service proxy, the real notification WS bridge, the Phase 5
 //     mountXRoutes proxies below, and 501 stubs for the remaining
@@ -102,16 +108,32 @@ func NewRouter(deps Deps) http.Handler {
 	r := chi.NewRouter()
 
 	if deps.AuthClient != nil {
-		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator, deps.SsoConfig)
+		// 10 attempts/min per IP, burst 10 — spec's literal figure
+		// (docs/logic/auth/BL-AUTH-01-local-login.md).
+		loginRateLimiter := usecase.NewRateLimiter(10.0/60.0, 10)
+		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator, loginRateLimiter, deps.SsoConfig)
 	}
-	mountTraceRoutes(r)
+	mountTraceRoutes(r, deps.TraceBroadcast)
 	// mountPushRoutes is unauthenticated by design (see its doc comment) —
 	// mounted here, outside the authed group below, never moved inside it.
 	if deps.NotificationClient != nil {
 		mountPushRoutes(r, deps.NotificationClient, deps.CookieValidator)
 	}
+	// mountSCMWebhookRoutes is unauthenticated by design (see its doc
+	// comment): GitHub/GitLab's own servers call this, never carrying an
+	// Orca JWT. Authenticity comes from ReceiveWebhook's own signature
+	// verification inside scm-integration-service, not authMiddleware.
+	if deps.SCMClient != nil {
+		mountSCMWebhookRoutes(r, deps.SCMClient)
+	}
 	if deps.WSCompatHandler != nil {
 		r.Get("/ws", deps.WSCompatHandler)
+	}
+	// mountUnauthenticatedPairingRoutes is unauthenticated by design (see its
+	// doc comment) — mounted here, outside the authed group below, following
+	// mountPushRoutes's precedent immediately above. Never move inside r.Group.
+	if deps.AuthClient != nil {
+		mountUnauthenticatedPairingRoutes(r, deps.AuthClient, pairingRateLimitMiddleware(deps.RateLimiter))
 	}
 	if deps.AgentProxyHandler != nil {
 		r.Get("/agent", deps.AgentProxyHandler.ServeHTTP)
@@ -133,9 +155,10 @@ func NewRouter(deps Deps) http.Handler {
 		if deps.AuthClient != nil {
 			mountAuthAdminRoutes(authed, deps.AuthClient)
 			mountAdminRoutes(authed, deps.AuthClient)
+			mountPairingRoutes(authed, deps.AuthClient)
 		}
 		if deps.AnnotationClient != nil {
-			mountAnnotationRoutes(authed, deps.AnnotationClient)
+			mountAnnotationRoutes(authed, deps.AnnotationClient, deps.GitGatewayClient)
 		}
 		if deps.TaskClient != nil {
 			mountTaskRoutes(authed, deps.TaskClient)
@@ -169,6 +192,12 @@ func NewRouter(deps Deps) http.Handler {
 		}
 		if deps.SCMClient != nil {
 			mountSCMRoutes(authed, deps.SCMClient)
+		}
+		// mountPRReviewRoutes (SOL-PI-04) composes both clients — the
+		// annotation-service read + scm-integration-service write this
+		// aggregation route needs.
+		if deps.SCMClient != nil && deps.AnnotationClient != nil {
+			mountPRReviewRoutes(authed, deps.SCMClient, deps.AnnotationClient)
 		}
 		if deps.WorkflowClient != nil {
 			mountWorkflowRoutes(authed, deps.WorkflowClient)

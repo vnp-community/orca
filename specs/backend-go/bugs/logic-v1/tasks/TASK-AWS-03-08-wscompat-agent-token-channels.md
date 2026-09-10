@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_devserver_agent_tokens.go` (new)
 **Depends on:** TASK-AWS-03-07
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — channels_devserver_agent_tokens.go created, wired into RegisterRealChannels, 4 tests pass (create/list/revoke/no-devServerId + plaintext-token-never-in-list regression guard).
 
 ---
 

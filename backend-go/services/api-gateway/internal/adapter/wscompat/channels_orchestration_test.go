@@ -176,9 +176,9 @@ func TestAgentSessionListActiveChannel_EmptyReturnsEmptyArrayNotNull(t *testing.
 	if !ok {
 		t.Fatalf("want map result, got %T", result)
 	}
-	sessions, ok := out["agentSessions"].([]agentSessionView)
+	sessions, ok := out["agentSessions"].([]activeDispatchContextView)
 	if !ok {
-		t.Fatalf("want agentSessions to be []agentSessionView, got %T", out["agentSessions"])
+		t.Fatalf("want agentSessions to be []activeDispatchContextView, got %T", out["agentSessions"])
 	}
 	if sessions == nil {
 		t.Error("want empty slice, got nil (would serialize as JSON null, not [])")

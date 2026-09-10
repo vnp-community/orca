@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/queued_prompt.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `domain.QueuedPrompt`/`NewQueuedPrompt` added; `TestNewQueuedPrompt_ValidatesInvariants` (empty/too-long/exactly-10000) passes.
 
 ---
 

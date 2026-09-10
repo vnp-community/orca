@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/usecase/ports.go`
 **Depends on:** TASK-PRF-03-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — DevServerHealthChecker/AuditPublisher/MemberNotifier/ProfileResolver ports + ListForMember added to ports.go; fakeProjectRepository.ListForMember added; go vet clean
 
 ---
 

@@ -23,3 +23,9 @@ declare const ORCA_DIAGNOSTICS_TOKEN_URL: string | null
 
 // ── v6 Feature Flags (Conflict Resolution C2) ────────────────────────────────
 declare const __ORCA_WORKSPACE_V6__: boolean
+
+// Agent bundle version, substituted by agent/build.mjs's esbuild `define` —
+// infra-fleet-service's sshrelay.remoteVersionAndPresence reads this via
+// `require('./agent.js').AGENT_VERSION` (see agent-entry.ts) to skip a
+// redundant redeploy when the remote bundle is already current (BR-SSH-07).
+declare const __AGENT_VERSION__: string

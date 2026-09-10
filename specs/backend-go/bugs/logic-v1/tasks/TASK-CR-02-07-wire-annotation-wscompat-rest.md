@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`, `backend-go/services/api-gateway/internal/adapter/httpgateway/annotation_routes.go`
 **Depends on:** TASK-CR-02-01, TASK-CR-02-04, TASK-CR-02-05, TASK-CR-02-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — annotationAnchorArg/create/list/delete extended, annotation.markSent + POST /v1/annotations/mark-sent wired; go build/vet/test pass (channels_test.go, annotation_routes_test.go).
 
 ---
 

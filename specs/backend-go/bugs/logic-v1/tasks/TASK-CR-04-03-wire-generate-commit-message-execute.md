@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/services/git-gateway-service/internal/usecase/generate_commit_message.go`, `backend-go/services/git-gateway-service/cmd/server/main.go`, `backend-go/services/git-gateway-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-CR-04-01, TASK-CR-04-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — GenerateCommitMessage rewritten with history composition, BR-CR-15 threshold branch, BR-CR-16 issue-ref enforcement; main.go/server_test.go/dispatch_test.go updated; go build+vet clean, existing GenerateCommitMessage tests pass
 
 ---
 

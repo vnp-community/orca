@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/proto/orca/automation/v1/automation.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — automation.proto: project_id/actions/OnFailurePolicy added to Automation+Create/UpdateRequest, step_type/step_config_json deprecated; buf generate + go build ./proto/... clean.
 
 ---
 

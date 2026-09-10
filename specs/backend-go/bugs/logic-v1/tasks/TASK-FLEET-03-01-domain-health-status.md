@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (domain)
 **File:** `backend-go/services/infra-fleet-service/internal/domain/dev_server_health.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added HealthStatus type + ComputeHealthStatus + DevServerHealth.Status; table test covers the full threshold matrix (79/81, 84/86, exactly-80/85 boundaries, unreachable/unhealthy priority). Passes.
 
 ---
 

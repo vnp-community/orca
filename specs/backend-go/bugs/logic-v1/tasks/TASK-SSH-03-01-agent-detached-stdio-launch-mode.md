@@ -5,7 +5,7 @@
 **Service:** agent/ (Dev Server Agent)
 **File:** `agent/src/relay/agent-connection-stdio.ts`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — runDetachedStdioMode (parent spawn+wait + child net.Server/pidfile) added to agent-connection-stdio.ts; new tests cover both branches`
 
 ---
 

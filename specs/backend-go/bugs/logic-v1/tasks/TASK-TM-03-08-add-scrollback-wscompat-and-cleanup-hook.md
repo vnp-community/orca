@@ -5,7 +5,7 @@
 **Service:** `api-gateway` + `git-gateway-service`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_terminal_scrollback.go`
 **Depends on:** TASK-TM-03-03 (proto), TASK-TM-03-07 (server RPC handlers live)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `terminal.scrollback.save`/`.restore` wscompat channels registered; `RemoveWorktree` gained a best-effort `ScrollbackCleaner.DeleteTerminalScrollbackSnapshots` call (logged, not surfaced) wired via `grpcclient.NewScrollbackCleaner(infraFleetClient)` in `cmd/server/main.go`; `go build ./services/api-gateway/... ./services/git-gateway-service/...` clean; `TestTerminalScrollback*` and `TestRemoveWorktree*` (incl. new cleanup-called-with-id + cleanup-failure-does-not-fail-removal cases) pass.
 
 ---
 

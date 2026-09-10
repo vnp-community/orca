@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (grpc adapter)
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-FLEET-04-01, TASK-FLEET-04-04, TASK-FLEET-04-05
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — wired both handlers using `tenant.RequireTenantID(ctx)` + `apperrors.ToGRPCStatus` (matching this file's actual established convention — the task's `identityFromContext`/`mapAppError` placeholders don't exist in this codebase). Wired Server fields/constructor + main.go bootstrap. New server_test.go fakes (fakeDevServerAgent implementing the full usecase.DevServerAgentClient interface) cover request->response marshaling for both RPCs and no-tenant->Unauthenticated gRPC status mapping. Full suite + `-race` pass.
 
 ---
 

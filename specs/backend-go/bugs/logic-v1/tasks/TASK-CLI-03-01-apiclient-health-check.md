@@ -5,7 +5,7 @@
 **Service:** `orca-cli`
 **File:** `backend-go/cmd/orca-cli/internal/apiclient/health.go`
 **Depends on:** TASK-CLI-01-06 (scaffold — `apiclient.Client`)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — added apiclient/health.go (GetHealth/probeOK) + newGetRequest helper in client.go + health_test.go (both-OK, readyz-fails-distinct-from-unhealthy, unreachable-gateway-errors); `go build ./cmd/orca-cli/...` and `go test ./cmd/orca-cli/internal/apiclient/... -run TestGetHealth -v` pass.
 
 ---
 

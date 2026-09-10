@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/stop_agent_session.go` (new), `backend-go/services/infra-fleet-service/internal/usecase/agent_session_lookup.go` (new)
 **Depends on:** TASK-AG-01-02, TASK-AG-01-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — agent_session_lookup.go (resolveAgentSession) + stop_agent_session.go implemented exactly as specced; stop_agent_session_test.go asserts SendAgentInput({0x03}) against the right ptyId and that SendSignal/KillPty are never called — passing.
 
 ---
 

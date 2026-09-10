@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/postgres/repository.go`
 **Depends on:** TASK-SSH-01-02, TASK-SSH-01-03
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — SshTargetStore Create/List/Get persist+load new columns, new integration test TestSshTargetStore_PersistsPortKnownHostsAndJumpHost passes`
 
 ---
 

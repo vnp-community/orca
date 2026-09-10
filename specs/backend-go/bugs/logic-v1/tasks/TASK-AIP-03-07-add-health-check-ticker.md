@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service`
 **File:** `backend-go/services/ai-provider-service/internal/adapter/scheduler/health_check_ticker.go` (new)
 **Depends on:** TASK-AIP-03-04, TASK-AIP-03-06
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — scheduler.HealthCheckTicker added + wired into main.go; TestHealthCheckTicker_TicksAndStopsOnCancel passes.`
 
 ---
 

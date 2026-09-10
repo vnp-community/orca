@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/create_ssh_target.go`
 **Depends on:** TASK-SSH-01-01, TASK-SSH-01-02, TASK-SSH-01-04
-**Status:** `[ ]` TODO
+**Status:** `[x] DONE — CreateSshTargetInput + gRPC CreateSshTarget/ListSshTargets map the 3 new fields, existing tests pass`
 
 ---
 

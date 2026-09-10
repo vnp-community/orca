@@ -5,7 +5,7 @@
 **Service:** `ai-provider-service` (+ `api-gateway`)
 **File:** `backend-go/services/ai-provider-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-AIP-02-01, TASK-AIP-02-05, TASK-AIP-02-06
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — grpc/server.go's ResolveProvider already threaded all fields (Phase 1, commit 99ffee469); this task wired the REST side (`handleResolveProvider` now reads `dev_server_id`/`model_hint`/`account_id`/`scoped_ref` off the query string; `model_hint` is a proto3-optional `*string` so it's set only when non-empty). No grpc/server_test.go exists in this service, so only the httpgateway test was extended (`TestHandleResolveProvider_NewFieldsRoundTrip`) — passes.
 
 ---
 

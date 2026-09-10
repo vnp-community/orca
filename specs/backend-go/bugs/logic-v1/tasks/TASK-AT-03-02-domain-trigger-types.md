@@ -5,7 +5,7 @@
 **Service:** `automation-service`
 **File:** `backend-go/services/automation-service/internal/domain/trigger.go` (new), `backend-go/services/automation-service/internal/domain/automation.go`
 **Depends on:** TASK-AT-03-01
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain/trigger.go added (TriggerType/EventName/TriggerFilter + ParseTriggerFilter); NewAutomation validates trigger/event consistency; domain tests pass.
 
 ---
 

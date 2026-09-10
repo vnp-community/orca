@@ -5,7 +5,7 @@
 **Service:** `project-service`
 **File:** `backend-go/services/project-service/internal/adapter/grpc/server.go`, `backend-go/services/project-service/cmd/server/main.go`
 **Depends on:** TASK-MB-04-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — added `getMobileWorktreeStatus` field + `Deps.GetMobileWorktreeStatus` + `GetMobileWorktreeStatus` handler to `grpc/server.go`; `cmd/server/main.go` dials `NewInfraFleetTerminalStatusResolver(cfg.InfraFleetServiceAddr)` and wires `NewGetMobileWorktreeStatus(worktreeRepo, repo, terminalStatusResolver)` into `grpc.New`'s Deps; `go build`/`go vet`/`go test ./services/project-service/...` all pass.
 
 ---
 

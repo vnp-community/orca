@@ -76,9 +76,12 @@ func (r *ServiceRegistry) Rules() []RoutingRule {
 // bridge at /v1/notifications/stream (internal/adapter/wsbridge), a
 // distinct route mounted directly, not derived from this table.
 //
-// credential-broker-service has no direct rule: per §7, it's "reached only
-// indirectly via infra-fleet-service's credential path" — no client calls
-// it through this gateway directly.
+// credential-broker-service has no REST RoutingRule (it's a wscompat-only
+// surface if/when wired, not a REST resource). TASK-INT-02-01 added a
+// direct dial (main.go's credentialBrokerClient, threaded through
+// wscompat.RegisterRealChannels) but no channel calls it yet — see
+// TASK-INT-02-02's Status (BLOCKED: channel-name collision with the
+// existing TASK-042 credentials.* implementation) for why.
 func NewDefaultServiceRegistry() *ServiceRegistry {
 	return NewServiceRegistry([]RoutingRule{
 		{PathPrefix: "/v1/usage", ServiceName: "usage-service", ProtoPackage: "orca.usage.v1", Status: RouteWired},

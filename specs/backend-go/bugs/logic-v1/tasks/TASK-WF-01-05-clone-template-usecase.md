@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/usecase/clone_template.go` (new)
 **Depends on:** TASK-WF-01-02, TASK-WF-01-03, TASK-WF-01-04
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — new `usecase.CloneTemplate` (resolves source via `ResolveTemplate`, persists a disconnected root template with `ClonedFromTemplateID` set); wired into `grpc.Server.CloneTemplate` handler, `cmd/server/main.go`, and `toProtoTemplate` extended to carry all the new authoring fields. `clone_template_test.go` covers Inherit-mode-source snapshot, clone-update-never-touches-original, validation, and not-found. `go build ./... && go vet ./... && go test ./...` green for workflow-service and api-gateway.
 
 ---
 

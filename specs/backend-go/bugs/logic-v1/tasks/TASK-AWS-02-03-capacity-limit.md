@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/agentwsserver/capacity.go` (new), `server.go`, `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/client.go`
 **Depends on:** TASK-AWS-02-01
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `LiveSessionCount` on `Client`, `capacity.go`'s `SessionCounter`, `Server.Sessions`/pre-upgrade capacity check in `ServeHTTP`, wired in main.go; 2 new tests (at-capacity pre-auth reject, disabled-by-default no-regression) green.
 
 ---
 

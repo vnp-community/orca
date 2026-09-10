@@ -214,6 +214,28 @@ export async function dispatchMiscRpc(
       }
     }
 
+    // ── SOL-SSH-04: ports.detect (auto port-forwarding scan) ────────────────
+    case 'ports.detect': {
+      try {
+        const { handlePortsDetect } = await import('./port-scan-handler')
+        return (await handlePortsDetect(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `ports.detect unavailable: ${msg}`)
+      }
+    }
+
+    // ── SOL-SSH-04: ports.kill (KillWorkspacePort relay target) ──────────────
+    case 'ports.kill': {
+      try {
+        const { handlePortsKill } = await import('./port-kill-handler')
+        return (await handlePortsKill(rpc.id, rpc.params ?? {})) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `ports.kill unavailable: ${msg}`)
+      }
+    }
+
     // accounts.* moved to agent-rpc-dispatch-accounts.ts (max-lines split).
 
     // ── connection.teardown ──────────────────────────────────────────────────

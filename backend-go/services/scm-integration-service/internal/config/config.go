@@ -59,6 +59,20 @@ type Config struct {
 	// OAuthRegistry — see internal/adapter/providerregistry.OAuthRegistry's
 	// doc comment.
 	OAuth OAuthProvidersConfig
+
+	// NATSURL is the transactional-outbox relay's NATS JetStream target
+	// (SOL-PI-03) — mirrors issue-tracking-service's own NATSURL field.
+	NATSURL string
+
+	// GitHubWebhookSecret/GitLabWebhookToken back ReceiveWebhook's signature
+	// verification (BUG-PI-03/TASK-PI-03-06) — ONE shared secret per
+	// provider for this deployment, not per-tenant; see
+	// usecase.WebhookVerifier's doc comment for why. Empty defaults mean
+	// "reject every webhook" (internal/adapter/webhookverify.Verifier
+	// treats an empty configured secret as never matching), never a
+	// silently-open signature check.
+	GitHubWebhookSecret string
+	GitLabWebhookToken  string
 }
 
 // OAuthProviderConfig is one provider's OAuth 2.0 app registration.
@@ -96,6 +110,9 @@ func Load() (Config, error) {
 		CredentialBrokerAddr:    commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
 		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 		OAuthStateSecret:        commonconfig.StringEnv("OAUTH_STATE_SECRET", "dev-only-insecure-oauth-state-secret"),
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		GitHubWebhookSecret:     commonconfig.StringEnv("GITHUB_WEBHOOK_SECRET", ""),
+		GitLabWebhookToken:      commonconfig.StringEnv("GITLAB_WEBHOOK_TOKEN", ""),
 		OAuth: OAuthProvidersConfig{
 			GitHub: OAuthProviderConfig{
 				AuthorizeURL: commonconfig.StringEnv("GITHUB_OAUTH_AUTHORIZE_URL", "https://github.com/login/oauth/authorize"),

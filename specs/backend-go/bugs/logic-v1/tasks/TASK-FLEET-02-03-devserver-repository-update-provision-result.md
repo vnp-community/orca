@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` (usecase port + postgres adapter)
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/ports.go`, `backend-go/services/infra-fleet-service/internal/adapter/postgres/dev_server_store.go`
 **Depends on:** TASK-FLEET-02-01, TASK-FLEET-02-02
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — FindBySshTarget already existed pre-task; added UpdateProvisionResult to DevServerRepository port + Repository impl + fake. Deviation from task pseudocode: defined usecase.HandshakeInfo as a local DTO (not devserveragent.HandshakeInfo) to avoid a usecase<->devserveragent import cycle (devserveragent already imports usecase to implement DevServerAgentClient). Real testcontainers-Postgres test TestRepository_UpdateProvisionResult passes (persist + idempotent second-call update).
 
 ---
 

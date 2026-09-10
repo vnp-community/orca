@@ -3,6 +3,8 @@ package usecase
 import (
 	"context"
 	"testing"
+
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
 func TestGetSshState_ThreeCases(t *testing.T) {
@@ -30,6 +32,54 @@ func TestGetSshState_ThreeCases(t *testing.T) {
 				t.Errorf("got Connected=%v, want %v", got.Connected, tc.wantConnected)
 			}
 		})
+	}
+}
+
+// TestGetSshState_ReconnectingStatus is TASK-SSH-03-05's regression: a
+// connection row in "reconnecting" status must report Connected=false and
+// Status="reconnecting" — distinct from "closed" (which GetActiveByDevServer
+// never even returns, found=false instead) and distinct from a fully
+// established connection.
+func TestGetSshState_ReconnectingStatus(t *testing.T) {
+	devServers := &fakeDevServerRepository{found: true}
+	conns := &fakeConnectionRepository{
+		found:      true,
+		activeConn: domain.Connection{ID: "conn-1", Status: "reconnecting"},
+	}
+	uc := NewGetSshState(&fakeSshTargetRepository{}, devServers, conns)
+
+	got, err := uc.Execute(withTenant(context.Background(), "t1"), SshStateInput{SshTargetID: "s1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Connected {
+		t.Error("expected Connected=false while reconnecting")
+	}
+	if got.Status != "reconnecting" {
+		t.Errorf("expected Status=%q, got %q", "reconnecting", got.Status)
+	}
+	if got.ConnectionID != "conn-1" {
+		t.Errorf("expected ConnectionID to still be populated, got %q", got.ConnectionID)
+	}
+}
+
+func TestGetSshState_EstablishedStatus_ReportsConnectedTrue(t *testing.T) {
+	devServers := &fakeDevServerRepository{found: true}
+	conns := &fakeConnectionRepository{
+		found:      true,
+		activeConn: domain.Connection{ID: "conn-2", Status: "established"},
+	}
+	uc := NewGetSshState(&fakeSshTargetRepository{}, devServers, conns)
+
+	got, err := uc.Execute(withTenant(context.Background(), "t1"), SshStateInput{SshTargetID: "s1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !got.Connected {
+		t.Error("expected Connected=true for an established connection")
+	}
+	if got.Status != "established" {
+		t.Errorf("expected Status=%q, got %q", "established", got.Status)
 	}
 }
 

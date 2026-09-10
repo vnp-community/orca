@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/add_edge.go`
 **Depends on:** TASK-TG-01-03, TASK-TG-01-04, TASK-TG-01-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — AddEdge now runs cycle-check+write+auto-block in one TxRunner transaction (ListByKindForUpdate); UpdateTask un-blocks dependents on transition to Done; AddComment/ListComments usecases added; go test ./internal/usecase/... -run TestAddEdge\|TestUpdateTask\|TestAddComment\|TestListComments passes.
 
 ---
 

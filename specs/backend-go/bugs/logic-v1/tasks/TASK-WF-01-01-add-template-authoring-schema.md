@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/migrations/0007_template_authoring_fields.up.sql`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — migration 0007 added (schema-qualified `workflow.templates`, spec's bare table name fixed); verified via `go test -tags=integration -run TestRepository_CreateAndGetTemplate ./internal/adapter/postgres/...` (real Postgres testcontainer, up applies cleanly with backfill)
 
 ---
 

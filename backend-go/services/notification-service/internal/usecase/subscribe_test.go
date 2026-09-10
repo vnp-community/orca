@@ -50,6 +50,15 @@ func (f *fakeSubscriptionRepository) DeleteByEndpoint(ctx context.Context, endpo
 	return nil
 }
 
+func (f *fakeSubscriptionRepository) DeviceIDFor(ctx context.Context, subscriptionID string) (string, error) {
+	for _, s := range f.saved {
+		if s.ID == subscriptionID && s.DeviceID != nil {
+			return *s.DeviceID, nil
+		}
+	}
+	return "", nil
+}
+
 func withTenant(ctx context.Context, tenantID string) context.Context {
 	return tenant.WithTenantID(ctx, tenantID)
 }

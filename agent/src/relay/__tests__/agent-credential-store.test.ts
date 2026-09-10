@@ -9,6 +9,7 @@ import {
   handleReadCredential,
   handleHealthCheck,
   handleDeleteCredential,
+  handleTestProviderConnection,
   readDecryptedKey,
 } from '../agent-credential-store'
 import type { AgentConfig } from '../agent-config'
@@ -196,6 +197,43 @@ describe('handleHealthCheck', () => {
   it('returns error when credential does not exist', async () => {
     const resp = await handleHealthCheck(1, { accountId: 'nope' }, makeConfig(), mockLog) as any
     expect(resp.error).toBeDefined()
+  })
+})
+
+// ─── handleTestProviderConnection ─────────────────────────────────────────────
+describe('handleTestProviderConnection', () => {
+  it('returns InvalidParams when credentialRef is missing', async () => {
+    const resp = await handleTestProviderConnection(1, { providerType: 'anthropic' }, makeConfig(), mockLog) as any
+    expect(resp.error.code).toBe(-32602)
+  })
+
+  it('returns InvalidParams when providerType is missing', async () => {
+    const resp = await handleTestProviderConnection(1, { credentialRef: 'cred-ref-1' }, makeConfig(), mockLog) as any
+    expect(resp.error.code).toBe(-32602)
+  })
+
+  it('result.success is true for a local provider (no reachability URL configured)', async () => {
+    const resp = await handleTestProviderConnection(1,
+      { credentialRef: 'cred-ref-2', providerType: 'ollama' },
+      makeConfig(), mockLog
+    ) as any
+    expect(resp.result.success).toBe(true)
+    expect(resp.result.message).toContain('local_provider')
+  })
+
+  it('result.success is false and message includes the failure note when the provider is unreachable', async () => {
+    const originalFetch = global.fetch
+    global.fetch = vi.fn().mockRejectedValue(new Error('network down')) as unknown as typeof fetch
+    try {
+      const resp = await handleTestProviderConnection(1,
+        { credentialRef: 'cred-ref-3', providerType: 'anthropic' },
+        makeConfig(), mockLog
+      ) as any
+      expect(resp.result.success).toBe(false)
+      expect(resp.result.message).toContain('unreachable')
+    } finally {
+      global.fetch = originalFetch
+    }
   })
 })
 

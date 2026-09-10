@@ -30,6 +30,11 @@ type fakeScmIntegrationServiceClient struct {
 
 	listIssuesResp *scmintegrationv1.ListIssuesResponse
 	listIssuesErr  error
+	listIssuesReq  *scmintegrationv1.ListIssuesRequest // captures the last request for assertions
+
+	listIssueCommentsBySlugResp *scmintegrationv1.ListIssueCommentsBySlugResponse
+	listIssueCommentsBySlugErr  error
+	listIssueCommentsBySlugReq  *scmintegrationv1.ListIssueCommentsBySlugRequest
 
 	createPullRequestResp *scmintegrationv1.CreatePullRequestResponse
 	createPullRequestErr  error
@@ -52,13 +57,34 @@ type fakeScmIntegrationServiceClient struct {
 
 	revokeAuthResp *scmintegrationv1.RevokeAuthResponse
 	revokeAuthErr  error
+
+	submitReviewResp *scmintegrationv1.Review
+	submitReviewErr  error
+	submitReviewReq  *scmintegrationv1.SubmitReviewRequest
 }
 
-func (f *fakeScmIntegrationServiceClient) ListIssues(_ context.Context, _ *scmintegrationv1.ListIssuesRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListIssuesResponse, error) {
+func (f *fakeScmIntegrationServiceClient) ListIssues(_ context.Context, in *scmintegrationv1.ListIssuesRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListIssuesResponse, error) {
+	f.listIssuesReq = in
 	if f.listIssuesErr != nil {
 		return nil, f.listIssuesErr
 	}
 	return f.listIssuesResp, nil
+}
+
+func (f *fakeScmIntegrationServiceClient) SubmitReview(_ context.Context, in *scmintegrationv1.SubmitReviewRequest, _ ...grpc.CallOption) (*scmintegrationv1.Review, error) {
+	f.submitReviewReq = in
+	if f.submitReviewErr != nil {
+		return nil, f.submitReviewErr
+	}
+	return f.submitReviewResp, nil
+}
+
+func (f *fakeScmIntegrationServiceClient) ListIssueCommentsBySlug(_ context.Context, in *scmintegrationv1.ListIssueCommentsBySlugRequest, _ ...grpc.CallOption) (*scmintegrationv1.ListIssueCommentsBySlugResponse, error) {
+	f.listIssueCommentsBySlugReq = in
+	if f.listIssueCommentsBySlugErr != nil {
+		return nil, f.listIssueCommentsBySlugErr
+	}
+	return f.listIssueCommentsBySlugResp, nil
 }
 
 func (f *fakeScmIntegrationServiceClient) CreatePullRequest(_ context.Context, in *scmintegrationv1.CreatePullRequestRequest, _ ...grpc.CallOption) (*scmintegrationv1.CreatePullRequestResponse, error) {
@@ -246,5 +272,78 @@ func TestHandleGetAuthStatus_SuccessRoundTrip(t *testing.T) {
 	}
 	if !got.GetConnected() {
 		t.Fatal("connected = false, want true")
+	}
+}
+
+// TestScmRoutes_ListIssues_FiltersAndForceRefreshForwarded is TASK-PI-01-08's
+// gateway-level regression guard: state/assignee/label(repeated)/milestone
+// query params and refresh=true must reach the RPC's Filter/ForceRefresh
+// fields, not be silently dropped at the REST edge.
+func TestScmRoutes_ListIssues_FiltersAndForceRefreshForwarded(t *testing.T) {
+	fake := &fakeScmIntegrationServiceClient{
+		listIssuesResp: &scmintegrationv1.ListIssuesResponse{},
+	}
+	router := scmTestRouter(fake)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/scm/issues?provider=github&repo=acme/repo&state=open&assignee=octocat&label=bug&label=p0&milestone=v1&refresh=true", nil)
+	req = withTestIdentity(req, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if fake.listIssuesReq == nil {
+		t.Fatal("ListIssues was never called")
+	}
+	f := fake.listIssuesReq.GetFilter()
+	if f.GetState() != "open" || f.GetAssignee() != "octocat" || f.GetMilestone() != "v1" {
+		t.Fatalf("unexpected filter forwarded: %+v", f)
+	}
+	if len(f.GetLabels()) != 2 || f.GetLabels()[0] != "bug" || f.GetLabels()[1] != "p0" {
+		t.Fatalf("expected repeated label query params to become Filter.Labels, got %v", f.GetLabels())
+	}
+	if !fake.listIssuesReq.GetForceRefresh() {
+		t.Fatal("expected refresh=true to map to ForceRefresh")
+	}
+}
+
+// TestScmRoutes_ListIssueComments_RoundTrip round-trips the new
+// GET /v1/scm/issues/{number}/comments route through a fake
+// ScmIntegrationServiceClient.
+func TestScmRoutes_ListIssueComments_RoundTrip(t *testing.T) {
+	fake := &fakeScmIntegrationServiceClient{
+		listIssueCommentsBySlugResp: &scmintegrationv1.ListIssueCommentsBySlugResponse{
+			Comments: []*scmintegrationv1.ProjectComment{{Id: "c-1", Body: "looks good"}},
+		},
+	}
+	router := scmTestRouter(fake)
+
+	req := httptest.NewRequest(http.MethodGet, "/v1/scm/issues/42/comments?repo=acme/repo", nil)
+	req = withTestIdentity(req, usecase.Identity{TenantID: "tenant-1", UserID: "user-1"})
+
+	rec := httptest.NewRecorder()
+	router.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if fake.listIssueCommentsBySlugReq == nil {
+		t.Fatal("ListIssueCommentsBySlug was never called")
+	}
+	if fake.listIssueCommentsBySlugReq.GetItemSlug() != "acme/repo#42" {
+		t.Fatalf("item_slug = %q, want %q", fake.listIssueCommentsBySlugReq.GetItemSlug(), "acme/repo#42")
+	}
+	if fake.listIssueCommentsBySlugReq.GetTenantId() != "tenant-1" {
+		t.Fatalf("tenant_id = %q, want %q", fake.listIssueCommentsBySlugReq.GetTenantId(), "tenant-1")
+	}
+
+	var got scmintegrationv1.ListIssueCommentsBySlugResponse
+	if err := json.Unmarshal(rec.Body.Bytes(), &got); err != nil {
+		t.Fatalf("response body is not the expected JSON shape: %v; body=%s", err, rec.Body.String())
+	}
+	if len(got.GetComments()) != 1 || got.GetComments()[0].GetId() != "c-1" {
+		t.Fatalf("unexpected comments in response: %+v", got.GetComments())
 	}
 }

@@ -5,7 +5,7 @@
 **Service:** `api-gateway` (httpgateway)
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/admin_routes.go`
 **Depends on:** TASK-AUTH-04-01, TASK-AUTH-04-03, TASK-AUTH-04-04, TASK-AUTH-04-05
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — `handleListAllSessions` now proxies to cross-user `ListSessions` when `user_id` is absent (still `ListSessionsForUser` when present); `PATCH /admin/api/users/{id}` now routes to new `handleUpdateUser` (email/name/role via `UpdateUserRequest` wrapper fields); tests in `admin_routes_test.go` pass.
 
 ---
 

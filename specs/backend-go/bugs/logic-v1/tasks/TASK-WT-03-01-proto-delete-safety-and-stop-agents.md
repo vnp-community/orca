@@ -5,7 +5,7 @@
 **Service:** `git-gateway-service`
 **File:** `backend-go/proto/orca/gitgateway/v1/gitgateway.proto`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — Added CheckWorktreeDeleteSafety RPC + messages; RemoveWorktreeRequest gained stop_agents, RemoveWorktreeResponse replaces google.protobuf.Empty. buf generate + go build ./proto/... clean.
 
 ---
 

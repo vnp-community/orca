@@ -25,7 +25,9 @@ export async function dispatchPtyRpc(
   switch (rpc.method) {
     // ── v5.0: pty.create ─────────────────────────────────────────────────────
     // TM-001/TM-006: Create a PTY session in agent mode.
-    // Params: { cwd, cols?, rows?, env?, shellOverride? }
+    // Params: { cwd, cols?, rows?, env?, shellOverride?, shellIntegration? }
+    // shellIntegration (BR-TM-13, SOL-TM-04): opt-in PowerShell OSC 133
+    // bootstrap injection — default false, no effect on non-PowerShell shells.
     // Returns: { id, cols, rows, cwd, shell }
     case 'pty.create': {
       try {

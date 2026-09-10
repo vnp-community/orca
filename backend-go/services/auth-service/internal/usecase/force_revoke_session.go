@@ -65,7 +65,7 @@ func (uc *ForceRevokeSession) Execute(ctx context.Context, sessionID string) err
 		return apperrors.New(apperrors.KindInternal, "AUTH_SESSION_REVOKE_FAILED", "failed to revoke session", err)
 	}
 
-	if entry, err := domain.NewAuditEntry(uuid.NewString(), actor.TenantID, actor.ID, "session.force_revoke", session.UserID, domain.OutcomeAllowed, "", now); err == nil {
+	if entry, err := domain.NewAuditEntry(uuid.NewString(), actor.TenantID, actor.ID, "session.force_revoke", session.UserID, "", "", nil, domain.OutcomeAllowed, "", now); err == nil {
 		_ = uc.audit.Append(ctx, entry)
 	}
 	return nil

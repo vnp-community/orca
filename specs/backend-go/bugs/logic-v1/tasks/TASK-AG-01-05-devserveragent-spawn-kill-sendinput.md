@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/agent_methods.go` (new)
 **Depends on:** TASK-AG-01-02
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — agent_methods.go adds SpawnAgent/KillAgent/SendAgentInput; agent_methods_test.go (fake-agent-over-real-websocket, mirrors methods_test.go's pattern) asserts exact method names/param shapes and result decoding — all passing.
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/domain/topological_waves.go` (new), `backend-go/services/task-service/internal/usecase/execute_batch.go` (new)
 **Depends on:** TASK-TG-04-03 (`ExecuteTask` real dispatch), TASK-TG-02-02 (`buildDependsOnGraph` reuse)
-**Status:** `[ ]` TODO
+**Status:** [x] DONE — `domain.TopologicalWaves` + `usecase.ExecuteBatch` implemented and reusing `ExecuteTask.Execute` per task; 5 domain tests + 5 usecase tests (bounded-concurrency and StopOnFailure-halts-next-wave both verified) all pass, `go build`/`go vet` clean. Also closed the `{{outputs.<taskId>.*}}` interpolation wiring the Context note flagged rather than skipped: migration 0007 (`last_execution_output`, truncated to 8KB at the application layer — TASK-TG-04-05 had already claimed 0006), `TaskRepository.UpdateLastExecutionOutput`, `SimpleExecutor.Execute` persists stdout on every successful run, and `buildExecutePrompt`/`interpolateOutputs` resolve `{{outputs.<depID>.stdout}}`/`{{outputs.<depID>.*}}` tokens against `completedDeps` — composes for free through ExecuteBatch's wave sequencing with no new plumbing in `ExecuteBatch` itself, since each wave's tasks re-resolve their own completed dependencies via the existing TG-04-06 lookup. Known caveat, not fixed: `go test -race` surfaces a data race in the shared `fakeTaskRepository` test fake's unsynchronized map (first usecase to dispatch it from concurrent goroutines) — a test-fake-only concern (the real Postgres repository has no such issue), left as a follow-up rather than risking a mutex retrofit across all 17 of that fake's methods in this pass.
 
 ---
 

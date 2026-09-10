@@ -42,11 +42,15 @@ const (
 	RunTriggerManual    RunTrigger = "manual"
 	RunTriggerScheduled RunTrigger = "scheduled"
 	RunTriggerExternal  RunTrigger = "external"
+	// RunTriggerEvent marks a run dispatched by HandleEventTrigger — an
+	// incoming JetStream event matched an enabled event-triggered
+	// automation (BL-AT-03).
+	RunTriggerEvent RunTrigger = "event"
 )
 
 func (t RunTrigger) Valid() bool {
 	switch t {
-	case RunTriggerManual, RunTriggerScheduled, RunTriggerExternal:
+	case RunTriggerManual, RunTriggerScheduled, RunTriggerExternal, RunTriggerEvent:
 		return true
 	default:
 		return false
@@ -70,13 +74,17 @@ var (
 // actual step execution happens on workflow-service's side; this record
 // tracks the outcome workflow-service reported back synchronously.
 type AutomationRun struct {
-	ID             string
-	AutomationID   string
-	TenantID       string
-	RequestID      string // idempotency key, see automation-service.md §8
-	Status         RunStatus
-	StepType       StepType
-	Trigger        RunTrigger
+	ID           string
+	AutomationID string
+	TenantID     string
+	RequestID    string // idempotency key, see automation-service.md §8
+	Status       RunStatus
+	StepType     StepType
+	Trigger      RunTrigger
+	// StepConfigJSON/OutputJSON/ErrorMessage hold the *last* action's
+	// config/output/error, kept for back-compat with any caller still
+	// reading them directly — ActionResults is the source of truth for a
+	// multi-action chain's per-step outcomes (SOL-AT-01).
 	StepConfigJSON string
 	OutputJSON     string
 	ErrorMessage   string

@@ -5,7 +5,7 @@
 **Service:** `annotation-service`
 **File:** `backend-go/services/annotation-service/internal/domain/annotation.go`
 **Depends on:** none
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — domain/annotation.go rewritten with Side type, extended Anchor/Annotation, MarkSent; annotation_test.go + domain_test.go updated and passing
 
 ---
 

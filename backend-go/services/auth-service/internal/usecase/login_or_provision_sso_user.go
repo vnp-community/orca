@@ -237,7 +237,7 @@ func (uc *LoginOrProvisionSsoUser) Execute(ctx context.Context, in VerifiedSsoId
 // entry, and run an optional side effect (e.g. touching
 // sso_identities.last_login_at) with the same "now" instant.
 func (uc *LoginOrProvisionSsoUser) issueSession(ctx context.Context, user domain.User, provider domain.SsoProvider, auditAction string, sideEffect func(now time.Time)) (LoginOrProvisionSsoUserOutput, error) {
-	rawToken, rawRefreshToken, now, err := createSessionForUser(ctx, uc.sessions, uc.clock, uc.sessionTTL, user)
+	rawToken, rawRefreshToken, now, err := createSessionForUser(ctx, uc.sessions, uc.clock, uc.sessionTTL, user, "", "")
 	if err != nil {
 		return LoginOrProvisionSsoUserOutput{}, err
 	}
@@ -246,7 +246,7 @@ func (uc *LoginOrProvisionSsoUser) issueSession(ctx context.Context, user domain
 	if sideEffect != nil {
 		sideEffect(now)
 	}
-	if entry, err := domain.NewAuditEntry(uuid.NewString(), user.TenantID, user.ID, auditAction, user.ID, domain.OutcomeAllowed, "", now); err == nil {
+	if entry, err := domain.NewAuditEntry(uuid.NewString(), user.TenantID, user.ID, auditAction, "", "user", user.ID, nil, domain.OutcomeAllowed, "", now); err == nil {
 		_ = uc.audit.Append(ctx, entry)
 	}
 	return LoginOrProvisionSsoUserOutput{SessionToken: rawToken, RefreshToken: rawRefreshToken, User: user}, nil
