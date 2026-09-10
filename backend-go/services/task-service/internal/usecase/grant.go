@@ -14,6 +14,8 @@ type GrantInput struct {
 	SubjectID string
 	Level     domain.GrantLevel
 	ApplyTree bool
+	// ExpiresAt is optional (TASK-TG-003-03) — nil means the grant never
+	// expires.
 	ExpiresAt *time.Time
 }
 

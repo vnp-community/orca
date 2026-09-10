@@ -64,3 +64,13 @@ func TestGetSubtree_NotFound(t *testing.T) {
 		t.Fatal("expected an error for a missing root task")
 	}
 }
+
+func TestGetSubtree_RequiresTenantContext(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	teams := &fakeTeamScopeResolver{}
+	uc := NewGetSubtree(tasks, grants, teams)
+	if _, err := uc.Execute(context.Background(), GetSubtreeInput{RootID: "root"}); err == nil {
+		t.Fatal("expected an error when no tenant is in context")
+	}
+}

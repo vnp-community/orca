@@ -56,6 +56,15 @@ service InfraFleetService {
   rpc AssignDevServerGroup(AssignDevServerGroupRequest) returns (AssignDevServerGroupResponse);
   rpc CreateDevServerGroup(CreateDevServerGroupRequest) returns (CreateDevServerGroupResponse);
   rpc ListDevServerGroups(ListDevServerGroupsRequest) returns (ListDevServerGroupsResponse);
+  // PickByTag (TASK-WF-002-04) picks a live, connected dev server whose
+  // group name matches tag and resolves it to a Relay-ready connection id —
+  // closes workflow-service's TargetKindFleetTag gap (BE-SOL-002). "tag"
+  // maps onto DevServerGroup.name (this service has no separate tagging
+  // concept — group membership, via DevServer.group_id, is the real
+  // grouping primitive ListDevServerGroups already exposes). Naive
+  // first-connected-match selection — load-balancing algorithm choice is
+  // explicitly deferred, see usecase.PickByTag's doc comment.
+  rpc PickByTag(PickByTagRequest) returns (PickByTagResponse);
   rpc GrantDevServerGroupAccess(GrantDevServerGroupAccessRequest) returns (GrantDevServerGroupAccessResponse);
   rpc RevokeDevServerGroupAccess(RevokeDevServerGroupAccessRequest) returns (RevokeDevServerGroupAccessResponse);
   rpc ListDevServerGroupGrants(ListDevServerGroupGrantsRequest) returns (ListDevServerGroupGrantsResponse);
@@ -654,6 +663,15 @@ message ListDevServerGroupsRequest {
 }
 message ListDevServerGroupsResponse {
   repeated DevServerGroup groups = 1;
+}
+
+message PickByTagRequest {
+  // tenant_id intentionally absent — pulled from context, same convention
+  // as ListDevServerGroupsRequest.
+  string tag = 1; // matches a DevServerGroup.name
+}
+message PickByTagResponse {
+  string connection_id = 1;
 }
 
 // ── CR-DS-007: department/team ↔ group access grants ────────────────────

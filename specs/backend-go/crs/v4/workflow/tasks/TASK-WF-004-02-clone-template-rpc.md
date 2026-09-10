@@ -5,7 +5,55 @@
 **Service:** `workflow-service`
 **File:** `backend-go/proto/orca/workflow/v1/workflow.proto` (`CloneTemplate` RPC), `backend-go/services/workflow-service/internal/usecase/clone_template.go` (new), `backend-go/services/workflow-service/internal/adapter/grpc/server.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels_workflow.go`
 **Depends on:** None (independent of TASK-WF-004-01; both feed BE-SOL-005's "Import to My Workflows")
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+Re-verified live: no `CloneTemplate` anywhere, `domain.NewWorkflowTemplate`
+signature exactly as cited, `ResolveTemplate.Execute` output shape exactly
+as cited. Implemented essentially verbatim from the task's sketch — no
+real-code divergence found here (a rare case in this series where the
+task's own sketch matched live code exactly).
+
+**Changes made:**
+1. `workflow.proto`: `CloneTemplate` RPC + `CloneTemplateRequest`/
+   `CloneTemplateResponse`; regenerated.
+2. `internal/usecase/clone_template.go` (new): `CloneTemplate` verbatim
+   from the task.
+3. `internal/adapter/grpc/server.go`: handler + `Server` struct/
+   constructor widened.
+4. `cmd/server/main.go`: `usecase.NewCloneTemplate(resolveTemplateUC,
+   repo)`, wired into the registration call.
+5. `api-gateway/.../channels_workflow.go`: `workflow.template.clone`
+   channel, `TenantId` from `Identity` (matches `.create`'s guard, even
+   though `CloneTemplateRequest` itself carries no `tenant_id` field —
+   tenant comes from context server-side like every other RPC here).
+6. Test-only: `httpgateway/workflow_routes_test.go`'s
+   `fakeWorkflowServiceClient` gained a stub `CloneTemplate`;
+   `wscompat/channels_workflow_test.go`'s fake gained a real
+   `cloneTemplateFunc` hook.
+
+**Verify output:**
+```
+go build ./services/workflow-service/... ./services/api-gateway/...   # clean
+go vet   ./services/workflow-service/... ./services/api-gateway/...   # clean
+go test  ./services/workflow-service/internal/usecase/... -run TestCloneTemplate -v
+  # 5/5 PASS (clone own steps + no parent, uses RESOLVED not raw source
+  #           DAG, mutate-source-after-clone leaves clone unaffected,
+  #           nonexistent source propagates NotFound, requires tenant)
+go test  ./services/api-gateway/internal/adapter/wscompat/... -run TestWorkflowTemplateCloneChannel -v
+  # 1/1 PASS
+go test  ./services/workflow-service/... ./services/api-gateway/...   # full suite, all ok
+```
+
+**Note on the task's own Verify command
+`go test .../internal/adapter/grpc/... -run TestCloneTemplate -v`:** that
+package has no test files at all (confirmed: `?  .../adapter/grpc  [no
+test files]`, true both before and after this task, consistent with every
+other RPC handler in this thin pass-through adapter layer never getting
+its own test file in this codebase) — not a gap introduced by this task,
+so no test file was added there; the usecase-level tests above are the
+substantive coverage.
 
 ---
 

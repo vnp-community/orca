@@ -4,7 +4,9 @@
 **Solution Ref:** FE-SOL-001 Phần 5
 **Priority:** 🟠 P1
 **Estimated:** 35 phút
-**Status:** ✅ DONE — 2026-09-09
+**Status:** ✅ DONE — 2026-09-09 (2 lượt triển khai độc lập được ghi nhận khi merge — xem 2 ghi chú dưới đây)
+
+---
 
 ### Kết quả thực tế
 
@@ -32,7 +34,24 @@
 - Không có gap ngoài giới hạn cố ý đã ghi trong spec (polling, không phải push event thật — chờ
   CR-FLOW-TASK-003 + `RuntimeClientEvent` variant mới, ngoài phạm vi).
 
----
+### Kết quả thực thi (ghi chú B, 2026-09-09)
+
+- Copy nguyên văn design của flow-task's FE-TASK-003 (đọc trực tiếp file đó +
+  `FE-SOL-001-unified-task-execution-ui.md` §3 để lấy code mẫu đầy đủ, vì file task-graph này chỉ
+  tóm tắt không có code): `useTaskActivity.ts` dùng `useReducer`, `TASK_ACTIVITY_POLL_INTERVAL_MS =
+  4_000` (cùng hằng số `useWorkflowExecution.ts`), `isLive: false` cố định, poll `task.get` ngay khi
+  mount + mỗi 4s, cleanup đúng (`cancelled` flag + `clearInterval`).
+- Xác nhận lại hạ tầng KHÔNG đổi: `subscribeRuntimeEvent` vẫn 0 kết quả, `RuntimeClientEvent` vẫn
+  chưa có variant task/workflow activity — đúng kết luận "vẫn đúng nguyên văn hôm nay" của task file.
+- `TaskDetail.tsx`: thêm `useTaskActivity(task?.id ?? null)` đặt SAU effect
+  `task.resolvePermission` (điểm khác biệt 1 của task), hiển thị `<TaskStatusBadge status=
+  {polledTask?.status ?? task.status} />` cạnh Status Select (điểm khác biệt 2 — tận dụng
+  `TaskStatusBadge` 7-status đầy đủ đã vá ở FE-TASK-003 thay vì render text thô).
+- Test: `useTaskActivity.test.ts` (5 case: poll ngay khi mount, advance 4000ms gọi lại + cập nhật
+  state, unmount clearInterval, taskId=null không effect, isLive luôn false), thêm 1 case vào
+  `TaskDetail.test.tsx` (polledTask.status='done' → badge hiển thị "✅ Done" thay vì
+  task.status='todo' gốc). `npx vitest run` cả 2 file → 16/16 pass.
+- Không vá `subscribeRuntimeEvent`/thêm variant event — đúng phạm vi "Không làm ở task này".
 
 ## Mục tiêu
 

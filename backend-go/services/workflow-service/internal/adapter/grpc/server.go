@@ -33,6 +33,7 @@ type Server struct {
 	resolveTemplate     *usecase.ResolveTemplate
 	updateTemplate      *usecase.UpdateTemplate
 	cloneTemplate       *usecase.CloneTemplate
+	listExecutions      *usecase.ListExecutions
 
 	publishTemplate      *usecase.PublishTemplate
 	resolveApproval      *usecase.ResolveApproval
@@ -57,6 +58,7 @@ func New(
 	resolveTemplate *usecase.ResolveTemplate,
 	updateTemplate *usecase.UpdateTemplate,
 	cloneTemplate *usecase.CloneTemplate,
+	listExecutions *usecase.ListExecutions,
 	publishTemplate *usecase.PublishTemplate,
 	resolveApproval *usecase.ResolveApproval,
 	listPendingApprovals *usecase.ListPendingApprovals,
@@ -78,6 +80,7 @@ func New(
 		resolveTemplate:       resolveTemplate,
 		updateTemplate:        updateTemplate,
 		cloneTemplate:         cloneTemplate,
+		listExecutions:        listExecutions,
 		publishTemplate:       publishTemplate,
 		resolveApproval:       resolveApproval,
 		listPendingApprovals:  listPendingApprovals,
@@ -225,6 +228,22 @@ func (s *Server) CloneTemplate(ctx context.Context, req *workflowv1.CloneTemplat
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &workflowv1.CloneTemplateResponse{Template: toProtoTemplate(tmpl)}, nil
+}
+
+func (s *Server) ListExecutions(ctx context.Context, req *workflowv1.ListExecutionsRequest) (*workflowv1.ListExecutionsResponse, error) {
+	out, err := s.listExecutions.Execute(ctx, usecase.ListExecutionsInput{
+		ProjectID: req.GetProjectId(),
+		Cursor:    req.GetCursor(),
+		Limit:     req.GetLimit(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	execs := make([]*workflowv1.WorkflowExecution, 0, len(out.Executions))
+	for _, e := range out.Executions {
+		execs = append(execs, toProtoExecution(e))
+	}
+	return &workflowv1.ListExecutionsResponse{Executions: execs, NextCursor: out.NextCursor}, nil
 }
 
 func (s *Server) PublishTemplate(ctx context.Context, req *workflowv1.PublishTemplateRequest) (*workflowv1.WorkflowTemplate, error) {

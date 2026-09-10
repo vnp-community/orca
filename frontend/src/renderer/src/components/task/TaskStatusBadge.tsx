@@ -2,6 +2,8 @@ import type { TaskStatus, TaskPriority } from '../../../../shared/task-types'
 
 // Colors kept in sync with TaskDAGView.tsx's STATUS_COLORS (review=purple, blocked=red) so
 // the DAG and Board views agree on a color per status — see AGENTS.md's Design System.
+// FE-TASK-003 (task-graph v4): previously covered only 4 of 7 TaskStatus values and fell
+// back to "Todo" for backlog/review/blocked — fixed below to cover all 7.
 const STATUS_CONFIG = {
   backlog: { label: 'Backlog', icon: '📋', className: 'text-slate-400' },
   todo: { label: 'Todo', icon: '⏳', className: 'text-gray-500' },

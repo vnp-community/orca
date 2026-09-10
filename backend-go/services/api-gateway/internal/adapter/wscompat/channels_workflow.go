@@ -104,6 +104,33 @@ func registerWorkflowChannels(r *Registry, client workflowv1.WorkflowServiceClie
 		return resp.GetTemplate(), nil
 	})
 
+	// workflow.template.clone (TASK-WF-004-02): TenantId always comes from
+	// Identity, never args — same "malicious/buggy frontend payload must
+	// not act under a different tenant" rule workflow.template.create's
+	// own comment states, even though CloneTemplateRequest doesn't carry
+	// a tenant_id field at all (tenant comes from context server-side,
+	// same convention as every other RPC here).
+	r.Register("workflow.template.clone", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type cloneArgs struct {
+			SourceTemplateID string   `json:"sourceTemplateId"`
+			Name             string   `json:"name"`
+			Description      string   `json:"description"`
+			Tags             []string `json:"tags"`
+		}
+		in, err := decodeArg[cloneArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		resp, err := client.CloneTemplate(ctx, &workflowv1.CloneTemplateRequest{
+			SourceTemplateId: in.SourceTemplateID, Name: in.Name, Description: in.Description, Tags: in.Tags,
+		})
+		if err != nil {
+			return nil, err
+		}
+		return resp.GetTemplate(), nil
+	})
+
 	r.Register("workflow.template.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type updateArgs struct {
 			ID               string `json:"id"`
@@ -263,5 +290,41 @@ func registerWorkflowChannels(r *Registry, client workflowv1.WorkflowServiceClie
 			return nil, err
 		}
 		return resp.GetResult(), nil
+	})
+
+	// workflow.listExecutions: TASK-WF-005-01 (P0) — WorkflowMonitor.tsx
+	// (frontend/src/renderer/src/components/workflow/WorkflowMonitor.tsx)
+	// already calls this channel and does
+	// `useAppStore.getState().setExecutions(result)` directly on the
+	// decoded RPC result, i.e. it expects the bare array as the top-level
+	// result — NOT wrapped in `{executions, nextCursor}` like
+	// workflow.template.list wraps `{templates, nextPageToken}`. Confirmed
+	// live against that call site before choosing this shape: an
+	// implementing agent must match the real, already-broken caller's
+	// wire contract, not invent a new envelope.
+	r.Register("workflow.listExecutions", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type listExecutionsArgs struct {
+			ProjectID string `json:"projectId"`
+			Limit     int32  `json:"limit"`
+			Cursor    string `json:"cursor"`
+		}
+		in, err := decodeArg[listExecutionsArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		resp, err := client.ListExecutions(ctx, &workflowv1.ListExecutionsRequest{
+			ProjectId: in.ProjectID, Limit: in.Limit, Cursor: in.Cursor,
+		})
+		if err != nil {
+			return nil, err
+		}
+		// List-shaped channels return [] not null when empty (established
+		// convention — see workflow.template.list above).
+		executions := resp.GetExecutions()
+		if executions == nil {
+			executions = []*workflowv1.WorkflowExecution{}
+		}
+		return executions, nil
 	})
 }

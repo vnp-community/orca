@@ -227,7 +227,10 @@ func TestRepository_ListGrantsForAncestors_ExcludesExpiredRows(t *testing.T) {
 }
 
 // TestRepository_Revoke_And_ListGrantsForTask round-trips the widened
-// grant lifecycle: Grant -> ListGrantsForTask -> Revoke -> gone.
+// grant lifecycle: Grant -> ListGrantsForTask -> Revoke -> gone. Revoke
+// deletes by the (task_id, subject_id, level) composite key — no surrogate
+// grant_id is surfaced above the DB layer (see GrantRepository.Revoke's
+// doc comment).
 func TestRepository_Revoke_And_ListGrantsForTask(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
@@ -236,7 +239,8 @@ func TestRepository_Revoke_And_ListGrantsForTask(t *testing.T) {
 	task, _ := domain.NewTask(uuid.NewString(), tenantID, "task", domain.StatusOpen, "", "")
 	_, _ = repo.Create(ctx, task)
 
-	grantID, err := repo.Grant(ctx, tenantID, domain.Grant{TaskID: task.ID, SubjectID: uuid.NewString(), Level: domain.GrantLevelUser})
+	subjectID := uuid.NewString()
+	grantID, err := repo.Grant(ctx, tenantID, domain.Grant{TaskID: task.ID, SubjectID: subjectID, Level: domain.GrantLevelUser})
 	if err != nil {
 		t.Fatalf("granting: %v", err)
 	}
@@ -249,7 +253,7 @@ func TestRepository_Revoke_And_ListGrantsForTask(t *testing.T) {
 		t.Fatalf("unexpected grants: %+v", got)
 	}
 
-	if err := repo.Revoke(ctx, tenantID, grantID); err != nil {
+	if err := repo.Revoke(ctx, tenantID, task.ID, subjectID, domain.GrantLevelUser); err != nil {
 		t.Fatalf("revoking: %v", err)
 	}
 
@@ -262,12 +266,15 @@ func TestRepository_Revoke_And_ListGrantsForTask(t *testing.T) {
 	}
 }
 
-func TestRepository_Revoke_NonexistentGrant_Fails(t *testing.T) {
+// TestRepository_Revoke_NonexistentGrant_IsIdempotent: revoking a
+// (task_id, subject_id, level) tuple that doesn't exist is a no-op, not an
+// error — see GrantRepository.Revoke's doc comment.
+func TestRepository_Revoke_NonexistentGrant_IsIdempotent(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 
-	if err := repo.Revoke(ctx, uuid.NewString(), uuid.NewString()); err == nil {
-		t.Fatal("expected an error revoking a nonexistent grant")
+	if err := repo.Revoke(ctx, uuid.NewString(), uuid.NewString(), uuid.NewString(), domain.GrantLevelUser); err != nil {
+		t.Fatalf("expected a no-op, not an error, for a nonexistent grant: %v", err)
 	}
 }
 

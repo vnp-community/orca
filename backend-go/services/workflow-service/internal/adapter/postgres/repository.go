@@ -402,9 +402,9 @@ func (r *Repository) ResolveChain(ctx context.Context, tenantID, templateID stri
 // doc comment.
 func (r *Repository) CreateExecution(ctx context.Context, exec domain.WorkflowExecution) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO workflow.executions (id, template_id, tenant_id, status, root_trace_id, paused_at, project_id, origin_task_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-	`, exec.ID, nullableString(exec.TemplateID), exec.TenantID, string(exec.Status), nullableString(exec.RootTraceID), exec.PausedAt, nullableString(exec.ProjectID), exec.OriginTaskID)
+		INSERT INTO workflow.executions (id, template_id, tenant_id, status, root_trace_id, paused_at, project_id, origin_task_id, inputs_json)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb)
+	`, exec.ID, nullableString(exec.TemplateID), exec.TenantID, string(exec.Status), nullableString(exec.RootTraceID), exec.PausedAt, nullableString(exec.ProjectID), exec.OriginTaskID, nullableString(exec.InputsJSON))
 	if err != nil {
 		return fmt.Errorf("postgres: insert execution: %w", err)
 	}
@@ -413,7 +413,7 @@ func (r *Repository) CreateExecution(ctx context.Context, exec domain.WorkflowEx
 
 func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (domain.WorkflowExecution, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, ''), origin_task_id
+		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, ''), origin_task_id, COALESCE(inputs_json::text, '')
 		FROM workflow.executions
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
@@ -421,7 +421,7 @@ func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (dom
 	var exec domain.WorkflowExecution
 	var status string
 	var pausedAt *time.Time
-	err := row.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID, &exec.OriginTaskID)
+	err := row.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID, &exec.OriginTaskID, &exec.InputsJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.WorkflowExecution{}, domain.ErrExecutionNotFound
 	}
@@ -543,7 +543,7 @@ func (r *Repository) MarkPublished(ctx context.Context, ids []string) error {
 // status='running' predicate.
 func (r *Repository) ListRunning(ctx context.Context) ([]domain.WorkflowExecution, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, ''), origin_task_id
+		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, ''), origin_task_id, COALESCE(inputs_json::text, '')
 		FROM workflow.executions
 		WHERE status = 'running'
 	`)
@@ -557,7 +557,7 @@ func (r *Repository) ListRunning(ctx context.Context) ([]domain.WorkflowExecutio
 		var exec domain.WorkflowExecution
 		var status string
 		var pausedAt *time.Time
-		if err := rows.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID, &exec.OriginTaskID); err != nil {
+		if err := rows.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID, &exec.OriginTaskID, &exec.InputsJSON); err != nil {
 			return nil, fmt.Errorf("postgres: scan running execution row: %w", err)
 		}
 		exec.Status = domain.Status(status)
@@ -568,6 +568,56 @@ func (r *Repository) ListRunning(ctx context.Context) ([]domain.WorkflowExecutio
 		return nil, fmt.Errorf("postgres: iterate running execution rows: %w", err)
 	}
 	return out, nil
+}
+
+// ListExecutions backs usecase.ListExecutions — keyset pagination ordered
+// newest-first by created_at. Unlike ListTemplates' id-based cursor
+// (id::text > pageToken), execution ids are random UUIDs (gen_random_uuid,
+// not sequential), so they carry no chronological meaning — the cursor
+// here is still the opaque last-seen execution id, but the WHERE clause
+// resolves it back to that row's created_at via a subquery so ordering
+// stays correct regardless of id randomness. (created_at, id) as the
+// compound key breaks ties deterministically when two executions share a
+// created_at timestamp.
+func (r *Repository) ListExecutions(ctx context.Context, tenantID, projectID, cursor string, limit int32) ([]domain.WorkflowExecution, string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, '')
+		FROM workflow.executions
+		WHERE tenant_id = $1
+		  AND ($2 = '' OR project_id = $2::uuid)
+		  AND (
+		    $3 = ''
+		    OR (created_at, id) < (SELECT created_at, id FROM workflow.executions WHERE id = $3::uuid AND tenant_id = $1)
+		  )
+		ORDER BY created_at DESC, id DESC
+		LIMIT $4
+	`, tenantID, projectID, cursor, limit)
+	if err != nil {
+		return nil, "", fmt.Errorf("postgres: query executions: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.WorkflowExecution
+	for rows.Next() {
+		var exec domain.WorkflowExecution
+		var status string
+		var pausedAt *time.Time
+		if err := rows.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID); err != nil {
+			return nil, "", fmt.Errorf("postgres: scan execution row: %w", err)
+		}
+		exec.Status = domain.Status(status)
+		exec.PausedAt = pausedAt
+		out = append(out, exec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("postgres: iterate execution rows: %w", err)
+	}
+
+	next := ""
+	if int32(len(out)) == limit && len(out) > 0 {
+		next = out[len(out)-1].ID
+	}
+	return out, next, nil
 }
 
 // CreateStepExecution backs usecase.StepExecutionRepository. Tenant scoping

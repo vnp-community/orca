@@ -26,7 +26,7 @@ type Server struct {
 
 	createTask            *usecase.CreateTask
 	getTask               *usecase.GetTask
-	addEdge               *usecase.AddEdge
+	txRunner              usecase.TxRunner
 	grant                 *usecase.Grant
 	resolvePermission     *usecase.ResolvePermission
 	executeTask           *usecase.ExecuteTask
@@ -49,12 +49,19 @@ type Server struct {
 	listComments          *usecase.ListComments
 	reportExecutionResult *usecase.ReportTaskExecutionResult
 	findTaskByNumber      *usecase.FindTaskByNumber
+	// generateShareLink/getTaskByShareToken back TASK-TG-003-05's
+	// GenerateShareLink/GetTaskByShareToken RPCs — a second,
+	// independently-built share-link mechanism kept deliberately side by
+	// side with CreatePublicLink/ResolvePublicLink above (see task.proto's
+	// RPC doc comment for why).
+	generateShareLink   *usecase.GenerateShareLink
+	getTaskByShareToken *usecase.GetTaskByShareToken
 }
 
 func New(
 	createTask *usecase.CreateTask,
 	getTask *usecase.GetTask,
-	addEdge *usecase.AddEdge,
+	txRunner usecase.TxRunner,
 	grant *usecase.Grant,
 	resolvePermission *usecase.ResolvePermission,
 	executeTask *usecase.ExecuteTask,
@@ -77,11 +84,13 @@ func New(
 	listComments *usecase.ListComments,
 	reportExecutionResult *usecase.ReportTaskExecutionResult,
 	findTaskByNumber *usecase.FindTaskByNumber,
+	generateShareLink *usecase.GenerateShareLink,
+	getTaskByShareToken *usecase.GetTaskByShareToken,
 ) *Server {
 	return &Server{
 		createTask:            createTask,
 		getTask:               getTask,
-		addEdge:               addEdge,
+		txRunner:              txRunner,
 		grant:                 grant,
 		resolvePermission:     resolvePermission,
 		executeTask:           executeTask,
@@ -104,6 +113,8 @@ func New(
 		listComments:          listComments,
 		reportExecutionResult: reportExecutionResult,
 		findTaskByNumber:      findTaskByNumber,
+		generateShareLink:     generateShareLink,
+		getTaskByShareToken:   getTaskByShareToken,
 	}
 }
 
@@ -122,6 +133,7 @@ func (s *Server) CreateTask(ctx context.Context, req *taskv1.CreateTaskRequest) 
 		Title:     req.GetTitle(),
 		ParentID:  req.GetParentId(),
 		ProjectID: req.GetProjectId(),
+		CreatorID: req.GetCreatorId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -137,11 +149,19 @@ func (s *Server) GetTask(ctx context.Context, req *taskv1.GetTaskRequest) (*task
 	return &taskv1.GetTaskResponse{Task: toProtoTask(task)}, nil
 }
 
+// AddEdge wraps the cycle-check + edge-write + auto-block sequence in one
+// Postgres transaction via TxRunner — closing add_edge.go's previously
+// admitted check-then-write race (see AddEdge usecase's doc comment) rather
+// than constructing a single pool-scoped *usecase.AddEdge once at
+// server-startup wiring time.
 func (s *Server) AddEdge(ctx context.Context, req *taskv1.AddEdgeRequest) (*taskv1.AddEdgeResponse, error) {
-	_, err := s.addEdge.Execute(ctx, usecase.AddEdgeInput{
-		FromTaskID: req.GetFromTaskId(),
-		ToTaskID:   req.GetToTaskId(),
-		Kind:       toDomainEdgeKind(req.GetType()),
+	err := s.txRunner.RunInTx(ctx, func(ctx context.Context, tasks usecase.TaskRepository, edges usecase.EdgeRepository) error {
+		_, err := usecase.NewAddEdge(tasks, edges).Execute(ctx, usecase.AddEdgeInput{
+			FromTaskID: req.GetFromTaskId(),
+			ToTaskID:   req.GetToTaskId(),
+			Kind:       toDomainEdgeKind(req.GetType()),
+		})
+		return err
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -168,7 +188,12 @@ func (s *Server) Grant(ctx context.Context, req *taskv1.GrantRequest) (*taskv1.G
 }
 
 func (s *Server) RevokeGrant(ctx context.Context, req *taskv1.RevokeGrantRequest) (*emptypb.Empty, error) {
-	if err := s.revokeGrant.Execute(ctx, usecase.RevokeGrantInput{TaskID: req.GetTaskId(), GrantID: req.GetGrantId()}); err != nil {
+	err := s.revokeGrant.Execute(ctx, usecase.RevokeGrantInput{
+		TaskID:    req.GetTaskId(),
+		SubjectID: req.GetSubjectId(),
+		Level:     toDomainGrantLevel(req.GetLevel()),
+	})
+	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &emptypb.Empty{}, nil
@@ -179,13 +204,13 @@ func (s *Server) ListGrants(ctx context.Context, req *taskv1.ListGrantsRequest) 
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	out := make([]*taskv1.Grant, 0, len(grants))
+	out := make([]*taskv1.GrantView, 0, len(grants))
 	for _, g := range grants {
-		pg := &taskv1.Grant{Id: g.ID, TaskId: g.TaskID, SubjectId: g.SubjectID, Level: toProtoGrantLevel(g.Level), ApplyTree: g.ApplyTree}
+		view := &taskv1.GrantView{SubjectId: g.SubjectID, Level: toProtoGrantLevel(g.Level), ApplyTree: g.ApplyTree}
 		if g.ExpiresAt != nil {
-			pg.ExpiresAt = timestamppb.New(*g.ExpiresAt)
+			view.ExpiresAt = timestamppb.New(*g.ExpiresAt)
 		}
-		out = append(out, pg)
+		out = append(out, view)
 	}
 	return &taskv1.ListGrantsResponse{Grants: out}, nil
 }
@@ -225,10 +250,20 @@ func (s *Server) ResolvePublicLink(ctx context.Context, req *taskv1.ResolvePubli
 }
 
 func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermissionRequest) (*taskv1.ResolvePermissionResponse, error) {
+	// action defaults to "read" when empty — either an older client built
+	// against a pre-TASK-TG-003-06 proto that has no action field to send,
+	// or a caller that legitimately wants the default. The usecase's own
+	// input contract stays strict ("empty means empty"); this adapter layer
+	// absorbs the rollout-compatibility shim, matching this codebase's
+	// existing adapter-absorbs-wire-quirks convention.
+	action := req.GetAction()
+	if action == "" {
+		action = "read"
+	}
 	level, err := s.resolvePermission.Execute(ctx, usecase.ResolvePermissionInput{
 		TaskID: req.GetTaskId(),
 		UserID: req.GetUserId(),
-		Action: req.GetAction(), // real field now (TASK-TG-03-04/03-06) — closes README.md's "not reachable through the RPC surface yet" gap
+		Action: action,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -279,7 +314,7 @@ func (s *Server) UpdateTask(ctx context.Context, req *taskv1.UpdateTaskRequest) 
 		in.Title = &v
 	}
 	if req.GetStatus() != nil {
-		v := req.GetStatus().GetValue()
+		v := domain.Status(req.GetStatus().GetValue())
 		in.Status = &v
 	}
 	if req.GetPrUrl() != nil {
@@ -417,6 +452,59 @@ func (s *Server) ReportTaskExecutionResult(ctx context.Context, req *taskv1.Repo
 	return &emptypb.Empty{}, nil
 }
 
+func (s *Server) FindTaskByNumber(ctx context.Context, req *taskv1.FindTaskByNumberRequest) (*taskv1.FindTaskByNumberResponse, error) {
+	task, err := s.findTaskByNumber.Execute(ctx, usecase.FindTaskByNumberInput{
+		ProjectID: req.GetProjectId(), TaskNumber: req.GetTaskNumber(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.FindTaskByNumberResponse{Task: toProtoTask(task)}, nil
+}
+
+// GenerateShareLink requires the caller to already hold admin-level
+// permission (enforced inside the usecase, not here) — TASK-TG-003-05.
+func (s *Server) GenerateShareLink(ctx context.Context, req *taskv1.GenerateShareLinkRequest) (*taskv1.GenerateShareLinkResponse, error) {
+	token, err := s.generateShareLink.Execute(ctx, usecase.GenerateShareLinkInput{
+		TaskID: req.GetTaskId(),
+		UserID: req.GetUserId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.GenerateShareLinkResponse{ShareToken: token}, nil
+}
+
+// GetTaskByShareToken is task-service's first unauthenticated RPC —
+// TASK-TG-003-05, SECURITY REVIEW REQUIRED before merge. Deliberately does
+// NOT call anything from common/tenant — see usecase.GetTaskByShareToken's
+// doc comment. Confirmed reachable without any special allowlisting:
+// common/grpcmw.ChainUnary's TenantExtractionInterceptor
+// (common/grpcmw/grpcmw.go:50-66) only OPTIONALLY populates tenant/user
+// context from incoming metadata when present — it never rejects a call
+// for missing metadata, so there is no default-deny gate at the gRPC layer
+// for ANY RPC in this service today; the actual "auth" enforcement is
+// exclusively each usecase's own tenant.RequireTenantID call. Since this
+// usecase deliberately never calls that, it's reachable with zero metadata
+// exactly like every other RPC's transport-level reachability — the only
+// thing making it meaningfully different is that it's SAFE to reach that
+// way, unlike every other RPC. Whether task-service's gRPC port itself is
+// reachable from outside the internal mesh (bypassing api-gateway's own
+// auth) is a deployment-topology question the security reviewer should
+// confirm explicitly, not something resolved by this handler.
+func (s *Server) GetTaskByShareToken(ctx context.Context, req *taskv1.GetTaskByShareTokenRequest) (*taskv1.GetTaskByShareTokenResponse, error) {
+	view, err := s.getTaskByShareToken.Execute(ctx, req.GetShareToken())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.GetTaskByShareTokenResponse{Task: &taskv1.TaskShareView{
+		Id:          view.ID,
+		Title:       view.Title,
+		Status:      view.Status,
+		Description: view.Description,
+	}}, nil
+}
+
 func toProtoSubtaskProposals(proposals []domain.SubtaskProposal) []*taskv1.SubtaskProposal {
 	out := make([]*taskv1.SubtaskProposal, 0, len(proposals))
 	for _, p := range proposals {
@@ -509,27 +597,56 @@ func toProtoGrantLevel(l domain.GrantLevel) taskv1.GrantLevel {
 	}
 }
 
+// timePtrToProto converts a nullable domain time field to the wire's
+// google.protobuf.Timestamp — nil maps to an unset (nil) field.
+func timePtrToProto(t *time.Time) *timestamppb.Timestamp {
+	if t == nil {
+		return nil
+	}
+	return timestamppb.New(*t)
+}
+
+// float64PtrToDoubleValue converts a nullable domain float field to the
+// wire's google.protobuf.DoubleValue wrapper — nil maps to an unset (nil)
+// field, distinguishable from an explicit 0 on the wire.
+func float64PtrToDoubleValue(f *float64) *wrapperspb.DoubleValue {
+	if f == nil {
+		return nil
+	}
+	return wrapperspb.Double(*f)
+}
+
 func toProtoTask(t domain.Task) *taskv1.Task {
 	return &taskv1.Task{
 		Id:                 t.ID,
 		TenantId:           t.TenantID,
 		Title:              t.Title,
-		Status:             t.Status,
+		Status:             string(t.Status),
 		ParentId:           t.ParentID,
 		ProjectId:          t.ProjectID,
-		TaskNumber:         t.TaskNumber,
+		Description:        t.Description,
+		TaskType:           t.Type,
+		Priority:           t.Priority,
+		AssigneeId:         t.AssigneeID,
+		OwnerId:            t.OwnerID,
+		DueDate:            timePtrToProto(t.DueDate),
+		EstimatedHours:     float64PtrToDoubleValue(t.EstimatedHours),
+		ActualHours:        float64PtrToDoubleValue(t.ActualHours),
+		PromptTemplate:     t.PromptTemplate,
+		AiContext:          t.AIContext,
+		AiPlanJson:         t.AIPlanJSON,
+		Visibility:         t.Visibility,
 		WorktreeId:         t.WorktreeID,
+		AgentSessionId:     t.AgentSessionID,
+		ProgressPercent:    int32(t.ProgressPercent),
+		TaskNumber:         t.TaskNumber,
 		PrUrl:              t.PRURL,
 		WorkflowTemplateId: t.WorkflowTemplateID,
+		Labels:             t.Labels,
+		ReporterId:         t.ReporterID,
+		WorkflowExecId:     t.WorkflowExecID,
+		DoneSubtasks:       int32(t.DoneSubtasks),
+		TotalSubtasks:      int32(t.TotalSubtasks),
+		ShareToken:         t.ShareToken,
 	}
-}
-
-func (s *Server) FindTaskByNumber(ctx context.Context, req *taskv1.FindTaskByNumberRequest) (*taskv1.FindTaskByNumberResponse, error) {
-	task, err := s.findTaskByNumber.Execute(ctx, usecase.FindTaskByNumberInput{
-		ProjectID: req.GetProjectId(), TaskNumber: req.GetTaskNumber(),
-	})
-	if err != nil {
-		return nil, apperrors.ToGRPCStatus(err)
-	}
-	return &taskv1.FindTaskByNumberResponse{Task: toProtoTask(task)}, nil
 }

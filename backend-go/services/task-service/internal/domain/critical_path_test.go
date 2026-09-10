@@ -5,93 +5,115 @@ import (
 	"testing"
 )
 
-// TestCalculateCriticalPath_DiamondDAG: A depends on B and C; B and C each
-// depend on D. D=1h, B=2h, C=5h, A=1h. The D->C->A leg (1+5+1=7) beats the
-// D->B->A leg (1+2+1=4) — critical path picks the longer one.
-func TestCalculateCriticalPath_DiamondDAG(t *testing.T) {
+func hoursPtr(h float64) *float64 { return &h }
+
+// TestCalculateCriticalPath_FiveNodeTwoBranch_MatchesHandComputedPath builds
+// a 5-node DAG with 2 branches:
+//
+//	A(2h) -> B(3h) -> D(1h)
+//	A(2h) -> C(10h) -> D(1h)
+//	D(1h) -> E(4h)
+//
+// Branch through C is the longest: A(2) -> C(10) -> D(1) -> E(4) = 17h,
+// versus A(2) -> B(3) -> D(1) -> E(4) = 10h.
+func TestCalculateCriticalPath_FiveNodeTwoBranch_MatchesHandComputedPath(t *testing.T) {
+	tasks := []Task{
+		{ID: "A", EstimatedHours: hoursPtr(2)},
+		{ID: "B", EstimatedHours: hoursPtr(3)},
+		{ID: "C", EstimatedHours: hoursPtr(10)},
+		{ID: "D", EstimatedHours: hoursPtr(1)},
+		{ID: "E", EstimatedHours: hoursPtr(4)},
+	}
 	edges := []TaskEdge{
 		{FromTaskID: "A", ToTaskID: "B", Kind: EdgeKindDependsOn},
 		{FromTaskID: "A", ToTaskID: "C", Kind: EdgeKindDependsOn},
 		{FromTaskID: "B", ToTaskID: "D", Kind: EdgeKindDependsOn},
 		{FromTaskID: "C", ToTaskID: "D", Kind: EdgeKindDependsOn},
+		{FromTaskID: "D", ToTaskID: "E", Kind: EdgeKindDependsOn},
 	}
-	hours := map[string]float64{"A": 1, "B": 2, "C": 5, "D": 1}
 
-	path, total := CalculateCriticalPath(edges, hours)
-	if !reflect.DeepEqual(path, []string{"D", "C", "A"}) {
-		t.Errorf("expected path [D C A], got %v", path)
-	}
-	if total != 7 {
-		t.Errorf("expected total 7, got %v", total)
+	got := CalculateCriticalPath(tasks, edges)
+	want := []string{"A", "C", "D", "E"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("expected critical path %v, got %v", want, got)
 	}
 }
 
-// TestCalculateCriticalPath_ParallelChains_LongestWins: two independent
-// chains (no edges between them) — the longer one is the critical path.
-func TestCalculateCriticalPath_ParallelChains_LongestWins(t *testing.T) {
+// TestCalculateCriticalPath_Deterministic_AcrossRepeatedCalls is the
+// tie-break regression test: repeated calls against identical input must
+// return the exact same path.
+func TestCalculateCriticalPath_Deterministic_AcrossRepeatedCalls(t *testing.T) {
+	tasks := []Task{
+		{ID: "A", EstimatedHours: hoursPtr(1)},
+		{ID: "B", EstimatedHours: hoursPtr(1)},
+		{ID: "C", EstimatedHours: hoursPtr(1)},
+	}
 	edges := []TaskEdge{
-		// chain 1: A -> B -> C (3 nodes)
 		{FromTaskID: "A", ToTaskID: "B", Kind: EdgeKindDependsOn},
-		{FromTaskID: "B", ToTaskID: "C", Kind: EdgeKindDependsOn},
-		// chain 2: X -> Y (2 nodes)
-		{FromTaskID: "X", ToTaskID: "Y", Kind: EdgeKindDependsOn},
+		{FromTaskID: "A", ToTaskID: "C", Kind: EdgeKindDependsOn},
 	}
-	hours := map[string]float64{"A": 1, "B": 1, "C": 1, "X": 10, "Y": 10}
 
-	path, total := CalculateCriticalPath(edges, hours)
-	if !reflect.DeepEqual(path, []string{"Y", "X"}) {
-		t.Errorf("expected path [Y X] (the heavier chain), got %v", path)
-	}
-	if total != 20 {
-		t.Errorf("expected total 20, got %v", total)
+	first := CalculateCriticalPath(tasks, edges)
+	for i := 0; i < 10; i++ {
+		got := CalculateCriticalPath(tasks, edges)
+		if !reflect.DeepEqual(got, first) {
+			t.Fatalf("expected deterministic path across repeated calls, got %v then %v", first, got)
+		}
 	}
 }
 
-// TestCalculateCriticalPath_NoEdges_ReturnsEmpty: with no edges, no nodes
-// are ever discovered (nodes come only from edge endpoints) — must not
-// panic or divide by zero, just return an empty result.
-func TestCalculateCriticalPath_NoEdges_ReturnsEmpty(t *testing.T) {
-	path, total := CalculateCriticalPath(nil, map[string]float64{"solo": 5})
-	if path != nil {
-		t.Errorf("expected a nil path, got %v", path)
+// TestCalculateCriticalPath_NilEstimatedHours_TreatedAsZero proves a task
+// with no estimate contributes 0 to path length but is not excluded from
+// the graph.
+func TestCalculateCriticalPath_NilEstimatedHours_TreatedAsZero(t *testing.T) {
+	tasks := []Task{
+		{ID: "A", EstimatedHours: hoursPtr(5)},
+		{ID: "B", EstimatedHours: nil},
+		{ID: "C", EstimatedHours: hoursPtr(5)},
 	}
-	if total != 0 {
-		t.Errorf("expected total 0, got %v", total)
-	}
-}
-
-// TestCalculateCriticalPath_AllZeroHours_StillWalksFullChain locks in the
-// tie-break fix: a linear chain with every hours entry defaulting to 0
-// (spec: "if AI/user leaves estimate blank") must still return the FULL
-// chain (path length == node count), not collapse to a single node just
-// because every candidate ties at 0.
-func TestCalculateCriticalPath_AllZeroHours_StillWalksFullChain(t *testing.T) {
 	edges := []TaskEdge{
 		{FromTaskID: "A", ToTaskID: "B", Kind: EdgeKindDependsOn},
 		{FromTaskID: "B", ToTaskID: "C", Kind: EdgeKindDependsOn},
-		{FromTaskID: "C", ToTaskID: "D", Kind: EdgeKindDependsOn},
 	}
-	path, total := CalculateCriticalPath(edges, map[string]float64{})
-	if len(path) != 4 {
-		t.Fatalf("expected path length == node count (4), got %d: %v", len(path), path)
+
+	got := CalculateCriticalPath(tasks, edges)
+	want := []string{"A", "B", "C"}
+	if !reflect.DeepEqual(got, want) {
+		t.Errorf("expected path %v through the zero-duration node, got %v", want, got)
 	}
-	if !reflect.DeepEqual(path, []string{"D", "C", "B", "A"}) {
-		t.Errorf("expected path [D C B A], got %v", path)
+}
+
+func TestCalculateCriticalPath_EmptyTasks_ReturnsNil(t *testing.T) {
+	if got := CalculateCriticalPath(nil, nil); got != nil {
+		t.Errorf("expected nil for empty tasks, got %v", got)
 	}
-	if total != 0 {
-		t.Errorf("expected total 0, got %v", total)
+}
+
+func TestCalculateCriticalPath_NoEdges_ReturnsSingleHighestEstimateTask(t *testing.T) {
+	tasks := []Task{
+		{ID: "A", EstimatedHours: hoursPtr(1)},
+		{ID: "B", EstimatedHours: hoursPtr(9)},
+	}
+	got := CalculateCriticalPath(tasks, nil)
+	if len(got) != 1 || got[0] != "B" {
+		t.Errorf("expected single-node path [B], got %v", got)
 	}
 }
 
 // TestCalculateCriticalPath_IgnoresParentChildEdges confirms only
 // depends_on edges participate — parent_child edges are a different
-// relation entirely.
+// relation entirely, and a task with no depends_on edges at all still
+// yields a (single-node) path from the highest-estimate task.
 func TestCalculateCriticalPath_IgnoresParentChildEdges(t *testing.T) {
+	tasks := []Task{
+		{ID: "parent", EstimatedHours: hoursPtr(5)},
+		{ID: "child", EstimatedHours: hoursPtr(3)},
+	}
 	edges := []TaskEdge{
 		{FromTaskID: "parent", ToTaskID: "child", Kind: EdgeKindParentChild},
 	}
-	path, total := CalculateCriticalPath(edges, map[string]float64{"parent": 5, "child": 3})
-	if path != nil || total != 0 {
-		t.Errorf("expected no path for a parent_child-only edge set, got %v/%v", path, total)
+	got := CalculateCriticalPath(tasks, edges)
+	if len(got) != 1 || got[0] != "parent" {
+		t.Errorf("expected single-node path [parent] (parent_child edges ignored), got %v", got)
 	}
 }

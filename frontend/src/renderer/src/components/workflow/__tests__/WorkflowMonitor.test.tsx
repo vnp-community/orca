@@ -40,6 +40,8 @@ vi.mock('../../../store', () => ({
 const mockRpc = vi.mocked(callRuntimeRpc)
 
 describe('WorkflowMonitor (CR-PW-003)', () => {
+  const onNewWorkflow = vi.fn()
+
   beforeEach(() => {
     cleanup()
     vi.clearAllMocks()
@@ -48,7 +50,7 @@ describe('WorkflowMonitor (CR-PW-003)', () => {
   })
 
   it('fetches workflow.listExecutions(projectId) on mount', async () => {
-    render(<WorkflowMonitor projectId="p1" onNewWorkflow={vi.fn()} />)
+    render(<WorkflowMonitor projectId="p1" onNewWorkflow={onNewWorkflow} />)
     await waitFor(() => {
       expect(mockRpc).toHaveBeenCalledWith('mock-target', 'workflow.listExecutions', {
         projectId: 'p1'
@@ -57,7 +59,7 @@ describe('WorkflowMonitor (CR-PW-003)', () => {
   })
 
   it('shows the empty state when there are no executions', async () => {
-    render(<WorkflowMonitor projectId="p1" onNewWorkflow={vi.fn()} />)
+    render(<WorkflowMonitor projectId="p1" onNewWorkflow={onNewWorkflow} />)
     await waitFor(() => {
       expect(screen.getByTestId('workflow-empty')).toBeInTheDocument()
     })
@@ -65,18 +67,10 @@ describe('WorkflowMonitor (CR-PW-003)', () => {
 
   it('shows an error state when the RPC throws', async () => {
     mockRpc.mockRejectedValueOnce(new Error('boom'))
-    render(<WorkflowMonitor projectId="p1" onNewWorkflow={vi.fn()} />)
+    render(<WorkflowMonitor projectId="p1" onNewWorkflow={onNewWorkflow} />)
     await waitFor(() => {
       expect(screen.getByTestId('workflow-load-error')).toBeInTheDocument()
     })
-  })
-
-  it('"+ New Workflow" button calls onNewWorkflow', async () => {
-    const onNewWorkflow = vi.fn()
-    render(<WorkflowMonitor projectId="p1" onNewWorkflow={onNewWorkflow} />)
-    await waitFor(() => screen.getByTestId('new-workflow-btn'))
-    fireEvent.click(screen.getByTestId('new-workflow-btn'))
-    expect(onNewWorkflow).toHaveBeenCalled()
   })
 
   it('renders one row per execution with its status and triggeredBy', async () => {
@@ -88,7 +82,7 @@ describe('WorkflowMonitor (CR-PW-003)', () => {
         definition: { name: 'Deploy', steps: [] }
       }
     ])
-    render(<WorkflowMonitor projectId="p1" onNewWorkflow={vi.fn()} />)
+    render(<WorkflowMonitor projectId="p1" onNewWorkflow={onNewWorkflow} />)
     await waitFor(() => {
       expect(screen.getByTestId('execution-row-exec-1')).toHaveTextContent('Deploy')
       expect(screen.getByTestId('execution-row-exec-1')).toHaveTextContent('Running')
@@ -105,7 +99,7 @@ describe('WorkflowMonitor (CR-PW-003)', () => {
         definition: { name: 'Deploy', steps: [] }
       }
     ])
-    render(<WorkflowMonitor projectId="p1" onNewWorkflow={vi.fn()} />)
+    render(<WorkflowMonitor projectId="p1" onNewWorkflow={onNewWorkflow} />)
     await waitFor(() => screen.getByTestId('execution-row-exec-1'))
     fireEvent.click(screen.getByTestId('execution-row-exec-1'))
 
@@ -115,5 +109,31 @@ describe('WorkflowMonitor (CR-PW-003)', () => {
     await waitFor(() => {
       expect(screen.getByTestId('execution-row-exec-1')).toBeInTheDocument()
     })
+  })
+
+  // FE-TASK-001 (workflow v4): mount WorkflowBuilder — entry point is this new button.
+  it('"+ New Workflow" button calls onNewWorkflow', async () => {
+    render(<WorkflowMonitor projectId="p1" onNewWorkflow={onNewWorkflow} />)
+    await waitFor(() => screen.getByTestId('workflow-empty'))
+    fireEvent.click(screen.getByTestId('new-workflow-btn'))
+    expect(onNewWorkflow).toHaveBeenCalled()
+  })
+
+  // FE-TASK-002 (workflow v4): Library entry point, optional prop (WorkspaceLayout always
+  // passes it, but the button must not render/crash without it).
+  it('onOpenLibrary provided → "Browse Library" button calls it', async () => {
+    const onOpenLibrary = vi.fn()
+    render(
+      <WorkflowMonitor projectId="p1" onNewWorkflow={onNewWorkflow} onOpenLibrary={onOpenLibrary} />
+    )
+    await waitFor(() => screen.getByTestId('workflow-empty'))
+    fireEvent.click(screen.getByTestId('open-library-btn'))
+    expect(onOpenLibrary).toHaveBeenCalled()
+  })
+
+  it('onOpenLibrary omitted → "Browse Library" button not rendered', async () => {
+    render(<WorkflowMonitor projectId="p1" onNewWorkflow={onNewWorkflow} />)
+    await waitFor(() => screen.getByTestId('workflow-empty'))
+    expect(screen.queryByTestId('open-library-btn')).not.toBeInTheDocument()
   })
 })

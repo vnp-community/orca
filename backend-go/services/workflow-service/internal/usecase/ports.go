@@ -193,6 +193,12 @@ type ExecutionRepository interface {
 	// re-attach to every tenant's in-flight executions this instance's
 	// database holds, not just one.
 	ListRunning(ctx context.Context) ([]domain.WorkflowExecution, error)
+	// ListExecutions keyset-paginates tenantID/projectID's executions,
+	// newest first — same opaque-cursor (last-seen id) convention as
+	// TemplateRepository.ListTemplates (ports.go:23-27), but ordered by
+	// creation time rather than id since execution ids are random UUIDs,
+	// not sequential.
+	ListExecutions(ctx context.Context, tenantID, projectID, cursor string, limit int32) ([]domain.WorkflowExecution, string, error)
 }
 
 // StepExecutionRepository is the persistence port for individual step runs

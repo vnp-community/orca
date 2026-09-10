@@ -5,7 +5,35 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/adapter/infrafleetclient/agent_step_executor.go`
 **Depends on:** None
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+Re-verified against live file before editing — matched the task's
+description byte for byte. Applied exactly the two changes:
+
+1. `agentExecMethod` constant flipped from `"agent.exec"` to
+   `"agent.execPrompt"`; doc comment rewritten to state the fix is applied
+   (kept the historical "why agent.exec looked plausible" context, dropped
+   the "reconcile before depending on this in production" hedge since it's
+   now reconciled).
+2. `agentExecParams` widened with `Model`, `AccountID`, `StepID`,
+   `Env map[string]string` (all `omitempty`), left unpopulated at the
+   `Execute` call site as instructed — that's TASK-WF-002-03's job.
+
+Added `TestAgentExecutor_RelayUsesExecPromptMethodAndParamsShape`
+asserting the relay call's method name (`"agent.execPrompt"`) and params
+JSON shape explicitly, including that the four new fields marshal as
+absent (not empty-string/null) when unset.
+
+**Verify output:**
+```
+go build ./services/workflow-service/...   # clean, no output
+go vet ./services/workflow-service/...     # clean, no output
+go test ./services/workflow-service/internal/adapter/infrafleetclient/... -v
+# ok  	github.com/stablyai/orca-go/services/workflow-service/internal/adapter/infrafleetclient	0.006s
+# 12/12 tests PASS (6 pre-existing agent tests + 1 new regression test + 5 shell/notification tests)
+```
 
 ---
 

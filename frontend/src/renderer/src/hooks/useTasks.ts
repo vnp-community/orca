@@ -24,8 +24,8 @@ export function useTasks(projectId: string) {
   const [filterStatus, setFilterStatus] = useState<'all' | string>('all')
   const [searchQuery, setSearchQuery] = useState('')
   const [isLoading, setIsLoading] = useState(false)
-  // Bumped by refetch() to force the fetch effect below to re-run — there is
-  // no other trigger for a manual reload (e.g. right after task.create).
+  // FE-TASK-001 (task-graph v4): bumped by refetch() to force the fetch effect below to
+  // re-run — there is no other trigger for a manual reload (e.g. right after task.create).
   const [refetchTrigger, setRefetchTrigger] = useState(0)
   const refetch = useCallback(() => setRefetchTrigger((n) => n + 1), [])
 

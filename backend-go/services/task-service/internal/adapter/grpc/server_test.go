@@ -43,15 +43,6 @@ func (f *fakeTaskRepository) Grant(ctx context.Context, tenantID string, grant d
 	f.grants = append(f.grants, grant)
 	return grant.ID, nil
 }
-func (f *fakeTaskRepository) Revoke(ctx context.Context, tenantID, grantID string) error {
-	for i, g := range f.grants {
-		if g.ID == grantID {
-			f.grants = append(f.grants[:i], f.grants[i+1:]...)
-			return nil
-		}
-	}
-	return errors.New("not found")
-}
 func (f *fakeTaskRepository) ListGrantsForTask(ctx context.Context, tenantID, taskID string) ([]domain.Grant, error) {
 	var out []domain.Grant
 	for _, g := range f.grants {
@@ -75,6 +66,24 @@ func (f *fakeTaskRepository) ListGrantsForAncestors(ctx context.Context, tenantI
 	return out, nil
 }
 
+func (f *fakeTaskRepository) Revoke(ctx context.Context, tenantID, taskID, subjectID string, level domain.GrantLevel) error {
+	for i, g := range f.grants {
+		if g.TaskID == taskID && g.SubjectID == subjectID && g.Level == level {
+			f.grants = append(f.grants[:i], f.grants[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
+func (f *fakeTaskRepository) GetByShareToken(ctx context.Context, token string) (domain.Task, error) {
+	for _, t := range f.tasks {
+		if t.ShareToken != "" && t.ShareToken == token {
+			return t, nil
+		}
+	}
+	return domain.Task{}, errors.New("not found")
+}
+
 func (f *fakeTaskRepository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
 	f.tasks[task.ID] = task
 	return task, nil
@@ -87,12 +96,15 @@ func (f *fakeTaskRepository) Get(ctx context.Context, tenantID, id string) (doma
 	return t, nil
 }
 func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id string, maxDepth int) ([]domain.Task, error) {
+	var chain []domain.Task
 	current, ok := f.tasks[id]
 	if !ok || current.TenantID != tenantID {
 		return nil, errors.New("not found")
 	}
-	var chain []domain.Task
-	for i := 0; maxDepth <= 0 || i < maxDepth; i++ {
+	for i := 0; ; i++ {
+		if maxDepth > 0 && i >= maxDepth {
+			break
+		}
 		chain = append(chain, current)
 		if current.ParentID == "" {
 			break
@@ -105,7 +117,7 @@ func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id stri
 	}
 	return chain, nil
 }
-func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, status string) error {
+func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id string, status domain.Status) error {
 	t, ok := f.tasks[id]
 	if !ok {
 		return errors.New("not found")
@@ -131,6 +143,15 @@ func (f *fakeTaskRepository) SetActiveExecutionLink(ctx context.Context, tenantI
 	t.ActiveExecutionLinkID = linkID
 	f.tasks[id] = t
 	return nil
+}
+func (f *fakeTaskRepository) ListChildren(ctx context.Context, tenantID, taskID string) ([]domain.Task, error) {
+	var out []domain.Task
+	for _, t := range f.tasks {
+		if t.ParentID == taskID {
+			out = append(out, t)
+		}
+	}
+	return out, nil
 }
 func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
 	return false, nil
@@ -264,7 +285,7 @@ func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id
 	if !ok || t.TenantID != tenantID {
 		return errors.New("not found")
 	}
-	t.Status = status
+	t.Status = domain.Status(status)
 	t.ActualHours = &actualHours
 	t.AgentSessionID = ""
 	f.tasks[id] = t
@@ -379,6 +400,81 @@ func (f fakeAICompleter) Complete(ctx context.Context, connectionID, prompt stri
 	return f.content, nil
 }
 
+// companyReadOnlyOPA mimics task_grant.rego's real level_actions table just
+// enough to prove ResolvePermissionRequest.action actually reaches OPA
+// end-to-end (task_grant.rego:25-31: level_actions["company"] = {"read"}) —
+// TASK-TG-003-06's regression test doesn't need the real Rego engine to
+// prove server.go's wire-field plumbing is correct, only a fake precise
+// enough to distinguish "read" from every other action for company-level
+// callers.
+type companyReadOnlyOPA struct{}
+
+func (companyReadOnlyOPA) Decision(ctx context.Context, level domain.GrantLevel, action, tenantID string) (bool, error) {
+	if level == domain.GrantLevelCompany {
+		return action == "read", nil
+	}
+	return true, nil
+}
+
+// TestServer_ResolvePermission_ActionReachesOPA is TASK-TG-003-06's core
+// regression test: before that fix, ResolvePermissionRequest had no action
+// field at all and server.go hardcoded "read", so it was IMPOSSIBLE to
+// exercise the deny branch below — every call silently used "read" and
+// therefore always passed level_actions["company"]'s check.
+func TestServer_ResolvePermission_ActionReachesOPA(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1"}
+	tasks.grants = []domain.Grant{{TaskID: "t1", SubjectID: "tenant-1", Level: domain.GrantLevelCompany}}
+	resolvePermissionUC := usecase.NewResolvePermission(tasks, tasks, stubTeams{}, companyReadOnlyOPA{}, nil)
+	edges := &fakeEdgeRepository{}
+	txRunner := fakeTxRunner{tasks: tasks, edges: edges}
+	shareLinks := newFakeShareLinkRepository()
+	comments := &fakeCommentRepository{}
+	s := New(
+		usecase.NewCreateTask(tasks, tasks), usecase.NewGetTask(tasks), txRunner,
+		usecase.NewGrant(tasks, resolvePermissionUC, stubEvents{}), resolvePermissionUC,
+		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}, stubWorkflowExecutor{}, resolvePermissionUC, stubWorktreeProvisioner{}, fakeProjectExecutionResolver{}, stubClock{}, stubExecutionLinkRepository{}),
+		usecase.NewHasActiveExecutions(tasks),
+		usecase.NewListTasks(tasks), usecase.NewUpdateTask(tasks, edges), usecase.NewDeleteTask(tasks),
+		usecase.NewGetDependencies(tasks, edges),
+		usecase.NewAIDecompose(tasks, edges, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{}, fakeProjectContextResolver{}, fakeTechStackDetector{}, fakeVelocityResolver{}, fakeAICompleter{}),
+		usecase.NewAIApply(txRunner),
+		usecase.NewGenerateAgentPrompt(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{}, fakeAICompleter{}),
+		usecase.NewRevokeGrant(tasks, resolvePermissionUC, stubEvents{}), usecase.NewListGrants(tasks, resolvePermissionUC),
+		usecase.NewCreatePublicLink(shareLinks, resolvePermissionUC),
+		usecase.NewRevokePublicLink(shareLinks, resolvePermissionUC, tasks),
+		usecase.NewResolvePublicLink(shareLinks),
+		usecase.NewGetSubtree(tasks, tasks, stubTeams{}),
+		usecase.NewRecalculateProgress(tasks),
+		usecase.NewAddComment(comments), usecase.NewListComments(comments),
+		usecase.NewReportTaskExecutionResult(tasks, stubExecutionLinkRepository{}),
+		usecase.NewFindTaskByNumber(tasks),
+		usecase.NewGenerateShareLink(tasks, resolvePermissionUC), usecase.NewGetTaskByShareToken(tasks),
+	)
+	ctx := ctxWithTenant(t)
+
+	// action="write" on a company-level-only grant must be denied.
+	if _, err := s.ResolvePermission(ctx, &taskv1.ResolvePermissionRequest{TaskId: "t1", UserId: "u1", Action: "write"}); err == nil {
+		t.Fatal("expected action=write to be denied for a company-level-only grant")
+	} else if status.Code(err) != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied, got %v", status.Code(err))
+	}
+
+	// action="" (an older client) must default to "read" and succeed.
+	resp, err := s.ResolvePermission(ctx, &taskv1.ResolvePermissionRequest{TaskId: "t1", UserId: "u1"})
+	if err != nil {
+		t.Fatalf("expected action=\"\" to default to read and succeed, got %v", err)
+	}
+	if resp.GetEffectiveLevel() != taskv1.GrantLevel_GRANT_LEVEL_COMPANY {
+		t.Errorf("expected effective level COMPANY, got %v", resp.GetEffectiveLevel())
+	}
+
+	// action="read" explicitly must also succeed.
+	if _, err := s.ResolvePermission(ctx, &taskv1.ResolvePermissionRequest{TaskId: "t1", UserId: "u1", Action: "read"}); err != nil {
+		t.Errorf("expected action=read to succeed, got %v", err)
+	}
+}
+
 func wrapperString(v string) *wrapperspb.StringValue {
 	return wrapperspb.String(v)
 }
@@ -403,8 +499,8 @@ func (f fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context, 
 }
 
 func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server {
-	createTaskUC := usecase.NewCreateTask(tasks)
-	addEdgeUC := usecase.NewAddEdge(fakeTxRunner{tasks: tasks, edges: edges})
+	createTaskUC := usecase.NewCreateTask(tasks, tasks)
+	txRunner := fakeTxRunner{tasks: tasks, edges: edges}
 	// resolvePermissionUC is shared: Grant now requires it internally
 	// (TASK-TG-03-01's manage-access check) in addition to the standalone
 	// ResolvePermission RPC wiring below.
@@ -414,7 +510,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 	return New(
 		createTaskUC,
 		usecase.NewGetTask(tasks),
-		addEdgeUC,
+		txRunner,
 		usecase.NewGrant(tasks, resolvePermissionUC, stubEvents{}),
 		resolvePermissionUC,
 		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}, stubWorkflowExecutor{}, resolvePermissionUC, stubWorktreeProvisioner{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, stubClock{}, stubExecutionLinkRepository{}),
@@ -428,7 +524,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 			fakeProjectContextResolver{}, fakeTechStackDetector{}, fakeVelocityResolver{},
 			fakeAICompleter{content: `{"subtasks":[{"title":"Do X"}]}`},
 		),
-		usecase.NewAIApply(fakeTxRunner{tasks: tasks, edges: edges}),
+		usecase.NewAIApply(txRunner),
 		usecase.NewGenerateAgentPrompt(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, fakeAICompleter{content: "generated prompt text"}),
 		usecase.NewRevokeGrant(tasks, resolvePermissionUC, stubEvents{}),
 		usecase.NewListGrants(tasks, resolvePermissionUC),
@@ -441,6 +537,8 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		usecase.NewListComments(comments),
 		usecase.NewReportTaskExecutionResult(tasks, stubExecutionLinkRepository{}),
 		usecase.NewFindTaskByNumber(tasks),
+		usecase.NewGenerateShareLink(tasks, resolvePermissionUC),
+		usecase.NewGetTaskByShareToken(tasks),
 	)
 }
 
@@ -603,7 +701,7 @@ func TestServer_UpdateTask_RejectsInProgressTransition(t *testing.T) {
 
 	_, err := s.UpdateTask(ctxWithTenant(t), &taskv1.UpdateTaskRequest{
 		Id:     "t1",
-		Status: wrapperString(domain.StatusInProgress),
+		Status: wrapperString(string(domain.StatusInProgress)),
 	})
 	if err == nil {
 		t.Fatal("expected an error transitioning into in_progress via UpdateTask")
@@ -765,11 +863,12 @@ func TestServer_RevokeGrant_And_ListGrants(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error listing: %v", err)
 	}
-	if len(listResp.GetGrants()) != 1 || listResp.GetGrants()[0].GetId() != granted.GetId() {
+	if len(listResp.GetGrants()) != 1 || listResp.GetGrants()[0].GetSubjectId() != "u2" {
 		t.Fatalf("unexpected grants: %+v", listResp.GetGrants())
 	}
+	_ = granted
 
-	if _, err := s.RevokeGrant(ctx, &taskv1.RevokeGrantRequest{TaskId: "t1", GrantId: granted.GetId()}); err != nil {
+	if _, err := s.RevokeGrant(ctx, &taskv1.RevokeGrantRequest{TaskId: "t1", SubjectId: "u2", Level: taskv1.GrantLevel_GRANT_LEVEL_USER}); err != nil {
 		t.Fatalf("unexpected error revoking: %v", err)
 	}
 
@@ -912,5 +1011,31 @@ func TestServer_AddComment_And_ListComments(t *testing.T) {
 	}
 	if listResp.GetComments()[0].GetContent() != "hello" {
 		t.Errorf("expected listed comment content=hello, got %q", listResp.GetComments()[0].GetContent())
+	}
+}
+
+// TestServer_GenerateShareLink_And_GetTaskByShareToken exercises
+// TASK-TG-003-05's second, narrower share-link mechanism end to end through
+// the gRPC layer — distinct from CreatePublicLink/ResolvePublicLink above.
+func TestServer_GenerateShareLink_And_GetTaskByShareToken(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "user-1", Title: "Shared task", Status: domain.StatusOpen, Description: "desc"}
+	s := newTestServer(tasks, &fakeEdgeRepository{})
+	ctx := ctxWithTenantAndUser(t, "user-1")
+
+	genResp, err := s.GenerateShareLink(ctx, &taskv1.GenerateShareLinkRequest{TaskId: "t1", UserId: "user-1"})
+	if err != nil {
+		t.Fatalf("unexpected error generating share link: %v", err)
+	}
+	if genResp.GetShareToken() == "" {
+		t.Fatal("expected a non-empty share token")
+	}
+
+	viewResp, err := s.GetTaskByShareToken(context.Background(), &taskv1.GetTaskByShareTokenRequest{ShareToken: genResp.GetShareToken()})
+	if err != nil {
+		t.Fatalf("unexpected error resolving share token: %v", err)
+	}
+	if viewResp.GetTask().GetTitle() != "Shared task" || viewResp.GetTask().GetDescription() != "desc" {
+		t.Errorf("unexpected task share view: %+v", viewResp.GetTask())
 	}
 }

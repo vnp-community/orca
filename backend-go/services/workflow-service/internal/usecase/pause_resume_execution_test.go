@@ -19,6 +19,11 @@ type fakeExecutionRepository struct {
 	updateErr        error
 	hasActiveExecErr error
 	listRunningErr   error
+	listExecErr      error
+	// insertOrder records creation order (oldest first) — domain.WorkflowExecution
+	// has no CreatedAt field, so ListExecutions' "newest first" fake
+	// ordering is derived from this instead of a stored timestamp.
+	insertOrder []string
 	// onUpdate, if set, is invoked synchronously inside UpdateExecution
 	// after the row is stored — a deterministic hook execute_test.go uses
 	// to observe "the background dispatch goroutine reached its final
@@ -38,6 +43,9 @@ func newFakeExecutionRepository() *fakeExecutionRepository {
 func (f *fakeExecutionRepository) CreateExecution(ctx context.Context, exec domain.WorkflowExecution) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if _, exists := f.executions[exec.ID]; !exists {
+		f.insertOrder = append(f.insertOrder, exec.ID)
+	}
 	f.executions[exec.ID] = exec
 	return nil
 }
@@ -106,6 +114,54 @@ func (f *fakeExecutionRepository) ListRunning(ctx context.Context) ([]domain.Wor
 		}
 	}
 	return out, nil
+}
+
+// ListExecutions implements usecase.ExecutionRepository.ListExecutions —
+// newest-first (reverse insertion order, since domain.WorkflowExecution
+// carries no CreatedAt to sort by), keyset-paginated on the opaque
+// last-seen-id cursor, same contract as the real Postgres implementation.
+func (f *fakeExecutionRepository) ListExecutions(ctx context.Context, tenantID, projectID, cursor string, limit int32) ([]domain.WorkflowExecution, string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.listExecErr != nil {
+		return nil, "", f.listExecErr
+	}
+
+	// newestFirst: insertOrder is oldest-first, so walk it in reverse.
+	var newestFirst []domain.WorkflowExecution
+	for i := len(f.insertOrder) - 1; i >= 0; i-- {
+		e := f.executions[f.insertOrder[i]]
+		if e.TenantID != tenantID {
+			continue
+		}
+		if projectID != "" && e.ProjectID != projectID {
+			continue
+		}
+		newestFirst = append(newestFirst, e)
+	}
+
+	start := 0
+	if cursor != "" {
+		for i, e := range newestFirst {
+			if e.ID == cursor {
+				start = i + 1
+				break
+			}
+		}
+	}
+	if start > len(newestFirst) {
+		start = len(newestFirst)
+	}
+	page := newestFirst[start:]
+	if int32(len(page)) > limit {
+		page = page[:limit]
+	}
+
+	next := ""
+	if len(page) > 0 && start+len(page) < len(newestFirst) {
+		next = page[len(page)-1].ID
+	}
+	return page, next, nil
 }
 
 // snapshot returns a copy of id's current stored execution, for tests to

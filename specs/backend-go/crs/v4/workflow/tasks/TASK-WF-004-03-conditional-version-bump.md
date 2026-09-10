@@ -5,7 +5,87 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/usecase/update_template.go`, `backend-go/services/workflow-service/internal/usecase/ports.go` (`TemplateRepository.Update` signature), `backend-go/services/workflow-service/internal/adapter/postgres/repository.go`
 **Depends on:** None
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+Re-verified live: `update_template.go`, `ports.go`'s `Update` signature,
+and the real postgres `Update` SQL all matched the task's citations
+exactly (including the confirmed absence of `UpdateConditional`).
+Implemented against the task's own proposed "breaking" definition (step
+removed / type changed / dependsOn changed) — **product sign-off on that
+definition is still a merge blocker**, exactly as the task's header
+mandates; not settled by this implementation.
+
+**Real, pre-existing bug found and fixed while touching this exact SQL
+statement (confirmed unrelated to this task's own change — same failure
+reproduced against the unmodified `Update` method before any edit, and
+matches a failure already observed in this worktree's very first full
+postgres-integration-suite run during TASK-WF-005-01, before TASK-WF-004-03
+was even started):** the real `Update` SQL's `parent_template_id =
+NULLIF($4, '')` had no explicit `::uuid` cast. Postgres unifies `NULLIF`'s
+result type with the `''` literal as `text`, and rejects assigning `text`
+to `parent_template_id`'s `uuid` column outright — `column
+"parent_template_id" is of type uuid but expression is of type text`.
+This meant **every UpdateTemplate call against a real database failed**,
+for any template, parent or not — a live, total-breakage bug, not a
+theoretical one. Fixed by adding `::uuid` to the same clause. Flagging
+this prominently since it's a correctness fix, not scope creep, but was
+discovered opportunistically rather than being this task's stated target.
+
+**Changes made:**
+1. `internal/usecase/ports.go`: `Update` widened with `bump bool`; new
+   `HasActiveExecutionsUsingTemplate` method.
+2. `internal/usecase/update_template.go`: captures `existing` (previously
+   discarded), computes `isBreaking`/`hasActiveUsage`/`bump` before the
+   `Update` call; added `isBreakingChange`/`diffIsBreaking`/
+   `sameDependsOnSet` helpers (order-independent `dependsOn` set
+   comparison — reordering entries alone is not itself breaking).
+3. `internal/adapter/postgres/repository.go`: `Update`'s SET list's
+   version-increment clause is now conditional on `bump` (WHERE clause's
+   version-match check, the `ErrTemplateVersionConflict` trigger, is
+   completely unchanged); added `HasActiveExecutionsUsingTemplate`
+   (same non-terminal status set as `HasActiveExecutions`) + the
+   `parent_template_id` UUID cast fix above.
+4. Test fakes: `fakeTemplateRepository`'s `Update`/new
+   `HasActiveExecutionsUsingTemplate` updated; all direct
+   `repo.Update(...)` call sites across the package (including
+   `clone_template_test.go`, written earlier this session) updated to the
+   new 4-arg signature.
+
+**Existing-test regression handling (explicit, per the task's own
+"regression check" requirement):** one pre-existing test,
+`TestUpdateTemplate_Succeeds_ForwardsExpectedVersionAndReturnsBumpedResult`,
+asserted the OLD unconditional-bump behavior (version 1→2 on every
+write) — this is now a legitimately outdated assumption, not a
+regression to preserve; renamed to
+`TestUpdateTemplate_NonBreakingChange_DoesNotBumpVersion` and its
+assertion flipped to match the new correct behavior (version stays 1),
+with `hasActiveExecutionsUsingTemplate=true` set explicitly to prove
+`isBreaking`, not `hasActiveUsage`, is what gates the no-bump outcome
+here. Every other pre-existing `TestUpdateTemplate_*` case
+(`StaleExpectedVersion`, `CyclicParent`, `EmptyParent`,
+`NoExecutionRepositoryDependency`) passes completely unmodified.
+
+**Verify output:**
+```
+go build ./services/workflow-service/...   # clean
+go vet   ./services/workflow-service/...   # clean
+go test  ./services/workflow-service/internal/usecase/... -run TestUpdateTemplate -v
+  # 9/9 PASS — non-breaking-does-not-bump, breaking+active-bumps,
+  # breaking+no-active-does-not-bump (all 3 test-plan cases), a
+  # table-driven breaking-change-detection test (4 sub-cases: type
+  # change, dependsOn change, pure addition, config-only edit), plus
+  # every pre-existing case (stale-version, cyclic-parent, empty-parent,
+  # no-execution-repo-dependency) unmodified
+go test -tags=integration ./services/workflow-service/internal/adapter/postgres/... \
+  -run "TestRepository_Update_CorrectVersion_Succeeds|TestRepository_Update_StaleVersion_ReturnsConflict|TestRepository_Update_BumpFalse_DoesNotIncrementVersion|TestRepository_HasActiveExecutionsUsingTemplate" -v
+  # 4/4 PASS against a real testcontainers Postgres — including the
+  # PRE-EXISTING TestRepository_Update_CorrectVersion_Succeeds, which now
+  # passes for the first time after the uuid-cast fix (confirmed broken
+  # before, on the unmodified statement)
+go test  ./services/workflow-service/... ./services/api-gateway/...   # full suite, all ok
+```
 
 ---
 

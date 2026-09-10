@@ -84,4 +84,10 @@ describe('useTaskGrants', () => {
     )
     expect(mockRpc).not.toHaveBeenCalled()
   })
+
+  it('grants is always empty (task.listGrants does not exist yet)', async () => {
+    const { useTaskGrants } = await import('../useTaskGrants')
+    const { result } = renderHook(() => useTaskGrants('t1'))
+    expect(result.current.grants).toEqual([])
+  })
 })

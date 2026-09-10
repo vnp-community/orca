@@ -24,6 +24,8 @@ const (
 	TaskService_GetTask_FullMethodName                   = "/orca.task.v1.TaskService/GetTask"
 	TaskService_AddEdge_FullMethodName                   = "/orca.task.v1.TaskService/AddEdge"
 	TaskService_Grant_FullMethodName                     = "/orca.task.v1.TaskService/Grant"
+	TaskService_RevokeGrant_FullMethodName               = "/orca.task.v1.TaskService/RevokeGrant"
+	TaskService_ListGrants_FullMethodName                = "/orca.task.v1.TaskService/ListGrants"
 	TaskService_ResolvePermission_FullMethodName         = "/orca.task.v1.TaskService/ResolvePermission"
 	TaskService_Execute_FullMethodName                   = "/orca.task.v1.TaskService/Execute"
 	TaskService_HasActiveExecutions_FullMethodName       = "/orca.task.v1.TaskService/HasActiveExecutions"
@@ -39,11 +41,11 @@ const (
 	TaskService_AddComment_FullMethodName                = "/orca.task.v1.TaskService/AddComment"
 	TaskService_ListComments_FullMethodName              = "/orca.task.v1.TaskService/ListComments"
 	TaskService_GenerateAgentPrompt_FullMethodName       = "/orca.task.v1.TaskService/GenerateAgentPrompt"
-	TaskService_RevokeGrant_FullMethodName               = "/orca.task.v1.TaskService/RevokeGrant"
-	TaskService_ListGrants_FullMethodName                = "/orca.task.v1.TaskService/ListGrants"
 	TaskService_CreatePublicLink_FullMethodName          = "/orca.task.v1.TaskService/CreatePublicLink"
 	TaskService_RevokePublicLink_FullMethodName          = "/orca.task.v1.TaskService/RevokePublicLink"
 	TaskService_ResolvePublicLink_FullMethodName         = "/orca.task.v1.TaskService/ResolvePublicLink"
+	TaskService_GenerateShareLink_FullMethodName         = "/orca.task.v1.TaskService/GenerateShareLink"
+	TaskService_GetTaskByShareToken_FullMethodName       = "/orca.task.v1.TaskService/GetTaskByShareToken"
 	TaskService_ReportTaskExecutionResult_FullMethodName = "/orca.task.v1.TaskService/ReportTaskExecutionResult"
 )
 
@@ -59,6 +61,11 @@ type TaskServiceClient interface {
 	GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*GetTaskResponse, error)
 	AddEdge(ctx context.Context, in *AddEdgeRequest, opts ...grpc.CallOption) (*AddEdgeResponse, error)
 	Grant(ctx context.Context, in *GrantRequest, opts ...grpc.CallOption) (*GrantResponse, error)
+	// RevokeGrant/ListGrants are the public grant-management surface for the
+	// frontend's Access tab (FE-SOL-001) — distinct from the internal
+	// ListGrantsForAncestors path ResolvePermission's BFS walk uses.
+	RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error)
 	ResolvePermission(ctx context.Context, in *ResolvePermissionRequest, opts ...grpc.CallOption) (*ResolvePermissionResponse, error)
 	Execute(ctx context.Context, in *TaskServiceExecuteRequest, opts ...grpc.CallOption) (*TaskServiceExecuteResponse, error)
 	// HasActiveExecutions answers "does this project have a task currently
@@ -91,11 +98,20 @@ type TaskServiceClient interface {
 	AddComment(ctx context.Context, in *AddCommentRequest, opts ...grpc.CallOption) (*AddCommentResponse, error)
 	ListComments(ctx context.Context, in *ListCommentsRequest, opts ...grpc.CallOption) (*ListCommentsResponse, error)
 	GenerateAgentPrompt(ctx context.Context, in *GenerateAgentPromptRequest, opts ...grpc.CallOption) (*GenerateAgentPromptResponse, error)
-	RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
-	ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error)
 	CreatePublicLink(ctx context.Context, in *CreatePublicLinkRequest, opts ...grpc.CallOption) (*CreatePublicLinkResponse, error)
 	RevokePublicLink(ctx context.Context, in *RevokePublicLinkRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ResolvePublicLink(ctx context.Context, in *ResolvePublicLinkRequest, opts ...grpc.CallOption) (*ResolvePublicLinkResponse, error)
+	// GenerateShareLink/GetTaskByShareToken (TASK-TG-003-05) is a second,
+	// independently-built share-link path alongside CreatePublicLink/
+	// ResolvePublicLink above — narrower (TaskShareView's 4-field projection
+	// vs. a full read-only grant). Both landed with real, tested usecases;
+	// kept side by side rather than unilaterally picking one, since
+	// consolidating them is a product/architecture call, not a merge
+	// decision. GetTaskByShareToken is task-service's first unauthenticated
+	// read endpoint by design (the token itself is the authorization) —
+	// SECURITY REVIEW REQUIRED before this path is exposed at api-gateway.
+	GenerateShareLink(ctx context.Context, in *GenerateShareLinkRequest, opts ...grpc.CallOption) (*GenerateShareLinkResponse, error)
+	GetTaskByShareToken(ctx context.Context, in *GetTaskByShareTokenRequest, opts ...grpc.CallOption) (*GetTaskByShareTokenResponse, error)
 	// ReportTaskExecutionResult is the shared inbound completion callback for
 	// Engine 2 (orchestration-service, via its autonomous coordinator,
 	// SOL-TASKV1-005) and Engine 3 (workflow-service's runToCompletion,
@@ -155,6 +171,26 @@ func (c *taskServiceClient) Grant(ctx context.Context, in *GrantRequest, opts ..
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GrantResponse)
 	err := c.cc.Invoke(ctx, TaskService_Grant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TaskService_RevokeGrant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListGrantsResponse)
+	err := c.cc.Invoke(ctx, TaskService_ListGrants_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -311,26 +347,6 @@ func (c *taskServiceClient) GenerateAgentPrompt(ctx context.Context, in *Generat
 	return out, nil
 }
 
-func (c *taskServiceClient) RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(emptypb.Empty)
-	err := c.cc.Invoke(ctx, TaskService_RevokeGrant_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *taskServiceClient) ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListGrantsResponse)
-	err := c.cc.Invoke(ctx, TaskService_ListGrants_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 func (c *taskServiceClient) CreatePublicLink(ctx context.Context, in *CreatePublicLinkRequest, opts ...grpc.CallOption) (*CreatePublicLinkResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreatePublicLinkResponse)
@@ -361,6 +377,26 @@ func (c *taskServiceClient) ResolvePublicLink(ctx context.Context, in *ResolvePu
 	return out, nil
 }
 
+func (c *taskServiceClient) GenerateShareLink(ctx context.Context, in *GenerateShareLinkRequest, opts ...grpc.CallOption) (*GenerateShareLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateShareLinkResponse)
+	err := c.cc.Invoke(ctx, TaskService_GenerateShareLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GetTaskByShareToken(ctx context.Context, in *GetTaskByShareTokenRequest, opts ...grpc.CallOption) (*GetTaskByShareTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTaskByShareTokenResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetTaskByShareToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *taskServiceClient) ReportTaskExecutionResult(ctx context.Context, in *ReportTaskExecutionResultRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -383,6 +419,11 @@ type TaskServiceServer interface {
 	GetTask(context.Context, *GetTaskRequest) (*GetTaskResponse, error)
 	AddEdge(context.Context, *AddEdgeRequest) (*AddEdgeResponse, error)
 	Grant(context.Context, *GrantRequest) (*GrantResponse, error)
+	// RevokeGrant/ListGrants are the public grant-management surface for the
+	// frontend's Access tab (FE-SOL-001) — distinct from the internal
+	// ListGrantsForAncestors path ResolvePermission's BFS walk uses.
+	RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error)
+	ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error)
 	ResolvePermission(context.Context, *ResolvePermissionRequest) (*ResolvePermissionResponse, error)
 	Execute(context.Context, *TaskServiceExecuteRequest) (*TaskServiceExecuteResponse, error)
 	// HasActiveExecutions answers "does this project have a task currently
@@ -415,11 +456,20 @@ type TaskServiceServer interface {
 	AddComment(context.Context, *AddCommentRequest) (*AddCommentResponse, error)
 	ListComments(context.Context, *ListCommentsRequest) (*ListCommentsResponse, error)
 	GenerateAgentPrompt(context.Context, *GenerateAgentPromptRequest) (*GenerateAgentPromptResponse, error)
-	RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error)
-	ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error)
 	CreatePublicLink(context.Context, *CreatePublicLinkRequest) (*CreatePublicLinkResponse, error)
 	RevokePublicLink(context.Context, *RevokePublicLinkRequest) (*emptypb.Empty, error)
 	ResolvePublicLink(context.Context, *ResolvePublicLinkRequest) (*ResolvePublicLinkResponse, error)
+	// GenerateShareLink/GetTaskByShareToken (TASK-TG-003-05) is a second,
+	// independently-built share-link path alongside CreatePublicLink/
+	// ResolvePublicLink above — narrower (TaskShareView's 4-field projection
+	// vs. a full read-only grant). Both landed with real, tested usecases;
+	// kept side by side rather than unilaterally picking one, since
+	// consolidating them is a product/architecture call, not a merge
+	// decision. GetTaskByShareToken is task-service's first unauthenticated
+	// read endpoint by design (the token itself is the authorization) —
+	// SECURITY REVIEW REQUIRED before this path is exposed at api-gateway.
+	GenerateShareLink(context.Context, *GenerateShareLinkRequest) (*GenerateShareLinkResponse, error)
+	GetTaskByShareToken(context.Context, *GetTaskByShareTokenRequest) (*GetTaskByShareTokenResponse, error)
 	// ReportTaskExecutionResult is the shared inbound completion callback for
 	// Engine 2 (orchestration-service, via its autonomous coordinator,
 	// SOL-TASKV1-005) and Engine 3 (workflow-service's runToCompletion,
@@ -456,6 +506,12 @@ func (UnimplementedTaskServiceServer) AddEdge(context.Context, *AddEdgeRequest) 
 }
 func (UnimplementedTaskServiceServer) Grant(context.Context, *GrantRequest) (*GrantResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Grant not implemented")
+}
+func (UnimplementedTaskServiceServer) RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeGrant not implemented")
+}
+func (UnimplementedTaskServiceServer) ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListGrants not implemented")
 }
 func (UnimplementedTaskServiceServer) ResolvePermission(context.Context, *ResolvePermissionRequest) (*ResolvePermissionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolvePermission not implemented")
@@ -502,12 +558,6 @@ func (UnimplementedTaskServiceServer) ListComments(context.Context, *ListComment
 func (UnimplementedTaskServiceServer) GenerateAgentPrompt(context.Context, *GenerateAgentPromptRequest) (*GenerateAgentPromptResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GenerateAgentPrompt not implemented")
 }
-func (UnimplementedTaskServiceServer) RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error) {
-	return nil, status.Error(codes.Unimplemented, "method RevokeGrant not implemented")
-}
-func (UnimplementedTaskServiceServer) ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListGrants not implemented")
-}
 func (UnimplementedTaskServiceServer) CreatePublicLink(context.Context, *CreatePublicLinkRequest) (*CreatePublicLinkResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreatePublicLink not implemented")
 }
@@ -516,6 +566,12 @@ func (UnimplementedTaskServiceServer) RevokePublicLink(context.Context, *RevokeP
 }
 func (UnimplementedTaskServiceServer) ResolvePublicLink(context.Context, *ResolvePublicLinkRequest) (*ResolvePublicLinkResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolvePublicLink not implemented")
+}
+func (UnimplementedTaskServiceServer) GenerateShareLink(context.Context, *GenerateShareLinkRequest) (*GenerateShareLinkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateShareLink not implemented")
+}
+func (UnimplementedTaskServiceServer) GetTaskByShareToken(context.Context, *GetTaskByShareTokenRequest) (*GetTaskByShareTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTaskByShareToken not implemented")
 }
 func (UnimplementedTaskServiceServer) ReportTaskExecutionResult(context.Context, *ReportTaskExecutionResultRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method ReportTaskExecutionResult not implemented")
@@ -609,6 +665,42 @@ func _TaskService_Grant_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TaskServiceServer).Grant(ctx, req.(*GrantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_RevokeGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeGrantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).RevokeGrant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_RevokeGrant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).RevokeGrant(ctx, req.(*RevokeGrantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ListGrants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListGrantsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ListGrants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ListGrants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ListGrants(ctx, req.(*ListGrantsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -883,42 +975,6 @@ func _TaskService_GenerateAgentPrompt_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _TaskService_RevokeGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(RevokeGrantRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TaskServiceServer).RevokeGrant(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TaskService_RevokeGrant_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TaskServiceServer).RevokeGrant(ctx, req.(*RevokeGrantRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _TaskService_ListGrants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListGrantsRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(TaskServiceServer).ListGrants(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: TaskService_ListGrants_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(TaskServiceServer).ListGrants(ctx, req.(*ListGrantsRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _TaskService_CreatePublicLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CreatePublicLinkRequest)
 	if err := dec(in); err != nil {
@@ -973,6 +1029,42 @@ func _TaskService_ResolvePublicLink_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_GenerateShareLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateShareLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GenerateShareLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GenerateShareLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GenerateShareLink(ctx, req.(*GenerateShareLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GetTaskByShareToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTaskByShareTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetTaskByShareToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetTaskByShareToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetTaskByShareToken(ctx, req.(*GetTaskByShareTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _TaskService_ReportTaskExecutionResult_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ReportTaskExecutionResultRequest)
 	if err := dec(in); err != nil {
@@ -1013,6 +1105,14 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Grant",
 			Handler:    _TaskService_Grant_Handler,
+		},
+		{
+			MethodName: "RevokeGrant",
+			Handler:    _TaskService_RevokeGrant_Handler,
+		},
+		{
+			MethodName: "ListGrants",
+			Handler:    _TaskService_ListGrants_Handler,
 		},
 		{
 			MethodName: "ResolvePermission",
@@ -1075,14 +1175,6 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _TaskService_GenerateAgentPrompt_Handler,
 		},
 		{
-			MethodName: "RevokeGrant",
-			Handler:    _TaskService_RevokeGrant_Handler,
-		},
-		{
-			MethodName: "ListGrants",
-			Handler:    _TaskService_ListGrants_Handler,
-		},
-		{
 			MethodName: "CreatePublicLink",
 			Handler:    _TaskService_CreatePublicLink_Handler,
 		},
@@ -1093,6 +1185,14 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResolvePublicLink",
 			Handler:    _TaskService_ResolvePublicLink_Handler,
+		},
+		{
+			MethodName: "GenerateShareLink",
+			Handler:    _TaskService_GenerateShareLink_Handler,
+		},
+		{
+			MethodName: "GetTaskByShareToken",
+			Handler:    _TaskService_GetTaskByShareToken_Handler,
 		},
 		{
 			MethodName: "ReportTaskExecutionResult",

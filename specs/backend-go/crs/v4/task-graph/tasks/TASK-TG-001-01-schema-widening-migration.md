@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/migrations/0004_task_fields_and_comments.up.sql` (new), `backend-go/services/task-service/migrations/0004_task_fields_and_comments.down.sql` (new)
 **Depends on:** None (first BE-SOL-001 task)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -138,3 +138,20 @@ columns are dropped — order matters since the down migration's constraint
 recreation must run first, matching the up migration's own drop-then-add
 ordering in reverse); no existing `task.tasks` row is affected (every new
 column is nullable or has a safe default, no NOT NULL without DEFAULT).
+
+## Execution notes (2026-09-09)
+
+Wrote `0004_task_fields_and_comments.up/down.sql` exactly as specified,
+**combined with TASK-TG-003-03's `task.task_grants.expires_at` and
+TASK-TG-003-05's `task.tasks.share_token` + partial index** in the same
+file, per this task's own Context note (single agent run implementing all
+three in dependency order — avoids the three-competing-edits scenario the
+Context section warns about). Did not include the
+`task.task_comments_index()` prose-as-SQL line.
+
+Verify: `go test -tags=integration ./services/task-service/internal/adapter/postgres/... -run TestRepository -v` — 8/9 passed; `TestRepository_Update_WrongTenant_Fails` failed once with
+`pq: the database system is starting up` (a testcontainers container-readiness
+race predating this change, not a migration defect) and passed cleanly
+(14.51s) when re-run in isolation. Migration applies cleanly on top of
+0001-0003 in every run; all other repository tests (grants, list, update,
+delete, RunInTx) passed against the widened schema.

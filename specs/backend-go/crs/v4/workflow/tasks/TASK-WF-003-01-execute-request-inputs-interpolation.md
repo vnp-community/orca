@@ -5,7 +5,127 @@
 **Service:** `workflow-service`
 **File:** `backend-go/proto/orca/workflow/v1/workflow.proto` (`ExecuteRequest`), `backend-go/services/workflow-service/internal/usecase/execute.go`, `backend-go/services/workflow-service/internal/usecase/interpolate.go` (new), `backend-go/services/workflow-service/internal/usecase/wave_dispatcher.go`, `backend-go/services/workflow-service/internal/adapter/grpc/server.go`
 **Depends on:** TASK-WF-002-03 (this task's interpolation pass runs on step config JSON before the resolvers/executors from that task consume it)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+**Coordination check (re-run live immediately before editing, as
+instructed):** `ExecuteRequest` still exactly `{template_id, project_id,
+root_trace_id, request_id}` — `origin_task_id` has not landed
+(`TASK-FT-002-01` still `[ ]` TODO). Added `inputs` as field `5`, no
+collision.
+
+**Real bug in BE-SOL-003's own sketch, caught and fixed, not copied
+blind:** the sketch put `inputs`/`completedOutputs` as fields directly on
+`waveDispatcher`. `waveDispatcher` is constructed ONCE per usecase
+(`Execute.dispatcher`, `ExecuteAdHocStep.dispatcher` — both set at
+`New*` time, not per-call) and shared across every call that usecase ever
+makes. Storing per-execution data on it would let two concurrent
+executions dispatched through the same shared dispatcher clobber each
+other's inputs — a real, live concurrency bug. Fixed by threading
+`inputs`/`completedOutputs` as call parameters all the way down
+(`dispatchWaves` → `dispatchWavesFrom` → `dispatchWave` → `dispatchStep` →
+`runStep`) instead — `wave_dispatcher_test.go` run under `go test -race`
+confirms no data race.
+
+**completedOutputs accumulation:** built once in `dispatchWavesFrom`
+(seeded from `existingRows` for the resume case), passed by reference into
+each `dispatchWave` call and mutated in place after that wave's `wg.Wait()`
+— so a step in wave N+2 can reference wave N's output. Within one wave,
+each goroutine writes its own `StepResult` to its own slice index (same
+pattern `results []bool` already used) — merged into the shared map
+single-threaded, after all goroutines finish, avoiding concurrent map
+writes.
+
+**Persistence for resume/recovery — resolved the task's own open
+question:** added `domain.WorkflowExecution.InputsJSON string`, set via
+direct field assignment in `Execute.Execute` (NOT a `NewWorkflowExecution`
+constructor parameter — that constructor has 30+ existing call sites
+across this codebase; widening it for genuinely optional data was out of
+proportion, same reasoning `PausedAt`'s post-construction `Pause()` already
+established). Added migration `0008_execution_inputs_json`
+(`workflow.executions.inputs_json JSONB`) and threaded it through
+`CreateExecution`/`GetExecution`/`ListRunning` (the query
+`RecoverExecutions` actually uses to enumerate resumable executions).
+`RecoverExecutions.resumeToCompletion` decodes it back to
+`map[string]any` before resuming dispatch.
+
+**Flagged scope reduction (per the task's own explicit allowance):** the
+test plan's "referencing a step that hasn't run yet" case is caught at
+dispatch time (`resolveStepOutput`'s error), NOT via an execute-start
+static DAG-shape check — BE-SOL-003's stated preference. A static check
+would need to walk the template's dag_json for `{{outputs.*}}` references
+and cross-check against topological order before Execute even persists
+the execution row; out of this task's time budget. The dispatch-time
+error is still a clear, non-silent failure (see
+`TestWaveDispatcher_UnresolvableOutputReferenceFailsStepNotPanic`), just
+one wave dispatch later than the ideal.
+
+**Also flagged:** `resolveStepOutput`'s field-extraction (left as an
+explicit placeholder in the task's own sketch) is fully implemented here —
+walks arbitrarily nested JSON via repeated `map[string]any` lookups, not
+just one level, so `{{outputs.stepX.data.branch}}` works, not only
+`{{outputs.stepX.branch}}`.
+
+**Changes made:**
+1. `workflow.proto`: added `import "google/protobuf/struct.proto"` +
+   `ExecuteRequest.inputs` (field 5); regenerated via `buf generate`.
+2. `internal/usecase/interpolate.go` (new): `Interpolate` (verbatim logic
+   from the task, `resolveStepOutput` fully implemented) +
+   `interpolateStepConfig`/`interpolateValue` (generic recursive JSON-tree
+   walker interpolating every string leaf — new, the task left this
+   "exact implementation left to the engineer").
+3. `internal/usecase/execute.go`: `ExecuteInput.Inputs`; marshals into
+   `exec.InputsJSON`; threads `in.Inputs` through to `dispatchWaves` via
+   the detached `runToCompletion` goroutine.
+4. `internal/usecase/execute_ad_hoc_step.go`: `runStep` call updated with
+   `nil, nil` (ad hoc runs have no `ExecuteRequest.inputs` field at all —
+   confirmed live, same gap TASK-WF-002-03 already flagged for
+   `ProjectID`).
+5. `internal/usecase/recover_executions.go`: decodes `exec.InputsJSON`,
+   passes to `dispatchWavesFrom`; a decode failure logs and resumes with
+   no inputs rather than aborting the whole process-wide recovery scan
+   over one row's corrupted JSON.
+6. `internal/usecase/wave_dispatcher.go`: `dispatchWaves`/
+   `dispatchWavesFrom`/`dispatchWave`/`dispatchStep`/`runStep` all widened
+   with `inputs`/`outputs` parameters (not struct fields, see the
+   concurrency-bug note above); `runStep` now calls
+   `interpolateStepConfig` immediately before `executor.Execute`.
+7. `internal/adapter/grpc/server.go`: `Execute` handler adds
+   `Inputs: req.GetInputs().AsMap()`.
+8. `internal/domain/execution.go`: `WorkflowExecution.InputsJSON` field.
+9. `internal/adapter/postgres/repository.go` +
+   `migrations/0008_execution_inputs_json.{up,down}.sql`: persist/read
+   `inputs_json` in `CreateExecution`/`GetExecution`/`ListRunning`.
+10. Test-only: `wave_dispatcher_test.go` call sites widened
+    (`nil`/`waves` → `..., nil` for the new `inputs` param).
+
+**Verify output:**
+```
+go build ./services/workflow-service/... ./services/api-gateway/...   # clean
+go vet   ./services/workflow-service/... ./services/api-gateway/...   # clean
+go test  ./services/workflow-service/internal/usecase/... -run "TestInterpolate|TestExecute|TestWaveDispatcher" -v
+  # 34/34 PASS — includes 11 new Interpolate/interpolateStepConfig unit
+  # tests and 3 new wave_dispatcher integration tests (inputs reach
+  # Execute; cross-wave output reaches a later wave; unresolvable
+  # reference fails the step, not a panic)
+go test -race ./services/workflow-service/internal/usecase/...   # ok, no data races
+go test  ./services/workflow-service/... ./services/api-gateway/...   # full suite, all ok
+go test -tags=integration ./services/workflow-service/internal/adapter/postgres/... \
+  -run "TestRepository_CreateExecution_PersistsInputsJSON|TestRepository_CreateExecution_EmptyInputsJSONRoundTripsEmpty" -v
+  # both PASS in isolation against a real testcontainers Postgres (one hit
+  # the same pre-existing sandbox testcontainers-readiness flake already
+  # documented in TASK-WF-005-01's notes on a retry; passed clean on
+  # re-run — confirmed environmental, not a code defect)
+```
+
+**Not done — explicitly out of scope, flagged for follow-up:** the
+`workflow.execute` wscompat channel (api-gateway) does not yet forward an
+`inputs` argument to `ExecuteRequest.inputs` — this task's own file list
+(proto/execute.go/interpolate.go/wave_dispatcher.go/server.go) didn't
+include `channels_workflow.go`, so this wasn't touched; a frontend caller
+wanting to supply inputs today has no wire path to do so until that
+channel is updated.
 
 ---
 

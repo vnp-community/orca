@@ -59,7 +59,10 @@ type Grant struct {
 	SubjectID string
 	Level     GrantLevel
 	ApplyTree bool
-	ExpiresAt *time.Time // new — nil = never expires
+	// ExpiresAt is nullable — a nil ExpiresAt never expires. Filtered at
+	// read time by ResolvePermission (TASK-TG-003-03), not enforced here:
+	// this pure domain type has no notion of "now."
+	ExpiresAt *time.Time
 }
 
 // CallerIdentity is the resolved-identity input to grant resolution: the

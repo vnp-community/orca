@@ -66,6 +66,21 @@ type WorkflowExecution struct {
 	// workflow run. runToCompletion (TASK-FT-002-05) reports back to
 	// task-service via ReportTaskExecutionResult iff this is non-empty.
 	OriginTaskID string
+	// InputsJSON is ExecuteRequest.inputs_json (TASK-WF-003-01), frozen at
+	// Execute time — a {{input_field}} reference inside a step dispatched
+	// after a restart still needs the original inputs available, so this
+	// is persisted alongside the execution rather than only held in
+	// Execute's in-memory ExecutionContext. Set via direct field assignment
+	// after NewWorkflowExecution (not a constructor parameter) to avoid
+	// widening that constructor's signature across its 30+ existing call
+	// sites for what is genuinely optional data — same
+	// set-after-construction pattern PausedAt already uses via Pause().
+	// Empty string (not "{}"), same as DAGJSON's blank-string convention,
+	// means "no inputs were supplied." Consumed by RecoverExecutions'
+	// resumeToCompletion so a step dispatched after a crash-restart still
+	// has the original inputs available (closing the gap this field's
+	// absence used to leave — see that function's doc comment).
+	InputsJSON string
 }
 
 // NewWorkflowExecution constructs a WorkflowExecution in StatusRunning —

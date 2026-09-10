@@ -4,7 +4,9 @@
 **Solution Ref:** FE-SOL-001 Phần 3
 **Priority:** 🟠 P1
 **Estimated:** 45 phút
-**Status:** ✅ DONE — 2026-09-09
+**Status:** ✅ DONE — 2026-09-09 (2 lượt triển khai độc lập được ghi nhận khi merge — xem 2 ghi chú dưới đây)
+
+---
 
 ### Kết quả thực tế
 
@@ -38,7 +40,35 @@ Làm đúng thứ tự bước 1 (đổi type) trước bước 2-4, đúng file
 Không có gap chưa xử lý — cả phần type, RPC, UI, và regression phát sinh từ `StepStatusBadge` đều
 đã vá và có test.
 
----
+### Kết quả thực thi (ghi chú B, 2026-09-09)
+
+- Thêm `'paused'` vào `WorkflowExecutionStatus` ở đúng `frontend/src/shared/workflow-types.ts`
+  (đã xác nhận đây là file THẬT, không phải file chết ở `renderer/src/types/` — file đó đã bị xoá
+  hoàn toàn ở FE-TASK-006, làm trước task này đúng khuyến nghị điều phối).
+- Thêm `pauseExecution`/`resumeExecution` vào `useWorkflowExecution.ts`, cả 2 đều tự
+  `updateExecutionStatus` optimistic ngay sau RPC thành công (đúng lý do nêu trong task: polling
+  effect chỉ re-arm khi `executionStatus` đổi, không optimistic thì Resume sẽ kẹt polling vĩnh viễn).
+  Thêm `import { toast } from 'sonner'` (chưa có trong file trước đó).
+- Thêm nút Pause (khi `running`)/Resume (khi `paused`) vào `ExecutionMonitor.tsx`, giữ Cancel chỉ
+  hiện khi `running` (không đổi hành vi cũ).
+- Vá `STATUS_LABEL` ở `WorkflowMonitor.tsx` thêm key `paused`.
+- **Phát hiện thêm ngoài task file**: `StepStatusBadge.tsx`'s `STEP_STATUS` là
+  `Record<StepStatus | WorkflowExecutionStatus, ...>` — thêm `'paused'` vào
+  `WorkflowExecutionStatus` khiến map này cũng cần 1 entry `paused` mới (object literal exhaustive)
+  để không throw khi `ExecutionMonitor.tsx` gọi `<StepStatusBadge status={execution.status}>` với
+  status `'paused'`. Đã thêm icon `PauseCircle` (lucide-react), màu `text-amber-500`.
+- ⚠️ **Lưu ý quan trọng cho người review**: `frontend/tsconfig.json` hôm nay **thiếu path mapping
+  cho alias `@shared/*`** (chỉ có `@renderer/*` và `@/*`) — đây là gap tiền tồn tại, không do task
+  này gây ra (`npx tsc --noEmit -p .` đã có sẵn ~10 lỗi `Cannot find module '@shared/workflow-types'`
+  /`'@shared/workspace-types'` từ trước ở nhiều file khác chưa từng liên quan tới series này). Do
+  module không resolve được, `tsc` không thể tự phát hiện thiếu key trong các `Record<
+  WorkflowExecutionStatus, ...>` như kỳ vọng của "bước 1 sẽ khiến tsc báo lỗi ngay" — đã tự rà thủ
+  công tất cả chỗ dùng `Record<WorkflowExecutionStatus,...>`/`Record<BadgeStatus,...>` thay vì dựa
+  vào compiler. Không tự sửa `tsconfig.json`'s alias ở task này (ngoài phạm vi, ảnh hưởng rộng toàn
+  bộ ~80 lỗi tiền tồn tại khác) — gắn cờ để human review cân nhắc 1 task riêng.
+- Test: `npx vitest run useWorkflowExecution.test.ts ExecutionMonitor.test.tsx
+  WorkflowMonitor.test.tsx StepStatusBadge.test.tsx` → 33/33 pass (đã thêm 4 case pause/resume ở
+  `useWorkflowExecution.test.ts`, 3 case Pause/Resume UI ở `ExecutionMonitor.test.tsx`).
 
 ## Mục tiêu
 

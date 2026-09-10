@@ -16,6 +16,11 @@ service TaskService {
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
   rpc AddEdge(AddEdgeRequest) returns (AddEdgeResponse);
   rpc Grant(GrantRequest) returns (GrantResponse);
+  // RevokeGrant/ListGrants are the public grant-management surface for the
+  // frontend's Access tab (FE-SOL-001) — distinct from the internal
+  // ListGrantsForAncestors path ResolvePermission's BFS walk uses.
+  rpc RevokeGrant(RevokeGrantRequest) returns (google.protobuf.Empty);
+  rpc ListGrants(ListGrantsRequest) returns (ListGrantsResponse);
   rpc ResolvePermission(ResolvePermissionRequest) returns (ResolvePermissionResponse);
   rpc Execute(TaskServiceExecuteRequest) returns (TaskServiceExecuteResponse);
 
@@ -54,12 +59,21 @@ service TaskService {
 
   rpc GenerateAgentPrompt(GenerateAgentPromptRequest) returns (GenerateAgentPromptResponse);
 
-  rpc RevokeGrant(RevokeGrantRequest) returns (google.protobuf.Empty);
-  rpc ListGrants(ListGrantsRequest) returns (ListGrantsResponse);
-
   rpc CreatePublicLink(CreatePublicLinkRequest) returns (CreatePublicLinkResponse); // requires 'manage'; returns the plaintext token ONCE
   rpc RevokePublicLink(RevokePublicLinkRequest) returns (google.protobuf.Empty);
   rpc ResolvePublicLink(ResolvePublicLinkRequest) returns (ResolvePublicLinkResponse); // token -> task_id + read-only grant, no auth required
+
+  // GenerateShareLink/GetTaskByShareToken (TASK-TG-003-05) is a second,
+  // independently-built share-link path alongside CreatePublicLink/
+  // ResolvePublicLink above — narrower (TaskShareView's 4-field projection
+  // vs. a full read-only grant). Both landed with real, tested usecases;
+  // kept side by side rather than unilaterally picking one, since
+  // consolidating them is a product/architecture call, not a merge
+  // decision. GetTaskByShareToken is task-service's first unauthenticated
+  // read endpoint by design (the token itself is the authorization) —
+  // SECURITY REVIEW REQUIRED before this path is exposed at api-gateway.
+  rpc GenerateShareLink(GenerateShareLinkRequest) returns (GenerateShareLinkResponse);
+  rpc GetTaskByShareToken(GetTaskByShareTokenRequest) returns (GetTaskByShareTokenResponse);
 
   // ReportTaskExecutionResult is the shared inbound completion callback for
   // Engine 2 (orchestration-service, via its autonomous coordinator,
@@ -76,6 +90,31 @@ service TaskService {
   // added. Implemented for real as of TASK-FT-002-04 (this was previously a
   // compile-only stub returning codes.Unimplemented).
   rpc ReportTaskExecutionResult(ReportTaskExecutionResultRequest) returns (google.protobuf.Empty);
+}
+
+message GenerateShareLinkRequest {
+  string task_id = 1;
+  string user_id = 2; // acting caller — must hold admin-level permission
+}
+message GenerateShareLinkResponse {
+  string share_token = 1;
+}
+
+message GetTaskByShareTokenRequest {
+  string share_token = 1;
+}
+message GetTaskByShareTokenResponse {
+  TaskShareView task = 1;
+}
+// TaskShareView is a DEDICATED, narrow projection — NOT Task reused with
+// fields blanked out, so a future Task field addition can never leak
+// through this public, unauthenticated path by accident. ONLY these 4
+// fields, ever — see domain.TaskShareView's own doc comment.
+message TaskShareView {
+  string id = 1;
+  string title = 2;
+  string status = 3;
+  string description = 4;
 }
 
 message Task {
@@ -113,6 +152,21 @@ message Task {
   // workflow_template_id: optional workflow-service template attached to
   // this task (Engine 3). Empty = none attached. See docs/backlog/BACKLOG-016.
   string workflow_template_id = 24; // BE-SOL-001/BE-SOL-002 — empty = unchanged behavior (selectEngine treats "" as "no workflow engine selected"); mirrors domain.Task.WorkflowTemplateID (TASK-FT-001-01/02)
+  // Fields below (TASK-TG-001-02) were present on domain.Task before the
+  // proto caught up — added here at the next-free numbers rather than the
+  // task's own self-assigned ones, which collided with fields main had
+  // already claimed (see workflow_template_id above).
+  repeated string labels = 25;
+  string reporter_id = 26;
+  string workflow_exec_id = 27; // execution-tracking counterpart to workflow_template_id above — see domain.Task.WorkflowExecID
+  int32 done_subtasks = 28;
+  int32 total_subtasks = 29;
+  // share_token: unset until GenerateShareLink mints one (TASK-TG-003-05 —
+  // SECURITY REVIEW REQUIRED before merge). Only readable here via an
+  // authenticated Task read (GetTask/ListTasks with a valid grant); the
+  // public GetTaskByShareToken RPC returns a dedicated, narrower
+  // TaskShareView instead — see that message's own doc comment.
+  string share_token = 30;
 }
 
 message CreateTaskRequest {
@@ -129,6 +183,11 @@ message CreateTaskRequest {
   string prompt_template = 11;
   string ai_context = 12;
   string visibility = 13;
+  // creator_id: the caller's own user id — mints an owner-level Grant for
+  // this task (TASK-TG-003-02), separate from and NOT the same as
+  // Task.owner_id (informational/display-only, never read by
+  // ResolvePermission).
+  string creator_id = 14;
 }
 
 message CreateTaskResponse {
@@ -172,11 +231,35 @@ message GrantRequest {
   string subject_id = 2; // user or team id
   GrantLevel level = 3;
   bool apply_tree = 4;
-  google.protobuf.Timestamp expires_at = 5; // optional; unset = never expires
+  // expires_at: optional (TASK-TG-003-03) — unset means the grant never
+  // expires.
+  google.protobuf.Timestamp expires_at = 5;
 }
 
 message GrantResponse {
   string id = 1; // new — the persisted grant's id, needed by RevokeGrant callers
+}
+
+message RevokeGrantRequest {
+  string task_id = 1;
+  string subject_id = 2;
+  GrantLevel level = 3;
+}
+
+message ListGrantsRequest {
+  string task_id = 1;
+}
+message ListGrantsResponse {
+  repeated GrantView grants = 1;
+}
+// GrantView is a dedicated, narrow projection of task.task_grants — task_id
+// is deliberately omitted (the caller already knows it, from
+// ListGrantsRequest.task_id) and tenant_id is never exposed on the wire.
+message GrantView {
+  string subject_id = 1;
+  GrantLevel level = 2;
+  bool apply_tree = 3;
+  google.protobuf.Timestamp expires_at = 4; // unset if never expires
 }
 
 // ResolvePermission runs the BFS ancestor-resolution algorithm in domain/,
@@ -185,7 +268,12 @@ message GrantResponse {
 message ResolvePermissionRequest {
   string task_id = 1;
   string user_id = 2;
-  string action = 3; // new — closes README.md's "no action field on the wire" gap
+  // action: the OPA action being authorized (e.g. "read"/"write"/"admin"),
+  // forwarded to task_grant.rego's level_actions table. Empty (an older
+  // client that hasn't been rebuilt against this field yet) defaults to
+  // "read" at the server.go call site, not here — see that handler's doc
+  // comment.
+  string action = 3;
 }
 
 message ResolvePermissionResponse {
@@ -337,24 +425,6 @@ message ListCommentsResponse { repeated AddCommentResponse comments = 1; string 
 
 message GenerateAgentPromptRequest { string task_id = 1; bool save = 2; }
 message GenerateAgentPromptResponse { string prompt = 1; }
-
-message RevokeGrantRequest {
-  string task_id = 1;
-  string grant_id = 2;
-}
-
-message ListGrantsRequest { string task_id = 1; }
-message Grant {
-  string id = 1;
-  string task_id = 2;
-  string subject_id = 3;
-  GrantLevel level = 4;
-  bool apply_tree = 5;
-  google.protobuf.Timestamp expires_at = 6;
-}
-message ListGrantsResponse {
-  repeated Grant grants = 1;
-}
 
 message CreatePublicLinkRequest { string task_id = 1; google.protobuf.Timestamp expires_at = 2; }
 message CreatePublicLinkResponse { string id = 1; string token = 2; } // token returned ONCE, plaintext, never again

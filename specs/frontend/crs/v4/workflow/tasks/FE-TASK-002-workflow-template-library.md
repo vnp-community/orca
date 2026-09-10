@@ -4,7 +4,9 @@
 **Solution Ref:** FE-SOL-001 Phần 2
 **Priority:** 🔴 P0 — gap chính ma trận hoàn thành nêu
 **Estimated:** 75 phút
-**Status:** ✅ DONE — 2026-09-09
+**Status:** ✅ DONE — 2026-09-09 (2 lượt triển khai độc lập được ghi nhận khi merge — xem 2 ghi chú dưới đây)
+
+---
 
 ### Kết quả thực tế
 
@@ -34,7 +36,28 @@ Gap thật đã biết trước (không phải lỗi phát sinh): search full-te
 Share/Clone thật đều chờ BE-SOL-005's `SearchTemplates`/sharing RPC — đúng như task đã flag từ
 đầu, không tự chế RPC giả.
 
----
+### Kết quả thực thi (ghi chú B, 2026-09-09)
+
+- Tạo mới `useWorkflowLibrary.ts` (hook `LibraryScope = 'company'|'team'|'personal'`, dùng
+  `workflow.template.list({scope})` thật, filter search client-side), `WorkflowTemplateCard.tsx`,
+  `WorkflowLibrary.tsx` — đúng nguyên mẫu code trong task file, không tái dùng `WorkflowScope` (khác
+  khái niệm, đã ghi rõ trong comment).
+- `WorkspaceLayout.tsx`: mở rộng `workflowView` từ FE-TASK-001 thành
+  `'monitor' | 'builder' | 'library'`, thêm state `selectedTemplateId`, lazy-load `WorkflowLibrary`,
+  nối `onUseTemplate` → mở Builder với đúng `templateId` đã chọn.
+- `WorkflowMonitor.tsx`: thêm prop optional `onOpenLibrary` + nút "Browse Library" cạnh "+ New
+  Workflow" (chỉ render khi prop được truyền — giữ tương thích ngược nếu có caller khác không cần
+  Library).
+- Test: tạo `useWorkflowLibrary.test.ts` (5 case: mount theo scope, đổi scope, search lọc
+  case-insensitive, RPC lỗi, reload) + `WorkflowLibrary.test.tsx` (6 case: 3 tab, empty/loading/error
+  state, click Use, gõ search). Cập nhật `WorkflowMonitor.test.tsx` (2 case Browse Library) và
+  `WorkspaceLayout.test.tsx` (mock `WorkflowLibrary` mới + 1 case toggle Library→Builder với đúng
+  `templateId`).
+- Test: `npx vitest run useWorkflowLibrary.test.ts WorkflowLibrary.test.tsx WorkflowMonitor.test.tsx
+  WorkspaceLayout.test.tsx` → 34/34 pass.
+- Đúng phạm vi: `onPreview`/`onClone` no-op (chưa có RPC preview/clone thật), search chỉ lọc
+  client-side trên tập đã load theo `scope` (chưa có `SearchTemplates`, BE-SOL-005 📋 Proposed) —
+  không chặn phần Browse/Use, đúng ghi chú "Không làm ở task này".
 
 ## Mục tiêu
 

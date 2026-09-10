@@ -30,6 +30,7 @@ const (
 	WorkflowService_ListTemplates_FullMethodName         = "/orca.workflow.v1.WorkflowService/ListTemplates"
 	WorkflowService_ResolveTemplate_FullMethodName       = "/orca.workflow.v1.WorkflowService/ResolveTemplate"
 	WorkflowService_HasActiveExecutions_FullMethodName   = "/orca.workflow.v1.WorkflowService/HasActiveExecutions"
+	WorkflowService_ListExecutions_FullMethodName        = "/orca.workflow.v1.WorkflowService/ListExecutions"
 	WorkflowService_CloneTemplate_FullMethodName         = "/orca.workflow.v1.WorkflowService/CloneTemplate"
 	WorkflowService_StreamExecutionEvents_FullMethodName = "/orca.workflow.v1.WorkflowService/StreamExecutionEvents"
 	WorkflowService_PublishTemplate_FullMethodName       = "/orca.workflow.v1.WorkflowService/PublishTemplate"
@@ -84,6 +85,11 @@ type WorkflowServiceClient interface {
 	// project-service.RebindDevServer's guard, previously a client-side
 	// no-op because this RPC didn't exist.
 	HasActiveExecutions(ctx context.Context, in *HasActiveExecutionsRequest, opts ...grpc.CallOption) (*HasActiveExecutionsResponse, error)
+	// ListExecutions keyset-paginates a project's workflow executions, newest
+	// first — TASK-WF-005-01 (P0): WorkflowMonitor.tsx (frontend) already
+	// calls workflow.listExecutions and had no backing RPC, so the Workflow
+	// tab failed to load for every backend-go user before this was added.
+	ListExecutions(ctx context.Context, in *ListExecutionsRequest, opts ...grpc.CallOption) (*ListExecutionsResponse, error)
 	// CloneTemplate snapshots a RESOLVED template (server-computed) into a
 	// brand-new, disconnected root template — distinct from CreateTemplate,
 	// which always takes caller-supplied dag_json.
@@ -234,6 +240,16 @@ func (c *workflowServiceClient) HasActiveExecutions(ctx context.Context, in *Has
 	return out, nil
 }
 
+func (c *workflowServiceClient) ListExecutions(ctx context.Context, in *ListExecutionsRequest, opts ...grpc.CallOption) (*ListExecutionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListExecutionsResponse)
+	err := c.cc.Invoke(ctx, WorkflowService_ListExecutions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *workflowServiceClient) CloneTemplate(ctx context.Context, in *CloneTemplateRequest, opts ...grpc.CallOption) (*CloneTemplateResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CloneTemplateResponse)
@@ -376,6 +392,11 @@ type WorkflowServiceServer interface {
 	// project-service.RebindDevServer's guard, previously a client-side
 	// no-op because this RPC didn't exist.
 	HasActiveExecutions(context.Context, *HasActiveExecutionsRequest) (*HasActiveExecutionsResponse, error)
+	// ListExecutions keyset-paginates a project's workflow executions, newest
+	// first — TASK-WF-005-01 (P0): WorkflowMonitor.tsx (frontend) already
+	// calls workflow.listExecutions and had no backing RPC, so the Workflow
+	// tab failed to load for every backend-go user before this was added.
+	ListExecutions(context.Context, *ListExecutionsRequest) (*ListExecutionsResponse, error)
 	// CloneTemplate snapshots a RESOLVED template (server-computed) into a
 	// brand-new, disconnected root template — distinct from CreateTemplate,
 	// which always takes caller-supplied dag_json.
@@ -448,6 +469,9 @@ func (UnimplementedWorkflowServiceServer) ResolveTemplate(context.Context, *Reso
 }
 func (UnimplementedWorkflowServiceServer) HasActiveExecutions(context.Context, *HasActiveExecutionsRequest) (*HasActiveExecutionsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method HasActiveExecutions not implemented")
+}
+func (UnimplementedWorkflowServiceServer) ListExecutions(context.Context, *ListExecutionsRequest) (*ListExecutionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListExecutions not implemented")
 }
 func (UnimplementedWorkflowServiceServer) CloneTemplate(context.Context, *CloneTemplateRequest) (*CloneTemplateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CloneTemplate not implemented")
@@ -695,6 +719,24 @@ func _WorkflowService_HasActiveExecutions_Handler(srv interface{}, ctx context.C
 	return interceptor(ctx, in, info, handler)
 }
 
+func _WorkflowService_ListExecutions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListExecutionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(WorkflowServiceServer).ListExecutions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: WorkflowService_ListExecutions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(WorkflowServiceServer).ListExecutions(ctx, req.(*ListExecutionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _WorkflowService_CloneTemplate_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CloneTemplateRequest)
 	if err := dec(in); err != nil {
@@ -900,6 +942,10 @@ var WorkflowService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "HasActiveExecutions",
 			Handler:    _WorkflowService_HasActiveExecutions_Handler,
+		},
+		{
+			MethodName: "ListExecutions",
+			Handler:    _WorkflowService_ListExecutions_Handler,
 		},
 		{
 			MethodName: "CloneTemplate",

@@ -47,6 +47,8 @@ export function WorkflowLibrary({
               key={t.id}
               template={t}
               onUse={() => onUseTemplate(t.id)}
+              // BE-SOL-005 is still Proposed — no real preview/clone RPC exists yet,
+              // so these are intentional no-ops rather than fabricating a fake RPC call.
               onPreview={() => {}}
               onClone={() => {}}
             />

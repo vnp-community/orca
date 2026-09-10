@@ -214,6 +214,8 @@ describe('TaskDetail', () => {
     render(<TaskDetail />)
 
     await waitFor(() => {
+      // useTaskActivity.ts calls task.get with {id} — see channels.go's
+      // task.get registration (getArgs.ID, json tag "id").
       expect(mockRpc).toHaveBeenCalledWith('mock-target', 'task.get', { id: 't1' })
     })
     await waitFor(() => {
@@ -305,13 +307,13 @@ describe('TaskDetail', () => {
     })
   })
 
-  it('Access tab renders TaskAccessPanel — unsupported message by default (RPC not wired)', async () => {
+  it('tab "Access" renders TaskGrantModal for the current task', async () => {
     render(<TaskDetail />)
     // Radix TabsTrigger switches tabs on mousedown (not click) — see
     // @radix-ui/react-tabs's TabsTrigger onMouseDown handler.
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Access' }))
     await waitFor(() => {
-      expect(screen.getByTestId('task-access-unsupported')).toBeInTheDocument()
+      expect(screen.getByTestId('task-grant-modal')).toBeInTheDocument()
     })
   })
 })

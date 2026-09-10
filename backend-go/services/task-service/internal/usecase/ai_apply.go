@@ -63,15 +63,18 @@ func (uc *AIApply) Execute(ctx context.Context, in AIApplyInput) ([]domain.Task,
 	err = uc.txRunner.RunInTx(ctx, func(ctx context.Context, tasks TaskRepository, edges EdgeRepository) error {
 		// Scoped to the open transaction's repos (tasks/edges), not the
 		// outer-scope repos NewAIApply might otherwise have captured — see
-		// TxRunner's doc comment for why this reuses CreateTask unchanged.
-		// Edge adds call addEdgeWithinTx directly (NOT NewAddEdge(...).Execute)
-		// — AddEdge now opens its OWN transaction via TxRunner, and nesting
-		// that here would start an unrelated second transaction against the
-		// pool rather than participating in this one, breaking AIApply's
-		// all-or-nothing guarantee. See addEdgeWithinTx's doc comment
-		// (add_edge.go).
-		createTask := NewCreateTask(tasks)
-		for _, p := range in.Proposals {
+		// TxRunner's doc comment for why this reuses CreateTask/AddEdge
+		// unchanged rather than duplicating their logic.
+		//
+		// nil GrantRepository: AI-generated subtasks have no human
+		// "creator" to owner-grant (see NewCreateTask's doc comment,
+		// TASK-TG-003-02's option (b)) — this loop never sets CreatorID
+		// either, so CreateTask.Execute's grant step is simply never
+		// reached from this call site.
+		createTask := NewCreateTask(tasks, nil)
+		addEdge := NewAddEdge(tasks, edges)
+		createdIDs := make([]string, len(in.Proposals))
+		for i, p := range in.Proposals {
 			task, err := createTask.Execute(ctx, CreateTaskInput{
 				Title: p.Title, Description: p.Description, ParentID: in.TaskID,
 				Type: p.Type, EstimatedHours: p.EstimatedHours, PromptTemplate: p.PromptTemplate,
@@ -79,28 +82,29 @@ func (uc *AIApply) Execute(ctx context.Context, in AIApplyInput) ([]domain.Task,
 			if err != nil {
 				return apperrors.New(apperrors.KindInternal, "TASK_AI_APPLY_FAILED", "failed to create subtask from AI proposal", err)
 			}
-			edge, err := domain.NewTaskEdge(in.TaskID, task.ID, domain.EdgeKindParentChild)
-			if err != nil {
-				return apperrors.New(apperrors.KindInternal, "TASK_AI_APPLY_FAILED", "failed to build parent-child edge", err)
-			}
-			if err := addEdgeWithinTx(ctx, tenantID, tasks, edges, edge); err != nil {
+			createdIDs[i] = task.ID
+			if _, err := addEdge.Execute(ctx, AddEdgeInput{FromTaskID: in.TaskID, ToTaskID: task.ID, Kind: domain.EdgeKindParentChild}); err != nil {
 				return apperrors.New(apperrors.KindInternal, "TASK_AI_APPLY_FAILED", "failed to link subtask to parent", err)
 			}
 			created = append(created, task)
 		}
 
-		// Second pass: proposal indices only resolve to real Task.IDs once
-		// every proposal in this call has been created above.
+		// depends_on edges are added in a SECOND pass, after every subtask
+		// in the batch has a real ID — DependsOnIndices references index
+		// positions in the SAME batch (see domain.SubtaskProposal's doc
+		// comment), which don't resolve to anything until the loop above
+		// has run to completion. Reuses AddEdge.Execute unchanged, so the
+		// cycle check AND the auto-block write both run per edge
+		// automatically — a same-batch dependency cycle is rejected exactly
+		// like a manual AddEdge call would reject it, and the whole RunInTx
+		// closure rolling back means zero tasks/edges persist from a
+		// rejected batch.
 		for i, p := range in.Proposals {
 			for _, depIdx := range p.DependsOnIndices {
-				if depIdx < 0 || depIdx >= len(created) {
+				if depIdx < 0 || depIdx >= len(createdIDs) {
 					continue // defensive: AI hallucinated an out-of-range index
 				}
-				depEdge, err := domain.NewTaskEdge(created[i].ID, created[depIdx].ID, domain.EdgeKindDependsOn)
-				if err != nil {
-					continue // defensive: e.g. a self-dependency (i == depIdx) — skip, don't fail the whole apply
-				}
-				if err := addEdgeWithinTx(ctx, tenantID, tasks, edges, depEdge); err != nil {
+				if _, err := addEdge.Execute(ctx, AddEdgeInput{FromTaskID: createdIDs[i], ToTaskID: createdIDs[depIdx], Kind: domain.EdgeKindDependsOn}); err != nil {
 					return apperrors.New(apperrors.KindInternal, "TASK_AI_APPLY_FAILED", "failed to create dependency edge from AI proposal", err)
 				}
 			}

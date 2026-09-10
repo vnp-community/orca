@@ -89,6 +89,14 @@ describe('WorkflowBuilder', () => {
     expect(mockRun).toHaveBeenCalledWith('proj-1')
   })
 
+  // FE-TASK-001 (workflow v4): Run must forward this component's projectId prop —
+  // useWorkflow.ts's runWorkflow(projectId) needs it to set ExecuteRequest.ProjectId.
+  it('Run button calls runWorkflow with this component projectId prop', () => {
+    render(<WorkflowBuilder projectId="proj-1" />)
+    fireEvent.click(screen.getByTestId('run-workflow-btn'))
+    expect(mockRun).toHaveBeenCalledWith('proj-1')
+  })
+
   it('Show DAG toggle shows/hides the DAGPreview panel', async () => {
     render(<WorkflowBuilder projectId="proj-1" />)
 

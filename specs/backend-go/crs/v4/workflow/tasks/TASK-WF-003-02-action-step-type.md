@@ -5,7 +5,58 @@
 **Service:** `workflow-service`
 **File:** `backend-go/proto/orca/workflow/v1/workflow.proto` (`StepType` enum), `backend-go/services/workflow-service/internal/domain/step.go` (`StepTypeAction`, `ActionStepConfig`), `backend-go/services/workflow-service/internal/adapter/stepexecutors/` (new `action_executor.go` or similar, dispatch registry)
 **Depends on:** None beyond BE-SOL-003's proto coordination note (shared `workflow.proto` edit with TASK-WF-003-01/-03 — land these together or in quick succession to avoid enum-value churn across concurrent branches)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+Landed together with TASK-WF-003-03 (both touch `workflow.proto`'s
+`StepType` enum) — added `STEP_TYPE_ACTION = 6` and `STEP_TYPE_PARALLEL =
+7` in one proto edit/regen to avoid the enum-value-churn the two tasks'
+own coordination notes warned about.
+
+**Real-code divergence found, corrects the task's own instruction:**
+`api-gateway`'s `channels_automation_task.go`'s `parseStepType(v string)`
+does **not** need an explicit `"action"`/`"parallel"` case added —
+confirmed live, it's a generic `workflowv1.StepType_value[name]` map
+lookup (protoc-gen-go's auto-generated enum name→value map), not a
+switch statement. Regenerating the proto after adding the two enum
+values was sufficient; no code change to that file was needed or made.
+`toDomainStepType` in `internal/adapter/grpc/server.go`, by contrast,
+genuinely is a switch statement and DID need new cases — added both.
+
+**Changes made:**
+1. `workflow.proto`: `STEP_TYPE_ACTION = 6`; regenerated.
+2. `internal/domain/step.go`: `StepTypeAction`, widened `Valid()`,
+   `ActionStepConfig{Action, Params}`.
+3. `internal/adapter/grpc/server.go`: `toDomainStepType` case added.
+4. `internal/adapter/stepexecutors/action.go` (new): `ActionHandler`,
+   `ActionExecutor` verbatim from the task's sketch.
+5. `cmd/server/main.go`: registered `StepTypeAction`. Per BE-SOL-003's own
+   "Not in scope" note (which git.*/github.*/jira.* handlers ship is a
+   product decision), wired exactly one illustrative handler end to end —
+   `"project.getDevServer"` — against project-service's already-dialed
+   `GetProject` RPC (the same client `ServerResolver` uses), to prove the
+   dispatch mechanism reaches a real downstream client rather than being a
+   no-op stub. No git-gateway-service/issue-tracking-service dependency
+   was added — that's the explicitly-deferred product decision.
+
+**Verify output:**
+```
+go build ./services/workflow-service/...   # clean
+go test  ./services/workflow-service/internal/domain/... -run TestStepType -v
+  # 2/2 PASS
+go test  ./services/workflow-service/internal/adapter/stepexecutors/... -run TestActionExecutor -v
+  # 4/4 PASS (dispatch to handler, unregistered action errors clearly,
+  #           handler error propagates, invalid config JSON errors)
+go test -race ./services/workflow-service/internal/adapter/stepexecutors/...   # ok
+go test  ./services/workflow-service/... ./services/api-gateway/...   # full suite, all ok
+```
+
+**Flagged for human/product follow-up:** which real `git.*`/`github.*`/
+`jira.*` action handlers ship, and whether `"project.getDevServer"`
+should stay as a real action or was purely illustrative — per this task's
+own "Not in scope" note, this is a product decision this implementation
+pass explicitly did not make.
 
 ---
 

@@ -20,6 +20,9 @@ export async function dispatchMiscRpc(
   config: AgentConfig,
   log: AgentLogger,
   ws: WebSocket,
+  // CR-TG-006's shell.execStream below needs WireState for its
+  // stream.chunk/stream.end frames — route() in agent-rpc-dispatch.ts
+  // already passes `state` positionally.
   state: WireState
 ): Promise<JsonRpcResponse | null> {
   switch (rpc.method) {
@@ -188,6 +191,24 @@ export async function dispatchMiscRpc(
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `shell.exec unavailable: ${msg}`)
+      }
+    }
+
+    // ── shell.execStream ─────────────────────────────────────────────────────
+    // CR-TG-006: streaming sibling of shell.exec above — delivers
+    // stream.chunk/stream.end frames incrementally instead of a single
+    // buffer-then-return response. Follows the exact
+    // void handleXxxStream(...) + literal stream.started return shape
+    // git.execStream/agent.spawn already use in this codebase.
+    case 'shell.execStream': {
+      try {
+        const { handleShellExecStream } = await import('./shell-agent-extensions')
+        // Streaming: fire-and-forget, sends multiple frames asynchronously
+        void handleShellExecStream(ws, state, rpc.id, rpc.params ?? {}, config)
+        return { jsonrpc: '2.0', id: rpc.id, result: { type: 'stream.started' } }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `shell.execStream unavailable: ${msg}`)
       }
     }
 

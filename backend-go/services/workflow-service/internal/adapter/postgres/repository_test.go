@@ -117,6 +117,68 @@ func TestRepository_ExecutionPauseResumeRoundTrip(t *testing.T) {
 	}
 }
 
+// TestRepository_CreateExecution_PersistsInputsJSON exercises
+// TASK-WF-003-01's InputsJSON round-trip — frozen at Execute time so a
+// RecoverExecutions resume after a restart still has the original inputs
+// available for interpolation.
+func TestRepository_CreateExecution_PersistsInputsJSON(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "77777777-7777-7777-7777-777777777777"
+
+	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000004", tenantID, "inputs-test", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
+	if err := repo.CreateTemplate(ctx, tmpl); err != nil {
+		t.Fatalf("create template: %v", err)
+	}
+
+	exec, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000020", tenantID, tmpl.ID, "trace-inputs", "", "")
+	if err != nil {
+		t.Fatalf("building execution: %v", err)
+	}
+	exec.InputsJSON = `{"feature_description":"add dark mode"}`
+	if err := repo.CreateExecution(ctx, exec); err != nil {
+		t.Fatalf("create execution: %v", err)
+	}
+
+	got, err := repo.GetExecution(ctx, tenantID, exec.ID)
+	if err != nil {
+		t.Fatalf("get execution: %v", err)
+	}
+	if !jsonEqual(t, got.InputsJSON, exec.InputsJSON) {
+		t.Errorf("expected InputsJSON to round-trip, got %q want %q", got.InputsJSON, exec.InputsJSON)
+	}
+}
+
+// TestRepository_CreateExecution_EmptyInputsJSONRoundTripsEmpty confirms an
+// execution with no inputs at all persists and reads back as an empty
+// string, not a spurious "null" or "{}".
+func TestRepository_CreateExecution_EmptyInputsJSONRoundTripsEmpty(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "88888888-8888-8888-8888-888888888888"
+
+	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000005", tenantID, "no-inputs-test", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
+	if err := repo.CreateTemplate(ctx, tmpl); err != nil {
+		t.Fatalf("create template: %v", err)
+	}
+
+	exec, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000021", tenantID, tmpl.ID, "trace-no-inputs", "", "")
+	if err != nil {
+		t.Fatalf("building execution: %v", err)
+	}
+	if err := repo.CreateExecution(ctx, exec); err != nil {
+		t.Fatalf("create execution: %v", err)
+	}
+
+	got, err := repo.GetExecution(ctx, tenantID, exec.ID)
+	if err != nil {
+		t.Fatalf("get execution: %v", err)
+	}
+	if got.InputsJSON != "" {
+		t.Errorf("expected empty InputsJSON, got %q", got.InputsJSON)
+	}
+}
+
 func TestRepository_ListTemplates_KeysetPagination(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
@@ -151,6 +213,62 @@ func TestRepository_ListTemplates_KeysetPagination(t *testing.T) {
 	}
 	if len(secondPage) != 1 || next2 != "" {
 		t.Fatalf("expected exactly one remaining template and no further page, got %d rows, next=%q", len(secondPage), next2)
+	}
+}
+
+// TestRepository_ListExecutions_KeysetPaginationNewestFirst exercises
+// TASK-WF-005-01's ListExecutions — ordering by created_at DESC (not by id,
+// since execution ids are random UUIDs with no chronological meaning,
+// unlike ListTemplates' id-based cursor above). A short sleep between
+// inserts guarantees distinct created_at values so ordering is
+// unambiguous.
+func TestRepository_ListExecutions_KeysetPaginationNewestFirst(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "55555555-5555-5555-5555-555555555555"
+	projectID := "66666666-6666-6666-6666-666666666666"
+
+	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000003", tenantID, "list-exec", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
+	if err := repo.CreateTemplate(ctx, tmpl); err != nil {
+		t.Fatalf("create template: %v", err)
+	}
+
+	ids := []string{
+		"dddddddd-0000-0000-0000-000000000010",
+		"dddddddd-0000-0000-0000-000000000011",
+		"dddddddd-0000-0000-0000-000000000012",
+	}
+	for _, id := range ids {
+		exec, err := domain.NewWorkflowExecution(id, tenantID, tmpl.ID, "trace-"+id, projectID, "")
+		if err != nil {
+			t.Fatalf("building execution %s: %v", id, err)
+		}
+		if err := repo.CreateExecution(ctx, exec); err != nil {
+			t.Fatalf("create execution %s: %v", id, err)
+		}
+		time.Sleep(10 * time.Millisecond) // ensure distinct created_at for deterministic ordering
+	}
+
+	firstPage, next, err := repo.ListExecutions(ctx, tenantID, projectID, "", 2)
+	if err != nil {
+		t.Fatalf("list executions (page 1): %v", err)
+	}
+	if len(firstPage) != 2 || next == "" {
+		t.Fatalf("expected a full first page with a next cursor, got %d rows, next=%q", len(firstPage), next)
+	}
+	if firstPage[0].ID != ids[2] || firstPage[1].ID != ids[1] {
+		t.Fatalf("expected newest-first order [%s, %s], got %+v", ids[2], ids[1], firstPage)
+	}
+
+	secondPage, next2, err := repo.ListExecutions(ctx, tenantID, projectID, next, 2)
+	if err != nil {
+		t.Fatalf("list executions (page 2): %v", err)
+	}
+	if len(secondPage) != 1 || next2 != "" {
+		t.Fatalf("expected exactly one remaining execution and no further page, got %d rows, next=%q", len(secondPage), next2)
+	}
+	if secondPage[0].ID != ids[0] {
+		t.Fatalf("expected the oldest execution %s last, got %+v", ids[0], secondPage)
 	}
 }
 
@@ -309,6 +427,50 @@ func TestRepository_Update_StaleVersion_ReturnsConflict(t *testing.T) {
 	}
 	if got.Version != 1 || got.Name != "deploy" {
 		t.Fatalf("row must be unchanged after a conflicting update, got %+v", got)
+	}
+}
+
+// TestRepository_Update_BumpFalse_DoesNotIncrementVersion covers
+// TASK-WF-004-03: bump=false must leave templates.version unchanged while
+// still applying every other field — and the WHERE clause's version-match
+// check (ErrTemplateVersionConflict's trigger) must stay unaffected by
+// bump's value, proven by chaining a second bump=false update using the
+// SAME (unbumped) expectedVersion.
+func TestRepository_Update_BumpFalse_DoesNotIncrementVersion(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "99999999-9999-9999-9999-999999999999"
+
+	tmpl, err := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000006", tenantID, "deploy", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
+	if err != nil {
+		t.Fatalf("building template: %v", err)
+	}
+	if err := repo.CreateTemplate(ctx, tmpl); err != nil {
+		t.Fatalf("create template: %v", err)
+	}
+
+	tmpl.Name = "deploy-renamed"
+	updated, err := repo.Update(ctx, tmpl, 1, false)
+	if err != nil {
+		t.Fatalf("update: %v", err)
+	}
+	if updated.Version != 1 {
+		t.Fatalf("want version unchanged at 1 (bump=false), got %d", updated.Version)
+	}
+	if updated.Name != "deploy-renamed" {
+		t.Fatalf("expected the name field to still apply even with bump=false, got %q", updated.Name)
+	}
+
+	// The version-match WHERE clause must be unaffected by bump=false —
+	// a second update against the SAME expectedVersion=1 (still correct,
+	// since the first update didn't bump it) must also succeed.
+	tmpl.Name = "deploy-renamed-again"
+	updated2, err := repo.Update(ctx, tmpl, 1, false)
+	if err != nil {
+		t.Fatalf("second update (same expectedVersion, proving the WHERE clause is unaffected by bump): %v", err)
+	}
+	if updated2.Version != 1 {
+		t.Fatalf("want version still unchanged at 1, got %d", updated2.Version)
 	}
 }
 

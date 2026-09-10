@@ -20,7 +20,7 @@ import (
 type UpdateTaskInput struct {
 	ID         string
 	Title      *string
-	Status     *string
+	Status     *domain.Status
 	PRURL      *string
 	WorktreeID *string
 	// WorkflowTemplateID: nil = leave untouched, non-nil = set (an empty
@@ -80,12 +80,14 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 	if in.WorktreeID != nil {
 		current.WorktreeID = *in.WorktreeID
 	}
+	reachedTerminal := false
 	if in.Status != nil {
 		updated, err := current.SetStatus(*in.Status)
 		if err != nil {
 			return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_INVALID_STATUS_TRANSITION", err.Error(), err)
 		}
 		current = updated
+		reachedTerminal = current.Status == domain.StatusDone || current.Status == domain.StatusCancelled
 	}
 	if in.WorkflowTemplateID != nil {
 		current.WorkflowTemplateID = *in.WorkflowTemplateID
@@ -95,7 +97,7 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 	if in.Status != nil && *in.Status != previousStatus {
 		payload, err := json.Marshal(taskStatusChangedPayload{
 			TaskID: current.ID, ProjectID: current.ProjectID, WorktreeID: current.WorktreeID,
-			PreviousStatus: previousStatus, NewStatus: current.Status,
+			PreviousStatus: string(previousStatus), NewStatus: string(current.Status),
 		})
 		if err != nil {
 			return domain.Task{}, apperrors.New(apperrors.KindInternal, "TASK_MARSHAL_EVENT_FAILED", "failed to marshal status-changed event payload", err)
@@ -142,6 +144,21 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 				_ = uc.repo.UpdateStatus(ctx, tenantID, dependent.ID, domain.StatusOpen)
 			}
 		}
+	}
+
+	// BE-SOL-001: recalculate the parent's done_subtasks/total_subtasks
+	// whenever a child task with a non-empty ParentID reaches a terminal
+	// status — NOT on every field edit. Wired here (UpdateTask's own
+	// status-transition path) rather than ExecuteTask's completion path,
+	// since ExecuteTask has no completion callback yet — see
+	// TASK-TG-005-01/-02 for that gap; re-wire the execute-path cascade once
+	// it lands. Best-effort: a recalculation failure doesn't fail the
+	// status update itself, since the counts are a derived, self-healing
+	// projection (a later successful call recomputes them from scratch).
+	// Recalculates one level (the direct parent's subtree) — a grandparent's
+	// counts are picked up by ITS OWN children's terminal transitions.
+	if reachedTerminal && current.ParentID != "" {
+		_, _ = NewRecalculateProgress(uc.repo).Execute(ctx, current.ParentID)
 	}
 	return current, nil
 }

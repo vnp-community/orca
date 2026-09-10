@@ -32,5 +32,9 @@ func (uc *ListGrants) Execute(ctx context.Context, taskID string) ([]domain.Gran
 	// Only the target task's own grants — not the ancestor chain, which
 	// would leak ancestor-task grant details to a caller who may not have
 	// visibility into the ancestor task itself.
-	return uc.grants.ListGrantsForTask(ctx, tenantID, taskID)
+	grants, err := uc.grants.ListGrantsForTask(ctx, tenantID, taskID)
+	if err != nil {
+		return nil, apperrors.New(apperrors.KindInternal, "TASK_LIST_GRANTS_FAILED", "failed to list grants for task", err)
+	}
+	return grants, nil
 }

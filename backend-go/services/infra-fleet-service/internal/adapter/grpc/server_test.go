@@ -47,6 +47,7 @@ func newTestServer(getAgentTerminalSession *usecase.GetAgentTerminalSession, sen
 		nil, nil, // relayByDevServer, isDevServerConnected, 69-70
 		nil,                // streamAgentExecOutput usecase (TASK-AG-FLOWTASK-002), 71, unused here
 		nil, nil, nil, nil, // ephemeral-VM + fleet-connectivity + file-changes usecases, 72-75, unused here
+		nil, // pickByTag usecase, 76, unused here
 	)
 }
 

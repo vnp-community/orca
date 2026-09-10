@@ -1,8 +1,8 @@
 import { useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useAppStore } from '../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
 import { Tracers } from '../../../shared/trace/tracers'
-import { toast } from 'sonner'
 import type { WorkflowExecution } from '@shared/workflow-types'
 
 // How often to re-poll `workflow.getExecution` while an execution is running.

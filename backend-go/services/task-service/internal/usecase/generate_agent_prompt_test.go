@@ -60,7 +60,7 @@ func TestGenerateAgentPrompt_SaveFalse_NeverPersists(t *testing.T) {
 }
 
 // TestGenerateAgentPrompt_SaveTrue_PersistsToPromptTemplate is Save=true's
-// mirror case.
+// mirror case — everything else about the task must round-trip unchanged.
 func TestGenerateAgentPrompt_SaveTrue_PersistsToPromptTemplate(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}
@@ -74,6 +74,9 @@ func TestGenerateAgentPrompt_SaveTrue_PersistsToPromptTemplate(t *testing.T) {
 	if got := tasks.tasks["t1"].PromptTemplate; got != completer.content {
 		t.Errorf("expected PromptTemplate=%q, got %q", completer.content, got)
 	}
+	if tasks.tasks["t1"].Title != "Build widget" {
+		t.Errorf("expected Title to remain unchanged, got %q", tasks.tasks["t1"].Title)
+	}
 }
 
 func TestGenerateAgentPrompt_RelayFailurePropagates(t *testing.T) {
@@ -84,5 +87,17 @@ func TestGenerateAgentPrompt_RelayFailurePropagates(t *testing.T) {
 
 	if _, err := uc.Execute(ctx, GenerateAgentPromptInput{TaskID: "t1"}); err == nil {
 		t.Fatal("expected an error when the AI relay call fails")
+	}
+}
+
+func TestGenerateAgentPrompt_SaveFailurePropagates(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1"}
+	tasks.updatePromptTemplateErr = errors.New("db unavailable")
+	uc := NewGenerateAgentPrompt(tasks, &fakeAIProviderContextResolver{}, &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, &fakeAICompleter{content: "prompt"})
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, GenerateAgentPromptInput{TaskID: "t1", Save: true}); err == nil {
+		t.Fatal("expected an error when persisting the generated prompt fails")
 	}
 }

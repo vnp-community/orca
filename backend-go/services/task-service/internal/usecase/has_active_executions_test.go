@@ -46,7 +46,7 @@ func TestHasActiveExecutions_TrueWhenATaskInTheProjectIsInProgress(t *testing.T)
 
 func TestHasActiveExecutions_FalseWhenOnlyNonActiveStatusesExist(t *testing.T) {
 	repo := newFakeTaskRepository()
-	for id, status := range map[string]string{
+	for id, status := range map[string]domain.Status{
 		"task-open":      domain.StatusOpen,
 		"task-done":      domain.StatusDone,
 		"task-cancelled": domain.StatusCancelled,

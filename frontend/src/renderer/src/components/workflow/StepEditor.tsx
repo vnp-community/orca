@@ -49,7 +49,7 @@ export function StepEditor({ step, allSteps, onUpdate, onDelete }: StepEditorPro
           <Label>Prompt</Label>
           <textarea
             className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring mt-1"
-            value={(step.config as AgentStepConfig).prompt ?? ''}
+            value={(step.config as AgentStepConfig)?.prompt ?? ''}
             onChange={(e) =>
               onUpdate({ config: { ...(step.config as AgentStepConfig), prompt: e.target.value } })
             }

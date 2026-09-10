@@ -180,9 +180,9 @@ func TestAIDecompose_MalformedJSON_ReturnsInvalidJSONCode(t *testing.T) {
 	}
 }
 
-// TestAIDecompose_TechStackDetectorFailure_DoesNotFailExecute locks in
-// SOL-TG-02's best-effort contract: a tech-stack detection error degrades
-// prompt richness, never fails the whole call.
+// TestGenerateAgentPrompt-adjacent: TestAIDecompose_TechStackDetectorFailure_DoesNotFailExecute
+// locks in SOL-TG-02's best-effort contract: a tech-stack detection error
+// degrades prompt richness, never fails the whole call.
 func TestAIDecompose_TechStackDetectorFailure_DoesNotFailExecute(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", ProjectID: "p1", Title: "Build widget"}

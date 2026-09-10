@@ -111,7 +111,7 @@ func TestReportTaskExecutionResult_MatchingSuccess_CompletesTaskAndLink(t *testi
 		t.Fatalf("expected exactly one CompleteExecution call, got %d: %+v", len(tasks.completeExecutionCalls), tasks.completeExecutionCalls)
 	}
 	got := tasks.completeExecutionCalls[0]
-	if got.status != domain.StatusReview || got.actualHours != 2.5 {
+	if got.status != string(domain.StatusReview) || got.actualHours != 2.5 {
 		t.Errorf("expected StatusReview + actual_hours=2.5, got %+v", got)
 	}
 	if links.created[0].StatusMirror != "completed" {

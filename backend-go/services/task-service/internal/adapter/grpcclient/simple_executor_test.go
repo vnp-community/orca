@@ -84,7 +84,13 @@ func (f *fakeTaskRepository) Get(ctx context.Context, tenantID, id string) (doma
 func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id string, maxDepth int) ([]domain.Task, error) {
 	return nil, errors.New("not implemented")
 }
-func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, status string) error {
+func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id string, status domain.Status) error {
+	panic("not implemented")
+}
+func (f *fakeTaskRepository) ListChildren(ctx context.Context, tenantID, taskID string) ([]domain.Task, error) {
+	panic("not implemented")
+}
+func (f *fakeTaskRepository) GetByShareToken(ctx context.Context, token string) (domain.Task, error) {
 	panic("not implemented")
 }
 func (f *fakeTaskRepository) SetActiveExecutionLink(ctx context.Context, tenantID, id, linkID string) error {

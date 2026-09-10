@@ -5,7 +5,9 @@
 **Priority:** 🟠 P1
 **Estimated:** 40 phút
 **Status:** ✅ DONE — 2026-09-09 (phần rename an toàn; phần xoá `'approval'` vẫn giữ nguyên, chờ
-xác nhận sản phẩm — đúng thiết kế 2 giai đoạn của chính task này, không phải gap bỏ sót)
+xác nhận sản phẩm — đúng thiết kế 2 giai đoạn của chính task này, không phải gap bỏ sót) (2 lượt triển khai độc lập được ghi nhận khi merge — xem 2 ghi chú dưới đây)
+
+---
 
 ### Kết quả thực tế
 
@@ -33,7 +35,30 @@ xác nhận sản phẩm — đúng thiết kế 2 giai đoạn của chính tas
 **Chưa làm, đúng chủ đích**: xoá `'approval'` khỏi union + dropdown — chờ xác nhận sản phẩm theo
 Hướng A/B trong task doc. Không thêm `action`/`parallel`.
 
----
+### Kết quả thực thi (ghi chú B, 2026-09-09)
+
+- **Phát hiện khác với task file**: vì FE-TASK-006 (dọn dẹp 2 file `workflow-types.ts` trùng lặp) đã
+  làm TRƯỚC task này (đúng khuyến nghị điều phối), `frontend/src/renderer/src/types/workflow-types.ts`
+  **đã bị xoá hoàn toàn** — chỉ còn đúng 1 file `frontend/src/shared/workflow-types.ts` cần sửa, thay
+  vì 2 file như task mô tả ban đầu. Không có gì cần làm thêm cho file đã xoá.
+- Rename `'notify'` → `'notification'` ở `WorkflowStepType` + `NotifyStepConfig['type']`, thêm
+  `'webhook'`/`'condition'` khớp backend `StepType` thật (`agent|shell|notification|webhook|
+  condition`). Giữ `'approval'` trong union đúng theo yêu cầu "chờ xác nhận sản phẩm, không tự
+  quyết" — thêm comment giải thích tại chỗ.
+- Xác nhận `grep -rn "type.*===.*'approval'"` trong `components/workflow/` và `hooks/` → không có
+  logic nào rẽ nhánh theo `'approval'` ngoài việc liệt kê trong dropdown — an toàn giữ nguyên tạm
+  thời, không cần xử lý gì thêm ở Hướng A/B.
+- Sửa mảng hardcode ở `StepEditor.tsx`'s dropdown Type thành
+  `['agent','shell','notification','webhook','condition','approval']`.
+- `grep -rn "'notify'"` sau khi sửa → 0 kết quả sót lại.
+- `StepEditor.test.tsx` **chưa tồn tại trước task này** (task file ghi MODIFY nhưng thực tế file
+  chưa có) — tạo mới, cover đúng 2 case yêu cầu: dropdown hiện đúng 6 giá trị (không còn `notify`),
+  và `step.type='notification'` phản ánh đúng trong `Select`'s value.
+- Test: `npx vitest run StepEditor.test.tsx` → 2/2 pass. Chạy thêm
+  `useWorkflow.test.ts`/`WorkflowBuilder.test.tsx` (đụng chung `shared/workflow-types.ts`) → 15/15
+  pass, không hồi quy.
+- Cùng lưu ý `@shared/*` alias thiếu trong `tsconfig.json` đã ghi ở FE-TASK-003 — áp dụng y hệt ở
+  đây, không lặp lại chi tiết.
 
 ## ⚠️ Cần xác nhận sản phẩm trước khi xoá `'approval'` — KHÔNG tự quyết ở task này
 

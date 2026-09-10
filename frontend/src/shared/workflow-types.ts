@@ -2,7 +2,8 @@
 
 // FE-TASK-004: renamed from 'notify' to match backend StepType (agent|shell|notification|
 // webhook|condition; step.go:16-23). 'approval' has no backend equivalent — kept until
-// product confirms removal (see FE-TASK-004's task doc); do not remove without that sign-off.
+// product confirms removal or a mapping to orchestration-service's DecisionGate; do not
+// remove without that sign-off (see FE-TASK-004's task doc).
 export type WorkflowStepType =
   | 'agent'
   | 'shell'

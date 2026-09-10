@@ -4,9 +4,12 @@
 **Solution Ref:** FE-SOL-001 Phần 1
 **Priority:** 🟠 P1
 **Estimated:** 50 phút
-**Status:** ✅ DONE — 2026-09-09
+**Status:** ✅ DONE — 2026-09-09 (hai lượt triển khai độc lập được ghi nhận khi merge — xem 2 ghi
+chú dưới đây, số liệu test khác nhau giữa 2 bản vì chạy trên 2 nhánh riêng)
 
-### Kết quả thực tế
+---
+
+### Kết quả thực tế (ghi chú A)
 
 - Đã thêm `refetchTrigger`/`refetch()` vào `useTasks.ts` đúng như thiết kế; `TaskCreateDialog.tsx`
   (mới) gọi `task.create({ title, projectId })` — giữ nguyên ghi chú về gap backend
@@ -26,7 +29,25 @@
   còn nguyên — cần 1 PR backend-go riêng để tính năng "xong" end-to-end theo nghĩa người dùng thấy
   task mới xuất hiện ngay lập tức trong đúng project.
 
----
+### Kết quả thực thi (ghi chú B, 2026-09-09)
+
+- Thêm `refetchTrigger`/`refetch()` vào `useTasks.ts`, đưa vào dep array của effect fetch —
+  không đổi hành vi fetch-on-projectId-change hiện có.
+- Tạo mới `TaskCreateDialog.tsx` đúng nguyên mẫu task file (gửi `{title, projectId}` qua
+  `task.create`, disable nút khi title rỗng, Enter submit, toast lỗi không tự đóng dialog).
+- `TaskGraph.tsx`: thêm `Button` import, nút "+ New Task", state `showCreateDialog`, mount
+  `TaskCreateDialog`, gọi `refetch()` khi tạo xong.
+- **Phát hiện khác task file**: `TaskGraph.test.tsx` không hề tồn tại trước task này (task file ghi
+  MODIFY nhưng thực tế chưa có file) — tạo mới hoàn toàn thay vì sửa.
+- Test: tạo `TaskCreateDialog.test.tsx` (5 case), tạo mới `TaskGraph.test.tsx` (4 case), thêm 1 case
+  `refetch()` vào `useTasks.test.ts`. `npx vitest run` cả 3 file → 16/16 pass.
+- Xác nhận lại theo đúng ghi chú của task: `task.create` RPC đã tồn tại thật nhưng
+  `channels.go:278-291`'s `createArgs` chưa decode `projectId` — không tự sửa backend-go ở task này
+  (đúng "Không làm ở task này"), chỉ ghi lại gap. Manual/E2E verify "task thật sự xuất hiện sau khi
+  tạo" sẽ lộ đúng bug đã biết này (task biến mất do `projectId` rỗng) cho tới khi
+  `TASK-TG-001-06-task-create-channel-project-id-fix.md` (agent song song khác) merge — không phải
+  bug của task này.
+- Không đổi Status filter dropdown (giữ 3 giá trị `all/todo/in_progress/done`) — đúng phạm vi.
 
 ## Mục tiêu
 

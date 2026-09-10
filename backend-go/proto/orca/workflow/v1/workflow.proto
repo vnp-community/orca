@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package orca.workflow.v1;
 
+import "google/protobuf/struct.proto";
+
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1;workflowv1";
 
 import "google/protobuf/timestamp.proto";
@@ -51,6 +53,12 @@ service WorkflowService {
   // no-op because this RPC didn't exist.
   rpc HasActiveExecutions(HasActiveExecutionsRequest) returns (HasActiveExecutionsResponse);
 
+  // ListExecutions keyset-paginates a project's workflow executions, newest
+  // first — TASK-WF-005-01 (P0): WorkflowMonitor.tsx (frontend) already
+  // calls workflow.listExecutions and had no backing RPC, so the Workflow
+  // tab failed to load for every backend-go user before this was added.
+  rpc ListExecutions(ListExecutionsRequest) returns (ListExecutionsResponse);
+
   // CloneTemplate snapshots a RESOLVED template (server-computed) into a
   // brand-new, disconnected root template — distinct from CreateTemplate,
   // which always takes caller-supplied dag_json.
@@ -93,8 +101,8 @@ enum StepType {
   STEP_TYPE_WEBHOOK = 4;
   STEP_TYPE_CONDITION = 5;
   STEP_TYPE_CLEANUP_WORKTREES = 6; // BL-AT-04
-  STEP_TYPE_ACTION = 7;
-  STEP_TYPE_PARALLEL = 8;
+  STEP_TYPE_ACTION = 7; // TASK-WF-003-02
+  STEP_TYPE_PARALLEL = 8; // TASK-WF-003-03
   // STEP_TYPE_COMMIT_PUSH — CR-AUTO-003/TASK-BE-AUTO-005. automation-service's
   // AutomationAction "commit_push" dispatches here via ExecuteAdHocStep, the
   // same cross-service call every other automation action step type uses —
@@ -114,6 +122,11 @@ message WorkflowTemplate {
   string owner_id = 8; // required — the authoring user, workflow-service.md §4
   string description = 9;
   repeated string tags = 10;
+  // overrides_json/inject_steps_json/remove_steps_json (TASK-WF-004-01) are
+  // folded onto an ancestor's resolved DAG by ResolveTemplate — see that
+  // RPC's doc comment; ResolveTemplateResponse reuses this same message so
+  // the resolved values round-trip through the same JSON-string fields as
+  // CreateTemplate/UpdateTemplate accept.
   string overrides_json = 11;    // Inherit-mode: map[stepId]json.RawMessage merge instructions
   string inject_steps_json = 12; // Inherit-mode: []Step appended after remove_steps is applied
   string remove_steps_json = 13; // Inherit-mode: []string step ids to drop from the parent's resolved steps
@@ -173,8 +186,8 @@ message ExecuteRequest {
   string project_id = 2;
   string root_trace_id = 3; // resumability across restart
   string request_id = 4;
-  string inputs_json = 5; // caller-supplied {{...}} values, e.g. {"feature_description": "..."}
-  string origin_task_id = 6; // NEW (BE-SOL-002/TASK-FT-002-01) — logical FK back to task-service.Task.id, empty for a standalone workflow run
+  string inputs_json = 5; // caller-supplied {{...}} values, e.g. {"feature_description": "..."} — feeds usecase.Interpolate's {{path}} substitution pass (TASK-WF-003-01)
+  string origin_task_id = 6; // BE-SOL-002/TASK-FT-002-01 — logical FK back to task-service.Task.id, empty for a standalone workflow run
 }
 
 message WorkflowExecution {
@@ -362,4 +375,15 @@ message RateTemplateRequest {
 message RateTemplateResponse {
   int32 rating_sum = 1;
   int32 rating_count = 2;
+}
+
+message ListExecutionsRequest {
+  string project_id = 1;
+  int32 limit = 2;
+  string cursor = 3; // opaque, last-seen execution id; empty = first page
+}
+
+message ListExecutionsResponse {
+  repeated WorkflowExecution executions = 1;
+  string next_cursor = 2; // empty = no further page
 }

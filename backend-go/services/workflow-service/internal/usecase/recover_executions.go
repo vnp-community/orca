@@ -175,6 +175,11 @@ func (uc *RecoverExecutions) recoverOne(ctx context.Context, exec domain.Workflo
 	// Execute's own ctx (the boot-time scan's, not any RPC's), and every
 	// recovered execution needs ITS OWN tenant id, not a shared one, since
 	// this scan spans every tenant in one pass.
+	// TriggeredBy is deliberately left empty here — a boot-time recovery
+	// scan has no inbound request/acting user to capture (see
+	// ExecutionRepository.ListRunning's doc comment for this usecase's
+	// same "no single request" nature), same "no user scope" fallback
+	// ProviderResolver's chain already treats as valid.
 	dispatchCtx := tenant.WithTenantID(context.Background(), exec.TenantID)
 	go uc.resumeToCompletion(dispatchCtx, exec, waves, resumeWave, byStepID)
 }
@@ -183,14 +188,27 @@ func (uc *RecoverExecutions) recoverOne(ctx context.Context, exec domain.Workflo
 // counterpart to Execute's runToCompletion, reusing the same waveDispatcher
 // machinery (dispatchWavesFrom, see wave_dispatcher.go) instead of a
 // bespoke recovery-only dispatch loop.
+//
+// inputs is decoded from exec.InputsJSON (TASK-WF-003-01) — frozen at
+// Execute time precisely so a step dispatched after this restart still has
+// the original {{input_field}} values available. A decode failure is
+// logged and treated as "no inputs" rather than aborting recovery — a
+// step referencing an input that's now unavailable fails with
+// Interpolate's own clear "unknown reference" error at dispatch time,
+// which is a much better failure mode than blocking this execution's (and
+// every other tenant's, since this scan is process-wide) recovery over one
+// row's corrupted JSON.
 func (uc *RecoverExecutions) resumeToCompletion(ctx context.Context, exec domain.WorkflowExecution, waves [][]domain.Step, resumeWave int, existingRows map[string]domain.StepExecution) {
-	// Inputs are NOT recoverable here — ExecuteRequest.inputs_json is
-	// never persisted (see execute.go), so a resumed-after-crash execution
-	// loses access to {{...}} input tokens for its remaining waves; earlier
-	// waves' {{outputs.*}} ARE recoverable, reconstructed from each
-	// completed step's persisted OutputJSON below. Documented as a known
-	// gap alongside recoverOne's ad-hoc-execution one, not a silent loss.
-	execCtx := newExecutionContext(domain.ExecutionContext{ProjectID: exec.ProjectID})
+	var inputs map[string]any
+	if exec.InputsJSON != "" {
+		if err := json.Unmarshal([]byte(exec.InputsJSON), &inputs); err != nil {
+			slog.ErrorContext(ctx, "workflow: decoding recovered execution's inputs failed, resuming with no inputs", slog.String("execution_id", exec.ID), slog.Any("error", err))
+			inputs = nil
+		}
+	}
+	// Earlier waves' {{outputs.*}} are recoverable too, reconstructed from
+	// each already-completed step's persisted OutputJSON.
+	execCtx := newExecutionContext(domain.ExecutionContext{Inputs: inputs, ProjectID: exec.ProjectID})
 	for stepID, se := range existingRows {
 		if se.Status != domain.StepExecutionStatusCompleted {
 			continue

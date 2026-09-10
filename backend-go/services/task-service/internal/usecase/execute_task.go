@@ -209,7 +209,7 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	// exits — the completion transition happens INLINE, same call, no
 	// separate completion RPC needed (see this usecase's doc comment).
 	actualHours := uc.clock.Now().Sub(dispatchStart).Hours()
-	if err := uc.repo.CompleteExecution(ctx, tenantID, in.TaskID, domain.StatusReview, actualHours); err != nil {
+	if err := uc.repo.CompleteExecution(ctx, tenantID, in.TaskID, string(domain.StatusReview), actualHours); err != nil {
 		_ = uc.links.Complete(ctx, tenantID, link.ID, "failed")
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_COMPLETION_WRITE_FAILED", "failed to persist execution completion", err)
 	}

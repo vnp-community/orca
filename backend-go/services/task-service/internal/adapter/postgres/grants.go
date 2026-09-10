@@ -42,15 +42,20 @@ func (r *Repository) Grant(ctx context.Context, tenantID string, grant domain.Gr
 	return id, nil
 }
 
-// Revoke deletes a task_grants row by id — a nonexistent grant_id is a
-// real NOT_FOUND error, never a silent no-op.
-func (r *Repository) Revoke(ctx context.Context, tenantID, grantID string) error {
-	tag, err := r.db.Exec(ctx, `DELETE FROM task.task_grants WHERE tenant_id = $1 AND id = $2`, tenantID, grantID)
+// Revoke deletes a grant by its (task_id, subject_id, level) composite key
+// — see usecase.GrantRepository.Revoke's doc comment for why there's no
+// surrogate grant_id to delete by instead. Idempotent by design: a DELETE
+// affecting 0 rows (already revoked, or never existed) is not an error.
+func (r *Repository) Revoke(ctx context.Context, tenantID, taskID, subjectID string, level domain.GrantLevel) error {
+	levelStr, ok := grantLevelToString[level]
+	if !ok {
+		return fmt.Errorf("postgres: unrecognized grant level %v", level)
+	}
+	_, err := r.db.Exec(ctx, `
+		DELETE FROM task.task_grants WHERE tenant_id = $1 AND task_id = $2 AND subject_id = $3 AND level = $4
+	`, tenantID, taskID, subjectID, levelStr)
 	if err != nil {
 		return fmt.Errorf("postgres: revoke task grant: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: grant %s not found", grantID)
 	}
 	return nil
 }
@@ -58,7 +63,8 @@ func (r *Repository) Revoke(ctx context.Context, tenantID, grantID string) error
 // ListGrantsForTask returns only the grants recorded directly against
 // taskID — NOT the ancestor chain, since leaking an ancestor's grant
 // details to a caller without visibility into that ancestor would be a
-// real information leak (see usecase.ListGrants's doc comment).
+// real information leak (see usecase.ListGrants's doc comment). Also the
+// public ListGrants RPC's backing query.
 func (r *Repository) ListGrantsForTask(ctx context.Context, tenantID, taskID string) ([]domain.Grant, error) {
 	rows, err := r.db.Query(ctx, `
 		SELECT id, task_id, subject_id, level, apply_tree, expires_at

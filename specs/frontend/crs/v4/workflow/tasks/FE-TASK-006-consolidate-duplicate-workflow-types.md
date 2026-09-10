@@ -4,7 +4,9 @@
 **Solution Ref:** không trực tiếp — phát hiện khi làm [FE-TASK-003](./FE-TASK-003-pause-resume-execution-status-type.md), không phải gap của FE-SOL-001/002
 **Priority:** 🟡 P2 — technical debt, không chặn chức năng nào, nhưng rủi ro cao cho người sửa sau (sửa nhầm file im lặng không lỗi)
 **Estimated:** 30 phút
-**Status:** ✅ DONE — 2026-09-09
+**Status:** ✅ DONE — 2026-09-09 (2 lượt triển khai độc lập được ghi nhận khi merge — xem 2 ghi chú dưới đây)
+
+---
 
 ### Kết quả thực tế
 
@@ -32,7 +34,16 @@ trước khi nó bị xoá ở đây) đúng thứ tự khuyến nghị:
 Không có gap còn sót — 2 file `workflow-types.ts` giờ chỉ còn 1 (`shared/`), mọi import đã trỏ
 đúng.
 
----
+### Kết quả thực thi (ghi chú B, 2026-09-09)
+
+- Xác nhận lại bằng `grep`: chỉ có 1 nơi import file chết (`DAGPreview.tsx`, chỉ dùng `WorkflowStep`).
+- Đổi import trong `DAGPreview.tsx` sang `@shared/workflow-types` (alias đã dùng ở 7 file
+  khác trong domain workflow), rồi xoá hẳn `frontend/src/renderer/src/types/workflow-types.ts`.
+- `grep -rn "renderer/src/types/workflow-types"` sau khi xoá → 0 kết quả, không còn tham chiếu treo.
+- `npx vitest run DAGPreview.test.tsx` → 5/5 pass. `pnpm typecheck` chạy chung ở cuối đợt (xem báo
+  cáo tổng); không phát sinh lỗi liên quan file này.
+- Làm task này SỚM (trước cả FE-TASK-003/004 của workflow) đúng khuyến nghị trong ghi chú điều phối
+  — loại bỏ hẳn rủi ro nhầm lẫn 2 file `workflow-types.ts` cho các task sau.
 
 ## Mục tiêu
 

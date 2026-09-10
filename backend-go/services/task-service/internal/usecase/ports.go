@@ -42,7 +42,7 @@ type TaskRepository interface {
 	// StatusInProgress on dispatch and, on a failed dispatch, to revert back
 	// to the task's pre-dispatch status (see ExecuteTask) — the compensating
 	// write that closes the "status never reverts" bug SOL-TG-04 fixes.
-	UpdateStatus(ctx context.Context, tenantID, id, status string) error
+	UpdateStatus(ctx context.Context, tenantID, id string, status domain.Status) error
 	// UpdateWorktreeID persists the worktree ExecuteTask's WorktreeProvisioner
 	// just created for a task that didn't already have one — see
 	// WorktreeProvisioner's doc comment (SOL-TG-04).
@@ -109,6 +109,16 @@ type TaskRepository interface {
 	// BatchUpdateProgress persists every (taskID -> progress_percent) pair
 	// in one call — task-service.md §8's N+1 guard.
 	BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error
+	// ListChildren returns the direct children of taskID (parent_child
+	// edges' targets) — a plain, non-recursive read available for future
+	// context-bundle callers.
+	ListChildren(ctx context.Context, tenantID, taskID string) ([]domain.Task, error)
+	// GetByShareToken looks up a task by its public share-link token
+	// (TASK-TG-003-05) with NO tenant scoping — the token itself IS the
+	// authorization, by design (BE-SOL-003: "bypasses ResolveGrant/OPA
+	// entirely"). SECURITY REVIEW REQUIRED before merge — see
+	// GetTaskByShareToken's doc comment.
+	GetByShareToken(ctx context.Context, token string) (domain.Task, error)
 }
 
 // SubtreeProgressNode is one GetSubtreeWithChildPercents result row: the
@@ -162,9 +172,11 @@ type GrantRepository interface {
 	// taskIDs, grouped by task ID — the input ResolveGrant's BFS walk
 	// (domain/grant_resolution.go) consumes. Excludes expired rows.
 	ListGrantsForAncestors(ctx context.Context, tenantID string, taskIDs []string) (map[string][]domain.Grant, error)
-	// Revoke deletes a grant by id — a nonexistent grant_id is a real
-	// error, never a silent no-op.
-	Revoke(ctx context.Context, tenantID, grantID string) error
+	// Revoke deletes a grant by its (task_id, subject_id, level) composite
+	// key — no surrogate grant_id is surfaced above the DB layer today
+	// (TASK-TG-003-04). Idempotent by design: deleting 0 rows is not an
+	// error.
+	Revoke(ctx context.Context, tenantID, taskID, subjectID string, level domain.GrantLevel) error
 	// ListGrantsForTask returns only the grants recorded directly against
 	// taskID — NOT the ancestor chain, per usecase.ListGrants's doc
 	// comment (avoids leaking an ancestor's grant details).

@@ -1,20 +1,41 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { WorkflowLibrary } from '../WorkflowLibrary'
 import { useWorkflowLibrary } from '../../../hooks/useWorkflowLibrary'
+import type { ReactNode } from 'react'
 import type { WorkflowDefinition } from '../../../../../shared/workflow-types'
 
 vi.mock('../../../hooks/useWorkflowLibrary', () => ({
   useWorkflowLibrary: vi.fn()
 }))
 
+// Same pattern as ModelSelector.test.tsx / StepEditor.test.tsx — render Tabs' children
+// directly so TabsTrigger buttons are queryable without driving Radix's open state.
+type TestTabsProps = { children?: ReactNode }
+type TestTabsTriggerProps = {
+  value: string
+  onValueChange?: (v: string) => void
+  children?: ReactNode
+}
+
+vi.mock('../../ui/tabs', () => ({
+  Tabs: (p: TestTabsProps) => <div>{p.children}</div>,
+  TabsList: (p: TestTabsProps) => <div>{p.children}</div>,
+  TabsTrigger: (p: TestTabsTriggerProps) => (
+    <button data-testid={`scope-tab-${p.value}`} onClick={() => p.onValueChange?.(p.value)}>
+      {p.children}
+    </button>
+  )
+}))
+
 const mockUseWorkflowLibrary = vi.mocked(useWorkflowLibrary)
 
 describe('WorkflowLibrary', () => {
+  afterEach(cleanup)
+
   beforeEach(() => {
-    cleanup()
     vi.clearAllMocks()
     mockUseWorkflowLibrary.mockReturnValue({
       templates: [],
@@ -24,11 +45,11 @@ describe('WorkflowLibrary', () => {
     })
   })
 
-  it('renders 3 tabs company/team/personal, defaults to company', () => {
+  it('renders 3 scope tabs company/team/personal, defaults to company', () => {
     render(<WorkflowLibrary onUseTemplate={vi.fn()} />)
-    expect(screen.getByText('Company Standards')).toBeInTheDocument()
-    expect(screen.getByText('Team Templates')).toBeInTheDocument()
-    expect(screen.getByText('My Workflows')).toBeInTheDocument()
+    expect(screen.getByTestId('scope-tab-company')).toBeInTheDocument()
+    expect(screen.getByTestId('scope-tab-team')).toBeInTheDocument()
+    expect(screen.getByTestId('scope-tab-personal')).toBeInTheDocument()
     expect(mockUseWorkflowLibrary).toHaveBeenCalledWith('company', '')
   })
 
@@ -56,7 +77,7 @@ describe('WorkflowLibrary', () => {
     render(<WorkflowLibrary onUseTemplate={vi.fn()} />)
     fireEvent.change(screen.getByTestId('library-search'), { target: { value: 'deploy' } })
     await waitFor(() => {
-      expect(mockUseWorkflowLibrary).toHaveBeenCalledWith('company', 'deploy')
+      expect(mockUseWorkflowLibrary).toHaveBeenLastCalledWith('company', 'deploy')
     })
   })
 

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/domain/critical_path.go` (new), `backend-go/services/task-service/internal/usecase/generate_agent_prompt.go` (new), `backend-go/proto/orca/task/v1/task.proto` (`GenerateAgentPrompt` RPC), `backend-go/services/task-service/internal/adapter/grpc/server.go` (handler)
 **Depends on:** TASK-TG-001-02 (`Task.EstimatedHours`, `Task.PromptTemplate` fields)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -155,3 +155,42 @@ go test ./services/task-service/internal/usecase/... -run TestGenerateAgentPromp
 Expected: clean build; critical-path test matches hand-computed expected
 path and total hours; `GenerateAgentPrompt` persists the AI-generated
 template and returns it in the same call.
+
+## Execution notes (2026-09-09)
+
+Implemented `CalculateCriticalPath` (Kahn's topological sort + longest-path
+DP, exactly the 4-step algorithm sketched) and `GenerateAgentPrompt` (usecase
+matches the task's own code sample verbatim, including the "load task,
+mutate PromptTemplate, call the existing whole-row `Update`" convention —
+confirmed `repository.go`'s `Update` overwrites every column
+unconditionally per its own doc comment, so `withPromptTemplate`'s job is
+just "mutate the in-memory struct before calling Update," which
+`GenerateAgentPrompt.Execute` does inline rather than as a separate named
+helper). Checked `FE-SOL-001-task-crud-board-grant-ui.md` for a
+`CalculateCriticalPath`/critical-path RPC consumer per this task's own
+instruction — it names none, so no dedicated RPC was added; the function is
+pure and unwired, ready for whichever future read path needs it.
+
+Added `GenerateAgentPrompt` RPC + `GenerateAgentPromptRequest`/
+`GenerateAgentPromptResponse` to `task.proto`, regenerated via `buf
+generate`, added the `Server` handler following `AIDecompose`'s pattern,
+and wired `usecase.NewGenerateAgentPrompt(repo, projectExecutionResolver,
+aiCompleter)` into `main.go` (reusing the already-dialed
+infra-fleet-service clients — no new downstream dial needed, unlike
+TASK-TG-002-01's git-gateway-service client).
+
+Test plan coverage: `critical_path_test.go` covers the 5-node/2-branch
+hand-computed case (branch through the 10h node wins over the 3h branch,
+17h vs. 10h total), a 10-iteration determinism/tie-break check, a
+nil-EstimatedHours-treated-as-zero case, plus 2 edge cases beyond the named
+test plan (empty input, no-edges single-node result).
+`generate_agent_prompt_test.go` covers tenant/not-found/not-connected/
+relay-failure/save-failure plus the task's own named "snapshot test":
+`TestGenerateAgentPrompt_PersistsResultOnTask` asserts both the returned
+value and the persisted `Task.PromptTemplate` match, and that unrelated
+fields (`Title`) round-trip unchanged through the whole-row `Update`.
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean; `go
+test .../domain/... -run TestCalculateCriticalPath` — 5/5 pass; `go test
+.../usecase/... -run TestGenerateAgentPrompt` — 6/6 pass; full `go test
+./services/task-service/...` passes with no regressions.

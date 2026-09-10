@@ -14,19 +14,31 @@ type AddEdgeInput struct {
 	Kind       domain.EdgeKind
 }
 
-// AddEdge is task-service's edge-mutation usecase. Runs the cycle check
-// (depends_on only) and the write in ONE transaction via TxRunner, closing
-// README.md's "known gap": a SELECT ... FOR UPDATE over the depends_on edge
-// set (EdgeRepository.ListByKindForUpdate) closes the race the prior
-// two-call (ListByKind then Add) shape allowed. Also implements auto-block:
-// adding "from depends_on to" means "from must wait for to" — if `to` isn't
-// Done/Cancelled, `from` transitions to StatusBlocked.
+// AddEdge is task-service's edge-mutation usecase — the one place
+// domain.DetectCycle gets called, per task-service.md §4/§8. Only
+// depends_on edges are cycle-checked: parent_child's single-parent
+// invariant is a different, DB-enforced constraint (unique index on
+// to_task_id), not a cycle in the sense TaskDAGValidator guards against.
+//
+// AddEdge does NOT open its own transaction — it trusts whatever tasks/edges
+// pair it was constructed with are already correctly scoped (either the
+// pool-backed repos for a standalone call, or tx-scoped repos when
+// constructed inside a usecase.TxRunner.RunInTx closure), mirroring
+// AIApply's identical relationship with CreateTask. The standalone AddEdge
+// RPC path gets its atomicity from the gRPC handler wrapping this usecase in
+// a RunInTx call instead — see server.go's AddEdge handler — closing this
+// usecase's previous check-then-write race (cycle check + edge write, now
+// also + auto-block write, were 3 separate calls with no atomicity
+// guarantee between them). Delegates to addEdgeWithinTx, which uses
+// ListByKindForUpdate's row-locked cycle check to also close the
+// check-then-write race WITHIN the transaction (README.md's "known gap").
 type AddEdge struct {
-	txRunner TxRunner
+	tasks TaskRepository
+	edges EdgeRepository
 }
 
-func NewAddEdge(txRunner TxRunner) *AddEdge {
-	return &AddEdge{txRunner: txRunner}
+func NewAddEdge(tasks TaskRepository, edges EdgeRepository) *AddEdge {
+	return &AddEdge{tasks: tasks, edges: edges}
 }
 
 func (uc *AddEdge) Execute(ctx context.Context, in AddEdgeInput) (domain.TaskEdge, error) {
@@ -39,10 +51,7 @@ func (uc *AddEdge) Execute(ctx context.Context, in AddEdgeInput) (domain.TaskEdg
 		return domain.TaskEdge{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_EDGE_INVALID", err.Error(), err)
 	}
 
-	err = uc.txRunner.RunInTx(ctx, func(ctx context.Context, tasks TaskRepository, edges EdgeRepository) error {
-		return addEdgeWithinTx(ctx, tenantID, tasks, edges, edge)
-	})
-	if err != nil {
+	if err := addEdgeWithinTx(ctx, tenantID, uc.tasks, uc.edges, edge); err != nil {
 		return domain.TaskEdge{}, err
 	}
 	return edge, nil
@@ -50,12 +59,13 @@ func (uc *AddEdge) Execute(ctx context.Context, in AddEdgeInput) (domain.TaskEdg
 
 // addEdgeWithinTx is the cycle-check + write + auto-block core, factored
 // out so it can run against an ALREADY-open transaction's TaskRepository/
-// EdgeRepository pair — AddEdge.Execute calls it via TxRunner.RunInTx;
-// AIApply's own RunInTx-scoped subtask loop (ai_apply.go) calls it
-// directly, since Repository.RunInTx always begins a fresh transaction
-// against the pool (not the currently-open pgx.Tx) — nesting a second
-// RunInTx call there would silently open an unrelated transaction and
-// break AIApply's all-or-nothing guarantee.
+// EdgeRepository pair — AddEdge.Execute calls it against whatever pair it
+// was constructed with; AIApply's own RunInTx-scoped subtask loop
+// (ai_apply.go) can call it directly for the same reason: Repository.RunInTx
+// always begins a fresh transaction against the pool (not any
+// already-open pgx.Tx), so nesting a second RunInTx call there would
+// silently open an unrelated transaction and break AIApply's all-or-nothing
+// guarantee.
 func addEdgeWithinTx(ctx context.Context, tenantID string, tasks TaskRepository, edges EdgeRepository, edge domain.TaskEdge) error {
 	if edge.Kind == domain.EdgeKindDependsOn {
 		existing, err := edges.ListByKindForUpdate(ctx, tenantID, domain.EdgeKindDependsOn)

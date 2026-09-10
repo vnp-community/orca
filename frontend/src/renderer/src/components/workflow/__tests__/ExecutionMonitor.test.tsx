@@ -65,7 +65,9 @@ describe('ExecutionMonitor', () => {
       execution,
       stepStatuses: { s1: 'failed', s2: 'pending' },
       streamingOutput: {},
-      cancelExecution
+      cancelExecution,
+      pauseExecution,
+      resumeExecution
     } as unknown as ReturnType<typeof useWorkflowExecution>)
     render(<ExecutionMonitor executionId="e1" />)
     const s1Row = screen.getByTestId('step-row-s1')
@@ -125,7 +127,9 @@ describe('ExecutionMonitor', () => {
       execution: { ...execution, rootTraceId: 'trace-root-123' },
       stepStatuses: { s1: 'completed', s2: 'running' },
       streamingOutput: {},
-      cancelExecution
+      cancelExecution,
+      pauseExecution,
+      resumeExecution
     } as unknown as ReturnType<typeof useWorkflowExecution>)
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
@@ -151,11 +155,41 @@ describe('ExecutionMonitor', () => {
       execution: { ...execution, status: 'cancelled' },
       stepStatuses: { s1: 'completed', s2: 'skipped' },
       streamingOutput: {},
-      cancelExecution
+      cancelExecution,
+      pauseExecution,
+      resumeExecution
     } as unknown as ReturnType<typeof useWorkflowExecution>)
     expect(() => render(<ExecutionMonitor executionId="e1" />)).not.toThrow()
     expect(screen.getAllByText('Cancelled')[0]).toBeInTheDocument()
     // A cancelled execution is no longer running — no Cancel button.
     expect(screen.queryByTestId('cancel-btn')).not.toBeInTheDocument()
+  })
+
+  // FE-TASK-003 (workflow v4): Pause/Resume buttons toggle by execution.status.
+  it("execution.status='running' → Pause button shown, Resume not shown", () => {
+    render(<ExecutionMonitor executionId="e1" />)
+    expect(screen.getByTestId('pause-btn')).toBeInTheDocument()
+    expect(screen.queryByTestId('resume-btn')).not.toBeInTheDocument()
+  })
+
+  it("execution.status='paused' → Resume button shown, Pause and Cancel not shown", () => {
+    vi.mocked(useWorkflowExecution).mockReturnValue({
+      execution: { ...execution, status: 'paused' },
+      stepStatuses: { s1: 'completed', s2: 'pending' },
+      streamingOutput: {},
+      cancelExecution,
+      pauseExecution,
+      resumeExecution
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
+    render(<ExecutionMonitor executionId="e1" />)
+    expect(screen.getByTestId('resume-btn')).toBeInTheDocument()
+    expect(screen.queryByTestId('pause-btn')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('cancel-btn')).not.toBeInTheDocument()
+  })
+
+  it('Pause button calls pauseExecution from the hook', () => {
+    render(<ExecutionMonitor executionId="e1" />)
+    fireEvent.click(screen.getByTestId('pause-btn'))
+    expect(pauseExecution).toHaveBeenCalled()
   })
 })

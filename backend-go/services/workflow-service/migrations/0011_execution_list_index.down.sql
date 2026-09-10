@@ -1,0 +1,1 @@
+DROP INDEX IF EXISTS workflow.idx_workflow_executions_tenant_project_created;

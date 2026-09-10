@@ -220,6 +220,7 @@ func run() error {
 	resolveTemplateUC := usecase.NewResolveTemplate(repo)
 	updateTemplateUC := usecase.NewUpdateTemplate(repo)
 	cloneTemplateUC := usecase.NewCloneTemplate(resolveTemplateUC, repo)
+	listExecutionsUC := usecase.NewListExecutions(repo)
 	publishTemplateUC := usecase.NewPublishTemplate(repo, approvalStore, opaChecker)
 	resolveApprovalUC := usecase.NewResolveApproval(approvalStore, opaChecker)
 	listPendingApprovalsUC := usecase.NewListPendingApprovals(approvalStore, opaChecker)
@@ -244,7 +245,7 @@ func run() error {
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	workflowv1.RegisterWorkflowServiceServer(grpcServer, workflowgrpc.New(
 		createTemplateUC, executeUC, getExecutionUC, pauseExecutionUC, resumeExecutionUC, executeAdHocStepUC, hasActiveExecutionsUC,
-		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC, cloneTemplateUC,
+		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC, cloneTemplateUC, listExecutionsUC,
 		publishTemplateUC, resolveApprovalUC, listPendingApprovalsUC,
 		generateShareLinkUC, previewSharedTemplateUC, importSharedTemplateUC, rateTemplateUC,
 	))

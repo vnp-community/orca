@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/create_task.go`, `backend-go/services/task-service/internal/adapter/grpc/server.go` (`CreateTask` handler), `backend-go/proto/orca/task/v1/task.proto` (`CreateTaskRequest.creator_id`)
 **Depends on:** TASK-TG-001-02 (no new `Task` field needed for this — `Task.OwnerID` is informational/display-only per BE-SOL-003 §1, NOT read by authorization; this task only needs `GrantRepository` wired into `CreateTask`, which already exists as a port — see Context)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -151,3 +151,45 @@ failure (simulated via a fake `GrantRepository` returning an error) still
 returns the created task successfully (best-effort); `AIApply`'s existing
 tests still pass unchanged regardless of which option ((a) or (b) above)
 was chosen for its `NewCreateTask` call site.
+
+## Execution notes (2026-09-09)
+
+Chose option (b) exactly as the task's own Context section recommends:
+`AIApply`'s `RunInTx` closure now constructs `NewCreateTask(tasks, nil)`,
+and `CreateTask.Execute`'s grant step is skipped whenever `in.CreatorID ==
+""` OR `uc.grants == nil` — AIApply never sets `CreatorID`, so this is
+never actually reached from that call site, not a latent nil-pointer risk
+(covered by a dedicated regression test,
+`TestCreateTask_NilGrantRepository_SkipsGrantStep`). Implemented
+`CreateTaskInput.CreatorID`, the best-effort `Grant` insert (using
+`log/slog`'s `slog.ErrorContext`, the exact logging convention already used
+elsewhere in this codebase for "best-effort, log and continue" — e.g.
+`workflow-service/internal/usecase/execute.go` — no prior logging call
+existed in this specific package before this task), `task.proto`'s
+`creator_id = 5` field (confirmed still the next-free number — field count
+unchanged at 4 since the task file was written, despite line numbers
+having drifted from `task.proto:61-66` to 125-130 due to this same agent
+run's earlier proto edits for other tasks in this series), the `server.go`
+handler passthrough, and `main.go`'s `NewCreateTask(repo, repo)` wiring
+(one `*postgres.Repository` instance already implements both
+`TaskRepository` and `GrantRepository`).
+
+Fixed test fallout beyond the task's own file list: `create_task_test.go`
+rewritten with a `GrantRepository` fake at every call site;
+`server_test.go`'s 2 `NewCreateTask` call sites updated (both pass `tasks`
+twice — that package's `fakeTaskRepository` already implements both ports).
+Added exactly the cases the task's Verify section names plus a few more:
+`TestCreateTask_CreatorID_ThenResolvePermission_ResolvesOwner` (the named
+integration-style test — `CreateTask` then `ResolvePermission` in the same
+test, real `domain.ResolveGrant` BFS walk, not a special-cased assertion),
+`TestCreateTask_GrantInsertFailure_StillReturnsCreatedTask` (best-effort),
+`TestCreateTask_CreatorID_InsertsOwnerGrant`/`_NoCreatorID_NoGrantInserted`/
+`_NilGrantRepository_SkipsGrantStep` (the 3 branches of the new guard
+condition).
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean; `go
+test .../usecase/... -run "TestCreateTask|TestAIApply"` — all 15 cases
+pass (7 new `TestCreateTask_*` cases plus the unchanged `TestAIApply_*`
+suite, confirming option (b) didn't disturb `AIApply`'s existing
+transactional tests); full `go test ./services/task-service/...` passes
+with no regressions.

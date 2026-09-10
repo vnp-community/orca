@@ -136,7 +136,7 @@ func TestExecuteTask_SimplePath_NoSubtasksNoDependencies(t *testing.T) {
 		t.Fatalf("expected exactly 1 CompleteExecution call, got %d: %+v", len(tasks.completeExecutionCalls), tasks.completeExecutionCalls)
 	}
 	call := tasks.completeExecutionCalls[0]
-	if call.status != domain.StatusReview {
+	if call.status != string(domain.StatusReview) {
 		t.Errorf("expected CompleteExecution status=review, got %q", call.status)
 	}
 	if call.actualHours < 0 {
@@ -454,7 +454,7 @@ func TestExecuteTask_SimplePath_CompletesInlineWithActualHours(t *testing.T) {
 		t.Fatalf("expected exactly one CompleteExecution call, got %d: %+v", len(tasks.completeExecutionCalls), tasks.completeExecutionCalls)
 	}
 	got := tasks.completeExecutionCalls[0]
-	if got.status != domain.StatusReview {
+	if got.status != string(domain.StatusReview) {
 		t.Errorf("expected StatusReview, got %q", got.status)
 	}
 	if got.actualHours <= 0 {

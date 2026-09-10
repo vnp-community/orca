@@ -17,7 +17,10 @@ import (
 // ExecuteInput mirrors ExecuteRequest. ProjectID is persisted on the
 // resulting execution — see domain.WorkflowExecution and
 // usecase.HasActiveExecutions, which is what project-service.RebindDevServer
-// relies on (Epic C, backend-go/docs/execution-plan.md).
+// relies on (Epic C, backend-go/docs/execution-plan.md). Inputs
+// (TASK-WF-003-01) feeds usecase.Interpolate's {{path}} substitution pass —
+// also persisted (WorkflowExecution.InputsJSON) so a step dispatched after
+// a restart still has the original inputs available.
 type ExecuteInput struct {
 	TemplateID  string
 	ProjectID   string
@@ -140,6 +143,11 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 	if err != nil {
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_EXECUTION", err.Error(), err)
 	}
+	// Persisted verbatim (already validated above via the inputs unmarshal)
+	// so a step dispatched after a restart still has the original {{...}}
+	// input values available — see domain.WorkflowExecution.InputsJSON's
+	// doc comment and RecoverExecutions.resumeToCompletion.
+	exec.InputsJSON = in.InputsJSON
 
 	if err := uc.executions.CreateExecution(ctx, exec); err != nil {
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_EXECUTION_SAVE_FAILED", "failed to persist workflow execution", err)
@@ -164,6 +172,7 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 // final status (completed if every wave succeeded, failed if any step
 // did not — see waveDispatcher's doc comment for the failure-semantics
 // rationale). Runs entirely off the originating RPC's goroutine.
+//
 // runToCompletion is the one place exec.Status transitions to a terminal
 // value for the main dispatch path — the single outbox publish point
 // SOL-PW-04 (TASK-PW-04-06) adds. A marshal failure degrades to "persist

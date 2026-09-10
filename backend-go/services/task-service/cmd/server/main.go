@@ -218,9 +218,8 @@ func run() error {
 
 	eventPublisher := taskeventbus.NewPublisher(repo, logger)
 
-	createTaskUC := usecase.NewCreateTask(repo)
+	createTaskUC := usecase.NewCreateTask(repo, repo) // repo implements both TaskRepository and GrantRepository
 	getTaskUC := usecase.NewGetTask(repo)
-	addEdgeUC := usecase.NewAddEdge(repo)
 	// resolvePermissionUC must be constructed before grantUC — Grant now
 	// requires 'manage' access to a task before writing a new grant on it,
 	// closing a live authorization gap (TASK-TG-03-01).
@@ -245,10 +244,11 @@ func run() error {
 		projectContextResolver, techStackDetector, repo, aiCompleter,
 	)
 	// repo also implements usecase.TxRunner (internal/adapter/postgres's
-	// RunInTx) — AIApply needs its create-subtask+add-edge loop to run in
-	// one transaction (TASK-224 Gap 2), not the standalone createTaskUC/
-	// addEdgeUC instances above (those stay wired to the plain CreateTask/
-	// AddEdge RPCs, which don't need a shared transaction).
+	// RunInTx) — AIApply needs its create-subtask+add-edge loop, and the
+	// AddEdge RPC handler needs its cycle-check+write+auto-block sequence,
+	// to each run inside one transaction; passed to taskgrpc.New directly
+	// (as txRunner) rather than a pre-built *usecase.AddEdge, since AddEdge
+	// must be constructed fresh per call, scoped to that call's transaction.
 	aiApplyUC := usecase.NewAIApply(repo)
 	generateAgentPromptUC := usecase.NewGenerateAgentPrompt(repo, aiProviderContextResolver, projectExecutionResolver, aiCompleter)
 	// TASK-TG-03-08's public/anonymous share-link flow. See server.go's
@@ -276,6 +276,11 @@ func run() error {
 	// handler is missing.
 	reportExecutionResultUC := usecase.NewReportTaskExecutionResult(repo, repo)
 	findTaskByNumberUC := usecase.NewFindTaskByNumber(repo)
+	// TASK-TG-003-05's second, independently-built share-link mechanism —
+	// see task.proto's GenerateShareLink/GetTaskByShareToken doc comment
+	// for why this coexists with CreatePublicLink/ResolvePublicLink above.
+	generateShareLinkUC := usecase.NewGenerateShareLink(repo, resolvePermissionUC)
+	getTaskByShareTokenUC := usecase.NewGetTaskByShareToken(repo)
 
 	// Execution-status mirror consumer (BE-SOL-003/TASK-FT-003-05) —
 	// subscribes orca.orchestration.task.statuschanged /
@@ -321,10 +326,11 @@ func run() error {
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
-		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
+		createTaskUC, getTaskUC, repo, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
 		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC, generateAgentPromptUC,
 		revokeGrantUC, listGrantsUC, createPublicLinkUC, revokePublicLinkUC, resolvePublicLinkUC,
 		getSubtreeUC, recalculateProgressUC, addCommentUC, listCommentsUC, reportExecutionResultUC, findTaskByNumberUC,
+		generateShareLinkUC, getTaskByShareTokenUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

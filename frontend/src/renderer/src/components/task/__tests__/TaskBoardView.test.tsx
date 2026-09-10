@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import '@testing-library/jest-dom/vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
-import { describe, expect, it, vi, beforeEach } from 'vitest'
+import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { TaskBoardView } from '../TaskBoardView'
 import type { OrcaTask } from '../../../../../shared/task-types'
 
@@ -86,10 +86,11 @@ describe('TaskBoardView', () => {
   const onSelect = vi.fn()
 
   beforeEach(() => {
-    cleanup()
     vi.clearAllMocks()
     mockStore.tasks = []
   })
+
+  afterEach(cleanup)
 
   it('renders 7 columns in STATUS_ORDER, each counting its own tasks', () => {
     const tasks = [

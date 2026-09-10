@@ -9,20 +9,32 @@ import (
 	"time"
 )
 
-// Status values a Task can hold. Kept as an open-ish small set matching the
-// TS source's status strings (see specs/backend-go/services/task-service.md
-// §10 — faithful port, not a redesign).
+// Status is a task's lifecycle state. Widened from a plain string
+// (BE-SOL-001) to a defined type so status parameters/fields get compile-time
+// type safety throughout ports.go/repository.go/server.go, rather than only
+// where this package itself uses status values.
+type Status string
+
+// Status values a Task can hold. StatusOpen is kept as a first-class value
+// alongside the 3 new BE-SOL-001 states (Backlog/Todo dropped from the
+// enum's "current" set, Blocked/Review added) because existing rows/tests
+// use it and TASK-TG-001-01's migration explicitly does not backfill them
+// away — see that migration's up.sql comment.
+// Explicitly typed as Status (not left as untyped string constants) so
+// `status := domain.StatusDone`-style short variable declarations infer
+// domain.Status, not string — load-bearing for every call site that takes
+// its address (e.g. UpdateTaskInput.Status *domain.Status).
 const (
-	StatusOpen       = "open"
-	StatusBlocked    = "blocked" // new — see TASK-TG-01-07's auto-block design
-	StatusInProgress = "in_progress"
+	StatusOpen       Status = "open"
+	StatusBlocked    Status = "blocked" // new — see TASK-TG-01-07's auto-block design
+	StatusInProgress Status = "in_progress"
 	// StatusReview is the simple execution path's terminal status (SOL-TG-04)
 	// — ExecuteTask.CompleteExecution lands a successful simple-path run here
 	// directly, inline, rather than leaving it stuck in_progress. See
 	// usecase.ExecuteTask's doc comment.
-	StatusReview    = "review"
-	StatusDone      = "done"
-	StatusCancelled = "cancelled"
+	StatusReview    Status = "review"
+	StatusDone      Status = "done"
+	StatusCancelled Status = "cancelled"
 )
 
 var (
@@ -53,16 +65,16 @@ var (
 )
 
 // Task is task-service's central entity — see
-// specs/backend-go/services/task-service.md §4 and §5. The proto's Task
-// message (id, tenant_id, title, status, parent_id, project_id) is this
-// scaffold's authoritative field set; the design doc's broader schema
-// (description, complexity, assignee, active_execution_id) is intentionally
-// deferred, see this service's README.
+// specs/backend-go/services/task-service.md §4 and §5. Widened by
+// TASK-TG-001-02/BE-SOL-001 with the fields the AI-decompose, access-control,
+// and orchestration solutions need (description, classification, assignment,
+// ownership, estimates, AI context/plan, visibility, execution tracking,
+// subtask progress counters) alongside the original proto-backed field set.
 type Task struct {
 	ID       string
 	TenantID string
 	Title    string
-	Status   string
+	Status   Status
 	// ParentID is empty for a root task. Hierarchy is stored directly on
 	// the task row (denormalized) rather than requiring a task_edges
 	// parent_child row to exist before GetAncestors can walk it — see
@@ -138,9 +150,33 @@ type Task struct {
 	// so a stale/duplicate callback (e.g. for a task re-dispatched since) is
 	// a no-op rather than corrupting a newer run's state.
 	ActiveExecutionLinkID string
+
+	// Labels are free-form tags (TASK-TG-001-02's widening) — added to the
+	// proto at the next-free field number (25), since the task's own
+	// self-assigned numbering collided with fields main had already claimed.
+	Labels []string
+	// ReporterID is a logical FK into tenant-service's user set, same
+	// bounded-context rule as AssigneeID/OwnerID — empty means unset.
+	ReporterID string
+	// WorkflowExecID is the execution-tracking counterpart to
+	// WorkflowTemplateID above — set once Engine 3 dispatch starts.
+	WorkflowExecID string
+	// DoneSubtasks/TotalSubtasks are progress-cascade counters maintained by
+	// RecalculateProgress — never written directly by CreateTask/UpdateTask.
+	DoneSubtasks  int
+	TotalSubtasks int
+	// ShareToken is the public share-link lookup key (TASK-TG-003-05,
+	// SECURITY REVIEW REQUIRED before merge) — empty until GenerateShareLink
+	// mints one. A cryptographically random value (crypto/rand, never a UUID
+	// derived from the task ID or any other guessable value) — see
+	// usecase.GenerateShareLink's doc comment for why. Never exposed via the
+	// public GetTaskByShareToken path itself (that returns the dedicated,
+	// narrower TaskShareView) — only via authenticated reads of the full
+	// Task (GetTask/ListTasks), so an admin can retrieve/share it.
+	ShareToken string
 }
 
-func validStatus(s string) bool {
+func validStatus(s Status) bool {
 	switch s {
 	case StatusOpen, StatusBlocked, StatusInProgress, StatusReview, StatusDone, StatusCancelled:
 		return true
@@ -155,7 +191,7 @@ func validStatus(s string) bool {
 // handler). projectID is optional (may be empty) and carries no validation
 // of its own — task-service never validates that a project_id refers to a
 // real project-service project, per the bounded-context rule.
-func NewTask(id, tenantID, title, status, parentID, projectID string) (Task, error) {
+func NewTask(id, tenantID, title string, status Status, parentID, projectID string) (Task, error) {
 	if tenantID == "" {
 		return Task{}, ErrEmptyTenant
 	}
@@ -188,7 +224,7 @@ func NewTask(id, tenantID, title, status, parentID, projectID string) (Task, err
 // be able to fake or clear a dispatch. ExecuteTask still transitions a task
 // into StatusInProgress the way it always has, directly via
 // TaskRepository.UpdateStatus, bypassing this method entirely.
-func (t Task) SetStatus(status string) (Task, error) {
+func (t Task) SetStatus(status Status) (Task, error) {
 	if !validStatus(status) {
 		return t, ErrInvalidStatus
 	}

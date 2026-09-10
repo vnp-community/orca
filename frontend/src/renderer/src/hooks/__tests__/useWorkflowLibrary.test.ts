@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { renderHook, waitFor } from '@testing-library/react'
+import { renderHook, waitFor, act } from '@testing-library/react'
 import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
 import type { LibraryScope } from '../useWorkflowLibrary'
 
@@ -65,7 +65,7 @@ describe('useWorkflowLibrary', () => {
 
     await waitFor(() => {
       expect(result.current.templates).toHaveLength(1)
-      expect(result.current.templates[0].id).toBe('t1')
+      expect(result.current.templates[0]?.id).toBe('t1')
     })
   })
 
@@ -78,5 +78,16 @@ describe('useWorkflowLibrary', () => {
       expect(result.current.loadError).toBe(true)
       expect(result.current.templates).toEqual([])
     })
+  })
+
+  it('reload() re-runs the RPC', async () => {
+    const { useWorkflowLibrary } = await import('../useWorkflowLibrary')
+    const { result } = renderHook(() => useWorkflowLibrary('company', ''))
+    await waitFor(() => expect(mockRpc).toHaveBeenCalledTimes(1))
+
+    await act(async () => {
+      await result.current.reload()
+    })
+    expect(mockRpc).toHaveBeenCalledTimes(2)
   })
 })

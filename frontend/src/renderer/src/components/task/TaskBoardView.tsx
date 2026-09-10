@@ -50,9 +50,8 @@ export function TaskBoardView({
         const { [taskId]: _drop, ...rest } = prev
         return rest
       })
-      toast.error(
-        `Cannot move "${task.title}" to ${newStatus}: ${err instanceof Error ? err.message : String(err)}`
-      )
+      const message = err instanceof Error ? err.message : String(err)
+      toast.error(`Cannot move "${task.title}" to ${newStatus}: ${message}`)
     }
   }
 
@@ -76,7 +75,7 @@ export function TaskBoardView({
               className="flex-1 space-y-2 overflow-y-auto min-h-[100px]"
               onDrop={(e) => {
                 e.preventDefault()
-                handleDrop(e.dataTransfer.getData('taskId'), status)
+                void handleDrop(e.dataTransfer.getData('taskId'), status)
               }}
               onDragOver={(e) => e.preventDefault()}
               data-testid={`board-dropzone-${status}`}

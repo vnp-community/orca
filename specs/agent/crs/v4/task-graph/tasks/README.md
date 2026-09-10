@@ -16,7 +16,7 @@ solution's sketch.
 | Solution | Task IDs | Notes |
 |---|---|---|
 | [SOL-AG-TG-001](../solutions/SOL-AG-TG-001-agent-env-contract-assessment.md) — `agent.execPrompt` env-injection contract assessment | **None** | See "Why SOL-AG-TG-001 has no tasks" below. |
-| [SOL-AG-TG-002](../solutions/SOL-AG-TG-002-agent-chunk-streaming.md) — `agent.execPromptStream`/`shell.execStream` chunk streaming | [TASK-AG-TG-001](./TASK-AG-TG-001-agent-exec-prompt-stream-handler.md) (`handleAgentExecPromptStream` + `agent.execPromptStream` dispatch), [TASK-AG-TG-002](./TASK-AG-TG-002-shell-exec-stream-handler.md) (`handleShellExecStream` + `shell.execStream` dispatch) | Both tasks reuse the exact same real precedent (`git.execStream`); see each task's Context for the file-specific complications re-reading the code surfaced. |
+| [SOL-AG-TG-002](../solutions/SOL-AG-TG-002-agent-chunk-streaming.md) — `agent.execPromptStream`/`shell.execStream` chunk streaming | [TASK-AG-TG-001](./TASK-AG-TG-001-agent-exec-prompt-stream-handler.md) `[x]` DONE (`handleAgentExecPromptStream` + `agent.execPromptStream` dispatch), [TASK-AG-TG-002](./TASK-AG-TG-002-shell-exec-stream-handler.md) `[x]` DONE (`handleShellExecStream` + `shell.execStream` dispatch) | Both tasks reuse the exact same real precedent (`git.execStream`); see each task's Context for the file-specific complications re-reading the code surfaced. Both resolved their chunking-granularity open question the same way: raw `data` event verbatim, no line-splitting. Full `agent/` suite green after both: 352 files / 4022 tests passed. |
 
 ## Why SOL-AG-TG-001 has no tasks
 

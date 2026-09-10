@@ -2,10 +2,11 @@
 // FS RPC handlers for Orca Dev Agent v5.0.
 // Wraps existing fs-handler-*.ts modules for agent RPC methods:
 //   fs.readDir, fs.readFile, fs.stat, fs.glob
-// Split across fs-agent-write-extensions.ts (fs.writeFile/mkdir/rmdir),
-// fs-agent-search-extensions.ts (fs.grep/preflight.check), shell-agent-extensions.ts
-// (shell.eval/exec), and fs-agent-watch-extensions.ts (fs.watch/unwatch) to
-// stay under the repo's 300-line max-lines ratchet (config/max-lines-baseline.txt).
+// Sibling RPC-handler groups split out of this file (max-lines ratchet,
+// config/max-lines-baseline.txt): fs.grep/preflight.check ->
+// fs-agent-search-extensions.ts, fs.writeFile/mkdir/rmdir ->
+// fs-agent-write-extensions.ts, shell.eval/exec/execStream ->
+// shell-agent-extensions.ts, fs.watch/unwatch -> fs-agent-watch-extensions.ts.
 
 import { readdir, stat } from 'node:fs/promises'
 import { join, isAbsolute } from 'node:path'

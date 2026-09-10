@@ -3,9 +3,9 @@
 // step/wave tracking.
 import { useCallback, useEffect, useState } from 'react'
 import { ExecutionMonitor } from './ExecutionMonitor'
+import { Button } from '../ui/button'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { useAppStore } from '../../store'
-import { Button } from '../ui/button'
 import type { WorkflowExecution, WorkflowExecutionStatus } from '@shared/workflow-types'
 
 // Why not StepStatusBadge: it only maps StepStatus (pending/running/completed/failed/skipped),

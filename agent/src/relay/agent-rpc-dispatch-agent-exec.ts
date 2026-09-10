@@ -190,6 +190,28 @@ export async function dispatchAgentExecRpc(
       }
     }
 
+    // ── agent.execPromptStream ───────────────────────────────────────────────
+    // CR-TG-006: streaming sibling of agent.execPrompt above — same setup,
+    // but delivers stream.chunk/stream.end frames incrementally instead of a
+    // single buffer-then-return response. Follows the exact
+    // void handleXxxStream(...) + literal stream.started return shape
+    // git.execStream/agent.spawn already use in this dispatcher.
+    case 'agent.execPromptStream': {
+      try {
+        const { handleAgentExecPromptStream } = await import('./agent-print-mode-exec')
+        // Streaming: fire-and-forget, sends multiple frames asynchronously
+        void handleAgentExecPromptStream(ws, state, rpc.id, rpc.params ?? {}, config, log)
+        return { jsonrpc: '2.0', id: rpc.id, result: { type: 'stream.started' } }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(
+          rpc.id,
+          AgentErrorCode.ServerError,
+          `agent.execPromptStream unavailable: ${msg}`
+        )
+      }
+    }
+
     default:
       return null
   }

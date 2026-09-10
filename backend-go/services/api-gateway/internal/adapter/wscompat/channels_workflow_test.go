@@ -29,6 +29,8 @@ type fakeWorkflowServiceClient struct {
 	resolveTemplateFunc     func(ctx context.Context, in *workflowv1.ResolveTemplateRequest) (*workflowv1.ResolveTemplateResponse, error)
 	hasActiveExecutionsFunc func(ctx context.Context, in *workflowv1.HasActiveExecutionsRequest) (*workflowv1.HasActiveExecutionsResponse, error)
 	executeAdHocStepFunc    func(ctx context.Context, in *workflowv1.ExecuteAdHocStepRequest) (*workflowv1.ExecuteAdHocStepResponse, error)
+	listExecutionsFunc      func(ctx context.Context, in *workflowv1.ListExecutionsRequest) (*workflowv1.ListExecutionsResponse, error)
+	cloneTemplateFunc       func(ctx context.Context, in *workflowv1.CloneTemplateRequest) (*workflowv1.CloneTemplateResponse, error)
 
 	lastRequest *workflowv1.HasActiveExecutionsRequest
 }
@@ -79,6 +81,14 @@ func (f *fakeWorkflowServiceClient) HasActiveExecutions(ctx context.Context, in 
 
 func (f *fakeWorkflowServiceClient) ExecuteAdHocStep(ctx context.Context, in *workflowv1.ExecuteAdHocStepRequest, _ ...grpc.CallOption) (*workflowv1.ExecuteAdHocStepResponse, error) {
 	return f.executeAdHocStepFunc(ctx, in)
+}
+
+func (f *fakeWorkflowServiceClient) ListExecutions(ctx context.Context, in *workflowv1.ListExecutionsRequest, _ ...grpc.CallOption) (*workflowv1.ListExecutionsResponse, error) {
+	return f.listExecutionsFunc(ctx, in)
+}
+
+func (f *fakeWorkflowServiceClient) CloneTemplate(ctx context.Context, in *workflowv1.CloneTemplateRequest, _ ...grpc.CallOption) (*workflowv1.CloneTemplateResponse, error) {
+	return f.cloneTemplateFunc(ctx, in)
 }
 
 func TestWorkflowExecuteChannel_Success(t *testing.T) {
@@ -525,6 +535,94 @@ func TestWorkflowExecuteAdHocStepChannel_TenantIDComesFromIdentityNotArgs(t *tes
 	}
 	res, ok := result.(*workflowv1.StepResult)
 	if !ok || res.Status != "completed" {
+		t.Fatalf("unexpected result: %+v (type %T)", result, result)
+	}
+}
+
+// TestWorkflowListExecutionsChannel_ReturnsBareArray guards the real wire
+// contract WorkflowMonitor.tsx already codes against (confirmed live
+// against that component before choosing this shape, TASK-WF-005-01):
+// `callRuntimeRpc<WorkflowExecution[]>` assigns the RPC result directly as
+// an array — NOT wrapped in a `{executions, nextCursor}` envelope like
+// workflow.template.list wraps `{templates, nextPageToken}`.
+func TestWorkflowListExecutionsChannel_ReturnsBareArray(t *testing.T) {
+	var gotReq *workflowv1.ListExecutionsRequest
+	fake := &fakeWorkflowServiceClient{
+		listExecutionsFunc: func(ctx context.Context, in *workflowv1.ListExecutionsRequest) (*workflowv1.ListExecutionsResponse, error) {
+			gotReq = in
+			return &workflowv1.ListExecutionsResponse{
+				Executions: []*workflowv1.WorkflowExecution{{Id: "exec-1"}, {Id: "exec-2"}},
+				NextCursor: "exec-2",
+			}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"projectId": "proj-1", "limit": 20, "cursor": ""})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.listExecutions", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.ProjectId != "proj-1" || gotReq.Limit != 20 {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	executions, ok := result.([]*workflowv1.WorkflowExecution)
+	if !ok {
+		t.Fatalf("expected a bare []*WorkflowExecution result (matching WorkflowMonitor.tsx's callRuntimeRpc<WorkflowExecution[]> contract), got %T", result)
+	}
+	if len(executions) != 2 || executions[0].Id != "exec-1" {
+		t.Errorf("unexpected executions: %+v", executions)
+	}
+}
+
+// TestWorkflowListExecutionsChannel_EmptyReturnsEmptyArrayNotNull guards the
+// established list-shaped-channel convention (see the template.list
+// precedent above): a nil proto slice must serialize as `[]`, never `null`.
+func TestWorkflowListExecutionsChannel_EmptyReturnsEmptyArrayNotNull(t *testing.T) {
+	fake := &fakeWorkflowServiceClient{
+		listExecutionsFunc: func(ctx context.Context, in *workflowv1.ListExecutionsRequest) (*workflowv1.ListExecutionsResponse, error) {
+			return &workflowv1.ListExecutionsResponse{Executions: nil, NextCursor: ""}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"projectId": "proj-empty"})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.listExecutions", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	executions, ok := result.([]*workflowv1.WorkflowExecution)
+	if !ok || executions == nil || len(executions) != 0 {
+		t.Fatalf("want non-nil empty slice, got %#v", result)
+	}
+}
+
+func TestWorkflowTemplateCloneChannel_Success(t *testing.T) {
+	var gotReq *workflowv1.CloneTemplateRequest
+	fake := &fakeWorkflowServiceClient{
+		cloneTemplateFunc: func(ctx context.Context, in *workflowv1.CloneTemplateRequest) (*workflowv1.CloneTemplateResponse, error) {
+			gotReq = in
+			return &workflowv1.CloneTemplateResponse{Template: &workflowv1.WorkflowTemplate{Id: "tmpl-clone", Name: in.Name}}, nil
+		},
+	}
+
+	r := NewRegistry()
+	registerWorkflowChannels(r, fake)
+
+	args := argsJSON(t, map[string]any{"sourceTemplateId": "tmpl-1", "name": "my clone", "description": "a clone", "tags": []string{"a"}})
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "workflow.template.clone", args)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.SourceTemplateId != "tmpl-1" || gotReq.Name != "my clone" || gotReq.Description != "a clone" || len(gotReq.Tags) != 1 {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	tmpl, ok := result.(*workflowv1.WorkflowTemplate)
+	if !ok || tmpl.Id != "tmpl-clone" {
 		t.Fatalf("unexpected result: %+v (type %T)", result, result)
 	}
 }

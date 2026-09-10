@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/domain/subtask_proposal.go`, `backend-go/services/task-service/internal/usecase/ai_decompose.go` (`parseSubtaskProposals`), `backend-go/services/task-service/internal/usecase/ai_apply.go`, `backend-go/proto/orca/task/v1/task.proto` (`SubtaskProposal` message widened)
 **Depends on:** TASK-TG-001-04 (this task reuses `AddEdge`'s new `tasks TaskRepository`-aware constructor and its auto-block/cycle-check logic for `depends_on` edges created here)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -177,3 +177,71 @@ Expected: clean build; the existing
 `TestAIApply_MidLoopFailure_RollsBackEntireSubtree` test still passes
 unchanged; new dependency-edge tests pass; malformed-JSON test asserts a
 non-nil error and zero `domain.Task` rows created.
+
+## Execution notes (2026-09-09)
+
+Implemented exactly per the task's corrected shape: `domain.SubtaskProposal`
+widened with `Type`, `EstimatedHours *float64` (pointer, not the sketch's
+bare `float64` — preserves "no estimate given" vs. "estimate is 0"
+distinguishability through to `CreateTaskInput`, consistent with
+`domain.Task`'s own `*float64` fields from TASK-TG-001-02), `DependsOnIndex
+[]int`, `PromptTemplate`. `parseSubtaskProposals` rewritten to unmarshal a
+JSON array via a usecase-local `subtaskProposalJSON` wire-shape struct
+(kept out of `domain/` — no existing `domain/*.go` file uses `json:"..."`
+tags, so wire-format mapping stays in the usecase layer, consistent with
+that convention) and now returns `(proposals, error)`; `AIDecompose.Execute`
+propagates the error as `TASK_AI_DECOMPOSE_PARSE_FAILED` instead of
+returning an empty slice. `buildDecomposePrompt` (TASK-TG-002-01's widened
+version) gained an explicit JSON-array schema example so the AI relay
+response actually parses.
+
+`AIApply.Execute`'s existing transactional loop (unchanged: still
+`uc.txRunner.RunInTx`) gained a second pass over `in.Proposals` after every
+subtask has a real ID, resolving `DependsOnIndex` to real `depends_on`
+edges via `NewAddEdge(tasks, edges).Execute` (TASK-TG-001-04's 2-arg
+constructor) — reusing it unchanged means the cycle check and auto-block
+write both run per edge automatically, exactly as the task's own note
+describes. Also widened `CreateTaskInput` (not explicitly listed in the
+task's own "Changes to make" numbered steps, but flagged inline in its
+code sample: *"Description/Type/EstimatedHours/PromptTemplate: ... widen
+CreateTaskInput alongside this change ... do not silently drop them"*) with
+those 4 fields, and `CreateTask.Execute` now sets them on the constructed
+`domain.Task` before persisting — closes the gap the task's own sketch
+flagged rather than leaving AI-proposed `Description`/`Type`/etc. silently
+dropped.
+
+`task.proto`'s `SubtaskProposal` gained `type`, `estimated_hours` +
+`has_estimated_hours` (a has-bit pair rather than a
+`google.protobuf.DoubleValue`, to keep proto3 field access via plain
+getters — matches this file's existing convention of plain scalars, not
+wrapper types, for `Task`'s own optional numeric-shaped fields),
+`depends_on_index` (repeated int32), `prompt_template`; regenerated via
+`buf generate`. `server.go`'s `toProtoSubtaskProposals`/
+`toDomainSubtaskProposals` widened to round-trip all 4 new fields including
+the has-bit.
+
+Fixed test fallout: 4 existing fixtures in `ai_decompose_test.go`/
+`server_test.go` used the OLD free-text numbered-list format ("1. Do X")
+which is no longer valid input to the new JSON parser — converted each to
+a minimal JSON-array literal. Added exactly the 3 cases the task's own Test
+plan names: `TestAIDecompose_MalformedJSON_ReturnsErrorNotEmptyResult`
+(malformed JSON → error, nil proposals);
+`TestAIApply_DependsOnIndex_SameBatchCycle_RollsBackWholeBatch` (2-cycle
+within one batch → whole transaction rolled back, reusing the existing
+`fakeTxRunner`'s snapshot/restore semantics the same way
+`TestAIApply_MidLoopFailure_RollsBackEntireSubtree` already does); and
+`TestAIApply_DependsOnIndex_CreatesDependsOnEdgesAmongSiblings` (valid
+index → correct depends_on edge direction between the created siblings,
+plus asserting TASK-TG-001-04's auto-block fires as a consequence). Also
+added `TestAIApply_DependsOnIndex_OutOfRange_RollsBackWholeBatch` for the
+explicit range-check branch, beyond what the task's Test plan named.
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean; `go
+test ./services/task-service/... -run "TestAIDecompose|TestAIApply"` — all
+16 cases pass, including the unchanged
+`TestAIApply_MidLoopFailure_RollsBackEntireSubtree`; full `go test
+./services/task-service/...` passes with no regressions. `go test
+-tags=integration .../postgres/... -run TestRepository` — 3 unrelated tests
+hit the same pre-existing testcontainers flake documented in
+TASK-TG-001-02's execution notes on the full-suite run, all 3 passed
+cleanly when re-run in isolation together.

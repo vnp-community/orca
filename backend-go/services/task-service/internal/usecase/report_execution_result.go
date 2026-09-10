@@ -73,7 +73,7 @@ func (uc *ReportTaskExecutionResult) Execute(ctx context.Context, in ReportTaskE
 		if err := uc.links.Complete(ctx, tenantID, link.ID, "completed"); err != nil {
 			return apperrors.New(apperrors.KindInternal, "TASK_EXECUTION_LINK_COMPLETE_FAILED", "failed to complete execution link", err)
 		}
-		return uc.tasks.CompleteExecution(ctx, tenantID, in.TaskID, domain.StatusReview, in.ActualHours)
+		return uc.tasks.CompleteExecution(ctx, tenantID, in.TaskID, string(domain.StatusReview), in.ActualHours)
 	}
 
 	// Failed complex/workflow execution. domain.StatusBlocked does not

@@ -32,22 +32,27 @@ describe('TaskStatusBadge', () => {
     expect(screen.getByText('⏳')).toBeInTheDocument()
   })
 
+  // FE-TASK-003 (task-graph v4): STATUS_CONFIG was missing 3 of 7 real TaskStatus values —
+  // these used to silently fall back to "Todo" (STATUS_CONFIG[status] || STATUS_CONFIG.todo).
   it("renders backlog with label 'Backlog', not a Todo fallback", () => {
     render(<TaskStatusBadge status="backlog" />)
     expect(screen.getByText('Backlog')).toBeInTheDocument()
     expect(screen.getByText('📋')).toBeInTheDocument()
+    expect(screen.queryByText('Todo')).not.toBeInTheDocument()
   })
 
   it("renders review with label 'Review'", () => {
     render(<TaskStatusBadge status="review" />)
     expect(screen.getByText('Review')).toBeInTheDocument()
     expect(screen.getByText('👀')).toBeInTheDocument()
+    expect(screen.getByText('Review').parentElement).toHaveClass('text-purple-600')
   })
 
   it("renders blocked with label 'Blocked'", () => {
     render(<TaskStatusBadge status="blocked" />)
     expect(screen.getByText('Blocked')).toBeInTheDocument()
     expect(screen.getByText('🚫')).toBeInTheDocument()
+    expect(screen.getByText('Blocked').parentElement).toHaveClass('text-red-600')
   })
 })
 

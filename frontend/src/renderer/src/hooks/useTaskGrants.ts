@@ -17,7 +17,8 @@ export function useTaskGrants(taskId: string) {
         await callRuntimeRpc(target, 'task.grant', { taskId, subjectId, level, applyTree })
         toast.success(`Granted ${level} to ${subjectId}`)
       } catch (err) {
-        toast.error(`Failed to grant: ${err instanceof Error ? err.message : String(err)}`)
+        const message = err instanceof Error ? err.message : String(err)
+        toast.error(`Failed to grant: ${message}`)
         throw err
       } finally {
         setIsGranting(false)

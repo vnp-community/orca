@@ -5,7 +5,64 @@
 **Service:** `workflow-service` (calls out to `ai-provider-service`)
 **File:** `backend-go/services/workflow-service/internal/domain/step.go` (`AgentStepConfig.Provider` field, new), `backend-go/services/workflow-service/internal/usecase/resolve_provider.go` (new), `backend-go/services/workflow-service/internal/usecase/ports.go` (client port addition), `backend-go/services/workflow-service/cmd/server/main.go` (wire `ai-provider-service` client)
 **Depends on:** None (independent of TASK-WF-002-01; both feed TASK-WF-002-03)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+Re-verified live before implementing: `ResolveProvider` RPC confirmed
+exact shape (task's own correction of BE-SOL-002's nonexistent
+`ResolveForContext` was accurate); `AgentStepConfig` confirmed to have
+exactly `{ConnectionID, Prompt, WorktreePath, TrustPreset}` with no
+`Provider` field before this change.
+
+**One additional real-code finding beyond what the task flagged:**
+`aiprovider.proto` has **no single-account-lookup RPC** (`GetAccount` does
+not exist) — full RPC list is `CreateAccount/ResolveProvider/RotateKey/
+GetUsageToday/ListAccounts/UpdateAccount/DeleteAccount/WriteCredential/
+TestConnection`. `GetAccountStatus` (needed to validate an explicit pin)
+is implemented via `ListAccounts` (tenant-scoped server-side) filtered
+client-side by account id — the task's own step 4 anticipated needing to
+check for this and pick the right existing RPC; `ListAccounts` was it.
+
+Also note (documented in the new adapter's doc comment, not fixed —
+different service, out of this task's scope): the real generated Go
+interface is `aiproviderv1.AiProviderServiceClient` (lowercase "i" in
+"Ai") — confirmed against generated code before using it, since it's easy
+to typo as "AIProviderServiceClient". Separately: an existing
+git-gateway-service client (`grpcclient/aiprovider_client.go`) calls
+`ResolveProvider` without forwarding tenant via outbound gRPC metadata,
+relying only on the request's `TenantId` field — but `ai-provider-service`'s
+real handler reads tenant via `tenant.RequireTenantID(ctx)` (context
+metadata), not the request field. This looks like a pre-existing latent
+bug in a different service; out of scope here, not touched, but worth a
+human follow-up ticket.
+
+**Changes made (per the task's sketch, one deviation noted above):**
+1. `internal/domain/step.go`: added `ProviderPin` + `AgentStepConfig.Provider *ProviderPin`.
+2. `internal/usecase/ports.go`: added `AIProviderClient` port.
+3. `internal/usecase/resolve_provider.go` (new): `ProviderResolver` verbatim from the task.
+4. `internal/adapter/aiproviderclient/` (new package): `client.go`
+   (`Dial` + `Client.ResolveForProject`/`GetAccountStatus`) +
+   `tenant_forwarding.go` (own `withTenantMetadata` copy, same
+   per-package-duplication convention as `projectclient`/`infrafleetclient`).
+5. `internal/config/config.go`: added `AIProviderServiceAddr` (env
+   `AI_PROVIDER_SERVICE_ADDR`, default `ai-provider-service:9090`,
+   matching git-gateway-service's identically-named field).
+6. `cmd/server/main.go`: dials ai-provider-service, constructs
+   `ProviderResolver` alongside `ServerResolver` (both left
+   intentionally-unused-for-now — `_, _ = serverResolver, providerResolver` —
+   TASK-WF-002-03 threads both into the step executors' construction).
+
+**Verify output:**
+```
+go build ./services/workflow-service/...   # clean
+go vet   ./services/workflow-service/...   # clean
+go test  ./services/workflow-service/internal/usecase/... -run TestProviderResolver -v
+  # 6/6 PASS (active pin wins, inactive pin hard-errors, no-pin falls back,
+  #           empty-AccountID pin falls back, chain error propagates,
+  #           status lookup error propagates)
+go test  ./services/workflow-service/...   # full suite, all ok
+```
 
 ---
 

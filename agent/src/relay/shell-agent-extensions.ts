@@ -1,8 +1,12 @@
 // src/relay/shell-agent-extensions.ts
-// Shell RPC handlers for Orca Dev Agent v5.0: shell.eval, shell.exec.
-// Split out of fs-agent-extensions.ts to stay under the repo's 300-line max-lines ratchet.
+// Shell RPC handlers for Orca Dev Agent v5.0. Split out of
+// fs-agent-extensions.ts (max-lines ratchet) — pure code move, no behavior
+// change. Covers: shell.eval, shell.exec, shell.execStream.
 
 import { spawn } from 'node:child_process'
+import type WebSocket from 'ws'
+import { encodeDataFrame } from 'orca-dev-agent-transport'
+import type { WireState } from 'orca-dev-agent-transport'
 import type { AgentConfig } from './agent-config'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 import { createTracer } from '../shared/trace'
@@ -167,4 +171,109 @@ export async function handleShellExec(
       })
     })
   })
+}
+
+// ─── shell.execStream ───────────────────────────────────────────────────────
+// CR-TG-006: streaming sibling of handleShellExec above — same script/env/
+// timeout setup, but delivers stdout/stderr incrementally via stream.chunk/
+// stream.end wire frames (agent-git-handler.ts's handleGitExecStream
+// convention) instead of a buffer-then-return response. Reused by the
+// workflow 'shell' step executor for live output; StepExecutors.executeShell()'s
+// relay.call('shell.exec', ...) contract and handleShellExec itself are
+// untouched.
+//
+// Open Question 3 (chunking granularity) resolved consistently with
+// handleAgentExecPromptStream in agent-print-mode-exec.ts: forward each raw
+// stdout/stderr `data` event verbatim, no line-splitting — lower latency,
+// and shell scripts commonly emit unterminated prompts/progress output that
+// line-buffering would hold back.
+//
+// Open Question 1 (output-size cap) resolved: leave uncapped, relying on the
+// caller/connection lifecycle — unlike handleShellExec, this handler never
+// accumulates stdout/stderr into a buffer (each chunk is forwarded and
+// discarded immediately), so SHELL_EXEC_MAX_OUTPUT_BYTES's memory-growth
+// concern does not apply here; there is nothing to truncate.
+export async function handleShellExecStream(
+  ws: WebSocket,
+  wireState: WireState,
+  id: string | number | null,
+  params: Record<string, unknown>,
+  _config: AgentConfig
+): Promise<void> {
+  const script = typeof params.script === 'string' ? params.script : ''
+  const traceId = typeof params.traceId === 'string' ? params.traceId : undefined
+  const extraEnv =
+    params.env && typeof params.env === 'object' && !Array.isArray(params.env)
+      ? (params.env as Record<string, string>)
+      : {}
+  const timeoutMs =
+    typeof params.timeoutMs === 'number'
+      ? Math.min(Math.max(params.timeoutMs, 1_000), SHELL_EXEC_MAX_TIMEOUT_MS)
+      : SHELL_EXEC_DEFAULT_TIMEOUT_MS
+  const span = fsTracer.start({ method: 'shell.execStream', scriptLen: script.length, traceId })
+
+  if (!script) {
+    span.fail('missing param: script', { method: 'shell.execStream' })
+    sendFrame(ws, wireState, {
+      jsonrpc: '2.0',
+      id,
+      error: { code: AgentErrorCode.InvalidParams, message: 'Missing required param: script' }
+    })
+    return
+  }
+
+  const spawnEnv = { ...process.env, ...extraEnv } as NodeJS.ProcessEnv
+  const child = spawn('sh', ['-c', script], { env: spawnEnv })
+
+  function sendChunk(text: string, source?: 'stderr'): void {
+    sendFrame(ws, wireState, {
+      jsonrpc: '2.0',
+      id,
+      result: { type: 'stream.chunk', line: text, ...(source ? { source } : {}) }
+    })
+  }
+
+  let settled = false
+  const timer = setTimeout(() => {
+    settled = true
+    try {
+      child.kill('SIGKILL')
+    } catch {
+      /* ignore */
+    }
+    span.fail('timed out', { timeoutMs })
+    sendFrame(ws, wireState, { jsonrpc: '2.0', id, result: { type: 'stream.end', exitCode: -1 } })
+  }, timeoutMs)
+
+  child.stdout.on('data', (d: Buffer) => sendChunk(d.toString('utf8')))
+  child.stderr.on('data', (d: Buffer) => sendChunk(d.toString('utf8'), 'stderr'))
+  child.on('close', (code) => {
+    if (settled) {
+      return
+    }
+    settled = true
+    clearTimeout(timer)
+    const exitCode = code ?? 0
+    span.ok({ exitCode })
+    sendFrame(ws, wireState, { jsonrpc: '2.0', id, result: { type: 'stream.end', exitCode } })
+  })
+  child.on('error', (err) => {
+    if (settled) {
+      return
+    }
+    settled = true
+    clearTimeout(timer)
+    span.fail(err)
+    sendFrame(ws, wireState, {
+      jsonrpc: '2.0',
+      id,
+      error: { code: AgentErrorCode.ServerError, message: err.message }
+    })
+  })
+}
+
+function sendFrame(ws: WebSocket, wireState: WireState, payload: object): void {
+  if (ws.readyState === 1 /* WebSocket.OPEN */) {
+    ws.send(encodeDataFrame(wireState, JSON.stringify(payload)))
+  }
 }

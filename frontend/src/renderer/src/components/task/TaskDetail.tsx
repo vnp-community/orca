@@ -13,7 +13,7 @@ import { TaskComments } from './TaskComments'
 import { TaskDispatchStatusPanel } from './TaskDispatchStatusPanel'
 import { ExecutionEngineBadge } from './ExecutionEngineBadge'
 import { AttachWorkflowTemplateAction } from './AttachWorkflowTemplateAction'
-import { TaskAccessPanel } from './TaskAccessPanel'
+import { TaskGrantModal } from './TaskGrantModal'
 import { Button } from '../ui/button'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { useTaskPermission } from '../../hooks/useTaskPermission'
@@ -231,7 +231,7 @@ export function TaskDetail() {
           <TaskComments taskId={task.id} />
         </TabsContent>
         <TabsContent value="access">
-          <TaskAccessPanel taskId={task.id} />
+          <TaskGrantModal taskId={task.id} />
         </TabsContent>
       </Tabs>
     </div>

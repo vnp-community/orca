@@ -131,16 +131,31 @@ func (f *fakeWorkflowServiceClient) HasActiveExecutions(_ context.Context, _ *wo
 	return f.hasActiveExecutionsResp, nil
 }
 
-// CloneTemplate/PublishTemplate/ListPendingApprovals/ResolveApproval/
-// GenerateShareLink/PreviewSharedTemplate/ImportSharedTemplate/
-// RateTemplate/StreamExecutionEvents (TASK-WF-01-03/02-01/03-03): no route
-// in this file's tests exercises any of these yet, so each exists only to
-// satisfy the workflowv1.WorkflowServiceClient interface this fake must
-// implement in full — same convention as UpdateTemplate above.
+// ListExecutions: no route in this file's tests exercises it (added by
+// TASK-WF-005-01, wired only through wscompat, not this REST gateway), so
+// this exists only to satisfy the workflowv1.WorkflowServiceClient
+// interface this fake must implement in full — same precedent as
+// UpdateTemplate above.
+func (f *fakeWorkflowServiceClient) ListExecutions(_ context.Context, _ *workflowv1.ListExecutionsRequest, _ ...grpc.CallOption) (*workflowv1.ListExecutionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
+}
+
+// CloneTemplate: no route in this file's tests exercises it (added by
+// TASK-WF-004-02, wired only through wscompat, not this REST gateway), so
+// this exists only to satisfy the workflowv1.WorkflowServiceClient
+// interface this fake must implement in full — same precedent as
+// UpdateTemplate/ListExecutions above.
 func (f *fakeWorkflowServiceClient) CloneTemplate(_ context.Context, _ *workflowv1.CloneTemplateRequest, _ ...grpc.CallOption) (*workflowv1.CloneTemplateResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
 }
 
+// PublishTemplate/ListPendingApprovals/ResolveApproval/GenerateShareLink/
+// PreviewSharedTemplate/ImportSharedTemplate/RateTemplate/
+// StreamExecutionEvents (TASK-WF-01-03/02-01/03-03): no route in this
+// file's tests exercises any of these yet, so each exists only to satisfy
+// the workflowv1.WorkflowServiceClient interface this fake must implement
+// in full — same convention as UpdateTemplate/ListExecutions/CloneTemplate
+// above.
 func (f *fakeWorkflowServiceClient) PublishTemplate(_ context.Context, _ *workflowv1.PublishTemplateRequest, _ ...grpc.CallOption) (*workflowv1.WorkflowTemplate, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by workflow_routes_test.go")
 }

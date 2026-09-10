@@ -66,6 +66,19 @@ func ParseDAG(dagJSON string) (DAGDefinition, error) {
 	return d, nil
 }
 
+// Serialize marshals d back to the JSON string shape the templates/
+// executions tables persist in their dag_json column — the inverse of
+// ParseDAG. Added for TASK-WF-004-01's inheritance fold
+// (resolveEffectiveTemplate), which mutates a parsed DAGDefinition and
+// needs to re-flatten it back to a DAGJSON string.
+func (d DAGDefinition) Serialize() (string, error) {
+	b, err := json.Marshal(d)
+	if err != nil {
+		return "", fmt.Errorf("domain: serialize dag: %w", err)
+	}
+	return string(b), nil
+}
+
 // Validate checks the structural invariants BuildWaves' full topological
 // sort needs anyway: every step id is non-empty and unique, and every
 // dependsOn edge resolves to an existing, different step. It only catches

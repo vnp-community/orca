@@ -18,7 +18,7 @@ export function TaskGrantModal({ taskId }: { taskId: string }) {
       <div>
         <p className="text-xs font-semibold mb-1">Current grants</p>
         {grants.length === 0 ? (
-          <p className="text-xs text-muted-foreground">
+          <p className="text-xs text-muted-foreground" data-testid="grant-list-empty">
             No grant list available yet — pending backend `ListGrants` (BE-SOL-003).
           </p>
         ) : (

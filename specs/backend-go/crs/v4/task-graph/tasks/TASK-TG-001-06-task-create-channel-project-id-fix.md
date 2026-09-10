@@ -5,7 +5,7 @@
 **Service:** `api-gateway` (wscompat) + `task-service` (proto already has the field, unused)
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Depends on:** None — independent of every BE-SOL-00N task, can land immediately
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -77,6 +77,24 @@ Expected: a `task.create` call with `projectId` set produces a task whose
 `ProjectId` matches — add a test case if one testing this channel doesn't
 already assert on the field (confirm current test coverage before writing
 a new one, don't duplicate an existing assertion).
+
+## Execution notes (2026-09-09)
+
+Confirmed the live code matched the task's citation exactly
+(`channels.go:278-294` unchanged since the task file was written). Applied
+the fix verbatim: `createArgs` gained `ProjectID string
+\`json:"projectId"\`` and the `CreateTaskRequest` construction forwards
+`ProjectId: in.ProjectID`. Confirmed no existing test asserted on this field
+(`TestTaskCreateGetChannels_StillRegistered` only checks the channel stays
+registered) and added a new one,
+`TestTaskCreateChannel_ForwardsProjectID`, asserting both `ProjectId` and
+`ParentId` are forwarded from the decoded JSON args.
+
+Verify: `go build ./services/api-gateway/...` clean; `go vet
+./services/api-gateway/...` clean; `go test
+./services/api-gateway/internal/adapter/wscompat/... -run TestTaskCreate`
+— both tests pass; full `go test ./services/api-gateway/...` also passes
+(all packages, no regressions).
 
 ## Coordinate with
 

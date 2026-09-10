@@ -5,7 +5,57 @@
 **Service:** `workflow-service` (calls out to `project-service` and `infra-fleet-service`; see the infra-fleet-service note below, which may require a small addition there too)
 **File:** `backend-go/services/workflow-service/internal/domain/target_spec.go` (new), `backend-go/services/workflow-service/internal/usecase/resolve_target.go` (new), `backend-go/services/workflow-service/internal/usecase/ports.go` (client port additions), `backend-go/services/workflow-service/cmd/server/main.go` (wire `project-service`/`infra-fleet-service` clients)
 **Depends on:** TASK-WF-001-01 (`agentExecParams`'s widened shape, so this task's callers have somewhere to put a resolved `connectionID`)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+Landed AFTER TASK-WF-002-04 (infra-fleet-service's `PickByTag` RPC), so
+`TargetKindFleetTag` is wired to the real RPC directly — no "not yet
+supported" stub needed.
+
+Re-verified live before implementing: `AgentStepConfig`/`ShellStepConfig`/
+`NotificationStepConfig` still have the bare `ConnectionID` field exactly
+as described; `project.proto`'s `GetProjectResponse` still nests
+`dev_server_id` under `Project` (confirmed the task's own divergence note
+is accurate — `resp.GetProject().GetDevServerId()`, not
+`resp.GetDevServerId()`).
+
+**Changes made (exactly per the task's sketch, no further divergences found):**
+1. `internal/domain/target_spec.go` (new): `TargetKind`/`TargetSpec`/
+   `ParseTargetSpec` verbatim from the task.
+2. `internal/usecase/ports.go`: added `ProjectClient`/`InfraFleetPicker`
+   ports.
+3. `internal/usecase/resolve_target.go` (new): `ServerResolver` verbatim.
+4. `internal/adapter/projectclient/` (new package): `project_client.go`
+   (`Dial` + `Client.GetProject`, unwrapping the nested `Project` message)
+   + `tenant_forwarding.go` (own `withTenantMetadata` copy — every
+   outbound-client package in this codebase duplicates this helper rather
+   than sharing one, confirmed by grepping all 5 existing copies across
+   services; followed the same convention here rather than introducing a
+   shared one unilaterally).
+5. `internal/adapter/infrafleetclient/infra_fleet_picker.go` (new):
+   `InfraFleetPicker` wrapping the now-real `PickByTag` RPC, reusing this
+   package's existing `withTenantMetadata`.
+6. `internal/config/config.go`: added `ProjectServiceAddr` (env
+   `PROJECT_SERVICE_ADDR`, default `project-service:9090`, mirroring
+   git-gateway-service's identically-named field).
+7. `cmd/server/main.go`: dials project-service, constructs
+   `ServerResolver`. Left as an intentionally-unused-for-now local
+   (`serverResolver`) — TASK-WF-002-03 is the task that actually threads
+   it into the Agent/Shell/Notification step executors' construction; this
+   task only builds and wires the resolver itself, per the dependency
+   ordering in this directory's README.
+
+**Verify output:**
+```
+go build ./services/workflow-service/...   # clean
+go vet   ./services/workflow-service/...   # clean
+go test  ./services/workflow-service/internal/domain/... -run TestParseTargetSpec -v
+  # 5/5 PASS (project/server/fleet:tag prefixes, unknown prefix, empty string)
+go test  ./services/workflow-service/internal/usecase/... -run TestServerResolver -v
+  # 6/6 PASS (project bound/unbound/error, server passthrough+no-client-call,
+  #           fleet:tag success+error)
+```
 
 ---
 

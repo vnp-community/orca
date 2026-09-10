@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/adapter/grpcclient/team_scope_resolver.go` (replace `StubTeamScopeResolver`), `backend-go/services/task-service/cmd/server/main.go` (dial `tenant-service`)
 **Depends on:** None
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -122,3 +122,41 @@ Expected: clean build; `ResolveTeams` calls `ListTeamsForUser` (not
 via team membership now resolves correctly through `ResolvePermission`
 end-to-end (this was previously impossible — `StubTeamScopeResolver` always
 returned `nil, nil`).
+
+## Execution notes (2026-09-09)
+
+Confirmed the live `tenant.proto` matches the task's citation exactly
+(`ListTeamsForUser` at line 35, `ListTeamsForUserRequest`/`Response` at
+221-231, `user_id`-only request). Replaced
+`team_scope_resolver.go`'s `StubTeamScopeResolver` entirely with the real
+`TeamScopeResolver` per the task's code sample, using
+`withTenantMetadata(ctx)` (the same tenant-forwarding-via-outgoing-metadata
+helper `AIProviderContextResolver`/`TechStackDetector` already use) rather
+than a wire field — matches the doc comment's "tenant derived from the
+validated request context" convention exactly. `NewStubTeamScopeResolver`
+had exactly one caller (`main.go`); updated it to dial `tenant-service` (new
+`TenantServiceAddr` config field, `TENANT_SERVICE_ADDR` env var defaulting
+to `tenant-service:9090`, matching `auth-service`'s existing naming
+convention for the same address) and wire the real resolver.
+
+Added `fakeTenantServiceClient` to `grpcclient_test.go` (embeds
+`tenantv1.TenantServiceClient`, same "panic on any unimplemented method"
+convention as the existing `fakeAiProviderServiceClient`) and 3 new tests:
+`TestTeamScopeResolver_ResolveTeams_CallsListTeamsForUserWithOnlyUserID`
+(the task's own named regression test — asserts the request carries only
+`user_id`), `TestTeamScopeResolver_ResolveErrorPropagates_NotSilentEmptyList`
+(a real tenant-service error surfaces as a real error, not the stub's old
+always-`nil,nil` behavior), and `TestTeamScopeResolver_NoTenantInContext`.
+Did not add a dedicated `ResolvePermission`-end-to-end test with a
+team-level grant beyond what already exists —
+`TestResolvePermission_UsesTeamScopeResolverForTeamGrants` (pre-existing,
+unaffected by this change since `usecase.ResolvePermission` itself has zero
+changes here) already covers that BFS-walk behavior against a fake
+`TeamScopeResolver` at the usecase layer, and this task's own scope is the
+grpcclient adapter, not a new usecase-layer test.
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean; `go
+test .../grpcclient/... -run TestTeamScopeResolver` — 3/3 pass; `go test
+.../usecase/... -run TestResolvePermission` — all 8 pre-existing cases pass
+unchanged; full `go test ./services/task-service/...` passes with no
+regressions.

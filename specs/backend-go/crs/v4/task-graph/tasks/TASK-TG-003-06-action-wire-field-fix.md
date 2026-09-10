@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`, `backend-go/services/task-service/internal/adapter/grpc/server.go`
 **Depends on:** None
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -93,3 +93,38 @@ go test ./services/task-service/internal/usecase/... -run TestResolvePermission 
 Expected: clean build; the `action="write"`-denied-for-company-level test
 is the one regression test that actually matters here — before this fix it
 was impossible to write because every call silently used `"read"`.
+
+## Execution notes (2026-09-09)
+
+Confirmed the live code matched the task's citations exactly
+(`ResolvePermissionRequest` at 2 fields, `server.go`'s hardcoded
+`Action: "read"`). Applied exactly the change specified: added `action = 3`
+to `task.proto` (regenerated via `buf generate`), and `server.go`'s handler
+now reads `req.GetAction()` with a `""`-defaults-to-`"read"` shim at the
+adapter layer, matching the task's own backward-compatibility instruction
+verbatim. Zero changes to `usecase.ResolvePermission` (already forwards
+`in.Action` unchanged), confirming the task's own "usecase side needs ZERO
+changes" claim.
+
+Added the one regression test that actually matters, per the task's own
+framing: `TestServer_ResolvePermission_ActionReachesOPA` in
+`server_test.go`, using a new `companyReadOnlyOPA` fake that mimics
+`task_grant.rego`'s real `level_actions["company"] = {"read"}` rule closely
+enough to prove the wire field reaches OPA end-to-end (not the real Rego
+engine — proving server.go's plumbing doesn't need it). Asserts: `action="write"`
+denied (`PermissionDenied`) for a company-level-only grant; `action=""`
+(old-client simulation) defaults to `"read"` and succeeds; `action="read"`
+explicitly also succeeds. This surfaced that `server_test.go`'s own
+`fakeTaskRepository.GetAncestors` was an unimplemented stub
+(`return nil, errors.New("not implemented")`) — never exercised before
+since no test in this file had called `ResolvePermission` through the real
+`Server` yet; implemented it properly (parent-chain walk, same shape as
+`internal/usecase/fakes_test.go`'s equivalent) since this fix's own
+regression test is the first caller.
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean; `go
+test ./services/task-service/internal/adapter/grpc/... -run
+TestServer_ResolvePermission` — 1/1 pass; `go test
+./services/task-service/internal/usecase/... -run TestResolvePermission` —
+all 8 pre-existing cases pass unchanged; full `go test
+./services/task-service/...` passes with no regressions.

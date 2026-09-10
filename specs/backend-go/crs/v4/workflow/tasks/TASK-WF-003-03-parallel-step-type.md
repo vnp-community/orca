@@ -5,7 +5,87 @@
 **Service:** `workflow-service`
 **File:** `backend-go/proto/orca/workflow/v1/workflow.proto` (`StepType` enum), `backend-go/services/workflow-service/internal/domain/step.go` (`StepTypeParallel`, `ParallelStepConfig`), `backend-go/services/workflow-service/internal/usecase/wave_dispatcher.go`, `backend-go/services/workflow-service/internal/adapter/grpc/server.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels_automation_task.go`
 **Depends on:** TASK-WF-003-02 (shares the same `workflow.proto` `StepType` enum edit — land together or in quick succession to avoid enum-value churn)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+Landed together with TASK-WF-003-02 (see that task's notes for the shared
+proto enum edit and the `parseStepType` divergence correction, which
+applies identically here for `"parallel"`).
+
+**Adapted `runStep`'s real (post-TASK-WF-003-01) signature:** the task's
+own sketch shows `runStep(ctx, step, se)` — a 3-arg signature that no
+longer matches live code after TASK-WF-003-01 widened it to
+`runStep(ctx, step, se, inputs, outputs)` for interpolation. Threaded
+`inputs`/`outputs` through `runParallelStep`/`runParallelSubStep` too, so
+a parallel sub-step can reference `{{outputs.*}}` from steps outside its
+own parallel block (via the same `outputs` snapshot the parent step
+received), exactly as this task's own doc comment specifies — while
+sibling sub-steps within the same block correctly cannot see each other's
+output (no shared/updated map between them, matching "no defined
+execution order among them to interpolate against").
+
+**Design decision made explicit (per the task's own instruction):**
+implemented **persist-each-sub-step's-own-row** (the "recommended"
+option) — `runParallelSubStep` calls `CreateStepExecution`/
+`UpdateStepExecution` for every sub-step exactly like `dispatchStep` does
+for a top-level step (same `Wave`/`ExecutionID`, read off the parent
+step's own `*domain.StepExecution`), giving full observability parity
+(`ListStepExecutions` shows each sub-step's own running→terminal
+transition, error, and output independently) rather than aggregating
+sub-steps into the parent's single row.
+
+**Failure-result design decision beyond the sketch:** the sketch treated
+`allowPartialFailure=false` + a failed sub-step purely as a hard Go error
+(`se.Fail(errMsg)`, which discards `OutputJSON`). Changed this: the
+parallel step's aggregated output is real, inspectable data even when it
+represents a failure (which sub-step failed and why), so `runStep`'s
+parallel branch now always calls `se.FromResult(result)` first (preserving
+`OutputJSON`) and only additionally sets `se.Error`/returns the error —
+matching how a business-level failure is handled everywhere else in this
+codebase (e.g. `ConditionExecutor`), rather than discarding it as if no
+result existed at all. `domain.ErrParallelStepFailed` (added, per the
+task's instruction) is still the returned/propagated error in that case.
+
+**Aggregated output shape (a stable-shape decision this task had to make
+explicit, since later `{{outputs.<parallelStepId>.*}}` references depend
+on it):** `{"subSteps": {"<stepId>": {"status": "...", "output": <parsed
+JSON or null>}}}` — each sub-step's `OutputJSON` is parsed back into a
+real nested JSON value (not left as an escaped string) so
+`{{outputs.p.subSteps.stepA.output.field}}` resolves through
+`interpolate.go`'s existing nested-map walk unchanged.
+
+**Changes made:**
+1. `workflow.proto`: `STEP_TYPE_PARALLEL = 7` (see 003-02's notes).
+2. `internal/domain/step.go`: `StepTypeParallel`, widened `Valid()`,
+   `ParallelStepConfig{Steps, AllowPartialFailure}`,
+   `ErrParallelStepFailed` sentinel.
+3. `internal/adapter/grpc/server.go`: `toDomainStepType` case added.
+4. `internal/usecase/wave_dispatcher.go`: `runStep` branches to
+   `runParallelStep` for `StepTypeParallel` (bypassing
+   `StepExecutorRegistry` entirely, per the task's own reasoning — a
+   sub-step fan-out needs to recurse into `runStep` itself, not relay
+   JSON through a `StepExecutor.Execute` contract); added
+   `runParallelStep`, `runParallelSubStep`, `aggregateParallelOutputs`.
+
+**Verify output:**
+```
+go build ./services/workflow-service/...   # clean
+go test  ./services/workflow-service/internal/usecase/... -run "TestWaveDispatcher_Parallel" -v
+  # 4/4 PASS (all-succeed with per-sub-step persisted rows,
+  #           partial-failure-allowed succeeds with aggregated output,
+  #           partial-failure-disallowed fails the execution with a clear
+  #           error, later-step interpolates the aggregated output)
+go test -race ./services/workflow-service/internal/usecase/... ./services/workflow-service/internal/adapter/stepexecutors/... ./services/workflow-service/internal/domain/...
+  # ok — no data races in the concurrent sub-step fan-out
+go test  ./services/workflow-service/... ./services/api-gateway/...   # full suite, all ok
+```
+
+**Not in scope, confirmed unenforced (matching the task's own "Not in
+scope" note):** nested parallel-within-parallel has no depth limit —
+`runParallelSubStep` calls `runStep`, which would recurse into
+`runParallelStep` again for a nested `parallel` sub-step, with no guard.
+Flagging for human/product review as the task instructs, not fixed here.
 
 ---
 

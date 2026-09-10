@@ -36,8 +36,11 @@ type fakeTaskRepository struct {
 	completeExecutionErr      error
 	setActiveExecutionLinkErr error
 	findByNumberErr           error
-	updateStatusCalls         []updateStatusCall
-	updateWorktreeIDCalls     []updateWorktreeIDCall
+	// updatePromptTemplateErr lets generate_agent_prompt_test.go's
+	// Save=true path simulate a persist failure without a database.
+	updatePromptTemplateErr error
+	updateStatusCalls       []updateStatusCall
+	updateWorktreeIDCalls   []updateWorktreeIDCall
 	// batchUpdateProgressCalls records every BatchUpdateProgress call — lets
 	// recalculate_progress_test.go assert it's called exactly once (N+1
 	// regression guard).
@@ -66,7 +69,7 @@ type completeExecutionCall struct {
 type updateStatusCall struct {
 	tenantID string
 	id       string
-	status   string
+	status   domain.Status
 }
 
 // updateWorktreeIDCall/completeExecutionCall mirror updateStatusCall's
@@ -141,7 +144,7 @@ func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id stri
 // this package exercise ExecuteTask without first seeding a task via
 // Create, and this fake is a permissive test double, not a fidelity
 // replica of Postgres's not-found behavior.
-func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, status string) error {
+func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id string, status domain.Status) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.updateStatusCalls = append(f.updateStatusCalls, updateStatusCall{tenantID: tenantID, id: id, status: status})
@@ -186,6 +189,34 @@ func (f *fakeTaskRepository) SetActiveExecutionLink(ctx context.Context, tenantI
 		f.tasks[id] = t
 	}
 	return nil
+}
+
+// ListChildren scans the fake's tasks map for direct children of taskID —
+// real enough to exercise context-bundle-style wiring without a database.
+func (f *fakeTaskRepository) ListChildren(ctx context.Context, tenantID, taskID string) ([]domain.Task, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var out []domain.Task
+	for _, t := range f.tasks {
+		if t.TenantID == tenantID && t.ParentID == taskID {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
+// GetByShareToken scans the fake's tasks map for a matching ShareToken —
+// deliberately NOT tenant-filtered, matching the real repository's
+// unauthenticated-lookup contract (TASK-TG-003-05).
+func (f *fakeTaskRepository) GetByShareToken(ctx context.Context, token string) (domain.Task, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	for _, t := range f.tasks {
+		if t.ShareToken != "" && t.ShareToken == token {
+			return t, nil
+		}
+	}
+	return domain.Task{}, errNotFound
 }
 
 // HasActiveExecutions scans the fake's tasks map — real enough to exercise
@@ -303,6 +334,9 @@ func (f *fakeTaskRepository) UpdateLastExecutionOutput(ctx context.Context, tena
 func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
+	if f.updatePromptTemplateErr != nil {
+		return f.updatePromptTemplateErr
+	}
 	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
 		t.PromptTemplate = promptTemplate
 		f.tasks[id] = t
@@ -432,7 +466,7 @@ func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id
 	if !ok || t.TenantID != tenantID {
 		return errNotFound
 	}
-	t.Status = status
+	t.Status = domain.Status(status)
 	t.ActualHours = &actualHours
 	t.AgentSessionID = ""
 	f.tasks[id] = t
@@ -553,19 +587,20 @@ func (f *fakeGrantRepository) ListGrantsForAncestors(ctx context.Context, tenant
 	return out, nil
 }
 
-// Revoke removes a grant by id — a nonexistent id is a real error, never a
-// silent no-op, mirroring the real repository's RowsAffected==0 check.
-func (f *fakeGrantRepository) Revoke(ctx context.Context, tenantID, grantID string) error {
+// Revoke removes the first grant matching (taskID, subjectID, level) —
+// idempotent, mirrors the real postgres.Repository.Revoke's
+// DELETE-affecting-0-rows-is-fine semantics.
+func (f *fakeGrantRepository) Revoke(ctx context.Context, tenantID, taskID, subjectID string, level domain.GrantLevel) error {
 	if f.revokeErr != nil {
 		return f.revokeErr
 	}
 	for i, g := range f.grants {
-		if g.ID == grantID {
+		if g.TaskID == taskID && g.SubjectID == subjectID && g.Level == level {
 			f.grants = append(f.grants[:i], f.grants[i+1:]...)
-			return nil
+			break
 		}
 	}
-	return errNotFound
+	return nil
 }
 
 // ListGrantsForTask returns only the grants recorded directly against
