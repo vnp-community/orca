@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // Package auditclient is the thin cross-service wrapper every non-auth
 // service's OPA-gated usecases (annotation-service, infra-fleet-service,
 // project-service, task-service — TASK-BE-017/019..022) use to append an
@@ -5,20 +6,37 @@
 // (auth.audit_log lives only in auth-service's database, per the
 // database-per-service rule — see that RPC's proto doc comment for why
 // this is the one cross-service write path onto it).
+=======
+// Package auditclient is the thin gRPC client every non-auth-service uses to
+// append an audit entry to auth-service's audit_log — audit_log is
+// auth-service's own schema (auth-service.md §2), so no other service talks
+// to its Postgres directly.
+>>>>>>> feat/team-rbac-implementation
 package auditclient
 
 import (
 	"context"
+<<<<<<< HEAD
+=======
+	"log/slog"
+>>>>>>> feat/team-rbac-implementation
 
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 )
 
+<<<<<<< HEAD
 // Client wraps an authv1.AuthServiceClient for the one RPC every calling
 // usecase needs.
+=======
+// Client is the shared cross-service audit-append client (TASK-BE-018),
+// following the same "cross-service shared code policy" as
+// common/grpcmw/common/tenant.
+>>>>>>> feat/team-rbac-implementation
 type Client struct {
 	auth authv1.AuthServiceClient
 }
 
+<<<<<<< HEAD
 func New(auth authv1.AuthServiceClient) *Client {
 	return &Client{auth: auth}
 }
@@ -41,4 +59,22 @@ func (c *Client) Append(ctx context.Context, tenantID, actorID, action, target, 
 		Outcome:   outcome,
 		IpAddress: ip,
 	})
+=======
+// New wraps an already-dialed authv1.AuthServiceClient.
+func New(auth authv1.AuthServiceClient) *Client { return &Client{auth: auth} }
+
+// Append is best-effort: an audit-append failure is logged, never returned
+// to the caller as an error — a permission-check RPC's own success/failure
+// must never depend on the audit system being reachable (matches
+// auth-service's own audit calls, which never roll back the primary
+// operation on an audit-write failure — see update_access_policy.go's doc
+// comment on PublishPolicyChange's identical non-blocking posture).
+func (c *Client) Append(ctx context.Context, tenantID, actorID, action, target, outcome, ipAddress string) {
+	_, err := c.auth.AppendAuditEntry(ctx, &authv1.AppendAuditEntryRequest{
+		TenantId: tenantID, ActorId: actorID, Action: action, Target: target, Outcome: outcome, IpAddress: ipAddress,
+	})
+	if err != nil {
+		slog.WarnContext(ctx, "auditclient: failed to append audit entry", "action", action, "error", err)
+	}
+>>>>>>> feat/team-rbac-implementation
 }

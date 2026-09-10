@@ -110,6 +110,7 @@ func toProtoVmProvisionEvent(e usecase.VmProvisionEvent) *infrafleetv1.VmProvisi
 
 // toProtoPortForwards mirrors toUsecasePortForwards (devserveragent/client.go)
 // in the opposite direction — CR-EVM-008/TASK-BE-EVM-021.
+<<<<<<< HEAD
 func toProtoPortForwards(forwards []usecase.PortForward) []*infrafleetv1.RecipePortForward {
 	if len(forwards) == 0 {
 		return nil
@@ -117,6 +118,15 @@ func toProtoPortForwards(forwards []usecase.PortForward) []*infrafleetv1.RecipeP
 	out := make([]*infrafleetv1.RecipePortForward, len(forwards))
 	for i, f := range forwards {
 		out[i] = &infrafleetv1.RecipePortForward{
+=======
+func toProtoPortForwards(forwards []usecase.PortForward) []*infrafleetv1.PortForward {
+	if len(forwards) == 0 {
+		return nil
+	}
+	out := make([]*infrafleetv1.PortForward, len(forwards))
+	for i, f := range forwards {
+		out[i] = &infrafleetv1.PortForward{
+>>>>>>> feat/team-rbac-implementation
 			LocalPort:  f.LocalPort,
 			RemoteHost: f.RemoteHost,
 			RemotePort: f.RemotePort,

@@ -28,6 +28,24 @@ type SignVapidPayloadInput struct {
 // credential_id to audit against (same schema-driven reasoning
 // ResolveCredential's not-found path documents), and this key is
 // service-provisioned rather than a stored, lifecycle-managed credential.
+//
+// BUG FIX (found while implementing TASK-BE-NOTIF-010): this usecase's doc
+// comment always said "signs," but the code below called
+// store.TransitEncrypt (Vault's transit/encrypt/<key> — returns opaque
+// "vault:v1:..." ciphertext) instead of store.TransitSign (transit/sign/<key>
+// — returns an actual asymmetric-key signature). A push service verifies a
+// VAPID JWT's third segment as a real ES256 signature against the tenant's
+// published VAPID public key; Vault ciphertext is not a signature and would
+// never verify — every real Web Push send would have failed at the
+// browser vendor's push relay. Fixed to call TransitSign. The pre-existing
+// test (TestSignVapidPayload_SignsViaTransit) asserted the OLD, wrong
+// behavior — see its update in the same commit. Operationally: the
+// "vapid-signing-<tenant_id>" Transit key must be provisioned as an
+// asymmetric signing key type (e.g. "ecdsa-p256", matching RFC 8292's ES256)
+// for transit/sign to produce a verifiable signature — this usecase does not
+// create the key (see vapidKeyName's doc comment: no TransitEnsureKey call
+// here, provisioning is external/ops), so confirm the key's actual type
+// before relying on this in a real environment.
 type SignVapidPayload struct {
 	store SecretStore
 }
@@ -43,7 +61,7 @@ func (uc *SignVapidPayload) Execute(ctx context.Context, in SignVapidPayloadInpu
 	if len(in.Payload) == 0 {
 		return "", apperrors.New(apperrors.KindInvalidArgument, "CREDENTIAL_EMPTY_PAYLOAD", "payload is required", nil)
 	}
-	signature, err := uc.store.TransitEncrypt(ctx, vapidKeyName(in.TenantID), in.Payload)
+	signature, err := uc.store.TransitSign(ctx, vapidKeyName(in.TenantID), in.Payload)
 	if err != nil {
 		return "", apperrors.New(apperrors.KindInternal, "CREDENTIAL_VAULT_SIGN_FAILED", "failed to sign vapid payload via vault transit", err)
 	}

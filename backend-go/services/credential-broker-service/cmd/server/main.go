@@ -106,7 +106,7 @@ func run() error {
 	getMetadataByOwnerUC := usecase.NewGetCredentialMetadataByOwner(repo)
 	listByCategoryUC := usecase.NewListCredentialsByCategory(repo)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	credentialbrokerv1.RegisterCredentialBrokerServiceServer(grpcServer, credentialgrpc.New(
 		writeUC, resolveUC, rotateUC, revokeUC, getMetadataUC, resolveByOwnerUC, revokeByOwnerUC, signVapidUC,
 		getMetadataByOwnerUC, listByCategoryUC,

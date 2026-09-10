@@ -24,6 +24,7 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+<<<<<<< HEAD
 type TriggerType int32
 
 const (
@@ -76,6 +77,8 @@ func (TriggerType) EnumDescriptor() ([]byte, []int) {
 	return file_orca_automation_v1_automation_proto_rawDescGZIP(), []int{0}
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 type AutomationActionType int32
 
 const (
@@ -121,11 +124,19 @@ func (x AutomationActionType) String() string {
 }
 
 func (AutomationActionType) Descriptor() protoreflect.EnumDescriptor {
+<<<<<<< HEAD
 	return file_orca_automation_v1_automation_proto_enumTypes[1].Descriptor()
 }
 
 func (AutomationActionType) Type() protoreflect.EnumType {
 	return &file_orca_automation_v1_automation_proto_enumTypes[1]
+=======
+	return file_orca_automation_v1_automation_proto_enumTypes[0].Descriptor()
+}
+
+func (AutomationActionType) Type() protoreflect.EnumType {
+	return &file_orca_automation_v1_automation_proto_enumTypes[0]
+>>>>>>> feat/team-rbac-implementation
 }
 
 func (x AutomationActionType) Number() protoreflect.EnumNumber {
@@ -134,6 +145,7 @@ func (x AutomationActionType) Number() protoreflect.EnumNumber {
 
 // Deprecated: Use AutomationActionType.Descriptor instead.
 func (AutomationActionType) EnumDescriptor() ([]byte, []int) {
+<<<<<<< HEAD
 	return file_orca_automation_v1_automation_proto_rawDescGZIP(), []int{1}
 }
 
@@ -156,10 +168,39 @@ type Automation struct {
 	Enabled  bool        `protobuf:"varint,7,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	Dtstart  string      `protobuf:"bytes,8,opt,name=dtstart,proto3" json:"dtstart,omitempty"`    // RFC3339; empty = defaults to created_at at creation time
 	Timezone string      `protobuf:"bytes,10,opt,name=timezone,proto3" json:"timezone,omitempty"` // renumbered from 9 to make room for project_id above; IANA tz name (e.g. "Asia/Ho_Chi_Minh"); empty = UTC
+=======
+	return file_orca_automation_v1_automation_proto_rawDescGZIP(), []int{0}
+}
+
+type Automation struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	TenantId       string                 `protobuf:"bytes,2,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
+	Name           string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`
+	Rrule          string                 `protobuf:"bytes,4,opt,name=rrule,proto3" json:"rrule,omitempty"`
+	StepConfigJson string                 `protobuf:"bytes,5,opt,name=step_config_json,json=stepConfigJson,proto3" json:"step_config_json,omitempty"`
+	// step_type promotes what used to live only inside a "step_type" JSON key
+	// in step_config_json (domain.ParseStepType) to a first-class field —
+	// closes the Phase 2 execution-plan item. Reuses workflow-service's own
+	// StepType enum rather than defining a duplicate one, since automation's
+	// step_type must already match what ExecuteAdHocStepRequest.step_type
+	// expects on dispatch.
+	//
+	// DEPRECATED as of CR-AUTO-002/TASK-BE-AUTO-002: kept, NOT removed, for
+	// automation rows created before `actions` existed — usecase layer reads
+	// an empty `actions` as "resolve this single legacy step instead" (see
+	// resolveActions in internal/usecase). New automations should populate
+	// `actions`, not this field.
+	StepType v1.StepType `protobuf:"varint,6,opt,name=step_type,json=stepType,proto3,enum=orca.workflow.v1.StepType" json:"step_type,omitempty"`
+	Enabled  bool        `protobuf:"varint,7,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Dtstart  string      `protobuf:"bytes,8,opt,name=dtstart,proto3" json:"dtstart,omitempty"`   // RFC3339; empty = defaults to created_at at creation time
+	Timezone string      `protobuf:"bytes,9,opt,name=timezone,proto3" json:"timezone,omitempty"` // IANA tz name (e.g. "Asia/Ho_Chi_Minh"); empty = UTC
+>>>>>>> feat/team-rbac-implementation
 	// actions — CR-AUTO-002/TASK-BE-AUTO-002. Ordered action chain, replacing
 	// the single step_type/step_config_json model. Empty means "legacy
 	// automation, resolve step_type/step_config_json instead" — see
 	// resolveActions.
+<<<<<<< HEAD
 	Actions           []*AutomationAction `protobuf:"bytes,11,rep,name=actions,proto3" json:"actions,omitempty"`
 	TriggerType       TriggerType         `protobuf:"varint,12,opt,name=trigger_type,json=triggerType,proto3,enum=orca.automation.v1.TriggerType" json:"trigger_type,omitempty"` // NEW — BR-AT-09
 	TriggerEvent      string              `protobuf:"bytes,13,opt,name=trigger_event,json=triggerEvent,proto3" json:"trigger_event,omitempty"`                                   // NEW — one of the 5 event names below; empty unless trigger_type=EVENT
@@ -169,6 +210,14 @@ type Automation struct {
 	// run_timeout_seconds — CR-AUTO-007/TASK-BE-AUTO-010. 0 = default (7200,
 	// i.e. 2 hours).
 	RunTimeoutSeconds int32 `protobuf:"varint,16,opt,name=run_timeout_seconds,json=runTimeoutSeconds,proto3" json:"run_timeout_seconds,omitempty"`
+=======
+	Actions []*AutomationAction `protobuf:"bytes,10,rep,name=actions,proto3" json:"actions,omitempty"`
+	// max_run_history — CR-AUTO-007/TASK-BE-AUTO-010. 0 = default (100).
+	MaxRunHistory int32 `protobuf:"varint,11,opt,name=max_run_history,json=maxRunHistory,proto3" json:"max_run_history,omitempty"`
+	// run_timeout_seconds — CR-AUTO-007/TASK-BE-AUTO-010. 0 = default (7200,
+	// i.e. 2 hours).
+	RunTimeoutSeconds int32 `protobuf:"varint,12,opt,name=run_timeout_seconds,json=runTimeoutSeconds,proto3" json:"run_timeout_seconds,omitempty"`
+>>>>>>> feat/team-rbac-implementation
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -282,6 +331,7 @@ func (x *Automation) GetActions() []*AutomationAction {
 	return nil
 }
 
+<<<<<<< HEAD
 func (x *Automation) GetTriggerType() TriggerType {
 	if x != nil {
 		return x.TriggerType
@@ -303,6 +353,8 @@ func (x *Automation) GetTriggerFilterJson() string {
 	return ""
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 func (x *Automation) GetMaxRunHistory() int32 {
 	if x != nil {
 		return x.MaxRunHistory
@@ -465,6 +517,7 @@ type CreateAutomationRequest struct {
 	TenantId          string                 `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
 	Name              string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
 	Rrule             string                 `protobuf:"bytes,3,opt,name=rrule,proto3" json:"rrule,omitempty"`
+<<<<<<< HEAD
 	StepConfigJson    string                 `protobuf:"bytes,4,opt,name=step_config_json,json=stepConfigJson,proto3" json:"step_config_json,omitempty"`                            // legacy 1-step path; ignored if actions is non-empty
 	StepType          v1.StepType            `protobuf:"varint,5,opt,name=step_type,json=stepType,proto3,enum=orca.workflow.v1.StepType" json:"step_type,omitempty"`                // legacy 1-step path; ignored if actions is non-empty
 	Dtstart           string                 `protobuf:"bytes,6,opt,name=dtstart,proto3" json:"dtstart,omitempty"`                                                                  // optional; empty = defaults to now at creation time
@@ -476,6 +529,15 @@ type CreateAutomationRequest struct {
 	TriggerFilterJson string                 `protobuf:"bytes,12,opt,name=trigger_filter_json,json=triggerFilterJson,proto3" json:"trigger_filter_json,omitempty"`                  // NEW
 	MaxRunHistory     int32                  `protobuf:"varint,13,opt,name=max_run_history,json=maxRunHistory,proto3" json:"max_run_history,omitempty"`                             // CR-AUTO-007; 0 = default (100)
 	RunTimeoutSeconds int32                  `protobuf:"varint,14,opt,name=run_timeout_seconds,json=runTimeoutSeconds,proto3" json:"run_timeout_seconds,omitempty"`                 // CR-AUTO-007; 0 = default (7200)
+=======
+	StepConfigJson    string                 `protobuf:"bytes,4,opt,name=step_config_json,json=stepConfigJson,proto3" json:"step_config_json,omitempty"`             // legacy 1-step path; ignored if actions is non-empty
+	StepType          v1.StepType            `protobuf:"varint,5,opt,name=step_type,json=stepType,proto3,enum=orca.workflow.v1.StepType" json:"step_type,omitempty"` // legacy 1-step path; ignored if actions is non-empty
+	Dtstart           string                 `protobuf:"bytes,6,opt,name=dtstart,proto3" json:"dtstart,omitempty"`                                                   // optional; empty = defaults to now at creation time
+	Timezone          string                 `protobuf:"bytes,7,opt,name=timezone,proto3" json:"timezone,omitempty"`                                                 // optional; empty = UTC
+	Actions           []*AutomationAction    `protobuf:"bytes,8,rep,name=actions,proto3" json:"actions,omitempty"`                                                   // CR-AUTO-002; preferred over step_type/step_config_json
+	MaxRunHistory     int32                  `protobuf:"varint,9,opt,name=max_run_history,json=maxRunHistory,proto3" json:"max_run_history,omitempty"`               // CR-AUTO-007; 0 = default (100)
+	RunTimeoutSeconds int32                  `protobuf:"varint,10,opt,name=run_timeout_seconds,json=runTimeoutSeconds,proto3" json:"run_timeout_seconds,omitempty"`  // CR-AUTO-007; 0 = default (7200)
+>>>>>>> feat/team-rbac-implementation
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -559,6 +621,7 @@ func (x *CreateAutomationRequest) GetTimezone() string {
 	return ""
 }
 
+<<<<<<< HEAD
 func (x *CreateAutomationRequest) GetProjectId() string {
 	if x != nil {
 		return x.ProjectId
@@ -566,6 +629,8 @@ func (x *CreateAutomationRequest) GetProjectId() string {
 	return ""
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 func (x *CreateAutomationRequest) GetActions() []*AutomationAction {
 	if x != nil {
 		return x.Actions
@@ -573,6 +638,7 @@ func (x *CreateAutomationRequest) GetActions() []*AutomationAction {
 	return nil
 }
 
+<<<<<<< HEAD
 func (x *CreateAutomationRequest) GetTriggerType() TriggerType {
 	if x != nil {
 		return x.TriggerType
@@ -594,6 +660,8 @@ func (x *CreateAutomationRequest) GetTriggerFilterJson() string {
 	return ""
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 func (x *CreateAutomationRequest) GetMaxRunHistory() int32 {
 	if x != nil {
 		return x.MaxRunHistory
@@ -1161,22 +1229,35 @@ type UpdateAutomationRequest struct {
 	Rrule    *wrapperspb.StringValue `protobuf:"bytes,4,opt,name=rrule,proto3" json:"rrule,omitempty"`
 	// Deprecated: Marked as deprecated in orca/automation/v1/automation.proto.
 	StepConfigJson *wrapperspb.StringValue `protobuf:"bytes,5,opt,name=step_config_json,json=stepConfigJson,proto3" json:"step_config_json,omitempty"`
+<<<<<<< HEAD
 	// Deprecated: Marked as deprecated in orca/automation/v1/automation.proto.
 	StepType  v1.StepType             `protobuf:"varint,6,opt,name=step_type,json=stepType,proto3,enum=orca.workflow.v1.StepType" json:"step_type,omitempty"` // 0 (unspecified) = no change
 	Enabled   *wrapperspb.BoolValue   `protobuf:"bytes,7,opt,name=enabled,proto3" json:"enabled,omitempty"`
 	Dtstart   *wrapperspb.StringValue `protobuf:"bytes,8,opt,name=dtstart,proto3" json:"dtstart,omitempty"`
 	Timezone  *wrapperspb.StringValue `protobuf:"bytes,9,opt,name=timezone,proto3" json:"timezone,omitempty"`
 	ProjectId *wrapperspb.StringValue `protobuf:"bytes,10,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"` // NEW
+=======
+	StepType       v1.StepType             `protobuf:"varint,6,opt,name=step_type,json=stepType,proto3,enum=orca.workflow.v1.StepType" json:"step_type,omitempty"` // 0 (unspecified) = no change
+	Enabled        *wrapperspb.BoolValue   `protobuf:"bytes,7,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	Dtstart        *wrapperspb.StringValue `protobuf:"bytes,8,opt,name=dtstart,proto3" json:"dtstart,omitempty"`
+	Timezone       *wrapperspb.StringValue `protobuf:"bytes,9,opt,name=timezone,proto3" json:"timezone,omitempty"`
+>>>>>>> feat/team-rbac-implementation
 	// actions_set — CR-AUTO-002. Wrapper-message-shaped "was actions provided
 	// at all" flag: an update that doesn't mention actions must not silently
 	// clear an existing chain to empty (proto3 can't distinguish "empty
 	// repeated field" from "field not set" the way scalar wrapper types can).
+<<<<<<< HEAD
 	ActionsSet        *AutomationActionList   `protobuf:"bytes,11,opt,name=actions_set,json=actionsSet,proto3" json:"actions_set,omitempty"`
 	TriggerType       TriggerType             `protobuf:"varint,12,opt,name=trigger_type,json=triggerType,proto3,enum=orca.automation.v1.TriggerType" json:"trigger_type,omitempty"` // NEW — 0 (unspecified) = no change
 	TriggerEvent      *wrapperspb.StringValue `protobuf:"bytes,13,opt,name=trigger_event,json=triggerEvent,proto3" json:"trigger_event,omitempty"`                                   // NEW
 	TriggerFilterJson *wrapperspb.StringValue `protobuf:"bytes,14,opt,name=trigger_filter_json,json=triggerFilterJson,proto3" json:"trigger_filter_json,omitempty"`                  // NEW
 	MaxRunHistory     *wrapperspb.Int32Value  `protobuf:"bytes,15,opt,name=max_run_history,json=maxRunHistory,proto3" json:"max_run_history,omitempty"`                              // CR-AUTO-007
 	RunTimeoutSeconds *wrapperspb.Int32Value  `protobuf:"bytes,16,opt,name=run_timeout_seconds,json=runTimeoutSeconds,proto3" json:"run_timeout_seconds,omitempty"`                  // CR-AUTO-007
+=======
+	ActionsSet        *AutomationActionList  `protobuf:"bytes,10,opt,name=actions_set,json=actionsSet,proto3" json:"actions_set,omitempty"`
+	MaxRunHistory     *wrapperspb.Int32Value `protobuf:"bytes,11,opt,name=max_run_history,json=maxRunHistory,proto3" json:"max_run_history,omitempty"`             // CR-AUTO-007
+	RunTimeoutSeconds *wrapperspb.Int32Value `protobuf:"bytes,12,opt,name=run_timeout_seconds,json=runTimeoutSeconds,proto3" json:"run_timeout_seconds,omitempty"` // CR-AUTO-007
+>>>>>>> feat/team-rbac-implementation
 	unknownFields     protoimpl.UnknownFields
 	sizeCache         protoimpl.SizeCache
 }
@@ -1276,6 +1357,7 @@ func (x *UpdateAutomationRequest) GetTimezone() *wrapperspb.StringValue {
 	return nil
 }
 
+<<<<<<< HEAD
 func (x *UpdateAutomationRequest) GetProjectId() *wrapperspb.StringValue {
 	if x != nil {
 		return x.ProjectId
@@ -1283,6 +1365,8 @@ func (x *UpdateAutomationRequest) GetProjectId() *wrapperspb.StringValue {
 	return nil
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 func (x *UpdateAutomationRequest) GetActionsSet() *AutomationActionList {
 	if x != nil {
 		return x.ActionsSet
@@ -1290,6 +1374,7 @@ func (x *UpdateAutomationRequest) GetActionsSet() *AutomationActionList {
 	return nil
 }
 
+<<<<<<< HEAD
 func (x *UpdateAutomationRequest) GetTriggerType() TriggerType {
 	if x != nil {
 		return x.TriggerType
@@ -1311,6 +1396,8 @@ func (x *UpdateAutomationRequest) GetTriggerFilterJson() *wrapperspb.StringValue
 	return nil
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 func (x *UpdateAutomationRequest) GetMaxRunHistory() *wrapperspb.Int32Value {
 	if x != nil {
 		return x.MaxRunHistory
@@ -1585,7 +1672,11 @@ var File_orca_automation_v1_automation_proto protoreflect.FileDescriptor
 
 const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\n" +
+<<<<<<< HEAD
 	"#orca/automation/v1/automation.proto\x12\x12orca.automation.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a\x1forca/workflow/v1/workflow.proto\"\xee\x04\n" +
+=======
+	"#orca/automation/v1/automation.proto\x12\x12orca.automation.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1egoogle/protobuf/wrappers.proto\x1a\x1forca/workflow/v1/workflow.proto\"\xae\x03\n" +
+>>>>>>> feat/team-rbac-implementation
 	"\n" +
 	"Automation\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
@@ -1598,6 +1689,7 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\tstep_type\x18\x06 \x01(\x0e2\x1a.orca.workflow.v1.StepTypeB\x02\x18\x01R\bstepType\x12\x18\n" +
 	"\aenabled\x18\a \x01(\bR\aenabled\x12\x18\n" +
 	"\adtstart\x18\b \x01(\tR\adtstart\x12\x1a\n" +
+<<<<<<< HEAD
 	"\btimezone\x18\n" +
 	" \x01(\tR\btimezone\x12>\n" +
 	"\aactions\x18\v \x03(\v2$.orca.automation.v1.AutomationActionR\aactions\x12B\n" +
@@ -1606,6 +1698,13 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\x13trigger_filter_json\x18\x0e \x01(\tR\x11triggerFilterJson\x12&\n" +
 	"\x0fmax_run_history\x18\x0f \x01(\x05R\rmaxRunHistory\x12.\n" +
 	"\x13run_timeout_seconds\x18\x10 \x01(\x05R\x11runTimeoutSeconds\"\xb1\x01\n" +
+=======
+	"\btimezone\x18\t \x01(\tR\btimezone\x12>\n" +
+	"\aactions\x18\n" +
+	" \x03(\v2$.orca.automation.v1.AutomationActionR\aactions\x12&\n" +
+	"\x0fmax_run_history\x18\v \x01(\x05R\rmaxRunHistory\x12.\n" +
+	"\x13run_timeout_seconds\x18\f \x01(\x05R\x11runTimeoutSeconds\"\xb1\x01\n" +
+>>>>>>> feat/team-rbac-implementation
 	"\x10AutomationAction\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12<\n" +
 	"\x04type\x18\x02 \x01(\x0e2(.orca.automation.v1.AutomationActionTypeR\x04type\x12\x1f\n" +
@@ -1617,7 +1716,11 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x1f\n" +
 	"\voutput_json\x18\x03 \x01(\tR\n" +
 	"outputJson\x12\x14\n" +
+<<<<<<< HEAD
 	"\x05error\x18\x04 \x01(\tR\x05error\"\xc9\x04\n" +
+=======
+	"\x05error\x18\x04 \x01(\tR\x05error\"\x91\x03\n" +
+>>>>>>> feat/team-rbac-implementation
 	"\x17CreateAutomationRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12\x14\n" +
@@ -1625,6 +1728,7 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\x10step_config_json\x18\x04 \x01(\tR\x0estepConfigJson\x127\n" +
 	"\tstep_type\x18\x05 \x01(\x0e2\x1a.orca.workflow.v1.StepTypeR\bstepType\x12\x18\n" +
 	"\adtstart\x18\x06 \x01(\tR\adtstart\x12\x1a\n" +
+<<<<<<< HEAD
 	"\btimezone\x18\a \x01(\tR\btimezone\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\b \x01(\tR\tprojectId\x12>\n" +
@@ -1635,6 +1739,13 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\x13trigger_filter_json\x18\f \x01(\tR\x11triggerFilterJson\x12&\n" +
 	"\x0fmax_run_history\x18\r \x01(\x05R\rmaxRunHistory\x12.\n" +
 	"\x13run_timeout_seconds\x18\x0e \x01(\x05R\x11runTimeoutSeconds\"Z\n" +
+=======
+	"\btimezone\x18\a \x01(\tR\btimezone\x12>\n" +
+	"\aactions\x18\b \x03(\v2$.orca.automation.v1.AutomationActionR\aactions\x12&\n" +
+	"\x0fmax_run_history\x18\t \x01(\x05R\rmaxRunHistory\x12.\n" +
+	"\x13run_timeout_seconds\x18\n" +
+	" \x01(\x05R\x11runTimeoutSeconds\"Z\n" +
+>>>>>>> feat/team-rbac-implementation
 	"\x18CreateAutomationResponse\x12>\n" +
 	"\n" +
 	"automation\x18\x01 \x01(\v2\x1e.orca.automation.v1.AutomationR\n" +
@@ -1672,7 +1783,11 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\"\x83\x01\n" +
 	"\x17ListAutomationsResponse\x12@\n" +
 	"\vautomations\x18\x01 \x03(\v2\x1e.orca.automation.v1.AutomationR\vautomations\x12&\n" +
+<<<<<<< HEAD
 	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xcc\a\n" +
+=======
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xb2\x05\n" +
+>>>>>>> feat/team-rbac-implementation
 	"\x17UpdateAutomationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x120\n" +
@@ -1682,6 +1797,7 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\tstep_type\x18\x06 \x01(\x0e2\x1a.orca.workflow.v1.StepTypeB\x02\x18\x01R\bstepType\x124\n" +
 	"\aenabled\x18\a \x01(\v2\x1a.google.protobuf.BoolValueR\aenabled\x126\n" +
 	"\adtstart\x18\b \x01(\v2\x1c.google.protobuf.StringValueR\adtstart\x128\n" +
+<<<<<<< HEAD
 	"\btimezone\x18\t \x01(\v2\x1c.google.protobuf.StringValueR\btimezone\x12;\n" +
 	"\n" +
 	"project_id\x18\n" +
@@ -1693,6 +1809,14 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\x13trigger_filter_json\x18\x0e \x01(\v2\x1c.google.protobuf.StringValueR\x11triggerFilterJson\x12C\n" +
 	"\x0fmax_run_history\x18\x0f \x01(\v2\x1b.google.protobuf.Int32ValueR\rmaxRunHistory\x12K\n" +
 	"\x13run_timeout_seconds\x18\x10 \x01(\v2\x1b.google.protobuf.Int32ValueR\x11runTimeoutSeconds\"V\n" +
+=======
+	"\btimezone\x18\t \x01(\v2\x1c.google.protobuf.StringValueR\btimezone\x12I\n" +
+	"\vactions_set\x18\n" +
+	" \x01(\v2(.orca.automation.v1.AutomationActionListR\n" +
+	"actionsSet\x12C\n" +
+	"\x0fmax_run_history\x18\v \x01(\v2\x1b.google.protobuf.Int32ValueR\rmaxRunHistory\x12K\n" +
+	"\x13run_timeout_seconds\x18\f \x01(\v2\x1b.google.protobuf.Int32ValueR\x11runTimeoutSeconds\"V\n" +
+>>>>>>> feat/team-rbac-implementation
 	"\x14AutomationActionList\x12>\n" +
 	"\aactions\x18\x01 \x03(\v2$.orca.automation.v1.AutomationActionR\aactions\"Z\n" +
 	"\x18UpdateAutomationResponse\x12>\n" +
@@ -1701,6 +1825,7 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"automation\"F\n" +
 	"\x17DeleteAutomationRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
+<<<<<<< HEAD
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\"q\n" +
 	"\x19WriteCleanupReportRequest\x12\x15\n" +
 	"\x06run_id\x18\x01 \x01(\tR\x05runId\x12=\n" +
@@ -1715,6 +1840,9 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\x11TRIGGER_TYPE_CRON\x10\x01\x12\x17\n" +
 	"\x13TRIGGER_TYPE_MANUAL\x10\x02\x12\x16\n" +
 	"\x12TRIGGER_TYPE_EVENT\x10\x03*\xb3\x02\n" +
+=======
+	"\ttenant_id\x18\x02 \x01(\tR\btenantId*\xb3\x02\n" +
+>>>>>>> feat/team-rbac-implementation
 	"\x14AutomationActionType\x12&\n" +
 	"\"AUTOMATION_ACTION_TYPE_UNSPECIFIED\x10\x00\x12*\n" +
 	"&AUTOMATION_ACTION_TYPE_CREATE_WORKTREE\x10\x01\x12$\n" +
@@ -1722,7 +1850,11 @@ const file_orca_automation_v1_automation_proto_rawDesc = "" +
 	"\"AUTOMATION_ACTION_TYPE_COMMIT_PUSH\x10\x03\x12$\n" +
 	" AUTOMATION_ACTION_TYPE_CREATE_PR\x10\x04\x12,\n" +
 	"(AUTOMATION_ACTION_TYPE_SEND_NOTIFICATION\x10\x05\x12%\n" +
+<<<<<<< HEAD
 	"!AUTOMATION_ACTION_TYPE_RUN_SCRIPT\x10\x062\xb9\x06\n" +
+=======
+	"!AUTOMATION_ACTION_TYPE_RUN_SCRIPT\x10\x062\xdc\x05\n" +
+>>>>>>> feat/team-rbac-implementation
 	"\x11AutomationService\x12m\n" +
 	"\x10CreateAutomation\x12+.orca.automation.v1.CreateAutomationRequest\x1a,.orca.automation.v1.CreateAutomationResponse\x12O\n" +
 	"\x06RunNow\x12!.orca.automation.v1.RunNowRequest\x1a\".orca.automation.v1.RunNowResponse\x12U\n" +
@@ -1745,6 +1877,7 @@ func file_orca_automation_v1_automation_proto_rawDescGZIP() []byte {
 	return file_orca_automation_v1_automation_proto_rawDescData
 }
 
+<<<<<<< HEAD
 var file_orca_automation_v1_automation_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
 var file_orca_automation_v1_automation_proto_msgTypes = make([]protoimpl.MessageInfo, 20)
 var file_orca_automation_v1_automation_proto_goTypes = []any{
@@ -1828,6 +1961,79 @@ var file_orca_automation_v1_automation_proto_depIdxs = []int32{
 	30, // [30:30] is the sub-list for extension type_name
 	30, // [30:30] is the sub-list for extension extendee
 	0,  // [0:30] is the sub-list for field type_name
+=======
+var file_orca_automation_v1_automation_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_orca_automation_v1_automation_proto_msgTypes = make([]protoimpl.MessageInfo, 18)
+var file_orca_automation_v1_automation_proto_goTypes = []any{
+	(AutomationActionType)(0),             // 0: orca.automation.v1.AutomationActionType
+	(*Automation)(nil),                    // 1: orca.automation.v1.Automation
+	(*AutomationAction)(nil),              // 2: orca.automation.v1.AutomationAction
+	(*ActionResult)(nil),                  // 3: orca.automation.v1.ActionResult
+	(*CreateAutomationRequest)(nil),       // 4: orca.automation.v1.CreateAutomationRequest
+	(*CreateAutomationResponse)(nil),      // 5: orca.automation.v1.CreateAutomationResponse
+	(*RunNowRequest)(nil),                 // 6: orca.automation.v1.RunNowRequest
+	(*AutomationRun)(nil),                 // 7: orca.automation.v1.AutomationRun
+	(*RunNowResponse)(nil),                // 8: orca.automation.v1.RunNowResponse
+	(*ListRunsRequest)(nil),               // 9: orca.automation.v1.ListRunsRequest
+	(*ListRunsResponse)(nil),              // 10: orca.automation.v1.ListRunsResponse
+	(*HandleExternalTriggerRequest)(nil),  // 11: orca.automation.v1.HandleExternalTriggerRequest
+	(*HandleExternalTriggerResponse)(nil), // 12: orca.automation.v1.HandleExternalTriggerResponse
+	(*ListAutomationsRequest)(nil),        // 13: orca.automation.v1.ListAutomationsRequest
+	(*ListAutomationsResponse)(nil),       // 14: orca.automation.v1.ListAutomationsResponse
+	(*UpdateAutomationRequest)(nil),       // 15: orca.automation.v1.UpdateAutomationRequest
+	(*AutomationActionList)(nil),          // 16: orca.automation.v1.AutomationActionList
+	(*UpdateAutomationResponse)(nil),      // 17: orca.automation.v1.UpdateAutomationResponse
+	(*DeleteAutomationRequest)(nil),       // 18: orca.automation.v1.DeleteAutomationRequest
+	(v1.StepType)(0),                      // 19: orca.workflow.v1.StepType
+	(*wrapperspb.StringValue)(nil),        // 20: google.protobuf.StringValue
+	(*wrapperspb.BoolValue)(nil),          // 21: google.protobuf.BoolValue
+	(*wrapperspb.Int32Value)(nil),         // 22: google.protobuf.Int32Value
+	(*emptypb.Empty)(nil),                 // 23: google.protobuf.Empty
+}
+var file_orca_automation_v1_automation_proto_depIdxs = []int32{
+	19, // 0: orca.automation.v1.Automation.step_type:type_name -> orca.workflow.v1.StepType
+	2,  // 1: orca.automation.v1.Automation.actions:type_name -> orca.automation.v1.AutomationAction
+	0,  // 2: orca.automation.v1.AutomationAction.type:type_name -> orca.automation.v1.AutomationActionType
+	19, // 3: orca.automation.v1.CreateAutomationRequest.step_type:type_name -> orca.workflow.v1.StepType
+	2,  // 4: orca.automation.v1.CreateAutomationRequest.actions:type_name -> orca.automation.v1.AutomationAction
+	1,  // 5: orca.automation.v1.CreateAutomationResponse.automation:type_name -> orca.automation.v1.Automation
+	3,  // 6: orca.automation.v1.AutomationRun.action_results:type_name -> orca.automation.v1.ActionResult
+	7,  // 7: orca.automation.v1.RunNowResponse.run:type_name -> orca.automation.v1.AutomationRun
+	7,  // 8: orca.automation.v1.ListRunsResponse.runs:type_name -> orca.automation.v1.AutomationRun
+	7,  // 9: orca.automation.v1.HandleExternalTriggerResponse.run:type_name -> orca.automation.v1.AutomationRun
+	1,  // 10: orca.automation.v1.ListAutomationsResponse.automations:type_name -> orca.automation.v1.Automation
+	20, // 11: orca.automation.v1.UpdateAutomationRequest.name:type_name -> google.protobuf.StringValue
+	20, // 12: orca.automation.v1.UpdateAutomationRequest.rrule:type_name -> google.protobuf.StringValue
+	20, // 13: orca.automation.v1.UpdateAutomationRequest.step_config_json:type_name -> google.protobuf.StringValue
+	19, // 14: orca.automation.v1.UpdateAutomationRequest.step_type:type_name -> orca.workflow.v1.StepType
+	21, // 15: orca.automation.v1.UpdateAutomationRequest.enabled:type_name -> google.protobuf.BoolValue
+	20, // 16: orca.automation.v1.UpdateAutomationRequest.dtstart:type_name -> google.protobuf.StringValue
+	20, // 17: orca.automation.v1.UpdateAutomationRequest.timezone:type_name -> google.protobuf.StringValue
+	16, // 18: orca.automation.v1.UpdateAutomationRequest.actions_set:type_name -> orca.automation.v1.AutomationActionList
+	22, // 19: orca.automation.v1.UpdateAutomationRequest.max_run_history:type_name -> google.protobuf.Int32Value
+	22, // 20: orca.automation.v1.UpdateAutomationRequest.run_timeout_seconds:type_name -> google.protobuf.Int32Value
+	2,  // 21: orca.automation.v1.AutomationActionList.actions:type_name -> orca.automation.v1.AutomationAction
+	1,  // 22: orca.automation.v1.UpdateAutomationResponse.automation:type_name -> orca.automation.v1.Automation
+	4,  // 23: orca.automation.v1.AutomationService.CreateAutomation:input_type -> orca.automation.v1.CreateAutomationRequest
+	6,  // 24: orca.automation.v1.AutomationService.RunNow:input_type -> orca.automation.v1.RunNowRequest
+	9,  // 25: orca.automation.v1.AutomationService.ListRuns:input_type -> orca.automation.v1.ListRunsRequest
+	11, // 26: orca.automation.v1.AutomationService.HandleExternalTrigger:input_type -> orca.automation.v1.HandleExternalTriggerRequest
+	13, // 27: orca.automation.v1.AutomationService.ListAutomations:input_type -> orca.automation.v1.ListAutomationsRequest
+	15, // 28: orca.automation.v1.AutomationService.UpdateAutomation:input_type -> orca.automation.v1.UpdateAutomationRequest
+	18, // 29: orca.automation.v1.AutomationService.DeleteAutomation:input_type -> orca.automation.v1.DeleteAutomationRequest
+	5,  // 30: orca.automation.v1.AutomationService.CreateAutomation:output_type -> orca.automation.v1.CreateAutomationResponse
+	8,  // 31: orca.automation.v1.AutomationService.RunNow:output_type -> orca.automation.v1.RunNowResponse
+	10, // 32: orca.automation.v1.AutomationService.ListRuns:output_type -> orca.automation.v1.ListRunsResponse
+	12, // 33: orca.automation.v1.AutomationService.HandleExternalTrigger:output_type -> orca.automation.v1.HandleExternalTriggerResponse
+	14, // 34: orca.automation.v1.AutomationService.ListAutomations:output_type -> orca.automation.v1.ListAutomationsResponse
+	17, // 35: orca.automation.v1.AutomationService.UpdateAutomation:output_type -> orca.automation.v1.UpdateAutomationResponse
+	23, // 36: orca.automation.v1.AutomationService.DeleteAutomation:output_type -> google.protobuf.Empty
+	30, // [30:37] is the sub-list for method output_type
+	23, // [23:30] is the sub-list for method input_type
+	23, // [23:23] is the sub-list for extension type_name
+	23, // [23:23] is the sub-list for extension extendee
+	0,  // [0:23] is the sub-list for field type_name
+>>>>>>> feat/team-rbac-implementation
 }
 
 func init() { file_orca_automation_v1_automation_proto_init() }
@@ -1840,8 +2046,13 @@ func file_orca_automation_v1_automation_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_automation_v1_automation_proto_rawDesc), len(file_orca_automation_v1_automation_proto_rawDesc)),
+<<<<<<< HEAD
 			NumEnums:      2,
 			NumMessages:   20,
+=======
+			NumEnums:      1,
+			NumMessages:   18,
+>>>>>>> feat/team-rbac-implementation
 			NumExtensions: 0,
 			NumServices:   1,
 		},

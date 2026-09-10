@@ -70,7 +70,10 @@ func Load() (Config, error) {
 		ScmIntegrationServiceAddr: commonconfig.StringEnv("SCM_INTEGRATION_SERVICE_ADDR", "localhost:9092"),
 		SchedulerInterval:         interval,
 		SchedulerBatchSize:        batchSize,
+<<<<<<< HEAD
 		NATSURL:                   commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+=======
+>>>>>>> feat/team-rbac-implementation
 	}, nil
 }
 

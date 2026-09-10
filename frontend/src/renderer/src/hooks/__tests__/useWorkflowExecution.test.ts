@@ -20,6 +20,10 @@ vi.mock('../../runtime/runtime-rpc-client', () => ({
   getActiveRuntimeTarget: vi.fn().mockReturnValue('mock-target')
 }))
 
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() }
+}))
+
 type MockExecution = { id: string; templateId: string; status: string; rootTraceId?: string }
 type MockStore = {
   executions: MockExecution[]
@@ -237,5 +241,123 @@ describe('useWorkflowExecution() execution-status polling (CR-PW-006 interim)', 
       await vi.advanceTimersByTimeAsync(4_000)
     })
     expect(mockStore.updateExecutionStatus).not.toHaveBeenCalled()
+  })
+})
+
+// FE-TASK-003: pauseExecution/resumeExecution must optimistically update the store —
+// the polling effect above only (re)starts while status==='running', so without an
+// optimistic 'running' write after resume, polling would never restart.
+describe('useWorkflowExecution().pauseExecution()/resumeExecution()', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockStore.executions = [{ id: 'exec-1', templateId: 't1', status: 'running' }]
+    mockStore.stepStatuses = {}
+    mockStore.streamingOutput = {}
+  })
+
+  it('pauseExecution() → calls workflow.pause({executionId}), then updateExecutionStatus(executionId, "paused")', async () => {
+    mockRpc.mockResolvedValueOnce(undefined)
+    const { useWorkflowExecution } = await import('../useWorkflowExecution')
+    const { result } = renderHook(() => useWorkflowExecution('exec-1'))
+
+    await act(async () => {
+      await result.current.pauseExecution()
+    })
+
+    expect(mockRpc).toHaveBeenCalledWith('mock-target', 'workflow.pause', {
+      executionId: 'exec-1'
+    })
+    expect(mockStore.updateExecutionStatus).toHaveBeenCalledWith('exec-1', 'paused')
+  })
+
+  it('pauseExecution() RPC error → toast.error, does not call updateExecutionStatus, rethrows', async () => {
+    const err = new Error('pause boom')
+    mockRpc.mockRejectedValueOnce(err)
+    const { toast } = await import('sonner')
+    const { useWorkflowExecution } = await import('../useWorkflowExecution')
+    const { result } = renderHook(() => useWorkflowExecution('exec-1'))
+
+    await expect(
+      act(async () => {
+        await result.current.pauseExecution()
+      })
+    ).rejects.toThrow('pause boom')
+
+    expect(toast.error).toHaveBeenCalledWith('Failed to pause workflow')
+    expect(mockStore.updateExecutionStatus).not.toHaveBeenCalled()
+  })
+
+  it('resumeExecution() → calls workflow.resume({executionId}), then updateExecutionStatus(executionId, "running")', async () => {
+    mockStore.executions = [{ id: 'exec-1', templateId: 't1', status: 'paused' }]
+    mockRpc.mockResolvedValueOnce(undefined)
+    const { useWorkflowExecution } = await import('../useWorkflowExecution')
+    const { result } = renderHook(() => useWorkflowExecution('exec-1'))
+
+    await act(async () => {
+      await result.current.resumeExecution()
+    })
+
+    expect(mockRpc).toHaveBeenCalledWith('mock-target', 'workflow.resume', {
+      executionId: 'exec-1'
+    })
+    expect(mockStore.updateExecutionStatus).toHaveBeenCalledWith('exec-1', 'running')
+  })
+
+  it('resumeExecution() RPC error → toast.error, does not call updateExecutionStatus, rethrows', async () => {
+    mockStore.executions = [{ id: 'exec-1', templateId: 't1', status: 'paused' }]
+    const err = new Error('resume boom')
+    mockRpc.mockRejectedValueOnce(err)
+    const { toast } = await import('sonner')
+    const { useWorkflowExecution } = await import('../useWorkflowExecution')
+    const { result } = renderHook(() => useWorkflowExecution('exec-1'))
+
+    await expect(
+      act(async () => {
+        await result.current.resumeExecution()
+      })
+    ).rejects.toThrow('resume boom')
+
+    expect(toast.error).toHaveBeenCalledWith('Failed to resume workflow')
+    expect(mockStore.updateExecutionStatus).not.toHaveBeenCalled()
+  })
+})
+
+describe('useWorkflowExecution() resume restarts polling (CR-PW-006 interim)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    vi.useFakeTimers()
+    mockStore.stepStatuses = {}
+    mockStore.streamingOutput = {}
+  })
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("resumeExecution() success flips status to 'running' → polling effect restarts", async () => {
+    mockStore.executions = [{ id: 'exec-1', templateId: 't1', status: 'paused' }]
+    // updateExecutionStatus needs to actually mutate the store for the hook's next
+    // render to see the new status and re-arm the polling effect.
+    mockStore.updateExecutionStatus.mockImplementation((execId: string, status: string) => {
+      mockStore.executions = mockStore.executions.map((e) =>
+        e.id === execId ? { ...e, status } : e
+      )
+    })
+    mockRpc.mockResolvedValue(undefined)
+    const { useWorkflowExecution } = await import('../useWorkflowExecution')
+    const { result, rerender } = renderHook(() => useWorkflowExecution('exec-1'))
+
+    await act(async () => {
+      await result.current.resumeExecution()
+    })
+    rerender()
+
+    mockRpc.mockClear()
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(4_000)
+    })
+    expect(mockRpc).toHaveBeenCalledWith('mock-target', 'workflow.getExecution', {
+      executionId: 'exec-1'
+    })
   })
 })

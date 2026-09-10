@@ -139,3 +139,20 @@ interface IStateRepository {
 | `/health/ready` response | < 100ms |
 | Migration time (5 migrations) | < 1s |
 | SQLite backward compat | 100% (0 regressions) |
+
+---
+
+## Phạm vi mở rộng: SaaS platform (`backend-go`)
+
+Quyết định 2026-09-09 (xem
+[`docs/crs/v4/multi-database/CR-DB-001`](../crs/v4/multi-database/CR-DB-001-postgres-lockin-gap-analysis-and-decision.md)):
+`backend-go` (kiến trúc microservices Go, khác `backend/` legacy TS ở
+trên) cũng sẽ hỗ trợ multi-dialect thật — Postgres (mặc định) + MySQL/TiDB
+— theo use case "Enterprise: dùng PostgreSQL/MySQL cluster sẵn có". Triển
+khai qua [CR-DB-002](../crs/v4/multi-database/CR-DB-002-dialect-capability-layer-foundation.md)
+(capability layer) và [CR-DB-003](../crs/v4/multi-database/CR-DB-003-mysql-tidb-adapter-backend-go.md)
+(adapter MySQL/TiDB), giai đoạn đầu pilot 1 service
+(`usage-service`) — xem
+[`specs/backend-go/crs/v4/multi-database/tasks/README.md`](../../specs/backend-go/crs/v4/multi-database/tasks/README.md)
+cho thiết kế/task chi tiết. `backend-go` **không** hỗ trợ SQLite (khác
+`backend/` legacy) — lý do loại trừ ở CR-DB-002.

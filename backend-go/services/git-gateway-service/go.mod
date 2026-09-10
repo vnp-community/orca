@@ -5,8 +5,12 @@ go 1.25.0
 require (
 	github.com/stablyai/orca-go/common v0.0.0
 	github.com/stablyai/orca-go/proto v0.0.0
+<<<<<<< HEAD
 	golang.org/x/sync v0.22.0
 	golang.org/x/sys v0.47.0
+=======
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.69.0
+>>>>>>> feat/team-rbac-implementation
 	google.golang.org/grpc v1.83.0
 	google.golang.org/protobuf v1.36.12
 )

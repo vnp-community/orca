@@ -17,6 +17,16 @@ type JWKSClient interface {
 	PublicKey(ctx context.Context, kid string) (any, error)
 }
 
+// RevocationChecker answers "has this jti been revoked" for
+// AuthValidator's bearer-JWT verify path (CR-CLI-002/TASK-BE-CLI-005).
+// Implemented by internal/adapter/authclient against auth-service's
+// IsServiceTokenRevoked RPC, cached short-term (mirrors JWKSClient's
+// jwksCacheTTL) so a per-request revocation check doesn't cost a network
+// round trip on every bearer-JWT request.
+type RevocationChecker interface {
+	IsRevoked(ctx context.Context, jti string) (bool, error)
+}
+
 // RateLimitStore is the storage port a shared, multi-replica rate limiter
 // (Redis-backed, per api-gateway.md §5) would implement. RateLimiter in
 // rate_limit.go is a real, working per-replica in-memory implementation

@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -149,7 +150,7 @@ func run() error {
 	// a local-dev/scaffold convenience only; production deploys terminate
 	// mTLS via the service mesh sidecar, per
 	// architecture/07-security-architecture.md.
-	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
 	}
@@ -249,6 +250,7 @@ func run() error {
 	// same getAuthStatusUC instance the GetAuthStatus RPC already uses.
 	checkHostedReviewEligibilityUC := usecase.NewCheckHostedReviewEligibility(credentials, registry, getAuthStatusUC)
 
+<<<<<<< HEAD
 	// BUG-PI-01/SOL-PI-01 (TASK-PI-01-06) and BUG-PI-04/SOL-PI-04
 	// (TASK-PI-04-02) additions.
 	getLinkedPullRequestsForIssueUC := usecase.NewGetLinkedPullRequestsForIssue(credentials, registry)
@@ -260,6 +262,9 @@ func run() error {
 	receiveWebhookUC := usecase.NewReceiveWebhook(webhookVerifier, webhookDeliveries, outboxRepo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+=======
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
+>>>>>>> feat/team-rbac-implementation
 	scmintegrationv1.RegisterScmIntegrationServiceServer(grpcServer, scmgrpc.New(
 		listIssuesUC, createPullRequestUC, listPullRequestsUC, listWorkItemsUC, getRateLimitStatusUC,
 		getAuthStatusUC, startOAuthFlowUC, completeOAuthFlowUC, revokeAuthUC,

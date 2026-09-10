@@ -345,6 +345,7 @@ func (s *SshTargetStore) Get(ctx context.Context, tenantID, id string) (domain.S
 	return target, nil
 }
 
+<<<<<<< HEAD
 // Upsert inserts or updates by (tenant_id, host, user_name) — the conflict
 // target migrations/0007_ssh_target_project_tags's unique index establishes.
 // The `xmax != 0` trick is the standard Postgres idiom for "insert vs.
@@ -395,6 +396,16 @@ func (s *SshTargetStore) GetByHostUser(ctx context.Context, tenantID, host, user
 		t.JumpHostTargetID = *jumpHostID
 	}
 	return t, true, nil
+=======
+// Delete removes the ssh_targets row scoped to tenantID — used by
+// usecase.DeleteSshTarget's compensating-rollback path.
+func (s *SshTargetStore) Delete(ctx context.Context, tenantID, id string) error {
+	_, err := s.pool.Exec(ctx, `DELETE FROM infra.ssh_targets WHERE id = $1 AND tenant_id = $2`, id, tenantID)
+	if err != nil {
+		return fmt.Errorf("postgres: delete ssh target: %w", err)
+	}
+	return nil
+>>>>>>> feat/team-rbac-implementation
 }
 
 // ResolveConnection is the storage-backed half of THE core coordination

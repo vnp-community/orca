@@ -17,6 +17,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -114,7 +115,7 @@ func run() error {
 	// architecture/07-security-architecture.md. See
 	// internal/adapter/grpcclient's package doc comment for the
 	// SECURITY-CRITICAL constraint this client must uphold.
-	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
 	}
@@ -124,7 +125,7 @@ func run() error {
 	// infra-fleet-service connection — mediates TestConnection's relay to
 	// the execution plane (TASK-028); same insecure-transport-credentials
 	// local-dev/scaffold convenience as brokerConn above.
-	infraFleetConn, err := grpc.NewClient(cfg.InfraFleetServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	infraFleetConn, err := grpc.NewClient(cfg.InfraFleetServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing infra-fleet-service at %s: %w", cfg.InfraFleetServiceAddr, err)
 	}
@@ -143,7 +144,7 @@ func run() error {
 	reconcileHealthUC := usecase.NewReconcileProviderHealth(repo, infraFleet, repo, nil)
 	recordTokenUsageUC := usecase.NewRecordTokenUsage(repo, repo, repo, nil)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	aiproviderv1.RegisterAiProviderServiceServer(grpcServer, aiprovidergrpc.New(
 		createAccountUC, resolveProviderUC, rotateKeyUC, getUsageTodayUC,
 		listAccountsUC, updateAccountUC, deleteAccountUC, writeCredentialUC, testConnectionUC,

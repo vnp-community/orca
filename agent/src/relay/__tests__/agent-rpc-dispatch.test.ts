@@ -7,17 +7,55 @@ import type { AgentLogger } from '../agent-logger'
 import { createWireState, HEADER_SIZE } from 'orca-dev-agent-transport'
 import { registerTraceSink, type TraceEvent } from '../../shared/trace'
 import { AgentErrorCode } from '../../shared/agent-wire-protocol'
+import type WebSocket from 'ws'
 
 // ─── Mock WebSocket ──────────────────────────────────────────────────────────
 class MockWs {
-  readyState = 1  // WebSocket.OPEN
+  readyState = 1 // WebSocket.OPEN
   sent: Buffer[] = []
-  send = vi.fn((data: Buffer) => { this.sent.push(data) })
+  send = vi.fn((data: Buffer) => {
+    this.sent.push(data)
+  })
+}
+
+// TestToolCallResult/TestRpcResponse describe only the shapes this file's
+// assertions actually reach into — dispatch()/formatMcpResult()/makeError()
+// all return real JSON-RPC-shaped values already; these types replace the
+// blanket `as any` casts test assertions previously used to poke into the
+// intentionally-`unknown` `result`/`data` payload fields. Fields other tests
+// genuinely check for absence (`error?`, `meta?`) stay optional; the rest are
+// left non-optional purely for this test file's ergonomics — a success
+// response only ever has `result` and an error response only ever has
+// `error`, but each call site already knows from context which one applies.
+type TestToolCallResult = {
+  tools: { name: string; description: string; inputSchema: unknown }[]
+  content: { type: string; text: string }[]
+  isError: boolean
+  exitCode: number
+  stdout: string
+  ok: boolean
+  delivered: boolean
+  error?: string
+  meta?: { path?: string }
+}
+
+type TestRpcResponse = {
+  jsonrpc: '2.0'
+  id: string | number | null
+  result: TestToolCallResult
+  error: { code: number; message: string; data?: unknown }
 }
 
 function lastResponseJson(ws: MockWs): Record<string, unknown> {
   const last = ws.sent.at(-1)!
   return JSON.parse(last.subarray(HEADER_SIZE).toString('utf8'))
+}
+
+// lastResponse narrows the parsed JSON into TestRpcResponse's shape —
+// same underlying JSON.parse result as lastResponseJson, just typed for
+// assertions instead of cast with `any` at every call site.
+function lastResponse(ws: MockWs): TestRpcResponse {
+  return lastResponseJson(ws) as unknown as TestRpcResponse
 }
 
 // ─── Mock tools ──────────────────────────────────────────────────────────────
@@ -28,7 +66,7 @@ const echoTool: ToolDefinition = {
   inputSchema: { type: 'object', properties: { msg: { type: 'string', description: 'message' } } },
   async handler(params): Promise<ToolResult> {
     return { stdout: String(params.msg ?? ''), stderr: '', exitCode: 0 }
-  },
+  }
 }
 
 const failTool: ToolDefinition = {
@@ -36,7 +74,9 @@ const failTool: ToolDefinition = {
   binary: null,
   description: 'Throws an error',
   inputSchema: { type: 'object', properties: {} },
-  async handler(): Promise<ToolResult> { throw new Error('handler kaboom') },
+  async handler(): Promise<ToolResult> {
+    throw new Error('handler kaboom')
+  }
 }
 
 const exitOneTool: ToolDefinition = {
@@ -46,7 +86,7 @@ const exitOneTool: ToolDefinition = {
   inputSchema: { type: 'object', properties: {} },
   async handler(): Promise<ToolResult> {
     return { stdout: '', stderr: 'error output', exitCode: 1 }
-  },
+  }
 }
 
 const mockConfig = { workDir: '/tmp', toolEnv: {} } as unknown as AgentConfig
@@ -55,18 +95,26 @@ const mockLog: AgentLogger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), deb
 // ─── tests/list ─────────────────────────────────────────────────────────────
 describe('tools/list', () => {
   it('returns all registered tools', async () => {
-    const d  = createRpcDispatcher([echoTool, failTool], mockConfig, mockLog)
+    const d = createRpcDispatcher([echoTool, failTool], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), { jsonrpc: '2.0', id: 1, method: 'tools/list' })
-    const resp = lastResponseJson(ws) as any
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list'
+    })
+    const resp = lastResponse(ws)
     expect(resp.result.tools).toHaveLength(2)
   })
 
   it('tool entry has name, description, inputSchema', async () => {
-    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const d = createRpcDispatcher([echoTool], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), { jsonrpc: '2.0', id: 1, method: 'tools/list' })
-    const resp = lastResponseJson(ws) as any
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list'
+    })
+    const resp = lastResponse(ws)
     const t = resp.result.tools[0]
     expect(t.name).toBe('echo')
     expect(t.description).toBeTruthy()
@@ -74,17 +122,25 @@ describe('tools/list', () => {
   })
 
   it('returns empty tools array when no tools registered', async () => {
-    const d  = createRpcDispatcher([], mockConfig, mockLog)
+    const d = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), { jsonrpc: '2.0', id: 2, method: 'tools/list' })
-    const resp = lastResponseJson(ws) as any
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/list'
+    })
+    const resp = lastResponse(ws)
     expect(resp.result.tools).toHaveLength(0)
   })
 
   it('response id matches request id', async () => {
-    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const d = createRpcDispatcher([echoTool], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), { jsonrpc: '2.0', id: 99, method: 'tools/list' })
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 99,
+      method: 'tools/list'
+    })
     expect(lastResponseJson(ws).id).toBe(99)
   })
 })
@@ -92,53 +148,63 @@ describe('tools/list', () => {
 // ─── tools/call ──────────────────────────────────────────────────────────────
 describe('tools/call', () => {
   it('calls handler with parsed arguments', async () => {
-    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const d = createRpcDispatcher([echoTool], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 2, method: 'tools/call',
-      params: { name: 'echo', arguments: { msg: 'hello-world' } },
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 2,
+      method: 'tools/call',
+      params: { name: 'echo', arguments: { msg: 'hello-world' } }
     })
-    const resp = lastResponseJson(ws) as any
+    const resp = lastResponse(ws)
     expect(resp.result.content[0].text).toContain('hello-world')
   })
 
   it('returns MethodNotFound (-32601) for unknown tool name', async () => {
-    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const d = createRpcDispatcher([echoTool], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 3, method: 'tools/call',
-      params: { name: 'nonexistent' },
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'tools/call',
+      params: { name: 'nonexistent' }
     })
-    expect((lastResponseJson(ws) as any).error.code).toBe(-32601)
+    expect(lastResponse(ws).error.code).toBe(-32601)
   })
 
   it('returns ServerError (-32000) when handler throws — no crash', async () => {
-    const d  = createRpcDispatcher([failTool], mockConfig, mockLog)
+    const d = createRpcDispatcher([failTool], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 4, method: 'tools/call',
-      params: { name: 'fails', arguments: {} },
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'tools/call',
+      params: { name: 'fails', arguments: {} }
     })
-    expect((lastResponseJson(ws) as any).error.code).toBe(-32000)
+    expect(lastResponse(ws).error.code).toBe(-32000)
   })
 
   it('sets isError=true when exitCode != 0', async () => {
-    const d  = createRpcDispatcher([exitOneTool], mockConfig, mockLog)
+    const d = createRpcDispatcher([exitOneTool], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 5, method: 'tools/call',
-      params: { name: 'exitone', arguments: {} },
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 5,
+      method: 'tools/call',
+      params: { name: 'exitone', arguments: {} }
     })
-    const resp = lastResponseJson(ws) as any
+    const resp = lastResponse(ws)
     expect(resp.result.isError).toBe(true)
   })
 
   it('passes null id correctly in response', async () => {
-    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const d = createRpcDispatcher([echoTool], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: null, method: 'tools/call',
-      params: { name: 'echo', arguments: { msg: 'x' } },
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: null,
+      method: 'tools/call',
+      params: { name: 'echo', arguments: { msg: 'x' } }
     })
     expect(lastResponseJson(ws).id).toBeNull()
   })
@@ -147,16 +213,24 @@ describe('tools/call', () => {
 // ─── unknown method ───────────────────────────────────────────────────────────
 describe('unknown method', () => {
   it('returns MethodNotFound (-32601)', async () => {
-    const d  = createRpcDispatcher([], mockConfig, mockLog)
+    const d = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), { jsonrpc: '2.0', id: 5, method: 'nonexistent.method' })
-    expect((lastResponseJson(ws) as any).error.code).toBe(-32601)
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 5,
+      method: 'nonexistent.method'
+    })
+    expect(lastResponse(ws).error.code).toBe(-32601)
   })
 
   it('response id matches request id for unknown method', async () => {
-    const d  = createRpcDispatcher([], mockConfig, mockLog)
+    const d = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), { jsonrpc: '2.0', id: 77, method: 'bad' })
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 77,
+      method: 'bad'
+    })
     expect(lastResponseJson(ws).id).toBe(77)
   })
 })
@@ -164,18 +238,26 @@ describe('unknown method', () => {
 // ─── ws.readyState guard ─────────────────────────────────────────────────────
 describe('ws.readyState guard', () => {
   it('does NOT call ws.send when readyState != 1 (CLOSED)', async () => {
-    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const d = createRpcDispatcher([echoTool], mockConfig, mockLog)
     const ws = new MockWs()
-    ws.readyState = 3  // CLOSED
-    await d.dispatch(ws as any, createWireState(), { jsonrpc: '2.0', id: 6, method: 'tools/list' })
+    ws.readyState = 3 // CLOSED
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 6,
+      method: 'tools/list'
+    })
     expect(ws.send).not.toHaveBeenCalled()
   })
 
   it('DOES call ws.send when readyState == 1 (OPEN)', async () => {
-    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const d = createRpcDispatcher([echoTool], mockConfig, mockLog)
     const ws = new MockWs()
     ws.readyState = 1
-    await d.dispatch(ws as any, createWireState(), { jsonrpc: '2.0', id: 7, method: 'tools/list' })
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 7,
+      method: 'tools/list'
+    })
     expect(ws.send).toHaveBeenCalledOnce()
   })
 })
@@ -183,38 +265,55 @@ describe('ws.readyState guard', () => {
 // ─── formatMcpResult ─────────────────────────────────────────────────────────
 describe('formatMcpResult', () => {
   it('content[0].type is "text"', () => {
-    const r = formatMcpResult(1, { stdout: 'out', stderr: '', exitCode: 0 }) as any
+    const r = formatMcpResult(1, { stdout: 'out', stderr: '', exitCode: 0 }) as unknown as {
+      result: TestToolCallResult
+    }
     expect(r.result.content[0].type).toBe('text')
   })
 
   it('isError=false when exitCode=0', () => {
-    const r = formatMcpResult(1, { stdout: 'x', stderr: '', exitCode: 0 }) as any
+    const r = formatMcpResult(1, { stdout: 'x', stderr: '', exitCode: 0 }) as unknown as {
+      result: TestToolCallResult
+    }
     expect(r.result.isError).toBe(false)
   })
 
   it('isError=true when exitCode=1', () => {
-    const r = formatMcpResult(1, { stdout: '', stderr: 'err', exitCode: 1 }) as any
+    const r = formatMcpResult(1, { stdout: '', stderr: 'err', exitCode: 1 }) as unknown as {
+      result: TestToolCallResult
+    }
     expect(r.result.isError).toBe(true)
   })
 
   it('includes "[stderr]" prefix when stderr is non-empty', () => {
-    const r = formatMcpResult(1, { stdout: 'out', stderr: 'err msg', exitCode: 0 }) as any
+    const r = formatMcpResult(1, { stdout: 'out', stderr: 'err msg', exitCode: 0 }) as unknown as {
+      result: TestToolCallResult
+    }
     expect(r.result.content[0].text).toContain('[stderr]')
     expect(r.result.content[0].text).toContain('err msg')
   })
 
   it('uses "(no output)" when both stdout and stderr are empty', () => {
-    const r = formatMcpResult(1, { stdout: '', stderr: '', exitCode: 0 }) as any
+    const r = formatMcpResult(1, { stdout: '', stderr: '', exitCode: 0 }) as unknown as {
+      result: TestToolCallResult
+    }
     expect(r.result.content[0].text).toBe('(no output)')
   })
 
   it('preserves exitCode in result', () => {
-    const r = formatMcpResult(1, { stdout: '', stderr: '', exitCode: 42 }) as any
+    const r = formatMcpResult(1, { stdout: '', stderr: '', exitCode: 42 }) as unknown as {
+      result: TestToolCallResult
+    }
     expect(r.result.exitCode).toBe(42)
   })
 
   it('includes meta when provided', () => {
-    const r = formatMcpResult(1, { stdout: '', stderr: '', exitCode: 0, meta: { path: '/foo' } }) as any
+    const r = formatMcpResult(1, {
+      stdout: '',
+      stderr: '',
+      exitCode: 0,
+      meta: { path: '/foo' }
+    }) as unknown as { result: TestToolCallResult }
     expect(r.result.meta?.path).toBe('/foo')
   })
 })
@@ -222,7 +321,7 @@ describe('formatMcpResult', () => {
 // ─── makeError ───────────────────────────────────────────────────────────────
 describe('makeError', () => {
   it('returns valid JSON-RPC error structure', () => {
-    const e = makeError(1, -32601, 'Not found') as any
+    const e = makeError(1, -32601, 'Not found')
     expect(e.jsonrpc).toBe('2.0')
     expect(e.id).toBe(1)
     expect(e.error.code).toBe(-32601)
@@ -230,12 +329,12 @@ describe('makeError', () => {
   })
 
   it('includes data field when provided', () => {
-    const e = makeError(1, -32000, 'err', { detail: 'x' }) as any
-    expect(e.error.data?.detail).toBe('x')
+    const e = makeError(1, -32000, 'err', { detail: 'x' })
+    expect((e.error.data as { detail: string })?.detail).toBe('x')
   })
 
   it('does not include data field when not provided', () => {
-    const e = makeError(1, -32000, 'err') as any
+    const e = makeError(1, -32000, 'err')
     expect('data' in e.error).toBe(false)
   })
 })
@@ -244,25 +343,32 @@ describe('makeError', () => {
 describe('dispatch() — trace resume', () => {
   it('resumes agent:rpc span id from params._trace.id', async () => {
     const events: TraceEvent[] = []
-    const unregister = registerTraceSink(e => events.push(e))
-    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const unregister = registerTraceSink((e) => events.push(e))
+    const d = createRpcDispatcher([echoTool], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'tools/list', params: { _trace: { id: 'resumed-rpc-1' } },
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list',
+      params: { _trace: { id: 'resumed-rpc-1' } }
     })
     unregister()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')
     expect(start?.id).toBe('resumed-rpc-1')
   })
 
   it('generates a new span id when params._trace is absent', async () => {
     const events: TraceEvent[] = []
-    const unregister = registerTraceSink(e => events.push(e))
-    const d  = createRpcDispatcher([echoTool], mockConfig, mockLog)
+    const unregister = registerTraceSink((e) => events.push(e))
+    const d = createRpcDispatcher([echoTool], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), { jsonrpc: '2.0', id: 1, method: 'tools/list' })
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'tools/list'
+    })
     unregister()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')
     expect(start?.id).toBeTruthy()
     expect(start?.id).not.toBe('resumed-rpc-1')
   })
@@ -275,12 +381,14 @@ describe('agent.exec — extractTraceFields (CR-TRACE-015)', () => {
     const unregister = registerTraceSink((e) => events.push(e))
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec',
-      params: { binary: 'echo', args: ['hi'], cwd: '/tmp', env: { FOO: 'bar' }, timeoutMs: 5000 },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: { binary: 'echo', args: ['hi'], cwd: '/tmp', env: { FOO: 'bar' }, timeoutMs: 5000 }
     })
     unregister()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')!
     expect(start.fields.binary).toBe('echo')
     expect(start.fields.argsCount).toBe(1)
     expect(start.fields.hasEnvOverride).toBe(true)
@@ -293,12 +401,14 @@ describe('agent.exec — extractTraceFields (CR-TRACE-015)', () => {
     const unregister = registerTraceSink((e) => events.push(e))
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec',
-      params: { binary: process.execPath, args: ['-e', 'process.exit(0)'] },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: { binary: process.execPath, args: ['-e', 'process.exit(0)'] }
     })
     unregister()
-    const ok = events.find(e => e.flow === 'agent:rpc' && e.level === 'ok')!
+    const ok = events.find((e) => e.flow === 'agent:rpc' && e.level === 'ok')!
     expect(ok.fields.exitCode).toBe(0)
     expect(ok.fields.timedOut).toBe(false)
   })
@@ -308,12 +418,14 @@ describe('agent.exec — extractTraceFields (CR-TRACE-015)', () => {
     const unregister = registerTraceSink((e) => events.push(e))
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.spawn',
-      params: { taskId: 'task-1', modelId: 'unknown-model-xyz', userId: 'u1', accountId: 'a1' },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.spawn',
+      params: { taskId: 'task-1', modelId: 'unknown-model-xyz', userId: 'u1', accountId: 'a1' }
     })
     unregister()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')!
     // Legacy 'agent.' bucket (session/binary/cmd) still applies — unaffected by
     // the new dedicated agent.exec bucket, which is checked BEFORE this one.
     expect(start.fields.session).toBe('task-1')
@@ -328,12 +440,14 @@ describe('agent.exec — extractTraceFields (CR-TRACE-015)', () => {
     const unregister = registerTraceSink((e) => events.push(e))
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec',
-      params: { binary: 'echo', args: ['hi'] },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: { binary: 'echo', args: ['hi'] }
     })
     unregister()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')!
     expect(start.fields.hasEnvOverride).toBe(false)
   })
 })
@@ -345,12 +459,14 @@ describe('agent.exec — stepId / parentTraceId (CR-TRACE-017)', () => {
     const unregister = registerTraceSink((e) => events.push(e))
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec',
-      params: { binary: 'echo', args: [], cwd: '/tmp', stepId: 'step-42' },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: { binary: 'echo', args: [], cwd: '/tmp', stepId: 'step-42' }
     })
     unregister()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')!
     expect(start.fields.stepId).toBe('step-42')
   })
 
@@ -359,12 +475,14 @@ describe('agent.exec — stepId / parentTraceId (CR-TRACE-017)', () => {
     const unregister = registerTraceSink((e) => events.push(e))
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec',
-      params: { binary: 'echo', args: [], cwd: '/tmp', parentTraceId: 'root-abc123' },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: { binary: 'echo', args: [], cwd: '/tmp', parentTraceId: 'root-abc123' }
     })
     unregister()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')!
     expect(start.fields.parentTraceId).toBe('root-abc123')
   })
 
@@ -373,12 +491,14 @@ describe('agent.exec — stepId / parentTraceId (CR-TRACE-017)', () => {
     const unregister = registerTraceSink((e) => events.push(e))
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec',
-      params: { binary: 'echo', args: [], cwd: '/tmp' },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: { binary: 'echo', args: [], cwd: '/tmp' }
     })
     unregister()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')!
     expect(start.fields.stepId).toBeUndefined()
     expect(start.fields.parentTraceId).toBeUndefined()
   })
@@ -391,10 +511,13 @@ describe("case 'agent.execPrompt'", () => {
   it('returns InvalidParams when prompt/worktreePath are missing', async () => {
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.execPrompt', params: {},
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.execPrompt',
+      params: {}
     })
-    const resp = lastResponseJson(ws) as any
+    const resp = lastResponse(ws)
     expect(resp.error.code).toBe(AgentErrorCode.InvalidParams)
     expect(resp.error.message).toContain('missing required field(s)')
   })
@@ -402,11 +525,13 @@ describe("case 'agent.execPrompt'", () => {
   it('returns InvalidParams for an unsupported (non-claude) model', async () => {
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.execPrompt',
-      params: { prompt: 'do it', worktreePath: '/tmp', model: 'gpt-4o' },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.execPrompt',
+      params: { prompt: 'do it', worktreePath: '/tmp', model: 'gpt-4o' }
     })
-    const resp = lastResponseJson(ws) as any
+    const resp = lastResponse(ws)
     expect(resp.error.code).toBe(AgentErrorCode.InvalidParams)
     expect(resp.error.message).toContain('UNSUPPORTED_MODEL_FOR_ONE_SHOT_EXEC')
   })
@@ -417,10 +542,13 @@ describe('shell.exec', () => {
   it('executes the script and returns stdout/exitCode', async () => {
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'shell.exec', params: { script: 'echo hi' },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'shell.exec',
+      params: { script: 'echo hi' }
     })
-    const resp = lastResponseJson(ws) as any
+    const resp = lastResponse(ws)
     expect(resp.error).toBeUndefined()
     expect(resp.result.exitCode).toBe(0)
     expect(resp.result.stdout.trim()).toBe('hi')
@@ -429,10 +557,13 @@ describe('shell.exec', () => {
   it('returns InvalidParams when script is missing', async () => {
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'shell.exec', params: {},
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'shell.exec',
+      params: {}
     })
-    const resp = lastResponseJson(ws) as any
+    const resp = lastResponse(ws)
     expect(resp.error.code).toBe(AgentErrorCode.InvalidParams)
   })
 })
@@ -442,10 +573,13 @@ describe('notification.send', () => {
   it('acknowledges the notification without erroring', async () => {
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'notification.send', params: { message: 'hi' },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'notification.send',
+      params: { message: 'hi' }
     })
-    const resp = lastResponseJson(ws) as any
+    const resp = lastResponse(ws)
     expect(resp.error).toBeUndefined()
     expect(resp.result.ok).toBe(true)
     expect(typeof resp.result.delivered).toBe('boolean')
@@ -454,11 +588,45 @@ describe('notification.send', () => {
   it('returns InvalidParams when message is missing', async () => {
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'notification.send', params: {},
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'notification.send',
+      params: {}
     })
-    const resp = lastResponseJson(ws) as any
+    const resp = lastResponse(ws)
     expect(resp.error.code).toBe(AgentErrorCode.InvalidParams)
+  })
+
+  // TASK-AG-AUTO-001 (CR-AUTO-004): confirms — against the REAL handler,
+  // not a mock — the exact contract gap SOL-AG-AUTO-001 flagged as a risk.
+  // This sandbox has neither notify-send nor osascript on PATH (a headless
+  // Linux dev server, the "common case" notification-send-handler.ts's own
+  // doc comment describes), so tryOsNotify() genuinely fails here — this
+  // is not a simulated failure. The response still reports ok:true, with
+  // no error field anywhere in `result` — CR-AUTO-004's
+  // automation-service's NotificationExecutor (notification_step_executor.go)
+  // only inspects a `result.error` field, which this response never sends,
+  // so it will report the action "completed" even though no human ever saw
+  // a notification. Per this handler's own design comment ("Delivery
+  // failure is never fatal — a notification step should not fail a
+  // workflow run"), this is DELIBERATE agent-side behavior, not a bug to
+  // fix here — flagged for whoever designs send_notification's real
+  // reliability guarantees (see FE-AUTO-SOL-004's UI warning note).
+  it('reports ok:true with no error field even when OS notification delivery fails (delivered:false)', async () => {
+    const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
+    const ws = new MockWs()
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'notification.send',
+      params: { message: 'hi' }
+    })
+    const resp = lastResponse(ws)
+    expect(resp.error).toBeUndefined()
+    expect(resp.result.ok).toBe(true)
+    expect(resp.result.delivered).toBe(false) // this sandbox has no notify-send/osascript
+    expect(resp.result.error).toBeUndefined()
   })
 })
 
@@ -475,13 +643,15 @@ describe('ai.complete — extractTraceFields (CR-TRACE-018)', () => {
     const unregister = registerTraceSink((e) => events.push(e))
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'ai.complete',
-      params: { prompt: 'hello world', taskId: 'task-77', model: 'claude-opus-4-5' },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'ai.complete',
+      params: { prompt: 'hello world', taskId: 'task-77', model: 'claude-opus-4-5' }
     })
     unregister()
     vi.unstubAllEnvs()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')!
     expect(start.fields.model).toBe('claude-opus-4-5')
     expect(start.fields.taskId).toBe('task-77')
     expect(start.fields.promptLength).toBe('hello world'.length)
@@ -495,12 +665,14 @@ describe('agent.exec — taskId (CR-TRACE-018, forward-compat)', () => {
     const unregister = registerTraceSink((e) => events.push(e))
     const dispatcher = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec',
-      params: { binary: 'echo', args: [], cwd: '/tmp', taskId: 'task-99' },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: { binary: 'echo', args: [], cwd: '/tmp', taskId: 'task-99' }
     })
     unregister()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')!
     expect(start.fields.taskId).toBe('task-99')
   })
 
@@ -511,12 +683,14 @@ describe('agent.exec — taskId (CR-TRACE-018, forward-compat)', () => {
     const ws = new MockWs()
     // Matches today's real backend payload: ProfileAwareAgentSpawner.spawn()
     // only sends { binary, args, cwd, env, timeoutMs } — no top-level taskId.
-    await dispatcher.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec',
-      params: { binary: 'echo', args: [], cwd: '/tmp' },
+    await dispatcher.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: { binary: 'echo', args: [], cwd: '/tmp' }
     })
     unregister()
-    const start = events.find(e => e.flow === 'agent:rpc' && e.level === 'start')!
+    const start = events.find((e) => e.flow === 'agent:rpc' && e.level === 'start')!
     expect(start.fields.taskId).toBeUndefined()
   })
 })
@@ -525,42 +699,53 @@ describe('agent.exec — taskId (CR-TRACE-018, forward-compat)', () => {
 describe("case 'agent.exec' — agentOrch:spawn", () => {
   it('emits agentOrch:spawn span with ok() containing exitCode on success', async () => {
     const events: TraceEvent[] = []
-    const unregister = registerTraceSink(e => events.push(e))
-    const d  = createRpcDispatcher([], mockConfig, mockLog)
+    const unregister = registerTraceSink((e) => events.push(e))
+    const d = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec',
-      params: { binary: process.execPath, args: ['-e', 'process.exit(0)'] },
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: { binary: process.execPath, args: ['-e', 'process.exit(0)'] }
     })
     unregister()
-    const ok = events.find(e => e.flow === 'agentOrch:spawn' && e.level === 'ok')
+    const ok = events.find((e) => e.flow === 'agentOrch:spawn' && e.level === 'ok')
     expect(ok?.fields.exitCode).toBe(0)
   })
 
   it('emits fail() when binary is missing', async () => {
     const events: TraceEvent[] = []
-    const unregister = registerTraceSink(e => events.push(e))
-    const d  = createRpcDispatcher([], mockConfig, mockLog)
+    const unregister = registerTraceSink((e) => events.push(e))
+    const d = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec', params: {},
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: {}
     })
     unregister()
-    const fail = events.find(e => e.flow === 'agentOrch:spawn' && e.level === 'fail')
+    const fail = events.find((e) => e.flow === 'agentOrch:spawn' && e.level === 'fail')
     expect(fail?.fields.err).toBe('binary is required')
   })
 
   it('emits fail() with timeout field when subprocess times out', async () => {
     const events: TraceEvent[] = []
-    const unregister = registerTraceSink(e => events.push(e))
-    const d  = createRpcDispatcher([], mockConfig, mockLog)
+    const unregister = registerTraceSink((e) => events.push(e))
+    const d = createRpcDispatcher([], mockConfig, mockLog)
     const ws = new MockWs()
-    await d.dispatch(ws as any, createWireState(), {
-      jsonrpc: '2.0', id: 1, method: 'agent.exec',
-      params: { binary: process.execPath, args: ['-e', 'setTimeout(() => {}, 5000)'], timeoutMs: 1000 },
+    await d.dispatch(ws as unknown as WebSocket, createWireState(), {
+      jsonrpc: '2.0',
+      id: 1,
+      method: 'agent.exec',
+      params: {
+        binary: process.execPath,
+        args: ['-e', 'setTimeout(() => {}, 5000)'],
+        timeoutMs: 1000
+      }
     })
     unregister()
-    const fail = events.find(e => e.flow === 'agentOrch:spawn' && e.level === 'fail')
+    const fail = events.find((e) => e.flow === 'agentOrch:spawn' && e.level === 'fail')
     expect(fail?.fields.err).toContain('timeout')
   }, 10_000)
 })

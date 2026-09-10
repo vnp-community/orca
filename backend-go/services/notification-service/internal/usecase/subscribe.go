@@ -13,14 +13,18 @@ import (
 
 // SubscribeInput mirrors the gRPC SubscribeRequest 1:1 by design — see
 // architecture/03's note that usecase granularity mirrors today's RPC
-// methods so the mapping stays traceable. The proto's fields (endpoint +
-// p256dh_key + auth_key) are Web Push subscription fields, so this usecase
-// always constructs a ChannelWeb subscription.
+// methods so the mapping stays traceable. Endpoint+p256dh_key+auth_key are
+// Web Push-specific fields (only meaningful/required when Channel is web
+// or empty); Channel/DeviceLabel (TASK-BE-MOBILE-001, CR-MOBILE-001) let a
+// native (ios/android) client register a device push token through the
+// same RPC instead of a Web Push subscription.
 type SubscribeInput struct {
-	UserID    string
-	Endpoint  string
-	P256dhKey string
-	AuthKey   string
+	UserID      string
+	Endpoint    string
+	P256dhKey   string
+	AuthKey     string
+	Channel     string // empty == "web", preserves every existing caller's behavior unchanged
+	DeviceLabel string
 }
 
 // Subscribe is notification-service's push-subscription write path.
@@ -46,9 +50,14 @@ func (uc *Subscribe) Execute(ctx context.Context, in SubscribeInput) (domain.Pus
 		return domain.PushSubscription{}, apperrors.New(apperrors.KindInvalidArgument, "NOTIFICATION_NO_USER", "user_id is required", nil)
 	}
 
+	channel := domain.ChannelWeb
+	if in.Channel != "" {
+		channel = domain.Channel(in.Channel)
+	}
+
 	sub, err := domain.NewPushSubscription(
-		uuid.NewString(), tenantID, in.UserID, domain.ChannelWeb, in.Endpoint,
-		&in.P256dhKey, &in.AuthKey, "", time.Now().UTC(),
+		uuid.NewString(), tenantID, in.UserID, channel, in.Endpoint,
+		&in.P256dhKey, &in.AuthKey, in.DeviceLabel, time.Now().UTC(),
 	)
 	if err != nil {
 		return domain.PushSubscription{}, apperrors.New(apperrors.KindInvalidArgument, "NOTIFICATION_INVALID_SUBSCRIPTION", err.Error(), err)

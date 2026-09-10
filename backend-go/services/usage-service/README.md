@@ -48,7 +48,7 @@ here** — read this README before scaffolding another service.
 ```sh
 # from backend-go/
 docker compose up -d postgres nats   # see ../../docker-compose.yml
-migrate -path services/usage-service/migrations \
+migrate -path services/usage-service/migrations/postgres \
   -database "$DATABASE_DSN" up       # golang-migrate; see architecture/05
 
 cd services/usage-service

@@ -29,6 +29,9 @@ vi.mock('../WorkspaceTabBar', () => ({
       <button data-testid="tab-agent" onClick={() => onTabChange('agent')}>
         Agent
       </button>
+      <button data-testid="tab-workflows" onClick={() => onTabChange('workflows')}>
+        Workflows
+      </button>
     </div>
   )
 }))
@@ -57,7 +60,22 @@ vi.mock('../../task/TaskGraphPanel', () => ({
   TaskGraphPanel: () => <div data-testid="task-graph-panel" />
 }))
 vi.mock('../../workflow/WorkflowMonitor', () => ({
-  WorkflowMonitor: () => <div data-testid="workflow-monitor" />
+  WorkflowMonitor: ({ onNewWorkflow }: { onNewWorkflow: () => void }) => (
+    <div data-testid="workflow-monitor">
+      <button data-testid="mock-new-workflow-btn" onClick={onNewWorkflow}>
+        New Workflow
+      </button>
+    </div>
+  )
+}))
+vi.mock('../../workflow/WorkflowBuilder', () => ({
+  WorkflowBuilder: ({ onSave }: { onSave?: () => void }) => (
+    <div data-testid="workflow-builder">
+      <button data-testid="mock-builder-save-btn" onClick={onSave}>
+        Save
+      </button>
+    </div>
+  )
 }))
 vi.mock('../AgentPanel', () => ({
   AgentPanel: ({ worktreeId }: { worktreeId: string }) => (
@@ -206,5 +224,39 @@ describe('WorkspaceLayout', () => {
       'data-worktree-id',
       'wt-1'
     )
+  })
+
+  // FE-TASK-001: WorkflowBuilder used to not be mounted anywhere — 'workflows' tab only ever
+  // rendered WorkflowMonitor with no way to reach the Builder.
+  it('"workflows" tab, default → renders WorkflowMonitor', async () => {
+    render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByTestId('tab-workflows'))
+    await waitFor(() => {
+      expect(screen.getByTestId('workflow-monitor')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('workflow-builder')).not.toBeInTheDocument()
+  })
+
+  it("WorkflowMonitor's onNewWorkflow → switches to render WorkflowBuilder", async () => {
+    render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByTestId('tab-workflows'))
+    await waitFor(() => screen.getByTestId('workflow-monitor'))
+    fireEvent.click(screen.getByTestId('mock-new-workflow-btn'))
+    await waitFor(() => {
+      expect(screen.getByTestId('workflow-builder')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('workflow-monitor')).not.toBeInTheDocument()
+  })
+
+  it("WorkflowBuilder's onSave → switches back to WorkflowMonitor", async () => {
+    render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByTestId('tab-workflows'))
+    await waitFor(() => screen.getByTestId('workflow-monitor'))
+    fireEvent.click(screen.getByTestId('mock-new-workflow-btn'))
+    await waitFor(() => screen.getByTestId('workflow-builder'))
+    fireEvent.click(screen.getByTestId('mock-builder-save-btn'))
+    await waitFor(() => {
+      expect(screen.getByTestId('workflow-monitor')).toBeInTheDocument()
+    })
   })
 })

@@ -87,7 +87,7 @@ tidy-all:
 
 migrate-all:
 	@echo "Run per-service, e.g.:"
-	@echo "  migrate -path services/usage-service/migrations -database \$$DATABASE_DSN up"
+	@echo "  migrate -path services/usage-service/migrations/postgres -database \$$DATABASE_DSN up"
 	@echo "See each service's README for its own migrations path and expected DSN."
 
 # Epic E (docs/execution-plan.md §2): makes the orca-authz bundle CI-ready.

@@ -141,6 +141,7 @@ type fakeSecretStore struct {
 
 	encryptErr error
 	decryptErr error
+	signErr    error
 	kvWriteErr error
 	kvReadErr  error
 	revokeErr  error
@@ -172,6 +173,19 @@ func (f *fakeSecretStore) TransitDecrypt(ctx context.Context, keyName, ciphertex
 		return nil, errors.New("fake: malformed ciphertext")
 	}
 	return []byte(ciphertext[len(prefix):]), nil
+}
+
+// TransitSign is a DISTINCT fake operation from TransitEncrypt above — its
+// output must not look like TransitEncrypt's ("vault:v1:...") ciphertext
+// prefix, or a test could pass by accident even if the usecase called the
+// wrong method (exactly the bug this fake exists to catch, see
+// sign_vapid_payload.go's fix note).
+func (f *fakeSecretStore) TransitSign(ctx context.Context, keyName string, input []byte) (string, error) {
+	f.recorder.record("store.TransitSign")
+	if f.signErr != nil {
+		return "", f.signErr
+	}
+	return "sig:" + keyName + ":" + string(input), nil
 }
 
 func (f *fakeSecretStore) KVWrite(ctx context.Context, mount, path string, data map[string]any) error {

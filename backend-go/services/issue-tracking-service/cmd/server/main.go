@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
@@ -65,7 +66,21 @@ func run() error {
 	logger := logging.New(cfg.ServiceName, version)
 	slog.SetDefault(logger)
 
-	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
+	// NATS connect moved ahead of tracing.Init (TASK-BE-FFT-008) so pub
+	// exists in time to pass to tracing.WithTraceEventPublisher. Same
+	// non-fatal degrade posture issue-tracking-service already had: rows
+	// still write durably to the outbox even when NATS is down at startup.
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.*.trace.span"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure TRACE jetstream stream", slog.Any("error", err))
+		}
+	}
+
+	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint, tracing.WithTraceEventPublisher(pub))
 	if err != nil {
 		return fmt.Errorf("initializing tracing: %w", err)
 	}
@@ -107,7 +122,7 @@ func run() error {
 	// a local-dev/scaffold convenience only; production deploys terminate
 	// mTLS via the service mesh sidecar, per
 	// architecture/07-security-architecture.md.
-	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	brokerConn, err := grpc.NewClient(cfg.CredentialBrokerAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
 	if err != nil {
 		return fmt.Errorf("dialing credential-broker-service at %s: %w", cfg.CredentialBrokerAddr, err)
 	}
@@ -130,11 +145,9 @@ func run() error {
 	// same limitation every other NATS-consuming service here already
 	// carries.
 	var relay *outbox.Relay
-	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
-	if err != nil {
-		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
-	} else {
-		defer func() { _ = closeBus() }()
+	// pub already connected above (TASK-BE-FFT-008) — nil here iff
+	// eventbus.Connect failed, same non-fatal degrade as before.
+	if pub != nil {
 		if err := pub.EnsureStream(ctx, "ISSUETRACKING", []string{"orca.issuetracking.>"}); err != nil {
 			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
 		} else {
@@ -193,7 +206,7 @@ func run() error {
 	listIntegrationCredentialsUC := usecase.NewListIntegrationCredentials(credentialResolver)
 	revokeAuthUC := usecase.NewRevokeAuth(credentialResolver)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	issuetrackingv1.RegisterIssueTrackingServiceServer(grpcServer, issuetrackinggrpc.New(issuetrackinggrpc.Deps{
 		ListIssues:  listIssuesUC,
 		CreateIssue: createIssueUC,

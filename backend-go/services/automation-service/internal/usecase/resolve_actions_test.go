@@ -10,10 +10,14 @@ import (
 func mustNewAutomation(t *testing.T, stepType domain.StepType, stepConfigJSON string) domain.Automation {
 	t.Helper()
 	now := time.Now().UTC()
+<<<<<<< HEAD
 	a, err := domain.NewAutomation(domain.NewAutomationParams{
 		ID: "auto-1", TenantID: "tenant-1", Name: "n", RRule: "FREQ=DAILY",
 		StepType: stepType, StepConfigJSON: stepConfigJSON, DTStart: now, Timezone: "UTC", Enabled: true, CreatedAt: now,
 	})
+=======
+	a, err := domain.NewAutomation("auto-1", "tenant-1", "n", "FREQ=DAILY", stepType, stepConfigJSON, now, "UTC", true, now)
+>>>>>>> feat/team-rbac-implementation
 	if err != nil {
 		t.Fatalf("NewAutomation: %v", err)
 	}

@@ -174,6 +174,7 @@ func (f *fakeAutomationRunRepository) ListByAutomation(ctx context.Context, tena
 	return out, "", nil
 }
 
+<<<<<<< HEAD
 func (f *fakeAutomationRunRepository) FindRunning(ctx context.Context, tenantID, automationID string) (domain.AutomationRun, bool, error) {
 	for _, r := range f.byID {
 		if r.TenantID == tenantID && r.AutomationID == automationID && r.Status == domain.RunStatusRunning {
@@ -208,6 +209,8 @@ func (f *fakeAutomationRunRepository) WriteCleanupReport(ctx context.Context, te
 	return nil
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 func (f *fakeAutomationRunRepository) PruneRuns(ctx context.Context, tenantID, automationID string, maxRuns int32) error {
 	f.prunedCalls = append(f.prunedCalls, prunedRunsCall{TenantID: tenantID, AutomationID: automationID, MaxRuns: maxRuns})
 	return nil

@@ -30,7 +30,7 @@ should find the same shape every time.
 |---------|--------|-----|
 | Driver | `pgx` (v5), used directly and via `sqlc`-generated code | Fastest, most complete Postgres driver in the Go ecosystem; native support for the Postgres wire protocol (no `database/sql` abstraction tax) |
 | Query layer | `sqlc` — SQL-first, compile-time-checked Go code generation from `.sql` files | Keeps SQL visible and reviewable (vs. an ORM's generated queries), catches type mismatches at build time, no runtime reflection cost. **Exception**: `task-service` and `workflow-service` (DAG-heavy, recursive-query-heavy domains) may use `ent` instead where the graph-traversal codegen pays for itself — decide per-service, documented in that service's doc |
-| Migrations | `golang-migrate`, one migration directory per service, numbered sequentially (mirrors the TS system's own `0001, 0002, …` convention for continuity) | Battle-tested, dialect-agnostic enough to keep a TiDB escape hatch open the way ADR-002/ADR-021 did for the TS system |
+| Migrations | `golang-migrate`, one migration directory per service (further split into `<dialect>/` subdirectories where a service supports >1 dialect — see `usage-service`'s pilot), numbered sequentially per dialect | Battle-tested; the "TiDB escape hatch" is no longer aspirational — CR-DB-001 (2026-09-09) confirmed Option B (real multi-dialect support), being implemented via CR-DB-002/CR-DB-003, piloted on `usage-service` |
 | Connection pooling | `pgxpool`, sized per service based on expected concurrency, credentials rotated via Vault's dynamic secrets engine (not a static pool-wide password) | See [`06-secrets-vault-architecture.md`](./06-secrets-vault-architecture.md) |
 
 ## Secrets

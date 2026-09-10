@@ -40,6 +40,11 @@ func (s *SecretStore) TransitDecrypt(ctx context.Context, keyName, ciphertext st
 	return s.client.TransitDecrypt(ctx, keyName, ciphertext)
 }
 
+// TransitSign delegates directly to secrets.Client.TransitSign.
+func (s *SecretStore) TransitSign(ctx context.Context, keyName string, input []byte) (string, error) {
+	return s.client.TransitSign(ctx, keyName, input)
+}
+
 // KVWrite delegates directly to secrets.Client.KVWrite.
 func (s *SecretStore) KVWrite(ctx context.Context, mount, path string, data map[string]any) error {
 	return s.client.KVWrite(ctx, mount, path, data)

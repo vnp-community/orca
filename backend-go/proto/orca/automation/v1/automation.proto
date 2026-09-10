@@ -42,6 +42,7 @@ message Automation {
   string project_id = 9; // NEW — logical FK -> project-service.projects; empty = unscoped (back-compat)
   string name = 3;
   string rrule = 4;
+<<<<<<< HEAD
   // step_type/step_config_json (fields 5/6) are DEPRECATED but left on the
   // wire for one release: UpdateAutomation on a pre-migration row without
   // `actions` set still round-trips through them. New/updated automations
@@ -51,10 +52,30 @@ message Automation {
   bool enabled = 7;
   string dtstart = 8; // RFC3339; empty = defaults to created_at at creation time
   string timezone = 10; // renumbered from 9 to make room for project_id above; IANA tz name (e.g. "Asia/Ho_Chi_Minh"); empty = UTC
+=======
+  string step_config_json = 5;
+  // step_type promotes what used to live only inside a "step_type" JSON key
+  // in step_config_json (domain.ParseStepType) to a first-class field —
+  // closes the Phase 2 execution-plan item. Reuses workflow-service's own
+  // StepType enum rather than defining a duplicate one, since automation's
+  // step_type must already match what ExecuteAdHocStepRequest.step_type
+  // expects on dispatch.
+  //
+  // DEPRECATED as of CR-AUTO-002/TASK-BE-AUTO-002: kept, NOT removed, for
+  // automation rows created before `actions` existed — usecase layer reads
+  // an empty `actions` as "resolve this single legacy step instead" (see
+  // resolveActions in internal/usecase). New automations should populate
+  // `actions`, not this field.
+  orca.workflow.v1.StepType step_type = 6;
+  bool enabled = 7;
+  string dtstart = 8; // RFC3339; empty = defaults to created_at at creation time
+  string timezone = 9; // IANA tz name (e.g. "Asia/Ho_Chi_Minh"); empty = UTC
+>>>>>>> feat/team-rbac-implementation
   // actions — CR-AUTO-002/TASK-BE-AUTO-002. Ordered action chain, replacing
   // the single step_type/step_config_json model. Empty means "legacy
   // automation, resolve step_type/step_config_json instead" — see
   // resolveActions.
+<<<<<<< HEAD
   repeated AutomationAction actions = 11;
   TriggerType trigger_type = 12;      // NEW — BR-AT-09
   string trigger_event = 13;          // NEW — one of the 5 event names below; empty unless trigger_type=EVENT
@@ -71,6 +92,14 @@ enum TriggerType {
   TRIGGER_TYPE_CRON = 1;
   TRIGGER_TYPE_MANUAL = 2;      // rrule/dtstart still stored but next_run_at never advances — RunNow-only
   TRIGGER_TYPE_EVENT = 3;
+=======
+  repeated AutomationAction actions = 10;
+  // max_run_history — CR-AUTO-007/TASK-BE-AUTO-010. 0 = default (100).
+  int32 max_run_history = 11;
+  // run_timeout_seconds — CR-AUTO-007/TASK-BE-AUTO-010. 0 = default (7200,
+  // i.e. 2 hours).
+  int32 run_timeout_seconds = 12;
+>>>>>>> feat/team-rbac-implementation
 }
 
 enum AutomationActionType {
@@ -112,6 +141,7 @@ message CreateAutomationRequest {
   orca.workflow.v1.StepType step_type = 5; // legacy 1-step path; ignored if actions is non-empty
   string dtstart = 6; // optional; empty = defaults to now at creation time
   string timezone = 7; // optional; empty = UTC
+<<<<<<< HEAD
   string project_id = 8; // NEW — logical FK -> project-service.projects; empty = unscoped (back-compat)
   repeated AutomationAction actions = 9; // CR-AUTO-002; preferred over step_type/step_config_json
   TriggerType trigger_type = 10;      // NEW
@@ -119,6 +149,11 @@ message CreateAutomationRequest {
   string trigger_filter_json = 12;    // NEW
   int32 max_run_history = 13; // CR-AUTO-007; 0 = default (100)
   int32 run_timeout_seconds = 14; // CR-AUTO-007; 0 = default (7200)
+=======
+  repeated AutomationAction actions = 8; // CR-AUTO-002; preferred over step_type/step_config_json
+  int32 max_run_history = 9; // CR-AUTO-007; 0 = default (100)
+  int32 run_timeout_seconds = 10; // CR-AUTO-007; 0 = default (7200)
+>>>>>>> feat/team-rbac-implementation
 }
 
 message CreateAutomationResponse {
@@ -191,17 +226,26 @@ message UpdateAutomationRequest {
   google.protobuf.BoolValue enabled = 7;
   google.protobuf.StringValue dtstart = 8;
   google.protobuf.StringValue timezone = 9;
+<<<<<<< HEAD
   google.protobuf.StringValue project_id = 10; // NEW
+=======
+>>>>>>> feat/team-rbac-implementation
   // actions_set — CR-AUTO-002. Wrapper-message-shaped "was actions provided
   // at all" flag: an update that doesn't mention actions must not silently
   // clear an existing chain to empty (proto3 can't distinguish "empty
   // repeated field" from "field not set" the way scalar wrapper types can).
+<<<<<<< HEAD
   AutomationActionList actions_set = 11;
   TriggerType trigger_type = 12; // NEW — 0 (unspecified) = no change
   google.protobuf.StringValue trigger_event = 13; // NEW
   google.protobuf.StringValue trigger_filter_json = 14; // NEW
   google.protobuf.Int32Value max_run_history = 15; // CR-AUTO-007
   google.protobuf.Int32Value run_timeout_seconds = 16; // CR-AUTO-007
+=======
+  AutomationActionList actions_set = 10;
+  google.protobuf.Int32Value max_run_history = 11; // CR-AUTO-007
+  google.protobuf.Int32Value run_timeout_seconds = 12; // CR-AUTO-007
+>>>>>>> feat/team-rbac-implementation
 }
 
 // AutomationActionList — CR-AUTO-002. Exists only so UpdateAutomationRequest

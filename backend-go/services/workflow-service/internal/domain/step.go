@@ -23,6 +23,7 @@ const (
 	StepTypeNotification StepType = "notification"
 	StepTypeWebhook      StepType = "webhook"
 	StepTypeCondition    StepType = "condition"
+<<<<<<< HEAD
 	// StepTypeCleanupWorktrees is BL-AT-04's bulk policy-delete step — see
 	// internal/usecase.CleanupWorktreesStepExecutor.
 	StepTypeCleanupWorktrees StepType = "cleanup_worktrees"
@@ -33,6 +34,8 @@ const (
 	// StepTypeParallel fans a fixed list of sub-steps out concurrently —
 	// see ParallelStepConfig's doc comment.
 	StepTypeParallel StepType = "parallel"
+=======
+>>>>>>> feat/team-rbac-implementation
 	// StepTypeCommitPush — CR-AUTO-003/TASK-BE-AUTO-005. Not part of the
 	// original five (see this const block's original comment) — added so
 	// automation-service's ExecuteAutomationChain (CR-AUTO-002) has a
@@ -47,7 +50,11 @@ const (
 // Valid reports whether t is one of the known step types.
 func (t StepType) Valid() bool {
 	switch t {
+<<<<<<< HEAD
 	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition, StepTypeCleanupWorktrees, StepTypeAction, StepTypeParallel, StepTypeCommitPush:
+=======
+	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition, StepTypeCommitPush:
+>>>>>>> feat/team-rbac-implementation
 		return true
 	default:
 		return false
@@ -190,6 +197,7 @@ type NotificationStepConfig struct {
 	Message      string `json:"message"`
 }
 
+<<<<<<< HEAD
 func (c NotificationStepConfig) EffectiveTarget() string {
 	if c.Target != "" {
 		return c.Target
@@ -200,6 +208,8 @@ func (c NotificationStepConfig) EffectiveTarget() string {
 	return ""
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 // CommitPushStepConfig is the CommitPush step type's config shape —
 // CR-AUTO-003/TASK-BE-AUTO-005. ConnectionID: see AgentStepConfig's doc
 // comment (same new-field rationale) — relays to agent's git.commit then
@@ -214,6 +224,7 @@ type CommitPushStepConfig struct {
 	Push *bool `json:"push,omitempty"`
 }
 
+<<<<<<< HEAD
 // ExecutionEvent is a step/execution-level lifecycle event fanned out to
 // live StreamExecutionEvents subscribers — mirrors workflowv1.ExecutionEvent
 // (proto, added TASK-WF-02-01) one-for-one.
@@ -225,6 +236,8 @@ type ExecutionEvent struct {
 	OccurredAt  int64 // unix ms
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 // StepExecutor is the domain-level strategy interface each step type
 // implements — one Execute per StepType, dispatched by
 // usecase.StepExecutorRegistry.Resolve.

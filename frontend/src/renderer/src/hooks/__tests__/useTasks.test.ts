@@ -112,6 +112,24 @@ describe('useTasks', () => {
     expect(result.current.expandedNodes.has('t1')).toBe(true)
   })
 
+  it('refetch() re-calls task.list with the same projectId', async () => {
+    const { useTasks } = await import('../useTasks')
+    const { result } = renderHook(() => useTasks('p1'))
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledTimes(1)
+    })
+
+    act(() => {
+      result.current.refetch()
+    })
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledTimes(2)
+    })
+    expect(mockRpc).toHaveBeenNthCalledWith(2, 'mock-target', 'task.list', { projectId: 'p1' })
+  })
+
   it('toggleExpanded(id) again removes id (toggle behavior)', async () => {
     const { useTasks } = await import('../useTasks')
     const { result } = renderHook(() => useTasks('p1'))

@@ -48,6 +48,7 @@ func (f *fakeAutomationRepository) Delete(ctx context.Context, tenantID, id stri
 	return nil
 }
 
+<<<<<<< HEAD
 func (f *fakeAutomationRepository) CountByProject(ctx context.Context, tenantID, projectID string) (int, error) {
 	return 0, nil
 }
@@ -60,6 +61,8 @@ func (f *fakeAutomationRepository) ListEventTriggered(ctx context.Context, tenan
 	return nil, nil
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 func (f *fakeAutomationRepository) AcquireRunLock(ctx context.Context, tenantID, automationID, runID string, ttl time.Duration) (bool, error) {
 	return true, nil
 }
@@ -95,6 +98,7 @@ func (f *fakeAutomationRunRepository) ListByAutomation(ctx context.Context, tena
 	return nil, "", nil
 }
 
+<<<<<<< HEAD
 func (f *fakeAutomationRunRepository) FindRunning(ctx context.Context, tenantID, automationID string) (domain.AutomationRun, bool, error) {
 	for _, r := range f.byID {
 		if r.TenantID == tenantID && r.AutomationID == automationID && r.Status == domain.RunStatusRunning {
@@ -112,6 +116,8 @@ func (f *fakeAutomationRunRepository) WriteCleanupReport(ctx context.Context, te
 	return nil
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 func (f *fakeAutomationRunRepository) PruneRuns(ctx context.Context, tenantID, automationID string, maxRuns int32) error {
 	return nil
 }

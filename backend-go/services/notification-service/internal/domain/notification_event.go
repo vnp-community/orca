@@ -32,6 +32,12 @@ const (
 // not a delivery worth retrying.
 var ErrNoRecipients = errors.New("domain: event payload names no recipient user")
 
+// ErrInvalidCursor is returned by NotificationRepository.ListByRecipient
+// when the caller-supplied cursor isn't the "<rfc3339nano>|<id>" shape this
+// repository encodes — a malformed/tampered cursor is a client input error
+// (usecase/ maps it to apperrors.KindInvalidArgument), not a panic.
+var ErrInvalidCursor = errors.New("domain: invalid pagination cursor")
+
 // EventPayload is the generic shape TranslateEvent decodes a consumed bus
 // event's JSON payload into. Per §3, the subject list is illustrative, not
 // exhaustive — a new publisher's payload only needs to carry these
@@ -78,6 +84,16 @@ type NotificationEvent struct {
 	Severity         Severity
 	Channels         []DeliveryChannel
 	CreatedAt        time.Time
+	// IsRead/ReadAt are read-model fields — TranslateEvent never sets them
+	// (zero value: false/nil), so every newly translated notification is
+	// unread by construction. Populated by NotificationRepository when
+	// reading persisted rows back, and set to true (with ReadAt) by
+	// MarkAsRead/MarkAllAsRead's read-receipt broadcast. See
+	// specs/backend-go/crs/v4/notification/solutions/BE-NOTIF-SOL-001's
+	// §1 for why this lives directly on NotificationEvent instead of a
+	// separate wrapper struct.
+	IsRead bool
+	ReadAt *time.Time
 }
 
 // subjectRule is one row of §3's subject table: how a subject maps to a

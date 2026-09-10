@@ -9,7 +9,10 @@ package postgres
 
 import (
 	"context"
+<<<<<<< HEAD
 	"errors"
+=======
+>>>>>>> feat/team-rbac-implementation
 	"fmt"
 	"os/exec"
 	"path/filepath"
@@ -294,10 +297,14 @@ func TestAutomationRunRepository_PruneRuns_KeepsOnlyMostRecentN(t *testing.T) {
 	base := time.Now().UTC().Truncate(time.Second)
 	tenantID := "11111111-1111-1111-1111-111111111111"
 
+<<<<<<< HEAD
 	a, _ := domain.NewAutomation(domain.NewAutomationParams{
 		ID: "00000000-0000-0000-0000-0000000000c1", TenantID: tenantID, Name: "retained-job", RRule: "FREQ=DAILY;INTERVAL=1",
 		StepType: domain.StepTypeAgent, StepConfigJSON: `{}`, DTStart: base, Timezone: "UTC", Enabled: true, CreatedAt: base,
 	})
+=======
+	a, _ := domain.NewAutomation("00000000-0000-0000-0000-0000000000c1", tenantID, "retained-job", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{}`, base, "UTC", true, base)
+>>>>>>> feat/team-rbac-implementation
 	if err := automations.Create(ctx, a); err != nil {
 		t.Fatalf("create automation: %v", err)
 	}
@@ -352,10 +359,14 @@ func TestAutomationRunRepository_PruneRuns_ZeroOrNegativeIsNoop(t *testing.T) {
 	base := time.Now().UTC().Truncate(time.Second)
 	tenantID := "11111111-1111-1111-1111-111111111111"
 
+<<<<<<< HEAD
 	a, _ := domain.NewAutomation(domain.NewAutomationParams{
 		ID: "00000000-0000-0000-0000-0000000000c2", TenantID: tenantID, Name: "untouched-job", RRule: "FREQ=DAILY;INTERVAL=1",
 		StepType: domain.StepTypeAgent, StepConfigJSON: `{}`, DTStart: base, Timezone: "UTC", Enabled: true, CreatedAt: base,
 	})
+=======
+	a, _ := domain.NewAutomation("00000000-0000-0000-0000-0000000000c2", tenantID, "untouched-job", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{}`, base, "UTC", true, base)
+>>>>>>> feat/team-rbac-implementation
 	if err := automations.Create(ctx, a); err != nil {
 		t.Fatalf("create automation: %v", err)
 	}
@@ -386,10 +397,14 @@ func TestAutomationRepository_AcquireRunLock_OnlyOneCallerWinsWhenUnlocked(t *te
 	base := time.Now().UTC().Truncate(time.Second)
 	tenantID := "11111111-1111-1111-1111-111111111111"
 
+<<<<<<< HEAD
 	a, _ := domain.NewAutomation(domain.NewAutomationParams{
 		ID: "00000000-0000-0000-0000-0000000000d3", TenantID: tenantID, Name: "locked-job", RRule: "FREQ=DAILY;INTERVAL=1",
 		StepType: domain.StepTypeAgent, StepConfigJSON: `{}`, DTStart: base, Timezone: "UTC", Enabled: true, CreatedAt: base,
 	})
+=======
+	a, _ := domain.NewAutomation("00000000-0000-0000-0000-0000000000d3", tenantID, "locked-job", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{}`, base, "UTC", true, base)
+>>>>>>> feat/team-rbac-implementation
 	if err := automations.Create(ctx, a); err != nil {
 		t.Fatalf("create automation: %v", err)
 	}
@@ -428,10 +443,14 @@ func TestAutomationRepository_AcquireRunLock_StaleLockPastTTLSelfHeals(t *testin
 	base := time.Now().UTC().Truncate(time.Second)
 	tenantID := "11111111-1111-1111-1111-111111111111"
 
+<<<<<<< HEAD
 	a, _ := domain.NewAutomation(domain.NewAutomationParams{
 		ID: "00000000-0000-0000-0000-0000000000d4", TenantID: tenantID, Name: "stale-lock-job", RRule: "FREQ=DAILY;INTERVAL=1",
 		StepType: domain.StepTypeAgent, StepConfigJSON: `{}`, DTStart: base, Timezone: "UTC", Enabled: true, CreatedAt: base,
 	})
+=======
+	a, _ := domain.NewAutomation("00000000-0000-0000-0000-0000000000d4", tenantID, "stale-lock-job", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{}`, base, "UTC", true, base)
+>>>>>>> feat/team-rbac-implementation
 	if err := automations.Create(ctx, a); err != nil {
 		t.Fatalf("create automation: %v", err)
 	}
@@ -462,10 +481,14 @@ func TestAutomationRepository_ReleaseRunLock_OnlyReleasesOwnLock(t *testing.T) {
 	base := time.Now().UTC().Truncate(time.Second)
 	tenantID := "11111111-1111-1111-1111-111111111111"
 
+<<<<<<< HEAD
 	a, _ := domain.NewAutomation(domain.NewAutomationParams{
 		ID: "00000000-0000-0000-0000-0000000000d5", TenantID: tenantID, Name: "release-job", RRule: "FREQ=DAILY;INTERVAL=1",
 		StepType: domain.StepTypeAgent, StepConfigJSON: `{}`, DTStart: base, Timezone: "UTC", Enabled: true, CreatedAt: base,
 	})
+=======
+	a, _ := domain.NewAutomation("00000000-0000-0000-0000-0000000000d5", tenantID, "release-job", "FREQ=DAILY;INTERVAL=1", domain.StepTypeAgent, `{}`, base, "UTC", true, base)
+>>>>>>> feat/team-rbac-implementation
 	if err := automations.Create(ctx, a); err != nil {
 		t.Fatalf("create automation: %v", err)
 	}

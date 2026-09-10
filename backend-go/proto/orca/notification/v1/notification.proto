@@ -15,6 +15,14 @@ service NotificationService {
   // StreamNotifications is a server-streaming RPC api-gateway opens per
   // connected WS client and pipes frames from directly to the browser/mobile.
   rpc StreamNotifications(StreamNotificationsRequest) returns (stream NotificationServiceStreamNotificationsResponse);
+
+  // ListNotifications/MarkAsRead/MarkAllAsRead/GetUnreadCount — CR-NOTIF-001,
+  // the in-app Notification Center's list/unread-state surface. See
+  // specs/backend-go/crs/v4/notification/solutions/BE-NOTIF-SOL-001.
+  rpc ListNotifications(ListNotificationsRequest) returns (ListNotificationsResponse);
+  rpc MarkAsRead(MarkAsReadRequest) returns (google.protobuf.Empty);
+  rpc MarkAllAsRead(MarkAllAsReadRequest) returns (google.protobuf.Empty);
+  rpc GetUnreadCount(GetUnreadCountRequest) returns (GetUnreadCountResponse);
 }
 
 message SubscribeRequest {
@@ -22,6 +30,8 @@ message SubscribeRequest {
   string endpoint = 2;
   string p256dh_key = 3;
   string auth_key = 4;
+  string channel = 5;       // "web" (default when empty) | "ios" | "android"
+  string device_label = 6;  // optional, shown in the "Paired Devices" UI
 }
 
 message SubscribeResponse {
@@ -46,4 +56,44 @@ message NotificationServiceStreamNotificationsResponse {
   string id = 1;
   string type = 2; // e.g. task.completed, workflow.execution.failed
   string payload_json = 3;
+}
+
+message ListNotificationsRequest {
+  string user_id = 1;      // resolved server-side from authenticated identity by api-gateway — never trust a client-supplied user_id for a DIFFERENT user
+  string cursor = 2;       // opaque; empty = first page
+  int32 limit = 3;
+  bool unread_only = 4;
+}
+
+message Notification {
+  string id = 1;
+  string type = 2;
+  string title = 3;
+  string body = 4;
+  string deep_link = 5;
+  string severity = 6;
+  bool is_read = 7;
+  string created_at = 8; // RFC3339
+}
+
+message ListNotificationsResponse {
+  repeated Notification notifications = 1;
+  string next_cursor = 2; // empty when there is no next page
+}
+
+message MarkAsReadRequest {
+  string user_id = 1;
+  string notification_id = 2;
+}
+
+message MarkAllAsReadRequest {
+  string user_id = 1;
+}
+
+message GetUnreadCountRequest {
+  string user_id = 1;
+}
+
+message GetUnreadCountResponse {
+  int64 count = 1;
 }

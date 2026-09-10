@@ -165,6 +165,7 @@ type SshTargetRepository interface {
 	// List returns every SSH target registered for tenantID — backs
 	// ssh.listTargets/ssh.getUserAccount.
 	List(ctx context.Context, tenantID string) ([]domain.SshTarget, error)
+<<<<<<< HEAD
 	// Upsert inserts or updates by (tenant_id, host, user_name) — the
 	// conflict target migrations/0007's unique index establishes.
 	// updated=true means an existing row's vault_ssh_role/project/tags were
@@ -174,6 +175,22 @@ type SshTargetRepository interface {
 	// dry-run import path (usecase.ImportFleetInventory) — it does not
 	// commit anything.
 	GetByHostUser(ctx context.Context, tenantID, host, userName string) (domain.SshTarget, bool, error)
+=======
+	// Delete removes an SSH target scoped to tenantID — used by
+	// DeleteSshTarget's compensating-rollback path in BulkProvisionFleet
+	// (CR-FLEET-001) when RegisterDevServer fails after CreateSshTarget
+	// already succeeded.
+	Delete(ctx context.Context, tenantID, id string) error
+}
+
+// TerraformRunner runs `terraform apply` on a registered control dev
+// server (via its agent) and returns `terraform output -json`'s raw
+// content — CR-FLEET-002's Hướng A. Orca never runs terraform itself;
+// it orchestrates the agent that does, mirroring how EphemeralVmRelay
+// dispatches vm.provision instead of exec'ing locally.
+type TerraformRunner interface {
+	Apply(ctx context.Context, controlDevServer domain.DevServer, workingDir, varsFile string) (outputJSON string, err error)
+>>>>>>> feat/team-rbac-implementation
 }
 
 // ConnectionRepository is the persistence port for the write side of
@@ -945,6 +962,7 @@ type TerminalSessionRepository interface {
 	CloseAllForConnection(ctx context.Context, tenantID, connectionID string, closedAt time.Time) error
 }
 
+<<<<<<< HEAD
 // TerminalScrollbackSnapshotRepository is the persistence port for
 // infra.terminal_scrollback_snapshots (migrations/0007) — parallel in shape
 // to TerminalSessionRepository, tenantID threaded explicitly on every
@@ -1086,4 +1104,19 @@ type QueuedPromptRepository interface {
 // relay loop itself.
 type LifecycleEventPublisher interface {
 	PublishAgentLifecycle(ctx context.Context, tenantID, subject string, payload eventbus.AgentLifecyclePayload) error
+=======
+// FleetDefinitionRepository is the persistence port for CR-FLEET-003's
+// FleetDefinition CRUD — infra.fleet_definitions (migration 0018,
+// TASK-BE-FLEET-011).
+type FleetDefinitionRepository interface {
+	Create(ctx context.Context, def domain.FleetDefinition) (domain.FleetDefinition, error)
+	// Update applies optimistic locking: def.Version is the NEW version
+	// (already incremented by the caller) — the adapter's WHERE clause
+	// matches the OLD version (def.Version-1) so a concurrent writer's
+	// stale Update loses instead of silently clobbering. 0 rows affected
+	// surfaces as domain.ErrFleetDefinitionVersionConflict.
+	Update(ctx context.Context, def domain.FleetDefinition) (domain.FleetDefinition, error)
+	Get(ctx context.Context, tenantID, id string) (domain.FleetDefinition, error)
+	List(ctx context.Context, tenantID string) ([]domain.FleetDefinition, error)
+>>>>>>> feat/team-rbac-implementation
 }

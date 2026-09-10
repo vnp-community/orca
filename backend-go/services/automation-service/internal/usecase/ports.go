@@ -38,6 +38,7 @@ type AutomationRepository interface {
 	// (automation_runs.automation_id has ON DELETE CASCADE per
 	// migrations/0001_init.up.sql — no separate run-cleanup step needed).
 	Delete(ctx context.Context, tenantID, id string) error
+<<<<<<< HEAD
 	// CountByProject returns the number of automations for tenantID scoped
 	// to projectID — backs BR-AT-02's per-project cap.
 	CountByProject(ctx context.Context, tenantID, projectID string) (int, error)
@@ -49,6 +50,8 @@ type AutomationRepository interface {
 	// tenantID (regardless of enabled) — backs DetectTriggerCycle's graph
 	// build (BR-AT-10).
 	ListEventTriggered(ctx context.Context, tenantID string) ([]domain.Automation, error)
+=======
+>>>>>>> feat/team-rbac-implementation
 	// AcquireRunLock claims automationID's running-run slot for runID —
 	// CR-AUTO-007/TASK-BE-AUTO-011's concurrency guard, preventing a manual
 	// RunNow from overlapping a scheduled run of the same automation (or
@@ -85,6 +88,7 @@ type AutomationRunRepository interface {
 	// Automation page's initial load has no automation selected yet); an
 	// empty pageToken means "first page" — both are valid, not error inputs.
 	ListByAutomation(ctx context.Context, tenantID, automationID, pageToken string, pageSize int32) ([]domain.AutomationRun, string, error)
+<<<<<<< HEAD
 	// FindRunning returns the currently-running run for automationID, if
 	// any — backed by idx_automation_runs_one_running, the partial unique
 	// index enforcing BR-AT-08's "at most one running run per automation".
@@ -103,6 +107,8 @@ type AutomationRunRepository interface {
 	// WriteCleanupReport persists one worktree_cleanup_log row per entry —
 	// backs the WriteCleanupReport RPC workflow-service calls (BR-AT-14).
 	WriteCleanupReport(ctx context.Context, tenantID, runID string, entries []domain.CleanupLogEntry) error
+=======
+>>>>>>> feat/team-rbac-implementation
 	// PruneRuns deletes automationID's oldest runs beyond the maxRuns most
 	// recent (by created_at) — CR-AUTO-007/TASK-BE-AUTO-010's run-history
 	// retention, called after each chain execution finishes. maxRuns <= 0 is

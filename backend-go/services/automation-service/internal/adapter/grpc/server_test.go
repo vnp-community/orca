@@ -70,6 +70,7 @@ func (f *fakeAutomationRepository) Delete(ctx context.Context, tenantID, id stri
 	return nil
 }
 
+<<<<<<< HEAD
 func (f *fakeAutomationRepository) CountByProject(ctx context.Context, tenantID, projectID string) (int, error) {
 	count := 0
 	for _, a := range f.byID {
@@ -100,6 +101,8 @@ func (f *fakeAutomationRepository) ListEventTriggered(ctx context.Context, tenan
 	return out, nil
 }
 
+=======
+>>>>>>> feat/team-rbac-implementation
 func (f *fakeAutomationRepository) AcquireRunLock(ctx context.Context, tenantID, automationID, runID string, ttl time.Duration) (bool, error) {
 	return true, nil
 }
@@ -306,7 +309,11 @@ func TestServer_DeleteAutomation_CallsRepositoryWithTenantAndID(t *testing.T) {
 
 func TestServer_CreateAutomation_ActionsRoundTripThroughProto(t *testing.T) {
 	repo := newFakeAutomationRepository()
+<<<<<<< HEAD
 	s := New(usecase.NewCreateAutomation(repo), nil, nil, nil, nil, nil, nil, nil)
+=======
+	s := New(usecase.NewCreateAutomation(repo), nil, nil, nil, nil, nil, nil)
+>>>>>>> feat/team-rbac-implementation
 	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
 
 	resp, err := s.CreateAutomation(ctx, &automationv1.CreateAutomationRequest{

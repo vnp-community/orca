@@ -25,6 +25,7 @@ type fakeSshTargetRepository struct {
 	targets map[string][]domain.SshTarget
 	listErr error
 
+<<<<<<< HEAD
 	// byHostUser (tenantID|host|user -> target) and getByHostUserErr drive
 	// GetByHostUser's fake answer — used by import_fleet_inventory_test.go's
 	// dry-run assertions.
@@ -65,6 +66,12 @@ func (f *fakeSshTargetRepository) GetByHostUser(ctx context.Context, tenantID, h
 	}
 	t, ok := f.byHostUser[sshTargetHostUserKey(tenantID, host, userName)]
 	return t, ok, nil
+=======
+	// deleted records (tenantID, id) pairs passed to Delete, and deleteErr
+	// drives its fake answer — used by delete_ssh_target_test.go.
+	deleted   [][2]string
+	deleteErr error
+>>>>>>> feat/team-rbac-implementation
 }
 
 func (f *fakeSshTargetRepository) Create(ctx context.Context, target domain.SshTarget) (domain.SshTarget, error) {
@@ -91,6 +98,15 @@ func (f *fakeSshTargetRepository) List(ctx context.Context, tenantID string) ([]
 		return nil, f.listErr
 	}
 	return f.targets[tenantID], nil
+}
+
+// Delete implements usecase.SshTargetRepository.Delete.
+func (f *fakeSshTargetRepository) Delete(ctx context.Context, tenantID, id string) error {
+	if f.deleteErr != nil {
+		return f.deleteErr
+	}
+	f.deleted = append(f.deleted, [2]string{tenantID, id})
+	return nil
 }
 
 func TestCreateSshTarget_RequiresTenantContext(t *testing.T) {

@@ -8,6 +8,7 @@ require (
 	github.com/nats-io/nats.go v1.53.1
 	github.com/open-policy-agent/opa v1.19.1
 	github.com/testcontainers/testcontainers-go v0.44.0
+	go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc v0.69.0
 	go.opentelemetry.io/otel v1.45.0
 	go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc v1.44.0
 	go.opentelemetry.io/otel/sdk v1.45.0

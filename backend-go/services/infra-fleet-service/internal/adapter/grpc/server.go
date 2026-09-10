@@ -29,6 +29,7 @@ import (
 type Server struct {
 	infrafleetv1.UnimplementedInfraFleetServiceServer
 
+<<<<<<< HEAD
 	registerDevServer   *usecase.RegisterDevServer
 	resolveConnection   *usecase.ResolveConnection
 	createSshTarget     *usecase.CreateSshTarget
@@ -39,6 +40,26 @@ type Server struct {
 	createConnection    *usecase.CreateConnection
 	relay               *usecase.Relay
 	relayStream         *usecase.RelayStream
+=======
+	registerDevServer  *usecase.RegisterDevServer
+	resolveConnection  *usecase.ResolveConnection
+	createSshTarget    *usecase.CreateSshTarget
+	bulkProvisionFleet *usecase.BulkProvisionFleet
+	applyTerraformPlan *usecase.ApplyTerraformPlan
+
+	createFleetDefinition     *usecase.CreateFleetDefinition
+	updateFleetDefinition     *usecase.UpdateFleetDefinition
+	getFleetDefinition        *usecase.GetFleetDefinition
+	listFleetDefinitions      *usecase.ListFleetDefinitions
+	exportFleetDefinitionYaml *usecase.ExportFleetDefinitionYaml
+	deployFleetDefinition     *usecase.DeployFleetDefinition
+
+	getFleetHealth     *usecase.GetFleetHealth
+	scanWorkspacePorts *usecase.ScanWorkspacePorts
+	listDevServers     *usecase.ListDevServers
+	createConnection   *usecase.CreateConnection
+	relay              *usecase.Relay
+>>>>>>> feat/team-rbac-implementation
 
 	listSshTargets      *usecase.ListSshTargets
 	getSshState         *usecase.GetSshState
@@ -149,6 +170,14 @@ func New(
 	registerDevServer *usecase.RegisterDevServer,
 	resolveConnection *usecase.ResolveConnection,
 	createSshTarget *usecase.CreateSshTarget,
+	bulkProvisionFleet *usecase.BulkProvisionFleet,
+	applyTerraformPlan *usecase.ApplyTerraformPlan,
+	createFleetDefinition *usecase.CreateFleetDefinition,
+	updateFleetDefinition *usecase.UpdateFleetDefinition,
+	getFleetDefinition *usecase.GetFleetDefinition,
+	listFleetDefinitions *usecase.ListFleetDefinitions,
+	exportFleetDefinitionYaml *usecase.ExportFleetDefinitionYaml,
+	deployFleetDefinition *usecase.DeployFleetDefinition,
 	getFleetHealth *usecase.GetFleetHealth,
 	scanWorkspacePorts *usecase.ScanWorkspacePorts,
 	listDevServers *usecase.ListDevServers,
@@ -222,6 +251,7 @@ func New(
 	streamFileChanges *usecase.StreamFileChanges,
 ) *Server {
 	return &Server{
+<<<<<<< HEAD
 		registerDevServer:      registerDevServer,
 		resolveConnection:      resolveConnection,
 		createSshTarget:        createSshTarget,
@@ -284,6 +314,44 @@ func New(
 		dispatchPrompt:             dispatchPrompt,
 		getQueuedPrompt:            getQueuedPrompt,
 		liveStates:                 liveStates,
+=======
+		registerDevServer:          registerDevServer,
+		resolveConnection:          resolveConnection,
+		createSshTarget:            createSshTarget,
+		bulkProvisionFleet:         bulkProvisionFleet,
+		applyTerraformPlan:         applyTerraformPlan,
+		createFleetDefinition:      createFleetDefinition,
+		updateFleetDefinition:      updateFleetDefinition,
+		getFleetDefinition:         getFleetDefinition,
+		listFleetDefinitions:       listFleetDefinitions,
+		exportFleetDefinitionYaml:  exportFleetDefinitionYaml,
+		deployFleetDefinition:      deployFleetDefinition,
+		getFleetHealth:             getFleetHealth,
+		scanWorkspacePorts:         scanWorkspacePorts,
+		listDevServers:             listDevServers,
+		createConnection:           createConnection,
+		relay:                      relay,
+		listSshTargets:             listSshTargets,
+		getSshState:                getSshState,
+		establishConnection:        establishConnection,
+		killWorkspacePort:          killWorkspacePort,
+		spawnTerminalSession:       spawnTerminalSession,
+		resizeTerminalSession:      resizeTerminalSession,
+		killTerminalSession:        killTerminalSession,
+		stopTerminalProcess:        stopTerminalProcess,
+		listTerminalSessions:       listTerminalSessions,
+		waitTerminalSession:        waitTerminalSession,
+		focusTerminalSession:       focusTerminalSession,
+		getTerminalAgentStatus:     getTerminalAgentStatus,
+		inspectTerminalProcess:     inspectTerminalProcess,
+		attachPty:                  attachPty,
+		attachScreencast:           attachScreencast,
+		listBrowserProfiles:        listBrowserProfiles,
+		createBrowserProfile:       createBrowserProfile,
+		deleteBrowserProfile:       deleteBrowserProfile,
+		emulatorRelay:              emulatorRelay,
+		getHostCapabilities:        getHostCapabilities,
+>>>>>>> feat/team-rbac-implementation
 		approveDevServer:           approveDevServer,
 		rejectDevServer:            rejectDevServer,
 		assignDevServerGroup:       assignDevServerGroup,
@@ -711,6 +779,228 @@ func (s *Server) CreateSshTarget(ctx context.Context, req *infrafleetv1.CreateSs
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &infrafleetv1.CreateSshTargetResponse{SshTargetId: target.ID}, nil
+}
+
+// BulkProvisionFleet fans usecase.BulkProvisionFleet's per-server callback
+// out into one BulkProvisionFleetEvent per stream.Send — CR-FLEET-001.
+// sendErr latches the first stream.Send failure so later emit() calls
+// become no-ops instead of calling Send on an already-broken stream.
+func (s *Server) BulkProvisionFleet(req *infrafleetv1.BulkProvisionFleetRequest, stream infrafleetv1.InfraFleetService_BulkProvisionFleetServer) error {
+	servers := make([]domain.FleetSpecServer, 0, len(req.GetServers()))
+	for _, sp := range req.GetServers() {
+		servers = append(servers, domain.FleetSpecServer{
+			Host:         sp.GetHost(),
+			UserName:     sp.GetUserName(),
+			VaultSSHRole: sp.GetVaultSshRole(),
+			Kind:         toDomainAgentKind(sp.GetKind()),
+		})
+	}
+	spec := usecase.FleetSpec{Servers: servers}
+
+	// BulkProvisionFleet.Execute's emit callback fires from N concurrent
+	// per-server goroutines (its whole point — bounded concurrency), so
+	// sendErr and stream.Send() itself both need this mutex: gRPC streams
+	// are not safe for concurrent Send calls from multiple goroutines, and
+	// reading/writing a plain `var sendErr error` from N goroutines races.
+	// Confirmed via `go test -race` — this was a live bug in the version
+	// TASK-BE-FLEET-003 originally shipped.
+	var mu sync.Mutex
+	var sendErr error
+	_, err := s.bulkProvisionFleet.Execute(stream.Context(), spec, int(req.GetConcurrency()), func(r usecase.BulkProvisionServerResult) {
+		mu.Lock()
+		defer mu.Unlock()
+		if sendErr != nil {
+			return // already failed once — stream may be closed, don't retry
+		}
+		status := infrafleetv1.BulkProvisionFleetEvent_SUCCEEDED
+		if r.Status == "FAILED" {
+			status = infrafleetv1.BulkProvisionFleetEvent_FAILED
+		}
+		sendErr = stream.Send(&infrafleetv1.BulkProvisionFleetEvent{
+			Host: r.Host, Status: status, DevServerId: r.DevServerID, Error: r.Error,
+		})
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	if sendErr != nil {
+		return apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInternal, "INFRA_BULK_PROVISION_STREAM_SEND_FAILED", "failed to stream event", sendErr))
+	}
+	return nil
+}
+
+// ApplyTerraformPlan sends exactly one terminal "result" event after
+// usecase.ApplyTerraformPlan.Execute returns — see infrafleet.proto's
+// ApplyTerraformPlanEvent doc comment for why (no per-chunk emit callback
+// exists at the usecase layer yet, a known MVP limitation, not a silent
+// gap). Still server-streaming on the wire so a future streaming usecase
+// signature doesn't require a breaking RPC/proto change.
+func (s *Server) ApplyTerraformPlan(req *infrafleetv1.ApplyTerraformPlanRequest, stream infrafleetv1.InfraFleetService_ApplyTerraformPlanServer) error {
+	result, err := s.applyTerraformPlan.Execute(stream.Context(), usecase.ApplyTerraformPlanInput{
+		ControlDevServerID: req.GetControlDevServerId(),
+		WorkingDir:         req.GetWorkingDir(),
+		VarsFile:           req.GetVarsFile(),
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	if err := stream.Send(&infrafleetv1.ApplyTerraformPlanEvent{
+		Type:       "result",
+		OutputJson: result.OutputJSON,
+	}); err != nil {
+		return apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInternal, "INFRA_APPLY_TERRAFORM_PLAN_STREAM_SEND_FAILED", "failed to stream event", err))
+	}
+	return nil
+}
+
+// --- FleetDefinition CRUD (TASK-BE-FLEET-012, CR-FLEET-003) ---
+
+func (s *Server) CreateFleetDefinition(ctx context.Context, req *infrafleetv1.CreateFleetDefinitionRequest) (*infrafleetv1.FleetDefinitionProto, error) {
+	def, err := s.createFleetDefinition.Execute(ctx, usecase.CreateFleetDefinitionInput{
+		Name:      req.GetName(),
+		Servers:   toDomainFleetSpecServers(req.GetServers()),
+		Provision: toDomainProvisionConfig(req.GetProvision()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoFleetDefinition(def), nil
+}
+
+func (s *Server) UpdateFleetDefinition(ctx context.Context, req *infrafleetv1.UpdateFleetDefinitionRequest) (*infrafleetv1.FleetDefinitionProto, error) {
+	def, err := s.updateFleetDefinition.Execute(ctx, usecase.UpdateFleetDefinitionInput{
+		ID:        req.GetId(),
+		Servers:   toDomainFleetSpecServers(req.GetServers()),
+		Provision: toDomainProvisionConfig(req.GetProvision()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoFleetDefinition(def), nil
+}
+
+func (s *Server) GetFleetDefinition(ctx context.Context, req *infrafleetv1.GetFleetDefinitionRequest) (*infrafleetv1.FleetDefinitionProto, error) {
+	def, err := s.getFleetDefinition.Execute(ctx, req.GetId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoFleetDefinition(def), nil
+}
+
+func (s *Server) ListFleetDefinitions(ctx context.Context, req *infrafleetv1.ListFleetDefinitionsRequest) (*infrafleetv1.ListFleetDefinitionsResponse, error) {
+	defs, err := s.listFleetDefinitions.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.FleetDefinitionProto, 0, len(defs))
+	for _, def := range defs {
+		out = append(out, toProtoFleetDefinition(def))
+	}
+	return &infrafleetv1.ListFleetDefinitionsResponse{Definitions: out}, nil
+}
+
+func toDomainFleetSpecServers(protoServers []*infrafleetv1.FleetSpecServerProto) []domain.FleetSpecServer {
+	servers := make([]domain.FleetSpecServer, 0, len(protoServers))
+	for _, sp := range protoServers {
+		servers = append(servers, domain.FleetSpecServer{
+			Host:         sp.GetHost(),
+			UserName:     sp.GetUserName(),
+			VaultSSHRole: sp.GetVaultSshRole(),
+			Kind:         toDomainAgentKind(sp.GetKind()),
+		})
+	}
+	return servers
+}
+
+func toProtoFleetSpecServers(servers []domain.FleetSpecServer) []*infrafleetv1.FleetSpecServerProto {
+	out := make([]*infrafleetv1.FleetSpecServerProto, 0, len(servers))
+	for _, sv := range servers {
+		out = append(out, &infrafleetv1.FleetSpecServerProto{
+			Host:         sv.Host,
+			UserName:     sv.UserName,
+			VaultSshRole: sv.VaultSSHRole,
+			Kind:         toProtoAgentKind(sv.Kind),
+		})
+	}
+	return out
+}
+
+// toDomainProvisionConfig returns nil for a nil proto message — mirrors
+// domain.FleetDefinition.Provision's "nil means register-only, no infra
+// provisioned" convention (see domain/fleet_definition.go's doc comment).
+func toDomainProvisionConfig(p *infrafleetv1.ProvisionConfigProto) *domain.ProvisionConfig {
+	if p == nil {
+		return nil
+	}
+	return &domain.ProvisionConfig{IaC: p.GetIac(), WorkingDir: p.GetWorkingDir(), VarsFile: p.GetVarsFile()}
+}
+
+func toProtoProvisionConfig(p *domain.ProvisionConfig) *infrafleetv1.ProvisionConfigProto {
+	if p == nil {
+		return nil
+	}
+	return &infrafleetv1.ProvisionConfigProto{Iac: p.IaC, WorkingDir: p.WorkingDir, VarsFile: p.VarsFile}
+}
+
+// toProtoFleetDefinition formats CreatedAt/UpdatedAt as RFC3339 strings —
+// infrafleet.proto's FleetDefinitionProto deliberately uses `string` rather
+// than google.protobuf.Timestamp for these 2 fields (mirroring this file's
+// existing string-timestamp fields elsewhere), a zero time.Time formats as
+// "0001-01-01T00:00:00Z" which callers should treat as "unset", same as
+// other zero-value timestamp fields in this service.
+func toProtoFleetDefinition(def domain.FleetDefinition) *infrafleetv1.FleetDefinitionProto {
+	return &infrafleetv1.FleetDefinitionProto{
+		Id:        def.ID,
+		Name:      def.Name,
+		Version:   int32(def.Version),
+		Servers:   toProtoFleetSpecServers(def.Servers),
+		Provision: toProtoProvisionConfig(def.Provision),
+		CreatedBy: def.CreatedBy,
+		CreatedAt: def.CreatedAt.Format(time.RFC3339),
+		UpdatedAt: def.UpdatedAt.Format(time.RFC3339),
+	}
+}
+
+func (s *Server) ExportFleetDefinitionYaml(ctx context.Context, req *infrafleetv1.ExportFleetDefinitionYamlRequest) (*infrafleetv1.ExportFleetDefinitionYamlResponse, error) {
+	yamlContent, err := s.exportFleetDefinitionYaml.Execute(ctx, req.GetId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.ExportFleetDefinitionYamlResponse{YamlContent: yamlContent}, nil
+}
+
+// DeployFleetDefinition mirrors BulkProvisionFleet's stream-event pattern
+// exactly (same sendErr-latching approach) — see that handler's doc comment.
+func (s *Server) DeployFleetDefinition(req *infrafleetv1.DeployFleetDefinitionRequest, stream infrafleetv1.InfraFleetService_DeployFleetDefinitionServer) error {
+	// Same concurrency hazard as BulkProvisionFleet's handler above (this
+	// usecase calls straight through to BulkProvisionFleet.Execute's
+	// concurrent emit) — same mutex fix, see that handler's comment.
+	var mu sync.Mutex
+	var sendErr error
+	_, err := s.deployFleetDefinition.Execute(stream.Context(), usecase.DeployFleetDefinitionInput{
+		FleetDefinitionID:  req.GetFleetDefinitionId(),
+		ControlDevServerID: req.GetControlDevServerId(),
+	}, func(r usecase.BulkProvisionServerResult) {
+		mu.Lock()
+		defer mu.Unlock()
+		if sendErr != nil {
+			return
+		}
+		status := infrafleetv1.BulkProvisionFleetEvent_SUCCEEDED
+		if r.Status == "FAILED" {
+			status = infrafleetv1.BulkProvisionFleetEvent_FAILED
+		}
+		sendErr = stream.Send(&infrafleetv1.BulkProvisionFleetEvent{
+			Host: r.Host, Status: status, DevServerId: r.DevServerID, Error: r.Error,
+		})
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	if sendErr != nil {
+		return apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInternal, "INFRA_DEPLOY_FLEET_DEFINITION_STREAM_SEND_FAILED", "failed to stream event", sendErr))
+	}
+	return nil
 }
 
 func (s *Server) GetFleetHealth(ctx context.Context, req *infrafleetv1.GetFleetHealthRequest) (*infrafleetv1.GetFleetHealthResponse, error) {

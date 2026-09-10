@@ -340,8 +340,11 @@ func toProtoStepType(s domain.StepType) workflowv1.StepType {
 		return workflowv1.StepType_STEP_TYPE_WEBHOOK
 	case domain.StepTypeCondition:
 		return workflowv1.StepType_STEP_TYPE_CONDITION
+<<<<<<< HEAD
 	case domain.StepTypeCleanupWorktrees:
 		return workflowv1.StepType_STEP_TYPE_CLEANUP_WORKTREES
+=======
+>>>>>>> feat/team-rbac-implementation
 	case domain.StepTypeCommitPush:
 		return workflowv1.StepType_STEP_TYPE_COMMIT_PUSH
 	default:
@@ -361,8 +364,11 @@ func fromProtoStepType(s workflowv1.StepType) domain.StepType {
 		return domain.StepTypeWebhook
 	case workflowv1.StepType_STEP_TYPE_CONDITION:
 		return domain.StepTypeCondition
+<<<<<<< HEAD
 	case workflowv1.StepType_STEP_TYPE_CLEANUP_WORKTREES:
 		return domain.StepTypeCleanupWorktrees
+=======
+>>>>>>> feat/team-rbac-implementation
 	case workflowv1.StepType_STEP_TYPE_COMMIT_PUSH:
 		return domain.StepTypeCommitPush
 	default:

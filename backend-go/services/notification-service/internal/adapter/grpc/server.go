@@ -7,6 +7,7 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -26,6 +27,10 @@ type Server struct {
 	subscribe                  *usecase.Subscribe
 	unregisterPushSubscription *usecase.UnregisterPushSubscription
 	getVapidPublicKey          *usecase.GetVapidPublicKey
+	listNotifications          *usecase.ListNotifications
+	markAsRead                 *usecase.MarkAsRead
+	markAllAsRead              *usecase.MarkAllAsRead
+	getUnreadCount             *usecase.GetUnreadCount
 	broadcaster                usecase.NotificationBroadcaster
 	// signer backs GetVapidPublicKey's sibling web-push signing path,
 	// actually invoked now by usecase.DeliverPush (BL-MB-02,
@@ -37,11 +42,29 @@ type Server struct {
 	buffer usecase.BufferedNotificationRepository
 }
 
+<<<<<<< HEAD
 func New(subscribe *usecase.Subscribe, unregisterPushSubscription *usecase.UnregisterPushSubscription, getVapidPublicKey *usecase.GetVapidPublicKey, broadcaster usecase.NotificationBroadcaster, signer usecase.VaultSigner, buffer usecase.BufferedNotificationRepository) *Server {
+=======
+func New(
+	subscribe *usecase.Subscribe,
+	unregisterPushSubscription *usecase.UnregisterPushSubscription,
+	getVapidPublicKey *usecase.GetVapidPublicKey,
+	listNotifications *usecase.ListNotifications,
+	markAsRead *usecase.MarkAsRead,
+	markAllAsRead *usecase.MarkAllAsRead,
+	getUnreadCount *usecase.GetUnreadCount,
+	broadcaster usecase.NotificationBroadcaster,
+	signer usecase.VaultSigner,
+) *Server {
+>>>>>>> feat/team-rbac-implementation
 	return &Server{
 		subscribe:                  subscribe,
 		unregisterPushSubscription: unregisterPushSubscription,
 		getVapidPublicKey:          getVapidPublicKey,
+		listNotifications:          listNotifications,
+		markAsRead:                 markAsRead,
+		markAllAsRead:              markAllAsRead,
+		getUnreadCount:             getUnreadCount,
 		broadcaster:                broadcaster,
 		signer:                     signer,
 		buffer:                     buffer,
@@ -50,10 +73,12 @@ func New(subscribe *usecase.Subscribe, unregisterPushSubscription *usecase.Unreg
 
 func (s *Server) Subscribe(ctx context.Context, req *notificationv1.SubscribeRequest) (*notificationv1.SubscribeResponse, error) {
 	sub, err := s.subscribe.Execute(ctx, usecase.SubscribeInput{
-		UserID:    req.GetUserId(),
-		Endpoint:  req.GetEndpoint(),
-		P256dhKey: req.GetP256DhKey(),
-		AuthKey:   req.GetAuthKey(),
+		UserID:      req.GetUserId(),
+		Endpoint:    req.GetEndpoint(),
+		P256dhKey:   req.GetP256DhKey(),
+		AuthKey:     req.GetAuthKey(),
+		Channel:     req.GetChannel(),
+		DeviceLabel: req.GetDeviceLabel(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -74,6 +99,54 @@ func (s *Server) GetVapidPublicKey(ctx context.Context, req *notificationv1.GetV
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &notificationv1.GetVapidPublicKeyResponse{PublicKey: key}, nil
+}
+
+func (s *Server) ListNotifications(ctx context.Context, req *notificationv1.ListNotificationsRequest) (*notificationv1.ListNotificationsResponse, error) {
+	events, next, err := s.listNotifications.Execute(ctx, usecase.ListNotificationsInput{
+		UserID:     req.GetUserId(),
+		Cursor:     req.GetCursor(),
+		Limit:      req.GetLimit(),
+		UnreadOnly: req.GetUnreadOnly(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*notificationv1.Notification, 0, len(events))
+	for _, e := range events {
+		out = append(out, &notificationv1.Notification{
+			Id:        e.ID,
+			Type:      e.Type,
+			Title:     e.Title,
+			Body:      e.Body,
+			DeepLink:  e.DeepLink,
+			Severity:  string(e.Severity),
+			IsRead:    e.IsRead,
+			CreatedAt: e.CreatedAt.Format(time.RFC3339),
+		})
+	}
+	return &notificationv1.ListNotificationsResponse{Notifications: out, NextCursor: next}, nil
+}
+
+func (s *Server) MarkAsRead(ctx context.Context, req *notificationv1.MarkAsReadRequest) (*emptypb.Empty, error) {
+	if err := s.markAsRead.Execute(ctx, req.GetUserId(), req.GetNotificationId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) MarkAllAsRead(ctx context.Context, req *notificationv1.MarkAllAsReadRequest) (*emptypb.Empty, error) {
+	if _, err := s.markAllAsRead.Execute(ctx, req.GetUserId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) GetUnreadCount(ctx context.Context, req *notificationv1.GetUnreadCountRequest) (*notificationv1.GetUnreadCountResponse, error) {
+	count, err := s.getUnreadCount.Execute(ctx, req.GetUserId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &notificationv1.GetUnreadCountResponse{Count: count}, nil
 }
 
 // StreamNotifications is a real, working server-streaming handler:

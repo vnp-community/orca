@@ -18,6 +18,7 @@ type Config struct {
 	// exception to "no service but credential-broker-service touches
 	// Vault directly."
 	CredentialBrokerAddr string
+<<<<<<< HEAD
 	// AuthServiceAddr is auth-service's gRPC target — dialed by
 	// internal/adapter/grpcclient/authclient.DeviceSecretResolver to call
 	// ResolveDeviceSharedSecret (SOL-MB-01), an internal-only RPC never
@@ -39,6 +40,15 @@ type Config struct {
 	// credentials are provisioned" posture as APNs above.
 	FCMProjectID           string
 	FCMServiceAccountEmail string
+=======
+	// VapidContactURI is the "sub" claim RFC 8292 §2 requires every VAPID
+	// JWT to carry — a contactable mailto:/https: URI for this deployment's
+	// operator, NOT a per-tenant or per-event value. Configurable rather
+	// than hardcoded (TASK-BE-NOTIF-011) because it's operator-identifying
+	// contact info a self-hosted deployment must be able to set to its own
+	// address, not Orca's.
+	VapidContactURI string
+>>>>>>> feat/team-rbac-implementation
 }
 
 func Load() (Config, error) {
@@ -47,6 +57,7 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
+<<<<<<< HEAD
 		Base:                   base,
 		NATSURL:                commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		CredentialBrokerAddr:   commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
@@ -57,5 +68,11 @@ func Load() (Config, error) {
 		APNsEndpoint:           commonconfig.StringEnv("APNS_ENDPOINT", "https://api.push.apple.com"),
 		FCMProjectID:           commonconfig.StringEnv("FCM_PROJECT_ID", ""),
 		FCMServiceAccountEmail: commonconfig.StringEnv("FCM_SERVICE_ACCOUNT_EMAIL", ""),
+=======
+		Base:                 base,
+		NATSURL:              commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		CredentialBrokerAddr: commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
+		VapidContactURI:      commonconfig.StringEnv("VAPID_CONTACT_URI", "mailto:support@orca.dev"),
+>>>>>>> feat/team-rbac-implementation
 	}, nil
 }

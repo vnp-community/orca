@@ -22,14 +22,24 @@ const maxAutomationsPerProject = 20
 // wire strings (RFC3339 / IANA tz name); empty means "default" — see
 // Execute for the resolution rules.
 type CreateAutomationInput struct {
+<<<<<<< HEAD
 	Name      string
 	RRule     string
 	ProjectID string // BR-AT-02; empty = unscoped
+=======
+	Name           string
+	RRule          string
+	StepType       domain.StepType
+	StepConfigJSON string
+	DTStart        string // RFC3339; empty = defaults to now
+	Timezone       string // IANA tz name; empty = UTC
+>>>>>>> feat/team-rbac-implementation
 	// Actions — CR-AUTO-002/TASK-BE-AUTO-005. Preferred over StepType/
 	// StepConfigJSON when non-empty (see resolveActions). A caller MAY
 	// populate both (e.g. a legacy StepConfigJSON kept for reference) —
 	// Actions always wins at dispatch time.
 	Actions           []domain.AutomationAction
+<<<<<<< HEAD
 	StepType          domain.StepType
 	StepConfigJSON    string
 	DTStart           string // RFC3339; empty = defaults to now
@@ -37,6 +47,8 @@ type CreateAutomationInput struct {
 	TriggerType       domain.TriggerType
 	TriggerEvent      domain.EventName
 	TriggerFilter     *domain.TriggerFilter
+=======
+>>>>>>> feat/team-rbac-implementation
 	MaxRunHistory     int32 // CR-AUTO-007; 0 = default (100)
 	RunTimeoutSeconds int32 // CR-AUTO-007; 0 = default (7200)
 }
@@ -108,6 +120,7 @@ func (uc *CreateAutomation) Execute(ctx context.Context, in CreateAutomationInpu
 	if stepConfigForValidation == "" && len(in.Actions) > 0 {
 		stepConfigForValidation = "{}"
 	}
+<<<<<<< HEAD
 	automation, err := domain.NewAutomation(domain.NewAutomationParams{
 		ID:             uuid.NewString(),
 		TenantID:       tenantID,
@@ -124,12 +137,16 @@ func (uc *CreateAutomation) Execute(ctx context.Context, in CreateAutomationInpu
 		TriggerEvent:   in.TriggerEvent,
 		TriggerFilter:  in.TriggerFilter,
 	})
+=======
+	automation, err := domain.NewAutomation(uuid.NewString(), tenantID, in.Name, in.RRule, in.StepType, stepConfigForValidation, dtstart, timezone, true, now)
+>>>>>>> feat/team-rbac-implementation
 	if err != nil {
 		return domain.Automation{}, apperrors.New(apperrors.KindInvalidArgument, "AUTOMATION_INVALID", err.Error(), err)
 	}
 	automation.Actions = in.Actions
 	automation.MaxRunHistory = in.MaxRunHistory
 	automation.RunTimeoutSeconds = in.RunTimeoutSeconds
+<<<<<<< HEAD
 
 	// BR-AT-10/BR-AT-04 — reject a create that would introduce a cycle in
 	// the event-triggered automation graph. Only meaningful for
@@ -140,6 +157,8 @@ func (uc *CreateAutomation) Execute(ctx context.Context, in CreateAutomationInpu
 			return domain.Automation{}, err
 		}
 	}
+=======
+>>>>>>> feat/team-rbac-implementation
 
 	// Compute the FIRST next_run_at from rrule+dtstart so the scheduler has
 	// something to claim without waiting for a first manual RunNow. Anchored
