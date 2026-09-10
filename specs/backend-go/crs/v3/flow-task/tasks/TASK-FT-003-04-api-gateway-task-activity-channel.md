@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_task_activity.go` (new), `backend-go/services/api-gateway/internal/adapter/wscompat/channels_task_activity_test.go` (new), `backend-go/services/api-gateway/cmd/server/main.go` (registration)
 **Depends on:** TASK-FT-003-01, TASK-FT-003-02 (the 4 `orchestration.*` subjects), TASK-FT-003-03 (the 2 `workflow.step.*` subjects)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

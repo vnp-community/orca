@@ -93,7 +93,7 @@ func TestRepository_ExecutionPauseResumeRoundTrip(t *testing.T) {
 	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000002", tenantID, "release", `{"steps":[]}`, domain.ScopeTeam, "", "owner-1")
 	_ = repo.CreateTemplate(ctx, tmpl)
 
-	exec, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000001", tenantID, tmpl.ID, "trace-1", "")
+	exec, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000001", tenantID, tmpl.ID, "trace-1", "", "")
 	if err != nil {
 		t.Fatalf("building execution: %v", err)
 	}
@@ -358,7 +358,7 @@ func TestRepository_StepExecution_CreateAndUpdateRoundTrip(t *testing.T) {
 		t.Fatalf("create template: %v", err)
 	}
 
-	exec, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000003", tenantID, tmpl.ID, "trace-step", "")
+	exec, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000003", tenantID, tmpl.ID, "trace-step", "", "")
 	if err != nil {
 		t.Fatalf("building execution: %v", err)
 	}
@@ -375,7 +375,7 @@ func TestRepository_StepExecution_CreateAndUpdateRoundTrip(t *testing.T) {
 	}
 
 	se.MarkRunning()
-	if err := repo.UpdateStepExecution(ctx, se); err != nil {
+	if err := repo.UpdateStepExecution(ctx, se, domain.OutboxEvent{}); err != nil {
 		t.Fatalf("update (running) step execution: %v", err)
 	}
 
@@ -388,7 +388,7 @@ func TestRepository_StepExecution_CreateAndUpdateRoundTrip(t *testing.T) {
 	}
 
 	se.FromResult(domain.StepResult{Status: domain.ResultStatusCompleted, OutputJSON: `{"ok":true}`})
-	if err := repo.UpdateStepExecution(ctx, se); err != nil {
+	if err := repo.UpdateStepExecution(ctx, se, domain.OutboxEvent{}); err != nil {
 		t.Fatalf("update (completed) step execution: %v", err)
 	}
 
@@ -431,7 +431,7 @@ func TestRepository_ListRunning_ReturnsOnlyRunningAcrossTenants(t *testing.T) {
 	tmplB, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000006", tenantB, "t-b", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	_ = repo.CreateTemplate(ctx, tmplB)
 
-	running, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000005", tenantA, tmplA.ID, "trace-running", "")
+	running, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000005", tenantA, tmplA.ID, "trace-running", "", "")
 	if err != nil {
 		t.Fatalf("building running execution: %v", err)
 	}
@@ -439,7 +439,7 @@ func TestRepository_ListRunning_ReturnsOnlyRunningAcrossTenants(t *testing.T) {
 		t.Fatalf("create running execution: %v", err)
 	}
 
-	runningOtherTenant, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000006", tenantB, tmplB.ID, "trace-running-b", "")
+	runningOtherTenant, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000006", tenantB, tmplB.ID, "trace-running-b", "", "")
 	if err != nil {
 		t.Fatalf("building second running execution: %v", err)
 	}
@@ -447,7 +447,7 @@ func TestRepository_ListRunning_ReturnsOnlyRunningAcrossTenants(t *testing.T) {
 		t.Fatalf("create second running execution: %v", err)
 	}
 
-	paused, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000007", tenantA, tmplA.ID, "trace-paused", "")
+	paused, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000007", tenantA, tmplA.ID, "trace-paused", "", "")
 	if err != nil {
 		t.Fatalf("building paused execution: %v", err)
 	}
@@ -461,7 +461,7 @@ func TestRepository_ListRunning_ReturnsOnlyRunningAcrossTenants(t *testing.T) {
 		t.Fatalf("update (pause): %v", err)
 	}
 
-	completed, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000008", tenantA, tmplA.ID, "trace-completed", "")
+	completed, err := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000008", tenantA, tmplA.ID, "trace-completed", "", "")
 	if err != nil {
 		t.Fatalf("building completed execution: %v", err)
 	}
@@ -510,7 +510,7 @@ func TestRepository_ListStepExecutions_ScopedByTenant(t *testing.T) {
 
 	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000004", tenantA, "t", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	_ = repo.CreateTemplate(ctx, tmpl)
-	exec, _ := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000004", tenantA, tmpl.ID, "trace", "")
+	exec, _ := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000004", tenantA, tmpl.ID, "trace", "", "")
 	_ = repo.CreateExecution(ctx, exec)
 	se, _ := domain.NewStepExecution("eeeeeeee-0000-0000-0000-000000000002", exec.ID, "a", "ffffffff-0000-0000-0000-000000000002", 0)
 	if err := repo.CreateStepExecution(ctx, se); err != nil {
@@ -541,9 +541,9 @@ func TestRepository_UpdateExecution_WithEvent_WritesOutboxRowInSameTransaction(t
 	ctx := context.Background()
 	tenantID := "11111111-1111-1111-1111-111111111111"
 
-	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000005", tenantID, "t", `{"steps":[]}`, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000005", tenantID, "t", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	_ = repo.CreateTemplate(ctx, tmpl)
-	exec, _ := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000005", tenantID, tmpl.ID, "trace", "")
+	exec, _ := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000005", tenantID, tmpl.ID, "trace", "", "")
 	if err := repo.CreateExecution(ctx, exec); err != nil {
 		t.Fatalf("create execution: %v", err)
 	}
@@ -584,9 +584,9 @@ func TestRepository_UpdateExecution_NilEvent_WritesNoOutboxRow(t *testing.T) {
 	ctx := context.Background()
 	tenantID := "11111111-1111-1111-1111-111111111112"
 
-	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000006", tenantID, "t", `{"steps":[]}`, domain.ScopePersonal, "")
+	tmpl, _ := domain.NewWorkflowTemplate("cccccccc-0000-0000-0000-000000000006", tenantID, "t", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
 	_ = repo.CreateTemplate(ctx, tmpl)
-	exec, _ := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000006", tenantID, tmpl.ID, "trace", "")
+	exec, _ := domain.NewWorkflowExecution("dddddddd-0000-0000-0000-000000000006", tenantID, tmpl.ID, "trace", "", "")
 	if err := repo.CreateExecution(ctx, exec); err != nil {
 		t.Fatalf("create execution: %v", err)
 	}

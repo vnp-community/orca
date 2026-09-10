@@ -56,6 +56,10 @@ export type OrcaTask = {
   aiContext?: string
   /** Template string with ${task.*} interpolation for agent prompt */
   promptTemplate?: string
+  /** Set khi user "Attach Workflow Template" (FE-TASK-002). Backend hiện CHƯA
+   * lưu/trả field này (CR-FLOW-TASK-002 chưa triển khai) — luôn `undefined` sau
+   * khi load lại task cho tới khi backend field tồn tại. */
+  workflowTemplateId?: string
   dueDate?: Date
   createdAt: Date
   updatedAt: Date
@@ -133,9 +137,12 @@ export const TASK_STATUS_PROGRESS: Readonly<Record<TaskStatus, number>> = {
   cancelled: 0
 } as const
 
-/** Alias for TaskPermission — used by TaskGrantService API (TDD-18) */
-export type TaskGrantLevel = TaskPermission
+// Grantee-kind scale thật của backend-go's `GrantLevel` (task.proto:92-99) — KHÁC
+// TaskPermission (action scale) ở trên. TaskPermission tài liệu hoá ý định thiết kế
+// ban đầu (BL-TG-03) chưa từng được backend-go hiện thực; dùng TaskGrantLevel khi gọi
+// task.grant/resolvePermission, KHÔNG dùng TaskPermission cho việc đó (BUG-TASKV1-003).
+export type TaskGrantLevel = 'owner' | 'admin' | 'user' | 'team' | 'company'
 
-/** Real GrantLevel scale matching backend taskv1.GrantLevel (BE-SOL-003's correction —
- * NOT TaskPermission's view/comment/edit/execute/manage, which has no backend counterpart). */
-export type RealGrantLevel = 'owner' | 'admin' | 'user' | 'team' | 'company'
+/** Alias for TaskGrantLevel — matches backend taskv1.GrantLevel (BE-SOL-003). Kept for
+ * TaskGrantModal/useTaskGrants call sites that predate the TaskGrantLevel fix above. */
+export type RealGrantLevel = TaskGrantLevel

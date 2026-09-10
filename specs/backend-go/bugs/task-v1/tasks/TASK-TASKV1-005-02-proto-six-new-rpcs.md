@@ -5,7 +5,7 @@
 **Service:** `orchestration-service` (proto only — no handler implementation in this task)
 **File:** `backend-go/proto/orca/orchestration/v1/orchestration.proto`
 **Depends on:** none (proto-only; can land in parallel with TASK-01, both are prerequisites for TASK-03..10)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

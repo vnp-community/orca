@@ -5,7 +5,7 @@
 **Service:** `orchestration-service` (outbound adapters — `infra-fleet-service` and `task-service` clients)
 **File:** `backend-go/services/orchestration-service/internal/adapter/infrafleetclient/worker_dispatcher.go` (new package + file), `backend-go/services/orchestration-service/internal/adapter/taskserviceclient/reporter.go` (new package + file)
 **Depends on:** TASK-TASKV1-005-04 (`WorkerDispatcher`/`TaskServiceReporter` ports)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE — WorkerDispatcher DONE; TaskServiceReporter client DONE. Update: the server-side stub gap this line originally flagged was closed by `TASK-FT-002-04` (task-service's real `ReportTaskExecutionResult` usecase, superseding `TASK-TG-04-05` per the flow-task conflict-resolution decision) — confirmed live: `internal/adapter/grpc/server.go`'s `ReportTaskExecutionResult` handler is a real implementation, not falling through to `UnimplementedTaskServiceServer`.
 
 ---
 

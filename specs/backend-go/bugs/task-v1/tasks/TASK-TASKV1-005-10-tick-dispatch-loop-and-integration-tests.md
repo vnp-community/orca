@@ -5,7 +5,7 @@
 **Service:** `orchestration-service` (`internal/usecase`, `cmd/server`)
 **File:** `backend-go/services/orchestration-service/internal/usecase/tick_dispatch.go` (new), `backend-go/services/orchestration-service/cmd/server/main.go` (extend)
 **Depends on:** TASK-TASKV1-005-05 (`ListReadyUnclaimed`/`ClaimReady`/`ListUnreportedTerminal`), TASK-TASKV1-005-06 (`CreateDispatchContext` reused), TASK-TASKV1-005-07 (`FailDispatch` reused), TASK-TASKV1-005-08 (`WorkerDispatcher`/`TaskServiceReporter`), TASK-TASKV1-005-09 (main.go wiring this extends)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

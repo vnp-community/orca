@@ -38,11 +38,26 @@ type TaskRepository interface {
 	// bounds the walk (task-service.md §8's max-depth guard) — 0 means the
 	// repository's own default cap.
 	GetAncestors(ctx context.Context, tenantID, id string, maxDepth int) ([]domain.Task, error)
-	// UpdateStatus persists a task's status transition. Currently only ever
-	// called to set StatusInProgress on dispatch (see ExecuteTask) — there is
-	// no RPC surface yet to transition a task back out of in_progress. See
-	// this service's README "Known gaps".
+	// UpdateStatus persists a task's status transition. Called both to set
+	// StatusInProgress on dispatch and, on a failed dispatch, to revert back
+	// to the task's pre-dispatch status (see ExecuteTask) — the compensating
+	// write that closes the "status never reverts" bug SOL-TG-04 fixes.
 	UpdateStatus(ctx context.Context, tenantID, id, status string) error
+	// UpdateWorktreeID persists the worktree ExecuteTask's WorktreeProvisioner
+	// just created for a task that didn't already have one — see
+	// WorktreeProvisioner's doc comment (SOL-TG-04).
+	UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error
+	// SetActiveExecutionLink persists domain.Task.ActiveExecutionLinkID — see
+	// that field's doc comment (TASK-FT-002-04). Called by ExecuteTask right
+	// after a new execution_links row is created, for every engine.
+	SetActiveExecutionLink(ctx context.Context, tenantID, taskID, linkID string) error
+	// CompleteExecution is the simple path's terminal write: sets status,
+	// actual_hours, and clears agent_session_id in one statement — the fix
+	// for task-service having no execution-completion path at all (see
+	// ExecuteTask's doc comment). The complex path's equivalent write lands
+	// later via TASK-TG-04-05's ReportTaskExecutionResult, reusing this same
+	// method.
+	CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error
 	// HasActiveExecutions reports whether tenantID/projectID has any task
 	// currently in_progress — see usecase.HasActiveExecutions's doc comment
 	// for the one-way-transition caveat this answer is subject to today.
@@ -66,9 +81,6 @@ type TaskRepository interface {
 	// with ON DELETE CASCADE (migrations/0001_init.up.sql) — no explicit
 	// edge/grant cleanup needed.
 	Delete(ctx context.Context, tenantID, id string) error
-	// UpdateWorktreeID persists the provisioned worktree a task's execution
-	// is running in — see SOL-TG-04.
-	UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error
 	// UpdateActiveExecutionID persists the complex path's coordinator_run
 	// id (TASK-TG-04-04/05) — read back by ReportTaskExecutionResult to
 	// reject a stale/duplicate completion callback.
@@ -97,11 +109,6 @@ type TaskRepository interface {
 	// BatchUpdateProgress persists every (taskID -> progress_percent) pair
 	// in one call — task-service.md §8's N+1 guard.
 	BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error
-	// CompleteExecution is the simple path's (TASK-TG-04-03) and, via
-	// TASK-TG-04-05's ReportTaskExecutionResult, the complex path's terminal
-	// write: sets status, actual_hours, and clears agent_session_id in one
-	// statement.
-	CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error
 }
 
 // SubtreeProgressNode is one GetSubtreeWithChildPercents result row: the
@@ -232,18 +239,52 @@ type SimpleExecutor interface {
 	Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (executionRef string, err error)
 }
 
+// AgentExecOutputChunk mirrors infrafleetv1.AgentExecOutputEvent — kept as
+// its own type so this package doesn't import generated protobuf code, per
+// architecture/03's port-isolation convention (ports.go stays
+// transport-agnostic; internal/adapter/grpcclient does the proto
+// translation).
+type AgentExecOutputChunk struct {
+	Stream string // "stdout" | "stderr"
+	Data   string
+}
+
+// AgentExecOutputStreamer streams stepID's mid-run agent.execPrompt output
+// from infra-fleet-service's StreamExecOutput RPC (TASK-AG-FLOWTASK-002) —
+// SimpleExecutor's dependency for TASK-AG-FLOWTASK-003's throttled
+// republish onto task.activity. The returned channel closes once ctx is
+// cancelled or the underlying stream ends (EOF, a transport error, or a
+// resolve failure such as an unknown connectionId) — there is no separate
+// error return: a streaming failure is never fatal to SimpleExecutor.Execute
+// (whose real completion source of truth is its own unary Relay call), it
+// just means no partial-progress events get published for this run.
+type AgentExecOutputStreamer interface {
+	StreamExecOutput(ctx context.Context, connectionID, stepID string) <-chan AgentExecOutputChunk
+}
+
 // ComplexExecutor relays Execute's complex-path dispatch to
 // orchestration-service's coordinator, per task-service.md §3.1.
 //
-// STUB in this scaffold: internal/adapter/grpcclient's implementation
-// returns a fixed placeholder execution ref without calling
-// orchestration-service — see this service's README.
+// Real as of the BE-SOL-002 integration addendum:
+// internal/adapter/grpcclient.ComplexExecutor builds a spec_json DAG from
+// the task's parent_child subtree (in-process, via TaskRepository/
+// EdgeRepository — see that type's doc comment for the exact, simplified
+// shape) and calls orchestration-service's real StartCoordinatorRun RPC
+// (TASK-TASKV1-005-05).
 type ComplexExecutor interface {
 	// worktreeID is resolved by ExecuteTask's own worktree reuse-or-create
 	// step (TASK-TG-04-02/03) before dispatch — threaded through so
 	// orchestration-service's coordinator_run knows which worktree its
 	// dispatched work runs in.
 	Execute(ctx context.Context, tenantID, taskID, requestID, worktreeID string) (executionRef string, err error)
+}
+
+// WorkflowExecutor relays Execute's Engine 3 dispatch to workflow-service's
+// Execute RPC, per CR-FLOW-TASK-002/BE-SOL-002. Same port shape as
+// SimpleExecutor/ComplexExecutor — a distinct port, not a variant of
+// either.
+type WorkflowExecutor interface {
+	Execute(ctx context.Context, tenantID, taskID, requestID, workflowTemplateID string) (executionRef string, err error)
 }
 
 // ProjectExecutionResolver resolves a project's execution target
@@ -282,9 +323,15 @@ type ProjectExecutionResolver interface {
 
 // WorktreeProvisioner implements Execute's "reuse or create" worktree step
 // (SOL-TG-04) — a task with an existing WorktreeID reuses it; otherwise a
-// new one is created via git-gateway-service's existing CreateWorktree
-// saga.
+// new one is created via git-gateway-service's existing CreateWorktree saga.
+// Implemented by internal/adapter/grpcclient against git-gateway-service's
+// CreateWorktree RPC, not a re-implementation of that saga.
 type WorktreeProvisioner interface {
+	// EnsureWorktree returns the worktree to execute task against. path is
+	// only populated on the create branch — see the create-branch/reuse split
+	// note on internal/adapter/grpcclient.WorktreeProvisioner.EnsureWorktree;
+	// callers resolve the reuse-branch path separately via
+	// ProjectExecutionResolver, same as today.
 	EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (worktreeID, path string, err error)
 }
 
@@ -360,4 +407,62 @@ type ProjectContextResolver interface {
 type ProjectContext struct {
 	ProjectID, ProjectName, Description     string
 	RepoURL, DevServerID, DevServerHostname string
+}
+
+// ExecutionLinkRepository is the persistence port for
+// task.execution_links (BE-SOL-001/CR-FLOW-TASK-001) — one row per
+// ExecuteTask dispatch, across all three engines, giving CR-FLOW-TASK-003's
+// Activity Feed a history row even for the synchronous Engine 1 path.
+type ExecutionLinkRepository interface {
+	// CreateExecutionLink inserts a new execution_links row for
+	// tenantID/taskID/engine. externalRefID may be empty at creation time
+	// (Engine 1 has none; the async engines' ref is only known after
+	// dispatch succeeds — see SetExternalRef below). Named
+	// CreateExecutionLink, not Create, because *postgres.Repository already
+	// has a Create method for TaskRepository with a different signature —
+	// one struct implementing both ports needs distinct method names here.
+	CreateExecutionLink(ctx context.Context, tenantID, taskID string, engine domain.ExecutionEngine, externalRefID string) (domain.ExecutionLink, error)
+	// SetExternalRef backfills external_ref_id once a dispatch returns its
+	// coordinator_run_id / workflow execution id — called after Create,
+	// before Complete.
+	SetExternalRef(ctx context.Context, tenantID, linkID, externalRefID string) error
+	// GetExecutionLink returns one execution_links row by id — used by
+	// ReportTaskExecutionResult (TASK-FT-002-04) to load the task's active
+	// link and validate an inbound callback against it. Named
+	// GetExecutionLink, not Get, for the same reason CreateExecutionLink
+	// isn't named Create — one struct implements both this port and
+	// TaskRepository, which already has its own Get.
+	GetExecutionLink(ctx context.Context, tenantID, id string) (domain.ExecutionLink, error)
+	// Complete marks a link's status_mirror/completed_at terminal —
+	// "completed" or "failed". For Engine 1 this reflects the synchronous
+	// dispatch result immediately; for Engine 2/3, BE-SOL-003's consumer
+	// later updates status_mirror again as real terminal events arrive —
+	// Complete here only marks task-service's own initial bookkeeping, it
+	// does not have to be the last word for async engines.
+	Complete(ctx context.Context, tenantID, linkID, statusMirror string) error
+	// UpdateStatusMirror updates the execution_links row whose
+	// external_ref_id matches externalRefID — a no-op (not an error) if no
+	// such row exists, per MirrorExecutionStatus's idempotence contract
+	// (BE-SOL-003/TASK-FT-003-05): this consumer's cross-service ref is one
+	// task-service does NOT own the lifecycle of (unlike SetExternalRef/
+	// Complete, which target a known link.ID this service just created), so
+	// a stale/duplicate/unrelated ref is a legitimate no-op.
+	UpdateStatusMirror(ctx context.Context, tenantID, externalRefID, newStatus string) error
+}
+
+// OutboxWriter is the persistence port for task.outbox_events
+// (TASK-AG-FLOWTASK-003) — task-service's first published event family:
+// orca.task.agent_output_partial, Engine 1's throttled mid-run output.
+// Deliberately a narrow, standalone insert (not the shared-transaction
+// enqueue orchestration-service's outbox write is, see
+// postgres.Repository.InsertOutboxEvent's doc comment for why) — the row's
+// own common/outbox.Store half (FetchUnpublished/MarkPublished) is
+// implemented directly against *postgres.Repository, not exposed through
+// this usecase-facing port, mirroring every other service's outbox wiring
+// (only cmd/server/main.go's relay construction touches that half).
+type OutboxWriter interface {
+	// InsertOutboxEvent durably enqueues one row for the outbox relay to
+	// publish. id must be a fresh, caller-generated UUID (this port does
+	// not generate one); payload is already JSON-encoded.
+	InsertOutboxEvent(ctx context.Context, id, tenantID, subject string, payload []byte) error
 }

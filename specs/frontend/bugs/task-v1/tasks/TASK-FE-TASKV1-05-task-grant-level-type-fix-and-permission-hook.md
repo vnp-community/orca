@@ -4,7 +4,7 @@
 **Bug:** [BUG-FE-TASKV1-003](../BUG-FE-TASKV1-003-access-control-va-share-link-khong-dung.md)
 **File:** `frontend/src/shared/task-types.ts`, `frontend/src/renderer/src/hooks/useTaskPermission.ts` (mới)
 **Estimated:** 45 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 **Phụ thuộc:** Không (đứng trước [TASK-FE-TASKV1-06](./TASK-FE-TASKV1-06-task-access-panel-and-execute-gate.md), task đó cần type + hook này)
 
 ---
@@ -117,8 +117,8 @@ pnpm --filter frontend test -- useTaskPermission
 
 ## Definition of Done
 
-- [ ] `TaskGrantLevel` ở `task-types.ts` đổi thành `'owner' | 'admin' | 'user' | 'team' | 'company'`, không còn alias `TaskPermission`
-- [ ] `useTaskPermission.ts` mới, dùng `useAppStore(s => s.currentUser?.id)` pattern đúng (không dùng `currentUserId` không tồn tại)
-- [ ] `isSupported` hạ xuống `false` khi RPC lỗi (feature-detect, không hard-code)
-- [ ] Test mới: mock RPC thành công → parse đúng `level`; mock RPC lỗi (404/method not found) → `isSupported === false`
-- [ ] `pnpm tsc --noEmit` sạch
+- [x] `TaskGrantLevel` ở `task-types.ts` đổi thành `'owner' | 'admin' | 'user' | 'team' | 'company'`, không còn alias `TaskPermission`
+- [x] `useTaskPermission.ts` mới, dùng `useAppStore(s => s.currentUser?.id)` pattern đúng (không dùng `currentUserId` không tồn tại)
+- [x] `isSupported` hạ xuống `false` khi RPC lỗi (feature-detect, không hard-code)
+- [x] Test mới: mock RPC thành công → parse đúng `level`; mock RPC lỗi (404/method not found) → `isSupported === false`
+- [x] `pnpm tsc --noEmit` sạch

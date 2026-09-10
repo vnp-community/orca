@@ -5,7 +5,7 @@
 **Service:** `orchestration-service` (schema only)
 **File:** `backend-go/services/orchestration-service/migrations/0004_coordinator_run_lifecycle.up.sql`, `.down.sql` (new)
 **Depends on:** none — first task in this breakdown, everything else reads/writes these columns
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

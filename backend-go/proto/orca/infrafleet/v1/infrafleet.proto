@@ -14,14 +14,6 @@ service InfraFleetService {
   rpc RegisterDevServer(RegisterDevServerRequest) returns (RegisterDevServerResponse);
   rpc ResolveConnection(ResolveConnectionRequest) returns (ResolveConnectionResponse);
   rpc CreateSshTarget(CreateSshTargetRequest) returns (CreateSshTargetResponse);
-  // BulkProvisionFleet fans out CreateSshTarget+RegisterDevServer over every
-  // server in a FleetSpec (CR-FLEET-001) — server-streaming so the caller
-  // gets a BulkProvisionFleetEvent per server as it completes, mirroring
-  // StreamVmProvision's "N steps, want progress" convention. No tenant_id
-  // field on the request — see ListDevServersRequest's doc comment for the
-  // same convention: tenantID always comes from tenant.RequireTenantID(ctx),
-  // never a caller-supplied field.
-  rpc BulkProvisionFleet(BulkProvisionFleetRequest) returns (stream BulkProvisionFleetEvent);
   // ApplyTerraformPlan runs `terraform apply` on a registered control dev
   // server via its agent (CR-FLEET-002 §"Hướng A") and streams back its
   // outcome — server-streaming to mirror StreamVmProvision's convention,
@@ -111,6 +103,20 @@ service InfraFleetService {
   // AttachScreencast, there's no interactive input to send once watching
   // starts; the caller ends the subscription by canceling this call's ctx).
   rpc StreamFileChanges(StreamFileChangesRequest) returns (stream FileChangeEvent);
+  // StreamExecOutput is Relay's server-streaming counterpart for
+  // agent.execPrompt.output (TASK-AG-FLOWTASK-002/003) — subscribes to an
+  // in-flight agent.execPrompt run's stdout/stderr chunks, keyed by the
+  // same stepId the caller passed to Relay's own agent.execPrompt call.
+  // task-service's SimpleExecutor is the one caller: it calls Relay
+  // (unary, blocks until the CLI exits) AND this RPC concurrently, over
+  // the same connectionId/stepId pair — this RPC never issues
+  // agent.execPrompt itself, it only observes a run someone else started.
+  // Ends when the caller cancels ctx (e.g. once Relay's call returns) or
+  // the underlying session's subscription is torn down; carries no
+  // terminal/exit event of its own (see usecase.ExecOutputEvent's doc
+  // comment) — the owning Relay call's response is still the source of
+  // truth for exitCode/timedOut.
+  rpc StreamExecOutput(StreamExecOutputRequest) returns (stream AgentExecOutputEvent);
   // IsDevServerConnected answers "does this dev server have a live agent
   // session right now" — cheap, side-effect-free (never dials). Replaces
   // the hardcoded "disconnected" wscompat's devServer.list/listForUser used
@@ -816,6 +822,23 @@ message RelayStreamFrame {
   string frame_json = 1;
 }
 
+message StreamExecOutputRequest {
+  string connection_id = 1;
+  // step_id must match the stepId the caller sent Relay's own
+  // agent.execPrompt call in — this RPC does not validate that match
+  // itself (it has no visibility into a concurrent Relay call), the
+  // caller owns keeping them consistent.
+  string step_id = 2;
+}
+
+// AgentExecOutputEvent is one stdout/stderr chunk from an in-flight
+// agent.execPrompt run — mirrors usecase.ExecOutputEvent 1:1.
+message AgentExecOutputEvent {
+  string step_id = 1;
+  string stream = 2; // "stdout" | "stderr"
+  string data = 3;
+}
+
 message RelayByDevServerRequest {
   string dev_server_id = 1;
   string method = 2;
@@ -882,11 +905,6 @@ message FleetSpecServerProto {
   // field type verified in server.go before writing this proto; task's
   // original sketch of a plain string was wrong).
   AgentKind kind = 4;
-}
-
-message BulkProvisionFleetRequest {
-  repeated FleetSpecServerProto servers = 1;
-  int32 concurrency = 2; // 0 = use usecase default (5)
 }
 
 message BulkProvisionFleetEvent {

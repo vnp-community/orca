@@ -39,6 +39,7 @@ import (
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serverresolver"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/serviceclients"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/stepexecutors"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/taskclient"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
@@ -47,6 +48,7 @@ import (
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
+	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 )
@@ -137,6 +139,17 @@ func run() error {
 	defer func() { _ = authConn.Close() }()
 	authClient := authv1.NewAuthServiceClient(authConn)
 
+	// task-service dial — TaskClient's Engine 3 completion callback
+	// (BE-SOL-002/TASK-FT-002-05). Reuses infrafleetclient.Dial (this
+	// service's existing shared insecure-dial helper) rather than
+	// duplicating the boilerplate a third way.
+	taskConn, err := infrafleetclient.Dial(cfg.TaskServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing task-service: %w", err)
+	}
+	defer func() { _ = taskConn.Close() }()
+	taskClient := taskclient.New(taskv1.NewTaskServiceClient(taskConn))
+
 	profileResolver := infrafleetclient.NewProfileResolver(tenantClient)
 	projectContextResolver := infrafleetclient.NewProjectContextResolver(projectClient)
 	// ServerResolver turns a step's Target string into a connectionId —
@@ -196,7 +209,7 @@ func run() error {
 	registry.Register(domain.StepTypeCleanupWorktrees, usecase.NewCleanupWorktreesStepExecutor(cleanupProjectClient, gitGatewayClient, cleanupAuditClient))
 
 	createTemplateUC := usecase.NewCreateTemplate(repo)
-	executeUC := usecase.NewExecute(repo, repo, repo, registry)
+	executeUC := usecase.NewExecute(repo, repo, repo, registry, taskClient)
 	getExecutionUC := usecase.NewGetExecution(repo)
 	pauseExecutionUC := usecase.NewPauseExecution(repo)
 	resumeExecutionUC := usecase.NewResumeExecution(repo)
@@ -214,7 +227,7 @@ func run() error {
 	rateTemplateUC := usecase.NewRateTemplate(repo)
 	previewSharedTemplateUC := usecase.NewPreviewSharedTemplate(repo)
 	importSharedTemplateUC := usecase.NewImportSharedTemplate(repo, resolveTemplateUC)
-	recoverExecutionsUC := usecase.NewRecoverExecutions(repo, repo, repo, registry)
+	recoverExecutionsUC := usecase.NewRecoverExecutions(repo, repo, repo, registry, taskClient)
 
 	// Boot-time recovery scan (workflow-service.md §8: "before accepting
 	// new Execute calls"), run every time this process boots, not gated
@@ -244,11 +257,13 @@ func run() error {
 		return pool.Ping(ctx)
 	})
 
-	// Transactional-outbox relay (SOL-PW-04, TASK-PW-04-06): Execute's
-	// runToCompletion/RecoverExecutions' finish durably enqueue an outbox
-	// row in the SAME Postgres transaction as the execution's terminal
-	// status write (internal/adapter/postgres.Repository.UpdateExecution)
-	// — this relay is what actually gets those rows to NATS. Matches
+	// Transactional-outbox relay (SOL-PW-04/TASK-PW-04-06, extended by
+	// BE-SOL-003/TASK-FT-003-03 for step-level events): Execute's
+	// runToCompletion/RecoverExecutions' finish (execution-level) and
+	// waveDispatcher.dispatchStep (step-level) all durably enqueue an
+	// outbox row in the SAME Postgres transaction as the write they
+	// describe (internal/adapter/postgres.Repository.UpdateExecution /
+	// UpdateStepExecution) — this ONE relay drains both into NATS. Matches
 	// usage-service's/task-service's identical graceful-degradation
 	// posture: NATS unavailable at startup does not fail service startup,
 	// outbox rows queue durably in Postgres and drain on a future restart
@@ -263,7 +278,8 @@ func run() error {
 		// ALREADY-WIRED SubjectBinding{StreamName: "WORKFLOW", ...} —
 		// verified present in
 		// services/notification-service/internal/adapter/eventbus/consumer.go
-		// before picking this name; do not rename it.
+		// before picking this name; do not rename it. Also covers
+		// step-level subjects (orca.workflow.step.*) — no second stream.
 		if err := pub.EnsureStream(ctx, "WORKFLOW", []string{"orca.workflow.>"}); err != nil {
 			logger.WarnContext(ctx, "failed to ensure WORKFLOW stream", slog.Any("error", err))
 		} else {

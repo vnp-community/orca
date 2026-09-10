@@ -89,118 +89,6 @@ func (x *OrchestrationTaskSpec) GetDeps() []string {
 	return nil
 }
 
-type StartCoordinatorRunRequest struct {
-	state         protoimpl.MessageState   `protogen:"open.v1"`
-	TenantId      string                   `protobuf:"bytes,1,opt,name=tenant_id,json=tenantId,proto3" json:"tenant_id,omitempty"`
-	OriginTaskId  string                   `protobuf:"bytes,2,opt,name=origin_task_id,json=originTaskId,proto3" json:"origin_task_id,omitempty"` // task-service's root Task.ID for this dispatch
-	WorktreeId    string                   `protobuf:"bytes,3,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
-	Tasks         []*OrchestrationTaskSpec `protobuf:"bytes,4,rep,name=tasks,proto3" json:"tasks,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *StartCoordinatorRunRequest) Reset() {
-	*x = StartCoordinatorRunRequest{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[1]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *StartCoordinatorRunRequest) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*StartCoordinatorRunRequest) ProtoMessage() {}
-
-func (x *StartCoordinatorRunRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[1]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use StartCoordinatorRunRequest.ProtoReflect.Descriptor instead.
-func (*StartCoordinatorRunRequest) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *StartCoordinatorRunRequest) GetTenantId() string {
-	if x != nil {
-		return x.TenantId
-	}
-	return ""
-}
-
-func (x *StartCoordinatorRunRequest) GetOriginTaskId() string {
-	if x != nil {
-		return x.OriginTaskId
-	}
-	return ""
-}
-
-func (x *StartCoordinatorRunRequest) GetWorktreeId() string {
-	if x != nil {
-		return x.WorktreeId
-	}
-	return ""
-}
-
-func (x *StartCoordinatorRunRequest) GetTasks() []*OrchestrationTaskSpec {
-	if x != nil {
-		return x.Tasks
-	}
-	return nil
-}
-
-type StartCoordinatorRunResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"` // the new coordinator_run's id — task-service's "logical FK" (active_execution_id)
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
-}
-
-func (x *StartCoordinatorRunResponse) Reset() {
-	*x = StartCoordinatorRunResponse{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[2]
-	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-	ms.StoreMessageInfo(mi)
-}
-
-func (x *StartCoordinatorRunResponse) String() string {
-	return protoimpl.X.MessageStringOf(x)
-}
-
-func (*StartCoordinatorRunResponse) ProtoMessage() {}
-
-func (x *StartCoordinatorRunResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[2]
-	if x != nil {
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		if ms.LoadMessageInfo() == nil {
-			ms.StoreMessageInfo(mi)
-		}
-		return ms
-	}
-	return mi.MessageOf(x)
-}
-
-// Deprecated: Use StartCoordinatorRunResponse.ProtoReflect.Descriptor instead.
-func (*StartCoordinatorRunResponse) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{2}
-}
-
-func (x *StartCoordinatorRunResponse) GetId() string {
-	if x != nil {
-		return x.Id
-	}
-	return ""
-}
-
 type DispatchContext struct {
 	state            protoimpl.MessageState `protogen:"open.v1"`
 	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
@@ -229,7 +117,7 @@ type DispatchContext struct {
 
 func (x *DispatchContext) Reset() {
 	*x = DispatchContext{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[3]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -241,7 +129,7 @@ func (x *DispatchContext) String() string {
 func (*DispatchContext) ProtoMessage() {}
 
 func (x *DispatchContext) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[3]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -254,7 +142,7 @@ func (x *DispatchContext) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DispatchContext.ProtoReflect.Descriptor instead.
 func (*DispatchContext) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{3}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{1}
 }
 
 func (x *DispatchContext) GetId() string {
@@ -342,7 +230,7 @@ type CreateDispatchContextRequest struct {
 
 func (x *CreateDispatchContextRequest) Reset() {
 	*x = CreateDispatchContextRequest{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[4]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -354,7 +242,7 @@ func (x *CreateDispatchContextRequest) String() string {
 func (*CreateDispatchContextRequest) ProtoMessage() {}
 
 func (x *CreateDispatchContextRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[4]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -367,7 +255,7 @@ func (x *CreateDispatchContextRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDispatchContextRequest.ProtoReflect.Descriptor instead.
 func (*CreateDispatchContextRequest) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{4}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *CreateDispatchContextRequest) GetHandle() string {
@@ -407,7 +295,7 @@ type CreateDispatchContextResponse struct {
 
 func (x *CreateDispatchContextResponse) Reset() {
 	*x = CreateDispatchContextResponse{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[5]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -419,7 +307,7 @@ func (x *CreateDispatchContextResponse) String() string {
 func (*CreateDispatchContextResponse) ProtoMessage() {}
 
 func (x *CreateDispatchContextResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[5]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -432,7 +320,7 @@ func (x *CreateDispatchContextResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateDispatchContextResponse.ProtoReflect.Descriptor instead.
 func (*CreateDispatchContextResponse) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{5}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *CreateDispatchContextResponse) GetContext() *DispatchContext {
@@ -459,7 +347,7 @@ type DecisionGate struct {
 
 func (x *DecisionGate) Reset() {
 	*x = DecisionGate{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[6]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -471,7 +359,7 @@ func (x *DecisionGate) String() string {
 func (*DecisionGate) ProtoMessage() {}
 
 func (x *DecisionGate) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[6]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -484,7 +372,7 @@ func (x *DecisionGate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use DecisionGate.ProtoReflect.Descriptor instead.
 func (*DecisionGate) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{6}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *DecisionGate) GetId() string {
@@ -543,7 +431,7 @@ type CreateGateRequest struct {
 
 func (x *CreateGateRequest) Reset() {
 	*x = CreateGateRequest{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[7]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -555,7 +443,7 @@ func (x *CreateGateRequest) String() string {
 func (*CreateGateRequest) ProtoMessage() {}
 
 func (x *CreateGateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[7]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -568,7 +456,7 @@ func (x *CreateGateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateGateRequest.ProtoReflect.Descriptor instead.
 func (*CreateGateRequest) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{7}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CreateGateRequest) GetDispatchContextId() string {
@@ -608,7 +496,7 @@ type CreateGateResponse struct {
 
 func (x *CreateGateResponse) Reset() {
 	*x = CreateGateResponse{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[8]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -620,7 +508,7 @@ func (x *CreateGateResponse) String() string {
 func (*CreateGateResponse) ProtoMessage() {}
 
 func (x *CreateGateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[8]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -633,7 +521,7 @@ func (x *CreateGateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CreateGateResponse.ProtoReflect.Descriptor instead.
 func (*CreateGateResponse) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{8}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *CreateGateResponse) GetGate() *DecisionGate {
@@ -653,7 +541,7 @@ type ResolveGateRequest struct {
 
 func (x *ResolveGateRequest) Reset() {
 	*x = ResolveGateRequest{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[9]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[7]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -665,7 +553,7 @@ func (x *ResolveGateRequest) String() string {
 func (*ResolveGateRequest) ProtoMessage() {}
 
 func (x *ResolveGateRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[9]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[7]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -678,7 +566,7 @@ func (x *ResolveGateRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveGateRequest.ProtoReflect.Descriptor instead.
 func (*ResolveGateRequest) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{9}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{7}
 }
 
 func (x *ResolveGateRequest) GetGateId() string {
@@ -704,7 +592,7 @@ type ResolveGateResponse struct {
 
 func (x *ResolveGateResponse) Reset() {
 	*x = ResolveGateResponse{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[10]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[8]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -716,7 +604,7 @@ func (x *ResolveGateResponse) String() string {
 func (*ResolveGateResponse) ProtoMessage() {}
 
 func (x *ResolveGateResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[10]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[8]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -729,7 +617,7 @@ func (x *ResolveGateResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveGateResponse.ProtoReflect.Descriptor instead.
 func (*ResolveGateResponse) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{10}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{8}
 }
 
 func (x *ResolveGateResponse) GetGate() *DecisionGate {
@@ -749,7 +637,7 @@ type UpdateTaskStatusAndPromoteRequest struct {
 
 func (x *UpdateTaskStatusAndPromoteRequest) Reset() {
 	*x = UpdateTaskStatusAndPromoteRequest{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[11]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[9]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -761,7 +649,7 @@ func (x *UpdateTaskStatusAndPromoteRequest) String() string {
 func (*UpdateTaskStatusAndPromoteRequest) ProtoMessage() {}
 
 func (x *UpdateTaskStatusAndPromoteRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[11]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[9]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -774,7 +662,7 @@ func (x *UpdateTaskStatusAndPromoteRequest) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use UpdateTaskStatusAndPromoteRequest.ProtoReflect.Descriptor instead.
 func (*UpdateTaskStatusAndPromoteRequest) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{11}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{9}
 }
 
 func (x *UpdateTaskStatusAndPromoteRequest) GetOrchestrationTaskId() string {
@@ -800,7 +688,7 @@ type UpdateTaskStatusAndPromoteResponse struct {
 
 func (x *UpdateTaskStatusAndPromoteResponse) Reset() {
 	*x = UpdateTaskStatusAndPromoteResponse{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[12]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[10]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -812,7 +700,7 @@ func (x *UpdateTaskStatusAndPromoteResponse) String() string {
 func (*UpdateTaskStatusAndPromoteResponse) ProtoMessage() {}
 
 func (x *UpdateTaskStatusAndPromoteResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[12]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[10]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -825,7 +713,7 @@ func (x *UpdateTaskStatusAndPromoteResponse) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use UpdateTaskStatusAndPromoteResponse.ProtoReflect.Descriptor instead.
 func (*UpdateTaskStatusAndPromoteResponse) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{12}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{10}
 }
 
 func (x *UpdateTaskStatusAndPromoteResponse) GetPromotedTaskIds() []string {
@@ -844,7 +732,7 @@ type GetDispatchContextForTaskRequest struct {
 
 func (x *GetDispatchContextForTaskRequest) Reset() {
 	*x = GetDispatchContextForTaskRequest{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[13]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[11]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -856,7 +744,7 @@ func (x *GetDispatchContextForTaskRequest) String() string {
 func (*GetDispatchContextForTaskRequest) ProtoMessage() {}
 
 func (x *GetDispatchContextForTaskRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[13]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[11]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -869,7 +757,7 @@ func (x *GetDispatchContextForTaskRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetDispatchContextForTaskRequest.ProtoReflect.Descriptor instead.
 func (*GetDispatchContextForTaskRequest) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{13}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{11}
 }
 
 func (x *GetDispatchContextForTaskRequest) GetOrchestrationTaskId() string {
@@ -891,7 +779,7 @@ type GetDispatchContextForTaskResponse struct {
 
 func (x *GetDispatchContextForTaskResponse) Reset() {
 	*x = GetDispatchContextForTaskResponse{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[14]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[12]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -903,7 +791,7 @@ func (x *GetDispatchContextForTaskResponse) String() string {
 func (*GetDispatchContextForTaskResponse) ProtoMessage() {}
 
 func (x *GetDispatchContextForTaskResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[14]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[12]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -916,7 +804,7 @@ func (x *GetDispatchContextForTaskResponse) ProtoReflect() protoreflect.Message 
 
 // Deprecated: Use GetDispatchContextForTaskResponse.ProtoReflect.Descriptor instead.
 func (*GetDispatchContextForTaskResponse) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{14}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{12}
 }
 
 func (x *GetDispatchContextForTaskResponse) GetDispatch() *DispatchContext {
@@ -934,7 +822,7 @@ type ListActiveDispatchContextsForUserRequest struct {
 
 func (x *ListActiveDispatchContextsForUserRequest) Reset() {
 	*x = ListActiveDispatchContextsForUserRequest{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[15]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[13]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -946,7 +834,7 @@ func (x *ListActiveDispatchContextsForUserRequest) String() string {
 func (*ListActiveDispatchContextsForUserRequest) ProtoMessage() {}
 
 func (x *ListActiveDispatchContextsForUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[15]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[13]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -959,7 +847,7 @@ func (x *ListActiveDispatchContextsForUserRequest) ProtoReflect() protoreflect.M
 
 // Deprecated: Use ListActiveDispatchContextsForUserRequest.ProtoReflect.Descriptor instead.
 func (*ListActiveDispatchContextsForUserRequest) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{15}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{13}
 }
 
 type ListActiveDispatchContextsForUserResponse struct {
@@ -971,7 +859,7 @@ type ListActiveDispatchContextsForUserResponse struct {
 
 func (x *ListActiveDispatchContextsForUserResponse) Reset() {
 	*x = ListActiveDispatchContextsForUserResponse{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[16]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[14]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -983,7 +871,7 @@ func (x *ListActiveDispatchContextsForUserResponse) String() string {
 func (*ListActiveDispatchContextsForUserResponse) ProtoMessage() {}
 
 func (x *ListActiveDispatchContextsForUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[16]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[14]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -996,7 +884,7 @@ func (x *ListActiveDispatchContextsForUserResponse) ProtoReflect() protoreflect.
 
 // Deprecated: Use ListActiveDispatchContextsForUserResponse.ProtoReflect.Descriptor instead.
 func (*ListActiveDispatchContextsForUserResponse) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{16}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{14}
 }
 
 func (x *ListActiveDispatchContextsForUserResponse) GetDispatchContexts() []*DispatchContext {
@@ -1026,7 +914,7 @@ type FailDispatchRequest struct {
 
 func (x *FailDispatchRequest) Reset() {
 	*x = FailDispatchRequest{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[17]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1038,7 +926,7 @@ func (x *FailDispatchRequest) String() string {
 func (*FailDispatchRequest) ProtoMessage() {}
 
 func (x *FailDispatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[17]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1051,7 +939,7 @@ func (x *FailDispatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FailDispatchRequest.ProtoReflect.Descriptor instead.
 func (*FailDispatchRequest) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{17}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *FailDispatchRequest) GetDispatchContextId() string {
@@ -1090,7 +978,7 @@ type FailDispatchResponse struct {
 
 func (x *FailDispatchResponse) Reset() {
 	*x = FailDispatchResponse{}
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[18]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1102,7 +990,7 @@ func (x *FailDispatchResponse) String() string {
 func (*FailDispatchResponse) ProtoMessage() {}
 
 func (x *FailDispatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[18]
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1115,7 +1003,7 @@ func (x *FailDispatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FailDispatchResponse.ProtoReflect.Descriptor instead.
 func (*FailDispatchResponse) Descriptor() ([]byte, []int) {
-	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{18}
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *FailDispatchResponse) GetContext() *DispatchContext {
@@ -1132,6 +1020,453 @@ func (x *FailDispatchResponse) GetRecorded() bool {
 	return false
 }
 
+type CoordinatorRun struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	OriginTaskId      string                 `protobuf:"bytes,2,opt,name=origin_task_id,json=originTaskId,proto3" json:"origin_task_id,omitempty"` // logical FK -> task-service.Task.id, per §2.1
+	SpecJson          string                 `protobuf:"bytes,3,opt,name=spec_json,json=specJson,proto3" json:"spec_json,omitempty"`               // round-trips the caller-supplied spec verbatim
+	Status            string                 `protobuf:"bytes,4,opt,name=status,proto3" json:"status,omitempty"`                                   // idle|running|completed|failed
+	CoordinatorHandle string                 `protobuf:"bytes,5,opt,name=coordinator_handle,json=coordinatorHandle,proto3" json:"coordinator_handle,omitempty"`
+	PollIntervalMs    int32                  `protobuf:"varint,6,opt,name=poll_interval_ms,json=pollIntervalMs,proto3" json:"poll_interval_ms,omitempty"`
+	WorktreeId        string                 `protobuf:"bytes,7,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`       // caller-supplied, same optional/nullable pattern as DispatchContext.worktree_id
+	ResultJson        string                 `protobuf:"bytes,8,opt,name=result_json,json=resultJson,proto3" json:"result_json,omitempty"`       // set when status=completed
+	ErrorMessage      string                 `protobuf:"bytes,9,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"` // set when status=failed
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *CoordinatorRun) Reset() {
+	*x = CoordinatorRun{}
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CoordinatorRun) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CoordinatorRun) ProtoMessage() {}
+
+func (x *CoordinatorRun) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CoordinatorRun.ProtoReflect.Descriptor instead.
+func (*CoordinatorRun) Descriptor() ([]byte, []int) {
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *CoordinatorRun) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CoordinatorRun) GetOriginTaskId() string {
+	if x != nil {
+		return x.OriginTaskId
+	}
+	return ""
+}
+
+func (x *CoordinatorRun) GetSpecJson() string {
+	if x != nil {
+		return x.SpecJson
+	}
+	return ""
+}
+
+func (x *CoordinatorRun) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *CoordinatorRun) GetCoordinatorHandle() string {
+	if x != nil {
+		return x.CoordinatorHandle
+	}
+	return ""
+}
+
+func (x *CoordinatorRun) GetPollIntervalMs() int32 {
+	if x != nil {
+		return x.PollIntervalMs
+	}
+	return 0
+}
+
+func (x *CoordinatorRun) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+func (x *CoordinatorRun) GetResultJson() string {
+	if x != nil {
+		return x.ResultJson
+	}
+	return ""
+}
+
+func (x *CoordinatorRun) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+// StartCoordinatorRunRequest.spec_json is an OPAQUE payload from
+// task-service's ComplexExecutor (SOL-TG-04's buildOrchestrationSpec) —
+// this service does not interpret task-service's shape, only the
+// {tempId, title, spec, deps: [tempId,...]}[] array domain.ExpandSpec
+// requires (TASK-TASKV1-005-03), matching §2.1's "distinct id space...
+// task-service.Task.ID rides along as each node's origin reference, not
+// as the primary key here."
+type StartCoordinatorRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	OriginTaskId  string                 `protobuf:"bytes,1,opt,name=origin_task_id,json=originTaskId,proto3" json:"origin_task_id,omitempty"`
+	SpecJson      string                 `protobuf:"bytes,2,opt,name=spec_json,json=specJson,proto3" json:"spec_json,omitempty"`
+	WorktreeId    string                 `protobuf:"bytes,3,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"` // optional
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *StartCoordinatorRunRequest) Reset() {
+	*x = StartCoordinatorRunRequest{}
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *StartCoordinatorRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*StartCoordinatorRunRequest) ProtoMessage() {}
+
+func (x *StartCoordinatorRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use StartCoordinatorRunRequest.ProtoReflect.Descriptor instead.
+func (*StartCoordinatorRunRequest) Descriptor() ([]byte, []int) {
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *StartCoordinatorRunRequest) GetOriginTaskId() string {
+	if x != nil {
+		return x.OriginTaskId
+	}
+	return ""
+}
+
+func (x *StartCoordinatorRunRequest) GetSpecJson() string {
+	if x != nil {
+		return x.SpecJson
+	}
+	return ""
+}
+
+func (x *StartCoordinatorRunRequest) GetWorktreeId() string {
+	if x != nil {
+		return x.WorktreeId
+	}
+	return ""
+}
+
+type GetCoordinatorRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetCoordinatorRunRequest) Reset() {
+	*x = GetCoordinatorRunRequest{}
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetCoordinatorRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetCoordinatorRunRequest) ProtoMessage() {}
+
+func (x *GetCoordinatorRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetCoordinatorRunRequest.ProtoReflect.Descriptor instead.
+func (*GetCoordinatorRunRequest) Descriptor() ([]byte, []int) {
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GetCoordinatorRunRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+type CompleteCoordinatorRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ResultJson    string                 `protobuf:"bytes,2,opt,name=result_json,json=resultJson,proto3" json:"result_json,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CompleteCoordinatorRunRequest) Reset() {
+	*x = CompleteCoordinatorRunRequest{}
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CompleteCoordinatorRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CompleteCoordinatorRunRequest) ProtoMessage() {}
+
+func (x *CompleteCoordinatorRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CompleteCoordinatorRunRequest.ProtoReflect.Descriptor instead.
+func (*CompleteCoordinatorRunRequest) Descriptor() ([]byte, []int) {
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *CompleteCoordinatorRunRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *CompleteCoordinatorRunRequest) GetResultJson() string {
+	if x != nil {
+		return x.ResultJson
+	}
+	return ""
+}
+
+type FailCoordinatorRunRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,2,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *FailCoordinatorRunRequest) Reset() {
+	*x = FailCoordinatorRunRequest{}
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *FailCoordinatorRunRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*FailCoordinatorRunRequest) ProtoMessage() {}
+
+func (x *FailCoordinatorRunRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use FailCoordinatorRunRequest.ProtoReflect.Descriptor instead.
+func (*FailCoordinatorRunRequest) Descriptor() ([]byte, []int) {
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *FailCoordinatorRunRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *FailCoordinatorRunRequest) GetErrorMessage() string {
+	if x != nil {
+		return x.ErrorMessage
+	}
+	return ""
+}
+
+type RecordHeartbeatRequest struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	DispatchContextId string                 `protobuf:"bytes,1,opt,name=dispatch_context_id,json=dispatchContextId,proto3" json:"dispatch_context_id,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *RecordHeartbeatRequest) Reset() {
+	*x = RecordHeartbeatRequest{}
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RecordHeartbeatRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RecordHeartbeatRequest) ProtoMessage() {}
+
+func (x *RecordHeartbeatRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RecordHeartbeatRequest.ProtoReflect.Descriptor instead.
+func (*RecordHeartbeatRequest) Descriptor() ([]byte, []int) {
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *RecordHeartbeatRequest) GetDispatchContextId() string {
+	if x != nil {
+		return x.DispatchContextId
+	}
+	return ""
+}
+
+type ListPendingDecisionGatesRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPendingDecisionGatesRequest) Reset() {
+	*x = ListPendingDecisionGatesRequest{}
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPendingDecisionGatesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPendingDecisionGatesRequest) ProtoMessage() {}
+
+func (x *ListPendingDecisionGatesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPendingDecisionGatesRequest.ProtoReflect.Descriptor instead.
+func (*ListPendingDecisionGatesRequest) Descriptor() ([]byte, []int) {
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{23}
+}
+
+type ListPendingDecisionGatesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Gates         []*DecisionGate        `protobuf:"bytes,1,rep,name=gates,proto3" json:"gates,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListPendingDecisionGatesResponse) Reset() {
+	*x = ListPendingDecisionGatesResponse{}
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[24]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListPendingDecisionGatesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListPendingDecisionGatesResponse) ProtoMessage() {}
+
+func (x *ListPendingDecisionGatesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_orchestration_v1_orchestration_proto_msgTypes[24]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListPendingDecisionGatesResponse.ProtoReflect.Descriptor instead.
+func (*ListPendingDecisionGatesResponse) Descriptor() ([]byte, []int) {
+	return file_orca_orchestration_v1_orchestration_proto_rawDescGZIP(), []int{24}
+}
+
+func (x *ListPendingDecisionGatesResponse) GetGates() []*DecisionGate {
+	if x != nil {
+		return x.Gates
+	}
+	return nil
+}
+
 var File_orca_orchestration_v1_orchestration_proto protoreflect.FileDescriptor
 
 const file_orca_orchestration_v1_orchestration_proto_rawDesc = "" +
@@ -1141,15 +1476,7 @@ const file_orca_orchestration_v1_orchestration_proto_rawDesc = "" +
 	"\atemp_id\x18\x01 \x01(\tR\x06tempId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x16\n" +
 	"\x06prompt\x18\x03 \x01(\tR\x06prompt\x12\x12\n" +
-	"\x04deps\x18\x04 \x03(\tR\x04deps\"\xc4\x01\n" +
-	"\x1aStartCoordinatorRunRequest\x12\x1b\n" +
-	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12$\n" +
-	"\x0eorigin_task_id\x18\x02 \x01(\tR\foriginTaskId\x12\x1f\n" +
-	"\vworktree_id\x18\x03 \x01(\tR\n" +
-	"worktreeId\x12B\n" +
-	"\x05tasks\x18\x04 \x03(\v2,.orca.orchestration.v1.OrchestrationTaskSpecR\x05tasks\"-\n" +
-	"\x1bStartCoordinatorRunResponse\x12\x0e\n" +
-	"\x02id\x18\x01 \x01(\tR\x02id\"\xbe\x02\n" +
+	"\x04deps\x18\x04 \x03(\tR\x04deps\"\xbe\x02\n" +
 	"\x0fDispatchContext\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x16\n" +
 	"\x06handle\x18\x02 \x01(\tR\x06handle\x12,\n" +
@@ -1206,17 +1533,53 @@ const file_orca_orchestration_v1_orchestration_proto_rawDesc = "" +
 	"\x10grpc_status_code\x18\x03 \x01(\rR\x0egrpcStatusCode\"t\n" +
 	"\x14FailDispatchResponse\x12@\n" +
 	"\acontext\x18\x01 \x01(\v2&.orca.orchestration.v1.DispatchContextR\acontext\x12\x1a\n" +
-	"\brecorded\x18\x02 \x01(\bR\brecorded2\x99\b\n" +
+	"\brecorded\x18\x02 \x01(\bR\brecorded\"\xbb\x02\n" +
+	"\x0eCoordinatorRun\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12$\n" +
+	"\x0eorigin_task_id\x18\x02 \x01(\tR\foriginTaskId\x12\x1b\n" +
+	"\tspec_json\x18\x03 \x01(\tR\bspecJson\x12\x16\n" +
+	"\x06status\x18\x04 \x01(\tR\x06status\x12-\n" +
+	"\x12coordinator_handle\x18\x05 \x01(\tR\x11coordinatorHandle\x12(\n" +
+	"\x10poll_interval_ms\x18\x06 \x01(\x05R\x0epollIntervalMs\x12\x1f\n" +
+	"\vworktree_id\x18\a \x01(\tR\n" +
+	"worktreeId\x12\x1f\n" +
+	"\vresult_json\x18\b \x01(\tR\n" +
+	"resultJson\x12#\n" +
+	"\rerror_message\x18\t \x01(\tR\ferrorMessage\"\x80\x01\n" +
+	"\x1aStartCoordinatorRunRequest\x12$\n" +
+	"\x0eorigin_task_id\x18\x01 \x01(\tR\foriginTaskId\x12\x1b\n" +
+	"\tspec_json\x18\x02 \x01(\tR\bspecJson\x12\x1f\n" +
+	"\vworktree_id\x18\x03 \x01(\tR\n" +
+	"worktreeId\"*\n" +
+	"\x18GetCoordinatorRunRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\"P\n" +
+	"\x1dCompleteCoordinatorRunRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
+	"\vresult_json\x18\x02 \x01(\tR\n" +
+	"resultJson\"P\n" +
+	"\x19FailCoordinatorRunRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12#\n" +
+	"\rerror_message\x18\x02 \x01(\tR\ferrorMessage\"H\n" +
+	"\x16RecordHeartbeatRequest\x12.\n" +
+	"\x13dispatch_context_id\x18\x01 \x01(\tR\x11dispatchContextId\"!\n" +
+	"\x1fListPendingDecisionGatesRequest\"]\n" +
+	" ListPendingDecisionGatesResponse\x129\n" +
+	"\x05gates\x18\x01 \x03(\v2#.orca.orchestration.v1.DecisionGateR\x05gates2\xd7\f\n" +
 	"\x14OrchestrationService\x12\x82\x01\n" +
 	"\x15CreateDispatchContext\x123.orca.orchestration.v1.CreateDispatchContextRequest\x1a4.orca.orchestration.v1.CreateDispatchContextResponse\x12a\n" +
 	"\n" +
 	"CreateGate\x12(.orca.orchestration.v1.CreateGateRequest\x1a).orca.orchestration.v1.CreateGateResponse\x12d\n" +
 	"\vResolveGate\x12).orca.orchestration.v1.ResolveGateRequest\x1a*.orca.orchestration.v1.ResolveGateResponse\x12\x91\x01\n" +
 	"\x1aUpdateTaskStatusAndPromote\x128.orca.orchestration.v1.UpdateTaskStatusAndPromoteRequest\x1a9.orca.orchestration.v1.UpdateTaskStatusAndPromoteResponse\x12\x8e\x01\n" +
-	"\x19GetDispatchContextForTask\x127.orca.orchestration.v1.GetDispatchContextForTaskRequest\x1a8.orca.orchestration.v1.GetDispatchContextForTaskResponse\x12|\n" +
-	"\x13StartCoordinatorRun\x121.orca.orchestration.v1.StartCoordinatorRunRequest\x1a2.orca.orchestration.v1.StartCoordinatorRunResponse\x12\xa6\x01\n" +
+	"\x19GetDispatchContextForTask\x127.orca.orchestration.v1.GetDispatchContextForTaskRequest\x1a8.orca.orchestration.v1.GetDispatchContextForTaskResponse\x12\xa6\x01\n" +
 	"!ListActiveDispatchContextsForUser\x12?.orca.orchestration.v1.ListActiveDispatchContextsForUserRequest\x1a@.orca.orchestration.v1.ListActiveDispatchContextsForUserResponse\x12g\n" +
-	"\fFailDispatch\x12*.orca.orchestration.v1.FailDispatchRequest\x1a+.orca.orchestration.v1.FailDispatchResponseBPZNgithub.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1;orchestrationv1b\x06proto3"
+	"\fFailDispatch\x12*.orca.orchestration.v1.FailDispatchRequest\x1a+.orca.orchestration.v1.FailDispatchResponse\x12o\n" +
+	"\x13StartCoordinatorRun\x121.orca.orchestration.v1.StartCoordinatorRunRequest\x1a%.orca.orchestration.v1.CoordinatorRun\x12k\n" +
+	"\x11GetCoordinatorRun\x12/.orca.orchestration.v1.GetCoordinatorRunRequest\x1a%.orca.orchestration.v1.CoordinatorRun\x12u\n" +
+	"\x16CompleteCoordinatorRun\x124.orca.orchestration.v1.CompleteCoordinatorRunRequest\x1a%.orca.orchestration.v1.CoordinatorRun\x12m\n" +
+	"\x12FailCoordinatorRun\x120.orca.orchestration.v1.FailCoordinatorRunRequest\x1a%.orca.orchestration.v1.CoordinatorRun\x12h\n" +
+	"\x0fRecordHeartbeat\x12-.orca.orchestration.v1.RecordHeartbeatRequest\x1a&.orca.orchestration.v1.DispatchContext\x12\x8b\x01\n" +
+	"\x18ListPendingDecisionGates\x126.orca.orchestration.v1.ListPendingDecisionGatesRequest\x1a7.orca.orchestration.v1.ListPendingDecisionGatesResponseBPZNgithub.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1;orchestrationv1b\x06proto3"
 
 var (
 	file_orca_orchestration_v1_orchestration_proto_rawDescOnce sync.Once
@@ -1230,54 +1593,70 @@ func file_orca_orchestration_v1_orchestration_proto_rawDescGZIP() []byte {
 	return file_orca_orchestration_v1_orchestration_proto_rawDescData
 }
 
-var file_orca_orchestration_v1_orchestration_proto_msgTypes = make([]protoimpl.MessageInfo, 19)
+var file_orca_orchestration_v1_orchestration_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
 var file_orca_orchestration_v1_orchestration_proto_goTypes = []any{
 	(*OrchestrationTaskSpec)(nil),                     // 0: orca.orchestration.v1.OrchestrationTaskSpec
-	(*StartCoordinatorRunRequest)(nil),                // 1: orca.orchestration.v1.StartCoordinatorRunRequest
-	(*StartCoordinatorRunResponse)(nil),               // 2: orca.orchestration.v1.StartCoordinatorRunResponse
-	(*DispatchContext)(nil),                           // 3: orca.orchestration.v1.DispatchContext
-	(*CreateDispatchContextRequest)(nil),              // 4: orca.orchestration.v1.CreateDispatchContextRequest
-	(*CreateDispatchContextResponse)(nil),             // 5: orca.orchestration.v1.CreateDispatchContextResponse
-	(*DecisionGate)(nil),                              // 6: orca.orchestration.v1.DecisionGate
-	(*CreateGateRequest)(nil),                         // 7: orca.orchestration.v1.CreateGateRequest
-	(*CreateGateResponse)(nil),                        // 8: orca.orchestration.v1.CreateGateResponse
-	(*ResolveGateRequest)(nil),                        // 9: orca.orchestration.v1.ResolveGateRequest
-	(*ResolveGateResponse)(nil),                       // 10: orca.orchestration.v1.ResolveGateResponse
-	(*UpdateTaskStatusAndPromoteRequest)(nil),         // 11: orca.orchestration.v1.UpdateTaskStatusAndPromoteRequest
-	(*UpdateTaskStatusAndPromoteResponse)(nil),        // 12: orca.orchestration.v1.UpdateTaskStatusAndPromoteResponse
-	(*GetDispatchContextForTaskRequest)(nil),          // 13: orca.orchestration.v1.GetDispatchContextForTaskRequest
-	(*GetDispatchContextForTaskResponse)(nil),         // 14: orca.orchestration.v1.GetDispatchContextForTaskResponse
-	(*ListActiveDispatchContextsForUserRequest)(nil),  // 15: orca.orchestration.v1.ListActiveDispatchContextsForUserRequest
-	(*ListActiveDispatchContextsForUserResponse)(nil), // 16: orca.orchestration.v1.ListActiveDispatchContextsForUserResponse
-	(*FailDispatchRequest)(nil),                       // 17: orca.orchestration.v1.FailDispatchRequest
-	(*FailDispatchResponse)(nil),                      // 18: orca.orchestration.v1.FailDispatchResponse
+	(*DispatchContext)(nil),                           // 1: orca.orchestration.v1.DispatchContext
+	(*CreateDispatchContextRequest)(nil),              // 2: orca.orchestration.v1.CreateDispatchContextRequest
+	(*CreateDispatchContextResponse)(nil),             // 3: orca.orchestration.v1.CreateDispatchContextResponse
+	(*DecisionGate)(nil),                              // 4: orca.orchestration.v1.DecisionGate
+	(*CreateGateRequest)(nil),                         // 5: orca.orchestration.v1.CreateGateRequest
+	(*CreateGateResponse)(nil),                        // 6: orca.orchestration.v1.CreateGateResponse
+	(*ResolveGateRequest)(nil),                        // 7: orca.orchestration.v1.ResolveGateRequest
+	(*ResolveGateResponse)(nil),                       // 8: orca.orchestration.v1.ResolveGateResponse
+	(*UpdateTaskStatusAndPromoteRequest)(nil),         // 9: orca.orchestration.v1.UpdateTaskStatusAndPromoteRequest
+	(*UpdateTaskStatusAndPromoteResponse)(nil),        // 10: orca.orchestration.v1.UpdateTaskStatusAndPromoteResponse
+	(*GetDispatchContextForTaskRequest)(nil),          // 11: orca.orchestration.v1.GetDispatchContextForTaskRequest
+	(*GetDispatchContextForTaskResponse)(nil),         // 12: orca.orchestration.v1.GetDispatchContextForTaskResponse
+	(*ListActiveDispatchContextsForUserRequest)(nil),  // 13: orca.orchestration.v1.ListActiveDispatchContextsForUserRequest
+	(*ListActiveDispatchContextsForUserResponse)(nil), // 14: orca.orchestration.v1.ListActiveDispatchContextsForUserResponse
+	(*FailDispatchRequest)(nil),                       // 15: orca.orchestration.v1.FailDispatchRequest
+	(*FailDispatchResponse)(nil),                      // 16: orca.orchestration.v1.FailDispatchResponse
+	(*CoordinatorRun)(nil),                            // 17: orca.orchestration.v1.CoordinatorRun
+	(*StartCoordinatorRunRequest)(nil),                // 18: orca.orchestration.v1.StartCoordinatorRunRequest
+	(*GetCoordinatorRunRequest)(nil),                  // 19: orca.orchestration.v1.GetCoordinatorRunRequest
+	(*CompleteCoordinatorRunRequest)(nil),             // 20: orca.orchestration.v1.CompleteCoordinatorRunRequest
+	(*FailCoordinatorRunRequest)(nil),                 // 21: orca.orchestration.v1.FailCoordinatorRunRequest
+	(*RecordHeartbeatRequest)(nil),                    // 22: orca.orchestration.v1.RecordHeartbeatRequest
+	(*ListPendingDecisionGatesRequest)(nil),           // 23: orca.orchestration.v1.ListPendingDecisionGatesRequest
+	(*ListPendingDecisionGatesResponse)(nil),          // 24: orca.orchestration.v1.ListPendingDecisionGatesResponse
 }
 var file_orca_orchestration_v1_orchestration_proto_depIdxs = []int32{
-	0,  // 0: orca.orchestration.v1.StartCoordinatorRunRequest.tasks:type_name -> orca.orchestration.v1.OrchestrationTaskSpec
-	3,  // 1: orca.orchestration.v1.CreateDispatchContextResponse.context:type_name -> orca.orchestration.v1.DispatchContext
-	6,  // 2: orca.orchestration.v1.CreateGateResponse.gate:type_name -> orca.orchestration.v1.DecisionGate
-	6,  // 3: orca.orchestration.v1.ResolveGateResponse.gate:type_name -> orca.orchestration.v1.DecisionGate
-	3,  // 4: orca.orchestration.v1.GetDispatchContextForTaskResponse.dispatch:type_name -> orca.orchestration.v1.DispatchContext
-	3,  // 5: orca.orchestration.v1.ListActiveDispatchContextsForUserResponse.dispatch_contexts:type_name -> orca.orchestration.v1.DispatchContext
-	3,  // 6: orca.orchestration.v1.FailDispatchResponse.context:type_name -> orca.orchestration.v1.DispatchContext
-	4,  // 7: orca.orchestration.v1.OrchestrationService.CreateDispatchContext:input_type -> orca.orchestration.v1.CreateDispatchContextRequest
-	7,  // 8: orca.orchestration.v1.OrchestrationService.CreateGate:input_type -> orca.orchestration.v1.CreateGateRequest
-	9,  // 9: orca.orchestration.v1.OrchestrationService.ResolveGate:input_type -> orca.orchestration.v1.ResolveGateRequest
-	11, // 10: orca.orchestration.v1.OrchestrationService.UpdateTaskStatusAndPromote:input_type -> orca.orchestration.v1.UpdateTaskStatusAndPromoteRequest
-	13, // 11: orca.orchestration.v1.OrchestrationService.GetDispatchContextForTask:input_type -> orca.orchestration.v1.GetDispatchContextForTaskRequest
-	1,  // 12: orca.orchestration.v1.OrchestrationService.StartCoordinatorRun:input_type -> orca.orchestration.v1.StartCoordinatorRunRequest
-	15, // 13: orca.orchestration.v1.OrchestrationService.ListActiveDispatchContextsForUser:input_type -> orca.orchestration.v1.ListActiveDispatchContextsForUserRequest
-	17, // 14: orca.orchestration.v1.OrchestrationService.FailDispatch:input_type -> orca.orchestration.v1.FailDispatchRequest
-	5,  // 15: orca.orchestration.v1.OrchestrationService.CreateDispatchContext:output_type -> orca.orchestration.v1.CreateDispatchContextResponse
-	8,  // 16: orca.orchestration.v1.OrchestrationService.CreateGate:output_type -> orca.orchestration.v1.CreateGateResponse
-	10, // 17: orca.orchestration.v1.OrchestrationService.ResolveGate:output_type -> orca.orchestration.v1.ResolveGateResponse
-	12, // 18: orca.orchestration.v1.OrchestrationService.UpdateTaskStatusAndPromote:output_type -> orca.orchestration.v1.UpdateTaskStatusAndPromoteResponse
-	14, // 19: orca.orchestration.v1.OrchestrationService.GetDispatchContextForTask:output_type -> orca.orchestration.v1.GetDispatchContextForTaskResponse
-	2,  // 20: orca.orchestration.v1.OrchestrationService.StartCoordinatorRun:output_type -> orca.orchestration.v1.StartCoordinatorRunResponse
-	16, // 21: orca.orchestration.v1.OrchestrationService.ListActiveDispatchContextsForUser:output_type -> orca.orchestration.v1.ListActiveDispatchContextsForUserResponse
-	18, // 22: orca.orchestration.v1.OrchestrationService.FailDispatch:output_type -> orca.orchestration.v1.FailDispatchResponse
-	15, // [15:23] is the sub-list for method output_type
-	7,  // [7:15] is the sub-list for method input_type
+	1,  // 0: orca.orchestration.v1.CreateDispatchContextResponse.context:type_name -> orca.orchestration.v1.DispatchContext
+	4,  // 1: orca.orchestration.v1.CreateGateResponse.gate:type_name -> orca.orchestration.v1.DecisionGate
+	4,  // 2: orca.orchestration.v1.ResolveGateResponse.gate:type_name -> orca.orchestration.v1.DecisionGate
+	1,  // 3: orca.orchestration.v1.GetDispatchContextForTaskResponse.dispatch:type_name -> orca.orchestration.v1.DispatchContext
+	1,  // 4: orca.orchestration.v1.ListActiveDispatchContextsForUserResponse.dispatch_contexts:type_name -> orca.orchestration.v1.DispatchContext
+	1,  // 5: orca.orchestration.v1.FailDispatchResponse.context:type_name -> orca.orchestration.v1.DispatchContext
+	4,  // 6: orca.orchestration.v1.ListPendingDecisionGatesResponse.gates:type_name -> orca.orchestration.v1.DecisionGate
+	2,  // 7: orca.orchestration.v1.OrchestrationService.CreateDispatchContext:input_type -> orca.orchestration.v1.CreateDispatchContextRequest
+	5,  // 8: orca.orchestration.v1.OrchestrationService.CreateGate:input_type -> orca.orchestration.v1.CreateGateRequest
+	7,  // 9: orca.orchestration.v1.OrchestrationService.ResolveGate:input_type -> orca.orchestration.v1.ResolveGateRequest
+	9,  // 10: orca.orchestration.v1.OrchestrationService.UpdateTaskStatusAndPromote:input_type -> orca.orchestration.v1.UpdateTaskStatusAndPromoteRequest
+	11, // 11: orca.orchestration.v1.OrchestrationService.GetDispatchContextForTask:input_type -> orca.orchestration.v1.GetDispatchContextForTaskRequest
+	13, // 12: orca.orchestration.v1.OrchestrationService.ListActiveDispatchContextsForUser:input_type -> orca.orchestration.v1.ListActiveDispatchContextsForUserRequest
+	15, // 13: orca.orchestration.v1.OrchestrationService.FailDispatch:input_type -> orca.orchestration.v1.FailDispatchRequest
+	18, // 14: orca.orchestration.v1.OrchestrationService.StartCoordinatorRun:input_type -> orca.orchestration.v1.StartCoordinatorRunRequest
+	19, // 15: orca.orchestration.v1.OrchestrationService.GetCoordinatorRun:input_type -> orca.orchestration.v1.GetCoordinatorRunRequest
+	20, // 16: orca.orchestration.v1.OrchestrationService.CompleteCoordinatorRun:input_type -> orca.orchestration.v1.CompleteCoordinatorRunRequest
+	21, // 17: orca.orchestration.v1.OrchestrationService.FailCoordinatorRun:input_type -> orca.orchestration.v1.FailCoordinatorRunRequest
+	22, // 18: orca.orchestration.v1.OrchestrationService.RecordHeartbeat:input_type -> orca.orchestration.v1.RecordHeartbeatRequest
+	23, // 19: orca.orchestration.v1.OrchestrationService.ListPendingDecisionGates:input_type -> orca.orchestration.v1.ListPendingDecisionGatesRequest
+	3,  // 20: orca.orchestration.v1.OrchestrationService.CreateDispatchContext:output_type -> orca.orchestration.v1.CreateDispatchContextResponse
+	6,  // 21: orca.orchestration.v1.OrchestrationService.CreateGate:output_type -> orca.orchestration.v1.CreateGateResponse
+	8,  // 22: orca.orchestration.v1.OrchestrationService.ResolveGate:output_type -> orca.orchestration.v1.ResolveGateResponse
+	10, // 23: orca.orchestration.v1.OrchestrationService.UpdateTaskStatusAndPromote:output_type -> orca.orchestration.v1.UpdateTaskStatusAndPromoteResponse
+	12, // 24: orca.orchestration.v1.OrchestrationService.GetDispatchContextForTask:output_type -> orca.orchestration.v1.GetDispatchContextForTaskResponse
+	14, // 25: orca.orchestration.v1.OrchestrationService.ListActiveDispatchContextsForUser:output_type -> orca.orchestration.v1.ListActiveDispatchContextsForUserResponse
+	16, // 26: orca.orchestration.v1.OrchestrationService.FailDispatch:output_type -> orca.orchestration.v1.FailDispatchResponse
+	17, // 27: orca.orchestration.v1.OrchestrationService.StartCoordinatorRun:output_type -> orca.orchestration.v1.CoordinatorRun
+	17, // 28: orca.orchestration.v1.OrchestrationService.GetCoordinatorRun:output_type -> orca.orchestration.v1.CoordinatorRun
+	17, // 29: orca.orchestration.v1.OrchestrationService.CompleteCoordinatorRun:output_type -> orca.orchestration.v1.CoordinatorRun
+	17, // 30: orca.orchestration.v1.OrchestrationService.FailCoordinatorRun:output_type -> orca.orchestration.v1.CoordinatorRun
+	1,  // 31: orca.orchestration.v1.OrchestrationService.RecordHeartbeat:output_type -> orca.orchestration.v1.DispatchContext
+	24, // 32: orca.orchestration.v1.OrchestrationService.ListPendingDecisionGates:output_type -> orca.orchestration.v1.ListPendingDecisionGatesResponse
+	20, // [20:33] is the sub-list for method output_type
+	7,  // [7:20] is the sub-list for method input_type
 	7,  // [7:7] is the sub-list for extension type_name
 	7,  // [7:7] is the sub-list for extension extendee
 	0,  // [0:7] is the sub-list for field type_name
@@ -1294,7 +1673,7 @@ func file_orca_orchestration_v1_orchestration_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_orchestration_v1_orchestration_proto_rawDesc), len(file_orca_orchestration_v1_orchestration_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   19,
+			NumMessages:   25,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

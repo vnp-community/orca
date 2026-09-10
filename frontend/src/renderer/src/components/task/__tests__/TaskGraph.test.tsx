@@ -4,9 +4,23 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { TaskGraph } from '../TaskGraph'
 import { useTasks } from '../../../hooks/useTasks'
+import { useTaskDependencyEdges } from '../../../hooks/useTaskDependencyEdges'
+import { useTaskBatchExecution } from '../../../hooks/useTaskBatchExecution'
 
 vi.mock('../../../hooks/useTasks', () => ({
   useTasks: vi.fn()
+}))
+
+vi.mock('../../../hooks/useTaskDependencyEdges', () => ({
+  useTaskDependencyEdges: vi.fn()
+}))
+
+vi.mock('../../../hooks/useTaskBatchExecution', () => ({
+  useTaskBatchExecution: vi.fn()
+}))
+
+vi.mock('sonner', () => ({
+  toast: { success: vi.fn(), error: vi.fn() }
 }))
 
 vi.mock('../TaskTreeView', () => ({
@@ -19,23 +33,33 @@ vi.mock('../TaskBoardView', () => ({
   TaskBoardView: () => <div data-testid="mock-board-view" />
 }))
 vi.mock('../TaskCreateDialog', () => ({
-  TaskCreateDialog: ({ onCreated }: { onCreated: () => void }) => (
-    <div data-testid="mock-task-create-dialog">
-      <button data-testid="mock-created" onClick={onCreated}>
-        created
-      </button>
-    </div>
-  )
+  TaskCreateDialog: ({
+    open,
+    onCreate
+  }: {
+    open: boolean
+    onCreate: (title: string, parentId?: string) => Promise<void>
+  }) =>
+    open ? (
+      <div data-testid="mock-task-create-dialog">
+        <button data-testid="mock-created" onClick={() => onCreate('New Task')}>
+          created
+        </button>
+      </div>
+    ) : null
 }))
 
 const mockUseTasks = vi.mocked(useTasks)
+const mockUseTaskDependencyEdges = vi.mocked(useTaskDependencyEdges)
+const mockUseTaskBatchExecution = vi.mocked(useTaskBatchExecution)
 
 describe('TaskGraph', () => {
-  const refetch = vi.fn()
+  const createTask = vi.fn().mockResolvedValue({ id: 't-new' })
 
   beforeEach(() => {
     cleanup()
     vi.clearAllMocks()
+    createTask.mockResolvedValue({ id: 't-new' })
     mockUseTasks.mockReturnValue({
       filteredTasks: [],
       expandedNodes: new Set(),
@@ -46,9 +70,24 @@ describe('TaskGraph', () => {
       searchQuery: '',
       setSearchQuery: vi.fn(),
       isLoading: false,
-      refetch,
-      dagView: null
+      refetch: vi.fn(),
+      dagView: null,
+      createTask,
+      selectedIds: new Set<string>(),
+      toggleSelected: vi.fn(),
+      clearSelection: vi.fn()
+    } as unknown as ReturnType<typeof useTasks>)
+    mockUseTaskDependencyEdges.mockReturnValue({
+      edges: new Map(),
+      loading: false,
+      error: false,
+      refetch: vi.fn()
     })
+    mockUseTaskBatchExecution.mockReturnValue({
+      running: false,
+      results: new Map(),
+      runSelected: vi.fn().mockResolvedValue(new Map())
+    } as unknown as ReturnType<typeof useTaskBatchExecution>)
   })
 
   it('clicking "+ New Task" shows TaskCreateDialog', () => {
@@ -58,12 +97,13 @@ describe('TaskGraph', () => {
     expect(screen.getByTestId('mock-task-create-dialog')).toBeInTheDocument()
   })
 
-  it('TaskCreateDialog onCreated calls refetch() and closes the dialog', () => {
+  it('TaskCreateDialog onCreate calls createTask(title, parentId)', async () => {
     render(<TaskGraph projectId="p1" />)
     fireEvent.click(screen.getByTestId('new-task-btn'))
     fireEvent.click(screen.getByTestId('mock-created'))
-    expect(refetch).toHaveBeenCalled()
-    expect(screen.queryByTestId('mock-task-create-dialog')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(createTask).toHaveBeenCalledWith('New Task', undefined)
+    })
   })
 
   it('clicking "Board" switches viewMode, renders TaskBoardView instead of Tree/DAG', async () => {

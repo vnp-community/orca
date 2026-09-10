@@ -350,6 +350,22 @@ func run() error {
 	// other parallel edits to RegisterRealChannels's own signature.
 	wscompat.RegisterClientStateChannels(wsCompatRegistry, tenantClient)
 
+	// task.activity (BE-SOL-003/TASK-FT-003-04) — subscribes the 4
+	// orchestration.* + 2 workflow.step.* subjects (published by
+	// orchestration-service/workflow-service's own outbox relays,
+	// TASK-FT-003-01/-02/-03) per connection, filtered by taskId. If NATS
+	// is unreachable at startup, the channel simply never registers —
+	// task.activity.subscribe then falls through to
+	// StreamHandlerFor's own "not found" handling, same degrade-not-panic
+	// shape as every other optional downstream in this composition root.
+	_, natsConsumer, closeNatsBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, task.activity channel disabled", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeNatsBus() }()
+		wscompat.RegisterTaskActivityStreamChannel(wsCompatRegistry, natsConsumer)
+	}
+
 	// workspace.subscribe (TASK-PW-04-07, SOL-PW-04): bridges task-service's
 	// orca.task.task.statuschanged and workflow-service's
 	// orca.workflow.execution.completed/.failed outbox events to connected

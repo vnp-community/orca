@@ -79,7 +79,8 @@ const taskColumns = `
 	due_date, estimated_hours, actual_hours, COALESCE(prompt_template, ''), COALESCE(ai_context, ''),
 	COALESCE(ai_plan_json::text, ''), visibility, COALESCE(worktree_id::text, ''), COALESCE(agent_session_id, ''),
 	progress_percent, COALESCE(active_execution_id, ''), COALESCE(last_execution_output, ''),
-	COALESCE(task_number, 0), COALESCE(pr_url, ''), COALESCE(workflow_template_id::text, '')
+	COALESCE(task_number, 0), COALESCE(pr_url, ''), COALESCE(workflow_template_id::text, ''),
+	COALESCE(active_execution_link_id::text, '')
 `
 
 // rowScanner abstracts over pgx.Row/pgx.Rows — both satisfy Scan(...any)
@@ -97,7 +98,7 @@ func scanTask(row rowScanner) (domain.Task, error) {
 		&t.Description, &t.Type, &t.Priority, &t.AssigneeID, &t.OwnerID,
 		&t.DueDate, &t.EstimatedHours, &t.ActualHours, &t.PromptTemplate, &t.AIContext,
 		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent, &t.ActiveExecutionID, &t.LastExecutionOutput,
-		&t.TaskNumber, &t.PRURL, &t.WorkflowTemplateID)
+		&t.TaskNumber, &t.PRURL, &t.WorkflowTemplateID, &t.ActiveExecutionLinkID)
 	return t, err
 }
 
@@ -111,7 +112,7 @@ func scanTaskAndTrailing(row rowScanner, extra ...any) (domain.Task, error) {
 		&t.Description, &t.Type, &t.Priority, &t.AssigneeID, &t.OwnerID,
 		&t.DueDate, &t.EstimatedHours, &t.ActualHours, &t.PromptTemplate, &t.AIContext,
 		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent, &t.ActiveExecutionID, &t.LastExecutionOutput,
-		&t.TaskNumber, &t.PRURL, &t.WorkflowTemplateID}
+		&t.TaskNumber, &t.PRURL, &t.WorkflowTemplateID, &t.ActiveExecutionLinkID}
 	dest = append(dest, extra...)
 	err := row.Scan(dest...)
 	return t, err
@@ -128,7 +129,8 @@ func prefixedTaskColumns(alias string) string {
 	` + alias + `.due_date, ` + alias + `.estimated_hours, ` + alias + `.actual_hours, COALESCE(` + alias + `.prompt_template, ''), COALESCE(` + alias + `.ai_context, ''),
 	COALESCE(` + alias + `.ai_plan_json::text, ''), ` + alias + `.visibility, COALESCE(` + alias + `.worktree_id::text, ''), COALESCE(` + alias + `.agent_session_id, ''),
 	` + alias + `.progress_percent, COALESCE(` + alias + `.active_execution_id, ''), COALESCE(` + alias + `.last_execution_output, ''),
-	COALESCE(` + alias + `.task_number, 0), COALESCE(` + alias + `.pr_url, ''), COALESCE(` + alias + `.workflow_template_id::text, '')
+	COALESCE(` + alias + `.task_number, 0), COALESCE(` + alias + `.pr_url, ''), COALESCE(` + alias + `.workflow_template_id::text, ''),
+	COALESCE(` + alias + `.active_execution_link_id::text, '')
 `
 }
 
@@ -205,7 +207,7 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 				description, task_type, priority, assignee_id, owner_id,
 				due_date, estimated_hours, actual_hours, prompt_template, ai_context,
 				ai_plan_json, visibility, worktree_id, agent_session_id, progress_percent, active_execution_id, last_execution_output,
-				task_number, pr_url, workflow_template_id, 0 AS depth
+				task_number, pr_url, workflow_template_id, active_execution_link_id, 0 AS depth
 			FROM task.tasks
 			WHERE tenant_id = $1 AND id = $2
 
@@ -215,7 +217,7 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 				t.description, t.task_type, t.priority, t.assignee_id, t.owner_id,
 				t.due_date, t.estimated_hours, t.actual_hours, t.prompt_template, t.ai_context,
 				t.ai_plan_json, t.visibility, t.worktree_id, t.agent_session_id, t.progress_percent, t.active_execution_id, t.last_execution_output,
-				t.task_number, t.pr_url, t.workflow_template_id, a.depth + 1
+				t.task_number, t.pr_url, t.workflow_template_id, t.active_execution_link_id, a.depth + 1
 			FROM task.tasks t
 			JOIN ancestors a ON t.id = a.parent_id
 			WHERE a.depth + 1 < $3
@@ -225,7 +227,8 @@ func (r *Repository) GetAncestors(ctx context.Context, tenantID, id string, maxD
 			due_date, estimated_hours, actual_hours, COALESCE(prompt_template, ''), COALESCE(ai_context, ''),
 			COALESCE(ai_plan_json::text, ''), visibility, COALESCE(worktree_id::text, ''), COALESCE(agent_session_id, ''),
 			progress_percent, COALESCE(active_execution_id, ''), COALESCE(last_execution_output, ''),
-			COALESCE(task_number, 0), COALESCE(pr_url, ''), COALESCE(workflow_template_id::text, '')
+			COALESCE(task_number, 0), COALESCE(pr_url, ''), COALESCE(workflow_template_id::text, ''),
+			COALESCE(active_execution_link_id::text, '')
 		FROM ancestors
 		ORDER BY depth
 	`, tenantID, id, maxDepth)
@@ -259,6 +262,50 @@ func (r *Repository) UpdateStatus(ctx context.Context, tenantID, id, status stri
 	tag, err := r.db.Exec(ctx, `UPDATE task.tasks SET status = $1, updated_at = now() WHERE tenant_id = $2 AND id = $3`, status, tenantID, id)
 	if err != nil {
 		return fmt.Errorf("postgres: update task status: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("postgres: task %s not found", id)
+	}
+	return nil
+}
+
+// UpdateWorktreeID persists the worktree ExecuteTask's WorktreeProvisioner
+// just created for a task that didn't already have one — see
+// usecase.WorktreeProvisioner's doc comment (SOL-TG-04).
+func (r *Repository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
+	_, err := r.db.Exec(ctx, `UPDATE task.tasks SET worktree_id = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, id, nullableUUID(worktreeID))
+	if err != nil {
+		return fmt.Errorf("postgres: update task worktree_id: %w", err)
+	}
+	return nil
+}
+
+// SetActiveExecutionLink persists which execution_links row is currently
+// "the" dispatch for this task — see domain.Task.ActiveExecutionLinkID's
+// doc comment (TASK-FT-002-04). Called right after ExecuteTask creates a
+// new link, before dispatch, for every engine.
+func (r *Repository) SetActiveExecutionLink(ctx context.Context, tenantID, taskID, linkID string) error {
+	tag, err := r.db.Exec(ctx, `UPDATE task.tasks SET active_execution_link_id = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, taskID, nullableUUID(linkID))
+	if err != nil {
+		return fmt.Errorf("postgres: set active execution link: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("postgres: task %s not found", taskID)
+	}
+	return nil
+}
+
+// CompleteExecution is the simple path's (and, via TASK-TG-04-05's
+// ReportTaskExecutionResult, the complex path's) terminal write: sets
+// status, actual_hours, and clears agent_session_id in one statement — see
+// usecase.TaskRepository's doc comment.
+func (r *Repository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE task.tasks SET status = $3, actual_hours = $4, agent_session_id = NULL, updated_at = now()
+		WHERE tenant_id = $1 AND id = $2
+	`, tenantID, id, status, actualHours)
+	if err != nil {
+		return fmt.Errorf("postgres: complete task execution: %w", err)
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("postgres: task %s not found", id)
@@ -371,16 +418,6 @@ func (r *Repository) Update(ctx context.Context, tenantID string, t domain.Task,
 // task.outbox_events table, see migrations/0005_outbox.up.sql and
 // 0008_task_outbox_and_number.up.sql's doc comments).
 
-// UpdateWorktreeID persists the provisioned worktree a task's execution is
-// running in — see SOL-TG-04.
-func (r *Repository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
-	_, err := r.db.Exec(ctx, `UPDATE task.tasks SET worktree_id = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, id, nullableUUID(worktreeID))
-	if err != nil {
-		return fmt.Errorf("postgres: update task worktree_id: %w", err)
-	}
-	return nil
-}
-
 // UpdateActiveExecutionID persists the complex path's coordinator_run id —
 // set by ComplexExecutor.Execute right after StartCoordinatorRun succeeds
 // (TASK-TG-04-04), read by ReportTaskExecutionResult (TASK-TG-04-05) to
@@ -431,24 +468,6 @@ func (r *Repository) UpdateAIPlanJSON(ctx context.Context, tenantID, id, aiPlanJ
 	_, err := r.db.Exec(ctx, `UPDATE task.tasks SET ai_plan_json = $3, updated_at = now() WHERE tenant_id = $1 AND id = $2`, tenantID, id, aiPlanJSON)
 	if err != nil {
 		return fmt.Errorf("postgres: update task ai_plan_json: %w", err)
-	}
-	return nil
-}
-
-// CompleteExecution is the simple path's (TASK-TG-04-03) and, via
-// TASK-TG-04-05's ReportTaskExecutionResult, the complex path's terminal
-// write: sets status, actual_hours, and clears agent_session_id in one
-// statement.
-func (r *Repository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
-	tag, err := r.db.Exec(ctx, `
-		UPDATE task.tasks SET status = $3, actual_hours = $4, agent_session_id = NULL, updated_at = now()
-		WHERE tenant_id = $1 AND id = $2
-	`, tenantID, id, status, actualHours)
-	if err != nil {
-		return fmt.Errorf("postgres: complete task execution: %w", err)
-	}
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("postgres: task %s not found", id)
 	}
 	return nil
 }

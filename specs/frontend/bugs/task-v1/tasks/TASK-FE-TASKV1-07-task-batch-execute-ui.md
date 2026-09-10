@@ -4,7 +4,7 @@
 **Bug:** [BUG-FE-TASKV1-004](../BUG-FE-TASKV1-004-run-agent-ux-gaps.md)
 **File:** `frontend/src/renderer/src/hooks/useTasks.ts`, `frontend/src/renderer/src/hooks/useTaskBatchExecution.ts` (mới), `frontend/src/renderer/src/components/task/TaskGraph.tsx`, `frontend/src/renderer/src/components/task/TaskTreeView.tsx`, `frontend/src/renderer/src/components/task/TaskCard.tsx`
 **Estimated:** 75 phút
-**Status:** [ ] TODO
+**Status:** `[x]` DONE
 **Phụ thuộc:** Không — dùng `task.execute` đã tồn tại và hoạt động, gọi tuần tự/song song có giới hạn (không cần RPC batch mới)
 
 ---

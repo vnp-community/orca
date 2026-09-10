@@ -402,9 +402,9 @@ func (r *Repository) ResolveChain(ctx context.Context, tenantID, templateID stri
 // doc comment.
 func (r *Repository) CreateExecution(ctx context.Context, exec domain.WorkflowExecution) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO workflow.executions (id, template_id, tenant_id, status, root_trace_id, paused_at, project_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, exec.ID, nullableString(exec.TemplateID), exec.TenantID, string(exec.Status), nullableString(exec.RootTraceID), exec.PausedAt, nullableString(exec.ProjectID))
+		INSERT INTO workflow.executions (id, template_id, tenant_id, status, root_trace_id, paused_at, project_id, origin_task_id)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+	`, exec.ID, nullableString(exec.TemplateID), exec.TenantID, string(exec.Status), nullableString(exec.RootTraceID), exec.PausedAt, nullableString(exec.ProjectID), exec.OriginTaskID)
 	if err != nil {
 		return fmt.Errorf("postgres: insert execution: %w", err)
 	}
@@ -413,7 +413,7 @@ func (r *Repository) CreateExecution(ctx context.Context, exec domain.WorkflowEx
 
 func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (domain.WorkflowExecution, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, '')
+		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, ''), origin_task_id
 		FROM workflow.executions
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
@@ -421,7 +421,7 @@ func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (dom
 	var exec domain.WorkflowExecution
 	var status string
 	var pausedAt *time.Time
-	err := row.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID)
+	err := row.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID, &exec.OriginTaskID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.WorkflowExecution{}, domain.ErrExecutionNotFound
 	}
@@ -543,7 +543,7 @@ func (r *Repository) MarkPublished(ctx context.Context, ids []string) error {
 // status='running' predicate.
 func (r *Repository) ListRunning(ctx context.Context) ([]domain.WorkflowExecution, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, '')
+		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, ''), origin_task_id
 		FROM workflow.executions
 		WHERE status = 'running'
 	`)
@@ -557,7 +557,7 @@ func (r *Repository) ListRunning(ctx context.Context) ([]domain.WorkflowExecutio
 		var exec domain.WorkflowExecution
 		var status string
 		var pausedAt *time.Time
-		if err := rows.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID); err != nil {
+		if err := rows.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID, &exec.OriginTaskID); err != nil {
 			return nil, fmt.Errorf("postgres: scan running execution row: %w", err)
 		}
 		exec.Status = domain.Status(status)
@@ -590,8 +590,28 @@ func (r *Repository) CreateStepExecution(ctx context.Context, se domain.StepExec
 
 // UpdateStepExecution persists a step execution's mutable fields — status,
 // output, error — set as a step transitions pending->running->completed/failed.
-func (r *Repository) UpdateStepExecution(ctx context.Context, se domain.StepExecution) error {
-	tag, err := r.pool.Exec(ctx, `
+// Wrapped in a transaction (BE-SOL-003/TASK-FT-003-03 — this method had
+// none before, a single UPDATE was trivially atomic on its own) so event's
+// outbox row, when non-zero, commits atomically with the status write.
+//
+// This method's own UPDATE has no tenantID parameter (updates by se.ID
+// alone, relying on RLS via the connection's session app.tenant_id setting
+// — see workflow.step_executions' RLS policy, migration 0004). That
+// session variable is never actually SET anywhere in this codebase's Go
+// layer today (confirmed: no `current_setting`/`SET LOCAL` call site
+// exists), so it cannot be relied on for the outbox row's own NOT NULL
+// tenant_id column — this method instead resolves tenant_id by joining to
+// workflow.executions via se.ExecutionID, which this table's own RLS
+// policy already establishes as the source of truth for a step
+// execution's tenant.
+func (r *Repository) UpdateStepExecution(ctx context.Context, se domain.StepExecution, event domain.OutboxEvent) error {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("postgres: begin tx: %w", err)
+	}
+	defer func() { _ = tx.Rollback(ctx) }()
+
+	tag, err := tx.Exec(ctx, `
 		UPDATE workflow.step_executions
 		SET status = $1, output = $2::jsonb, error_message = $3, updated_at = now()
 		WHERE id = $4
@@ -601,6 +621,21 @@ func (r *Repository) UpdateStepExecution(ctx context.Context, se domain.StepExec
 	}
 	if tag.RowsAffected() == 0 {
 		return fmt.Errorf("postgres: update step execution: no row for id %s", se.ID)
+	}
+
+	if event.ID != "" {
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO workflow.outbox_events (id, tenant_id, subject, occurred_at, version, payload)
+			SELECT $1, e.tenant_id, $2, $3, 1, $4::jsonb
+			FROM workflow.executions e
+			WHERE e.id = $5
+		`, event.ID, event.Subject, event.OccurredAt, event.PayloadJSON, se.ExecutionID); err != nil {
+			return fmt.Errorf("postgres: insert outbox event: %w", err)
+		}
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("postgres: commit tx: %w", err)
 	}
 	return nil
 }

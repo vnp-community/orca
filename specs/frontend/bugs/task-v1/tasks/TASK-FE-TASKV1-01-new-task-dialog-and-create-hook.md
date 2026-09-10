@@ -4,7 +4,7 @@
 **Bug:** [BUG-FE-TASKV1-001](../BUG-FE-TASKV1-001-orcatask-crud-va-tree-navigation.md)
 **File:** `frontend/src/renderer/src/components/task/TaskCreateDialog.tsx` (mới), `frontend/src/renderer/src/hooks/useTasks.ts`, `frontend/src/renderer/src/components/task/TaskGraph.tsx`, `frontend/src/renderer/src/components/task/TaskCard.tsx`
 **Estimated:** 90 phút (bao gồm sửa gap wscompat mới phát hiện — xem bên dưới)
-**Status:** [ ] TODO
+**Status:** `[x]` DONE
 **Phụ thuộc:** BLOCKED một phần — xem "Phát hiện quan trọng" bên dưới, cần 1 fix nhỏ ở `backend-go` trước khi task hoàn thành đúng nghĩa.
 
 ---

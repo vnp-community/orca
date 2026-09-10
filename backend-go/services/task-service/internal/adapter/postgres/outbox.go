@@ -24,8 +24,39 @@ func (r *Repository) WriteOutboxEvent(ctx context.Context, tenantID string, even
 	return nil
 }
 
+// InsertOutboxEvent implements usecase.OutboxWriter — a plain, standalone
+// INSERT, deliberately NOT wrapped in the same transaction as any domain
+// write (unlike orchestration-service's inline outbox-enqueue in
+// UpdateTaskStatusAndPromote): an agent_output_partial event has no
+// corresponding row-level domain state change to piggyback on, it is a
+// side-channel progress signal for an already-in-flight, already-durably-
+// dispatched execution_links row. A dropped/failed insert here loses one
+// throttled progress update, never task-service's source of truth for
+// whether/how the task executed — same "best-effort, non-critical
+// bookkeeping" posture ExecuteTask already uses for
+// ExecutionLinkRepository.SetExternalRef.
+func (r *Repository) InsertOutboxEvent(ctx context.Context, id, tenantID, subject string, payload []byte) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO task.outbox_events (id, tenant_id, subject, occurred_at, version, payload)
+		VALUES ($1, $2, $3, now(), 1, $4::jsonb)
+	`, id, tenantID, subject, payload)
+	if err != nil {
+		return fmt.Errorf("postgres: insert outbox event: %w", err)
+	}
+	return nil
+}
+
+// ---- common/outbox.Store -------------------------------------------------
+//
 // FetchUnpublished and MarkPublished implement common/outbox.Store — see
-// cmd/server/main.go for where the relay is wired.
+// cmd/server/main.go for where the relay is wired (TASK-AG-FLOWTASK-003),
+// same shape as orchestration-service's identically-named methods
+// (internal/adapter/postgres/repository.go there) against
+// task.outbox_events instead of orchestration.outbox_events. task-service's
+// first (and, at this pass, only) published event family is
+// orca.task.agent_output_partial — Engine 1 (direct_agent)'s throttled
+// mid-run output (see usecase.PublishAgentOutputPartial).
+
 func (r *Repository) FetchUnpublished(ctx context.Context, limit int) ([]outbox.Record, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, tenant_id, subject, occurred_at, version, payload

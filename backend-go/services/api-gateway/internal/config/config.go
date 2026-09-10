@@ -50,13 +50,15 @@ type Config struct {
 	// agent.subscribeStatus (TASK-AG-05-06, forwards infra-fleet-service's
 	// agent.statusChanged/agent.rateLimited events to the renderer), the
 	// workspace-event bridge (TASK-PW-04-07/SOL-PW-04, forwards task/
-	// workflow-service outbox events), and api-gateway's own first NATS
+	// workflow-service outbox events), api-gateway's own first NATS
 	// connection for publishing/subscribing CR-FFT-002 TraceEvent spans on
-	// the TRACE stream (TASK-BE-FFT-008/011). Same env var / default as
-	// notification-service's own NATS_URL, since all dial the same NATS
-	// cluster. Empty/unreachable degrades each consumer independently
-	// (closed-immediately channel for agent.subscribeStatus, a startup
-	// warning for the workspace bridge / trace publishing) rather than
+	// the TRACE stream (TASK-BE-FFT-008/011), and the task.activity WS
+	// channel (BE-SOL-003/TASK-FT-003-04)'s subscription to the 4
+	// orchestration.* + 2 workflow.step.* subjects. Same env var / default
+	// as every other NATS-consuming service's config field. Empty/
+	// unreachable degrades each consumer independently (closed-immediately
+	// channel for agent.subscribeStatus, a startup warning for the
+	// workspace bridge / trace publishing / task.activity) rather than
 	// crashing api-gateway.
 	NATSURL string
 

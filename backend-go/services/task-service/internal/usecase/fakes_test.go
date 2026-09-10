@@ -24,22 +24,26 @@ func withIdentity(ctx context.Context, tenantID, userID string) context.Context 
 type fakeTaskRepository struct {
 	// mu guards every field below — TestExecuteBatch_BoundedConcurrency
 	// dispatches real goroutines against this fake concurrently.
-	mu                sync.Mutex
-	tasks             map[string]domain.Task
-	createErr         error
-	updateStatusErr   error
-	hasActiveErr      error
-	listErr           error
-	updateErr         error
-	deleteErr         error
-	updateStatusCalls []updateStatusCall
+	mu                        sync.Mutex
+	tasks                     map[string]domain.Task
+	createErr                 error
+	updateStatusErr           error
+	hasActiveErr              error
+	listErr                   error
+	updateErr                 error
+	deleteErr                 error
+	updateWorktreeIDErr       error
+	completeExecutionErr      error
+	setActiveExecutionLinkErr error
+	findByNumberErr           error
+	updateStatusCalls         []updateStatusCall
+	updateWorktreeIDCalls     []updateWorktreeIDCall
 	// batchUpdateProgressCalls records every BatchUpdateProgress call — lets
 	// recalculate_progress_test.go assert it's called exactly once (N+1
 	// regression guard).
-	batchUpdateProgressCalls []map[string]int
-	completeExecutionCalls   []completeExecutionCall
-	completeExecutionErr     error
-	findByNumberErr          error
+	batchUpdateProgressCalls    []map[string]int
+	completeExecutionCalls      []completeExecutionCall
+	setActiveExecutionLinkCalls []setActiveExecutionLinkCall
 	// lastUpdateEvents records the events slice passed to the most recent
 	// Update call — SOL-PW-04's regression guard for "a status-changing
 	// update enqueues exactly one/two events; a title-only update enqueues
@@ -63,6 +67,23 @@ type updateStatusCall struct {
 	tenantID string
 	id       string
 	status   string
+}
+
+// updateWorktreeIDCall/completeExecutionCall mirror updateStatusCall's
+// call-recorder shape for execute_task_test.go's worktree/completion
+// assertions (SOL-TG-04).
+type updateWorktreeIDCall struct {
+	tenantID   string
+	id         string
+	worktreeID string
+}
+
+// setActiveExecutionLinkCall mirrors updateStatusCall's call-recorder shape
+// for report_execution_result_test.go's assertions (TASK-FT-002-04).
+type setActiveExecutionLinkCall struct {
+	tenantID string
+	id       string
+	linkID   string
 }
 
 func newFakeTaskRepository() *fakeTaskRepository {
@@ -129,6 +150,39 @@ func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, sta
 	}
 	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
 		t.Status = status
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+// UpdateWorktreeID mirrors UpdateStatus's fake semantics — records the call
+// and mutates the stored task's WorktreeID (missing task is not an error,
+// same permissive-double rationale as UpdateStatus above).
+func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.updateWorktreeIDCalls = append(f.updateWorktreeIDCalls, updateWorktreeIDCall{tenantID: tenantID, id: id, worktreeID: worktreeID})
+	if f.updateWorktreeIDErr != nil {
+		return f.updateWorktreeIDErr
+	}
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.WorktreeID = worktreeID
+		f.tasks[id] = t
+	}
+	return nil
+}
+
+// SetActiveExecutionLink mirrors UpdateStatus's fake semantics — records
+// the call and mutates the stored task's ActiveExecutionLinkID.
+func (f *fakeTaskRepository) SetActiveExecutionLink(ctx context.Context, tenantID, id, linkID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.setActiveExecutionLinkCalls = append(f.setActiveExecutionLinkCalls, setActiveExecutionLinkCall{tenantID: tenantID, id: id, linkID: linkID})
+	if f.setActiveExecutionLinkErr != nil {
+		return f.setActiveExecutionLinkErr
+	}
+	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
+		t.ActiveExecutionLinkID = linkID
 		f.tasks[id] = t
 	}
 	return nil
@@ -223,19 +277,9 @@ func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) er
 	return nil
 }
 
-// UpdateWorktreeID, UpdatePromptTemplate, UpdateAIPlanJSON are permissive,
-// map-mutating fakes — same posture as UpdateStatus above (no not-found
-// error) since no test in this package needs that fidelity yet.
-func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
-	f.mu.Lock()
-	defer f.mu.Unlock()
-	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
-		t.WorktreeID = worktreeID
-		f.tasks[id] = t
-	}
-	return nil
-}
-
+// UpdatePromptTemplate, UpdateAIPlanJSON are permissive, map-mutating fakes
+// — same posture as UpdateStatus above (no not-found error) since no test in
+// this package needs that fidelity yet.
 func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
@@ -628,13 +672,6 @@ func (f *fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context,
 	return nil
 }
 
-// fakeClock backs Clock-dependent tests (grant-expiry assertions) with a
-// deterministic `now` — mirrors auth-service/internal/usecase/fakes_test.go's
-// identical fakeClock.
-type fakeClock struct{ now time.Time }
-
-func (f *fakeClock) Now() time.Time { return f.now }
-
 // fakeShareLinkRepository backs the public-link usecases' tests without a
 // database — stores only the token hash it's given, never a plaintext, the
 // same discipline the real ShareLinkStore keeps.
@@ -698,26 +735,6 @@ func (f *fakeShareLinkRepository) TaskIDFor(ctx context.Context, tenantID, linkI
 	return l.taskID, nil
 }
 
-// fakeWorktreeProvisioner backs ExecuteTask's worktree-reuse-or-create
-// tests without a real git-gateway-service call.
-type fakeWorktreeProvisioner struct {
-	worktreeID string
-	path       string
-	err        error
-	called     bool
-}
-
-func (f *fakeWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (string, string, error) {
-	f.called = true
-	if f.err != nil {
-		return "", "", f.err
-	}
-	if task.WorktreeID != "" {
-		return task.WorktreeID, "", nil
-	}
-	return f.worktreeID, f.path, nil
-}
-
 type fakeExecutor struct {
 	ref       string
 	err       error
@@ -748,6 +765,25 @@ type fakeComplexExecutor struct {
 func (f *fakeComplexExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreeID string) (string, error) {
 	f.called = true
 	f.gotWorktreeID = worktreeID
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.ref, nil
+}
+
+// fakeWorkflowExecutor backs execute_task_test.go's EngineWorkflow dispatch
+// assertions (TASK-FT-002-03) — same shape as fakeExecutor, plus recording
+// the workflowTemplateID it was called with.
+type fakeWorkflowExecutor struct {
+	ref                   string
+	err                   error
+	called                bool
+	gotWorkflowTemplateID string
+}
+
+func (f *fakeWorkflowExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, workflowTemplateID string) (string, error) {
+	f.called = true
+	f.gotWorkflowTemplateID = workflowTemplateID
 	if f.err != nil {
 		return "", f.err
 	}
@@ -785,4 +821,101 @@ func (f *fakeCommentRepository) ListComments(ctx context.Context, tenantID, task
 		}
 	}
 	return out, "", nil
+}
+
+// fakeWorktreeProvisioner backs execute_task_test.go's worktree reuse-or-
+// create assertions (SOL-TG-04/TASK-TG-04-02) without a real
+// git-gateway-service client.
+type fakeWorktreeProvisioner struct {
+	worktreeID string
+	path       string
+	err        error
+	called     bool
+	gotTask    domain.Task
+}
+
+func (f *fakeWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (string, string, error) {
+	f.called = true
+	f.gotTask = task
+	if f.err != nil {
+		return "", "", f.err
+	}
+	return f.worktreeID, f.path, nil
+}
+
+// fakeExecutionLinkRepository backs execute_task_test.go's execution_links
+// assertions (BE-SOL-001/CR-FLOW-TASK-001) without a real postgres adapter.
+type fakeExecutionLinkRepository struct {
+	created []domain.ExecutionLink
+	nextID  int
+}
+
+func (f *fakeExecutionLinkRepository) CreateExecutionLink(ctx context.Context, tenantID, taskID string, engine domain.ExecutionEngine, externalRefID string) (domain.ExecutionLink, error) {
+	f.nextID++
+	link := domain.ExecutionLink{ID: fmt.Sprintf("link-%d", f.nextID), TenantID: tenantID, TaskID: taskID, Engine: engine, ExternalRefID: externalRefID, StatusMirror: "in_progress"}
+	f.created = append(f.created, link)
+	return link, nil
+}
+
+func (f *fakeExecutionLinkRepository) SetExternalRef(ctx context.Context, tenantID, linkID, externalRefID string) error {
+	for i := range f.created {
+		if f.created[i].ID == linkID {
+			f.created[i].ExternalRefID = externalRefID
+		}
+	}
+	return nil
+}
+
+// GetExecutionLink backs report_execution_result_test.go's staleness/match
+// assertions (TASK-FT-002-04) — a not-found lookup returns errNotFound,
+// mirroring the real repository's not-found behavior.
+func (f *fakeExecutionLinkRepository) GetExecutionLink(ctx context.Context, tenantID, id string) (domain.ExecutionLink, error) {
+	for _, l := range f.created {
+		if l.ID == id && l.TenantID == tenantID {
+			return l, nil
+		}
+	}
+	return domain.ExecutionLink{}, errNotFound
+}
+
+func (f *fakeExecutionLinkRepository) Complete(ctx context.Context, tenantID, linkID, statusMirror string) error {
+	for i := range f.created {
+		if f.created[i].ID == linkID {
+			f.created[i].StatusMirror = statusMirror
+		}
+	}
+	return nil
+}
+
+// UpdateStatusMirror backs mirror_execution_status_test.go's assertions
+// (BE-SOL-003/TASK-FT-003-05) — a no-op (not an error) when no row matches
+// externalRefID, mirroring the real repository's idempotence contract.
+func (f *fakeExecutionLinkRepository) UpdateStatusMirror(ctx context.Context, tenantID, externalRefID, newStatus string) error {
+	for i := range f.created {
+		if f.created[i].ExternalRefID == externalRefID && f.created[i].TenantID == tenantID {
+			f.created[i].StatusMirror = newStatus
+		}
+	}
+	return nil
+}
+
+// fakeClock returns `now`, then `now` advanced by `step` on every subsequent
+// call — deterministic enough for execute_task_test.go to assert a
+// non-zero, exact actual_hours value without real wall-clock time. Also
+// constructible as a bare fixed clock via the literal &fakeClock{now: t}
+// (step defaults to zero, so every call returns the same instant) — the
+// shape execute_batch_test.go/resolve_permission_test.go use.
+type fakeClock struct {
+	now  time.Time
+	step time.Duration
+}
+
+func newFakeClock(start time.Time, step time.Duration) *fakeClock {
+	return &fakeClock{now: start, step: step}
+}
+
+func (c *fakeClock) Now() time.Time {
+	t := c.now
+	c.now = c.now.Add(c.step)
+	return t
 }

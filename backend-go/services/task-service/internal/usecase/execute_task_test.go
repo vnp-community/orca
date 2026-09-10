@@ -10,47 +10,110 @@ import (
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
 
-// newExecuteTaskForTest wires a real ResolvePermission (not a fake) so
-// ExecuteTask's permission pre-check (TASK-TG-04-01) is genuinely
-// exercised — repo is expected to already have "task-1" (or whatever
-// TaskID a test uses) seeded with OwnerID "user-1" so the owner-intrinsic
-// short-circuit grants the caller access by default. worktrees/resolver
-// default to permissive fakes; clock defaults to a fixed instant (so
-// actual_hours math is deterministic without every test needing to care).
-func newExecuteTaskForTest(repo *fakeTaskRepository, edges *fakeEdgeRepository, simple SimpleExecutor, complex ComplexExecutor) *ExecuteTask {
-	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
-	worktrees := &fakeWorktreeProvisioner{worktreeID: "wt-1", path: "/srv/worktrees/wt-1"}
-	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}
-	clock := &fakeClock{now: time.Unix(1000, 0)}
-	return NewExecuteTask(repo, edges, simple, complex, resolvePermission, worktrees, resolver, clock)
+// seedExecutableTask creates a task ("tenant-1"/"proj-1"-shaped, unless
+// projectID overrides) with an owner grant directly on it for "user-1" —
+// the minimum ResolvePermission needs to authorize the "execute" action
+// (see ResolvePermission's doc comment: chain[0] must be the task itself,
+// and a grant directly on the target task counts regardless of ApplyTree).
+func seedExecutableTask(t *testing.T, tasks *fakeTaskRepository, grants *fakeGrantRepository, id, projectID string) {
+	t.Helper()
+	task, err := domain.NewTask(id, "tenant-1", "Task "+id, domain.StatusOpen, "", projectID)
+	if err != nil {
+		t.Fatalf("building task %s: %v", id, err)
+	}
+	tasks.tasks[id] = task
+	grants.grants = append(grants.grants, domain.Grant{TaskID: id, SubjectID: "user-1", Level: domain.GrantLevelOwner, ApplyTree: false})
 }
 
-// seedOwnedTask puts a task-1 (or the given id) owned by "user-1" into repo
-// — every test in this file calls Execute as "user-1" via withIdentity.
-func seedOwnedTask(repo *fakeTaskRepository, id string) {
-	repo.tasks[id] = domain.Task{ID: id, TenantID: "tenant-1", OwnerID: "user-1", Status: domain.StatusOpen}
+// newExecutableExecuteTask wires an ExecuteTask usecase whose permission
+// check, connection resolution, and worktree provisioning all succeed by
+// default (a project with a connected dev server and a task-service that
+// successfully reuses/creates a worktree) — individual tests override
+// whichever of the returned fakes they're exercising.
+func newExecutableExecuteTask(tasks *fakeTaskRepository, edges *fakeEdgeRepository, simple SimpleExecutor, complex ComplexExecutor, grants *fakeGrantRepository) (uc *ExecuteTask, worktrees *fakeWorktreeProvisioner, resolver *fakeProjectExecutionResolver, clock *fakeClock, links *fakeExecutionLinkRepository) {
+	return newExecutableExecuteTaskWithWorkflow(tasks, edges, simple, complex, &fakeWorkflowExecutor{ref: "workflow-ref-1"}, grants)
+}
+
+// newExecutableExecuteTaskWithWorkflow is newExecutableExecuteTask's full
+// form — used by the EngineWorkflow-dispatch tests (TASK-FT-002-03) that
+// need to control/assert against the WorkflowExecutor fake directly.
+func newExecutableExecuteTaskWithWorkflow(tasks *fakeTaskRepository, edges *fakeEdgeRepository, simple SimpleExecutor, complex ComplexExecutor, workflow WorkflowExecutor, grants *fakeGrantRepository) (uc *ExecuteTask, worktrees *fakeWorktreeProvisioner, resolver *fakeProjectExecutionResolver, clock *fakeClock, links *fakeExecutionLinkRepository) {
+	resolvePermissionUC := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
+	worktrees = &fakeWorktreeProvisioner{worktreeID: "wt-1", path: "/srv/worktrees/wt-1"}
+	resolver = &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/wt-1", connected: true}
+	clock = newFakeClock(time.Unix(1000, 0), time.Hour)
+	links = &fakeExecutionLinkRepository{}
+	uc = NewExecuteTask(tasks, edges, simple, complex, workflow, resolvePermissionUC, worktrees, resolver, clock, links)
+	return uc, worktrees, resolver, clock, links
 }
 
 func TestExecuteTask_RequiresTenantContext(t *testing.T) {
-	uc := newExecuteTaskForTest(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeExecutor{}, &fakeComplexExecutor{})
+	tasks := newFakeTaskRepository()
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, &fakeExecutor{}, &fakeExecutor{}, &fakeGrantRepository{})
 	_, err := uc.Execute(context.Background(), ExecuteTaskInput{TaskID: "t1"})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
 	}
 }
 
-// TestExecuteTask_SimplePath_NoSubtasksNoDependencies is the core branching
-// regression: a task with neither parent_child nor depends_on edges FROM it
-// must dispatch to SimpleExecutor, never ComplexExecutor. Also covers
-// TASK-TG-04-03's inline completion: the simple path writes StatusReview +
-// a non-zero actual_hours in the SAME call, Async=false.
-func TestExecuteTask_SimplePath_NoSubtasksNoDependencies(t *testing.T) {
-	repo := newFakeTaskRepository()
-	seedOwnedTask(repo, "task-1")
+func TestExecuteTask_RequiresTaskID(t *testing.T) {
+	uc, _, _, _, _ := newExecutableExecuteTask(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeExecutor{}, &fakeExecutor{}, &fakeGrantRepository{})
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, ExecuteTaskInput{RequestID: "req-1"}); err == nil {
+		t.Fatal("expected an error for an empty task_id")
+	}
+}
+
+// TestExecuteTask_PermissionDenied_NeverWritesStatus is the regression
+// guard for TASK-TG-04-01's permission pre-check: a caller with no grant on
+// the task must be denied BEFORE any UpdateStatus/worktree/dispatch call —
+// closing the gap where ExecuteTask dispatched real work without ever
+// calling ResolvePermission.
+func TestExecuteTask_PermissionDenied_NeverWritesStatus(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	task, err := domain.NewTask("task-1", "tenant-1", "Task", domain.StatusOpen, "", "proj-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks.tasks["task-1"] = task
+	grants := &fakeGrantRepository{} // no grants recorded anywhere — every action is denied
 	edges := &fakeEdgeRepository{}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	complex := &fakeComplexExecutor{ref: "orchestration-ref-1"}
-	uc := newExecuteTaskForTest(repo, edges, simple, complex)
+	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	uc, worktrees, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, complex, grants)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	_, err = uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
+	if err == nil {
+		t.Fatal("expected a permission-denied error")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Kind != apperrors.KindPermissionDenied {
+		t.Fatalf("expected KindPermissionDenied, got %v", err)
+	}
+	if len(tasks.updateStatusCalls) != 0 {
+		t.Errorf("expected NO UpdateStatus call when permission is denied, got %+v", tasks.updateStatusCalls)
+	}
+	if worktrees.called {
+		t.Error("expected WorktreeProvisioner NOT to be called when permission is denied")
+	}
+	if simple.called || complex.called {
+		t.Error("expected neither executor to be called when permission is denied")
+	}
+}
+
+// TestExecuteTask_SimplePath_NoSubtasksNoDependencies is the core branching
+// regression: a task with neither parent_child nor depends_on edges FROM it
+// must dispatch to SimpleExecutor, never ComplexExecutor.
+func TestExecuteTask_SimplePath_NoSubtasksNoDependencies(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	edges := &fakeEdgeRepository{}
+	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	result, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
@@ -61,7 +124,7 @@ func TestExecuteTask_SimplePath_NoSubtasksNoDependencies(t *testing.T) {
 		t.Errorf("expected the simple executor's ref, got %q", result.ExecutionRef)
 	}
 	if result.Async {
-		t.Error("expected Async=false for the simple path")
+		t.Error("expected the simple path to report Async: false")
 	}
 	if !simple.called {
 		t.Error("expected SimpleExecutor to be called")
@@ -69,10 +132,10 @@ func TestExecuteTask_SimplePath_NoSubtasksNoDependencies(t *testing.T) {
 	if complex.called {
 		t.Error("expected ComplexExecutor NOT to be called")
 	}
-	if len(repo.completeExecutionCalls) != 1 {
-		t.Fatalf("expected exactly 1 CompleteExecution call, got %d: %+v", len(repo.completeExecutionCalls), repo.completeExecutionCalls)
+	if len(tasks.completeExecutionCalls) != 1 {
+		t.Fatalf("expected exactly 1 CompleteExecution call, got %d: %+v", len(tasks.completeExecutionCalls), tasks.completeExecutionCalls)
 	}
-	call := repo.completeExecutionCalls[0]
+	call := tasks.completeExecutionCalls[0]
 	if call.status != domain.StatusReview {
 		t.Errorf("expected CompleteExecution status=review, got %q", call.status)
 	}
@@ -82,14 +145,15 @@ func TestExecuteTask_SimplePath_NoSubtasksNoDependencies(t *testing.T) {
 }
 
 func TestExecuteTask_ComplexPath_HasSubtasks(t *testing.T) {
-	repo := newFakeTaskRepository()
-	seedOwnedTask(repo, "task-1")
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
 	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
 		{FromTaskID: "task-1", ToTaskID: "subtask-1", Kind: domain.EdgeKindParentChild},
 	}}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	complex := &fakeComplexExecutor{ref: "orchestration-ref-1"}
-	uc := newExecuteTaskForTest(repo, edges, simple, complex)
+	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	result, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
@@ -108,25 +172,26 @@ func TestExecuteTask_ComplexPath_HasSubtasks(t *testing.T) {
 	if simple.called {
 		t.Error("expected SimpleExecutor NOT to be called")
 	}
-	if len(repo.completeExecutionCalls) != 0 {
-		t.Errorf("expected NO inline CompleteExecution call for the complex (async) path, got %+v", repo.completeExecutionCalls)
+	if len(tasks.completeExecutionCalls) != 0 {
+		t.Errorf("expected NO inline CompleteExecution call for the complex (async) path, got %+v", tasks.completeExecutionCalls)
 	}
 	// Status stays at in_progress — no further write until
 	// ReportTaskExecutionResult (TASK-TG-04-05).
-	if got := repo.tasks["task-1"].Status; got != domain.StatusInProgress {
+	if got := tasks.tasks["task-1"].Status; got != domain.StatusInProgress {
 		t.Errorf("expected status to remain in_progress after complex dispatch, got %q", got)
 	}
 }
 
 func TestExecuteTask_ComplexPath_HasDependencies(t *testing.T) {
-	repo := newFakeTaskRepository()
-	seedOwnedTask(repo, "task-1")
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
 	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
 		{FromTaskID: "task-1", ToTaskID: "blocking-task", Kind: domain.EdgeKindDependsOn},
 	}}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	complex := &fakeComplexExecutor{ref: "orchestration-ref-1"}
-	uc := newExecuteTaskForTest(repo, edges, simple, complex)
+	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	result, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
@@ -144,14 +209,15 @@ func TestExecuteTask_ComplexPath_HasDependencies(t *testing.T) {
 func TestExecuteTask_IgnoresEdgesToTheTaskWhenDecidingComplexity(t *testing.T) {
 	// task-1 is someone else's dependency (an edge TO it, not FROM it) —
 	// that must not make task-1 itself "complex".
-	repo := newFakeTaskRepository()
-	seedOwnedTask(repo, "task-1")
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
 	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
 		{FromTaskID: "other-task", ToTaskID: "task-1", Kind: domain.EdgeKindDependsOn},
 	}}
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	complex := &fakeComplexExecutor{ref: "orchestration-ref-1"}
-	uc := newExecuteTaskForTest(repo, edges, simple, complex)
+	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
@@ -163,11 +229,12 @@ func TestExecuteTask_IgnoresEdgesToTheTaskWhenDecidingComplexity(t *testing.T) {
 }
 
 func TestExecuteTask_ExecutorFailurePropagates(t *testing.T) {
-	repo := newFakeTaskRepository()
-	seedOwnedTask(repo, "task-1")
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
 	edges := &fakeEdgeRepository{}
 	simple := &fakeExecutor{err: errors.New("infra-fleet-service unavailable")}
-	uc := newExecuteTaskForTest(repo, edges, simple, &fakeComplexExecutor{})
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, &fakeExecutor{}, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
@@ -175,33 +242,57 @@ func TestExecuteTask_ExecutorFailurePropagates(t *testing.T) {
 	}
 }
 
-func TestExecuteTask_RequiresTaskID(t *testing.T) {
-	uc := newExecuteTaskForTest(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeExecutor{}, &fakeComplexExecutor{})
+// TestExecuteTask_DispatchFailure_RevertsStatusToPrevious is TASK-TG-04-01's
+// core regression: a dispatch failure used to leave the task marked
+// in_progress PERMANENTLY (no RPC ever cleared it). Execute must now write
+// InProgress, then on failure revert back to the task's pre-dispatch
+// status, in that order.
+func TestExecuteTask_DispatchFailure_RevertsStatusToPrevious(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1") // starts StatusOpen
+	edges := &fakeEdgeRepository{}
+	simple := &fakeExecutor{err: errors.New("infra-fleet-service unavailable")}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, &fakeExecutor{}, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
-	if _, err := uc.Execute(ctx, ExecuteTaskInput{RequestID: "req-1"}); err == nil {
-		t.Fatal("expected an error for an empty task_id")
+	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
+		t.Fatal("expected error to propagate from executor failure")
+	}
+	if len(tasks.updateStatusCalls) != 2 {
+		t.Fatalf("expected exactly two UpdateStatus calls (in_progress then revert), got %d: %+v", len(tasks.updateStatusCalls), tasks.updateStatusCalls)
+	}
+	if tasks.updateStatusCalls[0].status != domain.StatusInProgress {
+		t.Errorf("expected the first UpdateStatus call to be StatusInProgress, got %+v", tasks.updateStatusCalls[0])
+	}
+	if tasks.updateStatusCalls[1].status != domain.StatusOpen {
+		t.Errorf("expected the second UpdateStatus call to revert to the pre-dispatch status (open), got %+v", tasks.updateStatusCalls[1])
+	}
+	if len(tasks.completeExecutionCalls) != 0 {
+		t.Errorf("expected no CompleteExecution call on a failed dispatch, got %+v", tasks.completeExecutionCalls)
+	}
+	// The fake mutates its map on every UpdateStatus call, so the final
+	// persisted status must be the reverted one, not in_progress.
+	if got := tasks.tasks["task-1"].Status; got != domain.StatusOpen {
+		t.Errorf("expected persisted status to be reverted to open, got %q", got)
 	}
 }
 
-// TestExecuteTask_MarksTaskInProgressBeforeDispatching is the regression for
-// this usecase's real state transition (see execute_task.go's doc comment):
-// Execute must call TaskRepository.UpdateStatus(StatusInProgress) before
-// handing off to either executor.
 func TestExecuteTask_MarksTaskInProgressBeforeDispatching(t *testing.T) {
-	repo := newFakeTaskRepository()
-	seedOwnedTask(repo, "task-1")
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, &fakeComplexExecutor{})
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(repo.updateStatusCalls) != 1 {
-		t.Fatalf("expected exactly one UpdateStatus call, got %d: %+v", len(repo.updateStatusCalls), repo.updateStatusCalls)
+	if len(tasks.updateStatusCalls) != 1 {
+		t.Fatalf("expected exactly one UpdateStatus call, got %d: %+v", len(tasks.updateStatusCalls), tasks.updateStatusCalls)
 	}
-	got := repo.updateStatusCalls[0]
+	got := tasks.updateStatusCalls[0]
 	if got.tenantID != "tenant-1" || got.id != "task-1" || got.status != domain.StatusInProgress {
 		t.Errorf("unexpected UpdateStatus call: %+v", got)
 	}
@@ -210,17 +301,17 @@ func TestExecuteTask_MarksTaskInProgressBeforeDispatching(t *testing.T) {
 	}
 }
 
-// TestExecuteTask_StatusUpdateFailurePropagatesAndSkipsDispatch: since the
-// status transition is the entire point of this usecase's Epic C addition,
-// a failure to persist it must fail Execute outright rather than silently
-// dispatching with no recorded state.
+// TestExecuteTask_StatusUpdateFailurePropagatesAndSkipsDispatch: a failure
+// to persist the in_progress transition must fail Execute outright rather
+// than silently dispatching with no recorded state.
 func TestExecuteTask_StatusUpdateFailurePropagatesAndSkipsDispatch(t *testing.T) {
-	repo := newFakeTaskRepository()
-	seedOwnedTask(repo, "task-1")
-	repo.updateStatusErr = errors.New("db unavailable")
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	tasks.updateStatusErr = errors.New("db unavailable")
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	complex := &fakeComplexExecutor{ref: "orchestration-ref-1"}
-	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, complex)
+	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
@@ -231,82 +322,16 @@ func TestExecuteTask_StatusUpdateFailurePropagatesAndSkipsDispatch(t *testing.T)
 	}
 }
 
-// TestExecuteTask_DispatchFailure_RevertsStatusToPrevious is TASK-TG-04-01's
-// core regression: a dispatch failure must revert the in_progress write to
-// the task's PREVIOUS status, not strand it in_progress forever.
-func TestExecuteTask_DispatchFailure_RevertsStatusToPrevious(t *testing.T) {
-	repo := newFakeTaskRepository()
-	repo.tasks["task-1"] = domain.Task{ID: "task-1", TenantID: "tenant-1", OwnerID: "user-1", Status: domain.StatusReview}
-	simple := &fakeExecutor{err: errors.New("dev server offline")}
-	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, &fakeComplexExecutor{})
-	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
-
-	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
-		t.Fatal("expected an error when dispatch fails")
-	}
-
-	if len(repo.updateStatusCalls) != 2 {
-		t.Fatalf("expected exactly 2 UpdateStatus calls (in_progress then revert), got %d: %+v", len(repo.updateStatusCalls), repo.updateStatusCalls)
-	}
-	if repo.updateStatusCalls[0].status != domain.StatusInProgress {
-		t.Errorf("expected first call to set in_progress, got %+v", repo.updateStatusCalls[0])
-	}
-	if repo.updateStatusCalls[1].status != domain.StatusReview {
-		t.Errorf("expected second call to revert to the previous status (review), got %+v", repo.updateStatusCalls[1])
-	}
-	// The fake mutates its map on every UpdateStatus call, so the final
-	// persisted status must be the reverted one, not in_progress.
-	if got := repo.tasks["task-1"].Status; got != domain.StatusReview {
-		t.Errorf("expected persisted status to be reverted to review, got %q", got)
-	}
-}
-
-// TestExecuteTask_PermissionDenied_NeverWritesStatus is the other
-// TASK-TG-04-01 regression guard: a ResolvePermission denial must
-// short-circuit BEFORE any UpdateStatus call at all — the false-in_progress
-// bug this fix closes.
-func TestExecuteTask_PermissionDenied_NeverWritesStatus(t *testing.T) {
-	repo := newFakeTaskRepository()
-	repo.tasks["task-1"] = domain.Task{ID: "task-1", TenantID: "tenant-1", OwnerID: "someone-else", Status: domain.StatusOpen}
-	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
+// TestExecuteTask_NoConnection_FailsBeforeAnyStatusWrite is TASK-TG-04-03's
+// pre-check 2: a disconnected project must fail closed BEFORE the
+// in_progress write and BEFORE worktree provisioning.
+func TestExecuteTask_NoConnection_FailsBeforeAnyStatusWrite(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	worktrees := &fakeWorktreeProvisioner{worktreeID: "wt-1"}
-	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}
-	clock := &fakeClock{now: time.Unix(1000, 0)}
-	uc := NewExecuteTask(repo, &fakeEdgeRepository{}, simple, &fakeComplexExecutor{}, resolvePermission, worktrees, resolver, clock)
-	ctx := withIdentity(context.Background(), "tenant-1", "attacker")
-
-	_, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
-	if err == nil {
-		t.Fatal("expected PermissionDenied for a caller with no execute access")
-	}
-	var ae *apperrors.AppError
-	if !errors.As(err, &ae) || ae.Kind != apperrors.KindPermissionDenied {
-		t.Fatalf("expected KindPermissionDenied, got %v", err)
-	}
-	if len(repo.updateStatusCalls) != 0 {
-		t.Errorf("expected NO UpdateStatus calls for a denied caller, got %+v", repo.updateStatusCalls)
-	}
-	if simple.called {
-		t.Error("expected the executor to never be called for a denied caller")
-	}
-	if worktrees.called {
-		t.Error("expected EnsureWorktree to never be called for a denied caller")
-	}
-}
-
-// TestExecuteTask_NoConnection_ReturnsFailedPrecondition: a disconnected
-// project must fail BEFORE the in_progress write, per TASK-TG-04-03's
-// pre-check ordering.
-func TestExecuteTask_NoConnection_ReturnsFailedPrecondition(t *testing.T) {
-	repo := newFakeTaskRepository()
-	seedOwnedTask(repo, "task-1")
-	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
-	worktrees := &fakeWorktreeProvisioner{worktreeID: "wt-1"}
-	resolver := &fakeProjectExecutionResolver{connected: false}
-	clock := &fakeClock{now: time.Unix(1000, 0)}
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	uc := NewExecuteTask(repo, &fakeEdgeRepository{}, simple, &fakeComplexExecutor{}, resolvePermission, worktrees, resolver, clock)
+	uc, worktrees, resolver, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
+	resolver.connected = false
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	_, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
@@ -317,34 +342,266 @@ func TestExecuteTask_NoConnection_ReturnsFailedPrecondition(t *testing.T) {
 	if !errors.As(err, &ae) || ae.Kind != apperrors.KindFailedPrecondition {
 		t.Fatalf("expected KindFailedPrecondition, got %v", err)
 	}
-	if len(repo.updateStatusCalls) != 0 {
-		t.Errorf("expected NO UpdateStatus calls when there's no connection, got %+v", repo.updateStatusCalls)
+	if len(tasks.updateStatusCalls) != 0 {
+		t.Errorf("expected NO UpdateStatus call when there's no connection, got %+v", tasks.updateStatusCalls)
 	}
 	if worktrees.called {
-		t.Error("expected EnsureWorktree to never be called when there's no connection")
+		t.Error("expected WorktreeProvisioner NOT to be called when there's no connection")
 	}
 	if simple.called {
-		t.Error("expected the executor to never be called when there's no connection")
+		t.Error("expected SimpleExecutor NOT to be called when there's no connection")
 	}
 }
 
-// TestExecuteTask_ExistingWorktreeID_NeverCallsCreateBranch: a task with an
-// existing WorktreeID never triggers EnsureWorktree's create branch — the
-// fake provisioner reuses task.WorktreeID directly and Execute must not
-// re-persist an unchanged worktree id.
-func TestExecuteTask_ExistingWorktreeID_NeverCallsCreateBranch(t *testing.T) {
-	repo := newFakeTaskRepository()
-	repo.tasks["task-1"] = domain.Task{ID: "task-1", TenantID: "tenant-1", OwnerID: "user-1", Status: domain.StatusOpen, WorktreeID: "existing-wt"}
+// TestExecuteTask_WorktreeProvisionFailure_PropagatesBeforeStatusWrite:
+// EnsureWorktree failing must surface as an error before any status
+// mutation, same as the connection/permission pre-checks.
+func TestExecuteTask_WorktreeProvisionFailure_PropagatesBeforeStatusWrite(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
-	uc := newExecuteTaskForTest(repo, &fakeEdgeRepository{}, simple, &fakeComplexExecutor{})
+	uc, worktrees, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
+	worktrees.err = errors.New("git-gateway-service unavailable")
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
+		t.Fatal("expected an error when worktree provisioning fails")
+	}
+	if len(tasks.updateStatusCalls) != 0 {
+		t.Errorf("expected NO UpdateStatus call when worktree provisioning fails, got %+v", tasks.updateStatusCalls)
+	}
+	if simple.called {
+		t.Error("expected SimpleExecutor NOT to be called when worktree provisioning fails")
+	}
+}
+
+// TestExecuteTask_ReusesWorktree_DoesNotRewriteUnchangedWorktreeID: a task
+// with an existing worktree ID reuses it via EnsureWorktree — receiving the
+// SAME id back must not trigger a redundant UpdateWorktreeID write.
+func TestExecuteTask_ReusesWorktree_DoesNotRewriteUnchangedWorktreeID(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	task := tasks.tasks["task-1"]
+	task.WorktreeID = "wt-existing"
+	tasks.tasks["task-1"] = task
+
+	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	uc, worktrees, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
+	worktrees.worktreeID = "wt-existing" // EnsureWorktree's real reuse branch echoes the task's existing id back
+	worktrees.path = ""
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	// UpdateWorktreeID must NOT have been called — the worktree id didn't
-	// change (reuse case).
-	if got := repo.tasks["task-1"].WorktreeID; got != "existing-wt" {
-		t.Errorf("expected the existing worktree id to remain unchanged, got %q", got)
+	if !worktrees.called {
+		t.Error("expected EnsureWorktree to be called")
+	}
+	if worktrees.gotTask.WorktreeID != "wt-existing" {
+		t.Errorf("expected EnsureWorktree to receive the task's persisted worktree id, got %q", worktrees.gotTask.WorktreeID)
+	}
+	if len(tasks.updateWorktreeIDCalls) != 0 {
+		t.Errorf("expected NO UpdateWorktreeID call when the returned worktree id matches the task's existing one, got %+v", tasks.updateWorktreeIDCalls)
+	}
+}
+
+// TestExecuteTask_CreatesWorktree_PersistsNewWorktreeID: a task with no
+// existing worktree gets the newly created id persisted via
+// UpdateWorktreeID before dispatch.
+func TestExecuteTask_CreatesWorktree_PersistsNewWorktreeID(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1") // no WorktreeID yet
+	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	uc, worktrees, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
+	worktrees.worktreeID = "wt-new"
+	worktrees.path = "/srv/worktrees/wt-new"
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(tasks.updateWorktreeIDCalls) != 1 {
+		t.Fatalf("expected exactly one UpdateWorktreeID call, got %d: %+v", len(tasks.updateWorktreeIDCalls), tasks.updateWorktreeIDCalls)
+	}
+	if tasks.updateWorktreeIDCalls[0].worktreeID != "wt-new" {
+		t.Errorf("expected the new worktree id to be persisted, got %q", tasks.updateWorktreeIDCalls[0].worktreeID)
+	}
+}
+
+// TestExecuteTask_SimplePath_CompletesInlineWithActualHours is
+// TASK-TG-04-03's core regression: SimpleExecutor.Execute already blocks
+// until completion, so Execute must persist StatusReview + a non-zero
+// actual_hours in the SAME call — no second RPC needed.
+func TestExecuteTask_SimplePath_CompletesInlineWithActualHours(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	result, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Async {
+		t.Error("expected the simple path to report Async: false")
+	}
+	if len(tasks.completeExecutionCalls) != 1 {
+		t.Fatalf("expected exactly one CompleteExecution call, got %d: %+v", len(tasks.completeExecutionCalls), tasks.completeExecutionCalls)
+	}
+	got := tasks.completeExecutionCalls[0]
+	if got.status != domain.StatusReview {
+		t.Errorf("expected StatusReview, got %q", got.status)
+	}
+	if got.actualHours <= 0 {
+		t.Errorf("expected a non-zero actual_hours, got %v", got.actualHours)
+	}
+}
+
+// TestExecuteTask_ComplexPath_ReturnsAsyncAndLeavesStatusInProgress: the
+// complex path has no synchronous completion signal — it must return
+// Async: true and leave the task at InProgress, with no CompleteExecution
+// call (that arrives later via TASK-TG-04-05's ReportTaskExecutionResult).
+func TestExecuteTask_ComplexPath_ReturnsAsyncAndLeavesStatusInProgress(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
+		{FromTaskID: "task-1", ToTaskID: "subtask-1", Kind: domain.EdgeKindParentChild},
+	}}
+	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, &fakeExecutor{}, complex, grants)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	result, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Async {
+		t.Error("expected the complex path to report Async: true")
+	}
+	if len(tasks.completeExecutionCalls) != 0 {
+		t.Errorf("expected no CompleteExecution call on the complex path, got %+v", tasks.completeExecutionCalls)
+	}
+	if len(tasks.updateStatusCalls) != 1 || tasks.updateStatusCalls[0].status != domain.StatusInProgress {
+		t.Errorf("expected status to remain in_progress after a successful complex dispatch (no revert, no completion), got %+v", tasks.updateStatusCalls)
+	}
+}
+
+// TestExecuteTask_WorkflowTemplateID_TakesPriorityOverSubtasks is a
+// regression guard against the exact ambiguity CR-FLOW-TASK-001 calls out:
+// a task with BOTH a workflow_template_id AND child edges must select
+// EngineWorkflow, not EngineOrchestration.
+func TestExecuteTask_WorkflowTemplateID_TakesPriorityOverSubtasks(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	task := tasks.tasks["task-1"]
+	task.WorkflowTemplateID = "wf-tmpl-1"
+	tasks.tasks["task-1"] = task
+	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
+		{FromTaskID: "task-1", ToTaskID: "subtask-1", Kind: domain.EdgeKindParentChild},
+	}}
+	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	workflow := &fakeWorkflowExecutor{ref: "workflow-ref-1"}
+	uc, _, _, _, links := newExecutableExecuteTaskWithWorkflow(tasks, edges, simple, complex, workflow, grants)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(links.created) != 1 || links.created[0].Engine != domain.EngineWorkflow {
+		t.Fatalf("expected exactly one execution_links row with engine=workflow, got %+v", links.created)
+	}
+	if !workflow.called || complex.called || simple.called {
+		t.Errorf("expected only WorkflowExecutor to be called, workflow=%v complex=%v simple=%v", workflow.called, complex.called, simple.called)
+	}
+}
+
+// TestExecuteTask_WorkflowPath_DispatchesToWorkflowExecutor is
+// TASK-FT-002-03's core regression: EngineWorkflow must call
+// WorkflowExecutor.Execute (with the task's workflow_template_id), never
+// ComplexExecutor, and report Async: true (same shape as the complex path
+// — workflow-service.Execute dispatches asynchronously too).
+func TestExecuteTask_WorkflowPath_DispatchesToWorkflowExecutor(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	task := tasks.tasks["task-1"]
+	task.WorkflowTemplateID = "wf-tmpl-1"
+	tasks.tasks["task-1"] = task
+	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	complex := &fakeExecutor{ref: "orchestration-ref-1"}
+	workflow := &fakeWorkflowExecutor{ref: "workflow-exec-1"}
+	uc, _, _, _, _ := newExecutableExecuteTaskWithWorkflow(tasks, &fakeEdgeRepository{}, simple, complex, workflow, grants)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	result, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !workflow.called {
+		t.Error("expected WorkflowExecutor to be called")
+	}
+	if complex.called || simple.called {
+		t.Errorf("expected neither SimpleExecutor nor ComplexExecutor to be called, simple=%v complex=%v", simple.called, complex.called)
+	}
+	if workflow.gotWorkflowTemplateID != "wf-tmpl-1" {
+		t.Errorf("expected the task's workflow_template_id to pass through, got %q", workflow.gotWorkflowTemplateID)
+	}
+	if result.ExecutionRef != "workflow-exec-1" {
+		t.Errorf("expected the workflow executor's ref, got %q", result.ExecutionRef)
+	}
+	if !result.Async {
+		t.Error("expected the workflow path to report Async: true")
+	}
+}
+
+// TestExecuteTask_EveryEngineBranch_EnqueuesExactlyOneExecutionLink covers
+// BE-SOL-001/CR-FLOW-TASK-001's acceptance criteria: every Execute call that
+// reaches dispatch — across all three engines — records exactly one
+// execution_links row tagged with the engine selected.
+func TestExecuteTask_EveryEngineBranch_EnqueuesExactlyOneExecutionLink(t *testing.T) {
+	cases := []struct {
+		name           string
+		edges          []domain.TaskEdge
+		workflowTmplID string
+		wantEngine     domain.ExecutionEngine
+	}{
+		{name: "no edges, no template -> direct_agent", wantEngine: domain.EngineDirectAgent},
+		{name: "parent_child edge -> orchestration", edges: []domain.TaskEdge{{FromTaskID: "task-1", ToTaskID: "sub-1", Kind: domain.EdgeKindParentChild}}, wantEngine: domain.EngineOrchestration},
+		{name: "depends_on edge -> orchestration", edges: []domain.TaskEdge{{FromTaskID: "task-1", ToTaskID: "dep-1", Kind: domain.EdgeKindDependsOn}}, wantEngine: domain.EngineOrchestration},
+		{name: "workflow_template_id set -> workflow", workflowTmplID: "wf-1", wantEngine: domain.EngineWorkflow},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tasks := newFakeTaskRepository()
+			grants := &fakeGrantRepository{}
+			seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+			if tc.workflowTmplID != "" {
+				task := tasks.tasks["task-1"]
+				task.WorkflowTemplateID = tc.workflowTmplID
+				tasks.tasks["task-1"] = task
+			}
+			simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+			complex := &fakeExecutor{ref: "orchestration-ref-1"}
+			uc, _, _, _, links := newExecutableExecuteTask(tasks, &fakeEdgeRepository{edges: tc.edges}, simple, complex, grants)
+			ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+			if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(links.created) != 1 {
+				t.Fatalf("expected exactly one execution_links row, got %d", len(links.created))
+			}
+			if links.created[0].Engine != tc.wantEngine {
+				t.Errorf("expected engine %q, got %q", tc.wantEngine, links.created[0].Engine)
+			}
+		})
 	}
 }

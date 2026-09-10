@@ -11,27 +11,41 @@ import (
 
 // WorktreeProvisioner implements usecase.WorktreeProvisioner against
 // git-gateway-service's CreateWorktree RPC — delegates the whole
-// create+record saga rather than re-implementing it.
+// create+record saga rather than re-implementing it (SOL-TG-04).
 //
-// Open wiring detail this task's Context flagged, resolved: CreateWorktreeRequest
-// requires a repo_id (gitgateway.proto's CreateWorktreeRequest.repo_id,
-// field 2) that task.ProjectID alone doesn't resolve. Checked
-// project-service's actual cardinality before choosing
-// (project-service.md / project.proto's AddRepo/ListRepos RPCs: a project
-// can have MULTIPLE repos, ordered by position) — this adapter resolves
-// RepoID itself via project-service.ListRepos and uses the first repo by
-// position (the project's "primary"/default repo), the same convention
-// ProjectInfoResolver (TASK-TG-02-04) already uses for its repoURL.
-// git-gateway-service's own CreateWorktree saga is NOT changed to add
-// project_id-based resolution server-side — that would duplicate this
-// lookup in two places for no benefit.
+// Resolved wiring detail (TASK-TG-04-02's "open wiring detail, flagged
+// rather than guessed at, not to be guessed at"): CreateWorktreeRequest
+// requires a repo_id (gitgateway.proto's CreateWorktreeRequest) that
+// task.ProjectID alone cannot supply. Reading
+// git-gateway-service/internal/usecase/create_worktree.go settles which of
+// the task file's two options is correct:
+//
+//   - Option 1 (server-side project_id resolution inside CreateWorktree) is
+//     NOT how the saga works: CreateWorktree.Execute resolves exclusively
+//     via projects.GetRepo(in.RepoID) — in.ProjectID is accepted on the wire
+//     but never read by that usecase today (see that file's own doc comment:
+//     "no real caller ever sends project_id on this RPC").
+//   - project-service's project→repo cardinality is 1:N, not 1:1
+//     (project.repos has a project_id FK, a position ordering column, and
+//     ReorderRepos/ListRepos operate over a project's whole repo list) — so
+//     even a hypothetical server-side resolution couldn't pick a single repo
+//     from project_id alone without a stated default.
+//
+// This adapter therefore implements Option 2: it resolves RepoID itself via
+// project-service's ListRepos, taking the lowest-position entry —
+// ListReposResponse's own doc comment states repos come back "ordered by
+// position", the same ordering ReorderRepos/ListRepos already establish
+// elsewhere. This is a real, explicit assumption (task-service has no
+// per-task repo-selection concept yet, only a project_id), not a re-guess
+// of the open question — revisit once a task can target a project's
+// non-default repo.
 type WorktreeProvisioner struct {
-	git     gitgatewayv1.GitGatewayServiceClient
-	project projectv1.ProjectServiceClient
+	git      gitgatewayv1.GitGatewayServiceClient
+	projects projectv1.ProjectServiceClient
 }
 
-func NewWorktreeProvisioner(git gitgatewayv1.GitGatewayServiceClient, project projectv1.ProjectServiceClient) *WorktreeProvisioner {
-	return &WorktreeProvisioner{git: git, project: project}
+func NewWorktreeProvisioner(git gitgatewayv1.GitGatewayServiceClient, projects projectv1.ProjectServiceClient) *WorktreeProvisioner {
+	return &WorktreeProvisioner{git: git, projects: projects}
 }
 
 func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (worktreeID, path string, err error) {
@@ -39,27 +53,45 @@ func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID strin
 		return task.WorktreeID, "", nil // reuse — spec's "IF task.worktreeId exists: use existing worktree". Caller resolves the path separately via ProjectExecutionResolver, unchanged from today.
 	}
 
-	ctx, err = withTenantMetadata(ctx)
+	repoID, err := p.resolveRepoID(ctx, task.ProjectID)
 	if err != nil {
 		return "", "", err
 	}
 
-	reposResp, err := p.project.ListRepos(ctx, &projectv1.ListReposRequest{ProjectId: task.ProjectID})
+	ctx, err = withTenantMetadata(ctx)
 	if err != nil {
-		return "", "", fmt.Errorf("worktree_provisioner: list repos for project %q: %w", task.ProjectID, err)
+		return "", "", err
 	}
-	repos := reposResp.GetRepos()
-	if len(repos) == 0 {
-		return "", "", fmt.Errorf("worktree_provisioner: project %q has no repos configured", task.ProjectID)
-	}
-
 	resp, err := p.git.CreateWorktree(ctx, &gitgatewayv1.CreateWorktreeRequest{
 		ProjectId: task.ProjectID,
-		RepoId:    repos[0].GetId(),
+		RepoId:    repoID,
 		Branch:    fmt.Sprintf("task/%s", task.ID),
+		TaskId:    &task.ID,
 	})
 	if err != nil {
 		return "", "", fmt.Errorf("worktree_provisioner: create worktree: %w", err)
 	}
 	return resp.GetWorktreeId(), resp.GetPath(), nil
+}
+
+// resolveRepoID picks the project's default repo — see this type's doc
+// comment for why a lookup is needed here at all and why "lowest position"
+// is the chosen default.
+func (p *WorktreeProvisioner) resolveRepoID(ctx context.Context, projectID string) (string, error) {
+	if projectID == "" {
+		return "", fmt.Errorf("worktree_provisioner: task has no project_id, cannot resolve a repo to create a worktree against")
+	}
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return "", err
+	}
+	resp, err := p.projects.ListRepos(ctx, &projectv1.ListReposRequest{ProjectId: projectID})
+	if err != nil {
+		return "", fmt.Errorf("worktree_provisioner: list repos for project %q: %w", projectID, err)
+	}
+	repos := resp.GetRepos()
+	if len(repos) == 0 {
+		return "", fmt.Errorf("worktree_provisioner: project %q has no repos", projectID)
+	}
+	return repos[0].GetId(), nil
 }

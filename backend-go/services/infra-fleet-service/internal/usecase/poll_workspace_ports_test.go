@@ -93,6 +93,9 @@ func (f *scriptedAgent) StreamScreencast(ctx context.Context, devServer domain.D
 func (f *scriptedAgent) StreamFileChanges(ctx context.Context, devServer domain.DevServer, path string) (<-chan FileChangeEvent, func(), error) {
 	return nil, nil, errors.New("not used")
 }
+func (f *scriptedAgent) StreamExecOutput(ctx context.Context, devServer domain.DevServer, stepID string) (<-chan ExecOutputEvent, func(), error) {
+	return nil, nil, errors.New("not used")
+}
 func (f *scriptedAgent) StreamVmProvision(ctx context.Context, devServer domain.DevServer, params VmProvisionParams) (<-chan VmProvisionEvent, func(), error) {
 	return nil, nil, errors.New("not used")
 }

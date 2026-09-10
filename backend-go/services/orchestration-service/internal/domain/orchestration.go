@@ -313,6 +313,10 @@ type CoordinatorRun struct {
 	Status            RunStatus
 	CoordinatorHandle string
 	PollIntervalMs    int32
+	WorktreeID        string          // caller-supplied, optional — see StartCoordinatorRunRequest.worktree_id
+	Result            json.RawMessage // set by Complete
+	ErrorMessage      string          // set by Fail
+	ReportedAt        time.Time       // zero until TaskServiceReporter.ReportResult succeeds (TASK-TASKV1-005-07)
 	CreatedAt         time.Time
 	CompletedAt       time.Time
 }
@@ -337,4 +341,33 @@ func NewCoordinatorRun(id, tenantID, originTaskID, coordinatorHandle string, spe
 		CoordinatorHandle: coordinatorHandle,
 		PollIntervalMs:    pollIntervalMs,
 	}, nil
+}
+
+// ErrRunNotRunning guards CoordinatorRun.Complete/Fail's one-way-door
+// invariant — mirrors ErrGateAlreadyResolved's role for DecisionGate.Resolve.
+var ErrRunNotRunning = errors.New("domain: coordinator run is not running")
+
+// Complete transitions a running CoordinatorRun to completed. A run cannot
+// be completed twice, closing the same double-transition class of bug
+// ErrGateAlreadyResolved guards against for DecisionGate.
+func (r CoordinatorRun) Complete(result json.RawMessage) (CoordinatorRun, error) {
+	if r.Status != RunStatusRunning {
+		return CoordinatorRun{}, ErrRunNotRunning
+	}
+	r.Status = RunStatusCompleted
+	r.Result = result
+	return r, nil
+}
+
+// Fail transitions a running CoordinatorRun to failed. A run may be failed
+// from RunStatusRunning OR RunStatusIdle (e.g. StartCoordinatorRun's own
+// spec-expansion step failing before any task ever ran) — unlike Complete,
+// which only makes sense once work has actually started.
+func (r CoordinatorRun) Fail(errMsg string) (CoordinatorRun, error) {
+	if r.Status != RunStatusRunning && r.Status != RunStatusIdle {
+		return CoordinatorRun{}, ErrRunNotRunning
+	}
+	r.Status = RunStatusFailed
+	r.ErrorMessage = errMsg
+	return r, nil
 }

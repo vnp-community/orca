@@ -5,7 +5,7 @@
 **Service:** `orchestration-service` (`internal/adapter/postgres` + `internal/usecase`)
 **File:** `backend-go/services/orchestration-service/internal/adapter/postgres/repository.go` (extend `UpdateStatusAndPromote`), `backend-go/services/orchestration-service/internal/usecase/update_task_status_and_promote.go` (extend)
 **Depends on:** TASK-TASKV1-005-01 (migration), TASK-TASKV1-005-04 (`TaskServiceReporter` port, `CoordinatorRunRepository.MarkReported`)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

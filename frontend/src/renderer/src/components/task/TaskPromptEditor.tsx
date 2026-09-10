@@ -29,8 +29,8 @@ export function TaskPromptEditor({ task }: { task: OrcaTask }) {
         taskId: task.id,
         projectId: project!.id,
         worktreePath: currentWorktree!.path,
-        prompt,
-        traceId: span.id
+        traceId: span.id,
+        prompt: prompt.trim() || undefined
       })
       span.ok({ taskId: task.id })
     } catch (err) {
@@ -50,11 +50,7 @@ export function TaskPromptEditor({ task }: { task: OrcaTask }) {
         placeholder="Describe what the agent should do for this task..."
         rows={4}
       />
-      <Button
-        onClick={runWithAgent}
-        disabled={isRunning || !prompt.trim()}
-        data-testid="run-agent-btn"
-      >
+      <Button onClick={runWithAgent} disabled={isRunning} data-testid="run-agent-btn">
         {isRunning ? (
           <>
             <Loader2 size={12} className="animate-spin mr-1" />

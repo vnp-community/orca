@@ -25,28 +25,37 @@ type Config struct {
 	// dials ai-provider-service's ResolveProvider RPC.
 	AIProviderServiceAddr string
 	// GitGatewayServiceAddr is where TechStackDetector (TASK-TG-02-03) and
-	// WorktreeProvisioner (TASK-TG-04-02) dial git-gateway-service's
+	// WorktreeProvisioner (TASK-TG-04-02/SOL-TG-04) dial git-gateway-service's
 	// ReadFile/CreateWorktree RPCs — a genuine scope addition (a new
 	// task-service -> git-gateway-service dependency edge, flagged
 	// explicitly in both tasks' Context sections).
 	GitGatewayServiceAddr string
 	// ProjectServiceAddr is ProjectContextResolver's dependency — dials
 	// project-service's GetProjectContext (SimpleExecutor's profile-aware
-	// env injection, TASK-PRF-04-07/08) and GetProject/ListRepos
-	// (TASK-TG-02-04's AIDecompose context bundle) RPCs.
+	// env injection, TASK-PRF-04-07/08), GetProject/ListRepos
+	// (TASK-TG-02-04's AIDecompose context bundle) RPCs, and
+	// WorktreeProvisioner's task->repo_id resolution (see that adapter's doc
+	// comment for why this lookup is needed at all).
 	ProjectServiceAddr string
 	// TenantServiceAddr is ProfileResolver's dependency (SimpleExecutor's
 	// profile-aware env injection, TASK-PRF-04-07/08) AND TeamScopeResolver's
 	// (TASK-TG-03-03, dials tenant-service's ListTeamsForUser RPC,
 	// TASK-TG-03-02) — one address, two independent dials.
 	TenantServiceAddr string
-	// OrchestrationServiceAddr is where ComplexExecutor (TASK-TG-04-04)
-	// dials orchestration-service's StartCoordinatorRun RPC — the complex
-	// (subtree-dispatch) execution path.
+	// OrchestrationServiceAddr is where ComplexExecutor (TASK-TG-04-04/
+	// BE-SOL-002 integration addendum) dials orchestration-service's
+	// StartCoordinatorRun RPC — the complex (subtree-dispatch, Engine 2)
+	// execution path.
 	OrchestrationServiceAddr string
+	// WorkflowServiceAddr is where WorkflowExecutor (TASK-FT-002-03) dials
+	// workflow-service's Execute RPC for Engine 3 dispatch.
+	WorkflowServiceAddr string
 	// NATSURL is where the transactional-outbox relay (TASK-TG-03-07,
 	// TASK-PW-04-04) publishes both grant audit events and task.* domain
-	// events — mirrors usage-service's identical config field.
+	// events, and where the execution-status mirror consumer
+	// (BE-SOL-003/TASK-FT-003-05) subscribes
+	// orca.orchestration.task.statuschanged / orca.workflow.step.completed —
+	// mirrors usage-service's identical config field.
 	NATSURL string
 	// AuthServiceAddr is ResolvePermission's audit-append dependency
 	// (TASK-BE-020/CR-RBAC-005, common/auditclient) — the only other service
@@ -73,6 +82,7 @@ func Load() (Config, error) {
 		ProjectServiceAddr:       commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
 		TenantServiceAddr:        commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
 		OrchestrationServiceAddr: commonconfig.StringEnv("ORCHESTRATION_SERVICE_ADDR", "orchestration-service:9090"),
+		WorkflowServiceAddr:      commonconfig.StringEnv("WORKFLOW_SERVICE_ADDR", "workflow-service:9090"),
 		NATSURL:                  commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		AuthServiceAddr:          commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
 	}, nil

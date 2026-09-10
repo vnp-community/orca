@@ -1,3 +1,9 @@
+/**
+ * Tests for `useTaskActivity` (FE-TASK-003) — polling fallback for `task.get` since no
+ * real push channel (`task.activity:{taskId}`) exists anywhere in the codebase yet.
+ *
+ * @module renderer/hooks/__tests__/useTaskActivity.test
+ */
 // @vitest-environment happy-dom
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
@@ -8,13 +14,15 @@ vi.mock('../../runtime/runtime-rpc-client', () => ({
   getActiveRuntimeTarget: vi.fn().mockReturnValue('mock-target')
 }))
 
+const mockStore = { settings: {} }
+
 vi.mock('../../store', () => ({
-  useAppStore: Object.assign(vi.fn(), { getState: () => ({ settings: {} }) })
+  useAppStore: Object.assign(vi.fn(), { getState: () => mockStore })
 }))
 
 const mockRpc = vi.mocked(callRuntimeRpc)
 
-describe('useTaskActivity', () => {
+describe('useTaskActivity()', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.useFakeTimers()
@@ -87,5 +95,17 @@ describe('useTaskActivity', () => {
     const { useTaskActivity } = await import('../useTaskActivity')
     const { result } = renderHook(() => useTaskActivity('t1'))
     expect(result.current.isLive).toBe(false)
+  })
+
+  it('a rejected poll does not throw or crash the hook', async () => {
+    mockRpc.mockRejectedValue(new Error('network down'))
+    const { useTaskActivity } = await import('../useTaskActivity')
+
+    const { result } = renderHook(() => useTaskActivity('t1'))
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(result.current.task).toBeNull()
   })
 })

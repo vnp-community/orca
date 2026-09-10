@@ -11044,7 +11044,7 @@
           },
           "agents": {
             "orchestration": {
-              "OrchestrationPage": {
+              "OrchestrationStoryboard": {
                 "30b509a467": "하위 2개",
                 "862605d066": "2개의 하위 워크스페이스"
               },

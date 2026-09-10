@@ -1,8 +1,11 @@
 -- Transactional outbox table — same shape as usage.outbox_events
--- (usage-service/migrations/0002_outbox.up.sql). workflow.executions
--- writes and this table's INSERT happen in the same Postgres transaction
--- (internal/adapter/postgres.Repository.UpdateExecution); common/outbox.Relay
--- polls unpublished rows and publishes them to NATS JetStream.
+-- (usage-service/migrations/0002_outbox.up.sql). Two independent event
+-- families publish through this one table: workflow.executions writes
+-- (internal/adapter/postgres.Repository.UpdateExecution, in the same
+-- transaction) and BE-SOL-003/TASK-FT-003-03's step-level events — both
+-- landed independently and were consolidated onto this single table
+-- rather than creating a duplicate. common/outbox.Relay polls unpublished
+-- rows and publishes them to NATS JetStream.
 CREATE TABLE workflow.outbox_events (
     id            UUID PRIMARY KEY,
     tenant_id     UUID NOT NULL,

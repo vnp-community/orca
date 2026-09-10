@@ -9,7 +9,15 @@ vi.mock('../../runtime/runtime-rpc-client', () => ({
   getActiveRuntimeTarget: vi.fn().mockReturnValue('mock-target')
 }))
 
-const mockStore: Record<string, unknown> = {
+type MockWorkflowStore = {
+  templates: Record<string, unknown>[]
+  executions: Record<string, unknown>[]
+  addTemplate: ReturnType<typeof vi.fn>
+  addExecution: ReturnType<typeof vi.fn>
+  settings: Record<string, unknown>
+}
+
+const mockStore: MockWorkflowStore = {
   templates: [],
   executions: [],
   addTemplate: vi.fn(),
@@ -19,7 +27,7 @@ const mockStore: Record<string, unknown> = {
 
 vi.mock('../../store', () => ({
   useAppStore: Object.assign(
-    (fn?: (state: typeof mockStore) => unknown) => (fn ? fn(mockStore) : mockStore),
+    (fn?: (store: MockWorkflowStore) => unknown) => (fn ? fn(mockStore) : mockStore),
     { getState: () => mockStore }
   )
 }))
@@ -90,7 +98,7 @@ describe('useWorkflow', () => {
     expect(startEvent?.fields.mode).toBe('update')
   })
 
-  it('saveTemplate with templateId → sends { id, name, dagJson, scope } — dagJson is a JSON-encoded string, not a nested object (BACKLOG-020)', async () => {
+  it('saveTemplate with templateId → sends { id, name, dagJson, scope, parentTemplateId, expectedVersion } — NOT templateId/definition/traceId (BUG-FE-RPC-006, FE-TASK-005)', async () => {
     mockStore.templates = [{ id: 't1', name: 'Existing', scope: 'personal', steps: [{ id: 's1' }] }]
     const { useWorkflow } = await import('../useWorkflow')
     const { result } = renderHook(() => useWorkflow('t1'))
@@ -105,7 +113,9 @@ describe('useWorkflow', () => {
       id: 't1',
       name: 'Existing',
       scope: 'personal',
-      dagJson: JSON.stringify({ steps: [{ id: 's1' }] })
+      dagJson: JSON.stringify({ steps: [{ id: 's1' }] }),
+      parentTemplateId: '',
+      expectedVersion: 0
     })
     // The real RPC has no templateId/definition/traceId fields — sending them
     // (the previous shape) silently decoded to an empty id/dagJson server-side.
@@ -145,7 +155,7 @@ describe('useWorkflow', () => {
     stop()
 
     const startEvent = events.find((e) => e.flow === 'ui:workflow.execute' && e.level === 'start')
-    // BACKLOG-020/channels_workflow.go:36-52: workflow.execute's real shape is
+    // BACKLOG-020/channels_workflow.go:47-53: workflow.execute's real shape is
     // {templateId, projectId, rootTraceId, requestId} — projectId must be sent
     // by the client, backend already forwards it.
     expect(mockRpc).toHaveBeenCalledWith('mock-target', 'workflow.execute', {

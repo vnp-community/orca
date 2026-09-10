@@ -1,4 +1,4 @@
-import { useMemo, useCallback, useEffect, useState } from 'react'
+import { useMemo, useCallback, useState } from 'react'
 import {
   ReactFlow,
   type Node,
@@ -9,50 +9,17 @@ import {
   MiniMap
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
-import { useAppStore } from '../../store'
 import { toast } from 'sonner'
-import type { OrcaTask, TaskEdgeType } from '../../../../shared/task-types'
+import { useAppStore } from '../../store'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
+import type { TaskEdgeMap } from '../../hooks/useTaskDependencyEdges'
+import type { OrcaTask } from '../../../../shared/task-types'
 
 type TaskDAGViewProps = {
   tasks: OrcaTask[]
+  dependencyEdges: TaskEdgeMap
   onSelect: (taskId: string) => void
-}
-
-function useDependencyEdges(tasks: OrcaTask[]): Map<string, string[]> {
-  const [depsById, setDepsById] = useState<Map<string, string[]>>(new Map())
-
-  useEffect(() => {
-    let cancelled = false
-    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    Promise.all(
-      tasks.map(async (t) => {
-        // Real shape (channels_automation_task.go:330-347, same as TaskDetail.tsx) is a
-        // flat { task, edgeType }[] — NOT { dependencies: [...] }.
-        const edges = (await callRuntimeRpc(target, 'task.getDependencies', { taskId: t.id })) as {
-          task: OrcaTask
-          edgeType: TaskEdgeType
-        }[]
-        return [
-          t.id,
-          edges.filter((e) => e.edgeType === 'depends_on').map((e) => e.task.id)
-        ] as const
-      })
-    )
-      .then((pairs) => {
-        if (!cancelled) {
-          setDepsById(new Map(pairs))
-        }
-      })
-      .catch(() => {
-        /* keep the previous depsById if one request fails — DAG still renders with what it has */
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [tasks])
-
-  return depsById
+  onEdgeAdded?: () => void
 }
 
 // Color coding by status
@@ -68,17 +35,18 @@ const STATUS_COLORS: Record<string, { bg: string; border: string }> = {
 
 function buildDAGLayout(
   tasks: OrcaTask[],
-  depsById: Map<string, string[]>
+  dependencyEdges: TaskEdgeMap
 ): { nodes: Node[]; edges: Edge[] } {
   if (tasks.length === 0) {
     return { nodes: [], edges: [] }
   }
 
-  // Dependency map: taskId -> list of taskIds this depends on, from task.getDependencies
-  // (fetched by useDependencyEdges) — no longer the always-empty `(task as any).dependsOn`.
+  // Build dependency map: taskId -> list of taskIds this depends on, sourced from
+  // useTaskDependencyEdges (real task.getDependencies data, not a fictitious field
+  // on OrcaTask itself — edges live in a separate table).
   const dependsOnMap = new Map<string, string[]>()
   for (const task of tasks) {
-    dependsOnMap.set(task.id, depsById.get(task.id) ?? [])
+    dependsOnMap.set(task.id, dependencyEdges.get(task.id)?.blockedBy ?? [])
   }
 
   // Topological wave assignment
@@ -152,7 +120,7 @@ function buildDAGLayout(
   // Create dependency edges
   const edges: Edge[] = []
   for (const task of tasks) {
-    const deps = depsById.get(task.id) ?? []
+    const deps = dependencyEdges.get(task.id)?.blockedBy ?? []
     for (const depId of deps) {
       if (tasks.find((t) => t.id === depId)) {
         edges.push({
@@ -169,30 +137,71 @@ function buildDAGLayout(
   return { nodes, edges }
 }
 
-export function TaskDAGView({ tasks, onSelect }: TaskDAGViewProps) {
-  const depsById = useDependencyEdges(tasks)
-  const { nodes, edges } = useMemo(() => buildDAGLayout(tasks, depsById), [tasks, depsById])
+export function TaskDAGView({ tasks, dependencyEdges, onSelect, onEdgeAdded }: TaskDAGViewProps) {
+  const { nodes, edges } = useMemo(
+    () => buildDAGLayout(tasks, dependencyEdges),
+    [tasks, dependencyEdges]
+  )
   const [addingFor, setAddingFor] = useState<string | null>(null)
 
-  const addDependency = useCallback(async (fromTaskId: string, toTaskId: string) => {
-    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    try {
-      await callRuntimeRpc(target, 'task.addEdge', { fromTaskId, toTaskId, type: 'depends_on' })
-      setAddingFor(null)
-      // depsById only refreshes when the `tasks` prop changes (parent's useTasks refetch) —
-      // no local re-fetch here; acceptable per FE-TASK-002, follow-up if instant refresh is needed.
-    } catch (err) {
-      // Deliberately does NOT reset addingFor — the "to" dropdown stays open so the user
-      // can retry (e.g. backend's cycle-detection rejected the edge).
-      toast.error(`Failed to add dependency: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }, [])
-
-  const onNodeClick: NodeMouseHandler = useCallback(
+  const onNodeClick = useCallback<NodeMouseHandler>(
     (_event, node) => {
       onSelect(node.id)
     },
     [onSelect]
+  )
+
+  // Wires up to `task.addEdge` — the RPC exists at gRPC/proto level (AddEdgeRequest,
+  // task.proto:84-90) but is not yet registered in wscompat's channel registry
+  // (TASK-FE-TASKV1-04). Every connect will fail with "method not found" until
+  // backend-go wires it — surfaced via toast, not hidden behind a feature flag.
+  const onConnect = useCallback(
+    async (connection: { source: string | null; target: string | null }) => {
+      if (!connection.source || !connection.target) {
+        return
+      }
+      const sourceTitle = tasks.find((t) => t.id === connection.source)?.title ?? connection.source
+      const targetTitle = tasks.find((t) => t.id === connection.target)?.title ?? connection.target
+      const confirmed = window.confirm(
+        `Set dependency: "${targetTitle}" depends on "${sourceTitle}"?`
+      )
+      if (!confirmed) {
+        return
+      }
+      try {
+        const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+        // Channel name assumed "task.addEdge" following the camelCase convention of
+        // the other task.* channels — RECONFIRM the real name once backend-go wires
+        // it (not yet tracked as its own backend-go task, see TASK-FE-TASKV1-04).
+        await callRuntimeRpc(target, 'task.addEdge', {
+          fromTaskId: connection.source,
+          toTaskId: connection.target,
+          type: 'EDGE_TYPE_DEPENDS_ON'
+        })
+        onEdgeAdded?.()
+      } catch (err) {
+        toast.error(`Could not add dependency: ${(err as Error).message}`)
+      }
+    },
+    [tasks, onEdgeAdded]
+  )
+
+  // Dropdown-based alternative to drag-connect above — same task.addEdge RPC, useful when
+  // dragging between nodes isn't practical (keyboard/touch users, dense graphs).
+  const addDependency = useCallback(
+    async (fromTaskId: string, toTaskId: string) => {
+      const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+      try {
+        await callRuntimeRpc(target, 'task.addEdge', { fromTaskId, toTaskId, type: 'depends_on' })
+        setAddingFor(null)
+        onEdgeAdded?.()
+      } catch (err) {
+        // Deliberately does NOT reset addingFor — the "to" dropdown stays open so the user
+        // can retry (e.g. backend's cycle-detection rejected the edge).
+        toast.error(`Failed to add dependency: ${err instanceof Error ? err.message : String(err)}`)
+      }
+    },
+    [onEdgeAdded]
   )
 
   if (tasks.length === 0) {
@@ -244,10 +253,11 @@ export function TaskDAGView({ tasks, onSelect }: TaskDAGViewProps) {
           nodes={nodes}
           edges={edges}
           onNodeClick={onNodeClick}
+          onConnect={onConnect}
           fitView
           fitViewOptions={{ padding: 0.2 }}
           nodesDraggable={false}
-          nodesConnectable={false}
+          nodesConnectable
           elementsSelectable={true}
           proOptions={{ hideAttribution: true }}
         >

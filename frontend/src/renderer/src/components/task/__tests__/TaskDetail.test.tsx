@@ -2,57 +2,23 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { createContext, useContext, useMemo, type ReactNode } from 'react'
 import { TaskDetail } from '../TaskDetail'
 import { useTask } from '../../../hooks/useTask'
 import { registerTraceSink, type TraceEvent } from '../../../../../shared/trace'
-import type { OrcaTask } from '../../../../../shared/task-types'
-import type { OrcaUser } from '../../../store/slices/auth'
-
-// Real Radix Tabs doesn't reliably switch active tab under fireEvent.click in happy-dom
-// (same workaround used elsewhere in this codebase, e.g. CreateProjectDialog.test.tsx) —
-// a minimal controlled mock instead, so TabsContent visibility actually follows value.
-vi.mock('../../ui/tabs', () => {
-  const TabsCtx = createContext<{ value: string; onValueChange: (v: string) => void }>({
-    value: '',
-    onValueChange: () => {}
-  })
-  const Tabs = (p: { value: string; onValueChange: (v: string) => void; children: ReactNode }) => {
-    const ctxValue = useMemo(
-      () => ({ value: p.value, onValueChange: p.onValueChange }),
-      [p.value, p.onValueChange]
-    )
-    return (
-      <TabsCtx.Provider value={ctxValue}>
-        <div>{p.children}</div>
-      </TabsCtx.Provider>
-    )
-  }
-  const TabsList = (p: { children: ReactNode }) => <div>{p.children}</div>
-  const TabsTrigger = (p: { value: string; children: ReactNode; 'data-testid'?: string }) => {
-    const ctx = useContext(TabsCtx)
-    return (
-      <button
-        type="button"
-        data-testid={p['data-testid']}
-        onClick={() => ctx.onValueChange(p.value)}
-      >
-        {p.children}
-      </button>
-    )
-  }
-  const TabsContent = (p: { value: string; children: ReactNode }) => {
-    const ctx = useContext(TabsCtx)
-    return ctx.value === p.value ? <div>{p.children}</div> : null
-  }
-  return { Tabs, TabsList, TabsTrigger, TabsContent }
-})
 
 // Mock useAppStore for activeTaskId and settings
 vi.mock('../../../store', () => ({
   useAppStore: Object.assign(
-    vi.fn((selector) => selector({ activeTaskId: 't1', settings: {} })),
-    { getState: () => ({ settings: {} }) }
+    vi.fn((selector) =>
+      selector({
+        activeTaskId: 't1',
+        settings: {},
+        tasks: [],
+        templates: [],
+        currentUser: { id: 'u1' }
+      })
+    ),
+    { getState: () => ({ settings: {}, updateTask: vi.fn() }) }
   )
 }))
 
@@ -60,25 +26,6 @@ vi.mock('../../../store', () => ({
 vi.mock('../../../hooks/useTask', () => ({
   useTask: vi.fn()
 }))
-
-// Mock useAuthUser (FE-TASK-004's permission-gated Run button needs a current user id)
-vi.mock('../../../hooks/useAuthSession', () => ({
-  useAuthUser: vi.fn().mockReturnValue(null)
-}))
-import { useAuthUser } from '../../../hooks/useAuthSession'
-
-// Mock TaskGrantModal — its own behavior is covered by TaskGrantModal.test.tsx
-vi.mock('../TaskGrantModal', () => ({
-  TaskGrantModal: ({ taskId }: { taskId: string }) => (
-    <div data-testid="mock-task-grant-modal">{taskId}</div>
-  )
-}))
-
-// Mock useTaskActivity — its own polling behavior is covered by useTaskActivity.test.ts
-vi.mock('../../../hooks/useTaskActivity', () => ({
-  useTaskActivity: vi.fn().mockReturnValue({ task: null, isLive: false })
-}))
-import { useTaskActivity } from '../../../hooks/useTaskActivity'
 
 // Mock useWorkspace (real one requires <WorkspaceProvider>)
 vi.mock('../../../context/WorkspaceContext', () => ({
@@ -102,23 +49,31 @@ vi.mock('sonner', () => ({
 import { toast } from 'sonner'
 const mockToast = vi.mocked(toast)
 
-function makeUseTaskReturn(
-  overrides: Partial<ReturnType<typeof useTask>> = {}
-): ReturnType<typeof useTask> {
-  return {
-    task: undefined,
-    updateTask: vi.fn(),
-    deleteTask: vi.fn(),
-    aiDecompose: vi.fn(),
-    acceptSubtasks: vi.fn(),
-    ...overrides
-  }
-}
-
 function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
   const events: TraceEvent[] = []
   const unregister = registerTraceSink((e) => events.push(e))
   return { events, stop: unregister }
+}
+
+// TaskDetail mounts several RPC-calling effects at once now (task.getDependencies,
+// AttachWorkflowTemplateAction's workflow.template.list) — React fires child effects
+// before a parent's own, so the call order between them isn't the source-code order.
+// Route by method name instead of relying on mockResolvedValueOnce's call-position queue.
+type RpcHandlers = Record<string, (params?: unknown) => Promise<unknown>>
+
+function mockRpcByMethod(overrides: RpcHandlers = {}) {
+  mockRpc.mockImplementation(((_target: unknown, method: string, params?: unknown) => {
+    if (overrides[method]) {
+      return overrides[method](params)
+    }
+    if (method === 'task.getDependencies') {
+      return Promise.resolve([])
+    }
+    if (method === 'workflow.template.list') {
+      return Promise.resolve({ templates: [] })
+    }
+    return Promise.resolve(undefined)
+  }) as typeof callRuntimeRpc)
 }
 
 describe('TaskDetail', () => {
@@ -127,25 +82,17 @@ describe('TaskDetail', () => {
   beforeEach(() => {
     cleanup()
     vi.clearAllMocks()
-    vi.mocked(useTask).mockReturnValue(
-      makeUseTaskReturn({
-        task: {
-          id: 't1',
-          title: 'My Task',
-          status: 'todo',
-          priority: 'high',
-          projectId: 'p1'
-        } as unknown as OrcaTask,
-        updateTask
-      })
-    )
-    vi.mocked(useAuthUser).mockReturnValue(null)
-    vi.mocked(useTaskActivity).mockReturnValue({ task: null, isLive: false })
-    mockRpc.mockResolvedValue([]) // task.getDependencies returns a flat { task, edgeType }[]
+    vi.mocked(useTask).mockReturnValue({
+      task: { id: 't1', title: 'My Task', status: 'todo', priority: 'high', projectId: 'p1' },
+      updateTask
+    } as unknown as ReturnType<typeof useTask>)
+    mockRpcByMethod()
   })
 
   it('null task → renders empty state', () => {
-    vi.mocked(useTask).mockReturnValue(makeUseTaskReturn({ task: undefined, updateTask }))
+    vi.mocked(useTask).mockReturnValue({ task: null, updateTask } as unknown as ReturnType<
+      typeof useTask
+    >)
     render(<TaskDetail />)
     expect(screen.getByText('Select a task')).toBeInTheDocument()
   })
@@ -192,11 +139,9 @@ describe('TaskDetail', () => {
   })
 
   it('RPC success → span.ok({taskId}), toast.success shown', async () => {
-    mockRpc.mockResolvedValueOnce([]) // task.getDependencies (mount)
     const { events, stop } = captureTraceEvents()
     render(<TaskDetail />)
 
-    mockRpc.mockResolvedValueOnce(undefined) // task.execute
     fireEvent.click(screen.getByTestId('run-agent-btn'))
 
     await waitFor(() => {
@@ -210,9 +155,9 @@ describe('TaskDetail', () => {
 
   it('RPC error → span.fail(err, {taskId}), toast.error shown', async () => {
     const err = new Error('agent spawn failed')
+    mockRpcByMethod({ 'task.execute': () => Promise.reject(err) })
     render(<TaskDetail />)
 
-    mockRpc.mockRejectedValueOnce(err) // task.execute
     const { events, stop } = captureTraceEvents()
     fireEvent.click(screen.getByTestId('run-agent-btn'))
 
@@ -226,10 +171,17 @@ describe('TaskDetail', () => {
     expect(failEvents[0]?.fields.taskId).toBe('t1')
   })
 
+  it('renders ExecutionEngineBadge next to the Run button', () => {
+    render(<TaskDetail />)
+    expect(screen.getByTestId('execution-engine-badge')).toHaveTextContent('Direct Agent')
+  })
+
   it('dependencies section renders blocked-by list', async () => {
-    mockRpc.mockResolvedValueOnce([
-      { task: { id: 'b1', title: 'Blocker 1' }, edgeType: 'depends_on' }
-    ])
+    // task.getDependencies returns a flat Task[] (this task's own "depends on" edges) —
+    // see TaskDetail.tsx's own comment on the deps effect.
+    mockRpcByMethod({
+      'task.getDependencies': () => Promise.resolve([{ id: 'b1', title: 'Blocker 1' }])
+    })
     render(<TaskDetail />)
     await waitFor(() => {
       expect(screen.getByText('Blocker 1')).toBeInTheDocument()
@@ -237,33 +189,115 @@ describe('TaskDetail', () => {
     })
   })
 
-  it("task.resolvePermission → effectiveLevel='user' → canManage=false → Run button not rendered", async () => {
-    vi.mocked(useAuthUser).mockReturnValue({ id: 'me' } as unknown as OrcaUser)
-    mockRpc.mockImplementation((_target, method) => {
-      if (method === 'task.resolvePermission') {
-        return Promise.resolve({ effectiveLevel: 'user' })
-      }
-      return Promise.resolve([]) // task.getDependencies
+  it('renders AttachWorkflowTemplateAction next to the Run button, populated from workflow.template.list', async () => {
+    mockRpcByMethod({
+      'workflow.template.list': () =>
+        Promise.resolve({ templates: [{ id: 'wt1', name: 'Template One' }] })
     })
+    render(<TaskDetail />)
+    expect(screen.getByTestId('attach-workflow-template-trigger')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mock-target',
+        'workflow.template.list',
+        expect.any(Object)
+      )
+    })
+  })
+
+  // FE-TASK-003: useTaskActivity polls task.get and this replaces the previous
+  // "fire handleRunAgent then watch nothing" silent gap — status now re-renders without F5.
+  it('useTaskActivity polling → polled task.get status displays without needing F5', async () => {
+    mockRpcByMethod({
+      'task.get': () => Promise.resolve({ id: 't1', status: 'done' })
+    })
+    render(<TaskDetail />)
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'task.get', { id: 't1' })
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('task-live-status')).toHaveTextContent('Status: done')
+    })
+  })
+
+  it('before any poll resolves, live status falls back to task.status', () => {
+    mockRpcByMethod({ 'task.get': () => new Promise(() => {}) }) // never resolves
+    render(<TaskDetail />)
+    expect(screen.getByTestId('task-live-status')).toHaveTextContent('Status: todo')
+  })
+
+  // useTaskActivity's polled status also drives the Details tab's TaskStatusBadge (icon +
+  // label), not just the raw "Status: x" text above — confirms TaskDetail prefers
+  // polledTask.status over the (stale) task.status prop there too.
+  it("useTaskActivity's polled status renders via TaskStatusBadge (icon/label), not raw text", async () => {
+    mockRpcByMethod({
+      'task.get': () => Promise.resolve({ id: 't1', status: 'in_progress' })
+    })
+    render(<TaskDetail />)
+    await waitFor(() => {
+      expect(screen.getByText('In Progress')).toBeInTheDocument()
+      expect(screen.getByText('🔄')).toBeInTheDocument()
+    })
+  })
+
+  // TASK-FE-TASKV1-10: dispatch status panel sits under the Execute button.
+  it('renders TaskDispatchStatusPanel, calling orchestration.dispatchShow for this task', async () => {
+    mockRpcByMethod({
+      'orchestration.dispatchShow': () =>
+        Promise.resolve({
+          dispatch: { id: 'd1', orchestration_task_id: 't1', assignee_handle: '', status: 'queued' }
+        })
+    })
+    render(<TaskDetail />)
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'orchestration.dispatchShow', {
+        task: 't1'
+      })
+    })
+    await waitFor(() => {
+      expect(screen.getByTestId('task-dispatch-status')).toBeInTheDocument()
+    })
+  })
+
+  // TASK-FE-TASKV1-08: Comments tab is always present; on backend-go/today's Node (no
+  // task.listComments read RPC anywhere) it shows the "unavailable" message.
+  it('Comments tab renders TaskComments, showing "unavailable" when task.listComments is unsupported', async () => {
+    render(<TaskDetail />)
+    // Radix TabsTrigger switches tabs on mousedown (not click) — see
+    // @radix-ui/react-tabs's TabsTrigger onMouseDown handler.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Comments' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('task-comments-unsupported')).toBeInTheDocument()
+    })
+  })
+
+  // TASK-FE-TASKV1-06: task.resolvePermission isn't wired at backend-go today, so it
+  // rejects for every call — isSupported flips to false and Execute must stay visible.
+  it('Execute with Agent stays visible when task.resolvePermission is not wired (isSupported === false)', async () => {
     render(<TaskDetail />)
     await waitFor(() => {
       expect(mockRpc).toHaveBeenCalledWith('mock-target', 'task.resolvePermission', {
         taskId: 't1',
-        userId: 'me'
+        userId: 'u1'
       })
     })
+    expect(screen.getByTestId('run-agent-btn')).toBeInTheDocument()
+  })
+
+  it('Execute with Agent is hidden once permission resolves to a level below "user" (e.g. "team")', async () => {
+    mockRpcByMethod({
+      'task.resolvePermission': () => Promise.resolve({ effectiveLevel: 'GRANT_LEVEL_TEAM' })
+    })
+    render(<TaskDetail />)
     await waitFor(() => {
       expect(screen.queryByTestId('run-agent-btn')).not.toBeInTheDocument()
     })
   })
 
-  it("task.resolvePermission → effectiveLevel='owner' → Run button renders normally", async () => {
-    vi.mocked(useAuthUser).mockReturnValue({ id: 'me' } as unknown as OrcaUser)
-    mockRpc.mockImplementation((_target, method) => {
-      if (method === 'task.resolvePermission') {
-        return Promise.resolve({ effectiveLevel: 'owner' })
-      }
-      return Promise.resolve([])
+  it('Execute with Agent stays visible when permission resolves to "user" or above', async () => {
+    mockRpcByMethod({
+      'task.resolvePermission': () => Promise.resolve({ effectiveLevel: 'GRANT_LEVEL_USER' })
     })
     render(<TaskDetail />)
     await waitFor(() => {
@@ -271,21 +305,13 @@ describe('TaskDetail', () => {
     })
   })
 
-  it('Access tab renders TaskGrantModal with the current taskId', () => {
+  it('Access tab renders TaskAccessPanel — unsupported message by default (RPC not wired)', async () => {
     render(<TaskDetail />)
-    fireEvent.click(screen.getByText('Access'))
-    expect(screen.getByTestId('mock-task-grant-modal')).toHaveTextContent('t1')
-  })
-
-  it("useTaskActivity's polled status renders via TaskStatusBadge (icon/label), not raw text", () => {
-    vi.mocked(useTaskActivity).mockReturnValue({
-      task: { id: 't1', status: 'in_progress' } as unknown as OrcaTask,
-      isLive: false
+    // Radix TabsTrigger switches tabs on mousedown (not click) — see
+    // @radix-ui/react-tabs's TabsTrigger onMouseDown handler.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Access' }))
+    await waitFor(() => {
+      expect(screen.getByTestId('task-access-unsupported')).toBeInTheDocument()
     })
-    render(<TaskDetail />)
-    // task.status prop is 'todo' (useTask mock) — the badge must reflect the polled
-    // 'in_progress' override, confirming TaskDetail prefers polledTask.status.
-    expect(screen.getByText('In Progress')).toBeInTheDocument()
-    expect(screen.getByText('🔄')).toBeInTheDocument()
   })
 })

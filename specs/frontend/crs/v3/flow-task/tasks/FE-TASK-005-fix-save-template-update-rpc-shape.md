@@ -4,7 +4,7 @@
 **Solution Ref:** FE-SOL-001 Phần 4 (nửa sau — `saveTemplate`'s update branch)
 **Priority:** 🟠 P1
 **Estimated:** 30 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 

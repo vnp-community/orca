@@ -10,7 +10,7 @@ import (
 
 func TestCancelExecution_RunningTransitionsToCancelled(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "", "")
 	_ = repo.CreateExecution(context.Background(), exec)
 
 	uc := NewCancelExecution(repo)
@@ -30,7 +30,7 @@ func TestCancelExecution_RunningTransitionsToCancelled(t *testing.T) {
 
 func TestCancelExecution_PausedTransitionsToCancelled(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "", "")
 	_ = exec.Pause(time.Now().UTC())
 	_ = repo.CreateExecution(context.Background(), exec)
 
@@ -51,7 +51,7 @@ func TestCancelExecution_PausedTransitionsToCancelled(t *testing.T) {
 
 func TestCancelExecution_RejectsTerminalExecution(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "", "")
 	exec.Status = domain.StatusCompleted
 	_ = repo.CreateExecution(context.Background(), exec)
 

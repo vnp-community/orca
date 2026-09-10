@@ -63,7 +63,7 @@ func (e *orderedFakeExecutor) Execute(_ context.Context, _ string) (domain.StepR
 
 func TestWaveDispatcher_DispatchWaves_EmptyWavesSucceed(t *testing.T) {
 	d := newWaveDispatcher(newFakeStepExecutionRepository(), newFakeRegistry(), 10)
-	if !d.dispatchWaves(context.Background(), "exec-1", nil, newExecutionContext(domain.ExecutionContext{})) {
+	if !d.dispatchWaves(context.Background(), "exec-1", nil, newExecutionContext(domain.ExecutionContext{}), "") {
 		t.Fatal("expected an empty wave list to trivially succeed")
 	}
 }
@@ -80,7 +80,7 @@ func TestWaveDispatcher_DispatchWaves_AllSucceed(t *testing.T) {
 		{{ID: "c", Type: domain.StepTypeWebhook}},
 	}
 
-	if !d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{})) {
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{}), "") {
 		t.Fatal("expected the run to succeed")
 	}
 
@@ -111,7 +111,7 @@ func TestWaveDispatcher_DispatchWaves_OneStepFailsAbortsExecution(t *testing.T) 
 		{{ID: "b", Type: domain.StepTypeWebhook}},
 	}
 
-	if d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{})) {
+	if d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{}), "") {
 		t.Fatal("expected the run to fail")
 	}
 	if wave1Executor.invocations != 0 {
@@ -135,7 +135,7 @@ func TestWaveDispatcher_DispatchWaves_HardExecutorErrorAlsoAbortsExecution(t *te
 	d := newWaveDispatcher(stepRepo, registry, 10)
 	waves := [][]domain.Step{{{ID: "a", Type: domain.StepTypeShell}}}
 
-	if d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{})) {
+	if d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{}), "") {
 		t.Fatal("expected a hard executor error to fail the run")
 	}
 
@@ -155,7 +155,7 @@ func TestWaveDispatcher_DispatchWaves_UnregisteredStepTypeFailsExecution(t *test
 	d := newWaveDispatcher(stepRepo, registry, 10)
 	waves := [][]domain.Step{{{ID: "a", Type: domain.StepTypeAgent}}}
 
-	if d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{})) {
+	if d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{}), "") {
 		t.Fatal("expected dispatch to fail when no executor is registered for the step type")
 	}
 }
@@ -188,7 +188,7 @@ func TestWaveDispatcher_WaveGate_Wave1NeverStartsBeforeWave0Terminates(t *testin
 
 	done := make(chan bool, 1)
 	go func() {
-		done <- d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{}))
+		done <- d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{}), "")
 	}()
 
 	// Block until wave 0's step has genuinely entered Execute — only then
@@ -240,7 +240,7 @@ func TestWaveDispatcher_DispatchWave_BoundsConcurrency(t *testing.T) {
 	}
 	waves := [][]domain.Step{steps}
 
-	if !d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{})) {
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{}), "") {
 		t.Fatal("expected the run to succeed")
 	}
 	rows := stepRepo.byExecution("exec-1")
@@ -271,7 +271,7 @@ func TestWaveDispatcher_InterpolatesEarlierWaveOutputIntoLaterWaveConfig(t *test
 	}
 
 	execCtx := newExecutionContext(domain.ExecutionContext{ProjectID: "proj-1", UserID: "user-1"})
-	if !d.dispatchWaves(context.Background(), "exec-1", waves, execCtx) {
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, execCtx, "") {
 		t.Fatal("expected both waves to succeed")
 	}
 	if stepB.lastConfig != `{"url":"hello"}` {
@@ -293,7 +293,7 @@ func TestWaveDispatcher_InterpolatesProjectAndUserTokens(t *testing.T) {
 	}
 
 	execCtx := newExecutionContext(domain.ExecutionContext{ProjectID: "proj-1", UserID: "user-1"})
-	if !d.dispatchWaves(context.Background(), "exec-1", waves, execCtx) {
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, execCtx, "") {
 		t.Fatal("expected the wave to succeed")
 	}
 	if step.lastConfig != `{"note":"proj-1/user-1"}` {
@@ -319,7 +319,7 @@ func TestWaveDispatcher_ConcurrentOutputWritesWithinOneWave(t *testing.T) {
 	}
 
 	execCtx := newExecutionContext(domain.ExecutionContext{})
-	if !d.dispatchWaves(context.Background(), "exec-1", [][]domain.Step{wave}, execCtx) {
+	if !d.dispatchWaves(context.Background(), "exec-1", [][]domain.Step{wave}, execCtx, "") {
 		t.Fatal("expected the wave to succeed")
 	}
 	snap := execCtx.snapshot()
@@ -341,10 +341,76 @@ func TestWaveDispatcher_UnresolvableTokenLeftLiteral(t *testing.T) {
 		{{ID: "a", Type: domain.StepTypeShell, Config: json.RawMessage(`{"note":"{{does.not.exist}}"}`)}},
 	}
 
-	if !d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{})) {
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{}), "") {
 		t.Fatal("expected the wave to succeed despite an unresolvable token")
 	}
 	if step.lastConfig != `{"note":"{{does.not.exist}}"}` {
 		t.Errorf("expected the unresolvable token left as literal text, got %q", step.lastConfig)
+	}
+}
+
+// TestWaveDispatcher_DispatchStep_EnqueuesOutboxEventOnTerminalOnly proves
+// BE-SOL-003/TASK-FT-003-03: a step transitioning to completed enqueues
+// exactly one orca.workflow.step.completed outbox event (never on the
+// optimistic pending->running transition), carrying OriginTaskID.
+func TestWaveDispatcher_DispatchStep_EnqueuesOutboxEventOnTerminalOnly(t *testing.T) {
+	stepRepo := newFakeStepExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeShell] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted, OutputJSON: `{"ok":true}`}}
+
+	d := newWaveDispatcher(stepRepo, registry, 10)
+	waves := [][]domain.Step{{{ID: "a", Type: domain.StepTypeShell}}}
+
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{}), "origin-task-1") {
+		t.Fatal("expected the run to succeed")
+	}
+
+	events := stepRepo.enqueuedEvents()
+	if len(events) != 1 {
+		t.Fatalf("expected exactly 1 enqueued outbox event (only the terminal transition), got %d", len(events))
+	}
+	if events[0].Subject != "orca.workflow.step.completed" {
+		t.Errorf("expected subject orca.workflow.step.completed, got %q", events[0].Subject)
+	}
+	var payload stepEventPayload
+	if err := json.Unmarshal(events[0].PayloadJSON, &payload); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if payload.OriginTaskID != "origin-task-1" {
+		t.Errorf("expected origin_task_id origin-task-1, got %q", payload.OriginTaskID)
+	}
+	if payload.Status != string(domain.StepExecutionStatusCompleted) {
+		t.Errorf("expected status completed, got %q", payload.Status)
+	}
+}
+
+// TestWaveDispatcher_DispatchStep_EnqueuesFailedSubjectAndEmptyOriginTaskID
+// proves the failed subject is used for a failed step, and OriginTaskID is
+// empty (not absent) for a standalone workflow run.
+func TestWaveDispatcher_DispatchStep_EnqueuesFailedSubjectAndEmptyOriginTaskID(t *testing.T) {
+	stepRepo := newFakeStepExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeShell] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusFailed, OutputJSON: `{"error":"boom"}`}}
+
+	d := newWaveDispatcher(stepRepo, registry, 10)
+	waves := [][]domain.Step{{{ID: "a", Type: domain.StepTypeShell}}}
+
+	if d.dispatchWaves(context.Background(), "exec-1", waves, newExecutionContext(domain.ExecutionContext{}), "") {
+		t.Fatal("expected the run to fail")
+	}
+
+	events := stepRepo.enqueuedEvents()
+	if len(events) != 1 {
+		t.Fatalf("expected exactly 1 enqueued outbox event, got %d", len(events))
+	}
+	if events[0].Subject != "orca.workflow.step.failed" {
+		t.Errorf("expected subject orca.workflow.step.failed, got %q", events[0].Subject)
+	}
+	var payload stepEventPayload
+	if err := json.Unmarshal(events[0].PayloadJSON, &payload); err != nil {
+		t.Fatalf("unmarshal payload: %v", err)
+	}
+	if payload.OriginTaskID != "" {
+		t.Errorf("expected empty origin_task_id for a standalone run, got %q", payload.OriginTaskID)
 	}
 }

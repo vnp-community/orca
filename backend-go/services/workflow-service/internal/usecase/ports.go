@@ -205,7 +205,14 @@ type StepExecutionRepository interface {
 	// UpdateStepExecution persists a step execution's mutable fields
 	// (status, output, error) — called as a step transitions
 	// pending->running->completed/failed.
-	UpdateStepExecution(ctx context.Context, se domain.StepExecution) error
+	//
+	// event (BE-SOL-003/TASK-FT-003-03) is enqueued into
+	// workflow.outbox_events in the SAME transaction as the status write —
+	// a zero-value domain.OutboxEvent{} (ID == "") skips the enqueue; the
+	// optimistic pending->running transition never has one, only a
+	// terminal (completed/failed) transition does — see
+	// wave_dispatcher.go's dispatchStep.
+	UpdateStepExecution(ctx context.Context, se domain.StepExecution, event domain.OutboxEvent) error
 	// ListStepExecutions returns every step execution row for
 	// tenantID/executionID, ordered by wave then id — used by integration
 	// tests and any future observability surface over a run's step-level
@@ -246,6 +253,30 @@ var ErrStepExecutorNotRegistered = errors.New("usecase: no step executor registe
 // typed outcome for every ActionName today (a clear error, not a silent
 // no-op or a panic), until a future pass registers real handlers.
 var ErrNoActionHandlerRegistered = errors.New("usecase: no action handler registered for this action name")
+
+// TaskClient is workflow-service's first outbound dependency on
+// task-service (BE-SOL-002/TASK-FT-002-05) — not previously drawn in
+// 02-microservices-decomposition.md's dependency graph for this direction
+// (that doc's §7 lists only task-service -> workflow-service, "Called by
+// task-service"). Used only by runToCompletion's (and RecoverExecutions'
+// boot-time-recovery finish's) Engine-3 completion callback. Implemented by
+// internal/adapter/taskclient against task-service's real
+// ReportTaskExecutionResult RPC (TASK-FT-002-04).
+type TaskClient interface {
+	ReportTaskExecutionResult(ctx context.Context, in ReportTaskExecutionResultInput) error
+}
+
+// ReportTaskExecutionResultInput mirrors task.proto's
+// ReportTaskExecutionResultRequest (TASK-FT-002-01's engine-neutral,
+// 6-field shape).
+type ReportTaskExecutionResultInput struct {
+	TaskID       string
+	ExecutionRef string
+	Success      bool
+	ActualHours  float64
+	ErrorMessage string
+	Engine       string
+}
 
 // StepExecutorRegistry resolves a StepType to the concrete StepExecutor
 // that runs it. Implemented by internal/adapter/stepexecutors and wired in

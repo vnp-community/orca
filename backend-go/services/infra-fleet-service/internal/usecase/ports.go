@@ -599,6 +599,20 @@ type DevServerAgentClient interface {
 	// comment for the matching "never log contentPEM" requirement on the
 	// agent side.
 	ReadCredentialFile(ctx context.Context, devServer domain.DevServer, path string) (contentPEM string, err error)
+
+	// --- Agent exec output streaming (TASK-AG-FLOWTASK-002) ---
+
+	// StreamExecOutput subscribes to stepID's agent.execPrompt.output
+	// notifications over devServer's persistent session (see
+	// devserveragent/session.go's execOutputSubs demux) and returns a
+	// receive-only event channel plus an unsubscribe func — same shape as
+	// StreamPty, except there is no separate "spawn" call first: the
+	// agent.execPrompt request that produces stepID's output is issued by
+	// the caller (task-service's SimpleExecutor via Relay), not by this
+	// usecase layer, so subscribing only observes an in-flight run rather
+	// than starting one. unsubscribe MUST be called exactly once by the
+	// caller (typically via defer).
+	StreamExecOutput(ctx context.Context, devServer domain.DevServer, stepID string) (<-chan ExecOutputEvent, func(), error)
 }
 
 // SpawnAgentInput mirrors agent.spawn's real param set 1:1
@@ -914,6 +928,18 @@ type PtyEvent struct {
 	Data     []byte
 	Exited   bool
 	ExitCode int32
+}
+
+// ExecOutputEvent is one event StreamExecOutput's channel delivers — one
+// stdout/stderr chunk from an in-flight agent.execPrompt run. Unlike
+// PtyEvent/ScreencastEvent there is no separate "exited" variant: the
+// owning unary agent.execPrompt call (Client.Exec/Relay) already reports
+// exitCode/timedOut in its own final response, so this event type only
+// ever carries output bytes.
+type ExecOutputEvent struct {
+	StepID string
+	Stream string // "stdout" | "stderr"
+	Data   string
 }
 
 // AgentStatusResult carries GetTerminalAgentStatusResponse's fields.

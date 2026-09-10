@@ -4,7 +4,7 @@
 **Bug:** [BUG-FE-TASKV1-006](../BUG-FE-TASKV1-006-task-execute-orchestration-ui-khong-ton-tai.md)
 **File:** `frontend/src/renderer/src/components/task/TaskDispatchStatusPanel.tsx` (mới), `frontend/src/renderer/src/components/task/TaskDetail.tsx`
 **Estimated:** 60 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 **Phụ thuộc:** [TASK-FE-TASKV1-09](./TASK-FE-TASKV1-09-orchestration-page-rename.md) không bắt buộc (độc lập, có thể làm song song) — nhưng nên xong trước để tránh xung đột tên `Orchestration*` trong cùng PR review.
 
 ---
@@ -143,9 +143,9 @@ qua orchestration-service thật → thấy status/assignee đúng, bấm "Focus
 
 ## Definition of Done
 
-- [ ] `TaskDispatchStatusPanel.tsx` mới, dùng đúng response shape thật (`assignee_handle`, `status`)
-- [ ] Gắn vào `TaskDetail.tsx` ngay dưới nút Execute
-- [ ] `focusRuntimeOrchestrationTask` gọi với `environmentId` thật (không hard-code `null`) — SSH-aware
-- [ ] Không implement lại `terminal-orchestration-task-links.ts` — import và dùng nguyên vẹn
-- [ ] PR ghi chú phát hiện `agentSession.listActive` đã wire (cơ hội mở rộng tương lai, không làm trong task này)
-- [ ] `pnpm tsc --noEmit` sạch
+- [x] `TaskDispatchStatusPanel.tsx` mới, dùng đúng response shape thật (`assignee_handle`, `status`)
+- [x] Gắn vào `TaskDetail.tsx` ngay dưới nút Execute
+- [x] `focusRuntimeOrchestrationTask` gọi với `environmentId` thật (không hard-code `null`) — SSH-aware
+- [x] Không implement lại `terminal-orchestration-task-links.ts` — import và dùng nguyên vẹn
+- [x] PR ghi chú phát hiện `agentSession.listActive` đã wire (cơ hội mở rộng tương lai, không làm trong task này)
+- [x] `pnpm tsc --noEmit` sạch

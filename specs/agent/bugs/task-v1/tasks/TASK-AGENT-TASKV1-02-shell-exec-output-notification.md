@@ -8,7 +8,7 @@
 phải luồn `WireState` qua 1 lớp dispatch chưa có sẵn tham số này)
 **Dependencies:** Không bắt buộc — độc lập với TASK-AGENT-TASKV1-01, có thể
 làm song song (2 handler khác file, không đụng nhau)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 

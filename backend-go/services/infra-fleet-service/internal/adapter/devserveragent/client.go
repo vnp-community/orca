@@ -759,6 +759,59 @@ func (c *Client) StreamFileChanges(ctx context.Context, devServer domain.DevServ
 	return out, unsubscribe, nil
 }
 
+// StreamExecOutput subscribes to stepID's agent.execPrompt.output
+// notifications over devServer's persistent session (see session.go's
+// subscribeExecOutput/routeNotification) and translates them into
+// usecase.ExecOutputEvent — same shape as StreamPty above.
+//
+// relay-ssh scope (TASK-AG-FLOWTASK-002 Open Question 2): StreamPty/
+// StreamScreencast block relay-ssh today citing "no persistent session",
+// which SOL-AG-FLOWTASK-001 §3 flagged as possibly inconsistent with
+// getOrProvisionSession's actual session reuse (dòng 187-214) — that
+// inconsistency was NOT resolved by this pass (still needs someone with
+// TASK-192 context). Per the task's explicit default stance, this method
+// INHERITS the same block unconditionally rather than unilaterally
+// widening scope while the reason is unverified.
+func (c *Client) StreamExecOutput(ctx context.Context, devServer domain.DevServer, stepID string) (<-chan usecase.ExecOutputEvent, func(), error) {
+	if devServer.Mode == domain.ConnectionModeRelaySSH {
+		return nil, nil, fmt.Errorf("%w: relay-ssh mode has no agent.execPrompt.output JSON-RPC surface (no relay.js deployed)", ErrConnectionModeNotImplemented)
+	}
+	sess, err := c.getOrCreateSession(ctx, devServer)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	raw := sess.subscribeExecOutput(stepID)
+	out := make(chan usecase.ExecOutputEvent, 64)
+	done := make(chan struct{})
+	var closeOnce sync.Once
+
+	go func() {
+		defer close(out)
+		for {
+			select {
+			case n, ok := <-raw:
+				if !ok {
+					return
+				}
+				out <- usecase.ExecOutputEvent{StepID: n.StepID, Stream: n.Stream, Data: n.Data}
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			}
+		}
+	}()
+
+	unsubscribe := func() {
+		closeOnce.Do(func() {
+			close(done)
+			sess.unsubscribeExecOutput(stepID, raw)
+		})
+	}
+	return out, unsubscribe, nil
+}
+
 // screencastStartParams builds browser.screencastStart's JSON-RPC params
 // from usecase.ScreencastParams — field names match
 // browser-screencast-handler.ts's dispatch case exactly (both sides of this

@@ -132,6 +132,11 @@ type Server struct {
 	relayByDevServer     *usecase.RelayByDevServer
 	isDevServerConnected *usecase.IsDevServerConnected
 
+	// streamAgentExecOutput backs the StreamExecOutput RPC
+	// (TASK-AG-FLOWTASK-002/003) — see usecase.StreamAgentExecOutput's doc
+	// comment.
+	streamAgentExecOutput *usecase.StreamAgentExecOutput
+
 	// --- Ephemeral VM (SOL-004 Group 1/2a, TASK-002/004) ---
 	listEphemeralVmRuntimes *usecase.ListEphemeralVmRuntimes
 	ephemeralVmRelay        *usecase.EphemeralVmRelay
@@ -216,6 +221,7 @@ func New(
 	resolveAccessRequest *usecase.ResolveAccessRequest,
 	relayByDevServer *usecase.RelayByDevServer,
 	isDevServerConnected *usecase.IsDevServerConnected,
+	streamAgentExecOutput *usecase.StreamAgentExecOutput,
 	listEphemeralVmRuntimes *usecase.ListEphemeralVmRuntimes,
 	ephemeralVmRelay *usecase.EphemeralVmRelay,
 	getFleetConnectivitySummary *usecase.GetFleetConnectivitySummary,
@@ -298,6 +304,8 @@ func New(
 		resolveAccessRequest:       resolveAccessRequest,
 		relayByDevServer:           relayByDevServer,
 		isDevServerConnected:       isDevServerConnected,
+
+		streamAgentExecOutput: streamAgentExecOutput,
 
 		listEphemeralVmRuntimes: listEphemeralVmRuntimes,
 		ephemeralVmRelay:        ephemeralVmRelay,
@@ -1455,6 +1463,42 @@ func (s *Server) AttachScreencast(stream infrafleetv1.InfraFleetService_AttachSc
 				return apperrors.ToGRPCStatus(err)
 			}
 			return nil
+		}
+	}
+}
+
+// StreamExecOutput implements the server-streaming RPC exposing
+// usecase.StreamAgentExecOutput to other services (task-service's
+// SimpleExecutor, TASK-AG-FLOWTASK-003) — see infrafleet.proto's
+// StreamExecOutput doc comment for the "observes, never issues,
+// agent.execPrompt" contract.
+//
+// Tenant extraction: same manual workaround AttachPty/AttachScreencast use
+// above (see AttachPty's doc comment) — grpcmw.ChainUnary's interceptor
+// chain does not apply to streaming RPCs.
+func (s *Server) StreamExecOutput(req *infrafleetv1.StreamExecOutputRequest, stream infrafleetv1.InfraFleetService_StreamExecOutputServer) error {
+	ctx := withTenantFromStreamMetadata(stream.Context())
+
+	out, unsubscribe, err := s.streamAgentExecOutput.Execute(ctx, usecase.StreamAgentExecOutputInput{
+		ConnectionID: req.GetConnectionId(),
+		StepID:       req.GetStepId(),
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	defer unsubscribe()
+
+	for {
+		select {
+		case ev, ok := <-out:
+			if !ok {
+				return nil // subscription's channel closed (unsubscribe/session teardown) — a clean end, not an error
+			}
+			if err := stream.Send(&infrafleetv1.AgentExecOutputEvent{StepId: ev.StepID, Stream: ev.Stream, Data: ev.Data}); err != nil {
+				return err
+			}
+		case <-stream.Context().Done():
+			return nil // caller (task-service) cancelled — typically once its own Relay('agent.execPrompt') call returned
 		}
 	}
 }

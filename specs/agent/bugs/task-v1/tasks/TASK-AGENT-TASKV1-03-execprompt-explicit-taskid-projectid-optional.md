@@ -9,7 +9,7 @@ bị chặn nếu bỏ qua task này)
 §"Đề xuất nhỏ, không bắt buộc, ở phía `agent/`"
 **Estimated effort:** Rất nhỏ
 **Dependencies:** Không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 

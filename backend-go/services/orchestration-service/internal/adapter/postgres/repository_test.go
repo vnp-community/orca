@@ -9,9 +9,12 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"os/exec"
 	"path/filepath"
+	"sync"
 	"testing"
 	"time"
 
@@ -87,15 +90,18 @@ func TestRepository_UpdateStatusAndPromote_PromotesReadySiblingsAtomically(t *te
 		t.Fatalf("creating dependent task: %v", err)
 	}
 
-	updated, promoted, err := repo.UpdateStatusAndPromote(ctx, tenantID, root.ID, domain.TaskStatusCompleted)
+	result, err := repo.UpdateStatusAndPromote(ctx, tenantID, root.ID, domain.TaskStatusCompleted, domain.OutboxEvent{})
 	if err != nil {
 		t.Fatalf("UpdateStatusAndPromote: %v", err)
 	}
-	if updated.Status != domain.TaskStatusCompleted {
-		t.Errorf("expected root completed, got %s", updated.Status)
+	if result.Task.Status != domain.TaskStatusCompleted {
+		t.Errorf("expected root completed, got %s", result.Task.Status)
 	}
-	if len(promoted) != 1 || promoted[0] != dependent.ID {
-		t.Fatalf("expected dependent promoted, got %v", promoted)
+	if len(result.PromotedIDs) != 1 || result.PromotedIDs[0] != dependent.ID {
+		t.Fatalf("expected dependent promoted, got %v", result.PromotedIDs)
+	}
+	if result.RunFinalized != nil {
+		t.Errorf("expected run NOT finalized while a sibling remains non-terminal, got %+v", result.RunFinalized)
 	}
 
 	got, err := repo.Get(ctx, tenantID, dependent.ID)
@@ -124,12 +130,12 @@ func TestRepository_ResolveGate_CannotBeResolvedTwice(t *testing.T) {
 		t.Fatalf("creating task: %v", err)
 	}
 
-	dc, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-1", runID, task.ID)
+	dc, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-1", runID, task.ID, domain.OutboxEvent{})
 	if err != nil {
 		t.Fatalf("creating dispatch context: %v", err)
 	}
 
-	gate, err := repo.CreateGate(ctx, tenantID, dc.ID, "proceed?", []string{"yes", "no"})
+	gate, err := repo.CreateGate(ctx, tenantID, dc.ID, "proceed?", []string{"yes", "no"}, domain.OutboxEvent{})
 	if err != nil {
 		t.Fatalf("CreateGate: %v", err)
 	}
@@ -166,7 +172,7 @@ func TestRepository_CreateGate_SucceedsWhenDispatchContextHasTask(t *testing.T) 
 		t.Fatalf("creating task: %v", err)
 	}
 
-	dc, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-1", runID, task.ID)
+	dc, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-1", runID, task.ID, domain.OutboxEvent{})
 	if err != nil {
 		t.Fatalf("creating dispatch context: %v", err)
 	}
@@ -174,7 +180,7 @@ func TestRepository_CreateGate_SucceedsWhenDispatchContextHasTask(t *testing.T) 
 		t.Fatalf("expected dispatch context orchestration_task_id %q, got %q", task.ID, dc.OrchestrationTaskID)
 	}
 
-	gate, err := repo.CreateGate(ctx, tenantID, dc.ID, "proceed?", []string{"yes", "no"})
+	gate, err := repo.CreateGate(ctx, tenantID, dc.ID, "proceed?", []string{"yes", "no"}, domain.OutboxEvent{})
 	if err != nil {
 		t.Fatalf("expected CreateGate to succeed for a dispatch context with a task, got: %v", err)
 	}
@@ -211,12 +217,12 @@ func TestRepository_CreateGate_FailsWhenDispatchContextHasNoTask(t *testing.T) {
 
 	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-4")
 
-	dc, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-1", runID, "")
+	dc, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-1", runID, "", domain.OutboxEvent{})
 	if err != nil {
 		t.Fatalf("creating dispatch context: %v", err)
 	}
 
-	if _, err := repo.CreateGate(ctx, tenantID, dc.ID, "proceed?", []string{"yes", "no"}); !errors.Is(err, usecase.ErrDispatchContextHasNoTask) {
+	if _, err := repo.CreateGate(ctx, tenantID, dc.ID, "proceed?", []string{"yes", "no"}, domain.OutboxEvent{}); !errors.Is(err, usecase.ErrDispatchContextHasNoTask) {
 		t.Fatalf("expected usecase.ErrDispatchContextHasNoTask, got: %v", err)
 	}
 }
@@ -243,13 +249,13 @@ func TestRepository_GetLatestForTask_ReturnsMostRecentAfterRetry(t *testing.T) {
 		t.Fatalf("creating task: %v", err)
 	}
 
-	first, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-a", runID, task.ID)
+	first, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-a", runID, task.ID, domain.OutboxEvent{})
 	if err != nil {
 		t.Fatalf("create first dispatch context: %v", err)
 	}
 	_ = first
 	time.Sleep(10 * time.Millisecond) // ensure created_at strictly orders the second row after the first
-	second, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-b", runID, task.ID)
+	second, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-b", runID, task.ID, domain.OutboxEvent{})
 	if err != nil {
 		t.Fatalf("create second (retry) dispatch context: %v", err)
 	}
@@ -292,13 +298,13 @@ func TestRepository_ListActiveDispatchContextsForUser_ReturnsOnlyCallerNonTermin
 	seedCoordinatorRun(t, repo, repo.pool, otherTenantID, otherTenantRunID, "coord-list-2")
 
 	// Active, this user, this tenant — should be returned.
-	active, err := repo.CreateDispatchContext(ctx, tenantID, "user-a", "", "handle-active", runID, "")
+	active, err := repo.CreateDispatchContext(ctx, tenantID, "user-a", "", "handle-active", runID, "", domain.OutboxEvent{})
 	if err != nil {
 		t.Fatalf("create active dispatch context: %v", err)
 	}
 
 	// Completed, this user, this tenant — terminal, should be excluded.
-	completed, err := repo.CreateDispatchContext(ctx, tenantID, "user-a", "", "handle-completed", runID, "")
+	completed, err := repo.CreateDispatchContext(ctx, tenantID, "user-a", "", "handle-completed", runID, "", domain.OutboxEvent{})
 	if err != nil {
 		t.Fatalf("create completed dispatch context: %v", err)
 	}
@@ -307,13 +313,13 @@ func TestRepository_ListActiveDispatchContextsForUser_ReturnsOnlyCallerNonTermin
 	}
 
 	// Active, DIFFERENT user, same tenant — should be excluded.
-	if _, err := repo.CreateDispatchContext(ctx, tenantID, "user-b", "", "handle-other-user", runID, ""); err != nil {
+	if _, err := repo.CreateDispatchContext(ctx, tenantID, "user-b", "", "handle-other-user", runID, "", domain.OutboxEvent{}); err != nil {
 		t.Fatalf("create other-user dispatch context: %v", err)
 	}
 
 	// Active, same user id string, DIFFERENT tenant — should be excluded
 	// (tenant isolation must not leak across the user_id filter alone).
-	if _, err := repo.CreateDispatchContext(ctx, otherTenantID, "user-a", "", "handle-other-tenant", otherTenantRunID, ""); err != nil {
+	if _, err := repo.CreateDispatchContext(ctx, otherTenantID, "user-a", "", "handle-other-tenant", otherTenantRunID, "", domain.OutboxEvent{}); err != nil {
 		t.Fatalf("create other-tenant dispatch context: %v", err)
 	}
 
@@ -329,5 +335,378 @@ func TestRepository_ListActiveDispatchContextsForUser_ReturnsOnlyCallerNonTermin
 	}
 	if got[0].UserID != "user-a" {
 		t.Errorf("want UserID=user-a, got %q", got[0].UserID)
+	}
+}
+
+// TestRepository_CreateWithTasks_ResolvesTempIDDepsToRealIDs is the
+// concrete proof that CreateWithTasks's tempId->real-id resolution
+// (repository.go's CreateWithTasks doc comment) actually round-trips: a
+// child task's Deps must end up pointing at the parent's freshly-minted
+// real UUID, never left as a raw tempId string (which DepsSatisfied could
+// never match against a real completed id).
+func TestRepository_CreateWithTasks_ResolvesTempIDDepsToRealIDs(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "d0000000-0000-0000-0000-000000000001"
+
+	specJSON := []byte(`[
+		{"tempId":"a","title":"Root","spec":{},"deps":[]},
+		{"tempId":"b","title":"Child","spec":{},"deps":["a"]}
+	]`)
+	run, err := domain.NewCoordinatorRun("", tenantID, "origin-task-1", "coord-create-with-tasks", specJSON, 0)
+	if err != nil {
+		t.Fatalf("building run: %v", err)
+	}
+	run.Status = domain.RunStatusRunning
+
+	created, err := repo.CreateWithTasks(ctx, tenantID, run)
+	if err != nil {
+		t.Fatalf("CreateWithTasks: %v", err)
+	}
+	if created.ID == "" {
+		t.Fatal("expected a minted run id")
+	}
+
+	rows, err := repo.pool.Query(ctx, `
+		SELECT id, task_title, status, deps FROM orchestration.orchestration_tasks
+		WHERE coordinator_run_id = $1 ORDER BY task_title
+	`, created.ID)
+	if err != nil {
+		t.Fatalf("querying materialized tasks: %v", err)
+	}
+	defer rows.Close()
+
+	type row struct {
+		id, title, status string
+		deps              []string
+	}
+	var got []row
+	for rows.Next() {
+		var r row
+		var depsJSON []byte
+		if err := rows.Scan(&r.id, &r.title, &r.status, &depsJSON); err != nil {
+			t.Fatalf("scanning task row: %v", err)
+		}
+		if len(depsJSON) > 0 {
+			if err := json.Unmarshal(depsJSON, &r.deps); err != nil {
+				t.Fatalf("unmarshal deps: %v", err)
+			}
+		}
+		got = append(got, r)
+	}
+	if err := rows.Err(); err != nil {
+		t.Fatalf("iterating task rows: %v", err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 materialized tasks, got %d", len(got))
+	}
+	// got[0] = Child (alphabetically first), got[1] = Root
+	child, root := got[0], got[1]
+	if child.title != "Child" || root.title != "Root" {
+		t.Fatalf("unexpected task ordering: %+v", got)
+	}
+	if root.status != string(domain.TaskStatusReady) {
+		t.Errorf("expected root (no deps) status ready, got %s", root.status)
+	}
+	if child.status != string(domain.TaskStatusPending) {
+		t.Errorf("expected child (has dep) status pending, got %s", child.status)
+	}
+	if len(child.deps) != 1 || child.deps[0] != root.id {
+		t.Errorf("expected child.deps to resolve to root's real id %q, got %v", root.id, child.deps)
+	}
+}
+
+// TestRepository_ClaimReady_ExactlyOneWinsUnderConcurrency proves the CAS
+// contract the tick loop depends on: two goroutines racing to claim the
+// same ready task must result in exactly one success.
+func TestRepository_ClaimReady_ExactlyOneWinsUnderConcurrency(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "d0000000-0000-0000-0000-000000000002"
+	runID := "d0000000-0000-0000-0000-000000000003"
+
+	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-claim")
+
+	task, err := domain.NewOrchestrationTask("", tenantID, runID, "", "", "claimable", nil, nil)
+	if err != nil {
+		t.Fatalf("building task: %v", err)
+	}
+	task, err = repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+	if _, err := repo.pool.Exec(ctx, `UPDATE orchestration.orchestration_tasks SET status = 'ready' WHERE id = $1`, task.ID); err != nil {
+		t.Fatalf("marking task ready: %v", err)
+	}
+
+	const attempts = 5
+	results := make(chan bool, attempts)
+	var wg sync.WaitGroup
+	for i := 0; i < attempts; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			_, ok, err := repo.ClaimReady(ctx, tenantID, task.ID)
+			if err != nil {
+				t.Errorf("ClaimReady: %v", err)
+				return
+			}
+			results <- ok
+		}()
+	}
+	wg.Wait()
+	close(results)
+
+	successes := 0
+	for ok := range results {
+		if ok {
+			successes++
+		}
+	}
+	if successes != 1 {
+		t.Fatalf("expected exactly 1 successful claim, got %d", successes)
+	}
+}
+
+func TestRepository_ListPending_ReturnsOnlyPendingRows(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "d0000000-0000-0000-0000-000000000004"
+	runID := "d0000000-0000-0000-0000-000000000005"
+
+	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-pending")
+
+	pendingTask, err := domain.NewOrchestrationTask("", tenantID, runID, "", "", "pending gate task", nil, nil)
+	if err != nil {
+		t.Fatalf("building task: %v", err)
+	}
+	pendingTask, err = repo.Create(ctx, pendingTask)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+	dc1, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-pending", runID, pendingTask.ID, domain.OutboxEvent{})
+	if err != nil {
+		t.Fatalf("creating dispatch context: %v", err)
+	}
+	pendingGate, err := repo.CreateGate(ctx, tenantID, dc1.ID, "proceed?", []string{"yes", "no"}, domain.OutboxEvent{})
+	if err != nil {
+		t.Fatalf("CreateGate: %v", err)
+	}
+
+	resolvedTask, err := domain.NewOrchestrationTask("", tenantID, runID, "", "", "resolved gate task", nil, nil)
+	if err != nil {
+		t.Fatalf("building task: %v", err)
+	}
+	resolvedTask, err = repo.Create(ctx, resolvedTask)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+	dc2, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-resolved", runID, resolvedTask.ID, domain.OutboxEvent{})
+	if err != nil {
+		t.Fatalf("creating dispatch context: %v", err)
+	}
+	resolvedGate, err := repo.CreateGate(ctx, tenantID, dc2.ID, "proceed?", []string{"yes", "no"}, domain.OutboxEvent{})
+	if err != nil {
+		t.Fatalf("CreateGate: %v", err)
+	}
+	if _, _, err := repo.ResolveGate(ctx, tenantID, resolvedGate.ID, "yes"); err != nil {
+		t.Fatalf("ResolveGate: %v", err)
+	}
+
+	got, err := repo.ListPending(ctx, tenantID)
+	if err != nil {
+		t.Fatalf("ListPending: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != pendingGate.ID {
+		t.Fatalf("expected exactly the pending gate %q, got %+v", pendingGate.ID, got)
+	}
+}
+
+func TestRepository_CountNonTerminalByRun(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "d0000000-0000-0000-0000-000000000006"
+	runID := "d0000000-0000-0000-0000-000000000007"
+
+	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-count")
+
+	statuses := []domain.TaskStatus{
+		domain.TaskStatusPending, domain.TaskStatusReady, domain.TaskStatusDispatched,
+		domain.TaskStatusBlocked, domain.TaskStatusCompleted, domain.TaskStatusFailed,
+	}
+	for i, s := range statuses {
+		task, err := domain.NewOrchestrationTask("", tenantID, runID, "", "", fmt.Sprintf("task-%d", i), nil, nil)
+		if err != nil {
+			t.Fatalf("building task: %v", err)
+		}
+		task, err = repo.Create(ctx, task)
+		if err != nil {
+			t.Fatalf("creating task: %v", err)
+		}
+		if _, err := repo.pool.Exec(ctx, `UPDATE orchestration.orchestration_tasks SET status = $1 WHERE id = $2`, string(s), task.ID); err != nil {
+			t.Fatalf("setting status: %v", err)
+		}
+	}
+
+	count, err := repo.CountNonTerminalByRun(ctx, tenantID, runID)
+	if err != nil {
+		t.Fatalf("CountNonTerminalByRun: %v", err)
+	}
+	if count != 4 { // pending, ready, dispatched, blocked — completed/failed excluded
+		t.Errorf("expected 4 non-terminal tasks, got %d", count)
+	}
+}
+
+func TestRepository_RecordHeartbeat(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "d0000000-0000-0000-0000-000000000008"
+	runID := "d0000000-0000-0000-0000-000000000009"
+
+	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-heartbeat")
+
+	dc, err := repo.CreateDispatchContext(ctx, tenantID, "user-1", "", "handle-hb", runID, "", domain.OutboxEvent{})
+	if err != nil {
+		t.Fatalf("creating dispatch context: %v", err)
+	}
+
+	updated, err := repo.RecordHeartbeat(ctx, tenantID, dc.ID)
+	if err != nil {
+		t.Fatalf("RecordHeartbeat: %v", err)
+	}
+	if updated.LastHeartbeatAt.IsZero() {
+		t.Error("expected LastHeartbeatAt to be set")
+	}
+
+	if _, err := repo.RecordHeartbeat(ctx, tenantID, "does-not-exist"); !errors.Is(err, usecase.ErrDispatchContextNotFound) {
+		t.Fatalf("expected ErrDispatchContextNotFound, got %v", err)
+	}
+}
+
+func TestRepository_ListUnreportedTerminal_AndMarkReported(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "d0000000-0000-0000-0000-00000000000a"
+	runID := "d0000000-0000-0000-0000-00000000000b"
+
+	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-unreported")
+	if _, err := repo.pool.Exec(ctx, `UPDATE orchestration.coordinator_runs SET status = 'completed' WHERE id = $1`, runID); err != nil {
+		t.Fatalf("marking run completed: %v", err)
+	}
+
+	unreported, err := repo.ListUnreportedTerminal(ctx)
+	if err != nil {
+		t.Fatalf("ListUnreportedTerminal: %v", err)
+	}
+	found := false
+	for _, r := range unreported {
+		if r.ID == runID {
+			found = true
+		}
+	}
+	if !found {
+		t.Fatalf("expected run %q in unreported terminal list, got %+v", runID, unreported)
+	}
+
+	if err := repo.MarkReported(ctx, tenantID, runID); err != nil {
+		t.Fatalf("MarkReported: %v", err)
+	}
+
+	after, err := repo.ListUnreportedTerminal(ctx)
+	if err != nil {
+		t.Fatalf("ListUnreportedTerminal (after): %v", err)
+	}
+	for _, r := range after {
+		if r.ID == runID {
+			t.Fatalf("expected run %q to be removed from unreported list after MarkReported", runID)
+		}
+	}
+}
+
+// TestRepository_UpdateStatusAndPromote_FinalizesRunOnLastTask is the
+// concrete postgres-level proof of TASK-TASKV1-005-07: completing the last
+// non-terminal task in a run transitions coordinator_runs to completed in
+// the SAME transaction and returns RunFinalized with the run's
+// origin_task_id.
+func TestRepository_UpdateStatusAndPromote_FinalizesRunOnLastTask(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "d0000000-0000-0000-0000-00000000000c"
+	runID := "d0000000-0000-0000-0000-00000000000d"
+
+	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-finalize")
+	if _, err := repo.pool.Exec(ctx, `UPDATE orchestration.coordinator_runs SET status = 'running' WHERE id = $1`, runID); err != nil {
+		t.Fatalf("marking run running: %v", err)
+	}
+
+	task, err := domain.NewOrchestrationTask("", tenantID, runID, "", "", "only task", nil, nil)
+	if err != nil {
+		t.Fatalf("building task: %v", err)
+	}
+	task, err = repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+
+	result, err := repo.UpdateStatusAndPromote(ctx, tenantID, task.ID, domain.TaskStatusCompleted, domain.OutboxEvent{})
+	if err != nil {
+		t.Fatalf("UpdateStatusAndPromote: %v", err)
+	}
+	if result.RunFinalized == nil {
+		t.Fatal("expected RunFinalized to be set when the last task completes")
+	}
+	if result.RunFinalized.CoordinatorRunID != runID {
+		t.Errorf("expected CoordinatorRunID %q, got %q", runID, result.RunFinalized.CoordinatorRunID)
+	}
+	if result.RunFinalized.OriginTaskID != "origin-task-1" {
+		t.Errorf("expected OriginTaskID origin-task-1 (seeded), got %q", result.RunFinalized.OriginTaskID)
+	}
+	if !result.RunFinalized.Success {
+		t.Error("expected Success=true for an all-completed run")
+	}
+
+	var status string
+	if err := repo.pool.QueryRow(ctx, `SELECT status FROM orchestration.coordinator_runs WHERE id = $1`, runID).Scan(&status); err != nil {
+		t.Fatalf("querying run status: %v", err)
+	}
+	if status != "completed" {
+		t.Errorf("expected coordinator_runs.status = completed, got %q", status)
+	}
+}
+
+// TestRepository_UpdateStatusAndPromote_DoesNotDoubleFinalizeRacingRun
+// proves the WHERE ... AND status = 'running' guard: a run already
+// completed/failed by a racing concurrent call must not error the whole
+// transaction, only skip setting RunFinalized.
+func TestRepository_UpdateStatusAndPromote_DoesNotDoubleFinalizeRacingRun(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "d0000000-0000-0000-0000-00000000000e"
+	runID := "d0000000-0000-0000-0000-00000000000f"
+
+	seedCoordinatorRun(t, repo, repo.pool, tenantID, runID, "coord-race")
+	// Simulate the run already finalized by a racing concurrent call.
+	if _, err := repo.pool.Exec(ctx, `UPDATE orchestration.coordinator_runs SET status = 'completed', completed_at = now() WHERE id = $1`, runID); err != nil {
+		t.Fatalf("marking run already completed: %v", err)
+	}
+
+	task, err := domain.NewOrchestrationTask("", tenantID, runID, "", "", "task", nil, nil)
+	if err != nil {
+		t.Fatalf("building task: %v", err)
+	}
+	task, err = repo.Create(ctx, task)
+	if err != nil {
+		t.Fatalf("creating task: %v", err)
+	}
+
+	result, err := repo.UpdateStatusAndPromote(ctx, tenantID, task.ID, domain.TaskStatusCompleted, domain.OutboxEvent{})
+	if err != nil {
+		t.Fatalf("expected no error for a racing already-finalized run, got: %v", err)
+	}
+	if result.RunFinalized != nil {
+		t.Errorf("expected RunFinalized to stay nil for an already-finalized run, got %+v", result.RunFinalized)
+	}
+	if result.Task.Status != domain.TaskStatusCompleted {
+		t.Errorf("expected the task-status write itself to still succeed, got %s", result.Task.Status)
 	}
 }

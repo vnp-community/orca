@@ -127,7 +127,7 @@ func (f *fakeExecutionRepository) count() int {
 
 func TestPauseExecution_RunningTransitionsToPaused(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, err := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
+	exec, err := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "", "")
 	if err != nil {
 		t.Fatalf("building execution: %v", err)
 	}
@@ -153,7 +153,7 @@ func TestPauseExecution_RunningTransitionsToPaused(t *testing.T) {
 
 func TestPauseExecution_RejectsNonRunningExecution(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "", "")
 	// Force it into a terminal state a real running execution would reach
 	// on its own — pausing from here must be rejected.
 	exec.Status = domain.StatusCompleted
@@ -170,7 +170,7 @@ func TestPauseExecution_RejectsNonRunningExecution(t *testing.T) {
 
 func TestResumeExecution_PausedTransitionsToRunning(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "", "")
 	_ = exec.Pause(time.Now().UTC())
 	_ = repo.CreateExecution(context.Background(), exec)
 
@@ -192,7 +192,7 @@ func TestResumeExecution_PausedTransitionsToRunning(t *testing.T) {
 func TestResumeExecution_RejectsNonPausedExecution(t *testing.T) {
 	repo := newFakeExecutionRepository()
 	// Still running — never paused.
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "", "")
 	_ = repo.CreateExecution(context.Background(), exec)
 
 	uc := NewResumeExecution(repo)

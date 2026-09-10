@@ -5,7 +5,7 @@
 **Service:** `orchestration-service` (`internal/adapter/grpc`, `cmd/server`)
 **File:** `backend-go/services/orchestration-service/internal/adapter/grpc/server.go`, `backend-go/services/orchestration-service/cmd/server/main.go`, `backend-go/services/orchestration-service/internal/config/config.go`
 **Depends on:** TASK-TASKV1-005-02 (proto), TASK-TASKV1-005-06 (usecases), TASK-TASKV1-005-07 (`UpdateTaskStatusAndPromote` new constructor signature), TASK-TASKV1-005-08 (adapters)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

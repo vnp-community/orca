@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -15,16 +16,19 @@ import (
 // gitgatewayv1.GitGatewayServiceClient directly (panics on any
 // unimplemented method via the embed) — same convention as
 // fakeGitGatewayServiceClient (tech_stack_detector_test.go), kept separate
-// here since this file only needs CreateWorktree.
+// here (distinct name) since that fake already owns ReadFile for a
+// different file's tests and this one only needs CreateWorktree.
 type fakeGitGatewayCreateWorktreeClient struct {
-	gitgatewayv1.GitGatewayServiceClient
+	gitgatewayv1.GitGatewayServiceClient // embed: panics on any unimplemented method, intentional for these tests
 
-	createWorktreeResp *gitgatewayv1.CreateWorktreeResponse
-	createWorktreeErr  error
-	gotCreateWorktree  *gitgatewayv1.CreateWorktreeRequest
+	createWorktreeResp   *gitgatewayv1.CreateWorktreeResponse
+	createWorktreeErr    error
+	gotCreateWorktree    *gitgatewayv1.CreateWorktreeRequest
+	createWorktreeCalled bool
 }
 
 func (f *fakeGitGatewayCreateWorktreeClient) CreateWorktree(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest, _ ...grpc.CallOption) (*gitgatewayv1.CreateWorktreeResponse, error) {
+	f.createWorktreeCalled = true
 	f.gotCreateWorktree = in
 	if f.createWorktreeErr != nil {
 		return nil, f.createWorktreeErr
@@ -33,81 +37,115 @@ func (f *fakeGitGatewayCreateWorktreeClient) CreateWorktree(ctx context.Context,
 }
 
 // fakeProjectServiceClient implements projectv1.ProjectServiceClient
-// directly — same fake-the-generated-client-port convention as
-// fakeInfraFleetServiceClient/fakeGitGatewayServiceClient.
+// directly — same convention as fakeGitGatewayCreateWorktreeClient above.
 type fakeProjectServiceClient struct {
-	projectv1.ProjectServiceClient
+	projectv1.ProjectServiceClient // embed: panics on any unimplemented method, intentional for these tests
 
 	listReposResp *projectv1.ListReposResponse
 	listReposErr  error
+	gotListRepos  *projectv1.ListReposRequest
 }
 
 func (f *fakeProjectServiceClient) ListRepos(ctx context.Context, in *projectv1.ListReposRequest, _ ...grpc.CallOption) (*projectv1.ListReposResponse, error) {
+	f.gotListRepos = in
 	if f.listReposErr != nil {
 		return nil, f.listReposErr
 	}
 	return f.listReposResp, nil
 }
 
-func TestWorktreeProvisioner_ExistingWorktreeID_NeverCallsCreateWorktree(t *testing.T) {
+// TestWorktreeProvisioner_ReusesExistingWorktree is the core reuse
+// regression: a task with a non-empty WorktreeID must never call
+// CreateWorktree (or even look up a repo for it) — SOL-TG-04's "IF
+// task.worktreeId exists: use existing worktree".
+func TestWorktreeProvisioner_ReusesExistingWorktree(t *testing.T) {
 	git := &fakeGitGatewayCreateWorktreeClient{}
-	project := &fakeProjectServiceClient{}
-	p := NewWorktreeProvisioner(git, project)
+	projects := &fakeProjectServiceClient{}
+	p := NewWorktreeProvisioner(git, projects)
 
-	task := domain.Task{ID: "t1", ProjectID: "p1", WorktreeID: "existing-wt"}
-	worktreeID, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", task)
+	worktreeID, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-existing"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if worktreeID != "existing-wt" {
-		t.Errorf("expected the existing worktree id to be reused, got %q", worktreeID)
+	if worktreeID != "wt-existing" {
+		t.Errorf("expected the task's existing worktree id to be reused, got %q", worktreeID)
 	}
 	if path != "" {
-		t.Errorf("expected an empty path for the reuse case, got %q", path)
+		t.Errorf("expected empty path on reuse (caller resolves it via ProjectExecutionResolver), got %q", path)
 	}
-	if git.gotCreateWorktree != nil {
-		t.Error("expected CreateWorktree to never be called when task.WorktreeID is already set")
+	if git.createWorktreeCalled {
+		t.Error("expected CreateWorktree NOT to be called when the task already has a worktree")
+	}
+	if projects.gotListRepos != nil {
+		t.Error("expected ListRepos NOT to be called when the task already has a worktree")
 	}
 }
 
-func TestWorktreeProvisioner_EmptyWorktreeID_CreatesNewOne(t *testing.T) {
-	git := &fakeGitGatewayCreateWorktreeClient{
-		createWorktreeResp: &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "new-wt", Path: "/srv/worktrees/new-wt"},
-	}
-	project := &fakeProjectServiceClient{
-		listReposResp: &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "repo-1", Position: 0}, {Id: "repo-2", Position: 1}}},
-	}
-	p := NewWorktreeProvisioner(git, project)
+// TestWorktreeProvisioner_CreatesWorktreeForTaskWithNoExistingOne is the
+// create-branch regression: an empty WorktreeID resolves the project's
+// default repo (lowest position) via ListRepos, then calls CreateWorktree
+// with it, returning CreateWorktreeResponse's id/path verbatim.
+func TestWorktreeProvisioner_CreatesWorktreeForTaskWithNoExistingOne(t *testing.T) {
+	git := &fakeGitGatewayCreateWorktreeClient{createWorktreeResp: &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "wt-new", Path: "/srv/worktrees/wt-new", HeadSha: "abc123"}}
+	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{Repos: []*projectv1.Repo{
+		{Id: "repo-1", ProjectId: "proj-1", Position: 0},
+		{Id: "repo-2", ProjectId: "proj-1", Position: 1},
+	}}}
+	p := NewWorktreeProvisioner(git, projects)
 
-	task := domain.Task{ID: "t1", ProjectID: "p1"}
-	worktreeID, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", task)
+	worktreeID, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if worktreeID != "new-wt" || path != "/srv/worktrees/new-wt" {
-		t.Errorf("expected the created worktree's id/path, got %q/%q", worktreeID, path)
+	if worktreeID != "wt-new" || path != "/srv/worktrees/wt-new" {
+		t.Errorf("expected CreateWorktreeResponse's id/path to pass through, got id=%q path=%q", worktreeID, path)
 	}
-	if git.gotCreateWorktree.GetProjectId() != "p1" {
-		t.Errorf("expected project_id=p1, got %q", git.gotCreateWorktree.GetProjectId())
+	if !git.createWorktreeCalled {
+		t.Fatal("expected CreateWorktree to be called for a task with no existing worktree")
 	}
-	if git.gotCreateWorktree.GetRepoId() != "repo-1" {
-		t.Errorf("expected the first repo (by position) to be used as repo_id, got %q", git.gotCreateWorktree.GetRepoId())
+	if got := git.gotCreateWorktree.GetRepoId(); got != "repo-1" {
+		t.Errorf("expected the lowest-position repo (repo-1) to be resolved, got %q", got)
 	}
-	if git.gotCreateWorktree.GetBranch() != "task/t1" {
-		t.Errorf("expected branch=task/t1, got %q", git.gotCreateWorktree.GetBranch())
+	if got := git.gotCreateWorktree.GetProjectId(); got != "proj-1" {
+		t.Errorf("expected project_id to pass through, got %q", got)
+	}
+	if got := git.gotCreateWorktree.GetBranch(); got != "task/task-1" {
+		t.Errorf(`expected branch "task/task-1", got %q`, got)
+	}
+	if got := git.gotCreateWorktree.GetTaskId(); got != "task-1" {
+		t.Errorf("expected task_id to be set, got %q", got)
 	}
 }
 
-func TestWorktreeProvisioner_NoReposConfigured_ReturnsError(t *testing.T) {
+func TestWorktreeProvisioner_NoReposForProject_ReturnsError(t *testing.T) {
 	git := &fakeGitGatewayCreateWorktreeClient{}
-	project := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{}}
-	p := NewWorktreeProvisioner(git, project)
+	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{}}
+	p := NewWorktreeProvisioner(git, projects)
 
-	task := domain.Task{ID: "t1", ProjectID: "p1"}
-	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", task); err == nil {
-		t.Fatal("expected an error when the project has no repos configured")
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err == nil {
+		t.Fatal("expected an error when the project has no repos")
 	}
-	if git.gotCreateWorktree != nil {
-		t.Error("expected CreateWorktree to never be called when repo resolution fails")
+	if git.createWorktreeCalled {
+		t.Error("expected CreateWorktree NOT to be called when repo resolution fails")
+	}
+}
+
+func TestWorktreeProvisioner_ListReposError_Propagates(t *testing.T) {
+	git := &fakeGitGatewayCreateWorktreeClient{}
+	projects := &fakeProjectServiceClient{listReposErr: errors.New("project-service unavailable")}
+	p := NewWorktreeProvisioner(git, projects)
+
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err == nil {
+		t.Fatal("expected an error when ListRepos fails")
+	}
+}
+
+func TestWorktreeProvisioner_CreateWorktreeError_Propagates(t *testing.T) {
+	git := &fakeGitGatewayCreateWorktreeClient{createWorktreeErr: errors.New("git-gateway-service unavailable")}
+	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "repo-1", ProjectId: "proj-1"}}}}
+	p := NewWorktreeProvisioner(git, projects)
+
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err == nil {
+		t.Fatal("expected an error when CreateWorktree fails")
 	}
 }

@@ -4,7 +4,7 @@
 **Solution Ref:** FE-SOL-001 Phần 3
 **Priority:** 🟠 P1
 **Estimated:** 40 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/migrations/0003_execution_links.up.sql` (new), `backend-go/services/task-service/migrations/0003_execution_links.down.sql` (new)
 **Depends on:** None to start, but see the numbering/collision check in Context before running this migration — **confirm whether TASK-TG-04-05 (SOL-TG-04)'s `active_execution_id` migration has already landed**, since both target the same "next migration" slot and a related-but-distinct column name.
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

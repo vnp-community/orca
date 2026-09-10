@@ -2,6 +2,7 @@ package grpcclient
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -9,139 +10,130 @@ import (
 
 	orchestrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
-	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 )
 
 // fakeOrchestrationServiceClient implements
-// orchestrationv1.OrchestrationServiceClient directly (embeds the nil
-// interface, panics on any unimplemented method) — same convention as
-// fakeGitGatewayCreateWorktreeClient, kept separate since this file only
-// needs StartCoordinatorRun.
+// orchestrationv1.OrchestrationServiceClient directly — same
+// fake-the-generated-client-port convention as fakeInfraFleetServiceClient
+// (simple_executor_test.go).
 type fakeOrchestrationServiceClient struct {
-	orchestrationv1.OrchestrationServiceClient
+	orchestrationv1.OrchestrationServiceClient // embed: panics on any unimplemented method, intentional for these tests
 
-	startCoordinatorRunResp *orchestrationv1.StartCoordinatorRunResponse
-	startCoordinatorRunErr  error
-	gotStartCoordinatorRun  *orchestrationv1.StartCoordinatorRunRequest
+	startResp *orchestrationv1.CoordinatorRun
+	startErr  error
+	got       *orchestrationv1.StartCoordinatorRunRequest
 }
 
-func (f *fakeOrchestrationServiceClient) StartCoordinatorRun(ctx context.Context, in *orchestrationv1.StartCoordinatorRunRequest, _ ...grpc.CallOption) (*orchestrationv1.StartCoordinatorRunResponse, error) {
-	f.gotStartCoordinatorRun = in
-	if f.startCoordinatorRunErr != nil {
-		return nil, f.startCoordinatorRunErr
+func (f *fakeOrchestrationServiceClient) StartCoordinatorRun(_ context.Context, in *orchestrationv1.StartCoordinatorRunRequest, _ ...grpc.CallOption) (*orchestrationv1.CoordinatorRun, error) {
+	f.got = in
+	if f.startErr != nil {
+		return nil, f.startErr
 	}
-	return f.startCoordinatorRunResp, nil
+	return f.startResp, nil
 }
 
-// fakeSubtreeTaskRepository implements usecase.TaskRepository directly
-// (embeds the nil interface, panics on any unimplemented method) — this
-// file needs GetSubtree (buildOrchestrationSpec's one dependency) and
-// UpdateActiveExecutionID (Execute persists the new run's id right after
-// StartCoordinatorRun succeeds, TASK-TG-04-05).
-type fakeSubtreeTaskRepository struct {
-	usecase.TaskRepository
-
-	subtree              []domain.Task
-	subtreeEdges         []domain.TaskEdge
-	subtreeErr           error
-	gotActiveExecutionID string
+// complexExecutorEdgeRepository is a minimal usecase.EdgeRepository for
+// this file's tests — only ListFrom(parent_child) is exercised by
+// ComplexExecutor.buildSpec.
+type complexExecutorEdgeRepository struct {
+	edges []domain.TaskEdge
 }
 
-func (f *fakeSubtreeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
-	f.gotActiveExecutionID = activeExecutionID
-	return nil
+func (f *complexExecutorEdgeRepository) Add(ctx context.Context, tenantID string, edge domain.TaskEdge) error {
+	panic("not implemented")
 }
-
-func (f *fakeSubtreeTaskRepository) GetSubtree(ctx context.Context, tenantID, rootID string, maxDepth int) ([]domain.Task, []domain.TaskEdge, error) {
-	if f.subtreeErr != nil {
-		return nil, nil, f.subtreeErr
+func (f *complexExecutorEdgeRepository) ListByKind(ctx context.Context, tenantID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	panic("not implemented")
+}
+func (f *complexExecutorEdgeRepository) ListByKindForUpdate(ctx context.Context, tenantID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	panic("not implemented")
+}
+func (f *complexExecutorEdgeRepository) ListFrom(ctx context.Context, tenantID, fromTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	var out []domain.TaskEdge
+	for _, e := range f.edges {
+		if e.Kind == kind && e.FromTaskID == fromTaskID {
+			out = append(out, e)
+		}
 	}
-	return f.subtree, f.subtreeEdges, nil
+	return out, nil
+}
+func (f *complexExecutorEdgeRepository) ListTo(ctx context.Context, tenantID, toTaskID string, kind domain.EdgeKind) ([]domain.TaskEdge, error) {
+	panic("not implemented")
 }
 
-func TestComplexExecutor_Execute_BuildsSpecAndStartsCoordinatorRun(t *testing.T) {
-	tasks := &fakeSubtreeTaskRepository{
-		subtree: []domain.Task{
-			{ID: "root", Title: "Root", PromptTemplate: "do the root thing"},
-			{ID: "child-1", Title: "Child 1", Description: "child 1 description"},
-		},
-		subtreeEdges: []domain.TaskEdge{
-			{FromTaskID: "child-1", ToTaskID: "root", Kind: domain.EdgeKindDependsOn},
-		},
-	}
-	orch := &fakeOrchestrationServiceClient{
-		startCoordinatorRunResp: &orchestrationv1.StartCoordinatorRunResponse{Id: "run-1"},
-	}
-	c := NewComplexExecutor(orch, tasks, nil)
+func TestComplexExecutor_NoChildren_BuildsSingleRootNode(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{
+		"task-1": {ID: "task-1", TenantID: "tenant-1", Title: "Root Task"},
+	}}
+	edges := &complexExecutorEdgeRepository{}
+	client := &fakeOrchestrationServiceClient{startResp: &orchestrationv1.CoordinatorRun{Id: "run-1"}}
+	c := NewComplexExecutor(tasks, edges, client)
 
-	ref, err := c.Execute(ctxWithTenant(t), "tenant-1", "root", "req-1", "wt-1")
+	ref, err := c.Execute(ctxWithTenant(t), "tenant-1", "task-1", "req-1", "wt-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if ref != "run-1" {
-		t.Errorf("expected the coordinator run's id, got %q", ref)
+		t.Errorf("expected the coordinator run id to be returned, got %q", ref)
 	}
-	if tasks.gotActiveExecutionID != "run-1" {
-		t.Errorf("expected UpdateActiveExecutionID to be called with the new run's id, got %q", tasks.gotActiveExecutionID)
+	if client.got.GetOriginTaskId() != "task-1" {
+		t.Errorf("expected origin_task_id=task-1, got %q", client.got.GetOriginTaskId())
 	}
-
-	got := orch.gotStartCoordinatorRun
-	if got.GetTenantId() != "tenant-1" || got.GetOriginTaskId() != "root" || got.GetWorktreeId() != "wt-1" {
-		t.Errorf("unexpected request fields: %+v", got)
+	if client.got.GetWorktreeId() != "wt-1" {
+		t.Errorf("expected the dispatched worktree_id to pass through, got %q", client.got.GetWorktreeId())
 	}
-	if len(got.GetTasks()) != 2 {
-		t.Fatalf("expected one spec node per subtree task, got %d", len(got.GetTasks()))
+	if tasks.tasks["task-1"].ActiveExecutionID != "run-1" {
+		t.Errorf("expected UpdateActiveExecutionID to persist the new run's id, got %q", tasks.tasks["task-1"].ActiveExecutionID)
 	}
-
-	byTempID := map[string]*orchestrationv1.OrchestrationTaskSpec{}
-	for _, spec := range got.GetTasks() {
-		byTempID[spec.GetTempId()] = spec
+	var nodes []specNode
+	if err := json.Unmarshal([]byte(client.got.GetSpecJson()), &nodes); err != nil {
+		t.Fatalf("spec_json did not unmarshal: %v", err)
 	}
-	rootSpec, ok := byTempID["root"]
-	if !ok {
-		t.Fatal("expected a spec node with temp_id=root")
-	}
-	if rootSpec.GetPrompt() != "do the root thing" {
-		t.Errorf("expected root's prompt to come from PromptTemplate, got %q", rootSpec.GetPrompt())
-	}
-	childSpec, ok := byTempID["child-1"]
-	if !ok {
-		t.Fatal("expected a spec node with temp_id=child-1")
-	}
-	if childSpec.GetPrompt() != "child 1 description" {
-		t.Errorf("expected child-1's prompt to fall back to Description, got %q", childSpec.GetPrompt())
-	}
-	// deps are temp-id based, translated from the depends_on edge
-	// (child-1 -> root), not raw task-service ids re-used as orchestration
-	// primary keys — this repo's edges ARE task-service temp_ids already,
-	// so the assertion is that Deps threads them through unchanged.
-	if len(childSpec.GetDeps()) != 1 || childSpec.GetDeps()[0] != "root" {
-		t.Errorf("expected child-1.deps=[root], got %v", childSpec.GetDeps())
-	}
-	if len(rootSpec.GetDeps()) != 0 {
-		t.Errorf("expected root to have no deps, got %v", rootSpec.GetDeps())
+	if len(nodes) != 1 || nodes[0].TempID != "task-1" || len(nodes[0].Deps) != 0 {
+		t.Fatalf("expected a single, dep-free root node, got %+v", nodes)
 	}
 }
 
-func TestComplexExecutor_Execute_SubtreeFetchError_NeverCallsStartCoordinatorRun(t *testing.T) {
-	tasks := &fakeSubtreeTaskRepository{subtreeErr: errors.New("db unavailable")}
-	orch := &fakeOrchestrationServiceClient{}
-	c := NewComplexExecutor(orch, tasks, nil)
+func TestComplexExecutor_WithChildren_RootDependsOnEveryChild(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{
+		"task-1": {ID: "task-1", TenantID: "tenant-1", Title: "Root Task"},
+		"sub-1":  {ID: "sub-1", TenantID: "tenant-1", Title: "Subtask 1"},
+		"sub-2":  {ID: "sub-2", TenantID: "tenant-1", Title: "Subtask 2"},
+	}}
+	edges := &complexExecutorEdgeRepository{edges: []domain.TaskEdge{
+		{FromTaskID: "task-1", ToTaskID: "sub-1", Kind: domain.EdgeKindParentChild},
+		{FromTaskID: "task-1", ToTaskID: "sub-2", Kind: domain.EdgeKindParentChild},
+	}}
+	client := &fakeOrchestrationServiceClient{startResp: &orchestrationv1.CoordinatorRun{Id: "run-2"}}
+	c := NewComplexExecutor(tasks, edges, client)
 
-	if _, err := c.Execute(ctxWithTenant(t), "tenant-1", "root", "req-1", "wt-1"); err == nil {
-		t.Fatal("expected an error when the subtree fetch fails")
+	if _, err := c.Execute(ctxWithTenant(t), "tenant-1", "task-1", "req-1", "wt-1"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
 	}
-	if orch.gotStartCoordinatorRun != nil {
-		t.Error("expected StartCoordinatorRun to never be called when the subtree fetch fails")
+	var nodes []specNode
+	if err := json.Unmarshal([]byte(client.got.GetSpecJson()), &nodes); err != nil {
+		t.Fatalf("spec_json did not unmarshal: %v", err)
+	}
+	if len(nodes) != 3 {
+		t.Fatalf("expected 3 nodes (root + 2 children), got %d: %+v", len(nodes), nodes)
+	}
+	root := nodes[0]
+	if root.TempID != "task-1" {
+		t.Fatalf("expected the root node first (index 0), got %+v", root)
+	}
+	if len(root.Deps) != 2 {
+		t.Errorf("expected the root to depend on both children, got deps=%v", root.Deps)
 	}
 }
 
-func TestComplexExecutor_Execute_StartCoordinatorRunError_Propagates(t *testing.T) {
-	tasks := &fakeSubtreeTaskRepository{subtree: []domain.Task{{ID: "root", Title: "Root"}}}
-	orch := &fakeOrchestrationServiceClient{startCoordinatorRunErr: errors.New("orchestration-service unavailable")}
-	c := NewComplexExecutor(orch, tasks, nil)
+func TestComplexExecutor_StartCoordinatorRunFailurePropagates(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{
+		"task-1": {ID: "task-1", TenantID: "tenant-1", Title: "Root Task"},
+	}}
+	client := &fakeOrchestrationServiceClient{startErr: errors.New("orchestration-service unavailable")}
+	c := NewComplexExecutor(tasks, &complexExecutorEdgeRepository{}, client)
 
-	if _, err := c.Execute(ctxWithTenant(t), "tenant-1", "root", "req-1", "wt-1"); err == nil {
-		t.Fatal("expected the StartCoordinatorRun error to propagate")
+	if _, err := c.Execute(ctxWithTenant(t), "tenant-1", "task-1", "req-1", "wt-1"); err == nil {
+		t.Fatal("expected the orchestration-service failure to propagate")
 	}
 }

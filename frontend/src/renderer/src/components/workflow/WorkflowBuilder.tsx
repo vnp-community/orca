@@ -3,6 +3,7 @@ import { useWorkflow } from '../../hooks/useWorkflow'
 import { StepList } from './StepList'
 import { arrayMove } from '@dnd-kit/sortable'
 import { Button } from '../ui/button'
+import type { WorkflowStep } from '@shared/workflow-types'
 
 const DAGPreview = lazy(() => import('./DAGPreview').then((m) => ({ default: m.DAGPreview })))
 const StepEditor = lazy(() => import('./StepEditor').then((m) => ({ default: m.StepEditor })))
@@ -85,7 +86,7 @@ export function WorkflowBuilder({
               <StepEditor
                 step={template.steps.find((s) => s.id === selectedStepId)!}
                 allSteps={template.steps}
-                onUpdate={(patch) => updateStep(selectedStepId, patch)}
+                onUpdate={(patch: Partial<WorkflowStep>) => updateStep(selectedStepId, patch)}
                 onDelete={() => {
                   removeStep(selectedStepId)
                   setSelectedStep(null)

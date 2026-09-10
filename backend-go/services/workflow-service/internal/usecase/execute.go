@@ -28,6 +28,11 @@ type ExecuteInput struct {
 	// {{feature_description}}. Malformed JSON fails Execute synchronously
 	// (same as an invalid dag_json), not silently at dispatch time.
 	InputsJSON string
+	// OriginTaskID is threaded from ExecuteRequest.origin_task_id
+	// (BE-SOL-002/TASK-FT-002-01) — set when task-service's Engine 3
+	// WorkflowExecutor dispatched this run, empty for a standalone workflow
+	// run. See runToCompletion's doc comment (TASK-FT-002-05).
+	OriginTaskID string
 }
 
 // Execute resolves a template, validates and wave-computes its DAG,
@@ -63,14 +68,19 @@ type Execute struct {
 	executions     ExecutionRepository
 	stepExecutions StepExecutionRepository
 	dispatcher     *waveDispatcher
+	// taskClient is workflow-service's first outbound dependency on
+	// task-service (BE-SOL-002/TASK-FT-002-05) — used only by
+	// runToCompletion's Engine 3 callback.
+	taskClient TaskClient
 }
 
-func NewExecute(templates TemplateRepository, executions ExecutionRepository, stepExecutions StepExecutionRepository, registry StepExecutorRegistry) *Execute {
+func NewExecute(templates TemplateRepository, executions ExecutionRepository, stepExecutions StepExecutionRepository, registry StepExecutorRegistry, taskClient TaskClient) *Execute {
 	return &Execute{
 		templates:      templates,
 		executions:     executions,
 		stepExecutions: stepExecutions,
 		dispatcher:     newWaveDispatcher(stepExecutions, registry, defaultMaxConcurrentSteps),
+		taskClient:     taskClient,
 	}
 }
 
@@ -126,7 +136,7 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 		rootTraceID = uuid.NewString()
 	}
 
-	exec, err := domain.NewWorkflowExecution(uuid.NewString(), tenantID, tmpl.ID, rootTraceID, in.ProjectID)
+	exec, err := domain.NewWorkflowExecution(uuid.NewString(), tenantID, tmpl.ID, rootTraceID, in.ProjectID, in.OriginTaskID)
 	if err != nil {
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_EXECUTION", err.Error(), err)
 	}
@@ -161,8 +171,15 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 // transition — matches this function's existing best-effort logging
 // posture for UpdateExecution failures (both are already fire-and-forget
 // from a background goroutine with no caller to propagate an error to).
+//
+// BE-SOL-002/TASK-FT-002-05: once the final status is durably persisted, an
+// execution with a non-empty OriginTaskID (task-service's Engine 3
+// dispatch) reports the result back to task-service via
+// ReportTaskExecutionResult — a standalone workflow run (OriginTaskID=="")
+// has no task-service caller to report back to and skips this entirely, the
+// CR's explicit regression guard.
 func (uc *Execute) runToCompletion(ctx context.Context, exec domain.WorkflowExecution, waves [][]domain.Step, execCtx *executionContext) {
-	succeeded := uc.dispatcher.dispatchWaves(ctx, exec.ID, waves, execCtx)
+	succeeded := uc.dispatcher.dispatchWaves(ctx, exec.ID, waves, execCtx, exec.OriginTaskID)
 
 	exec.Status = domain.StatusCompleted
 	subject := "orca.workflow.execution.completed"
@@ -183,6 +200,34 @@ func (uc *Execute) runToCompletion(ctx context.Context, exec domain.WorkflowExec
 
 	if err := uc.executions.UpdateExecution(ctx, exec, event); err != nil {
 		slog.ErrorContext(ctx, "workflow: persisting final execution status failed", slog.String("execution_id", exec.ID), slog.String("status", string(exec.Status)), slog.Any("error", err))
+		return // do not call back with a result that was never durably persisted
+	}
+	reportExecutionResultToTaskService(ctx, uc.taskClient, exec)
+}
+
+// reportExecutionResultToTaskService is runToCompletion's (and
+// RecoverExecutions.finish's — extended identically, since a recovered
+// execution's terminal transition needs the same downstream signal a
+// crashed-and-restarted process would otherwise never send) shared Engine 3
+// completion callback. actual_hours is not computed here — left as 0, since
+// domain.WorkflowExecution has no StartedAt field exposed to this call site
+// today; flagged, not solved (the CR does not name this as an acceptance
+// criterion). A failed callback is best-effort: it must not crash the
+// background goroutine or retry inline — task-service's task stays
+// in_progress until a later reconciliation mechanism catches the mismatch,
+// the same honest, flagged gap SOL-TG-04 already carries for Engine 2's own
+// callback failure mode. A package-level function (not a method) so both
+// Execute and RecoverExecutions — distinct structs with their own
+// TaskClient field — can share it without an extra indirection type.
+func reportExecutionResultToTaskService(ctx context.Context, taskClient TaskClient, exec domain.WorkflowExecution) {
+	if exec.OriginTaskID == "" {
+		return // standalone workflow run — no task-service caller to report back to
+	}
+	if err := taskClient.ReportTaskExecutionResult(ctx, ReportTaskExecutionResultInput{
+		TaskID: exec.OriginTaskID, ExecutionRef: exec.ID,
+		Success: exec.Status == domain.StatusCompleted, Engine: "workflow",
+	}); err != nil {
+		slog.ErrorContext(ctx, "workflow: reporting execution result to task-service failed", slog.String("execution_id", exec.ID), slog.Any("error", err))
 	}
 }
 

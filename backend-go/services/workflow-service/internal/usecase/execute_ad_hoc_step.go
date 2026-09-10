@@ -95,14 +95,19 @@ func (uc *ExecuteAdHocStep) Execute(ctx context.Context, in ExecuteAdHocStepInpu
 	}
 
 	se.MarkRunning()
-	if uerr := uc.stepExecutions.UpdateStepExecution(ctx, se); uerr != nil {
+	// ExecuteAdHocStep bypasses waveDispatcher.dispatchStep (it calls
+	// runStep directly, see this type's doc comment) so it also bypasses
+	// dispatchStep's outbox-event enqueue (BE-SOL-003/TASK-FT-003-03) —
+	// scoped to real DAG-driven step transitions only; both calls here
+	// pass a zero-value domain.OutboxEvent{} to skip it.
+	if uerr := uc.stepExecutions.UpdateStepExecution(ctx, se, domain.OutboxEvent{}); uerr != nil {
 		slog.ErrorContext(ctx, "workflow: marking ad hoc step execution running failed", slog.String("step_execution_id", se.ID), slog.Any("error", uerr))
 	}
 
 	step := domain.Step{ID: adHocStepID, Type: in.StepType, Config: json.RawMessage(in.StepConfigJSON)}
 	result, runErr := uc.dispatcher.runStep(ctx, step, &se)
 
-	if uerr := uc.stepExecutions.UpdateStepExecution(ctx, se); uerr != nil {
+	if uerr := uc.stepExecutions.UpdateStepExecution(ctx, se, domain.OutboxEvent{}); uerr != nil {
 		slog.ErrorContext(ctx, "workflow: persisting terminal ad hoc step execution failed", slog.String("step_execution_id", se.ID), slog.Any("error", uerr))
 	}
 

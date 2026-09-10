@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/migrations/0008_outbox_events.up.sql` (new — number depends on TASK-FT-002-02 landing `0007` first, see Context), `backend-go/services/workflow-service/internal/domain/outbox_event.go` (new), `backend-go/services/workflow-service/internal/usecase/ports.go` (`StepExecutionRepository.UpdateStepExecution` widened), `backend-go/services/workflow-service/internal/usecase/wave_dispatcher.go` (`dispatchStep`), `backend-go/services/workflow-service/internal/adapter/postgres/repository.go` (`UpdateStepExecution` widened + `common/outbox.Store` impl), `backend-go/services/workflow-service/cmd/server/main.go` (wire `outbox.Relay`)
 **Depends on:** TASK-FT-002-02 (claims migration `0007` first — this task's migration number must be re-checked at implementation time), TASK-FT-002-05 (`OriginTaskID` on `WorkflowExecution`, needed for the payload's `origin_task_id` field)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

@@ -10,7 +10,7 @@ import (
 
 func TestHasActiveExecutions_TrueForNonTerminalExecution(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, err := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "project-1")
+	exec, err := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "project-1", "")
 	if err != nil {
 		t.Fatalf("building execution: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestHasActiveExecutions_TrueForNonTerminalExecution(t *testing.T) {
 
 func TestHasActiveExecutions_TruePausedExecution(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "project-1")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "project-1", "")
 	exec.Status = domain.StatusPaused
 	_ = repo.CreateExecution(context.Background(), exec)
 
@@ -48,15 +48,15 @@ func TestHasActiveExecutions_TruePausedExecution(t *testing.T) {
 
 func TestHasActiveExecutions_FalseWhenOnlyTerminalExecutions(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	completed, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "project-1")
+	completed, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "project-1", "")
 	completed.Status = domain.StatusCompleted
 	_ = repo.CreateExecution(context.Background(), completed)
 
-	failed, _ := domain.NewWorkflowExecution("exec-2", "tenant-1", "tmpl-1", "trace-2", "project-1")
+	failed, _ := domain.NewWorkflowExecution("exec-2", "tenant-1", "tmpl-1", "trace-2", "project-1", "")
 	failed.Status = domain.StatusFailed
 	_ = repo.CreateExecution(context.Background(), failed)
 
-	cancelled, _ := domain.NewWorkflowExecution("exec-3", "tenant-1", "tmpl-1", "trace-3", "project-1")
+	cancelled, _ := domain.NewWorkflowExecution("exec-3", "tenant-1", "tmpl-1", "trace-3", "project-1", "")
 	cancelled.Status = domain.StatusCancelled
 	_ = repo.CreateExecution(context.Background(), cancelled)
 
@@ -74,7 +74,7 @@ func TestHasActiveExecutions_FalseWhenOnlyTerminalExecutions(t *testing.T) {
 
 func TestHasActiveExecutions_FalseForUnknownProject(t *testing.T) {
 	repo := newFakeExecutionRepository()
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "project-1")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "project-1", "")
 	_ = repo.CreateExecution(context.Background(), exec)
 
 	uc := NewHasActiveExecutions(repo)

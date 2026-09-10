@@ -32,14 +32,20 @@ type RecoverExecutions struct {
 	executions     ExecutionRepository
 	stepExecutions StepExecutionRepository
 	dispatcher     *waveDispatcher
+	// taskClient backs finish's Engine 3 completion callback — see
+	// reportExecutionResultToTaskService's doc comment (execute.go,
+	// TASK-FT-002-05) for why a recovered execution's terminal transition
+	// gets the same downstream signal runToCompletion sends.
+	taskClient TaskClient
 }
 
-func NewRecoverExecutions(templates TemplateRepository, executions ExecutionRepository, stepExecutions StepExecutionRepository, registry StepExecutorRegistry) *RecoverExecutions {
+func NewRecoverExecutions(templates TemplateRepository, executions ExecutionRepository, stepExecutions StepExecutionRepository, registry StepExecutorRegistry, taskClient TaskClient) *RecoverExecutions {
 	return &RecoverExecutions{
 		templates:      templates,
 		executions:     executions,
 		stepExecutions: stepExecutions,
 		dispatcher:     newWaveDispatcher(stepExecutions, registry, defaultMaxConcurrentSteps),
+		taskClient:     taskClient,
 	}
 }
 
@@ -194,7 +200,7 @@ func (uc *RecoverExecutions) resumeToCompletion(ctx context.Context, exec domain
 		execCtx.recordOutput(stepID, parsed)
 	}
 
-	succeeded := uc.dispatcher.dispatchWavesFrom(ctx, exec.ID, waves, resumeWave, existingRows, execCtx)
+	succeeded := uc.dispatcher.dispatchWavesFrom(ctx, exec.ID, waves, resumeWave, existingRows, execCtx, exec.OriginTaskID)
 	uc.finish(ctx, exec, succeeded)
 }
 
@@ -225,5 +231,7 @@ func (uc *RecoverExecutions) finish(ctx context.Context, exec domain.WorkflowExe
 
 	if err := uc.executions.UpdateExecution(ctx, exec, event); err != nil {
 		slog.ErrorContext(ctx, "workflow: recovery scan: persisting final execution status failed", slog.String("execution_id", exec.ID), slog.String("status", string(exec.Status)), slog.Any("error", err))
+		return // do not call back with a result that was never durably persisted
 	}
+	reportExecutionResultToTaskService(ctx, uc.taskClient, exec)
 }

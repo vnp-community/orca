@@ -224,22 +224,6 @@ func (s *Server) ResolvePublicLink(ctx context.Context, req *taskv1.ResolvePubli
 	return &taskv1.ResolvePublicLinkResponse{TaskId: taskID}, nil
 }
 
-// ReportTaskExecutionResult is called BY orchestration-service only — see
-// usecase.ReportTaskExecutionResult's doc comment for the service-identity
-// check this handler is missing (flagged, not resolved: no mTLS/mesh-identity
-// interceptor exists anywhere in this codebase's common/grpcmw to reuse; a
-// guessed-at check would be worse than an honest gap). api-gateway never
-// routes to this RPC.
-func (s *Server) ReportTaskExecutionResult(ctx context.Context, req *taskv1.ReportTaskExecutionResultRequest) (*emptypb.Empty, error) {
-	if err := s.reportExecutionResult.Execute(ctx, usecase.ReportTaskExecutionResultInput{
-		TaskID: req.GetTaskId(), CoordinatorRunID: req.GetCoordinatorRunId(),
-		Success: req.GetSuccess(), ActualHours: req.GetActualHours(),
-	}); err != nil {
-		return nil, apperrors.ToGRPCStatus(err)
-	}
-	return &emptypb.Empty{}, nil
-}
-
 func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermissionRequest) (*taskv1.ResolvePermissionResponse, error) {
 	level, err := s.resolvePermission.Execute(ctx, usecase.ResolvePermissionInput{
 		TaskID: req.GetTaskId(),
@@ -405,6 +389,32 @@ func (s *Server) ListComments(ctx context.Context, req *taskv1.ListCommentsReque
 		out = append(out, &taskv1.AddCommentResponse{Id: c.ID, AuthorId: c.AuthorID, Content: c.Content, CreatedAt: c.CreatedAt.Format(time.RFC3339)})
 	}
 	return &taskv1.ListCommentsResponse{Comments: out, NextPageToken: next}, nil
+}
+
+// ReportTaskExecutionResult is orchestration-service/workflow-service's
+// shared inbound completion callback (TASK-FT-002-04, generalizing
+// SOL-TG-04/TASK-TG-04-05's Engine-2-only design — see task.proto's RPC
+// doc comment).
+//
+// NOTE (open gap, not a placeholder guard asserting something false): this
+// codebase's common/grpcmw has no service-identity/mTLS interceptor today
+// (only TenantExtractionInterceptor/RecoveryInterceptor/LoggingInterceptor
+// exist) — so, unlike this RPC's doc comment's stated intent ("api-gateway
+// never routes to it"), nothing yet actually enforces that only
+// orchestration-service/workflow-service can call this RPC at the mesh
+// level. Flagged rather than asserting a check that doesn't exist.
+func (s *Server) ReportTaskExecutionResult(ctx context.Context, req *taskv1.ReportTaskExecutionResultRequest) (*emptypb.Empty, error) {
+	if err := s.reportExecutionResult.Execute(ctx, usecase.ReportTaskExecutionResultInput{
+		TaskID:       req.GetTaskId(),
+		ExecutionRef: req.GetExecutionRef(),
+		Success:      req.GetSuccess(),
+		ActualHours:  req.GetActualHours(),
+		ErrorMessage: req.GetErrorMessage(),
+		Engine:       req.GetEngine(),
+	}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func toProtoSubtaskProposals(proposals []domain.SubtaskProposal) []*taskv1.SubtaskProposal {

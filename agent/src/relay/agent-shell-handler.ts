@@ -2,7 +2,8 @@
 // Part A (direct-websocket/relay-websocket) implementation of fs.copyFile —
 // the one genuinely new filesystem capability the web/server-mode
 // DevServerFilePickerDialog flow needs beyond what fs-agent-extensions.ts
-// already exposes (fs.stat/fs.readFile/fs.writeFile/fs.mkdir/fs.rmdir).
+// and fs-agent-write-extensions.ts already expose
+// (fs.stat/fs.readFile/fs.writeFile/fs.mkdir/fs.rmdir).
 //
 // Backs backend/src/main/runtime/rpc/methods/dev-server.ts's devServer.copyFile,
 // itself the server/web-mode counterpart of desktop's shell.copyFile

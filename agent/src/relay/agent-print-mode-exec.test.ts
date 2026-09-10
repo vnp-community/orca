@@ -36,7 +36,9 @@ function createFakeChild(): FakeChild {
 // child, or the emitted events fire before any listener is attached.
 async function waitForSpawn(): Promise<void> {
   for (let i = 0; i < 50; i++) {
-    if (spawnMock.mock.calls.length > 0) {return}
+    if (spawnMock.mock.calls.length > 0) {
+      return
+    }
     await Promise.resolve()
   }
   throw new Error('spawn() was never called')
@@ -232,5 +234,96 @@ describe('handleAgentExecPrompt', () => {
 
     const result = (await pending) as { result?: { stepId?: string } }
     expect(result.result?.stepId).toBe('step-7')
+  })
+
+  it('emits agent.execPrompt.output notifications for each stdout/stderr chunk', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+    const notify = vi.fn()
+
+    const pending = handleAgentExecPrompt(
+      1,
+      { prompt: 'hi', worktreePath: '/repo', stepId: 'step-42' },
+      MOCK_CONFIG,
+      MOCK_LOG,
+      notify
+    )
+    await waitForSpawn()
+    child.stdout.emit('data', Buffer.from('chunk-1'))
+    child.stderr.emit('data', Buffer.from('warn-1'))
+    child.emit('close', 0)
+    await pending
+
+    expect(notify).toHaveBeenCalledWith('agent.execPrompt.output', {
+      stepId: 'step-42',
+      stream: 'stdout',
+      data: 'chunk-1'
+    })
+    expect(notify).toHaveBeenCalledWith('agent.execPrompt.output', {
+      stepId: 'step-42',
+      stream: 'stderr',
+      data: 'warn-1'
+    })
+  })
+
+  it('still resolves with the unchanged response shape when notify is omitted', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+
+    const pending = handleAgentExecPrompt(
+      2,
+      { prompt: 'hi', worktreePath: '/repo' },
+      MOCK_CONFIG,
+      MOCK_LOG
+      // notify omitted — backward-compat, existing callers don't pass it
+    )
+    await waitForSpawn()
+    child.stdout.emit('data', Buffer.from('done'))
+    child.emit('close', 0)
+    const result = (await pending) as { result?: { stdout: string } }
+    expect(result.result?.stdout).toBe('done')
+  })
+
+  it('prefers explicit params.taskId/projectId over stepId when building env', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+
+    const pending = handleAgentExecPrompt(
+      1,
+      {
+        prompt: 'hi',
+        worktreePath: '/repo',
+        stepId: 'req-1',
+        taskId: 'task-42',
+        projectId: 'proj-7'
+      },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+    await waitForSpawn()
+    child.emit('close', 0)
+    await pending
+
+    const spawnEnv = spawnMock.mock.calls[0]?.[2]?.env as Record<string, string>
+    expect(spawnEnv.ORCA_TASK_ID).toBe('task-42')
+    expect(spawnEnv.ORCA_PROJECT_ID).toBe('proj-7')
+  })
+
+  it('falls back to stepId as taskId when params.taskId is absent (backward-compat)', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+
+    const pending = handleAgentExecPrompt(
+      1,
+      { prompt: 'hi', worktreePath: '/repo', stepId: 'req-1' },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+    await waitForSpawn()
+    child.emit('close', 0)
+    await pending
+
+    const spawnEnv = spawnMock.mock.calls[0]?.[2]?.env as Record<string, string>
+    expect(spawnEnv.ORCA_TASK_ID).toBe('req-1')
   })
 })

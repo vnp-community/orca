@@ -685,7 +685,8 @@ type ExecuteRequest struct {
 	ProjectId     string                 `protobuf:"bytes,2,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	RootTraceId   string                 `protobuf:"bytes,3,opt,name=root_trace_id,json=rootTraceId,proto3" json:"root_trace_id,omitempty"` // resumability across restart
 	RequestId     string                 `protobuf:"bytes,4,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
-	InputsJson    string                 `protobuf:"bytes,5,opt,name=inputs_json,json=inputsJson,proto3" json:"inputs_json,omitempty"` // caller-supplied {{...}} values, e.g. {"feature_description": "..."}
+	InputsJson    string                 `protobuf:"bytes,5,opt,name=inputs_json,json=inputsJson,proto3" json:"inputs_json,omitempty"`         // caller-supplied {{...}} values, e.g. {"feature_description": "..."}
+	OriginTaskId  string                 `protobuf:"bytes,6,opt,name=origin_task_id,json=originTaskId,proto3" json:"origin_task_id,omitempty"` // NEW (BE-SOL-002/TASK-FT-002-01) — logical FK back to task-service.Task.id, empty for a standalone workflow run
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -755,13 +756,21 @@ func (x *ExecuteRequest) GetInputsJson() string {
 	return ""
 }
 
+func (x *ExecuteRequest) GetOriginTaskId() string {
+	if x != nil {
+		return x.OriginTaskId
+	}
+	return ""
+}
+
 type WorkflowExecution struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Id            string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
 	TemplateId    string                 `protobuf:"bytes,2,opt,name=template_id,json=templateId,proto3" json:"template_id,omitempty"`
 	Status        string                 `protobuf:"bytes,3,opt,name=status,proto3" json:"status,omitempty"` // pending|running|paused|completed|failed|cancelled
 	RootTraceId   string                 `protobuf:"bytes,4,opt,name=root_trace_id,json=rootTraceId,proto3" json:"root_trace_id,omitempty"`
-	ProjectId     string                 `protobuf:"bytes,5,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"` // added for Epic C's HasActiveExecutions — see that RPC's doc comment
+	ProjectId     string                 `protobuf:"bytes,5,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`            // added for Epic C's HasActiveExecutions — see that RPC's doc comment
+	OriginTaskId  string                 `protobuf:"bytes,6,opt,name=origin_task_id,json=originTaskId,proto3" json:"origin_task_id,omitempty"` // NEW (BE-SOL-002/TASK-FT-002-01), mirrors ExecuteRequest.origin_task_id
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -827,6 +836,13 @@ func (x *WorkflowExecution) GetRootTraceId() string {
 func (x *WorkflowExecution) GetProjectId() string {
 	if x != nil {
 		return x.ProjectId
+	}
+	return ""
+}
+
+func (x *WorkflowExecution) GetOriginTaskId() string {
+	if x != nil {
+		return x.OriginTaskId
 	}
 	return ""
 }
@@ -2612,7 +2628,7 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\astep_id\x18\x02 \x01(\tR\x06stepId\x12\x12\n" +
 	"\x04type\x18\x03 \x01(\tR\x04type\x12!\n" +
 	"\fpayload_json\x18\x04 \x01(\tR\vpayloadJson\x12-\n" +
-	"\x13occurred_at_unix_ms\x18\x05 \x01(\x03R\x10occurredAtUnixMs\"\xb4\x01\n" +
+	"\x13occurred_at_unix_ms\x18\x05 \x01(\x03R\x10occurredAtUnixMs\"\xda\x01\n" +
 	"\x0eExecuteRequest\x12\x1f\n" +
 	"\vtemplate_id\x18\x01 \x01(\tR\n" +
 	"templateId\x12\x1d\n" +
@@ -2622,7 +2638,8 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\n" +
 	"request_id\x18\x04 \x01(\tR\trequestId\x12\x1f\n" +
 	"\vinputs_json\x18\x05 \x01(\tR\n" +
-	"inputsJson\"\x9f\x01\n" +
+	"inputsJson\x12$\n" +
+	"\x0eorigin_task_id\x18\x06 \x01(\tR\foriginTaskId\"\xc5\x01\n" +
 	"\x11WorkflowExecution\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1f\n" +
 	"\vtemplate_id\x18\x02 \x01(\tR\n" +
@@ -2630,7 +2647,8 @@ const file_orca_workflow_v1_workflow_proto_rawDesc = "" +
 	"\x06status\x18\x03 \x01(\tR\x06status\x12\"\n" +
 	"\rroot_trace_id\x18\x04 \x01(\tR\vrootTraceId\x12\x1d\n" +
 	"\n" +
-	"project_id\x18\x05 \x01(\tR\tprojectId\"T\n" +
+	"project_id\x18\x05 \x01(\tR\tprojectId\x12$\n" +
+	"\x0eorigin_task_id\x18\x06 \x01(\tR\foriginTaskId\"T\n" +
 	"\x0fExecuteResponse\x12A\n" +
 	"\texecution\x18\x01 \x01(\v2#.orca.workflow.v1.WorkflowExecutionR\texecution\"%\n" +
 	"\x13GetExecutionRequest\x12\x0e\n" +

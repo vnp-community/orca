@@ -143,3 +143,60 @@ func TestNewCoordinatorRun_ValidatesInvariantsAndDefaultsPollInterval(t *testing
 		t.Errorf("expected default poll interval %d, got %d", defaultPollIntervalMs, run.PollIntervalMs)
 	}
 }
+
+func TestCoordinatorRun_Complete(t *testing.T) {
+	running, err := NewCoordinatorRun("r1", "tenant-1", "task-1", "coord-1", nil, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	running.Status = RunStatusRunning
+
+	completed, err := running.Complete([]byte(`{"ok":true}`))
+	if err != nil {
+		t.Fatalf("unexpected error completing a running run: %v", err)
+	}
+	if completed.Status != RunStatusCompleted {
+		t.Errorf("expected RunStatusCompleted, got %s", completed.Status)
+	}
+	if string(completed.Result) != `{"ok":true}` {
+		t.Errorf("expected result to be set, got %q", completed.Result)
+	}
+
+	for _, status := range []RunStatus{RunStatusIdle, RunStatusCompleted, RunStatusFailed} {
+		r := running
+		r.Status = status
+		if _, err := r.Complete(nil); !errors.Is(err, ErrRunNotRunning) {
+			t.Errorf("Complete from %s: expected ErrRunNotRunning, got %v", status, err)
+		}
+	}
+}
+
+func TestCoordinatorRun_Fail(t *testing.T) {
+	base, err := NewCoordinatorRun("r1", "tenant-1", "task-1", "coord-1", nil, 0)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	for _, status := range []RunStatus{RunStatusRunning, RunStatusIdle} {
+		r := base
+		r.Status = status
+		failed, err := r.Fail("boom")
+		if err != nil {
+			t.Fatalf("Fail from %s: unexpected error: %v", status, err)
+		}
+		if failed.Status != RunStatusFailed {
+			t.Errorf("Fail from %s: expected RunStatusFailed, got %s", status, failed.Status)
+		}
+		if failed.ErrorMessage != "boom" {
+			t.Errorf("Fail from %s: expected error message to be set, got %q", status, failed.ErrorMessage)
+		}
+	}
+
+	for _, status := range []RunStatus{RunStatusCompleted, RunStatusFailed} {
+		r := base
+		r.Status = status
+		if _, err := r.Fail("boom"); !errors.Is(err, ErrRunNotRunning) {
+			t.Errorf("Fail from %s: expected ErrRunNotRunning, got %v", status, err)
+		}
+	}
+}

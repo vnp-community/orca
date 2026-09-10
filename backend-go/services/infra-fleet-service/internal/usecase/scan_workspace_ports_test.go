@@ -134,6 +134,13 @@ type fakeDevServerAgentClient struct {
 	streamFileChangesErr          error
 	streamFileChangesUnsubscribed bool
 	streamFileChangesCalls        []string // path, per call
+
+	// streamExecOutputEvents/Err/Unsubscribed mirror streamPtyEvents's
+	// convention exactly, for StreamExecOutput (TASK-AG-FLOWTASK-002).
+	streamExecOutputEvents       chan ExecOutputEvent
+	streamExecOutputErr          error
+	streamExecOutputUnsubscribed bool
+	streamExecOutputCalls        []string // stepIDs, for assertions
 }
 
 type readCredentialFileCall struct {
@@ -356,6 +363,25 @@ func (f *fakeDevServerAgentClient) StreamVmProvision(ctx context.Context, devSer
 	unsubscribe := func() {
 		f.mu.Lock()
 		f.streamVmProvisionUnsubscribed = true
+		f.mu.Unlock()
+	}
+	return events, unsubscribe, nil
+}
+
+func (f *fakeDevServerAgentClient) StreamExecOutput(ctx context.Context, devServer domain.DevServer, stepID string) (<-chan ExecOutputEvent, func(), error) {
+	f.mu.Lock()
+	f.streamExecOutputCalls = append(f.streamExecOutputCalls, stepID)
+	f.mu.Unlock()
+	if f.streamExecOutputErr != nil {
+		return nil, nil, f.streamExecOutputErr
+	}
+	events := f.streamExecOutputEvents
+	if events == nil {
+		events = make(chan ExecOutputEvent)
+	}
+	unsubscribe := func() {
+		f.mu.Lock()
+		f.streamExecOutputUnsubscribed = true
 		f.mu.Unlock()
 	}
 	return events, unsubscribe, nil

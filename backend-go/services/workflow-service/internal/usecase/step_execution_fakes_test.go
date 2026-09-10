@@ -17,6 +17,11 @@ type fakeStepExecutionRepository struct {
 	rows      map[string]domain.StepExecution
 	createErr error
 	updateErr error
+	// events records every non-zero-value outbox event UpdateStepExecution
+	// was asked to enqueue (BE-SOL-003/TASK-FT-003-03), keyed by the
+	// updated row's StepID for tests that don't care which execution/wave
+	// it came from.
+	events []domain.OutboxEvent
 }
 
 func newFakeStepExecutionRepository() *fakeStepExecutionRepository {
@@ -33,14 +38,27 @@ func (f *fakeStepExecutionRepository) CreateStepExecution(ctx context.Context, s
 	return nil
 }
 
-func (f *fakeStepExecutionRepository) UpdateStepExecution(ctx context.Context, se domain.StepExecution) error {
+func (f *fakeStepExecutionRepository) UpdateStepExecution(ctx context.Context, se domain.StepExecution, event domain.OutboxEvent) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	if f.updateErr != nil {
 		return f.updateErr
 	}
+	if event.ID != "" {
+		f.events = append(f.events, event)
+	}
 	f.rows[se.ID] = se
 	return nil
+}
+
+// enqueuedEvents is a test helper returning a safe copy of the events this
+// fake was asked to enqueue.
+func (f *fakeStepExecutionRepository) enqueuedEvents() []domain.OutboxEvent {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	out := make([]domain.OutboxEvent, len(f.events))
+	copy(out, f.events)
+	return out
 }
 
 func (f *fakeStepExecutionRepository) ListStepExecutions(ctx context.Context, tenantID, executionID string) ([]domain.StepExecution, error) {

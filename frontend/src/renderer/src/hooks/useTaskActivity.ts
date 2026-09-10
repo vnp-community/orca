@@ -24,7 +24,7 @@ export function useTaskActivity(taskId: string | null | undefined) {
       return
     }
     let cancelled = false
-    const poll = async () => {
+    const poll = async (): Promise<void> => {
       try {
         const target = getActiveRuntimeTarget(useAppStore.getState().settings)
         // channels.go:299-312 decodes {id}, not {taskId} — the flow-task v3 solution doc this

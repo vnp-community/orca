@@ -5,7 +5,7 @@
 **Service:** `orchestration-service` (usecase-layer ports only — no implementation)
 **File:** `backend-go/services/orchestration-service/internal/usecase/ports.go`
 **Depends on:** TASK-TASKV1-005-03 (domain types referenced by these signatures)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

@@ -165,7 +165,7 @@ type Task struct {
 	PrUrl string `protobuf:"bytes,23,opt,name=pr_url,json=prUrl,proto3" json:"pr_url,omitempty"`
 	// workflow_template_id: optional workflow-service template attached to
 	// this task (Engine 3). Empty = none attached. See docs/backlog/BACKLOG-016.
-	WorkflowTemplateId string `protobuf:"bytes,24,opt,name=workflow_template_id,json=workflowTemplateId,proto3" json:"workflow_template_id,omitempty"`
+	WorkflowTemplateId string `protobuf:"bytes,24,opt,name=workflow_template_id,json=workflowTemplateId,proto3" json:"workflow_template_id,omitempty"` // BE-SOL-001/BE-SOL-002 — empty = unchanged behavior (selectEngine treats "" as "no workflow engine selected"); mirrors domain.Task.WorkflowTemplateID (TASK-FT-001-01/02)
 	unknownFields      protoimpl.UnknownFields
 	sizeCache          protoimpl.SizeCache
 }
@@ -1033,9 +1033,14 @@ func (x *TaskServiceExecuteRequest) GetPrompt() string {
 }
 
 type TaskServiceExecuteResponse struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	ExecutionRef  string                 `protobuf:"bytes,1,opt,name=execution_ref,json=executionRef,proto3" json:"execution_ref,omitempty"` // opaque handle into infra-fleet-service or orchestration-service
-	Async         bool                   `protobuf:"varint,2,opt,name=async,proto3" json:"async,omitempty"`                                  // true = complex path (orchestration-service, async completion via ReportTaskExecutionResult); false = simple path (completed inline, same call)
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	ExecutionRef string                 `protobuf:"bytes,1,opt,name=execution_ref,json=executionRef,proto3" json:"execution_ref,omitempty"` // opaque handle into infra-fleet-service or orchestration-service
+	// async is true for the complex path (orchestration-service dispatch is
+	// async — completion arrives later via ReportTaskExecutionResult,
+	// TASK-TG-04-05) and false for the simple path, which is already complete
+	// (status=review, actual_hours persisted) by the time this response is
+	// sent — see usecase.ExecuteTask's doc comment (SOL-TG-04).
+	Async         bool `protobuf:"varint,2,opt,name=async,proto3" json:"async,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2997,15 +3002,24 @@ func (x *ResolvePublicLinkResponse) GetTaskId() string {
 	return ""
 }
 
+// ReportTaskExecutionResultRequest's shape is BE-SOL-002's engine-neutral
+// generalization of SOL-TG-04/TASK-TG-04-05's original Engine-2-only
+// version (see the RPC's own doc comment above): task_id/execution_ref
+// identify which task and which engine-specific run (coordinator_run_id
+// for Engine 2, workflow execution_id for Engine 3) this report is for —
+// execution_ref matches task.execution_links.external_ref_id
+// (TASK-FT-001-01); success/error_message/actual_hours carry the terminal
+// outcome CompleteExecution (postgres/repository.go) needs to write.
 type ReportTaskExecutionResultRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	TaskId           string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	CoordinatorRunId string                 `protobuf:"bytes,2,opt,name=coordinator_run_id,json=coordinatorRunId,proto3" json:"coordinator_run_id,omitempty"` // must match the task's current active_execution_id
-	Success          bool                   `protobuf:"varint,3,opt,name=success,proto3" json:"success,omitempty"`
-	ActualHours      float64                `protobuf:"fixed64,4,opt,name=actual_hours,json=actualHours,proto3" json:"actual_hours,omitempty"`
-	ErrorMessage     string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"` // set iff !success
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	ExecutionRef  string                 `protobuf:"bytes,2,opt,name=execution_ref,json=executionRef,proto3" json:"execution_ref,omitempty"` // renamed from coordinator_run_id (TASK-FT-002-01) — coordinator_run_id (Engine 2) or workflow execution_id (Engine 3)
+	Success       bool                   `protobuf:"varint,3,opt,name=success,proto3" json:"success,omitempty"`
+	ActualHours   float64                `protobuf:"fixed64,4,opt,name=actual_hours,json=actualHours,proto3" json:"actual_hours,omitempty"`
+	ErrorMessage  string                 `protobuf:"bytes,5,opt,name=error_message,json=errorMessage,proto3" json:"error_message,omitempty"` // set when success = false
+	Engine        string                 `protobuf:"bytes,6,opt,name=engine,proto3" json:"engine,omitempty"`                                 // "orchestration" | "workflow" (NEW, BE-SOL-002) — picks which execution_links row to validate staleness against
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ReportTaskExecutionResultRequest) Reset() {
@@ -3045,9 +3059,9 @@ func (x *ReportTaskExecutionResultRequest) GetTaskId() string {
 	return ""
 }
 
-func (x *ReportTaskExecutionResultRequest) GetCoordinatorRunId() string {
+func (x *ReportTaskExecutionResultRequest) GetExecutionRef() string {
 	if x != nil {
-		return x.CoordinatorRunId
+		return x.ExecutionRef
 	}
 	return ""
 }
@@ -3069,6 +3083,13 @@ func (x *ReportTaskExecutionResultRequest) GetActualHours() float64 {
 func (x *ReportTaskExecutionResultRequest) GetErrorMessage() string {
 	if x != nil {
 		return x.ErrorMessage
+	}
+	return ""
+}
+
+func (x *ReportTaskExecutionResultRequest) GetEngine() string {
+	if x != nil {
+		return x.Engine
 	}
 	return ""
 }
@@ -3301,13 +3322,14 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\x18ResolvePublicLinkRequest\x12\x14\n" +
 	"\x05token\x18\x01 \x01(\tR\x05token\"4\n" +
 	"\x19ResolvePublicLinkResponse\x12\x17\n" +
-	"\atask_id\x18\x01 \x01(\tR\x06taskId\"\xcb\x01\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\"\xda\x01\n" +
 	" ReportTaskExecutionResultRequest\x12\x17\n" +
-	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12,\n" +
-	"\x12coordinator_run_id\x18\x02 \x01(\tR\x10coordinatorRunId\x12\x18\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12#\n" +
+	"\rexecution_ref\x18\x02 \x01(\tR\fexecutionRef\x12\x18\n" +
 	"\asuccess\x18\x03 \x01(\bR\asuccess\x12!\n" +
 	"\factual_hours\x18\x04 \x01(\x01R\vactualHours\x12#\n" +
-	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage*[\n" +
+	"\rerror_message\x18\x05 \x01(\tR\ferrorMessage\x12\x16\n" +
+	"\x06engine\x18\x06 \x01(\tR\x06engine*[\n" +
 	"\bEdgeType\x12\x19\n" +
 	"\x15EDGE_TYPE_UNSPECIFIED\x10\x00\x12\x1a\n" +
 	"\x16EDGE_TYPE_PARENT_CHILD\x10\x01\x12\x18\n" +

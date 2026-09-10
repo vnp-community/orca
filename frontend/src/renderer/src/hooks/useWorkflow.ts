@@ -69,20 +69,30 @@ export function useWorkflow(templateId?: string) {
       // exists on either RPC — dropped, not renamed.
       const dagJson = JSON.stringify({ steps: local.steps ?? [] })
       if (templateId) {
+        // BUG-FE-RPC-006 (FE-TASK-005): shape thật channels_workflow.go:107-115's updateArgs
+        // dùng `id`/`dagJson` (string JSON)/`parentTemplateId`/`expectedVersion` — không phải
+        // `templateId`/`definition`/`traceId`. `expectedVersion` gửi tạm 0 tới khi
+        // WorkflowDefinition có field `version` thật (mất tính năng optimistic-concurrency
+        // backend cung cấp, chấp nhận last-write-wins cho tới lúc đó).
         await callRuntimeRpc(target, 'workflow.template.update', {
           id: templateId,
           name: local.name,
           dagJson,
-          scope: local.scope
+          scope: local.scope,
+          parentTemplateId: local.templateId ?? '',
+          expectedVersion: (local as { version?: number }).version ?? 0
         })
       } else {
+        // Same createArgs shape as workflow.template.update above minus `id`/`expectedVersion`
+        // (channels_workflow.go:85-92) — `parentTemplateId` still applies (forking a template).
         const created = await callRuntimeRpc<WorkflowDefinition>(
           target,
           'workflow.template.create',
           {
             name: local.name,
             dagJson,
-            scope: local.scope
+            scope: local.scope,
+            parentTemplateId: local.templateId ?? ''
           }
         )
         useAppStore.getState().addTemplate(created)
@@ -106,15 +116,20 @@ export function useWorkflow(templateId?: string) {
       // id này TRƯỚC khi có executionId từ backend.
       const span = Tracers.uiWorkflowExecuteFlow.start({ templateId })
       try {
-        // BACKLOG-020/channels_workflow.go:36-52: workflow.execute's real shape is
-        // {templateId, projectId, rootTraceId, requestId} — backend already decodes
-        // + forwards projectId, this was just never sent from the client.
-        const result = await callRuntimeRpc<{ id: string }>(target, 'workflow.execute', {
-          templateId,
-          projectId,
-          rootTraceId: span.id,
-          requestId: span.id
-        })
+        // BACKLOG-020/channels_workflow.go:47-53's executeArgs shape is
+        // {templateId, projectId, rootTraceId, requestId} — no `inputs` (engine chưa hỗ trợ
+        // truyền input runtime qua RPC này). `requestId` dùng span.id làm idempotency key,
+        // cùng convention `task.execute`'s `requestId`.
+        const result = await callRuntimeRpc<{ id: string; status: string }>(
+          target,
+          'workflow.execute',
+          {
+            templateId,
+            projectId,
+            rootTraceId: span.id,
+            requestId: span.id
+          }
+        )
         // Lưu rootTraceId vào execution record ngay khi biết executionId.
         useAppStore.getState().addExecution({
           id: result.id,

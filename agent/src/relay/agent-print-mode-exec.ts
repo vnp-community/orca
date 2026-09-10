@@ -34,11 +34,16 @@ export async function handleAgentExecPrompt(
   id: string | number | null,
   params: Record<string, unknown>,
   config: AgentConfig,
-  log: AgentLogger
+  log: AgentLogger,
+  notify?: (method: string, params: Record<string, unknown>) => void
 ): Promise<object> {
   const prompt = typeof params.prompt === 'string' ? params.prompt : ''
   const worktreePath = typeof params.worktreePath === 'string' ? params.worktreePath : ''
   const stepId = typeof params.stepId === 'string' ? params.stepId : undefined
+  // Distinct from stepId (protocol-level request id) — an explicit business
+  // taskId/projectId, when the caller sends one, avoids conflating the two.
+  const taskId = typeof params.taskId === 'string' ? params.taskId : ''
+  const projectId = typeof params.projectId === 'string' ? params.projectId : ''
   // 'default'/'standard'/'none' (StepExecutors.ts's and the old vocabulary's
   // non-'full' values) all mean "no extra flag" here — only 'full' is acted on.
   const trustPresetFull = params.trustPreset === 'full'
@@ -60,7 +65,9 @@ export async function handleAgentExecPrompt(
   const span = Tracers.agentOrchSpawn.start({ stepId, modelId })
 
   if (!prompt || !worktreePath) {
-    const missing = [!prompt && 'prompt', !worktreePath && 'worktreePath'].filter(Boolean).join(', ')
+    const missing = [!prompt && 'prompt', !worktreePath && 'worktreePath']
+      .filter(Boolean)
+      .join(', ')
     span.fail(`missing ${missing}`)
     return {
       jsonrpc: '2.0',
@@ -107,7 +114,15 @@ export async function handleAgentExecPrompt(
     // instead of silently running unauthenticated; if accountId is absent,
     // it proceeds relying on the CLI's own already-authenticated state.
     env = await buildAgentEnv(
-      { accountId, userId: '', taskId: stepId ?? '', cwd: worktreePath, model: modelId, extraEnv },
+      {
+        accountId,
+        userId: '',
+        taskId: taskId || (stepId ?? ''),
+        projectId,
+        cwd: worktreePath,
+        model: modelId,
+        extraEnv
+      },
       spec,
       config,
       null,
@@ -133,7 +148,9 @@ export async function handleAgentExecPrompt(
     })
 
     const finish = (r: PrintModeExecResult): void => {
-      if (settled) {return}
+      if (settled) {
+        return
+      }
       settled = true
       clearTimeout(timer)
       resolve(r)
@@ -149,10 +166,14 @@ export async function handleAgentExecPrompt(
     }, timeoutMs)
 
     child.stdout?.on('data', (d: Buffer) => {
-      stdout += d.toString('utf8')
+      const chunk = d.toString('utf8')
+      stdout += chunk
+      notify?.('agent.execPrompt.output', { stepId, stream: 'stdout', data: chunk })
     })
     child.stderr?.on('data', (d: Buffer) => {
-      stderr += d.toString('utf8')
+      const chunk = d.toString('utf8')
+      stderr += chunk
+      notify?.('agent.execPrompt.output', { stepId, stream: 'stderr', data: chunk })
     })
     child.on('error', (err) => {
       finish({ stdout, stderr: err.message, exitCode: null, timedOut })

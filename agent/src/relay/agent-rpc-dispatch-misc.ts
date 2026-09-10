@@ -12,7 +12,7 @@ import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 import type { JsonRpcRequest, JsonRpcResponse } from './agent-rpc-dispatch'
-import { makeError, formatMcpResult } from './agent-rpc-dispatch'
+import { makeError, formatMcpResult, makeNotifier } from './agent-rpc-dispatch'
 
 export async function dispatchMiscRpc(
   rpc: JsonRpcRequest,
@@ -20,12 +20,7 @@ export async function dispatchMiscRpc(
   config: AgentConfig,
   log: AgentLogger,
   ws: WebSocket,
-  // Why unused: vm.provision (the one case here that needed WireState for
-  // its stream.chunk/stream.end frames) moved to agent-rpc-dispatch-vm.ts
-  // (max-lines split). Kept in the signature for shape-consistency with
-  // every other dispatchXxxRpc function route() calls positionally
-  // (dispatchFsRpc/dispatchBrowserRpc etc. all take the same param set).
-  _state: WireState
+  state: WireState
 ): Promise<JsonRpcResponse | null> {
   switch (rpc.method) {
     // ── MCP: tools/list ──────────────────────────────────────────────────────
@@ -73,7 +68,7 @@ export async function dispatchMiscRpc(
     // ── v5.0: preflight.check ────────────────────────────────────────────────
     case 'preflight.check': {
       try {
-        const { handlePreflightCheck } = await import('./fs-agent-extensions')
+        const { handlePreflightCheck } = await import('./fs-agent-search-extensions')
         return (await handlePreflightCheck(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -173,7 +168,7 @@ export async function dispatchMiscRpc(
     // SECURITY: only used internally via relay — not exposed to browser directly.
     case 'shell.eval': {
       try {
-        const { handleShellEval } = await import('./fs-agent-extensions')
+        const { handleShellEval } = await import('./shell-agent-extensions')
         return (await handleShellEval(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -187,8 +182,9 @@ export async function dispatchMiscRpc(
     // Previously unimplemented (specs/agent/api/gaps-and-findings.md #1).
     case 'shell.exec': {
       try {
-        const { handleShellExec } = await import('./fs-agent-extensions')
-        return (await handleShellExec(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
+        const { handleShellExec } = await import('./shell-agent-extensions')
+        const notify = makeNotifier(ws, state)
+        return (await handleShellExec(rpc.id, rpc.params ?? {}, config, notify)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `shell.exec unavailable: ${msg}`)

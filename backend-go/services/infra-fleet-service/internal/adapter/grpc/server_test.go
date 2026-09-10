@@ -45,7 +45,8 @@ func newTestServer(getAgentTerminalSession *usecase.GetAgentTerminalSession, sen
 		nil, nil, nil, nil, // 62-65
 		nil, nil, nil, // 66-68
 		nil, nil, // relayByDevServer, isDevServerConnected, 69-70
-		nil, nil, nil, nil, // ephemeral-VM + fleet-connectivity + file-changes usecases, 71-74, unused here
+		nil,                // streamAgentExecOutput usecase (TASK-AG-FLOWTASK-002), 71, unused here
+		nil, nil, nil, nil, // ephemeral-VM + fleet-connectivity + file-changes usecases, 72-75, unused here
 	)
 }
 
@@ -176,6 +177,9 @@ func (f *fakeDevServerAgentClient) StreamScreencast(ctx context.Context, devServ
 	return nil, nil, nil
 }
 func (f *fakeDevServerAgentClient) StreamFileChanges(ctx context.Context, devServer domain.DevServer, path string) (<-chan usecase.FileChangeEvent, func(), error) {
+	return nil, nil, nil
+}
+func (f *fakeDevServerAgentClient) StreamExecOutput(ctx context.Context, devServer domain.DevServer, stepID string) (<-chan usecase.ExecOutputEvent, func(), error) {
 	return nil, nil, nil
 }
 func (f *fakeDevServerAgentClient) StreamVmProvision(ctx context.Context, devServer domain.DevServer, params usecase.VmProvisionParams) (<-chan usecase.VmProvisionEvent, func(), error) {
@@ -482,6 +486,9 @@ func (f *fakeDevServerAgent) StreamScreencast(ctx context.Context, devServer dom
 	return nil, nil, nil
 }
 func (f *fakeDevServerAgent) StreamFileChanges(ctx context.Context, devServer domain.DevServer, path string) (<-chan usecase.FileChangeEvent, func(), error) {
+	return nil, nil, nil
+}
+func (f *fakeDevServerAgent) StreamExecOutput(ctx context.Context, devServer domain.DevServer, stepID string) (<-chan usecase.ExecOutputEvent, func(), error) {
 	return nil, nil, nil
 }
 func (f *fakeDevServerAgent) StreamVmProvision(ctx context.Context, devServer domain.DevServer, params usecase.VmProvisionParams) (<-chan usecase.VmProvisionEvent, func(), error) {

@@ -10,7 +10,7 @@ import type { WireState } from 'orca-dev-agent-transport'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 import { Tracers } from '../shared/trace/tracers'
 import type { JsonRpcRequest, JsonRpcResponse } from './agent-rpc-dispatch'
-import { makeError, extractResume } from './agent-rpc-dispatch'
+import { makeError, extractResume, makeNotifier } from './agent-rpc-dispatch'
 
 export async function dispatchAgentExecRpc(
   rpc: JsonRpcRequest,
@@ -176,11 +176,13 @@ export async function dispatchAgentExecRpc(
     case 'agent.execPrompt': {
       try {
         const { handleAgentExecPrompt } = await import('./agent-print-mode-exec')
+        const notify = makeNotifier(ws, state)
         return (await handleAgentExecPrompt(
           rpc.id,
           rpc.params ?? {},
           config,
-          log
+          log,
+          notify
         )) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)

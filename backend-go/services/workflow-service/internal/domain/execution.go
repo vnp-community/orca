@@ -60,6 +60,12 @@ type WorkflowExecution struct {
 	RootTraceID string
 	PausedAt    *time.Time
 	ProjectID   string
+	// OriginTaskID is a logical FK to task-service.Task.id (BE-SOL-002,
+	// TASK-FT-002-02) — set when this execution was dispatched via
+	// task-service's Engine 3 WorkflowExecutor, empty for a standalone
+	// workflow run. runToCompletion (TASK-FT-002-05) reports back to
+	// task-service via ReportTaskExecutionResult iff this is non-empty.
+	OriginTaskID string
 }
 
 // NewWorkflowExecution constructs a WorkflowExecution in StatusRunning —
@@ -69,7 +75,7 @@ type WorkflowExecution struct {
 // scaffold, see README "Known gaps": the execution is recorded but never
 // progresses past running on its own). projectID is optional and not
 // validated — see WorkflowExecution's doc comment.
-func NewWorkflowExecution(id, tenantID, templateID, rootTraceID, projectID string) (WorkflowExecution, error) {
+func NewWorkflowExecution(id, tenantID, templateID, rootTraceID, projectID, originTaskID string) (WorkflowExecution, error) {
 	if tenantID == "" {
 		return WorkflowExecution{}, ErrExecutionEmptyTenant
 	}
@@ -77,12 +83,13 @@ func NewWorkflowExecution(id, tenantID, templateID, rootTraceID, projectID strin
 		return WorkflowExecution{}, ErrExecutionEmptyTemplate
 	}
 	return WorkflowExecution{
-		ID:          id,
-		TenantID:    tenantID,
-		TemplateID:  templateID,
-		Status:      StatusRunning,
-		RootTraceID: rootTraceID,
-		ProjectID:   projectID,
+		ID:           id,
+		TenantID:     tenantID,
+		TemplateID:   templateID,
+		Status:       StatusRunning,
+		RootTraceID:  rootTraceID,
+		ProjectID:    projectID,
+		OriginTaskID: originTaskID,
 	}, nil
 }
 

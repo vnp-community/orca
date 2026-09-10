@@ -96,9 +96,20 @@ type TaskServiceClient interface {
 	CreatePublicLink(ctx context.Context, in *CreatePublicLinkRequest, opts ...grpc.CallOption) (*CreatePublicLinkResponse, error)
 	RevokePublicLink(ctx context.Context, in *RevokePublicLinkRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ResolvePublicLink(ctx context.Context, in *ResolvePublicLinkRequest, opts ...grpc.CallOption) (*ResolvePublicLinkResponse, error)
-	// ReportTaskExecutionResult is called BY orchestration-service only — see
-	// this RPC's usecase doc comment for the service-identity check this
-	// handler must perform. api-gateway never routes to it.
+	// ReportTaskExecutionResult is the shared inbound completion callback for
+	// Engine 2 (orchestration-service, via its autonomous coordinator,
+	// SOL-TASKV1-005) and Engine 3 (workflow-service's runToCompletion,
+	// BE-SOL-002) — never called by api-gateway/a user session. At-least-once
+	// consumer idempotence is expected of the caller side (a duplicate/stale
+	// report is ignored, not an error) — see
+	// usecase.ReportTaskExecutionResult's doc comment for the concrete rule.
+	//
+	// BE-SOL-002 (TASK-FT-002-01) generalizes SOL-TG-04/TASK-TG-04-05's
+	// original Engine-2-only 5-field shape (task_id, coordinator_run_id,
+	// success, actual_hours, error_message) to also cover Engine 3: field 2
+	// is renamed coordinator_run_id -> execution_ref and field 6 (engine) is
+	// added. Implemented for real as of TASK-FT-002-04 (this was previously a
+	// compile-only stub returning codes.Unimplemented).
 	ReportTaskExecutionResult(ctx context.Context, in *ReportTaskExecutionResultRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
@@ -409,9 +420,20 @@ type TaskServiceServer interface {
 	CreatePublicLink(context.Context, *CreatePublicLinkRequest) (*CreatePublicLinkResponse, error)
 	RevokePublicLink(context.Context, *RevokePublicLinkRequest) (*emptypb.Empty, error)
 	ResolvePublicLink(context.Context, *ResolvePublicLinkRequest) (*ResolvePublicLinkResponse, error)
-	// ReportTaskExecutionResult is called BY orchestration-service only — see
-	// this RPC's usecase doc comment for the service-identity check this
-	// handler must perform. api-gateway never routes to it.
+	// ReportTaskExecutionResult is the shared inbound completion callback for
+	// Engine 2 (orchestration-service, via its autonomous coordinator,
+	// SOL-TASKV1-005) and Engine 3 (workflow-service's runToCompletion,
+	// BE-SOL-002) — never called by api-gateway/a user session. At-least-once
+	// consumer idempotence is expected of the caller side (a duplicate/stale
+	// report is ignored, not an error) — see
+	// usecase.ReportTaskExecutionResult's doc comment for the concrete rule.
+	//
+	// BE-SOL-002 (TASK-FT-002-01) generalizes SOL-TG-04/TASK-TG-04-05's
+	// original Engine-2-only 5-field shape (task_id, coordinator_run_id,
+	// success, actual_hours, error_message) to also cover Engine 3: field 2
+	// is renamed coordinator_run_id -> execution_ref and field 6 (engine) is
+	// added. Implemented for real as of TASK-FT-002-04 (this was previously a
+	// compile-only stub returning codes.Unimplemented).
 	ReportTaskExecutionResult(context.Context, *ReportTaskExecutionResultRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }

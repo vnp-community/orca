@@ -34,7 +34,7 @@ import type { JsonRpcRequest } from './agent-rpc-dispatch'
 import { createTracer } from '../shared/trace'
 import { scheduleAgentSpawnGracePeriod, rebindAgentSpawnConnection } from './agent-spawner'
 import { notifyDaemonSessionClosed } from './pty-daemon-client'
-import { cleanupAgentWatches } from './fs-agent-extensions'
+import { cleanupAgentWatches } from './fs-agent-watch-extensions'
 import { sendHandshake, startKeepalive, startLiveness } from './agent-session-handshake'
 
 const sessionTracer = createTracer('agent:session')

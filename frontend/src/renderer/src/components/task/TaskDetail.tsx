@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAppStore } from '../../store'
 import { useTask } from '../../hooks/useTask'
-import { useAuthUser } from '../../hooks/useAuthSession'
 import { useTaskActivity } from '../../hooks/useTaskActivity'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { Input } from '../ui/input'
@@ -9,22 +8,22 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '../ui/tabs'
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '../ui/select'
 import { TaskAIDecompose } from './TaskAIDecompose'
 import { TaskPromptEditor } from './TaskPromptEditor'
-import { TaskGrantModal } from './TaskGrantModal'
 import { TaskStatusBadge } from './TaskStatusBadge'
+import { TaskComments } from './TaskComments'
+import { TaskDispatchStatusPanel } from './TaskDispatchStatusPanel'
+import { ExecutionEngineBadge } from './ExecutionEngineBadge'
+import { AttachWorkflowTemplateAction } from './AttachWorkflowTemplateAction'
+import { TaskAccessPanel } from './TaskAccessPanel'
 import { Button } from '../ui/button'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
+import { useTaskPermission } from '../../hooks/useTaskPermission'
 import { toast } from 'sonner'
 import { Tracers } from '../../../../shared/trace/tracers'
-import type {
-  OrcaTask,
-  TaskEdgeType,
-  TaskStatus,
-  TaskPriority
-} from '../../../../shared/task-types'
+import type { OrcaTask, TaskPriority, TaskStatus } from '../../../../shared/task-types'
 
 // Right-panel detail view for active task
 // Fields: title (editable), description (textarea), type, status, priority, assignee, progress
-// Tabs: Details | Subtasks | AI Agent
+// Tabs: Details | Subtasks | AI Agent | Comments | Access
 
 const TASK_STATUSES: OrcaTask['status'][] = [
   'backlog',
@@ -40,53 +39,50 @@ export function TaskDetail() {
   const activeTaskId = useAppStore((s) => s.activeTaskId)
   const { task, updateTask } = useTask(activeTaskId!)
   const { project, currentWorktree } = useWorkspace()
-  const currentUser = useAuthUser()
   const [localTitle, setLocalTitle] = useState(task?.title ?? '')
-  const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'ai' | 'access'>('details')
-  // Defaults to true so the Run button isn't hidden while resolvePermission is in flight.
-  const [canManage, setCanManage] = useState(true)
+  const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'ai' | 'comments' | 'access'>(
+    'details'
+  )
+  // Polling fallback (FE-TASK-003) — no push channel for task activity exists yet, see
+  // useTaskActivity.ts's header comment. `polledTask` reflects status changes (e.g.
+  // 'in_progress' → 'done') without the user needing to F5.
+  const { task: polledTask } = useTaskActivity(task?.id ?? null)
 
-  const [deps, setDeps] = useState<{ blockedBy: OrcaTask[]; blocks: OrcaTask[] }>({
-    blockedBy: [],
-    blocks: []
-  })
+  // task.getDependencies returns a flat Task[] (NOT { task, edgeType }[] — no edgeType field
+  // exists at all, see task.proto:169-177 + channels_automation_task.go:296-308), always the
+  // "this task depends on" direction. "blocks" can't be derived from a single task's call (it
+  // would need every task's dependency list), so Details only shows blockedBy accurately —
+  // see TaskDAGView for the aggregate view where "blocks" is derived across all tasks.
+  const [blockedBy, setBlockedBy] = useState<OrcaTask[]>([])
+  const [depsError, setDepsError] = useState(false)
 
   useEffect(() => {
     if (!task?.id) {
       return
     }
+    setDepsError(false)
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    callRuntimeRpc(target, 'task.getDependencies', { taskId: task.id })
-      .then((d) => {
-        // task.getDependencies returns this task's own outgoing edges as a flat
-        // { task, edgeType }[] — split by edgeType into the blockedBy/blocks split the UI wants.
-        const edges = d as { task: OrcaTask; edgeType: TaskEdgeType }[]
-        setDeps({
-          blockedBy: edges.filter((e) => e.edgeType === 'depends_on').map((e) => e.task),
-          blocks: edges.filter((e) => e.edgeType === 'blocks').map((e) => e.task)
-        })
-      })
-      .catch(() => {})
+    callRuntimeRpc<OrcaTask[]>(target, 'task.getDependencies', { taskId: task.id })
+      .then((deps) => setBlockedBy(deps ?? []))
+      .catch(() => setDepsError(true)) // no longer swallows the error silently
   }, [task?.id])
 
-  useEffect(() => {
-    if (!task?.id || !currentUser?.id) {
-      return
-    }
-    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    // task.resolvePermission returns { effectiveLevel } (already lowercased, GRANT_LEVEL_
-    // prefix stripped) — channels_automation_task.go:465-479. "owner"/"admin" gate Run here.
-    callRuntimeRpc<{ effectiveLevel: string }>(target, 'task.resolvePermission', {
-      taskId: task.id,
-      userId: currentUser.id
-    })
-      .then((r) => setCanManage(r.effectiveLevel === 'owner' || r.effectiveLevel === 'admin'))
-      .catch(() => setCanManage(false))
-  }, [task?.id, currentUser?.id])
-
-  // Polling fallback (no push channel yet — see useTaskActivity's own doc comment) so a
-  // status change from a running agent shows up here without the user needing to F5.
-  const { task: polledTask } = useTaskActivity(task?.id)
+  // canExecute chỉ có ý nghĩa quyết định sản phẩm tạm thời (owner/admin/user đủ để thao
+  // tác, team/company chỉ xem) — chưa phải quy tắc đã chốt với chủ sở hữu BL-TG-03, vì
+  // GrantLevel là grantee-kind (ai được cấp), không phải action-scale (làm được gì).
+  // Không bao giờ ẩn nút khi RPC chưa wire (isSupported === false, mặc định hôm nay) —
+  // và cũng không ẩn trong lúc `myLevel` vẫn đang tải (null): `isSupported` khởi tạo
+  // `true` cho tới khi useTaskPermission's RPC settle, nên chỉ dựa `!permissionSupported`
+  // sẽ làm nút biến mất chớp nhoáng ở mọi lần mount trước khi promise resolve — chỉ ẩn
+  // khi đã CÓ bằng chứng dương tính (myLevel resolved) rằng quyền không đủ.
+  // Gọi trước early-return `if (!task)` bên dưới — Rules of Hooks, cùng pattern useTaskActivity ở trên.
+  const currentUserId = useAppStore((s) => s.currentUser?.id)
+  const { level: myLevel, isSupported: permissionSupported } = useTaskPermission(
+    task?.id ?? '',
+    currentUserId
+  )
+  const canExecute =
+    !permissionSupported || myLevel === null || ['owner', 'admin', 'user'].includes(myLevel)
 
   if (!task) {
     return <div className="p-4 text-sm text-muted-foreground">Select a task</div>
@@ -129,24 +125,37 @@ export function TaskDetail() {
       />
 
       {/* Action Buttons */}
-      <div className="flex gap-2 mt-2">
-        {canManage && (
+      <div className="flex gap-2 mt-2 items-center">
+        <ExecutionEngineBadge task={task} />
+        <AttachWorkflowTemplateAction task={task} />
+        {canExecute && (
           <Button variant="default" onClick={handleRunAgent} data-testid="run-agent-btn">
             ▶ Execute with Agent
           </Button>
         )}
       </div>
 
+      <TaskDispatchStatusPanel taskId={task.id} />
+
+      {/* Live status from useTaskActivity's polling fallback (FE-TASK-003) — reflects
+          status changes (e.g. 'in_progress' → 'done') without the user needing to F5. */}
+      <div className="text-xs text-muted-foreground mt-1" data-testid="task-live-status">
+        Status: {polledTask?.status ?? task.status}
+      </div>
+
       {/* Tabs */}
       <Tabs
         value={activeTab}
-        onValueChange={(v) => setActiveTab(v as 'details' | 'subtasks' | 'ai' | 'access')}
+        onValueChange={(v) =>
+          setActiveTab(v as 'details' | 'subtasks' | 'ai' | 'comments' | 'access')
+        }
         className="mt-4"
       >
         <TabsList>
           <TabsTrigger value="details">Details</TabsTrigger>
           <TabsTrigger value="subtasks">Subtasks</TabsTrigger>
           <TabsTrigger value="ai">AI Agent</TabsTrigger>
+          <TabsTrigger value="comments">Comments</TabsTrigger>
           <TabsTrigger value="access">Access</TabsTrigger>
         </TabsList>
         <TabsContent value="details">
@@ -193,20 +202,21 @@ export function TaskDetail() {
             {/* Dependencies */}
             <div className="pt-2 text-xs">
               <p className="font-semibold mb-1">Dependencies</p>
-              {deps.blockedBy.length > 0 ? (
+              {blockedBy.length > 0 ? (
                 <div className="text-muted-foreground flex gap-1">
                   <span>← Blocked by:</span>
-                  <span>{deps.blockedBy.map((d) => d.title).join(', ')}</span>
+                  <span>{blockedBy.map((d) => d.title).join(', ')}</span>
                 </div>
               ) : null}
-              {deps.blocks.length > 0 ? (
-                <div className="text-muted-foreground flex gap-1 mt-1">
-                  <span>→ Blocks:</span>
-                  <span>{deps.blocks.map((d) => d.title).join(', ')}</span>
-                </div>
-              ) : null}
-              {deps.blockedBy.length === 0 && deps.blocks.length === 0 && (
+              <div className="text-muted-foreground flex gap-1 mt-1">
+                <span>→ Blocks:</span>
+                <span>Not supported on the Details tab — see the DAG tab</span>
+              </div>
+              {blockedBy.length === 0 && (
                 <div className="text-muted-foreground">No dependencies</div>
+              )}
+              {depsError && (
+                <div className="text-destructive mt-1">Failed to load dependencies</div>
               )}
             </div>
           </div>
@@ -217,8 +227,11 @@ export function TaskDetail() {
         <TabsContent value="ai">
           <TaskPromptEditor task={task} />
         </TabsContent>
+        <TabsContent value="comments">
+          <TaskComments taskId={task.id} />
+        </TabsContent>
         <TabsContent value="access">
-          <TaskGrantModal taskId={task.id} />
+          <TaskAccessPanel taskId={task.id} />
         </TabsContent>
       </Tabs>
     </div>

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -113,6 +114,24 @@ func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, sta
 	f.tasks[id] = t
 	return nil
 }
+func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
+	t, ok := f.tasks[id]
+	if !ok {
+		return errors.New("not found")
+	}
+	t.WorktreeID = worktreeID
+	f.tasks[id] = t
+	return nil
+}
+func (f *fakeTaskRepository) SetActiveExecutionLink(ctx context.Context, tenantID, id, linkID string) error {
+	t, ok := f.tasks[id]
+	if !ok {
+		return errors.New("not found")
+	}
+	t.ActiveExecutionLinkID = linkID
+	f.tasks[id] = t
+	return nil
+}
 func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
 	return false, nil
 }
@@ -147,15 +166,6 @@ func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) er
 		return errors.New("not found")
 	}
 	delete(f.tasks, id)
-	return nil
-}
-func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
-	t, ok := f.tasks[id]
-	if !ok {
-		return errors.New("not found")
-	}
-	t.WorktreeID = worktreeID
-	f.tasks[id] = t
 	return nil
 }
 func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
@@ -407,8 +417,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		addEdgeUC,
 		usecase.NewGrant(tasks, resolvePermissionUC, stubEvents{}),
 		resolvePermissionUC,
-		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubComplexExecutor{}, resolvePermissionUC,
-			stubWorktreeProvisioner{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, usecase.SystemClock{}),
+		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}, stubWorkflowExecutor{}, resolvePermissionUC, stubWorktreeProvisioner{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, stubClock{}, stubExecutionLinkRepository{}),
 		usecase.NewHasActiveExecutions(tasks),
 		usecase.NewListTasks(tasks),
 		usecase.NewUpdateTask(tasks, edges),
@@ -430,7 +439,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		usecase.NewRecalculateProgress(tasks),
 		usecase.NewAddComment(comments),
 		usecase.NewListComments(comments),
-		usecase.NewReportTaskExecutionResult(tasks),
+		usecase.NewReportTaskExecutionResult(tasks, stubExecutionLinkRepository{}),
 		usecase.NewFindTaskByNumber(tasks),
 	)
 }
@@ -507,24 +516,52 @@ func (stubExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, pr
 	return "ref", nil
 }
 
-// stubComplexExecutor mirrors stubExecutor for usecase.ComplexExecutor's
-// widened (worktreeID-carrying) signature (TASK-TG-04-04).
-type stubComplexExecutor struct{}
+// stubWorkflowExecutor backs this file's ExecuteTask wiring (TASK-FT-002-03)
+// — same fixed, always-succeeding posture as stubExecutor.
+type stubWorkflowExecutor struct{}
 
-func (stubComplexExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreeID string) (string, error) {
-	return "ref", nil
+func (stubWorkflowExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, workflowTemplateID string) (string, error) {
+	return "workflow-ref", nil
 }
 
-// stubWorktreeProvisioner backs this file's ExecuteTask wiring tests —
-// always reuses the task's existing WorktreeID (or a fixed stand-in id/path
-// when empty), never calling out to git-gateway-service for real.
+// stubWorktreeProvisioner/stubClock back this file's ExecuteTask wiring —
+// SOL-TG-04's worktree reuse-or-create and actual_hours steps aren't this
+// file's concern (see internal/usecase/execute_task_test.go for those), so
+// these are fixed, always-succeeding stand-ins.
 type stubWorktreeProvisioner struct{}
 
 func (stubWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (string, string, error) {
-	if task.WorktreeID != "" {
-		return task.WorktreeID, "", nil
-	}
 	return "wt-1", "/srv/worktrees/wt-1", nil
+}
+
+type stubClock struct{}
+
+func (stubClock) Now() time.Time { return time.Unix(0, 0) }
+
+// stubExecutionLinkRepository backs this file's ExecuteTask wiring
+// (BE-SOL-001/CR-FLOW-TASK-001) — a fixed, always-succeeding stand-in, same
+// posture as stubWorktreeProvisioner/stubClock above; the real branch
+// coverage lives in internal/usecase/execute_task_test.go.
+type stubExecutionLinkRepository struct{}
+
+func (stubExecutionLinkRepository) CreateExecutionLink(ctx context.Context, tenantID, taskID string, engine domain.ExecutionEngine, externalRefID string) (domain.ExecutionLink, error) {
+	return domain.ExecutionLink{ID: "link-1", TenantID: tenantID, TaskID: taskID, Engine: engine, ExternalRefID: externalRefID}, nil
+}
+
+func (stubExecutionLinkRepository) SetExternalRef(ctx context.Context, tenantID, linkID, externalRefID string) error {
+	return nil
+}
+
+func (stubExecutionLinkRepository) GetExecutionLink(ctx context.Context, tenantID, id string) (domain.ExecutionLink, error) {
+	return domain.ExecutionLink{}, errors.New("not found")
+}
+
+func (stubExecutionLinkRepository) Complete(ctx context.Context, tenantID, linkID, statusMirror string) error {
+	return nil
+}
+
+func (stubExecutionLinkRepository) UpdateStatusMirror(ctx context.Context, tenantID, externalRefID, newStatus string) error {
+	return nil
 }
 
 func TestServer_ListTasks(t *testing.T) {

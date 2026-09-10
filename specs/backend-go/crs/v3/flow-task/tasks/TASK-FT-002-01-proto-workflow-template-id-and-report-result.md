@@ -5,7 +5,7 @@
 **Service:** `task-service` (proto owner), `workflow-service` (proto owner)
 **File:** `backend-go/proto/orca/task/v1/task.proto`, `backend-go/proto/orca/workflow/v1/workflow.proto`
 **Depends on:** TASK-FT-001-01/02 (`ExecutionEngine`, `workflow_template_id` domain plumbing this RPC's `engine` field and `Task.workflow_template_id` proto field connect to)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

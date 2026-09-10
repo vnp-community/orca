@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/domain/execution_engine.go` (new), `backend-go/services/task-service/internal/domain/task.go` (extend `Task`), `backend-go/services/task-service/internal/usecase/execute_task.go` (`isComplex` → `selectEngine`)
 **Depends on:** TASK-FT-001-01 (`workflow_template_id` column this reads)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

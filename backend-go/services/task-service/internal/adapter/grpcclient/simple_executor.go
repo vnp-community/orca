@@ -5,6 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"strings"
+	"sync"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -104,10 +108,145 @@ type SimpleExecutor struct {
 	relay    infrafleetv1.InfraFleetServiceClient
 	profiles usecase.ProfileResolver        // NEW
 	projects usecase.ProjectContextResolver // NEW
+	// outbox/streamer back TASK-AG-FLOWTASK-003's throttled mid-run
+	// republish — see publishThrottledOutput's doc comment. Both are
+	// best-effort: neither ever changes Execute's own success/failure
+	// outcome, only whether task.activity's agent_output_partial frames
+	// show up for this run.
+	outbox   usecase.OutboxWriter
+	streamer usecase.AgentExecOutputStreamer
+	// throttleInterval defaults to execOutputThrottleInterval in
+	// NewSimpleExecutor — a struct field (not just the const directly) so
+	// tests can shrink it instead of sleeping multiple real seconds per
+	// assertion; same same-package-direct-field-set convention this repo's
+	// other tests use (e.g. SystemClock's fake in execute_task_test.go).
+	throttleInterval time.Duration
 }
 
-func NewSimpleExecutor(tasks usecase.TaskRepository, edges usecase.EdgeRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient, profiles usecase.ProfileResolver, projects usecase.ProjectContextResolver) *SimpleExecutor {
-	return &SimpleExecutor{tasks: tasks, edges: edges, resolver: resolver, relay: relay, profiles: profiles, projects: projects}
+func NewSimpleExecutor(tasks usecase.TaskRepository, edges usecase.EdgeRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient, profiles usecase.ProfileResolver, projects usecase.ProjectContextResolver, outbox usecase.OutboxWriter, streamer usecase.AgentExecOutputStreamer) *SimpleExecutor {
+	return &SimpleExecutor{
+		tasks: tasks, edges: edges, resolver: resolver, relay: relay, profiles: profiles, projects: projects,
+		outbox: outbox, streamer: streamer, throttleInterval: execOutputThrottleInterval,
+	}
+}
+
+// execOutputThrottleInterval is SOL-AG-FLOWTASK-001 §2.3's throttle option
+// (a) — a fixed 2s interval, the only viable option for this path (option
+// (b), OSC-133 milestones, is not viable: `claude --print` doesn't run
+// inside a PTY, so no OSC sequences are ever emitted here — see
+// agent-print-mode-exec.ts and SOL-AG-FLOWTASK-001 §2.3's own note). No
+// real traffic data exists yet to tune this against (TASK-AG-FLOWTASK-003
+// Open Question 1) — 2s is a starting point, not a measured value.
+const execOutputThrottleInterval = 2 * time.Second
+
+// agentOutputPartialSubject is task-service's first published NATS
+// subject (TASK-AG-FLOWTASK-003) — api-gateway's wscompat
+// channels_task_activity.go subscribes to it and republishes onto
+// task.activity:{taskId} with Engine "direct_agent", EventType
+// "agent_output_partial".
+const agentOutputPartialSubject = "orca.task.agent_output_partial"
+
+// agentOutputPartialPayload is this subject's payload shape — origin_task_id
+// is the field channels_task_activity.go's translateToTaskActivity filters
+// every subject's payload on (see that file), so it MUST be present and
+// correct on every publish, same as every other orca.orchestration.*/
+// orca.workflow.* payload already does.
+type agentOutputPartialPayload struct {
+	OriginTaskID string `json:"origin_task_id"`
+	RequestID    string `json:"request_id"`
+	Stdout       string `json:"stdout"`
+	Stderr       string `json:"stderr"`
+}
+
+// publishThrottledOutput drains chunks (from streamer.StreamExecOutput,
+// keyed by the same stepId=requestID Execute already sends
+// agent.execPrompt), accumulating stdout/stderr separately, and flushes an
+// outbox event at most once per execOutputThrottleInterval. Each flush
+// carries the FULL buffer accumulated so far (cumulative, not a delta) —
+// SOL-AG-FLOWTASK-001 §2.3's own wording ("publish one event carrying the
+// buffer accumulated so far"), the simplest possible contract for whatever
+// eventually reads these frames (no client-side reassembly needed). Runs
+// until ctx is cancelled (Execute cancels it right after its own Relay
+// call returns, success or failure) or chunks closes on its own.
+func (s *SimpleExecutor) publishThrottledOutput(ctx context.Context, tenantID, taskID, requestID string, chunks <-chan usecase.AgentExecOutputChunk) {
+	var stdout, stderr strings.Builder
+	dirty := false
+	ticker := time.NewTicker(s.throttleInterval)
+	defer ticker.Stop()
+
+	flush := func() {
+		if !dirty {
+			return
+		}
+		dirty = false
+		s.publishAgentOutputPartial(tenantID, taskID, requestID, stdout.String(), stderr.String())
+	}
+	accumulate := func(chunk usecase.AgentExecOutputChunk) {
+		if chunk.Stream == "stderr" {
+			stderr.WriteString(chunk.Data)
+		} else {
+			stdout.WriteString(chunk.Data)
+		}
+		dirty = true
+	}
+
+	for {
+		select {
+		case chunk, ok := <-chunks:
+			if !ok {
+				flush() // final flush — the run ended right after a chunk, don't lose the last partial buffer
+				return
+			}
+			accumulate(chunk)
+		case <-ticker.C:
+			flush()
+		case <-ctx.Done():
+			// ctx.Done() firing (Execute's own Relay call just returned)
+			// races the select above against chunks already sitting in its
+			// buffer — Go picks randomly between two simultaneously-ready
+			// cases, so without this drain a burst of output delivered
+			// right as the run ends could be silently lost instead of
+			// reaching the final flush. Non-blocking: stops the moment
+			// chunks has nothing immediately available, it does not wait
+			// for the producer goroutine (AgentExecOutputRelay's own ctx is
+			// the same one that was just cancelled, so it is also winding
+			// down and will close chunks shortly regardless).
+			for {
+				select {
+				case chunk, ok := <-chunks:
+					if !ok {
+						flush()
+						return
+					}
+					accumulate(chunk)
+				default:
+					flush()
+					return
+				}
+			}
+		}
+	}
+}
+
+// publishAgentOutputPartial marshals and inserts one outbox row —
+// deliberately swallows both the marshal and insert error (best-effort,
+// see this file's SimpleExecutor doc comment and
+// postgres.Repository.InsertOutboxEvent's doc comment for the shared
+// posture): a lost partial-progress update must never surface as
+// SimpleExecutor.Execute's own error.
+func (s *SimpleExecutor) publishAgentOutputPartial(tenantID, taskID, requestID, stdout, stderr string) {
+	payload, err := json.Marshal(agentOutputPartialPayload{
+		OriginTaskID: taskID, RequestID: requestID, Stdout: stdout, Stderr: stderr,
+	})
+	if err != nil {
+		return
+	}
+	// context.Background(): this publish happens from publishThrottledOutput's
+	// goroutine, whose own ctx may already be cancelled (e.g. the final
+	// ctx.Done() flush) by the time this call runs — an outbox insert
+	// should not be aborted just because the streaming subscription itself
+	// is winding down.
+	_ = s.outbox.InsertOutboxEvent(context.Background(), uuid.NewString(), tenantID, agentOutputPartialSubject, payload)
 }
 
 // agentExecPromptParams mirrors agent-print-mode-exec.ts's handled fields —
@@ -238,6 +377,29 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: marshal params: %w", err)
 	}
+
+	// TASK-AG-FLOWTASK-003: subscribe to this run's mid-run output
+	// CONCURRENTLY with the unary Relay('agent.execPrompt') call below —
+	// same stepId (requestID) both calls share, so infra-fleet-service's
+	// execOutputSubs demux (TASK-AG-FLOWTASK-002) correlates them. streamCtx
+	// is scoped to just this Execute call: cancelled (and its consumer
+	// goroutine drained via wg.Wait, in that order — see the two defers
+	// below) right after Relay returns, success or failure, so no
+	// subscription/goroutine outlives one Execute call.
+	streamCtx, cancelStream := context.WithCancel(ctx)
+	var streamWG sync.WaitGroup
+	streamWG.Add(1)
+	go func() {
+		defer streamWG.Done()
+		s.publishThrottledOutput(streamCtx, tenantID, taskID, requestID, s.streamer.StreamExecOutput(streamCtx, connectionID, requestID))
+	}()
+	// Deliberately two separate defers, not one combined func — LIFO order
+	// makes cancelStream() run BEFORE streamWG.Wait() (the later defer
+	// statement runs first), so the goroutine above is actually asked to
+	// stop before Execute blocks waiting for it to.
+	defer streamWG.Wait()
+	defer cancelStream()
+
 	resp, err := s.relay.Relay(ctx, &infrafleetv1.RelayRequest{
 		ConnectionId: connectionID, Method: "agent.execPrompt", ParamsJson: string(paramsJSON),
 	})

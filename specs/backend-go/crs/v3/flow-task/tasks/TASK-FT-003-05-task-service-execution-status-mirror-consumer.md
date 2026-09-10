@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/mirror_execution_status.go` (new), `backend-go/services/task-service/internal/usecase/ports.go` (`ExecutionLinkRepository.UpdateStatusMirror`), `backend-go/services/task-service/internal/adapter/eventbus/consumer.go` (new package), `backend-go/services/task-service/cmd/server/main.go` (wire consumer), `backend-go/services/task-service/internal/config/config.go` (new `NATSURL`)
 **Depends on:** TASK-FT-001-03 (`execution_links` table/repository), TASK-FT-003-01/-02 (`orca.orchestration.task.statuschanged` publisher), TASK-FT-003-03 (`orca.workflow.step.completed` publisher)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/ports.go` (new `ExecutionLinkRepository`), `backend-go/services/task-service/internal/adapter/postgres/execution_links.go` (new), `backend-go/services/task-service/internal/usecase/execute_task.go` (`Execute` wiring), `backend-go/services/task-service/cmd/server/main.go` (constructor wiring)
 **Depends on:** TASK-FT-001-01 (`task.execution_links` table), TASK-FT-001-02 (`selectEngine`/`ExecutionEngine`)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

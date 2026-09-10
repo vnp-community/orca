@@ -19,52 +19,73 @@ type ExecuteTaskInput struct {
 }
 
 // ExecuteResult replaces the bare execution-ref string Execute used to
-// return — Async distinguishes the complex path (orchestration-service,
-// completion arrives later via ReportTaskExecutionResult, TASK-TG-04-05)
-// from the simple path (SimpleExecutor.Execute blocks until the CLI
-// process exits, so completion is written INLINE, same call — TASK-TG-04-03).
+// return — Async distinguishes the complex/workflow paths (orchestration-
+// service or workflow-service; completion arrives later via
+// ReportTaskExecutionResult, TASK-TG-04-05/TASK-FT-002-04) from the simple
+// path (SimpleExecutor.Execute blocks until the CLI process exits, so
+// completion is written INLINE, same call — TASK-TG-04-03).
 type ExecuteResult struct {
 	ExecutionRef string
 	Async        bool
 }
 
 // ExecuteTask is task-service's execution-dispatch usecase (§3.1). The
-// branching logic — simple vs. complex — is this usecase's real,
-// non-stubbed value: a task with any parent_child (subtask) or depends_on
-// edge FROM it is "complex" and hands off to ComplexExecutor
-// (orchestration-service); otherwise it's "simple" and relays directly to
-// SimpleExecutor (infra-fleet-service).
+// branching logic — selectEngine's three-way split — is this usecase's
+// real, non-stubbed value: a task with an explicit workflow_template_id
+// goes to Engine 3 (WorkflowExecutor/workflow-service); otherwise any
+// parent_child (subtask) or depends_on edge FROM it makes it "complex" and
+// hands off to Engine 2 (ComplexExecutor/orchestration-service); everything
+// else is "simple" and relays directly to Engine 1 (SimpleExecutor/
+// infra-fleet-service).
 //
-// TASK-TG-04-01 fixed two real bugs found while grounding SOL-TG-04
-// against this code: the permission check and complexity determination now
-// run BEFORE the in_progress write, and a dispatch failure reverts to the
-// task's PREVIOUS status (a compensating write) rather than leaving it
-// permanently stuck in_progress.
+// Execute (SOL-TG-04) does the following, in order, BEFORE marking the task
+// StatusInProgress: (1) resolves the caller's permission to "execute" the
+// task via ResolvePermission — every other mutating RPC does this per
+// task-service.md §3, ExecuteTask previously didn't despite dispatching
+// real work; (2) determines the engine via selectEngine; (3) resolves the
+// project's dev server connection, failing closed (TASK_EXECUTE_NO_CONNECTION)
+// before any status write if it's not connected; (4) provisions
+// (reuse-or-create) the task's worktree via WorktreeProvisioner. Only once
+// all of that succeeds does it write StatusInProgress and dispatch.
 //
-// TASK-TG-04-03 adds two more real pieces: (1) worktree reuse-or-create via
-// WorktreeProvisioner before dispatch, persisting Task.WorktreeID when it
-// changes; (2) inline completion for the simple path — SimpleExecutor.Execute
-// already blocks until the Dev Server Agent's CLI process exits (see
-// SimpleExecutor's own doc comment), so ExecuteTask already knows the
-// simple path finished, successfully or not, before its own Execute call
-// returns. That's a completion callback available and unused until now:
-// on simple-path success this writes StatusReview + actual_hours (measured
-// via Clock) in the SAME call, no second RPC. The complex path has no such
-// synchronous signal (orchestration-service's dispatch is async) — it stays
-// at StatusInProgress until ReportTaskExecutionResult (TASK-TG-04-05).
+// If dispatch itself then fails, Execute reverts the status write back to
+// whatever it was before dispatch — TASK-TG-04-01's fix for a real bug: a
+// task whose dev server is offline (or any other dispatch failure) used to
+// be marked in_progress PERMANENTLY on every failed Execute attempt, with no
+// RPC to ever clear it.
+//
+// The simple path additionally closes the "no completion callback" gap
+// inline: SimpleExecutor.Execute already blocks synchronously until the Dev
+// Server Agent's agent.execPrompt call returns, so by the time it returns
+// here Execute already knows the outcome — CompleteExecution records
+// StatusReview + actual_hours (measured via Clock) in the same call, no
+// second RPC needed. The complex/workflow paths have no such synchronous
+// signal (orchestration-service/workflow-service dispatch is async) — they
+// return Async: true and leave status at InProgress; TASK-FT-002-04's
+// generalized ReportTaskExecutionResult is the eventual completion write for
+// both.
 type ExecuteTask struct {
 	repo              TaskRepository
 	edges             EdgeRepository
 	simple            SimpleExecutor
 	complex           ComplexExecutor
+	workflow          WorkflowExecutor
 	resolvePermission *ResolvePermission
 	worktrees         WorktreeProvisioner
 	resolver          ProjectExecutionResolver
 	clock             Clock
+	// links records one execution_links row per Execute call that reaches
+	// dispatch, across all three engines (BE-SOL-001/CR-FLOW-TASK-001) — see
+	// ExecutionLinkRepository's doc comment.
+	links ExecutionLinkRepository
 }
 
-func NewExecuteTask(repo TaskRepository, edges EdgeRepository, simple SimpleExecutor, complex ComplexExecutor, resolvePermission *ResolvePermission, worktrees WorktreeProvisioner, resolver ProjectExecutionResolver, clock Clock) *ExecuteTask {
-	return &ExecuteTask{repo: repo, edges: edges, simple: simple, complex: complex, resolvePermission: resolvePermission, worktrees: worktrees, resolver: resolver, clock: clock}
+func NewExecuteTask(repo TaskRepository, edges EdgeRepository, simple SimpleExecutor, complex ComplexExecutor, workflow WorkflowExecutor, resolvePermission *ResolvePermission, worktrees WorktreeProvisioner, resolver ProjectExecutionResolver, clock Clock, links ExecutionLinkRepository) *ExecuteTask {
+	return &ExecuteTask{
+		repo: repo, edges: edges, simple: simple, complex: complex, workflow: workflow,
+		resolvePermission: resolvePermission, worktrees: worktrees, resolver: resolver, clock: clock,
+		links: links,
+	}
 }
 
 func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (ExecuteResult, error) {
@@ -90,9 +111,9 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	}
 	previousStatus := task.Status
 
-	complex, err := uc.isComplex(ctx, tenantID, in.TaskID) // unchanged — computed BEFORE any status write now, not after
+	engine, err := uc.selectEngine(ctx, tenantID, task) // computed BEFORE any status write, same as the old isComplex was
 	if err != nil {
-		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_EDGE_LOOKUP_FAILED", "failed to determine task complexity", err)
+		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_EDGE_LOOKUP_FAILED", "failed to determine execution engine", err)
 	}
 
 	// Pre-check 2: dev-server-online — resolved once here, BEFORE the
@@ -103,15 +124,16 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 		return ExecuteResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_CONNECTION", "task's project has no connected dev server", err)
 	}
 
-	// Worktree reuse-or-create.
+	// Worktree reuse-or-create (SOL-TG-04's "IF task.worktreeId exists: use
+	// existing worktree ELSE: create one").
 	worktreeID, worktreePath, err := uc.worktrees.EnsureWorktree(ctx, tenantID, task)
 	if err != nil {
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_WORKTREE_FAILED", "failed to provision worktree", err)
 	}
 	if worktreePath == "" {
-		worktreePath = resolvedPath // reuse path: EnsureWorktree returns "" for path on reuse, see TASK-TG-04-02
+		worktreePath = resolvedPath // reuse branch: EnsureWorktree returns "" for path on reuse — see WorktreeProvisioner's doc comment
 	}
-	_ = worktreePath // resolved for parity with SOL-TG-04's design; SimpleExecutor resolves its own worktree path today (TASK-TG-04-06 threads this through as a context preamble)
+	_ = worktreePath // resolved for parity with SOL-TG-04's design; SimpleExecutor/ComplexExecutor resolve their own worktree path today (TASK-TG-04-06 threads this through as a context preamble)
 	if worktreeID != task.WorktreeID {
 		if err := uc.repo.UpdateWorktreeID(ctx, tenantID, in.TaskID, worktreeID); err != nil {
 			return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_WORKTREE_PERSIST_FAILED", "failed to persist worktree id", err)
@@ -123,50 +145,103 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	}
 	dispatchStart := uc.clock.Now()
 
-	if complex {
-		ref, err := uc.complex.Execute(ctx, tenantID, in.TaskID, in.RequestID, worktreeID)
-		if err != nil {
-			// The fix: revert the in_progress write instead of leaving the task
-			// stuck — a dispatch failure must never leave permanently-false
-			// "running" state, since there is no other RPC to clear it.
-			_ = uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, previousStatus)
-			return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", "execution dispatch failed", err)
-		}
-		// No further status write here — StatusReview/Done arrives later
-		// via ReportTaskExecutionResult (TASK-TG-04-05).
+	// One execution_links row per Execute call that reaches dispatch, across
+	// all three engines — CR-FLOW-TASK-001's acceptance criteria, so
+	// CR-FLOW-TASK-003's Activity Feed (BE-SOL-003) has a history row even
+	// for the synchronous Engine 1 path. A failed link write must not
+	// silently proceed with an unaccounted-for dispatch: fail closed and
+	// revert the in_progress write already made, same posture as the other
+	// pre-dispatch failures above.
+	link, linkErr := uc.links.CreateExecutionLink(ctx, tenantID, in.TaskID, engine, "")
+	if linkErr != nil {
+		_ = uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, previousStatus)
+		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_LINK_CREATE_FAILED", "failed to record execution link", linkErr)
+	}
+	// Record this link as the task's active dispatch BEFORE calling out to
+	// the engine — ReportTaskExecutionResult (TASK-FT-002-04) validates an
+	// inbound callback's execution_ref/engine against this pointer, and a
+	// fast-completing async engine could call back before this Execute call
+	// returns. A failed write here must fail closed like the link create
+	// above: without it, the eventual completion callback can never match
+	// and would be silently dropped forever.
+	if err := uc.repo.SetActiveExecutionLink(ctx, tenantID, in.TaskID, link.ID); err != nil {
+		_ = uc.links.Complete(ctx, tenantID, link.ID, "failed")
+		_ = uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, previousStatus)
+		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_ACTIVE_LINK_PERSIST_FAILED", "failed to record active execution link", err)
+	}
+
+	// in.Prompt (docs/backlog/BACKLOG-016) overrides SimpleExecutor's own
+	// default prompt when non-empty; worktreeID threads the reuse-or-create
+	// result above into the complex path, same as before selectEngine
+	// generalized this switch (TASK-TG-04-04).
+	var ref string
+	switch engine {
+	case domain.EngineOrchestration:
+		ref, err = uc.complex.Execute(ctx, tenantID, in.TaskID, in.RequestID, worktreeID)
+	case domain.EngineWorkflow:
+		ref, err = uc.workflow.Execute(ctx, tenantID, in.TaskID, in.RequestID, task.WorkflowTemplateID)
+	default: // domain.EngineDirectAgent
+		ref, err = uc.simple.Execute(ctx, tenantID, in.TaskID, in.RequestID, in.Prompt)
+	}
+
+	if err != nil {
+		// The fix: revert the in_progress write instead of leaving the task
+		// stuck — a dispatch failure must never leave permanently-false
+		// "running" state, since there is no other RPC to clear it.
+		_ = uc.links.Complete(ctx, tenantID, link.ID, "failed") // best-effort, same posture as this codebase's other non-critical bookkeeping writes
+		_ = uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, previousStatus)
+		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", "execution dispatch failed", err)
+	}
+	if ref != "" {
+		_ = uc.links.SetExternalRef(ctx, tenantID, link.ID, ref) // best-effort: a failed backfill doesn't invalidate a dispatch that already succeeded
+	}
+
+	if engine != domain.EngineDirectAgent {
+		// No further status write here — StatusReview/Done arrives later via
+		// ReportTaskExecutionResult (TASK-TG-04-05). The link's "completed"
+		// mark is only task-service's own initial bookkeeping for the async
+		// engines — see ExecutionLinkRepository.Complete's doc comment.
+		_ = uc.links.Complete(ctx, tenantID, link.ID, "completed")
 		return ExecuteResult{ExecutionRef: ref, Async: true}, nil
 	}
 
 	// Simple path: SimpleExecutor.Execute blocks until the CLI process
-	// exits — the completion transition happens INLINE, same call. in.Prompt
-	// (docs/backlog/BACKLOG-016) overrides SimpleExecutor's own default
-	// prompt when non-empty.
-	result, err := uc.simple.Execute(ctx, tenantID, in.TaskID, in.RequestID, in.Prompt)
-	if err != nil {
-		_ = uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, previousStatus)
-		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", "execution dispatch failed", err)
-	}
+	// exits — the completion transition happens INLINE, same call, no
+	// separate completion RPC needed (see this usecase's doc comment).
 	actualHours := uc.clock.Now().Sub(dispatchStart).Hours()
 	if err := uc.repo.CompleteExecution(ctx, tenantID, in.TaskID, domain.StatusReview, actualHours); err != nil {
+		_ = uc.links.Complete(ctx, tenantID, link.ID, "failed")
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_COMPLETION_WRITE_FAILED", "failed to persist execution completion", err)
 	}
-	return ExecuteResult{ExecutionRef: result, Async: false}, nil
+	_ = uc.links.Complete(ctx, tenantID, link.ID, "completed")
+	return ExecuteResult{ExecutionRef: ref, Async: false}, nil
 }
 
-// isComplex implements task-service.md §3.1's branch: "a complex task has
-// subtasks and/or dependency edges."
-func (uc *ExecuteTask) isComplex(ctx context.Context, tenantID, taskID string) (bool, error) {
-	children, err := uc.edges.ListFrom(ctx, tenantID, taskID, domain.EdgeKindParentChild)
-	if err != nil {
-		return false, err
-	}
-	if len(children) > 0 {
-		return true, nil
+// selectEngine implements task-service.md §3.1's three-way dispatch branch
+// (CR-FLOW-TASK-001) — same two ListFrom calls isComplex used to make, plus
+// the workflow_template_id priority check.
+func (uc *ExecuteTask) selectEngine(ctx context.Context, tenantID string, task domain.Task) (domain.ExecutionEngine, error) {
+	// Priority: an explicitly-set workflow_template_id always wins over the
+	// automatic subtree/dependency check below — CR-FLOW-TASK-001's own
+	// stated rule (avoid ambiguity when a task has both a subtask and an
+	// attached workflow).
+	if task.WorkflowTemplateID != "" {
+		return domain.EngineWorkflow, nil
 	}
 
-	deps, err := uc.edges.ListFrom(ctx, tenantID, taskID, domain.EdgeKindDependsOn)
+	children, err := uc.edges.ListFrom(ctx, tenantID, task.ID, domain.EdgeKindParentChild)
 	if err != nil {
-		return false, err
+		return "", err
 	}
-	return len(deps) > 0, nil
+	if len(children) > 0 {
+		return domain.EngineOrchestration, nil
+	}
+	deps, err := uc.edges.ListFrom(ctx, tenantID, task.ID, domain.EdgeKindDependsOn)
+	if err != nil {
+		return "", err
+	}
+	if len(deps) > 0 {
+		return domain.EngineOrchestration, nil
+	}
+	return domain.EngineDirectAgent, nil
 }

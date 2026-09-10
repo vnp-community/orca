@@ -4,7 +4,7 @@
 **Bug:** [BUG-FE-TASKV1-004](../BUG-FE-TASKV1-004-run-agent-ux-gaps.md)
 **File:** `frontend/src/renderer/src/hooks/useTaskComments.ts` (mới), `frontend/src/renderer/src/components/task/TaskComments.tsx` (mới), `frontend/src/renderer/src/components/task/TaskDetail.tsx`
 **Estimated:** 60 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 **Phụ thuộc:** BLOCKED trên `backend-go` — xem "Depends on" bên dưới. Chỉ chạy thật được trên deploy target Node (Desktop Electron / server-web hiện tại).
 
 ---
@@ -165,9 +165,9 @@ thật trước khi coi task hoàn thành đầy đủ.
 
 ## Definition of Done
 
-- [ ] `useTaskComments.ts`/`TaskComments.tsx` dùng đúng field `TaskComment` thật (`userId`, `content` — không tự đặt `authorId`/`body`)
-- [ ] `isSupported` tự ẩn UI khi RPC không tồn tại (đúng cho `backend-go` hôm nay)
-- [ ] Tab "Comments" thêm vào `TaskDetail.tsx`
-- [ ] Đã xác nhận (hoặc ghi rõ chưa xác nhận được) tên RPC đọc thật ở Node trước khi merge
-- [ ] PR ghi rõ: tính năng chỉ chạy thật trên Node; trên `backend-go` sẽ luôn hiện "chưa khả dụng" cho tới khi có 3 việc backend-go liệt kê ở "Depends on" (chưa có task backend-go riêng track)
-- [ ] `pnpm tsc --noEmit` sạch
+- [x] `useTaskComments.ts`/`TaskComments.tsx` dùng đúng field `TaskComment` thật (`userId`, `content` — không tự đặt `authorId`/`body`)
+- [x] `isSupported` tự ẩn UI khi RPC không tồn tại (đúng cho `backend-go` hôm nay)
+- [x] Tab "Comments" thêm vào `TaskDetail.tsx`
+- [x] Đã xác nhận (hoặc ghi rõ chưa xác nhận được) tên RPC đọc thật ở Node trước khi merge
+- [x] PR ghi rõ: tính năng chỉ chạy thật trên Node; trên `backend-go` sẽ luôn hiện "chưa khả dụng" cho tới khi có 3 việc backend-go liệt kê ở "Depends on" (chưa có task backend-go riêng track)
+- [x] `pnpm tsc --noEmit` sạch

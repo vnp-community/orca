@@ -103,11 +103,12 @@ func (s *Server) CreateTemplate(ctx context.Context, req *workflowv1.CreateTempl
 
 func (s *Server) Execute(ctx context.Context, req *workflowv1.ExecuteRequest) (*workflowv1.ExecuteResponse, error) {
 	exec, err := s.execute.Execute(ctx, usecase.ExecuteInput{
-		TemplateID:  req.GetTemplateId(),
-		ProjectID:   req.GetProjectId(),
-		RootTraceID: req.GetRootTraceId(),
-		RequestID:   req.GetRequestId(),
-		InputsJSON:  req.GetInputsJson(),
+		TemplateID:   req.GetTemplateId(),
+		ProjectID:    req.GetProjectId(),
+		RootTraceID:  req.GetRootTraceId(),
+		RequestID:    req.GetRequestId(),
+		InputsJSON:   req.GetInputsJson(),
+		OriginTaskID: req.GetOriginTaskId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -365,11 +366,12 @@ func toProtoTemplate(t domain.WorkflowTemplate) *workflowv1.WorkflowTemplate {
 
 func toProtoExecution(e domain.WorkflowExecution) *workflowv1.WorkflowExecution {
 	return &workflowv1.WorkflowExecution{
-		Id:          e.ID,
-		TemplateId:  e.TemplateID,
-		Status:      string(e.Status),
-		RootTraceId: e.RootTraceID,
-		ProjectId:   e.ProjectID,
+		Id:           e.ID,
+		TemplateId:   e.TemplateID,
+		Status:       string(e.Status),
+		RootTraceId:  e.RootTraceID,
+		ProjectId:    e.ProjectID,
+		OriginTaskId: e.OriginTaskID,
 	}
 }
 

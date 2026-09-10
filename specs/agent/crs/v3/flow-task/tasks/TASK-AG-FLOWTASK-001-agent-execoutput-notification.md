@@ -6,12 +6,18 @@
 **Depends on:** None within `agent/` itself (self-contained), but the notification this task
 produces has **no consumer** until TASK-AG-FLOWTASK-002 ships — implementing this alone is
 inert, not harmful.
-**Status:** [ ] TODO (chờ quyết định triển khai — không phải TODO ngay)
-
-> **Không bắt đầu code cho tới khi ai đó quyết định lên lịch triển khai phần
-> streaming của CR-FLOW-TASK-003.** Task này chỉ ghi lại thiết kế đã có trong
-> SOL-AG-FLOWTASK-001 ở dạng sẵn sàng cầm lên làm, không phải một task đang
-> chờ nhận việc ngay.
+**Status:** [x] DONE — already implemented under a different name/path before this pass, by
+TASK-AGENT-TASKV1-01/02 (`specs/agent/bugs/task-v1/tasks/`), while wiring `agent.execPrompt`'s
+notification support for an unrelated bug fix. `agent-print-mode-exec.ts`'s `handleAgentExecPrompt`
+already accepts the optional `notify` callback and emits **`agent.execPrompt.output`** (not
+`agent.execOutput` as this task's sketch names it — the real method name, confirmed by reading the
+live source) with `{stepId, stream, data}` on every raw `child.stdout`/`child.stderr` `'data'`
+event (granularity: unbuffered/per-event, Open Question 1 resolved that way already — no
+line-buffering); no size cap was added (Open Question 2 left open, matching
+`agent.execPrompt`'s pre-existing unbounded accumulation). `agent-rpc-dispatch-agent-exec.ts`'s
+`case 'agent.execPrompt'` passes `makeNotifier(ws, state)` through. Verified in this pass:
+`cd agent && npx vitest run src/relay/agent-print-mode-exec.test.ts src/relay/__tests__/fs-agent-extensions.test.ts`
+→ 61 passed. No code changes made here — this entry only corrects the task record to match reality.
 
 ---
 

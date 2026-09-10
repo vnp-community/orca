@@ -10,7 +10,7 @@ import (
 
 func TestExecute_RequiresTenantContext(t *testing.T) {
 	templates := newFakeTemplateRepository()
-	uc := NewExecute(templates, newFakeExecutionRepository(), newFakeStepExecutionRepository(), newFakeRegistry())
+	uc := NewExecute(templates, newFakeExecutionRepository(), newFakeStepExecutionRepository(), newFakeRegistry(), &fakeTaskClient{})
 
 	_, err := uc.Execute(context.Background(), ExecuteInput{TemplateID: "tmpl-1"})
 	if err == nil {
@@ -21,7 +21,7 @@ func TestExecute_RequiresTenantContext(t *testing.T) {
 func TestExecute_TemplateNotFound(t *testing.T) {
 	templates := newFakeTemplateRepository()
 	executions := newFakeExecutionRepository()
-	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), newFakeRegistry())
+	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), newFakeRegistry(), &fakeTaskClient{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	_, err := uc.Execute(ctx, ExecuteInput{TemplateID: "does-not-exist"})
@@ -38,7 +38,7 @@ func TestExecute_InvalidDAGRejectedSynchronously(t *testing.T) {
 	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell","dependsOn":["ghost"]}]}`, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 	executions := newFakeExecutionRepository()
-	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), newFakeRegistry())
+	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), newFakeRegistry(), &fakeTaskClient{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	_, err := uc.Execute(ctx, ExecuteInput{TemplateID: "tmpl-1"})
@@ -65,7 +65,7 @@ func TestExecute_CyclicDAGRejectedSynchronously(t *testing.T) {
 	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", dagJSON, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 	executions := newFakeExecutionRepository()
-	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), newFakeRegistry())
+	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), newFakeRegistry(), &fakeTaskClient{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	_, err := uc.Execute(ctx, ExecuteInput{TemplateID: "tmpl-1"})
@@ -100,7 +100,7 @@ func TestExecute_ReturnsRunningImmediatelyWithoutWaitingForDispatch(t *testing.T
 		}
 	}
 
-	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), registry)
+	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), registry, &fakeTaskClient{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	exec, err := uc.Execute(ctx, ExecuteInput{TemplateID: "tmpl-1"})
@@ -156,7 +156,7 @@ func TestExecute_DispatchesWavesAndMarksExecutionCompleted(t *testing.T) {
 		}
 	}
 
-	uc := NewExecute(templates, executions, stepExecutions, registry)
+	uc := NewExecute(templates, executions, stepExecutions, registry, &fakeTaskClient{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	exec, err := uc.Execute(ctx, ExecuteInput{TemplateID: "tmpl-1"})
@@ -199,7 +199,7 @@ func TestExecute_WaveFailureMarksExecutionFailed(t *testing.T) {
 		}
 	}
 
-	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), registry)
+	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), registry, &fakeTaskClient{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	if _, err := uc.Execute(ctx, ExecuteInput{TemplateID: "tmpl-1"}); err != nil {
@@ -215,6 +215,116 @@ func TestExecute_WaveFailureMarksExecutionFailed(t *testing.T) {
 	}
 }
 
+// TestExecute_OriginTaskIDSet_ReportsResultToTaskService is
+// TASK-FT-002-05's core regression: an execution dispatched via
+// task-service's Engine 3 WorkflowExecutor (OriginTaskID set) must call
+// TaskClient.ReportTaskExecutionResult exactly once on completion, with
+// Engine: "workflow" and Success reflecting the terminal status.
+func TestExecute_OriginTaskIDSet_ReportsResultToTaskService(t *testing.T) {
+	templates := newFakeTemplateRepository()
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "", "owner-1")
+	_ = templates.CreateTemplate(context.Background(), tmpl)
+
+	executions := newFakeExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeShell] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted}}
+
+	done := make(chan domain.WorkflowExecution, 1)
+	executions.onUpdate = func(e domain.WorkflowExecution) {
+		if e.Status == domain.StatusCompleted || e.Status == domain.StatusFailed {
+			done <- e
+		}
+	}
+
+	taskClient := &fakeTaskClient{}
+	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), registry, taskClient)
+	ctx := withTenantContext(context.Background(), "tenant-1")
+
+	exec, err := uc.Execute(ctx, ExecuteInput{TemplateID: "tmpl-1", OriginTaskID: "task-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	<-done
+
+	if taskClient.callCount() != 1 {
+		t.Fatalf("expected exactly one ReportTaskExecutionResult call, got %d", taskClient.callCount())
+	}
+	got := taskClient.lastCall()
+	if got.TaskID != "task-1" || got.ExecutionRef != exec.ID || got.Engine != "workflow" || !got.Success {
+		t.Errorf("unexpected callback payload: %+v", got)
+	}
+}
+
+// TestExecute_OriginTaskIDSet_FailedRun_ReportsSuccessFalse covers the
+// failure half of the same regression — Success must reflect
+// StatusFailed, not be hardcoded true.
+func TestExecute_OriginTaskIDSet_FailedRun_ReportsSuccessFalse(t *testing.T) {
+	templates := newFakeTemplateRepository()
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "", "owner-1")
+	_ = templates.CreateTemplate(context.Background(), tmpl)
+
+	executions := newFakeExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeShell] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusFailed}}
+
+	done := make(chan domain.WorkflowExecution, 1)
+	executions.onUpdate = func(e domain.WorkflowExecution) {
+		if e.Status == domain.StatusCompleted || e.Status == domain.StatusFailed {
+			done <- e
+		}
+	}
+
+	taskClient := &fakeTaskClient{}
+	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), registry, taskClient)
+	ctx := withTenantContext(context.Background(), "tenant-1")
+
+	if _, err := uc.Execute(ctx, ExecuteInput{TemplateID: "tmpl-1", OriginTaskID: "task-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	<-done
+
+	if taskClient.callCount() != 1 {
+		t.Fatalf("expected exactly one ReportTaskExecutionResult call, got %d", taskClient.callCount())
+	}
+	if taskClient.lastCall().Success {
+		t.Error("expected Success=false for a failed run")
+	}
+}
+
+// TestExecute_OriginTaskIDEmpty_NeverReportsToTaskService is
+// TASK-FT-002-05's explicit regression guard: a standalone workflow run
+// (no OriginTaskID) must not call TaskClient at all — "does not break the
+// existing behavior of Workflow Orchestration standing alone."
+func TestExecute_OriginTaskIDEmpty_NeverReportsToTaskService(t *testing.T) {
+	templates := newFakeTemplateRepository()
+	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "", "owner-1")
+	_ = templates.CreateTemplate(context.Background(), tmpl)
+
+	executions := newFakeExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeShell] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted}}
+
+	done := make(chan domain.WorkflowExecution, 1)
+	executions.onUpdate = func(e domain.WorkflowExecution) {
+		if e.Status == domain.StatusCompleted || e.Status == domain.StatusFailed {
+			done <- e
+		}
+	}
+
+	taskClient := &fakeTaskClient{}
+	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), registry, taskClient)
+	ctx := withTenantContext(context.Background(), "tenant-1")
+
+	if _, err := uc.Execute(ctx, ExecuteInput{TemplateID: "tmpl-1"}); err != nil { // no OriginTaskID
+		t.Fatalf("unexpected error: %v", err)
+	}
+	<-done
+
+	if taskClient.callCount() != 0 {
+		t.Errorf("expected zero ReportTaskExecutionResult calls for a standalone run, got %d: %+v", taskClient.callCount(), taskClient.calls)
+	}
+}
+
 func TestExecute_ZeroStepTemplateCompletesImmediately(t *testing.T) {
 	templates := newFakeTemplateRepository()
 	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[]}`, domain.ScopePersonal, "", "owner-1")
@@ -224,7 +334,7 @@ func TestExecute_ZeroStepTemplateCompletesImmediately(t *testing.T) {
 	done := make(chan domain.WorkflowExecution, 1)
 	executions.onUpdate = func(e domain.WorkflowExecution) { done <- e }
 
-	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), newFakeRegistry())
+	uc := NewExecute(templates, executions, newFakeStepExecutionRepository(), newFakeRegistry(), &fakeTaskClient{})
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
 	if _, err := uc.Execute(ctx, ExecuteInput{TemplateID: "tmpl-1"}); err != nil {

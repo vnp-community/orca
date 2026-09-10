@@ -5,12 +5,44 @@
 **Solution Ref:** [SOL-AG-FLOWTASK-001](../solutions/SOL-AG-FLOWTASK-001-execution-activity-streaming-design.md) §2.2, §3
 **Depends on:** TASK-AG-FLOWTASK-001 (agent/ must actually emit `agent.execOutput` first —
 otherwise this has nothing to route)
-**Status:** [ ] TODO (chờ quyết định triển khai — không phải TODO ngay)
+**Status:** [x] DONE — implemented this pass.
 
-> **Không bắt đầu code cho tới khi ai đó quyết định lên lịch triển khai phần
-> streaming của CR-FLOW-TASK-003**, và cho tới khi §3's mâu thuẫn trong
-> `StreamPty`'s doc comment (xem "Open Question 2" dưới) được người có bối
-> cảnh TASK-192 xác nhận.
+`session.go`: added `execOutputMu`/`execOutputSubs map[string][]chan rawExecOutputNotification`
+(keyed by stepId) alongside `ptySubs`/`screencastSubs`; `routeNotification` gained a third case
+matching the REAL notification method name confirmed against `agent-print-mode-exec.ts` —
+**`agent.execPrompt.output`** (exact match, not the `strings.HasPrefix(n.Method,
+"agent.execOutput")` this task's sketch used — that guess doesn't match the real method name, and
+a broad prefix would also have wrongly captured the unrelated `shell.exec.output` family, keyed by
+`traceId` for a different, not-yet-wired workflow-service consumer — Open Question 3 resolved:
+no collision, because this demux is an exact-method match). `subscribeExecOutput`/
+`unsubscribeExecOutput` mirror `subscribePty`/`subscribeScreencast` exactly, including the 64-slot
+channel buffer (Open Question 1: kept the same as the two precedents, no real traffic data yet to
+tune against).
+
+`client.go`: added `Client.StreamExecOutput`, gating `relay-ssh` unconditionally like `StreamPty`/
+`StreamScreencast` — Open Question 2 resolved per this task's own explicit default stance
+("inherit the block"); the `StreamPty` doc-comment contradiction SOL-AG-FLOWTASK-001 §3 flagged
+remains **unresolved**, still needs someone with TASK-192 context.
+
+`ports.go`: added `ExecOutputEvent` + `StreamExecOutput` to `DevServerAgentClient`.
+
+Beyond this task's own listed Files (needed to make TASK-AG-FLOWTASK-003 actually reachable
+cross-service, since `Client.StreamExecOutput` above is in-process only): added
+`usecase.StreamAgentExecOutput` (resolve-then-subscribe, mirrors `usecase.Relay`'s shape) and a new
+gRPC server-streaming RPC `StreamExecOutput` (`infrafleet.proto` + `grpc/server.go`, mirroring
+`AttachPty`'s tenant-extraction-workaround pattern) so `task-service` can consume this stream.
+
+Tests added: `session_exec_output_test.go` (demux-by-stepId, stdout/stderr passthrough, unsubscribe
+closes+stops routing, `routeNotification` dispatches the new branch without disturbing
+`ptySubs`/`screencastSubs`, unrelated methods incl. `shell.exec.output` still fall through to the
+silent default) + `stream_agent_exec_output_test.go`. Verified:
+`go build`/`go vet`/`go test` clean for `internal/adapter/devserveragent` and `internal/usecase`
+(the two packages this task's Files list names). `internal/adapter/grpc` and `cmd/server/main.go`
+could NOT be fully `go build`-verified — pre-existing, unrelated breakage already present in this
+worktree before this pass (a parallel agent's in-progress `TeardownConnection`/
+`GetFleetConnectivitySummary`/ephemeral-VM work references usecases/domain fields that don't exist
+yet); confirmed via `git status` (those files were already modified, mine are the only new/touched
+ones actually needed here) and via `gofmt -l` (my additions are syntactically valid).
 
 ---
 

@@ -4,7 +4,7 @@
 **Bug:** [BUG-FE-TASKV1-006](../BUG-FE-TASKV1-006-task-execute-orchestration-ui-khong-ton-tai.md)
 **File:** `frontend/src/renderer/src/components/feature-wall/agents-orchestration/OrchestrationPage.tsx`
 **Estimated:** 15 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 **Phụ thuộc:** Không — rename thuần, không đổi hành vi
 
 ---
@@ -60,7 +60,7 @@ pnpm --filter frontend test -- AgentsOrchestrationVisual
 
 ## Definition of Done
 
-- [ ] File đổi tên qua `git mv` (giữ lịch sử), export đổi tên khớp file
-- [ ] `AgentsOrchestrationVisual.tsx` cập nhật import + JSX usage
-- [ ] `grep -rn "OrchestrationPage" frontend/src` → 0 kết quả
-- [ ] `pnpm tsc --noEmit` sạch
+- [x] File đổi tên qua `git mv` (giữ lịch sử), export đổi tên khớp file
+- [x] `AgentsOrchestrationVisual.tsx` cập nhật import + JSX usage
+- [x] `grep -rn "OrchestrationPage" frontend/src` → 0 kết quả
+- [x] `pnpm tsc --noEmit` sạch

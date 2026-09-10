@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/report_execution_result.go` (new), `backend-go/services/task-service/internal/adapter/grpc/server.go` (new handler)
 **Depends on:** TASK-FT-002-01 (proto), TASK-FT-001-01/03 (`execution_links` table this validates staleness against)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

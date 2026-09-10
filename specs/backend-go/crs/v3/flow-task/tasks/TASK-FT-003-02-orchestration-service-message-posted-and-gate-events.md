@@ -5,7 +5,7 @@
 **Service:** `orchestration-service`
 **File:** `backend-go/services/orchestration-service/internal/usecase/ports.go` (`GateRepository` signatures widened), `backend-go/services/orchestration-service/internal/usecase/create_gate.go`, `resolve_gate.go` (call sites), `backend-go/services/orchestration-service/internal/adapter/postgres/repository.go` (`CreateGate`/`ResolveGate` widened)
 **Depends on:** TASK-FT-003-01 (`orchestration.outbox_events` table, `domain.OutboxEvent`, `common/outbox.Store` on `*Repository`)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

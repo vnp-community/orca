@@ -37,7 +37,7 @@ type Publisher struct {
 	logger *slog.Logger
 }
 
-func New(writer OutboxWriter, logger *slog.Logger) *Publisher {
+func NewPublisher(writer OutboxWriter, logger *slog.Logger) *Publisher {
 	if logger == nil {
 		logger = slog.Default()
 	}

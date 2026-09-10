@@ -28,7 +28,7 @@ func newExecuteBatchForTest(t *testing.T, repo *fakeTaskRepository, edges *fakeE
 	worktrees := &fakeWorktreeProvisioner{worktreeID: "wt-1"}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}
 	clock := &fakeClock{now: time.Unix(1000, 0)}
-	executeTask := NewExecuteTask(repo, edges, simple, complex, resolvePermission, worktrees, resolver, clock)
+	executeTask := NewExecuteTask(repo, edges, simple, complex, &fakeWorkflowExecutor{}, resolvePermission, worktrees, resolver, clock, &fakeExecutionLinkRepository{})
 	return NewExecuteBatch(edges, executeTask)
 }
 

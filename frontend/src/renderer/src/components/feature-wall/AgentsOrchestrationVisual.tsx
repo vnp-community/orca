@@ -3,7 +3,7 @@ import { cn } from '@/lib/utils'
 import type { AgentsStepId } from '../../../../shared/agents-orchestration-steps'
 import { StatusesPage } from './agents-orchestration/StatusesPage'
 import { UsagePage } from './agents-orchestration/UsagePage'
-import { OrchestrationPage } from './agents-orchestration/OrchestrationPage'
+import { OrchestrationStoryboard } from './agents-orchestration/OrchestrationStoryboard'
 
 const PANEL_HEIGHT_PX = 392
 const PANEL_WIDTH_PX = 520
@@ -40,7 +40,7 @@ export function AgentsOrchestrationVisual(props: {
         <UsagePage active={activeStepId === 'usage'} reducedMotion={reducedMotion} />
       </Page>
       <Page active={activeStepId === 'orchestration'}>
-        <OrchestrationPage
+        <OrchestrationStoryboard
           active={activeStepId === 'orchestration'}
           reducedMotion={reducedMotion}
           onCycleComplete={onCycleComplete}

@@ -4,7 +4,7 @@
 **Bug:** [BUG-FE-TASKV1-001](../BUG-FE-TASKV1-001-orcatask-crud-va-tree-navigation.md)
 **File:** `frontend/src/renderer/src/hooks/useTasks.ts`, `frontend/src/renderer/src/components/task/TaskCard.tsx`
 **Estimated:** 30 phút
-**Status:** [ ] TODO
+**Status:** `[x]` DONE
 **Phụ thuộc:** Không — độc lập với TASK-FE-TASKV1-01, không cần RPC nào (thuần client-side)
 
 ---

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/execute_task_test.go` (extend), `backend-go/services/task-service/internal/usecase/fakes_test.go` (extend), `backend-go/services/task-service/internal/domain/execution_engine_test.go` (new), `backend-go/services/task-service/internal/adapter/postgres/execution_links_test.go` (new)
 **Depends on:** TASK-FT-001-01, TASK-FT-001-02, TASK-FT-001-03
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

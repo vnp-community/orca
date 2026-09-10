@@ -5,7 +5,7 @@
 **Service:** `orchestration-service`
 **File:** `backend-go/services/orchestration-service/migrations/0004_outbox_events.up.sql` (new), `backend-go/services/orchestration-service/migrations/0004_outbox_events.down.sql` (new), `backend-go/services/orchestration-service/internal/domain/outbox_event.go` (new), `backend-go/services/orchestration-service/internal/usecase/ports.go` (repository interfaces widened, NOT a standalone `OutboxStore`), `backend-go/services/orchestration-service/internal/adapter/postgres/repository.go` (existing methods widened to also enqueue), `backend-go/services/orchestration-service/internal/usecase/create_dispatch_context.go`, `update_task_status_and_promote.go` (call-site signature changes), `backend-go/services/orchestration-service/cmd/server/main.go` (wire `outbox.Relay`)
 **Depends on:** None (first BE-SOL-003 task)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

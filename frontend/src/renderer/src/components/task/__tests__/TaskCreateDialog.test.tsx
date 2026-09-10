@@ -4,95 +4,54 @@ import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/re
 import { describe, expect, it, vi, beforeEach } from 'vitest'
 import { TaskCreateDialog } from '../TaskCreateDialog'
 
-vi.mock('../../../store', () => ({
-  useAppStore: Object.assign(
-    vi.fn((selector) => selector({ settings: {} })),
-    {
-      getState: () => ({ settings: {} })
-    }
-  )
-}))
-
-vi.mock('../../../runtime/runtime-rpc-client', () => ({
-  callRuntimeRpc: vi.fn(),
-  getActiveRuntimeTarget: vi.fn().mockReturnValue('mock-target')
-}))
-import { callRuntimeRpc } from '../../../runtime/runtime-rpc-client'
-const mockRpc = vi.mocked(callRuntimeRpc)
-
-vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn() }
-}))
-import { toast } from 'sonner'
-const mockToast = vi.mocked(toast)
-
 describe('TaskCreateDialog', () => {
-  const onCreated = vi.fn()
-  const onCancel = vi.fn()
+  beforeEach(() => cleanup())
 
-  beforeEach(() => {
-    cleanup()
-    vi.clearAllMocks()
+  it('renders "New Task" title when no parentId', () => {
+    render(<TaskCreateDialog open onOpenChange={vi.fn()} onCreate={vi.fn()} />)
+    expect(screen.getByText('New Task')).toBeInTheDocument()
   })
 
-  it('empty title → Create button disabled', () => {
-    render(<TaskCreateDialog projectId="p1" onCreated={onCreated} onCancel={onCancel} />)
-    expect(screen.getByTestId('task-create-submit')).toBeDisabled()
+  it('renders "New Subtask" title when parentId is set', () => {
+    render(<TaskCreateDialog open parentId="p1" onOpenChange={vi.fn()} onCreate={vi.fn()} />)
+    expect(screen.getByText('New Subtask')).toBeInTheDocument()
   })
 
-  it('types title, clicks Create → calls task.create({title, projectId}), calls onCreated on success', async () => {
-    mockRpc.mockResolvedValueOnce(undefined)
-    render(<TaskCreateDialog projectId="p1" onCreated={onCreated} onCancel={onCancel} />)
+  it('submit button disabled when title is empty', () => {
+    render(<TaskCreateDialog open onOpenChange={vi.fn()} onCreate={vi.fn()} />)
+    expect(screen.getByTestId('new-task-submit')).toBeDisabled()
+  })
 
-    fireEvent.change(screen.getByTestId('task-create-title-input'), {
-      target: { value: 'New Task' }
+  it('typing a title enables submit, clicking it calls onCreate(title, parentId)', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    const onOpenChange = vi.fn()
+    render(
+      <TaskCreateDialog open parentId="parent-1" onOpenChange={onOpenChange} onCreate={onCreate} />
+    )
+
+    fireEvent.change(screen.getByTestId('new-task-title-input'), {
+      target: { value: '  My New Task  ' }
     })
-    fireEvent.click(screen.getByTestId('task-create-submit'))
+    expect(screen.getByTestId('new-task-submit')).not.toBeDisabled()
+
+    fireEvent.click(screen.getByTestId('new-task-submit'))
 
     await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'task.create', {
-        title: 'New Task',
-        projectId: 'p1'
-      })
-      expect(onCreated).toHaveBeenCalled()
+      expect(onCreate).toHaveBeenCalledWith('My New Task', 'parent-1')
+      expect(onOpenChange).toHaveBeenCalledWith(false)
     })
   })
 
-  it('Enter key in title input submits like clicking Create', async () => {
-    mockRpc.mockResolvedValueOnce(undefined)
-    render(<TaskCreateDialog projectId="p1" onCreated={onCreated} onCancel={onCancel} />)
+  it('pressing Enter in the input submits', async () => {
+    const onCreate = vi.fn().mockResolvedValue(undefined)
+    render(<TaskCreateDialog open onOpenChange={vi.fn()} onCreate={onCreate} />)
 
-    const input = screen.getByTestId('task-create-title-input')
-    fireEvent.change(input, { target: { value: 'Enter Task' } })
+    const input = screen.getByTestId('new-task-title-input')
+    fireEvent.change(input, { target: { value: 'Enter task' } })
     fireEvent.keyDown(input, { key: 'Enter' })
 
     await waitFor(() => {
-      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'task.create', {
-        title: 'Enter Task',
-        projectId: 'p1'
-      })
+      expect(onCreate).toHaveBeenCalledWith('Enter task', undefined)
     })
-  })
-
-  it('RPC error → toast.error shown, dialog does not auto-close (onCreated not called)', async () => {
-    mockRpc.mockRejectedValueOnce(new Error('boom'))
-    render(<TaskCreateDialog projectId="p1" onCreated={onCreated} onCancel={onCancel} />)
-
-    fireEvent.change(screen.getByTestId('task-create-title-input'), {
-      target: { value: 'Failing Task' }
-    })
-    fireEvent.click(screen.getByTestId('task-create-submit'))
-
-    await waitFor(() => {
-      expect(mockToast.error).toHaveBeenCalledWith('Failed to create task: boom')
-    })
-    expect(onCreated).not.toHaveBeenCalled()
-  })
-
-  it('clicking Cancel calls onCancel, no RPC called', () => {
-    render(<TaskCreateDialog projectId="p1" onCreated={onCreated} onCancel={onCancel} />)
-    fireEvent.click(screen.getByTestId('task-create-cancel'))
-    expect(onCancel).toHaveBeenCalled()
-    expect(mockRpc).not.toHaveBeenCalled()
   })
 })

@@ -4,7 +4,7 @@
 **Bug:** [BUG-FE-TASKV1-002](../BUG-FE-TASKV1-002-orcatask-dependency-graph-gia.md)
 **File:** `frontend/src/renderer/src/hooks/useTaskDependencyEdges.ts` (mới), `frontend/src/renderer/src/components/task/TaskGraph.tsx`, `frontend/src/renderer/src/components/task/TaskDAGView.tsx`, `frontend/src/renderer/src/components/task/TaskDetail.tsx`
 **Estimated:** 90 phút
-**Status:** [ ] TODO
+**Status:** `[x]` DONE
 **Phụ thuộc:** Không — dùng đúng RPC `task.getDependencies` đã tồn tại và hoạt động ở cả 2 tầng (gRPC + wscompat)
 
 ---

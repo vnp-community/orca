@@ -5,7 +5,7 @@
 **Service:** `orchestration-service` (`internal/usecase`)
 **File:** `backend-go/services/orchestration-service/internal/usecase/start_coordinator_run.go`, `get_coordinator_run.go`, `complete_coordinator_run.go`, `fail_coordinator_run.go`, `record_heartbeat.go`, `list_pending_decision_gates.go` (all new)
 **Depends on:** TASK-TASKV1-005-04 (ports), TASK-TASKV1-005-05 (postgres implementation, needed for tests to run against something real — the usecase code itself only needs the interface)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

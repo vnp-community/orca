@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/ports.go` (new `WorkflowExecutor` port), `backend-go/services/task-service/internal/adapter/grpcclient/workflow_executor.go` (new), `backend-go/services/task-service/internal/usecase/execute_task.go` (Engine 3 dispatch branch, replaces TASK-FT-001-03's placeholder), `backend-go/services/task-service/cmd/server/main.go` (dial `workflow-service`), `backend-go/services/task-service/internal/config/config.go` (new `WorkflowServiceAddr`)
 **Depends on:** TASK-FT-002-01 (proto), TASK-FT-001-03 (the `EngineWorkflow` placeholder branch this task replaces)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

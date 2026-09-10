@@ -13,7 +13,7 @@ func withTenant(ctx context.Context, tenantID string) context.Context {
 }
 
 func TestCreateDispatchContext_RequiresTenantContext(t *testing.T) {
-	uc := NewCreateDispatchContext(&fakeDispatchContextRepository{}, &synchronousSerializer{})
+	uc := NewCreateDispatchContext(&fakeDispatchContextRepository{}, &synchronousSerializer{}, nil)
 	_, err := uc.Execute(context.Background(), CreateDispatchContextInput{Handle: "handle-1"})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
@@ -21,7 +21,7 @@ func TestCreateDispatchContext_RequiresTenantContext(t *testing.T) {
 }
 
 func TestCreateDispatchContext_RequiresHandle(t *testing.T) {
-	uc := NewCreateDispatchContext(&fakeDispatchContextRepository{}, &synchronousSerializer{})
+	uc := NewCreateDispatchContext(&fakeDispatchContextRepository{}, &synchronousSerializer{}, nil)
 	ctx := withTenant(context.Background(), "tenant-1")
 	_, err := uc.Execute(ctx, CreateDispatchContextInput{})
 	if err == nil {
@@ -32,7 +32,7 @@ func TestCreateDispatchContext_RequiresHandle(t *testing.T) {
 func TestCreateDispatchContext_CreatesAndKeysSerializerByHandle(t *testing.T) {
 	repo := &fakeDispatchContextRepository{}
 	ser := &synchronousSerializer{}
-	uc := NewCreateDispatchContext(repo, ser)
+	uc := NewCreateDispatchContext(repo, ser, nil)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	got, err := uc.Execute(ctx, CreateDispatchContextInput{Handle: "handle-1", CoordinatorRunID: "run-1"})
@@ -55,7 +55,7 @@ func TestCreateDispatchContext_CreatesAndKeysSerializerByHandle(t *testing.T) {
 // reaches the repository call, not just Handle/CoordinatorRunID.
 func TestCreateDispatchContext_ThreadsOrchestrationTaskID(t *testing.T) {
 	repo := &fakeDispatchContextRepository{}
-	uc := NewCreateDispatchContext(repo, &synchronousSerializer{})
+	uc := NewCreateDispatchContext(repo, &synchronousSerializer{}, nil)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	got, err := uc.Execute(ctx, CreateDispatchContextInput{
@@ -79,7 +79,7 @@ func TestCreateDispatchContext_ThreadsOrchestrationTaskID(t *testing.T) {
 // see docs/backlog/BACKLOG-013-dispatch-context-handle-worktree-linkage.md.
 func TestCreateDispatchContext_ThreadsWorktreeID(t *testing.T) {
 	repo := &fakeDispatchContextRepository{}
-	uc := NewCreateDispatchContext(repo, &synchronousSerializer{})
+	uc := NewCreateDispatchContext(repo, &synchronousSerializer{}, nil)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	got, err := uc.Execute(ctx, CreateDispatchContextInput{
@@ -100,11 +100,32 @@ func TestCreateDispatchContext_ThreadsWorktreeID(t *testing.T) {
 
 func TestCreateDispatchContext_RepositoryFailurePropagates(t *testing.T) {
 	repo := &fakeDispatchContextRepository{err: errors.New("db unavailable")}
-	uc := NewCreateDispatchContext(repo, &synchronousSerializer{})
+	uc := NewCreateDispatchContext(repo, &synchronousSerializer{}, nil)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	_, err := uc.Execute(ctx, CreateDispatchContextInput{Handle: "handle-1"})
 	if err == nil {
 		t.Fatal("expected error to propagate from repository failure")
+	}
+}
+
+// TestCreateDispatchContext_EnqueuesOutboxEvent proves BE-SOL-003/
+// TASK-FT-003-01: creating a dispatch context enqueues exactly one
+// orca.orchestration.task.dispatched outbox event in the same fake call as
+// the dispatch-context row.
+func TestCreateDispatchContext_EnqueuesOutboxEvent(t *testing.T) {
+	repo := &fakeDispatchContextRepository{}
+	uc := NewCreateDispatchContext(repo, &synchronousSerializer{}, nil)
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	if _, err := uc.Execute(ctx, CreateDispatchContextInput{Handle: "handle-1", CoordinatorRunID: "run-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(repo.enqueuedEvents) != 1 {
+		t.Fatalf("expected exactly 1 enqueued outbox event, got %d", len(repo.enqueuedEvents))
+	}
+	if repo.enqueuedEvents[0].Subject != "orca.orchestration.task.dispatched" {
+		t.Errorf("expected subject orca.orchestration.task.dispatched, got %q", repo.enqueuedEvents[0].Subject)
 	}
 }

@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/migrations/0007_origin_task_id.up.sql` (new), `backend-go/services/workflow-service/migrations/0007_origin_task_id.down.sql` (new), `backend-go/services/workflow-service/internal/domain/execution.go` (extend), `backend-go/services/workflow-service/internal/adapter/postgres/repository.go` (widen `executions` read/write columns)
 **Depends on:** TASK-FT-002-01 (`origin_task_id` proto field this column backs)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

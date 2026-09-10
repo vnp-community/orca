@@ -162,6 +162,19 @@ type session struct {
 	fileWatchMu   sync.Mutex
 	fileWatchSubs map[string][]chan rawFileWatchNotification
 
+	// execOutputMu/execOutputSubs is the same demux pattern as ptyMu/ptySubs
+	// and screencastMu/screencastSubs — a third copy (TASK-AG-FLOWTASK-002),
+	// for agent.execPrompt.output notifications (agent-print-mode-exec.ts's
+	// handleAgentExecPrompt, wired to makeNotifier by TASK-AGENT-TASKV1-01/02
+	// — NOT the "agent.execOutput" name SOL-AG-FLOWTASK-001 §2.1 sketched;
+	// this demux matches the real agent/ method name, confirmed by reading
+	// agent-print-mode-exec.ts directly rather than the design doc's guess).
+	// Keyed by stepId (agent.execPrompt's caller-supplied correlation id),
+	// not a pty/worktree id — own mutex, same never-contend-with-call()
+	// reason ptyMu/screencastMu each have their own.
+	execOutputMu   sync.Mutex
+	execOutputSubs map[string][]chan rawExecOutputNotification
+
 	reconnectAttempt int
 
 	closeCh chan struct{}
@@ -428,6 +441,18 @@ func (s *session) routeNotification(n JSONRPCNotification) {
 		s.routeScreencastNotification(n)
 	case "fs.changed":
 		s.routeFileWatchNotification(n)
+	case "agent.execPrompt.output":
+		// TASK-AG-FLOWTASK-002 Open Question 3: exact match, not a
+		// strings.HasPrefix("agent.execOutput", ...) like SOL-AG-FLOWTASK-001
+		// §2.2 sketched — the real agent/ notification family also includes
+		// "shell.exec.output" (fs-agent-extensions.ts's handleShellExec,
+		// keyed by traceId, a different workflow-service consumer than this
+		// stepId-keyed one), which a broad "agent.exec*" prefix would have
+		// wrongly captured here. Only agent.execPrompt.output is routed by
+		// this task's scope (task-service's SimpleExecutor/Engine 1) —
+		// shell.exec.output has no consumer wired yet and is intentionally
+		// left to the silent default below, not a false demux.
+		s.routeExecOutputNotification(n)
 	default:
 		return // not a notification this client demuxes, see package doc comment's "Two RPC surfaces" note
 	}
@@ -755,6 +780,57 @@ func (s *session) routeFileWatchNotification(n JSONRPCNotification) {
 	}
 }
 
+// rawExecOutputNotification is session.go's internal decoding of one
+// agent.execPrompt.output notification — Client.StreamExecOutput (client.go)
+// wraps this into the exported usecase.ExecOutputEvent shape. Unlike
+// rawPtyNotification/rawScreencastNotification, every field is always
+// meaningful (there is no exit/ended variant of this notification — the
+// unary agent.execPrompt response itself carries exitCode/timedOut).
+type rawExecOutputNotification struct {
+	StepID string
+	Stream string // "stdout" | "stderr"
+	Data   string
+}
+
+// execOutputNotificationParams is this adapter's decoding of
+// agent.execPrompt.output's params — field names match
+// agent-print-mode-exec.ts's handleAgentExecPrompt's notify?.(
+// 'agent.execPrompt.output', { stepId, stream, data }) call exactly (both
+// sides read directly from the real TS source for this pass, not guessed
+// the way ptyNotificationParams's FLAGGED comment documents for TASK-183).
+type execOutputNotificationParams struct {
+	StepID string `json:"stepId"`
+	Stream string `json:"stream"`
+	Data   string `json:"data"`
+}
+
+// routeExecOutputNotification is routeNotification's agent.execPrompt.output
+// counterpart — same demux-by-correlation-key-then-non-blocking-fanout
+// shape as routePtyNotification/routeScreencastNotification, keyed by
+// stepId.
+func (s *session) routeExecOutputNotification(n JSONRPCNotification) {
+	var p execOutputNotificationParams
+	if len(n.Params) > 0 {
+		_ = json.Unmarshal(n.Params, &p)
+	}
+	if p.StepID == "" {
+		return // no correlation key to demux on — drop, same posture as routePtyNotification's empty-ID case
+	}
+
+	raw := rawExecOutputNotification{StepID: p.StepID, Stream: p.Stream, Data: p.Data}
+
+	s.execOutputMu.Lock()
+	subs := append([]chan rawExecOutputNotification(nil), s.execOutputSubs[p.StepID]...)
+	s.execOutputMu.Unlock()
+
+	for _, ch := range subs {
+		select {
+		case ch <- raw:
+		default: // slow/gone consumer — drop rather than block the read loop
+		}
+	}
+}
+
 // subscribeFileWatch registers a new listener for path's fs.changed
 // notifications — StreamFileChanges's implementation. MUST be called BEFORE
 // issuing the fs.watch call (same subscribe-before-call discipline
@@ -787,6 +863,43 @@ func (s *session) unsubscribeFileWatch(path string, ch chan rawFileWatchNotifica
 		delete(s.fileWatchSubs, path)
 	}
 	s.fileWatchMu.Unlock()
+	close(ch)
+}
+
+// subscribeExecOutput registers a new listener for stepID's
+// agent.execPrompt.output notifications — Client.StreamExecOutput's
+// implementation. The returned channel is buffered so a burst of output
+// doesn't immediately trip routeExecOutputNotification's drop-on-full path
+// — same buffer size as subscribePty/subscribeScreencast, no evidence yet
+// this RPC's chunk frequency needs a different bound (TASK-AG-FLOWTASK-002
+// Open Question 1: revisit once real traffic data exists).
+func (s *session) subscribeExecOutput(stepID string) chan rawExecOutputNotification {
+	ch := make(chan rawExecOutputNotification, 64)
+	s.execOutputMu.Lock()
+	if s.execOutputSubs == nil {
+		s.execOutputSubs = make(map[string][]chan rawExecOutputNotification)
+	}
+	s.execOutputSubs[stepID] = append(s.execOutputSubs[stepID], ch)
+	s.execOutputMu.Unlock()
+	return ch
+}
+
+// unsubscribeExecOutput removes and closes ch — MUST be called exactly once
+// by whoever called subscribeExecOutput (see Client.StreamExecOutput's
+// returned unsubscribe func).
+func (s *session) unsubscribeExecOutput(stepID string, ch chan rawExecOutputNotification) {
+	s.execOutputMu.Lock()
+	subs := s.execOutputSubs[stepID]
+	for i, c := range subs {
+		if c == ch {
+			s.execOutputSubs[stepID] = append(subs[:i], subs[i+1:]...)
+			break
+		}
+	}
+	if len(s.execOutputSubs[stepID]) == 0 {
+		delete(s.execOutputSubs, stepID)
+	}
+	s.execOutputMu.Unlock()
 	close(ch)
 }
 

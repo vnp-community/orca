@@ -138,4 +138,43 @@ describe('TaskPromptEditor.runWithAgent() tracing', () => {
       expect(screen.getByTestId('run-agent-btn')).not.toHaveTextContent('Running...')
     })
   })
+
+  it('Run button is NOT disabled when the prompt textarea is empty (content was never actually sent before this task)', () => {
+    render(<TaskPromptEditor task={{ ...task, promptTemplate: undefined }} />)
+    const textarea = screen.getByPlaceholderText(
+      'Describe what the agent should do for this task...'
+    )
+    expect(textarea).toHaveValue('')
+    expect(screen.getByTestId('run-agent-btn')).not.toBeDisabled()
+  })
+
+  it('runWithAgent sends `prompt` (textarea value, or undefined when empty) in the task.execute payload', async () => {
+    render(<TaskPromptEditor task={{ ...task, promptTemplate: undefined }} />)
+    const textarea = screen.getByPlaceholderText(
+      'Describe what the agent should do for this task...'
+    )
+    fireEvent.change(textarea, { target: { value: 'do the extra thing' } })
+    fireEvent.click(screen.getByTestId('run-agent-btn'))
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mock-target',
+        'task.execute',
+        expect.objectContaining({ prompt: 'do the extra thing' })
+      )
+    })
+  })
+
+  it('runWithAgent sends prompt: undefined when the textarea is empty', async () => {
+    render(<TaskPromptEditor task={{ ...task, promptTemplate: undefined }} />)
+    fireEvent.click(screen.getByTestId('run-agent-btn'))
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith(
+        'mock-target',
+        'task.execute',
+        expect.objectContaining({ prompt: undefined })
+      )
+    })
+  })
 })

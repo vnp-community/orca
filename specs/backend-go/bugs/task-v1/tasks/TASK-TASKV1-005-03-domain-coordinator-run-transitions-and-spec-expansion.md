@@ -5,7 +5,7 @@
 **Service:** `orchestration-service` (domain layer — zero imports outside stdlib + other domain packages, per `03-clean-architecture-guidelines.md`)
 **File:** `backend-go/services/orchestration-service/internal/domain/orchestration.go` (extend), `backend-go/services/orchestration-service/internal/domain/spec.go` (new)
 **Depends on:** none (pure domain code, no dependency on proto/migration landing first)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

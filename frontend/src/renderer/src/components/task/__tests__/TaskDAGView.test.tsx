@@ -2,21 +2,40 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
-import { TaskDAGView } from '../TaskDAGView'
-import type { OrcaTask } from '../../../../../shared/task-types'
 import type { Node, Edge } from '@xyflow/react'
+import { TaskDAGView } from '../TaskDAGView'
+import type { TaskEdgeMap } from '../../../hooks/useTaskDependencyEdges'
+import type { OrcaTask } from '../../../../../shared/task-types'
 
-// ReactFlow needs a real DOM size + ResizeObserver to render — mocked the same way
-// components/workflow/__tests__/DAGPreview.test.tsx does for the other DAG view in this repo.
+// Mock ReactFlow since it requires a real DOM size and ResizeObserver to render properly —
+// same approach as DAGPreview.test.tsx. Exposes onConnect so tests can simulate a drag-connect.
+let capturedOnConnect: ((c: { source: string | null; target: string | null }) => void) | null = null
+
+type MockReactFlowProps = {
+  nodes: Node[]
+  edges: Edge[]
+  onNodeClick: (event: unknown, node: Node) => void
+  onConnect: (c: { source: string | null; target: string | null }) => void
+}
+
 vi.mock('@xyflow/react', () => ({
-  ReactFlow: ({ nodes, edges }: { nodes: Node[]; edges: Edge[] }) => (
-    <div data-testid="mock-react-flow">
-      <div data-testid="nodes-count">{nodes.length}</div>
-      <div data-testid="edges-json">
-        {JSON.stringify(edges.map((e) => ({ source: e.source, target: e.target })))}
+  ReactFlow: ({ nodes, edges, onNodeClick, onConnect }: MockReactFlowProps) => {
+    capturedOnConnect = onConnect
+    return (
+      <div data-testid="mock-react-flow">
+        <div data-testid="nodes-count">{nodes.length}</div>
+        <div data-testid="edges-count">{edges.length}</div>
+        <div data-testid="edges-json">
+          {JSON.stringify(edges.map((e: Edge) => ({ source: e.source, target: e.target })))}
+        </div>
+        {nodes.map((n: Node) => (
+          <button key={n.id} data-testid={`mock-node-${n.id}`} onClick={() => onNodeClick(null, n)}>
+            {n.id}
+          </button>
+        ))}
       </div>
-    </div>
-  ),
+    )
+  },
   Background: () => <div />,
   Controls: () => <div />,
   MiniMap: () => <div />
@@ -26,6 +45,12 @@ vi.mock('../../../store', () => ({
   useAppStore: Object.assign(vi.fn(), { getState: () => ({ settings: {} }) })
 }))
 
+vi.mock('sonner', () => ({
+  toast: { error: vi.fn(), success: vi.fn() }
+}))
+import { toast } from 'sonner'
+const mockToast = vi.mocked(toast)
+
 vi.mock('../../../runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: vi.fn(),
   getActiveRuntimeTarget: vi.fn().mockReturnValue('mock-target')
@@ -33,82 +58,134 @@ vi.mock('../../../runtime/runtime-rpc-client', () => ({
 import { callRuntimeRpc } from '../../../runtime/runtime-rpc-client'
 const mockRpc = vi.mocked(callRuntimeRpc)
 
-vi.mock('sonner', () => ({
-  toast: { success: vi.fn(), error: vi.fn() }
-}))
-import { toast } from 'sonner'
-const mockToast = vi.mocked(toast)
-
-function makeTask(overrides: Partial<OrcaTask>): OrcaTask {
+function makeTask(id: string, overrides: Record<string, unknown> = {}) {
   return {
-    id: 't1',
-    projectId: 'p1',
-    title: 'Task',
+    id,
+    title: `Task ${id}`,
     type: 'task',
     status: 'todo',
     priority: 'medium',
-    labels: [],
-    visibility: 'private',
     progressPercent: 0,
-    createdAt: new Date(),
-    updatedAt: new Date(),
     ...overrides
-  }
+  } as OrcaTask
 }
 
 describe('TaskDAGView', () => {
-  const onSelect = vi.fn()
-
   beforeEach(() => {
     cleanup()
     vi.clearAllMocks()
+    capturedOnConnect = null
+    // happy-dom doesn't implement window.confirm — stub it before spying.
+    window.confirm = vi.fn().mockReturnValue(true)
   })
 
-  it('2 tasks, task.getDependencies returns 1 depends_on edge → edges render exactly that 1 edge', async () => {
-    const tasks = [makeTask({ id: 'a', title: 'A' }), makeTask({ id: 'b', title: 'B' })]
-    mockRpc.mockImplementation((_target, _method, args) => {
-      if ((args as { taskId: string }).taskId === 'b') {
-        return Promise.resolve([{ task: { id: 'a' }, edgeType: 'depends_on' }])
-      }
-      return Promise.resolve([])
-    })
+  it('empty tasks → shows empty state', () => {
+    render(<TaskDAGView tasks={[]} dependencyEdges={new Map()} onSelect={vi.fn()} />)
+    expect(screen.getByTestId('task-dag-empty')).toBeInTheDocument()
+  })
 
-    render(<TaskDAGView tasks={tasks} onSelect={onSelect} />)
+  it('builds an edge from dependencyEdges.blockedBy (real data, not a fake `dependsOn` field)', () => {
+    const tasks = [makeTask('a'), makeTask('b')]
+    const dependencyEdges: TaskEdgeMap = new Map([
+      ['b', { blockedBy: ['a'], blocks: [] }],
+      ['a', { blockedBy: [], blocks: ['b'] }]
+    ])
+    render(<TaskDAGView tasks={tasks} dependencyEdges={dependencyEdges} onSelect={vi.fn()} />)
+
+    expect(screen.getByTestId('edges-count')).toHaveTextContent('1')
+    const edges = JSON.parse(screen.getByTestId('edges-json').textContent!)
+    expect(edges).toEqual([{ source: 'a', target: 'b' }])
+  })
+
+  it('no dependencyEdges entry for a task → no edges built (not a crash)', () => {
+    const tasks = [makeTask('a'), makeTask('b')]
+    render(<TaskDAGView tasks={tasks} dependencyEdges={new Map()} onSelect={vi.fn()} />)
+    expect(screen.getByTestId('edges-count')).toHaveTextContent('0')
+  })
+
+  it('clicking a node calls onSelect(taskId)', () => {
+    const onSelect = vi.fn()
+    render(<TaskDAGView tasks={[makeTask('a')]} dependencyEdges={new Map()} onSelect={onSelect} />)
+    fireEvent.click(screen.getByTestId('mock-node-a'))
+    expect(onSelect).toHaveBeenCalledWith('a')
+  })
+
+  it('onConnect: confirms, calls task.addEdge with fromTaskId/toTaskId/type, then onEdgeAdded()', async () => {
+    mockRpc.mockResolvedValueOnce(undefined)
+    const onEdgeAdded = vi.fn()
+    const tasks = [makeTask('a', { title: 'Source' }), makeTask('b', { title: 'Target' })]
+    render(
+      <TaskDAGView
+        tasks={tasks}
+        dependencyEdges={new Map()}
+        onSelect={vi.fn()}
+        onEdgeAdded={onEdgeAdded}
+      />
+    )
+
+    await capturedOnConnect?.({ source: 'a', target: 'b' })
 
     await waitFor(() => {
-      const edges = JSON.parse(screen.getByTestId('edges-json').textContent!)
-      expect(edges).toEqual([{ source: 'a', target: 'b' }])
+      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'task.addEdge', {
+        fromTaskId: 'a',
+        toTaskId: 'b',
+        type: 'EDGE_TYPE_DEPENDS_ON'
+      })
+      expect(onEdgeAdded).toHaveBeenCalled()
     })
   })
 
-  it('task.getDependencies fails for one task → DAG still renders nodes, edges for that task are empty', async () => {
-    const tasks = [makeTask({ id: 'a', title: 'A' }), makeTask({ id: 'b', title: 'B' })]
-    mockRpc.mockImplementation((_target, _method, args) => {
-      if ((args as { taskId: string }).taskId === 'b') {
-        return Promise.reject(new Error('rpc failed'))
-      }
-      return Promise.resolve([])
-    })
+  it('onConnect: user cancels confirm → no RPC call', async () => {
+    window.confirm = vi.fn().mockReturnValue(false)
+    render(
+      <TaskDAGView
+        tasks={[makeTask('a'), makeTask('b')]}
+        dependencyEdges={new Map()}
+        onSelect={vi.fn()}
+      />
+    )
+    await capturedOnConnect?.({ source: 'a', target: 'b' })
+    expect(mockRpc).not.toHaveBeenCalled()
+  })
 
-    render(<TaskDAGView tasks={tasks} onSelect={onSelect} />)
+  it('onConnect: RPC failure (e.g. "method not found" until backend wires task.addEdge) shows toast.error, does not throw', async () => {
+    const err = new Error('method not found: task.addEdge')
+    mockRpc.mockRejectedValueOnce(err)
+    render(
+      <TaskDAGView
+        tasks={[makeTask('a'), makeTask('b')]}
+        dependencyEdges={new Map()}
+        onSelect={vi.fn()}
+      />
+    )
+    await capturedOnConnect?.({ source: 'a', target: 'b' })
 
     await waitFor(() => {
-      expect(screen.getByTestId('nodes-count')).toHaveTextContent('2')
+      expect(mockToast.error).toHaveBeenCalledWith(
+        'Could not add dependency: method not found: task.addEdge'
+      )
     })
-    // The whole Promise.all rejects when any task's fetch rejects — depsById keeps its
-    // initial empty Map, so no edges render (not a crash), per the component's .catch().
-    expect(JSON.parse(screen.getByTestId('edges-json').textContent!)).toEqual([])
+  })
+
+  it('onConnect: missing source or target → no-op', async () => {
+    render(<TaskDAGView tasks={[makeTask('a')]} dependencyEdges={new Map()} onSelect={vi.fn()} />)
+    await capturedOnConnect?.({ source: null, target: 'a' })
+    expect(mockRpc).not.toHaveBeenCalled()
   })
 
   it('selecting "from" then "to" in the add-dependency dropdowns calls task.addEdge', async () => {
-    const tasks = [makeTask({ id: 'a', title: 'A' }), makeTask({ id: 'b', title: 'B' })]
-    mockRpc.mockResolvedValue([])
+    mockRpc.mockResolvedValueOnce(undefined)
+    const onEdgeAdded = vi.fn()
+    const tasks = [makeTask('a', { title: 'A' }), makeTask('b', { title: 'B' })]
 
-    render(<TaskDAGView tasks={tasks} onSelect={onSelect} />)
-    await waitFor(() => expect(screen.getByTestId('nodes-count')).toHaveTextContent('2'))
-
-    mockRpc.mockClear()
-    mockRpc.mockResolvedValueOnce(undefined) // task.addEdge
+    render(
+      <TaskDAGView
+        tasks={tasks}
+        dependencyEdges={new Map()}
+        onSelect={vi.fn()}
+        onEdgeAdded={onEdgeAdded}
+      />
+    )
 
     fireEvent.change(screen.getByTestId('dag-add-dependency-select-from'), {
       target: { value: 'a' }
@@ -123,18 +200,15 @@ describe('TaskDAGView', () => {
         toTaskId: 'b',
         type: 'depends_on'
       })
+      expect(onEdgeAdded).toHaveBeenCalled()
     })
   })
 
-  it('task.addEdge failure does not crash and leaves addingFor set (select-to stays visible)', async () => {
-    const tasks = [makeTask({ id: 'a', title: 'A' }), makeTask({ id: 'b', title: 'B' })]
-    mockRpc.mockResolvedValue([])
-
-    render(<TaskDAGView tasks={tasks} onSelect={onSelect} />)
-    await waitFor(() => expect(screen.getByTestId('nodes-count')).toHaveTextContent('2'))
-
-    mockRpc.mockClear()
+  it('dropdown task.addEdge failure does not crash and leaves addingFor set (select-to stays visible)', async () => {
     mockRpc.mockRejectedValueOnce(new Error('cycle detected'))
+    const tasks = [makeTask('a', { title: 'A' }), makeTask('b', { title: 'B' })]
+
+    render(<TaskDAGView tasks={tasks} dependencyEdges={new Map()} onSelect={vi.fn()} />)
 
     fireEvent.change(screen.getByTestId('dag-add-dependency-select-from'), {
       target: { value: 'a' }

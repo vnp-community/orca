@@ -7,6 +7,7 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
@@ -27,6 +28,12 @@ type Server struct {
 	getDispatchContextForTask         *usecase.GetDispatchContextForTask
 	listActiveDispatchContextsForUser *usecase.ListActiveDispatchContextsForUser
 	failDispatch                      *usecase.FailDispatch
+	startCoordinatorRun               *usecase.StartCoordinatorRun
+	getCoordinatorRun                 *usecase.GetCoordinatorRun
+	completeCoordinatorRun            *usecase.CompleteCoordinatorRun
+	failCoordinatorRun                *usecase.FailCoordinatorRun
+	recordHeartbeat                   *usecase.RecordHeartbeat
+	listPendingDecisionGates          *usecase.ListPendingDecisionGates
 }
 
 func New(
@@ -37,6 +44,12 @@ func New(
 	getDispatchContextForTask *usecase.GetDispatchContextForTask,
 	listActiveDispatchContextsForUser *usecase.ListActiveDispatchContextsForUser,
 	failDispatch *usecase.FailDispatch,
+	startCoordinatorRun *usecase.StartCoordinatorRun,
+	getCoordinatorRun *usecase.GetCoordinatorRun,
+	completeCoordinatorRun *usecase.CompleteCoordinatorRun,
+	failCoordinatorRun *usecase.FailCoordinatorRun,
+	recordHeartbeat *usecase.RecordHeartbeat,
+	listPendingDecisionGates *usecase.ListPendingDecisionGates,
 ) *Server {
 	return &Server{
 		createDispatchContext:             createDispatchContext,
@@ -46,6 +59,12 @@ func New(
 		getDispatchContextForTask:         getDispatchContextForTask,
 		listActiveDispatchContextsForUser: listActiveDispatchContextsForUser,
 		failDispatch:                      failDispatch,
+		startCoordinatorRun:               startCoordinatorRun,
+		getCoordinatorRun:                 getCoordinatorRun,
+		completeCoordinatorRun:            completeCoordinatorRun,
+		failCoordinatorRun:                failCoordinatorRun,
+		recordHeartbeat:                   recordHeartbeat,
+		listPendingDecisionGates:          listPendingDecisionGates,
 	}
 }
 
@@ -182,4 +201,81 @@ func (s *Server) FailDispatch(ctx context.Context, req *orchestrationv1.FailDisp
 		resp.Context = toProtoDispatchContext(out.Context)
 	}
 	return resp, nil
+}
+
+func toProtoCoordinatorRun(run domain.CoordinatorRun) *orchestrationv1.CoordinatorRun {
+	return &orchestrationv1.CoordinatorRun{
+		Id:                run.ID,
+		OriginTaskId:      run.OriginTaskID,
+		SpecJson:          string(run.Spec),
+		Status:            string(run.Status),
+		CoordinatorHandle: run.CoordinatorHandle,
+		PollIntervalMs:    run.PollIntervalMs,
+		WorktreeId:        run.WorktreeID,
+		ResultJson:        string(run.Result),
+		ErrorMessage:      run.ErrorMessage,
+	}
+}
+
+func (s *Server) StartCoordinatorRun(ctx context.Context, req *orchestrationv1.StartCoordinatorRunRequest) (*orchestrationv1.CoordinatorRun, error) {
+	run, err := s.startCoordinatorRun.Execute(ctx, usecase.StartCoordinatorRunInput{
+		OriginTaskID: req.GetOriginTaskId(),
+		SpecJSON:     json.RawMessage(req.GetSpecJson()),
+		WorktreeID:   req.GetWorktreeId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoCoordinatorRun(run), nil
+}
+
+func (s *Server) GetCoordinatorRun(ctx context.Context, req *orchestrationv1.GetCoordinatorRunRequest) (*orchestrationv1.CoordinatorRun, error) {
+	run, err := s.getCoordinatorRun.Execute(ctx, req.GetId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoCoordinatorRun(run), nil
+}
+
+func (s *Server) CompleteCoordinatorRun(ctx context.Context, req *orchestrationv1.CompleteCoordinatorRunRequest) (*orchestrationv1.CoordinatorRun, error) {
+	run, err := s.completeCoordinatorRun.Execute(ctx, usecase.CompleteCoordinatorRunInput{
+		ID: req.GetId(), ResultJSON: json.RawMessage(req.GetResultJson()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoCoordinatorRun(run), nil
+}
+
+func (s *Server) FailCoordinatorRun(ctx context.Context, req *orchestrationv1.FailCoordinatorRunRequest) (*orchestrationv1.CoordinatorRun, error) {
+	run, err := s.failCoordinatorRun.Execute(ctx, usecase.FailCoordinatorRunInput{
+		ID: req.GetId(), ErrorMessage: req.GetErrorMessage(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoCoordinatorRun(run), nil
+}
+
+func (s *Server) RecordHeartbeat(ctx context.Context, req *orchestrationv1.RecordHeartbeatRequest) (*orchestrationv1.DispatchContext, error) {
+	dc, err := s.recordHeartbeat.Execute(ctx, req.GetDispatchContextId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return toProtoDispatchContext(dc), nil
+}
+
+func (s *Server) ListPendingDecisionGates(ctx context.Context, _ *orchestrationv1.ListPendingDecisionGatesRequest) (*orchestrationv1.ListPendingDecisionGatesResponse, error) {
+	gates, err := s.listPendingDecisionGates.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*orchestrationv1.DecisionGate, 0, len(gates))
+	for _, g := range gates {
+		out = append(out, &orchestrationv1.DecisionGate{
+			Id: g.ID, DispatchContextId: g.DispatchContextID, Status: string(g.Status),
+			Question: g.Question, Options: g.Options,
+		})
+	}
+	return &orchestrationv1.ListPendingDecisionGatesResponse{Gates: out}, nil
 }

@@ -7,84 +7,143 @@ import (
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
 
+// seedTaskWithActiveLink creates a task with an execution_links row already
+// recorded as "the" active dispatch — the state ExecuteTask leaves behind
+// after a successful Engine 2/3 dispatch (SetActiveExecutionLink,
+// TASK-FT-002-04's precondition).
+func seedTaskWithActiveLink(tasks *fakeTaskRepository, links *fakeExecutionLinkRepository, taskID string, engine domain.ExecutionEngine, externalRefID string) domain.ExecutionLink {
+	link := domain.ExecutionLink{ID: "link-1", TenantID: "tenant-1", TaskID: taskID, Engine: engine, ExternalRefID: externalRefID, StatusMirror: "in_progress"}
+	links.created = append(links.created, link)
+	task := tasks.tasks[taskID]
+	task.ActiveExecutionLinkID = link.ID
+	tasks.tasks[taskID] = task
+	return link
+}
+
 func TestReportTaskExecutionResult_RequiresTenantContext(t *testing.T) {
-	uc := NewReportTaskExecutionResult(newFakeTaskRepository())
-	err := uc.Execute(context.Background(), ReportTaskExecutionResultInput{TaskID: "t1", CoordinatorRunID: "run-1"})
+	uc := NewReportTaskExecutionResult(newFakeTaskRepository(), &fakeExecutionLinkRepository{})
+	err := uc.Execute(context.Background(), ReportTaskExecutionResultInput{TaskID: "task-1"})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
 	}
 }
 
-func TestReportTaskExecutionResult_TaskNotFound(t *testing.T) {
-	uc := NewReportTaskExecutionResult(newFakeTaskRepository())
-	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
-
-	if err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "does-not-exist", CoordinatorRunID: "run-1"}); err == nil {
-		t.Fatal("expected an error for a nonexistent task")
-	}
-}
-
-// TestReportTaskExecutionResult_MismatchedCoordinatorRunID_IsSilentNoOp is
-// the core regression: a callback whose coordinator_run_id doesn't match
-// the task's current ActiveExecutionID must be a silent no-op, not an
-// error — at-least-once consumer idempotence.
-func TestReportTaskExecutionResult_MismatchedCoordinatorRunID_IsSilentNoOp(t *testing.T) {
-	repo := newFakeTaskRepository()
-	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Status: domain.StatusInProgress, ActiveExecutionID: "run-current"}
-	uc := NewReportTaskExecutionResult(repo)
-	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
-
-	err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "t1", CoordinatorRunID: "run-stale", Success: true, ActualHours: 2})
+func TestReportTaskExecutionResult_NoActiveLink_IsNoop(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	task, err := domain.NewTask("task-1", "tenant-1", "Task", domain.StatusInProgress, "", "proj-1")
 	if err != nil {
-		t.Fatalf("expected a silent no-op (nil error) for a mismatched coordinator_run_id, got %v", err)
+		t.Fatal(err)
 	}
-	if len(repo.completeExecutionCalls) != 0 {
-		t.Errorf("expected NO CompleteExecution call for a stale callback, got %+v", repo.completeExecutionCalls)
+	tasks.tasks["task-1"] = task // no ActiveExecutionLinkID set
+	links := &fakeExecutionLinkRepository{}
+	uc := NewReportTaskExecutionResult(tasks, links)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "task-1", ExecutionRef: "run-1", Engine: "orchestration", Success: true}); err != nil {
+		t.Fatalf("expected a silent no-op, got error: %v", err)
 	}
-	// Status must remain unchanged.
-	if got := repo.tasks["t1"].Status; got != domain.StatusInProgress {
-		t.Errorf("expected status to remain in_progress, got %q", got)
+	if len(tasks.completeExecutionCalls) != 0 {
+		t.Errorf("expected no CompleteExecution call, got %+v", tasks.completeExecutionCalls)
 	}
 }
 
-func TestReportTaskExecutionResult_Success_TransitionsToReview(t *testing.T) {
-	repo := newFakeTaskRepository()
-	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Status: domain.StatusInProgress, ActiveExecutionID: "run-1"}
-	uc := NewReportTaskExecutionResult(repo)
+func TestReportTaskExecutionResult_MismatchedExecutionRef_IsNoop(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	task, err := domain.NewTask("task-1", "tenant-1", "Task", domain.StatusInProgress, "", "proj-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks.tasks["task-1"] = task
+	links := &fakeExecutionLinkRepository{}
+	seedTaskWithActiveLink(tasks, links, "task-1", domain.EngineOrchestration, "run-current")
+	uc := NewReportTaskExecutionResult(tasks, links)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
-	if err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "t1", CoordinatorRunID: "run-1", Success: true, ActualHours: 3.5}); err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	// A stale/duplicate callback for a DIFFERENT (older) run.
+	if err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "task-1", ExecutionRef: "run-stale", Engine: "orchestration", Success: true}); err != nil {
+		t.Fatalf("expected a silent no-op, got error: %v", err)
 	}
-	if len(repo.completeExecutionCalls) != 1 {
-		t.Fatalf("expected exactly 1 CompleteExecution call, got %d", len(repo.completeExecutionCalls))
+	if len(tasks.completeExecutionCalls) != 0 {
+		t.Errorf("expected no CompleteExecution call for a stale execution_ref, got %+v", tasks.completeExecutionCalls)
 	}
-	call := repo.completeExecutionCalls[0]
-	if call.status != domain.StatusReview {
-		t.Errorf("expected status=review, got %q", call.status)
-	}
-	if call.actualHours != 3.5 {
-		t.Errorf("expected actual_hours=3.5, got %v", call.actualHours)
+	if links.created[0].StatusMirror != "in_progress" {
+		t.Errorf("expected the active link to be untouched by a stale callback, got %+v", links.created[0])
 	}
 }
 
-// TestReportTaskExecutionResult_Failure_TransitionsToBlocked_NeverRevertsToPreDispatch
-// is the complex path's distinct failure semantics (TASK-TG-04-05): unlike
-// the simple path's revert-to-previous-status (TASK-TG-04-01), a failed
-// complex execution goes to Blocked — never a silent revert.
-func TestReportTaskExecutionResult_Failure_TransitionsToBlocked_NeverRevertsToPreDispatch(t *testing.T) {
-	repo := newFakeTaskRepository()
-	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Status: domain.StatusInProgress, ActiveExecutionID: "run-1"}
-	uc := NewReportTaskExecutionResult(repo)
+func TestReportTaskExecutionResult_MismatchedEngine_IsNoop(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	task, err := domain.NewTask("task-1", "tenant-1", "Task", domain.StatusInProgress, "", "proj-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks.tasks["task-1"] = task
+	links := &fakeExecutionLinkRepository{}
+	seedTaskWithActiveLink(tasks, links, "task-1", domain.EngineWorkflow, "exec-1")
+	uc := NewReportTaskExecutionResult(tasks, links)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
-	if err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "t1", CoordinatorRunID: "run-1", Success: false, ActualHours: 1.0}); err != nil {
+	// Same external_ref_id string, but reported by the wrong engine.
+	if err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "task-1", ExecutionRef: "exec-1", Engine: "orchestration", Success: true}); err != nil {
+		t.Fatalf("expected a silent no-op, got error: %v", err)
+	}
+	if len(tasks.completeExecutionCalls) != 0 {
+		t.Errorf("expected no CompleteExecution call for a mismatched engine, got %+v", tasks.completeExecutionCalls)
+	}
+}
+
+func TestReportTaskExecutionResult_MatchingSuccess_CompletesTaskAndLink(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	task, err := domain.NewTask("task-1", "tenant-1", "Task", domain.StatusInProgress, "", "proj-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks.tasks["task-1"] = task
+	links := &fakeExecutionLinkRepository{}
+	seedTaskWithActiveLink(tasks, links, "task-1", domain.EngineOrchestration, "run-1")
+	uc := NewReportTaskExecutionResult(tasks, links)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "task-1", ExecutionRef: "run-1", Engine: "orchestration", Success: true, ActualHours: 2.5}); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(repo.completeExecutionCalls) != 1 {
-		t.Fatalf("expected exactly 1 CompleteExecution call, got %d", len(repo.completeExecutionCalls))
+	if len(tasks.completeExecutionCalls) != 1 {
+		t.Fatalf("expected exactly one CompleteExecution call, got %d: %+v", len(tasks.completeExecutionCalls), tasks.completeExecutionCalls)
 	}
-	if got := repo.completeExecutionCalls[0].status; got != domain.StatusBlocked {
-		t.Errorf("expected status=blocked on failure, got %q", got)
+	got := tasks.completeExecutionCalls[0]
+	if got.status != domain.StatusReview || got.actualHours != 2.5 {
+		t.Errorf("expected StatusReview + actual_hours=2.5, got %+v", got)
+	}
+	if links.created[0].StatusMirror != "completed" {
+		t.Errorf("expected the link to be marked completed, got %+v", links.created[0])
+	}
+}
+
+func TestReportTaskExecutionResult_MatchingFailure_LeavesTaskInProgress(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	task, err := domain.NewTask("task-1", "tenant-1", "Task", domain.StatusInProgress, "", "proj-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks.tasks["task-1"] = task
+	links := &fakeExecutionLinkRepository{}
+	seedTaskWithActiveLink(tasks, links, "task-1", domain.EngineWorkflow, "exec-1")
+	uc := NewReportTaskExecutionResult(tasks, links)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "task-1", ExecutionRef: "exec-1", Engine: "workflow", Success: false, ErrorMessage: "boom"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	// No status/completion status enforced yet (domain has no
+	// blocked/failed task status — see this usecase's doc comment):
+	// CompleteExecution must NOT be called on the failure path.
+	if len(tasks.completeExecutionCalls) != 0 {
+		t.Errorf("expected no CompleteExecution call on a failed report, got %+v", tasks.completeExecutionCalls)
+	}
+	if links.created[0].StatusMirror != "failed" {
+		t.Errorf("expected the link to be marked failed, got %+v", links.created[0])
+	}
+	if tasks.tasks["task-1"].Status != domain.StatusInProgress {
+		t.Errorf("expected the task to remain in_progress, got %q", tasks.tasks["task-1"].Status)
 	}
 }

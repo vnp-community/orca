@@ -272,6 +272,10 @@ func run() error {
 	// relayUC/relayByDevServerUC each use separately.
 	streamFileChangesUC := usecase.NewStreamFileChanges(repo, repo, agentClient)
 	isDevServerConnectedUC := usecase.NewIsDevServerConnected(repo, agentClient)
+	// streamAgentExecOutputUC backs the StreamExecOutput RPC
+	// (TASK-AG-FLOWTASK-002/003) — task-service's SimpleExecutor consumes
+	// it alongside its own Relay('agent.execPrompt') call.
+	streamAgentExecOutputUC := usecase.NewStreamAgentExecOutput(repo, agentClient)
 	listSshTargetsUC := usecase.NewListSshTargets(sshTargetStore)
 	getSshStateUC := usecase.NewGetSshState(sshTargetStore, repo, repo)
 
@@ -625,6 +629,7 @@ func run() error {
 		resolveAccessRequestUC,
 		relayByDevServerUC,
 		isDevServerConnectedUC,
+		streamAgentExecOutputUC,
 		listEphemeralVmRuntimesUC,
 		ephemeralVmRelayUC,
 		getFleetConnectivitySummaryUC,

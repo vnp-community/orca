@@ -23,7 +23,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/stablyai/orca-go/common/auditclient"
-	"github.com/stablyai/orca-go/common/eventbus"
+	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
@@ -48,7 +48,15 @@ import (
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
+	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 )
+
+// SystemClock implements usecase.Clock against the real wall clock — the
+// only production implementation; execute_task_test.go uses a deterministic
+// fake instead (SOL-TG-04's actual_hours computation needs to be testable).
+type SystemClock struct{}
+
+func (SystemClock) Now() time.Time { return time.Now() }
 
 // version is overridden at build time via -ldflags "-X main.version=...".
 var version = "dev"
@@ -91,15 +99,16 @@ func run() error {
 	repo := taskpostgres.New(pool)
 
 	// Complex (orchestration-service) execution dispatch is real as of
-	// TASK-TG-04-04: dials orchestration-service's StartCoordinatorRun RPC.
-	// FLAGGED DEPENDENCY (not covered by this task, orchestration-service's
-	// own scope): StartCoordinatorRun's server-side handler — persisting a
-	// coordinator_runs row, minting orchestration_tasks rows, starting the
-	// state-machine — may not exist yet in orchestration-service. Calling
-	// an RPC with no server implementation fails at dial/call time (a real,
-	// visible error), not at compile time, so this wiring is safe to land
-	// ahead of that landing; confirm it before relying on the complex path
-	// in production. StubComplexExecutor (grpcclient's doc comment) remains
+	// TASK-TG-04-04/BE-SOL-002: dials orchestration-service's
+	// StartCoordinatorRun RPC. FLAGGED DEPENDENCY (not covered by this
+	// task, orchestration-service's own scope): StartCoordinatorRun's
+	// server-side handler — persisting a coordinator_runs row, minting
+	// orchestration_tasks rows, starting the state-machine — may not exist
+	// yet in orchestration-service. Calling an RPC with no server
+	// implementation fails at dial/call time (a real, visible error), not
+	// at compile time, so this wiring is safe to land ahead of that
+	// landing; confirm it before relying on the complex path in
+	// production. StubComplexExecutor (grpcclient's doc comment) remains
 	// available as a fallback for environments where that handler isn't up.
 	orchConn, err := taskgrpcclient.Dial(cfg.OrchestrationServiceAddr)
 	if err != nil {
@@ -107,7 +116,7 @@ func run() error {
 	}
 	defer func() { _ = orchConn.Close() }()
 	orchClient := orchestrationv1.NewOrchestrationServiceClient(orchConn)
-	complexExecutor := taskgrpcclient.NewComplexExecutor(orchClient, repo, repo)
+	complexExecutor := taskgrpcclient.NewComplexExecutor(repo, repo, orchClient)
 
 	tenantConn, err := taskgrpcclient.Dial(cfg.TenantServiceAddr)
 	if err != nil {
@@ -124,6 +133,10 @@ func run() error {
 	defer func() { _ = infraFleetConn.Close() }()
 	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
 	projectExecutionResolver := taskgrpcclient.NewProjectExecutionResolver(infraFleetClient)
+	// execOutputRelay/repo (as usecase.OutboxWriter) back
+	// TASK-AG-FLOWTASK-003's throttled mid-run republish — see
+	// SimpleExecutor's own doc comment.
+	execOutputRelay := taskgrpcclient.NewAgentExecOutputRelay(infraFleetClient)
 	aiCompleter := taskgrpcclient.NewAICompleter(infraFleetClient)
 
 	// project-service dependency: ProjectContextResolver's GetProjectContext
@@ -131,7 +144,7 @@ func run() error {
 	// AND its GetProject/ListRepos calls (AIDecompose's context bundle,
 	// TASK-TG-02-04) — task-service never reads project-service's tables
 	// directly. Also WorktreeProvisioner's repo_id resolution
-	// (TASK-TG-04-02). One dial, one client, reused by all three.
+	// (TASK-TG-04-02/SOL-TG-04). One dial, one client, reused by all three.
 	projectConn, err := taskgrpcclient.Dial(cfg.ProjectServiceAddr)
 	if err != nil {
 		return fmt.Errorf("dialing project-service: %w", err)
@@ -145,7 +158,10 @@ func run() error {
 	// injection (TASK-PRF-04-07/08) is a second, independent use of that
 	// already-open connection, not a new dial.
 	profileResolver := taskgrpcclient.NewProfileResolver(tenantClient)
-	simpleExecutor := taskgrpcclient.NewSimpleExecutor(repo, repo, projectExecutionResolver, infraFleetClient, profileResolver, projectContextResolver)
+	simpleExecutor := taskgrpcclient.NewSimpleExecutor(
+		repo, repo, projectExecutionResolver, infraFleetClient, profileResolver, projectContextResolver,
+		repo, execOutputRelay,
+	)
 
 	aiProviderConn, err := taskgrpcclient.Dial(cfg.AIProviderServiceAddr)
 	if err != nil {
@@ -157,8 +173,8 @@ func run() error {
 
 	// git-gateway-service dependency: TechStackDetector's ReadFile probes
 	// (TASK-TG-02-03) and WorktreeProvisioner's CreateWorktree calls
-	// (TASK-TG-04-02) — both a genuine scope addition, flagged in their own
-	// task Context sections.
+	// (TASK-TG-04-02/SOL-TG-04) — both a genuine scope addition, flagged in
+	// their own task Context sections.
 	gitGatewayConn, err := taskgrpcclient.Dial(cfg.GitGatewayServiceAddr)
 	if err != nil {
 		return fmt.Errorf("dialing git-gateway-service: %w", err)
@@ -166,6 +182,19 @@ func run() error {
 	defer func() { _ = gitGatewayConn.Close() }()
 	gitGatewayClient := gitgatewayv1.NewGitGatewayServiceClient(gitGatewayConn)
 	techStackDetector := taskgrpcclient.NewTechStackDetector(gitGatewayClient, projectExecutionResolver)
+	// worktreeProvisioner implements Execute's reuse-or-create worktree step
+	// (TASK-TG-04-02/03/SOL-TG-04) against git-gateway-service's existing
+	// CreateWorktree saga, resolving repo_id itself via project-service.
+	worktreeProvisioner := taskgrpcclient.NewWorktreeProvisioner(gitGatewayClient, projectClient)
+
+	// workflow-service dial — WorkflowExecutor's Engine 3 dispatch (TASK-FT-002-03).
+	workflowConn, err := taskgrpcclient.Dial(cfg.WorkflowServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing workflow-service: %w", err)
+	}
+	defer func() { _ = workflowConn.Close() }()
+	workflowClient := workflowv1.NewWorkflowServiceClient(workflowConn)
+	workflowExecutor := taskgrpcclient.NewWorkflowExecutor(workflowClient)
 
 	// opaEvaluator loads/compiles the orca-authz bundle once per distinct
 	// query string (common/policy.Evaluator's own cache) and is shared by
@@ -175,34 +204,6 @@ func run() error {
 		return fmt.Errorf("task-service: OPA bundle failed to load at startup (bundle path %q): %w", cfg.OPABundlePath, err)
 	}
 	opaClient := taskopaclient.New(opaEvaluator)
-
-	// Transactional-outbox relay (TASK-TG-03-07): Grant/RevokeGrant durably
-	// enqueue an audit-event outbox row (internal/adapter/postgres's
-	// WriteOutboxEvent) via internal/adapter/eventbus.Publisher; this relay
-	// is what actually gets those rows to NATS. Same "queue up unpublished
-	// until an operator restarts this process" posture as usage-service's
-	// identical wiring if NATS is unreachable at startup.
-	var outboxRelay *outbox.Relay
-	natsPub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
-	if err != nil {
-		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
-	} else {
-		defer func() { _ = closeBus() }()
-		if err := natsPub.EnsureStream(ctx, "TASK", []string{"orca.task.>"}); err != nil {
-			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
-		} else {
-			outboxRelay = outbox.NewRelay(repo, natsPub, outbox.DefaultConfig, logger)
-		}
-	}
-	var relayWG sync.WaitGroup
-	if outboxRelay != nil {
-		relayWG.Add(1)
-		go func() {
-			defer relayWG.Done()
-			outboxRelay.Run(ctx)
-		}()
-	}
-	eventPublisher := taskeventbus.New(repo, logger)
 
 	// Audit-append client (TASK-BE-018/020, CR-RBAC-005) — ResolvePermission
 	// uses this to record every OPA allow/deny decision to auth-service's
@@ -215,6 +216,8 @@ func run() error {
 	defer func() { _ = authConn.Close() }()
 	auditClient := auditclient.New(authv1.NewAuthServiceClient(authConn))
 
+	eventPublisher := taskeventbus.NewPublisher(repo, logger)
+
 	createTaskUC := usecase.NewCreateTask(repo)
 	getTaskUC := usecase.NewGetTask(repo)
 	addEdgeUC := usecase.NewAddEdge(repo)
@@ -225,11 +228,10 @@ func run() error {
 	grantUC := usecase.NewGrant(repo, resolvePermissionUC, eventPublisher)
 	revokeGrantUC := usecase.NewRevokeGrant(repo, resolvePermissionUC, eventPublisher)
 	listGrantsUC := usecase.NewListGrants(repo, resolvePermissionUC)
-	// worktreeProvisioner implements Execute's reuse-or-create worktree step
-	// (TASK-TG-04-02/03) against git-gateway-service's existing
-	// CreateWorktree saga, resolving repo_id itself via project-service.
-	worktreeProvisioner := taskgrpcclient.NewWorktreeProvisioner(gitGatewayClient, projectClient)
-	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor, resolvePermissionUC, worktreeProvisioner, projectExecutionResolver, usecase.SystemClock{})
+	// repo also implements usecase.ExecutionLinkRepository (adapter/postgres's
+	// execution_links.go) — one row per Execute dispatch, across all three
+	// engines (BE-SOL-001/CR-FLOW-TASK-001).
+	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor, workflowExecutor, resolvePermissionUC, worktreeProvisioner, projectExecutionResolver, SystemClock{}, repo)
 	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
 	listTasksUC := usecase.NewListTasks(repo)
 	updateTaskUC := usecase.NewUpdateTask(repo, repo)
@@ -265,12 +267,57 @@ func run() error {
 	recalculateProgressUC := usecase.NewRecalculateProgress(repo)
 	addCommentUC := usecase.NewAddComment(repo)
 	listCommentsUC := usecase.NewListComments(repo)
-	// reportExecutionResultUC (TASK-TG-04-05) is the complex path's inbound
-	// completion callback, called BY orchestration-service only — see
-	// server.go's ReportTaskExecutionResult doc comment for the flagged
-	// (unresolved) service-identity check this handler is missing.
-	reportExecutionResultUC := usecase.NewReportTaskExecutionResult(repo)
+	// reportExecutionResultUC is the shared inbound completion callback for
+	// Engine 2 (orchestration-service) and Engine 3 (workflow-service),
+	// TASK-FT-002-04/TASK-TG-04-05 — repo also implements
+	// usecase.ExecutionLinkRepository. Called BY orchestration-service/
+	// workflow-service only — see server.go's ReportTaskExecutionResult doc
+	// comment for the flagged (unresolved) service-identity check this
+	// handler is missing.
+	reportExecutionResultUC := usecase.NewReportTaskExecutionResult(repo, repo)
 	findTaskByNumberUC := usecase.NewFindTaskByNumber(repo)
+
+	// Execution-status mirror consumer (BE-SOL-003/TASK-FT-003-05) —
+	// subscribes orca.orchestration.task.statuschanged /
+	// orca.workflow.step.completed (published by orchestration-service's
+	// and workflow-service's own outbox relays, TASK-FT-003-01/-02/-03) to
+	// keep execution_links.status_mirror (TASK-FT-001-01) roughly in sync
+	// with the owning engine's real state, for CR-FLOW-TASK-003's Activity
+	// Feed to read. If NATS is unreachable at startup, mirroring is simply
+	// disabled — repo also implements usecase.ExecutionLinkRepository.
+	mirrorExecutionStatusUC := usecase.NewMirrorExecutionStatus(repo)
+
+	// Transactional-outbox relay (TASK-TG-03-07/TASK-PW-04-04/
+	// TASK-AG-FLOWTASK-003): Grant/RevokeGrant/UpdateTask durably enqueue an
+	// outbox row (internal/adapter/postgres's WriteOutboxEvent/
+	// InsertOutboxEvent) and this relay is what actually gets those rows to
+	// NATS — same "queue up unpublished until an operator restarts this
+	// process" posture as usage-service's identical wiring if NATS is
+	// unreachable at startup. The same connection also backs the
+	// execution-status mirror consumer above.
+	var outboxRelay *outbox.Relay
+	pub, consumerBus, closeBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, execution-status mirroring and outbox publishing disabled", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		consumer := taskeventbus.NewConsumer(consumerBus, mirrorExecutionStatusUC)
+		go consumer.Run(ctx, logger)
+
+		if err := pub.EnsureStream(ctx, "TASK", []string{"orca.task.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure TASK stream", slog.Any("error", err))
+		} else {
+			outboxRelay = outbox.NewRelay(repo, pub, outbox.DefaultConfig, logger)
+		}
+	}
+	var outboxRelayWG sync.WaitGroup
+	if outboxRelay != nil {
+		outboxRelayWG.Add(1)
+		go func() {
+			defer outboxRelayWG.Done()
+			outboxRelay.Run(ctx)
+		}()
+	}
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
@@ -287,11 +334,11 @@ func run() error {
 		defer cancel()
 		return pool.Ping(ctx)
 	})
-	// outboxRelay (TASK-TG-03-07/SOL-PW-04) is already running by this point
-	// — see its wiring above, right after opaClient. Both grant-audit events
-	// (Grant/RevokeGrant) and task.* domain events (UpdateTask, SOL-PW-04)
-	// flow through the SAME relay/table, so there is exactly one to report
-	// health for here.
+	// outboxRelay (TASK-TG-03-07/SOL-PW-04/TASK-AG-FLOWTASK-003) is already
+	// running by this point — see its wiring above. Grant-audit events
+	// (Grant/RevokeGrant), task.* domain events (UpdateTask, SOL-PW-04), and
+	// SimpleExecutor's agent_output_partial frames all flow through the SAME
+	// relay/table, so there is exactly one to report health for here.
 	if outboxRelay != nil {
 		healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
 	}
@@ -339,9 +386,9 @@ func run() error {
 
 	// Wait for the outbox relay goroutine (if started) to observe ctx
 	// cancellation and return, so it doesn't outlive the rest of the
-	// server on shutdown — same pattern usage-service's main.go uses for
-	// its own outbox relay goroutine.
-	relayWG.Wait()
+	// server on shutdown — same pattern usage-service's/orchestration-service's
+	// main.go uses for their own outbox relay goroutines.
+	outboxRelayWG.Wait()
 
 	return nil
 }

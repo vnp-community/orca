@@ -4,7 +4,7 @@
 **Bug:** [BUG-FE-TASKV1-002](../BUG-FE-TASKV1-002-orcatask-dependency-graph-gia.md)
 **File:** `frontend/src/renderer/src/components/task/TaskDAGView.tsx`
 **Estimated:** 45 phút (code), nhưng KHÔNG chạy được thật cho tới khi backend-go wire xong
-**Status:** [ ] TODO
+**Status:** `[x]` DONE
 **Phụ thuộc:** [TASK-FE-TASKV1-03](./TASK-FE-TASKV1-03-taskdagview-real-dependency-data.md) (cần `dependencyEdges` prop + `onEdgeAdded` refetch đã có trước)
 
 ---

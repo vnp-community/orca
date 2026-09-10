@@ -34,7 +34,7 @@ const CHILD_ONE_CREATE_MS = ORCHESTRATION_CLI_COMMAND_TIMINGS_MS[0]
 const CHILD_TWO_CREATE_MS = ORCHESTRATION_CLI_COMMAND_TIMINGS_MS[1]
 const FIRST_DISPATCH_MS = ORCHESTRATION_CLI_COMMAND_TIMINGS_MS[2]
 
-export function OrchestrationPage(props: {
+export function OrchestrationStoryboard(props: {
   active: boolean
   reducedMotion: boolean
   onCycleComplete?: () => void
@@ -321,14 +321,14 @@ export function OrchestrationPage(props: {
             className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-1.5 text-muted-foreground"
             style={{ height: 18, fontSize: 10, fontWeight: 500 }}
             aria-label={translate(
-              'auto.components.feature.wall.agents.orchestration.OrchestrationPage.862605d066',
+              'auto.components.feature.wall.agents.orchestration.OrchestrationStoryboard.862605d066',
               '2 child workspaces'
             )}
           >
             <Workflow className="size-2.5" aria-hidden />
             <span className="truncate">
               {translate(
-                'auto.components.feature.wall.agents.orchestration.OrchestrationPage.30b509a467',
+                'auto.components.feature.wall.agents.orchestration.OrchestrationStoryboard.30b509a467',
                 '2 children'
               )}
             </span>

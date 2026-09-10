@@ -5,7 +5,7 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/usecase/execute.go` (`ExecuteInput`, `runToCompletion`), `backend-go/services/workflow-service/internal/usecase/ports.go` (new `TaskClient` port), `backend-go/services/workflow-service/internal/adapter/taskclient/` (new), `backend-go/services/workflow-service/cmd/server/main.go` (dial `task-service`), `backend-go/services/workflow-service/internal/config/config.go` (new `TaskServiceAddr`), `backend-go/services/workflow-service/internal/adapter/grpc/server.go` (`ExecuteInput.OriginTaskID` wiring)
 **Depends on:** TASK-FT-002-01 (proto), TASK-FT-002-02 (`OriginTaskID` on `WorkflowExecution`/`ExecuteInput`), TASK-FT-002-04 (`ReportTaskExecutionResult` this calls)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

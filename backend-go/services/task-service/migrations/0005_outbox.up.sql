@@ -1,7 +1,12 @@
--- Transactional-outbox table for task-service's grant-mutation audit
--- events (task.grant_received / task.grant_revoked) — see
+-- Transactional-outbox table for task-service's published events — see
 -- common/outbox.Relay's doc comment and usage-service's identical
--- usage.outbox_events table for the pattern this mirrors.
+-- usage.outbox_events table for the pattern this mirrors. Two independent
+-- event families publish through this one table: grant-mutation audit
+-- events (task.grant_received / task.grant_revoked, TG-03-07) and
+-- TASK-AG-FLOWTASK-003's orca.task.agent_output_partial (Engine 1's
+-- throttled mid-run output, republished onto task.activity:{taskId} by
+-- api-gateway's wscompat layer) — both landed independently and were
+-- consolidated onto this single table rather than creating a duplicate.
 CREATE TABLE task.outbox_events (
     id            UUID PRIMARY KEY,
     tenant_id     UUID NOT NULL,

@@ -21,7 +21,7 @@ func TestRecoverExecutions_ResumesAtFirstIncompleteWave_NotWaveZero(t *testing.T
 	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", dagJSON, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "", "")
 	executions := newFakeExecutionRepository()
 	_ = executions.CreateExecution(context.Background(), exec)
 
@@ -43,7 +43,7 @@ func TestRecoverExecutions_ResumesAtFirstIncompleteWave_NotWaveZero(t *testing.T
 		}
 	}
 
-	uc := NewRecoverExecutions(templates, executions, stepExecutions, registry)
+	uc := NewRecoverExecutions(templates, executions, stepExecutions, registry, &fakeTaskClient{})
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestRecoverExecutions_RedispatchesMidFlightStep(t *testing.T) {
 	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "", "")
 	executions := newFakeExecutionRepository()
 	_ = executions.CreateExecution(context.Background(), exec)
 
@@ -102,7 +102,7 @@ func TestRecoverExecutions_RedispatchesMidFlightStep(t *testing.T) {
 		}
 	}
 
-	uc := NewRecoverExecutions(templates, executions, stepExecutions, registry)
+	uc := NewRecoverExecutions(templates, executions, stepExecutions, registry, &fakeTaskClient{})
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -136,7 +136,7 @@ func TestRecoverExecutions_NeverTouchesPausedExecution(t *testing.T) {
 	tmpl, _ := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "t", `{"steps":[{"id":"a","type":"shell"}]}`, domain.ScopePersonal, "", "owner-1")
 	_ = templates.CreateTemplate(context.Background(), tmpl)
 
-	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "")
+	exec, _ := domain.NewWorkflowExecution("exec-1", "tenant-1", "tmpl-1", "trace-1", "", "")
 	exec.Status = domain.StatusPaused
 	executions := newFakeExecutionRepository()
 	_ = executions.CreateExecution(context.Background(), exec)
@@ -144,7 +144,7 @@ func TestRecoverExecutions_NeverTouchesPausedExecution(t *testing.T) {
 	stepExecutions := newFakeStepExecutionRepository()
 	registry := newFakeRegistry()
 
-	uc := NewRecoverExecutions(templates, executions, stepExecutions, registry)
+	uc := NewRecoverExecutions(templates, executions, stepExecutions, registry, &fakeTaskClient{})
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestRecoverExecutions_NeverTouchesTerminalExecutions(t *testing.T) {
 	for i, status := range []domain.Status{domain.StatusCompleted, domain.StatusFailed, domain.StatusCancelled} {
 		exec, _ := domain.NewWorkflowExecution(
 			[]string{"exec-completed", "exec-failed", "exec-cancelled"}[i],
-			"tenant-1", "tmpl-1", "trace", "",
+			"tenant-1", "tmpl-1", "trace", "", "",
 		)
 		exec.Status = status
 		_ = executions.CreateExecution(context.Background(), exec)
@@ -183,7 +183,7 @@ func TestRecoverExecutions_NeverTouchesTerminalExecutions(t *testing.T) {
 	stepExecutions := newFakeStepExecutionRepository()
 	registry := newFakeRegistry()
 
-	uc := NewRecoverExecutions(templates, executions, stepExecutions, registry)
+	uc := NewRecoverExecutions(templates, executions, stepExecutions, registry, &fakeTaskClient{})
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -210,7 +210,7 @@ func TestRecoverExecutions_SkipsAdHocExecutions(t *testing.T) {
 	executions := newFakeExecutionRepository()
 	_ = executions.CreateExecution(context.Background(), exec)
 
-	uc := NewRecoverExecutions(newFakeTemplateRepository(), executions, newFakeStepExecutionRepository(), newFakeRegistry())
+	uc := NewRecoverExecutions(newFakeTemplateRepository(), executions, newFakeStepExecutionRepository(), newFakeRegistry(), &fakeTaskClient{})
 	if err := uc.Execute(context.Background()); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

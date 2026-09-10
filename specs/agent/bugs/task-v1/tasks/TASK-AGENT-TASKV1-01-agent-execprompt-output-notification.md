@@ -6,7 +6,7 @@
 **Solution:** [SOL-AGENT-TASKV1-003](../solutions/SOL-AGENT-TASKV1-003-streaming-output-gap-for-activity-feed.md) §2 ("Pattern A")
 **Estimated effort:** Nhỏ (1 tham số mới + 2 lệnh gọi `notify` + wiring dispatch)
 **Dependencies:** Không — độc lập với TASK-AGENT-TASKV1-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 

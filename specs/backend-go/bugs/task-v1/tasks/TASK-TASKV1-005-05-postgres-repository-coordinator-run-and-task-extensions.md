@@ -5,7 +5,7 @@
 **Service:** `orchestration-service` (`internal/adapter/postgres`)
 **File:** `backend-go/services/orchestration-service/internal/adapter/postgres/repository.go`
 **Depends on:** TASK-TASKV1-005-01 (migration columns), TASK-TASKV1-005-03 (domain `ExpandSpec`/`CoordinatorRun` fields), TASK-TASKV1-005-04 (port signatures)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 

@@ -4,7 +4,7 @@
 **Bug:** [BUG-FE-TASKV1-003](../BUG-FE-TASKV1-003-access-control-va-share-link-khong-dung.md)
 **File:** `frontend/src/renderer/src/components/task/TaskAccessPanel.tsx` (mới), `frontend/src/renderer/src/components/task/TaskDetail.tsx`
 **Estimated:** 60 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 **Phụ thuộc:** [TASK-FE-TASKV1-05](./TASK-FE-TASKV1-05-task-grant-level-type-fix-and-permission-hook.md) (cần `TaskGrantLevel` đã sửa + `useTaskPermission`). **BLOCKED một phần** — xem "Depends on" bên dưới.
 
 ---
@@ -173,8 +173,8 @@ ràng, nút Execute vẫn hiện bình thường (không bị ẩn nhầm khi RP
 
 ## Definition of Done
 
-- [ ] `TaskAccessPanel.tsx` mới, dùng đúng `TaskGrantLevel` (đã sửa ở TASK-05), không dùng `currentUserId`
-- [ ] Tab "Access" xuất hiện trong `TaskDetail.tsx`, panel tự ẩn form khi `isSupported === false`
-- [ ] Nút Execute chỉ bị ẩn khi `isSupported === true` VÀ quyền không đủ — không bao giờ ẩn khi RPC chưa wire
-- [ ] PR ghi rõ: tính năng cấp quyền sẽ lỗi 100% cho tới khi backend-go wire `task.grant`/`task.resolvePermission` (chưa có task backend-go riêng track — cần mở), và quy tắc "quyền nào được Execute" là giả định tạm, cần xác nhận sản phẩm
-- [ ] `pnpm tsc --noEmit` sạch
+- [x] `TaskAccessPanel.tsx` mới, dùng đúng `TaskGrantLevel` (đã sửa ở TASK-05), không dùng `currentUserId`
+- [x] Tab "Access" xuất hiện trong `TaskDetail.tsx`, panel tự ẩn form khi `isSupported === false`
+- [x] Nút Execute chỉ bị ẩn khi `isSupported === true` VÀ quyền không đủ — không bao giờ ẩn khi RPC chưa wire
+- [x] PR ghi rõ: tính năng cấp quyền sẽ lỗi 100% cho tới khi backend-go wire `task.grant`/`task.resolvePermission` (chưa có task backend-go riêng track — cần mở), và quy tắc "quyền nào được Execute" là giả định tạm, cần xác nhận sản phẩm
+- [x] `pnpm tsc --noEmit` sạch

@@ -2,13 +2,29 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"time"
+
+	"github.com/google/uuid"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
 
 	"github.com/stablyai/orca-go/services/orchestration-service/internal/domain"
 )
+
+// decisionGateOpenedPayload is orca.orchestration.decision_gate.opened's
+// JSON payload shape (BE-SOL-003/TASK-FT-003-02). OriginTaskID is carried
+// directly (best-effort — see Execute) so api-gateway's task.activity
+// channel (TASK-FT-003-04) can filter by it without a cross-service lookup.
+type decisionGateOpenedPayload struct {
+	DispatchContextID   string   `json:"dispatch_context_id"`
+	OrchestrationTaskID string   `json:"orchestration_task_id"`
+	OriginTaskID        string   `json:"origin_task_id"`
+	Question            string   `json:"question"`
+	Options             []string `json:"options"`
+}
 
 // CreateGateInput mirrors the CreateGateRequest RPC message. Question/Options
 // now flow through from the gRPC adapter — see docs/execution-plan.md Epic C
@@ -30,10 +46,17 @@ type CreateGateInput struct {
 type CreateGate struct {
 	repo       GateRepository
 	serializer HandleSerializer
+	// dispatchContexts/tasks resolve DispatchContextID -> orchestration_task_id
+	// -> origin_task_id for the decision_gate.opened outbox payload
+	// (BE-SOL-003/TASK-FT-003-02, TASK-FT-003-04's task.activity filter) —
+	// nil-safe (see Execute) so existing callers/tests that don't care
+	// about the outbox event still compile without wiring these.
+	dispatchContexts DispatchContextRepository
+	tasks            OrchestrationTaskRepository
 }
 
-func NewCreateGate(repo GateRepository, serializer HandleSerializer) *CreateGate {
-	return &CreateGate{repo: repo, serializer: serializer}
+func NewCreateGate(repo GateRepository, serializer HandleSerializer, dispatchContexts DispatchContextRepository, tasks OrchestrationTaskRepository) *CreateGate {
+	return &CreateGate{repo: repo, serializer: serializer, dispatchContexts: dispatchContexts, tasks: tasks}
 }
 
 func (uc *CreateGate) Execute(ctx context.Context, in CreateGateInput) (domain.DecisionGate, error) {
@@ -45,9 +68,37 @@ func (uc *CreateGate) Execute(ctx context.Context, in CreateGateInput) (domain.D
 		return domain.DecisionGate{}, apperrors.New(apperrors.KindInvalidArgument, "ORCH_EMPTY_DISPATCH_CONTEXT_ID", "dispatch_context_id is required", nil)
 	}
 
+	// Outbox event (BE-SOL-003/TASK-FT-003-02) — best-effort, two hops
+	// (dispatch context -> orchestration task -> origin task id), each
+	// independently degrading to an empty field rather than failing the
+	// whole call; GateRepository.CreateGate below still does its own
+	// authoritative, transaction-locked resolution of dispatchContextID ->
+	// orchestration_task_id for the actual gate row.
+	var orchestrationTaskID, originTaskID string
+	if uc.dispatchContexts != nil {
+		if dc, gerr := uc.dispatchContexts.GetDispatchContext(ctx, tenantID, in.DispatchContextID); gerr == nil {
+			orchestrationTaskID = dc.OrchestrationTaskID
+		}
+	}
+	if orchestrationTaskID != "" && uc.tasks != nil {
+		if task, gerr := uc.tasks.Get(ctx, tenantID, orchestrationTaskID); gerr == nil {
+			originTaskID = task.OriginTaskID
+		}
+	}
+	var event domain.OutboxEvent
+	if payload, merr := json.Marshal(decisionGateOpenedPayload{
+		DispatchContextID: in.DispatchContextID, OrchestrationTaskID: orchestrationTaskID,
+		OriginTaskID: originTaskID, Question: in.Question, Options: in.Options,
+	}); merr == nil {
+		event = domain.OutboxEvent{
+			ID: uuid.NewString(), Subject: "orca.orchestration.decision_gate.opened",
+			OccurredAt: time.Now().UTC(), PayloadJSON: payload,
+		}
+	}
+
 	var gate domain.DecisionGate
 	err = uc.serializer.Do(ctx, in.DispatchContextID, func() error {
-		created, err := uc.repo.CreateGate(ctx, tenantID, in.DispatchContextID, in.Question, in.Options)
+		created, err := uc.repo.CreateGate(ctx, tenantID, in.DispatchContextID, in.Question, in.Options, event)
 		if err != nil {
 			return err
 		}

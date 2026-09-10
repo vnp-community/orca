@@ -1,69 +1,68 @@
 import { useState } from 'react'
-import { Button } from '../ui/button'
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '../ui/dialog'
 import { Input } from '../ui/input'
-import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
-import { useAppStore } from '../../store'
-import { toast } from 'sonner'
+import { Button } from '../ui/button'
+
+type TaskCreateDialogProps = {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  // parentId when opened from the "+ subtask" context on a specific TaskCard; undefined = root task
+  parentId?: string
+  onCreate: (title: string, parentId?: string) => Promise<void>
+}
 
 export function TaskCreateDialog({
-  projectId,
-  onCreated,
-  onCancel
-}: {
-  projectId: string
-  onCreated: () => void
-  onCancel: () => void
-}) {
+  open,
+  onOpenChange,
+  parentId,
+  onCreate
+}: TaskCreateDialogProps) {
   const [title, setTitle] = useState('')
-  const [isCreating, setIsCreating] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
 
-  const create = async () => {
+  const submit = async () => {
     if (!title.trim()) {
       return
     }
-    setIsCreating(true)
-    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    setSubmitting(true)
     try {
-      // The backend today only decodes {title, parentId} (channels.go's createArgs) —
-      // projectId sent here is silently dropped until that struct gains a ProjectID
-      // field. Still sending it now avoids a second call-site change later.
-      await callRuntimeRpc(target, 'task.create', { title: title.trim(), projectId })
-      toast.success(`Task "${title.trim()}" created`)
-      onCreated()
-    } catch (err) {
-      toast.error(`Failed to create task: ${err instanceof Error ? err.message : String(err)}`)
+      await onCreate(title.trim(), parentId)
+      setTitle('')
+      onOpenChange(false)
     } finally {
-      setIsCreating(false)
+      setSubmitting(false)
     }
   }
 
   return (
-    <div
-      className="task-create-dialog border rounded p-3 bg-background shadow-sm"
-      data-testid="task-create-dialog"
-    >
-      <Input
-        autoFocus
-        placeholder="Task title..."
-        value={title}
-        onChange={(e) => setTitle(e.target.value)}
-        onKeyDown={(e) => e.key === 'Enter' && create()}
-        data-testid="task-create-title-input"
-        className="mb-2"
-      />
-      <div className="flex gap-2 justify-end">
-        <Button size="sm" variant="ghost" onClick={onCancel} data-testid="task-create-cancel">
-          Cancel
-        </Button>
-        <Button
-          size="sm"
-          disabled={!title.trim() || isCreating}
-          onClick={create}
-          data-testid="task-create-submit"
-        >
-          {isCreating ? 'Creating...' : 'Create'}
-        </Button>
-      </div>
-    </div>
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>{parentId ? 'New Subtask' : 'New Task'}</DialogTitle>
+        </DialogHeader>
+        {/* Title only — backend-go's CreateTaskRequest doesn't accept type/priority/
+            description (BUG-TASKV1-001); adding those fields here would be a UX lie. */}
+        <Input
+          autoFocus
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          placeholder="Task title..."
+          onKeyDown={(e) => e.key === 'Enter' && submit()}
+          data-testid="new-task-title-input"
+        />
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            onClick={submit}
+            disabled={submitting || !title.trim()}
+            data-testid="new-task-submit"
+          >
+            {submitting ? 'Creating…' : 'Create'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   )
 }

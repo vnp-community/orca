@@ -16,9 +16,13 @@ const (
 	StatusOpen       = "open"
 	StatusBlocked    = "blocked" // new — see TASK-TG-01-07's auto-block design
 	StatusInProgress = "in_progress"
-	StatusReview     = "review" // new — SOL-TG-04's completion target
-	StatusDone       = "done"
-	StatusCancelled  = "cancelled"
+	// StatusReview is the simple execution path's terminal status (SOL-TG-04)
+	// — ExecuteTask.CompleteExecution lands a successful simple-path run here
+	// directly, inline, rather than leaving it stuck in_progress. See
+	// usecase.ExecuteTask's doc comment.
+	StatusReview    = "review"
+	StatusDone      = "done"
+	StatusCancelled = "cancelled"
 )
 
 var (
@@ -84,7 +88,12 @@ type Task struct {
 	AIContext      string
 	AIPlanJSON     string // see SOL-TG-02
 	Visibility     string
-	WorktreeID     string // see SOL-TG-04; also mirrors project-service's Worktree.TaskID (SOL-PW-04)
+	// WorktreeID is the git-gateway-service/project-service worktree this
+	// task executes against — empty until ExecuteTask's WorktreeProvisioner
+	// first provisions or reuses one (SOL-TG-04); also mirrors
+	// project-service's Worktree.TaskID (SOL-PW-04). Once set, later Execute
+	// calls reuse the same worktree rather than creating a new one each time.
+	WorktreeID     string
 	AgentSessionID string // see SOL-TG-04
 	// ActiveExecutionID is the complex path's ComplexExecutor.Execute
 	// return value (an orchestration-service coordinator_run id) — set
@@ -109,12 +118,26 @@ type Task struct {
 	// PRURL is set by the PR-creation write-back saga — empty until a PR
 	// referencing this task's #TG-N is created. Added SOL-PW-04.
 	PRURL string
-	// WorkflowTemplateID optionally attaches a workflow-service template to
-	// this task (Engine 3, CR-FLOW-TASK-002) — set only via UpdateTask
-	// (AttachWorkflowTemplateAction.tsx), never at creation. No FK: lives in
-	// workflow-service's own database, same cross-service-reference
-	// convention as ProjectID. See docs/backlog/BACKLOG-016.
+	// WorkflowTemplateID, when set, attaches a workflow-service template to
+	// this task and routes ExecuteTask's dispatch to Engine 3 (EngineWorkflow,
+	// CR-FLOW-TASK-002) ahead of the subtask/dependency check — see
+	// selectEngine's priority rule. Empty means "no workflow engine
+	// selected", the same default every existing task effectively has today.
+	// Set only via UpdateTask (AttachWorkflowTemplateAction.tsx), never at
+	// creation. No FK: lives in workflow-service's own database, same
+	// cross-service-reference convention as ProjectID. Backed by
+	// task.tasks.workflow_template_id (0004_execution_links migration,
+	// BE-SOL-001). See docs/backlog/BACKLOG-016.
 	WorkflowTemplateID string
+	// ActiveExecutionLinkID points at the execution_links row (TASK-FT-001-01)
+	// created by the Execute call currently (or most recently) dispatched for
+	// this task — empty if the task has never been dispatched. Backed by
+	// task.tasks.active_execution_link_id (0004_execution_links migration).
+	// ReportTaskExecutionResult (TASK-FT-002-04) compares an inbound
+	// callback's execution_ref/engine against this link before accepting it,
+	// so a stale/duplicate callback (e.g. for a task re-dispatched since) is
+	// a no-op rather than corrupting a newer run's state.
+	ActiveExecutionLinkID string
 }
 
 func validStatus(s string) bool {

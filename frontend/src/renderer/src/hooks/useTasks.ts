@@ -29,11 +29,27 @@ export function useTasks(projectId: string) {
   const [refetchTrigger, setRefetchTrigger] = useState(0)
   const refetch = useCallback(() => setRefetchTrigger((n) => n + 1), [])
 
+  // Selection state for batch execute (TASK-FE-TASKV1-07) — reset on project switch below.
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const toggleSelected = useCallback((id: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }, [])
+  const clearSelection = useCallback(() => setSelectedIds(new Set()), [])
+
   // Fetch tasks when projectId changes
   useEffect(() => {
     if (!projectId) {
       return
     }
+    setSelectedIds(new Set())
     setIsLoading(true)
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
     // Why {tasks, nextPageToken}, not a bare array: the Go handler
@@ -84,6 +100,38 @@ export function useTasks(projectId: string) {
     })
   }, [])
 
+  // backend-go's CreateTaskResponse only returns {id, title, status, parentId, projectId} —
+  // the remaining required OrcaTask fields don't exist at backend-go yet (BUG-TASKV1-001),
+  // so they're defaulted client-side to avoid a partial object breaking TaskCard/TaskDetail
+  // (they read task.type/priority/progressPercent without optional-chaining).
+  const createTask = useCallback(
+    async (title: string, parentId?: string) => {
+      const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+      const created = await callRuntimeRpc<Partial<OrcaTask>>(target, 'task.create', {
+        title,
+        parentId,
+        projectId
+      })
+      const withDefaults: OrcaTask = {
+        id: created.id!,
+        projectId: created.projectId ?? projectId,
+        parentId: created.parentId,
+        title: created.title ?? title,
+        type: 'task',
+        status: (created.status as OrcaTask['status']) ?? 'todo',
+        priority: 'medium',
+        labels: [],
+        visibility: 'private',
+        progressPercent: 0,
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+      useAppStore.getState().addTask(withDefaults)
+      return withDefaults
+    },
+    [projectId]
+  )
+
   return {
     filteredTasks,
     expandedNodes,
@@ -95,6 +143,23 @@ export function useTasks(projectId: string) {
     setSearchQuery,
     isLoading,
     refetch,
-    dagView: null // future: DAG graph data
+    dagView: null, // future: DAG graph data
+    createTask,
+    selectedIds,
+    toggleSelected,
+    clearSelection
   }
+}
+
+// Displayed progress = ratio of direct subtasks with status 'done' — a client-side
+// estimate until backend-go has a real calculateProgress() (BUG-TASKV1-001).
+// Does NOT overwrite task.progressPercent in the store — returns a separate value
+// so TaskCard can decide which one to display.
+export function computeClientProgress(tasks: OrcaTask[], taskId: string): number | null {
+  const children = tasks.filter((t) => t.parentId === taskId)
+  if (children.length === 0) {
+    return null // leaf task: use its own real progressPercent
+  }
+  const done = children.filter((c) => c.status === 'done').length
+  return Math.round((done / children.length) * 100)
 }

@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc"
 
@@ -30,6 +32,11 @@ type fakeInfraFleetServiceClient struct {
 	relayResp *infrafleetv1.RelayResponse
 	relayErr  error
 	gotRelay  *infrafleetv1.RelayRequest
+	// relayBlock, if set, makes Relay wait for it to close before returning
+	// — lets throttle-behavior tests control exactly how long Execute's
+	// concurrent streaming goroutine (TASK-AG-FLOWTASK-003) runs before its
+	// owning Relay call completes.
+	relayBlock <-chan struct{}
 }
 
 func (f *fakeInfraFleetServiceClient) ResolveConnection(ctx context.Context, in *infrafleetv1.ResolveConnectionRequest, _ ...grpc.CallOption) (*infrafleetv1.ResolveConnectionResponse, error) {
@@ -42,6 +49,9 @@ func (f *fakeInfraFleetServiceClient) ResolveConnection(ctx context.Context, in 
 
 func (f *fakeInfraFleetServiceClient) Relay(ctx context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
 	f.gotRelay = in
+	if f.relayBlock != nil {
+		<-f.relayBlock
+	}
 	if f.relayErr != nil {
 		return nil, f.relayErr
 	}
@@ -77,6 +87,9 @@ func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id stri
 func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, status string) error {
 	panic("not implemented")
 }
+func (f *fakeTaskRepository) SetActiveExecutionLink(ctx context.Context, tenantID, id, linkID string) error {
+	panic("not implemented")
+}
 func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
 	panic("not implemented")
 }
@@ -95,8 +108,16 @@ func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) er
 func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
 	panic("not implemented")
 }
+
+// UpdateActiveExecutionID is real (not panicking) — ComplexExecutor.Execute
+// (complex_executor_test.go) calls this unconditionally after a successful
+// StartCoordinatorRun dispatch.
 func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
-	panic("not implemented")
+	if t, ok := f.tasks[id]; ok {
+		t.ActiveExecutionID = activeExecutionID
+		f.tasks[id] = t
+	}
+	return nil
 }
 
 // UpdateLastExecutionOutput is real (not panicking) — SimpleExecutor.Execute
@@ -204,12 +225,56 @@ func (f *fakeSimpleExecutorProjectContextResolver) GetProjectContext(ctx context
 	return f.ctx, nil
 }
 
+// fakeOutboxWriter records every InsertOutboxEvent call — TASK-AG-FLOWTASK-003's
+// publishThrottledOutput/publishAgentOutputPartial tests read events back
+// from this instead of a real Postgres table.
+type fakeOutboxWriter struct {
+	mu     sync.Mutex
+	events []fakeOutboxEvent
+}
+
+type fakeOutboxEvent struct {
+	TenantID, Subject string
+	Payload           []byte
+}
+
+func (f *fakeOutboxWriter) InsertOutboxEvent(ctx context.Context, id, tenantID, subject string, payload []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.events = append(f.events, fakeOutboxEvent{TenantID: tenantID, Subject: subject, Payload: append([]byte(nil), payload...)})
+	return nil
+}
+
+func (f *fakeOutboxWriter) snapshot() []fakeOutboxEvent {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return append([]fakeOutboxEvent(nil), f.events...)
+}
+
+// fakeAgentExecOutputStreamer backs SimpleExecutor's tests without a real
+// infra-fleet-service StreamExecOutput call — chunks (if set) is returned
+// as-is; a nil chunks field returns an already-closed empty channel,
+// matching usecase.AgentExecOutputStreamer's "a streaming failure never
+// blocks Execute" contract for the tests that don't care about streaming.
+type fakeAgentExecOutputStreamer struct {
+	chunks chan usecase.AgentExecOutputChunk
+}
+
+func (f *fakeAgentExecOutputStreamer) StreamExecOutput(ctx context.Context, connectionID, stepID string) <-chan usecase.AgentExecOutputChunk {
+	if f.chunks == nil {
+		ch := make(chan usecase.AgentExecOutputChunk)
+		close(ch)
+		return ch
+	}
+	return f.chunks
+}
+
 // newTestSimpleExecutor builds a SimpleExecutor with fresh no-op profile/
-// project-context fakes — used by every test that doesn't care about the
-// profile-aware env injection path (no actor in context, so it never
-// fires).
+// project-context/outbox/streamer fakes — used by every test that doesn't
+// care about the profile-aware env injection path or TASK-AG-FLOWTASK-003's
+// mid-run output streaming.
 func newTestSimpleExecutor(tasks usecase.TaskRepository, edges usecase.EdgeRepository, resolver usecase.ProjectExecutionResolver, relay infrafleetv1.InfraFleetServiceClient) *SimpleExecutor {
-	return NewSimpleExecutor(tasks, edges, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{})
+	return NewSimpleExecutor(tasks, edges, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{}, &fakeOutboxWriter{}, &fakeAgentExecOutputStreamer{})
 }
 
 // TestSimpleExecutor_Execute_RelaysAgentExecPrompt locks in TASK-224 Gap 1's
@@ -418,7 +483,7 @@ func TestSimpleExecutor_MethodStaysAgentExecPrompt_NoRegression(t *testing.T) {
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":0,"timedOut":false}`},
 	}
 	profiles := &fakeSimpleExecutorProfileResolver{settings: map[string]any{"agent": map[string]any{"preferredModel": "claude-opus-4-5"}}}
-	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{})
+	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{}, &fakeOutboxWriter{}, &fakeAgentExecOutputStreamer{})
 
 	ctx := tenant.WithUserID(context.Background(), "user-1")
 	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
@@ -438,7 +503,7 @@ func TestSimpleExecutor_ResolvableUserID_PopulatesEnvAndModel(t *testing.T) {
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":0,"timedOut":false}`},
 	}
 	profiles := &fakeSimpleExecutorProfileResolver{settings: map[string]any{"agent": map[string]any{"preferredModel": "claude-opus-4-5"}}}
-	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{})
+	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{}, &fakeOutboxWriter{}, &fakeAgentExecOutputStreamer{})
 
 	ctx := tenant.WithUserID(context.Background(), "user-1")
 	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
@@ -469,7 +534,7 @@ func TestSimpleExecutor_ProfileResolverError_DegradesToLegacyPassthrough(t *test
 		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"","stderr":"","exitCode":0,"timedOut":false}`},
 	}
 	profiles := &fakeSimpleExecutorProfileResolver{err: errors.New("tenant-service unreachable")}
-	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{})
+	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{}, &fakeOutboxWriter{}, &fakeAgentExecOutputStreamer{})
 
 	ctx := tenant.WithUserID(context.Background(), "user-1")
 	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
@@ -497,7 +562,7 @@ func TestSimpleExecutor_ProjectContextResolverError_SpawnStillProceeds(t *testin
 	}
 	profiles := &fakeSimpleExecutorProfileResolver{settings: map[string]any{}}
 	projects := &fakeSimpleExecutorProjectContextResolver{err: errors.New("project-service unreachable")}
-	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, projects)
+	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, projects, &fakeOutboxWriter{}, &fakeAgentExecOutputStreamer{})
 
 	ctx := tenant.WithUserID(context.Background(), "user-1")
 	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
@@ -566,5 +631,143 @@ func TestSimpleExecutor_Execute_CompletedDepsThreadIntoPrompt(t *testing.T) {
 	}
 	if !strings.Contains(sentParams.Prompt, "Completed dependencies:\n- Setup DB: created the schema\n") {
 		t.Errorf("expected the completed dependency to appear in the prompt, got %q", sentParams.Prompt)
+	}
+}
+
+// executeResult carries Execute's two return values through a channel —
+// TestSimpleExecutor_Execute_PublishesThrottledPartialOutputToOutbox below
+// runs Execute in a goroutine (so the test can feed streamer chunks and let
+// a throttle tick fire before the blocked Relay call is allowed to return).
+type executeResult struct {
+	ref string
+	err error
+}
+
+// TestSimpleExecutor_Execute_PublishesThrottledPartialOutputToOutbox is
+// TASK-AG-FLOWTASK-003's core acceptance test: SimpleExecutor.Execute
+// consumes AgentExecOutputStreamer concurrently with its own Relay call,
+// and publishes a throttled agent_output_partial outbox event carrying the
+// cumulative buffer — matching CR-FLOW-TASK-003's TaskActivityFrame shape
+// via origin_task_id (the field channels_task_activity.go's
+// translateToTaskActivity filters every subject's payload on).
+func TestSimpleExecutor_Execute_PublishesThrottledPartialOutputToOutbox(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1", Title: "Do the thing"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relayBlock := make(chan struct{})
+	relay := &fakeInfraFleetServiceClient{
+		relayResp:  &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
+		relayBlock: relayBlock,
+	}
+	chunks := make(chan usecase.AgentExecOutputChunk, 4)
+	outbox := &fakeOutboxWriter{}
+	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{}, outbox, &fakeAgentExecOutputStreamer{chunks: chunks})
+	exec.throttleInterval = 20 * time.Millisecond // real production default (2s) would make this test far too slow
+
+	resultCh := make(chan executeResult, 1)
+	go func() {
+		ref, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "")
+		resultCh <- executeResult{ref: ref, err: err}
+	}()
+
+	chunks <- usecase.AgentExecOutputChunk{Stream: "stdout", Data: "hello "}
+	chunks <- usecase.AgentExecOutputChunk{Stream: "stdout", Data: "world"}
+
+	// Give the throttle ticker time to fire at least once before letting
+	// the blocked Relay call (and therefore Execute) return.
+	time.Sleep(80 * time.Millisecond)
+	close(relayBlock)
+
+	res := <-resultCh
+	if res.err != nil {
+		t.Fatalf("unexpected error: %v", res.err)
+	}
+
+	events := outbox.snapshot()
+	if len(events) == 0 {
+		t.Fatal("expected at least one throttled agent_output_partial event")
+	}
+	for _, ev := range events {
+		if ev.Subject != agentOutputPartialSubject {
+			t.Errorf("expected subject %q, got %q", agentOutputPartialSubject, ev.Subject)
+		}
+		if ev.TenantID != "tenant-1" {
+			t.Errorf("expected tenantID=tenant-1, got %q", ev.TenantID)
+		}
+	}
+	var payload agentOutputPartialPayload
+	if err := json.Unmarshal(events[len(events)-1].Payload, &payload); err != nil {
+		t.Fatalf("payload didn't decode: %v", err)
+	}
+	if payload.OriginTaskID != "t1" {
+		t.Errorf("expected origin_task_id=t1, got %q", payload.OriginTaskID)
+	}
+	if payload.Stdout != "hello world" {
+		t.Errorf("expected the cumulative stdout buffer, got %q", payload.Stdout)
+	}
+}
+
+// TestSimpleExecutor_Execute_BatchesManyChunksIntoAtMostOneEvent locks in
+// the "never one outbox event per raw chunk" acceptance criterion —
+// CR-FLOW-TASK-003 explicitly scoped itself to discrete events, not a byte
+// stream (SOL-AG-FLOWTASK-001 §2.3).
+func TestSimpleExecutor_Execute_BatchesManyChunksIntoAtMostOneEvent(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
+	}
+	const chunkCount = 50
+	chunks := make(chan usecase.AgentExecOutputChunk, chunkCount)
+	for range chunkCount {
+		chunks <- usecase.AgentExecOutputChunk{Stream: "stdout", Data: "x"}
+	}
+	close(chunks) // simulates the run's stream ending — StreamExecOutput's real channel closes the same way once ctx is cancelled
+	outbox := &fakeOutboxWriter{}
+	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{}, outbox, &fakeAgentExecOutputStreamer{chunks: chunks})
+	exec.throttleInterval = time.Hour // no tick fires during this fast test — only the closed-channel final flush publishes
+
+	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	events := outbox.snapshot()
+	if len(events) != 1 {
+		t.Fatalf("expected exactly one batched event for %d chunks (never one-event-per-chunk), got %d", chunkCount, len(events))
+	}
+	var payload agentOutputPartialPayload
+	if err := json.Unmarshal(events[0].Payload, &payload); err != nil {
+		t.Fatalf("payload didn't decode: %v", err)
+	}
+	if len(payload.Stdout) != chunkCount {
+		t.Errorf("expected all %d chunks batched into one buffer, got len=%d", chunkCount, len(payload.Stdout))
+	}
+}
+
+// TestSimpleExecutor_Execute_StreamingFailureDoesNotFailExecute proves a
+// streaming subscribe failure (e.g. StreamExecOutput's connectionId
+// resolve failing on infra-fleet-service's side) never blocks or fails
+// Execute — its own unary Relay call remains the sole source of truth for
+// success/failure, per usecase.AgentExecOutputStreamer's doc comment.
+func TestSimpleExecutor_Execute_StreamingFailureDoesNotFailExecute(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`},
+	}
+	outbox := &fakeOutboxWriter{}
+	// fakeAgentExecOutputStreamer{} with a nil chunks field returns an
+	// already-closed empty channel — simulates a streaming subscribe that
+	// never delivered anything.
+	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{}, outbox, &fakeAgentExecOutputStreamer{})
+
+	ref, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ref != "task-exec:t1:req-1" {
+		t.Errorf("expected the normal executionRef, got %q", ref)
+	}
+	if len(outbox.snapshot()) != 0 {
+		t.Error("expected no outbox events when the stream never delivered any chunks")
 	}
 }

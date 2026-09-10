@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/google/uuid"
 
@@ -52,6 +53,19 @@ func (e *executionContext) recordOutput(stepID string, output map[string]any) {
 	e.ctx.Outputs[stepID] = output
 }
 
+// stepEventPayload is orca.workflow.step.completed/.failed's JSON payload
+// shape (BE-SOL-003/TASK-FT-003-03). OriginTaskID is carried directly
+// (empty, not absent, for a standalone workflow run — see dispatchStep) so
+// api-gateway's task.activity channel (TASK-FT-003-04) can filter by it
+// without a cross-service lookup.
+type stepEventPayload struct {
+	ExecutionID  string `json:"execution_id"`
+	StepID       string `json:"step_id"`
+	StepType     string `json:"step_type"`
+	Status       string `json:"status"`
+	OriginTaskID string `json:"origin_task_id"`
+}
+
 // defaultMaxConcurrentSteps bounds in-flight step dispatch per execution —
 // workflow-service.md §8: a bounded worker pool, not one unbounded
 // goroutine per step, which would let a pathological fan-out wave exhaust
@@ -97,8 +111,15 @@ func newWaveDispatcher(stepExecutions StepExecutionRepository, registry StepExec
 // ctx's lifetime must outlive the RPC that triggered dispatch when called
 // from Execute's background goroutine — see that type's doc comment; the
 // context passed here is NOT the inbound RPC's context in that path.
-func (d *waveDispatcher) dispatchWaves(ctx context.Context, executionID string, waves [][]domain.Step, execCtx *executionContext) bool {
-	return d.dispatchWavesFrom(ctx, executionID, waves, 0, nil, execCtx)
+//
+// originTaskID (BE-SOL-003/TASK-FT-003-03) is the owning execution's
+// domain.WorkflowExecution.OriginTaskID — threaded down as a plain
+// parameter (both callers already have the full exec object, so no extra
+// DB round trip is needed) so dispatchStep's terminal outbox event can
+// carry it without waveDispatcher needing its own ExecutionRepository
+// dependency. Empty for a standalone workflow run.
+func (d *waveDispatcher) dispatchWaves(ctx context.Context, executionID string, waves [][]domain.Step, execCtx *executionContext, originTaskID string) bool {
+	return d.dispatchWavesFrom(ctx, executionID, waves, 0, nil, execCtx, originTaskID)
 }
 
 // dispatchWavesFrom is dispatchWaves' resume variant, used by
@@ -114,7 +135,7 @@ func (d *waveDispatcher) dispatchWaves(ctx context.Context, executionID string, 
 // step_executions' (execution_id, step_id) UNIQUE constraint. Waves after
 // startWave have no pre-existing rows and dispatch fresh, identical to
 // dispatchWaves.
-func (d *waveDispatcher) dispatchWavesFrom(ctx context.Context, executionID string, waves [][]domain.Step, startWave int, existingRows map[string]domain.StepExecution, execCtx *executionContext) bool {
+func (d *waveDispatcher) dispatchWavesFrom(ctx context.Context, executionID string, waves [][]domain.Step, startWave int, existingRows map[string]domain.StepExecution, execCtx *executionContext, originTaskID string) bool {
 	succeeded := true
 	for waveIdx := startWave; waveIdx < len(waves); waveIdx++ {
 		if !succeeded {
@@ -124,7 +145,7 @@ func (d *waveDispatcher) dispatchWavesFrom(ctx context.Context, executionID stri
 		if waveIdx == startWave {
 			existing = existingRows
 		}
-		if !d.dispatchWave(ctx, executionID, waveIdx, waves[waveIdx], existing, execCtx) {
+		if !d.dispatchWave(ctx, executionID, waveIdx, waves[waveIdx], existing, execCtx, originTaskID) {
 			succeeded = false
 		}
 	}
@@ -152,7 +173,7 @@ func (d *waveDispatcher) dispatchWavesFrom(ctx context.Context, executionID stri
 // left alone: a running row's real-world outcome is unknown after a
 // crash, and treating a failed row as equally uncertain keeps this rule
 // uniform rather than adding a second special case.
-func (d *waveDispatcher) dispatchWave(ctx context.Context, executionID string, waveIdx int, wave []domain.Step, existing map[string]domain.StepExecution, execCtx *executionContext) bool {
+func (d *waveDispatcher) dispatchWave(ctx context.Context, executionID string, waveIdx int, wave []domain.Step, existing map[string]domain.StepExecution, execCtx *executionContext, originTaskID string) bool {
 	type dispatchable struct {
 		resultIdx int
 		step      domain.Step
@@ -196,7 +217,7 @@ func (d *waveDispatcher) dispatchWave(ctx context.Context, executionID string, w
 		go func(dsp dispatchable) {
 			defer wg.Done()
 			defer func() { <-sem }()
-			results[dsp.resultIdx] = d.dispatchStep(ctx, dsp.step, dsp.row, execCtx)
+			results[dsp.resultIdx] = d.dispatchStep(ctx, dsp.step, dsp.row, execCtx, originTaskID)
 		}(dsp)
 	}
 	wg.Wait()
@@ -220,12 +241,18 @@ func (d *waveDispatcher) dispatchWave(ctx context.Context, executionID string, w
 // (e.g. AgentExecutor's ProviderResolver — see TASK-WF-02-05) can read it
 // without its own signature changing. On success, the step's parsed
 // OutputJSON is recorded into execCtx.Outputs for later waves to reference.
-func (d *waveDispatcher) dispatchStep(ctx context.Context, step domain.Step, se domain.StepExecution, execCtx *executionContext) bool {
+//
+// originTaskID (BE-SOL-003/TASK-FT-003-03) is carried into the terminal
+// transition's outbox event payload — empty for a standalone workflow run,
+// non-empty when task-service's Engine 3 WorkflowExecutor dispatched the
+// owning execution.
+func (d *waveDispatcher) dispatchStep(ctx context.Context, step domain.Step, se domain.StepExecution, execCtx *executionContext, originTaskID string) bool {
 	se.MarkRunning()
-	if err := d.stepExecutions.UpdateStepExecution(ctx, se); err != nil {
+	if err := d.stepExecutions.UpdateStepExecution(ctx, se, domain.OutboxEvent{}); err != nil {
 		// A persistence hiccup on the pending->running transition doesn't
 		// block dispatch — the terminal update below is what the wave gate
-		// and final execution status actually depend on.
+		// and final execution status actually depend on. Never enqueues an
+		// outbox event — only the terminal transition below does.
 		slog.ErrorContext(ctx, "workflow: marking step execution running failed", slog.String("step_execution_id", se.ID), slog.Any("error", err))
 	}
 
@@ -240,7 +267,11 @@ func (d *waveDispatcher) dispatchStep(ctx context.Context, step domain.Step, se 
 		// changes, using the same fail-closed shape runStep's own errors
 		// use below.
 		se.Fail(ierr.Error())
-		if uerr := d.stepExecutions.UpdateStepExecution(ctx, se); uerr != nil {
+		// The outbox-events param was added by BE-SOL-003/TASK-FT-003-03
+		// after this interpolation-failure branch was written; a zero-value
+		// event here just skips the enqueue, same as the pending->running
+		// transition above.
+		if uerr := d.stepExecutions.UpdateStepExecution(ctx, se, domain.OutboxEvent{}); uerr != nil {
 			slog.ErrorContext(ctx, "workflow: persisting terminal step execution failed", slog.String("step_execution_id", se.ID), slog.Any("error", uerr))
 		}
 		return false
@@ -249,7 +280,24 @@ func (d *waveDispatcher) dispatchStep(ctx context.Context, step domain.Step, se 
 
 	result, err := d.runStep(ctx, step, &se)
 
-	if uerr := d.stepExecutions.UpdateStepExecution(ctx, se); uerr != nil {
+	// Outbox event (BE-SOL-003/TASK-FT-003-03) — a marshal failure degrades
+	// to "persist the terminal step status, skip the event" rather than
+	// failing the step, same best-effort posture
+	// orchestration-service.UpdateTaskStatusAndPromote's own marshal
+	// failure already uses (TASK-FT-003-01).
+	subject := "orca.workflow.step.completed"
+	if se.Status == domain.StepExecutionStatusFailed {
+		subject = "orca.workflow.step.failed"
+	}
+	var event domain.OutboxEvent
+	if payload, merr := json.Marshal(stepEventPayload{
+		ExecutionID: se.ExecutionID, StepID: se.StepID, StepType: string(step.Type),
+		Status: string(se.Status), OriginTaskID: originTaskID,
+	}); merr == nil {
+		event = domain.OutboxEvent{ID: uuid.NewString(), Subject: subject, OccurredAt: time.Now().UTC(), PayloadJSON: payload}
+	}
+
+	if uerr := d.stepExecutions.UpdateStepExecution(ctx, se, event); uerr != nil {
 		slog.ErrorContext(ctx, "workflow: persisting terminal step execution failed", slog.String("step_execution_id", se.ID), slog.Any("error", uerr))
 	}
 
