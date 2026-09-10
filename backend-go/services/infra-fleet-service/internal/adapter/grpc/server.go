@@ -90,6 +90,10 @@ type Server struct {
 	// summary (TASK-BE-STORAGE-006) — see usecase.GetFleetConnectivitySummary's
 	// doc comment.
 	getFleetConnectivitySummary *usecase.GetFleetConnectivitySummary
+
+	// pickByTag backs TASK-WF-002-04 — closes workflow-service's
+	// TargetKindFleetTag gap. See usecase.PickByTag's doc comment.
+	pickByTag *usecase.PickByTag
 }
 
 func New(
@@ -139,6 +143,7 @@ func New(
 	ephemeralVmRelay *usecase.EphemeralVmRelay,
 	getFleetConnectivitySummary *usecase.GetFleetConnectivitySummary,
 	teardownConnection *usecase.TeardownConnection,
+	pickByTag *usecase.PickByTag,
 ) *Server {
 	return &Server{
 		registerDevServer:          registerDevServer,
@@ -190,6 +195,8 @@ func New(
 		getFleetConnectivitySummary: getFleetConnectivitySummary,
 
 		teardownConnection: teardownConnection,
+
+		pickByTag: pickByTag,
 	}
 }
 
@@ -342,6 +349,14 @@ func (s *Server) ListDevServerGroups(ctx context.Context, req *infrafleetv1.List
 		out = append(out, toProtoDevServerGroup(g))
 	}
 	return &infrafleetv1.ListDevServerGroupsResponse{Groups: out}, nil
+}
+
+func (s *Server) PickByTag(ctx context.Context, req *infrafleetv1.PickByTagRequest) (*infrafleetv1.PickByTagResponse, error) {
+	connectionID, err := s.pickByTag.Execute(ctx, req.GetTag())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.PickByTagResponse{ConnectionId: connectionID}, nil
 }
 
 func (s *Server) GrantDevServerGroupAccess(ctx context.Context, req *infrafleetv1.GrantDevServerGroupAccessRequest) (*infrafleetv1.GrantDevServerGroupAccessResponse, error) {

@@ -20,10 +20,10 @@ func TestNotificationExecutor_SuccessfulRelayProducesCompletedStepResult(t *test
 			return &infrafleetv1.RelayResponse{ResultJson: `{}`}, nil
 		},
 	}
-	exec := NewNotificationExecutor(fake)
+	exec := NewNotificationExecutor(fake, newPassthroughServerResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
-	cfg, _ := json.Marshal(domain.NotificationStepConfig{ConnectionID: "conn-1", Channel: "#builds", Message: "workflow finished"})
+	cfg, _ := json.Marshal(domain.NotificationStepConfig{ConnectionID: "server:conn-1", Channel: "#builds", Message: "workflow finished"})
 	result, err := exec.Execute(ctx, string(cfg))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -46,10 +46,10 @@ func TestNotificationExecutor_RelayResultErrorProducesFailedStepResult(t *testin
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewNotificationExecutor(fake)
+	exec := NewNotificationExecutor(fake, newPassthroughServerResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
-	cfg, _ := json.Marshal(domain.NotificationStepConfig{ConnectionID: "conn-1", Channel: "#nope", Message: "hi"})
+	cfg, _ := json.Marshal(domain.NotificationStepConfig{ConnectionID: "server:conn-1", Channel: "#nope", Message: "hi"})
 	result, err := exec.Execute(ctx, string(cfg))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -65,10 +65,10 @@ func TestNotificationExecutor_RelayErrorPropagates(t *testing.T) {
 			return nil, errors.New("dev server unreachable")
 		},
 	}
-	exec := NewNotificationExecutor(fake)
+	exec := NewNotificationExecutor(fake, newPassthroughServerResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
-	cfg, _ := json.Marshal(domain.NotificationStepConfig{ConnectionID: "conn-1", Channel: "#builds", Message: "hi"})
+	cfg, _ := json.Marshal(domain.NotificationStepConfig{ConnectionID: "server:conn-1", Channel: "#builds", Message: "hi"})
 	_, err := exec.Execute(ctx, string(cfg))
 	if err == nil {
 		t.Fatal("expected the relay error to propagate")

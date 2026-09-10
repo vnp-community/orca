@@ -57,17 +57,48 @@ func (uc *AIApply) Execute(ctx context.Context, in AIApplyInput) ([]domain.Task,
 		// outer-scope repos NewAIApply might otherwise have captured — see
 		// TxRunner's doc comment for why this reuses CreateTask/AddEdge
 		// unchanged rather than duplicating their logic.
-		createTask := NewCreateTask(tasks)
-		addEdge := NewAddEdge(edges)
-		for _, p := range in.Proposals {
-			task, err := createTask.Execute(ctx, CreateTaskInput{Title: p.Title, ParentID: in.TaskID})
+		// nil GrantRepository: AI-generated subtasks have no human
+		// "creator" to owner-grant (see NewCreateTask's doc comment,
+		// TASK-TG-003-02's option (b)) — this loop never sets CreatorID
+		// either, so CreateTask.Execute's grant step is simply never
+		// reached from this call site.
+		createTask := NewCreateTask(tasks, nil)
+		addEdge := NewAddEdge(tasks, edges) // TASK-TG-001-04's 2-arg constructor
+		createdIDs := make([]string, len(in.Proposals))
+		for i, p := range in.Proposals {
+			task, err := createTask.Execute(ctx, CreateTaskInput{
+				Title: p.Title, ParentID: in.TaskID,
+				Description: p.Description, Type: p.Type,
+				EstimatedHours: p.EstimatedHours, PromptTemplate: p.PromptTemplate,
+			})
 			if err != nil {
 				return apperrors.New(apperrors.KindInternal, "TASK_AI_APPLY_FAILED", "failed to create subtask from AI proposal", err)
 			}
+			createdIDs[i] = task.ID
 			if _, err := addEdge.Execute(ctx, AddEdgeInput{FromTaskID: in.TaskID, ToTaskID: task.ID, Kind: domain.EdgeKindParentChild}); err != nil {
 				return apperrors.New(apperrors.KindInternal, "TASK_AI_APPLY_FAILED", "failed to link subtask to parent", err)
 			}
 			created = append(created, task)
+		}
+		// depends_on edges are added in a SECOND pass, after every subtask
+		// in the batch has a real ID — DependsOnIndex references index
+		// positions in the SAME batch (see domain.SubtaskProposal's doc
+		// comment), which don't resolve to anything until the loop above
+		// has run to completion. Reuses AddEdge.Execute unchanged, so the
+		// cycle check AND the auto-block write both run per edge
+		// automatically (TASK-TG-001-04) — a same-batch DependsOnIndex
+		// cycle is rejected exactly like a manual AddEdge call would
+		// reject it, and the whole RunInTx closure rolling back means zero
+		// tasks/edges persist from a rejected batch.
+		for i, p := range in.Proposals {
+			for _, depIdx := range p.DependsOnIndex {
+				if depIdx < 0 || depIdx >= len(createdIDs) {
+					return apperrors.New(apperrors.KindInvalidArgument, "TASK_AI_APPLY_INVALID_DEPENDENCY_INDEX", "depends_on_index out of range for this batch", nil)
+				}
+				if _, err := addEdge.Execute(ctx, AddEdgeInput{FromTaskID: createdIDs[depIdx], ToTaskID: createdIDs[i], Kind: domain.EdgeKindDependsOn}); err != nil {
+					return apperrors.New(apperrors.KindInternal, "TASK_AI_APPLY_FAILED", "failed to link AI-proposed dependency edge", err)
+				}
+			}
 		}
 		return nil
 	})

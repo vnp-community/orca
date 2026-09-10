@@ -5,7 +5,87 @@
 **Service:** `workflow-service` + `api-gateway`
 **File:** `backend-go/proto/orca/workflow/v1/workflow.proto` (`ListExecutions` RPC), `backend-go/services/workflow-service/internal/usecase/ports.go` (`ExecutionRepository.ListExecutions`), `backend-go/services/workflow-service/internal/usecase/list_executions.go` (new), `backend-go/services/workflow-service/internal/adapter/grpc/server.go`, `backend-go/services/workflow-service/internal/adapter/postgres/repository.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels_workflow.go`
 **Depends on:** None
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+Re-verified live: 11 RPCs, 11 wscompat channels, `ListExecutions` missing
+from both — matched the task's own findings exactly.
+
+**Real-code divergence found (the task explicitly asked to verify this
+before finalizing):** `WorkflowMonitor.tsx` calls
+`callRuntimeRpc<WorkflowExecution[]>(target, 'workflow.listExecutions', {
+projectId })` and does `useAppStore.getState().setExecutions(result)`
+directly on the decoded result — i.e. it expects the **bare array** as the
+top-level RPC result, NOT a `{executions, nextCursor}` envelope like the
+task's own sketch proposed (modeled on `workflow.template.list`'s
+`{templates, nextPageToken}` wrapping). Implemented to match the real,
+already-broken caller: the wscompat channel returns
+`[]*workflowv1.WorkflowExecution` directly (`[]` not `null` when empty,
+per the established convention). The gRPC/proto layer still carries
+`next_cursor` for future pagination UI, just not surfaced through this
+particular channel today since nothing consumes it yet.
+
+**Changes made:**
+1. `workflow.proto`: added `ListExecutions` RPC + `ListExecutionsRequest`/
+   `ListExecutionsResponse` messages; regenerated via `buf generate`.
+2. `ports.go`: added `ExecutionRepository.ListExecutions`.
+3. `usecase/list_executions.go` (new): modeled on `get_execution.go`'s
+   tenant→repo→error-mapping pattern.
+4. `adapter/grpc/server.go`: added `Server.ListExecutions` handler +
+   wired the new usecase into `Server`'s struct/constructor.
+5. `cmd/server/main.go`: wired `usecase.NewListExecutions(repo)` in.
+6. `adapter/postgres/repository.go`: implemented `ListExecutions` —
+   ordered `created_at DESC, id DESC` (NOT id-based like `ListTemplates`,
+   since execution ids are random UUIDs with no chronological meaning);
+   cursor is still the opaque last-seen id, resolved back to its
+   `created_at` via a subquery so ordering stays correct. Added migration
+   `0007_execution_list_index` (`(tenant_id, project_id, created_at DESC,
+   id DESC)`) since neither existing execution index covers this
+   unfiltered-by-status, newest-first scan.
+7. `api-gateway/.../channels_workflow.go`: registered `workflow.listExecutions`
+   returning the bare array (see divergence note above).
+8. Test fakes updated to satisfy the widened `ExecutionRepository` /
+   `WorkflowServiceClient` interfaces (`pause_resume_execution_test.go`'s
+   `fakeExecutionRepository` gained `ListExecutions` + insertion-order
+   tracking for deterministic "newest first" fake ordering;
+   `httpgateway/workflow_routes_test.go`'s `fakeWorkflowServiceClient`
+   gained a stub `ListExecutions`; `wscompat/channels_workflow_test.go`'s
+   fake gained a real `listExecutionsFunc` hook).
+
+**Verify output:**
+```
+go build ./services/workflow-service/... ./services/api-gateway/...   # clean
+go vet   ./services/workflow-service/... ./services/api-gateway/...   # clean
+go test  ./services/workflow-service/internal/usecase/... -run TestListExecutions -v
+  # 5/5 PASS (tenant/project filter, newest-first order, cursor pagination, empty, no-tenant)
+go test  ./services/api-gateway/internal/adapter/wscompat/... -run TestWorkflowListExecutions -v
+  # 2/2 PASS (bare-array shape, empty-returns-[]-not-null)
+go test  ./services/workflow-service/... ./services/api-gateway/...   # full suite, all ok
+go test -tags=integration ./services/workflow-service/internal/adapter/postgres/... \
+  -run TestRepository_ListExecutions_KeysetPaginationNewestFirst -v
+  # PASS against a real testcontainers Postgres (created_at-ordered keyset pagination confirmed)
+```
+Docker was available in this sandbox (`docker ps` showed running
+containers), so the real Postgres integration test above ran for real,
+not skipped. Running the FULL `-tags=integration` postgres suite back to
+back produced flaky failures (`TestRepository_CreateAndGetTemplate`,
+`TestRepository_ResolveChain_NotFound`, etc.) — confirmed **pre-existing
+sandbox flakiness, not a regression**: reran several of those pre-existing
+tests in isolation and they passed; this environment's Docker appears to
+struggle with rapid back-to-back testcontainer spin-up/teardown across a
+dozen tests, not with anything this change touched.
+
+**Not done — explicitly out of reach in this environment:** the task's
+own "Test plan" calls for a "manual/E2E check against a real backend-go
+target" confirming `WorkflowMonitor.tsx` loads live, since this exact bug
+class shipped past unit tests once already. No running Electron app or
+live backend-go deployment was available in this sandbox to drive that
+check. Mitigated by reading `WorkflowMonitor.tsx` and its RPC client
+(`callRuntimeRpc`) directly to confirm the wire contract instead of
+assuming it — see the divergence note above — but a human/CI E2E pass
+against a real target is still recommended before this is considered
+fully closed.
 
 ---
 

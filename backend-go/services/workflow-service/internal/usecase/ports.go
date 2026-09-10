@@ -32,10 +32,21 @@ type TemplateRepository interface {
 	// feeds. Returns domain.ErrTemplateNotFound (wrapped) if templateID
 	// itself doesn't exist for tenantID.
 	ResolveChain(ctx context.Context, tenantID, templateID string, maxDepth int) ([]domain.WorkflowTemplate, error)
-	// Update performs the version-bump-on-write conditional UPDATE.
-	// Returns domain.ErrTemplateVersionConflict (wrapped) when
-	// expectedVersion doesn't match the current row's version.
-	Update(ctx context.Context, tmpl domain.WorkflowTemplate, expectedVersion int32) (domain.WorkflowTemplate, error)
+	// Update performs the conditional UPDATE (WHERE version =
+	// expectedVersion — unchanged, still the trigger for
+	// domain.ErrTemplateVersionConflict, wrapped, on a mismatch). bump
+	// (TASK-WF-004-03) controls ONLY whether this write also increments
+	// version; the version-MATCH check in the WHERE clause is
+	// unconditional regardless of bump's value.
+	Update(ctx context.Context, tmpl domain.WorkflowTemplate, expectedVersion int32, bump bool) (domain.WorkflowTemplate, error)
+	// HasActiveExecutionsUsingTemplate reports whether any non-terminal
+	// (pending/running/paused) WorkflowExecution currently references
+	// templateID — used only to decide whether a breaking UpdateTemplate
+	// change should bump the version (TASK-WF-004-03), NOT a
+	// write-blocking guard: DefinitionSnapshot already freezes a running
+	// execution's DAG at Execute time (see UpdateTemplate.Execute's doc
+	// comment), so this check exists purely for the version-bump decision.
+	HasActiveExecutionsUsingTemplate(ctx context.Context, tenantID, templateID string) (bool, error)
 }
 
 // ExecutionRepository is the persistence port for workflow executions.
@@ -64,6 +75,12 @@ type ExecutionRepository interface {
 	// re-attach to every tenant's in-flight executions this instance's
 	// database holds, not just one.
 	ListRunning(ctx context.Context) ([]domain.WorkflowExecution, error)
+	// ListExecutions keyset-paginates tenantID/projectID's executions,
+	// newest first — same opaque-cursor (last-seen id) convention as
+	// TemplateRepository.ListTemplates (ports.go:23-27), but ordered by
+	// creation time rather than id since execution ids are random UUIDs,
+	// not sequential.
+	ListExecutions(ctx context.Context, tenantID, projectID, cursor string, limit int32) ([]domain.WorkflowExecution, string, error)
 }
 
 // StepExecutionRepository is the persistence port for individual step runs
@@ -82,6 +99,34 @@ type StepExecutionRepository interface {
 	// tests and any future observability surface over a run's step-level
 	// history.
 	ListStepExecutions(ctx context.Context, tenantID, executionID string) ([]domain.StepExecution, error)
+}
+
+// ProjectClient resolves a project's bound dev server — used by
+// ServerResolver to implement TargetKindProject.
+type ProjectClient interface {
+	GetProject(ctx context.Context, id string) (devServerID string, err error)
+}
+
+// InfraFleetPicker picks a live connection matching a fleet tag — used by
+// ServerResolver to implement TargetKindFleetTag. Backed by
+// infra-fleet-service's PickByTag RPC (TASK-WF-002-04).
+type InfraFleetPicker interface {
+	PickByTag(ctx context.Context, tag string) (connectionID string, err error)
+}
+
+// AIProviderClient resolves which provider account a project/user context
+// should use, and validates an explicit account pin is still active. Backs
+// ProviderResolver.
+type AIProviderClient interface {
+	// ResolveForProject runs ai-provider-service's existing user > project
+	// > server priority chain (its real ResolveProvider RPC — see
+	// TASK-WF-002-02's Context for why this is not named
+	// "ResolveForContext").
+	ResolveForProject(ctx context.Context, userID, projectID string) (accountID string, err error)
+	// GetAccountStatus returns the named account's current status
+	// ("active" | "rotating" | "revoked") — used to validate an explicit
+	// pin before trusting it.
+	GetAccountStatus(ctx context.Context, accountID string) (status string, err error)
 }
 
 // ErrStepExecutorNotRegistered is returned by StepExecutorRegistry.Resolve

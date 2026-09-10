@@ -4,14 +4,14 @@ Task thực thi cho [FE-SOL-001](../solutions/FE-SOL-001-frontend-builder-librar
 (CR-WF-006, task 001-004) và [FE-SOL-002](../solutions/FE-SOL-002-execution-live-streaming.md)
 (CR-WF-007, task 005).
 
-| Task ID | Mô tả | Phụ thuộc |
-|---------|-------|-----------|
-| [FE-TASK-001](./FE-TASK-001-mount-workflow-builder.md) | Mount `WorkflowBuilder` vào `WorkspaceLayout` (chưa mount ở đâu hôm nay) + vá `useWorkflow.ts`'s `runWorkflow()` thiếu gửi `projectId` | Không có |
-| [FE-TASK-002](./FE-TASK-002-workflow-template-library.md) | `WorkflowLibrary` — Template Library mới, dùng `workflow.template.list` thật (search/sort/share chờ backend) | FE-TASK-001 (dùng chung `workflowView` state); `SearchTemplates`/sharing RPC chờ BE-SOL-005 cho phần search/share |
-| [FE-TASK-003](./FE-TASK-003-pause-resume-execution-status-type.md) | Thêm `'paused'` vào `WorkflowExecutionStatus` (đúng file `shared/workflow-types.ts`, không phải file trùng tên ở `renderer/src/types/`) + nút Pause/Resume, vá polling-kẹt sau resume | Không có |
-| [FE-TASK-004](./FE-TASK-004-step-type-vocabulary-fix.md) | `WorkflowStepType` — rename `notify`→`notification` (an toàn); `approval` GIỮ LẠI chờ xác nhận sản phẩm trước khi xoá | Không có kỹ thuật; phần xoá `approval` chờ quyết định sản phẩm |
-| [FE-TASK-005](./FE-TASK-005-execution-live-streaming-subscription.md) | Consume live execution events qua subscription, polling giữ làm fallback | **🔴 BLOCKED** — chờ `CR-FLOW-TASK-003` rồi `BE-SOL-006`, cả 2 đều 📋 Proposed |
-| [FE-TASK-006](./FE-TASK-006-consolidate-duplicate-workflow-types.md) | **Không thuộc FE-SOL-001/002** — dọn dẹp 2 file `workflow-types.ts` trùng lặp (`shared/` thật vs `renderer/src/types/` chết), phát hiện khi làm FE-TASK-003 | Không có — độc lập hoàn toàn |
+| Task ID | Mô tả | Phụ thuộc | Trạng thái cuối |
+|---------|-------|-----------|-----------------|
+| [FE-TASK-001](./FE-TASK-001-mount-workflow-builder.md) | Mount `WorkflowBuilder` vào `WorkspaceLayout` (chưa mount ở đâu hôm nay) + vá `useWorkflow.ts`'s `runWorkflow()` thiếu gửi `projectId` | Không có | ✅ DONE |
+| [FE-TASK-002](./FE-TASK-002-workflow-template-library.md) | `WorkflowLibrary` — Template Library mới, dùng `workflow.template.list` thật (search/sort/share chờ backend) | FE-TASK-001 (dùng chung `workflowView` state); `SearchTemplates`/sharing RPC chờ BE-SOL-005 cho phần search/share | ✅ DONE — Browse/Use thật; search chỉ lọc client-side, share/clone no-op chờ BE-SOL-005 |
+| [FE-TASK-003](./FE-TASK-003-pause-resume-execution-status-type.md) | Thêm `'paused'` vào `WorkflowExecutionStatus` (đúng file `shared/workflow-types.ts`, không phải file trùng tên ở `renderer/src/types/`) + nút Pause/Resume, vá polling-kẹt sau resume | Không có | ✅ DONE |
+| [FE-TASK-004](./FE-TASK-004-step-type-vocabulary-fix.md) | `WorkflowStepType` — rename `notify`→`notification` (an toàn); `approval` GIỮ LẠI chờ xác nhận sản phẩm trước khi xoá | Không có kỹ thuật; phần xoá `approval` chờ quyết định sản phẩm | ✅ DONE — rename xong; `approval` giữ nguyên (chưa có xác nhận sản phẩm để xoá) |
+| [FE-TASK-005](./FE-TASK-005-execution-live-streaming-subscription.md) | Consume live execution events qua subscription, polling giữ làm fallback | **🔴 BLOCKED** — chờ `CR-FLOW-TASK-003` rồi `BE-SOL-006`, cả 2 đều 📋 Proposed | ⛔ BLOCKED-skipped — bỏ qua theo đúng chỉ định điều phối, không đụng file |
+| [FE-TASK-006](./FE-TASK-006-consolidate-duplicate-workflow-types.md) | **Không thuộc FE-SOL-001/002** — dọn dẹp 2 file `workflow-types.ts` trùng lặp (`shared/` thật vs `renderer/src/types/` chết), phát hiện khi làm FE-TASK-003 | Không có — độc lập hoàn toàn | ✅ DONE — làm sớm nhất (trước cả 003/004) đúng khuyến nghị, loại bỏ rủi ro nhầm file cho các task sau |
 
 **🔴 P0: FE-TASK-002** (Template Library) — gap chính ma trận hoàn thành CR-WF-006 nêu.
 

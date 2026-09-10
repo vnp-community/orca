@@ -11,6 +11,9 @@
 // See specs/agent/api/gaps-and-findings.md.
 
 import { spawn } from 'node:child_process'
+import type WebSocket from 'ws'
+import { encodeDataFrame } from 'orca-dev-agent-transport'
+import type { WireState } from 'orca-dev-agent-transport'
 import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
 import { resolveAgentSpec, buildAgentEnv } from './agent-spawner'
@@ -60,7 +63,9 @@ export async function handleAgentExecPrompt(
   const span = Tracers.agentOrchSpawn.start({ stepId, modelId })
 
   if (!prompt || !worktreePath) {
-    const missing = [!prompt && 'prompt', !worktreePath && 'worktreePath'].filter(Boolean).join(', ')
+    const missing = [!prompt && 'prompt', !worktreePath && 'worktreePath']
+      .filter(Boolean)
+      .join(', ')
     span.fail(`missing ${missing}`)
     return {
       jsonrpc: '2.0',
@@ -133,7 +138,9 @@ export async function handleAgentExecPrompt(
     })
 
     const finish = (r: PrintModeExecResult): void => {
-      if (settled) {return}
+      if (settled) {
+        return
+      }
       settled = true
       clearTimeout(timer)
       resolve(r)
@@ -175,4 +182,177 @@ export async function handleAgentExecPrompt(
   }
 
   return { jsonrpc: '2.0', id, result: { ...result, stepId } }
+}
+
+// ─── agent.execPromptStream ─────────────────────────────────────────────────
+// CR-TG-006: streaming sibling of handleAgentExecPrompt above — same
+// prompt/worktreePath/model/env setup and one-shot `claude --print` spawn,
+// but delivers stdout/stderr incrementally via stream.chunk/stream.end wire
+// frames (same convention as agent-git-handler.ts's handleGitExecStream)
+// instead of buffering into a single buffer-then-return response. Reused by
+// task-service's complex executor so callers can show live step output.
+// handleAgentExecPrompt itself is untouched — every existing caller
+// (SimpleExecutor, ProfileAwareAgentSpawner.spawn(), StepExecutors.executeAgent())
+// keeps its buffer-then-return contract.
+//
+// Open Question 1 (chunking granularity) resolved: forward each raw stdout/
+// stderr `data` event verbatim, no line-splitting. Matches SOL-AG-TG-002's
+// original sketch and keeps latency lowest (a line-buffered approach — like
+// handleGitExecStream's — would hold back a trailing partial line, e.g. an
+// unterminated prompt or progress indicator, until a newline or process
+// exit); git.execStream's line-buffering is about de-duplicating git's own
+// \r-heavy progress output, a concern that doesn't apply here.
+//
+// Open Question 2 (timeout behavior) resolved: keep handleAgentExecPrompt's
+// DEFAULT_TIMEOUT_MS/MAX_TIMEOUT_MS/SIGKILL-on-timeout behavior for parity
+// with the non-streaming sibling (git.execStream has no such timeout, but it
+// has no non-streaming sibling to stay consistent with). A killed-by-timeout
+// process reports `stream.end` with `exitCode: -1` — the sentinel
+// handleGitExecStream's `code ?? 0` fallback and this task's own sketch both
+// use for "no real exit code", since stream.end's exitCode field is a
+// required `number`, unlike handleAgentExecPrompt's nullable `exitCode`.
+export async function handleAgentExecPromptStream(
+  ws: WebSocket,
+  wireState: WireState,
+  id: string | number | null,
+  params: Record<string, unknown>,
+  config: AgentConfig,
+  log: AgentLogger
+): Promise<void> {
+  const prompt = typeof params.prompt === 'string' ? params.prompt : ''
+  const worktreePath = typeof params.worktreePath === 'string' ? params.worktreePath : ''
+  const stepId = typeof params.stepId === 'string' ? params.stepId : undefined
+  const trustPresetFull = params.trustPreset === 'full'
+  const modelId = typeof params.model === 'string' && params.model ? params.model : 'claude'
+  const accountId = typeof params.accountId === 'string' ? params.accountId : ''
+  const extraEnv =
+    params.env && typeof params.env === 'object' && !Array.isArray(params.env)
+      ? (params.env as Record<string, string>)
+      : undefined
+  const timeoutMs =
+    typeof params.timeoutMs === 'number'
+      ? Math.min(Math.max(params.timeoutMs, MIN_TIMEOUT_MS), MAX_TIMEOUT_MS)
+      : DEFAULT_TIMEOUT_MS
+
+  const span = Tracers.agentOrchSpawn.start({ stepId, modelId })
+
+  if (!prompt || !worktreePath) {
+    const missing = [!prompt && 'prompt', !worktreePath && 'worktreePath']
+      .filter(Boolean)
+      .join(', ')
+    span.fail(`missing ${missing}`)
+    sendFrame(ws, wireState, {
+      jsonrpc: '2.0',
+      id,
+      error: {
+        code: AgentErrorCode.InvalidParams,
+        message: `agent.execPromptStream: missing required field(s): ${missing}`
+      }
+    })
+    return
+  }
+
+  const spec = resolveAgentSpec(modelId)
+  if (!spec || spec.binary !== 'claude') {
+    span.fail('unsupported model for one-shot exec', { modelId })
+    sendFrame(ws, wireState, {
+      jsonrpc: '2.0',
+      id,
+      error: {
+        code: AgentErrorCode.InvalidParams,
+        message:
+          `agent.execPromptStream: model "${modelId}" is not supported for one-shot execution yet ` +
+          `(only claude is validated) — UNSUPPORTED_MODEL_FOR_ONE_SHOT_EXEC`
+      }
+    })
+    return
+  }
+
+  const args = ['--print', prompt]
+  if (trustPresetFull && YOLO_TUI_AGENT_ARGS.claude) {
+    args.push(YOLO_TUI_AGENT_ARGS.claude)
+  }
+
+  let env: Record<string, string>
+  try {
+    env = await buildAgentEnv(
+      { accountId, userId: '', taskId: stepId ?? '', cwd: worktreePath, model: modelId, extraEnv },
+      spec,
+      config,
+      null,
+      log,
+      span.id
+    )
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    span.fail(msg, { accountId })
+    sendFrame(ws, wireState, {
+      jsonrpc: '2.0',
+      id,
+      error: { code: AgentErrorCode.PermissionDenied, message: msg }
+    })
+    return
+  }
+
+  span.step('subprocess-spawn', { binary: spec.binary, cwd: worktreePath })
+  const child = spawn(spec.binary, args, {
+    cwd: worktreePath,
+    env: { ...process.env, ...env },
+    stdio: ['ignore', 'pipe', 'pipe']
+  })
+
+  let settled = false
+  const timer = setTimeout(() => {
+    settled = true
+    try {
+      child.kill('SIGKILL')
+    } catch {
+      /* ignore */
+    }
+    span.fail(`timeout after ${timeoutMs}ms`)
+    sendFrame(ws, wireState, { jsonrpc: '2.0', id, result: { type: 'stream.end', exitCode: -1 } })
+  }, timeoutMs)
+
+  function sendChunk(text: string, source?: 'stderr'): void {
+    sendFrame(ws, wireState, {
+      jsonrpc: '2.0',
+      id,
+      result: { type: 'stream.chunk', line: text, ...(source ? { source } : {}) }
+    })
+  }
+
+  child.stdout?.on('data', (d: Buffer) => sendChunk(d.toString('utf8')))
+  child.stderr?.on('data', (d: Buffer) => sendChunk(d.toString('utf8'), 'stderr'))
+  child.on('close', (code) => {
+    if (settled) {
+      return
+    }
+    settled = true
+    clearTimeout(timer)
+    const exitCode = code ?? -1
+    log.info(
+      `agent.execPromptStream: stepId=${stepId ?? '(none)'} model=${modelId} exitCode=${exitCode}`
+    )
+    span.ok({ exitCode })
+    sendFrame(ws, wireState, { jsonrpc: '2.0', id, result: { type: 'stream.end', exitCode } })
+  })
+  child.on('error', (err) => {
+    if (settled) {
+      return
+    }
+    settled = true
+    clearTimeout(timer)
+    span.fail(err)
+    sendFrame(ws, wireState, {
+      jsonrpc: '2.0',
+      id,
+      error: { code: AgentErrorCode.ServerError, message: err.message }
+    })
+  })
+}
+
+function sendFrame(ws: WebSocket, wireState: WireState, payload: object): void {
+  if (ws.readyState === 1 /* WebSocket.OPEN */) {
+    ws.send(encodeDataFrame(wireState, JSON.stringify(payload)))
+  }
 }

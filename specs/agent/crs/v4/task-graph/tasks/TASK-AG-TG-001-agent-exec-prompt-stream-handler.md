@@ -6,9 +6,77 @@
 **Depends on:** None (self-contained; see TASK-AG-TG-002 for the sibling `shell.execStream`
 task, which shares this task's reviewed pattern but has no code dependency on it — see that
 task's Context for the exact relationship).
-**Status:** [ ] TODO
+**Status:** `[x]` DONE
 
 ---
+
+## Execution notes (2026-09-09)
+
+Implemented exactly as sketched: `handleAgentExecPromptStream` added to
+`agent-print-mode-exec.ts` (module-local `sendFrame` helper +
+`WebSocket`/`WireState`/`encodeDataFrame` imports added, mirroring
+`agent-git-handler.ts`), duplicating (not extracting into a shared helper —
+per this task's own note to reuse the setup "as-is, not reimplemented")
+`handleAgentExecPrompt`'s prompt/worktreePath/stepId/trustPreset/model/
+accountId/extraEnv/timeoutMs extraction, `resolveAgentSpec`/unsupported-model
+gate, and `buildAgentEnv` call. `handleAgentExecPrompt` itself is untouched.
+`case 'agent.execPromptStream'` added to `agent-rpc-dispatch-agent-exec.ts`
+alongside `agent.execPrompt`, using the exact `void handleXxxStream(...)` +
+literal `{ type: 'stream.started' }` return shape `git.execStream`/
+`agent.spawn` already use — no `route()` changes needed since
+`dispatchAgentExecRpc` already receives `ws`/`state`.
+
+**Open Question 1 (chunking granularity) resolved: raw `data` event
+verbatim, no line-splitting.** Matches SOL-AG-TG-002's original sketch.
+Chose this over `handleGitExecStream`'s line-buffering because: (a) it's
+simpler, (b) it avoids holding back a trailing partial line (e.g. an
+unterminated prompt/progress indicator) until a newline or process exit —
+lower perceived latency for a live-output UI — and (c) `git.execStream`'s
+line-buffering is motivated by de-duplicating git's own `\r`-heavy progress
+output, a concern specific to git and not to a `claude --print` invocation.
+Documented in a code comment above the new function.
+
+**Open Question 2 (timeout behavior) resolved: kept `handleAgentExecPrompt`'s
+`DEFAULT_TIMEOUT_MS`/`MAX_TIMEOUT_MS`/`SIGKILL`-on-timeout behavior**, for
+parity with the non-streaming sibling (rather than relying purely on
+connection lifecycle like `git.execStream`, which has no non-streaming
+sibling to stay consistent with). A killed-by-timeout process sends
+`stream.end` with `exitCode: -1` — the sentinel already used elsewhere in
+this codebase (`handleGitExecStream`'s `code ?? 0` fallback pattern,
+`handleAgentExecPromptStream`'s own `code ?? -1` on `close`) for "no real
+exit code," since `stream.end.exitCode` is a required `number` unlike
+`handleAgentExecPrompt`'s nullable `exitCode`. Documented in a code comment.
+
+**Open Question 3 (other consumers of `agent-print-mode-exec.ts`) confirmed:**
+`grep -rn "agent-print-mode-exec" agent/src` shows only
+`agent-rpc-dispatch-agent-exec.ts` imports from it (both `agent.execPrompt`
+and the new `agent.execPromptStream`, both via dynamic `import()`) — no other
+file is affected by adding the second exported function.
+
+Verify:
+
+```
+cd agent && npx tsc --noEmit   # 53 pre-existing errors in unrelated test
+                                # files (AgentConfig missing orcaHttpUrl/
+                                # apiSecret, AgentBinarySpec missing
+                                # apiKeyEnvVar, ws-headers typing) — none in
+                                # agent-print-mode-exec.ts or
+                                # agent-rpc-dispatch-agent-exec.ts; confirmed
+                                # pre-existing via `git diff` (this task's
+                                # diff never touches the failing lines)
+cd agent && npx vitest run src/relay/agent-print-mode-exec.test.ts
+  # 15 passed (10 pre-existing handleAgentExecPrompt tests unmodified + 5 new
+  # handleAgentExecPromptStream tests: stream.chunk×N + stream.end, raw-chunk
+  # verbatim forwarding, missing-prompt error frame, unsupported-model error
+  # frame, timeout → stream.end exitCode -1)
+cd agent && pnpm test   # full package suite: 352 files / 4022 tests passed,
+                         # 10 pre-existing skips, 0 failures
+```
+
+New tests added to `agent/src/relay/agent-print-mode-exec.test.ts`, modeled
+on `agent-ephemeral-vm-handler.test.ts`'s `handleVmProvision` describe block
+(local `MockWs` + `orca-dev-agent-transport`'s `createWireState`/`decodeFrame`
+to capture/decode sent frames).
 
 ## Context
 
@@ -254,12 +322,12 @@ cd /opt/repos/orca/agent && pnpm test
 
 ## Acceptance Criteria
 
-- [ ] `handleAgentExecPromptStream` added to `agent-print-mode-exec.ts`; `handleAgentExecPrompt`'s
+- [x] `handleAgentExecPromptStream` added to `agent-print-mode-exec.ts`; `handleAgentExecPrompt`'s
       code and exported signature are unchanged.
-- [ ] `case 'agent.execPromptStream'` added to `agent-rpc-dispatch-agent-exec.ts`, following the
+- [x] `case 'agent.execPromptStream'` added to `agent-rpc-dispatch-agent-exec.ts`, following the
       exact `void handleXxxStream(...)` + literal `{ type: 'stream.started' }` return shape used
       by `git.execStream`/`vm.provision`/`agent.spawn` in this codebase today.
-- [ ] Chunking-granularity and timeout-behavior open questions (above) are explicitly decided and
+- [x] Chunking-granularity and timeout-behavior open questions (above) are explicitly decided and
       documented in code comments, not left implicit.
-- [ ] Existing `agent.execPrompt` callers' tests pass unmodified.
-- [ ] New tests (above) pass.
+- [x] Existing `agent.execPrompt` callers' tests pass unmodified.
+- [x] New tests (above) pass.

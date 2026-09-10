@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/generate_share_link.go` (new), `backend-go/services/task-service/internal/usecase/get_task_by_share_token.go` (new), `backend-go/services/task-service/migrations/0004_task_fields_and_comments.up/down.sql` (append `tasks.share_token`, shared file — see Context), `backend-go/proto/orca/task/v1/task.proto` (`share_token` field, new RPCs, `TaskShareView` message), `backend-go/services/task-service/internal/adapter/grpc/server.go` (handlers — confirm the unauthenticated RPC is actually reachable without the tenant-auth interceptor that gates every other RPC in this service)
 **Depends on:** TASK-TG-001-01/-02 (shares the migration file; `share_token` is the next free `Task` proto field after TASK-TG-001-02's ~18 new fields)
-**Status:** `[ ]` TODO — **security review required before merge, per `07-security-architecture.md`'s standard for any unauthenticated read endpoint (BE-SOL-003's own explicit requirement)**
+**Status:** `[x]` DONE — **implementation complete but SECURITY REVIEW STILL REQUIRED before merge, per `07-security-architecture.md`'s standard for any unauthenticated read endpoint. Do not merge this specific task without a human security sign-off — see Execution notes below for exactly what needs review.**
 
 ---
 
@@ -170,3 +170,107 @@ Expected: clean build; the field-allowlist regression test is the one that
 must never be weakened or removed in a later PR without a fresh security
 sign-off; `GenerateShareLink` permission-check test asserts denial for
 sub-admin callers.
+
+## Execution notes (2026-09-09) — implementation complete, HUMAN SECURITY REVIEW STILL REQUIRED
+
+Implemented every piece per the task's own code samples, with the field
+count re-verified live rather than trusted from the task file: `Task` had
+26 fields by the time this task started (TASK-TG-001-02 through
+TASK-TG-002-02 landed first in this same run), so `share_token = 27` is
+confirmed correct, not just the task's own guess.
+
+- `domain.Task.ShareToken *string` added; `domain.TaskShareView` (new file)
+  is the dedicated 4-field projection, matching the task's own field
+  allowlist exactly.
+- Migration: already landed via TASK-TG-001-01's combined
+  `0004_task_fields_and_comments.up/down.sql` (`share_token TEXT UNIQUE` +
+  partial index) — no new migration file here.
+- `usecase.GenerateShareLink`: requires admin-level permission by calling
+  the real `*ResolvePermission` usecase internally (composed as a
+  dependency, the same "usecase calls another usecase directly" pattern
+  `AIApply` already establishes for `CreateTask`/`AddEdge`) with
+  `Action: "admin"` before minting a link, exactly as this task instructs.
+  Token generation uses `crypto/rand` (32 bytes, hex-encoded — 256 bits of
+  entropy), explicitly NOT `math/rand` and NOT a UUID, with a code comment
+  explaining why a future reader must not "simplify" this.
+- `usecase.GetTaskByShareToken`: no tenant/permission check, returns
+  `TaskShareView` only. Unknown and malformed tokens hit the identical
+  `NotFound`/`TASK_NOT_FOUND` code path (proven by
+  `TestGetTaskByShareToken_MalformedToken_SameErrorAsUnknown`) — no
+  distinguishable-error side channel. Timing-based enumeration is
+  explicitly NOT addressed (flagged in the doc comment as a security-review
+  discussion point, per this task's own instruction not to over-solve it
+  here).
+- `ports.go`/`postgres`: `TaskRepository.GetByShareToken(ctx, token)` — no
+  `tenantID` parameter, a genuinely tenant-less global lookup. **RLS finding,
+  investigated rather than assumed**: grepped the whole `task-service` tree
+  for `SET LOCAL`/`set_config`/`app.tenant_id` — zero hits. `app.tenant_id`
+  is never set by this service's Go code at all, meaning
+  `task.tasks`'s RLS policy (`tenant_id = current_setting('app.tenant_id',
+  true)::uuid`) is already inert in this deployment (either the connecting
+  role owns the tables and RLS doesn't apply to owners by default, or the
+  policy always evaluates against a NULL setting) — every existing query in
+  this repository already relies solely on explicit `tenant_id = $1`
+  filtering, matching that file's own header comment ("RLS is the secondary
+  backstop"). `GetByShareToken`'s missing filter is therefore consistent
+  with, not a new deviation from, this codebase's real RLS posture today.
+  **This exact finding needs the security reviewer's explicit confirmation**
+  — it was derived by reading this scaffold's code, not by inspecting the
+  real production database's role grants, and a real deployment could still
+  have `FORCE ROW LEVEL SECURITY` or a non-owner connecting role that this
+  investigation didn't have access to check.
+- `task.proto`: `Task.share_token = 27`, `GenerateShareLink`/
+  `GetTaskByShareToken` RPCs, `GenerateShareLinkRequest/Response`,
+  `GetTaskByShareTokenRequest/Response`, `TaskShareView` (4 fields only) —
+  regenerated via `buf generate`.
+- `server.go` handler reachability (item 6 in Changes to make) — **real
+  finding, corrects this task's own framing**: read `common/grpcmw.ChainUnary`
+  in full. There is NO tenant-auth interceptor that gates any RPC in this
+  service — `TenantExtractionInterceptor` only OPTIONALLY populates
+  tenant/user context from incoming metadata when present; it never
+  rejects a call for missing metadata. Every RPC in task-service is
+  transport-level reachable with zero auth metadata today; the only actual
+  enforcement is each usecase's own `tenant.RequireTenantID` call, which
+  `GetTaskByShareToken` deliberately never makes. So there is no allowlist
+  entry or separate unauthenticated port to build — this RPC is reachable
+  the exact same way every other RPC already is, it's just SAFE to reach
+  that way, unlike every other RPC. **Flagged explicitly for the security
+  reviewer**: whether task-service's gRPC port is reachable from outside
+  the internal mesh (bypassing api-gateway's own end-user auth) is a
+  deployment-topology question this investigation could not resolve from
+  code alone — confirm before merge.
+
+Test coverage: all named cases from the Test plan plus the allowlist
+regression test the task's own instructions call "the actual security
+control here" —
+`TestGetTaskByShareToken_ReturnsExactlyTheAllowlistedFields` populates a
+`domain.Task` with every sensitive field set (AIContext, AIPlanJSON,
+PromptTemplate, OwnerID, AssigneeID, ReporterID, WorktreeID,
+AgentSessionID, WorkflowExecID) and asserts the returned `TaskShareView`
+contains ONLY the 4 allowlisted fields, both by value comparison and by
+reflecting over `TaskShareView`'s own struct fields (so a future field
+added to `TaskShareView` without updating this test's `allowedFields` map
+fails loudly). `TestGenerateShareLink_RequiresAdminPermission` asserts
+denial AND that no token gets minted for a denied caller;
+`TestGenerateShareLink_TokenUniqueness_AcrossCalls` is the statistical/
+format assertion the task's own Test plan names (2 distinct 64-char hex
+tokens, never colliding).
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean
+(including `-tags=integration`); `go test .../usecase/... -run
+"TestGenerateShareLink|TestGetTaskByShareToken"` — all 8 cases pass; full
+`go test ./services/task-service/...` passes with no regressions; `go test
+-tags=integration .../postgres/... -run TestRepository` — 4 tests
+(including the new `TestRepository_Revoke_And_ListByTask`, unrelated to
+this task) hit the same pre-existing testcontainers flake documented across
+this run's earlier execution notes, all 4 passed cleanly on immediate
+re-run in isolation, confirming the widened `share_token` column plumbing
+(Create/Get/GetAncestors/List/Update/GetSubtree/ListChildren, all now
+26-27 columns wide) didn't break anything structurally.
+
+**Summary for the human reviewer**: code is complete and tested, but this
+task is NOT cleared for merge without an explicit security sign-off
+covering (1) the RLS-inertness finding above against the real production
+database, (2) the deployment-topology question of direct gRPC-port
+reachability bypassing api-gateway, and (3) the timing-based token
+enumeration gap this task's own instructions deliberately left unsolved.

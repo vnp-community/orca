@@ -83,3 +83,77 @@ describe('dispatchMiscRpc — connection.teardown', () => {
     })
   })
 })
+
+// ─── shell.execStream (CR-TG-006) ──────────────────────────────────────────
+// Routing/response-shape contract only — handleShellExecStream's own
+// stream.chunk/stream.end behavior is covered in
+// __tests__/shell-agent-extensions.test.ts. This also exercises dispatchMiscRpc's
+// `state` parameter (previously unused/`_state`, now live again).
+describe('dispatchMiscRpc — shell.execStream', () => {
+  it('returns { type: "stream.started" } synchronously, without awaiting the handler', async () => {
+    let handlerResolved = false
+    vi.doMock('./shell-agent-extensions', () => ({
+      // A macrotask delay (not just a microtask `await Promise.resolve()`)
+      // so the assertion below reliably observes the dispatch's return value
+      // arriving first — dispatchMiscRpc's own `await import(...)` +
+      // async-function-return machinery already costs a few microtask
+      // ticks, so a same-tick microtask in the handler isn't a reliable
+      // enough gap to prove "not awaited" against.
+      handleShellExecStream: async () => {
+        await new Promise((resolve) => setTimeout(resolve, 10))
+        handlerResolved = true
+      }
+    }))
+    const { dispatchMiscRpc } = await import('./agent-rpc-dispatch-misc')
+    const rpc: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      id: 3,
+      method: 'shell.execStream',
+      params: { script: 'echo hi' }
+    }
+
+    const response = await dispatchMiscRpc(
+      rpc,
+      [],
+      {} as AgentConfig,
+      LOG,
+      new MockWs() as never,
+      createWireState()
+    )
+
+    expect(response).toEqual({ jsonrpc: '2.0', id: 3, result: { type: 'stream.started' } })
+    // The dispatch call above must have returned before the fire-and-forget
+    // handler's own promise settles.
+    expect(handlerResolved).toBe(false)
+    vi.doUnmock('./shell-agent-extensions')
+  })
+
+  it('returns a ServerError response if the dynamic import/handler setup throws', async () => {
+    vi.doMock('./shell-agent-extensions', () => {
+      throw new Error('module load failed')
+    })
+    const { dispatchMiscRpc } = await import('./agent-rpc-dispatch-misc')
+    const rpc: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      id: 4,
+      method: 'shell.execStream',
+      params: { script: 'echo hi' }
+    }
+
+    const response = await dispatchMiscRpc(
+      rpc,
+      [],
+      {} as AgentConfig,
+      LOG,
+      new MockWs() as never,
+      createWireState()
+    )
+
+    expect(response).toMatchObject({
+      jsonrpc: '2.0',
+      id: 4,
+      error: { message: expect.stringContaining('shell.execStream unavailable') }
+    })
+    vi.doUnmock('./shell-agent-extensions')
+  })
+})

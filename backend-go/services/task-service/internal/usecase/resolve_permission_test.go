@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
 )
@@ -140,6 +141,62 @@ func TestResolvePermission_DeniesWhenOPADecisionIsFalse(t *testing.T) {
 	}
 	if !opa.called {
 		t.Error("expected OPAClient.Decision to be called once a grant was resolved")
+	}
+}
+
+// TestResolvePermission_ExpiredGrant_ExcludedFromResolution is
+// TASK-TG-003-03's core regression test: a caller with ONLY an expired
+// grant must resolve exactly like "no grant at all" — PermissionDenied/
+// TASK_NO_GRANT, never a different, more revealing error.
+func TestResolvePermission_ExpiredGrant_ExcludedFromResolution(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	setupChain(t, tasks, "tenant-1", "task-1")
+	past := time.Now().Add(-time.Hour)
+	grants := &fakeGrantRepository{grants: []domain.Grant{
+		{TaskID: "task-1", SubjectID: "user-1", Level: domain.GrantLevelOwner, ApplyTree: false, ExpiresAt: &past},
+	}}
+	opa := &fakeOPAClient{allow: true}
+	uc := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, opa)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, ResolvePermissionInput{TaskID: "task-1", UserID: "user-1", Action: "read"}); err == nil {
+		t.Fatal("expected a permission-denied error for an expired-only grant")
+	}
+	if opa.called {
+		t.Error("OPAClient.Decision must not be called when the only grant is expired")
+	}
+}
+
+// TestResolvePermission_NonExpiringAndFutureExpiry_StillResolve is the
+// regression test that this change doesn't affect non-expiring grants: a
+// nil ExpiresAt or one in the future must resolve exactly as before.
+func TestResolvePermission_NonExpiringAndFutureExpiry_StillResolve(t *testing.T) {
+	future := time.Now().Add(time.Hour)
+	tests := []struct {
+		name      string
+		expiresAt *time.Time
+	}{
+		{"nil ExpiresAt never expires", nil},
+		{"future ExpiresAt has not expired yet", &future},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tasks := newFakeTaskRepository()
+			setupChain(t, tasks, "tenant-1", "task-1")
+			grants := &fakeGrantRepository{grants: []domain.Grant{
+				{TaskID: "task-1", SubjectID: "user-1", Level: domain.GrantLevelOwner, ApplyTree: false, ExpiresAt: tt.expiresAt},
+			}}
+			uc := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+			ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+			level, err := uc.Execute(ctx, ResolvePermissionInput{TaskID: "task-1", UserID: "user-1", Action: "read"})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if level != domain.GrantLevelOwner {
+				t.Errorf("expected GrantLevelOwner, got %v", level)
+			}
+		})
 	}
 }
 

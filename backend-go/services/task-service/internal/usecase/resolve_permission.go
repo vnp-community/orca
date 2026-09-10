@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -67,6 +68,10 @@ func (uc *ResolvePermission) Execute(ctx context.Context, in ResolvePermissionIn
 	if err != nil {
 		return domain.GrantLevelUnspecified, apperrors.New(apperrors.KindInternal, "TASK_GRANT_LIST_FAILED", "failed to list grants for ancestor chain", err)
 	}
+	now := time.Now()
+	for taskID, grants := range grantsByTask {
+		grantsByTask[taskID] = filterExpired(grants, now)
+	}
 
 	teamIDs, err := uc.teams.ResolveTeams(ctx, tenantID, in.UserID)
 	if err != nil {
@@ -95,4 +100,19 @@ func (uc *ResolvePermission) Execute(ctx context.Context, in ResolvePermissionIn
 // OPA denied the requested action" — see ResolvePermission's doc comment.
 func errNoGrant(cause error) error {
 	return apperrors.New(apperrors.KindPermissionDenied, "TASK_NO_GRANT", "no applicable grant found for caller", cause)
+}
+
+// filterExpired drops any grant whose ExpiresAt has passed — a grant with a
+// nil ExpiresAt never expires. Keeps domain.ResolveGrant's own signature
+// and existing unit tests untouched (BE-SOL-003's explicit design choice
+// not to add a `now time.Time` parameter to that pure function) by doing
+// the filtering here, before ResolveGrant ever sees an expired grant.
+func filterExpired(grants []domain.Grant, now time.Time) []domain.Grant {
+	out := grants[:0]
+	for _, g := range grants {
+		if g.ExpiresAt == nil || g.ExpiresAt.After(now) {
+			out = append(out, g)
+		}
+	}
+	return out
 }

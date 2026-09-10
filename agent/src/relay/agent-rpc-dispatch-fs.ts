@@ -41,7 +41,7 @@ export async function dispatchFsRpc(
     // ── v5.0: fs.grep ────────────────────────────────────────────────────────
     case 'fs.grep': {
       try {
-        const { handleFsGrep } = await import('./fs-agent-extensions')
+        const { handleFsGrep } = await import('./fs-agent-search-extensions')
         return (await handleFsGrep(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -74,7 +74,7 @@ export async function dispatchFsRpc(
     // ── v5.0: fs.writeFile ───────────────────────────────────────────────────
     case 'fs.writeFile': {
       try {
-        const { handleFsWriteFile } = await import('./fs-agent-extensions')
+        const { handleFsWriteFile } = await import('./fs-agent-write-extensions')
         return (await handleFsWriteFile(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -100,7 +100,7 @@ export async function dispatchFsRpc(
     // Creates a directory (recursive) on the agent's filesystem.
     case 'fs.mkdir': {
       try {
-        const { handleFsMkdir } = await import('./fs-agent-extensions')
+        const { handleFsMkdir } = await import('./fs-agent-write-extensions')
         return (await handleFsMkdir(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -112,7 +112,7 @@ export async function dispatchFsRpc(
     // Removes an empty directory on the agent's filesystem.
     case 'fs.rmdir': {
       try {
-        const { handleFsRmdir } = await import('./fs-agent-extensions')
+        const { handleFsRmdir } = await import('./fs-agent-write-extensions')
         return (await handleFsRmdir(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -138,7 +138,7 @@ export async function dispatchFsRpc(
     // Starts pushing `fs.changed` notifications for a path. Idempotent/refcounted.
     case 'fs.watch': {
       try {
-        const { handleFsWatch } = await import('./fs-agent-extensions')
+        const { handleFsWatch } = await import('./fs-agent-watch-extensions')
         return (await handleFsWatch(
           rpc.id,
           rpc.params ?? {},
@@ -154,7 +154,7 @@ export async function dispatchFsRpc(
     // ── fs.unwatch ───────────────────────────────────────────────────────────
     case 'fs.unwatch': {
       try {
-        const { handleFsUnwatch } = await import('./fs-agent-extensions')
+        const { handleFsUnwatch } = await import('./fs-agent-watch-extensions')
         return (await handleFsUnwatch(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)

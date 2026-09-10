@@ -27,7 +27,7 @@ type TaskRepository interface {
 	// called to set StatusInProgress on dispatch (see ExecuteTask) — there is
 	// no RPC surface yet to transition a task back out of in_progress. See
 	// this service's README "Known gaps".
-	UpdateStatus(ctx context.Context, tenantID, id, status string) error
+	UpdateStatus(ctx context.Context, tenantID, id string, status domain.Status) error
 	// HasActiveExecutions reports whether tenantID/projectID has any task
 	// currently in_progress — see usecase.HasActiveExecutions's doc comment
 	// for the one-way-transition caveat this answer is subject to today.
@@ -44,6 +44,27 @@ type TaskRepository interface {
 	// with ON DELETE CASCADE (migrations/0001_init.up.sql) — no explicit
 	// edge/grant cleanup needed.
 	Delete(ctx context.Context, tenantID, id string) error
+	// RecalculateAncestorProgress recalculates done_subtasks/total_subtasks
+	// for every ancestor of taskID (including taskID's own parent chain,
+	// per BE-SOL-001) in one WITH RECURSIVE UPDATE — not a per-ancestor
+	// round trip. A no-op (zero rows updated) for a root task with no
+	// parent.
+	RecalculateAncestorProgress(ctx context.Context, tenantID, taskID string) error
+	// GetSubtree returns id and every descendant of id (id first, breadth
+	// order not guaranteed) in one WITH RECURSIVE query — replaces the
+	// frontend's "load task.list for the whole project, filter client-side
+	// by parentId" pattern (see FE-SOL-001 §2.1).
+	GetSubtree(ctx context.Context, tenantID, id string) ([]domain.Task, error)
+	// ListChildren returns the direct children of taskID (parent_child
+	// edges' targets) — used by AIDecompose's context bundle to list
+	// already-existing subtasks so the AI doesn't propose duplicates.
+	ListChildren(ctx context.Context, tenantID, taskID string) ([]domain.Task, error)
+	// GetByShareToken looks up a task by its public share-link token
+	// (TASK-TG-003-05) with NO tenant scoping — the token itself IS the
+	// authorization, by design (BE-SOL-003: "bypasses ResolveGrant/OPA
+	// entirely"). SECURITY REVIEW REQUIRED before merge — see
+	// GetTaskByShareToken's doc comment.
+	GetByShareToken(ctx context.Context, token string) (domain.Task, error)
 }
 
 // EdgeRepository is the persistence port for task_edges rows. Cycle
@@ -76,6 +97,16 @@ type GrantRepository interface {
 	// taskIDs, grouped by task ID — the input ResolveGrant's BFS walk
 	// (domain/grant_resolution.go) consumes.
 	ListGrantsForAncestors(ctx context.Context, tenantID string, taskIDs []string) (map[string][]domain.Grant, error)
+	// Revoke deletes a grant by its (task_id, subject_id, level) composite
+	// key — no surrogate grant_id is surfaced above the DB layer today
+	// (TASK-TG-003-04). Idempotent by design: deleting 0 rows is not an
+	// error.
+	Revoke(ctx context.Context, tenantID, taskID, subjectID string, level domain.GrantLevel) error
+	// ListByTask returns every grant recorded directly against taskID
+	// (NOT its ancestors — unlike ListGrantsForAncestors) — the public
+	// ListGrants RPC's backing query, for the frontend's Access tab
+	// (FE-SOL-001).
+	ListByTask(ctx context.Context, tenantID, taskID string) ([]domain.Grant, error)
 }
 
 // TeamScopeResolver resolves a user's team memberships by calling
@@ -162,6 +193,17 @@ type AIProviderContextResolver interface {
 // infra-fleet-service's Relay RPC rather than duplicated per-service.
 type AICompleter interface {
 	Complete(ctx context.Context, connectionID, prompt string) (string, error)
+}
+
+// TechStackDetector inspects a project's worktree (via git-gateway-service)
+// for common manifest files to build a coarse tech-stack hint for the AI
+// decompose prompt — best-effort: AIDecompose must never fail because
+// detection failed or found nothing. See
+// internal/adapter/grpcclient.TechStackDetector's doc comment for what
+// identifier this is actually called with today (a real gap versus
+// BE-SOL-002's assumption, corrected there).
+type TechStackDetector interface {
+	Detect(ctx context.Context, id string) ([]string, error)
 }
 
 // TxRunner wraps a set of subtask creates + parent-link edges in one

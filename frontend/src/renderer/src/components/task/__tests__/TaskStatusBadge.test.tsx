@@ -27,9 +27,29 @@ describe('TaskStatusBadge', () => {
   })
 
   it('renders todo with ⏳ as fallback or explicit', () => {
-    render(<TaskStatusBadge status={'todo' as any} />)
+    render(<TaskStatusBadge status="todo" />)
     expect(screen.getByText('Todo')).toBeInTheDocument()
     expect(screen.getByText('⏳')).toBeInTheDocument()
+  })
+
+  // FE-TASK-003 (task-graph v4): STATUS_CONFIG was missing 3 of 7 real TaskStatus values —
+  // these used to silently fall back to "Todo" (STATUS_CONFIG[status] || STATUS_CONFIG.todo).
+  it("status='backlog' → label 'Backlog', không fallback về 'Todo'", () => {
+    render(<TaskStatusBadge status="backlog" />)
+    expect(screen.getByText('Backlog')).toBeInTheDocument()
+    expect(screen.queryByText('Todo')).not.toBeInTheDocument()
+  })
+
+  it("status='review' → label 'Review'", () => {
+    render(<TaskStatusBadge status="review" />)
+    expect(screen.getByText('Review')).toBeInTheDocument()
+    expect(screen.getByText('Review').parentElement).toHaveClass('text-purple-600')
+  })
+
+  it("status='blocked' → label 'Blocked'", () => {
+    render(<TaskStatusBadge status="blocked" />)
+    expect(screen.getByText('Blocked')).toBeInTheDocument()
+    expect(screen.getByText('Blocked').parentElement).toHaveClass('text-red-600')
   })
 })
 

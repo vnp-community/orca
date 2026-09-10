@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/add_edge.go`, `backend-go/services/task-service/internal/adapter/grpc/server.go` (wire the new `TxRunner`-wrapped call)
 **Depends on:** TASK-TG-001-02 (`domain.StatusBlocked`, `domain.Status` type)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -184,3 +184,46 @@ the same call; `TestAIApply_MidLoopFailure_RollsBackEntireSubtree`
 (`ai_apply_test.go`, already exists) still passes unchanged, proving the
 `NewAddEdge(tasks, edges)` signature change didn't disturb `AIApply`'s
 existing transactional behavior.
+
+## Execution notes (2026-09-09)
+
+Implemented exactly per the corrected `TxRunner` shape (not BE-SOL-001's
+`ports.Tx` sketch): `AddEdge` gained a `tasks TaskRepository` field
+(`NewAddEdge(tasks, edges)`), does its own cycle-check + write + auto-block
+sequence without opening a transaction itself, and trusts the
+tasks/edges pair it was constructed with. `server.go`'s `AddEdge` field was
+replaced with `txRunner usecase.TxRunner`; the `AddEdge` RPC handler now
+constructs a fresh `usecase.NewAddEdge(tasks, edges)` inside
+`txRunner.RunInTx` per call, matching the task's own handler sketch
+verbatim. `ai_apply.go:61`'s `NewAddEdge(edges)` → `NewAddEdge(tasks,
+edges)`; `main.go` no longer builds a standalone `addEdgeUC` — `repo`
+(already a `usecase.TxRunner`) is passed straight into `taskgrpc.New`.
+
+Fixed the resulting fallout beyond the task's own file list: `add_edge_test.go`
+needed a `TaskRepository` fake at every `NewAddEdge(...)` call site (seeded
+with a real `domain.Task` for the two tests that now reach the auto-block
+lookup) and gained 2 new tests (`TestAddEdge_AutoBlocksDependentOnUnmetDependency`,
+`TestAddEdge_DoesNotAutoBlockWhenDependencyAlreadyDone`) since the auto-block
+behavior itself had no unit coverage yet; `server_test.go`'s `newTestServer`
+already had a `fakeTxRunner` (built for `AIApply`'s wiring) — reused it for
+`AddEdge` too rather than introducing a second fake.
+
+Added a new integration-tagged file,
+`internal/adapter/postgres/add_edge_integration_test.go`, with the exact
+test the Verify section asks for:
+`TestAddEdge_ConcurrentCycleRace_ExactlyOneSucceeds` (two goroutines racing
+`b->c` and `c->a` against a seeded `a->b`, each wrapped in a real
+`repo.RunInTx`+`usecase.AddEdge` call — asserts exactly one of the two
+succeeds) plus `TestAddEdge_AutoBlock_PersistsAgainstRealDB` (auto-block
+write survives a real commit, not just a fake's in-memory map).
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean; `go test
+./services/task-service/...` (unit) all pass, including the 2 new
+`add_edge_test.go` cases and the unchanged `TestAIApply_MidLoopFailure_RollsBackEntireSubtree`.
+`go test -tags=integration .../postgres/... -run TestAddEdge` — both new
+integration tests pass; `TestAddEdge_ConcurrentCycleRace_ExactlyOneSucceeds`
+hit the same pre-existing testcontainers `pq: the database system is
+starting up` flake (documented in TASK-TG-001-02/-03's execution notes) on
+one run and passed cleanly (4.87s) on immediate re-run in isolation — the
+concurrency guarantee itself is confirmed working, the flake is
+infra-level.

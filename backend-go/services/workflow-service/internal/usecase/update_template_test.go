@@ -12,13 +12,22 @@ import (
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 )
 
-func TestUpdateTemplate_Succeeds_ForwardsExpectedVersionAndReturnsBumpedResult(t *testing.T) {
+// TestUpdateTemplate_NonBreakingChange_DoesNotBumpVersion covers
+// TASK-WF-004-03's conditional-version-bump behavior change: version is no
+// longer bumped unconditionally on every write. This test used to assert
+// an unconditional bump (Version 1 -> 2); that assumption is now wrong by
+// design — a non-breaking change (here: a pure rename, DAGJSON unchanged)
+// must NOT bump the version even when the template has active executions
+// using it (repo.hasActiveExecutionsUsingTemplate is set true specifically
+// to prove isBreaking, not hasActiveUsage, is the gating factor here).
+func TestUpdateTemplate_NonBreakingChange_DoesNotBumpVersion(t *testing.T) {
 	repo := newFakeTemplateRepository()
 	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[]}`, domain.ScopePersonal, "")
 	if err != nil {
 		t.Fatalf("building template: %v", err)
 	}
 	repo.templates[existing.ID] = existing
+	repo.hasActiveExecutionsUsingTemplate = true
 
 	uc := NewUpdateTemplate(repo)
 	ctx := withTenantContext(context.Background(), "tenant-1")
@@ -29,8 +38,8 @@ func TestUpdateTemplate_Succeeds_ForwardsExpectedVersionAndReturnsBumpedResult(t
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if got.Version != 2 {
-		t.Errorf("want bumped version 2, got %d", got.Version)
+	if got.Version != 1 {
+		t.Errorf("want version unchanged at 1 (non-breaking change must not bump), got %d", got.Version)
 	}
 	if got.Name != "deploy-v2" {
 		t.Errorf("want name=deploy-v2, got %q", got.Name)
@@ -40,6 +49,133 @@ func TestUpdateTemplate_Succeeds_ForwardsExpectedVersionAndReturnsBumpedResult(t
 	}
 	if repo.lastUpdateExpectedVersion != 1 {
 		t.Errorf("want expectedVersion=1 forwarded unchanged, got %d", repo.lastUpdateExpectedVersion)
+	}
+	if repo.lastUpdateBump {
+		t.Error("want bump=false forwarded to Update for a non-breaking change")
+	}
+}
+
+// TestUpdateTemplate_BreakingChangeWithActiveExecutions_BumpsVersion covers
+// the version-DOES-bump case: a step removed (breaking, per this task's
+// proposed definition) while the template has active executions using it.
+func TestUpdateTemplate_BreakingChangeWithActiveExecutions_BumpsVersion(t *testing.T) {
+	repo := newFakeTemplateRepository()
+	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[{"id":"s1","type":"webhook"},{"id":"s2","type":"webhook"}]}`, domain.ScopePersonal, "")
+	if err != nil {
+		t.Fatalf("building template: %v", err)
+	}
+	repo.templates[existing.ID] = existing
+	repo.hasActiveExecutionsUsingTemplate = true
+
+	uc := NewUpdateTemplate(repo)
+	ctx := withTenantContext(context.Background(), "tenant-1")
+
+	got, err := uc.Execute(ctx, UpdateTemplateInput{
+		ID: "tmpl-1", Name: "deploy", DAGJSON: `{"steps":[{"id":"s1","type":"webhook"}]}`, Scope: domain.ScopePersonal, ExpectedVersion: 1,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Version != 2 {
+		t.Errorf("want bumped version 2, got %d", got.Version)
+	}
+	if !repo.lastUpdateBump {
+		t.Error("want bump=true forwarded to Update for a breaking change with active executions")
+	}
+}
+
+// TestUpdateTemplate_BreakingChangeWithNoActiveExecutions_DoesNotBumpVersion
+// covers the third test-plan case: breaking change, but zero active
+// executions using the template → version does NOT bump.
+func TestUpdateTemplate_BreakingChangeWithNoActiveExecutions_DoesNotBumpVersion(t *testing.T) {
+	repo := newFakeTemplateRepository()
+	existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", `{"steps":[{"id":"s1","type":"webhook"},{"id":"s2","type":"webhook"}]}`, domain.ScopePersonal, "")
+	if err != nil {
+		t.Fatalf("building template: %v", err)
+	}
+	repo.templates[existing.ID] = existing
+	repo.hasActiveExecutionsUsingTemplate = false
+
+	uc := NewUpdateTemplate(repo)
+	ctx := withTenantContext(context.Background(), "tenant-1")
+
+	got, err := uc.Execute(ctx, UpdateTemplateInput{
+		ID: "tmpl-1", Name: "deploy", DAGJSON: `{"steps":[{"id":"s1","type":"webhook"}]}`, Scope: domain.ScopePersonal, ExpectedVersion: 1,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Version != 1 {
+		t.Errorf("want version unchanged at 1 (no active executions), got %d", got.Version)
+	}
+	if repo.lastUpdateBump {
+		t.Error("want bump=false forwarded to Update when there are no active executions")
+	}
+}
+
+// TestUpdateTemplate_BreakingChangeDetection covers isBreakingChange's
+// three proposed triggers independently: step removed, step type changed,
+// step dependsOn changed. Each uses hasActiveExecutionsUsingTemplate=true
+// so bump directly reflects isBreaking's own answer.
+func TestUpdateTemplate_BreakingChangeDetection(t *testing.T) {
+	cases := []struct {
+		name       string
+		oldDAG     string
+		newDAG     string
+		wantBumped bool
+	}{
+		{
+			name:       "step type changed is breaking",
+			oldDAG:     `{"steps":[{"id":"s1","type":"webhook"}]}`,
+			newDAG:     `{"steps":[{"id":"s1","type":"shell"}]}`,
+			wantBumped: true,
+		},
+		{
+			name:       "dependsOn changed is breaking",
+			oldDAG:     `{"steps":[{"id":"s1","type":"webhook"},{"id":"s2","type":"webhook"}]}`,
+			newDAG:     `{"steps":[{"id":"s1","type":"webhook"},{"id":"s2","type":"webhook","dependsOn":["s1"]}]}`,
+			wantBumped: true,
+		},
+		{
+			name:       "pure addition is not breaking",
+			oldDAG:     `{"steps":[{"id":"s1","type":"webhook"}]}`,
+			newDAG:     `{"steps":[{"id":"s1","type":"webhook"},{"id":"s2","type":"webhook"}]}`,
+			wantBumped: false,
+		},
+		{
+			name:       "prompt-only config edit is not breaking",
+			oldDAG:     `{"steps":[{"id":"s1","type":"agent","config":{"prompt":"a"}}]}`,
+			newDAG:     `{"steps":[{"id":"s1","type":"agent","config":{"prompt":"b"}}]}`,
+			wantBumped: false,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newFakeTemplateRepository()
+			existing, err := domain.NewWorkflowTemplate("tmpl-1", "tenant-1", "deploy", tc.oldDAG, domain.ScopePersonal, "")
+			if err != nil {
+				t.Fatalf("building template: %v", err)
+			}
+			repo.templates[existing.ID] = existing
+			repo.hasActiveExecutionsUsingTemplate = true
+
+			uc := NewUpdateTemplate(repo)
+			ctx := withTenantContext(context.Background(), "tenant-1")
+
+			got, err := uc.Execute(ctx, UpdateTemplateInput{
+				ID: "tmpl-1", Name: "deploy", DAGJSON: tc.newDAG, Scope: domain.ScopePersonal, ExpectedVersion: 1,
+			})
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			wantVersion := int32(1)
+			if tc.wantBumped {
+				wantVersion = 2
+			}
+			if got.Version != wantVersion {
+				t.Errorf("want version %d (bumped=%v), got %d", wantVersion, tc.wantBumped, got.Version)
+			}
+		})
 	}
 }
 

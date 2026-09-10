@@ -7,6 +7,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/stablyai/orca-go/services/orchestration-service/internal/domain"
 )
@@ -20,6 +21,7 @@ var (
 	ErrDispatchContextHasNoTask = errors.New("usecase: dispatch context has no owning orchestration task yet")
 	ErrGateNotFound             = errors.New("usecase: decision gate not found")
 	ErrGateNotPending           = errors.New("usecase: decision gate is not pending")
+	ErrCoordinatorRunNotFound   = errors.New("usecase: coordinator run not found")
 )
 
 // HandleSerializer is the KeyedAsyncQueue port from
@@ -121,4 +123,30 @@ type GateRepository interface {
 	// gate and the ids of any tasks whose status changed as a result (at
 	// least the gate's own owning task).
 	ResolveGate(ctx context.Context, tenantID, gateID, resolution string) (domain.DecisionGate, []string, error)
+}
+
+// CoordinatorRunRepository is the persistence port for
+// orchestration.coordinator_runs — the table and domain.CoordinatorRun
+// already exist (internal/domain/orchestration.go, migrations/0001_init.up.sql);
+// this port (TASK-TG-004-01) was the only missing layer. Method names are
+// disambiguated (CreateCoordinatorRun, not Create) for the same reason
+// DispatchContextRepository's are — one concrete Repository implements
+// every port in this package, and Go has no method overloading.
+type CoordinatorRunRepository interface {
+	CreateCoordinatorRun(ctx context.Context, run domain.CoordinatorRun) (domain.CoordinatorRun, error)
+	GetCoordinatorRun(ctx context.Context, tenantID, id string) (domain.CoordinatorRun, error)
+	// UpdateCoordinatorRunStatus transitions status; completedAt is nil for
+	// a non-terminal transition and set (persisted to completed_at) for a
+	// terminal one (completed/failed) — the caller decides which, this
+	// method doesn't infer it from status, so a future status value
+	// doesn't silently need this method updated too.
+	UpdateCoordinatorRunStatus(ctx context.Context, tenantID, id string, status domain.RunStatus, completedAt *time.Time) (domain.CoordinatorRun, error)
+	// RecordHeartbeat updates heartbeat_at only — never touches status. See
+	// TASK-TG-004-02's RecordHeartbeat usecase.
+	RecordHeartbeat(ctx context.Context, tenantID, id string, at time.Time) error
+	// ListRunningForAdvance is a FOR UPDATE SKIP LOCKED batch fetch of
+	// RunStatusRunning rows, used exclusively by TASK-TG-004-03's tick
+	// loop — see that task for the exact query and its concurrency-safety
+	// test.
+	ListRunningForAdvance(ctx context.Context, limit int) ([]domain.CoordinatorRun, error)
 }

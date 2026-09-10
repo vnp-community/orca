@@ -6,8 +6,10 @@ package grpc
 
 import (
 	"context"
+	"time"
 
 	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
@@ -22,7 +24,7 @@ type Server struct {
 
 	createTask          *usecase.CreateTask
 	getTask             *usecase.GetTask
-	addEdge             *usecase.AddEdge
+	txRunner            usecase.TxRunner
 	grant               *usecase.Grant
 	resolvePermission   *usecase.ResolvePermission
 	executeTask         *usecase.ExecuteTask
@@ -33,12 +35,19 @@ type Server struct {
 	getDependencies     *usecase.GetDependencies
 	aiDecompose         *usecase.AIDecompose
 	aiApply             *usecase.AIApply
+	recalculateProgress *usecase.RecalculateProgress
+	getSubtree          *usecase.GetSubtree
+	generateAgentPrompt *usecase.GenerateAgentPrompt
+	revokeGrant         *usecase.RevokeGrant
+	listGrants          *usecase.ListGrants
+	generateShareLink   *usecase.GenerateShareLink
+	getTaskByShareToken *usecase.GetTaskByShareToken
 }
 
 func New(
 	createTask *usecase.CreateTask,
 	getTask *usecase.GetTask,
-	addEdge *usecase.AddEdge,
+	txRunner usecase.TxRunner,
 	grant *usecase.Grant,
 	resolvePermission *usecase.ResolvePermission,
 	executeTask *usecase.ExecuteTask,
@@ -49,11 +58,18 @@ func New(
 	getDependencies *usecase.GetDependencies,
 	aiDecompose *usecase.AIDecompose,
 	aiApply *usecase.AIApply,
+	recalculateProgress *usecase.RecalculateProgress,
+	getSubtree *usecase.GetSubtree,
+	generateAgentPrompt *usecase.GenerateAgentPrompt,
+	revokeGrant *usecase.RevokeGrant,
+	listGrants *usecase.ListGrants,
+	generateShareLink *usecase.GenerateShareLink,
+	getTaskByShareToken *usecase.GetTaskByShareToken,
 ) *Server {
 	return &Server{
 		createTask:          createTask,
 		getTask:             getTask,
-		addEdge:             addEdge,
+		txRunner:            txRunner,
 		grant:               grant,
 		resolvePermission:   resolvePermission,
 		executeTask:         executeTask,
@@ -64,6 +80,13 @@ func New(
 		getDependencies:     getDependencies,
 		aiDecompose:         aiDecompose,
 		aiApply:             aiApply,
+		recalculateProgress: recalculateProgress,
+		getSubtree:          getSubtree,
+		generateAgentPrompt: generateAgentPrompt,
+		revokeGrant:         revokeGrant,
+		listGrants:          listGrants,
+		generateShareLink:   generateShareLink,
+		getTaskByShareToken: getTaskByShareToken,
 	}
 }
 
@@ -74,6 +97,7 @@ func (s *Server) CreateTask(ctx context.Context, req *taskv1.CreateTaskRequest) 
 		Title:     req.GetTitle(),
 		ParentID:  req.GetParentId(),
 		ProjectID: req.GetProjectId(),
+		CreatorID: req.GetCreatorId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -89,11 +113,19 @@ func (s *Server) GetTask(ctx context.Context, req *taskv1.GetTaskRequest) (*task
 	return &taskv1.GetTaskResponse{Task: toProtoTask(task)}, nil
 }
 
+// AddEdge wraps the cycle-check + edge-write + auto-block sequence in one
+// Postgres transaction via TxRunner — closing add_edge.go's previously
+// admitted check-then-write race (see AddEdge usecase's doc comment) rather
+// than constructing a single pool-scoped *usecase.AddEdge once at
+// server-startup wiring time.
 func (s *Server) AddEdge(ctx context.Context, req *taskv1.AddEdgeRequest) (*taskv1.AddEdgeResponse, error) {
-	_, err := s.addEdge.Execute(ctx, usecase.AddEdgeInput{
-		FromTaskID: req.GetFromTaskId(),
-		ToTaskID:   req.GetToTaskId(),
-		Kind:       toDomainEdgeKind(req.GetType()),
+	err := s.txRunner.RunInTx(ctx, func(ctx context.Context, tasks usecase.TaskRepository, edges usecase.EdgeRepository) error {
+		_, err := usecase.NewAddEdge(tasks, edges).Execute(ctx, usecase.AddEdgeInput{
+			FromTaskID: req.GetFromTaskId(),
+			ToTaskID:   req.GetToTaskId(),
+			Kind:       toDomainEdgeKind(req.GetType()),
+		})
+		return err
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -102,28 +134,66 @@ func (s *Server) AddEdge(ctx context.Context, req *taskv1.AddEdgeRequest) (*task
 }
 
 func (s *Server) Grant(ctx context.Context, req *taskv1.GrantRequest) (*taskv1.GrantResponse, error) {
-	err := s.grant.Execute(ctx, usecase.GrantInput{
+	in := usecase.GrantInput{
 		TaskID:    req.GetTaskId(),
 		SubjectID: req.GetSubjectId(),
 		Level:     toDomainGrantLevel(req.GetLevel()),
 		ApplyTree: req.GetApplyTree(),
-	})
+	}
+	if req.GetExpiresAt() != nil {
+		t := req.GetExpiresAt().AsTime()
+		in.ExpiresAt = &t
+	}
+	err := s.grant.Execute(ctx, in)
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &taskv1.GrantResponse{}, nil
 }
 
+func (s *Server) RevokeGrant(ctx context.Context, req *taskv1.RevokeGrantRequest) (*emptypb.Empty, error) {
+	err := s.revokeGrant.Execute(ctx, usecase.RevokeGrantInput{
+		TaskID:    req.GetTaskId(),
+		SubjectID: req.GetSubjectId(),
+		Level:     toDomainGrantLevel(req.GetLevel()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) ListGrants(ctx context.Context, req *taskv1.ListGrantsRequest) (*taskv1.ListGrantsResponse, error) {
+	grants, err := s.listGrants.Execute(ctx, req.GetTaskId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.GrantView, 0, len(grants))
+	for _, g := range grants {
+		view := &taskv1.GrantView{SubjectId: g.SubjectID, Level: toProtoGrantLevel(g.Level), ApplyTree: g.ApplyTree}
+		if g.ExpiresAt != nil {
+			view.ExpiresAt = timestamppb.New(*g.ExpiresAt)
+		}
+		out = append(out, view)
+	}
+	return &taskv1.ListGrantsResponse{Grants: out}, nil
+}
+
 func (s *Server) ResolvePermission(ctx context.Context, req *taskv1.ResolvePermissionRequest) (*taskv1.ResolvePermissionResponse, error) {
+	// action defaults to "read" when empty — either an older client built
+	// against a pre-TASK-TG-003-06 proto that has no action field to send,
+	// or a caller that legitimately wants the default. The usecase's own
+	// input contract stays strict ("empty means empty"); this adapter layer
+	// absorbs the rollout-compatibility shim, matching this codebase's
+	// existing adapter-absorbs-wire-quirks convention.
+	action := req.GetAction()
+	if action == "" {
+		action = "read"
+	}
 	level, err := s.resolvePermission.Execute(ctx, usecase.ResolvePermissionInput{
 		TaskID: req.GetTaskId(),
 		UserID: req.GetUserId(),
-		// ResolvePermissionRequest has no action-equivalent field yet (see
-		// this service's README "Known gaps") — default to "read", the one
-		// action task_grant.rego's level_actions table authorizes for
-		// every named GrantLevel, so a resolved grant of any kind still
-		// passes the OPA check until the wire contract grows a real field.
-		Action: "read",
+		Action: action,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -174,7 +244,7 @@ func (s *Server) UpdateTask(ctx context.Context, req *taskv1.UpdateTaskRequest) 
 		in.Title = &v
 	}
 	if req.GetStatus() != nil {
-		v := req.GetStatus().GetValue()
+		v := domain.Status(req.GetStatus().GetValue())
 		in.Status = &v
 	}
 	if req.GetWorkflowTemplateId() != nil {
@@ -230,10 +300,92 @@ func (s *Server) AIApply(ctx context.Context, req *taskv1.AIApplyRequest) (*task
 	return &taskv1.AIApplyResponse{CreatedSubtasks: out}, nil
 }
 
+func (s *Server) RecalculateProgress(ctx context.Context, req *taskv1.RecalculateProgressRequest) (*taskv1.RecalculateProgressResponse, error) {
+	if err := s.recalculateProgress.Execute(ctx, req.GetTaskId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.RecalculateProgressResponse{}, nil
+}
+
+func (s *Server) GetSubtree(ctx context.Context, req *taskv1.GetSubtreeRequest) (*taskv1.GetSubtreeResponse, error) {
+	tasks, err := s.getSubtree.Execute(ctx, req.GetTaskId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*taskv1.Task, 0, len(tasks))
+	for _, t := range tasks {
+		out = append(out, toProtoTask(t))
+	}
+	return &taskv1.GetSubtreeResponse{Tasks: out}, nil
+}
+
+func (s *Server) GenerateAgentPrompt(ctx context.Context, req *taskv1.GenerateAgentPromptRequest) (*taskv1.GenerateAgentPromptResponse, error) {
+	result, err := s.generateAgentPrompt.Execute(ctx, usecase.GenerateAgentPromptInput{TaskID: req.GetTaskId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.GenerateAgentPromptResponse{PromptTemplate: result}, nil
+}
+
+// GenerateShareLink requires the caller to already hold admin-level
+// permission (enforced inside the usecase, not here) — TASK-TG-003-05.
+func (s *Server) GenerateShareLink(ctx context.Context, req *taskv1.GenerateShareLinkRequest) (*taskv1.GenerateShareLinkResponse, error) {
+	token, err := s.generateShareLink.Execute(ctx, usecase.GenerateShareLinkInput{
+		TaskID: req.GetTaskId(),
+		UserID: req.GetUserId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.GenerateShareLinkResponse{ShareToken: token}, nil
+}
+
+// GetTaskByShareToken is task-service's first unauthenticated RPC —
+// TASK-TG-003-05, SECURITY REVIEW REQUIRED before merge. Deliberately does
+// NOT call anything from common/tenant — see usecase.GetTaskByShareToken's
+// doc comment. Confirmed reachable without any special allowlisting:
+// common/grpcmw.ChainUnary's TenantExtractionInterceptor
+// (common/grpcmw/grpcmw.go:50-66) only OPTIONALLY populates tenant/user
+// context from incoming metadata when present — it never rejects a call
+// for missing metadata, so there is no default-deny gate at the gRPC layer
+// for ANY RPC in this service today; the actual "auth" enforcement is
+// exclusively each usecase's own tenant.RequireTenantID call. Since this
+// usecase deliberately never calls that, it's reachable with zero metadata
+// exactly like every other RPC's transport-level reachability — the only
+// thing making it meaningfully different is that it's SAFE to reach that
+// way, unlike every other RPC. Whether task-service's gRPC port itself is
+// reachable from outside the internal mesh (bypassing api-gateway's own
+// auth) is a deployment-topology question the security reviewer should
+// confirm explicitly, not something resolved by this handler.
+func (s *Server) GetTaskByShareToken(ctx context.Context, req *taskv1.GetTaskByShareTokenRequest) (*taskv1.GetTaskByShareTokenResponse, error) {
+	view, err := s.getTaskByShareToken.Execute(ctx, req.GetShareToken())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &taskv1.GetTaskByShareTokenResponse{Task: &taskv1.TaskShareView{
+		Id:          view.ID,
+		Title:       view.Title,
+		Status:      view.Status,
+		Description: view.Description,
+	}}, nil
+}
+
 func toProtoSubtaskProposals(proposals []domain.SubtaskProposal) []*taskv1.SubtaskProposal {
 	out := make([]*taskv1.SubtaskProposal, 0, len(proposals))
 	for _, p := range proposals {
-		out = append(out, &taskv1.SubtaskProposal{Title: p.Title, Description: p.Description})
+		dependsOn := make([]int32, len(p.DependsOnIndex))
+		for i, idx := range p.DependsOnIndex {
+			dependsOn[i] = int32(idx)
+		}
+		proto := &taskv1.SubtaskProposal{
+			Title: p.Title, Description: p.Description, Type: p.Type,
+			DependsOnIndex: dependsOn, PromptTemplate: p.PromptTemplate,
+		}
+		if p.EstimatedHours != nil {
+			proto.EstimatedHours = *p.EstimatedHours
+			proto.HasEstimatedHours = true
+		}
+		out = append(out, proto)
 	}
 	return out
 }
@@ -241,7 +393,19 @@ func toProtoSubtaskProposals(proposals []domain.SubtaskProposal) []*taskv1.Subta
 func toDomainSubtaskProposals(proposals []*taskv1.SubtaskProposal) []domain.SubtaskProposal {
 	out := make([]domain.SubtaskProposal, 0, len(proposals))
 	for _, p := range proposals {
-		out = append(out, domain.SubtaskProposal{Title: p.GetTitle(), Description: p.GetDescription()})
+		dependsOn := make([]int, len(p.GetDependsOnIndex()))
+		for i, idx := range p.GetDependsOnIndex() {
+			dependsOn[i] = int(idx)
+		}
+		proposal := domain.SubtaskProposal{
+			Title: p.GetTitle(), Description: p.GetDescription(), Type: p.GetType(),
+			DependsOnIndex: dependsOn, PromptTemplate: p.GetPromptTemplate(),
+		}
+		if p.GetHasEstimatedHours() {
+			v := p.GetEstimatedHours()
+			proposal.EstimatedHours = &v
+		}
+		out = append(out, proposal)
 	}
 	return out
 }
@@ -296,9 +460,57 @@ func toProtoTask(t domain.Task) *taskv1.Task {
 		Id:                 t.ID,
 		TenantId:           t.TenantID,
 		Title:              t.Title,
-		Status:             t.Status,
+		Status:             string(t.Status),
 		ParentId:           t.ParentID,
 		ProjectId:          t.ProjectID,
 		WorkflowTemplateId: t.WorkflowTemplateID,
+		Description:        t.Description,
+		Type:               t.Type,
+		Priority:           t.Priority,
+		Labels:             t.Labels,
+		AssigneeId:         stringPtrValue(t.AssigneeID),
+		ReporterId:         stringPtrValue(t.ReporterID),
+		OwnerId:            stringPtrValue(t.OwnerID),
+		DueDate:            timePtrToProto(t.DueDate),
+		EstimatedHours:     float64PtrValue(t.EstimatedHours),
+		ActualHours:        float64PtrValue(t.ActualHours),
+		PromptTemplate:     t.PromptTemplate,
+		AiContext:          string(t.AIContext),
+		AiPlanJson:         string(t.AIPlanJSON),
+		Visibility:         t.Visibility,
+		WorktreeId:         stringPtrValue(t.WorktreeID),
+		AgentSessionId:     stringPtrValue(t.AgentSessionID),
+		WorkflowExecId:     stringPtrValue(t.WorkflowExecID),
+		DoneSubtasks:       int32(t.DoneSubtasks),
+		TotalSubtasks:      int32(t.TotalSubtasks),
+		ShareToken:         stringPtrValue(t.ShareToken),
 	}
+}
+
+// stringPtrValue/float64PtrValue/timePtrToProto convert domain.Task's
+// nullable pointer-backed fields to the plain-scalar wire representation
+// task.proto's Task message uses (matching Status's own untyped-string wire
+// convention) — a nil pointer maps to the type's zero value on the wire,
+// same "unset == zero value" tradeoff BE-SOL-001's own sketch accepts for
+// this message rather than introducing wrapper types for every optional
+// field.
+func stringPtrValue(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+func float64PtrValue(f *float64) float64 {
+	if f == nil {
+		return 0
+	}
+	return *f
+}
+
+func timePtrToProto(t *time.Time) *timestamppb.Timestamp {
+	if t == nil {
+		return nil
+	}
+	return timestamppb.New(*t)
 }

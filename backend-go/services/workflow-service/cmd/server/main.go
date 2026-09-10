@@ -5,6 +5,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -28,13 +29,17 @@ import (
 
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
 
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/aiproviderclient"
 	workflowgrpc "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/infrafleetclient"
 	workflowpostgres "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/postgres"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/projectclient"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/stepexecutors"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 
+	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 )
 
@@ -85,6 +90,32 @@ func run() error {
 	defer func() { _ = infraFleetConn.Close() }()
 	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
 
+	// project-service dependency (TASK-WF-002-01): ServerResolver's
+	// TargetKindProject branch resolves "project:<id>" targets to that
+	// project's bound dev server via GetProject.
+	projectConn, err := projectclient.Dial(cfg.ProjectServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing project-service: %w", err)
+	}
+	defer func() { _ = projectConn.Close() }()
+	projectServiceClient := projectv1.NewProjectServiceClient(projectConn)
+
+	serverResolver := usecase.NewServerResolver(
+		projectclient.New(projectServiceClient),
+		infrafleetclient.NewInfraFleetPicker(infraFleetClient),
+	)
+
+	// ai-provider-service dependency (TASK-WF-002-02): ProviderResolver's
+	// explicit-pin-vs-priority-chain resolution.
+	aiProviderConn, err := aiproviderclient.Dial(cfg.AIProviderServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing ai-provider-service: %w", err)
+	}
+	defer func() { _ = aiProviderConn.Close() }()
+	aiProviderServiceClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
+
+	providerResolver := usecase.NewProviderResolver(aiproviderclient.New(aiProviderServiceClient))
+
 	// StepExecutorRegistry wiring — all five step types, per
 	// workflow-service.md §4: Condition and Webhook are real, in-process
 	// implementations; Agent/Shell/Notification relay to infra-fleet-
@@ -94,9 +125,34 @@ func run() error {
 	registry := stepexecutors.NewRegistry()
 	registry.Register(domain.StepTypeCondition, stepexecutors.NewConditionExecutor())
 	registry.Register(domain.StepTypeWebhook, stepexecutors.NewWebhookExecutor(cfg.WebhookAllowlistHosts, &http.Client{Timeout: 30 * time.Second}))
-	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient))
-	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient))
-	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient))
+	registry.Register(domain.StepTypeAgent, infrafleetclient.NewAgentExecutor(infraFleetClient, serverResolver, providerResolver))
+	registry.Register(domain.StepTypeShell, infrafleetclient.NewShellExecutor(infraFleetClient, serverResolver))
+	registry.Register(domain.StepTypeNotification, infrafleetclient.NewNotificationExecutor(infraFleetClient, serverResolver))
+
+	// Action step type (TASK-WF-003-02): the specific set of git.*/
+	// github.*/jira.* handlers is explicitly a product decision, not fixed
+	// by this task (see BE-SOL-003's "Not in scope" note) — "project.getDevServer"
+	// below is wired end to end against project-service (already dialed
+	// above for ServerResolver) purely to prove the dispatch mechanism
+	// reaches a real downstream client, not a placeholder/no-op stub.
+	actionHandlers := map[string]stepexecutors.ActionHandler{
+		"project.getDevServer": func(ctx context.Context, params map[string]any) (domain.StepResult, error) {
+			projectID, _ := params["projectId"].(string)
+			if projectID == "" {
+				return domain.StepResult{Status: domain.ResultStatusFailed, OutputJSON: `{"error":"projectId is required"}`}, nil
+			}
+			devServerID, err := projectclient.New(projectServiceClient).GetProject(ctx, projectID)
+			if err != nil {
+				return domain.StepResult{}, fmt.Errorf("action project.getDevServer: %w", err)
+			}
+			output, err := json.Marshal(map[string]string{"devServerId": devServerID})
+			if err != nil {
+				return domain.StepResult{}, fmt.Errorf("action project.getDevServer: marshal output: %w", err)
+			}
+			return domain.StepResult{Status: domain.ResultStatusCompleted, OutputJSON: string(output)}, nil
+		},
+	}
+	registry.Register(domain.StepTypeAction, stepexecutors.NewActionExecutor(actionHandlers))
 
 	createTemplateUC := usecase.NewCreateTemplate(repo)
 	executeUC := usecase.NewExecute(repo, repo, repo, registry)
@@ -109,6 +165,8 @@ func run() error {
 	listTemplatesUC := usecase.NewListTemplates(repo)
 	resolveTemplateUC := usecase.NewResolveTemplate(repo)
 	updateTemplateUC := usecase.NewUpdateTemplate(repo)
+	listExecutionsUC := usecase.NewListExecutions(repo)
+	cloneTemplateUC := usecase.NewCloneTemplate(resolveTemplateUC, repo)
 	recoverExecutionsUC := usecase.NewRecoverExecutions(repo, repo, repo, registry)
 
 	// Boot-time recovery scan (workflow-service.md §8: "before accepting
@@ -126,7 +184,7 @@ func run() error {
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	workflowv1.RegisterWorkflowServiceServer(grpcServer, workflowgrpc.New(
 		createTemplateUC, executeUC, getExecutionUC, pauseExecutionUC, resumeExecutionUC, executeAdHocStepUC, hasActiveExecutionsUC,
-		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC,
+		cancelExecutionUC, listTemplatesUC, resolveTemplateUC, updateTemplateUC, listExecutionsUC, cloneTemplateUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

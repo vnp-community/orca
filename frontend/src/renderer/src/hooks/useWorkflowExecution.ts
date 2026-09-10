@@ -1,4 +1,5 @@
 import { useEffect, useCallback } from 'react'
+import { toast } from 'sonner'
 import { useAppStore } from '../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
 import { Tracers } from '../../../shared/trace/tracers'
@@ -74,5 +75,39 @@ export function useWorkflowExecution(executionId: string) {
     }
   }, [executionId])
 
-  return { execution, stepStatuses, streamingOutput, cancelExecution }
+  const pauseExecution = useCallback(async () => {
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    try {
+      await callRuntimeRpc(target, 'workflow.pause', { executionId })
+      // Bắt buộc cập nhật optimistic — polling effect (dòng 31-57) chỉ chạy khi status==='running',
+      // không tự nhận ra 'paused' cho tới lần poll kế tiếp nếu không set ở đây.
+      useAppStore.getState().updateExecutionStatus(executionId, 'paused')
+    } catch (err) {
+      toast.error('Failed to pause workflow')
+      throw err
+    }
+  }, [executionId])
+
+  const resumeExecution = useCallback(async () => {
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    try {
+      await callRuntimeRpc(target, 'workflow.resume', { executionId })
+      // Bắt buộc cập nhật optimistic — đưa status về 'running' để polling effect's dep
+      // [executionId, executionStatus] kích hoạt lại interval (nếu không làm bước này, polling
+      // kẹt vĩnh viễn ở trạng thái dừng vì effect chỉ re-arm khi executionStatus đổi).
+      useAppStore.getState().updateExecutionStatus(executionId, 'running')
+    } catch (err) {
+      toast.error('Failed to resume workflow')
+      throw err
+    }
+  }, [executionId])
+
+  return {
+    execution,
+    stepStatuses,
+    streamingOutput,
+    cancelExecution,
+    pauseExecution,
+    resumeExecution
+  }
 }

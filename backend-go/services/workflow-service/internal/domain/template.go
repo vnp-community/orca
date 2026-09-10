@@ -74,6 +74,24 @@ type WorkflowTemplate struct {
 	// backs the version-bump-on-write optimistic concurrency check
 	// (SOL-030), mirroring SOL-001's AccessPolicy pattern.
 	Version int32
+	// Overrides/InjectSteps/RemoveSteps (TASK-WF-004-01) are folded onto an
+	// ancestor's resolved DAG by usecase.resolveEffectiveTemplate — see that
+	// function's doc comment for the fold order and applyOverrides/
+	// applyInjections/applyRemovals for each field's semantics. Every one
+	// of these being nil/empty (true for every template that predates this
+	// pass) makes the fold a no-op — see resolveEffectiveTemplate's
+	// regression test.
+	Overrides   map[string]any  `json:"overrides,omitempty"`
+	InjectSteps []StepInjection `json:"injectSteps,omitempty"`
+	RemoveSteps []string        `json:"removeSteps,omitempty"`
+}
+
+// StepInjection adds a new step adjacent to an existing one in a parent
+// template's resolved DAG — see resolveEffectiveTemplate's applyInjections.
+type StepInjection struct {
+	AnchorStepID string `json:"anchorStepId"`
+	Position     string `json:"position"` // "before" | "after"
+	Step         Step   `json:"step"`
 }
 
 // NewWorkflowTemplate constructs a WorkflowTemplate, enforcing the

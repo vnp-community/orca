@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/revoke_grant.go` (new), `backend-go/services/task-service/internal/usecase/list_grants.go` (new), `backend-go/services/task-service/internal/usecase/ports.go` (extend `GrantRepository`), `backend-go/services/task-service/internal/adapter/postgres/grants.go` (new methods), `backend-go/proto/orca/task/v1/task.proto` (`RevokeGrant`/`ListGrants` RPCs), `backend-go/services/task-service/internal/adapter/grpc/server.go` (handlers)
 **Depends on:** TASK-TG-003-03 (this task's `ListGrants` response should carry `expires_at` — land after that field exists, not before, to avoid a second wire-message revision)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -169,3 +169,44 @@ go test ./services/task-service/internal/adapter/postgres/... -run TestRepositor
 
 Expected: clean build; idempotent-revoke test passes; `ListGrants` result
 matches the seeded grant rows exactly, including `expires_at`.
+
+## Execution notes (2026-09-09)
+
+Implemented exactly per the task's code samples: `GrantRepository.Revoke`/
+`ListByTask` added to `ports.go`; `postgres/grants.go` gained both methods
+verbatim (composite-key `DELETE`, idempotent by design); `usecase.RevokeGrant`/
+`usecase.ListGrants` (2 new files) match the task's sketches; `task.proto`
+gained `RevokeGrant`/`ListGrants` RPCs + `RevokeGrantRequest`/
+`ListGrantsRequest`/`ListGrantsResponse`/`GrantView` messages (regenerated
+via `buf generate`) — `GrantView` is a dedicated projection (no `task_id`,
+matching the task's own implied shape since the caller already has it from
+`ListGrantsRequest`). Server handlers follow the `Grant` handler's exact
+pattern; wired into `main.go`.
+
+No surrogate `grant_id` was added — confirmed via direct read of
+`migrations/0001_init.up.sql:67-76` that `task.task_grants` has an unused
+auto `id UUID PRIMARY KEY` column, matching the task's own note; the
+composite-key delete is unambiguous for every code path this task's own
+usecases create grants through (`Grant`/`CreateTask`'s owner-grant insert),
+so no double-grant collision risk was found — not flagged further.
+
+Fixed test fallout: added `Revoke`/`ListByTask` to both `fakeGrantRepository`
+(usecase package) and `fakeTaskRepository` (grpc package, which stands in
+for `GrantRepository` too); updated both `server_test.go` server-construction
+call sites for the 2 new constructor params. Added exactly the 3 cases the
+task's own Test plan names, all passing: `TestRevokeGrant_Idempotent_SecondCallNoOps`;
+`TestListGrants_ReturnsAllGrantsOnTheTask` (3 grants, one with `expires_at`
+set, a 4th grant on a DIFFERENT task correctly excluded); and
+`TestRevokeGrant_OnlyRemovesTheOneRow` (the regression test that revoking
+one caller's direct grant doesn't disturb a different caller's still-valid
+inherited ancestor grant — real `ResolvePermission`/`domain.ResolveGrant`
+BFS walk, not a special-cased assertion). Also added a new integration
+file, `internal/adapter/postgres/grants_integration_test.go`
+(`TestRepository_Revoke_And_ListByTask`), against a real database.
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean
+(including `-tags=integration`); `go test .../usecase/... -run
+"TestRevokeGrant|TestListGrants"` — all 7 cases pass; full `go test
+./services/task-service/...` passes with no regressions; `go test
+-tags=integration .../postgres/... -run TestRepository_Revoke_And_ListByTask`
+passes cleanly (4.61s, no flake hit this run).

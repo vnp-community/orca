@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
@@ -61,7 +62,7 @@ func (e *orderedFakeExecutor) Execute(_ context.Context, _ string) (domain.StepR
 
 func TestWaveDispatcher_DispatchWaves_EmptyWavesSucceed(t *testing.T) {
 	d := newWaveDispatcher(newFakeStepExecutionRepository(), newFakeRegistry(), 10)
-	if !d.dispatchWaves(context.Background(), "exec-1", nil) {
+	if !d.dispatchWaves(context.Background(), "exec-1", nil, nil) {
 		t.Fatal("expected an empty wave list to trivially succeed")
 	}
 }
@@ -78,7 +79,7 @@ func TestWaveDispatcher_DispatchWaves_AllSucceed(t *testing.T) {
 		{{ID: "c", Type: domain.StepTypeWebhook}},
 	}
 
-	if !d.dispatchWaves(context.Background(), "exec-1", waves) {
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
 		t.Fatal("expected the run to succeed")
 	}
 
@@ -109,7 +110,7 @@ func TestWaveDispatcher_DispatchWaves_OneStepFailsAbortsExecution(t *testing.T) 
 		{{ID: "b", Type: domain.StepTypeWebhook}},
 	}
 
-	if d.dispatchWaves(context.Background(), "exec-1", waves) {
+	if d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
 		t.Fatal("expected the run to fail")
 	}
 	if wave1Executor.invocations != 0 {
@@ -133,7 +134,7 @@ func TestWaveDispatcher_DispatchWaves_HardExecutorErrorAlsoAbortsExecution(t *te
 	d := newWaveDispatcher(stepRepo, registry, 10)
 	waves := [][]domain.Step{{{ID: "a", Type: domain.StepTypeShell}}}
 
-	if d.dispatchWaves(context.Background(), "exec-1", waves) {
+	if d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
 		t.Fatal("expected a hard executor error to fail the run")
 	}
 
@@ -153,7 +154,7 @@ func TestWaveDispatcher_DispatchWaves_UnregisteredStepTypeFailsExecution(t *test
 	d := newWaveDispatcher(stepRepo, registry, 10)
 	waves := [][]domain.Step{{{ID: "a", Type: domain.StepTypeAgent}}}
 
-	if d.dispatchWaves(context.Background(), "exec-1", waves) {
+	if d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
 		t.Fatal("expected dispatch to fail when no executor is registered for the step type")
 	}
 }
@@ -186,7 +187,7 @@ func TestWaveDispatcher_WaveGate_Wave1NeverStartsBeforeWave0Terminates(t *testin
 
 	done := make(chan bool, 1)
 	go func() {
-		done <- d.dispatchWaves(context.Background(), "exec-1", waves)
+		done <- d.dispatchWaves(context.Background(), "exec-1", waves, nil)
 	}()
 
 	// Block until wave 0's step has genuinely entered Execute — only then
@@ -221,6 +222,219 @@ func TestWaveDispatcher_WaveGate_Wave1NeverStartsBeforeWave0Terminates(t *testin
 	}
 }
 
+// TestWaveDispatcher_InterpolatesInputsIntoStepConfig proves
+// ExecuteInput.Inputs actually reaches the interpolated string handed to
+// the executor's Execute call — not just the raw {{...}} template.
+func TestWaveDispatcher_InterpolatesInputsIntoStepConfig(t *testing.T) {
+	stepRepo := newFakeStepExecutionRepository()
+	registry := newFakeRegistry()
+	shell := &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted}}
+	registry.executors[domain.StepTypeShell] = shell
+
+	d := newWaveDispatcher(stepRepo, registry, 10)
+	waves := [][]domain.Step{
+		{{ID: "a", Type: domain.StepTypeShell, Config: []byte(`{"script":"echo {{greeting}}"}`)}},
+	}
+	inputs := map[string]any{"greeting": "hello"}
+
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, inputs) {
+		t.Fatal("expected the run to succeed")
+	}
+	if shell.lastConfig != `{"script":"echo hello"}` {
+		t.Errorf("expected the interpolated config to reach Execute, got %q", shell.lastConfig)
+	}
+}
+
+// TestWaveDispatcher_InterpolatesEarlierWaveOutputIntoLaterWave proves a
+// later wave's {{outputs.<stepId>.*}} reference resolves once that
+// earlier-wave step has actually completed — accumulated across waves, not
+// reset per wave (see dispatchWave's completedOutputs doc comment).
+func TestWaveDispatcher_InterpolatesEarlierWaveOutputIntoLaterWave(t *testing.T) {
+	stepRepo := newFakeStepExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeShell] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted, OutputJSON: `{"branch":"feature/x"}`}}
+	webhook := &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted}}
+	registry.executors[domain.StepTypeWebhook] = webhook
+
+	d := newWaveDispatcher(stepRepo, registry, 10)
+	waves := [][]domain.Step{
+		{{ID: "build", Type: domain.StepTypeShell}},
+		{{ID: "deploy", Type: domain.StepTypeWebhook, Config: []byte(`{"message":"deploying {{outputs.build.branch}}"}`)}},
+	}
+
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
+		t.Fatal("expected the run to succeed")
+	}
+	if webhook.lastConfig != `{"message":"deploying feature/x"}` {
+		t.Errorf("expected the interpolated cross-wave output to reach Execute, got %q", webhook.lastConfig)
+	}
+}
+
+// TestWaveDispatcher_UnresolvableOutputReferenceFailsStepNotPanic covers
+// the test plan's third item: referencing a step that hasn't run (or
+// doesn't exist) in this DAG is a clear step failure, never a runtime
+// empty string or a panic.
+func TestWaveDispatcher_UnresolvableOutputReferenceFailsStepNotPanic(t *testing.T) {
+	stepRepo := newFakeStepExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeWebhook] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted}}
+
+	d := newWaveDispatcher(stepRepo, registry, 10)
+	waves := [][]domain.Step{
+		{{ID: "a", Type: domain.StepTypeWebhook, Config: []byte(`{"message":"{{outputs.does_not_exist.field}}"}`)}},
+	}
+
+	if d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
+		t.Fatal("expected dispatch to fail for an unresolvable outputs reference")
+	}
+	rows := stepRepo.byExecution("exec-1")
+	if len(rows) != 1 || rows[0].Status != domain.StepExecutionStatusFailed {
+		t.Fatalf("expected the step to be marked failed, got %+v", rows)
+	}
+	if rows[0].Error == "" {
+		t.Error("expected a clear error message to be recorded, not a silent empty string")
+	}
+}
+
+// buildParallelStepConfig marshals a ParallelStepConfig into the raw JSON
+// domain.Step.Config expects.
+func buildParallelStepConfig(t *testing.T, cfg domain.ParallelStepConfig) []byte {
+	t.Helper()
+	raw, err := json.Marshal(cfg)
+	if err != nil {
+		t.Fatalf("marshal parallel step config: %v", err)
+	}
+	return raw
+}
+
+func TestWaveDispatcher_Parallel_AllSubStepsSucceed(t *testing.T) {
+	stepRepo := newFakeStepExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeShell] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted, OutputJSON: `{"ok":true}`}}
+
+	d := newWaveDispatcher(stepRepo, registry, 10)
+	parallelCfg := buildParallelStepConfig(t, domain.ParallelStepConfig{
+		Steps: []domain.Step{
+			{ID: "subA", Type: domain.StepTypeShell},
+			{ID: "sub-b", Type: domain.StepTypeShell},
+		},
+	})
+	waves := [][]domain.Step{{{ID: "p", Type: domain.StepTypeParallel, Config: parallelCfg}}}
+
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
+		t.Fatal("expected the run to succeed when every sub-step succeeds")
+	}
+
+	rows := stepRepo.byExecution("exec-1")
+	// 1 parent parallel step + 2 sub-steps, each with its own persisted row.
+	if len(rows) != 3 {
+		t.Fatalf("expected 3 persisted step_executions rows (1 parent + 2 sub-steps), got %d: %+v", len(rows), rows)
+	}
+	for _, row := range rows {
+		if row.Status != domain.StepExecutionStatusCompleted {
+			t.Errorf("expected step %s to be completed, got %v", row.StepID, row.Status)
+		}
+	}
+}
+
+func TestWaveDispatcher_Parallel_PartialFailureAllowedSucceedsWithAggregatedOutput(t *testing.T) {
+	stepRepo := newFakeStepExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeShell] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusFailed, OutputJSON: `{"error":"boom"}`}}
+	registry.executors[domain.StepTypeWebhook] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted, OutputJSON: `{"ok":true}`}}
+
+	d := newWaveDispatcher(stepRepo, registry, 10)
+	parallelCfg := buildParallelStepConfig(t, domain.ParallelStepConfig{
+		AllowPartialFailure: true,
+		Steps: []domain.Step{
+			{ID: "sub-fail", Type: domain.StepTypeShell},
+			{ID: "sub-ok", Type: domain.StepTypeWebhook},
+		},
+	})
+	waves := [][]domain.Step{{{ID: "p", Type: domain.StepTypeParallel, Config: parallelCfg}}}
+
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
+		t.Fatal("expected allowPartialFailure=true to let the parallel step (and the run) succeed despite one failed sub-step")
+	}
+
+	rows := stepRepo.byExecution("exec-1")
+	var parent domain.StepExecution
+	for _, row := range rows {
+		if row.StepID == "p" {
+			parent = row
+		}
+	}
+	if parent.Status != domain.StepExecutionStatusCompleted {
+		t.Fatalf("expected the parent parallel step to be completed, got %v", parent.Status)
+	}
+	var aggregated map[string]any
+	if err := json.Unmarshal([]byte(parent.OutputJSON), &aggregated); err != nil {
+		t.Fatalf("unmarshal aggregated output: %v", err)
+	}
+	subSteps, ok := aggregated["subSteps"].(map[string]any)
+	if !ok || len(subSteps) != 2 {
+		t.Fatalf("expected an aggregated subSteps map with 2 entries, got %+v", aggregated)
+	}
+}
+
+func TestWaveDispatcher_Parallel_PartialFailureDisallowedFailsExecution(t *testing.T) {
+	stepRepo := newFakeStepExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeShell] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusFailed, OutputJSON: `{"error":"boom"}`}}
+
+	d := newWaveDispatcher(stepRepo, registry, 10)
+	parallelCfg := buildParallelStepConfig(t, domain.ParallelStepConfig{
+		AllowPartialFailure: false,
+		Steps:               []domain.Step{{ID: "sub-fail", Type: domain.StepTypeShell}},
+	})
+	waves := [][]domain.Step{{{ID: "p", Type: domain.StepTypeParallel, Config: parallelCfg}}}
+
+	if d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
+		t.Fatal("expected allowPartialFailure=false to fail the whole execution on a sub-step failure")
+	}
+
+	rows := stepRepo.byExecution("exec-1")
+	var parent domain.StepExecution
+	for _, row := range rows {
+		if row.StepID == "p" {
+			parent = row
+		}
+	}
+	if parent.Status != domain.StepExecutionStatusFailed {
+		t.Fatalf("expected the parent parallel step to be marked failed, got %v", parent.Status)
+	}
+	if parent.Error == "" {
+		t.Error("expected a clear error message to be recorded on the parent step execution")
+	}
+}
+
+// TestWaveDispatcher_Parallel_LaterStepInterpolatesAggregatedOutput proves
+// {{outputs.<parallelStepId>.*}} from a later step resolves correctly
+// against the parallel step's aggregated output shape.
+func TestWaveDispatcher_Parallel_LaterStepInterpolatesAggregatedOutput(t *testing.T) {
+	stepRepo := newFakeStepExecutionRepository()
+	registry := newFakeRegistry()
+	registry.executors[domain.StepTypeShell] = &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted, OutputJSON: `{"branch":"feature/x"}`}}
+	webhook := &fakeStepExecutor{result: domain.StepResult{Status: domain.ResultStatusCompleted}}
+	registry.executors[domain.StepTypeWebhook] = webhook
+
+	d := newWaveDispatcher(stepRepo, registry, 10)
+	parallelCfg := buildParallelStepConfig(t, domain.ParallelStepConfig{
+		Steps: []domain.Step{{ID: "subA", Type: domain.StepTypeShell}},
+	})
+	waves := [][]domain.Step{
+		{{ID: "p", Type: domain.StepTypeParallel, Config: parallelCfg}},
+		{{ID: "notify", Type: domain.StepTypeWebhook, Config: []byte(`{"message":"branch is {{outputs.p.subSteps.subA.output.branch}}"}`)}},
+	}
+
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
+		t.Fatal("expected the run to succeed")
+	}
+	if webhook.lastConfig != `{"message":"branch is feature/x"}` {
+		t.Errorf("expected the aggregated parallel output to interpolate into the later step, got %q", webhook.lastConfig)
+	}
+}
+
 func TestWaveDispatcher_DispatchWave_BoundsConcurrency(t *testing.T) {
 	// A wave with more steps than the configured concurrency cap must
 	// still dispatch every step and gate correctly — this isn't a strict
@@ -238,7 +452,7 @@ func TestWaveDispatcher_DispatchWave_BoundsConcurrency(t *testing.T) {
 	}
 	waves := [][]domain.Step{steps}
 
-	if !d.dispatchWaves(context.Background(), "exec-1", waves) {
+	if !d.dispatchWaves(context.Background(), "exec-1", waves, nil) {
 		t.Fatal("expected the run to succeed")
 	}
 	rows := stepRepo.byExecution("exec-1")

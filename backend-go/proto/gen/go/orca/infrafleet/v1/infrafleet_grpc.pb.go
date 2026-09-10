@@ -31,6 +31,7 @@ const (
 	InfraFleetService_AssignDevServerGroup_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/AssignDevServerGroup"
 	InfraFleetService_CreateDevServerGroup_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/CreateDevServerGroup"
 	InfraFleetService_ListDevServerGroups_FullMethodName         = "/orca.infrafleet.v1.InfraFleetService/ListDevServerGroups"
+	InfraFleetService_PickByTag_FullMethodName                   = "/orca.infrafleet.v1.InfraFleetService/PickByTag"
 	InfraFleetService_GrantDevServerGroupAccess_FullMethodName   = "/orca.infrafleet.v1.InfraFleetService/GrantDevServerGroupAccess"
 	InfraFleetService_RevokeDevServerGroupAccess_FullMethodName  = "/orca.infrafleet.v1.InfraFleetService/RevokeDevServerGroupAccess"
 	InfraFleetService_ListDevServerGroupGrants_FullMethodName    = "/orca.infrafleet.v1.InfraFleetService/ListDevServerGroupGrants"
@@ -102,6 +103,15 @@ type InfraFleetServiceClient interface {
 	AssignDevServerGroup(ctx context.Context, in *AssignDevServerGroupRequest, opts ...grpc.CallOption) (*AssignDevServerGroupResponse, error)
 	CreateDevServerGroup(ctx context.Context, in *CreateDevServerGroupRequest, opts ...grpc.CallOption) (*CreateDevServerGroupResponse, error)
 	ListDevServerGroups(ctx context.Context, in *ListDevServerGroupsRequest, opts ...grpc.CallOption) (*ListDevServerGroupsResponse, error)
+	// PickByTag (TASK-WF-002-04) picks a live, connected dev server whose
+	// group name matches tag and resolves it to a Relay-ready connection id —
+	// closes workflow-service's TargetKindFleetTag gap (BE-SOL-002). "tag"
+	// maps onto DevServerGroup.name (this service has no separate tagging
+	// concept — group membership, via DevServer.group_id, is the real
+	// grouping primitive ListDevServerGroups already exposes). Naive
+	// first-connected-match selection — load-balancing algorithm choice is
+	// explicitly deferred, see usecase.PickByTag's doc comment.
+	PickByTag(ctx context.Context, in *PickByTagRequest, opts ...grpc.CallOption) (*PickByTagResponse, error)
 	GrantDevServerGroupAccess(ctx context.Context, in *GrantDevServerGroupAccessRequest, opts ...grpc.CallOption) (*GrantDevServerGroupAccessResponse, error)
 	RevokeDevServerGroupAccess(ctx context.Context, in *RevokeDevServerGroupAccessRequest, opts ...grpc.CallOption) (*RevokeDevServerGroupAccessResponse, error)
 	ListDevServerGroupGrants(ctx context.Context, in *ListDevServerGroupGrantsRequest, opts ...grpc.CallOption) (*ListDevServerGroupGrantsResponse, error)
@@ -362,6 +372,16 @@ func (c *infraFleetServiceClient) ListDevServerGroups(ctx context.Context, in *L
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListDevServerGroupsResponse)
 	err := c.cc.Invoke(ctx, InfraFleetService_ListDevServerGroups_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *infraFleetServiceClient) PickByTag(ctx context.Context, in *PickByTagRequest, opts ...grpc.CallOption) (*PickByTagResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(PickByTagResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_PickByTag_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -866,6 +886,15 @@ type InfraFleetServiceServer interface {
 	AssignDevServerGroup(context.Context, *AssignDevServerGroupRequest) (*AssignDevServerGroupResponse, error)
 	CreateDevServerGroup(context.Context, *CreateDevServerGroupRequest) (*CreateDevServerGroupResponse, error)
 	ListDevServerGroups(context.Context, *ListDevServerGroupsRequest) (*ListDevServerGroupsResponse, error)
+	// PickByTag (TASK-WF-002-04) picks a live, connected dev server whose
+	// group name matches tag and resolves it to a Relay-ready connection id —
+	// closes workflow-service's TargetKindFleetTag gap (BE-SOL-002). "tag"
+	// maps onto DevServerGroup.name (this service has no separate tagging
+	// concept — group membership, via DevServer.group_id, is the real
+	// grouping primitive ListDevServerGroups already exposes). Naive
+	// first-connected-match selection — load-balancing algorithm choice is
+	// explicitly deferred, see usecase.PickByTag's doc comment.
+	PickByTag(context.Context, *PickByTagRequest) (*PickByTagResponse, error)
 	GrantDevServerGroupAccess(context.Context, *GrantDevServerGroupAccessRequest) (*GrantDevServerGroupAccessResponse, error)
 	RevokeDevServerGroupAccess(context.Context, *RevokeDevServerGroupAccessRequest) (*RevokeDevServerGroupAccessResponse, error)
 	ListDevServerGroupGrants(context.Context, *ListDevServerGroupGrantsRequest) (*ListDevServerGroupGrantsResponse, error)
@@ -1054,6 +1083,9 @@ func (UnimplementedInfraFleetServiceServer) CreateDevServerGroup(context.Context
 }
 func (UnimplementedInfraFleetServiceServer) ListDevServerGroups(context.Context, *ListDevServerGroupsRequest) (*ListDevServerGroupsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListDevServerGroups not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) PickByTag(context.Context, *PickByTagRequest) (*PickByTagResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method PickByTag not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) GrantDevServerGroupAccess(context.Context, *GrantDevServerGroupAccessRequest) (*GrantDevServerGroupAccessResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GrantDevServerGroupAccess not implemented")
@@ -1408,6 +1440,24 @@ func _InfraFleetService_ListDevServerGroups_Handler(srv interface{}, ctx context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(InfraFleetServiceServer).ListDevServerGroups(ctx, req.(*ListDevServerGroupsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InfraFleetService_PickByTag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PickByTagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).PickByTag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_PickByTag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).PickByTag(ctx, req.(*PickByTagRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2261,6 +2311,10 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListDevServerGroups",
 			Handler:    _InfraFleetService_ListDevServerGroups_Handler,
+		},
+		{
+			MethodName: "PickByTag",
+			Handler:    _InfraFleetService_PickByTag_Handler,
 		},
 		{
 			MethodName: "GrantDevServerGroupAccess",

@@ -6,7 +6,10 @@
 // doc comment) no infra-fleet-service relay client either.
 package domain
 
-import "context"
+import (
+	"context"
+	"errors"
+)
 
 // StepType is the discriminator for a workflow step's kind — mirrors
 // workflowv1.StepType (proto) one-for-one, see
@@ -20,17 +23,25 @@ const (
 	StepTypeNotification StepType = "notification"
 	StepTypeWebhook      StepType = "webhook"
 	StepTypeCondition    StepType = "condition"
+	StepTypeAction       StepType = "action"   // TASK-WF-003-02
+	StepTypeParallel     StepType = "parallel" // TASK-WF-003-03
 )
 
-// Valid reports whether t is one of the five known step types.
+// Valid reports whether t is one of the seven known step types.
 func (t StepType) Valid() bool {
 	switch t {
-	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition:
+	case StepTypeAgent, StepTypeShell, StepTypeNotification, StepTypeWebhook, StepTypeCondition, StepTypeAction, StepTypeParallel:
 		return true
 	default:
 		return false
 	}
 }
+
+// ErrParallelStepFailed is returned by waveDispatcher.runParallelStep when
+// at least one sub-step failed and ParallelStepConfig.AllowPartialFailure
+// is false — same per-package sentinel-error convention as
+// ErrTemplateNotFound et al. (template.go).
+var ErrParallelStepFailed = errors.New("domain: parallel step failed: at least one sub-step did not complete")
 
 // ResultStatus is a StepResult's outcome — "completed" and "failed" only;
 // no in-progress/partial state, since a StepExecutor call is synchronous
@@ -62,10 +73,23 @@ type StepResult struct {
 // infra-fleet-service's own ConnectionID/connectionId convention (see its
 // internal/usecase/resolve_connection.go and relay.go).
 type AgentStepConfig struct {
-	ConnectionID string `json:"connectionId"`
-	Prompt       string `json:"prompt"`
-	WorktreePath string `json:"worktreePath,omitempty"`
-	TrustPreset  string `json:"trustPreset,omitempty"`
+	ConnectionID string       `json:"connectionId"`
+	Prompt       string       `json:"prompt"`
+	WorktreePath string       `json:"worktreePath,omitempty"`
+	TrustPreset  string       `json:"trustPreset,omitempty"`
+	Provider     *ProviderPin `json:"provider,omitempty"`
+}
+
+// ProviderPin is an AgentStepConfig's optional explicit AI provider
+// choice — set, it beats ai-provider-service's own priority-chain
+// resolution (user > project > server); unset, ProviderResolver falls back
+// to that chain. See usecase.ProviderResolver. A pointer field so "field
+// entirely absent" (fall back to the chain) is distinguishable from
+// "present with an empty AccountID" (also falls back) without a second
+// boolean.
+type ProviderPin struct {
+	AccountID string `json:"accountId,omitempty"`
+	Model     string `json:"model,omitempty"`
 }
 
 // ShellStepConfig is the Shell step type's config shape — a script relayed
@@ -84,6 +108,26 @@ type NotificationStepConfig struct {
 	ConnectionID string `json:"connectionId"`
 	Channel      string `json:"channel"`
 	Message      string `json:"message"`
+}
+
+// ActionStepConfig is the Action step type's config shape — dispatches to
+// one of a registered set of action handlers (git.*, github.*, jira.*,
+// ...) by name. See stepexecutors.ActionExecutor's doc comment for which
+// handlers are actually wired — the set of supported actions is a product
+// decision, not fixed by this type.
+type ActionStepConfig struct {
+	Action string         `json:"action"` // "git.createBranch" | "github.createPR" | ...
+	Params map[string]any `json:"params"`
+}
+
+// ParallelStepConfig is the Parallel step type's config shape — a single
+// step's own nested fan-out to sub-steps, dispatched directly by
+// waveDispatcher.runStep (not through StepExecutorRegistry, since it needs
+// to recurse back into runStep itself for each sub-step — see
+// wave_dispatcher.go's runParallelStep).
+type ParallelStepConfig struct {
+	Steps               []Step `json:"steps"`
+	AllowPartialFailure bool   `json:"allowPartialFailure"`
 }
 
 // StepExecutor is the domain-level strategy interface each step type

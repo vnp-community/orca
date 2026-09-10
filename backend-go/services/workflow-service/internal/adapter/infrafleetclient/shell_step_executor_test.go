@@ -21,10 +21,10 @@ func TestShellExecutor_SuccessfulRelayProducesCompletedStepResult(t *testing.T) 
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewShellExecutor(fake)
+	exec := NewShellExecutor(fake, newPassthroughServerResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
-	cfg, _ := json.Marshal(domain.ShellStepConfig{ConnectionID: "conn-1", Script: "echo hi"})
+	cfg, _ := json.Marshal(domain.ShellStepConfig{ConnectionID: "server:conn-1", Script: "echo hi"})
 	result, err := exec.Execute(ctx, string(cfg))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -47,10 +47,10 @@ func TestShellExecutor_NonZeroExitCodeProducesFailedStepResult(t *testing.T) {
 			return &infrafleetv1.RelayResponse{ResultJson: string(result)}, nil
 		},
 	}
-	exec := NewShellExecutor(fake)
+	exec := NewShellExecutor(fake, newPassthroughServerResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
-	cfg, _ := json.Marshal(domain.ShellStepConfig{ConnectionID: "conn-1", Script: "not-a-command"})
+	cfg, _ := json.Marshal(domain.ShellStepConfig{ConnectionID: "server:conn-1", Script: "not-a-command"})
 	result, err := exec.Execute(ctx, string(cfg))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -66,10 +66,10 @@ func TestShellExecutor_RelayErrorPropagates(t *testing.T) {
 			return nil, errors.New("dev server unreachable")
 		},
 	}
-	exec := NewShellExecutor(fake)
+	exec := NewShellExecutor(fake, newPassthroughServerResolver())
 	ctx := withTenantContext(context.Background(), "tenant-1")
 
-	cfg, _ := json.Marshal(domain.ShellStepConfig{ConnectionID: "conn-1", Script: "echo hi"})
+	cfg, _ := json.Marshal(domain.ShellStepConfig{ConnectionID: "server:conn-1", Script: "echo hi"})
 	_, err := exec.Execute(ctx, string(cfg))
 	if err == nil {
 		t.Fatal("expected the relay error to propagate")

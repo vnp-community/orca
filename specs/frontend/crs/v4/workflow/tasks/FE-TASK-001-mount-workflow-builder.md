@@ -4,9 +4,31 @@
 **Solution Ref:** FE-SOL-001 Phần 1
 **Priority:** 🟠 P1
 **Estimated:** 50 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
+
+## Kết quả thực thi (2026-09-09)
+
+- Vá `useWorkflow.ts`'s `runWorkflow(inputs?)` → `runWorkflow(projectId: string)`, gửi `projectId`
+  trong payload `workflow.execute` (đúng comment cũ trong file đã ghi shape 4 field từ lâu). Xác nhận
+  bằng grep: `WorkflowBuilder.tsx` là call site DUY NHẤT của `runWorkflow()` trong toàn repo — đổi chữ
+  ký breaking an toàn, risk LOW đúng dự đoán.
+- Thêm prop `projectId` (bắt buộc) + `onSave` (optional) vào `WorkflowBuilder.tsx`; nút Save giờ
+  `await saveTemplate()` rồi gọi `onSave?.()`; nút Run gọi `runWorkflow(projectId)`.
+- Thêm nút "+ New Workflow" + prop `onNewWorkflow` vào `WorkflowMonitor.tsx` (đặt ở đầu phần render
+  danh sách, trước khối `isLoading`, không xuất hiện ở view chi tiết `ExecutionMonitor`).
+- `WorkspaceLayout.tsx`: thêm state `workflowView: 'monitor' | 'builder'`, lazy-load
+  `WorkflowBuilder`, toggle trong tab `'workflows'` đúng theo mẫu task đưa ra.
+- Cập nhật test: `useWorkflow.test.ts` (assertion `projectId` trong payload), `WorkflowBuilder.test.tsx`
+  (thêm case Run truyền đúng `projectId`, sửa mọi `render()` cũ thêm prop `projectId` bắt buộc),
+  `WorkflowMonitor.test.tsx` (case "+ New Workflow" → `onNewWorkflow`), `WorkspaceLayout.test.tsx`
+  (thêm nút `tab-workflows` vào mock `WorkspaceTabBar` — trước đây thiếu hẳn nút này; mock
+  `WorkflowBuilder` mới; 3 case toggle Monitor⇄Builder).
+- Test: `npx vitest run useWorkflow.test.ts WorkflowBuilder.test.tsx WorkflowMonitor.test.tsx
+  WorkspaceLayout.test.tsx` → 36/36 pass.
+- Cùng lưu ý `@shared/*` alias thiếu trong `tsconfig.json` (ghi ở FE-TASK-003) — không ảnh hưởng gì
+  thêm ở task này vì không file nào ở đây import `@shared/*` mới.
 
 ## Mục tiêu
 

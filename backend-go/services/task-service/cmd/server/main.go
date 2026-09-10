@@ -34,8 +34,10 @@ import (
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
+	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
+	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 )
 
 // version is overridden at build time via -ldflags "-X main.version=...".
@@ -78,13 +80,20 @@ func run() error {
 
 	repo := taskpostgres.New(pool)
 
-	// team-scope resolution and complex (orchestration-service) execution
-	// dispatch are still STUBS — see internal/adapter/grpcclient's doc
-	// comments and this service's README. simple execution dispatch and
-	// the AI-relay path are real as of TASK-224, dialed against
-	// infra-fleet-service and ai-provider-service below.
-	teamScopeResolver := taskgrpcclient.NewStubTeamScopeResolver()
+	// complex (orchestration-service) execution dispatch is still a STUB —
+	// see internal/adapter/grpcclient's doc comments and this service's
+	// README. simple execution dispatch, the AI-relay path, and (as of
+	// TASK-TG-003-01) team-scope resolution are all real, dialed against
+	// infra-fleet-service, ai-provider-service, and tenant-service below.
 	complexExecutor := taskgrpcclient.NewStubComplexExecutor()
+
+	tenantConn, err := taskgrpcclient.Dial(cfg.TenantServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing tenant-service: %w", err)
+	}
+	defer func() { _ = tenantConn.Close() }()
+	tenantClient := tenantv1.NewTenantServiceClient(tenantConn)
+	teamScopeResolver := taskgrpcclient.NewTeamScopeResolver(tenantClient)
 
 	infraFleetConn, err := taskgrpcclient.Dial(cfg.InfraFleetServiceAddr)
 	if err != nil {
@@ -104,6 +113,14 @@ func run() error {
 	aiProviderClient := aiproviderv1.NewAiProviderServiceClient(aiProviderConn)
 	aiProviderContextResolver := taskgrpcclient.NewAIProviderContextResolver(aiProviderClient)
 
+	gitGatewayConn, err := taskgrpcclient.Dial(cfg.GitGatewayServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing git-gateway-service: %w", err)
+	}
+	defer func() { _ = gitGatewayConn.Close() }()
+	gitGatewayClient := gitgatewayv1.NewGitGatewayServiceClient(gitGatewayConn)
+	techStackDetector := taskgrpcclient.NewTechStackDetector(gitGatewayClient)
+
 	// opaEvaluator loads/compiles the orca-authz bundle once per distinct
 	// query string (common/policy.Evaluator's own cache) and is shared by
 	// every ResolvePermission call for this process's lifetime.
@@ -113,9 +130,8 @@ func run() error {
 	}
 	opaClient := taskopaclient.New(opaEvaluator)
 
-	createTaskUC := usecase.NewCreateTask(repo)
+	createTaskUC := usecase.NewCreateTask(repo, repo) // repo implements both TaskRepository and GrantRepository
 	getTaskUC := usecase.NewGetTask(repo)
-	addEdgeUC := usecase.NewAddEdge(repo)
 	grantUC := usecase.NewGrant(repo)
 	resolvePermissionUC := usecase.NewResolvePermission(repo, repo, teamScopeResolver, opaClient)
 	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor)
@@ -124,18 +140,28 @@ func run() error {
 	updateTaskUC := usecase.NewUpdateTask(repo)
 	deleteTaskUC := usecase.NewDeleteTask(repo)
 	getDependenciesUC := usecase.NewGetDependencies(repo, repo)
-	aiDecomposeUC := usecase.NewAIDecompose(repo, aiProviderContextResolver, projectExecutionResolver, aiCompleter)
+	aiDecomposeUC := usecase.NewAIDecompose(repo, aiProviderContextResolver, projectExecutionResolver, aiCompleter, techStackDetector)
 	// repo also implements usecase.TxRunner (internal/adapter/postgres's
-	// RunInTx) — AIApply needs its create-subtask+add-edge loop to run in
-	// one transaction (TASK-224 Gap 2), not the standalone createTaskUC/
-	// addEdgeUC instances above (those stay wired to the plain CreateTask/
-	// AddEdge RPCs, which don't need a shared transaction).
+	// RunInTx) — AIApply needs its create-subtask+add-edge loop, and the
+	// AddEdge RPC handler needs its cycle-check+write+auto-block sequence
+	// (TASK-TG-001-04), to each run inside one transaction; passed to
+	// taskgrpc.New directly rather than a pre-built *usecase.AddEdge, since
+	// AddEdge must be constructed fresh per call, scoped to that call's
+	// transaction.
 	aiApplyUC := usecase.NewAIApply(repo)
+	recalculateProgressUC := usecase.NewRecalculateProgress(repo)
+	getSubtreeUC := usecase.NewGetSubtree(repo)
+	generateAgentPromptUC := usecase.NewGenerateAgentPrompt(repo, projectExecutionResolver, aiCompleter)
+	revokeGrantUC := usecase.NewRevokeGrant(repo)
+	listGrantsUC := usecase.NewListGrants(repo)
+	generateShareLinkUC := usecase.NewGenerateShareLink(repo, resolvePermissionUC)
+	getTaskByShareTokenUC := usecase.NewGetTaskByShareToken(repo)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
-		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
-		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC,
+		createTaskUC, getTaskUC, repo, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
+		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC, recalculateProgressUC,
+		getSubtreeUC, generateAgentPromptUC, revokeGrantUC, listGrantsUC, generateShareLinkUC, getTaskByShareTokenUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

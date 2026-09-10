@@ -7,7 +7,7 @@ func TestNewTask_ValidatesInvariants(t *testing.T) {
 		name     string
 		tenantID string
 		title    string
-		status   string
+		status   Status
 		parentID string
 		id       string
 		wantErr  error

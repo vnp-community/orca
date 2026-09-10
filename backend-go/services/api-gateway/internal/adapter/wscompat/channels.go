@@ -277,15 +277,16 @@ func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServi
 func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 	r.Register("task.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
-			Title    string `json:"title"`
-			ParentID string `json:"parentId"`
+			Title     string `json:"title"`
+			ParentID  string `json:"parentId"`
+			ProjectID string `json:"projectId"`
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
 		resp, err := client.CreateTask(ctx, &taskv1.CreateTaskRequest{
-			TenantId: id.TenantID, Title: in.Title, ParentId: in.ParentID,
+			TenantId: id.TenantID, Title: in.Title, ParentId: in.ParentID, ProjectId: in.ProjectID,
 		})
 		if err != nil {
 			return nil, err

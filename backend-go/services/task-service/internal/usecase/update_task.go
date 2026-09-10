@@ -14,7 +14,7 @@ import (
 type UpdateTaskInput struct {
 	ID     string
 	Title  *string
-	Status *string
+	Status *domain.Status
 	// WorkflowTemplateID: nil = leave untouched, non-nil = set (an empty
 	// string clears the attachment) — same wrapper-typed field-mask
 	// convention as Title/Status. See docs/backlog/BACKLOG-016.
@@ -52,18 +52,32 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 	if in.Title != nil {
 		current.Title = *in.Title
 	}
+	reachedTerminal := false
 	if in.Status != nil {
 		updated, err := current.SetStatus(*in.Status)
 		if err != nil {
 			return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_INVALID_STATUS_TRANSITION", err.Error(), err)
 		}
 		current = updated
+		reachedTerminal = current.Status == domain.StatusDone || current.Status == domain.StatusCancelled
 	}
 	if in.WorkflowTemplateID != nil {
 		current.WorkflowTemplateID = *in.WorkflowTemplateID
 	}
 	if err := uc.repo.Update(ctx, tenantID, current); err != nil {
 		return domain.Task{}, apperrors.New(apperrors.KindInternal, "TASK_UPDATE_FAILED", "failed to persist update", err)
+	}
+	// BE-SOL-001: recalculate the parent chain's done_subtasks/total_subtasks
+	// whenever a child task with a non-empty ParentID reaches a terminal
+	// status — NOT on every field edit. Wired here (UpdateTask's own
+	// status-transition path) rather than ExecuteTask's completion path,
+	// since ExecuteTask has no completion callback yet — see
+	// TASK-TG-005-01/-02 for that gap; re-wire the execute-path cascade once
+	// it lands. Best-effort: a recalculation failure doesn't fail the
+	// status update itself, since the counts are a derived, self-healing
+	// projection (a later successful call recomputes them from scratch).
+	if reachedTerminal && current.ParentID != "" {
+		_ = NewRecalculateProgress(uc.repo).Execute(ctx, current.ID)
 	}
 	return current, nil
 }

@@ -3,9 +3,10 @@ import { EventEmitter } from 'node:events'
 import { spawn } from 'node:child_process'
 import type * as ChildProcess from 'node:child_process'
 import { tmpdir } from 'node:os'
+import { createWireState, decodeFrame } from 'orca-dev-agent-transport'
 import type { AgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
-import { handleAgentExecPrompt } from './agent-print-mode-exec'
+import { handleAgentExecPrompt, handleAgentExecPromptStream } from './agent-print-mode-exec'
 
 const readDecryptedKeyMock = vi.hoisted(() => vi.fn(async (): Promise<string | null> => null))
 vi.mock('./agent-credential-store', () => ({ readDecryptedKey: readDecryptedKeyMock }))
@@ -36,7 +37,9 @@ function createFakeChild(): FakeChild {
 // child, or the emitted events fire before any listener is attached.
 async function waitForSpawn(): Promise<void> {
   for (let i = 0; i < 50; i++) {
-    if (spawnMock.mock.calls.length > 0) {return}
+    if (spawnMock.mock.calls.length > 0) {
+      return
+    }
     await Promise.resolve()
   }
   throw new Error('spawn() was never called')
@@ -232,5 +235,164 @@ describe('handleAgentExecPrompt', () => {
 
     const result = (await pending) as { result?: { stepId?: string } }
     expect(result.result?.stepId).toBe('step-7')
+  })
+})
+
+// ─── handleAgentExecPromptStream (CR-TG-006) ───────────────────────────────
+// Mirrors agent-ephemeral-vm-handler.test.ts's describe('handleVmProvision', ...)
+// pattern — the one real streaming-handler test precedent in this codebase —
+// using a local MockWs + orca-dev-agent-transport's createWireState/decodeFrame
+// to capture and decode every frame the handler sends.
+class MockWs {
+  readyState = 1
+  sent: Buffer[] = []
+  send = vi.fn((frame: Buffer) => {
+    this.sent.push(frame)
+  })
+}
+
+function decodeSentFrames(ws: MockWs): unknown[] {
+  const receiver = createWireState()
+  return ws.sent.map((frame) => {
+    const decoded = decodeFrame(receiver, frame)!
+    return JSON.parse(decoded.payload.toString('utf8'))
+  })
+}
+
+describe('handleAgentExecPromptStream', () => {
+  beforeEach(() => {
+    spawnMock.mockReset()
+    readDecryptedKeyMock.mockClear()
+  })
+
+  it('sends one stream.chunk frame per stdout/stderr data event, then one stream.end, all sharing the request id', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+    const ws = new MockWs()
+    const wireState = createWireState()
+
+    const pending = handleAgentExecPromptStream(
+      ws as unknown as never,
+      wireState,
+      'req-1',
+      { prompt: 'fix the bug', worktreePath: '/repo' },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+    await waitForSpawn()
+    child.stdout.emit('data', Buffer.from('line 1'))
+    child.stdout.emit('data', Buffer.from('line 2'))
+    child.stderr.emit('data', Buffer.from('warn 1'))
+    child.emit('close', 0)
+    await pending
+
+    const frames = decodeSentFrames(ws)
+    expect(frames).toHaveLength(4)
+    expect(frames[0]).toMatchObject({
+      id: 'req-1',
+      result: { type: 'stream.chunk', line: 'line 1' }
+    })
+    expect(frames[1]).toMatchObject({
+      id: 'req-1',
+      result: { type: 'stream.chunk', line: 'line 2' }
+    })
+    expect(frames[2]).toMatchObject({
+      id: 'req-1',
+      result: { type: 'stream.chunk', line: 'warn 1', source: 'stderr' }
+    })
+    expect(frames[3]).toMatchObject({ id: 'req-1', result: { type: 'stream.end', exitCode: 0 } })
+  })
+
+  it('forwards raw data events verbatim without line-splitting (Open Question 1 resolution)', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+    const ws = new MockWs()
+    const wireState = createWireState()
+
+    const pending = handleAgentExecPromptStream(
+      ws as unknown as never,
+      wireState,
+      'req-2',
+      { prompt: 'fix the bug', worktreePath: '/repo' },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+    await waitForSpawn()
+    child.stdout.emit('data', Buffer.from('partial line without newline\nsecond'))
+    child.emit('close', 0)
+    await pending
+
+    const frames = decodeSentFrames(ws) as { result?: { line?: string } }[]
+    expect(frames[0]?.result?.line).toBe('partial line without newline\nsecond')
+  })
+
+  it('sends a single error frame (no stream.chunk/stream.end) for a missing prompt', async () => {
+    const ws = new MockWs()
+    const wireState = createWireState()
+
+    await handleAgentExecPromptStream(
+      ws as unknown as never,
+      wireState,
+      'req-3',
+      { worktreePath: '/repo' },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+
+    const frames = decodeSentFrames(ws) as { error?: { message: string } }[]
+    expect(frames).toHaveLength(1)
+    expect(frames[0]?.error?.message).toContain('missing required field(s): prompt')
+    expect(spawnMock).not.toHaveBeenCalled()
+  })
+
+  it('sends a single error frame for an unsupported model', async () => {
+    const ws = new MockWs()
+    const wireState = createWireState()
+
+    await handleAgentExecPromptStream(
+      ws as unknown as never,
+      wireState,
+      'req-4',
+      { prompt: 'do the thing', worktreePath: '/repo', model: 'gpt-4o' },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+
+    const frames = decodeSentFrames(ws) as { error?: { message: string } }[]
+    expect(frames).toHaveLength(1)
+    expect(frames[0]?.error?.message).toContain('UNSUPPORTED_MODEL_FOR_ONE_SHOT_EXEC')
+    expect(spawnMock).not.toHaveBeenCalled()
+  })
+
+  it('kills the child and sends stream.end with exitCode -1 on timeout (Open Question 2 resolution)', async () => {
+    vi.useFakeTimers()
+    try {
+      const child = createFakeChild()
+      spawnMock.mockReturnValue(child as never)
+      const ws = new MockWs()
+      const wireState = createWireState()
+
+      const pending = handleAgentExecPromptStream(
+        ws as unknown as never,
+        wireState,
+        'req-5',
+        { prompt: 'fix the bug', worktreePath: '/repo', timeoutMs: 1_000 },
+        MOCK_CONFIG,
+        MOCK_LOG
+      )
+      // Flush the buildAgentEnv() microtask chain before spawn() is invoked.
+      for (let i = 0; i < 50 && spawnMock.mock.calls.length === 0; i++) {
+        await Promise.resolve()
+      }
+      await vi.advanceTimersByTimeAsync(1_000)
+      await pending
+
+      expect(child.kill).toHaveBeenCalledWith('SIGKILL')
+      const frames = decodeSentFrames(ws)
+      expect(frames).toHaveLength(1)
+      expect(frames[0]).toMatchObject({ id: 'req-5', result: { type: 'stream.end', exitCode: -1 } })
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

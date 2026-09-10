@@ -22,6 +22,17 @@ type Config struct {
 	// Agent/Shell/Notification step executors on the execution plane —
 	// mirrors git-gateway-service's identically-named config field.
 	InfraFleetServiceAddr string
+	// ProjectServiceAddr is where internal/adapter/projectclient dials
+	// project-service's GetProject RPC — TASK-WF-002-01's ServerResolver
+	// uses it to resolve TargetKindProject ("project:<id>") targets down to
+	// that project's bound dev server. Mirrors git-gateway-service's
+	// identically-named config field.
+	ProjectServiceAddr string
+	// AIProviderServiceAddr is where internal/adapter/aiproviderclient
+	// dials ai-provider-service's ResolveProvider/ListAccounts RPCs —
+	// TASK-WF-002-02's ProviderResolver uses it for the explicit-pin vs.
+	// priority-chain resolution.
+	AIProviderServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -33,6 +44,8 @@ func Load() (Config, error) {
 		Base:                  base,
 		WebhookAllowlistHosts: splitCSV(commonconfig.StringEnv("WEBHOOK_ALLOWLIST_HOSTS", "")),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
+		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 	}, nil
 }
 

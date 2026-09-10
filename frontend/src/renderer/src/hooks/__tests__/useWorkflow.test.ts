@@ -131,7 +131,7 @@ describe('useWorkflow', () => {
     expect(typeof params.dagJson).toBe('string')
   })
 
-  it('runWorkflow(templateId) calls workflow.execute with target as first arg, forwards rootTraceId/requestId, saves rootTraceId on addExecution', async () => {
+  it('runWorkflow(projectId) calls workflow.execute with target as first arg, forwards projectId/rootTraceId/requestId, saves rootTraceId on addExecution', async () => {
     mockStore.templates = [{ id: 't1', name: 'Existing' }]
     mockRpc.mockResolvedValueOnce({ id: 'exec-1' })
     const { events, stop } = captureTraceEvents()
@@ -140,16 +140,18 @@ describe('useWorkflow', () => {
 
     let execId: string | null = null
     await act(async () => {
-      execId = await result.current.runWorkflow({ foo: 'bar' })
+      execId = await result.current.runWorkflow('proj-1')
     })
     stop()
 
     const startEvent = events.find((e) => e.flow === 'ui:workflow.execute' && e.level === 'start')
-    // BACKLOG-020: the real RPC has no `inputs`/`traceId` fields — `inputs` is
-    // accepted for API-compat but not sent (ExecuteRequest carries no per-run
-    // payload today); `traceId` needed to be `rootTraceId` to actually land.
+    // FE-TASK-001 (workflow v4): channels_workflow.go:36-52 decodes + forwards
+    // ProjectID already — this asserts the frontend now actually sends it.
+    // BACKLOG-020: the real RPC has no `inputs`/`traceId` fields — `traceId`
+    // needed to be `rootTraceId` to actually land.
     expect(mockRpc).toHaveBeenCalledWith('mock-target', 'workflow.execute', {
       templateId: 't1',
+      projectId: 'proj-1',
       rootTraceId: startEvent?.id,
       requestId: startEvent?.id
     })
@@ -171,7 +173,7 @@ describe('useWorkflow', () => {
 
     let execId: string | null = 'not-null'
     await act(async () => {
-      execId = await result.current.runWorkflow()
+      execId = await result.current.runWorkflow('proj-1')
     })
     stop()
 
@@ -190,7 +192,7 @@ describe('useWorkflow', () => {
 
     let execId: string | null = 'not-null'
     await act(async () => {
-      execId = await result.current.runWorkflow()
+      execId = await result.current.runWorkflow('proj-1')
     })
     stop()
 

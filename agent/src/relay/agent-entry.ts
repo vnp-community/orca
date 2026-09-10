@@ -99,7 +99,7 @@ async function main(): Promise<void> {
     // process behind.
     const forceExitTimer = setTimeout(() => process.exit(0), 3_000)
     forceExitTimer.unref()
-    import('./fs-agent-extensions')
+    import('./fs-agent-watch-extensions')
       .then((m) => m.cleanupAgentWatches())
       .catch(() => {
         /* best effort — still exit */

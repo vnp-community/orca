@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package orca.workflow.v1;
 
+import "google/protobuf/struct.proto";
+
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1;workflowv1";
 
 // WorkflowService owns templates + DAG execution/step dispatch. Also exposes
@@ -48,6 +50,17 @@ service WorkflowService {
   // project-service.RebindDevServer's guard, previously a client-side
   // no-op because this RPC didn't exist.
   rpc HasActiveExecutions(HasActiveExecutionsRequest) returns (HasActiveExecutionsResponse);
+
+  // ListExecutions keyset-paginates a project's workflow executions, newest
+  // first — TASK-WF-005-01 (P0): WorkflowMonitor.tsx (frontend) already
+  // calls workflow.listExecutions and had no backing RPC, so the Workflow
+  // tab failed to load for every backend-go user before this was added.
+  rpc ListExecutions(ListExecutionsRequest) returns (ListExecutionsResponse);
+
+  // CloneTemplate (TASK-WF-004-02) produces a fresh, parent-less copy of a
+  // template's EFFECTIVE (post-inheritance) DAG — severs inheritance, see
+  // usecase.CloneTemplate's doc comment.
+  rpc CloneTemplate(CloneTemplateRequest) returns (CloneTemplateResponse);
 }
 
 enum StepType {
@@ -57,6 +70,8 @@ enum StepType {
   STEP_TYPE_NOTIFICATION = 3;
   STEP_TYPE_WEBHOOK = 4;
   STEP_TYPE_CONDITION = 5;
+  STEP_TYPE_ACTION = 6; // TASK-WF-003-02
+  STEP_TYPE_PARALLEL = 7; // TASK-WF-003-03
 }
 
 message WorkflowTemplate {
@@ -67,6 +82,20 @@ message WorkflowTemplate {
   string scope = 5; // company | team | personal
   string parent_template_id = 6; // empty = root of its inheritance chain; see ResolveTemplate
   int32 version = 7; // bumped by UpdateTemplate on every write; 1 at creation
+  // overrides/inject_steps/remove_steps (TASK-WF-004-01) are folded onto an
+  // ancestor's resolved DAG by ResolveTemplate — see that RPC's doc
+  // comment. Not yet settable via CreateTemplate/UpdateTemplate (a
+  // separate, not-yet-scoped follow-up); present here so ResolveTemplate's
+  // response can carry them through once a template row has them.
+  google.protobuf.Struct overrides = 8;
+  repeated StepInjection inject_steps = 9;
+  repeated string remove_steps = 10;
+}
+
+message StepInjection {
+  string anchor_step_id = 1;
+  string position = 2; // "before" | "after"
+  string step_json = 3; // JSON-encoded domain.Step — mirrors dag_json's raw-JSON convention
 }
 
 message CreateTemplateRequest {
@@ -86,6 +115,11 @@ message ExecuteRequest {
   string project_id = 2;
   string root_trace_id = 3; // resumability across restart
   string request_id = 4;
+  // inputs feeds usecase.Interpolate's {{path}} substitution pass — see
+  // TASK-WF-003-01. Re-check this field number against
+  // CR-FLOW-TASK-002's origin_task_id before reusing 5 if that field
+  // landed first (docs/crs/v3/flow-task/).
+  google.protobuf.Struct inputs = 5;
 }
 
 message WorkflowExecution {
@@ -205,4 +239,25 @@ message UpdateTemplateRequest {
 
 message UpdateTemplateResponse {
   WorkflowTemplate template = 1; // includes the bumped version
+}
+
+message ListExecutionsRequest {
+  string project_id = 1;
+  int32 limit = 2;
+  string cursor = 3; // opaque, last-seen execution id; empty = first page
+}
+
+message ListExecutionsResponse {
+  repeated WorkflowExecution executions = 1;
+  string next_cursor = 2; // empty = no further page
+}
+
+message CloneTemplateRequest {
+  string source_template_id = 1;
+  string new_name = 2;
+  string scope = 3; // company | team | personal
+}
+
+message CloneTemplateResponse {
+  WorkflowTemplate template = 1;
 }

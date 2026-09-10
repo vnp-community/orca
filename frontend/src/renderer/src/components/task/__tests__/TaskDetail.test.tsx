@@ -2,6 +2,7 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, fireEvent, waitFor, cleanup } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach } from 'vitest'
+import userEvent from '@testing-library/user-event'
 import { TaskDetail } from '../TaskDetail'
 import { useTask } from '../../../hooks/useTask'
 import { registerTraceSink, type TraceEvent } from '../../../../../shared/trace'
@@ -56,12 +57,14 @@ describe('TaskDetail', () => {
     vi.mocked(useTask).mockReturnValue({
       task: { id: 't1', title: 'My Task', status: 'todo', priority: 'high', projectId: 'p1' },
       updateTask
-    } as any)
+    } as unknown as ReturnType<typeof useTask>)
     mockRpc.mockResolvedValue([]) // task.getDependencies returns a flat { task, edgeType }[]
   })
 
   it('null task → renders empty state', () => {
-    vi.mocked(useTask).mockReturnValue({ task: null, updateTask } as any)
+    vi.mocked(useTask).mockReturnValue({ task: null, updateTask } as unknown as ReturnType<
+      typeof useTask
+    >)
     render(<TaskDetail />)
     expect(screen.getByText('Select a task')).toBeInTheDocument()
   })
@@ -104,7 +107,7 @@ describe('TaskDetail', () => {
     expect(startEvent?.fields.entryPoint).toBe('task-detail')
 
     const runAgentCall = mockRpc.mock.calls.find((c) => c[1] === 'task.execute')
-    expect((runAgentCall?.[2] as { traceId?: string }).traceId).toBe(startEvent?.id)
+    expect((runAgentCall?.[2] as { traceId?: string } | undefined)?.traceId).toBe(startEvent?.id)
   })
 
   it('RPC success → span.ok({taskId}), toast.success shown', async () => {
@@ -150,6 +153,63 @@ describe('TaskDetail', () => {
     await waitFor(() => {
       expect(screen.getByText('Blocker 1')).toBeInTheDocument()
       expect(screen.getByText('← Blocked by:')).toBeInTheDocument()
+    })
+  })
+
+  // FE-TASK-004 (task-graph v4): tab Access + permission badge/hide.
+  describe('permission-gated Run button + Access tab', () => {
+    function mockRpcByMethod(effectiveLevel: string) {
+      mockRpc.mockImplementation((_target, method) => {
+        if (method === 'task.resolvePermission') {
+          return Promise.resolve({ effectiveLevel })
+        }
+        return Promise.resolve([]) // task.getDependencies
+      })
+    }
+
+    it("task.resolvePermission trả effectiveLevel='user' → canManage=false → nút Run KHÔNG render", async () => {
+      mockRpcByMethod('user')
+      render(<TaskDetail />)
+      await waitFor(() => {
+        expect(screen.queryByTestId('run-agent-btn')).not.toBeInTheDocument()
+      })
+    })
+
+    it("task.resolvePermission trả effectiveLevel='owner' → nút Run render bình thường", async () => {
+      mockRpcByMethod('owner')
+      render(<TaskDetail />)
+      await waitFor(() => {
+        expect(screen.getByTestId('run-agent-btn')).toBeInTheDocument()
+      })
+    })
+
+    it('tab "Access" render TaskGrantModal đúng taskId', async () => {
+      mockRpcByMethod('owner')
+      render(<TaskDetail />)
+      await userEvent.click(screen.getByRole('tab', { name: 'Access' }))
+      await waitFor(() => {
+        expect(screen.getByTestId('task-grant-modal')).toBeInTheDocument()
+      })
+    })
+  })
+
+  // FE-TASK-005 (task-graph v4): useTaskActivity polling fallback.
+  it('polledTask.status đổi → <TaskStatusBadge> hiển thị đúng icon/label mới (không phải text thô)', async () => {
+    mockRpc.mockImplementation((_target, method) => {
+      if (method === 'task.get') {
+        return Promise.resolve({ id: 't1', title: 'My Task', status: 'done' })
+      }
+      if (method === 'task.resolvePermission') {
+        return Promise.resolve({ effectiveLevel: 'owner' })
+      }
+      return Promise.resolve([]) // task.getDependencies
+    })
+    render(<TaskDetail />)
+    // useTask's task.status stays 'todo' (mocked, not re-fetched) — polledTask (from
+    // useTaskActivity's task.get poll) should override the badge to 'done'.
+    await waitFor(() => {
+      expect(screen.getByText('Done')).toBeInTheDocument()
+      expect(screen.getByText('✅')).toBeInTheDocument()
     })
   })
 })

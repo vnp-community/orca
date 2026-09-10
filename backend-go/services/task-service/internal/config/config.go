@@ -24,6 +24,12 @@ type Config struct {
 	// AIProviderServiceAddr is where AIDecompose's AIProviderContextResolver
 	// dials ai-provider-service's ResolveProvider RPC.
 	AIProviderServiceAddr string
+	// GitGatewayServiceAddr is where AIDecompose's TechStackDetector
+	// (TASK-TG-002-01) dials git-gateway-service's ReadFile RPC.
+	GitGatewayServiceAddr string
+	// TenantServiceAddr is where the real TeamScopeResolver (TASK-TG-003-01)
+	// dials tenant-service's ListTeamsForUser RPC.
+	TenantServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -36,5 +42,7 @@ func Load() (Config, error) {
 		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "/policy/orca-authz"),
 		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
+		GitGatewayServiceAddr: commonconfig.StringEnv("GIT_GATEWAY_SERVICE_ADDR", "git-gateway-service:9090"),
+		TenantServiceAddr:     commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
 	}, nil
 }

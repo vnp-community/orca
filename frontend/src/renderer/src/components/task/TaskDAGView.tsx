@@ -1,11 +1,58 @@
-import { useMemo, useCallback } from 'react'
-import { ReactFlow, type Node, type Edge, Background, Controls, MiniMap } from '@xyflow/react'
+import { useMemo, useCallback, useEffect, useState } from 'react'
+import {
+  ReactFlow,
+  type Node,
+  type Edge,
+  type NodeMouseHandler,
+  Background,
+  Controls,
+  MiniMap
+} from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { OrcaTask } from '../../../../shared/task-types'
+import { toast } from 'sonner'
+import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
+import { useAppStore } from '../../store'
+import type { OrcaTask, TaskEdgeType } from '../../../../shared/task-types'
 
 type TaskDAGViewProps = {
   tasks: OrcaTask[]
   onSelect: (taskId: string) => void
+}
+
+// FE-TASK-002 (task-graph v4): task.getDependencies real response shape is a flat
+// { task, edgeType }[] (channels_automation_task.go:330-347) — same as TaskDetail.tsx's
+// existing usage, NOT { dependencies: { taskId }[] } as an earlier draft assumed.
+function useDependencyEdges(tasks: OrcaTask[]) {
+  const [depsById, setDepsById] = useState<Map<string, string[]>>(new Map())
+
+  useEffect(() => {
+    let cancelled = false
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    Promise.all(
+      tasks.map(async (t) => {
+        const edges = (await callRuntimeRpc(target, 'task.getDependencies', {
+          taskId: t.id
+        })) as { task: OrcaTask; edgeType: TaskEdgeType }[]
+        return [
+          t.id,
+          edges.filter((e) => e.edgeType === 'depends_on').map((e) => e.task.id)
+        ] as const
+      })
+    )
+      .then((pairs) => {
+        if (!cancelled) {
+          setDepsById(new Map(pairs))
+        }
+      })
+      .catch(() => {
+        // Giữ depsById cũ nếu 1 request lỗi — DAG vẫn render với dữ liệu đã có, không crash toàn bộ view.
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [tasks])
+
+  return depsById
 }
 
 // Color coding by status
@@ -19,17 +66,20 @@ const STATUS_COLORS: Record<string, { bg: string; border: string }> = {
   cancelled: { bg: '#f1f5f9', border: '#64748b' }
 }
 
-function buildDAGLayout(tasks: OrcaTask[]): { nodes: Node[]; edges: Edge[] } {
+function buildDAGLayout(
+  tasks: OrcaTask[],
+  depsById: Map<string, string[]>
+): { nodes: Node[]; edges: Edge[] } {
   if (tasks.length === 0) {
     return { nodes: [], edges: [] }
   }
 
-  // Build dependency map: taskId -> list of taskIds this depends on
-  // NOTE: OrcaTask has no embedded `dependsOn` — edges live in a separate table
-  // (task.getDependencies per task). Always [] until that's wired in (out of scope here).
+  // Build dependency map: taskId -> list of taskIds this depends on — from the real
+  // task.getDependencies RPC (via useDependencyEdges above), not the old always-[]
+  // (task as any).dependsOn placeholder.
   const dependsOnMap = new Map<string, string[]>()
   for (const task of tasks) {
-    dependsOnMap.set(task.id, (task as any).dependsOn ?? [])
+    dependsOnMap.set(task.id, depsById.get(task.id) ?? [])
   }
 
   // Topological wave assignment
@@ -103,7 +153,7 @@ function buildDAGLayout(tasks: OrcaTask[]): { nodes: Node[]; edges: Edge[] } {
   // Create dependency edges
   const edges: Edge[] = []
   for (const task of tasks) {
-    const deps = (task as any).dependsOn ?? []
+    const deps = depsById.get(task.id) ?? []
     for (const depId of deps) {
       if (tasks.find((t) => t.id === depId)) {
         edges.push({
@@ -121,10 +171,28 @@ function buildDAGLayout(tasks: OrcaTask[]): { nodes: Node[]; edges: Edge[] } {
 }
 
 export function TaskDAGView({ tasks, onSelect }: TaskDAGViewProps) {
-  const { nodes, edges } = useMemo(() => buildDAGLayout(tasks), [tasks])
+  const depsById = useDependencyEdges(tasks)
+  const { nodes, edges } = useMemo(() => buildDAGLayout(tasks, depsById), [tasks, depsById])
+  const [addingFor, setAddingFor] = useState<string | null>(null)
 
-  const onNodeClick = useCallback(
-    (_event: any, node: any) => {
+  const addDependency = useCallback(async (fromTaskId: string, toTaskId: string) => {
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    try {
+      await callRuntimeRpc(target, 'task.addEdge', { fromTaskId, toTaskId, type: 'depends_on' })
+      setAddingFor(null)
+      // Không có cách nào refetch depsById từ đây khác ngoài đợi `tasks` prop đổi (trigger
+      // useEffect ở useDependencyEdges) — chấp nhận được vì `tasks` re-render mỗi khi
+      // useTasks's refetch chạy; nếu cần cập nhật ngay lập tức, thêm 1 forceRefresh cục bộ
+      // ở bước follow-up (ngoài phạm vi task này).
+    } catch (err) {
+      // Backend đã atomic + tự cycle-detect (BE-SOL-001) — không tự lặp lại validation ở
+      // client, chỉ hiện lỗi. addingFor KHÔNG reset để người dùng thử lại ngay.
+      toast.error(`Cannot add dependency: ${(err as Error).message}`)
+    }
+  }, [])
+
+  const onNodeClick = useCallback<NodeMouseHandler>(
+    (_event, node) => {
       onSelect(node.id)
     },
     [onSelect]
@@ -142,22 +210,55 @@ export function TaskDAGView({ tasks, onSelect }: TaskDAGViewProps) {
   }
 
   return (
-    <div className="task-dag-view h-full min-h-[300px]" data-testid="task-dag-view">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodeClick={onNodeClick}
-        fitView
-        fitViewOptions={{ padding: 0.2 }}
-        nodesDraggable={false}
-        nodesConnectable={false}
-        elementsSelectable={true}
-        proOptions={{ hideAttribution: true }}
-      >
-        <Background gap={16} />
-        <Controls showInteractive={false} />
-        <MiniMap nodeStrokeWidth={2} />
-      </ReactFlow>
+    <div className="task-dag-view h-full min-h-[300px] flex flex-col" data-testid="task-dag-view">
+      <div className="flex items-center gap-2 p-1 border-b text-xs">
+        <select
+          className="border rounded px-1 py-0.5"
+          onChange={(e) => setAddingFor(e.target.value || null)}
+          value={addingFor ?? ''}
+          data-testid="dag-add-dependency-select-from"
+        >
+          <option value="">+ Add dependency: select task...</option>
+          {tasks.map((t) => (
+            <option key={t.id} value={t.id}>
+              {t.title}
+            </option>
+          ))}
+        </select>
+        {addingFor && (
+          <select
+            className="border rounded px-1 py-0.5"
+            onChange={(e) => e.target.value && addDependency(addingFor, e.target.value)}
+            data-testid="dag-add-dependency-select-to"
+          >
+            <option value="">depends on...</option>
+            {tasks
+              .filter((t) => t.id !== addingFor)
+              .map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.title}
+                </option>
+              ))}
+          </select>
+        )}
+      </div>
+      <div className="flex-1">
+        <ReactFlow
+          nodes={nodes}
+          edges={edges}
+          onNodeClick={onNodeClick}
+          fitView
+          fitViewOptions={{ padding: 0.2 }}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={true}
+          proOptions={{ hideAttribution: true }}
+        >
+          <Background gap={16} />
+          <Controls showInteractive={false} />
+          <MiniMap nodeStrokeWidth={2} />
+        </ReactFlow>
+      </div>
     </div>
   )
 }

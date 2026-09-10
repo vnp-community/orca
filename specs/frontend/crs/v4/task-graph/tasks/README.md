@@ -6,13 +6,13 @@ mảng solution đã thiết kế. FE-SOL-001 tự đính chính lại CR-TG-007
 sửa từ trước (đọc `TaskPromptEditor.tsx` thật xác nhận `prompt` đã gửi đúng qua `task.execute`) —
 mục đó **không có task tương ứng ở đây**, đúng ý solution.
 
-| Task ID | Mô tả | Phụ thuộc |
-|---------|-------|-----------|
-| [FE-TASK-001](./FE-TASK-001-new-task-creation-dialog.md) | `TaskCreateDialog` + nút "+ New Task" trên `TaskGraph` toolbar, gọi `task.create` (RPC đã tồn tại thật) | Không có hard blocker; khuyến nghị backend-go vá song song `createArgs`/`CreateTaskRequest` thiếu `ProjectId` |
-| [FE-TASK-002](./FE-TASK-002-task-dag-view-real-dependencies.md) | `TaskDAGView` đổi nguồn cạnh từ `(task as any).dependsOn` (luôn `[]`) sang `task.getDependencies` thật + UI "+ Add dependency" gọi `task.addEdge` | Không có (cả 2 RPC đã tồn tại thật) |
-| [FE-TASK-003](./FE-TASK-003-task-board-kanban-view.md) | `TaskBoardView` — Board/Kanban view mới, 7 cột theo `OrcaTask['status']`, kéo-thả gọi `task.update` | Không có (RPC đã tồn tại); phải vá `TaskStatusBadge`'s `STATUS_CONFIG` thiếu 3/7 status trước |
-| [FE-TASK-004](./FE-TASK-004-task-grant-modal-access-tab.md) | `TaskGrantModal` + tab Access + permission badge, dùng đúng thang `GrantLevel` thật (`owner/admin/user/team/company`) | `task.grant`/`task.resolvePermission` đã tồn tại (Add Grant + badge dùng ngay); list/revoke/share-link chờ BE-SOL-003's RPC mới |
-| [FE-TASK-005](./FE-TASK-005-use-task-activity-polling-fallback.md) | `useTaskActivity` — áp dụng nguyên thiết kế polling fallback đã có ở flow-task series (không thiết kế lại) | Không có |
+| Task ID | Mô tả | Phụ thuộc | Trạng thái cuối |
+|---------|-------|-----------|-----------------|
+| [FE-TASK-001](./FE-TASK-001-new-task-creation-dialog.md) | `TaskCreateDialog` + nút "+ New Task" trên `TaskGraph` toolbar, gọi `task.create` (RPC đã tồn tại thật) | Không có hard blocker; khuyến nghị backend-go vá song song `createArgs`/`CreateTaskRequest` thiếu `ProjectId` | ✅ DONE — UI + test đầy đủ; end-to-end "task thấy ngay sau khi tạo" chờ backend vá `projectId` (task riêng, đang chạy song song) |
+| [FE-TASK-002](./FE-TASK-002-task-dag-view-real-dependencies.md) | `TaskDAGView` đổi nguồn cạnh từ `(task as any).dependsOn` (luôn `[]`) sang `task.getDependencies` thật + UI "+ Add dependency" gọi `task.addEdge` | Không có (cả 2 RPC đã tồn tại thật) | ✅ DONE |
+| [FE-TASK-003](./FE-TASK-003-task-board-kanban-view.md) | `TaskBoardView` — Board/Kanban view mới, 7 cột theo `OrcaTask['status']`, kéo-thả gọi `task.update` | Không có (RPC đã tồn tại); phải vá `TaskStatusBadge`'s `STATUS_CONFIG` thiếu 3/7 status trước | ✅ DONE |
+| [FE-TASK-004](./FE-TASK-004-task-grant-modal-access-tab.md) | `TaskGrantModal` + tab Access + permission badge, dùng đúng thang `GrantLevel` thật (`owner/admin/user/team/company`) | `task.grant`/`task.resolvePermission` đã tồn tại (Add Grant + badge dùng ngay); list/revoke/share-link chờ BE-SOL-003's RPC mới | ✅ DONE — phần list/revoke/share-link mock/no-op chờ BE-SOL-003 |
+| [FE-TASK-005](./FE-TASK-005-use-task-activity-polling-fallback.md) | `useTaskActivity` — áp dụng nguyên thiết kế polling fallback đã có ở flow-task series (không thiết kế lại) | Không có | ✅ DONE |
 
 **🔴 P0: FE-TASK-003** (Board/Kanban view) — gap chính ma trận hoàn thành CR-TG-007 nêu, ưu tiên làm
 trước nếu phải chọn 1 task duy nhất trong đợt này.

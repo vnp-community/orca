@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"log/slog"
 
@@ -15,12 +16,16 @@ import (
 // ExecuteInput mirrors ExecuteRequest. ProjectID is persisted on the
 // resulting execution — see domain.WorkflowExecution and
 // usecase.HasActiveExecutions, which is what project-service.RebindDevServer
-// relies on (Epic C, backend-go/docs/execution-plan.md).
+// relies on (Epic C, backend-go/docs/execution-plan.md). Inputs
+// (TASK-WF-003-01) feeds usecase.Interpolate's {{path}} substitution pass —
+// also persisted (WorkflowExecution.InputsJSON) so a step dispatched after
+// a restart still has the original inputs available.
 type ExecuteInput struct {
 	TemplateID  string
 	ProjectID   string
 	RootTraceID string
 	RequestID   string
+	Inputs      map[string]any
 }
 
 // Execute resolves a template, validates and wave-computes its DAG,
@@ -110,6 +115,13 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 	if err != nil {
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_EXECUTION", err.Error(), err)
 	}
+	if len(in.Inputs) > 0 {
+		inputsJSON, err := json.Marshal(in.Inputs)
+		if err != nil {
+			return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInvalidArgument, "WORKFLOW_INVALID_INPUTS", "failed to encode execution inputs", err)
+		}
+		exec.InputsJSON = string(inputsJSON)
+	}
 
 	if err := uc.executions.CreateExecution(ctx, exec); err != nil {
 		return domain.WorkflowExecution{}, apperrors.New(apperrors.KindInternal, "WORKFLOW_EXECUTION_SAVE_FAILED", "failed to persist workflow execution", err)
@@ -119,8 +131,15 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 	// carry the resolved tenant id forward explicitly, since
 	// StepExecutionRepository/ExecutionRepository calls made from the
 	// background goroutine still need it — see this type's doc comment.
+	// triggeredBy is read from the still-live inbound ctx (not
+	// dispatchCtx, which is detached and starts empty) since it must be
+	// captured before that detach — see ExecutionContext's doc comment for
+	// why this is a context value rather than a widened StepExecutor
+	// signature.
+	triggeredBy, _ := tenant.UserID(ctx)
 	dispatchCtx := tenant.WithTenantID(context.Background(), tenantID)
-	go uc.runToCompletion(dispatchCtx, exec, waves)
+	dispatchCtx = WithExecutionContext(dispatchCtx, ExecutionContext{ProjectID: exec.ProjectID, TriggeredBy: triggeredBy})
+	go uc.runToCompletion(dispatchCtx, exec, waves, in.Inputs)
 
 	return exec, nil
 }
@@ -129,8 +148,8 @@ func (uc *Execute) Execute(ctx context.Context, in ExecuteInput) (domain.Workflo
 // final status (completed if every wave succeeded, failed if any step
 // did not — see waveDispatcher's doc comment for the failure-semantics
 // rationale). Runs entirely off the originating RPC's goroutine.
-func (uc *Execute) runToCompletion(ctx context.Context, exec domain.WorkflowExecution, waves [][]domain.Step) {
-	succeeded := uc.dispatcher.dispatchWaves(ctx, exec.ID, waves)
+func (uc *Execute) runToCompletion(ctx context.Context, exec domain.WorkflowExecution, waves [][]domain.Step, inputs map[string]any) {
+	succeeded := uc.dispatcher.dispatchWaves(ctx, exec.ID, waves, inputs)
 
 	exec.Status = domain.StatusCompleted
 	if !succeeded {

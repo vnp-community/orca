@@ -7,6 +7,7 @@ import (
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 )
 
 // shellExecMethod is the Relay method name ShellExecutor uses — the Relay
@@ -25,14 +26,18 @@ type shellExecParams struct {
 
 // ShellExecutor is the real Shell step executor — relays a script to
 // infra-fleet-service's Relay RPC for execution on the target connection.
+// TASK-WF-002-03: cfg.ConnectionID is now a domain.TargetSpec string,
+// resolved to a real connection id via serverResolver before every relay
+// call — see AgentExecutor's doc comment for the same widening.
 type ShellExecutor struct {
-	client infrafleetv1.InfraFleetServiceClient
+	client         infrafleetv1.InfraFleetServiceClient
+	serverResolver *usecase.ServerResolver
 }
 
 // NewShellExecutor wraps an already-constructed infrafleetv1 client — used
 // by cmd/server/main.go (real dial) and by tests (fake client).
-func NewShellExecutor(client infrafleetv1.InfraFleetServiceClient) *ShellExecutor {
-	return &ShellExecutor{client: client}
+func NewShellExecutor(client infrafleetv1.InfraFleetServiceClient, serverResolver *usecase.ServerResolver) *ShellExecutor {
+	return &ShellExecutor{client: client, serverResolver: serverResolver}
 }
 
 var _ domain.StepExecutor = (*ShellExecutor)(nil)
@@ -43,8 +48,17 @@ func (e *ShellExecutor) Execute(ctx context.Context, stepConfigJSON string) (dom
 		return domain.StepResult{}, fmt.Errorf("infrafleetclient: shell: invalid step config JSON: %w", err)
 	}
 
+	spec, err := domain.ParseTargetSpec(cfg.ConnectionID)
+	if err != nil {
+		return domain.StepResult{}, fmt.Errorf("infrafleetclient: shell: parsing target spec: %w", err)
+	}
+	connectionID, err := e.serverResolver.Resolve(ctx, spec)
+	if err != nil {
+		return domain.StepResult{}, fmt.Errorf("infrafleetclient: shell: resolving target: %w", err)
+	}
+
 	var result execResult
-	if err := relay(ctx, e.client, cfg.ConnectionID, shellExecMethod, shellExecParams{
+	if err := relay(ctx, e.client, connectionID, shellExecMethod, shellExecParams{
 		Script: cfg.Script,
 		Env:    cfg.Env,
 	}, &result); err != nil {

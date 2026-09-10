@@ -24,6 +24,8 @@ const (
 	TaskService_GetTask_FullMethodName             = "/orca.task.v1.TaskService/GetTask"
 	TaskService_AddEdge_FullMethodName             = "/orca.task.v1.TaskService/AddEdge"
 	TaskService_Grant_FullMethodName               = "/orca.task.v1.TaskService/Grant"
+	TaskService_RevokeGrant_FullMethodName         = "/orca.task.v1.TaskService/RevokeGrant"
+	TaskService_ListGrants_FullMethodName          = "/orca.task.v1.TaskService/ListGrants"
 	TaskService_ResolvePermission_FullMethodName   = "/orca.task.v1.TaskService/ResolvePermission"
 	TaskService_Execute_FullMethodName             = "/orca.task.v1.TaskService/Execute"
 	TaskService_HasActiveExecutions_FullMethodName = "/orca.task.v1.TaskService/HasActiveExecutions"
@@ -33,6 +35,11 @@ const (
 	TaskService_GetDependencies_FullMethodName     = "/orca.task.v1.TaskService/GetDependencies"
 	TaskService_AIDecompose_FullMethodName         = "/orca.task.v1.TaskService/AIDecompose"
 	TaskService_AIApply_FullMethodName             = "/orca.task.v1.TaskService/AIApply"
+	TaskService_RecalculateProgress_FullMethodName = "/orca.task.v1.TaskService/RecalculateProgress"
+	TaskService_GetSubtree_FullMethodName          = "/orca.task.v1.TaskService/GetSubtree"
+	TaskService_GenerateAgentPrompt_FullMethodName = "/orca.task.v1.TaskService/GenerateAgentPrompt"
+	TaskService_GenerateShareLink_FullMethodName   = "/orca.task.v1.TaskService/GenerateShareLink"
+	TaskService_GetTaskByShareToken_FullMethodName = "/orca.task.v1.TaskService/GetTaskByShareToken"
 )
 
 // TaskServiceClient is the client API for TaskService service.
@@ -47,6 +54,11 @@ type TaskServiceClient interface {
 	GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*GetTaskResponse, error)
 	AddEdge(ctx context.Context, in *AddEdgeRequest, opts ...grpc.CallOption) (*AddEdgeResponse, error)
 	Grant(ctx context.Context, in *GrantRequest, opts ...grpc.CallOption) (*GrantResponse, error)
+	// RevokeGrant/ListGrants are the public grant-management surface for the
+	// frontend's Access tab (FE-SOL-001) — distinct from the internal
+	// ListGrantsForAncestors path ResolvePermission's BFS walk uses.
+	RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error)
 	ResolvePermission(ctx context.Context, in *ResolvePermissionRequest, opts ...grpc.CallOption) (*ResolvePermissionResponse, error)
 	Execute(ctx context.Context, in *TaskServiceExecuteRequest, opts ...grpc.CallOption) (*TaskServiceExecuteResponse, error)
 	// HasActiveExecutions answers "does this project have a task currently
@@ -73,6 +85,28 @@ type TaskServiceClient interface {
 	// AIDecompose call, creating one subtask + parent_child edge per
 	// proposal.
 	AIApply(ctx context.Context, in *AIApplyRequest, opts ...grpc.CallOption) (*AIApplyResponse, error)
+	// RecalculateProgress recomputes done_subtasks/total_subtasks for
+	// task_id's whole ancestor chain in one repository round trip — called
+	// from UpdateTask's status-transition path when a child task reaches a
+	// terminal status, per BE-SOL-001. See task-service.md §3/§5,7.
+	RecalculateProgress(ctx context.Context, in *RecalculateProgressRequest, opts ...grpc.CallOption) (*RecalculateProgressResponse, error)
+	// GetSubtree returns task_id and every descendant in one call — replaces
+	// the frontend's "load task.list for the whole project, filter
+	// client-side by parentId" pattern (FE-SOL-001 §2.1).
+	GetSubtree(ctx context.Context, in *GetSubtreeRequest, opts ...grpc.CallOption) (*GetSubtreeResponse, error)
+	// GenerateAgentPrompt produces and persists a single-task agent prompt
+	// template (Task.prompt_template) via the same AI relay primitive as
+	// AIDecompose, but a distinct template (single-task instructions, not a
+	// subtask breakdown). See TASK-TG-005-03's buildExecutePrompt, the later
+	// reader of Task.prompt_template.
+	GenerateAgentPrompt(ctx context.Context, in *GenerateAgentPromptRequest, opts ...grpc.CallOption) (*GenerateAgentPromptResponse, error)
+	// GenerateShareLink/GetTaskByShareToken — TASK-TG-003-05, SECURITY REVIEW
+	// REQUIRED before merge. GetTaskByShareToken is task-service's first
+	// unauthenticated read endpoint by design: the token itself is the
+	// authorization, bypassing ResolveGrant/OPA entirely. See
+	// GenerateShareLinkResponse/TaskShareView's own doc comments.
+	GenerateShareLink(ctx context.Context, in *GenerateShareLinkRequest, opts ...grpc.CallOption) (*GenerateShareLinkResponse, error)
+	GetTaskByShareToken(ctx context.Context, in *GetTaskByShareTokenRequest, opts ...grpc.CallOption) (*GetTaskByShareTokenResponse, error)
 }
 
 type taskServiceClient struct {
@@ -117,6 +151,26 @@ func (c *taskServiceClient) Grant(ctx context.Context, in *GrantRequest, opts ..
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GrantResponse)
 	err := c.cc.Invoke(ctx, TaskService_Grant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) RevokeGrant(ctx context.Context, in *RevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TaskService_RevokeGrant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) ListGrants(ctx context.Context, in *ListGrantsRequest, opts ...grpc.CallOption) (*ListGrantsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListGrantsResponse)
+	err := c.cc.Invoke(ctx, TaskService_ListGrants_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -213,6 +267,56 @@ func (c *taskServiceClient) AIApply(ctx context.Context, in *AIApplyRequest, opt
 	return out, nil
 }
 
+func (c *taskServiceClient) RecalculateProgress(ctx context.Context, in *RecalculateProgressRequest, opts ...grpc.CallOption) (*RecalculateProgressResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RecalculateProgressResponse)
+	err := c.cc.Invoke(ctx, TaskService_RecalculateProgress_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GetSubtree(ctx context.Context, in *GetSubtreeRequest, opts ...grpc.CallOption) (*GetSubtreeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSubtreeResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetSubtree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GenerateAgentPrompt(ctx context.Context, in *GenerateAgentPromptRequest, opts ...grpc.CallOption) (*GenerateAgentPromptResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateAgentPromptResponse)
+	err := c.cc.Invoke(ctx, TaskService_GenerateAgentPrompt_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GenerateShareLink(ctx context.Context, in *GenerateShareLinkRequest, opts ...grpc.CallOption) (*GenerateShareLinkResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateShareLinkResponse)
+	err := c.cc.Invoke(ctx, TaskService_GenerateShareLink_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GetTaskByShareToken(ctx context.Context, in *GetTaskByShareTokenRequest, opts ...grpc.CallOption) (*GetTaskByShareTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTaskByShareTokenResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetTaskByShareToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TaskServiceServer is the server API for TaskService service.
 // All implementations must embed UnimplementedTaskServiceServer
 // for forward compatibility.
@@ -225,6 +329,11 @@ type TaskServiceServer interface {
 	GetTask(context.Context, *GetTaskRequest) (*GetTaskResponse, error)
 	AddEdge(context.Context, *AddEdgeRequest) (*AddEdgeResponse, error)
 	Grant(context.Context, *GrantRequest) (*GrantResponse, error)
+	// RevokeGrant/ListGrants are the public grant-management surface for the
+	// frontend's Access tab (FE-SOL-001) — distinct from the internal
+	// ListGrantsForAncestors path ResolvePermission's BFS walk uses.
+	RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error)
+	ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error)
 	ResolvePermission(context.Context, *ResolvePermissionRequest) (*ResolvePermissionResponse, error)
 	Execute(context.Context, *TaskServiceExecuteRequest) (*TaskServiceExecuteResponse, error)
 	// HasActiveExecutions answers "does this project have a task currently
@@ -251,6 +360,28 @@ type TaskServiceServer interface {
 	// AIDecompose call, creating one subtask + parent_child edge per
 	// proposal.
 	AIApply(context.Context, *AIApplyRequest) (*AIApplyResponse, error)
+	// RecalculateProgress recomputes done_subtasks/total_subtasks for
+	// task_id's whole ancestor chain in one repository round trip — called
+	// from UpdateTask's status-transition path when a child task reaches a
+	// terminal status, per BE-SOL-001. See task-service.md §3/§5,7.
+	RecalculateProgress(context.Context, *RecalculateProgressRequest) (*RecalculateProgressResponse, error)
+	// GetSubtree returns task_id and every descendant in one call — replaces
+	// the frontend's "load task.list for the whole project, filter
+	// client-side by parentId" pattern (FE-SOL-001 §2.1).
+	GetSubtree(context.Context, *GetSubtreeRequest) (*GetSubtreeResponse, error)
+	// GenerateAgentPrompt produces and persists a single-task agent prompt
+	// template (Task.prompt_template) via the same AI relay primitive as
+	// AIDecompose, but a distinct template (single-task instructions, not a
+	// subtask breakdown). See TASK-TG-005-03's buildExecutePrompt, the later
+	// reader of Task.prompt_template.
+	GenerateAgentPrompt(context.Context, *GenerateAgentPromptRequest) (*GenerateAgentPromptResponse, error)
+	// GenerateShareLink/GetTaskByShareToken — TASK-TG-003-05, SECURITY REVIEW
+	// REQUIRED before merge. GetTaskByShareToken is task-service's first
+	// unauthenticated read endpoint by design: the token itself is the
+	// authorization, bypassing ResolveGrant/OPA entirely. See
+	// GenerateShareLinkResponse/TaskShareView's own doc comments.
+	GenerateShareLink(context.Context, *GenerateShareLinkRequest) (*GenerateShareLinkResponse, error)
+	GetTaskByShareToken(context.Context, *GetTaskByShareTokenRequest) (*GetTaskByShareTokenResponse, error)
 	mustEmbedUnimplementedTaskServiceServer()
 }
 
@@ -272,6 +403,12 @@ func (UnimplementedTaskServiceServer) AddEdge(context.Context, *AddEdgeRequest) 
 }
 func (UnimplementedTaskServiceServer) Grant(context.Context, *GrantRequest) (*GrantResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Grant not implemented")
+}
+func (UnimplementedTaskServiceServer) RevokeGrant(context.Context, *RevokeGrantRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeGrant not implemented")
+}
+func (UnimplementedTaskServiceServer) ListGrants(context.Context, *ListGrantsRequest) (*ListGrantsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListGrants not implemented")
 }
 func (UnimplementedTaskServiceServer) ResolvePermission(context.Context, *ResolvePermissionRequest) (*ResolvePermissionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolvePermission not implemented")
@@ -299,6 +436,21 @@ func (UnimplementedTaskServiceServer) AIDecompose(context.Context, *AIDecomposeR
 }
 func (UnimplementedTaskServiceServer) AIApply(context.Context, *AIApplyRequest) (*AIApplyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method AIApply not implemented")
+}
+func (UnimplementedTaskServiceServer) RecalculateProgress(context.Context, *RecalculateProgressRequest) (*RecalculateProgressResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RecalculateProgress not implemented")
+}
+func (UnimplementedTaskServiceServer) GetSubtree(context.Context, *GetSubtreeRequest) (*GetSubtreeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSubtree not implemented")
+}
+func (UnimplementedTaskServiceServer) GenerateAgentPrompt(context.Context, *GenerateAgentPromptRequest) (*GenerateAgentPromptResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateAgentPrompt not implemented")
+}
+func (UnimplementedTaskServiceServer) GenerateShareLink(context.Context, *GenerateShareLinkRequest) (*GenerateShareLinkResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateShareLink not implemented")
+}
+func (UnimplementedTaskServiceServer) GetTaskByShareToken(context.Context, *GetTaskByShareTokenRequest) (*GetTaskByShareTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTaskByShareToken not implemented")
 }
 func (UnimplementedTaskServiceServer) mustEmbedUnimplementedTaskServiceServer() {}
 func (UnimplementedTaskServiceServer) testEmbeddedByValue()                     {}
@@ -389,6 +541,42 @@ func _TaskService_Grant_Handler(srv interface{}, ctx context.Context, dec func(i
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TaskServiceServer).Grant(ctx, req.(*GrantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_RevokeGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeGrantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).RevokeGrant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_RevokeGrant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).RevokeGrant(ctx, req.(*RevokeGrantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_ListGrants_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListGrantsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).ListGrants(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_ListGrants_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).ListGrants(ctx, req.(*ListGrantsRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -555,6 +743,96 @@ func _TaskService_AIApply_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TaskService_RecalculateProgress_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RecalculateProgressRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).RecalculateProgress(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_RecalculateProgress_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).RecalculateProgress(ctx, req.(*RecalculateProgressRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GetSubtree_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSubtreeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetSubtree(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetSubtree_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetSubtree(ctx, req.(*GetSubtreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GenerateAgentPrompt_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateAgentPromptRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GenerateAgentPrompt(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GenerateAgentPrompt_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GenerateAgentPrompt(ctx, req.(*GenerateAgentPromptRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GenerateShareLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateShareLinkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GenerateShareLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GenerateShareLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GenerateShareLink(ctx, req.(*GenerateShareLinkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GetTaskByShareToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTaskByShareTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetTaskByShareToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetTaskByShareToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetTaskByShareToken(ctx, req.(*GetTaskByShareTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TaskService_ServiceDesc is the grpc.ServiceDesc for TaskService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -577,6 +855,14 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Grant",
 			Handler:    _TaskService_Grant_Handler,
+		},
+		{
+			MethodName: "RevokeGrant",
+			Handler:    _TaskService_RevokeGrant_Handler,
+		},
+		{
+			MethodName: "ListGrants",
+			Handler:    _TaskService_ListGrants_Handler,
 		},
 		{
 			MethodName: "ResolvePermission",
@@ -613,6 +899,26 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "AIApply",
 			Handler:    _TaskService_AIApply_Handler,
+		},
+		{
+			MethodName: "RecalculateProgress",
+			Handler:    _TaskService_RecalculateProgress_Handler,
+		},
+		{
+			MethodName: "GetSubtree",
+			Handler:    _TaskService_GetSubtree_Handler,
+		},
+		{
+			MethodName: "GenerateAgentPrompt",
+			Handler:    _TaskService_GenerateAgentPrompt_Handler,
+		},
+		{
+			MethodName: "GenerateShareLink",
+			Handler:    _TaskService_GenerateShareLink_Handler,
+		},
+		{
+			MethodName: "GetTaskByShareToken",
+			Handler:    _TaskService_GetTaskByShareToken_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

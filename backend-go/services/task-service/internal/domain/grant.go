@@ -1,5 +1,7 @@
 package domain
 
+import "time"
+
 // GrantLevel is task-service's permission tier. Unlike the design doc's
 // sketch schema (grantee_type ∈ {user,team,company} as a field separate
 // from a 3-value level), the generated proto's GrantLevel enum
@@ -56,6 +58,10 @@ type Grant struct {
 	SubjectID string
 	Level     GrantLevel
 	ApplyTree bool
+	// ExpiresAt is nullable — a nil ExpiresAt never expires. Filtered at
+	// read time by ResolvePermission (TASK-TG-003-03), not enforced here:
+	// this pure domain type has no notion of "now."
+	ExpiresAt *time.Time
 }
 
 // CallerIdentity is the resolved-identity input to grant resolution: the

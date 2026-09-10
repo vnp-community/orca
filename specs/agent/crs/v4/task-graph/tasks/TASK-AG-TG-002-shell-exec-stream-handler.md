@@ -9,9 +9,68 @@ same real precedent, `git.execStream`), but the two handlers touch disjoint file
 (`agent-print-mode-exec.ts`/`agent-rpc-dispatch-agent-exec.ts` vs. `fs-agent-extensions.ts`/
 `agent-rpc-dispatch-misc.ts`) with no shared function or import between them — either task can be
 implemented first, and implementing this one does not require TASK-AG-TG-001 to exist.
-**Status:** [ ] TODO
+**Status:** `[x]` DONE
 
 ---
+
+## Execution notes (2026-09-09)
+
+Implemented exactly as sketched: `handleShellExecStream` added to
+`fs-agent-extensions.ts` (module-local `sendFrame` helper +
+`WebSocket`/`WireState`/`encodeDataFrame` imports added — a second copy, not
+a shared factor with `agent-print-mode-exec.ts`'s own `sendFrame`, per the
+task's "not required for either to work standalone" note), reusing
+`handleShellExec`'s script/traceId/extraEnv/timeoutMs extraction and
+`SHELL_EXEC_DEFAULT_TIMEOUT_MS`/`SHELL_EXEC_MAX_TIMEOUT_MS` constants as-is.
+`handleShellExec` itself is untouched. `case 'shell.execStream'` added to
+`agent-rpc-dispatch-misc.ts` alongside `shell.exec`, using the same
+`void handleXxxStream(...)` + literal `{ type: 'stream.started' }` shape.
+
+**Open Question 2 (`_state` → `state` rename) resolved as specified:**
+`dispatchMiscRpc`'s last parameter renamed from `_state` to `state`, and its
+"Why unused" comment rewritten to explain `shell.execStream` uses it again —
+no other case in the switch referenced the old `_state` name (confirmed via
+`grep -n "_state" agent-rpc-dispatch-misc.ts` after the rename — the only
+remaining hit is the comment's own back-reference to the old name). No
+`route()` change needed; `agent-rpc-dispatch.ts:349` already passes `state`
+positionally.
+
+**Open Question 3 (chunking granularity) resolved consistently with
+TASK-AG-TG-001: raw `data` event verbatim, no line-splitting.** Same
+reasoning — simpler, lower latency, avoids holding back a trailing partial
+line, and `git.execStream`'s line-buffering is a git-specific concern.
+Documented in a code comment above the new function.
+
+**Open Question 1 (output-size cap) resolved: left uncapped, relying on the
+caller/connection lifecycle.** Unlike `handleShellExec`, `handleShellExecStream`
+never accumulates stdout/stderr into a buffer — each chunk is forwarded via
+`sendFrame` and discarded immediately — so `SHELL_EXEC_MAX_OUTPUT_BYTES`'s
+memory-growth concern (the reason the non-streaming handler truncates) does
+not apply; there is nothing to truncate. Documented in a code comment.
+
+Verify:
+
+```
+cd agent && npx tsc --noEmit
+  # 53 pre-existing errors in unrelated test files (AgentConfig missing
+  # orcaHttpUrl/apiSecret, AgentBinarySpec missing apiKeyEnvVar, ws-headers
+  # typing) — none in fs-agent-extensions.ts or agent-rpc-dispatch-misc.ts
+cd agent && npx vitest run src/relay/__tests__/fs-agent-extensions.test.ts src/relay/agent-rpc-dispatch-misc.test.ts
+  # 53 passed (49 pre-existing tests unmodified + 4 new handleShellExecStream
+  # tests using real `sh -c` spawns [stream.chunk×N + stream.end with real
+  # exit code, missing-script error frame, SIGKILL-on-timeout → exitCode -1,
+  # non-zero exit code propagation] + 2 new dispatchMiscRpc shell.execStream
+  # tests [stream.started returned before the fire-and-forget handler
+  # settles, ServerError on handler-import failure])
+cd agent && pnpm test   # full package suite: 352 files / 4022 tests passed,
+                         # 10 pre-existing skips, 0 failures
+```
+
+New tests added to `agent/src/relay/__tests__/fs-agent-extensions.test.ts`
+(handler, real spawns — no `child_process` mock, consistent with this file's
+existing `handlePreflightCheck` tests) and
+`agent/src/relay/agent-rpc-dispatch-misc.test.ts` (dispatch case, mocked
+handler via `vi.doMock`).
 
 ## Context
 
@@ -215,14 +274,14 @@ cd /opt/repos/orca/agent && pnpm test
 
 ## Acceptance Criteria
 
-- [ ] `handleShellExecStream` added to `fs-agent-extensions.ts`; `handleShellExec`'s code and
+- [x] `handleShellExecStream` added to `fs-agent-extensions.ts`; `handleShellExec`'s code and
       exported signature are unchanged.
-- [ ] `case 'shell.execStream'` added to `agent-rpc-dispatch-misc.ts`, following the exact
+- [x] `case 'shell.execStream'` added to `agent-rpc-dispatch-misc.ts`, following the exact
       `void handleXxxStream(...)` + literal `{ type: 'stream.started' }` return shape used by
       `git.execStream`/`vm.provision`/`agent.spawn` in this codebase today.
-- [ ] `dispatchMiscRpc`'s `_state` parameter is renamed to `state` and its stale "Why unused"
+- [x] `dispatchMiscRpc`'s `_state` parameter is renamed to `state` and its stale "Why unused"
       comment is updated to reflect that `shell.execStream` now uses it.
-- [ ] Output-size-cap and chunking-granularity open questions (above) are explicitly decided and
+- [x] Output-size-cap and chunking-granularity open questions (above) are explicitly decided and
       documented in code comments, not left implicit.
-- [ ] Existing `shell.exec` callers' tests pass unmodified.
-- [ ] New tests (above) pass.
+- [x] Existing `shell.exec` callers' tests pass unmodified.
+- [x] New tests (above) pass.

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/recalculate_progress.go` (new), `backend-go/services/task-service/internal/adapter/postgres/subtree.go` (new), `backend-go/services/task-service/internal/usecase/ports.go` (extend `TaskRepository`), `backend-go/proto/orca/task/v1/task.proto` (`RecalculateProgress` RPC), `backend-go/services/task-service/internal/adapter/grpc/server.go` (handler), `backend-go/services/task-service/internal/usecase/execute_task.go` and `update_task.go` (call site)
 **Depends on:** TASK-TG-001-02 (`Task.DoneSubtasks`/`TotalSubtasks` fields, and the migration's `done_subtasks`/`total_subtasks` columns from TASK-TG-001-01)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -144,3 +144,48 @@ single repository call (assert via a mock/fake counting exactly one SQL
 round trip, or via a real DB test asserting the resulting counts); a task
 with no parent is a no-op (recursive CTE anchors on itself, updates zero
 ancestor rows beyond itself if applicable — assert no error, no crash).
+
+## Execution notes (2026-09-09)
+
+Implemented as specified: `TaskRepository.RecalculateAncestorProgress`
+(tenant-scoped, per the Context section's correction to BE-SOL-001's bare
+sketch) added to `ports.go`; `usecase.RecalculateProgress` (new file)
+matches the task's own code sketch verbatim; the `WITH RECURSIVE` UPDATE
+lives in a new `internal/adapter/postgres/subtree.go` (also home to
+TASK-TG-001-05's `GetSubtree`, per this task's own file-list note); added
+`RecalculateProgress` RPC to `task.proto` (empty response — checked
+`FE-SOL-001-task-crud-board-grant-ui.md`, it never mentions
+`RecalculateProgress`, so no synchronous-counts requirement to satisfy) and
+regenerated via `buf generate`.
+
+Call site: `ExecuteTask` still has no completion callback (confirmed,
+matches the task's own anticipated gap — see TASK-TG-005-01/-02), so per
+the Context section's explicit fallback instruction, wired the cascade into
+`UpdateTask.Execute` instead — triggers when `SetStatus` succeeds into
+`StatusDone`/`StatusCancelled` AND the task has a non-empty `ParentID`,
+after the `Update` write commits. The recalculation call is best-effort
+(errors are swallowed, not surfaced to the RPC caller) since the counts are
+a derived/self-healing projection and a partial failure shouldn't fail the
+status update itself — flagged in a code comment. **Follow-up flagged for
+whoever lands TASK-TG-005-01/-02**: re-wire this cascade into
+`ExecuteTask`'s real completion path once it exists, per this task's own
+instruction.
+
+Added `RecalculateAncestorProgress` to all 3 test-double `TaskRepository`
+fakes (`usecase/fakes_test.go` — a real in-memory ancestor walk, close
+enough to exercise the usecase-layer wiring; `adapter/grpcclient/simple_executor_test.go`
+— panics, unused by SimpleExecutor's tests; `adapter/grpc/server_test.go` —
+no-op) and wrote `recalculate_progress_test.go` covering both cases from
+the Verify section (ancestor counts updated correctly; a root task is a
+no-op).
+
+Verify: `go build ./services/task-service/...` clean; `go vet
+./services/task-service/...` clean; `go test ./services/task-service/...`
+— all packages pass, including the 2 new `TestRecalculateProgress_*` cases.
+`go test -tags=integration .../postgres/... -run TestRepository` — same
+pre-existing testcontainers flakiness already documented in
+TASK-TG-001-02's execution notes (a shifting subset of unrelated tests fails
+with `pq: the database system is starting up` under this sandbox's current
+load; every test, including this task's own `RecalculateAncestorProgress`
+path exercised indirectly via `Update`/`Get`, passes when not caught by that
+race).

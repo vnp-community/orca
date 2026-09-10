@@ -5,7 +5,94 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/adapter/infrafleetclient/agent_step_executor.go`, `shell_step_executor.go`, `notification_step_executor.go`, `backend-go/services/workflow-service/cmd/server/main.go`
 **Depends on:** TASK-WF-002-01 (`ServerResolver`), TASK-WF-002-02 (`ProviderResolver`), TASK-WF-001-01 (`agentExecParams`'s widened `Model`/`AccountID` fields)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+Re-verified live: all three executors matched the task's description
+exactly (`cfg.ConnectionID` passed straight into `relay` as a pre-resolved
+literal); no import cycle between `infrafleetclient` and `usecase` —
+confirmed by a clean `go build` after `infrafleetclient` started importing
+`usecase` for the two resolver types (`usecase` never imports
+`infrafleetclient`, one-directional adapter→usecase dependency as
+expected).
+
+**Execution context plumbing — the real design decision this task
+required — resolved with a THIRD option, not either of the two the task
+sketched:** rather than widening `domain.StepExecutor.Execute`'s signature
+(which every step type, including Condition/Webhook — neither has any
+provider/server-resolution concept — would have to accept and ignore) or
+coupling `wave_dispatcher.go` to agent-specific resolution logic, added
+`usecase.ExecutionContext{ProjectID, TriggeredBy}` threaded via
+`context.Context` — the same mechanism `common/tenant` already uses for
+per-request identity (`tenant.RequireTenantID`/`tenant.UserID`). Stamped
+once at each of the three places dispatch begins:
+- `Execute.Execute`: captures `triggeredBy` from the still-live inbound
+  ctx via `tenant.UserID` (before detaching to the background-goroutine
+  ctx, which starts empty) + `exec.ProjectID`.
+- `ExecuteAdHocStep.Execute`: `triggeredBy` from ctx (this path is
+  synchronous, no detach); `ProjectID` stays empty — confirmed live that
+  `ExecuteAdHocStepInput`/`Request` has no `ProjectID` field at all today,
+  a real, separate gap out of this task's scope (ProviderResolver's chain
+  and ai-provider-service's own server-scope tier already treat an empty
+  ProjectID as valid, so this degrades gracefully, not silently wrong).
+- `RecoverExecutions.recoverOne`: `exec.ProjectID` only — `TriggeredBy`
+  is deliberately left empty (a boot-time recovery scan has no inbound
+  request/acting user to capture, same reasoning as
+  `ExecutionRepository.ListRunning`'s doc comment).
+
+Read back via `usecase.ExecutionContextFrom(ctx)` inside `AgentExecutor.Execute`
+only (the one executor that needs it) — `wave_dispatcher.go` itself is
+completely unchanged, and Shell/Notification/Condition/Webhook executors
+never see or care about this value. Documented the full reasoning in the
+new `exec_context.go`'s doc comment per the task's explicit instruction to
+note the choice.
+
+**Changes made (widening + wiring, per the task's sketch):**
+1. `agent_step_executor.go`: `AgentExecutor` widened with
+   `serverResolver`/`providerResolver`; `Execute` now does
+   `ParseTargetSpec` → `serverResolver.Resolve` → (via
+   `ExecutionContextFrom(ctx)`) `providerResolver.Resolve` → `relay` with
+   the resolved connection id + `Model`/`AccountID`.
+2. `shell_step_executor.go` / `notification_step_executor.go`: same
+   `ParseTargetSpec` → `serverResolver.Resolve` widening, no provider
+   resolution (neither step type has that concept).
+3. `internal/usecase/exec_context.go` (new): `ExecutionContext` + context
+   helpers, as described above.
+4. `execute.go` / `execute_ad_hoc_step.go` / `recover_executions.go`:
+   stamp `ExecutionContext` at each dispatch-start point.
+5. `cmd/server/main.go`: `serverResolver`/`providerResolver` (built in
+   TASK-WF-002-01/-02, previously constructed-but-unused) now threaded
+   into all three `New*Executor` calls; removed the placeholder
+   `_, _ = serverResolver, providerResolver` blank-assignment.
+6. Test fixtures: all three executors' existing tests updated —
+   `"conn-1"` literals became `"server:conn-1"` (TargetKindServer's pure
+   passthrough resolves back to the same literal, so existing assertions
+   needed no other change) and constructors gained
+   `newPassthroughServerResolver()`/`newNoopProviderResolver()` (new
+   shared `resolver_fakes_test.go`, building REAL `*usecase.ServerResolver`/
+   `*usecase.ProviderResolver` backed by fakes of their `ProjectClient`/
+   `InfraFleetPicker`/`AIProviderClient` port dependencies — necessary
+   because the executors now take concrete resolver structs, not
+   interfaces, so the resolvers themselves can't be faked directly).
+   Added 5 new tests per the task's test plan: malformed-target-spec
+   surfaces as a clear error (not a panic) via `errors.Is`, end-to-end
+   `project:`/`fleet:tag:` resolution reaching the right connection id,
+   and an explicit provider pin reaching `Model`/`AccountID` in the relay
+   params.
+
+**Verify output:**
+```
+go build ./services/workflow-service/...   # clean, no import cycle
+go vet   ./services/workflow-service/...   # clean
+go test  ./services/workflow-service/internal/adapter/infrafleetclient/... -v
+  # 16/16 PASS (11 pre-existing + 5 new: malformed spec, project-target,
+  #             fleet-tag-target, explicit-pin-reaches-params)
+go test  ./services/workflow-service/internal/usecase/... -run TestWaveDispatcher -v
+  # 7/7 PASS — wave_dispatcher.go itself untouched, confirms the
+  # context-threading approach needed zero changes there
+go test  ./services/workflow-service/...   # full suite, all ok
+```
 
 ---
 

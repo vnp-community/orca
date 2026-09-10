@@ -187,6 +187,43 @@ func TestDAGDefinition_BuildWaves_ThreeNodeCycleDetected(t *testing.T) {
 	}
 }
 
+func TestDAGDefinition_Serialize_RoundTripsWithParseDAG(t *testing.T) {
+	original := `{"steps":[{"id":"s1","type":"shell","dependsOn":["s0"]},{"id":"s0","type":"webhook"}]}`
+	d, err := ParseDAG(original)
+	if err != nil {
+		t.Fatalf("unexpected parse error: %v", err)
+	}
+	serialized, err := d.Serialize()
+	if err != nil {
+		t.Fatalf("unexpected serialize error: %v", err)
+	}
+	reparsed, err := ParseDAG(serialized)
+	if err != nil {
+		t.Fatalf("unexpected re-parse error: %v", err)
+	}
+	if len(reparsed.Steps) != 2 || reparsed.Steps[0].ID != "s1" || reparsed.Steps[1].ID != "s0" {
+		t.Fatalf("expected the round trip to preserve step order/identity, got %+v", reparsed.Steps)
+	}
+	if len(reparsed.Steps[0].DependsOn) != 1 || reparsed.Steps[0].DependsOn[0] != "s0" {
+		t.Errorf("expected dependsOn to survive the round trip, got %v", reparsed.Steps[0].DependsOn)
+	}
+}
+
+func TestDAGDefinition_Serialize_EmptyStepsProducesValidJSON(t *testing.T) {
+	d := DAGDefinition{Steps: []Step{}}
+	serialized, err := d.Serialize()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	reparsed, err := ParseDAG(serialized)
+	if err != nil {
+		t.Fatalf("expected the serialized output to be valid JSON, got parse error: %v", err)
+	}
+	if len(reparsed.Steps) != 0 {
+		t.Errorf("expected zero steps, got %d", len(reparsed.Steps))
+	}
+}
+
 func TestDAGDefinition_BuildWaves_PreservesOriginalOrderWithinAWave(t *testing.T) {
 	d, err := ParseDAG(`{"steps":[{"id":"z","type":"shell"},{"id":"a","type":"shell"},{"id":"m","type":"shell"}]}`)
 	if err != nil {

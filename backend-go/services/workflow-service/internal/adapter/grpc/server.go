@@ -7,6 +7,10 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
+	"log/slog"
+
+	"google.golang.org/protobuf/types/known/structpb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
@@ -30,6 +34,8 @@ type Server struct {
 	listTemplates       *usecase.ListTemplates
 	resolveTemplate     *usecase.ResolveTemplate
 	updateTemplate      *usecase.UpdateTemplate
+	listExecutions      *usecase.ListExecutions
+	cloneTemplate       *usecase.CloneTemplate
 }
 
 func New(
@@ -44,6 +50,8 @@ func New(
 	listTemplates *usecase.ListTemplates,
 	resolveTemplate *usecase.ResolveTemplate,
 	updateTemplate *usecase.UpdateTemplate,
+	listExecutions *usecase.ListExecutions,
+	cloneTemplate *usecase.CloneTemplate,
 ) *Server {
 	return &Server{
 		createTemplate:      createTemplate,
@@ -57,6 +65,8 @@ func New(
 		listTemplates:       listTemplates,
 		resolveTemplate:     resolveTemplate,
 		updateTemplate:      updateTemplate,
+		listExecutions:      listExecutions,
+		cloneTemplate:       cloneTemplate,
 	}
 }
 
@@ -79,6 +89,7 @@ func (s *Server) Execute(ctx context.Context, req *workflowv1.ExecuteRequest) (*
 		ProjectID:   req.GetProjectId(),
 		RootTraceID: req.GetRootTraceId(),
 		RequestID:   req.GetRequestId(),
+		Inputs:      req.GetInputs().AsMap(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -181,6 +192,34 @@ func (s *Server) UpdateTemplate(ctx context.Context, req *workflowv1.UpdateTempl
 	return &workflowv1.UpdateTemplateResponse{Template: toProtoTemplate(updated)}, nil
 }
 
+func (s *Server) ListExecutions(ctx context.Context, req *workflowv1.ListExecutionsRequest) (*workflowv1.ListExecutionsResponse, error) {
+	out, err := s.listExecutions.Execute(ctx, usecase.ListExecutionsInput{
+		ProjectID: req.GetProjectId(),
+		Cursor:    req.GetCursor(),
+		Limit:     req.GetLimit(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	execs := make([]*workflowv1.WorkflowExecution, 0, len(out.Executions))
+	for _, e := range out.Executions {
+		execs = append(execs, toProtoExecution(e))
+	}
+	return &workflowv1.ListExecutionsResponse{Executions: execs, NextCursor: out.NextCursor}, nil
+}
+
+func (s *Server) CloneTemplate(ctx context.Context, req *workflowv1.CloneTemplateRequest) (*workflowv1.CloneTemplateResponse, error) {
+	tmpl, err := s.cloneTemplate.Execute(ctx, usecase.CloneTemplateInput{
+		SourceTemplateID: req.GetSourceTemplateId(),
+		NewName:          req.GetNewName(),
+		Scope:            req.GetScope(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &workflowv1.CloneTemplateResponse{Template: toProtoTemplate(tmpl)}, nil
+}
+
 func toDomainStepType(t workflowv1.StepType) domain.StepType {
 	switch t {
 	case workflowv1.StepType_STEP_TYPE_AGENT:
@@ -193,13 +232,17 @@ func toDomainStepType(t workflowv1.StepType) domain.StepType {
 		return domain.StepTypeWebhook
 	case workflowv1.StepType_STEP_TYPE_CONDITION:
 		return domain.StepTypeCondition
+	case workflowv1.StepType_STEP_TYPE_ACTION:
+		return domain.StepTypeAction
+	case workflowv1.StepType_STEP_TYPE_PARALLEL:
+		return domain.StepTypeParallel
 	default:
 		return domain.StepTypeUnspecified
 	}
 }
 
 func toProtoTemplate(t domain.WorkflowTemplate) *workflowv1.WorkflowTemplate {
-	return &workflowv1.WorkflowTemplate{
+	tpl := &workflowv1.WorkflowTemplate{
 		Id:               t.ID,
 		TenantId:         t.TenantID,
 		Name:             t.Name,
@@ -208,6 +251,38 @@ func toProtoTemplate(t domain.WorkflowTemplate) *workflowv1.WorkflowTemplate {
 		ParentTemplateId: t.ParentTemplateID,
 		Version:          t.Version,
 	}
+	if len(t.Overrides) > 0 {
+		if s, err := structpb.NewStruct(t.Overrides); err == nil {
+			tpl.Overrides = s
+		} else {
+			// Overrides holding a value structpb can't represent (a type
+			// outside JSON's data model) is a template-authoring bug, not
+			// something this read-path conversion should fail the whole
+			// response over — drop it from the response and log, same
+			// "best-effort, log don't crash" tolerance this service already
+			// gives ResolveConnection's HiddenTargetID lookup.
+			slog.Error("workflow: template overrides not representable as google.protobuf.Struct", slog.String("template_id", t.ID), slog.Any("error", err))
+		}
+	}
+	if len(t.InjectSteps) > 0 {
+		tpl.InjectSteps = make([]*workflowv1.StepInjection, 0, len(t.InjectSteps))
+		for _, inj := range t.InjectSteps {
+			stepJSON, err := json.Marshal(inj.Step)
+			if err != nil {
+				slog.Error("workflow: template injectSteps step not JSON-serializable", slog.String("template_id", t.ID), slog.Any("error", err))
+				continue
+			}
+			tpl.InjectSteps = append(tpl.InjectSteps, &workflowv1.StepInjection{
+				AnchorStepId: inj.AnchorStepID,
+				Position:     inj.Position,
+				StepJson:     string(stepJSON),
+			})
+		}
+	}
+	if len(t.RemoveSteps) > 0 {
+		tpl.RemoveSteps = t.RemoveSteps
+	}
+	return tpl
 }
 
 func toProtoExecution(e domain.WorkflowExecution) *workflowv1.WorkflowExecution {

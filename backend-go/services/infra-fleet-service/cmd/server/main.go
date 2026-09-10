@@ -292,6 +292,13 @@ func run() error {
 	// --- Fleet connectivity summary (CR-STORAGE-007, TASK-BE-STORAGE-006) ---
 	getFleetConnectivitySummaryUC := usecase.NewGetFleetConnectivitySummary(repo)
 
+	// PickByTag (TASK-WF-002-04) — closes workflow-service's
+	// TargetKindFleetTag gap. repo satisfies both DevServerRepository and
+	// ConnectionResolver (same combined repository every other usecase
+	// above already passes as both), devServerGroupStore satisfies
+	// DevServerGroupRepository.
+	pickByTagUC := usecase.NewPickByTag(devServerGroupStore, repo, repo, agentClient)
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
@@ -340,6 +347,7 @@ func run() error {
 		ephemeralVmRelayUC,
 		getFleetConnectivitySummaryUC,
 		teardownConnectionUC,
+		pickByTagUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

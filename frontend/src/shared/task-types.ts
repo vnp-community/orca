@@ -119,7 +119,7 @@ export const TASK_PERMISSION_ORDER: Readonly<Record<TaskPermission, number>> = {
   comment: 2,
   edit: 3,
   execute: 4,
-  manage: 5,
+  manage: 5
 } as const
 
 /** Progress weights by status (leaf node calculation) */
@@ -130,8 +130,18 @@ export const TASK_STATUS_PROGRESS: Readonly<Record<TaskStatus, number>> = {
   review: 80,
   done: 100,
   blocked: 0,
-  cancelled: 0,
+  cancelled: 0
 } as const
 
 /** Alias for TaskPermission — used by TaskGrantService API (TDD-18) */
 export type TaskGrantLevel = TaskPermission
+
+/**
+ * Thang GrantLevel THẬT khớp backend `taskv1.GrantLevel` (BE-SOL-003's correction of
+ * CR-TG-003 §2.2) — KHÔNG phải `TaskPermission`'s view/comment/edit/execute/manage, thang
+ * đó không có backend tương ứng và không được dùng bởi bất kỳ RPC call nào. `task.grant`'s
+ * `level` param (channels_automation_task.go:369-388) parses exactly these 5 strings via
+ * `taskv1.GrantLevel_value`. Deliberately a new type name, not a reuse of `TaskGrantLevel`
+ * above — see FE-TASK-004 (task-graph v4).
+ */
+export type RealGrantLevel = 'owner' | 'admin' | 'user' | 'team' | 'company'

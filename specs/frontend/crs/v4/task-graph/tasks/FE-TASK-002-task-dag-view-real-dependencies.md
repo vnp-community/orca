@@ -4,9 +4,31 @@
 **Solution Ref:** FE-SOL-001 Phần 2
 **Priority:** 🟠 P1
 **Estimated:** 55 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
+
+## Kết quả thực thi (2026-09-09)
+
+- Thêm `useDependencyEdges(tasks)` trong `TaskDAGView.tsx` — fetch song song (N+1, chấp nhận được)
+  `task.getDependencies` cho mỗi task, đúng shape thật flat `{task, edgeType}[]` (copy đúng cách
+  `TaskDetail.tsx` đã dùng, không theo shape sai `{dependencies: [...]}` của bản nháp gốc).
+- `buildDAGLayout()` đổi nguồn dữ liệu từ `(task as any).dependsOn` (luôn `[]`) sang
+  `depsById.get(task.id) ?? []` cho cả wave assignment lẫn edges.
+- Thêm UI "+ Add dependency" (2 dropdown from/to) phía trên `<ReactFlow>`, gọi `task.addEdge`.
+- **Phát hiện + vá thêm ngoài mẫu code gốc của task file**: mẫu `addDependency` gốc không có
+  try/catch quanh `await callRuntimeRpc(...)` — gây unhandled promise rejection thật khi RPC lỗi
+  (xác nhận bằng test, Vitest báo "Unhandled Rejection"). Thêm try/catch + `toast.error`, giữ đúng
+  hành vi "addingFor không reset khi lỗi" mà task yêu cầu.
+- **Phát hiện khác task file**: `TaskDAGView.test.tsx` chưa tồn tại trước task này (ghi MODIFY nhưng
+  thực tế chưa có) — tạo mới hoàn toàn.
+- Test: 5 case mới (2 tasks + 1 cạnh depends_on render đúng; 1 task lỗi → nodes vẫn render, cạnh dùng
+  giá trị cũ vì `Promise.all` fail cả batch — ghi rõ trong comment test, đây là giới hạn thật của
+  cách fetch theo batch chứ không phải per-task; add-edge thành công; add-edge lỗi không crash/không
+  reset; empty state). `npx vitest run TaskDAGView.test.tsx` → 5/5 pass, không còn unhandled
+  rejection.
+- Không thêm batch endpoint, không đổi `TaskDetail.tsx`, không tự validate cycle client-side — đúng
+  phạm vi "Không làm ở task này".
 
 ## Mục tiêu
 

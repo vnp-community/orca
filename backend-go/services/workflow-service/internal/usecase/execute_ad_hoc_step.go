@@ -99,8 +99,18 @@ func (uc *ExecuteAdHocStep) Execute(ctx context.Context, in ExecuteAdHocStepInpu
 		slog.ErrorContext(ctx, "workflow: marking ad hoc step execution running failed", slog.String("step_execution_id", se.ID), slog.Any("error", uerr))
 	}
 
+	// ExecuteAdHocStepInput/Request has no ProjectID field today — an ad
+	// hoc run's ExecutionContext therefore always has an empty ProjectID,
+	// same "no project scope" fallback ProviderResolver's chain and
+	// ai-provider-service's own server-scope tier already treat as valid.
+	// TriggeredBy is available since this path runs synchronously on the
+	// still-live inbound ctx (unlike Execute's detached background
+	// dispatch) — see ExecutionContext's doc comment.
+	triggeredBy, _ := tenant.UserID(ctx)
+	execCtx := WithExecutionContext(ctx, ExecutionContext{TriggeredBy: triggeredBy})
+
 	step := domain.Step{ID: adHocStepID, Type: in.StepType, Config: json.RawMessage(in.StepConfigJSON)}
-	result, runErr := uc.dispatcher.runStep(ctx, step, &se)
+	result, runErr := uc.dispatcher.runStep(execCtx, step, &se, nil, nil)
 
 	if uerr := uc.stepExecutions.UpdateStepExecution(ctx, se); uerr != nil {
 		slog.ErrorContext(ctx, "workflow: persisting terminal ad hoc step execution failed", slog.String("step_execution_id", se.ID), slog.Any("error", uerr))

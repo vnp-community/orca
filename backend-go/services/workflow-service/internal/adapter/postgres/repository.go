@@ -68,14 +68,31 @@ func (r *Repository) GetTemplate(ctx context.Context, tenantID, id string) (doma
 // (usecase.UpdateTemplate) already confirmed the row exists via GetTemplate
 // before calling this, so a zero-row UPDATE can only mean the version
 // moved between that read and this write.
-func (r *Repository) Update(ctx context.Context, t domain.WorkflowTemplate, expectedVersion int32) (domain.WorkflowTemplate, error) {
-	row := r.pool.QueryRow(ctx, `
+// Update's version-increment clause is conditional on bump
+// (TASK-WF-004-03) — the WHERE clause's version=$7 match check (the
+// trigger for ErrTemplateVersionConflict below) is UNCHANGED and always
+// present regardless of bump's value; only the SET list's
+// "version = version + 1" is toggled.
+func (r *Repository) Update(ctx context.Context, t domain.WorkflowTemplate, expectedVersion int32, bump bool) (domain.WorkflowTemplate, error) {
+	setVersion := ""
+	if bump {
+		setVersion = ", version = version + 1"
+	}
+	// NULLIF($4, '')::uuid — the explicit cast is a pre-existing-bug fix
+	// found while touching this exact statement for TASK-WF-004-03, not
+	// new scope: without it, NULLIF's result type unifies with the ''
+	// literal as text, and Postgres rejects assigning that to
+	// parent_template_id's uuid column ("column ... is of type uuid but
+	// expression is of type text") — this made EVERY UpdateTemplate call
+	// against a real database fail before this fix, for any template
+	// (parent or not), confirmed via this task's own integration test.
+	query := `
 		UPDATE workflow.templates
-		SET name = $1, dag_json = $2::jsonb, scope = $3, parent_template_id = NULLIF($4, ''),
-		    version = version + 1, updated_at = now()
+		SET name = $1, dag_json = $2::jsonb, scope = $3, parent_template_id = NULLIF($4, '')::uuid` + setVersion + `, updated_at = now()
 		WHERE id = $5 AND tenant_id = $6 AND version = $7
 		RETURNING id, tenant_id, name, dag_json::text, scope, COALESCE(parent_template_id::text, ''), version
-	`, t.Name, t.DAGJSON, string(t.Scope), t.ParentTemplateID, t.ID, t.TenantID, expectedVersion)
+	`
+	row := r.pool.QueryRow(ctx, query, t.Name, t.DAGJSON, string(t.Scope), t.ParentTemplateID, t.ID, t.TenantID, expectedVersion)
 
 	var updated domain.WorkflowTemplate
 	var scope string
@@ -88,6 +105,23 @@ func (r *Repository) Update(ctx context.Context, t domain.WorkflowTemplate, expe
 	}
 	updated.Scope = domain.Scope(scope)
 	return updated, nil
+}
+
+// HasActiveExecutionsUsingTemplate backs usecase.UpdateTemplate's
+// version-bump decision (TASK-WF-004-03) — same non-terminal status set
+// (pending|running|paused) HasActiveExecutions already uses.
+func (r *Repository) HasActiveExecutionsUsingTemplate(ctx context.Context, tenantID, templateID string) (bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT EXISTS(
+			SELECT 1 FROM workflow.executions
+			WHERE tenant_id = $1 AND template_id = $2 AND status IN ('pending','running','paused')
+		)
+	`, tenantID, templateID)
+	var exists bool
+	if err := row.Scan(&exists); err != nil {
+		return false, fmt.Errorf("postgres: query has-active-executions-using-template: %w", err)
+	}
+	return exists, nil
 }
 
 // ListTemplates backs usecase.ListTemplates — keyset pagination, same
@@ -182,9 +216,9 @@ func (r *Repository) ResolveChain(ctx context.Context, tenantID, templateID stri
 // doc comment.
 func (r *Repository) CreateExecution(ctx context.Context, exec domain.WorkflowExecution) error {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO workflow.executions (id, template_id, tenant_id, status, root_trace_id, paused_at, project_id)
-		VALUES ($1, $2, $3, $4, $5, $6, $7)
-	`, exec.ID, nullableString(exec.TemplateID), exec.TenantID, string(exec.Status), nullableString(exec.RootTraceID), exec.PausedAt, nullableString(exec.ProjectID))
+		INSERT INTO workflow.executions (id, template_id, tenant_id, status, root_trace_id, paused_at, project_id, inputs_json)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb)
+	`, exec.ID, nullableString(exec.TemplateID), exec.TenantID, string(exec.Status), nullableString(exec.RootTraceID), exec.PausedAt, nullableString(exec.ProjectID), nullableString(exec.InputsJSON))
 	if err != nil {
 		return fmt.Errorf("postgres: insert execution: %w", err)
 	}
@@ -193,7 +227,7 @@ func (r *Repository) CreateExecution(ctx context.Context, exec domain.WorkflowEx
 
 func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (domain.WorkflowExecution, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, '')
+		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, ''), COALESCE(inputs_json::text, '')
 		FROM workflow.executions
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
@@ -201,7 +235,7 @@ func (r *Repository) GetExecution(ctx context.Context, tenantID, id string) (dom
 	var exec domain.WorkflowExecution
 	var status string
 	var pausedAt *time.Time
-	err := row.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID)
+	err := row.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID, &exec.InputsJSON)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.WorkflowExecution{}, domain.ErrExecutionNotFound
 	}
@@ -258,7 +292,7 @@ func (r *Repository) UpdateExecution(ctx context.Context, exec domain.WorkflowEx
 // status='running' predicate.
 func (r *Repository) ListRunning(ctx context.Context) ([]domain.WorkflowExecution, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, '')
+		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, ''), COALESCE(inputs_json::text, '')
 		FROM workflow.executions
 		WHERE status = 'running'
 	`)
@@ -272,7 +306,7 @@ func (r *Repository) ListRunning(ctx context.Context) ([]domain.WorkflowExecutio
 		var exec domain.WorkflowExecution
 		var status string
 		var pausedAt *time.Time
-		if err := rows.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID); err != nil {
+		if err := rows.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID, &exec.InputsJSON); err != nil {
 			return nil, fmt.Errorf("postgres: scan running execution row: %w", err)
 		}
 		exec.Status = domain.Status(status)
@@ -283,6 +317,56 @@ func (r *Repository) ListRunning(ctx context.Context) ([]domain.WorkflowExecutio
 		return nil, fmt.Errorf("postgres: iterate running execution rows: %w", err)
 	}
 	return out, nil
+}
+
+// ListExecutions backs usecase.ListExecutions — keyset pagination ordered
+// newest-first by created_at. Unlike ListTemplates' id-based cursor
+// (id::text > pageToken), execution ids are random UUIDs (gen_random_uuid,
+// not sequential), so they carry no chronological meaning — the cursor
+// here is still the opaque last-seen execution id, but the WHERE clause
+// resolves it back to that row's created_at via a subquery so ordering
+// stays correct regardless of id randomness. (created_at, id) as the
+// compound key breaks ties deterministically when two executions share a
+// created_at timestamp.
+func (r *Repository) ListExecutions(ctx context.Context, tenantID, projectID, cursor string, limit int32) ([]domain.WorkflowExecution, string, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, COALESCE(template_id::text, ''), tenant_id, status, COALESCE(root_trace_id, ''), paused_at, COALESCE(project_id::text, '')
+		FROM workflow.executions
+		WHERE tenant_id = $1
+		  AND ($2 = '' OR project_id = $2::uuid)
+		  AND (
+		    $3 = ''
+		    OR (created_at, id) < (SELECT created_at, id FROM workflow.executions WHERE id = $3::uuid AND tenant_id = $1)
+		  )
+		ORDER BY created_at DESC, id DESC
+		LIMIT $4
+	`, tenantID, projectID, cursor, limit)
+	if err != nil {
+		return nil, "", fmt.Errorf("postgres: query executions: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.WorkflowExecution
+	for rows.Next() {
+		var exec domain.WorkflowExecution
+		var status string
+		var pausedAt *time.Time
+		if err := rows.Scan(&exec.ID, &exec.TemplateID, &exec.TenantID, &status, &exec.RootTraceID, &pausedAt, &exec.ProjectID); err != nil {
+			return nil, "", fmt.Errorf("postgres: scan execution row: %w", err)
+		}
+		exec.Status = domain.Status(status)
+		exec.PausedAt = pausedAt
+		out = append(out, exec)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, "", fmt.Errorf("postgres: iterate execution rows: %w", err)
+	}
+
+	next := ""
+	if int32(len(out)) == limit && len(out) > 0 {
+		next = out[len(out)-1].ID
+	}
+	return out, next, nil
 }
 
 // CreateStepExecution backs usecase.StepExecutionRepository. Tenant scoping

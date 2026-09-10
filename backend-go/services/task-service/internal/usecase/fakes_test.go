@@ -35,7 +35,7 @@ type fakeTaskRepository struct {
 type updateStatusCall struct {
 	tenantID string
 	id       string
-	status   string
+	status   domain.Status
 }
 
 func newFakeTaskRepository() *fakeTaskRepository {
@@ -87,7 +87,7 @@ func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id stri
 // this package exercise ExecuteTask without first seeding a task via
 // Create, and this fake is a permissive test double, not a fidelity
 // replica of Postgres's not-found behavior.
-func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, status string) error {
+func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id string, status domain.Status) error {
 	f.updateStatusCalls = append(f.updateStatusCalls, updateStatusCall{tenantID: tenantID, id: id, status: status})
 	if f.updateStatusErr != nil {
 		return f.updateStatusErr
@@ -97,6 +97,86 @@ func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, sta
 		f.tasks[id] = t
 	}
 	return nil
+}
+
+// RecalculateAncestorProgress recomputes done_subtasks/total_subtasks for
+// every task in the fake's map whose id is an ancestor of taskID, walking
+// ParentID the same way GetAncestors does — a plain in-memory equivalent of
+// the real WITH RECURSIVE UPDATE, close enough to exercise
+// RecalculateProgress's usecase-layer wiring without a database.
+func (f *fakeTaskRepository) RecalculateAncestorProgress(ctx context.Context, tenantID, taskID string) error {
+	current, ok := f.tasks[taskID]
+	if !ok || current.TenantID != tenantID {
+		return nil
+	}
+	id := current.ParentID
+	for id != "" {
+		parent, ok := f.tasks[id]
+		if !ok {
+			break
+		}
+		done, total := 0, 0
+		for _, t := range f.tasks {
+			if t.ParentID == id {
+				total++
+				if t.Status == domain.StatusDone {
+					done++
+				}
+			}
+		}
+		parent.DoneSubtasks, parent.TotalSubtasks = done, total
+		f.tasks[id] = parent
+		id = parent.ParentID
+	}
+	return nil
+}
+
+// GetSubtree walks the fake's tasks map by ParentID (the in-memory inverse
+// of RecalculateAncestorProgress's ancestor walk above) — close enough to
+// exercise GetSubtree's usecase-layer wiring without a database.
+func (f *fakeTaskRepository) GetSubtree(ctx context.Context, tenantID, id string) ([]domain.Task, error) {
+	root, ok := f.tasks[id]
+	if !ok || root.TenantID != tenantID {
+		return nil, errNotFound
+	}
+	out := []domain.Task{root}
+	queue := []string{id}
+	for len(queue) > 0 {
+		parentID := queue[0]
+		queue = queue[1:]
+		for _, t := range f.tasks {
+			if t.ParentID == parentID && t.TenantID == tenantID {
+				out = append(out, t)
+				queue = append(queue, t.ID)
+			}
+		}
+	}
+	return out, nil
+}
+
+// ListChildren scans the fake's tasks map for direct children of taskID —
+// real enough to exercise AIDecompose's context-bundle wiring without a
+// database.
+func (f *fakeTaskRepository) ListChildren(ctx context.Context, tenantID, taskID string) ([]domain.Task, error) {
+	var out []domain.Task
+	for _, t := range f.tasks {
+		if t.TenantID == tenantID && t.ParentID == taskID {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+
+// GetByShareToken scans the fake's tasks map for a matching ShareToken —
+// deliberately NOT tenant-filtered, matching the real repository's
+// unauthenticated-lookup contract (TASK-TG-003-05).
+func (f *fakeTaskRepository) GetByShareToken(ctx context.Context, token string) (domain.Task, error) {
+	for _, t := range f.tasks {
+		if t.ShareToken != nil && *t.ShareToken == token {
+			return t, nil
+		}
+	}
+	return domain.Task{}, errNotFound
 }
 
 // HasActiveExecutions scans the fake's tasks map — real enough to exercise
@@ -219,9 +299,10 @@ func (f *fakeEdgeRepository) ListFrom(ctx context.Context, tenantID, fromTaskID 
 }
 
 type fakeGrantRepository struct {
-	grants   []domain.Grant
-	grantErr error
-	listErr  error
+	grants    []domain.Grant
+	grantErr  error
+	listErr   error
+	revokeErr error
 }
 
 func (f *fakeGrantRepository) Grant(ctx context.Context, tenantID string, grant domain.Grant) error {
@@ -244,6 +325,39 @@ func (f *fakeGrantRepository) ListGrantsForAncestors(ctx context.Context, tenant
 	for _, g := range f.grants {
 		if ids[g.TaskID] {
 			out[g.TaskID] = append(out[g.TaskID], g)
+		}
+	}
+	return out, nil
+}
+
+// Revoke removes the first grant matching (taskID, subjectID, level) —
+// idempotent, mirrors the real postgres.Repository.Revoke's
+// DELETE-affecting-0-rows-is-fine semantics.
+func (f *fakeGrantRepository) Revoke(ctx context.Context, tenantID, taskID, subjectID string, level domain.GrantLevel) error {
+	if f.revokeErr != nil {
+		return f.revokeErr
+	}
+	for i, g := range f.grants {
+		if g.TaskID == taskID && g.SubjectID == subjectID && g.Level == level {
+			f.grants = append(f.grants[:i], f.grants[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
+
+// ListByTask returns every grant recorded directly against taskID — no
+// tenant filtering in this fake (the real repository filters by tenant_id;
+// this in-memory fake's tests don't currently need multi-tenant fixtures
+// for grants, matching ListGrantsForAncestors's own fake above).
+func (f *fakeGrantRepository) ListByTask(ctx context.Context, tenantID, taskID string) ([]domain.Grant, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []domain.Grant
+	for _, g := range f.grants {
+		if g.TaskID == taskID {
+			out = append(out, g)
 		}
 	}
 	return out, nil

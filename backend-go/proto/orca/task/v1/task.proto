@@ -3,6 +3,7 @@ syntax = "proto3";
 package orca.task.v1;
 
 import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
 import "google/protobuf/wrappers.proto";
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1;taskv1";
@@ -15,6 +16,11 @@ service TaskService {
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
   rpc AddEdge(AddEdgeRequest) returns (AddEdgeResponse);
   rpc Grant(GrantRequest) returns (GrantResponse);
+  // RevokeGrant/ListGrants are the public grant-management surface for the
+  // frontend's Access tab (FE-SOL-001) — distinct from the internal
+  // ListGrantsForAncestors path ResolvePermission's BFS walk uses.
+  rpc RevokeGrant(RevokeGrantRequest) returns (google.protobuf.Empty);
+  rpc ListGrants(ListGrantsRequest) returns (ListGrantsResponse);
   rpc ResolvePermission(ResolvePermissionRequest) returns (ResolvePermissionResponse);
   rpc Execute(TaskServiceExecuteRequest) returns (TaskServiceExecuteResponse);
 
@@ -44,6 +50,79 @@ service TaskService {
   // AIDecompose call, creating one subtask + parent_child edge per
   // proposal.
   rpc AIApply(AIApplyRequest) returns (AIApplyResponse);
+
+  // RecalculateProgress recomputes done_subtasks/total_subtasks for
+  // task_id's whole ancestor chain in one repository round trip — called
+  // from UpdateTask's status-transition path when a child task reaches a
+  // terminal status, per BE-SOL-001. See task-service.md §3/§5,7.
+  rpc RecalculateProgress(RecalculateProgressRequest) returns (RecalculateProgressResponse);
+
+  // GetSubtree returns task_id and every descendant in one call — replaces
+  // the frontend's "load task.list for the whole project, filter
+  // client-side by parentId" pattern (FE-SOL-001 §2.1).
+  rpc GetSubtree(GetSubtreeRequest) returns (GetSubtreeResponse);
+
+  // GenerateAgentPrompt produces and persists a single-task agent prompt
+  // template (Task.prompt_template) via the same AI relay primitive as
+  // AIDecompose, but a distinct template (single-task instructions, not a
+  // subtask breakdown). See TASK-TG-005-03's buildExecutePrompt, the later
+  // reader of Task.prompt_template.
+  rpc GenerateAgentPrompt(GenerateAgentPromptRequest) returns (GenerateAgentPromptResponse);
+
+  // GenerateShareLink/GetTaskByShareToken — TASK-TG-003-05, SECURITY REVIEW
+  // REQUIRED before merge. GetTaskByShareToken is task-service's first
+  // unauthenticated read endpoint by design: the token itself is the
+  // authorization, bypassing ResolveGrant/OPA entirely. See
+  // GenerateShareLinkResponse/TaskShareView's own doc comments.
+  rpc GenerateShareLink(GenerateShareLinkRequest) returns (GenerateShareLinkResponse);
+  rpc GetTaskByShareToken(GetTaskByShareTokenRequest) returns (GetTaskByShareTokenResponse);
+}
+
+message RecalculateProgressRequest {
+  string task_id = 1;
+}
+
+message RecalculateProgressResponse {}
+
+message GetSubtreeRequest {
+  string task_id = 1;
+}
+
+message GetSubtreeResponse {
+  repeated Task tasks = 1;
+}
+
+message GenerateAgentPromptRequest {
+  string task_id = 1;
+}
+
+message GenerateAgentPromptResponse {
+  string prompt_template = 1;
+}
+
+message GenerateShareLinkRequest {
+  string task_id = 1;
+  string user_id = 2; // acting caller — must hold admin-level permission
+}
+message GenerateShareLinkResponse {
+  string share_token = 1;
+}
+
+message GetTaskByShareTokenRequest {
+  string share_token = 1;
+}
+message GetTaskByShareTokenResponse {
+  TaskShareView task = 1;
+}
+// TaskShareView is a DEDICATED, narrow projection — NOT Task reused with
+// fields blanked out, so a future Task field addition can never leak
+// through this public, unauthenticated path by accident. ONLY these 4
+// fields, ever — see domain.TaskShareView's own doc comment.
+message TaskShareView {
+  string id = 1;
+  string title = 2;
+  string status = 3;
+  string description = 4;
 }
 
 message Task {
@@ -56,6 +135,35 @@ message Task {
   // workflow_template_id: optional workflow-service template attached to
   // this task (Engine 3). Empty = none attached. See docs/backlog/BACKLOG-016.
   string workflow_template_id = 7;
+
+  // BE-SOL-001 data-model widening (TASK-TG-001-02) — fields below are all
+  // optional/empty-by-default so existing pre-migration rows round-trip as
+  // zero values, matching the additive-only migration.
+  string description = 8;
+  string type = 9;
+  string priority = 10;
+  repeated string labels = 11;
+  string assignee_id = 12;
+  string reporter_id = 13;
+  string owner_id = 14;
+  google.protobuf.Timestamp due_date = 15;
+  double estimated_hours = 16;
+  double actual_hours = 17;
+  string prompt_template = 18;
+  string ai_context = 19; // opaque JSON, see domain.Task.AIContext's doc comment
+  string ai_plan_json = 20; // opaque JSON, see domain.Task.AIPlanJSON's doc comment
+  string visibility = 21;
+  string worktree_id = 22;
+  string agent_session_id = 23;
+  string workflow_exec_id = 24;
+  int32 done_subtasks = 25;
+  int32 total_subtasks = 26;
+  // share_token: unset until GenerateShareLink mints one (TASK-TG-003-05 —
+  // SECURITY REVIEW REQUIRED before merge). Only readable here via an
+  // authenticated Task read (GetTask/ListTasks with a valid grant); the
+  // public GetTaskByShareToken RPC returns a dedicated, narrower
+  // TaskShareView instead — see that message's own doc comment.
+  string share_token = 27;
 }
 
 message CreateTaskRequest {
@@ -63,6 +171,11 @@ message CreateTaskRequest {
   string title = 2;
   string parent_id = 3;
   string project_id = 4;
+  // creator_id: the caller's own user id — mints an owner-level Grant for
+  // this task (TASK-TG-003-02), separate from and NOT the same as
+  // Task.owner_id (informational/display-only, never read by
+  // ResolvePermission).
+  string creator_id = 5;
 }
 
 message CreateTaskResponse {
@@ -106,9 +219,34 @@ message GrantRequest {
   string subject_id = 2; // user or team id
   GrantLevel level = 3;
   bool apply_tree = 4;
+  // expires_at: optional (TASK-TG-003-03) — unset means the grant never
+  // expires.
+  google.protobuf.Timestamp expires_at = 5;
 }
 
 message GrantResponse {}
+
+message RevokeGrantRequest {
+  string task_id = 1;
+  string subject_id = 2;
+  GrantLevel level = 3;
+}
+
+message ListGrantsRequest {
+  string task_id = 1;
+}
+message ListGrantsResponse {
+  repeated GrantView grants = 1;
+}
+// GrantView is a dedicated, narrow projection of task.task_grants — task_id
+// is deliberately omitted (the caller already knows it, from
+// ListGrantsRequest.task_id) and tenant_id is never exposed on the wire.
+message GrantView {
+  string subject_id = 1;
+  GrantLevel level = 2;
+  bool apply_tree = 3;
+  google.protobuf.Timestamp expires_at = 4; // unset if never expires
+}
 
 // ResolvePermission runs the BFS ancestor-resolution algorithm in domain/,
 // then the caller passes the result as OPA policy input for the final
@@ -116,6 +254,12 @@ message GrantResponse {}
 message ResolvePermissionRequest {
   string task_id = 1;
   string user_id = 2;
+  // action: the OPA action being authorized (e.g. "read"/"write"/"admin"),
+  // forwarded to task_grant.rego's level_actions table. Empty (an older
+  // client that hasn't been rebuilt against this field yet) defaults to
+  // "read" at the server.go call site, not here — see that handler's doc
+  // comment.
+  string action = 3;
 }
 
 message ResolvePermissionResponse {
@@ -197,6 +341,18 @@ message AIDecomposeRequest {
 message SubtaskProposal {
   string title = 1;
   string description = 2;
+  // BE-SOL-002 structured-proposal widening (TASK-TG-002-02).
+  string type = 3;
+  // estimated_hours: use has_estimated_hours to distinguish "not given"
+  // from "given as 0", matching domain.SubtaskProposal.EstimatedHours's
+  // *float64 (nil-vs-zero) semantics.
+  double estimated_hours = 4;
+  bool has_estimated_hours = 5;
+  // depends_on_index: indices into the SAME AIApply proposal batch (not
+  // real task IDs, which don't exist until AIApply creates them) — see
+  // domain.SubtaskProposal.DependsOnIndex's doc comment.
+  repeated int32 depends_on_index = 6;
+  string prompt_template = 7;
 }
 message AIDecomposeResponse {
   repeated SubtaskProposal proposals = 1; // review-before-commit — not yet written to task_edges

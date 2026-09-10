@@ -20,12 +20,13 @@ export async function dispatchMiscRpc(
   config: AgentConfig,
   log: AgentLogger,
   ws: WebSocket,
-  // Why unused: vm.provision (the one case here that needed WireState for
-  // its stream.chunk/stream.end frames) moved to agent-rpc-dispatch-vm.ts
-  // (max-lines split). Kept in the signature for shape-consistency with
-  // every other dispatchXxxRpc function route() calls positionally
-  // (dispatchFsRpc/dispatchBrowserRpc etc. all take the same param set).
-  _state: WireState
+  // Was unused (`_state`) after vm.provision (the one case here that needed
+  // WireState for its stream.chunk/stream.end frames) moved to
+  // agent-rpc-dispatch-vm.ts (max-lines split). CR-TG-006's shell.execStream
+  // below needs WireState again for its own stream.chunk/stream.end frames,
+  // so the parameter is live once more — no rename needed at call sites,
+  // route() in agent-rpc-dispatch.ts already passes `state` positionally.
+  state: WireState
 ): Promise<JsonRpcResponse | null> {
   switch (rpc.method) {
     // ── MCP: tools/list ──────────────────────────────────────────────────────
@@ -73,7 +74,7 @@ export async function dispatchMiscRpc(
     // ── v5.0: preflight.check ────────────────────────────────────────────────
     case 'preflight.check': {
       try {
-        const { handlePreflightCheck } = await import('./fs-agent-extensions')
+        const { handlePreflightCheck } = await import('./fs-agent-search-extensions')
         return (await handlePreflightCheck(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -173,7 +174,7 @@ export async function dispatchMiscRpc(
     // SECURITY: only used internally via relay — not exposed to browser directly.
     case 'shell.eval': {
       try {
-        const { handleShellEval } = await import('./fs-agent-extensions')
+        const { handleShellEval } = await import('./shell-agent-extensions')
         return (await handleShellEval(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
@@ -187,11 +188,29 @@ export async function dispatchMiscRpc(
     // Previously unimplemented (specs/agent/api/gaps-and-findings.md #1).
     case 'shell.exec': {
       try {
-        const { handleShellExec } = await import('./fs-agent-extensions')
+        const { handleShellExec } = await import('./shell-agent-extensions')
         return (await handleShellExec(rpc.id, rpc.params ?? {}, config)) as JsonRpcResponse
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
         return makeError(rpc.id, AgentErrorCode.ServerError, `shell.exec unavailable: ${msg}`)
+      }
+    }
+
+    // ── shell.execStream ─────────────────────────────────────────────────────
+    // CR-TG-006: streaming sibling of shell.exec above — delivers
+    // stream.chunk/stream.end frames incrementally instead of a single
+    // buffer-then-return response. Follows the exact
+    // void handleXxxStream(...) + literal stream.started return shape
+    // git.execStream/agent.spawn already use in this codebase.
+    case 'shell.execStream': {
+      try {
+        const { handleShellExecStream } = await import('./shell-agent-extensions')
+        // Streaming: fire-and-forget, sends multiple frames asynchronously
+        void handleShellExecStream(ws, state, rpc.id, rpc.params ?? {}, config)
+        return { jsonrpc: '2.0', id: rpc.id, result: { type: 'stream.started' } }
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(rpc.id, AgentErrorCode.ServerError, `shell.execStream unavailable: ${msg}`)
       }
     }
 

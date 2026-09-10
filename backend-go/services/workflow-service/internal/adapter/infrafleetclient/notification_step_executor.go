@@ -7,6 +7,7 @@ import (
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/domain"
+	"github.com/stablyai/orca-go/services/workflow-service/internal/usecase"
 )
 
 // notificationSendMethod is the Relay method name NotificationExecutor
@@ -44,15 +45,19 @@ type notificationResultOutput struct {
 
 // NotificationExecutor is the real Notification step executor — relays a
 // channel+message notification to infra-fleet-service's Relay RPC.
+// TASK-WF-002-03: cfg.ConnectionID is now a domain.TargetSpec string,
+// resolved to a real connection id via serverResolver before every relay
+// call — see AgentExecutor's doc comment for the same widening.
 type NotificationExecutor struct {
-	client infrafleetv1.InfraFleetServiceClient
+	client         infrafleetv1.InfraFleetServiceClient
+	serverResolver *usecase.ServerResolver
 }
 
 // NewNotificationExecutor wraps an already-constructed infrafleetv1
 // client — used by cmd/server/main.go (real dial) and by tests (fake
 // client).
-func NewNotificationExecutor(client infrafleetv1.InfraFleetServiceClient) *NotificationExecutor {
-	return &NotificationExecutor{client: client}
+func NewNotificationExecutor(client infrafleetv1.InfraFleetServiceClient, serverResolver *usecase.ServerResolver) *NotificationExecutor {
+	return &NotificationExecutor{client: client, serverResolver: serverResolver}
 }
 
 var _ domain.StepExecutor = (*NotificationExecutor)(nil)
@@ -63,8 +68,17 @@ func (e *NotificationExecutor) Execute(ctx context.Context, stepConfigJSON strin
 		return domain.StepResult{}, fmt.Errorf("infrafleetclient: notification: invalid step config JSON: %w", err)
 	}
 
+	spec, err := domain.ParseTargetSpec(cfg.ConnectionID)
+	if err != nil {
+		return domain.StepResult{}, fmt.Errorf("infrafleetclient: notification: parsing target spec: %w", err)
+	}
+	connectionID, err := e.serverResolver.Resolve(ctx, spec)
+	if err != nil {
+		return domain.StepResult{}, fmt.Errorf("infrafleetclient: notification: resolving target: %w", err)
+	}
+
 	var result notificationResult
-	if err := relay(ctx, e.client, cfg.ConnectionID, notificationSendMethod, notificationSendParams{
+	if err := relay(ctx, e.client, connectionID, notificationSendMethod, notificationSendParams{
 		Channel: cfg.Channel,
 		Message: cfg.Message,
 	}, &result); err != nil {

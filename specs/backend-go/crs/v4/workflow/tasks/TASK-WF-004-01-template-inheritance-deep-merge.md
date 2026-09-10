@@ -5,7 +5,95 @@
 **Service:** `workflow-service`
 **File:** `backend-go/services/workflow-service/internal/domain/template.go`, `backend-go/services/workflow-service/internal/usecase/resolve_template.go`, `backend-go/proto/orca/workflow/v1/workflow.proto` (`WorkflowTemplate` message)
 **Depends on:** None
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
+
+## Execution notes (2026-09-09)
+
+Re-verified live: `WorkflowTemplate` (7 fields), `resolveEffectiveTemplate`
+(closest-with-steps-wins loop), `DAGDefinition` (no `Serialize`) all
+matched the task's citations exactly.
+
+**Must-preserve constraint honored, and strengthened beyond the task's own
+sketch:** base-selection loop copied verbatim, unchanged. Went further
+than the sketch on the byte-identical regression concern the task itself
+flagged as "a real risk to flag in the PR": rather than unconditionally
+calling `dag.Serialize()` after the fold loop (which the sketch does, and
+which risks a `ParseDAG`→`Serialize` round-trip changing whitespace/key
+order even for a no-op fold), this implementation tracks whether any
+descendant actually used `Overrides`/`InjectSteps`/`RemoveSteps` and
+returns `base` completely untouched — no round-trip at all — when none
+did. `TestResolveTemplate_Regression_NoNewFieldsResolvesByteIdenticalToBase`
+asserts exact byte equality, not just semantic equality, confirming this
+holds.
+
+**Design decisions made explicit (per the task's own instruction, since
+BE-SOL-004 left these open):**
+- **Override key format:** `"<stepId>.<field>"`. `field == "dependsOn"`
+  sets the step's dependency list (comma-separated string); any other
+  field name is applied inside the step's `Config` JSON object (parsed to
+  `map[string]any`, field set, re-marshaled) — Config is StepType-specific
+  raw JSON this package deliberately doesn't parse generically elsewhere,
+  so this stays a best-effort generic set rather than a typed one. An
+  override naming an unknown step id is a hard error (template-author
+  mistake, e.g. a stale override after a rename) — NOT a silent no-op.
+- **Injection with a missing anchor:** skipped, not an error — additive
+  enrichment from a descendant shouldn't hard-fail resolution just because
+  the parent later renamed the anchor step, unlike an override (which
+  explicitly expects to mutate something that should exist).
+- **Removal + dangling `dependsOn`:** pruned silently, not left for
+  `DAGDefinition.Validate`'s `ErrStepDependencyNotFound` to catch — a
+  `removeSteps` entry declares "this step should no longer exist," which
+  implies its edges go with it.
+- **Proto `StepInjection.step`:** the task's own sketch implies a typed
+  proto `Step` message, but `workflow.proto` has no `Step` message at all
+  today (DAG structure is kept as a raw `dag_json` string end-to-end,
+  confirmed live) — used `step_json string` instead, mirroring that same
+  established raw-JSON convention rather than inventing a new typed
+  message purely for this one field.
+
+**Changes made:**
+1. `internal/domain/template.go`: added `Overrides`/`InjectSteps`/
+   `RemoveSteps` to `WorkflowTemplate`, `StepInjection` type.
+2. `internal/domain/dag.go`: `DAGDefinition.Serialize()`.
+3. `internal/usecase/resolve_template.go`: extended
+   `resolveEffectiveTemplate` (base-selection loop untouched, fold added
+   after) + `applyOverrides`/`setStepField`/`applyInjections`/
+   `applyRemovals` helpers.
+4. `workflow.proto`: `WorkflowTemplate.overrides`/`inject_steps`/
+   `remove_steps` (fields 8-10) + new `StepInjection` message; regenerated.
+5. `internal/adapter/grpc/server.go`: `toProtoTemplate` carries the 3 new
+   fields through (best-effort — a non-JSON-representable `Overrides`
+   value or non-serializable injected step logs and is dropped from the
+   response rather than failing the whole template read).
+
+**Verify output:**
+```
+go build ./services/workflow-service/...   # clean
+go vet   ./services/workflow-service/...   # clean
+go test  ./services/workflow-service/internal/domain/... -run TestDAGDefinition_Serialize -v
+  # 2/2 PASS
+go test  ./services/workflow-service/internal/usecase/... -run TestResolveTemplate -v
+  # 13/13 PASS — the original 5 pre-existing cases pass byte-for-byte
+  # unmodified (regression proof), plus 8 new cases: byte-identical
+  # no-op regression, override changes one field, unknown-step override
+  # errors, injection adds a step, unknown-anchor injection is skipped,
+  # removal prunes dangling dependsOn (and the result still Validates),
+  # all three combined, and overrides-on-empty-DAG-does-not-become-base
+  # (the explicit base-selection-unchanged proof the task's test plan
+  # calls for)
+go test  ./services/workflow-service/... ./services/api-gateway/...   # full suite, all ok
+```
+
+**Explicitly out of scope, flagged for follow-up (matching the task's own
+stated file list, which did not include these):** `CreateTemplate`/
+`UpdateTemplate` usecases and RPCs do not yet accept
+`Overrides`/`InjectSteps`/`RemoveSteps` as input, and the postgres
+repository does not yet persist them (`workflow.templates` has no
+matching columns). The fold logic and its tests are fully correct and
+exercised against directly-constructed `domain.WorkflowTemplate` values,
+but in production today no template can actually acquire non-nil values
+for these 3 fields through the real create/update path — this is a real,
+separate vertical slice of work this task's own file list didn't include.
 
 ---
 

@@ -126,4 +126,24 @@ describe('useTasks', () => {
     })
     expect(result.current.expandedNodes.has('t1')).toBe(false)
   })
+
+  // FE-TASK-001 (task-graph v4): manual refetch after creating a task — there was
+  // previously no way to re-trigger task.list without projectId changing.
+  it('calling refetch() re-calls task.list with the same projectId', async () => {
+    const { useTasks } = await import('../useTasks')
+    const { result } = renderHook(() => useTasks('p1'))
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledTimes(1)
+    })
+
+    act(() => {
+      result.current.refetch()
+    })
+
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledTimes(2)
+    })
+    expect(mockRpc).toHaveBeenLastCalledWith('mock-target', 'task.list', { projectId: 'p1' })
+  })
 })

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/domain/grant.go`, `backend-go/services/task-service/internal/usecase/resolve_permission.go`, `backend-go/services/task-service/migrations/0004_task_fields_and_comments.up/down.sql` (append `grants.expires_at`, shared file — see Context)
 **Depends on:** TASK-TG-001-01 (shares the same migration file — see Context)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -150,3 +150,39 @@ Expected: clean build; expired-grant test asserts `PermissionDenied`/
 `TASK_NO_GRANT`, matching the identical error `ResolvePermission` already
 returns for "no grant at all" (per that usecase's own doc comment on not
 leaking which case applies).
+
+## Execution notes (2026-09-09)
+
+Migration already landed as part of TASK-TG-001-01's combined
+`0004_task_fields_and_comments.up/down.sql` (per that task's own
+coordination note — `task.task_grants.expires_at TIMESTAMPTZ`, nullable, no
+new migration file created here). Implemented every other piece exactly per
+the task's own code samples: `domain.Grant.ExpiresAt *time.Time`;
+`resolve_permission.go`'s `filterExpired` helper inserted right after the
+`ListGrantsForAncestors` call, `domain.ResolveGrant`'s signature left
+untouched; `grants.go`'s `Grant`/`ListGrantsForAncestors` widened for the
+new column; `usecase.GrantInput.ExpiresAt` + `GrantRequest.expires_at = 5`
+(a `google.protobuf.Timestamp`, regenerated via `buf generate`) so the
+field actually has a write path through the RPC, not just direct-SQL, per
+this task's own "a field with no write path is dead" note; `server.go`'s
+`Grant` handler maps the wrapper's `AsTime()` when set.
+
+Added exactly the 3 cases the task's own Test plan names:
+`TestResolvePermission_ExpiredGrant_ExcludedFromResolution` (expired-only
+grant → `PermissionDenied`, OPA never even called);
+`TestResolvePermission_NonExpiringAndFutureExpiry_StillResolve` (table test,
+nil and future `ExpiresAt` both resolve normally — the regression guard
+that non-expiring grants are unaffected); `TestGrant_PersistsExpiresAt` (the
+RPC write-path test — a grant created with `ExpiresAt` set persists it
+unchanged through the fake `GrantRepository`, and by extension through
+`grants.go`'s widened INSERT).
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean; `go
+test .../usecase/... -run "TestResolvePermission|TestGrant"` — all 12 cases
+pass (8 pre-existing + 4 new); `go test -tags=integration
+.../postgres/... -run TestRepository_Grant_And_ListGrantsForAncestors` —
+hit the same pre-existing testcontainers flake on the first run (documented
+in TASK-TG-001-02's execution notes), passed cleanly (9.21s) on immediate
+re-run, confirming the widened `Grant`/`ListGrantsForAncestors` SQL against
+a real `expires_at` column; full `go test ./services/task-service/...`
+passes with no regressions.

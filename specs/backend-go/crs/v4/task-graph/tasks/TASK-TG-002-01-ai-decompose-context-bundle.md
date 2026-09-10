@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/ai_decompose.go`, `backend-go/services/task-service/internal/usecase/tech_stack_detector.go` (new), `backend-go/services/task-service/internal/usecase/ports.go` (new `TechStackDetector` port, extend `EdgeRepository`/`TaskRepository` if `ListChildren` doesn't already exist)
 **Depends on:** TASK-TG-001-02 (needs `Task.Description`/`Task.AIContext` fields to exist and be populated)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -155,3 +155,72 @@ go test ./services/task-service/internal/usecase/... -run "TestAIDecompose|TestT
 Expected: clean build; `AIDecompose`'s prompt-building test asserts all 5
 context fields appear in the generated prompt; a `TechStackDetector` fake
 returning an error never fails `AIDecompose.Execute` itself.
+
+## Execution notes (2026-09-09)
+
+Implemented per the task's own corrected shape, with one further real-code
+divergence found and resolved during implementation (documented below).
+`ListChildren` added to `TaskRepository` (`ports.go`) and implemented in
+`adapter/postgres/repository.go` using the widened `taskSelectColumns`/
+`scanTask` helpers; `decomposeContext`/`buildContext`/widened
+`buildDecomposePrompt` added to `ai_decompose.go` exactly per the task's
+sketch (5 sources: title, description, AI context, tech stack, existing
+subtask titles); `TechStackDetector` interface added directly to
+`ports.go` (not a separate `usecase/tech_stack_detector.go` file — checked
+`AIProviderContextResolver`'s real precedent as the task itself instructed,
+confirmed its port interface lives in `ports.go` too, no separate file, so
+followed that exact convention).
+
+**Further divergence found beyond what the task file already flags**:
+`gitgateway.proto`'s real `ReadFileRequest`/`ReadFileResponse`
+(`gitgateway.proto:444-451`) is `{worktree_id, path}` →
+`{bytes content, string encoding}` — not the `{connection_id, absolute
+path}` → `{string content}` shape this task's own sketch assumed by analogy
+with `SimpleExecutor`. Bigger question this raised: `worktree_id` is
+documented (`specs/backend-go/tdd/services/git-gateway-service.md:121`) as
+"a logical FK into project-service" — a different registry than
+`ProjectExecutionResolver`'s infra-fleet-service `connectionId`. Resolved
+by following this codebase's own established convention instead of adding
+a new project-service client: `ProjectExecutionResolver`'s own doc comment
+states "Like git-gateway-service's worktreeID, task-service's projectID IS
+the infra-fleet-service connectionId" — i.e. this external identifier is
+passed through verbatim across every resource-scoped service's RPC
+regardless of the receiving field's local name. `TechStackDetector.Detect`
+follows that same convention: `task.ProjectID` is passed straight through
+as `ReadFileRequest.WorktreeId`, no new resolver added. Flagged in the new
+file's own doc comment for a future reader who might otherwise "fix" this
+into a project-service lookup that doesn't exist as a port anywhere in this
+service. `ProjectExecutionResolver` itself is therefore NOT used by
+`TechStackDetector` (BE-SOL-002's own sketch reused it for connectionID
+resolution, which doesn't apply once the real proto shape is known) — this
+is a real design correction, not an oversight; noted for the record since
+it changes the constructor shape from the task's literal code sample.
+
+Wired `NewTechStackDetector` in `adapter/grpcclient/tech_stack_detector.go`
+against `git-gateway-service`'s `ReadFile` RPC (6 candidate manifest
+files: package.json/go.mod/requirements.txt/Cargo.toml/pom.xml/Gemfile),
+fully best-effort (any error — including "no worktree" for `id == ""` — is
+swallowed, returns `nil, nil`). Added `GitGatewayServiceAddr` to
+`config.go` and dialed it in `main.go` alongside the other downstream
+clients; `NewAIDecompose`'s constructor gained the `techStack` parameter,
+updated at its one production call site.
+
+Fixed test fallout beyond the task's own file list: `ListChildren` and
+`GetSubtree`(already present)/`RecalculateAncestorProgress` needed adding
+to all 3 `TaskRepository` test doubles; `ai_decompose_test.go` needed a new
+`fakeTechStackDetector` and every existing `NewAIDecompose(...)` call site
+updated for the new 5th parameter. Added exactly the 3 tests the task's own
+"Test plan" section names:
+`TestAIDecompose_PromptIncludesAllFiveContextSources`,
+`TestAIDecompose_TechStackDetectorFailure_NeverFailsExecute`, and
+`TestAIDecompose_BuildContext_ListsExistingSubtaskTitles`.
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean
+(including `-tags=integration`); `go test ./services/task-service/... -run
+"TestAIDecompose|TestTechStackDetector"` — all 9 `TestAIDecompose_*` cases
+pass (no dedicated `TestTechStackDetector_*` unit tests were added for the
+grpcclient adapter itself — it has no branching logic beyond "loop over
+candidates, ignore errors," so its behavior is exercised indirectly through
+`TestAIDecompose_TechStackDetectorFailure_NeverFailsExecute`'s fake at the
+usecase layer); full `go test ./services/task-service/...` passes with no
+regressions.

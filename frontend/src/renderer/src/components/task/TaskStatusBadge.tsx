@@ -1,23 +1,32 @@
 import type { TaskStatus, TaskPriority } from '../../../../shared/task-types'
 
+// FE-TASK-003 (task-graph v4): was missing backlog/review/blocked (only 4 of 7 real
+// TaskStatus values) — fell back to "Todo" for those 3, a real label bug once any UI
+// (e.g. TaskBoardView) renders all 7 statuses directly. Colors match TaskDAGView.tsx's
+// STATUS_COLORS (review=purple #9333ea, blocked=red #dc2626) so both views agree.
 const STATUS_CONFIG = {
-  todo:        { label: 'Todo',        icon: '⏳', className: 'text-gray-500' },
+  backlog: { label: 'Backlog', icon: '📋', className: 'text-slate-400' },
+  todo: { label: 'Todo', icon: '⏳', className: 'text-gray-500' },
   in_progress: { label: 'In Progress', icon: '🔄', className: 'text-blue-600' },
-  done:        { label: 'Done',        icon: '✅', className: 'text-green-600' },
-  cancelled:   { label: 'Cancelled',   icon: '❌', className: 'text-gray-400' },
+  review: { label: 'Review', icon: '👀', className: 'text-purple-600' },
+  done: { label: 'Done', icon: '✅', className: 'text-green-600' },
+  blocked: { label: 'Blocked', icon: '🚫', className: 'text-red-600' },
+  cancelled: { label: 'Cancelled', icon: '❌', className: 'text-gray-400' }
 }
 
 const PRIORITY_CONFIG = {
-  critical: { label: 'Critical', className: 'text-red-600',    dot: '🔴' },
-  high:     { label: 'High',     className: 'text-orange-500', dot: '🟠' },
-  medium:   { label: 'Medium',   className: 'text-yellow-600', dot: '🟡' },
-  low:      { label: 'Low',      className: 'text-green-600',  dot: '🟢' },
+  critical: { label: 'Critical', className: 'text-red-600', dot: '🔴' },
+  high: { label: 'High', className: 'text-orange-500', dot: '🟠' },
+  medium: { label: 'Medium', className: 'text-yellow-600', dot: '🟡' },
+  low: { label: 'Low', className: 'text-green-600', dot: '🟢' }
 }
 
 export function TaskStatusBadge({ status }: { status: TaskStatus }) {
   const config = STATUS_CONFIG[status] || STATUS_CONFIG.todo
   return (
-    <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border ${config.className}`}>
+    <span
+      className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border ${config.className}`}
+    >
       <span>{config.icon}</span>
       <span>{config.label}</span>
     </span>
@@ -27,7 +36,9 @@ export function TaskStatusBadge({ status }: { status: TaskStatus }) {
 export function TaskPriorityBadge({ priority }: { priority: TaskPriority }) {
   const config = PRIORITY_CONFIG[priority] || PRIORITY_CONFIG.low
   return (
-    <span className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border ${config.className}`}>
+    <span
+      className={`inline-flex items-center gap-1 text-xs px-1.5 py-0.5 rounded border ${config.className}`}
+    >
       <span>{config.dot}</span>
       <span>{config.label}</span>
     </span>

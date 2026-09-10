@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/domain/task.go`, `backend-go/services/task-service/internal/usecase/ports.go`, `backend-go/services/task-service/internal/adapter/postgres/repository.go`, `backend-go/services/task-service/internal/adapter/grpc/server.go`, `backend-go/proto/orca/task/v1/task.proto`
 **Depends on:** TASK-TG-001-01 (migration must land first — this task's `Get`/`Create`/`Update` SQL reads/writes the new columns)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -146,3 +146,64 @@ the type — treat any remaining `string`/`domain.Status` mismatch as this
 task's own scope, not a follow-up); `Status` enum table test covers all 8
 values accepted, anything else rejected; existing `NewTask`/`SetStatus` unit
 tests pass unchanged in behavior (only the parameter type changed).
+
+## Execution notes (2026-09-09)
+
+Implemented option (a) from the Context section: `domain.Status` is a real
+defined type threaded through `ports.go` (`UpdateStatus`), `repository.go`
+(all Scan/bind sites), `update_task.go` (`UpdateTaskInput.Status
+*domain.Status`), and `server.go` (`UpdateTask`'s wrapper-to-domain
+conversion, `toProtoTask`'s status field). Fixed every resulting
+string/`domain.Status` mismatch outside the files BE-SOL-001 named, per the
+Context section's own instruction to grep the whole tree rather than stop at
+the named files: 3 test-double `UpdateStatus` signatures
+(`usecase/fakes_test.go`, `adapter/grpcclient/simple_executor_test.go`,
+`adapter/grpc/server_test.go`), one map-literal type in
+`has_active_executions_test.go`, one struct-field type in `task_test.go`,
+one `wrapperString(domain.StatusInProgress)` call needing an explicit
+`string()` conversion in `server_test.go`.
+
+Widened `domain.Task` with all ~18 BE-SOL-001 fields, widened
+`task.proto`'s `Task` message with fields 8-26 in the same order BE-SOL-001
+sketches (added `import "google/protobuf/timestamp.proto"` for `due_date`),
+regenerated via `buf generate` (buf/protoc-gen-go/protoc-gen-go-grpc all
+present in this environment), widened `repository.go`'s
+Create/Get/GetAncestors/List/Update to persist and read every new column
+(nullable pointer-backed fields scanned via pointer-to-pointer targets;
+`Labels` via pgx's native `TEXT[]`→`[]string` support; `AIContext`/
+`AIPlanJSON` via `nullableJSON` mapping empty `json.RawMessage` to SQL NULL
+rather than invalid empty-string JSON), and widened `server.go`'s
+`toProtoTask` with `stringPtrValue`/`float64PtrValue`/`timePtrToProto`
+helpers (nil pointer → wire zero value, matching `Status`'s own
+untyped-scalar wire convention rather than introducing wrapper types for
+every optional field — a scope-appropriate simplification, not something
+BE-SOL-001 asked for that was skipped).
+
+**Deliberately out of scope for this task** (left for the tasks that
+actually need each): `CreateTaskRequest`/`UpdateTaskRequest` proto messages
+were NOT widened with input fields for the new columns (only `Task`'s
+output/read-side widened, plus `UpdateTaskInput.Status`'s existing
+wrapper). The task's own Changes-to-make section only lists `message Task`
+in the proto section; nothing here yet writes `Description`/`OwnerID`/
+`AIContext`/etc. on create — TASK-TG-002-01/-002-02/-003-02/-005-03 each set
+specific new fields on `domain.Task` directly (via `CreateTaskInput`
+extensions or direct repo calls inside their own usecases) as they need
+them, and `Update`/`Create`'s SQL already covers whatever they set since
+every new column round-trips through the widened repository now.
+
+Verify: `go build ./services/task-service/...` clean; `go vet
+./services/task-service/...` clean; `go test
+./services/task-service/internal/domain/... ./services/task-service/internal/usecase/...`
+— both packages pass (all existing unit tests, behavior unchanged aside from
+the parameter-type widening). `go test -tags=integration
+./services/task-service/internal/adapter/postgres/... -run TestRepository`
+— every test passed at least once across several re-runs, but this
+environment's testcontainers Postgres wait-strategy is measurably flaky
+under concurrent load in this sandbox (intermittent `pq: the database
+system is starting up` from the `migrate` CLI racing the container's
+"port open" readiness check, seen on a shifting subset of tests each run,
+never the same one twice) — a pre-existing infra flake in
+`setupRepository`'s wait condition, not a regression from this task's schema
+widening (every test passed when re-run in isolation). Not fixed here (out
+of this task's scope; would mean hardening `testutil.StartPostgres`'s wait
+strategy, a cross-service test-infra change).

@@ -96,7 +96,7 @@ export function useWorkflow(templateId?: string) {
   }, [templateId, local])
 
   const runWorkflow = useCallback(
-    async (inputs?: Record<string, unknown>) => {
+    async (projectId: string) => {
       if (!templateId) {
         toast.error('Save workflow first')
         return null
@@ -106,15 +106,14 @@ export function useWorkflow(templateId?: string) {
       // id này TRƯỚC khi có executionId từ backend.
       const span = Tracers.uiWorkflowExecuteFlow.start({ templateId })
       try {
-        // BACKLOG-020: workflow.execute's real shape is
-        // {templateId, projectId, rootTraceId, requestId} — no `inputs` field
-        // exists on the RPC (ExecuteRequest carries no per-run input payload
-        // today; `inputs` was silently dropped by the Go decoder same as
-        // above), and `traceId` needed to be `rootTraceId` to actually land
-        // as this execution's root trace id per BL-WF-02's own comment.
-        void inputs
+        // channels_workflow.go:36-52 đã decode + forward projectId đầy đủ — chỉ thiếu
+        // gửi từ phía client trước đây (FE-TASK-001, workflow v4). workflow.execute's
+        // real shape is {templateId, projectId, rootTraceId, requestId} — no `inputs`
+        // field exists on the RPC (ExecuteRequest carries no per-run input payload
+        // today).
         const result = await callRuntimeRpc<{ id: string }>(target, 'workflow.execute', {
           templateId,
+          projectId,
           rootTraceId: span.id,
           requestId: span.id
         })

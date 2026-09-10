@@ -4,9 +4,35 @@
 **Solution Ref:** FE-SOL-001 Phần 4
 **Priority:** 🟠 P1
 **Estimated:** 65 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
+
+## Kết quả thực thi (2026-09-09)
+
+- Thêm `RealGrantLevel = 'owner'|'admin'|'user'|'team'|'company'` mới vào `task-types.ts` — KHÔNG
+  tái dùng `TaskPermission`/`TaskGrant`/`TaskGrantLevel` cũ (đúng thang sai CR-TG-003 gốc mắc phải,
+  BE-SOL-003 đã bác bỏ). Không xoá 3 type cũ đó — đúng phạm vi.
+- Tạo `useTaskGrants.ts` (addGrant qua `task.grant`, `grants` rỗng cố định + `revoke`/
+  `generateShareLink` no-op kèm `toast.info` — cả 3 RPC list/revoke/share-link chưa tồn tại thật,
+  BE-SOL-003 📋 Proposed).
+- Tạo `TaskGrantModal.tsx` đúng nguyên mẫu (Add Grant form + placeholder "Current grants" + nút
+  Share link).
+- `TaskDetail.tsx`: mở rộng `activeTab` thành `'details'|'subtasks'|'ai'|'access'`, thêm
+  `currentUserId` từ `useAppStore(s => s.currentUser?.id)` (xác nhận đúng field thật trong
+  `store/slices/auth.ts`, không đoán), thêm effect gọi `task.resolvePermission` set `canManage`, ẩn
+  nút "Execute with Agent" khi `!canManage`, thêm `TabsTrigger`/`TabsContent` "Access".
+- **Vấn đề khi viết test (không phải bug sản phẩm)**: `fireEvent.click` trên Radix `TabsTrigger`
+  không đủ để chuyển tab dưới happy-dom (Radix cần pointer event đầy đủ hơn) — đổi sang
+  `@testing-library/user-event`'s `userEvent.click` cho đúng case chuyển tab; test khác trong file
+  vẫn dùng `fireEvent` bình thường (không cần đổi toàn bộ).
+- Test: `useTaskGrants.test.ts` (5 case), `TaskGrantModal.test.tsx` (5 case, mock `ui/select` theo
+  đúng pattern `StepEditor.test.tsx` đã dùng), thêm 3 case mới vào `TaskDetail.test.tsx`
+  (effectiveLevel='user'→ẩn Run, ='owner'→hiện Run, tab Access render đúng `TaskGrantModal`).
+  `npx vitest run` cả 3 file → 20/20 pass, 7 case cũ của `TaskDetail.test.tsx` không hồi quy.
+- Phần list/revoke/share-link build UI đầy đủ nhưng gọi RPC sẽ lỗi/no-op cho tới khi BE-SOL-003
+  merge (`task.listGrants`/`revokeGrant`/`generateShareLink`) — đúng kỳ vọng, đã ghi rõ trong UI
+  bằng message "not available yet".
 
 ## ⚠️ Đính chính bắt buộc đọc trước khi implement — KHÔNG dùng thang `view/comment/edit/execute/manage`
 

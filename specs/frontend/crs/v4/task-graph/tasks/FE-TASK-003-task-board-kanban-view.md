@@ -4,9 +4,35 @@
 **Solution Ref:** FE-SOL-001 Phần 3
 **Priority:** 🔴 P0 — gap chính ma trận hoàn thành nêu
 **Estimated:** 70 phút
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
+
+## Kết quả thực thi (2026-09-09)
+
+- Bước 1 (bắt buộc, làm TRƯỚC): vá `TaskStatusBadge.tsx`'s `STATUS_CONFIG` thêm 3 entry
+  `backlog`/`review`/`blocked`, màu khớp `TaskDAGView.tsx`'s `STATUS_COLORS` (review=tím
+  `#9333ea`→`text-purple-600`, blocked=đỏ `#dc2626`→`text-red-600`) — chỉ THÊM key, không đổi/xoá 4
+  key cũ.
+- Tạo `TaskBoardView.tsx` đúng nguyên mẫu: 7 cột theo `STATUS_ORDER`, optimistic move + rollback cục
+  bộ qua `statusOverride` (không đụng `useTask.ts`'s `updateTask()` chung), kéo-thả bằng
+  `dataTransfer`, tái dùng `TaskCard` với `depth=0/isExpanded=false/onToggle=noop`.
+- `TaskGraph.tsx`: `viewMode` mở rộng `'tree'|'dag'|'board'`, thêm nút toggle "Board", lazy-load
+  `TaskBoardView`.
+- Test: thêm 3 case vào `TaskStatusBadge.test.tsx` (backlog/review/blocked không fallback Todo); tạo
+  mới `TaskBoardView.test.tsx` (4 case: 7 cột đúng thứ tự + đếm, optimistic move trước khi RPC
+  resolve, rollback khi RPC reject kèm đúng message toast, click card → onSelect); thêm 1 case Board
+  toggle vào `TaskGraph.test.tsx`.
+- **Lưu ý kỹ thuật khi viết test** (không phải bug sản phẩm): unit test dựng `TaskBoardView` độc lập
+  với `tasks` prop tĩnh — sau khi optimistic move thành công, code xoá `statusOverride` với giả định
+  `tasks` prop (từ store qua `TaskGraph`/`useTasks`) đã kịp cập nhật status mới; trong test cô lập
+  không có vòng lặp store thật đó nên phải assert "đã chuyển cột" ngay sau khi drop (đồng bộ, trước
+  khi RPC resolve) thay vì sau khi RPC resolve — đã viết lại test theo đúng thực tế này.
+- `npx vitest run TaskStatusBadge.test.tsx TaskBoardView.test.tsx TaskGraph.test.tsx` → 17/17 pass.
+  Chạy thêm `TaskCard.test.tsx`/`TaskDetail.test.tsx`/`TaskTreeView.test.tsx`/`TaskGraphPanel.test.tsx`
+  (đụng chung `TaskStatusBadge`) → 20/20 pass, không hồi quy.
+- Không thêm sort/reorder trong cùng cột, không đổi `TaskCard.tsx`, không sửa `updateTask()` chung —
+  đúng phạm vi.
 
 ## Mục tiêu
 

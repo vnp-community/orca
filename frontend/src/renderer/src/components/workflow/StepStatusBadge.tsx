@@ -1,5 +1,5 @@
 import type { StepStatus, WorkflowExecutionStatus } from '@shared/workflow-types'
-import { CheckCircle2, Loader2, Clock, XCircle, SkipForward, Ban } from 'lucide-react'
+import { CheckCircle2, Loader2, Clock, XCircle, SkipForward, Ban, PauseCircle } from 'lucide-react'
 import { cn } from '../../lib/utils'
 import type { ReactNode } from 'react'
 
@@ -8,6 +8,8 @@ import type { ReactNode } from 'react'
 // overlap on 4 values but diverge on the 5th ('skipped' vs 'cancelled'), so the
 // map below is keyed on their union rather than either type alone (CR-PW-004;
 // was `STEP_STATUS[status]` throwing on 'cancelled' via an `as any` cast).
+// 'paused' (CR-WF-006 pause/resume) only exists on WorkflowExecutionStatus, not
+// StepStatus, but the exhaustive map below still needs an entry for it.
 type BadgeStatus = StepStatus | WorkflowExecutionStatus
 
 const STEP_STATUS: Record<BadgeStatus, { icon: ReactNode; className: string; label: string }> = {
@@ -17,6 +19,7 @@ const STEP_STATUS: Record<BadgeStatus, { icon: ReactNode; className: string; lab
     className: 'text-blue-500',
     label: 'Running'
   },
+  paused: { icon: <PauseCircle size={14} />, className: 'text-amber-500', label: 'Paused' },
   completed: { icon: <CheckCircle2 size={14} />, className: 'text-green-500', label: 'Completed' },
   failed: { icon: <XCircle size={14} />, className: 'text-red-500', label: 'Failed' },
   skipped: { icon: <SkipForward size={14} />, className: 'text-gray-400', label: 'Skipped' },

@@ -19,12 +19,24 @@ type AddEdgeInput struct {
 // depends_on edges are cycle-checked: parent_child's single-parent
 // invariant is a different, DB-enforced constraint (unique index on
 // to_task_id), not a cycle in the sense TaskDAGValidator guards against.
+//
+// AddEdge does NOT open its own transaction — it trusts whatever tasks/edges
+// pair it was constructed with are already correctly scoped (either the
+// pool-backed repos for a standalone call, or tx-scoped repos when
+// constructed inside a usecase.TxRunner.RunInTx closure), mirroring
+// AIApply's existing relationship with CreateTask. The standalone AddEdge
+// RPC path gets its atomicity from the gRPC handler wrapping this usecase in
+// a RunInTx call instead — see server.go's AddEdge handler — closing this
+// usecase's previous check-then-write race (cycle check + edge write, now
+// also + auto-block write, were 3 separate calls with no atomicity
+// guarantee between them).
 type AddEdge struct {
+	tasks TaskRepository
 	edges EdgeRepository
 }
 
-func NewAddEdge(edges EdgeRepository) *AddEdge {
-	return &AddEdge{edges: edges}
+func NewAddEdge(tasks TaskRepository, edges EdgeRepository) *AddEdge {
+	return &AddEdge{tasks: tasks, edges: edges}
 }
 
 func (uc *AddEdge) Execute(ctx context.Context, in AddEdgeInput) (domain.TaskEdge, error) {
@@ -39,11 +51,6 @@ func (uc *AddEdge) Execute(ctx context.Context, in AddEdgeInput) (domain.TaskEdg
 	}
 
 	if edge.Kind == domain.EdgeKindDependsOn {
-		// NOTE: fetching the existing edge set and then writing the new one
-		// is two separate calls, not one transaction — task-service.md §8
-		// requires the cycle check and the write to be atomic so a
-		// concurrent AddEdge can't slip a cycle in between. Not wired in
-		// this scaffold; see this service's README's "known gaps" section.
 		existing, err := uc.edges.ListByKind(ctx, tenantID, domain.EdgeKindDependsOn)
 		if err != nil {
 			return domain.TaskEdge{}, apperrors.New(apperrors.KindInternal, "TASK_EDGE_LIST_FAILED", "failed to list existing edges for cycle check", err)
@@ -55,6 +62,23 @@ func (uc *AddEdge) Execute(ctx context.Context, in AddEdgeInput) (domain.TaskEdg
 
 	if err := uc.edges.Add(ctx, tenantID, edge); err != nil {
 		return domain.TaskEdge{}, apperrors.New(apperrors.KindInternal, "TASK_EDGE_ADD_FAILED", "failed to persist edge", err)
+	}
+
+	// Auto-block: a fresh depends_on edge onto a not-yet-done dependency
+	// blocks the dependent task immediately — BE-SOL-001's auto-block
+	// design. Runs against the same tasks/edges pair as the checks/write
+	// above, so it shares their transactional scope when AddEdge is
+	// constructed inside a RunInTx closure.
+	if edge.Kind == domain.EdgeKindDependsOn {
+		fromTask, err := uc.tasks.Get(ctx, tenantID, in.FromTaskID)
+		if err != nil {
+			return domain.TaskEdge{}, apperrors.New(apperrors.KindInternal, "TASK_EDGE_AUTOBLOCK_LOOKUP_FAILED", "failed to load dependency task for auto-block check", err)
+		}
+		if fromTask.Status != domain.StatusDone {
+			if err := uc.tasks.UpdateStatus(ctx, tenantID, in.ToTaskID, domain.StatusBlocked); err != nil {
+				return domain.TaskEdge{}, apperrors.New(apperrors.KindInternal, "TASK_EDGE_AUTOBLOCK_FAILED", "failed to auto-block dependent task", err)
+			}
+		}
 	}
 	return edge, nil
 }

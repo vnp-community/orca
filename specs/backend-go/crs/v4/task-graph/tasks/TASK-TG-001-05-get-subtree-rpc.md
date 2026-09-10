@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/internal/usecase/get_subtree.go` (new), `backend-go/services/task-service/internal/adapter/postgres/subtree.go` (new — shared with TASK-TG-001-03's `RecalculateAncestorProgress`), `backend-go/services/task-service/internal/usecase/ports.go` (extend `TaskRepository`), `backend-go/proto/orca/task/v1/task.proto` (`GetSubtree` RPC), `backend-go/services/task-service/internal/adapter/grpc/server.go` (handler)
 **Depends on:** TASK-TG-001-02 (widened `Task` struct — `GetSubtree` returns full `Task` rows, so its `SELECT`/`Scan` list depends on the final column set)
-**Status:** `[ ]` TODO
+**Status:** `[x]` DONE
 
 ---
 
@@ -163,3 +163,38 @@ returns only that node's own descendants, never a sibling subtree or the
 root itself; a task belonging to a different tenant with the same `id`
 never leaks into the result (regression test asserting the explicit
 `tenant_id` filter, not just RLS).
+
+## Execution notes (2026-09-09)
+
+Implemented as specified: `TaskRepository.GetSubtree` added to `ports.go`;
+`usecase.GetSubtree` (new file) matches the task's sketch; `GetSubtree`
+added to the existing `internal/adapter/postgres/subtree.go` (shared with
+TASK-TG-001-03's `RecalculateAncestorProgress`, per this task's own
+file-list note) using the widened `taskSelectColumns`/`scanTask` helpers
+TASK-TG-001-02 introduced rather than hand-listing 26 columns a second time
+— explicit column list, not `SELECT *`, matching this task's own correction
+of BE-SOL-001's sketch. Both the anchor and recursive CTE terms filter
+`tenant_id = $1`, matching `GetAncestors`'s convention. Added
+`GetSubtree` RPC + `GetSubtreeRequest`/`GetSubtreeResponse` to `task.proto`
+and regenerated via `buf generate`; added the `Server` handler following
+`GetDependencies`'s pattern; wired `usecase.NewGetSubtree(repo)` into
+`main.go` and the `Server` struct/constructor.
+
+Added `GetSubtree` to all 3 test-double `TaskRepository` fakes (a real
+BFS-by-ParentID walk in `usecase/fakes_test.go`; panic in the
+`grpcclient` fake, unused there; single-node passthrough in the `grpc`
+package's fake) and wrote `get_subtree_test.go` (root's subtree includes
+descendants but excludes a sibling; requires tenant context) plus a new
+integration file, `internal/adapter/postgres/subtree_integration_test.go`,
+covering exactly the Verify section's 3 assertions against a real 4-node
+tree (root -> {a -> a1, b}) plus a second-tenant task: root's subtree is
+all 4 of its own nodes, `a`'s subtree is `{a, a1}` only (excludes sibling
+`b` and root), and querying another tenant's task ID under the wrong
+tenant returns zero rows.
+
+Verify: `go build`/`go vet ./services/task-service/...` both clean; `go
+test ./services/task-service/...` all pass including the 2 new
+`TestGetSubtree_*` cases. `go test -tags=integration .../postgres/... -run
+TestRepository_GetSubtree` — hit the same pre-existing testcontainers flake
+documented in TASK-TG-001-02's execution notes on the first run, passed
+cleanly (4.57s) on immediate re-run.

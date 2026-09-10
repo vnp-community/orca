@@ -60,6 +60,18 @@ type WorkflowExecution struct {
 	RootTraceID string
 	PausedAt    *time.Time
 	ProjectID   string
+	// InputsJSON is ExecuteRequest.inputs (TASK-WF-003-01), frozen at
+	// Execute time — a {{input_field}} reference inside a step dispatched
+	// after a restart still needs the original inputs available, so this
+	// is persisted alongside the execution rather than only held in
+	// Execute's in-memory ExecuteInput. Set via direct field assignment
+	// after NewWorkflowExecution (not a constructor parameter) to avoid
+	// widening that constructor's signature across its 30+ existing call
+	// sites for what is genuinely optional data — same
+	// set-after-construction pattern PausedAt already uses via Pause().
+	// Empty string (not "{}"), same as DAGJSON's blank-string convention,
+	// means "no inputs were supplied."
+	InputsJSON string
 }
 
 // NewWorkflowExecution constructs a WorkflowExecution in StatusRunning —

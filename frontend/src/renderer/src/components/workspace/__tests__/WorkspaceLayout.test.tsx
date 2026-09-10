@@ -29,6 +29,9 @@ vi.mock('../WorkspaceTabBar', () => ({
       <button data-testid="tab-agent" onClick={() => onTabChange('agent')}>
         Agent
       </button>
+      <button data-testid="tab-workflows" onClick={() => onTabChange('workflows')}>
+        Workflows
+      </button>
     </div>
   )
 }))
@@ -57,7 +60,40 @@ vi.mock('../../task/TaskGraphPanel', () => ({
   TaskGraphPanel: () => <div data-testid="task-graph-panel" />
 }))
 vi.mock('../../workflow/WorkflowMonitor', () => ({
-  WorkflowMonitor: () => <div data-testid="workflow-monitor" />
+  WorkflowMonitor: ({
+    onNewWorkflow,
+    onOpenLibrary
+  }: {
+    onNewWorkflow: () => void
+    onOpenLibrary?: () => void
+  }) => (
+    <div data-testid="workflow-monitor">
+      <button data-testid="mock-new-workflow" onClick={onNewWorkflow}>
+        + New Workflow
+      </button>
+      <button data-testid="mock-open-library" onClick={onOpenLibrary}>
+        Browse Library
+      </button>
+    </div>
+  )
+}))
+vi.mock('../../workflow/WorkflowBuilder', () => ({
+  WorkflowBuilder: ({ templateId, onSave }: { templateId?: string; onSave?: () => void }) => (
+    <div data-testid="workflow-builder" data-template-id={templateId ?? ''}>
+      <button data-testid="mock-save-workflow" onClick={onSave}>
+        Save
+      </button>
+    </div>
+  )
+}))
+vi.mock('../../workflow/WorkflowLibrary', () => ({
+  WorkflowLibrary: ({ onUseTemplate }: { onUseTemplate: (id: string) => void }) => (
+    <div data-testid="workflow-library">
+      <button data-testid="mock-use-template" onClick={() => onUseTemplate('tmpl-1')}>
+        Use
+      </button>
+    </div>
+  )
 }))
 vi.mock('../AgentPanel', () => ({
   AgentPanel: ({ worktreeId }: { worktreeId: string }) => (
@@ -206,5 +242,55 @@ describe('WorkspaceLayout', () => {
       'data-worktree-id',
       'wt-1'
     )
+  })
+
+  // FE-TASK-001 (workflow v4): WorkflowBuilder was never mounted anywhere — this toggle is the fix.
+  describe('"workflows" tab — Monitor/Builder toggle (FE-TASK-001)', () => {
+    it('default → renders WorkflowMonitor', async () => {
+      render(<WorkspaceLayout />)
+      fireEvent.click(screen.getByTestId('tab-workflows'))
+      await waitFor(() => {
+        expect(screen.getByTestId('workflow-monitor')).toBeInTheDocument()
+      })
+      expect(screen.queryByTestId('workflow-builder')).not.toBeInTheDocument()
+    })
+
+    it("WorkflowMonitor's onNewWorkflow → switches to WorkflowBuilder", async () => {
+      render(<WorkspaceLayout />)
+      fireEvent.click(screen.getByTestId('tab-workflows'))
+      await waitFor(() => screen.getByTestId('workflow-monitor'))
+      fireEvent.click(screen.getByTestId('mock-new-workflow'))
+      await waitFor(() => {
+        expect(screen.getByTestId('workflow-builder')).toBeInTheDocument()
+      })
+      expect(screen.queryByTestId('workflow-monitor')).not.toBeInTheDocument()
+    })
+
+    it("WorkflowBuilder's onSave → switches back to WorkflowMonitor", async () => {
+      render(<WorkspaceLayout />)
+      fireEvent.click(screen.getByTestId('tab-workflows'))
+      await waitFor(() => screen.getByTestId('workflow-monitor'))
+      fireEvent.click(screen.getByTestId('mock-new-workflow'))
+      await waitFor(() => screen.getByTestId('workflow-builder'))
+      fireEvent.click(screen.getByTestId('mock-save-workflow'))
+      await waitFor(() => {
+        expect(screen.getByTestId('workflow-monitor')).toBeInTheDocument()
+      })
+    })
+
+    // FE-TASK-002 (workflow v4): Library extends the same workflowView toggle.
+    it('"Browse Library" → switches to WorkflowLibrary, its onUseTemplate → opens Builder with that templateId', async () => {
+      render(<WorkspaceLayout />)
+      fireEvent.click(screen.getByTestId('tab-workflows'))
+      await waitFor(() => screen.getByTestId('workflow-monitor'))
+      fireEvent.click(screen.getByTestId('mock-open-library'))
+      await waitFor(() => {
+        expect(screen.getByTestId('workflow-library')).toBeInTheDocument()
+      })
+      fireEvent.click(screen.getByTestId('mock-use-template'))
+      await waitFor(() => {
+        expect(screen.getByTestId('workflow-builder')).toHaveAttribute('data-template-id', 'tmpl-1')
+      })
+    })
   })
 })

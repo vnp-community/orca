@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -13,6 +14,9 @@ type GrantInput struct {
 	SubjectID string
 	Level     domain.GrantLevel
 	ApplyTree bool
+	// ExpiresAt is optional (TASK-TG-003-03) — nil means the grant never
+	// expires.
+	ExpiresAt *time.Time
 }
 
 // Grant is task-service's grant-mutation usecase. Per task-service.md §9,
@@ -42,7 +46,7 @@ func (uc *Grant) Execute(ctx context.Context, in GrantInput) error {
 		return apperrors.New(apperrors.KindInvalidArgument, "TASK_GRANT_INVALID", "level is not a recognized grant level", nil)
 	}
 
-	grant := domain.Grant{TaskID: in.TaskID, SubjectID: in.SubjectID, Level: in.Level, ApplyTree: in.ApplyTree}
+	grant := domain.Grant{TaskID: in.TaskID, SubjectID: in.SubjectID, Level: in.Level, ApplyTree: in.ApplyTree, ExpiresAt: in.ExpiresAt}
 	if err := uc.grants.Grant(ctx, tenantID, grant); err != nil {
 		return apperrors.New(apperrors.KindInternal, "TASK_GRANT_FAILED", "failed to persist grant", err)
 	}

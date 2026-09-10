@@ -327,6 +327,35 @@ func TestTaskCreateGetChannels_StillRegistered(t *testing.T) {
 	}
 }
 
+// TestTaskCreateChannel_ForwardsProjectID is the regression test for
+// TASK-TG-001-06: task.create's JSON args decoder must not silently drop
+// projectId — before this fix, CreateTaskRequest.ProjectId was always empty
+// regardless of what the caller sent, which made a freshly created task
+// disappear from useTasks(projectId)'s client-side filter immediately after
+// create.
+func TestTaskCreateChannel_ForwardsProjectID(t *testing.T) {
+	var gotReq *taskv1.CreateTaskRequest
+	r := NewRegistry()
+	registerTaskChannels(r, &fakeTaskServiceClient{
+		createTaskFunc: func(ctx context.Context, in *taskv1.CreateTaskRequest) (*taskv1.CreateTaskResponse, error) {
+			gotReq = in
+			return &taskv1.CreateTaskResponse{Task: &taskv1.Task{Id: "t1", ProjectId: in.GetProjectId()}}, nil
+		},
+	})
+
+	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "task.create", argsJSON(t, map[string]any{
+		"title": "x", "parentId": "p1", "projectId": "proj-1",
+	})); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetProjectId() != "proj-1" {
+		t.Errorf("expected CreateTaskRequest.ProjectId=%q, got %q", "proj-1", gotReq.GetProjectId())
+	}
+	if gotReq.GetParentId() != "p1" {
+		t.Errorf("expected CreateTaskRequest.ParentId=%q, got %q", "p1", gotReq.GetParentId())
+	}
+}
+
 func TestTaskExecuteChannel_Success(t *testing.T) {
 	var gotReq *taskv1.TaskServiceExecuteRequest
 	fake := &fakeTaskServiceClient{

@@ -54,6 +54,33 @@ func (f *fakeTaskRepository) ListGrantsForAncestors(ctx context.Context, tenantI
 	return out, nil
 }
 
+func (f *fakeTaskRepository) Revoke(ctx context.Context, tenantID, taskID, subjectID string, level domain.GrantLevel) error {
+	for i, g := range f.grants {
+		if g.TaskID == taskID && g.SubjectID == subjectID && g.Level == level {
+			f.grants = append(f.grants[:i], f.grants[i+1:]...)
+			break
+		}
+	}
+	return nil
+}
+func (f *fakeTaskRepository) GetByShareToken(ctx context.Context, token string) (domain.Task, error) {
+	for _, t := range f.tasks {
+		if t.ShareToken != nil && *t.ShareToken == token {
+			return t, nil
+		}
+	}
+	return domain.Task{}, errors.New("not found")
+}
+func (f *fakeTaskRepository) ListByTask(ctx context.Context, tenantID, taskID string) ([]domain.Grant, error) {
+	var out []domain.Grant
+	for _, g := range f.grants {
+		if g.TaskID == taskID {
+			out = append(out, g)
+		}
+	}
+	return out, nil
+}
+
 func (f *fakeTaskRepository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
 	f.tasks[task.ID] = task
 	return task, nil
@@ -66,9 +93,28 @@ func (f *fakeTaskRepository) Get(ctx context.Context, tenantID, id string) (doma
 	return t, nil
 }
 func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id string, maxDepth int) ([]domain.Task, error) {
-	return nil, errors.New("not implemented")
+	var chain []domain.Task
+	current, ok := f.tasks[id]
+	if !ok || current.TenantID != tenantID {
+		return nil, errors.New("not found")
+	}
+	for i := 0; ; i++ {
+		if maxDepth > 0 && i >= maxDepth {
+			break
+		}
+		chain = append(chain, current)
+		if current.ParentID == "" {
+			break
+		}
+		parent, ok := f.tasks[current.ParentID]
+		if !ok {
+			break
+		}
+		current = parent
+	}
+	return chain, nil
 }
-func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, status string) error {
+func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id string, status domain.Status) error {
 	t, ok := f.tasks[id]
 	if !ok {
 		return errors.New("not found")
@@ -76,6 +122,25 @@ func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, sta
 	t.Status = status
 	f.tasks[id] = t
 	return nil
+}
+func (f *fakeTaskRepository) RecalculateAncestorProgress(ctx context.Context, tenantID, taskID string) error {
+	return nil
+}
+func (f *fakeTaskRepository) ListChildren(ctx context.Context, tenantID, taskID string) ([]domain.Task, error) {
+	var out []domain.Task
+	for _, t := range f.tasks {
+		if t.ParentID == taskID {
+			out = append(out, t)
+		}
+	}
+	return out, nil
+}
+func (f *fakeTaskRepository) GetSubtree(ctx context.Context, tenantID, id string) ([]domain.Task, error) {
+	root, ok := f.tasks[id]
+	if !ok {
+		return nil, errors.New("not found")
+	}
+	return []domain.Task{root}, nil
 }
 func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
 	return false, nil
@@ -160,6 +225,74 @@ func (f fakeAICompleter) Complete(ctx context.Context, connectionID, prompt stri
 	return f.content, nil
 }
 
+type fakeTechStackDetector struct{}
+
+func (fakeTechStackDetector) Detect(ctx context.Context, id string) ([]string, error) {
+	return nil, nil
+}
+
+// companyReadOnlyOPA mimics task_grant.rego's real level_actions table just
+// enough to prove ResolvePermissionRequest.action actually reaches OPA
+// end-to-end (task_grant.rego:25-31: level_actions["company"] = {"read"}) —
+// TASK-TG-003-06's regression test doesn't need the real Rego engine to
+// prove server.go's wire-field plumbing is correct, only a fake precise
+// enough to distinguish "read" from every other action for company-level
+// callers.
+type companyReadOnlyOPA struct{}
+
+func (companyReadOnlyOPA) Decision(ctx context.Context, level domain.GrantLevel, action, tenantID string) (bool, error) {
+	if level == domain.GrantLevelCompany {
+		return action == "read", nil
+	}
+	return true, nil
+}
+
+// TestServer_ResolvePermission_ActionReachesOPA is TASK-TG-003-06's core
+// regression test: before that fix, ResolvePermissionRequest had no action
+// field at all and server.go hardcoded "read", so it was IMPOSSIBLE to
+// exercise the deny branch below — every call silently used "read" and
+// therefore always passed level_actions["company"]'s check.
+func TestServer_ResolvePermission_ActionReachesOPA(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1"}
+	tasks.grants = []domain.Grant{{TaskID: "t1", SubjectID: "tenant-1", Level: domain.GrantLevelCompany}}
+	resolvePermissionUC := usecase.NewResolvePermission(tasks, tasks, stubTeams{}, companyReadOnlyOPA{})
+	s := New(
+		usecase.NewCreateTask(tasks, tasks), usecase.NewGetTask(tasks), fakeTxRunner{tasks: tasks, edges: &fakeEdgeRepository{}},
+		usecase.NewGrant(tasks), resolvePermissionUC,
+		usecase.NewExecuteTask(tasks, &fakeEdgeRepository{}, stubExecutor{}, stubExecutor{}), usecase.NewHasActiveExecutions(tasks),
+		usecase.NewListTasks(tasks), usecase.NewUpdateTask(tasks), usecase.NewDeleteTask(tasks),
+		usecase.NewGetDependencies(tasks, &fakeEdgeRepository{}),
+		usecase.NewAIDecompose(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{}, fakeAICompleter{}, fakeTechStackDetector{}),
+		usecase.NewAIApply(fakeTxRunner{tasks: tasks, edges: &fakeEdgeRepository{}}), usecase.NewRecalculateProgress(tasks),
+		usecase.NewGetSubtree(tasks), usecase.NewGenerateAgentPrompt(tasks, fakeProjectExecutionResolver{}, fakeAICompleter{}),
+		usecase.NewRevokeGrant(tasks), usecase.NewListGrants(tasks),
+		usecase.NewGenerateShareLink(tasks, resolvePermissionUC), usecase.NewGetTaskByShareToken(tasks),
+	)
+	ctx := ctxWithTenant(t)
+
+	// action="write" on a company-level-only grant must be denied.
+	if _, err := s.ResolvePermission(ctx, &taskv1.ResolvePermissionRequest{TaskId: "t1", UserId: "u1", Action: "write"}); err == nil {
+		t.Fatal("expected action=write to be denied for a company-level-only grant")
+	} else if status.Code(err) != codes.PermissionDenied {
+		t.Errorf("expected PermissionDenied, got %v", status.Code(err))
+	}
+
+	// action="" (an older client) must default to "read" and succeed.
+	resp, err := s.ResolvePermission(ctx, &taskv1.ResolvePermissionRequest{TaskId: "t1", UserId: "u1"})
+	if err != nil {
+		t.Fatalf("expected action=\"\" to default to read and succeed, got %v", err)
+	}
+	if resp.GetEffectiveLevel() != taskv1.GrantLevel_GRANT_LEVEL_COMPANY {
+		t.Errorf("expected effective level COMPANY, got %v", resp.GetEffectiveLevel())
+	}
+
+	// action="read" explicitly must also succeed.
+	if _, err := s.ResolvePermission(ctx, &taskv1.ResolvePermissionRequest{TaskId: "t1", UserId: "u1", Action: "read"}); err != nil {
+		t.Errorf("expected action=read to succeed, got %v", err)
+	}
+}
+
 func wrapperString(v string) *wrapperspb.StringValue {
 	return wrapperspb.String(v)
 }
@@ -184,22 +317,30 @@ func (f fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context, 
 }
 
 func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server {
-	createTaskUC := usecase.NewCreateTask(tasks)
-	addEdgeUC := usecase.NewAddEdge(edges)
+	createTaskUC := usecase.NewCreateTask(tasks, tasks)
+	txRunner := fakeTxRunner{tasks: tasks, edges: edges}
+	resolvePermissionUC := usecase.NewResolvePermission(tasks, tasks, stubTeams{}, stubOPA{})
 	return New(
 		createTaskUC,
 		usecase.NewGetTask(tasks),
-		addEdgeUC,
+		txRunner,
 		usecase.NewGrant(tasks),
-		usecase.NewResolvePermission(tasks, tasks, stubTeams{}, stubOPA{}),
+		resolvePermissionUC,
 		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}),
 		usecase.NewHasActiveExecutions(tasks),
 		usecase.NewListTasks(tasks),
 		usecase.NewUpdateTask(tasks),
 		usecase.NewDeleteTask(tasks),
 		usecase.NewGetDependencies(tasks, edges),
-		usecase.NewAIDecompose(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, fakeAICompleter{content: "1. Do X"}),
-		usecase.NewAIApply(fakeTxRunner{tasks: tasks, edges: edges}),
+		usecase.NewAIDecompose(tasks, fakeAIProviderContextResolver{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, fakeAICompleter{content: `[{"title": "Do X"}]`}, fakeTechStackDetector{}),
+		usecase.NewAIApply(txRunner),
+		usecase.NewRecalculateProgress(tasks),
+		usecase.NewGetSubtree(tasks),
+		usecase.NewGenerateAgentPrompt(tasks, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, fakeAICompleter{content: "generated prompt"}),
+		usecase.NewRevokeGrant(tasks),
+		usecase.NewListGrants(tasks),
+		usecase.NewGenerateShareLink(tasks, resolvePermissionUC),
+		usecase.NewGetTaskByShareToken(tasks),
 	)
 }
 
@@ -260,7 +401,7 @@ func TestServer_UpdateTask_RejectsInProgressTransition(t *testing.T) {
 
 	_, err := s.UpdateTask(ctxWithTenant(t), &taskv1.UpdateTaskRequest{
 		Id:     "t1",
-		Status: wrapperString(domain.StatusInProgress),
+		Status: wrapperString(string(domain.StatusInProgress)),
 	})
 	if err == nil {
 		t.Fatal("expected an error transitioning into in_progress via UpdateTask")

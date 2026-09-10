@@ -11,10 +11,14 @@ vi.mock('../../../hooks/useWorkflow', () => ({
 
 // Mock components
 vi.mock('../StepList', () => ({
-  StepList: ({ onSelect, onAdd }: any) => (
+  StepList: ({ onSelect, onAdd }: { onSelect: (id: string) => void; onAdd: () => void }) => (
     <div data-testid="mock-step-list">
-      <button data-testid="add-step" onClick={() => onAdd()}>Add Step</button>
-      <button data-testid="select-s1" onClick={() => onSelect('s1')}>Select s1</button>
+      <button data-testid="add-step" onClick={() => onAdd()}>
+        Add Step
+      </button>
+      <button data-testid="select-s1" onClick={() => onSelect('s1')}>
+        Select s1
+      </button>
     </div>
   )
 }))
@@ -32,55 +36,67 @@ describe('WorkflowBuilder', () => {
   const mockRun = vi.fn()
   const mockUpdateTemplate = vi.fn()
   const mockAddStep = vi.fn().mockReturnValue('s2')
-  
+
   beforeEach(() => {
     cleanup()
     vi.clearAllMocks()
     vi.mocked(useWorkflow).mockReturnValue({
-      template: { id: 't1', name: 'My Workflow', steps: [{ id: 's1', type: 'shell', name: 'Step 1' }] },
+      template: {
+        id: 't1',
+        name: 'My Workflow',
+        steps: [{ id: 's1', type: 'shell', name: 'Step 1' }]
+      },
       saveTemplate: mockSave,
       runWorkflow: mockRun,
       updateTemplate: mockUpdateTemplate,
-      addStep: mockAddStep,
-    } as any)
+      addStep: mockAddStep
+    } as unknown as ReturnType<typeof useWorkflow>)
   })
 
   it('renders steps from template', () => {
-    render(<WorkflowBuilder templateId="t1" />)
+    render(<WorkflowBuilder templateId="t1" projectId="proj-1" />)
     expect(screen.getByTestId('mock-step-list')).toBeInTheDocument()
     expect(screen.getByTestId('workflow-name-input')).toHaveValue('My Workflow')
   })
 
   it('Add Step button calls addStep', () => {
-    render(<WorkflowBuilder />)
+    render(<WorkflowBuilder projectId="proj-1" />)
     fireEvent.click(screen.getByTestId('add-step'))
     expect(mockAddStep).toHaveBeenCalled()
   })
 
   it('updating name field updates local template state', () => {
-    render(<WorkflowBuilder />)
+    render(<WorkflowBuilder projectId="proj-1" />)
     fireEvent.change(screen.getByTestId('workflow-name-input'), { target: { value: 'New Name' } })
     expect(mockUpdateTemplate).toHaveBeenCalledWith({ name: 'New Name' })
   })
 
   it('Save button calls saveTemplate', () => {
-    render(<WorkflowBuilder />)
+    render(<WorkflowBuilder projectId="proj-1" />)
     fireEvent.click(screen.getByTestId('save-workflow-btn'))
     expect(mockSave).toHaveBeenCalled()
   })
 
+  // FE-TASK-001 (workflow v4): Run must forward this component's projectId prop —
+  // useWorkflow.ts's runWorkflow(projectId) needs it to set ExecuteRequest.ProjectId.
+  it('Run button calls runWorkflow with this component projectId prop', () => {
+    render(<WorkflowBuilder projectId="proj-1" />)
+    fireEvent.click(screen.getByTestId('run-workflow-btn'))
+    expect(mockRun).toHaveBeenCalledWith('proj-1')
+  })
+
   it('Show DAG toggle shows/hides the DAGPreview panel', async () => {
-    render(<WorkflowBuilder />)
-    
+    render(<WorkflowBuilder projectId="proj-1" />)
+
     // Initially hidden
     expect(screen.queryByTestId('mock-dag-preview')).not.toBeInTheDocument()
-    
+
     // Show DAG
     fireEvent.click(screen.getByTestId('toggle-dag-preview'))
     await waitFor(() => {
       expect(screen.getByTestId('mock-dag-preview')).toBeInTheDocument()
     })
-    
+
     // Hide DAG
     fireEvent.click(screen.getByTestId('toggle-dag-preview'))
     await waitFor(() => {
