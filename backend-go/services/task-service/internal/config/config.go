@@ -48,6 +48,10 @@ type Config struct {
 	// TASK-PW-04-04) publishes both grant audit events and task.* domain
 	// events — mirrors usage-service's identical config field.
 	NATSURL string
+	// AuthServiceAddr is ResolvePermission's audit-append dependency
+	// (TASK-BE-020/CR-RBAC-005, common/auditclient) — the only other service
+	// this one talks to purely to write audit_log rows.
+	AuthServiceAddr string
 }
 
 func Load() (Config, error) {
@@ -56,8 +60,13 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:                     base,
-		OPABundlePath:            commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		Base: base,
+		// Matches this service's deploy/Dockerfile `COPY --from=build
+		// /src/policy/orca-authz /policy/orca-authz` and dev
+		// docker-compose.yml's identical bind-mount — NOT a relative
+		// go-run-from-module-root path, since the container never lays the
+		// bundle out there.
+		OPABundlePath:            commonconfig.StringEnv("OPA_BUNDLE_PATH", "/policy/orca-authz"),
 		InfraFleetServiceAddr:    commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
 		AIProviderServiceAddr:    commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
 		GitGatewayServiceAddr:    commonconfig.StringEnv("GIT_GATEWAY_SERVICE_ADDR", "git-gateway-service:9090"),
@@ -65,5 +74,6 @@ func Load() (Config, error) {
 		TenantServiceAddr:        commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
 		OrchestrationServiceAddr: commonconfig.StringEnv("ORCHESTRATION_SERVICE_ADDR", "orchestration-service:9090"),
 		NATSURL:                  commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		AuthServiceAddr:          commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
 	}, nil
 }

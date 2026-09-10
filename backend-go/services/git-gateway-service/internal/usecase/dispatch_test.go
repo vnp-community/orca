@@ -42,6 +42,7 @@ type fakeGitExecutor struct {
 	calledUpstreamState          bool
 	calledRemoteCommit           bool
 	calledRemoteFile             bool
+	calledRemoteURL              bool
 	calledClone                  bool
 	calledInitRepo               bool
 	calledBaseRefDefault         bool
@@ -147,6 +148,8 @@ type fakeGitExecutor struct {
 	defaultBranch          string
 	initPath               string
 	baseRef                string
+	remoteURL              string
+	remoteURLErr           error
 	refs                   []string
 	installedHooks         []string
 	orcaHooksCurrent       bool
@@ -156,7 +159,7 @@ type fakeGitExecutor struct {
 
 	createWorktreeResult  domain.WorktreeCreateResult
 	fetchAndResolveRefSHA string
-	listWorktreePathsOut  []string
+	listWorktreePathsOut  []domain.WorktreeGitInfo
 
 	createWorktreeCallCount     int
 	gotCreateWorktreeTargetPath string
@@ -341,6 +344,15 @@ func (f *fakeGitExecutor) RemoteFileURL(ctx context.Context, repoPath, path, ref
 	return "https://example.com/blob/" + ref + "/" + path, nil
 }
 
+func (f *fakeGitExecutor) RemoteURL(ctx context.Context, repoPath, remoteName string) (string, error) {
+	f.calledRemoteURL = true
+	f.gotRepoPath = repoPath
+	if f.remoteURLErr != nil {
+		return "", f.remoteURLErr
+	}
+	return f.remoteURL, nil
+}
+
 func (f *fakeGitExecutor) Clone(ctx context.Context, url, destPath string) (string, string, error) {
 	f.calledClone = true
 	if f.cloneErr != nil {
@@ -349,12 +361,12 @@ func (f *fakeGitExecutor) Clone(ctx context.Context, url, destPath string) (stri
 	return f.worktreePath, f.defaultBranch, nil
 }
 
-func (f *fakeGitExecutor) InitRepo(ctx context.Context, destPath, defaultBranch string) (string, string, error) {
+func (f *fakeGitExecutor) InitRepo(ctx context.Context, destPath, defaultBranch, remoteName, remoteURL string) (string, string, bool, error) {
 	f.calledInitRepo = true
 	if f.initRepoErr != nil {
-		return "", "", f.initRepoErr
+		return "", "", false, f.initRepoErr
 	}
-	return f.initPath, f.defaultBranch, nil
+	return f.initPath, f.defaultBranch, remoteURL != "", nil
 }
 
 func (f *fakeGitExecutor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {
@@ -459,7 +471,7 @@ func (f *fakeGitExecutor) FetchAndResolveRef(ctx context.Context, repoPath, ref 
 	return "resolvedsha", nil
 }
 
-func (f *fakeGitExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error) {
+func (f *fakeGitExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]domain.WorktreeGitInfo, error) {
 	f.calledListWorktreePaths = true
 	f.gotRepoPath = repoPath
 	if f.listWorktreePathsErr != nil {
@@ -1752,5 +1764,76 @@ func TestDeleteBranch_RelaySSHDispatch_FailsClosed_NoRelayCall(t *testing.T) {
 	}
 	if local.calledDeleteBranch || relay.calledDeleteBranch {
 		t.Error("expected zero calls to either executor when relay-ssh is rejected")
+	}
+}
+
+// ── TASK-BE-EVM-015: dispatchExecutorForRepo threads
+// domain.RepoInfo.HiddenTargetID into ctx (WithHiddenTargetID) alongside
+// WithDevServerID, only on the relay branch — the actual wiring point
+// audited in this task ("Nơi RepoPath được resolve cho 1 repo/workspace
+// ephemeral-VM-backed"). RelayExecutor.relay's own behavior (routing to a
+// "ViaHiddenTarget" method name) is covered separately by
+// grpcclient_test.go's TestGitDispatch_HiddenTargetID_RoutesToAgentHiddenTargetMethod. ──
+
+func TestDispatchExecutorForRepo_HiddenTargetID_ThreadedIntoContext_WhenRelayed(t *testing.T) {
+	reachability := &fakeDevServerReachability{reachable: true}
+	local := &fakeGitExecutor{name: "local"}
+	relay := &fakeGitExecutor{name: "relay"}
+	repo := domain.RepoInfo{ID: "repo-1", URL: "/repo", DevServerID: "ds-1", HiddenTargetID: "runtime-1"}
+
+	ctx, executor, repoPath, err := dispatchExecutorForRepo(context.Background(), reachability, local, relay, repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if executor != relay {
+		t.Fatal("expected the relay executor when reachable")
+	}
+	if repoPath != "/repo" {
+		t.Errorf("expected repoPath=/repo, got %q", repoPath)
+	}
+	if devServerID, ok := DevServerIDFromContext(ctx); !ok || devServerID != "ds-1" {
+		t.Errorf("expected devServerID=ds-1 in ctx, got %q (ok=%v)", devServerID, ok)
+	}
+	if hiddenTargetID, ok := HiddenTargetIDFromContext(ctx); !ok || hiddenTargetID != "runtime-1" {
+		t.Errorf("expected hiddenTargetID=runtime-1 in ctx, got %q (ok=%v)", hiddenTargetID, ok)
+	}
+}
+
+func TestDispatchExecutorForRepo_NoHiddenTargetID_UnchangedBehavior(t *testing.T) {
+	reachability := &fakeDevServerReachability{reachable: true}
+	local := &fakeGitExecutor{name: "local"}
+	relay := &fakeGitExecutor{name: "relay"}
+	// Regression guard: an ordinary dev-server-backed repo (the common
+	// case, HiddenTargetID never set) must not gain a hiddenTargetID in
+	// ctx just because DevServerID is set.
+	repo := domain.RepoInfo{ID: "repo-1", URL: "/repo", DevServerID: "ds-1"}
+
+	ctx, executor, _, err := dispatchExecutorForRepo(context.Background(), reachability, local, relay, repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if executor != relay {
+		t.Fatal("expected the relay executor when reachable")
+	}
+	if _, ok := HiddenTargetIDFromContext(ctx); ok {
+		t.Error("expected no hiddenTargetID in ctx for an ordinary repo")
+	}
+}
+
+func TestDispatchExecutorForRepo_LocalFallback_NeverSetsHiddenTargetID(t *testing.T) {
+	reachability := &fakeDevServerReachability{reachable: false}
+	local := &fakeGitExecutor{name: "local"}
+	relay := &fakeGitExecutor{name: "relay"}
+	repo := domain.RepoInfo{ID: "repo-1", URL: "/repo", DevServerID: "ds-1", HiddenTargetID: "runtime-1"}
+
+	ctx, executor, _, err := dispatchExecutorForRepo(context.Background(), reachability, local, relay, repo)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if executor != local {
+		t.Fatal("expected the local executor when the dev server is unreachable")
+	}
+	if _, ok := HiddenTargetIDFromContext(ctx); ok {
+		t.Error("expected no hiddenTargetID in ctx when falling back to local execution")
 	}
 }

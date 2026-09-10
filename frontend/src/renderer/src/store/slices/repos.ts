@@ -11,11 +11,13 @@ import type {
   Project,
   ProjectUpdateArgs,
   Repo,
+  RepoHookSettings,
   ProjectGroup,
   ProjectHostSetup,
   FolderWorkspace,
   ProjectGroupImportResult,
   NestedRepoScanResult,
+  NestedRepoCandidate,
   ProjectHostSetupCloneArgs,
   ProjectHostSetupCreateArgs,
   ProjectHostSetupCreateResult,
@@ -47,6 +49,7 @@ import { normalizeRepoBadgeColor } from '../../../../shared/repo-badge-color'
 import { getProjectGroupSubtreeIds } from '../../../../shared/project-groups'
 import { isPathInsideOrEqual } from '../../../../shared/cross-platform-path'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree-id'
+import type { OrcaProject } from '../../types/workspace-types'
 import { selectProjectGroupRemovalTargets } from './project-group-removal-targets'
 import { reconcileFetchedRepos } from './repo-identity-reconcile'
 import {
@@ -89,7 +92,6 @@ import {
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { folderWorkspaceKey, parseWorkspaceKey } from '../../../../shared/workspace-scope'
 import { formatFolderWorkspaceCreateError } from '../../lib/folder-workspace-path-status'
-import { logRemoveProjectDiagnostic } from '@/lib/remove-project-diagnostic-log'
 import { isWebClientLocation } from '@/lib/web-client-location'
 
 const ERROR_TOAST_DURATION = 60_000
@@ -240,9 +242,23 @@ function getKnownRepoWorktreeIds(state: AppState, projectId: string, hostId?: st
 function getRuntimeTargetHostId(
   target: ReturnType<typeof getActiveRuntimeTarget>
 ): ReturnType<typeof toRuntimeExecutionHostId> | typeof LOCAL_EXECUTION_HOST_ID {
-  return target.kind === 'environment'
-    ? toRuntimeExecutionHostId(target.environmentId)
-    : LOCAL_EXECUTION_HOST_ID
+  // Why: a paired web client (isWebClientLocation) has no distinct "local"
+  // host — {kind:'environment', environmentId:'session-auth'} and
+  // {kind:'local'} both resolve to the SAME backend connection there (see
+  // fetchReposForAllHosts' own isWebClientLocation guard on its environment
+  // loop). Tagging the environment-kind target as a separate
+  // `runtime:session-auth` host here — while the hardcoded local fetch
+  // tags the identical rows `local` — caused every repo/project-group/
+  // worktree refetched via a runtime event (reposChanged etc., which only
+  // ever fires with an environment id, never {kind:'local'}) to be
+  // APPENDED as phantom duplicates alongside the real 'local'-tagged row,
+  // rather than recognized as an update to it. Found live: Settings'
+  // repo list showing every repo twice. Unifying both to LOCAL_EXECUTION_HOST_ID
+  // in web mode makes every merge helper's hostId-keyed identity agree.
+  if (target.kind === 'environment' && !isWebClientLocation()) {
+    return toRuntimeExecutionHostId(target.environmentId)
+  }
+  return LOCAL_EXECUTION_HOST_ID
 }
 
 function getProjectSetupRuntimeTarget(
@@ -368,9 +384,35 @@ function scheduleSafeAutoForkSync(get: () => AppState, repos: readonly Repo[]): 
 
 function repoWithFetchedOwner(repo: Repo, target: ReturnType<typeof getActiveRuntimeTarget>): Repo {
   if (target.kind === 'environment') {
-    return { ...repo, executionHostId: getRuntimeTargetHostId(target) }
+    // Why not always stamp getRuntimeTargetHostId(target) here: in web-client
+    // mode that now always returns LOCAL_EXECUTION_HOST_ID (Phase 10 fix for
+    // duplicate repo rows — a paired web client has no distinct "local" host,
+    // see getRuntimeTargetHostId's own doc comment). Stamping that literal
+    // 'local' onto every repo unconditionally would short-circuit
+    // getRepoExecutionHostId's own devServerId/connectionId fallback chain
+    // (it checks executionHostId FIRST), hiding a repo's real dev-server
+    // binding behind a fake "local" host — found live: Settings' "Available
+    // Hosts" showing "Local Mac" for a repo with a real dev_server_id set.
+    // Desktop/non-web environment targets still stamp it: there,
+    // getRuntimeTargetHostId(target) carries real per-environment info
+    // (`runtime:<environmentId>`), not a blanket web-mode alias.
+    return isWebClientLocation()
+      ? { ...repo, executionHostId: getRepoExecutionHostId(repo) }
+      : { ...repo, executionHostId: getRuntimeTargetHostId(target) }
   }
   if (repo.connectionId) {
+    return { ...repo, executionHostId: getRepoExecutionHostId(repo) }
+  }
+  // Why: fetchReposForAllHosts' own {kind:'local'} leg is, for a paired web
+  // client, the SAME session-auth connection as the 'environment' branch
+  // above (there is no genuinely distinct "local" host there) — and it runs
+  // first on every page load (App.tsx's boot effect), so it must resolve a
+  // repo's real devServerId too, not hardcode LOCAL_EXECUTION_HOST_ID.
+  // Skipping this left "Available Hosts" showing "Local Mac" even right
+  // after a hard refresh, since this leg's stamp is the very first one any
+  // repo gets. A genuinely-local (Electron desktop) repo has no dev-server
+  // concept and keeps the bare 'local' fallback.
+  if (isWebClientLocation()) {
     return { ...repo, executionHostId: getRepoExecutionHostId(repo) }
   }
   return repo.executionHostId ? repo : { ...repo, executionHostId: LOCAL_EXECUTION_HOST_ID }
@@ -401,6 +443,60 @@ function setupWithFetchedOwner(
     ...setup,
     hostId,
     executionHostId: hostId
+  }
+}
+
+// RemoteFolderWorkspaceCreateResult is project.proto's FolderWorkspace
+// message as it actually arrives over the wire — a much thinner shape than
+// this file's own FolderWorkspace type (no comment/isArchived/isUnread/
+// isPinned/sortOrder/linkedTask/... — those are client-only concerns the
+// backend has no column for). created_at is a google.protobuf.Timestamp,
+// which serializes as an RFC3339 string in JSON, not the epoch-ms number
+// this app's own FolderWorkspace.createdAt uses.
+type RemoteFolderWorkspaceCreateResult = {
+  id: string
+  devServerId: string
+  path: string
+  name: string
+  addedBy: string
+  createdAt?: string
+  projectGroupId: string
+}
+
+// mergeCreatedFolderWorkspaceResponse fills in every client-only field
+// createFolderWorkspace's caller already supplied in `args` (or a sensible
+// just-created default) — the backend response alone isn't a complete
+// FolderWorkspace by this app's own type.
+function mergeCreatedFolderWorkspaceResponse(
+  args: {
+    projectGroupId: string
+    name?: string
+    folderPath?: string | null
+    connectionId?: string | null
+    linkedTask?: FolderWorkspace['linkedTask']
+    createdWithAgent?: FolderWorkspace['createdWithAgent']
+    pendingFirstAgentMessageRename?: boolean
+  },
+  result: RemoteFolderWorkspaceCreateResult
+): FolderWorkspace {
+  const now = Date.now()
+  return {
+    id: result.id,
+    projectGroupId: result.projectGroupId,
+    name: result.name,
+    folderPath: result.path,
+    connectionId: args.connectionId ?? null,
+    linkedTask: args.linkedTask ?? null,
+    comment: '',
+    isArchived: false,
+    isUnread: false,
+    isPinned: false,
+    sortOrder: 0,
+    createdWithAgent: args.createdWithAgent,
+    pendingFirstAgentMessageRename: args.pendingFirstAgentMessageRename,
+    lastActivityAt: now,
+    createdAt: result.createdAt ? new Date(result.createdAt).getTime() : now,
+    updatedAt: now
   }
 }
 
@@ -817,21 +913,42 @@ function mergeById<T extends { id: string }>(base: readonly T[], overlay: readon
   return merged
 }
 
+// Why not getRepoExecutionHostId here: that helper is display-oriented and
+// falls through to the repo's OWN (mutable, independently rebindable since
+// Phase 10) devServerId — only ssh:/runtime: tags mark a genuinely distinct
+// fetch CONNECTION; a bare 'local' or devServer:-derived tag never does (a
+// single web/local session can hold many repos bound to many different dev
+// servers). Using the display value as the merge boundary made a repo whose
+// devServerId changed underneath it (RebindRepoDevServer, or a direct DB
+// correction) look like "a different host's repo" to the next fetch and get
+// appended as a duplicate instead of updated in place — found live: Settings'
+// repo list showing every repo twice again after a repo's dev server changed.
+function getRepoConnectionBoundaryHostId(repo: Pick<Repo, 'executionHostId'>): string {
+  const tag = repo.executionHostId
+  return tag && (tag.startsWith('ssh:') || tag.startsWith('runtime:'))
+    ? tag
+    : LOCAL_EXECUTION_HOST_ID
+}
+
+function getRepoMergeIdentity(repo: Pick<Repo, 'id' | 'executionHostId'>): string {
+  return getRepoHostIdentityForParts(repo.id, getRepoConnectionBoundaryHostId(repo))
+}
+
 function mergeFetchedReposForHost(
   previous: readonly Repo[],
   fetched: Repo[],
   hostId: string
 ): Repo[] {
   const fetchedWithProjectGroups = applyInheritedProjectGroups(previous, fetched)
-  const fetchedIdentities = new Set(fetchedWithProjectGroups.map(getRepoHostIdentity))
+  const fetchedIdentities = new Set(fetchedWithProjectGroups.map(getRepoMergeIdentity))
   const preserved = previous.filter((repo) => {
-    const existingHostId = getRepoExecutionHostId(repo)
-    return existingHostId !== hostId || fetchedIdentities.has(getRepoHostIdentity(repo))
+    const existingHostId = getRepoConnectionBoundaryHostId(repo)
+    return existingHostId !== hostId || fetchedIdentities.has(getRepoMergeIdentity(repo))
   })
   const merged = [...preserved]
-  const indexByIdentity = new Map(merged.map((repo, index) => [getRepoHostIdentity(repo), index]))
+  const indexByIdentity = new Map(merged.map((repo, index) => [getRepoMergeIdentity(repo), index]))
   for (const repo of fetchedWithProjectGroups) {
-    const identity = getRepoHostIdentity(repo)
+    const identity = getRepoMergeIdentity(repo)
     const existingIndex = indexByIdentity.get(identity)
     if (existingIndex === undefined) {
       indexByIdentity.set(identity, merged.length)
@@ -941,6 +1058,215 @@ type FetchedRepoCatalog = {
   hostId: ReturnType<typeof getRuntimeTargetHostId>
 }
 
+// ── one private default OrcaProject per user (Phase 4b) ──────────────────
+//
+// Session decision: every sidebar-added repo on the remote path needs a
+// project.repos row, which needs a project.projects row to belong to — but
+// today's sidebar has no "pick a project" step at all. Rather than force
+// one in, every repo.add/create/clone on the remote path is scoped to one
+// implicit "default" OrcaProject per user, auto-created on first use.
+// Cached per session (module-scoped, not store state) since it's resolved
+// far more often than it changes — reset between tests via
+// resetDefaultProjectCacheForTests.
+let cachedDefaultProjectId: string | null = null
+
+export function resetDefaultProjectCacheForTests(): void {
+  cachedDefaultProjectId = null
+}
+
+const DEFAULT_PROJECT_NAME = 'My Repos'
+
+// listCallerProjects: bare project.list — every OrcaProject the caller is
+// a member of (project-service's ListProjects is membership-scoped, this
+// session's own fix — it used to leak every tenant member's projects).
+// Shared by getOrCreateDefaultProject (resolve/create ONE project to add a
+// NEW repo into) and fetchRepoCatalogForTarget (list repos across ALL of
+// them — a repo can live in any project the caller belongs to, not just
+// the "default" one, e.g. one created via Project Workspace (Beta)'s own
+// "New Project" dialog).
+async function listCallerProjects(
+  target: Extract<ReturnType<typeof getActiveRuntimeTarget>, { kind: 'environment' }>
+): Promise<OrcaProject[]> {
+  const projects = await callRuntimeRpc<OrcaProject[]>(target, 'project.list', null, {
+    timeoutMs: 15_000
+  })
+  return projects ?? []
+}
+
+export async function getOrCreateDefaultProject(
+  target: Extract<ReturnType<typeof getActiveRuntimeTarget>, { kind: 'environment' }>
+): Promise<string> {
+  if (cachedDefaultProjectId) {
+    return cachedDefaultProjectId
+  }
+  // Reuse the earliest-created project the caller already has access to,
+  // rather than creating a redundant new one.
+  const projects = await listCallerProjects(target)
+  const earliest = projects.slice().sort((a, b) => a.createdAt - b.createdAt)[0]
+  if (earliest) {
+    cachedDefaultProjectId = earliest.id
+    return earliest.id
+  }
+  const created = await callRuntimeRpc<OrcaProject>(
+    target,
+    'project.create',
+    { name: DEFAULT_PROJECT_NAME, visibility: 'private' },
+    { timeoutMs: 15_000 }
+  )
+  cachedDefaultProjectId = created.id
+  return created.id
+}
+
+// RemoteRepoView mirrors channels_repo_ssh_status_workspace.go's repoView —
+// the bare wire shape repo.add/repo.list/repo.update actually return.
+export type RemoteRepoView = {
+  id: string
+  projectId: string
+  url: string
+  displayName: string
+  position: number
+  // Not part of project.proto's Repo message (dev-server binding lives on
+  // the owning Project, not the Repo) — stamped on client-side in
+  // fetchAllRemoteRepoViews from the project this repo was fetched under.
+  // Needed so mergeRepoViewIntoRepo can populate Repo.devServerId, which
+  // getRepoExecutionHostId (settings gates like SparsePresetSettingsSection's)
+  // reads to tell a dev-server-bound repo from a genuinely local one.
+  devServerId?: string
+  // hookSettings: JSON-encoded RepoHookSettings (project.proto's
+  // Repo.hook_settings — an opaque blob backend-go stores/returns verbatim).
+  // Empty/absent = never set. See migrations/0018_repo_hook_settings.
+  hookSettings?: string
+}
+
+export function repoDisplayNameFromUrl(url: string): string {
+  const trimmed = url.replace(/\/+$/, '')
+  const base = trimmed.split('/').findLast(Boolean) || trimmed || url
+  return base.replace(/\.git$/, '') || base
+}
+
+// mergeRepoViewIntoRepo builds/updates the rich local Repo shape from a
+// bare project-service RemoteRepoView — the backend only ever knows
+// id/projectId/url/displayName/position, so every other field (badgeColor,
+// worktreeBaseRef, hookSettings, ...) must come from the existing local
+// record (an update) or a sensible default (a first-time create). Mirrors
+// mergeCreatedFolderWorkspaceResponse's "backend response is a partial
+// record" pattern.
+export function mergeRepoViewIntoRepo(view: RemoteRepoView, existing?: Repo): Repo {
+  // Why fall back to `existing` per-field rather than trust `view` fully:
+  // callers that still expect the pre-fix `{ repo: RemoteRepoView }`
+  // response shape (a real bug this function's fix exposed — see repo.update's
+  // call site) pass a `view` with every field undefined; defaulting to
+  // `existing` here keeps that a no-op merge instead of a crash/data-loss.
+  const path = view.url || existing?.path || ''
+  return {
+    ...existing,
+    id: view.id || existing?.id || '',
+    projectId: view.projectId || existing?.projectId,
+    path,
+    displayName: view.displayName || existing?.displayName || repoDisplayNameFromUrl(path),
+    badgeColor: existing?.badgeColor ?? '',
+    addedAt: existing?.addedAt ?? Date.now(),
+    devServerId: view.devServerId ?? existing?.devServerId,
+    hookSettings: parseRepoHookSettings(view.hookSettings) ?? existing?.hookSettings
+  }
+}
+
+// parseRepoHookSettings: view.hookSettings is an opaque JSON string from
+// the wire (see RemoteRepoView's doc comment) — undefined/empty means "the
+// server has nothing stored," not "clear the local value," so callers fall
+// back to the existing local value in that case. A malformed blob (should
+// never happen — backend-go never parses this, only round-trips it) fails
+// open the same way, rather than throwing and losing the rest of the merge.
+function parseRepoHookSettings(raw: string | undefined): RepoHookSettings | undefined {
+  if (!raw) {
+    return undefined
+  }
+  try {
+    return JSON.parse(raw) as RepoHookSettings
+  } catch {
+    return undefined
+  }
+}
+
+function mapRemoteRepoViewsToRepos(
+  views: readonly RemoteRepoView[],
+  existingRepos: readonly Repo[]
+): Repo[] {
+  const byId = new Map(existingRepos.map((repo) => [repo.id, repo]))
+  return views.map((view) => mergeRepoViewIntoRepo(view, byId.get(view.id)))
+}
+
+// ── projectGroup.scanNested/importNested (Phase 4b-3) ─────────────────────
+//
+// RemoteNestedRepoCandidate mirrors project.proto's NestedRepoCandidate —
+// the bare shape scanNested actually returns (a flat list, no scan-progress
+// metadata at all: no truncated/timedOut/durationMs/maxDepth/maxRepos).
+// This deployment has no streaming/depth-limited remote scan today, so
+// those fields are best-effort placeholders below, not real telemetry —
+// documented rather than silently invented.
+type RemoteNestedRepoCandidate = {
+  path: string
+  suggestedName: string
+  isGitRepo: boolean
+}
+
+function mapRemoteNestedScanCandidates(
+  rootPath: string,
+  candidates: readonly RemoteNestedRepoCandidate[]
+): NestedRepoScanResult {
+  return {
+    selectedPath: rootPath,
+    selectedPathKind: 'non_git_folder',
+    repos: candidates.map((c) => ({
+      path: c.path,
+      displayName: c.suggestedName || repoDisplayNameFromUrl(c.path),
+      depth: 0,
+      suggestedName: c.suggestedName,
+      isGitRepo: c.isGitRepo
+    })),
+    truncated: false,
+    timedOut: false,
+    stopped: false,
+    durationMs: 0,
+    maxDepth: 0,
+    maxRepos: candidates.length,
+    timeoutMs: null
+  }
+}
+
+type RemoteImportNestedResult = {
+  createdGroups: { id: string; name: string; parentGroupId: string; projectId: string }[]
+  createdProjects: { id: string; name: string }[]
+}
+
+// mapRemoteImportNestedResult: ImportNestedResponse has no per-candidate
+// mode/groupName concept at all (confirmed against
+// ProjectGroupRepository.ImportNested's implementation — it creates one
+// new ProjectGroup + one new Project PER selected candidate, always,
+// regardless of the frontend's group/separate mode or groupName input,
+// which have no server-side equivalent). created_groups/created_projects
+// are populated in the same order as the request's `selected` array, so
+// index-align them back onto each selected candidate's path. The whole
+// call is one DB transaction — either every candidate imports, or the
+// call throws and none do, so there is no partial imported/failed mix to
+// report; every entry here is 'imported'.
+function mapRemoteImportNestedResult(
+  selectedPaths: readonly string[],
+  result: RemoteImportNestedResult
+): ProjectGroupImportResult {
+  const projects = selectedPaths.map((path, index) => ({
+    path,
+    projectId: result.createdProjects[index]?.id,
+    status: 'imported' as const
+  }))
+  return {
+    projects,
+    importedCount: projects.length,
+    alreadyKnownCount: 0,
+    failedCount: 0
+  }
+}
+
 type FetchedProjectGroupCatalog = {
   projectGroups: ProjectGroup[]
   hostId: ReturnType<typeof getRuntimeTargetHostId>
@@ -951,18 +1277,63 @@ type FetchedFolderWorkspaceCatalog = {
   hostId: ReturnType<typeof getRuntimeTargetHostId>
 }
 
+// fetchAllRemoteRepoViews lists repos across EVERY project the caller
+// belongs to, not just their default one — a repo can live in any project
+// (e.g. one created via Project Workspace (Beta)'s own "New Project"
+// dialog, not the sidebar's default-project flow), and the sidebar's
+// "Projects" list is supposed to show all of them, matching what Project
+// Workspace (Beta)'s own project switcher already lists. Found live: a
+// repo added to a second, non-default project was invisible in the
+// sidebar even though project.list correctly returned both projects.
+async function fetchAllRemoteRepoViews(
+  target: Extract<ReturnType<typeof getActiveRuntimeTarget>, { kind: 'environment' }>
+): Promise<RemoteRepoView[]> {
+  const projects = await listCallerProjects(target)
+  if (projects.length === 0) {
+    // No projects yet — nothing to list (the first addRepoPath/create/clone
+    // call creates the default project on demand, via getOrCreateDefaultProject).
+    return []
+  }
+  const perProject = await Promise.all(
+    projects.map((project) =>
+      callRuntimeRpc<{ repos: RemoteRepoView[] }>(
+        target,
+        'repo.list',
+        { projectId: project.id },
+        { timeoutMs: 15_000, reuseRecentCompatibilityFailure: true }
+      ).then(
+        // Phase 10: repo.list's wire response already carries each repo's
+        // OWN devServerId (project.repos.dev_server_id) — trust it. Falling
+        // back to the project's legacy devServerId only covers a repo that
+        // somehow has neither (shouldn't happen post-migration-0017's
+        // backfill, but cheaper than leaving a repo looking falsely local).
+        // Previously this unconditionally overwrote every repo's real
+        // per-repo binding with the project's field, which the "AI-Ops"/
+        // "Vnp-asm" projects' devServerId can now legitimately never
+        // reflect once repos move between hosts individually.
+        (result) =>
+          result.repos.map((repo) => ({
+            ...repo,
+            devServerId: repo.devServerId || project.devServerId || undefined
+          })),
+        (err) => {
+          console.error(`[repos] repo.list failed for project ${project.id}:`, err)
+          return []
+        }
+      )
+    )
+  )
+  return perProject.flat()
+}
+
 async function fetchRepoCatalogForTarget(
-  target: ReturnType<typeof getActiveRuntimeTarget>
+  target: ReturnType<typeof getActiveRuntimeTarget>,
+  existingRepos: readonly Repo[] = []
 ): Promise<FetchedRepoCatalog> {
   const fetchedRepos =
     target.kind === 'local'
       ? await window.api.repos.list()
-      : (
-          await callRuntimeRpc<{ repos: Repo[] }>(target, 'repo.list', undefined, {
-            timeoutMs: 15_000,
-            reuseRecentCompatibilityFailure: true
-          })
-        ).repos
+      : mapRemoteRepoViewsToRepos(await fetchAllRemoteRepoViews(target), existingRepos)
   // Why: seen live against the 'session-auth' web environment — repo.list's
   // handler always returns { repos: Repo[] } server-side, so an undefined/
   // non-array payload here means a malformed or dropped RPC response, not a
@@ -1277,6 +1648,7 @@ function getRuntimeEnvironmentDisplayName(state: AppState, environmentId: string
 async function fetchRuntimeAddProjectPathStatus(args: {
   target: Extract<ReturnType<typeof getActiveRuntimeTarget>, { kind: 'environment' }>
   path: string
+  devServerId: string | null
 }): Promise<FolderWorkspacePathStatus | null> {
   await assertRuntimeEnvironmentCapability(
     args.target.environmentId,
@@ -1288,13 +1660,13 @@ async function fetchRuntimeAddProjectPathStatus(args: {
     15_000
   )
   try {
-    const { status } = await callRuntimeRpc<{ status: FolderWorkspacePathStatus }>(
+    const result = await callRuntimeRpc<RemoteFolderWorkspacePathStatusResult>(
       args.target,
       'folderWorkspace.getPathStatus',
-      { scope: 'path', path: args.path },
+      { devServerId: args.devServerId, path: args.path },
       { timeoutMs: 15_000 }
     )
-    return status
+    return toFolderWorkspacePathStatus(args.path, result)
   } catch (err) {
     console.warn('Failed to check runtime folder path status:', err)
     return null
@@ -1410,6 +1782,63 @@ function getFolderWorkspaceStatusRequestSnapshot(
   ].join('\0')
 }
 
+// resolveFolderWorkspacePathStatusRequestPath extracts the real filesystem
+// path a request's scope variant refers to — 'path' carries one directly;
+// 'folder-workspace'/'project-group' name an already-known entity, so the
+// path comes from that entity's own record (same field lookups
+// getFolderWorkspaceStatusRequestSnapshot's cache-key fingerprint already
+// does, just without the fingerprinting). Returns null when the referenced
+// entity can't be found (deleted mid-flight, etc.) — the caller should
+// give up on the status check entirely rather than guess.
+function resolveFolderWorkspacePathStatusRequestPath(
+  state: Pick<AppState, 'projectGroups' | 'folderWorkspaces'>,
+  request: FolderWorkspacePathStatusRequest
+): string | null {
+  if (request.scope === 'path') {
+    return request.path
+  }
+  if (request.scope === 'project-group') {
+    return (
+      state.projectGroups.find((group) => group.id === request.projectGroupId)?.parentPath ?? null
+    )
+  }
+  return (
+    state.folderWorkspaces.find((workspace) => workspace.id === request.folderWorkspaceId)
+      ?.folderPath ?? null
+  )
+}
+
+// RemoteFolderWorkspacePathStatusResult is
+// GetFolderWorkspacePathStatusResponse as it arrives over the wire — a bare
+// PATH_STATUS_* string enum answering "is this path already registered as
+// something else in our DB," NOT the frontend's own richer
+// FolderWorkspacePathStatus (a live filesystem-existence probe result,
+// {path, exists, reason}). project.proto's own doc comment on this RPC is
+// explicit that it is "a DB-conflict check, NOT a live filesystem probe" —
+// there's no dev-server-agent capability wired here to answer the
+// frontend's actual question. toFolderWorkspacePathStatus below is a
+// best-effort bridge between the two, not a live probe result.
+type RemoteFolderWorkspacePathStatusResult = {
+  status: string
+  existingFolderWorkspaceId?: string
+}
+
+function toFolderWorkspacePathStatus(
+  path: string,
+  result: RemoteFolderWorkspacePathStatusResult
+): FolderWorkspacePathStatus {
+  switch (result.status) {
+    case 'PATH_STATUS_ALREADY_REPO':
+      return { path, exists: false, reason: 'ambiguous-connection' }
+    case 'PATH_STATUS_INVALID':
+      return { path, exists: false, reason: 'not-directory' }
+    case 'PATH_STATUS_AVAILABLE':
+    case 'PATH_STATUS_ALREADY_FOLDER_WORKSPACE':
+    default:
+      return { path, exists: true }
+  }
+}
+
 function getFreshFolderWorkspacePathStatusFromCache(args: {
   entry: FolderWorkspacePathStatusCacheEntry | undefined
   requestSnapshot: string | null
@@ -1480,6 +1909,11 @@ export type RepoSlice = {
     connectionId?: string
     scanId?: string
     mode: 'group' | 'separate'
+    // Why optional, remote-only: the remote projectGroup.importNested RPC
+    // needs each candidate's suggestedName/isGitRepo (project.proto's
+    // NestedRepoCandidate), not just its path — local (Electron) mode
+    // ignores this, it re-derives everything from the filesystem itself.
+    selectedCandidates?: NestedRepoCandidate[]
   }) => Promise<ProjectGroupImportResult | null>
   createProjectGroup: (name: string) => Promise<ProjectGroup | null>
   createFolderWorkspace: (
@@ -1598,7 +2032,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
     })
     try {
       const target = getActiveRuntimeTarget(get().settings)
-      const catalog = await fetchRepoCatalogForTarget(target)
+      const catalog = await fetchRepoCatalogForTarget(target, get().repos)
       // A newer fetchRepos superseded us while we awaited — drop this stale result.
       if (get().reposFetchGeneration !== generation) {
         return
@@ -1656,7 +2090,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
   fetchRuntimeEnvironmentRepos: async (environmentId) => {
     try {
       const target = { kind: 'environment' as const, environmentId }
-      const catalog = await fetchRepoCatalogForTarget(target)
+      const catalog = await fetchRepoCatalogForTarget(target, get().repos)
       let finalizedHostRepos: Repo[] = []
       set((s) => {
         const result = mergeFetchedRepoCatalog(catalog, s.repos)
@@ -1805,10 +2239,13 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       environments.map(async (environment) => {
         try {
           applyCatalog(
-            await fetchRepoCatalogForTarget({
-              kind: 'environment',
-              environmentId: environment.id
-            })
+            await fetchRepoCatalogForTarget(
+              {
+                kind: 'environment',
+                environmentId: environment.id
+              },
+              get().repos
+            )
           )
         } catch (err) {
           failed = true
@@ -1975,17 +2412,33 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       const target = getActiveRuntimeTarget(
         getFolderWorkspacePathStatusRouteSettings(options, get().settings)
       )
-      const status =
-        target.kind === 'local'
-          ? await window.api.folderWorkspaces.getPathStatus(request)
-          : (
-              await callRuntimeRpc<{ status: FolderWorkspacePathStatus }>(
+      let status: FolderWorkspacePathStatus | null
+      if (target.kind === 'local') {
+        status = await window.api.folderWorkspaces.getPathStatus(request)
+      } else {
+        // Why resolve-then-call, not the raw discriminated-union `request`:
+        // the Go handler decodes a flat {devServerId, path} — it has no
+        // notion of 'folder-workspace'/'project-group' scope variants at
+        // all, so those two used to silently resolve to an empty path.
+        // Resolving the real path client-side first (from already-known
+        // local state) works for every variant with the one RPC shape the
+        // backend actually supports.
+        const path = resolveFolderWorkspacePathStatusRequestPath(get(), request)
+        status = path
+          ? toFolderWorkspacePathStatus(
+              path,
+              await callRuntimeRpc<RemoteFolderWorkspacePathStatusResult>(
                 target,
                 'folderWorkspace.getPathStatus',
-                request,
+                { devServerId: get().activeDevServerId, path },
                 { timeoutMs: 15_000 }
               )
-            ).status
+            )
+          : null
+      }
+      if (!status) {
+        return null
+      }
       set((state) => ({
         folderWorkspacePathStatuses:
           requestSnapshot !== null &&
@@ -2027,14 +2480,23 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           unsubscribe?.()
         }
       }
+      // Why {devServerId, rootPath}, not {path}: the Go handler
+      // (channels_tenant_project.go) decodes ScanNestedRequest's real
+      // fields and returns a bare candidate array, not a pre-shaped
+      // NestedRepoScanResult — mapRemoteNestedScanCandidates bridges the
+      // two (see its doc comment for the metadata this deployment can't
+      // actually provide).
       return normalizeNestedRepoScanResult(
-        await callRuntimeRpc<NestedRepoScanResult>(
-          target,
-          'projectGroup.scanNested',
-          { path },
-          // Why: older runtime servers cannot stream or cancel scans, so the
-          // renderer must retain a bounded failure path for large folders.
-          { timeoutMs: 20_000 }
+        mapRemoteNestedScanCandidates(
+          path,
+          await callRuntimeRpc<RemoteNestedRepoCandidate[]>(
+            target,
+            'projectGroup.scanNested',
+            { devServerId: get().activeDevServerId, rootPath: path },
+            // Why: older runtime servers cannot stream or cancel scans, so the
+            // renderer must retain a bounded failure path for large folders.
+            { timeoutMs: 20_000 }
+          )
         )
       )
     } catch (err) {
@@ -2062,17 +2524,36 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       const result =
         target.kind === 'local'
           ? await window.api.projectGroups.importNested(args)
-          : await callRuntimeRpc<ProjectGroupImportResult>(
-              target,
-              'projectGroup.importNested',
-              {
-                parentPath: args.parentPath,
-                groupName: args.groupName,
-                projectPaths: args.projectPaths,
-                scanId: args.scanId,
-                mode: args.mode
-              },
-              { timeoutMs: 60_000 }
+          : // Why {devServerId, parentGroupId, selected}, not {parentPath,
+            // groupName, projectPaths, scanId, mode}: the Go handler
+            // (channels_tenant_project.go) decodes ImportNestedRequest's
+            // real fields — a one-shot "these exact candidates" call with
+            // no group-name/mode concept at all (confirmed against
+            // ProjectGroupRepository.ImportNested: it always creates one
+            // new group + project PER candidate, ignoring groupName/mode
+            // entirely — see mapRemoteImportNestedResult's doc comment).
+            // parentGroupId stays '' (root): today's UX has no "choose an
+            // existing parent group" step, matching current behavior of
+            // always creating new top-level groups.
+            mapRemoteImportNestedResult(
+              args.projectPaths,
+              await callRuntimeRpc<RemoteImportNestedResult>(
+                target,
+                'projectGroup.importNested',
+                {
+                  devServerId: get().activeDevServerId,
+                  parentGroupId: '',
+                  selected: args.projectPaths.map((path) => {
+                    const candidate = args.selectedCandidates?.find((c) => c.path === path)
+                    return {
+                      path,
+                      suggestedName: candidate?.suggestedName ?? candidate?.displayName ?? '',
+                      isGitRepo: candidate?.isGitRepo ?? true
+                    }
+                  })
+                },
+                { timeoutMs: 60_000 }
+              )
             )
       await get().fetchProjectGroups()
       await get().fetchFolderWorkspaces()
@@ -2128,14 +2609,38 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       const workspace =
         target.kind === 'local'
           ? await window.api.folderWorkspaces.create(args)
-          : (
-              await callRuntimeRpc<{ folderWorkspace: FolderWorkspace }>(
+          : // Why this shape, not the raw `args` object: the Go handler
+            // decodes {devServerId, path, name, projectGroupId}
+            // (channels_emulator_folderworkspace_host.go) — sending the
+            // frontend's own richer FolderWorkspace-create shape directly
+            // (folderPath instead of path, no devServerId at all) meant
+            // this call always created nothing/errored on the
+            // 'environment' path. devServerId comes from the same
+            // globally-selected dev server every other Add-Project flow
+            // resolves from (activeDevServerId), not from the runtime
+            // target's environmentId — those are different concepts (a
+            // web session's paired runtime environment vs. the user's
+            // chosen dev server). The backend's own FolderWorkspace
+            // message has none of this type's client-only fields
+            // (comment/isArchived/isUnread/isPinned/sortOrder/
+            // linkedTask/...) — mergeCreatedFolderWorkspaceResponse fills
+            // those in from `args`/sensible defaults, same "backend
+            // response is a partial record, not the full local shape"
+            // situation this session already hit for project groups.
+            mergeCreatedFolderWorkspaceResponse(
+              args,
+              await callRuntimeRpc<RemoteFolderWorkspaceCreateResult>(
                 target,
                 'folderWorkspace.create',
-                args,
+                {
+                  devServerId: get().activeDevServerId,
+                  path: args.folderPath ?? '',
+                  name: args.name,
+                  projectGroupId: args.projectGroupId
+                },
                 { timeoutMs: 15_000 }
               )
-            ).folderWorkspace
+            )
       set((s) => ({
         folderWorkspaces: [workspace, ...s.folderWorkspaces],
         folderWorkspacePathStatuses: {}
@@ -2149,25 +2654,67 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
   },
 
   updateFolderWorkspace: async (folderWorkspaceId, updates) => {
+    const target = getActiveRuntimeTarget(get().settings)
+    // Why local-mode is untouched below: Electron's own local database
+    // tracks every one of these fields for real — this fix is scoped to the
+    // 'environment' (project-service) path only, per this session's own
+    // web-deployment scope.
+    if (target.kind === 'local') {
+      try {
+        const updated = await window.api.folderWorkspaces.update({ folderWorkspaceId, updates })
+        if (!updated) {
+          return false
+        }
+        set((s) => ({
+          folderWorkspaces: s.folderWorkspaces.map((workspace) =>
+            workspace.id === folderWorkspaceId ? updated : workspace
+          ),
+          folderWorkspacePathStatuses: {}
+        }))
+        return true
+      } catch (err) {
+        console.error('Failed to update folder workspace:', err)
+        return false
+      }
+    }
+
+    // Why the name-only branch: project.proto's UpdateFolderWorkspaceRequest
+    // doc comment says name is "the only mutable field — path/dev_server_id
+    // are re-add, not edit" — there is nothing for project-service to
+    // persist for isPinned/isArchived/comment/etc. The previous
+    // {folderWorkspaceId, updates} shape (backend decodes {id, name}) meant
+    // every call here failed to update anything real: `id`/`name` were
+    // never at the top level the decode struct expects.
+    if (updates.name === undefined) {
+      set((s) => ({
+        folderWorkspaces: s.folderWorkspaces.map((workspace) =>
+          workspace.id === folderWorkspaceId ? { ...workspace, ...updates } : workspace
+        )
+      }))
+      return true
+    }
+
     try {
-      const target = getActiveRuntimeTarget(get().settings)
-      const updated =
-        target.kind === 'local'
-          ? await window.api.folderWorkspaces.update({ folderWorkspaceId, updates })
-          : (
-              await callRuntimeRpc<{ folderWorkspace: FolderWorkspace | null }>(
-                target,
-                'folderWorkspace.update',
-                { folderWorkspaceId, updates },
-                { timeoutMs: 15_000 }
-              )
-            ).folderWorkspace
+      // Why a bare FolderWorkspace, not { folderWorkspace: ... }: the Go
+      // handler returns `resp.GetFolderWorkspace()` directly
+      // (channels_emulator_folderworkspace_host.go) — a wrapper here would
+      // always deserialize to undefined.
+      const updated = await callRuntimeRpc<FolderWorkspace | null>(
+        target,
+        'folderWorkspace.update',
+        { id: folderWorkspaceId, name: updates.name },
+        { timeoutMs: 15_000 }
+      )
       if (!updated) {
         return false
       }
+      // Why merge, not replace: the backend response has none of this
+      // type's other fields (isPinned/isArchived/comment/sortOrder/...) —
+      // replacing wholesale would silently erase this workspace's existing
+      // local-only state instead of just updating the name that changed.
       set((s) => ({
         folderWorkspaces: s.folderWorkspaces.map((workspace) =>
-          workspace.id === folderWorkspaceId ? updated : workspace
+          workspace.id === folderWorkspaceId ? { ...workspace, ...updated } : workspace
         ),
         folderWorkspacePathStatuses: {}
       }))
@@ -2185,13 +2732,22 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         target.kind === 'local'
           ? await window.api.folderWorkspaces.delete({ folderWorkspaceId })
           : (
-              await callRuntimeRpc<{ deleted: boolean }>(
+              await callRuntimeRpc<{ ok: boolean }>(
                 target,
                 'folderWorkspace.delete',
-                { folderWorkspaceId },
+                // Why `id`, not `folderWorkspaceId`: the Go handler decodes
+                // {id} (channels_emulator_folderworkspace_host.go) — the
+                // previous key never reached it, so this call always
+                // deleted nothing/errored on the 'environment' path.
+                { id: folderWorkspaceId },
                 { timeoutMs: 15_000 }
               )
-            ).deleted
+            )
+              // Why `.ok`, not `.deleted`: the Go handler returns
+              // map[string]bool{"ok": true} — `.deleted` was always
+              // undefined, so a genuinely successful delete still looked
+              // like a failure to this caller.
+              .ok
       if (!deleted) {
         return false
       }
@@ -2211,27 +2767,82 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
   },
 
   updateProjectGroup: async (groupId, updates) => {
+    const target = getActiveRuntimeTarget(get().settings)
+    // Why local-mode is untouched below: Electron's own local database
+    // tracks tabOrder/isCollapsed/color for real, so window.api.projectGroups
+    // .update({groupId, updates}) already round-trips every field correctly
+    // there — this fix is scoped to the 'environment' (project-service)
+    // path only, per this session's own web-deployment scope.
+    if (target.kind === 'local') {
+      try {
+        const updated = await window.api.projectGroups.update({ groupId, updates })
+        if (!updated) {
+          return false
+        }
+        const ownedGroup = projectGroupWithFetchedOwner(updated, target)
+        set((s) => ({
+          projectGroups: s.projectGroups.map((group) =>
+            group.id === groupId ? ownedGroup : group
+          ),
+          folderWorkspacePathStatuses: {}
+        }))
+        return true
+      } catch (err) {
+        console.error('Failed to update project group:', err)
+        return false
+      }
+    }
+
+    // Why the name-only branch: project.proto's ProjectGroup/
+    // UpdateProjectGroupRequest have no tabOrder/isCollapsed/color fields at
+    // all — nothing for project-service to persist for a tabOrder-only
+    // update, and its usecase actually REJECTS an empty name
+    // (PROJECT_GROUP_INVALID) rather than treating it as "no change" like
+    // UpdateProject's other fields do. The previous {groupId, updates}
+    // shape (backend decodes {groupId, name}) meant EVERY call here failed
+    // silently — including real renames, since `name` never reached the
+    // decode struct nested under `updates`. Live bug: "New group from
+    // project" → rename never actually persisted.
+    if (updates.name === undefined) {
+      set((s) => ({
+        projectGroups: s.projectGroups.map((group) =>
+          group.id === groupId ? { ...group, ...updates } : group
+        )
+      }))
+      return true
+    }
+
     try {
-      // Why: project groups are focused-host-scoped by design — fetch/create/update/
-      // delete all route by the focused host, and the list is replaced (not merged).
-      const target = getActiveRuntimeTarget(get().settings)
-      const updated =
-        target.kind === 'local'
-          ? await window.api.projectGroups.update({ groupId, updates })
-          : (
-              await callRuntimeRpc<{ group: ProjectGroup | null }>(
-                target,
-                'projectGroup.update',
-                { groupId, updates },
-                { timeoutMs: 15_000 }
-              )
-            ).group
+      // Why a bare ProjectGroup, not { group: ... }: the Go handler returns
+      // `resp.GetGroup()` directly (channels_tenant_project.go), same "no
+      // wrapper" convention as project.get/project.list — a {group:...}
+      // wrapper here would always deserialize to undefined.
+      const updated = await callRuntimeRpc<ProjectGroup | null>(
+        target,
+        'projectGroup.update',
+        { groupId, name: updates.name },
+        { timeoutMs: 15_000 }
+      )
       if (!updated) {
         return false
       }
+      // Why merge, not replace: the backend response has no
+      // tabOrder/isCollapsed/color fields (see above) — replacing the local
+      // group wholesale would silently erase its existing local-only UI
+      // state instead of just updating the name that actually changed.
       const ownedGroup = projectGroupWithFetchedOwner(updated, target)
       set((s) => ({
-        projectGroups: s.projectGroups.map((group) => (group.id === groupId ? ownedGroup : group)),
+        projectGroups: s.projectGroups.map((group) =>
+          group.id === groupId
+            ? {
+                ...group,
+                ...ownedGroup,
+                tabOrder: group.tabOrder,
+                isCollapsed: group.isCollapsed,
+                color: group.color
+              }
+            : group
+        ),
         folderWorkspacePathStatuses: {}
       }))
       return true
@@ -2249,13 +2860,18 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
         target.kind === 'local'
           ? await window.api.projectGroups.delete({ groupId })
           : (
-              await callRuntimeRpc<{ deleted: boolean }>(
+              await callRuntimeRpc<{ ok: boolean }>(
                 target,
                 'projectGroup.delete',
                 { groupId },
                 { timeoutMs: 15_000 }
               )
-            ).deleted
+            )
+              // Why `.ok`, not `.deleted`: the Go handler returns
+              // map[string]bool{"ok": true} (channels_tenant_project.go) —
+              // `.deleted` was always undefined, so a genuinely successful
+              // delete still looked like a failure to this caller.
+              .ok
       if (!deleted) {
         return false
       }
@@ -2405,14 +3021,27 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           }
           repo = result.repo
         } else {
-          repo = (
-            await callRuntimeRpc<{ repo: Repo }>(
-              target,
-              'repo.add',
-              { path, kind },
-              { timeoutMs: 15_000 }
-            )
-          ).repo
+          // Why {projectId, url, displayName}, not {path, kind}: the Go
+          // handler (channels_repo_ssh_status_workspace.go) decodes
+          // AddRepoRequest's real fields — this call always errored/no-op'd
+          // on the remote path before. AddRepo accepts any non-empty
+          // string as url, including a plain filesystem path (not just a
+          // git remote), which is what makes the non-git 'folder' kind
+          // below work through the same call. The bare repoView response
+          // has no `kind` field (project-service doesn't model one) — set
+          // it back from the caller's own already-known kind.
+          const projectId = await getOrCreateDefaultProject(target)
+          repo = {
+            ...mergeRepoViewIntoRepo(
+              await callRuntimeRpc<RemoteRepoView>(
+                target,
+                'repo.add',
+                { projectId, url: path, displayName: repoDisplayNameFromUrl(path) },
+                { timeoutMs: 15_000 }
+              )
+            ),
+            kind
+          }
         }
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
@@ -2420,7 +3049,11 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
           throw err
         }
         if (target.kind !== 'local') {
-          const status = await fetchRuntimeAddProjectPathStatus({ target, path })
+          const status = await fetchRuntimeAddProjectPathStatus({
+            target,
+            path,
+            devServerId: get().activeDevServerId
+          })
           if (status?.exists !== true) {
             const hostName = getRuntimeEnvironmentDisplayName(get(), target.environmentId)
             toast.error(
@@ -2778,7 +3411,7 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       if (!repo) {
         return null
       }
-      await markOnboardingProjectAdded('addedFolder')
+      await markOnboardingProjectAdded('addedFolder', get().settings)
       // Why: without focusing the new folder, the UI looks unchanged after
       // the dialog closes and users think nothing happened. Fetch the
       // synthetic folder worktree and route through the standard activation
@@ -2816,9 +3449,6 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
   },
 
   removeProject: async (projectId, options) => {
-    logRemoveProjectDiagnostic(
-      `removeProject ENTER projectId=${projectId} hostId=${options?.hostId ?? 'none'}`
-    )
     try {
       // Why: pass an explicit hostId (e.g. when removing an SSH host's root repo)
       // so a duplicate id across hosts resolves to the intended row instead of
@@ -2878,18 +3508,11 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       const idExistsOnOtherHost = get().repos.some(
         (repo) => repo.id === projectId && getRepoExecutionHostId(repo) !== ownerHostId
       )
-      logRemoveProjectDiagnostic(
-        `removeProject(${projectId}) resolved ownerHostId=${ownerHostId} targetKind=${target.kind} ` +
-          `${target.kind === 'environment' ? `environmentId=${target.environmentId} ` : ''}idExistsOnOtherHost=${idExistsOnOtherHost}`
-      )
       await (target.kind === 'local'
         ? idExistsOnOtherHost
           ? window.api.repos.removeForHost({ repoId: projectId, hostId: ownerHostId })
           : window.api.repos.remove({ repoId: projectId })
-        : callRuntimeRpc(target, 'repo.rm', { repo: projectId }, { timeoutMs: 15_000 }))
-      logRemoveProjectDiagnostic(
-        `removeProject(${projectId}) removal call resolved without throwing`
-      )
+        : callRuntimeRpc(target, 'repo.rm', { repoId: projectId }, { timeoutMs: 15_000 }))
 
       get().clearOrcaHookTrustForRepo(projectId)
       const repoPath = get().repos.find((repo) =>
@@ -3044,14 +3667,10 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
             : {})
         }
       })
-      logRemoveProjectDiagnostic(
-        `removeProject(${projectId}) local set() applied, repos.length now=${get().repos.length}`
-      )
     } catch (err) {
       // Why: previously swallowed entirely — a failed repo.rm (e.g. RPC timeout,
       // unauthenticated runtime session) left the project visibly unremoved with
       // no feedback that anything had gone wrong.
-      logRemoveProjectDiagnostic(`removeProject(${projectId}) CAUGHT: ${String(err)}`)
       console.error('Failed to remove repo:', err)
       toast.error(
         translate('auto.store.slices.repos.removeProjectFailed', 'Failed to remove project'),
@@ -3120,17 +3739,46 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
       try {
         const sanitizedUpdates = sanitizeRepoUpdate(updates)
         const target = ownerTarget
+        // Local/desktop: window.api.repos.update already applies the FULL
+        // sanitizedUpdates server-side and returns the authoritative
+        // record — used as-is below (unchanged from before this fix).
         const updatedRepo =
           target.kind === 'local'
             ? await window.api.repos.update({ repoId: projectId, updates: sanitizedUpdates })
-            : (
-                await callRuntimeRpc<{ repo: Repo }>(
-                  target,
-                  'repo.update',
-                  { repo: projectId, updates: sanitizedUpdates },
-                  { timeoutMs: 15_000 }
-                )
-              ).repo
+            : undefined
+        // Remote/environment: project.repos only has columns for
+        // url/display_name/hook_settings (migrations/0018_repo_hook_settings)
+        // — every other field (badgeColor, repoIcon, worktreeBasePath, ...)
+        // stays local-only, so this response is authoritative ONLY for the
+        // fields it carries, never a full substitute for the manual merge
+        // below (applied as an overlay on top of it, not instead of it).
+        //
+        // Why flat {repoId, displayName, hookSettings}, not {repo, updates}:
+        // the Go handler decodes {repoId, url, displayName, hookSettings} —
+        // a nested `updates` object silently zeroed every field, and `repo`
+        // isn't the key it reads either.
+        //
+        // Response shape: this channel, like every repo.* mutation channel,
+        // returns a bare repoView (RemoteRepoView), NOT `{ repo: Repo }` —
+        // an earlier version of this call used the wrong shape and always
+        // got `undefined` back, silently discarding this response entirely
+        // (harmless before hook_settings had a column to lose; not harmless
+        // now).
+        const confirmedEnvironmentView =
+          target.kind === 'local'
+            ? undefined
+            : await callRuntimeRpc<RemoteRepoView>(
+                target,
+                'repo.update',
+                {
+                  repoId: projectId,
+                  displayName: sanitizedUpdates.displayName ?? '',
+                  ...('hookSettings' in sanitizedUpdates
+                    ? { hookSettings: JSON.stringify(sanitizedUpdates.hookSettings ?? {}) }
+                    : {})
+                },
+                { timeoutMs: 15_000 }
+              )
         set((s) => {
           const nextRepos = s.repos.map((r) => {
             const matchesOwner = ownerHasExplicitHost
@@ -3164,6 +3812,12 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
               mergedRepo = repoWithoutSuppression
             } else if (externalWorktreeDiscoverySuppressedAt !== undefined) {
               mergedRepo = { ...mergedRepo, externalWorktreeDiscoverySuppressedAt }
+            }
+            if (confirmedEnvironmentView) {
+              mergedRepo = repoWithFetchedOwner(
+                mergeRepoViewIntoRepo(confirmedEnvironmentView, mergedRepo),
+                target
+              )
             }
             return mergedRepo
           })
@@ -3245,14 +3899,24 @@ export const createRepoSlice: StateCreator<AppState, [], [], RepoSlice> = (set, 
             parsed?.kind === 'runtime'
               ? ({ kind: 'environment', environmentId: parsed.environmentId } as const)
               : ({ kind: 'local' } as const)
-          return target.kind === 'local'
-            ? window.api.repos.reorder({ orderedIds: group.orderedIds })
-            : callRuntimeRpc<{ status: 'applied' | 'rejected' }>(
-                target,
-                'repo.reorder',
-                { orderedIds: group.orderedIds },
-                { timeoutMs: 15_000 }
-              )
+          if (target.kind === 'local') {
+            return window.api.repos.reorder({ orderedIds: group.orderedIds })
+          }
+          // Why {projectId, repoIdsInOrder}, not {orderedIds}: the Go
+          // handler (channels_repo_ssh_status_workspace.go) decodes
+          // ReorderReposRequest's real fields and returns no body at all
+          // (a rejection is a thrown error, not a {status} response) — the
+          // catch block below already refetches on any thrown error, so
+          // normalize to the same {status:'applied'} shape window.api's
+          // local branch returns.
+          const projectId = next.find((repo) => repo.id === group.orderedIds[0])?.projectId ?? ''
+          await callRuntimeRpc(
+            target,
+            'repo.reorder',
+            { projectId, repoIdsInOrder: group.orderedIds },
+            { timeoutMs: 15_000 }
+          )
+          return { status: 'applied' as const }
         })
       )
       if (results.some((result) => result.status === 'rejected')) {

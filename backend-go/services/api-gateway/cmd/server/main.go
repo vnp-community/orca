@@ -24,10 +24,11 @@ import (
 	"syscall"
 	"time"
 
+	"go.opentelemetry.io/contrib/instrumentation/net/http/otelhttp"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/connectivity"
 
-	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/tracing"
@@ -83,11 +84,51 @@ func run() error {
 	logger := logging.New(cfg.ServiceName, version)
 	slog.SetDefault(logger)
 
-	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
+	// api-gateway's first NATS connection (TASK-BE-FFT-008) — used to
+	// publish CR-FFT-002 TraceEvent spans onto the TRACE stream, and (from
+	// TASK-BE-FFT-011) to subscribe to it for TracePanel's SSE bridge.
+	// Deliberately NON-fatal on connect failure: trace data is
+	// diagnostic/best-effort (CR-FFT-002's own doc comment), and
+	// api-gateway is the single external HTTP/WS entry point — it must
+	// never refuse to start (blocking ALL user traffic) just because an
+	// optional tracing sink is unreachable, the same degrade posture every
+	// other NATS-consuming service in this scaffold already uses.
+	pub, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, trace events will not be published", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.*.trace.span"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure TRACE jetstream stream", slog.Any("error", err))
+		}
+	}
+
+	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint, tracing.WithTraceEventPublisher(pub))
 	if err != nil {
 		return fmt.Errorf("initializing tracing: %w", err)
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
+
+	// traceBroadcast fans TRACE stream events out to this replica's own
+	// locally-connected /api/trace-stream SSE clients (TASK-BE-FFT-009/010).
+	// Always constructed, even if NATS is unreachable — httpgateway.NewRouter
+	// falls back to one too, but constructing it here lets the
+	// SubscribeEphemeral goroutine below feed it real events whenever cons
+	// is non-nil.
+	traceBroadcast := httpgateway.NewTraceBroadcast()
+	if cons != nil {
+		go func() {
+			// SubscribeEphemeral blocks until ctx is cancelled — run in its
+			// own goroutine so it doesn't delay server startup. Best-effort:
+			// an error here (e.g. TRACE stream missing) degrades to "no live
+			// trace events" rather than crashing api-gateway — trace data is
+			// diagnostic, not a startup-critical dependency (CR-FFT-002's
+			// outbox rationale).
+			if err := cons.SubscribeEphemeral(ctx, "TRACE", "orca.*.trace.span", traceEventHandler(traceBroadcast)); err != nil {
+				logger.ErrorContext(ctx, "trace event subscription ended", slog.Any("error", err))
+			}
+		}()
+	}
 
 	// The two downstream services this scaffold really dials — see
 	// README.md "what's really wired". grpc.NewClient doesn't block or
@@ -222,6 +263,11 @@ func run() error {
 	// JWT signatures for real, instead of trusting unverified claims.
 	jwksClient := authclient.NewJWKSClient(authClient)
 	authValidator := usecase.NewAuthValidator(jwksClient)
+	// Revocation set after construction (nil-tolerant field, not a
+	// constructor param — see AuthValidator.Revocation's doc comment):
+	// every bearer-JWT verify now also checks auth-service's real
+	// IsServiceTokenRevoked RPC, short-TTL cached (CR-CLI-002/TASK-BE-CLI-005).
+	authValidator.Revocation = authclient.NewRevocationClient(authClient)
 	rateLimiter := usecase.NewRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
 	registry := domain.NewDefaultServiceRegistry()
 
@@ -265,7 +311,7 @@ func run() error {
 	// NATS degrades that one channel to a closed-immediately push stream
 	// (see channels_agent.go's registerAgentStatusSubscribeChannel doc
 	// comment) rather than crashing startup.
-	_, eventBusConsumer, closeEventBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
+	_, eventBusConsumer, closeEventBus, err := eventbus.Connect(ctx, cfg.NATSURL)
 	if err != nil {
 		logger.Warn("eventbus unavailable — agent.subscribeStatus will not deliver push events", slog.Any("error", err))
 		eventBusConsumer = nil
@@ -276,16 +322,19 @@ func run() error {
 	// wscompat: the legacy channel-based RPC transport the deployed
 	// frontend/ actually speaks over /ws (see internal/adapter/wscompat's
 	// package doc and docs/execution-plan.md's frontend-compatibility-layer
-	// section). Session auth happens once at WS-upgrade time via
-	// authclient.SessionValidator (a REAL auth-service.ValidateSession
-	// call, not usecase.AuthValidator's JWT verification path — the
-	// browser's orca_session cookie holds a raw session token, never a JWT).
+	// section). Session auth: cookie first via authclient.SessionValidator (a
+	// REAL auth-service.ValidateSession call — the browser's orca_session
+	// cookie holds a raw session token, never a JWT), falling back to
+	// authValidator's bearer-JWT verification (CR-CLI-001/BE-CLI-SOL-001) for
+	// non-browser callers (Orca CLI over ORCA_SERVER_URL) that present
+	// Authorization: Bearer <jwt> instead of a cookie.
 	wsCompatRegistry := wscompat.NewRegistry()
 	wscompat.RegisterRealChannels(
 		wsCompatRegistry, annotationClient, taskClient, gitClient, automationClient, infraFleetClient,
 		tenantClient, projectClient, issueTrackingClient, orchestrationClient, scmClient, workflowClient,
 		aiProviderClient,
 		credentialBrokerClient,
+		authClient,
 		rateLimiter,
 		fanOutUseCase,
 		eventBusConsumer,
@@ -295,6 +344,11 @@ func run() error {
 	// request/response ChannelHandlers, see channels_push.go's doc comment.
 	clientEventBus := wscompat.NewClientEventBus()
 	wscompat.RegisterPushChannels(wsCompatRegistry, wscompat.NotificationStreamOpener(notificationStreamOpener), clientEventBus, infraFleetClient)
+	// clientState.*/workspaceSession.* (CR-STORAGE-001/003/004a,b) — same
+	// "separate call, not folded into RegisterRealChannels" pattern as
+	// RegisterPushChannels above, so this addition doesn't collide with
+	// other parallel edits to RegisterRealChannels's own signature.
+	wscompat.RegisterClientStateChannels(wsCompatRegistry, tenantClient)
 
 	// workspace.subscribe (TASK-PW-04-07, SOL-PW-04): bridges task-service's
 	// orca.task.task.statuschanged and workflow-service's
@@ -307,7 +361,7 @@ func run() error {
 	workspaceEventBus := wscompat.NewWorkspaceEventBus()
 	wscompat.RegisterWorkspaceSubscribeChannel(wsCompatRegistry, workspaceEventBus)
 	var workspaceBridgeWG sync.WaitGroup
-	_, workspaceEventConsumer, closeWorkspaceEventBus, err := commoneventbus.Connect(ctx, cfg.NATSURL)
+	_, workspaceEventConsumer, closeWorkspaceEventBus, err := eventbus.Connect(ctx, cfg.NATSURL)
 	if err != nil {
 		logger.WarnContext(ctx, "workspace event bridge: eventbus unavailable, continuing without event consumption", slog.Any("error", err))
 	} else {
@@ -325,7 +379,7 @@ func run() error {
 	deviceSecretResolver := authclient.NewDeviceSecretResolver(authClient)
 	wscompat.RegisterMobileChannels(wsCompatRegistry, infraFleetClient, projectClient, deviceSecretResolver)
 
-	wsCompatHandler := wscompat.New(logger, sessionValidator, wsCompatRegistry)
+	wsCompatHandler := wscompat.New(logger, sessionValidator, authValidator, wsCompatRegistry)
 
 	// agentProxyHandler raw-proxies the Dev Server Agent's /agent (WS) and
 	// /api/agent-token (HTTP) traffic straight to infra-fleet-service — see
@@ -339,13 +393,20 @@ func run() error {
 	}
 
 	router := httpgateway.NewRouter(httpgateway.Deps{
-		Logger:              logger,
-		Registry:            registry,
-		AuthValidator:       authValidator,
-		CookieValidator:     sessionValidator,
-		RateLimiter:         rateLimiter,
-		UsageClient:         usageClient,
-		AuthClient:          authClient,
+		Logger:          logger,
+		Registry:        registry,
+		AuthValidator:   authValidator,
+		CookieValidator: sessionValidator,
+		RateLimiter:     rateLimiter,
+		UsageClient:     usageClient,
+		AuthClient:      authClient,
+		SsoConfig: httpgateway.SsoRouteConfig{
+			PublicBaseURL:  cfg.PublicBaseURL,
+			AuthMode:       cfg.AuthMode,
+			GithubClientID: cfg.SsoGithubClientID,
+			GoogleClientID: cfg.SsoGoogleClientID,
+			OidcClientID:   cfg.SsoOidcClientID,
+		},
 		AnnotationClient:    annotationClient,
 		TaskClient:          taskClient,
 		GitGatewayClient:    gitClient,
@@ -362,6 +423,7 @@ func run() error {
 		WSHandler:           wsHandler.ServeHTTP,
 		WSCompatHandler:     wsCompatHandler.ServeHTTP,
 		AgentProxyHandler:   agentProxyHandler,
+		TraceBroadcast:      traceBroadcast,
 	})
 
 	healthSrv := health.New()
@@ -381,9 +443,14 @@ func run() error {
 	healthSrv.Register("scm-integration-service", grpcConnHealthCheck(scmConn))
 	healthSrv.Register("workflow-service", grpcConnHealthCheck(workflowConn))
 
+	// otelhttp gives every /api/* request its trace's root span — health
+	// checks below stay unwrapped so they never depend on OTel exporter
+	// health (TASK-BE-FFT-004).
+	publicHandler := otelhttp.NewHandler(router, "api-gateway")
+
 	publicServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.PublicPort),
-		Handler: router,
+		Handler: publicHandler,
 	}
 	healthServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
@@ -429,6 +496,21 @@ func run() error {
 	workspaceBridgeWG.Wait()
 
 	return nil
+}
+
+// traceEventHandler returns the eventbus.Handler passed to
+// cons.SubscribeEphemeral (TASK-BE-FFT-011): each TRACE-stream event's
+// already-JSON-encoded F40 TraceEvent Payload (TASK-BE-FFT-007) is
+// forwarded straight into broadcast for /api/trace-stream's SSE clients.
+// Extracted out of run() so this glue is unit-testable without a real NATS
+// connection — run() itself dials 15+ live gRPC services and blocks on a
+// shutdown signal, so (matching every other service's main.go in this
+// codebase) it has no direct test.
+func traceEventHandler(broadcast *httpgateway.TraceBroadcast) eventbus.Handler {
+	return func(_ context.Context, event eventbus.Event) error {
+		broadcast.Publish(event.Payload)
+		return nil
+	}
 }
 
 // grpcConnHealthCheck reports readiness from the ClientConn's connectivity

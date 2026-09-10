@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** High — GitHub integration (issues, PRs, GitHub Projects) is core to the product; every one of these calls fails.
 **Symptom:** Every `github.*` RPC below (except auth) falls through to `registry.go`'s `notImplementedHandler` and returns an error immediately.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-071–082 (12 task(s), all DONE) for implementation evidence.
 
 ---
 

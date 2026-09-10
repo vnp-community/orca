@@ -2,6 +2,7 @@ syntax = "proto3";
 
 package orca.project.v1;
 
+import "google/protobuf/struct.proto";
 import "google/protobuf/timestamp.proto";
 
 option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1;projectv1";
@@ -18,6 +19,13 @@ service ProjectService {
   rpc UpdateMemberRole(UpdateMemberRoleRequest) returns (UpdateMemberRoleResponse);
   rpc RebindDevServer(RebindDevServerRequest) returns (RebindDevServerResponse);
 
+  // RebindRepoDevServer is Phase 10's repo-scoped replacement for
+  // RebindDevServer — dev-server ownership now lives on Repo, not Project
+  // (see Repo.dev_server_id's doc comment). RebindDevServer stays wired
+  // during the deprecation window but is no longer what git-gateway-service
+  // reads for anything.
+  rpc RebindRepoDevServer(RebindRepoDevServerRequest) returns (RebindRepoDevServerResponse);
+
   // UpdateProject's field list deliberately excludes dev_server_id —
   // RebindDevServer (with its active-execution guard) stays the sole path
   // that may change it, per project-service.md §3's explicit note. An empty
@@ -31,6 +39,37 @@ service ProjectService {
   rpc ReorderRepos(ReorderReposRequest) returns (ReorderReposResponse);
   rpc RemoveRepo(RemoveRepoRequest) returns (RemoveRepoResponse);
   rpc UpdateRepo(UpdateRepoRequest) returns (UpdateRepoResponse);
+  // AssignRepoToProject moves an EXISTING repo (already in some other
+  // project) into a different project — distinct from AddRepo, which
+  // always creates a brand-new repo row. Backs Project Settings' "Repos"
+  // tab candidate picker (attach an already-known repo to this project).
+  rpc AssignRepoToProject(AssignRepoToProjectRequest) returns (AssignRepoToProjectResponse);
+  // GetRepo answers git-gateway-service's "does this repo exist, and which
+  // dev server does it live on" — ListRepos(project_id) was the only repo
+  // lookup RPC before this, unusable when a caller only has a repo_id (see
+  // git-gateway-service's project_client.go GetRepo doc comment for the
+  // confirmed gap this closes).
+  rpc GetRepo(GetRepoRequest) returns (GetRepoResponse);
+
+  // repo_members — a functional-role tier (developer/lead/admin) layered on
+  // top of project membership (AddMember/ListMembers/... above): decides
+  // what a project member can do on ONE specific repo, not the project as a
+  // whole. See policy/orca-authz/repo.rego and project-service's
+  // requireRepoAccess.
+  rpc AddRepoMember(AddRepoMemberRequest) returns (AddRepoMemberResponse);
+  rpc ListRepoMembers(ListRepoMembersRequest) returns (ListRepoMembersResponse);
+  rpc RemoveRepoMember(RemoveRepoMemberRequest) returns (RemoveRepoMemberResponse);
+  rpc UpdateRepoMemberRole(UpdateRepoMemberRoleRequest) returns (UpdateRepoMemberRoleResponse);
+
+  // sparse_presets — saved directory sets for sparse worktree creation,
+  // scoped to one repo. Ports backend/src/main/runtime/rpc/methods/
+  // sparse-presets.ts (legacy TS reference). Gated by the same
+  // repo_any_functional_role tier as repo visibility (requireRepoAccess) —
+  // these are per-repo convenience config, not a separate authorization
+  // dimension of their own.
+  rpc ListSparsePresets(ListSparsePresetsRequest) returns (ListSparsePresetsResponse);
+  rpc SaveSparsePreset(SaveSparsePresetRequest) returns (SaveSparsePresetResponse);
+  rpc RemoveSparsePreset(RemoveSparsePresetRequest) returns (RemoveSparsePresetResponse);
 
   // Worktree surface — metadata only, never authoritative for on-disk
   // existence (git-gateway-service reconciles on demand, per
@@ -45,6 +84,27 @@ service ProjectService {
   rpc GetWorktree(GetWorktreeRequest) returns (Worktree);
   rpc SetWorktreeActivation(SetWorktreeActivationRequest) returns (SetWorktreeActivationResponse);
   rpc RenameWorktree(RenameWorktreeRequest) returns (RenameWorktreeResponse);
+  // UpdateWorktreeMeta persists the frontend's WorktreeMeta fields
+  // (displayName/comment/isPinned/pushTarget/sparse*/... — see
+  // frontend/src/shared/types.ts's WorktreeMeta) that desktop already
+  // durably persists locally (orca-data.json) but backend-go previously
+  // dropped entirely (worktree.set only ever forwarded `active`). metadata
+  // is a partial patch, merged shallowly into the stored JSON blob — an
+  // explicit JSON null clears a field, an omitted key leaves it untouched,
+  // matching the frontend's own Partial<WorktreeMeta> spread semantics.
+  // Deliberately NOT a per-field message: WorktreeMeta gains fields often
+  // and independently of this proto; a typed field per key would drift
+  // constantly and buys no real validation this backend can act on anyway.
+  rpc UpdateWorktreeMeta(UpdateWorktreeMetaRequest) returns (UpdateWorktreeMetaResponse);
+  // SetWorktreeLineage re-parents (or clears the parent of) an
+  // already-created worktree — worktrees.ts's setWorktreeLineageForRuntime,
+  // distinct from RecordWorktreeCreated's creation-time lineage capture.
+  rpc SetWorktreeLineage(SetWorktreeLineageRequest) returns (SetWorktreeLineageResponse);
+  // ListWorktreeLineage returns every worktree with an explicitly-captured
+  // parent (tenant-scoped via RLS, no request params — mirrors the old TS
+  // backend's worktree.lineageList, explicit-capture only per
+  // docs/execution-plan.md's frontend-compatibility-layer coverage table).
+  rpc ListWorktreeLineage(ListWorktreeLineageRequest) returns (ListWorktreeLineageResponse);
 
   // GetWorktreeByIdempotencyKey backs BR-CLI-01 — git-gateway-service's
   // CreateWorktree saga calls this before running `git worktree add`.
@@ -95,6 +155,19 @@ service ProjectService {
   // binding validation), so this extends that existing edge rather than
   // adding a new cross-service dependency.
   rpc GetMobileWorktreeStatus(GetMobileWorktreeStatusRequest) returns (GetMobileWorktreeStatusResponse);
+
+  // ── orcaProjects.* — cross-project source sharing ─────────────────────
+  // Links another Project's repos/worktrees into this Project's ("the
+  // container") shared view. Both sides are ordinary Projects — there is
+  // no separate "OrcaProject" entity in this service; the legacy Electron
+  // backend's OrcaProject IS this service's Project, and its per-user-JSON
+  // "Project" concept has no equivalent here (everything is already a
+  // real, RBAC'd row). See wscompat's channels_orca_project_sharing.go for
+  // the orcaProjects.* wire-channel names this maps to.
+  rpc LinkSourceProject(LinkSourceProjectRequest) returns (LinkSourceProjectResponse);
+  rpc UnlinkSourceProject(UnlinkSourceProjectRequest) returns (UnlinkSourceProjectResponse);
+  rpc ListSourceProjects(ListSourceProjectsRequest) returns (ListSourceProjectsResponse);
+  rpc GetSharedProjectData(GetSharedProjectDataRequest) returns (GetSharedProjectDataResponse);
 }
 
 message Project {
@@ -109,6 +182,16 @@ message Project {
   google.protobuf.Timestamp created_at = 9;
   google.protobuf.Timestamp updated_at = 10;
   bool issue_status_sync_enabled = 11;  // BR-PI-07/BR-PI-06, default true
+  // mobile_emulator_agent_id — CR-DS-009 §3.2
+  // (docs/crs/v2/dev-server/CR-DS-009-mobile-emulator-agent-separation.md):
+  // a parallel, independent binding to dev_server_id — logical FK to an
+  // infra-fleet-service DevServer whose kind is AGENT_KIND_MOBILE_EMULATOR.
+  // Empty means no Mobile Emulator Agent bound yet. Unlike dev_server_id,
+  // updating this field goes through the ordinary UpdateProject path (see
+  // UpdateProjectRequest below), not a RebindDevServer-style guarded RPC —
+  // there is no active-execution concern tied to swapping which machine
+  // drives the emulator, the two bindings are deliberately independent.
+  string mobile_emulator_agent_id = 12;
 }
 
 message CreateProjectRequest {
@@ -200,6 +283,21 @@ message RebindDevServerResponse {
   Project project = 1;
 }
 
+// RebindRepoDevServerRequest's active-execution guard is scoped to the
+// repo's owning PROJECT (any active workflow/task anywhere in the project
+// blocks it), not just the one repo — see RebindRepoDevServer usecase's
+// doc comment for why (workflow-service/task-service's HasActiveExecutions
+// is project-scoped only today, no repo-level granularity exists yet).
+// new_dev_server_id empty = unbind (repo becomes local).
+message RebindRepoDevServerRequest {
+  string repo_id = 1;
+  string new_dev_server_id = 2;
+}
+
+message RebindRepoDevServerResponse {
+  Repo repo = 1;
+}
+
 message UpdateProjectRequest {
   string project_id = 1;
   string name = 2; // empty = no change
@@ -209,6 +307,7 @@ message UpdateProjectRequest {
   // issue_status_sync_enabled is presence-based (unlike the string fields
   // above) since "" can't mean no-change for a bool — unset = no change.
   optional bool issue_status_sync_enabled = 6;
+  string mobile_emulator_agent_id = 7; // empty = no change, see Project.mobile_emulator_agent_id
 }
 
 message UpdateProjectResponse {
@@ -227,12 +326,25 @@ message Repo {
   string url = 3;
   string display_name = 4;
   int32 position = 5; // ordering within project — see ReorderRepos
+  // dev_server_id is THIS repo's own dev-server binding (Phase 10) — empty
+  // means local (no dev server). Previously only Project.dev_server_id
+  // existed; a repo's host was inferred from its project, never stated
+  // directly. See migrations/0017_repo_dev_server for the backfill.
+  string dev_server_id = 6;
+  // hook_settings is an opaque JSON blob (structure owned by the frontend's
+  // RepoHookSettings type — Setup/Archive scripts + run/startup/command-
+  // source policies) — project-service stores and returns it verbatim,
+  // never parses it. Empty = never set. See migrations/0018_repo_hook_settings.
+  string hook_settings = 7;
 }
 
 message AddRepoRequest {
   string project_id = 1;
   string url = 2;
   string display_name = 3;
+  // dev_server_id: empty = local repo. Validated against infra-fleet when
+  // non-empty — see usecase.AddRepo.
+  string dev_server_id = 4;
 }
 
 message AddRepoResponse {
@@ -264,11 +376,140 @@ message UpdateRepoRequest {
   string repo_id = 1;
   string url = 2;          // empty = no change
   string display_name = 3; // empty = no change
+  // optional (proto3 explicit presence), not "empty = no change" like the
+  // fields above — hook_settings can legitimately be set to an empty JSON
+  // object (e.g. the user cleared all local scripts), which must be
+  // distinguishable from "this request doesn't touch hook_settings at all".
+  optional string hook_settings = 4;
 }
 
 message UpdateRepoResponse {
   Repo repo = 1;
 }
+
+message AssignRepoToProjectRequest {
+  string repo_id = 1;
+  string target_project_id = 2;
+}
+
+message AssignRepoToProjectResponse {
+  Repo repo = 1;
+}
+
+message GetRepoRequest {
+  string repo_id = 1;
+}
+
+message GetRepoResponse {
+  Repo repo = 1;
+  // dev_server_id mirrors repo.dev_server_id directly (Phase 10) — kept as
+  // its own top-level field for wire compatibility with existing callers
+  // (git-gateway-service's ProjectClient.GetRepo reads this field), even
+  // though it's now redundant with Repo.dev_server_id above. Previously
+  // this was resolved via a join through the OWNING PROJECT's
+  // dev_server_id, since project.repos had no such column of its own.
+  string dev_server_id = 2;
+  // hidden_target_id (TASK-BE-EVM-018, BE-SOL-EVM-004 §4/§6c) mirrors
+  // ResolveConnectionResponse.hidden_target_id's meaning for this repo —
+  // set when this repo is backed by an ssh-type ephemeral VM runtime
+  // (Hướng A), so git-gateway-service's repo-scoped dispatch
+  // (dispatchExecutorForRepo/dispatchFilesystemExecutorForRepo) can route
+  // via the hidden target too. Empty for every ordinary repo. This
+  // service does not populate a real value yet (which ephemeral VM
+  // runtime, if any, backs a given repo_id is an infra-fleet-service-owned
+  // fact — the join this field needs is a follow-up, see
+  // TASK-BE-EVM-015's "Kết quả thực tế" gap #2) — the field exists on the
+  // wire so git-gateway-service's client-side mapping has something real
+  // to read once that join lands.
+  string hidden_target_id = 3;
+}
+
+enum RepoRole {
+  REPO_ROLE_UNSPECIFIED = 0;
+  REPO_ROLE_DEVELOPER = 1;
+  REPO_ROLE_LEAD = 2;
+  REPO_ROLE_ADMIN = 3;
+}
+
+message RepoMember {
+  string repo_id = 1;
+  string user_id = 2;
+  RepoRole role = 3;
+}
+
+message AddRepoMemberRequest {
+  string repo_id = 1;
+  string user_id = 2;
+  RepoRole role = 3;
+}
+
+message AddRepoMemberResponse {
+  RepoMember member = 1;
+}
+
+message ListRepoMembersRequest {
+  string repo_id = 1;
+}
+
+message ListRepoMembersResponse {
+  repeated RepoMember members = 1;
+}
+
+message RemoveRepoMemberRequest {
+  string repo_id = 1;
+  string user_id = 2;
+}
+
+message RemoveRepoMemberResponse {}
+
+message UpdateRepoMemberRoleRequest {
+  string repo_id = 1;
+  string user_id = 2;
+  RepoRole role = 3;
+}
+
+message UpdateRepoMemberRoleResponse {
+  RepoMember member = 1;
+}
+
+message SparsePreset {
+  string id = 1;
+  string repo_id = 2;
+  string name = 3;
+  repeated string directories = 4;
+  google.protobuf.Timestamp created_at = 5;
+  google.protobuf.Timestamp updated_at = 6;
+}
+
+message ListSparsePresetsRequest {
+  string repo_id = 1;
+}
+
+message ListSparsePresetsResponse {
+  repeated SparsePreset presets = 1;
+}
+
+// SaveSparsePresetRequest upserts — an empty id creates a new preset, a
+// non-empty id updates the existing one with that id (matches the legacy
+// reference's optional `id` param exactly; see project-service's
+// SaveSparsePreset usecase doc comment).
+message SaveSparsePresetRequest {
+  string repo_id = 1;
+  string id = 2;
+  string name = 3;
+  repeated string directories = 4;
+}
+
+message SaveSparsePresetResponse {
+  SparsePreset preset = 1;
+}
+
+message RemoveSparsePresetRequest {
+  string repo_id = 1;
+  string preset_id = 2;
+}
+
+message RemoveSparsePresetResponse {}
 
 message Worktree {
   string id = 1;
@@ -282,6 +523,24 @@ message Worktree {
   optional string linked_issue_ref = 9;       // provider-native ref: "owner/repo#123" or "ENG-123"
   string status = 10; // NEW — "active" | "completed" | "error" | "stopped"; orthogonal to activation_state (the `active` field above)
   optional string base_ref = 11; // NEW (SOL-WT-04) — the branch/tag/sha this worktree was created from; empty for worktrees created before this backfill
+
+  // Lineage — explicit-capture only for now (see WorktreeLineageEntry's doc
+  // comment). Unset when this worktree wasn't created with a captured
+  // parent context.
+  optional string parent_worktree_id = 12;
+  optional string origin = 13;
+  optional string capture_source = 14;
+  optional string capture_confidence = 15;
+  optional string task_id = 16;
+  optional string orchestration_run_id = 17;
+  optional string coordinator_handle = 18;
+  optional string created_by_terminal_handle = 19;
+  int64 created_at_unix_ms = 20;
+
+  // Opaque UI-authored metadata blob — see UpdateWorktreeMetaRequest's doc
+  // comment. Unset (nil) when a worktree has never had UpdateWorktreeMeta
+  // called for it (e.g. every worktree created before this field existed).
+  google.protobuf.Struct metadata = 21;
 }
 
 // NEW (SOL-WT-04) — single-worktree lookup by id.
@@ -296,6 +555,19 @@ message RecordWorktreeCreatedRequest {
   optional string linked_issue_provider = 6;
   optional string linked_issue_ref = 7;
   optional string base_ref = 8; // NEW — the branch/tag/sha this worktree was created from
+
+  // Optional lineage-capture context, threaded through from the caller
+  // (git-gateway-service's CreateWorktree saga) when this worktree was
+  // branched from another one. capture_confidence is NOT a caller input —
+  // project-service always stamps "explicit" when any of these are set,
+  // since inferred capture (branch-description scanning) isn't ported yet.
+  optional string parent_worktree_id = 9;
+  optional string origin = 10;
+  optional string capture_source = 11;
+  optional string task_id = 12;
+  optional string orchestration_run_id = 13;
+  optional string coordinator_handle = 14;
+  optional string created_by_terminal_handle = 15;
 }
 
 message RecordWorktreeCreatedResponse {
@@ -361,6 +633,59 @@ message GetWorktreeByIdempotencyKeyResponse {
   Worktree worktree = 2; // unset when found=false
 }
 
+message UpdateWorktreeMetaRequest {
+  string worktree_id = 1;
+  // Partial patch, merged shallowly (Postgres jsonb `||`) into the stored
+  // metadata blob — an explicit JSON null clears a field, an omitted key
+  // leaves the previously-stored value untouched.
+  google.protobuf.Struct metadata = 2;
+}
+
+message UpdateWorktreeMetaResponse {
+  Worktree worktree = 1;
+}
+
+message SetWorktreeLineageRequest {
+  string worktree_id = 1;
+  // Unset + clear_parent=false is a no-op read-modify-write (returns the
+  // worktree unchanged); set clear_parent=true to remove an existing
+  // parent instead of supplying a new one.
+  optional string parent_worktree_id = 2;
+  bool clear_parent = 3;
+}
+
+message SetWorktreeLineageResponse {
+  Worktree worktree = 1;
+}
+
+message ListWorktreeLineageRequest {}
+
+message ListWorktreeLineageResponse {
+  repeated WorktreeLineageEntry lineage = 1;
+}
+
+// WorktreeLineageEntry mirrors frontend/src/shared/types.ts's WorktreeLineage
+// — one entry per worktree that has an explicitly-captured parent.
+// capture_confidence is always "explicit" today: inferring lineage from a
+// worktree's git branch description (the old TS backend's
+// extractOrchestrationTaskId) isn't ported — git-gateway-service has no RPC
+// to read a branch description yet. worktree_instance_id/
+// parent_worktree_instance_id from the TS shape are deliberately omitted:
+// backend-go has no separate "instance" concept, so wscompat mirrors
+// worktree_id/parent_worktree_id into both wire fields.
+message WorktreeLineageEntry {
+  string worktree_id = 1;
+  optional string parent_worktree_id = 2;
+  optional string origin = 3;
+  optional string capture_source = 4;
+  optional string capture_confidence = 5;
+  optional string task_id = 6;
+  optional string orchestration_run_id = 7;
+  optional string coordinator_handle = 8;
+  optional string created_by_terminal_handle = 9;
+  int64 created_at_unix_ms = 10;
+}
+
 message ProjectGroup {
   string id = 1;
   string tenant_id = 2;
@@ -410,12 +735,14 @@ message FolderWorkspace {
   string name = 4;            // display name (defaults to basename(path) if unset on create)
   string added_by = 5;        // logical FK -> tenant-service.users
   google.protobuf.Timestamp created_at = 6;
+  string project_group_id = 7; // empty = no group, logical FK -> project.project_groups
 }
 
 message CreateFolderWorkspaceRequest {
   string dev_server_id = 1;
   string path = 2;
   string name = 3;
+  string project_group_id = 4; // empty = no group
 }
 
 message CreateFolderWorkspaceResponse {
@@ -570,4 +897,54 @@ message MobileWorktreeStatus {
   string status = 4;          // "completed" | "running" | "waiting" | "idle" | "unknown"
   int64  duration_ms = 5;     // now - TerminalSession.CreatedAt for a running session; 0 if idle
   string last_output = 6;     // BR-MB-15: truncated to 500 chars server-side, never a raw dump
+}
+
+// ── orcaProjects.* messages ───────────────────────────────────────────────
+
+// SourceProject is the join row linking source_project_id's repos/worktrees
+// into container_project_id's shared view. linked_by records who performed
+// the link (audit trail) — not an ownership claim on either project.
+message SourceProject {
+  string id = 1;
+  string container_project_id = 2;
+  string source_project_id = 3;
+  string linked_by = 4; // logical FK -> tenant-service user id
+  google.protobuf.Timestamp linked_at = 5;
+}
+
+message LinkSourceProjectRequest {
+  string container_project_id = 1;
+  string source_project_id = 2;
+}
+message LinkSourceProjectResponse {
+  SourceProject source_project = 1;
+}
+
+message UnlinkSourceProjectRequest {
+  string container_project_id = 1;
+  string source_project_id = 2;
+}
+message UnlinkSourceProjectResponse {}
+
+message ListSourceProjectsRequest {
+  string container_project_id = 1;
+}
+message ListSourceProjectsResponse {
+  repeated SourceProject source_projects = 1;
+}
+
+// GetSharedProjectData returns source_project_id's repos/worktrees IF (and
+// only if) it's actually linked into container_project_id — the caller
+// must be a member of container_project_id; a caller passing a
+// source_project_id that isn't linked gets the same not-authorized error
+// as a non-member (enumeration resistance — never reveals whether a given
+// source_project_id exists or is merely unlinked).
+message GetSharedProjectDataRequest {
+  string container_project_id = 1;
+  string source_project_id = 2;
+}
+message GetSharedProjectDataResponse {
+  Project project = 1;
+  repeated Repo repos = 2;
+  repeated Worktree worktrees = 3;
 }

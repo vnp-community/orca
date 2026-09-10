@@ -1,10 +1,12 @@
-import type { OrcaTask, TaskStatus } from '../../../../shared/task-types'
+import type { StateCreator } from 'zustand'
+import type { AppState } from '../types'
+import type { OrcaTask } from '../../../../shared/task-types'
 
 export type TaskSlice = {
-  tasks:        OrcaTask[]
+  tasks: OrcaTask[]
   activeTaskId: string | null
-  taskLoading:  boolean
-  
+  taskLoading: boolean
+
   setTasks(tasks: OrcaTask[]): void
   addTask(task: OrcaTask): void
   updateTask(id: string, patch: Partial<OrcaTask>): void
@@ -13,17 +15,25 @@ export type TaskSlice = {
   setTaskLoading(v: boolean): void
 }
 
-export function createTaskSlice(set): TaskSlice {
-  return {
-    tasks: [], activeTaskId: null, taskLoading: false,
-    setTasks:       (tasks) => set(s => { s.tasks = tasks }),
-    addTask:        (task)  => set(s => { s.tasks.push(task) }),
-    updateTask:     (id, patch) => set(s => {
-      const idx = s.tasks.findIndex((t: OrcaTask) => t.id === id)
-      if (idx !== -1) {Object.assign(s.tasks[idx], patch)}
-    }),
-    removeTask:     (id) => set(s => { s.tasks = s.tasks.filter((t: OrcaTask) => t.id !== id) }),
-    setActiveTask:  (id) => set(s => { s.activeTaskId = id }),
-    setTaskLoading: (v)  => set(s => { s.taskLoading = v }),
-  }
-}
+// Why every action returns a partial object instead of mutating `s` and
+// returning nothing: this store has no immer middleware, so plain zustand's
+// `set` treats a non-object return value (i.e. `undefined`, from a bare
+// `set(s => { s.tasks = tasks })`) as a full-state REPLACE — wiping the
+// entire AppState to `undefined`. Live-reproduced as a whole-app crash
+// ("Cannot read properties of undefined (reading 'settings')" everywhere)
+// the moment any Project Workspace Tasks-tab action ran for real data.
+export const createTaskSlice: StateCreator<AppState, [], [], TaskSlice> = (set) => ({
+  tasks: [],
+  activeTaskId: null,
+  taskLoading: false,
+
+  setTasks: (tasks) => set(() => ({ tasks })),
+  addTask: (task) => set((s) => ({ tasks: [...s.tasks, task] })),
+  updateTask: (id, patch) =>
+    set((s) => ({
+      tasks: s.tasks.map((t) => (t.id === id ? { ...t, ...patch } : t))
+    })),
+  removeTask: (id) => set((s) => ({ tasks: s.tasks.filter((t) => t.id !== id) })),
+  setActiveTask: (id) => set(() => ({ activeTaskId: id })),
+  setTaskLoading: (v) => set(() => ({ taskLoading: v }))
+})

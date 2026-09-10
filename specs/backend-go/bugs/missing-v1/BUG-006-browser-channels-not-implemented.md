@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** Medium — a large namespace (15 methods) backing the in-app "browser pane" preview feature, but it's a secondary/preview surface, not core daily-usage functionality like git/files/terminal.
 **Symptom:** All 15 `browser.*` calls from `browser-pane-remote.tsx`/`browser.ts`/`workspace-port-actions.ts` time out with `channel "browser.X" is not yet implemented in backend-go — see backend-go/docs/execution-plan.md's frontend-compatibility-layer coverage table`.
-**Status:** ❌ Open
+**Status:** 🚧 Partially resolved — agent + backend-go layers DONE end-to-end (TASK-031–036); frontend dispatch to the new relay path remains an open, separately-scoped gap — see TASK-036's "Status by layer" section.
 
 ---
 

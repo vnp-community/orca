@@ -7,6 +7,7 @@ import (
 	"github.com/go-chi/chi/v5"
 
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
 	notificationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1"
 )
@@ -19,8 +20,8 @@ import (
 // literal path win over anything registered under this prefix).
 func mountNotificationRoutes(r chi.Router, client notificationv1.NotificationServiceClient) {
 	r.Route("/v1/notifications", func(sub chi.Router) {
-		sub.Post("/subscribe", handleSubscribe(client))
-		sub.Get("/vapid-public-key", handleGetVapidPublicKey(client))
+		sub.Post("/subscribe", handleSubscribe(client, nil))
+		sub.Get("/vapid-public-key", handleGetVapidPublicKey(client, nil))
 	})
 }
 
@@ -34,9 +35,37 @@ type subscribeRequestBody struct {
 	AuthKey   string `json:"auth_key"`
 }
 
-func handleSubscribe(client notificationv1.NotificationServiceClient) http.HandlerFunc {
+// resolveSoftIdentity reads the identity a prior authMiddleware run already
+// attached (the /v1/notifications/* mount); when nothing is attached (the
+// unauthenticated /api/push-* mount — see mountPushRoutes's doc comment for
+// why that mount MUST stay outside authMiddleware) it falls back to
+// validating the orca_session cookie directly, IF one is present, without
+// ever failing the request when it isn't. This is the fix for the live bug
+// where GetVapidPublicKey/Subscribe are tenant-scoped usecases
+// (VapidKeyRepository.GetPublicKey/Subscribe both call
+// tenant.RequireTenantID) but the unauthenticated mount never gave them a
+// tenant to resolve, even for a genuinely logged-in browser whose fetch()
+// sends the session cookie same-origin by default — NOTIFICATION_NO_TENANT
+// fired for every caller, logged in or not. A caller with no cookie at all
+// (BUG-003's original "before session" scenario) still degrades to an
+// empty identity here, same as before this fix.
+func resolveSoftIdentity(r *http.Request, cookieValidator CookieSessionValidator) usecase.Identity {
+	if identity, ok := identityFromContext(r.Context()); ok {
+		return identity
+	}
+	if cookieValidator == nil {
+		return usecase.Identity{}
+	}
+	id, err := cookieValidator.ValidateCookie(r.Context(), r)
+	if err != nil {
+		return usecase.Identity{}
+	}
+	return usecase.Identity{TenantID: id.TenantID, UserID: id.UserID, Role: id.Role}
+}
+
+func handleSubscribe(client notificationv1.NotificationServiceClient, cookieValidator CookieSessionValidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		identity, _ := identityFromContext(r.Context())
+		identity := resolveSoftIdentity(r, cookieValidator)
 
 		var body subscribeRequestBody
 		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
@@ -59,9 +88,9 @@ func handleSubscribe(client notificationv1.NotificationServiceClient) http.Handl
 	}
 }
 
-func handleGetVapidPublicKey(client notificationv1.NotificationServiceClient) http.HandlerFunc {
+func handleGetVapidPublicKey(client notificationv1.NotificationServiceClient, cookieValidator CookieSessionValidator) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		identity, _ := identityFromContext(r.Context())
+		identity := resolveSoftIdentity(r, cookieValidator)
 
 		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
 		resp, err := client.GetVapidPublicKey(ctx, &notificationv1.GetVapidPublicKeyRequest{})
@@ -84,9 +113,18 @@ func handleGetVapidPublicKey(client notificationv1.NotificationServiceClient) ht
 // either. See router.go's mounting order — this MUST be called outside the
 // authed route group, never inside it (regression guard: BUG-003,
 // TestPushRoutes_NoAuthRequired in notification_routes_test.go).
-func mountPushRoutes(r chi.Router, client notificationv1.NotificationServiceClient) {
-	r.Get("/api/vapid-public-key", handleGetVapidPublicKey(client))
-	r.Post("/api/push-subscribe", handleSubscribe(client))
+//
+// cookieValidator is passed through to handleGetVapidPublicKey/handleSubscribe
+// so a genuinely logged-in browser (the common real case: push permission is
+// requested from inside the app, session cookie already set) gets its real
+// tenant/user resolved via resolveSoftIdentity — without that, both
+// usecases' tenant.RequireTenantID call always failed
+// (NOTIFICATION_NO_TENANT), for every caller, logged in or not. A caller
+// with no cookie at all still degrades to an empty identity, never a 401 —
+// BUG-003's guarantee is unchanged.
+func mountPushRoutes(r chi.Router, client notificationv1.NotificationServiceClient, cookieValidator CookieSessionValidator) {
+	r.Get("/api/vapid-public-key", handleGetVapidPublicKey(client, cookieValidator))
+	r.Post("/api/push-subscribe", handleSubscribe(client, cookieValidator))
 	r.Post("/api/push-unsubscribe", handleUnsubscribe(client))
 }
 

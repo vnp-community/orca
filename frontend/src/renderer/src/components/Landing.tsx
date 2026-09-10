@@ -39,23 +39,36 @@ function GitHubStarButton({ hasRepos }: { hasRepos: boolean }): React.JSX.Elemen
   const wrapperRef = useRef<HTMLDivElement | null>(null)
   const mountedRef = useMountedRef()
   const settings = useAppStore((s) => s.settings)
+  // Why: only the active runtime environment affects which target
+  // checkRuntimeOrcaStarred hits — depend on that field instead of the
+  // whole settings object so unrelated setting changes don't re-fire this.
+  const activeRuntimeEnvironmentId = settings?.activeRuntimeEnvironmentId ?? null
 
   useEffect(() => {
     let cancelled = false
-    void checkRuntimeOrcaStarred(settings).then((result) => {
-      if (cancelled) {
-        return
-      }
-      if (result === null) {
-        setState('web-fallback')
-      } else {
-        setState(result ? 'starred' : 'not-starred')
-      }
-    })
+    void checkRuntimeOrcaStarred({ activeRuntimeEnvironmentId })
+      .then((result) => {
+        if (cancelled) {
+          return
+        }
+        if (result === null) {
+          setState('web-fallback')
+        } else {
+          setState(result ? 'starred' : 'not-starred')
+        }
+      })
+      // Why: a runtime-RPC rejection here is exactly as "unable to
+      // determine" as the already-handled `result === null` case — fall
+      // back the same way instead of leaving an uncaught rejection.
+      .catch(() => {
+        if (!cancelled) {
+          setState('web-fallback')
+        }
+      })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [activeRuntimeEnvironmentId])
 
   useEffect(() => {
     if (!menuOpen) {

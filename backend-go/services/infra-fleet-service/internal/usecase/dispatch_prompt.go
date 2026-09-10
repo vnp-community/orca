@@ -38,14 +38,15 @@ type DispatchOutcome struct {
 // second PTY-write path, and consumes TASK-MB-02-02's quiescence-based
 // ReadyForInput signal via AgentStatus.
 type DispatchPrompt struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
-	queue    QueuedPromptRepository
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	agent      DevServerAgentClient
+	queue      QueuedPromptRepository
 }
 
-func NewDispatchPrompt(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient, queue QueuedPromptRepository) *DispatchPrompt {
-	return &DispatchPrompt{sessions: sessions, resolver: resolver, agent: agent, queue: queue}
+func NewDispatchPrompt(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient, queue QueuedPromptRepository) *DispatchPrompt {
+	return &DispatchPrompt{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent, queue: queue}
 }
 
 func (uc *DispatchPrompt) Execute(ctx context.Context, in DispatchPromptInput) (DispatchOutcome, error) {
@@ -58,7 +59,7 @@ func (uc *DispatchPrompt) Execute(ctx context.Context, in DispatchPromptInput) (
 		return DispatchOutcome{}, apperrors.New(apperrors.KindInvalidArgument, "INFRA_PROMPT_INVALID", err.Error(), err)
 	}
 
-	_, devServer, err := resolveTerminalSession(ctx, tenantID, in.PtyID, uc.sessions, uc.resolver)
+	_, devServer, err := resolveTerminalSession(ctx, tenantID, in.PtyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		return DispatchOutcome{}, err
 	}

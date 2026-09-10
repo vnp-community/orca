@@ -6,6 +6,7 @@ import {
 } from '../../runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
 import { createTestStore } from './store-test-helpers'
+import { resetDefaultProjectCacheForTests } from './repos'
 
 const projectsCreateHostSetup = vi.fn()
 const projectsUpdateHostSetup = vi.fn()
@@ -46,6 +47,7 @@ const runtimeSetup: ProjectHostSetup = {
 
 beforeEach(() => {
   clearRuntimeCompatibilityCacheForTests()
+  resetDefaultProjectCacheForTests()
   projectsCreateHostSetup.mockReset()
   projectsUpdateHostSetup.mockReset()
   projectsDeleteHostSetup.mockReset()
@@ -186,15 +188,39 @@ describe('repo slice project host setup lifecycle', () => {
         return {
           id: 'rpc-repos',
           ok: true,
-          result: { repos: [runtimeRepo] },
+          result: {
+            repos: [
+              {
+                id: runtimeRepo.id,
+                projectId: project.id,
+                url: runtimeRepo.path,
+                displayName: runtimeRepo.displayName,
+                position: 0
+              }
+            ]
+          },
           _meta: { runtimeId: 'runtime-remote' }
         }
       }
+      // Why a bare OrcaProject[], not { projects: [...] }: this is now
+      // getOrCreateDefaultProject's resolution call (Phase 4b), not the
+      // legacy desktop projects.list() shape — project-service's project.list
+      // returns a plain array.
       if (args.method === 'project.list') {
         return {
           id: 'rpc-projects',
           ok: true,
-          result: { projects: [project] },
+          result: [
+            {
+              id: project.id,
+              name: project.displayName,
+              defaultBranch: 'main',
+              devServerId: '',
+              visibility: 'private',
+              createdAt: project.createdAt,
+              updatedAt: project.updatedAt
+            }
+          ],
           _meta: { runtimeId: 'runtime-remote' }
         }
       }

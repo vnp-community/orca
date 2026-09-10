@@ -27,8 +27,8 @@ import (
 // without needing to fake out SFTP too (deploy's very first RunCommand,
 // the `mkdir -p`, is the failure point).
 type flakySSHServer struct {
-	listener        net.Listener
-	attempts        atomic.Int32
+	listener         net.Listener
+	attempts         atomic.Int32
 	failUntilAttempt int32
 }
 

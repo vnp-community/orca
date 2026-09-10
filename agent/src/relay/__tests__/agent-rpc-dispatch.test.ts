@@ -4,7 +4,7 @@ import { createRpcDispatcher, formatMcpResult, makeError } from '../agent-rpc-di
 import type { ToolDefinition, ToolResult } from '../agent-tool-registry'
 import type { AgentConfig } from '../agent-config'
 import type { AgentLogger } from '../agent-logger'
-import { createWireState, HEADER_SIZE } from '../agent-wire'
+import { createWireState, HEADER_SIZE } from 'orca-dev-agent-transport'
 import { registerTraceSink, type TraceEvent } from '../../shared/trace'
 import { AgentErrorCode } from '../../shared/agent-wire-protocol'
 

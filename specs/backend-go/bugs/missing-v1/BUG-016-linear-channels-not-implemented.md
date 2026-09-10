@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** Medium-High
 **Symptom:** Every `linear.*` RPC below falls through to `registry.go`'s `notImplementedHandler` and returns an error immediately.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-102–107 (6 task(s), all DONE) for implementation evidence.
 
 ---
 

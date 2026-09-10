@@ -93,7 +93,7 @@ func TestBulkProvisionFleet_RetriesThenFailsAfterThreeAttempts(t *testing.T) {
 	if prov.calls != 3 {
 		t.Errorf("expected exactly 3 attempts, got %d", prov.calls)
 	}
-	if devRepo.updateProvisionResultCalls != 1 || devRepo.lastProvisionStatus != domain.DevServerStatusUnhealthy {
+	if devRepo.updateProvisionResultCalls != 1 || devRepo.lastProvisionStatus != domain.DevServerHealthUnhealthy {
 		t.Errorf("expected UpdateProvisionResult called once with unhealthy, got calls=%d status=%q", devRepo.updateProvisionResultCalls, devRepo.lastProvisionStatus)
 	}
 }
@@ -114,7 +114,7 @@ func TestBulkProvisionFleet_PrereqShortfallDoesNotConsumeARetry(t *testing.T) {
 	if prov.calls != 1 {
 		t.Errorf("expected exactly 1 Provision call (no retry consumed), got %d", prov.calls)
 	}
-	if devRepo.lastProvisionStatus != domain.DevServerStatusDegraded {
+	if devRepo.lastProvisionStatus != domain.DevServerHealthDegraded {
 		t.Errorf("expected degraded status, got %q", devRepo.lastProvisionStatus)
 	}
 }

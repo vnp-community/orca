@@ -260,6 +260,17 @@ type WorktreeCreateResult struct {
 	HeadSHA string
 }
 
+// WorktreeGitInfo is one entry from `git worktree list --porcelain` — path
+// plus enough git-level identity (HEAD sha, branch) for DetectWorktrees to
+// build a real reconciled worktree record without a second git invocation
+// per path. Branch is "" for a detached HEAD (the porcelain output's own
+// `detached` line, not a `branch <ref>` one).
+type WorktreeGitInfo struct {
+	Path   string
+	Head   string
+	Branch string
+}
+
 // WorktreeResult is CreateWorktree's usecase-level result: the saga's
 // combined answer once both the git operation and project-service's
 // bookkeeping record have succeeded.
@@ -269,22 +280,60 @@ type WorktreeResult struct {
 	HeadSHA    string
 }
 
-// RepoInfo is project-service's answer to "does this repo exist, and what
-// project/URL does it belong to" — the minimal shape the worktree usecases
-// need to validate a repo id before dispatching a git operation against it.
+// RepoInfo is project-service's answer to "does this repo exist, what
+// project/URL does it belong to, and which dev server does it live on" —
+// the shape the worktree usecases need to validate a repo id and dispatch
+// a git operation against it (see dispatchExecutorForRepo in
+// usecase/ports.go).
 //
-// Deviation from TASK-193's original sketch: project.proto's real Repo
-// message (backend-go/proto/orca/project/v1/project.proto) has no
-// dev_server_id or path field — those fields were this task's best-effort
-// guess before checking the proto and don't exist. Dev-server/host
-// resolution for a worktree op instead goes entirely through
-// ConnectionResolver (see dispatchExecutor in usecase/ports.go), never
-// through RepoInfo; RepoInfo here only carries what Repo actually has.
+// Deviation from TASK-193's original sketch, since corrected: project.proto's
+// Repo message itself still has no dev_server_id/path field (project.repos
+// has no such column — Repo.URL doubles as an absolute filesystem path for
+// repos set up via SetupExistingFolder/ImportNested, see those usecases'
+// doc comments). DevServerID here comes from project.proto's GetRepo RPC
+// resolving it through the repo's OWNING PROJECT instead (ProjectService.
+// GetRepoResponse.dev_server_id) — a second, project-service-side lookup
+// this service doesn't need to make itself.
 type RepoInfo struct {
 	ID          string
 	ProjectID   string
 	URL         string
 	DisplayName string
+	DevServerID string
+	// HiddenTargetID (TASK-BE-EVM-015, BE-SOL-EVM-004 §4's decision 3) is a
+	// routing attribute ORTHOGONAL to DevServerID/URL — set only for a repo
+	// living on a `ssh`-type ephemeral VM's hidden target (Hướng A,
+	// TASK-BE-EVM-014), never a new "host" for ResolveConnection. Empty for
+	// every other repo (the common case), same "empty means unaffected"
+	// convention DevServerID already uses just above.
+	//
+	// TASK-BE-EVM-018 (BE-SOL-EVM-004 §6c) added the wire field
+	// (project.proto's GetRepoResponse.hidden_target_id) and this struct's
+	// client-side mapping (grpcclient.ProjectClient.GetRepo) for real — but
+	// project-service's OWN GetRepo handler does not populate a real value
+	// yet (which ephemeral VM runtime, if any, backs a given repo_id is an
+	// infra-fleet-service-owned fact — that cross-service join is a
+	// follow-up, see TASK-BE-EVM-015's "Kết quả thực tế" gap #2 for the
+	// full audit). A repo-scoped fs/git dispatch still always sees "" here
+	// until that join lands.
+	HiddenTargetID string
+}
+
+// EphemeralVmRecipe mirrors frontend/src/shared/types.ts's OrcaVmRecipe — a
+// repo-authored orca.yaml `environmentRecipes[]` entry naming the shell
+// commands that provision/suspend/resume/destroy a per-workspace ephemeral
+// VM/container. This service never runs these commands itself (Group 1 is
+// read-only) — see usecase.EphemeralVmRelay (TASK-004) for the lifecycle
+// half that does.
+type EphemeralVmRecipe struct {
+	ID              string
+	Name            string
+	Description     string
+	Create          string
+	Suspend         string
+	Resume          string
+	Destroy         string
+	DestroyDisabled bool
 }
 
 // WorktreeRecord mirrors project-service's Worktree message — the
@@ -365,17 +414,6 @@ type MergeResult struct {
 	ConflictDispatchKey string
 }
 
-// WorktreeLineageCapture carries the linked-issue reference
-// CreateWorktreeFromIssue resolves through to project-service's
-// RecordWorktreeCreated (SOL-PI-02/SOL-PI-03) — empty fields mean "no
-// linked issue" (BR-PI-06 opt-out, or a plain CreateWorktree call).
-type WorktreeLineageCapture struct {
-	Origin              string
-	CaptureSource       string
-	LinkedIssueProvider string
-	LinkedIssueRef      string
-}
-
 // IssueRef identifies an issue in either an SCM (GitHub/GitLab) or an
 // issue-tracker (Jira/Linear), resolved by IssueSourceClient — mirrors
 // gitgatewayv1.CreateWorktreeFromIssueRequest's oneof issue_source.
@@ -397,6 +435,31 @@ type Issue struct {
 	Comments           []string
 	Provider           string
 	ExternalRef        string // "owner/repo#123" or "ENG-123", matches Worktree.linked_issue_ref
+}
+
+// WorktreeLineageCapture is optional lineage-capture context CreateWorktree
+// forwards to project-service's RecordWorktreeCreated — see
+// proto/orca/project/v1/project.proto's WorktreeLineageEntry doc comment
+// for what each field means. Every field empty means "no lineage captured",
+// the common case; project-service (not this service) decides
+// CaptureConfidence from whether any of these are set.
+//
+// LinkedIssueProvider/LinkedIssueRef are CreateWorktreeFromIssue's own
+// addition (SOL-PI-02/SOL-PI-03) — the linked-issue reference it resolves
+// through to RecordWorktreeCreated, empty for "no linked issue" (BR-PI-06
+// opt-out, or a plain CreateWorktree call). Independent of the other
+// fields: a plain CreateWorktree call may set ParentWorktreeID etc. without
+// ever setting these, and vice versa.
+type WorktreeLineageCapture struct {
+	ParentWorktreeID        string
+	Origin                  string
+	CaptureSource           string
+	TaskID                  string
+	OrchestrationRunID      string
+	CoordinatorHandle       string
+	CreatedByTerminalHandle string
+	LinkedIssueProvider     string
+	LinkedIssueRef          string
 }
 
 // ResolvedBase is PrefetchCreateBase/ResolvePrBase/ResolveMrBase's answer:

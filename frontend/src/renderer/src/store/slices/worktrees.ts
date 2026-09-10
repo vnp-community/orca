@@ -30,7 +30,6 @@ import { findRepoForHost } from './repo-host-identity'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
-import { logBugFePty001 } from '@/lib/bug-fe-pty-001-diagnostic-log'
 import {
   callRuntimeRpc,
   getActiveRuntimeTarget,
@@ -83,7 +82,6 @@ export type { WorktreeSlice, WorktreeDeleteState } from './worktree-helpers'
 
 // Why: old runtime servers only have `worktree.list`; preserve the large-list
 // UI hydration parity this slice used before `worktree.detectedList` existed.
-const REMOTE_WORKTREE_LIST_PARITY_LIMIT = 10_000
 const WORKTREE_REMOVAL_AMBIGUOUS_ERROR =
   'Workspace identity is ambiguous across hosts. Refresh projects and try again.'
 const ACTIVE_WORKTREE_TERMINAL_PREP_DELAY_MS = 300
@@ -354,6 +352,14 @@ function repoHostId(
 ): ExecutionHostId {
   const repo = findRepoForHost(state.repos, repoId, { hostId, settings: state.settings })
   return repo ? getRepoExecutionHostId(repo) : LOCAL_EXECUTION_HOST_ID
+}
+
+// repoProjectId resolves the OrcaProject id worktree.detectedList's
+// ListWorktreesRequest needs (see listDetectedWorktreesForRepo's doc
+// comment) — '' for local-mode/legacy repos with no project.repos row at
+// all (harmless: the local branch never reaches that RPC).
+function repoProjectId(state: Pick<AppState, 'repos'>, repoId: string): string {
+  return state.repos.find((repo) => repo.id === repoId)?.projectId ?? ''
 }
 
 function repoHasExecutionHost(
@@ -868,6 +874,7 @@ function settingsForWorktreeOwner(
 async function listDetectedWorktreesForRepo(
   settings: AppState['settings'],
   repoId: string,
+  projectId: string,
   options: BackgroundRuntimeRefreshOptions = {}
 ): Promise<DetectedWorktreeListResult> {
   const target = getActiveRuntimeTarget(settings)
@@ -876,29 +883,79 @@ async function listDetectedWorktreesForRepo(
       listDetected?: typeof window.api.worktrees.listDetected
     }
     if (typeof worktreesApi.listDetected === 'function') {
-      return worktreesApi.listDetected({ repoId })
+      return worktreesApi.listDetected({ repoId, projectId })
     }
     const legacyWorktrees = await worktreesApi.list({ repoId })
     return toLegacyDetectedWorktreeResult(repoId, { worktrees: legacyWorktrees })
   }
   try {
-    return await callRuntimeRpc<DetectedWorktreeListResult>(
+    // Why {projectId, repoId}, not {repo}: the Go handler
+    // (channels_worktree.go) decodes {projectId, repoId} and fans out to
+    // ListWorktrees(projectId) + git-gateway's DetectWorktrees(repoId) in
+    // parallel — an empty projectId binds into ListWorktrees' uuid-typed
+    // column and fails PROJECT_MEMBERSHIP_LOOKUP_FAILED (the same "empty
+    // string into a uuid column" bug class as BUG-004), not a clean
+    // not-found. Found live: the very first real project-service-backed
+    // repo this session's repo.add fix ever created broke the sidebar with
+    // this error on its very next refresh.
+    const result = await callRuntimeRpc<DetectedWorktreeListResult>(
       target,
       'worktree.detectedList',
-      { repo: repoId },
+      { projectId, repoId },
       {
         timeoutMs: 15_000,
         reuseRecentCompatibilityFailure: options.reuseRecentCompatibilityFailure
       }
     )
+    // Why the shape guard, kept as defense-in-depth even though
+    // channels_worktree.go's handler now DOES synthesize a real
+    // {repoId, authoritative, source, worktrees} (see the spec doc's
+    // "Thirty-fourth" entry — the {orphanedPaths} stub this guarded
+    // against is gone): a server running an older binary mid-rollout, or
+    // any future regression in that synthesis, should still degrade to
+    // the same safe "no worktrees" state the catch block below uses,
+    // rather than `.worktrees` being undefined and crashing the first
+    // caller that iterates it.
+    if (!Array.isArray(result.worktrees)) {
+      return { repoId, authoritative: false, source: 'metadata-fallback', worktrees: [] }
+    }
+    return result
   } catch (error) {
+    // Why treat these two errors as "no worktrees", not a rethrow: both are
+    // known, disclosed architectural gaps in worktree.*'s integration with
+    // project-scoped repos (see the spec doc's "Thirtieth" entry), not
+    // real repo problems — (1) PROJECT_MEMBERSHIP_LOOKUP_FAILED fires when
+    // this repo's Repo.projectId hasn't been resolved yet (e.g. a
+    // hydration-time refresh racing ahead of this repo's own repo.list
+    // fetch) and an empty projectId binds into a uuid-typed column; (2)
+    // WORKTREE_REPO_NOT_FOUND fires because git-gateway-service keeps its
+    // own separate repo registry, populated only by its own InitRepo/
+    // Clone/SetupExistingFolder flows — a repo added via project-service's
+    // bare AddRepo (what repo.add/addRepoPath call, for both git and
+    // folder kind) is never registered there. Until both are fixed for
+    // real, a project-service-only repo legitimately has no detectable
+    // worktrees yet, which is not a crash-worthy state for the sidebar.
+    const message = error instanceof Error ? error.message : String(error)
+    if (
+      message.includes('WORKTREE_REPO_NOT_FOUND') ||
+      message.includes('PROJECT_MEMBERSHIP_LOOKUP_FAILED')
+    ) {
+      return { repoId, authoritative: false, source: 'metadata-fallback', worktrees: [] }
+    }
     if (!isRuntimeMethodNotFoundError(error)) {
       throw error
     }
+    // Why projectId only, not {repo, limit}: worktree.list's Go handler
+    // decodes only {projectId} and returns every worktree in the whole
+    // project (ListWorktreesRequest has no repo-scoping field at all) —
+    // this legacy fallback path (older runtime servers lacking
+    // detectedList) was never reachable on this deployment to catch that
+    // its own repo-filtering was equally wrong; left as a known gap rather
+    // than guessing at a fix with no real server to verify against.
     const legacy = await callRuntimeRpc<RuntimeWorktreeListResult>(
       target,
       'worktree.list',
-      { repo: repoId, limit: REMOTE_WORKTREE_LIST_PARITY_LIMIT },
+      { projectId },
       {
         timeoutMs: 15_000,
         reuseRecentCompatibilityFailure: options.reuseRecentCompatibilityFailure
@@ -938,6 +995,7 @@ function detectedWorktreeRefreshKey(
 async function listDetectedWorktreesForRepoCoalesced(
   settings: AppState['settings'],
   repoId: string,
+  projectId: string,
   options: {
     executionHostId: ExecutionHostId
     requireAuthoritative?: boolean
@@ -951,7 +1009,7 @@ async function listDetectedWorktreesForRepoCoalesced(
   }
   // Why: startup/event fan-out can ask for the same repo/host refresh many
   // times at once; share only the scan promise so state merge semantics stay local.
-  const refresh = listDetectedWorktreesForRepo(settings, repoId, {
+  const refresh = listDetectedWorktreesForRepo(settings, repoId, projectId, {
     reuseRecentCompatibilityFailure: options.reuseRecentCompatibilityFailure
   })
   detectedWorktreeRefreshesInFlight.set(key, refresh)
@@ -2291,6 +2349,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       const result = await listDetectedWorktreesForRepoCoalesced(
         settingsForRepoOwner(ownerState, repoId, hostId),
         repoId,
+        repoProjectId(ownerState, repoId),
         { executionHostId: hostId }
       )
       set((s) => {
@@ -2327,10 +2386,15 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
       const ownerWasMissingAtStart = !ownerState.repos.some((repo) => repo.id === repoId)
       const setup = getProjectHostSetupForRepoHost(ownerState, repoId, hostId)
       const settings = settingsForRepoOwner(ownerState, repoId, hostId)
-      const detected = await listDetectedWorktreesForRepoCoalesced(settings, repoId, {
-        executionHostId: hostId,
-        requireAuthoritative: options?.requireAuthoritative
-      })
+      const detected = await listDetectedWorktreesForRepoCoalesced(
+        settings,
+        repoId,
+        repoProjectId(ownerState, repoId),
+        {
+          executionHostId: hostId,
+          requireAuthoritative: options?.requireAuthoritative
+        }
+      )
       if (options?.requireAuthoritative && !detected.authoritative) {
         return false
       }
@@ -2477,10 +2541,15 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           const hostId = getRepoExecutionHostId(r)
           const setup = getProjectHostSetupForRepoHost(get(), r.id, hostId)
           const settings = settingsForKnownRepoOwner(get().settings, r)
-          const detected = await listDetectedWorktreesForRepoCoalesced(settings, r.id, {
-            executionHostId: hostId,
-            reuseRecentCompatibilityFailure: true
-          })
+          const detected = await listDetectedWorktreesForRepoCoalesced(
+            settings,
+            r.id,
+            r.projectId ?? '',
+            {
+              executionHostId: hostId,
+              reuseRecentCompatibilityFailure: true
+            }
+          )
           const worktrees = sanitizeHostedReviewLinksForBranchClears(
             toVisibleWorktrees(detected, hostId, setup),
             get().worktreesByRepo[r.id]
@@ -2558,6 +2627,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
           const detected = await listDetectedWorktreesForRepoCoalesced(
             settingsForKnownRepoOwner(get().settings, r),
             r.id,
+            r.projectId ?? '',
             { executionHostId: hostId, reuseRecentCompatibilityFailure: true }
           )
           const current = get().worktreesByRepo[r.id]
@@ -4602,23 +4672,6 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
         worktreeId != null &&
         tabs.length > 0 &&
         tabs.every((tab) => !tab.pendingActivationSpawn && !tabHasLivePty(s.ptyIdsByTabId, tab.id))
-      // TEMP DIAG BUG-FE-PTY-001: confirm whether setActiveWorktree re-runs for
-      // the same worktree while an earlier bump's fresh spawn is still in
-      // flight (pendingActivationSpawn true), and whether the pendingActivationSpawn
-      // exclusion above actually prevents a double bump on live repro.
-      if (worktreeId != null && tabs.length > 0) {
-        logBugFePty001(
-          `setActiveWorktree allDead-check worktreeId=${worktreeId} allDead=${allDead} tabs=${JSON.stringify(
-            tabs.map((tab) => ({
-              id: tab.id,
-              generation: tab.generation ?? 0,
-              ptyId: tab.ptyId,
-              pendingActivationSpawn: tab.pendingActivationSpawn ?? false,
-              hasLivePty: tabHasLivePty(s.ptyIdsByTabId, tab.id)
-            }))
-          )}`
-        )
-      }
       const isFirstActivation = worktreeId != null && !s.everActivatedWorktreeIds.has(worktreeId)
       const shouldTagTabs = worktreeId != null && tabs.length > 0 && isFirstActivation
       // Why: when every PTY for the worktree's tabs is dead, the existing

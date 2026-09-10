@@ -1,4 +1,13 @@
 export function isWindowsAbsolutePathLike(value: string): boolean {
+  // Why the guard: same "backend response is a partial record" bug class
+  // as repo-display-labels.ts's normalizePathSegments — a ProjectHostSetup
+  // derived from a bare project-service Repo can reach this with `path`
+  // genuinely undefined at runtime despite the `string` type. `.test()`
+  // alone would coerce undefined to "undefined" harmlessly, but
+  // `.startsWith` on undefined throws.
+  if (!value) {
+    return false
+  }
   return /^[A-Za-z]:[\\/]/.test(value) || value.startsWith('\\\\') || value.startsWith('//')
 }
 

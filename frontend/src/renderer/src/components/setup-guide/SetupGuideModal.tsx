@@ -21,8 +21,8 @@ import { SetupGuideProgressRing } from './SetupGuideProgressRing'
 import { useSetupGuideProgress } from './use-setup-guide-progress'
 import { useSetupGuideOpenCloseTelemetry } from './use-setup-guide-telemetry'
 import { translate } from '@/i18n/i18n'
-import { useConnectedDevServers } from '@/store/slices/dev-servers'
-import { useServerChecklist } from '@/store/slices/onboarding-checklist'
+import { useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
+import { useServerChecklist } from '@/store/slices/onboarding-checklist-selectors'
 import type { DevServer } from '../../../../shared/dev-server-types'
 import type { PerServerChecklistState } from '../../../../shared/dev-server-types'
 
@@ -194,12 +194,12 @@ const SERVER_CHECKLIST_ITEMS: { key: keyof PerServerChecklistState; label: strin
   { key: 'addedRepo', label: 'Add a repository' },
   { key: 'ranFirstAgent', label: 'Run first agent' },
   { key: 'reviewedDiff', label: 'Review a diff' },
-  { key: 'openedPr', label: 'Open a pull request' },
+  { key: 'openedPr', label: 'Open a pull request' }
 ]
 
 function ServerChecklistSection({
   devServer,
-  checklist,
+  checklist
 }: {
   devServer: DevServer
   checklist: PerServerChecklistState
@@ -235,7 +235,7 @@ function ServerChecklistSectionWrapper({ devServer }: { devServer: DevServer }):
 
 export function OverallProgressBar({
   completedCount,
-  totalCount,
+  totalCount
 }: {
   completedCount: number
   totalCount: number
@@ -284,14 +284,22 @@ export function PerServerChecklistPanel(): JSX.Element {
   const totalCount = GLOBAL_ITEMS + PER_SERVER_ITEMS * connectedServers.length
 
   let completedCount = 0
-  if (checklistState.choseAgent) {completedCount++}
-  if (checklistState.addedRepo) {completedCount++}
-  if (checklistState.ranFirstAgent) {completedCount++}
+  if (checklistState.choseAgent) {
+    completedCount++
+  }
+  if (checklistState.addedRepo) {
+    completedCount++
+  }
+  if (checklistState.ranFirstAgent) {
+    completedCount++
+  }
 
   for (const ds of connectedServers) {
     const cl = checklistState.perServer[ds.id] ?? {}
     for (const { key } of SERVER_CHECKLIST_ITEMS) {
-      if (cl[key]) {completedCount++}
+      if (cl[key]) {
+        completedCount++
+      }
     }
   }
 

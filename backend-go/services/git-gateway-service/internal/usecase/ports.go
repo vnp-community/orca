@@ -41,6 +41,17 @@ type ResolvedConnection struct {
 	// the merge/stash/branch-write/push-stream operations Part B
 	// (relay-ssh) genuinely does not support.
 	Mode infrafleetv1.ConnectionMode
+	// HiddenTargetID (TASK-BE-EVM-015, populated for real as of
+	// TASK-BE-EVM-018) mirrors domain.RepoInfo.HiddenTargetID for the
+	// worktree-keyed resolution path — see that field's doc comment.
+	// infrafleetv1.ResolveConnectionResponse.hidden_target_id is the wire
+	// source; grpcclient.ConnectionResolver.ResolveConnection maps it here.
+	// Still "" for the overwhelming majority of connections (only non-empty
+	// when the worktree is attached to an ssh-type ephemeral VM runtime),
+	// and dispatchExecutor still deliberately does not thread it into ctx
+	// (see that function's doc comment) — but this field itself is real,
+	// not a stub.
+	HiddenTargetID string
 }
 
 // ConnectionResolver resolves which host owns a worktree, by calling
@@ -103,6 +114,12 @@ type GitExecutor interface {
 	// agent method on either side. See TASK-210's contract correction.
 	RemoteCommitURL(ctx context.Context, repoPath, sha string) (string, error)
 	RemoteFileURL(ctx context.Context, repoPath, path, ref string) (string, error)
+	// RemoteURL returns one configured remote's raw URL (e.g.
+	// "git@github.com:owner/repo.git") — unlike RemoteCommitURL/
+	// RemoteFileURL, no web-permalink construction. remoteName empty
+	// defaults to "origin". Added for GetRemoteURL (github.listWorkItems'
+	// owner/repo resolution) — see that usecase's doc comment.
+	RemoteURL(ctx context.Context, repoPath, remoteName string) (string, error)
 	// Fetch (TASK-210) runs `git fetch --prune [remote]` — the real agent
 	// always prunes and has no separate prune flag; pushTarget is optional
 	// and only its RemoteName is consulted for which remote to fetch (see
@@ -164,7 +181,8 @@ type GitExecutor interface {
 	// every other GitExecutor method, they are not called with a repoPath
 	// resolved from an existing worktreeId/connectionId. See DevServerReachability.
 	Clone(ctx context.Context, url, destPath string) (worktreePath, defaultBranch string, err error)
-	InitRepo(ctx context.Context, destPath, defaultBranch string) (path, resolvedDefaultBranch string, err error)
+	// remoteURL empty = no remote added (remoteName is ignored in that case).
+	InitRepo(ctx context.Context, destPath, defaultBranch, remoteName, remoteURL string) (path, resolvedDefaultBranch string, remoteAdded bool, err error)
 
 	BaseRefDefault(ctx context.Context, repoPath string) (ref string, err error)
 	SearchRefs(ctx context.Context, repoPath, query string) (refs []string, err error)
@@ -183,13 +201,19 @@ type GitExecutor interface {
 	// PrefetchCreateBase and ResolvePrBase/ResolveMrBase's "confirm the
 	// platform's base branch actually exists locally" step.
 	FetchAndResolveRef(ctx context.Context, repoPath, ref string) (sha string, err error)
-	// ListWorktreePaths returns the raw on-disk worktree paths for repoPath
+	// ListWorktreePaths returns the raw on-disk worktrees for repoPath
 	// (`git worktree list --porcelain`, no bookkeeping join) — DetectWorktrees
 	// needs this. Added directly to the interface rather than behind a
 	// runtime type assertion (TASK-193 Step 8's own correction: a
 	// compile-time-required method is available one edit away, so ship
 	// that instead of a type-assertion sketch).
-	ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error)
+	//
+	// Returns domain.WorktreeGitInfo (path + HEAD sha + branch), not bare
+	// paths — api-gateway's worktree.detectedList handler needs the git-level
+	// identity to synthesize a real DetectedWorktree for a path with no
+	// project.worktrees bookkeeping row (an "external"/orphaned worktree),
+	// not just confirm it exists.
+	ListWorktreePaths(ctx context.Context, repoPath string) ([]domain.WorktreeGitInfo, error)
 	// ForceDeleteBranch is REQUIRED on every GitExecutor implementation —
 	// deliberately not an optional/type-asserted method (TASK-194). This is
 	// the structural fix for the old TS backend's forceDeletePreservedBranch?
@@ -343,10 +367,38 @@ type FilesystemExecutor interface {
 	WriteFile(ctx context.Context, repoPath, relPath string, content []byte, createParents bool) (bytesWritten int64, err error)
 	WriteFileChunk(ctx context.Context, repoPath, relPath string, offsetBytes int64, content []byte, isFinal bool) (bytesWritten int64, err error)
 	CreateDir(ctx context.Context, repoPath, relPath string, recursive, noClobber bool) error
+	CreateFile(ctx context.Context, repoPath, relPath string) error
 	Delete(ctx context.Context, repoPath, relPath string, recursive bool) error
 	Stat(ctx context.Context, repoPath, relPath string) (domain.FileStat, error)
 	Search(ctx context.Context, repoPath string, opts domain.SearchOptions) ([]domain.SearchMatch, error)
 	Glob(ctx context.Context, repoPath, pattern string, maxResults int) ([]string, error)
+}
+
+// FileWatchStreamer is WatchWorktreeFiles's (BACKLOG-003) transport port —
+// relays to infra-fleet-service's StreamFileChanges RPC. Unlike
+// FilesystemExecutor, there is deliberately no local-host implementation:
+// this feature is scoped to remote/environment targets only (BACKLOG-003's
+// own title) — a worktree with Connected=false gets a clear
+// FailedPrecondition, not a silent local fallback watcher.
+type FileWatchStreamer interface {
+	// StreamFileChanges subscribes to path's fs.changed notifications over
+	// connectionID's dev server. unsubscribe MUST be called exactly once by
+	// the caller (WatchWorktreeFiles.Execute, via defer) — same contract
+	// infra-fleet-service's own DevServerAgentClient.StreamFileChanges
+	// documents one layer down.
+	StreamFileChanges(ctx context.Context, connectionID, path string) (<-chan FileChangeEvent, func(), error)
+}
+
+// FileChangeEvent mirrors infra-fleet-service's usecase.FileChangeEvent
+// field-for-field (no cross-service usecase import — each service's
+// internal/usecase package is self-contained, matching this codebase's
+// per-service isolation convention). OldPath/IsDirectory are always
+// zero-valued today — see that type's doc comment for why.
+type FileChangeEvent struct {
+	Kind        string
+	Path        string
+	OldPath     string
+	IsDirectory bool
 }
 
 // LocalOnlyFilesystemExecutor covers Rename/Copy — BUG-009's known gap: the
@@ -384,18 +436,18 @@ func dispatchFilesystemExecutor(ctx context.Context, resolver ConnectionResolver
 // project-service's existing RecordWorktreeCreated/RecordWorktreeRemoved
 // RPCs (no project-service proto change — those RPCs already exist).
 //
-// GetRepo is this task's own addition on top of that existing surface: see
-// its doc comment on domain.RepoInfo and internal/adapter/grpcclient's
-// project_client.go for the confirmed proto gap — project.proto has no
-// single-repo-by-id lookup RPC (only ListRepos(project_id)), so today's
-// grpcclient implementation returns a typed, catchable error rather than a
-// real answer, until project-service grows one.
+// GetRepo backs project.proto's ProjectService.GetRepo RPC — added
+// specifically to close this confirmed gap (project.proto previously had
+// no single-repo-by-id lookup, only ListRepos(project_id)). Returns the
+// repo's owning project's dev_server_id alongside it, so dispatchExecutor-
+// ForRepo can route without a second RPC.
 type ProjectClient interface {
 	GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error)
 	// RecordWorktreeCreated's lineage param carries the linked-issue
-	// reference CreateWorktreeFromIssue resolved (SOL-PI-02) — a plain
+	// reference CreateWorktreeFromIssue resolved (SOL-PI-02) plus the
+	// parent-worktree/orchestration lineage-capture context — a plain
 	// CreateWorktree call passes domain.WorktreeLineageCapture{}, which
-	// project-service's RPC now maps to "no linked issue". baseRef is
+	// project-service's RPC now maps to "no lineage captured". baseRef is
 	// forwarded onto RecordWorktreeCreatedRequest.base_ref (SOL-WT-04's
 	// base_ref backfill) — the branch/tag/sha this worktree was created
 	// from, so it can later be persisted and used by CompareWorktrees'
@@ -487,23 +539,81 @@ type PullRequestInfo struct {
 	Number int32
 }
 
-// dispatchExecutor is the resolve-and-dispatch logic every RPC-shaped
-// usecase in this package shares: ask ConnectionResolver which host owns
-// worktreeID, then return whichever GitExecutor answers for that host plus
-// the resolved repo path to operate against. Centralized here so the
-// routing behavior — connected=false -> local, connected=true -> relay — is
-// implemented and tested exactly once.
+// dispatchExecutor is the resolve-and-dispatch logic for a usecase that
+// already has a live worktreeID/connectionId to resolve through
+// ConnectionResolver — today, only RemoveWorktree (see its own doc
+// comment: RemoveWorktreeRequest carries a worktree_id directly, which IS
+// the dispatch key ConnectionResolver expects).
 //
-// worktreeID here is also reused, unchanged, as the dispatch key for the
-// repo-scoped worktree usecases (CreateWorktree, DetectWorktrees,
-// PrefetchCreateBase, ResolvePrBase, ResolveMrBase) — see those usecases'
-// doc comments for why passing a bare, caller-supplied repoID straight
-// through here (without first confirming it via ProjectClient.GetRepo)
-// would silently conflate a repo id with a worktree/connection id;
-// resolved by having each of them call ProjectClient.GetRepo first and
-// pass its echoed-back repo.ID into dispatchExecutor, the same shape
-// CreateWorktree's own uc.projects.GetRepo call establishes, rather than
-// forwarding the raw request field.
+// Historical note, corrected: an earlier revision of this package also
+// routed the repo-scoped usecases (CreateWorktree, DetectWorktrees,
+// PrefetchCreateBase, ResolvePrBase, ResolveMrBase) through this same
+// function, passing GetRepo's echoed-back repo.ID as if it were a
+// worktreeID. That never worked: ConnectionResolver.ResolveConnection
+// treats its argument as an infra-fleet-service connectionId (see
+// grpcclient/resolver.go's doc comment), and no infra.connections row is
+// ever keyed by a bare repo id — only CreateConnection call sites
+// (SetupExistingFolder, ScanNested) create one, keyed by a dev-server path,
+// never by repo.ID. Every one of those five usecases would resolve
+// Connected=false and silently treat the repo id itself as a filesystem
+// path. Fixed by dispatchExecutorForRepo below, which uses the same
+// DevServerReachability-based routing Clone/InitRepo already use
+// successfully instead.
+// devServerIDCtxKey/WithDevServerID/DevServerIDFromContext thread a repo's
+// dev server id from dispatch time (where it's known: DevServerReachability
+// is keyed by it) through to RelayExecutor.relay (grpcclient package),
+// which needs it to call infra-fleet-service's RelayByDevServer instead of
+// its connectionId-keyed Relay RPC — see relay_executor.go's own doc
+// comment for why Relay can't be used here: it requires a pre-existing
+// infra.connections row, and dispatchExecutorForRepo's own callers
+// (DetectWorktrees et al.) never have one (confirmed live: zero rows in
+// infra.connections, system-wide — WORKTREE_DETECT_FAILED's true root
+// cause once IsReachable started actually returning true).
+type devServerIDCtxKey struct{}
+
+func WithDevServerID(ctx context.Context, devServerID string) context.Context {
+	return context.WithValue(ctx, devServerIDCtxKey{}, devServerID)
+}
+
+func DevServerIDFromContext(ctx context.Context) (string, bool) {
+	v, _ := ctx.Value(devServerIDCtxKey{}).(string)
+	return v, v != ""
+}
+
+// hiddenTargetIDCtxKey/WithHiddenTargetID/HiddenTargetIDFromContext thread
+// domain.RepoInfo.HiddenTargetID / ResolvedConnection.HiddenTargetID
+// (TASK-BE-EVM-015, BE-SOL-EVM-004 §4's decision 3) from dispatch time
+// through to RelayExecutor.relay (grpcclient package), which needs it to
+// pick a "ViaHiddenTarget" agent method name and include hiddenTargetId in
+// the RPC params — mirrors WithDevServerID/DevServerIDFromContext's exact
+// pattern just above (same class of problem: a routing attribute
+// GitExecutor's ~20 methods don't carry in their own signatures, threaded
+// through ctx at the ONE shared dispatch chokepoint instead of widening
+// every method).
+type hiddenTargetIDCtxKey struct{}
+
+func WithHiddenTargetID(ctx context.Context, hiddenTargetID string) context.Context {
+	return context.WithValue(ctx, hiddenTargetIDCtxKey{}, hiddenTargetID)
+}
+
+func HiddenTargetIDFromContext(ctx context.Context) (string, bool) {
+	v, _ := ctx.Value(hiddenTargetIDCtxKey{}).(string)
+	return v, v != ""
+}
+
+// dispatchExecutor deliberately does NOT thread ResolvedConnection.HiddenTargetID
+// into ctx the way dispatchExecutorForRepo does below — its 3-value return
+// (executor, repoPath, err) is depended on by all ~33 worktree-keyed
+// usecases in this package. TASK-BE-EVM-018 (BE-SOL-EVM-004 §6c) closed
+// the proto gap this comment used to describe (infrafleetv1.ResolveConnectionResponse
+// now carries hidden_target_id, and grpcclient.ConnectionResolver.ResolveConnection
+// maps it into conn.HiddenTargetID for real) — conn.HiddenTargetID CAN be
+// non-empty from this path now. Widening this function's signature to
+// thread it into ctx anyway is still deliberately out of scope here: it
+// would churn all 33 call sites for a routing case
+// (worktree-keyed dispatch of a repo backed by an ssh-type ephemeral VM)
+// dispatchExecutorForRepo below already covers via the repo-scoped path —
+// revisit only if a real worktree-keyed (not repo-scoped) caller needs it.
 func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, relay GitExecutor, worktreeID string) (GitExecutor, string, error) {
 	conn, err := resolver.ResolveConnection(ctx, worktreeID)
 	if err != nil {
@@ -513,4 +623,76 @@ func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, r
 		return relay, conn.RepoPath, nil
 	}
 	return local, conn.RepoPath, nil
+}
+
+// dispatchExecutorForRepo is dispatchExecutor's repo-scoped counterpart,
+// used by every worktree usecase that starts from a repo id rather than an
+// existing worktree/connection id (CreateWorktree, DetectWorktrees,
+// PrefetchCreateBase, ResolvePrBase, ResolveMrBase — see dispatchExecutor's
+// doc comment for why routing these through ConnectionResolver never
+// worked). Mirrors Clone/InitRepo's own DevServerReachability-based
+// dispatch (usecase.Clone/InitRepo) rather than inventing a new pattern:
+// ask infra-fleet-service's fleet-health sample whether repo's dev server
+// is a live, agent-reachable host, and use repo.URL directly as the
+// on-disk repoPath — project-service's SetupExistingFolder/ImportNested
+// doc comments explain why Repo.URL carries an absolute filesystem path
+// for these repos, not a git remote URL.
+//
+// repo.DevServerID == "" (no dev server bound to the owning project) is
+// treated as "operate locally" rather than an error — a project created
+// without ever calling RebindDevServer is a valid, if degenerate, local-only
+// state.
+//
+// Known gap this used to not close (fixed by this function returning ctx
+// carrying repo.DevServerID via WithDevServerID): the relay branch requires
+// infra-fleet-service to have a real dispatch target for RelayExecutor's
+// relay to use. No infra.connections row exists for these repos (confirmed
+// live: zero rows, system-wide — every repo-scoped usecase here would have
+// hit the same WORKTREE_DETECT_FAILED-style error the moment IsReachable
+// ever returned true, which it never did before the fleet-health poller was
+// implemented). RelayExecutor now uses the returned ctx's DevServerID to
+// call RelayByDevServer instead, which was purpose-built for exactly this
+// "no connections row yet" case — see its own doc comment.
+func dispatchExecutorForRepo(ctx context.Context, reachability DevServerReachability, local, relay GitExecutor, repo domain.RepoInfo) (context.Context, GitExecutor, string, error) {
+	if repo.DevServerID == "" {
+		return ctx, local, repo.URL, nil
+	}
+	reachable, err := reachability.IsReachable(ctx, repo.DevServerID)
+	if err != nil {
+		return ctx, nil, "", err
+	}
+	if reachable {
+		relayCtx := WithDevServerID(ctx, repo.DevServerID)
+		if repo.HiddenTargetID != "" {
+			relayCtx = WithHiddenTargetID(relayCtx, repo.HiddenTargetID)
+		}
+		return relayCtx, relay, repo.URL, nil
+	}
+	return ctx, local, repo.URL, nil
+}
+
+// dispatchFilesystemExecutorForRepo is dispatchExecutorForRepo's
+// FilesystemExecutor counterpart. Needed because ReadFile lives on
+// FilesystemExecutor (implemented by localfs.Executor and RelayExecutor),
+// not GitExecutor — localgit.Executor (this service's GitExecutor "local")
+// has no ReadFile method. Same repo-scoped host dispatch logic as
+// dispatchExecutorForRepo above, parameterized on FilesystemExecutor
+// instead, for usecases like ReadEphemeralVmRecipes that need to read a
+// named file off a repo-scoped (not worktree-scoped) target.
+func dispatchFilesystemExecutorForRepo(ctx context.Context, reachability DevServerReachability, local, relay FilesystemExecutor, repo domain.RepoInfo) (context.Context, FilesystemExecutor, string, error) {
+	if repo.DevServerID == "" {
+		return ctx, local, repo.URL, nil
+	}
+	reachable, err := reachability.IsReachable(ctx, repo.DevServerID)
+	if err != nil {
+		return ctx, nil, "", err
+	}
+	if reachable {
+		relayCtx := WithDevServerID(ctx, repo.DevServerID)
+		if repo.HiddenTargetID != "" {
+			relayCtx = WithHiddenTargetID(relayCtx, repo.HiddenTargetID)
+		}
+		return relayCtx, relay, repo.URL, nil
+	}
+	return ctx, local, repo.URL, nil
 }

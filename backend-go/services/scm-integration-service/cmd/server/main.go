@@ -183,6 +183,7 @@ func run() error {
 
 	listIssuesUC := usecase.NewListIssues(credentials, registry, issueListCache, backoffExecutor)
 	listPullRequestsUC := usecase.NewListPullRequests(credentials, registry)
+	listWorkItemsUC := usecase.NewListWorkItems(credentials, registry)
 	getRateLimitStatusUC := usecase.NewGetRateLimitStatus(credentials, registry, rateLimitCache)
 	getAuthStatusUC := usecase.NewGetAuthStatus(credentials)
 	startOAuthFlowUC := usecase.NewStartOAuthFlow(oauthRegistry, stateCodec, nil)
@@ -201,6 +202,8 @@ func run() error {
 	removePullRequestReviewersUC := usecase.NewRemovePullRequestReviewers(credentials, registry)
 	setPullRequestAutoMergeUC := usecase.NewSetPullRequestAutoMerge(credentials, registry)
 	updateIssueUC := usecase.NewUpdateIssue(credentials, registry)
+	updatePullRequestUC := usecase.NewUpdatePullRequest(credentials, registry)
+	starRepositoryUC := usecase.NewStarRepository(credentials, registry)
 	getPullRequestForBranchUC := usecase.NewGetPullRequestForBranch(credentials, registry)
 	resolveRepoSlugUC := usecase.NewResolveRepoSlug(credentials, registry)
 
@@ -258,10 +261,10 @@ func run() error {
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	scmintegrationv1.RegisterScmIntegrationServiceServer(grpcServer, scmgrpc.New(
-		listIssuesUC, createPullRequestUC, listPullRequestsUC, getRateLimitStatusUC,
+		listIssuesUC, createPullRequestUC, listPullRequestsUC, listWorkItemsUC, getRateLimitStatusUC,
 		getAuthStatusUC, startOAuthFlowUC, completeOAuthFlowUC, revokeAuthUC,
 		mergePullRequestUC, requestPullRequestReviewersUC, removePullRequestReviewersUC,
-		setPullRequestAutoMergeUC, updateIssueUC, getPullRequestForBranchUC, resolveRepoSlugUC,
+		setPullRequestAutoMergeUC, updateIssueUC, updatePullRequestUC, starRepositoryUC, getPullRequestForBranchUC, resolveRepoSlugUC,
 		listAccessibleProjectsUC, resolveProjectRefUC, listProjectViewsUC, viewProjectTableUC,
 		updateProjectItemFieldUC, clearProjectItemFieldUC, getWorkItemDetailsBySlugUC,
 		updateIssueBySlugUC, updatePullRequestBySlugUC, updateIssueTypeBySlugUC,

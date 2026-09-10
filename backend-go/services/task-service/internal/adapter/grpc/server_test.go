@@ -398,7 +398,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 	// resolvePermissionUC is shared: Grant now requires it internally
 	// (TASK-TG-03-01's manage-access check) in addition to the standalone
 	// ResolvePermission RPC wiring below.
-	resolvePermissionUC := usecase.NewResolvePermission(tasks, tasks, stubTeams{}, stubOPA{})
+	resolvePermissionUC := usecase.NewResolvePermission(tasks, tasks, stubTeams{}, stubOPA{}, nil)
 	shareLinks := newFakeShareLinkRepository()
 	comments := &fakeCommentRepository{}
 	return New(
@@ -503,7 +503,7 @@ func (stubOPA) Decision(ctx context.Context, level domain.GrantLevel, action, te
 
 type stubExecutor struct{}
 
-func (stubExecutor) Execute(ctx context.Context, tenantID, taskID, requestID string) (string, error) {
+func (stubExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
 	return "ref", nil
 }
 
@@ -799,7 +799,7 @@ func TestServer_ResolvePermission_ThreadsRealActionToOPA(t *testing.T) {
 	// Constructed directly (not via newTestServer/New) so this test can
 	// inject a recording OPA fake without widening every other usecase's
 	// wiring just for this one assertion.
-	s := &Server{resolvePermission: usecase.NewResolvePermission(tasks, tasks, stubTeams{}, opa)}
+	s := &Server{resolvePermission: usecase.NewResolvePermission(tasks, tasks, stubTeams{}, opa, nil)}
 
 	_, err := s.ResolvePermission(ctxWithTenant(t), &taskv1.ResolvePermissionRequest{TaskId: "t1", UserId: "user-1", Action: "manage"})
 	if err != nil {

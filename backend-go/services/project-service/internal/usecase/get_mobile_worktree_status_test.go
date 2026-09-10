@@ -15,12 +15,18 @@ func seedMobileProject(t *testing.T, projects *fakeProjectRepository, id, tenant
 	if _, err := projects.Create(context.Background(), p); err != nil {
 		t.Fatalf("seeding project: %v", err)
 	}
+	// ProjectRepository.List is member-scoped (see its doc comment) — every
+	// test in this file calls Execute as "user-1", so seed that membership
+	// here rather than at each call site.
+	if err := projects.AddMember(context.Background(), domain.ProjectMember{ProjectID: id, UserID: "user-1", Role: domain.ProjectRoleOwner}); err != nil {
+		t.Fatalf("seeding project membership: %v", err)
+	}
 	return p
 }
 
 func seedMobileWorktree(t *testing.T, worktrees *fakeWorktreeRepository, id, projectID, repoID, path, branch string) domain.Worktree {
 	t.Helper()
-	wt, err := domain.NewWorktree(id, projectID, repoID, path, branch, "", "")
+	wt, err := domain.NewWorktree(id, projectID, repoID, path, branch, "", "", domain.WorktreeLineageCapture{})
 	if err != nil {
 		t.Fatalf("building worktree: %v", err)
 	}
@@ -48,7 +54,7 @@ func TestGetMobileWorktreeStatus_NoBoundDevServer_OmitsRuntimeFieldsNotSkipped(t
 	seedMobileWorktree(t, worktrees, "wt-1", "proj-1", "repo-1", "/home/wt-1", "feature-a")
 
 	uc := NewGetMobileWorktreeStatus(worktrees, projects, newFakeTerminalStatusResolver())
-	result, err := uc.Execute(withTenant(context.Background(), "tenant-1"))
+	result, err := uc.Execute(withTenantAndUser(context.Background(), "tenant-1", "user-1"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,7 +80,7 @@ func TestGetMobileWorktreeStatus_NoMatchingSession_Idle(t *testing.T) {
 
 	terminals := newFakeTerminalStatusResolver()
 	uc := NewGetMobileWorktreeStatus(worktrees, projects, terminals)
-	result, err := uc.Execute(withTenant(context.Background(), "tenant-1"))
+	result, err := uc.Execute(withTenantAndUser(context.Background(), "tenant-1", "user-1"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -104,7 +110,7 @@ func TestGetMobileWorktreeStatus_MatchedSession_ComposesAgentStatus(t *testing.T
 	}
 
 	uc := NewGetMobileWorktreeStatus(worktrees, projects, terminals)
-	result, err := uc.Execute(withTenant(context.Background(), "tenant-1"))
+	result, err := uc.Execute(withTenantAndUser(context.Background(), "tenant-1", "user-1"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -144,7 +150,7 @@ func TestGetMobileWorktreeStatus_ListSessionsError_DegradesToUnknown(t *testing.
 	terminals.errByDevServer["ds-bad"] = context.DeadlineExceeded
 
 	uc := NewGetMobileWorktreeStatus(worktrees, projects, terminals)
-	result, err := uc.Execute(withTenant(context.Background(), "tenant-1"))
+	result, err := uc.Execute(withTenantAndUser(context.Background(), "tenant-1", "user-1"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -176,7 +182,7 @@ func TestGetMobileWorktreeStatus_SharedDevServer_ListSessionsCalledOnce(t *testi
 
 	terminals := newFakeTerminalStatusResolver()
 	uc := NewGetMobileWorktreeStatus(worktrees, projects, terminals)
-	result, err := uc.Execute(withTenant(context.Background(), "tenant-1"))
+	result, err := uc.Execute(withTenantAndUser(context.Background(), "tenant-1", "user-1"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -201,7 +207,7 @@ func TestGetMobileWorktreeStatus_InactiveWorktree_Excluded(t *testing.T) {
 	}
 
 	uc := NewGetMobileWorktreeStatus(worktrees, projects, newFakeTerminalStatusResolver())
-	result, err := uc.Execute(withTenant(context.Background(), "tenant-1"))
+	result, err := uc.Execute(withTenantAndUser(context.Background(), "tenant-1", "user-1"))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -11,6 +11,11 @@ import (
 type ExecuteTaskInput struct {
 	TaskID    string
 	RequestID string
+	// Prompt overrides the executor's own default prompt (built from the
+	// task's Title) when non-empty — see docs/backlog/BACKLOG-016 and
+	// SimpleExecutor.buildExecutePrompt's doc comment for the default it
+	// replaces. Not persisted onto the task.
+	Prompt string
 }
 
 // ExecuteResult replaces the bare execution-ref string Execute used to
@@ -133,8 +138,10 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	}
 
 	// Simple path: SimpleExecutor.Execute blocks until the CLI process
-	// exits — the completion transition happens INLINE, same call.
-	result, err := uc.simple.Execute(ctx, tenantID, in.TaskID, in.RequestID)
+	// exits — the completion transition happens INLINE, same call. in.Prompt
+	// (docs/backlog/BACKLOG-016) overrides SimpleExecutor's own default
+	// prompt when non-empty.
+	result, err := uc.simple.Execute(ctx, tenantID, in.TaskID, in.RequestID, in.Prompt)
 	if err != nil {
 		_ = uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, previousStatus)
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", "execution dispatch failed", err)

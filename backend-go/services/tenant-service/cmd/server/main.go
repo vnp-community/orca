@@ -34,8 +34,10 @@ import (
 	tenantgrpc "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/grpc"
 	tenantopaclient "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/opaclient"
 	tenantpostgres "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/postgres"
+	"github.com/stablyai/orca-go/services/tenant-service/internal/adapter/scmstarcheck"
 	"github.com/stablyai/orca-go/services/tenant-service/internal/usecase"
 
+	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 )
 
@@ -82,6 +84,9 @@ func run() error {
 	profiles := tenantpostgres.NewUserProfileRepository(pool)
 	teams := tenantpostgres.NewTeamRepository(pool)
 	opa := tenantopaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
+	companyEmailDomains := tenantpostgres.NewCompanyEmailDomainRepository(pool)
+	workspaceSessions := tenantpostgres.NewUserWorkspaceSessionRepository(pool)
+	starNagRepo := tenantpostgres.NewStarNagStateRepository(pool)
 
 	// In-process LRU-with-TTL cache — a usecase-layer decorator, not
 	// baked into adapter/postgres. See tenant-service.md §6 for why this
@@ -103,6 +108,12 @@ func run() error {
 	// to today's TTL-bounded-only staleness instead of crash-looping.
 	var invalidationPublisher usecase.CacheInvalidationPublisher
 	var auditPublisher usecase.AuditPublisher
+	// starNagVisibilityPublisher is set from the SAME underlying
+	// *tenanteventbus.Publisher instance invalidationPublisher/auditPublisher
+	// use when NATS is reachable (one struct implements all three ports) —
+	// see TASK-014. Also nil (best-effort push skipped) when NATS is
+	// unreachable, same degrade posture as invalidationPublisher.
+	var starNagVisibilityPublisher usecase.StarNagVisibilityPublisher
 	var consumerWG sync.WaitGroup
 	pub, cons, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
 	if err != nil {
@@ -112,8 +123,10 @@ func run() error {
 		if err := pub.EnsureStream(ctx, tenanteventbus.StreamName, []string{"orca.tenant.>"}); err != nil {
 			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
 		} else {
-			invalidationPublisher = tenanteventbus.New(pub)
-			auditPublisher = tenanteventbus.New(pub)                // NEW — same Publisher implements both ports
+			sharedPublisher := tenanteventbus.New(pub)
+			invalidationPublisher = sharedPublisher
+			auditPublisher = sharedPublisher
+			starNagVisibilityPublisher = sharedPublisher
 			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
 
 			invalidationConsumer := tenanteventbus.NewConsumer(cons, profileCache)
@@ -126,6 +139,8 @@ func run() error {
 	}
 
 	createCompanyUC := usecase.NewCreateCompany(companies)
+	getCompanyUC := usecase.NewGetCompany(companies)
+	listCompaniesUC := usecase.NewListCompanies(companies)
 	validateTenantUC := usecase.NewValidateTenant(companies)
 	createDepartmentUC := usecase.NewCreateDepartment(companies, departments, opa, auditPublisher)
 	setUserDepartmentUC := usecase.NewSetUserDepartment(departments, profiles, profileCache, invalidationPublisher)
@@ -142,10 +157,52 @@ func run() error {
 	updateUserProfileUC := usecase.NewUpdateUserProfile(profiles, profileCache, invalidationPublisher)
 	listTeamsUC := usecase.NewListTeams(teams)
 	removeTeamMemberUC := usecase.NewRemoveTeamMember(teams, profileCache, invalidationPublisher)
+	getOnboardingStateUC := usecase.NewGetOnboardingState(profiles)
+	setOnboardingStateUC := usecase.NewSetOnboardingState(profiles)
+	addCompanyEmailDomainUC := usecase.NewAddCompanyEmailDomain(companies, companyEmailDomains)
+	removeCompanyEmailDomainUC := usecase.NewRemoveCompanyEmailDomain(companyEmailDomains)
+	listCompanyEmailDomainsUC := usecase.NewListCompanyEmailDomains(companyEmailDomains)
+	resolveCompanyByEmailDomainUC := usecase.NewResolveCompanyByEmailDomain(companyEmailDomains)
+
+	// profiles doubles as usecase.ClientStateRepository (5 opaque per-user
+	// JSON columns, CR-STORAGE-001/003/004b) — same repository struct as
+	// GetOnboardingState/SetOnboardingState above, just a different set of
+	// methods on it. workspaceSessions is its own table/repository
+	// (CR-STORAGE-004a) — see BE-SOL-STORAGE-001 §3.
+	getClientStateUC := usecase.NewGetClientState(profiles)
+	setClientStateUC := usecase.NewSetClientState(profiles)
+	getWorkspaceSessionUC := usecase.NewGetWorkspaceSession(workspaceSessions)
+	setWorkspaceSessionUC := usecase.NewSetWorkspaceSession(workspaceSessions)
+	patchWorkspaceSessionUC := usecase.NewPatchWorkspaceSession(workspaceSessions)
+
+	// starCheck backs starNag.starOrca/agentValueMoment's "is this repo
+	// starred" question — tenant-service's FIRST outbound synchronous
+	// service dependency (TASK-013, SOL-005), now that
+	// ScmIntegrationService.StarRepository exists (SOL-012/TASK-034/035).
+	// Dialed with the same lazy, non-blocking grpc.NewClient pattern every
+	// other service's own Dial helper uses — scm-integration-service being
+	// briefly unreachable at startup must not fail tenant-service's boot.
+	scmConn, err := scmstarcheck.Dial(cfg.ScmIntegrationServiceAddr)
+	if err != nil {
+		return fmt.Errorf("dialing scm-integration-service: %w", err)
+	}
+	defer func() { _ = scmConn.Close() }()
+	starCheck := scmstarcheck.NewGrpcAdapter(scmintegrationv1.NewScmIntegrationServiceClient(scmConn))
+	deferStarNagUC := usecase.NewDeferStarNag(starNagRepo, starNagVisibilityPublisher)
+	completeStarNagUC := usecase.NewCompleteStarNag(starNagRepo, starNagVisibilityPublisher)
+	disableStarNagUC := usecase.NewDisableStarNag(starNagRepo, starNagVisibilityPublisher)
+	forceShowStarNagUC := usecase.NewForceShowStarNag(starNagRepo, starNagVisibilityPublisher)
+	notifyStarNagOnboardingCompletedUC := usecase.NewNotifyStarNagOnboardingCompleted(starNagRepo)
+	openWebStarNagUC := usecase.NewOpenWebStarNag(starNagRepo, starNagVisibilityPublisher)
+	starOrcaFromNagUC := usecase.NewStarOrcaFromNag(starNagRepo, starCheck, starNagVisibilityPublisher)
+	prepareStarNagAgentValueMomentUC := usecase.NewPrepareStarNagAgentValueMoment(starNagRepo, starCheck)
+	showPreparedStarNagAgentValueMomentUC := usecase.NewShowPreparedStarNagAgentValueMoment(starNagRepo, starNagVisibilityPublisher)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	tenantv1.RegisterTenantServiceServer(grpcServer, tenantgrpc.New(
 		createCompanyUC,
+		getCompanyUC,
+		listCompaniesUC,
 		validateTenantUC,
 		createDepartmentUC,
 		setUserDepartmentUC,
@@ -161,6 +218,26 @@ func run() error {
 		updateUserProfileUC,
 		listTeamsUC,
 		removeTeamMemberUC,
+		getOnboardingStateUC,
+		setOnboardingStateUC,
+		addCompanyEmailDomainUC,
+		removeCompanyEmailDomainUC,
+		listCompanyEmailDomainsUC,
+		resolveCompanyByEmailDomainUC,
+		getClientStateUC,
+		setClientStateUC,
+		getWorkspaceSessionUC,
+		setWorkspaceSessionUC,
+		patchWorkspaceSessionUC,
+		deferStarNagUC,
+		completeStarNagUC,
+		disableStarNagUC,
+		forceShowStarNagUC,
+		notifyStarNagOnboardingCompletedUC,
+		openWebStarNagUC,
+		starOrcaFromNagUC,
+		prepareStarNagAgentValueMomentUC,
+		showPreparedStarNagAgentValueMomentUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

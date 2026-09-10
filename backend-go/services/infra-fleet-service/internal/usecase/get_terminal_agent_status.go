@@ -32,6 +32,7 @@ const readyForInputQuiescence = 3 * time.Second
 type GetTerminalAgentStatus struct {
 	sessions   TerminalSessionRepository
 	resolver   ConnectionResolver
+	devServers DevServerRepository
 	agent      DevServerAgentClient
 	liveStates *sync.Map // map[string]*ptyLiveState — shared with AttachPty (TASK-MB-02-01), same registry instance, injected via cmd/server/main.go
 	events     LifecycleEventPublisher
@@ -43,8 +44,8 @@ type GetTerminalAgentStatus struct {
 	queue QueuedPromptRepository
 }
 
-func NewGetTerminalAgentStatus(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient, liveStates *sync.Map, events LifecycleEventPublisher, queue QueuedPromptRepository) *GetTerminalAgentStatus {
-	return &GetTerminalAgentStatus{sessions: sessions, resolver: resolver, agent: agent, liveStates: liveStates, events: events, queue: queue}
+func NewGetTerminalAgentStatus(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient, liveStates *sync.Map, events LifecycleEventPublisher, queue QueuedPromptRepository) *GetTerminalAgentStatus {
+	return &GetTerminalAgentStatus{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent, liveStates: liveStates, events: events, queue: queue}
 }
 
 func (uc *GetTerminalAgentStatus) Execute(ctx context.Context, ptyID string) (AgentStatusResult, error) {
@@ -53,7 +54,7 @@ func (uc *GetTerminalAgentStatus) Execute(ctx context.Context, ptyID string) (Ag
 		return AgentStatusResult{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	session, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver)
+	session, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		return AgentStatusResult{}, err
 	}

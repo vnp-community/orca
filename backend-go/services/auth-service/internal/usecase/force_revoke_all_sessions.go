@@ -45,7 +45,7 @@ func (uc *ForceRevokeAllSessionsForUser) Execute(ctx context.Context, userID str
 	// admin actions aren't a concept this scaffold supports (see
 	// requireAdminActor's doc comment).
 	if entry, err := domain.NewAuditEntry(uuid.NewString(), actor.TenantID, actor.ID, "session.force_revoke_all",
-		"user", userID, map[string]any{"revokedCount": revoked}, "", now); err == nil {
+		"", "user", userID, map[string]any{"revokedCount": revoked}, domain.OutcomeAllowed, "", now); err == nil {
 		_ = uc.audit.Append(ctx, entry)
 	}
 	return revoked, nil

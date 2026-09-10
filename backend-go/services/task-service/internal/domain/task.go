@@ -109,6 +109,12 @@ type Task struct {
 	// PRURL is set by the PR-creation write-back saga — empty until a PR
 	// referencing this task's #TG-N is created. Added SOL-PW-04.
 	PRURL string
+	// WorkflowTemplateID optionally attaches a workflow-service template to
+	// this task (Engine 3, CR-FLOW-TASK-002) — set only via UpdateTask
+	// (AttachWorkflowTemplateAction.tsx), never at creation. No FK: lives in
+	// workflow-service's own database, same cross-service-reference
+	// convention as ProjectID. See docs/backlog/BACKLOG-016.
+	WorkflowTemplateID string
 }
 
 func validStatus(s string) bool {

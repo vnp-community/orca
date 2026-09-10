@@ -7,7 +7,7 @@ import {
   decodeFrame,
   parseJsonPayload,
   HEADER_SIZE,
-} from '../agent-wire'
+} from 'orca-dev-agent-transport'
 
 // Wire protocol TYPE values
 const TYPE_REGULAR   = 1  // MessageType.Regular

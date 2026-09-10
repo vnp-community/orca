@@ -445,9 +445,15 @@ export function ensureWebRuntimeWorktreeTerminalAfterWake(worktreeId: string): v
 
   // Why: sleep keeps local tab rows but terminal.stop clears host PTYs, so
   // activation alone can leave a woke workspace with tab chrome but no surface.
+  //
+  // Why cwd: the host's cwd resolution has no fallback when the caller omits
+  // it and ends up defaulting to the host user's home directory instead of
+  // the worktree's real folder — always pass the worktree's own path so that
+  // broken server-side fallback is never reached.
   void createWebRuntimeSessionTerminal({
     worktreeId,
     environmentId: runtimeEnvironmentId,
+    cwd: worktree.path,
     activate: true,
     selectWorktree: false
   }).finally(() => {

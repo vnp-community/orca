@@ -26,6 +26,7 @@ import (
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/issue-tracking-service/internal/config"
@@ -77,9 +78,13 @@ func run() error {
 	// cached as a queryable copy here (design doc §5's thin operational
 	// tables are a later, separate addition, not needed for
 	// ListIssues/CreateIssue/LinkIssue).
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (see common/secrets.DatabaseCredentialsFromFile's doc comment) —
+	// falls back to DATABASE_DSN itself when the file doesn't exist, which
+	// is what local dev / this scaffold's testcontainers path still uses.
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
+	if err != nil {
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {

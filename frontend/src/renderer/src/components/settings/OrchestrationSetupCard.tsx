@@ -9,6 +9,7 @@ import {
 } from '@/lib/orchestration-install-command'
 import type { InstalledAgentSkillState } from '@/hooks/useInstalledAgentSkills'
 import { useActiveProjectSkillRuntime } from '@/hooks/useActiveProjectSkillRuntime'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { AgentSkillSetupPanel } from './AgentSkillSetupPanel'
 import {
   buildSkillCommandForRuntime,
@@ -17,7 +18,10 @@ import {
 } from './CliSkillRuntimeSetup'
 import { useAppStore } from '@/store'
 import { translate } from '@/i18n/i18n'
-import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
+import {
+  getRuntimeCliInstallStatus,
+  getRuntimeWslCliInstallStatus
+} from '@/runtime/runtime-cli-client'
 
 export function OrchestrationSetupCard(props: {
   compact?: boolean
@@ -26,6 +30,15 @@ export function OrchestrationSetupCard(props: {
 }): JSX.Element {
   const { compact, terminalHeightPx, skill } = props
   const activeSkillRuntime = useActiveProjectSkillRuntime()
+  // Why: this panel's setup terminal has no project/repo behind it, so it
+  // has no natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   const installCommand = !activeSkillRuntime.installDisabledReason
     ? buildSkillCommandForRuntime(
         ORCHESTRATION_SKILL_INSTALL_COMMAND,
@@ -55,6 +68,7 @@ export function OrchestrationSetupCard(props: {
       terminalTitle="Orchestration setup"
       terminalAriaLabel="Orchestration skill install terminal"
       terminalWorktreeId="feature-wall-orchestration-skill-terminal"
+      devServerId={devServerId}
       terminalShellOverride={activeSkillRuntime.terminalShellOverride}
       installed={skill.installed}
       loading={skill.loading}
@@ -64,9 +78,7 @@ export function OrchestrationSetupCard(props: {
       preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
       getPrerequisiteStatus={() =>
         activeSkillRuntime.agentRuntime?.runtime === 'wsl'
-          ? getRuntimeWslCliInstallStatus(
-              getWslCliDistroRequest(activeSkillRuntime.agentRuntime)
-            )
+          ? getRuntimeWslCliInstallStatus(getWslCliDistroRequest(activeSkillRuntime.agentRuntime))
           : getRuntimeCliInstallStatus()
       }
       onBeforeOpenTerminal={async () => {

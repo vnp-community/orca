@@ -57,6 +57,9 @@ var Subjects = []SubjectBinding{
 	{StreamName: "INFRA", Subject: "orca.infra.terminal_session.agent_error"},
 	{StreamName: "INFRA", Subject: "orca.infra.terminal_session.agent_waiting"},
 	{StreamName: "AIPROVIDER", Subject: "orca.aiprovider.account.rate_limited"},
+	// starNag.subscribe's cross-replica visibility push (TASK-014, SOL-005)
+	// — see tenant-service's internal/adapter/eventbus.StarNagVisibilitySubject.
+	{StreamName: "TENANT", Subject: "orca.tenant.star_nag.visibility_changed"},
 }
 
 // Consumer subscribes to every binding in Subjects and forwards each

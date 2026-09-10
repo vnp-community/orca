@@ -29,7 +29,7 @@ func (r PrereqResult) Met() bool {
 // ErrPrerequisitesNotMet signals a soft-fail: the remote host does not meet
 // the minimum prerequisites, but deploy is still attempted (see
 // Provisioner.Provision) — the usecase layer (TASK-FLEET-02-05) maps this
-// to domain.DevServerStatusDegraded rather than Unhealthy, and it does not
+// to domain.DevServerHealthDegraded rather than Unhealthy, and it does not
 // consume a retry attempt.
 var ErrPrerequisitesNotMet = errors.New("sshrelay: remote host does not meet minimum prerequisites")
 

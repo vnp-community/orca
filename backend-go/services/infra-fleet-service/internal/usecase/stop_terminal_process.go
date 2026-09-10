@@ -20,13 +20,14 @@ const signalInterrupt = "SIGINT"
 // StopTerminalProcess sends SIGINT to ptyID's foreground process without
 // tearing the session down.
 type StopTerminalProcess struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	agent      DevServerAgentClient
 }
 
-func NewStopTerminalProcess(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient) *StopTerminalProcess {
-	return &StopTerminalProcess{sessions: sessions, resolver: resolver, agent: agent}
+func NewStopTerminalProcess(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient) *StopTerminalProcess {
+	return &StopTerminalProcess{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent}
 }
 
 func (uc *StopTerminalProcess) Execute(ctx context.Context, ptyID string) error {
@@ -35,7 +36,7 @@ func (uc *StopTerminalProcess) Execute(ctx context.Context, ptyID string) error 
 		return apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver)
+	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		return err
 	}

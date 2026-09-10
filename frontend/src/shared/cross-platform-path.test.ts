@@ -2,9 +2,31 @@ import { describe, expect, it } from 'vitest'
 import {
   isPathInsideOrEqual,
   isRuntimePathAbsolute,
+  isWindowsAbsolutePathLike,
   relativePathInsideRoot,
   resolveRuntimePath
 } from './cross-platform-path'
+
+describe('isWindowsAbsolutePathLike', () => {
+  it('recognizes drive-letter and UNC paths', () => {
+    expect(isWindowsAbsolutePathLike('C:\\Users\\jin\\repo')).toBe(true)
+    expect(isWindowsAbsolutePathLike('\\\\host\\share')).toBe(true)
+  })
+
+  it('rejects POSIX paths', () => {
+    expect(isWindowsAbsolutePathLike('/home/jin/repo')).toBe(false)
+  })
+
+  // Regression test: a ProjectHostSetup derived from a bare project-service
+  // Repo (no `path` field on the wire) can reach this with `path` genuinely
+  // undefined at runtime despite the `string` type — found live crashing
+  // the whole sidebar list (worktree-list-groups.ts's
+  // getProjectSetupSurfaceKey).
+  it('returns false instead of throwing for a missing path', () => {
+    expect(isWindowsAbsolutePathLike(undefined as unknown as string)).toBe(false)
+    expect(isWindowsAbsolutePathLike('')).toBe(false)
+  })
+})
 
 describe('cross-platform path containment', () => {
   it('keeps POSIX sibling prefixes outside the root', () => {

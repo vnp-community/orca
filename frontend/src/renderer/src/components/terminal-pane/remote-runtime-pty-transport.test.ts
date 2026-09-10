@@ -639,6 +639,132 @@ describe('createRemoteRuntimePtyTransport', () => {
     expect(transport.isConnected()).toBe(true)
   })
 
+  // Why: regression guard for the live bug where 'session-auth' (backend-go's
+  // WebSessionClient) was routed to terminal.multiplex, the binary protocol —
+  // confirmed via direct WS-frame capture against the real deployment that
+  // WebSessionClient cannot carry binary frames at all: its subscribe()
+  // sendBinary unconditionally throws, and its onmessage handler drops any
+  // non-string frame outright. The TS interface declares sendBinary/onBinary
+  // (satisfying RemoteRuntimeMultiplexedTerminalCallbacks structurally) but
+  // the implementation stubs them — an earlier pass here mistook the type
+  // for real support. 'session-auth' must use the plain-JSON
+  // subscribeTerminalViaJson fallback; terminal.multiplex is for
+  // WebRuntimeClient (paired/E2EE) only. Found live 2026-08-30.
+  it('subscribes via the plain-JSON terminal.subscribe fallback for session-auth, not terminal.multiplex', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('session-auth', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+
+    expect(runtimeSubscribe).toHaveBeenCalledWith(
+      expect.objectContaining({ selector: 'session-auth', method: 'terminal.subscribe' }),
+      expect.anything()
+    )
+    expect(runtimeSubscribe).not.toHaveBeenCalledWith(
+      expect.objectContaining({ method: 'terminal.multiplex' }),
+      expect.anything()
+    )
+  })
+
+  // Why: regression guard for a live bug found right after the one above —
+  // the JSON fallback's sendInput/claimViewport are permanent no-op stubs
+  // (see remote-runtime-terminal-json-subscribe.ts's own doc comment), so
+  // its first claim-resize latches pendingViewportClaim true forever (it
+  // only clears on an actual resubscribe, which a single-generation session
+  // never hits). Before the fix, every keystroke after that point silently
+  // queued into pendingClaimInput instead of reaching terminal.send —
+  // reproduced live on b15.openledger.vn: a terminal that opens and shows
+  // its prompt but accepts no typed input at all.
+  it('still sends typed input via terminal.send for session-auth after a claim-resize', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('session-auth', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+    runtimeCall.mockClear()
+
+    vi.useFakeTimers()
+    try {
+      // Mirrors forwardPtyResize's routine claim-resize on the first
+      // xterm.onResize during normal pane mount/fit — no special mode
+      // needed to trigger it.
+      transport.resize(80, 24, { claim: true })
+
+      expect(transport.sendInput('x')).toBe(true)
+      vi.advanceTimersByTime(8)
+
+      expect(runtimeCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'terminal.send',
+          params: expect.objectContaining({ text: 'x' })
+        })
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  // Why: regression guard for a live bug found right after typed input
+  // itself started reaching terminal.send again — a silent WS reconnect
+  // (network blip, idle timeout, api-gateway restart) mints a brand-new,
+  // empty per-connection terminal-stream registry backend-side, so every
+  // terminal.send for this pane's still-alive pty fails forever with
+  // "no live AttachPty stream" until the page reloads. terminal.reattachSend
+  // re-registers the same pty (no new PTY spawned, unlike terminal.create)
+  // so a single retry after it succeeds should recover transparently.
+  it('reattaches and retries once when terminal.send reports no live AttachPty stream', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('session-auth', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+    runtimeCall.mockClear()
+
+    let sendCalls = 0
+    runtimeCall.mockImplementation(async (args: { method: string }) => {
+      if (args.method === 'terminal.send') {
+        sendCalls += 1
+        if (sendCalls === 1) {
+          return {
+            ok: false,
+            error: {
+              message:
+                'wscompat: no live AttachPty stream for pty "terminal-1" — call terminal.create first'
+            }
+          }
+        }
+        return { ok: true, result: {} }
+      }
+      return { ok: true, result: {} }
+    })
+
+    vi.useFakeTimers()
+    try {
+      expect(transport.sendInput('c')).toBe(true)
+      await vi.advanceTimersByTimeAsync(8)
+      await vi.waitFor(() => expect(sendCalls).toBe(2))
+
+      expect(runtimeCall).toHaveBeenCalledWith(
+        expect.objectContaining({
+          method: 'terminal.reattachSend',
+          params: { terminal: 'terminal-1' }
+        })
+      )
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('does not send queued input through a stale stream during remote handle replacement', async () => {
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
     const transport = createRemoteRuntimePtyTransport('env-1', {
@@ -945,6 +1071,42 @@ describe('createRemoteRuntimePtyTransport', () => {
     }
   })
 
+  // TASK-021 (specs/backend-go/bugs/missing-v3/): infra-fleet-service's
+  // SpawnTerminalSession returns INFRA_TERMINAL_NO_COMPUTE_BOUND when a
+  // runtime:<environmentId> target has no dev-server/SSH connection bound —
+  // this should surface as a distinct, actionable message rather than the
+  // raw wire error string.
+  it('surfaces a human-readable message for INFRA_TERMINAL_NO_COMPUTE_BOUND instead of the raw RPC error', async () => {
+    const failure = {
+      ok: false,
+      error: {
+        code: 'failed_precondition',
+        message:
+          'INFRA_TERMINAL_NO_COMPUTE_BOUND: this environment has no dev server or SSH connection bound — attach compute before opening a terminal'
+      }
+    }
+    runtimeCall.mockImplementation(async (args: { method: string }) =>
+      args.method === 'terminal.create' ? failure : { ok: true, result: {} }
+    )
+
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const onError = vi.fn()
+    const transport = createRemoteRuntimePtyTransport('env-1', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    await transport.connect({ url: '', callbacks: { onError } })
+
+    expect(onError).toHaveBeenCalledWith(
+      'This environment has no compute attached — attach a dev server or SSH connection to this environment before opening a terminal.'
+    )
+    expect(onError).not.toHaveBeenCalledWith(
+      expect.stringContaining('INFRA_TERMINAL_NO_COMPUTE_BOUND')
+    )
+  })
+
   it('passes activation intent when creating the remote runtime terminal', async () => {
     const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
     const transport = createRemoteRuntimePtyTransport('env-1', {
@@ -994,6 +1156,49 @@ describe('createRemoteRuntimePtyTransport', () => {
         })
       })
     )
+  })
+
+  // Why: backend-go's terminal.create only reads connectionId, never
+  // worktree — an omitted connectionId is "spawn a host-local PTY", which
+  // the web deployment cannot do (INFRA_TERMINAL_HOST_LOCAL_UNIMPLEMENTED,
+  // found live 2026-08-30 on the onboarding CLI-install terminal). Every
+  // dev-server-bound terminal on web rides this transport, so a
+  // connectionId passed into opts must reach the wire call.
+  it('forwards connectionId to terminal.create when the caller provides one', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('env-1', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1',
+      connectionId: 'dev-server-1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+
+    expect(runtimeCall).toHaveBeenCalledWith(
+      expect.objectContaining({
+        method: 'terminal.create',
+        params: expect.objectContaining({
+          connectionId: 'dev-server-1'
+        })
+      })
+    )
+    expect(transport.getConnectionId?.()).toBe('dev-server-1')
+  })
+
+  it('omits connectionId from terminal.create when the caller has none (host-local desktop terminals)', async () => {
+    const { createRemoteRuntimePtyTransport } = await import('./remote-runtime-pty-transport')
+    const transport = createRemoteRuntimePtyTransport('env-1', {
+      worktreeId: 'wt-1',
+      tabId: 'tab-1',
+      leafId: 'pane:1'
+    })
+
+    await transport.connect({ url: '', callbacks: {} })
+
+    const call = runtimeCall.mock.calls.find((c) => c[0].method === 'terminal.create')
+    expect(call?.[0].params).not.toHaveProperty('connectionId')
+    expect(transport.getConnectionId?.()).toBeNull()
   })
 
   it('passes startup command delivery when creating the remote runtime terminal', async () => {

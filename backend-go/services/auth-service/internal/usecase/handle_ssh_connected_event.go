@@ -43,8 +43,8 @@ func NewHandleSSHConnectedEvent(audit AuditRepository) *HandleSSHConnectedEvent 
 func (uc *HandleSSHConnectedEvent) Execute(ctx context.Context, in HandleSSHConnectedEventInput) error {
 	entry, err := domain.NewAuditEntry(
 		uuid.NewString(), in.TenantID, in.ActorUserID,
-		"ssh.connect", "ssh_host", in.Host,
-		map[string]any{"connectionId": in.ConnectionID}, "", in.OccurredAt,
+		"ssh.connect", "", "ssh_host", in.Host,
+		map[string]any{"connectionId": in.ConnectionID}, domain.OutcomeAllowed, "", in.OccurredAt,
 	)
 	if err != nil {
 		return apperrors.New(apperrors.KindInvalidArgument, "AUTH_SSH_CONNECTED_EVENT_INVALID", "failed to construct audit entry for ssh.connect event", err)

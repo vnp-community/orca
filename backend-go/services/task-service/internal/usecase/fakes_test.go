@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"sort"
+	"sync"
 	"time"
 
 	"github.com/stablyai/orca-go/common/tenant"
@@ -21,6 +22,9 @@ func withIdentity(ctx context.Context, tenantID, userID string) context.Context 
 }
 
 type fakeTaskRepository struct {
+	// mu guards every field below — TestExecuteBatch_BoundedConcurrency
+	// dispatches real goroutines against this fake concurrently.
+	mu                sync.Mutex
 	tasks             map[string]domain.Task
 	createErr         error
 	updateStatusErr   error
@@ -66,6 +70,8 @@ func newFakeTaskRepository() *fakeTaskRepository {
 }
 
 func (f *fakeTaskRepository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.createErr != nil {
 		return domain.Task{}, f.createErr
 	}
@@ -74,6 +80,8 @@ func (f *fakeTaskRepository) Create(ctx context.Context, task domain.Task) (doma
 }
 
 func (f *fakeTaskRepository) Get(ctx context.Context, tenantID, id string) (domain.Task, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	t, ok := f.tasks[id]
 	if !ok || t.TenantID != tenantID {
 		return domain.Task{}, errNotFound
@@ -82,6 +90,8 @@ func (f *fakeTaskRepository) Get(ctx context.Context, tenantID, id string) (doma
 }
 
 func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id string, maxDepth int) ([]domain.Task, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	var chain []domain.Task
 	current, ok := f.tasks[id]
 	if !ok || current.TenantID != tenantID {
@@ -111,6 +121,8 @@ func (f *fakeTaskRepository) GetAncestors(ctx context.Context, tenantID, id stri
 // Create, and this fake is a permissive test double, not a fidelity
 // replica of Postgres's not-found behavior.
 func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, status string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.updateStatusCalls = append(f.updateStatusCalls, updateStatusCall{tenantID: tenantID, id: id, status: status})
 	if f.updateStatusErr != nil {
 		return f.updateStatusErr
@@ -125,6 +137,8 @@ func (f *fakeTaskRepository) UpdateStatus(ctx context.Context, tenantID, id, sta
 // HasActiveExecutions scans the fake's tasks map — real enough to exercise
 // usecase.HasActiveExecutions's tenant/project filtering without a database.
 func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, projectID string) (bool, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.hasActiveErr != nil {
 		return false, f.hasActiveErr
 	}
@@ -142,6 +156,8 @@ func (f *fakeTaskRepository) HasActiveExecutions(ctx context.Context, tenantID, 
 // is intentionally not simulated here (no test in this package needs it
 // yet); every match is returned with an empty next-page token.
 func (f *fakeTaskRepository) List(ctx context.Context, tenantID, projectID, pageToken string, pageSize int32) ([]domain.Task, string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.listErr != nil {
 		return nil, "", f.listErr
 	}
@@ -165,6 +181,8 @@ func (f *fakeTaskRepository) List(ctx context.Context, tenantID, projectID, page
 }
 
 func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task domain.Task, events []domain.OutboxEvent) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.lastUpdateEvents = events
 	if f.updateErr != nil {
 		return f.updateErr
@@ -178,6 +196,8 @@ func (f *fakeTaskRepository) Update(ctx context.Context, tenantID string, task d
 }
 
 func (f *fakeTaskRepository) FindByNumber(ctx context.Context, tenantID, projectID string, taskNumber int64) (domain.Task, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.findByNumberErr != nil {
 		return domain.Task{}, f.findByNumberErr
 	}
@@ -190,6 +210,8 @@ func (f *fakeTaskRepository) FindByNumber(ctx context.Context, tenantID, project
 }
 
 func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.deleteErr != nil {
 		return f.deleteErr
 	}
@@ -205,6 +227,8 @@ func (f *fakeTaskRepository) Delete(ctx context.Context, tenantID, id string) er
 // map-mutating fakes — same posture as UpdateStatus above (no not-found
 // error) since no test in this package needs that fidelity yet.
 func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id, worktreeID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
 		t.WorktreeID = worktreeID
 		f.tasks[id] = t
@@ -213,6 +237,8 @@ func (f *fakeTaskRepository) UpdateWorktreeID(ctx context.Context, tenantID, id,
 }
 
 func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
 		t.ActiveExecutionID = activeExecutionID
 		f.tasks[id] = t
@@ -221,6 +247,8 @@ func (f *fakeTaskRepository) UpdateActiveExecutionID(ctx context.Context, tenant
 }
 
 func (f *fakeTaskRepository) UpdateLastExecutionOutput(ctx context.Context, tenantID, id, output string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
 		t.LastExecutionOutput = output
 		f.tasks[id] = t
@@ -229,6 +257,8 @@ func (f *fakeTaskRepository) UpdateLastExecutionOutput(ctx context.Context, tena
 }
 
 func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID, id, promptTemplate string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
 		t.PromptTemplate = promptTemplate
 		f.tasks[id] = t
@@ -237,6 +267,8 @@ func (f *fakeTaskRepository) UpdatePromptTemplate(ctx context.Context, tenantID,
 }
 
 func (f *fakeTaskRepository) UpdateAIPlanJSON(ctx context.Context, tenantID, id, aiPlanJSON string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
 		t.AIPlanJSON = aiPlanJSON
 		f.tasks[id] = t
@@ -248,6 +280,15 @@ func (f *fakeTaskRepository) UpdateAIPlanJSON(ctx context.Context, tenantID, id,
 // map — a permissive, N^2-but-correct-enough-for-tests stand-in for the
 // real WITH RECURSIVE query.
 func (f *fakeTaskRepository) GetSubtree(ctx context.Context, tenantID, rootID string, maxDepth int) ([]domain.Task, []domain.TaskEdge, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.getSubtreeLocked(tenantID, rootID, maxDepth)
+}
+
+// getSubtreeLocked is GetSubtree's body without its own locking — callers
+// already holding f.mu (e.g. GetSubtreeWithChildPercents) call this instead
+// of GetSubtree, since sync.Mutex is not reentrant.
+func (f *fakeTaskRepository) getSubtreeLocked(tenantID, rootID string, maxDepth int) ([]domain.Task, []domain.TaskEdge, error) {
 	root, ok := f.tasks[rootID]
 	if !ok || root.TenantID != tenantID {
 		return nil, nil, errNotFound
@@ -278,7 +319,9 @@ func (f *fakeTaskRepository) GetSubtree(ctx context.Context, tenantID, rootID st
 // and orders deepest-first — enough fidelity for recalculate_progress_test.go's
 // fixtures without depending on GetSubtree's frontier order.
 func (f *fakeTaskRepository) GetSubtreeWithChildPercents(ctx context.Context, tenantID, rootID string) ([]SubtreeProgressNode, error) {
-	nodes, _, err := f.GetSubtree(ctx, tenantID, rootID, 0)
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	nodes, _, err := f.getSubtreeLocked(tenantID, rootID, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -319,6 +362,8 @@ func (f *fakeTaskRepository) GetSubtreeWithChildPercents(ctx context.Context, te
 // BatchUpdateProgress records every call for regression assertions
 // (N+1 guard) and mutates the fake's map.
 func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID string, updates map[string]int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.batchUpdateProgressCalls = append(f.batchUpdateProgressCalls, updates)
 	for id, p := range updates {
 		if t, ok := f.tasks[id]; ok && t.TenantID == tenantID {
@@ -333,6 +378,8 @@ func (f *fakeTaskRepository) BatchUpdateProgress(ctx context.Context, tenantID s
 // status/actual_hours/agent_session_id in the fake's map and records the
 // call for TestExecuteTask's inline-completion assertions.
 func (f *fakeTaskRepository) CompleteExecution(ctx context.Context, tenantID, id, status string, actualHours float64) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.completeExecutionCalls = append(f.completeExecutionCalls, completeExecutionCall{tenantID: tenantID, id: id, status: status, actualHours: actualHours})
 	if f.completeExecutionErr != nil {
 		return f.completeExecutionErr
@@ -525,13 +572,18 @@ func (f *fakeTeamScopeResolver) ResolveTeams(ctx context.Context, tenantID, user
 // Execute's fail-closed check; called records whether Decision was ever
 // invoked, so a not-found test can assert OPA was never even reached.
 type fakeOPAClient struct {
+	// mu guards `called` — TestExecuteBatch_BoundedConcurrency shares one
+	// fakeOPAClient across concurrent ResolvePermission.Execute calls.
+	mu          sync.Mutex
 	allow       bool
 	decisionErr error
 	called      bool
 }
 
 func (f *fakeOPAClient) Decision(ctx context.Context, level domain.GrantLevel, action, tenantID string) (bool, error) {
+	f.mu.Lock()
 	f.called = true
+	f.mu.Unlock()
 	if f.decisionErr != nil {
 		return false, f.decisionErr
 	}
@@ -667,13 +719,15 @@ func (f *fakeWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID s
 }
 
 type fakeExecutor struct {
-	ref    string
-	err    error
-	called bool
+	ref       string
+	err       error
+	called    bool
+	gotPrompt string
 }
 
-func (f *fakeExecutor) Execute(ctx context.Context, tenantID, taskID, requestID string) (string, error) {
+func (f *fakeExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
 	f.called = true
+	f.gotPrompt = prompt
 	if f.err != nil {
 		return "", f.err
 	}

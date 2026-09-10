@@ -62,10 +62,31 @@ type fakeProvider struct {
 	review    domain.Review
 	reviewErr error
 
+	starRepositoryResult bool
+	starRepositoryErr    error
+
+	updatedPR   domain.PullRequest
+	updatePRErr error
+
 	lastCred   Credential
 	lastRepo   string
 	lastFilter IssueFilter
 	calls      int
+
+	workItems          []domain.WorkItem
+	workItemsErr       error
+	lastWorkItemFilter WorkItemFilter
+}
+
+// ListWorkItems makes fakeProvider satisfy WorkItemProvider too — used by
+// ListWorkItems' own tests to exercise the "provider supports it" path.
+func (f *fakeProvider) ListWorkItems(ctx context.Context, cred Credential, repo string, filter WorkItemFilter) ([]domain.WorkItem, error) {
+	f.lastCred, f.lastRepo, f.lastWorkItemFilter = cred, repo, filter
+	f.calls++
+	if f.workItemsErr != nil {
+		return nil, f.workItemsErr
+	}
+	return f.workItems, nil
 }
 
 func (f *fakeProvider) MergePullRequest(ctx context.Context, cred Credential, repo string, number int32, input MergePullRequestInput) (domain.PullRequest, bool, string, error) {
@@ -149,6 +170,24 @@ func (f *fakeProvider) GetRepoFileContent(ctx context.Context, cred Credential, 
 		return "", false, f.repoFileErr
 	}
 	return f.repoFileContent, f.repoFileFound, nil
+}
+
+func (f *fakeProvider) StarRepository(ctx context.Context, cred Credential, repo string) (bool, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.starRepositoryErr != nil {
+		return false, f.starRepositoryErr
+	}
+	return f.starRepositoryResult, nil
+}
+
+func (f *fakeProvider) UpdatePullRequest(ctx context.Context, cred Credential, repo string, number int32, patch PullRequestPatch) (domain.PullRequest, error) {
+	f.lastCred, f.lastRepo = cred, repo
+	f.calls++
+	if f.updatePRErr != nil {
+		return domain.PullRequest{}, f.updatePRErr
+	}
+	return f.updatedPR, nil
 }
 
 func (f *fakeProvider) GetLinkedPullRequestsForIssue(ctx context.Context, cred Credential, repo string, issueNumber int32) ([]domain.PullRequest, bool, error) {

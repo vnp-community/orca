@@ -7,7 +7,7 @@ import (
 )
 
 func TestWaitTerminalSession_RequiresTenantContext(t *testing.T) {
-	uc := NewWaitTerminalSession(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerAgentClient{})
+	uc := NewWaitTerminalSession(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerRepository{}, &fakeDevServerAgentClient{})
 	_, err := uc.Execute(context.Background(), WaitTerminalSessionInput{PtyID: "pty-1"})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
@@ -15,7 +15,7 @@ func TestWaitTerminalSession_RequiresTenantContext(t *testing.T) {
 }
 
 func TestWaitTerminalSession_UnknownPtyID_ReturnsError(t *testing.T) {
-	uc := NewWaitTerminalSession(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerAgentClient{})
+	uc := NewWaitTerminalSession(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerRepository{}, &fakeDevServerAgentClient{})
 	ctx := withTenant(context.Background(), "tenant-1")
 	_, err := uc.Execute(ctx, WaitTerminalSessionInput{PtyID: "pty-unknown"})
 	if err == nil {
@@ -29,7 +29,7 @@ func TestWaitTerminalSession_ExitEvent_ReturnsExited(t *testing.T) {
 	events := make(chan PtyEvent, 1)
 	agent := &fakeDevServerAgentClient{streamPtyEvents: events}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
-	uc := NewWaitTerminalSession(sessions, resolver, agent)
+	uc := NewWaitTerminalSession(sessions, resolver, &fakeDevServerRepository{}, agent)
 
 	events <- PtyEvent{PtyID: "pty-1", Exited: true, ExitCode: 3}
 	ctx := withTenant(context.Background(), "tenant-1")
@@ -51,7 +51,7 @@ func TestWaitTerminalSession_IgnoresOutputEvents_KeepsWaitingForExit(t *testing.
 	events := make(chan PtyEvent, 2)
 	agent := &fakeDevServerAgentClient{streamPtyEvents: events}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
-	uc := NewWaitTerminalSession(sessions, resolver, agent)
+	uc := NewWaitTerminalSession(sessions, resolver, &fakeDevServerRepository{}, agent)
 
 	events <- PtyEvent{PtyID: "pty-1", Data: []byte("still running")}
 	events <- PtyEvent{PtyID: "pty-1", Exited: true, ExitCode: 0}
@@ -70,7 +70,7 @@ func TestWaitTerminalSession_NoExit_TimesOut(t *testing.T) {
 	resolver := &fakeConnectionResolver{}
 	agent := &fakeDevServerAgentClient{streamPtyEvents: make(chan PtyEvent)}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
-	uc := NewWaitTerminalSession(sessions, resolver, agent)
+	uc := NewWaitTerminalSession(sessions, resolver, &fakeDevServerRepository{}, agent)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	start := time.Now()

@@ -348,7 +348,13 @@ export async function handleFsStat(
   } catch (err: unknown) {
     const nodeErr = err as NodeJS.ErrnoException
     if (nodeErr.code === 'ENOENT') {
-      return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: `Not found: ${absPath}` } }
+      // Why PathNotFound, not the generic ServerError: callers (e.g. desktop's
+      // fs:pathExists handler) need a stable, non-message-based way to tell
+      // "doesn't exist" apart from a real server failure — ServerError made
+      // every existence check over a Dev Server connection indistinguishable
+      // from an actual error (found live: "New Markdown" looping through all
+      // 100 untitled-N.md candidates, each one misread as "already exists").
+      return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.PathNotFound, message: `Not found: ${absPath}` } }
     }
     const msg = err instanceof Error ? err.message : String(err)
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.ServerError, message: msg } }

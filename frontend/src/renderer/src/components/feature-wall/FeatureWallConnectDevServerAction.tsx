@@ -10,15 +10,15 @@ import {
   SelectTrigger,
   SelectValue
 } from '@/components/ui/select'
-import { useDevServers } from '@/store/slices/dev-servers'
+import { useDevServers } from '@/store/slices/dev-servers-selectors'
 import { useAddDevServer } from '@/hooks/useAddDevServer'
 import type { DevServerConnectionType } from '../../../../shared/dev-server-types'
 import { translate } from '@/i18n/i18n'
 
 const DEV_SERVER_CONNECTION_TYPE_LABELS: Record<DevServerConnectionType, string> = {
   'relay-ssh': 'SSH Relay',
-  'relay-websocket': 'WebSocket (dev server → Orca)',
-  'direct-websocket': 'WebSocket (Orca → dev server)'
+  'relay-websocket': 'WebSocket (Orca → dev server)',
+  'direct-websocket': 'WebSocket (dev server → Orca)'
 }
 
 /** Onboarding action for the 'connect-dev-server' setup step — the machine a

@@ -2,65 +2,78 @@ package usecase
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/stablyai/orca-go/services/tenant-service/internal/domain"
 )
 
-func TestListTeamsForUser_ReturnsTeamIDsForAMultiTeamUser(t *testing.T) {
+func TestListTeamsForUser_RequiresTenantContext(t *testing.T) {
+	uc := NewListTeamsForUser(newFakeTeamRepository())
+	if _, err := uc.Execute(context.Background(), ListTeamsForUserInput{UserID: "user-1"}); err == nil {
+		t.Fatal("expected an error when no tenant is in context")
+	}
+}
+
+func TestListTeamsForUser_ReturnsTeamIDs(t *testing.T) {
 	teams := newFakeTeamRepository()
-	teamA := mustTeam(t, "team-a", "company-1", "A", domain.Settings{})
-	teamB := mustTeam(t, "team-b", "company-1", "B", domain.Settings{})
-	_, _ = teams.Create(context.Background(), teamA)
-	_, _ = teams.Create(context.Background(), teamB)
+	teamA, _ := teams.Create(context.Background(), mustTeam(t, "team-a", "company-1", "Platform", nil))
+	teamB, _ := teams.Create(context.Background(), mustTeam(t, "team-b", "company-1", "Growth", nil))
 	_ = teams.AddMember(context.Background(), domain.TeamMember{TeamID: teamA.ID, UserID: "user-1", Priority: 1})
 	_ = teams.AddMember(context.Background(), domain.TeamMember{TeamID: teamB.ID, UserID: "user-1", Priority: 2})
 
 	uc := NewListTeamsForUser(teams)
-	got, err := uc.Execute(context.Background(), "company-1", "user-1")
+	ctx := withTenant(context.Background(), "company-1")
+
+	got, err := uc.Execute(ctx, ListTeamsForUserInput{UserID: "user-1"})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("Execute: %v", err)
 	}
 	if len(got) != 2 {
-		t.Fatalf("expected 2 team IDs, got %+v", got)
+		t.Fatalf("expected 2 team IDs, got %d: %v", len(got), got)
 	}
 	want := map[string]bool{"team-a": true, "team-b": true}
 	for _, id := range got {
 		if !want[id] {
 			t.Errorf("unexpected team id %q", id)
 		}
+		delete(want, id)
+	}
+	if len(want) != 0 {
+		t.Errorf("missing expected team ids: %v", want)
 	}
 }
 
-func TestListTeamsForUser_EmptyUserID_ReturnsNilNoError(t *testing.T) {
-	uc := NewListTeamsForUser(newFakeTeamRepository())
-	got, err := uc.Execute(context.Background(), "company-1", "")
+func TestListTeamsForUser_ScopesByCompany(t *testing.T) {
+	teams := newFakeTeamRepository()
+	teamA, _ := teams.Create(context.Background(), mustTeam(t, "team-a", "company-a", "Platform", nil))
+	teamOther, _ := teams.Create(context.Background(), mustTeam(t, "team-other", "company-b", "Other", nil))
+	// Same user_id happens to be a member of teams in two different
+	// companies — ListUserTeamLayers' join on tenant.teams.company_id must
+	// only surface the caller's own company's membership.
+	_ = teams.AddMember(context.Background(), domain.TeamMember{TeamID: teamA.ID, UserID: "user-1", Priority: 1})
+	_ = teams.AddMember(context.Background(), domain.TeamMember{TeamID: teamOther.ID, UserID: "user-1", Priority: 1})
+
+	uc := NewListTeamsForUser(teams)
+	ctx := withTenant(context.Background(), "company-a")
+
+	got, err := uc.Execute(ctx, ListTeamsForUserInput{UserID: "user-1"})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("Execute: %v", err)
 	}
-	if got != nil {
-		t.Errorf("expected nil for an empty user_id, got %+v", got)
+	if len(got) != 1 || got[0] != "team-a" {
+		t.Fatalf("cross-company leak: expected only [team-a], got %v", got)
 	}
 }
 
-func TestListTeamsForUser_NoTeams_ReturnsEmpty(t *testing.T) {
+func TestListTeamsForUser_NoMemberships(t *testing.T) {
 	uc := NewListTeamsForUser(newFakeTeamRepository())
-	got, err := uc.Execute(context.Background(), "company-1", "user-1")
+	ctx := withTenant(context.Background(), "company-1")
+
+	got, err := uc.Execute(ctx, ListTeamsForUserInput{UserID: "user-with-no-teams"})
 	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+		t.Fatalf("Execute: %v (expected no error, not-found is not applicable here)", err)
 	}
 	if len(got) != 0 {
-		t.Errorf("expected no teams, got %+v", got)
-	}
-}
-
-func TestListTeamsForUser_RepositoryFailurePropagates(t *testing.T) {
-	teams := newFakeTeamRepository()
-	teams.layersErr = errors.New("db unavailable")
-	uc := NewListTeamsForUser(teams)
-
-	if _, err := uc.Execute(context.Background(), "company-1", "user-1"); err == nil {
-		t.Fatal("expected an error to propagate from the repository")
+		t.Fatalf("expected empty slice, got %v", got)
 	}
 }

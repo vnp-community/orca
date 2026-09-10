@@ -34,14 +34,14 @@ type CreateWorktreeInput struct {
 // is the reconciliation safety net for exactly that failure window, not
 // optional polish.
 type CreateWorktree struct {
-	resolver ConnectionResolver
-	projects ProjectClient
-	local    GitExecutor
-	relay    GitExecutor
+	reachability DevServerReachability
+	projects     ProjectClient
+	local        GitExecutor
+	relay        GitExecutor
 }
 
-func NewCreateWorktree(resolver ConnectionResolver, projects ProjectClient, local, relay GitExecutor) *CreateWorktree {
-	return &CreateWorktree{resolver: resolver, projects: projects, local: local, relay: relay}
+func NewCreateWorktree(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *CreateWorktree {
+	return &CreateWorktree{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 
 func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (domain.WorktreeResult, error) {
@@ -73,10 +73,11 @@ func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (
 		return domain.WorktreeResult{}, apperrors.New(apperrors.KindNotFound, "WORKTREE_REPO_NOT_FOUND", "repo does not exist", err)
 	}
 
-	// dispatchExecutor's key is the repo confirmed by GetRepo (repo.ID),
-	// not the raw request field — see ports.go's dispatchExecutor doc
-	// comment for why that distinction matters here.
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, repo.ID)
+	// dispatchExecutorForRepo's key is the repo confirmed by GetRepo, not
+	// the raw request field — see ports.go's doc comment for why this
+	// (not dispatchExecutor/ConnectionResolver) is the correct dispatch
+	// for a repo-scoped usecase.
+	ctx, executor, repoPath, err := dispatchExecutorForRepo(ctx, uc.reachability, uc.local, uc.relay, repo)
 	if err != nil {
 		return domain.WorktreeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_RESOLVE_FAILED", "failed to resolve host", err)
 	}
@@ -99,10 +100,14 @@ func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (
 	// [A1] — duplicate-path pre-check + alternate-name suggestion via the
 	// already-required ListWorktreePaths; best-effort, git itself is still
 	// the final authority if this call fails.
+	// ListWorktreePaths now returns domain.WorktreeGitInfo (path + HEAD sha +
+	// branch), not bare paths (see ports.go's GitExecutor.ListWorktreePaths
+	// doc comment — DetectWorktrees/worktree.detectedList need the git-level
+	// identity too) — only the path is needed for this pre-check.
 	onDisk, _ := executor.ListWorktreePaths(ctx, repoPath)
 	taken := make(map[string]bool, len(onDisk))
 	for _, p := range onDisk {
-		taken[p] = true
+		taken[p.Path] = true
 	}
 	targetPath := in.Path
 	if targetPath == "" {
@@ -126,10 +131,19 @@ func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (
 					fmt.Sprintf("branch %q not found; available: %s", in.BaseRef, strings.Join(names, ", ")), err)
 			}
 		}
-		return domain.WorktreeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_CREATE_FAILED", "git worktree add failed", err)
+		// Include err's own text in Message (not just Err, which
+		// apperrors.ToGRPCStatus never sends over the wire) — this usecase's
+		// failures are internal validation/git-state errors, not sensitive,
+		// and the generic "git worktree add failed" alone left every past
+		// live failure needing a server-side log dive to diagnose.
+		return domain.WorktreeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_CREATE_FAILED", fmt.Sprintf("git worktree add failed: %s", err), err)
 	}
 
-	worktree, err := uc.projects.RecordWorktreeCreated(ctx, in.ProjectID, in.RepoID, result.Path, in.Branch, in.BaseRef, in.Lineage)
+	// repo.ProjectID (resolved server-side via GetRepo above), not the wire's
+	// in.ProjectID: no real caller ever sends project_id on this RPC (the
+	// frontend's worktree.create only ever sends repo/name/baseBranch), so
+	// trusting it left bookkeeping recorded under an empty project id.
+	worktree, err := uc.projects.RecordWorktreeCreated(ctx, repo.ProjectID, in.RepoID, result.Path, in.Branch, in.BaseRef, in.Lineage)
 	if err != nil {
 		// Compensating step (05-data-architecture.md's saga pattern) — the
 		// git op already succeeded; project-service has no record of it.

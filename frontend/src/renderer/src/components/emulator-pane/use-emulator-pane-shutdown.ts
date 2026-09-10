@@ -3,6 +3,7 @@ import { callRuntimeRpc } from '@/runtime/runtime-rpc-client'
 import { useAppStore } from '@/store'
 import { EMULATOR_LOCAL_SHUTDOWN_EVENT } from './use-emulator-pane-session-events'
 import { emulatorPaneErrorMessage } from './emulator-pane-error-message'
+import { resolveEmulatorPaneRuntimeTarget } from './emulator-pane-runtime-target'
 
 type UseEmulatorPaneShutdownArgs = {
   loading: boolean
@@ -34,9 +35,11 @@ export function useEmulatorPaneShutdown({
         useAppStore.getState().setTabLabel(tabId, 'Shutting down…')
       }
       try {
-        const res = (await callRuntimeRpc({ kind: 'local' }, 'emulator.shutdown', {
+        const { target, projectId } = resolveEmulatorPaneRuntimeTarget(worktreeId)
+        const res = (await callRuntimeRpc(target, 'emulator.shutdown', {
           ...(deviceTarget ? { device: deviceTarget } : {}),
-          worktree: worktreeId
+          worktree: worktreeId,
+          projectId
         })) as { deviceUdid?: string }
         const shutdownTarget = res?.deviceUdid || deviceTarget
         window.dispatchEvent(

@@ -328,7 +328,11 @@ describe('buildRows with pinned worktrees', () => {
     expect(rows[0]).toMatchObject({ type: 'header', label: 'c15t' })
   })
 
-  it('groups multiple host setups for the same project under one project header', () => {
+  it('keeps different host setups as separate project headers, not one merged header (Phase 10: one project per repo, no cross-host merging)', () => {
+    // Phase 10: projectHostSetupProjectionFromRepos never merges two Repos into
+    // one Project, so a local checkout and an SSH checkout of "the same"
+    // project each get their own project header now.
+    const projection = projectHostSetupProjectionFromRepos([repo, remoteRepo])
     const rows = buildRows(
       'repo',
       [worktree, remoteWorktree],
@@ -353,17 +357,38 @@ describe('buildRows with pinned worktrees', () => {
       new Map(),
       new Map(),
       [],
-      { projects: [project], projectHostSetups }
+      { projects: projection.projects, projectHostSetups: projection.setups }
     )
 
+    // Both repos display as "orca"; buildRows disambiguates same-name headers
+    // by trailing path segments (see withRepoSectionDisplayLabels) now that
+    // they render as two separate headers instead of one merged one.
     expect(rows).toMatchObject([
-      { type: 'header', key: 'project:github:stablyai/orca', label: 'Orca', count: 2 },
-      { type: 'item', worktree: { id: worktree.id }, hostContextLabel: LOCAL_HOST_LABEL },
-      { type: 'item', worktree: { id: remoteWorktree.id }, hostContextLabel: 'gpu-vm' }
+      {
+        type: 'header',
+        key: `project:${projection.projects[0]!.id}`,
+        label: 'tmp/orca',
+        count: 1
+      },
+      { type: 'item', worktree: { id: worktree.id } },
+      {
+        type: 'header',
+        key: `project:${projection.projects[1]!.id}`,
+        label: 'alice/orca',
+        count: 1
+      },
+      { type: 'item', worktree: { id: remoteWorktree.id } }
     ])
+    for (const row of rows) {
+      if (row.type === 'item') {
+        // Why: each project group now has exactly one host, so the mixed-host
+        // badge never renders.
+        expect(row.hostContextLabel).toBeUndefined()
+      }
+    }
   })
 
-  it('renders same-project records with git remote identity as one mixed-host project header', () => {
+  it('keeps records with matching git remote identity across local/SSH/runtime hosts as separate projects (Phase 10: one project per repo, no cross-host merging)', () => {
     const localRepo: Repo = {
       ...repo,
       id: 'local-sample-app',
@@ -450,20 +475,44 @@ describe('buildRows with pinned worktrees', () => {
       }
     )
 
+    // Phase 10: a shared git remote identity across local/SSH/runtime hosts no
+    // longer merges these into one project — each host's checkout gets its own
+    // header, and since each group now has exactly one host, no mixed-host
+    // badge (hostContextLabel) is emitted.
+    // All three repos display as "sample-app"; buildRows disambiguates
+    // same-name headers by trailing path segments now that each host's
+    // checkout renders as its own header instead of one merged one.
     expect(rows).toMatchObject([
       {
         type: 'header',
-        key: 'project:git:git.company.test/team/sample-app',
-        label: 'sample-app',
-        count: 3
+        key: `project:${projection.projects[0]!.id}`,
+        label: 'work/sample-app',
+        count: 1
       },
-      { type: 'item', worktree: { id: localWorktree.id }, hostContextLabel: LOCAL_HOST_LABEL },
-      { type: 'item', worktree: { id: sshWorktree.id }, hostContextLabel: 'build server' },
-      { type: 'item', worktree: { id: runtimeWorktree.id }, hostContextLabel: 'dev-container' }
+      { type: 'item', worktree: { id: localWorktree.id } },
+      {
+        type: 'header',
+        key: `project:${projection.projects[1]!.id}`,
+        label: 'src/sample-app',
+        count: 1
+      },
+      { type: 'item', worktree: { id: sshWorktree.id } },
+      {
+        type: 'header',
+        key: `project:${projection.projects[2]!.id}`,
+        label: 'workspace/sample-app',
+        count: 1
+      },
+      { type: 'item', worktree: { id: runtimeWorktree.id } }
     ])
+    for (const row of rows) {
+      if (row.type === 'item') {
+        expect(row.hostContextLabel).toBeUndefined()
+      }
+    }
   })
 
-  it('keeps mixed-host project item order while inserting inbox rows before worktrees', () => {
+  it('keeps each host project group intact, with inbox rows before worktrees (Phase 10: one project per repo, no cross-host merging)', () => {
     const localRepo: Repo = {
       ...repo,
       id: 'local-sample-app',
@@ -542,13 +591,17 @@ describe('buildRows with pinned worktrees', () => {
       }
     )
 
+    // Phase 10: localRepo and sshRepo no longer share one project, so each
+    // gets its own header and its own inbox row ahead of only its own
+    // worktrees, instead of one merged group interleaving both hosts' items.
     expect(rows).toMatchObject([
-      { type: 'header' },
+      { type: 'header', key: `project:${projection.projects[0]!.id}` },
       { type: 'new-external-worktrees-inbox', repo: { id: localRepo.id } },
-      { type: 'new-external-worktrees-inbox', repo: { id: sshRepo.id } },
       { type: 'item', worktree: { id: localFirst.id } },
-      { type: 'item', worktree: { id: sshWorktree.id } },
-      { type: 'item', worktree: { id: localSecond.id } }
+      { type: 'item', worktree: { id: localSecond.id } },
+      { type: 'header', key: `project:${projection.projects[1]!.id}` },
+      { type: 'new-external-worktrees-inbox', repo: { id: sshRepo.id } },
+      { type: 'item', worktree: { id: sshWorktree.id } }
     ])
   })
 
@@ -992,7 +1045,11 @@ describe('buildRows with pinned worktrees', () => {
     ])
   })
 
-  it('uses saved host labels for mixed-host sidebar card badges', () => {
+  it('never shows a mixed-host badge for saved host labels once repos are on separate projects (Phase 10: one project per repo, no cross-host merging)', () => {
+    // Phase 10: repo and runtimeRepo can no longer land in one project, so the
+    // saved-host-labels map (hostLabelById) has nothing left to disambiguate —
+    // each project group now has exactly one host, so getMixedHostContextLabels
+    // never fires regardless of what labels are saved.
     const runtimeRepo: Repo = {
       ...remoteRepo,
       id: 'repo-runtime',
@@ -1005,13 +1062,7 @@ describe('buildRows with pinned worktrees', () => {
       id: 'wt-runtime',
       repoId: runtimeRepo.id
     }
-    const runtimeSetup: ProjectHostSetup = {
-      ...projectHostSetups[1]!,
-      id: runtimeRepo.id,
-      hostId: 'runtime:03ef704c-b180-4b10-998d-e28fbd5de9a3',
-      repoId: runtimeRepo.id,
-      path: runtimeRepo.path
-    }
+    const projection = projectHostSetupProjectionFromRepos([repo, runtimeRepo])
     const rows = buildRows(
       'repo',
       [worktree, runtimeWorktree],
@@ -1036,7 +1087,7 @@ describe('buildRows with pinned worktrees', () => {
       new Map(),
       new Map(),
       [],
-      { projects: [project], projectHostSetups: [projectHostSetups[0]!, runtimeSetup] },
+      { projects: projection.projects, projectHostSetups: projection.setups },
       [],
       new Map([
         ['local', LOCAL_HOST_LABEL],
@@ -1044,11 +1095,15 @@ describe('buildRows with pinned worktrees', () => {
       ])
     )
 
-    expect(rows).toMatchObject([
-      { type: 'header', key: 'project:github:stablyai/orca', label: 'Orca', count: 2 },
-      { type: 'item', worktree: { id: worktree.id }, hostContextLabel: LOCAL_HOST_LABEL },
-      { type: 'item', worktree: { id: runtimeWorktree.id }, hostContextLabel: 'dev box' }
-    ])
+    const headers = rows.filter((row) => row.type === 'header')
+    expect(headers).toHaveLength(2)
+    expect(headers[0]).toMatchObject({ key: `project:${projection.projects[0]!.id}`, count: 1 })
+    expect(headers[1]).toMatchObject({ key: `project:${projection.projects[1]!.id}`, count: 1 })
+    for (const row of rows) {
+      if (row.type === 'item') {
+        expect(row.hostContextLabel).toBeUndefined()
+      }
+    }
   })
 
   it('omits host context labels when a project group only has one host', () => {

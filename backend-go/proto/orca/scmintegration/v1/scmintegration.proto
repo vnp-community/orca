@@ -18,6 +18,12 @@ service ScmIntegrationService {
   rpc ListPullRequests(ListPullRequestsRequest) returns (ListPullRequestsResponse);
   rpc GetRateLimitStatus(GetRateLimitStatusRequest) returns (GetRateLimitStatusResponse);
 
+  // ListWorkItems backs github.listWorkItems (the Tasks page's GitHub
+  // issue/PR picker) — a combined issue+PR listing, GitHub-only for now.
+  // See ListWorkItemsRequest's doc comment for the query-syntax subset
+  // supported in this v1.
+  rpc ListWorkItems(ListWorkItemsRequest) returns (ListWorkItemsResponse);
+
   // Auth — the §9.1 decision: a standard OAuth 2.0 authorization-code web
   // flow terminating at an api-gateway-hosted /auth/{provider}/callback, NOT
   // the TS PTY/CLI-login mechanism (gh auth login/glab auth login) it
@@ -38,6 +44,27 @@ service ScmIntegrationService {
   rpc RemovePullRequestReviewers(RemovePullRequestReviewersRequest) returns (PullRequest);
   rpc SetPullRequestAutoMerge(SetPullRequestAutoMergeRequest) returns (PullRequest);
   rpc UpdateIssue(UpdateIssueRequest) returns (Issue);
+
+  // UpdatePullRequest — github.updatePRTitle. Plain (repo, number) address,
+  // mirroring UpdateIssueRequest's shape immediately above (title-only for
+  // now, additive-ready for body/base/state later) — NOT
+  // UpdatePullRequestBySlug's Projects-v2-item addressing (this file, see
+  // UpdatePullRequestBySlugRequest below): a PR not added to any Projects
+  // v2 board has no slug, and github.updatePRTitle's actual callers have no
+  // dependency on GitHub Projects at all.
+  rpc UpdatePullRequest(UpdatePullRequestRequest) returns (PullRequest);
+
+  // StarRepository — github.starOrca. Routes through the same per-tenant
+  // OAuth client every other RPC on this service uses (no fixed-app-token
+  // shortcut — see SOL-012's routing-decision section): GitHub's star
+  // endpoint (PUT /user/starred/{owner}/{repo}) stars the repo on behalf of
+  // whichever identity authenticated the call, so there is no "star this
+  // repo as the Orca app" concept separate from an actual connected GitHub
+  // account. The natural backing RPC for github.checkOrcaStarred's existing
+  // honest nil,nil no-op (channels_scm.go:59-70) too, though a
+  // CheckRepositoryStarred sibling isn't added here — out of this task's
+  // scope, a low-cost follow-up once this lands.
+  rpc StarRepository(StarRepositoryRequest) returns (StarRepositoryResponse);
 
   // GetPullRequestForBranch — github.prForBranch AND hostedReview.forBranch's
   // branch-filtered case (SOL-014). Provider-generic: parameterized by
@@ -226,6 +253,43 @@ message ListPullRequestsResponse {
   repeated PullRequest pull_requests = 1;
 }
 
+// WorkItem is a combined issue-or-pull-request row — see
+// usecase.domain.WorkItem's doc comment (scm-integration-service) for the
+// full field-scoping rationale. author is empty when unknown (never a
+// placeholder). updated_at is RFC3339.
+message WorkItem {
+  string id = 1;
+  string type = 2; // "issue" | "pr"
+  int32 number = 3;
+  string title = 4;
+  string state = 5; // "open" | "closed" | "merged" | "draft"
+  string url = 6;
+  repeated string labels = 7;
+  string updated_at = 8;
+  string author = 9;
+}
+
+// ListWorkItemsRequest's query supports only a subset of the legacy
+// desktop backend's GitHub search-syntax grammar: is:issue/is:pr,
+// is:open/is:closed/is:merged, state:<x>, label:<x> (repeatable),
+// assignee:<login>, author:<login>. NOT supported in this v1 (silently
+// ignored, not an error): "@me", review-requested:/reviewed-by:, free-text
+// search, and cursor pagination (before is accepted for forward wire
+// compatibility but not yet honored).
+message ListWorkItemsRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3; // "owner/repo" — already resolved by the caller (api-gateway), not a repo_id
+  int32 limit = 4;
+  string query = 5;
+  string before = 6;
+  bool no_cache = 7;
+}
+
+message ListWorkItemsResponse {
+  repeated WorkItem work_items = 1;
+}
+
 message GetRateLimitStatusRequest {
   string tenant_id = 1;
   ScmProvider provider = 2;
@@ -354,6 +418,43 @@ message UpdateIssueRequest {
   repeated string add_labels = 8;
   repeated string remove_labels = 9;
   repeated string assignees = 10;
+}
+
+message UpdatePullRequestRequest {
+  string tenant_id = 1;
+  ScmProvider provider = 2;
+  string repo = 3;
+  int32 number = 4;
+  // Only field github.updatePRTitle's actual wire shape sends today
+  // (frontend/src/preload/api-types.ts:1605-1610) — optional + additional
+  // PATCH-able fields (body, base, state) can be added later the same way
+  // UpdateIssueRequest grew its own optional fields incrementally, without
+  // a breaking change.
+  optional string title = 5;
+}
+
+message StarRepositoryRequest {
+  string tenant_id = 1;
+  // GitHub-only today (starOrca's only caller), but parameterized like
+  // every other RPC on this service rather than hardcoded, per this
+  // proto's existing convention (e.g. GetRateLimitStatusRequest).
+  ScmProvider provider = 2;
+  string repo = 3; // "owner/name" slug — always the Orca repo for this
+                    // call site's actual use, but not hardcoded
+                    // server-side: the usecase takes whatever repo the
+                    // caller resolved, consistent with every other
+                    // repo-addressed RPC on this service never baking in a
+                    // specific repo name.
+}
+
+message StarRepositoryResponse {
+  // true once the API call succeeds — GitHub's star endpoint is
+  // idempotent (starring an already-starred repo still 204s), so this is
+  // always true on success, never meaningfully false; kept as an explicit
+  // field (rather than google.protobuf.Empty) so a future provider
+  // without a star concept could return false instead of erroring,
+  // without a wire-shape change.
+  bool starred = 1;
 }
 
 message GetPullRequestForBranchRequest {

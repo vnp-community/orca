@@ -5,7 +5,7 @@
 | **ID** | ADR-021 |
 | **Trạng thái** | 🚧 Proposed — Phase 0 (schema scaffolding) đã implement, Phase 1-4 chưa triển khai |
 | **Ngày** | 2026-08-15 |
-| **HLD Ref** | backend-server-architecture.md, docs/guides/postgres-shared-database-design.md |
+| **HLD Ref** | backend-server-architecture.md, docs/guides/database/postgres-shared-database-design.md |
 | **Code Ref** | `backend/src/main/db/migrations/0019-0022*.ts`, `backend/src/main/tenancy/tenant-context.ts` |
 | **Supersedes** | — |
 | **Amends** | [ADR-002](../v1/ADR-002-multi-database-iconnectionpool.md) (multi-dialect IConnectionPool), [ADR-016](./ADR-016-db-migrations-0006-0010-schema.md) (schema thật, không phải đề xuất) |
@@ -118,4 +118,4 @@ trong 1 database) — khi chuyển TiDB, chiến lược schema-per-service sẽ
 | [specs/backend/models/](../../../specs/backend/models/) | Khảo sát as-is toàn bộ data layer — nguồn cho ADR này |
 | [specs/backend/models/08-postgres-microservices-target-architecture.md](../../../specs/backend/models/08-postgres-microservices-target-architecture.md) | Kế hoạch chi tiết: bảng ánh xạ service↔schema, DDL, phased rollout đầy đủ |
 | [ADR-002](../v1/ADR-002-multi-database-iconnectionpool.md) | Nền tảng `IConnectionPool`/`MigrationRunner` đa dialect |
-| [docs/guides/postgres-shared-database-design.md](../../guides/postgres-shared-database-design.md) | Thiết kế Postgres dùng chung hiện tại cho multi-user process fork |
+| [docs/guides/database/postgres-shared-database-design.md](../../guides/database/postgres-shared-database-design.md) | Thiết kế Postgres dùng chung hiện tại cho multi-user process fork |

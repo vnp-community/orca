@@ -9,7 +9,7 @@
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_gitlab.go` (new file)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (wire the new register call into `RegisterRealChannels`)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_gitlab_test.go` (new)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 4 task(s) (TASK-083–086) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

@@ -68,26 +68,37 @@ function group(overrides: Partial<ProjectGroup> = {}): ProjectGroup {
 }
 
 describe('buildNewWorkspaceProjectOptions', () => {
-  it('deduplicates a logical project across local and SSH setups', () => {
+  it('keeps repo checkouts on different hosts as separate project options (Phase 10: no cross-host merging)', () => {
     const options = buildNewWorkspaceProjectOptions({
-      projects: [project()],
+      projects: [
+        project({ id: 'repo:local-repo', sourceRepoIds: ['local-repo'] }),
+        project({ id: 'repo:ssh-repo', sourceRepoIds: ['ssh-repo'] })
+      ],
       projectHostSetups: [
-        setup({ id: 'local-setup', hostId: 'local', repoId: 'local-repo' }),
-        setup({ id: 'ssh-setup', hostId: 'ssh:builder', repoId: 'ssh-repo' })
+        setup({
+          id: 'local-setup',
+          projectId: 'repo:local-repo',
+          hostId: 'local',
+          repoId: 'local-repo',
+          path: '/tmp/orca'
+        }),
+        setup({
+          id: 'ssh-setup',
+          projectId: 'repo:ssh-repo',
+          hostId: 'ssh:builder',
+          repoId: 'ssh-repo',
+          path: '/srv/orca'
+        })
       ],
       eligibleRepos: [repo('local-repo'), repo('ssh-repo', { connectionId: 'ssh:builder' })]
     })
 
-    expect(options).toEqual([
-      {
-        id: 'github:stablyai/orca',
-        kind: 'project',
-        projectId: 'github:stablyai/orca',
-        displayName: 'orca',
-        badgeColor: '#111111',
-        detail: 'stablyai/orca'
-      }
-    ])
+    // Same provider identity and display name no longer merge into one option
+    // (Phase 10): each host's checkout stays its own project, disambiguated
+    // by its own directory once the provider detail collides. Options sort by
+    // displayName then detail, so the /srv/orca entry sorts first.
+    expect(options.map((option) => option.id)).toEqual(['repo:ssh-repo', 'repo:local-repo'])
+    expect(options.map((option) => option.detail).sort()).toEqual(['/srv/orca', '/tmp/orca'])
   })
 
   it('excludes projects that do not have a ready eligible setup', () => {
@@ -188,7 +199,7 @@ describe('buildNewWorkspaceProjectOptions', () => {
     ])
   })
 
-  it('shows directory details for non-provider duplicates with different setup counts', () => {
+  it('shows directory details for non-provider duplicates across separate host-specific projects', () => {
     const options = buildNewWorkspaceProjectOptions({
       projects: [
         project({
@@ -197,7 +208,12 @@ describe('buildNewWorkspaceProjectOptions', () => {
           providerIdentity: undefined
         }),
         project({
-          id: 'project:merchant-multi',
+          id: 'project:merchant-multi-local',
+          displayName: 'merchant',
+          providerIdentity: undefined
+        }),
+        project({
+          id: 'project:merchant-multi-remote',
           displayName: 'merchant',
           providerIdentity: undefined
         })
@@ -211,13 +227,13 @@ describe('buildNewWorkspaceProjectOptions', () => {
         }),
         setup({
           id: 'merchant-multi-local-setup',
-          projectId: 'project:merchant-multi',
+          projectId: 'project:merchant-multi-local',
           repoId: 'merchant-multi-local-repo',
           path: '/workspace/multi/local/merchant'
         }),
         setup({
           id: 'merchant-multi-remote-setup',
-          projectId: 'project:merchant-multi',
+          projectId: 'project:merchant-multi-remote',
           hostId: 'ssh:builder',
           repoId: 'merchant-multi-remote-repo',
           path: '/workspace/multi/remote/merchant'
@@ -230,8 +246,12 @@ describe('buildNewWorkspaceProjectOptions', () => {
       ]
     })
 
+    // Phase 10: a project can no longer accumulate multiple ready setups, so
+    // what used to be one "+1 more" project is now two separate projects,
+    // each contributing its own single directory.
     expect(options.map((option) => option.detail).sort()).toEqual([
-      '/workspace/multi/local/merchant (+1 more)',
+      '/workspace/multi/local/merchant',
+      '/workspace/multi/remote/merchant',
       '/workspace/single/merchant'
     ])
   })

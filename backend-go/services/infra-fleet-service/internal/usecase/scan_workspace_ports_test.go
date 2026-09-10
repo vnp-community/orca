@@ -22,6 +22,11 @@ type fakeDevServerAgentClient struct {
 	execResult map[string]any
 	execErr    error
 	execCalls  []string // methods called with, for assertions
+	// execParams records the params map passed on each Exec call, in the
+	// same order as execCalls — TASK-BE-EVM-001's recipeId/runtimeId
+	// assertions need to inspect what was actually sent, not just the
+	// method name.
+	execParams []map[string]any
 
 	// execCalled/lastMethod are a simpler single-call view of execCalls,
 	// used by kill_workspace_port_test.go/establish_connection_test.go.
@@ -30,8 +35,10 @@ type fakeDevServerAgentClient struct {
 
 	// healthy/healthErr drive Health's fake answer — used by
 	// establish_connection_test.go.
-	healthy        bool
-	healthErr      error
+	healthy   bool
+	healthErr error
+	// isConnected drives IsConnected's fake answer.
+	isConnected    bool
 	spawnPtyResult SpawnPtyResult
 	spawnPtyErr    error
 	spawnPtyCalls  []SpawnPtyInput
@@ -54,6 +61,13 @@ type fakeDevServerAgentClient struct {
 	streamPtyEvents       chan PtyEvent
 	streamPtyErr          error
 	streamPtyUnsubscribed bool
+
+	// streamScreencastEvents/Err/Unsubscribed mirror streamPtyEvents's
+	// convention exactly, for StreamScreencast.
+	streamScreencastEvents       chan ScreencastEvent
+	streamScreencastErr          error
+	streamScreencastUnsubscribed bool
+	streamScreencastCalls        []ScreencastParams
 
 	agentStatusResult AgentStatusResult
 	agentStatusErr    error
@@ -92,6 +106,39 @@ type fakeDevServerAgentClient struct {
 	execStreamErr          error
 	execStreamCalls        []string // methods called with, for assertions
 	execStreamUnsubscribed bool
+
+	// streamVmProvisionEvents/Err/Unsubscribed/Calls mirror
+	// streamScreencastEvents's convention exactly, for StreamVmProvision
+	// (TASK-BE-EVM-003).
+	streamVmProvisionEvents       chan VmProvisionEvent
+	streamVmProvisionErr          error
+	streamVmProvisionUnsubscribed bool
+	streamVmProvisionCalls        []VmProvisionParams
+
+	// dialHiddenSshTarget* drive DialHiddenSshTarget's fake answer —
+	// TASK-BE-EVM-014's AgentOutboundSshProvisioner tests.
+	dialHiddenSshTargetResult      string
+	dialHiddenSshTargetFingerprint string
+	dialHiddenSshTargetErr         error
+	dialHiddenSshTargetCalls       []domain.EphemeralVmSshTarget
+
+	// readCredentialFile* drive ReadCredentialFile's fake answer —
+	// TASK-BE-EVM-017's BackendRelaySshProvisioner tests.
+	readCredentialFileResult string
+	readCredentialFileErr    error
+	readCredentialFileCalls  []readCredentialFileCall
+
+	// streamFileChanges* mirror streamScreencastEvents's convention exactly,
+	// for StreamFileChanges (BACKLOG-003).
+	streamFileChangesEvents       chan FileChangeEvent
+	streamFileChangesErr          error
+	streamFileChangesUnsubscribed bool
+	streamFileChangesCalls        []string // path, per call
+}
+
+type readCredentialFileCall struct {
+	devServer domain.DevServer
+	path      string
 }
 
 // LastHandshakeInfo implements usecase.DevServerAgentClient.LastHandshakeInfo.
@@ -106,6 +153,7 @@ type resizePtyCall struct {
 func (f *fakeDevServerAgentClient) Exec(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (map[string]any, error) {
 	f.mu.Lock()
 	f.execCalls = append(f.execCalls, method)
+	f.execParams = append(f.execParams, params)
 	f.execCalled = true
 	f.lastMethod = method
 	f.mu.Unlock()
@@ -120,6 +168,10 @@ func (f *fakeDevServerAgentClient) Health(ctx context.Context, devServer domain.
 		return false, f.healthErr
 	}
 	return f.healthy, nil
+}
+
+func (f *fakeDevServerAgentClient) IsConnected(devServerID string) bool {
+	return f.isConnected
 }
 
 func (f *fakeDevServerAgentClient) SpawnPty(ctx context.Context, devServer domain.DevServer, in SpawnPtyInput) (SpawnPtyResult, error) {
@@ -171,6 +223,44 @@ func (f *fakeDevServerAgentClient) StreamPty(ctx context.Context, devServer doma
 	unsubscribe := func() {
 		f.mu.Lock()
 		f.streamPtyUnsubscribed = true
+		f.mu.Unlock()
+	}
+	return events, unsubscribe, nil
+}
+
+func (f *fakeDevServerAgentClient) StreamScreencast(ctx context.Context, devServer domain.DevServer, params ScreencastParams) (<-chan ScreencastEvent, func(), error) {
+	f.mu.Lock()
+	f.streamScreencastCalls = append(f.streamScreencastCalls, params)
+	f.mu.Unlock()
+	if f.streamScreencastErr != nil {
+		return nil, nil, f.streamScreencastErr
+	}
+	events := f.streamScreencastEvents
+	if events == nil {
+		events = make(chan ScreencastEvent)
+	}
+	unsubscribe := func() {
+		f.mu.Lock()
+		f.streamScreencastUnsubscribed = true
+		f.mu.Unlock()
+	}
+	return events, unsubscribe, nil
+}
+
+func (f *fakeDevServerAgentClient) StreamFileChanges(ctx context.Context, devServer domain.DevServer, path string) (<-chan FileChangeEvent, func(), error) {
+	f.mu.Lock()
+	f.streamFileChangesCalls = append(f.streamFileChangesCalls, path)
+	f.mu.Unlock()
+	if f.streamFileChangesErr != nil {
+		return nil, nil, f.streamFileChangesErr
+	}
+	events := f.streamFileChangesEvents
+	if events == nil {
+		events = make(chan FileChangeEvent)
+	}
+	unsubscribe := func() {
+		f.mu.Lock()
+		f.streamFileChangesUnsubscribed = true
 		f.mu.Unlock()
 	}
 	return events, unsubscribe, nil
@@ -250,6 +340,49 @@ func (f *fakeDevServerAgentClient) ExecStream(ctx context.Context, devServer dom
 		f.mu.Unlock()
 	}
 	return frames, unsubscribe, nil
+}
+
+func (f *fakeDevServerAgentClient) StreamVmProvision(ctx context.Context, devServer domain.DevServer, params VmProvisionParams) (<-chan VmProvisionEvent, func(), error) {
+	f.mu.Lock()
+	f.streamVmProvisionCalls = append(f.streamVmProvisionCalls, params)
+	f.mu.Unlock()
+	if f.streamVmProvisionErr != nil {
+		return nil, nil, f.streamVmProvisionErr
+	}
+	events := f.streamVmProvisionEvents
+	if events == nil {
+		events = make(chan VmProvisionEvent)
+	}
+	unsubscribe := func() {
+		f.mu.Lock()
+		f.streamVmProvisionUnsubscribed = true
+		f.mu.Unlock()
+	}
+	return events, unsubscribe, nil
+}
+
+func (f *fakeDevServerAgentClient) DialHiddenSshTarget(ctx context.Context, devServer domain.DevServer, runtimeID string, target domain.EphemeralVmSshTarget) (string, string, error) {
+	f.mu.Lock()
+	f.dialHiddenSshTargetCalls = append(f.dialHiddenSshTargetCalls, target)
+	f.mu.Unlock()
+	if f.dialHiddenSshTargetErr != nil {
+		return "", "", f.dialHiddenSshTargetErr
+	}
+	hiddenTargetID := runtimeID
+	if f.dialHiddenSshTargetResult != "" {
+		hiddenTargetID = f.dialHiddenSshTargetResult
+	}
+	return hiddenTargetID, f.dialHiddenSshTargetFingerprint, nil
+}
+
+func (f *fakeDevServerAgentClient) ReadCredentialFile(ctx context.Context, devServer domain.DevServer, path string) (string, error) {
+	f.mu.Lock()
+	f.readCredentialFileCalls = append(f.readCredentialFileCalls, readCredentialFileCall{devServer: devServer, path: path})
+	f.mu.Unlock()
+	if f.readCredentialFileErr != nil {
+		return "", f.readCredentialFileErr
+	}
+	return f.readCredentialFileResult, nil
 }
 
 func TestScanWorkspacePorts_RequiresTenantContext(t *testing.T) {

@@ -84,6 +84,46 @@ func TestProjectGroupRepository_DeleteProjectGroup_CascadesToChildren(t *testing
 	}
 }
 
+// TestProjectGroupRepository_ImportNested_StampsDevServerIDOnRepoToo proves
+// Phase 10's fix: the dev server the candidates were scanned on must land on
+// the created REPO row, not just its owning project — previously only the
+// project got dev_server_id, leaving the repo's own binding unset.
+func TestProjectGroupRepository_ImportNested_StampsDevServerIDOnRepoToo(t *testing.T) {
+	pool := setupPool(t)
+	groupRepo := NewProjectGroupRepository(pool)
+	repoRepo := NewRepoRepository(pool)
+	ctx := context.Background()
+
+	tenantID := uuid.NewString()
+	userID := uuid.NewString()
+	devServerID := uuid.NewString()
+
+	candidates := []domain.NestedRepoCandidate{
+		{Path: "/home/dev/repo-a", SuggestedName: "repo-a", IsGitRepo: true},
+	}
+	_, projects, err := groupRepo.ImportNested(ctx, tenantID, userID, devServerID, "", candidates)
+	if err != nil {
+		t.Fatalf("import nested: %v", err)
+	}
+	if len(projects) != 1 {
+		t.Fatalf("expected exactly 1 project, got %d: %+v", len(projects), projects)
+	}
+	if projects[0].DevServerID != devServerID {
+		t.Errorf("expected project DevServerID=%q, got %q", devServerID, projects[0].DevServerID)
+	}
+
+	repos, err := repoRepo.ListRepos(ctx, projects[0].ID)
+	if err != nil {
+		t.Fatalf("list repos: %v", err)
+	}
+	if len(repos) != 1 {
+		t.Fatalf("expected exactly 1 repo, got %d: %+v", len(repos), repos)
+	}
+	if repos[0].DevServerID != devServerID {
+		t.Errorf("expected repo DevServerID=%q (stamped from the scan), got %q", devServerID, repos[0].DevServerID)
+	}
+}
+
 func TestProjectGroupRepository_ListProjectGroups_ScopedToTenant(t *testing.T) {
 	pool := setupPool(t)
 	groupRepo := NewProjectGroupRepository(pool)

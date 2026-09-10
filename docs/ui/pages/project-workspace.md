@@ -1,6 +1,6 @@
 # Project Workspace (Beta)
 
-**Route / trigger:** `activeView === 'workspace'` in the Zustand app store. Reached via the "Project Workspace (Beta)" button in the left sidebar's nav section (`components/sidebar/SidebarNav.tsx`, `onClick={() => setActiveView('workspace')}`, `FolderKanban` icon). Comment in code: "Giai đoạn 2c (F38) — additive-only 'Project Workspace (Beta)' entry point. Does not replace the Project/Repo sidebar flow" (`App.tsx` around line 312, `docs/guides/project-workspace-f38-doc-vs-code.md` §4 step 8).
+**Route / trigger:** `activeView === 'workspace'` in the Zustand app store. Reached via the "Project Workspace (Beta)" button in the left sidebar's nav section (`components/sidebar/SidebarNav.tsx`, `onClick={() => setActiveView('workspace')}`, `FolderKanban` icon). Comment in code: "Giai đoạn 2c (F38) — additive-only 'Project Workspace (Beta)' entry point. Does not replace the Project/Repo sidebar flow" (`App.tsx` around line 312, `docs/guides/project-workspace/project-workspace-f38-doc-vs-code.md` §4 step 8).
 **Top-level component:** `WorkspaceLayout` — `frontend/src/renderer/src/components/workspace/WorkspaceLayout.tsx`, lazy-loaded from `App.tsx`. Rendered together with `ProjectSwitcher` (`components/project/ProjectSwitcher.tsx`) inside a small wrapper in `App.tsx` (`activeView === 'workspace'` branch, ~line 2460): a header bar holding `ProjectSwitcher`, then `WorkspaceLayout` filling the rest.
 
 ## Purpose

@@ -5,7 +5,7 @@ import { toast } from 'sonner'
 import { Button } from '../ui/button'
 import { translate } from '@/i18n/i18n'
 import { isWebClientLocation } from '../../lib/web-client-location'
-import { useActiveDevServer } from '../../store/slices/dev-servers'
+import { useActiveDevServer } from '../../store/slices/dev-servers-selectors'
 import { DevServerFilePickerDialog } from '../remote-browser/DevServerFilePickerDialog'
 
 import { shellOpenUrl, shellPickDirectory } from '../../runtime/runtime-shell-client'

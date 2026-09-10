@@ -49,6 +49,16 @@ service GitGatewayService {
   rpc RemoteFileUrl(RemoteFileUrlRequest) returns (RemoteUrlResponse);
   rpc Fetch(FetchRequest) returns (FetchResponse);
 
+  // GetRemoteUrl returns one configured remote's raw URL (not a web
+  // permalink like RemoteCommitUrl/RemoteFileUrl) — repo-scoped, same
+  // dispatchExecutorForRepo pattern as BaseRefDefault/PrefetchCreateBase.
+  // Added for github.listWorkItems: api-gateway resolves a repo_id's
+  // GitHub owner/repo by reading its configured remote (trying "upstream"
+  // then "origin"), since project.repos.url is not reliably a git remote
+  // URL (often an on-disk path — see project-service's SetupExistingFolder/
+  // ImportNested doc comments).
+  rpc GetRemoteUrl(GetRemoteUrlRequest) returns (GetRemoteUrlResponse);
+
   // ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
   rpc GeneratePullRequestFields(GeneratePullRequestFieldsRequest) returns (GeneratePullRequestFieldsResponse);
   rpc DiscoverCommitMessageModels(DiscoverCommitMessageModelsRequest) returns (DiscoverCommitMessageModelsResponse);
@@ -62,11 +72,22 @@ service GitGatewayService {
   rpc WriteFile(WriteFileRequest) returns (WriteFileResponse);
   rpc WriteFileChunk(WriteFileChunkRequest) returns (WriteFileChunkResponse);
   rpc CreateDir(CreateDirRequest) returns (CreateDirResponse);
+  rpc CreateFile(CreateFileRequest) returns (CreateFileResponse);
   rpc DeleteFile(DeleteFileRequest) returns (google.protobuf.Empty);
   rpc StatFile(StatFileRequest) returns (StatFileResponse);
   rpc SearchFiles(SearchFilesRequest) returns (SearchFilesResponse);
   rpc ListAllFiles(ListAllFilesRequest) returns (ListAllFilesResponse);
   rpc ListMarkdownDocuments(ListMarkdownDocumentsRequest) returns (ListMarkdownDocumentsResponse);
+  // WatchWorktree streams live fs.changed events for worktree_id's root
+  // (BACKLOG-003) — plain server-streaming, not unary: this is the one
+  // files.* RPC that pushes rather than answers once. Resolves worktree_id
+  // -> repoPath -> connection/dev server exactly like every RPC above, then
+  // opens infra-fleet-service's StreamFileChanges for that resolved path.
+  // The caller ends the subscription by canceling this call's context (see
+  // channels_files_watch.go's wscompat channel) — there is no separate
+  // Unwatch RPC; ending the stream is what tells the agent to fs.unwatch
+  // (see devserveragent.Client.StreamFileChanges's unsubscribe doc comment).
+  rpc WatchWorktree(WatchWorktreeRequest) returns (stream FileChangeEvent);
   // Known gaps carried forward from the old backend — both RPCs exist so
   // the contract is honest, but return FAILED_PRECONDITION whenever
   // dispatch resolves to a relay target, never a silent no-op.
@@ -83,6 +104,11 @@ service GitGatewayService {
   rpc ReadIssueCommand(ReadIssueCommandRequest) returns (ReadIssueCommandResponse);
   rpc WriteIssueCommand(WriteIssueCommandRequest) returns (google.protobuf.Empty);
   rpc ScanSetupScriptImports(ScanSetupScriptImportsRequest) returns (ScanSetupScriptImportsResponse);
+  // ReadEphemeralVmRecipes reads orca.yaml's environmentRecipes section off
+  // repoId's owning host (Group 1 of SOL-004 — no new agent capability,
+  // reuses the already-existing fs.readFile relay via GitExecutor.ReadFile).
+  // See specs/backend-go/bugs/missing-v3/solutions/SOL-004-ephemeralvm-channels.md.
+  rpc ReadEphemeralVmRecipes(ReadEphemeralVmRecipesRequest) returns (ReadEphemeralVmRecipesResponse);
   rpc CreateWorktree(CreateWorktreeRequest) returns (CreateWorktreeResponse);
   // CreateWorktreeFromIssue is the same saga as CreateWorktree with issue
   // fetch/branch-derivation prepended and agent-spawn/status-sync-enqueue
@@ -532,6 +558,33 @@ message CreateDirRequest {
 }
 message CreateDirResponse {}
 
+// files.createFile has no noClobber-equivalent flag on the frontend side
+// (frontend/src/renderer/src/runtime/runtime-file-client.ts:395-414 sends
+// only worktreeId+path) — unlike CreateDir, creating an already-existing
+// file is always an error, matching desktop's local 'wx'-flag semantics
+// (desktop/src/main/ipc/filesystem-mutations.ts).
+message CreateFileRequest {
+  string worktree_id = 1;
+  string path = 2;
+}
+message CreateFileResponse {}
+
+message WatchWorktreeRequest { string worktree_id = 1; }
+
+// FileChangeEvent mirrors infrafleet.v1.FileChangeEvent and frontend's
+// FsChangeEvent (frontend/src/shared/types.ts) field-for-field — no proto
+// cross-import between the two services (gitgateway.proto is
+// self-contained, matching every other message here), so this is a
+// deliberate parallel definition, not a divergent one. See
+// infrafleet.v1.FileChangeEvent's doc comment for why old_absolute_path/
+// is_directory are always empty/false today.
+message FileChangeEvent {
+  string kind = 1;
+  string absolute_path = 2;
+  string old_absolute_path = 3;
+  bool is_directory = 4;
+}
+
 message DeleteFileRequest {
   string worktree_id = 1;
   string path = 2;
@@ -605,10 +658,16 @@ message CloneResponse {
   string default_branch = 2;
 }
 
-message BaseRefDefaultRequest { string worktree_id = 1; }
+// repo_id routes this call through dispatchExecutorForRepo (repo-scoped
+// dispatch), matching CreateWorktree/DetectWorktrees/PrefetchCreateBase/
+// ResolvePrBase/ResolveMrBase — worktree_id is kept only so any caller that
+// still has a live worktree/connection id (none currently do) keeps working;
+// repo_id is preferred when both are set.
+message BaseRefDefaultRequest { string worktree_id = 1; string repo_id = 2; }
 message BaseRefDefaultResponse { string ref = 1; }
 
-message SearchRefsRequest { string worktree_id = 1; string query = 2; }
+// See BaseRefDefaultRequest's doc comment — same repo_id addition, same reason.
+message SearchRefsRequest { string worktree_id = 1; string query = 2; string repo_id = 3; }
 message SearchRefsResponse { repeated string refs = 1; }
 
 // InitRepo runs `git init` at dest_path on the resolved host and returns
@@ -620,21 +679,54 @@ message InitRepoRequest {
   string dev_server_id = 1;
   string dest_path = 2;
   string default_branch = 3; // empty = git's own default
+  // remote_url: if set, `git remote add <remote_name> <remote_url>` runs in
+  // the same call, right after `git init` — added for the "Initialize as
+  // Git repo" feature (a folder added to Orca that isn't a git repo yet).
+  // remote_name defaults to "origin" server-side when empty.
+  string remote_url = 4;
+  string remote_name = 5;
 }
 message InitRepoResponse {
   string path = 1;
   string default_branch = 2;
+  bool remote_added = 3;
 }
 
-message CheckHooksRequest { string worktree_id = 1; }
+// repo_id routes this call through dispatchExecutorForRepo (repo-scoped
+// dispatch), matching BaseRefDefault/SearchRefs — worktree_id is kept only
+// for wire compatibility (no current caller sends it); repo_id is
+// preferred when both are set.
+message CheckHooksRequest { string worktree_id = 1; string repo_id = 2; }
 message CheckHooksResponse { repeated string installed_hooks = 1; bool orca_hooks_current = 2; }
 
-message ReadIssueCommandRequest { string worktree_id = 1; }
+// ReadEphemeralVmRecipes is called from repo-scoped contexts, same as
+// CheckHooks — no worktree_id variant needed.
+message ReadEphemeralVmRecipesRequest { string repo_id = 1; }
+message ReadEphemeralVmRecipesResponse {
+  string repo_path = 1;
+  repeated EphemeralVmRecipe recipes = 2;
+  repeated string diagnostics = 3;
+}
+message EphemeralVmRecipe {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  string create = 4;
+  string suspend = 5;
+  string resume = 6;
+  string destroy = 7;
+  bool destroy_disabled = 8;
+}
+
+// See CheckHooksRequest's doc comment — same repo_id addition, same reason.
+message ReadIssueCommandRequest { string worktree_id = 1; string repo_id = 2; }
 message ReadIssueCommandResponse { string content = 1; bool exists = 2; }
 
-message WriteIssueCommandRequest { string worktree_id = 1; string content = 2; }
+// See CheckHooksRequest's doc comment — same repo_id addition, same reason.
+message WriteIssueCommandRequest { string worktree_id = 1; string content = 2; string repo_id = 3; }
 
-message ScanSetupScriptImportsRequest { string worktree_id = 1; }
+// See CheckHooksRequest's doc comment — same repo_id addition, same reason.
+message ScanSetupScriptImportsRequest { string worktree_id = 1; string repo_id = 2; }
 message ScanSetupScriptImportsResponse { repeated string imported_paths = 1; }
 // CreateWorktree's usecase may fail with (via apperrors.Code, not a proto
 // field): WORKTREE_NAME_INVALID (BR-WT-01 charset), WORKTREE_PATH_EXISTS
@@ -659,6 +751,18 @@ message CreateWorktreeRequest {
   // defaults to the existing repoPath+"-"+name convention.
   optional string name = 6;
   optional string path = 7;
+  // Optional lineage-capture context, forwarded as-is to project-service's
+  // RecordWorktreeCreated by the CreateWorktree saga — see
+  // project.proto's WorktreeLineageEntry doc comment for the shape this
+  // backs. Explicit-capture only; caller (wscompat's worktree.create) never
+  // needs to set capture_confidence.
+  optional string parent_worktree_id = 8;
+  optional string origin = 9;
+  optional string capture_source = 10;
+  optional string task_id = 11;
+  optional string orchestration_run_id = 12;
+  optional string coordinator_handle = 13;
+  optional string created_by_terminal_handle = 14;
 }
 message CreateWorktreeResponse {
   string worktree_id = 1; // project-service's Worktree.id, from the saga's RecordWorktreeCreated step (TASK-193)
@@ -818,9 +922,26 @@ message GitProgressEvent {
   int32  exit_code = 4;   // only meaningful when is_final
 }
 
+// remote_name defaults to "origin" server-side when empty (see
+// GetRemoteURL usecase's doc comment) — callers needing upstream-then-
+// origin fallback semantics (github.listWorkItems) make two calls.
+message GetRemoteUrlRequest { string repo_id = 1; string remote_name = 2; }
+message GetRemoteUrlResponse { string url = 1; }
+
 message DetectWorktreesRequest  { string repo_id = 1; }
+
+// DetectedWorktreeGitInfo mirrors domain.WorktreeGitInfo — one on-disk
+// worktree's path plus enough git-level identity to build a real
+// reconciled worktree record without a second git invocation per path.
+// branch is empty for a detached HEAD.
+message DetectedWorktreeGitInfo {
+  string path = 1;
+  string head = 2;
+  string branch = 3;
+}
+
 message DetectWorktreesResponse {
-  repeated string on_disk_paths = 1; // raw `git worktree list --porcelain` result for the repo
+  repeated DetectedWorktreeGitInfo on_disk_worktrees = 1;
 }
 
 message PrefetchCreateBaseRequest  { string repo_id = 1; string base_ref = 2; }

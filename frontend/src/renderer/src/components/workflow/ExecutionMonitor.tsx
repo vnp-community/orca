@@ -4,9 +4,18 @@ import { Button } from '../ui/button'
 import type { WorkflowStep, StepStatus } from '@shared/workflow-types'
 
 export function ExecutionMonitor({ executionId }: { executionId: string }) {
-  const { execution, stepStatuses, streamingOutput, cancelExecution } = useWorkflowExecution(executionId)
+  const {
+    execution,
+    stepStatuses,
+    streamingOutput,
+    cancelExecution,
+    pauseExecution,
+    resumeExecution
+  } = useWorkflowExecution(executionId)
 
-  if (!execution) {return <div className="p-4 text-sm text-muted-foreground">Loading execution...</div>}
+  if (!execution) {
+    return <div className="p-4 text-sm text-muted-foreground">Loading execution...</div>
+  }
 
   // Group steps by wave
   const waves = groupStepsByWave(execution.definition.steps ?? [], stepStatuses)
@@ -32,7 +41,17 @@ export function ExecutionMonitor({ executionId }: { executionId: string }) {
               trace:{execution.rootTraceId}
             </button>
           )}
-          <StepStatusBadge status={execution.status as any} />
+          <StepStatusBadge status={execution.status} />
+          {execution.status === 'running' && (
+            <Button size="sm" variant="outline" onClick={pauseExecution} data-testid="pause-btn">
+              Pause
+            </Button>
+          )}
+          {execution.status === 'paused' && (
+            <Button size="sm" variant="outline" onClick={resumeExecution} data-testid="resume-btn">
+              Resume
+            </Button>
+          )}
           {execution.status === 'running' && (
             <Button size="sm" variant="outline" onClick={cancelExecution} data-testid="cancel-btn">
               Cancel
@@ -48,7 +67,11 @@ export function ExecutionMonitor({ executionId }: { executionId: string }) {
             Wave {waveIdx} {steps.length > 1 ? `(${steps.length} parallel)` : ''}
           </div>
           {steps.map(({ step, status }) => (
-            <div key={step.id} className="step-monitor-row border rounded p-2 mb-1" data-testid={`step-row-${step.id}`}>
+            <div
+              key={step.id}
+              className="step-monitor-row border rounded p-2 mb-1"
+              data-testid={`step-row-${step.id}`}
+            >
               <div className="flex items-center gap-2">
                 <StepStatusBadge status={status} />
                 <span className="text-sm font-medium">{step.name}</span>
@@ -70,10 +93,12 @@ export function ExecutionMonitor({ executionId }: { executionId: string }) {
 
 function groupStepsByWave(steps: WorkflowStep[], statuses: Record<string, StepStatus>) {
   const waveMap = new Map<number, { step: WorkflowStep; status: StepStatus }[]>()
-  
+
   steps.forEach((step) => {
     const wave = calculateWave(step, steps)
-    if (!waveMap.has(wave)) {waveMap.set(wave, [])}
+    if (!waveMap.has(wave)) {
+      waveMap.set(wave, [])
+    }
     waveMap.get(wave)!.push({ step, status: statuses[step.id] ?? 'pending' })
   })
 
@@ -83,9 +108,13 @@ function groupStepsByWave(steps: WorkflowStep[], statuses: Record<string, StepSt
 }
 
 function calculateWave(step: WorkflowStep, allSteps: WorkflowStep[]): number {
-  if (!step.dependsOn || step.dependsOn.length === 0) {return 0}
-  return Math.max(...step.dependsOn.map(depId => {
-    const dep = allSteps.find(s => s.id === depId)
-    return dep ? calculateWave(dep, allSteps) + 1 : 0
-  }))
+  if (!step.dependsOn || step.dependsOn.length === 0) {
+    return 0
+  }
+  return Math.max(
+    ...step.dependsOn.map((depId) => {
+      const dep = allSteps.find((s) => s.id === depId)
+      return dep ? calculateWave(dep, allSteps) + 1 : 0
+    })
+  )
 }

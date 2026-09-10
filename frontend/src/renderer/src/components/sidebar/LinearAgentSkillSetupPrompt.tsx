@@ -45,9 +45,13 @@ import {
   readLocalDismissed,
   type LinearAgentSkillPromptSettings
 } from './linear-agent-skill-runtime'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { LinearAgentSkillSetupDialog } from './LinearAgentSkillSetupDialog'
 import { translate } from '@/i18n/i18n'
-import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
+import {
+  getRuntimeCliInstallStatus,
+  getRuntimeWslCliInstallStatus
+} from '@/runtime/runtime-cli-client'
 
 export const _linearAgentSkillSetupPromptInternalsForTests = {
   resetSessionReminders(): void {
@@ -85,6 +89,16 @@ export function LinearAgentSkillSetupPrompt({
     () => getLinearPromptAgentRuntime(settings, currentPlatform, remote, projectRuntime),
     [currentPlatform, projectRuntime, remote, settings]
   )
+  // Why: this dialog's setup terminal always uses a synthetic worktreeId
+  // with no backing repo (even when the surrounding worktree is real), so
+  // it has no natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   const setupCheckIdentity = useMemo(
     () =>
       getLinearPromptSetupCheckIdentity({
@@ -287,6 +301,7 @@ export function LinearAgentSkillSetupPrompt({
       missingLabel={missingLabel}
       command={command}
       installedCommand={installedCommand}
+      devServerId={devServerId}
       terminalShellOverride={terminalShellOverride}
       installed={skill.installed}
       loading={showCheckingModal || cliLoading || skill.loading}

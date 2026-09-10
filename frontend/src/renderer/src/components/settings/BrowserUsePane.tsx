@@ -17,6 +17,7 @@ import {
   useInstalledAgentSkill
 } from '@/hooks/useInstalledAgentSkills'
 import { useActiveProjectSkillRuntime } from '@/hooks/useActiveProjectSkillRuntime'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { cn } from '@/lib/utils'
 import { useAppStore } from '../../store'
@@ -36,7 +37,10 @@ import {
   getWslCliDistroRequest
 } from './CliSkillRuntimeSetup'
 import { translate } from '@/i18n/i18n'
-import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
+import {
+  getRuntimeCliInstallStatus,
+  getRuntimeWslCliInstallStatus
+} from '@/runtime/runtime-cli-client'
 
 type BrowserUseSetupProps = {
   onConfigureMoreBrowsers?: () => void
@@ -57,6 +61,15 @@ export function BrowserUseSetup({
   const [cliBusy, setCliBusy] = useState(false)
   const mountedRef = useMountedRef()
   const activeSkillRuntime = useActiveProjectSkillRuntime()
+  // Why: BrowserUseSkillStep's setup terminal has no project/repo behind
+  // it, so it has no natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   const browserUseInstallCommand = !activeSkillRuntime.installDisabledReason
     ? buildSkillCommandForRuntime(ORCA_CLI_SKILL_INSTALL_COMMAND, activeSkillRuntime.agentRuntime)
     : ORCA_CLI_SKILL_INSTALL_COMMAND
@@ -281,6 +294,7 @@ export function BrowserUseSetup({
             skillLoading={skillLoading}
             skillError={activeSkillRuntime.installDisabledReason ?? skillError}
             disabled={step2Blocked}
+            devServerId={devServerId}
             terminalShellOverride={activeSkillRuntime.terminalShellOverride}
             preInstallNotice={AGENT_SKILL_CLI_PREREQUISITE_NOTICE}
             getPrerequisiteStatus={() =>

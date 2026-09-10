@@ -21,7 +21,7 @@ func newScrollbackFixture(t *testing.T, events []PtyEvent) (*GetTerminalScrollba
 		ch <- ev
 	}
 	agent := &fakeDevServerAgentClient{streamPtyEvents: ch}
-	uc := NewGetTerminalScrollback(sessions, resolver, agent)
+	uc := NewGetTerminalScrollback(sessions, resolver, &fakeDevServerRepository{}, agent)
 	uc.drainWindow = 30 * time.Millisecond // bound the test, not a real 500ms sleep
 	return uc, agent
 }

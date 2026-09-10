@@ -30,7 +30,6 @@ import type { PtyBufferSnapshot, PtyConnectResult } from './pty-transport'
 import { createIpcPtyTransport } from './pty-transport'
 import { createRemoteRuntimePtyTransport } from './remote-runtime-pty-transport'
 import { getConnectionId } from '@/lib/connection-context'
-import { logBugFePty001 } from '@/lib/bug-fe-pty-001-diagnostic-log'
 import { getLocalProjectExecutionRuntimeContext } from '@/lib/local-preflight-context'
 import {
   getCachedWindowsTerminalCapabilities,
@@ -669,14 +668,6 @@ function subscribeAgentTaskCompleteTrackingEnabled(listener: () => void): () => 
 }
 
 function recordPtyConnectDiagnostic(message: string): void {
-  // TEMP DIAG BUG-FE-PTY-001: the live repro shows a mirror transport
-  // created but never reaching any connectPanePty branch that calls
-  // transport.connect()/attach() (zero session.tabs.* RPCs in backend
-  // logs across the whole grace-close window) — persist every branch
-  // decision unconditionally (not gated by e2eConfig.exposeStore like the
-  // rest of this function) so the next repro's dump shows exactly which
-  // branch a given pane took, or that it took none at all.
-  logBugFePty001(`pty-connect ${message}`)
   if (!e2eConfig.exposeStore) {
     return
   }
@@ -3037,8 +3028,13 @@ export function connectPanePty(
   // Why: folder workspaces can inherit their SSH target from child repos, so
   // use the shared resolver instead of only looking up repo-backed worktrees.
   const worktree = getWorktreeMapFromState(state).get(deps.worktreeId)
-  const connectionId = getConnectionId(deps.worktreeId) ?? null
   const tab = (state.tabsByWorktree[deps.worktreeId] ?? []).find((t) => t.id === deps.tabId)
+  // Why: an ephemeral setup/onboarding terminal's worktreeId has no backing
+  // repo record, so getConnectionId always returns null/undefined for it —
+  // the tab's own explicit connectionId (set by createTab's caller) is the
+  // only source of truth there. Ordinary repo-backed tabs never set this
+  // field, so this is a no-op for them and getConnectionId keeps deciding.
+  const connectionId = tab?.connectionId ?? getConnectionId(deps.worktreeId) ?? null
   const shellOverride = tab?.shellOverride
   // Why: a serve/remote-runtime pane has no SSH connectionId and a Linux cwd, so
   // the native-Windows ConPTY heuristic misfires on a Windows client and wrongly

@@ -35,6 +35,11 @@ type Deps struct {
 	RateLimiter     *usecase.RateLimiter
 	UsageClient     usagev1.UsageServiceClient
 	AuthClient      authv1.AuthServiceClient
+	// SsoConfig configures the real GET /auth/sso/{provider}, GET
+	// /auth/callback, and GET /auth/config handlers (see
+	// SsoRouteConfig's doc comment) — the zero value degrades to "no SSO
+	// provider configured, local login only", never a panic.
+	SsoConfig SsoRouteConfig
 	// The remaining downstream clients below back the Phase 5 REST routes
 	// (execution-plan.md) — each wired only once its owning service was
 	// confirmed mature (real RPCs, not blanket Unimplemented), and marked
@@ -80,6 +85,10 @@ type Deps struct {
 	// Agent has no user session cookie to present. Nil is valid — the
 	// routes are simply not mounted (see Config.InfraFleetHTTPAddr).
 	AgentProxyHandler http.Handler
+	// TraceBroadcast feeds /api/trace-stream real backend spans (see
+	// trace_routes.go's doc comment) — nil is valid (NewRouter falls back
+	// to an empty hub), matching every other optional Deps field's posture.
+	TraceBroadcast *TraceBroadcast
 }
 
 // NewRouter builds api-gateway's chi router. Three route groups, in order:
@@ -102,13 +111,13 @@ func NewRouter(deps Deps) http.Handler {
 		// 10 attempts/min per IP, burst 10 — spec's literal figure
 		// (docs/logic/auth/BL-AUTH-01-local-login.md).
 		loginRateLimiter := usecase.NewRateLimiter(10.0/60.0, 10)
-		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator, loginRateLimiter)
+		mountAuthRoutes(r, deps.AuthClient, deps.CookieValidator, loginRateLimiter, deps.SsoConfig)
 	}
-	mountTraceRoutes(r)
+	mountTraceRoutes(r, deps.TraceBroadcast)
 	// mountPushRoutes is unauthenticated by design (see its doc comment) —
 	// mounted here, outside the authed group below, never moved inside it.
 	if deps.NotificationClient != nil {
-		mountPushRoutes(r, deps.NotificationClient)
+		mountPushRoutes(r, deps.NotificationClient, deps.CookieValidator)
 	}
 	// mountSCMWebhookRoutes is unauthenticated by design (see its doc
 	// comment): GitHub/GitLab's own servers call this, never carrying an

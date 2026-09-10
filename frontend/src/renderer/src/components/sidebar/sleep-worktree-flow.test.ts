@@ -9,7 +9,8 @@ const mocks = vi.hoisted(() => {
     suppressPtyExit: vi.fn(),
     consumeSuppressedPtyExit: vi.fn(),
     tabsByWorktree: {} as Record<string, { id: string }[]>,
-    ptyIdsByTabId: {} as Record<string, string[]>
+    ptyIdsByTabId: {} as Record<string, string[]>,
+    settings: { experimentalEphemeralVms: true } as { experimentalEphemeralVms?: boolean }
   }
   const suspendWorkspace = vi.fn().mockResolvedValue(null)
   const toastError = vi.fn()
@@ -61,6 +62,7 @@ describe('runSleepWorktree', () => {
     mocks.state.activeWorktreeId = null
     mocks.state.tabsByWorktree = {}
     mocks.state.ptyIdsByTabId = {}
+    mocks.state.settings = { experimentalEphemeralVms: true }
   })
 
   it('tears down browsers before terminals on the sleep path', async () => {
@@ -82,6 +84,18 @@ describe('runSleepWorktree', () => {
     const suspendCallOrder = mocks.suspendWorkspace.mock.invocationCallOrder[0]
     expect(browsersCallOrder).toBeLessThan(terminalsCallOrder)
     expect(terminalsCallOrder).toBeLessThan(suspendCallOrder)
+  })
+
+  // Regression guard: window.api?.ephemeralVm alone used to gate this call —
+  // on the web/paired preload that's a truthy fallback Proxy regardless of
+  // whether this experimental feature was ever enabled, so every sleep fired
+  // a real (and, until backend support exists, failing) suspendWorkspace RPC.
+  it('does not call suspendWorkspace when experimentalEphemeralVms is off', async () => {
+    mocks.state.settings = { experimentalEphemeralVms: false }
+
+    await runSleepWorktree('wt-1')
+
+    expect(mocks.suspendWorkspace).not.toHaveBeenCalled()
   })
 
   it('clears activeWorktreeId before teardown when the slept worktree is active', async () => {

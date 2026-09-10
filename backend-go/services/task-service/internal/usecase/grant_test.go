@@ -13,7 +13,7 @@ import (
 // manage-access check is genuinely exercised end to end — tasks/grants are
 // the same fakes the rest of this package's tests use.
 func newGrantForTest(tasks *fakeTaskRepository, grants GrantRepository, opaAllow bool) *Grant {
-	resolvePermission := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: opaAllow})
+	resolvePermission := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: opaAllow}, nil)
 	return NewGrant(grants, resolvePermission, &fakeEventPublisher{})
 }
 
@@ -54,7 +54,7 @@ func TestGrant_PublishesGrantReceivedEvent(t *testing.T) {
 	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "user-1"}
 	grants := &fakeGrantRepository{}
 	events := &fakeEventPublisher{}
-	resolvePermission := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	uc := NewGrant(grants, resolvePermission, events)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 

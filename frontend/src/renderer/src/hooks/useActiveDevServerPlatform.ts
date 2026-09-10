@@ -1,4 +1,4 @@
-import { useActiveDevServer } from '../store/slices/dev-servers'
+import { useActiveDevServer } from '../store/slices/dev-servers-selectors'
 
 /** Trả về platform của active dev server, hoặc null nếu chưa kết nối */
 export function useActiveDevServerPlatform(): NodeJS.Platform | null {

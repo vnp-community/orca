@@ -133,7 +133,7 @@ func (uc *CreateProject) Execute(ctx context.Context, in CreateProjectInput) (do
 	}
 
 	if repoPathValid {
-		repo, err := domain.NewRepo(uuid.NewString(), created.ID, in.RepoPath, in.Name)
+		repo, err := domain.NewRepo(uuid.NewString(), created.ID, in.RepoPath, in.Name, devServerID)
 		if err == nil {
 			_, _ = uc.repos.AddRepo(ctx, repo) // best-effort attach — the project itself is already valid and persisted
 		}

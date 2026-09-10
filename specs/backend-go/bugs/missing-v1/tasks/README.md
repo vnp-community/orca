@@ -9,7 +9,16 @@ Solution** / **Priority** / **Service** / **File** / **Depends on** /
 copy-pasteable code (not pseudocode), and a "Verify" section with exact
 shell commands.
 
-> **Status: `[ ]` All 186 tasks TODO.** Nothing has been implemented.
+> **Status (updated 2026-08-27): 187/188 tasks `[x]` DONE, 1 `[partial]`.**
+> Every task file's own `**Status:**` line is authoritative — this banner
+> just aggregates them. Only `TASK-036` (`browser.*` frontend dispatch) is
+> partial: its agent + backend-go layers are done and tested end-to-end,
+> but wiring the frontend to the new relay path is a separate, still-open
+> design decision (see that file's "Status by layer" section). This line
+> originally said "nothing has been implemented" when these tasks were
+> first written — that was accurate then, is not anymore, and had drifted
+> out of sync with the per-task Status lines below for some time before
+> this update.
 > Every task was written by extracting and formalizing the code sketches
 > already in its source `SOL-0XX` — not re-designed from scratch — and
 > cross-checked against the actual current `backend-go` source (proto

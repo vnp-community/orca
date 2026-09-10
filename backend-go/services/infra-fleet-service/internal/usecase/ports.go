@@ -38,11 +38,15 @@ type DevServerRepository interface {
 	// call site in this service.
 	FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (ds domain.DevServer, found bool, err error)
 	// UpdateProvisionResult persists the outcome of one provisioning
-	// attempt — status plus the handshake facts SOL-FLEET-04 needs
+	// attempt — health status plus the handshake facts SOL-FLEET-04 needs
 	// surfaced. Called once per server at the end of bulkProvisionOne
 	// (TASK-FLEET-02-05) and after EstablishConnection's handshake
-	// (TASK-FLEET-04-03), success or failure.
-	UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info HandshakeInfo, provisionedAt time.Time) error
+	// (TASK-FLEET-04-03), success or failure. status is
+	// domain.DevServerHealthStatus (connectivity/health), NOT
+	// domain.DevServerStatus (CR-DS-006 admin approval) — see
+	// domain.DevServerHealthStatus's doc comment for why these are
+	// deliberately separate types.
+	UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerHealthStatus, info HandshakeInfo, provisionedAt time.Time) error
 	// ListAllForPolling is cross-tenant by design (the poller is not
 	// answering one tenant's request), unlike every other
 	// DevServerRepository method's tenantID parameter.
@@ -51,6 +55,24 @@ type DevServerRepository interface {
 	// usecase.ListDevServersByTag / workflow-service's "fleet:tag:<tag>"
 	// dispatch-target shape (TASK-WF-02-02).
 	ListByTag(ctx context.Context, tenantID, tag string) ([]domain.DevServer, error)
+	// FindByHostAndMode returns the DevServer matching host+mode for tenantID,
+	// if one has been registered yet — the direct-websocket equivalent of
+	// FindBySshTarget's find-or-create pattern (used by
+	// ResolveDirectWebSocketDevServer). Scoped by mode as well as host
+	// because relay-websocket rows also populate host with a real
+	// ws://... URL — without the mode filter, an agent's external
+	// devServerID string could theoretically collide with an unrelated
+	// relay-websocket row's host value.
+	FindByHostAndMode(ctx context.Context, tenantID, host string, mode domain.ConnectionMode) (ds domain.DevServer, found bool, err error)
+	// UpdateApprovalStatus sets a dev server's approval_status — CR-DS-006
+	// Phase 2. Returns the updated row; errors.Is(err, domain.ErrNotFound)-
+	// style not-found signaling isn't needed here (same
+	// tenant_id+id-scoped-update convention as every other mutation in this
+	// service) — implementations return a plain error when 0 rows matched.
+	UpdateApprovalStatus(ctx context.Context, tenantID, devServerID string, status domain.DevServerStatus) (domain.DevServer, error)
+	// AssignGroup sets (or clears, when groupID == "") a dev server's
+	// group_id — CR-DS-006 Phase 2.
+	AssignGroup(ctx context.Context, tenantID, devServerID, groupID string) (domain.DevServer, error)
 }
 
 // HandshakeInfo is a usecase-owned mirror of
@@ -83,6 +105,54 @@ type Provisioner interface {
 	// tell "deployed but degraded" apart from "deploy/handshake genuinely
 	// failed" (a non-nil err, which DOES still consume a retry attempt).
 	Provision(ctx context.Context, devServer domain.DevServer) (info HandshakeInfo, prereqsMet bool, err error)
+}
+
+// DevServerGroupRepository is the persistence port for CR-DS-006's
+// DevServerGroup tree — see docs/crs/v2/dev-server/
+// CR-DS-006-dev-server-approval-and-grouping.md §3.2.
+type DevServerGroupRepository interface {
+	Create(ctx context.Context, group domain.DevServerGroup) (domain.DevServerGroup, error)
+	// List returns every group registered for tenantID, in no particular
+	// tree order — building the hierarchy from ParentGroupID is the
+	// caller's job (same division of labor project-service's ProjectGroup
+	// list endpoint uses).
+	List(ctx context.Context, tenantID string) ([]domain.DevServerGroup, error)
+}
+
+// DevServerGroupGrantRepository is the persistence port for CR-DS-007's
+// department/team ↔ group grants — see docs/crs/v2/dev-server/
+// CR-DS-007-department-based-access-control.md.
+type DevServerGroupGrantRepository interface {
+	Create(ctx context.Context, grant domain.DevServerGroupGrant) (domain.DevServerGroupGrant, error)
+	// Delete removes a grant by id, scoped to tenantID — a grantID from a
+	// different tenant must never delete anything (same tenant-join
+	// discipline as every other tenant-scoped mutation in this service).
+	Delete(ctx context.Context, tenantID, grantID string) error
+	// ListByGroup returns every grant on exactly this group (no
+	// hierarchy/inheritance resolution — that's
+	// usecase.ListDevServersForUser's job, composed from this plus
+	// DevServerGroupRepository.List's parent_group_id chain).
+	ListByGroup(ctx context.Context, tenantID, groupID string) ([]domain.DevServerGroupGrant, error)
+	// ListAll returns every grant in tenantID — backs
+	// ListDevServerGroupGrants's "empty group_id = every grant" case.
+	ListAll(ctx context.Context, tenantID string) ([]domain.DevServerGroupGrant, error)
+}
+
+// DevServerAccessRequestRepository is the persistence port for CR-DS-008's
+// access-request flow — see docs/crs/v2/dev-server/
+// CR-DS-008-first-login-department-gate-and-access-request.md §2.3.
+type DevServerAccessRequestRepository interface {
+	Create(ctx context.Context, req domain.DevServerAccessRequest) (domain.DevServerAccessRequest, error)
+	// Get fetches a request scoped to tenantID — same tenant-join
+	// requirement as every other Get in this service.
+	Get(ctx context.Context, tenantID, id string) (domain.DevServerAccessRequest, error)
+	// ListPending returns every AccessRequestStatusPending request in
+	// tenantID — backs the admin console's review queue.
+	ListPending(ctx context.Context, tenantID string) ([]domain.DevServerAccessRequest, error)
+	// UpdateStatus resolves a request (approved/rejected) — never reverts
+	// an already-resolved request back to pending (usecase.ResolveAccessRequest
+	// enforces that, not this port).
+	UpdateStatus(ctx context.Context, tenantID, id string, status domain.AccessRequestStatus) (domain.DevServerAccessRequest, error)
 }
 
 // SshTargetRepository is the persistence port for SSH target registration.
@@ -127,16 +197,16 @@ type ConnectionRepository interface {
 	// bound to devServerID, if any — backs ssh.getState's local read.
 	// found=false, err=nil means "no active connection", not an error.
 	GetActiveByDevServer(ctx context.Context, tenantID, devServerID string) (conn domain.Connection, found bool, err error)
-	// UpdateStatus sets connectionID's status column — TeardownConnection's
-	// "mark closed" step (BR-SSH-13), also usable by a future reconnect-state
-	// writer to record "reconnecting"/"degraded".
-	UpdateStatus(ctx context.Context, tenantID, connectionID, status string) error
-	// GetDevServerByConnection resolves connectionID's owning DevServer —
-	// TeardownConnection needs it to call DevServerAgentClient.CancelReconnect
-	// by DevServer.ID, not by connection id. found=false, err=nil means the
-	// connection row doesn't exist (already gone/never existed) — not an
-	// error, TeardownConnection stays idempotent on it.
-	GetDevServerByConnection(ctx context.Context, tenantID, connectionID string) (devServer domain.DevServer, found bool, err error)
+	// UpdateStatus persists conn's Status/DegradedSince after a domain state
+	// machine transition (MarkDegraded/Reestablish/CloseAfterGracePeriodExpiry/
+	// CloseExplicitly, see internal/domain/connection.go) — the usecase layer
+	// computes the transition, this port only writes its result. Scoped by
+	// tenantID, matching every other mutation in this service. Also
+	// TeardownConnection's "mark closed" step (BR-SSH-13/BE-SOL-STORAGE-003
+	// §5) — callers that only need to flip status build a domain.Connection
+	// via the relevant Close*/Mark* method rather than passing a bare status
+	// string.
+	UpdateStatus(ctx context.Context, tenantID string, conn domain.Connection) error
 }
 
 // PortForwardRepository is the storage port for domain.PortForward —
@@ -164,6 +234,19 @@ type TunnelOpener interface {
 // PollWorkspacePorts calls on it directly.
 type Tunnel interface {
 	Close() error
+}
+
+// FleetConnectivityRepository is the read port GetFleetConnectivitySummary
+// uses (TASK-BE-STORAGE-006, CR-STORAGE-007) — deliberately a separate,
+// narrow port from ConnectionRepository (not an added method on it), the
+// same reasoning FleetHealthPollerRepository's doc comment gives: only this
+// one usecase (and its own test fakes) needs it.
+type FleetConnectivityRepository interface {
+	// ListConnectivitySummary returns every connection scoped to tenantID —
+	// joined through dev_servers as defense-in-depth tenant scoping (per
+	// specs/backend-go/services/infra-fleet-service.md §9), even though
+	// connections.tenant_id already scopes correctly on its own.
+	ListConnectivitySummary(ctx context.Context, tenantID string) ([]domain.Connection, error)
 }
 
 // ConnectionResolver is THE core coordination/execution dispatch primitive
@@ -212,10 +295,12 @@ type FleetHealthPort interface {
 // already split a single Repository's read/write concerns in this file.
 type FleetHealthWriter interface {
 	UpsertFleetHealth(ctx context.Context, sample domain.DevServerHealth) error
-	// GetPrevious reads the last-persisted sample for devServerID —
-	// PollFleetHealth diffs against it to detect a status_change (BL-FLEET-03's
-	// poll-flow step 4). found=false means no prior sample exists yet.
-	GetPrevious(ctx context.Context, devServerID string) (sample domain.DevServerHealth, found bool, err error)
+	// GetDevServerHealth returns devServerID's PREVIOUS sample (found=false
+	// if none exists yet, e.g. its first-ever poll) — read before
+	// UpsertFleetHealth overwrites it, so PollFleetHealth can detect a
+	// reachable=true -> false transition (BL-FLEET-03's poll-flow step 4) to
+	// alert on.
+	GetDevServerHealth(ctx context.Context, devServerID string) (health domain.DevServerHealth, found bool, err error)
 }
 
 // PollLockPort wraps a Postgres session-level advisory lock keyed by a hash
@@ -254,6 +339,27 @@ type MetricsCollector interface {
 	Update(devServerID, host string, sample domain.DevServerHealth)
 }
 
+// OutboxWriter enqueues a durably-committed event row for
+// common/outbox.Relay to publish — see PollFleetHealth's use on a dev
+// server's reachable=true -> false transition.
+type OutboxWriter interface {
+	InsertOutboxEvent(ctx context.Context, event domain.OutboxEvent) error
+}
+
+// FleetHealthPollerRepository lists poll targets — deliberately a separate,
+// narrow port from DevServerRepository (not an added method on it) so the
+// 16+ existing DevServerRepository test fakes across this package don't all
+// need a new no-op method just to keep compiling; only PollFleetHealth (and
+// its own test's fake) depends on this port.
+type FleetHealthPollerRepository interface {
+	// ListAllDevServers returns every dev server across every tenant —
+	// deliberately unscoped, unlike DevServerRepository.List. An internal
+	// background poller has no request-scoped tenant to join through, and
+	// polling reachability is not tenant-sensitive data exposure the way a
+	// user-facing RPC's response would be.
+	ListAllDevServers(ctx context.Context) ([]domain.DevServer, error)
+}
+
 // BrowserProfileRepository is the persistence port for browser profile
 // metadata (infra.browser_profiles, TASK-032) — Postgres-only; the 3
 // live-agent profile operations (profileClearDefaultCookies/
@@ -288,6 +394,11 @@ type DevServerAgentClient interface {
 	// successful Health() call to persist platform/arch/node-version facts
 	// without a second round trip.
 	LastHandshakeInfo(devServerID string) (HandshakeInfo, bool)
+	// IsConnected is Health's cheap, side-effect-free sibling — a pure peek
+	// at whether devServerID already has a live session, never dialing one.
+	// See devserveragent.Client.IsConnected's doc comment for why this
+	// exists separately (safe to call in bulk, e.g. a dev server list).
+	IsConnected(devServerID string) bool
 
 	// --- Terminal/PTY (TASK-180..187) ---
 	// The six methods below extend the same generic-Exec transport with
@@ -374,6 +485,91 @@ type DevServerAgentClient interface {
 	// devServer connection (not per AgentSession, unlike StreamPty),
 	// consumed by RecordAgentHookProviderSession.
 	StreamAgentHooks(ctx context.Context, devServer domain.DevServer) (<-chan AgentHookEvent, func(), error)
+
+	// --- Browser screencast (browser.screencast's live-view stream) ---
+
+	// StreamScreencast starts a browser.screencast capture on the agent
+	// (fire-and-forget browser.screencastStart dispatch, mirroring how
+	// git.execStream/agent.spawn ack immediately then push further data via
+	// notify) and subscribes to its ready/frame/ended/error notifications
+	// over devServer's persistent session — same shape as StreamPty, except
+	// there's no separate "spawn" step to call first: starting IS
+	// subscribing, driven entirely by params.WorktreeID (the agent has no
+	// pre-existing screencast identity to key off of the way a pty already
+	// exists before StreamPty attaches to it). unsubscribe MUST be called
+	// exactly once by the caller (usecase.AttachScreencast).
+	StreamScreencast(ctx context.Context, devServer domain.DevServer, params ScreencastParams) (<-chan ScreencastEvent, func(), error)
+
+	// --- File watching (BACKLOG-003) ---
+
+	// StreamFileChanges calls fs.watch for path and subscribes to its
+	// fs.changed notifications over devServer's persistent session — same
+	// subscribe-before-call shape as StreamScreencast (starting IS
+	// subscribing), keyed by path directly since fs.watch/fs.unwatch/
+	// fs.changed are already refcounted-by-path agent-side (no separate
+	// subscription id to correlate on the way screencast's is). unsubscribe
+	// MUST be called exactly once by the caller (usecase.WatchWorktreeFiles)
+	// — it best-effort calls fs.unwatch, same as StreamScreencast's
+	// browser.screencastStop cleanup.
+	StreamFileChanges(ctx context.Context, devServer domain.DevServer, path string) (<-chan FileChangeEvent, func(), error)
+
+	// --- Ephemeral VM provisioning (BE-SOL-EVM-002) ---
+
+	// StreamVmProvision runs a recipe's `create` command on the agent via
+	// vm.provision and streams its stdout/stderr/result back — TASK-BE-EVM-003.
+	// Unlike StreamPty/StreamScreencast (a notification-keyed demux over an
+	// already-established subscription), vm.provision's wire shape is a
+	// SEQUENCE OF RESPONSE FRAMES sharing the original request's id: an
+	// immediate dispatcher-level "stream.started" ack (mirroring
+	// git.execStream's confirmed precedent, agent-git-handler.ts's
+	// handleGitExecStream), then zero-or-more "stream.chunk" frames, then
+	// exactly one terminal "stream.end" frame carrying either the parsed
+	// recipe result or an error — see
+	// devserveragent.session.streamCall's doc comment for the transport-level
+	// half of this. "stream.started" itself is swallowed by the adapter (not
+	// surfaced as a distinct VmProvisionEvent) — it only confirms the agent
+	// accepted the call and the stream is open. unsubscribe MUST be called
+	// exactly once by the caller (usecase.EphemeralVmRelay.Provision,
+	// TASK-BE-EVM-004).
+	StreamVmProvision(ctx context.Context, devServer domain.DevServer, params VmProvisionParams) (<-chan VmProvisionEvent, func(), error)
+
+	// --- Hidden-target SSH dial (TASK-BE-EVM-014, Hướng A) ---
+
+	// DialHiddenSshTarget calls a new agent RPC (vm.sshDial —
+	// BE-SOL-EVM-004 §3 / "Quyết định đã chốt" mục 1) telling devServer's
+	// agent to dial target directly (SOL-AG-EVM-003's outbound SSH client)
+	// and keep the resulting session in its own in-memory hidden-target
+	// registry, keyed by runtimeID — NOT a new infra.connections row on
+	// this side (see EphemeralVmSshProvisioner's doc comment for how
+	// AgentOutboundSshProvisioner.Provision uses this). Returns the
+	// agent-confirmed hiddenTargetID (by convention == runtimeID, per
+	// BE-SOL-EVM-004 §4: "hiddenTargetID (= ephemeral VM runtimeID)" — the
+	// agent's own ack is still surfaced here rather than assumed). target's
+	// credential fields are sent BY VALUE, exactly once, over this same
+	// agent<->Orca channel vm.exec already uses (same RPC-param mechanism,
+	// not a second channel) — never persisted here or expected to be
+	// persisted agent-side (SOL-AG-EVM-003 §2a/§2b, "Quyết định đã chốt"
+	// mục 1). hostKeyFingerprint is the agent's TOFU-observed SHA256
+	// fingerprint for this dial (TASK-AG-EVM-010) — caller threads
+	// target.KnownHostKeyFingerprint in on subsequent calls and persists
+	// the returned value, mirroring backendrelaysshprovisioner's
+	// knownFingerprint/ObservedFingerprint pattern for Hướng B.
+	DialHiddenSshTarget(ctx context.Context, devServer domain.DevServer, runtimeID string, target domain.EphemeralVmSshTarget) (hiddenTargetID string, hostKeyFingerprint string, err error)
+
+	// --- Hidden-target credential file read (TASK-BE-EVM-017, Hướng B) ---
+
+	// ReadCredentialFile calls a new agent RPC (vm.readCredentialFile —
+	// BE-SOL-EVM-004 §6a) — reads path's content on devServer's OWN
+	// filesystem (the SAME agent that ran this runtime's vm.provision
+	// `create` command, per EphemeralVmSshProvisioner.Provision's
+	// sourceDevServer contract) and returns it, for Hướng B's off-machine
+	// dial (adapter/backendrelaysshprovisioner, which cannot read the
+	// file itself — it isn't running on that host). Response bytes are
+	// used once, in-memory only by the caller (never logged/persisted) —
+	// see agent-ephemeral-vm-handler.ts's handleVmReadCredentialFile doc
+	// comment for the matching "never log contentPEM" requirement on the
+	// agent side.
+	ReadCredentialFile(ctx context.Context, devServer domain.DevServer, path string) (contentPEM string, err error)
 }
 
 // SpawnAgentInput mirrors agent.spawn's real param set 1:1
@@ -474,6 +670,170 @@ type AgentStatusEventPublisher interface {
 	PublishRateLimited(ctx context.Context, tenantID, sessionID string) error
 }
 
+// VmProvisionParams carries vm.provision's request fields — field names on
+// the wire (repoPath/command/recipeId/runtimeId) mirror vm.exec's existing
+// params contract 1:1 (TASK-BE-EVM-001), built by the adapter from this
+// struct, not proto (same ScreencastParams/PtyEvent convention: this
+// package's ports stay proto-agnostic, the grpc/wscompat layers translate).
+type VmProvisionParams struct {
+	RepoPath  string
+	Command   string
+	RecipeID  string
+	RuntimeID string
+}
+
+// VmProvisionEvent is one event StreamVmProvision's channel delivers — the
+// demuxed form of handleVmProvision's stream.chunk/stream.end wire frames.
+// Exactly one of Chunk/Result/ErrorMsg is meaningfully populated per value,
+// narrowed by Type, matching ScreencastEvent/PtyEvent's "one raw struct"
+// convention:
+//   - Type "stdout"/"stderr": Chunk carries one output line.
+//   - Type "result": the terminal, successful frame — Result is populated.
+//   - Type "error": the terminal, failed frame (non-zero exit, a malformed
+//     recipe result, or an agent-side exception) — ErrorMsg is populated.
+type VmProvisionEvent struct {
+	Type     string // "stdout" | "stderr" | "result" | "error"
+	Chunk    string
+	Result   VmProvisionResult
+	ErrorMsg string
+}
+
+// VmProvisionResult mirrors proto's VmProvisionResult message field-for-field
+// (BE-SOL-EVM-002 §6) — normalized here from
+// ephemeral-vm-recipes.ts's EphemeralVmRecipeResult union (both the legacy
+// pairingCode/projectRoot-at-top-level shape and the new explicit
+// `connection` shape collapse to this one flattened form, mirroring
+// getEphemeralVmRecipeResultConnection's own fallback-to-legacy logic).
+type VmProvisionResult struct {
+	Type        string // "orca-server" | "ssh"
+	PairingCode string // set when Type == "orca-server"
+	ProjectRoot string
+	SshTarget   *EphemeralVmRecipeSshTarget // set when Type == "ssh"
+}
+
+// EphemeralVmSshProvisioner is TASK-BE-EVM-012/013's abstraction over the 2
+// parallel strategies for reaching an ephemeral VM whose recipe result is
+// `ssh`-type (BE-SOL-EVM-004 §5a): Hướng A (agent-outbound,
+// TASK-BE-EVM-014/016) and Hướng B (backend-relay-deploy,
+// adapter/backendrelaysshprovisioner, TASK-BE-EVM-013/017) both implement
+// this same interface — EphemeralVmRelay.applyProvisionResult dispatches
+// through it without knowing which strategy is configured (see config.go's
+// EphemeralVmSshMode). Provision dials the target, gets a reachable Dev
+// Server Agent connection established for it (however the strategy achieves
+// that), and returns the resulting connectionID — a real infra.connections
+// row, ready for ResolveConnection like any other dev server.
+//
+// sourceDevServer (BE-SOL-EVM-004 §6b, TASK-BE-EVM-016 — BREAKING signature
+// change from TASK-BE-EVM-012/013's original, both implementations
+// updated): the Dev Server whose agent ran this runtime's vm.provision
+// `create` command — EphemeralVmRelay.Provision already resolves this via
+// resolveDevServerAndRepoPath and now threads it here, closing
+// TASK-BE-EVM-014's "no way to resolve which dev server should dial"
+// gap (formerly EphemeralVmSshDevServerResolver, now removed — the caller
+// already has this value, a lookup port was never necessary). Hướng A uses
+// it to route DialHiddenSshTarget to the right agent; Hướng B uses it to
+// call ReadCredentialFile against the SAME agent before dialing off-machine
+// (TASK-BE-EVM-017).
+//
+// target is domain.EphemeralVmSshTarget, not the usecase-local
+// EphemeralVmRecipeSshTarget below — see that type's doc comment for why a
+// separate, non-persisted type exists. target.ProjectRoot (new,
+// TASK-BE-EVM-016) is what makes constructing a REAL infra.connections row
+// possible — previously the connectionID returned was a bare convention.
+type EphemeralVmSshProvisioner interface {
+	Provision(ctx context.Context, tenantID, runtimeID string, sourceDevServer domain.DevServer, target domain.EphemeralVmSshTarget) (connectionID string, err error)
+}
+
+// EphemeralVmSshTargetRepository persists infra.ephemeral_vm_ssh_targets
+// (migrations/0015) — TASK-BE-EVM-014's Hướng A audit/at-rest record of
+// what host + Vault PATH (never raw material) was used to dial a
+// ssh-type ephemeral VM runtime's hidden target. Written by
+// AgentOutboundSshProvisioner.Provision on every successful dial (Upsert,
+// not Create-only — Provision can legitimately re-run for the same
+// runtime, e.g. after an agent restart drops the agent-local in-memory
+// hidden-target session per SOL-AG-EVM-003 §2b).
+type EphemeralVmSshTargetRepository interface {
+	Upsert(ctx context.Context, record domain.EphemeralVmSshTargetRecord) (domain.EphemeralVmSshTargetRecord, error)
+	Get(ctx context.Context, tenantID, runtimeID string) (record domain.EphemeralVmSshTargetRecord, found bool, err error)
+}
+
+// EphemeralVmSshDevServerResolver/EphemeralVmSshVaultResolver
+// (TASK-BE-EVM-014's original ports) are REMOVED as of TASK-BE-EVM-016 —
+// see BE-SOL-EVM-004 §6a/§6b for the full audit:
+//   - The devServer-resolution gap they described is closed by
+//     EphemeralVmSshProvisioner.Provision's sourceDevServer parameter
+//     instead (EphemeralVmRelay.Provision already has this value from
+//     resolveDevServerAndRepoPath — a separate lookup port was never
+//     necessary, it just hadn't been threaded through yet).
+//   - The Vault-resolve step EphemeralVmSshVaultResolver backed was based
+//     on a wrong premise (§6a: identityFile was never a Vault pointer) —
+//     AgentOutboundSshProvisioner no longer calls Vault at all.
+
+// EphemeralVmRecipeSshTarget mirrors frontend/src/shared/ephemeral-vm-recipes.ts's
+// EphemeralVmRecipeSshTargetSchema field-for-field (BE-SOL-EVM-002 §6's
+// cross-check — configHost/portForwards deliberately omitted, see
+// infrafleet.proto's EphemeralVmRecipeSshTarget message doc comment).
+type EphemeralVmRecipeSshTarget struct {
+	Label                   string
+	Host                    string
+	Port                    int32
+	Username                string
+	IdentityFile            string
+	IdentityAgent           string
+	IdentitiesOnly          bool
+	ProxyCommand            string
+	JumpHost                string
+	RelayGracePeriodSeconds int32
+}
+
+// ScreencastParams carries browser.screencastStart's request fields —
+// mirrors proto/orca/infrafleet/v1/infrafleet.proto's StartScreencast
+// message 1:1 (clamping to the same bounds happens at the wscompat layer,
+// before this usecase is ever reached, matching the OLD TS backend's
+// clampInteger/clampOptionalInteger/clampOptionalNumber behavior).
+type ScreencastParams struct {
+	WorktreeID         string
+	Page               string
+	Format             string
+	Quality            int32
+	MaxWidth           int32
+	MaxHeight          int32
+	ViewportWidth      *int32
+	ViewportHeight     *int32
+	DeviceScaleFactor  *float64
+	Mobile             bool
+	EveryNthFrame      int32
+	MinFrameIntervalMs int32
+}
+
+// ScreencastEvent is one event StreamScreencast's channel delivers —
+// exactly one of Ready/Frame/Ended/ErrorMsg is meaningfully populated per
+// value, mirroring PtyEvent's "one raw struct, narrow by which field is
+// set" convention. Frame carries opaque, already-encoded bytes produced
+// agent-side (encodeBrowserScreencastFrame) — this usecase and every layer
+// above it never parses image bytes, only relays them.
+type ScreencastEvent struct {
+	Ready          bool
+	SubscriptionID string
+	BrowserPageID  string
+	Format         string
+	Frame          []byte
+	Ended          bool
+	ErrorMsg       string
+}
+
+// FileChangeEvent is one fs.changed notification StreamFileChanges's
+// channel delivers, mirroring PtyEvent's "one raw struct" convention.
+// OldPath/IsDirectory always come back zero-valued today — see
+// devserveragent.rawFileWatchNotification's doc comment for why (Node's
+// fs.watch has no rename-pair or directory signal to fill them from).
+type FileChangeEvent struct {
+	Kind        string // "create" | "update" | "delete" | "rename" | "overflow"
+	Path        string // absolute path of the changed entry (watched root + filename)
+	OldPath     string // always "" today
+	IsDirectory bool   // always false today
+}
+
 // SpawnPtyInput carries pty.create's request fields.
 type SpawnPtyInput struct {
 	Cwd              string
@@ -562,6 +922,14 @@ type TerminalSessionRepository interface {
 	// session already closed simply gets a newer closed_at, not an error, so
 	// a duplicate/racing close request never fails the caller.
 	Close(ctx context.Context, tenantID, ptyID string, closedAt time.Time) error
+	// CloseAllForConnection sets closed_at for every OPEN session bound to
+	// connectionID — called by usecase.CloseTerminalSessionsForConnection
+	// ONLY when connections.status has genuinely transitioned to closed
+	// (grace-period expiry or explicit teardown), never for a merely
+	// degraded connection (BE-SOL-STORAGE-003 §3, TASK-BE-STORAGE-010).
+	// Idempotent: a connection with no open sessions closes zero rows, not
+	// an error.
+	CloseAllForConnection(ctx context.Context, tenantID, connectionID string, closedAt time.Time) error
 }
 
 // TerminalScrollbackSnapshotRepository is the persistence port for

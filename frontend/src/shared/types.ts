@@ -118,6 +118,15 @@ export type Project = {
   sourceRepoIds: string[]
   createdAt: number
   updatedAt: number
+  /**
+   * The dev server this project's one backing repo lives on — null/undefined
+   * = local. Phase 10: a legacy Project is now always exactly one (dev
+   * server, repo) pair (see getProjectIdentityKey), so this is just
+   * repo.devServerId passed through, not a new concept. Raw id only, not a
+   * name — renderers with store access resolve a display label via
+   * useDevServerById(devServerId).
+   */
+  devServerId?: string | null
 }
 
 export type ProjectUpdateArgs = {
@@ -231,6 +240,11 @@ export type ProjectHostSetupDeleteResult = {
 
 export type Repo = {
   id: string
+  /** OrcaProject this repo belongs to (project.repos' real project_id).
+   *  Undefined for local/Electron-mode repos, which have no OrcaProject
+   *  concept at all — only ever set for repos fetched/added through the
+   *  remote ('environment') project-service-backed path. */
+  projectId?: string
   path: string
   displayName: string
   badgeColor: string
@@ -359,6 +373,12 @@ export type NestedRepoCandidate = {
   path: string
   displayName: string
   depth: number
+  /** Threaded through from the remote scanNested RPC (project.proto's
+   *  NestedRepoCandidate) so importNestedRepos can round-trip the exact
+   *  candidate shape the backend requires. Undefined for local-mode scans
+   *  (Electron's own scanner has no equivalent concept). */
+  suggestedName?: string
+  isGitRepo?: boolean
 }
 
 export type NestedRepoScanResult = {
@@ -870,6 +890,13 @@ export type TerminalTab = {
    *  `sortEpoch` increments. Split layouts use a numeric count because one tab
    *  can remount several panes. Never persisted — it is a transient handoff. */
   pendingActivationSpawn?: boolean | number
+  /** Explicit dev-server binding for a tab whose worktreeId has no backing
+   *  repo record to resolve a connectionId from (ephemeral setup/onboarding
+   *  terminals — CLI install, agent-skill setup). pty-connection.ts prefers
+   *  this over the repo-based getConnectionId(worktreeId) lookup, which
+   *  always returns null/undefined for these synthetic worktree ids. Unset
+   *  for ordinary repo-backed tabs, which keep resolving via their repo. */
+  connectionId?: string | null
 }
 
 export type BrowserHistoryEntry = {
@@ -1109,6 +1136,14 @@ export type WorkspaceSessionState = {
   defaultTerminalTabsAppliedByWorktreeId?: Record<string, true>
   /** Provider-session resume records captured when workspaces sleep. */
   sleepingAgentSessionsByPaneKey?: Record<string, SleepingAgentSessionRecord>
+  /** FE-SOL-STORAGE-007(a): id of the user this persisted session belongs to.
+   *  Stamped on re-auth in main-web-bootstrap.tsx; a mismatch on the next
+   *  re-auth means a different user signed in and the stored state (this
+   *  field lives on, plus orca.saved-instances/accountsDevServer) must be
+   *  wiped instead of resumed. Chosen over OrcaInstance because
+   *  WorkspaceSessionState is the type written most centrally
+   *  (web-preload-api.ts), not because OrcaInstance couldn't also carry it. */
+  ownerUserId?: string
 }
 
 export type WorkspaceSessionPatch = Partial<WorkspaceSessionState>

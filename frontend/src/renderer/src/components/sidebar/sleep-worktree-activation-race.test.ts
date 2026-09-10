@@ -13,7 +13,8 @@ const mocks = vi.hoisted(() => {
       }
     }),
     tabsByWorktree: {} as Record<string, { id: string }[]>,
-    ptyIdsByTabId: {} as Record<string, string[]>
+    ptyIdsByTabId: {} as Record<string, string[]>,
+    settings: { experimentalEphemeralVms: true } as { experimentalEphemeralVms?: boolean }
   }
   const activateAndRevealWorktree = vi.fn()
   const activateAndRevealFolderWorkspace = vi.fn()
@@ -57,6 +58,7 @@ describe('sleep flow vs slept-workspace activation', () => {
       }
     })
     mocks.state.activeWorktreeId = 'wt-parent'
+    mocks.state.settings = { experimentalEphemeralVms: true }
     mocks.state.setActiveWorktree.mockClear()
     mocks.state.shutdownWorktreeBrowsers.mockClear().mockResolvedValue(undefined)
     mocks.state.shutdownWorktreeTerminals.mockClear().mockImplementation(async (worktreeId) => {

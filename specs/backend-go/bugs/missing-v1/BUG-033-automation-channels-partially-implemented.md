@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** Medium — 5/6 methods missing, but automation is a secondary feature vs. e.g. git/task/terminal.
 **Symptom:** Every `automation.*` call the frontend makes other than `automation.runNow` resolves through `notImplementedHandler` and errors out (see BUG-002 for the general "unregistered channel" failure mode).
-**Status: ❌ Open**
+**Status:** ✅ Resolved — see TASK-217–221 (5 task(s), all DONE) for implementation evidence.
 
 ---
 

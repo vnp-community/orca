@@ -9,7 +9,7 @@
 - `backend-go/services/infra-fleet-service/internal/adapter/postgres/terminal_session_repository.go` (new)
 - `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/client.go`, `methods.go` (extended: `Stream`, `pty.*` typed wrappers)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`, `push_bridge.go`
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 8 task(s) (TASK-180–187) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

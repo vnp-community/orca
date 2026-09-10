@@ -11,6 +11,8 @@ vi.mock('../../../hooks/useWorkflowExecution', () => ({
 
 describe('ExecutionMonitor', () => {
   const cancelExecution = vi.fn()
+  const pauseExecution = vi.fn()
+  const resumeExecution = vi.fn()
   const execution = {
     id: 'e1',
     status: 'running',
@@ -32,8 +34,10 @@ describe('ExecutionMonitor', () => {
       execution,
       stepStatuses: { s1: 'completed', s2: 'running' },
       streamingOutput: { e1: ['Log line 1', 'Log line 2'] },
-      cancelExecution
-    } as any)
+      cancelExecution,
+      pauseExecution,
+      resumeExecution
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
   })
 
   it('renders step list from execution object', () => {
@@ -62,7 +66,7 @@ describe('ExecutionMonitor', () => {
       stepStatuses: { s1: 'failed', s2: 'pending' },
       streamingOutput: {},
       cancelExecution
-    } as any)
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
     render(<ExecutionMonitor executionId="e1" />)
     const s1Row = screen.getByTestId('step-row-s1')
     expect(s1Row).toHaveTextContent('Failed')
@@ -74,13 +78,55 @@ describe('ExecutionMonitor', () => {
     expect(cancelExecution).toHaveBeenCalled()
   })
 
+  // FE-TASK-003: status='running' → Pause button shown (not Resume); Cancel still shown.
+  it("execution.status='running' → Pause button shown, Resume not shown", () => {
+    render(<ExecutionMonitor executionId="e1" />)
+    expect(screen.getByTestId('pause-btn')).toBeInTheDocument()
+    expect(screen.queryByTestId('resume-btn')).not.toBeInTheDocument()
+  })
+
+  it("execution.status='paused' → Resume button shown, Pause and Cancel not shown", () => {
+    vi.mocked(useWorkflowExecution).mockReturnValue({
+      execution: { ...execution, status: 'paused' },
+      stepStatuses: { s1: 'completed', s2: 'running' },
+      streamingOutput: {},
+      cancelExecution,
+      pauseExecution,
+      resumeExecution
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
+    render(<ExecutionMonitor executionId="e1" />)
+    expect(screen.getByTestId('resume-btn')).toBeInTheDocument()
+    expect(screen.queryByTestId('pause-btn')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('cancel-btn')).not.toBeInTheDocument()
+  })
+
+  it('Pause button calls pauseExecution from the hook', () => {
+    render(<ExecutionMonitor executionId="e1" />)
+    fireEvent.click(screen.getByTestId('pause-btn'))
+    expect(pauseExecution).toHaveBeenCalled()
+  })
+
+  it('Resume button calls resumeExecution from the hook', () => {
+    vi.mocked(useWorkflowExecution).mockReturnValue({
+      execution: { ...execution, status: 'paused' },
+      stepStatuses: {},
+      streamingOutput: {},
+      cancelExecution,
+      pauseExecution,
+      resumeExecution
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
+    render(<ExecutionMonitor executionId="e1" />)
+    fireEvent.click(screen.getByTestId('resume-btn'))
+    expect(resumeExecution).toHaveBeenCalled()
+  })
+
   it('rootTraceId present → shows copyable badge, click copies to clipboard', () => {
     vi.mocked(useWorkflowExecution).mockReturnValue({
       execution: { ...execution, rootTraceId: 'trace-root-123' },
       stepStatuses: { s1: 'completed', s2: 'running' },
       streamingOutput: {},
       cancelExecution
-    } as any)
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
     const writeText = vi.fn()
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true })
 
@@ -95,5 +141,21 @@ describe('ExecutionMonitor', () => {
   it('rootTraceId undefined → badge not rendered', () => {
     render(<ExecutionMonitor executionId="e1" />)
     expect(screen.queryByTestId('root-trace-id-badge')).not.toBeInTheDocument()
+  })
+
+  // CR-PW-004 regression: execution.status can be 'cancelled' (WorkflowExecutionStatus),
+  // which StepStatusBadge's old status map (keyed only on StepStatus) didn't handle —
+  // rendering here used to throw before the fix.
+  it("execution.status='cancelled' → header badge renders without crashing", () => {
+    vi.mocked(useWorkflowExecution).mockReturnValue({
+      execution: { ...execution, status: 'cancelled' },
+      stepStatuses: { s1: 'completed', s2: 'skipped' },
+      streamingOutput: {},
+      cancelExecution
+    } as unknown as ReturnType<typeof useWorkflowExecution>)
+    expect(() => render(<ExecutionMonitor executionId="e1" />)).not.toThrow()
+    expect(screen.getAllByText('Cancelled')[0]).toBeInTheDocument()
+    // A cancelled execution is no longer running — no Cancel button.
+    expect(screen.queryByTestId('cancel-btn')).not.toBeInTheDocument()
   })
 })

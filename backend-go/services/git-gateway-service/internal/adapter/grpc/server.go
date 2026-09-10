@@ -48,6 +48,7 @@ type Server struct {
 
 	remoteCommitURL *usecase.RemoteCommitURL
 	remoteFileURL   *usecase.RemoteFileURL
+	getRemoteURL    *usecase.GetRemoteURL
 	fetch           *usecase.Fetch
 
 	generatePullRequestFields   *usecase.GeneratePullRequestFields
@@ -60,6 +61,7 @@ type Server struct {
 	writeFile             *usecase.WriteFileUseCase
 	writeFileChunk        *usecase.WriteFileChunkUseCase
 	createDir             *usecase.CreateDirUseCase
+	createFile            *usecase.CreateFileUseCase
 	deleteFile            *usecase.DeleteFileUseCase
 	statFile              *usecase.StatFileUseCase
 	searchFiles           *usecase.SearchFilesUseCase
@@ -73,6 +75,8 @@ type Server struct {
 	baseRefDefault         *usecase.BaseRefDefault
 	searchRefs             *usecase.SearchRefs
 	checkHooks             *usecase.CheckHooks
+	readEphemeralVmRecipes *usecase.ReadEphemeralVmRecipes
+	watchWorktreeFiles     *usecase.WatchWorktreeFiles
 	readIssueCommand       *usecase.ReadIssueCommand
 	writeIssueCommand      *usecase.WriteIssueCommand
 	scanSetupScriptImports *usecase.ScanSetupScriptImports
@@ -137,6 +141,7 @@ func New(
 	submoduleStatus *usecase.SubmoduleStatus,
 	remoteCommitURL *usecase.RemoteCommitURL,
 	remoteFileURL *usecase.RemoteFileURL,
+	getRemoteURL *usecase.GetRemoteURL,
 	fetch *usecase.Fetch,
 	generatePullRequestFields *usecase.GeneratePullRequestFields,
 	discoverCommitMessageModels *usecase.DiscoverCommitMessageModels,
@@ -147,6 +152,7 @@ func New(
 	writeFile *usecase.WriteFileUseCase,
 	writeFileChunk *usecase.WriteFileChunkUseCase,
 	createDir *usecase.CreateDirUseCase,
+	createFile *usecase.CreateFileUseCase,
 	deleteFile *usecase.DeleteFileUseCase,
 	statFile *usecase.StatFileUseCase,
 	searchFiles *usecase.SearchFilesUseCase,
@@ -188,6 +194,8 @@ func New(
 	stashPop *usecase.StashPop,
 	createBranch *usecase.CreateBranch,
 	deleteBranch *usecase.DeleteBranch,
+	readEphemeralVmRecipes *usecase.ReadEphemeralVmRecipes,
+	watchWorktreeFiles *usecase.WatchWorktreeFiles,
 ) *Server {
 	return &Server{
 		getStatus:                   getStatus,
@@ -211,6 +219,7 @@ func New(
 		submoduleStatus:             submoduleStatus,
 		remoteCommitURL:             remoteCommitURL,
 		remoteFileURL:               remoteFileURL,
+		getRemoteURL:                getRemoteURL,
 		fetch:                       fetch,
 		generatePullRequestFields:   generatePullRequestFields,
 		discoverCommitMessageModels: discoverCommitMessageModels,
@@ -221,6 +230,7 @@ func New(
 		writeFile:                   writeFile,
 		writeFileChunk:              writeFileChunk,
 		createDir:                   createDir,
+		createFile:                  createFile,
 		deleteFile:                  deleteFile,
 		statFile:                    statFile,
 		searchFiles:                 searchFiles,
@@ -267,6 +277,10 @@ func New(
 		stashPop:        stashPop,
 		createBranch:    createBranch,
 		deleteBranch:    deleteBranch,
+
+		readEphemeralVmRecipes: readEphemeralVmRecipes,
+
+		watchWorktreeFiles: watchWorktreeFiles,
 	}
 }
 
@@ -442,11 +456,12 @@ func (s *Server) Clone(ctx context.Context, req *gitgatewayv1.CloneRequest) (*gi
 func (s *Server) InitRepo(ctx context.Context, req *gitgatewayv1.InitRepoRequest) (*gitgatewayv1.InitRepoResponse, error) {
 	result, err := s.initRepo.Execute(ctx, usecase.InitRepoInput{
 		DevServerID: req.GetDevServerId(), DestPath: req.GetDestPath(), DefaultBranch: req.GetDefaultBranch(),
+		RemoteName: req.GetRemoteName(), RemoteURL: req.GetRemoteUrl(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &gitgatewayv1.InitRepoResponse{Path: result.Path, DefaultBranch: result.DefaultBranch}, nil
+	return &gitgatewayv1.InitRepoResponse{Path: result.Path, DefaultBranch: result.DefaultBranch, RemoteAdded: result.RemoteAdded}, nil
 }
 
 func (s *Server) UpstreamStatus(ctx context.Context, req *gitgatewayv1.UpstreamStatusRequest) (*gitgatewayv1.UpstreamStatusResponse, error) {
@@ -642,6 +657,13 @@ func (s *Server) CreateDir(ctx context.Context, req *gitgatewayv1.CreateDirReque
 	return &gitgatewayv1.CreateDirResponse{}, nil
 }
 
+func (s *Server) CreateFile(ctx context.Context, req *gitgatewayv1.CreateFileRequest) (*gitgatewayv1.CreateFileResponse, error) {
+	if err := s.createFile.Execute(ctx, req.GetWorktreeId(), req.GetPath()); err != nil {
+		return nil, toFileGRPCStatus(err)
+	}
+	return &gitgatewayv1.CreateFileResponse{}, nil
+}
+
 func (s *Server) DeleteFile(ctx context.Context, req *gitgatewayv1.DeleteFileRequest) (*emptypb.Empty, error) {
 	if err := s.deleteFile.Execute(ctx, req.GetWorktreeId(), req.GetPath(), req.GetRecursive()); err != nil {
 		return nil, toFileGRPCStatus(err)
@@ -692,6 +714,33 @@ func (s *Server) ListMarkdownDocuments(ctx context.Context, req *gitgatewayv1.Li
 	return &gitgatewayv1.ListMarkdownDocumentsResponse{Paths: paths}, nil
 }
 
+// WatchWorktree (BACKLOG-003) is server-streaming — grpc.ServerStreamingServer's
+// generated method shape takes (req, stream), ctx from stream.Context(),
+// same as infra-fleet-service's StreamVmProvision/StreamFileChanges
+// handlers one layer down.
+func (s *Server) WatchWorktree(req *gitgatewayv1.WatchWorktreeRequest, stream gitgatewayv1.GitGatewayService_WatchWorktreeServer) error {
+	events, unsubscribe, err := s.watchWorktreeFiles.Execute(stream.Context(), usecase.WatchWorktreeFilesInput{WorktreeID: req.GetWorktreeId()})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	defer unsubscribe()
+	for event := range events {
+		if err := stream.Send(toProtoFileChangeEvent(event)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func toProtoFileChangeEvent(e usecase.FileChangeEvent) *gitgatewayv1.FileChangeEvent {
+	return &gitgatewayv1.FileChangeEvent{
+		Kind:            e.Kind,
+		AbsolutePath:    e.Path,
+		OldAbsolutePath: e.OldPath,
+		IsDirectory:     e.IsDirectory,
+	}
+}
+
 func (s *Server) RenameFile(ctx context.Context, req *gitgatewayv1.RenameFileRequest) (*gitgatewayv1.RenameFileResponse, error) {
 	if err := s.renameFile.Execute(ctx, req.GetWorktreeId(), req.GetFromPath(), req.GetToPath()); err != nil {
 		return nil, toFileGRPCStatus(err)
@@ -707,15 +756,23 @@ func (s *Server) CopyFile(ctx context.Context, req *gitgatewayv1.CopyFileRequest
 }
 
 func (s *Server) BaseRefDefault(ctx context.Context, req *gitgatewayv1.BaseRefDefaultRequest) (*gitgatewayv1.BaseRefDefaultResponse, error) {
-	ref, err := s.baseRefDefault.Execute(ctx, usecase.BaseRefDefaultInput{WorktreeID: req.GetWorktreeId()})
+	ref, err := s.baseRefDefault.Execute(ctx, usecase.BaseRefDefaultInput{RepoID: req.GetRepoId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.BaseRefDefaultResponse{Ref: ref}, nil
 }
 
+func (s *Server) GetRemoteUrl(ctx context.Context, req *gitgatewayv1.GetRemoteUrlRequest) (*gitgatewayv1.GetRemoteUrlResponse, error) {
+	url, err := s.getRemoteURL.Execute(ctx, usecase.GetRemoteURLInput{RepoID: req.GetRepoId(), RemoteName: req.GetRemoteName()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &gitgatewayv1.GetRemoteUrlResponse{Url: url}, nil
+}
+
 func (s *Server) SearchRefs(ctx context.Context, req *gitgatewayv1.SearchRefsRequest) (*gitgatewayv1.SearchRefsResponse, error) {
-	refs, err := s.searchRefs.Execute(ctx, usecase.SearchRefsInput{WorktreeID: req.GetWorktreeId(), Query: req.GetQuery()})
+	refs, err := s.searchRefs.Execute(ctx, usecase.SearchRefsInput{RepoID: req.GetRepoId(), Query: req.GetQuery()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -723,15 +780,33 @@ func (s *Server) SearchRefs(ctx context.Context, req *gitgatewayv1.SearchRefsReq
 }
 
 func (s *Server) CheckHooks(ctx context.Context, req *gitgatewayv1.CheckHooksRequest) (*gitgatewayv1.CheckHooksResponse, error) {
-	result, err := s.checkHooks.Execute(ctx, usecase.CheckHooksInput{WorktreeID: req.GetWorktreeId()})
+	result, err := s.checkHooks.Execute(ctx, usecase.CheckHooksInput{RepoID: req.GetRepoId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &gitgatewayv1.CheckHooksResponse{InstalledHooks: result.InstalledHooks, OrcaHooksCurrent: result.OrcaHooksCurrent}, nil
 }
 
+func (s *Server) ReadEphemeralVmRecipes(ctx context.Context, req *gitgatewayv1.ReadEphemeralVmRecipesRequest) (*gitgatewayv1.ReadEphemeralVmRecipesResponse, error) {
+	result, err := s.readEphemeralVmRecipes.Execute(ctx, usecase.ReadEphemeralVmRecipesInput{RepoID: req.GetRepoId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	recipes := make([]*gitgatewayv1.EphemeralVmRecipe, 0, len(result.Recipes))
+	for _, r := range result.Recipes {
+		recipes = append(recipes, &gitgatewayv1.EphemeralVmRecipe{
+			Id: r.ID, Name: r.Name, Description: r.Description,
+			Create: r.Create, Suspend: r.Suspend, Resume: r.Resume,
+			Destroy: r.Destroy, DestroyDisabled: r.DestroyDisabled,
+		})
+	}
+	return &gitgatewayv1.ReadEphemeralVmRecipesResponse{
+		RepoPath: result.RepoPath, Recipes: recipes, Diagnostics: result.Diagnostics,
+	}, nil
+}
+
 func (s *Server) ReadIssueCommand(ctx context.Context, req *gitgatewayv1.ReadIssueCommandRequest) (*gitgatewayv1.ReadIssueCommandResponse, error) {
-	result, err := s.readIssueCommand.Execute(ctx, usecase.ReadIssueCommandInput{WorktreeID: req.GetWorktreeId()})
+	result, err := s.readIssueCommand.Execute(ctx, usecase.ReadIssueCommandInput{RepoID: req.GetRepoId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -739,7 +814,7 @@ func (s *Server) ReadIssueCommand(ctx context.Context, req *gitgatewayv1.ReadIss
 }
 
 func (s *Server) WriteIssueCommand(ctx context.Context, req *gitgatewayv1.WriteIssueCommandRequest) (*emptypb.Empty, error) {
-	err := s.writeIssueCommand.Execute(ctx, usecase.WriteIssueCommandInput{WorktreeID: req.GetWorktreeId(), Content: req.GetContent()})
+	err := s.writeIssueCommand.Execute(ctx, usecase.WriteIssueCommandInput{RepoID: req.GetRepoId(), Content: req.GetContent()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -747,7 +822,7 @@ func (s *Server) WriteIssueCommand(ctx context.Context, req *gitgatewayv1.WriteI
 }
 
 func (s *Server) ScanSetupScriptImports(ctx context.Context, req *gitgatewayv1.ScanSetupScriptImportsRequest) (*gitgatewayv1.ScanSetupScriptImportsResponse, error) {
-	paths, err := s.scanSetupScriptImports.Execute(ctx, usecase.ScanSetupScriptImportsInput{WorktreeID: req.GetWorktreeId()})
+	paths, err := s.scanSetupScriptImports.Execute(ctx, usecase.ScanSetupScriptImportsInput{RepoID: req.GetRepoId()})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -761,6 +836,15 @@ func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWor
 		ProjectID: req.GetProjectId(), RepoID: req.GetRepoId(), Branch: req.GetBranch(), BaseRef: req.GetBaseRef(),
 		IdempotencyKey: req.GetIdempotencyKey(),
 		Name:           req.GetName(), Path: req.GetPath(),
+		Lineage: domain.WorktreeLineageCapture{
+			ParentWorktreeID:        req.GetParentWorktreeId(),
+			Origin:                  req.GetOrigin(),
+			CaptureSource:           req.GetCaptureSource(),
+			TaskID:                  req.GetTaskId(),
+			OrchestrationRunID:      req.GetOrchestrationRunId(),
+			CoordinatorHandle:       req.GetCoordinatorHandle(),
+			CreatedByTerminalHandle: req.GetCreatedByTerminalHandle(),
+		},
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -867,11 +951,15 @@ func (s *Server) ForceDeleteBranch(ctx context.Context, req *gitgatewayv1.ForceD
 }
 
 func (s *Server) DetectWorktrees(ctx context.Context, req *gitgatewayv1.DetectWorktreesRequest) (*gitgatewayv1.DetectWorktreesResponse, error) {
-	paths, err := s.detectWorktrees.Execute(ctx, req.GetRepoId())
+	infos, err := s.detectWorktrees.Execute(ctx, req.GetRepoId())
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &gitgatewayv1.DetectWorktreesResponse{OnDiskPaths: paths}, nil
+	out := make([]*gitgatewayv1.DetectedWorktreeGitInfo, 0, len(infos))
+	for _, info := range infos {
+		out = append(out, &gitgatewayv1.DetectedWorktreeGitInfo{Path: info.Path, Head: info.Head, Branch: info.Branch})
+	}
+	return &gitgatewayv1.DetectWorktreesResponse{OnDiskWorktrees: out}, nil
 }
 
 func (s *Server) PrefetchCreateBase(ctx context.Context, req *gitgatewayv1.PrefetchCreateBaseRequest) (*gitgatewayv1.PrefetchCreateBaseResponse, error) {

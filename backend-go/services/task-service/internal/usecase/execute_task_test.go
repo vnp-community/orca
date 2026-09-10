@@ -18,7 +18,7 @@ import (
 // default to permissive fakes; clock defaults to a fixed instant (so
 // actual_hours math is deterministic without every test needing to care).
 func newExecuteTaskForTest(repo *fakeTaskRepository, edges *fakeEdgeRepository, simple SimpleExecutor, complex ComplexExecutor) *ExecuteTask {
-	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	worktrees := &fakeWorktreeProvisioner{worktreeID: "wt-1", path: "/srv/worktrees/wt-1"}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}
 	clock := &fakeClock{now: time.Unix(1000, 0)}
@@ -268,7 +268,7 @@ func TestExecuteTask_DispatchFailure_RevertsStatusToPrevious(t *testing.T) {
 func TestExecuteTask_PermissionDenied_NeverWritesStatus(t *testing.T) {
 	repo := newFakeTaskRepository()
 	repo.tasks["task-1"] = domain.Task{ID: "task-1", TenantID: "tenant-1", OwnerID: "someone-else", Status: domain.StatusOpen}
-	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
 	worktrees := &fakeWorktreeProvisioner{worktreeID: "wt-1"}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}
@@ -301,7 +301,7 @@ func TestExecuteTask_PermissionDenied_NeverWritesStatus(t *testing.T) {
 func TestExecuteTask_NoConnection_ReturnsFailedPrecondition(t *testing.T) {
 	repo := newFakeTaskRepository()
 	seedOwnedTask(repo, "task-1")
-	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	worktrees := &fakeWorktreeProvisioner{worktreeID: "wt-1"}
 	resolver := &fakeProjectExecutionResolver{connected: false}
 	clock := &fakeClock{now: time.Unix(1000, 0)}

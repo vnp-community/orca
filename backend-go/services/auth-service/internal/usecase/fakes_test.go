@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync"
 	"time"
 
@@ -128,6 +129,17 @@ func (f *fakeUserRepository) UpdateUser(ctx context.Context, userID string, emai
 	delete(f.byEmail, oldEmail)
 	f.byEmail[u.Email] = u
 	return u, nil
+}
+
+func (f *fakeUserRepository) SetSsoProvider(ctx context.Context, userID string, provider domain.SsoProvider) error {
+	u, ok := f.byID[userID]
+	if !ok {
+		return nil
+	}
+	u.SsoProvider = provider
+	f.byID[userID] = u
+	f.byEmail[u.Email] = u
+	return nil
 }
 
 // fakeSessionRepository is an in-memory SessionRepository. Guarded by mu
@@ -286,6 +298,61 @@ func (f *fakeSessionRepository) DeleteExpiredBefore(ctx context.Context, cutoff 
 	return n, nil
 }
 
+func (f *fakeSessionRepository) GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (domain.Session, error) {
+	for _, s := range f.byHash {
+		if s.RefreshTokenHash != "" && s.RefreshTokenHash == refreshTokenHash {
+			return s, nil
+		}
+	}
+	return domain.Session{}, ErrSessionNotFound
+}
+
+// fakeSsoGroupRoleMappingRepository is an in-memory
+// SsoGroupRoleMappingRepository, keyed the same way the real table's
+// UNIQUE(tenant_id, provider, group_name) constraint is keyed.
+type fakeSsoGroupRoleMappingRepository struct {
+	byKey map[string]domain.SsoGroupRoleMapping
+	// listErr, when set, makes ListForProvider return it — TASK-BE-010's
+	// fail-closed-to-domain.RoleUser regression test.
+	listErr error
+}
+
+func newFakeSsoGroupRoleMappingRepository() *fakeSsoGroupRoleMappingRepository {
+	return &fakeSsoGroupRoleMappingRepository{byKey: make(map[string]domain.SsoGroupRoleMapping)}
+}
+
+func ssoGroupRoleMappingKey(tenantID string, provider domain.SsoProvider, groupName string) string {
+	return tenantID + "|" + string(provider) + "|" + groupName
+}
+
+func (f *fakeSsoGroupRoleMappingRepository) Upsert(ctx context.Context, m domain.SsoGroupRoleMapping) (domain.SsoGroupRoleMapping, error) {
+	key := ssoGroupRoleMappingKey(m.TenantID, m.Provider, m.GroupName)
+	if existing, ok := f.byKey[key]; ok {
+		existing.Role = m.Role
+		f.byKey[key] = existing
+		return existing, nil
+	}
+	f.byKey[key] = m
+	return m, nil
+}
+
+func (f *fakeSsoGroupRoleMappingRepository) ListForProvider(ctx context.Context, tenantID string, provider domain.SsoProvider) ([]domain.SsoGroupRoleMapping, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []domain.SsoGroupRoleMapping
+	for _, m := range f.byKey {
+		if m.TenantID != tenantID {
+			continue
+		}
+		if provider != "" && m.Provider != provider {
+			continue
+		}
+		out = append(out, m)
+	}
+	return out, nil
+}
+
 // fakeAccessPolicyRepository is an in-memory AccessPolicyRepository —
 // stores every version row (append-only, matching the real postgres
 // adapter's (id, version) primary key), keyed by id then version.
@@ -391,6 +458,9 @@ func (f *fakeAuditRepository) Query(ctx context.Context, filter AuditQueryFilter
 		if filter.ActorID != "" && e.ActorID != filter.ActorID {
 			continue
 		}
+		if filter.Outcome != "" && e.Outcome != filter.Outcome {
+			continue
+		}
 		out = append(out, e)
 	}
 	return out, "", nil
@@ -445,6 +515,66 @@ func (f *fakeTokenSigner) PublicJWKS(ctx context.Context) (jose.JSONWebKeySet, e
 		return jose.JSONWebKeySet{}, f.jwksErr
 	}
 	return f.jwks, nil
+}
+
+// fakeSsoIdentityRepository is an in-memory SsoIdentityRepository, keyed by
+// "provider|external_subject" the same way auth.sso_identities' UNIQUE
+// constraint is keyed.
+type fakeSsoIdentityRepository struct {
+	byKey map[string]domain.SsoIdentity
+
+	findCalls int
+	linkCalls int
+}
+
+func newFakeSsoIdentityRepository() *fakeSsoIdentityRepository {
+	return &fakeSsoIdentityRepository{byKey: make(map[string]domain.SsoIdentity)}
+}
+
+func ssoIdentityKey(provider domain.SsoProvider, subject string) string {
+	return string(provider) + "|" + subject
+}
+
+func (f *fakeSsoIdentityRepository) seed(identity domain.SsoIdentity) {
+	f.byKey[ssoIdentityKey(identity.Provider, identity.ExternalSubject)] = identity
+}
+
+func (f *fakeSsoIdentityRepository) FindByProviderSubject(ctx context.Context, provider domain.SsoProvider, externalSubject string) (domain.SsoIdentity, error) {
+	f.findCalls++
+	id, ok := f.byKey[ssoIdentityKey(provider, externalSubject)]
+	if !ok {
+		return domain.SsoIdentity{}, ErrSsoIdentityNotFound
+	}
+	return id, nil
+}
+
+func (f *fakeSsoIdentityRepository) Link(ctx context.Context, identity domain.SsoIdentity) error {
+	f.linkCalls++
+	f.seed(identity)
+	return nil
+}
+
+func (f *fakeSsoIdentityRepository) TouchLastLogin(ctx context.Context, id string, at time.Time) error {
+	for k, v := range f.byKey {
+		if v.ID == id {
+			v.LastLoginAt = &at
+			f.byKey[k] = v
+		}
+	}
+	return nil
+}
+
+// fakeTenantResolver is an in-memory TenantResolver.
+type fakeTenantResolver struct {
+	tenantID string
+	err      error
+}
+
+func (f *fakeTenantResolver) ResolveTenantForEmail(ctx context.Context, email string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.tenantID, nil
 }
 
 // fakeOPAClient backs requireAdminActor's tests without loading the real
@@ -554,6 +684,62 @@ func (f *fakePairedDeviceRepository) List(ctx context.Context, tenantID, userID 
 	for _, d := range f.byID {
 		if d.TenantID == tenantID && d.UserID == userID {
 			out = append(out, d)
+		}
+	}
+	return out, nil
+}
+
+// fakeServiceTokenRepository is an in-memory ServiceTokenRepository —
+// mirrors fakeUserRepository's "test against fakes" pattern.
+type fakeServiceTokenRepository struct {
+	byJTI map[string]domain.IssuedServiceToken
+
+	recordErr    error
+	isRevokedErr error
+	revokeErr    error
+}
+
+func newFakeServiceTokenRepository() *fakeServiceTokenRepository {
+	return &fakeServiceTokenRepository{byJTI: make(map[string]domain.IssuedServiceToken)}
+}
+
+func (f *fakeServiceTokenRepository) RecordIssuedToken(ctx context.Context, token domain.IssuedServiceToken) error {
+	if f.recordErr != nil {
+		return f.recordErr
+	}
+	f.byJTI[token.JTI] = token
+	return nil
+}
+
+func (f *fakeServiceTokenRepository) IsRevoked(ctx context.Context, jti string) (bool, error) {
+	if f.isRevokedErr != nil {
+		return false, f.isRevokedErr
+	}
+	t, ok := f.byJTI[jti]
+	if !ok {
+		return false, nil
+	}
+	return t.IsRevoked(), nil
+}
+
+func (f *fakeServiceTokenRepository) Revoke(ctx context.Context, jti string, revokedAt time.Time) error {
+	if f.revokeErr != nil {
+		return f.revokeErr
+	}
+	t, ok := f.byJTI[jti]
+	if !ok {
+		return fmt.Errorf("fake: revoke issued service token: %w", ErrServiceTokenNotFound)
+	}
+	t.RevokedAt = &revokedAt
+	f.byJTI[jti] = t
+	return nil
+}
+
+func (f *fakeServiceTokenRepository) ListServiceTokensForUser(ctx context.Context, userID string) ([]domain.IssuedServiceToken, error) {
+	var out []domain.IssuedServiceToken
+	for _, t := range f.byJTI {
+		if t.UserID == userID {
+			out = append(out, t)
 		}
 	}
 	return out, nil

@@ -10,12 +10,12 @@ import (
 )
 
 func TestResolvePrBase_HappyPath(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{fetchAndResolveRefSHA: "resolved-sha-1"}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
 	scm := &fakeSCMClient{prBaseBranch: "main"}
-	uc := NewResolvePrBase(scm, resolver, projects, local, relay)
+	uc := NewResolvePrBase(scm, reachability, projects, local, relay)
 
 	got, err := uc.Execute(context.Background(), "repo-1", 42)
 	if err != nil {
@@ -27,12 +27,12 @@ func TestResolvePrBase_HappyPath(t *testing.T) {
 }
 
 func TestResolvePrBase_FetchAndResolveRefFails_ReturnsUnresolvableAndZeroValue(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{fetchAndResolveRefErr: errors.New("base branch not found locally")}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
 	scm := &fakeSCMClient{prBaseBranch: "main", prBaseSHA: "should-not-leak"}
-	uc := NewResolvePrBase(scm, resolver, projects, local, relay)
+	uc := NewResolvePrBase(scm, reachability, projects, local, relay)
 
 	got, err := uc.Execute(context.Background(), "repo-1", 42)
 	if err == nil {
@@ -48,12 +48,12 @@ func TestResolvePrBase_FetchAndResolveRefFails_ReturnsUnresolvableAndZeroValue(t
 }
 
 func TestResolvePrBase_SCMLookupFails_FetchAndResolveRefNeverCalled(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
 	scm := &fakeSCMClient{prBaseErr: apperrors.New(apperrors.KindInternal, "WORKTREE_SCM_GET_PR_BASE_UNIMPLEMENTED", "scm-integration-service has no RPC yet", nil)}
-	uc := NewResolvePrBase(scm, resolver, projects, local, relay)
+	uc := NewResolvePrBase(scm, reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), "repo-1", 42)
 	if err == nil {

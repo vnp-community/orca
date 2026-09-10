@@ -9,7 +9,7 @@ WORKDIR /src
 COPY go.work go.work.sum* ./
 COPY common ./common
 COPY proto ./proto
-COPY services/automation-service ./services/automation-service
+COPY services ./services
 
 WORKDIR /src/services/automation-service
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION:-dev}" \

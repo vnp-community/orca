@@ -6,6 +6,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
@@ -21,7 +22,13 @@ import (
 type ProjectRepository interface {
 	Create(ctx context.Context, project domain.Project) (domain.Project, error)
 	Get(ctx context.Context, tenantID, id string) (domain.Project, error)
-	List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Project, string, error)
+	// List returns only projects userID is a member of — see
+	// usecase.ListProjects.Execute's doc comment for why this is not just
+	// tenant-scoped (found live during the "one private default project per
+	// user" pass: a bare tenant_id filter here leaked every tenant member's
+	// projects to every other member, undermining the private-by-default
+	// design before it existed).
+	List(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error)
 	AddMember(ctx context.Context, member domain.ProjectMember) error
 	// UpdateDevServerID rebinds a project to a new dev server — the only
 	// write path for dev_server_id (see usecase.RebindDevServer). Returns
@@ -73,6 +80,13 @@ type MembershipRepository interface {
 	GetMembership(ctx context.Context, projectID, userID string) (domain.ProjectMember, error)
 }
 
+// RepoMembershipRepository is the read-only subset of RepoRepository that
+// requireRepoAccess needs to resolve caller_repo_role — same shape/reasoning
+// as MembershipRepository, one tier down (repo, not project).
+type RepoMembershipRepository interface {
+	GetRepoMembership(ctx context.Context, repoID, userID string) (domain.RepoMember, error)
+}
+
 // OPAClient is the authorization port every OPA-gated usecase in this
 // service uses for the "does this caller_project_role/caller_global_role
 // authorize this action" decision — implemented by internal/adapter/
@@ -86,6 +100,13 @@ type OPAClient interface {
 	// "action"} input contract. action is one of the projectAction* constants
 	// in authorization.go.
 	Decision(ctx context.Context, callerProjectRole, callerGlobalRole, action string) (bool, error)
+	// RepoDecision is Decision's repo-scoped counterpart, consuming
+	// backend-go/policy/orca-authz/repo.rego's data.orca.authz.repo.allow
+	// rule instead — an owner always passes (repo.rego's own bypass rule)
+	// regardless of callerRepoRole; a non-owner project member needs a
+	// repo_members grant matching the action's tier. action is one of the
+	// repoAction* constants in authorization.go.
+	RepoDecision(ctx context.Context, callerProjectRole, callerRepoRole, callerGlobalRole, action string) (bool, error)
 }
 
 // WorkflowExecutionChecker is the outbound port toward workflow-service —
@@ -115,6 +136,15 @@ type RepoRepository interface {
 	AddRepo(ctx context.Context, repo domain.Repo) (domain.Repo, error)
 	// ListRepos returns a project's repos ordered by position.
 	ListRepos(ctx context.Context, projectID string) ([]domain.Repo, error)
+	// ListReposForTenant returns every repo across every project in the
+	// caller's tenant — the wscompat repo.list channel's "no project
+	// filter" call shape (frontend/src/main/runtime/rpc/methods/repo.ts's
+	// old repo.list took no params at all). No single project_id to check
+	// per-project membership against, so usecase.ListRepos gates this path
+	// on tenant membership alone, same reasoning as
+	// usecase.ListWorktreeLineage's doc comment — Postgres RLS on
+	// project.repos already scopes the query to the caller's tenant.
+	ListReposForTenant(ctx context.Context) ([]domain.Repo, error)
 	// ReorderRepos rewrites every listed repo's position (0-indexed, by
 	// list order) in a single transaction. Callers must have already
 	// validated idsInOrder is an exact permutation of the project's
@@ -132,6 +162,65 @@ type RepoRepository interface {
 	// usecase.UpdateRepo after it applies the field-mask. Returns
 	// domain.ErrRepoNotFound (wrapped) if no repo matches.
 	Update(ctx context.Context, repo domain.Repo) (domain.Repo, error)
+	// UpdateDevServerID rebinds a single repo to a new dev server — the only
+	// write path for repos.dev_server_id (see usecase.RebindRepoDevServer),
+	// analogous to ProjectRepository.UpdateDevServerID one tier down. Returns
+	// domain.ErrRepoNotFound (wrapped) if no repo matches.
+	UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error)
+	// ReassignProject moves repo into a different project, appending it at
+	// the end of that project's list (same position convention AddRepo uses
+	// for a brand-new repo) and clearing any repo_members grants (scoped to
+	// the OLD project's trust, must not silently carry over) — the only
+	// write path for usecase.AssignRepoToProject. The write is conditioned
+	// on fromProjectID still matching (guards the TOCTOU window between the
+	// caller's authorization check and this write): returns
+	// domain.ErrRepoNotFound if no repo matches at all, or
+	// domain.ErrRepoProjectChanged if the repo exists but its project_id no
+	// longer matches fromProjectID (a concurrent move raced this one).
+	ReassignProject(ctx context.Context, repoID, fromProjectID, targetProjectID string) (domain.Repo, error)
+
+	// ── repo_members (functional-role tier, layered on top of project_members) ──
+
+	// AddRepoMember grants userID a functional role on repoID — additional
+	// to (never a replacement for) that user's project membership.
+	AddRepoMember(ctx context.Context, member domain.RepoMember) error
+	// GetRepoMembership returns userID's functional-role grant on repoID.
+	// Returns domain.ErrRepoMembershipNotFound (wrapped) if no row matches
+	// — requireRepoAccess's normal "no grant on this repo" case.
+	GetRepoMembership(ctx context.Context, repoID, userID string) (domain.RepoMember, error)
+	// ListRepoMembers returns every functional-role grant for one repo.
+	ListRepoMembers(ctx context.Context, repoID string) ([]domain.RepoMember, error)
+	// RemoveRepoMember deletes one grant. Returns
+	// domain.ErrRepoMembershipNotFound (wrapped) if none exists.
+	RemoveRepoMember(ctx context.Context, repoID, userID string) error
+	// UpdateRepoMemberRole changes one grant's functional role. Returns
+	// domain.ErrRepoMembershipNotFound (wrapped) if none exists.
+	UpdateRepoMemberRole(ctx context.Context, repoID, userID string, role domain.RepoRole) (domain.RepoMember, error)
+	// ListRepoIDsWithMembership returns the subset of projectID's repo ids
+	// where userID holds a repo_members row — usecase.ListRepos' non-owner
+	// visibility filter ("a member sees only repos they're explicitly
+	// granted onto").
+	ListRepoIDsWithMembership(ctx context.Context, projectID, userID string) ([]string, error)
+}
+
+// SparsePresetRepository is the persistence port for a repo's saved sparse
+// worktree directory sets — ports backend/src/main/persistence.ts's (legacy
+// TS) getSparsePresets/saveSparsePreset/removeSparsePreset.
+type SparsePresetRepository interface {
+	// ListSparsePresets returns every preset saved for repoID.
+	ListSparsePresets(ctx context.Context, repoID string) ([]domain.SparsePreset, error)
+	// GetSparsePreset returns one preset by id, scoped to repoID. Returns
+	// domain.ErrSparsePresetNotFound (wrapped) if none matches.
+	GetSparsePreset(ctx context.Context, repoID, presetID string) (domain.SparsePreset, error)
+	// SaveSparsePreset inserts (empty preset.ID) or updates (non-empty
+	// preset.ID) a preset — the caller (usecase.SaveSparsePreset) has
+	// already resolved which case this is and set CreatedAt/UpdatedAt
+	// accordingly. Returns domain.ErrSparsePresetNotFound (wrapped) if
+	// preset.ID is non-empty but matches no existing row.
+	SaveSparsePreset(ctx context.Context, preset domain.SparsePreset) (domain.SparsePreset, error)
+	// RemoveSparsePreset deletes one preset. Returns
+	// domain.ErrSparsePresetNotFound (wrapped) if none exists.
+	RemoveSparsePreset(ctx context.Context, repoID, presetID string) error
 }
 
 // WorktreeRepository is the persistence port for a project's worktree
@@ -174,6 +263,21 @@ type WorktreeRepository interface {
 	// row (for its linked-issue fields) so the caller can build the event
 	// payload without a separate pre-delete read.
 	RemoveWorktreeWithEvent(ctx context.Context, worktreeID string, buildEvent func(removed domain.Worktree) domain.OutboxEvent) error
+	// UpdateWorktreeMeta shallow-merges patch (a JSON object) into the
+	// worktree's stored metadata blob — see
+	// postgres.WorktreeRepository.UpdateWorktreeMeta's doc comment for the
+	// merge semantics. patch must be a JSON object (`{...}`), never an
+	// array or scalar.
+	UpdateWorktreeMeta(ctx context.Context, worktreeID string, patch json.RawMessage) (domain.Worktree, error)
+	// SetWorktreeLineage re-parents (parentWorktreeID != nil) or clears the
+	// parent of (parentWorktreeID == nil) an already-created worktree.
+	SetWorktreeLineage(ctx context.Context, worktreeID string, parentWorktreeID *string) (domain.Worktree, error)
+	// ListLineage returns every worktree with an explicitly-captured parent
+	// — this is unrelated to the "lineage/history" mentioned in
+	// RecordWorktreeRemoved's doc comment above (that one means git commit
+	// history, owned by git-gateway-service; this one means worktree
+	// creation lineage — see domain.Worktree's ParentWorktreeID field).
+	ListLineage(ctx context.Context) ([]domain.Worktree, error)
 }
 
 // ProjectGroupRepository is the persistence port for the folder-style
@@ -214,6 +318,24 @@ type ProjectGroupRepository interface {
 type DevServerRelay interface {
 	CreateConnection(ctx context.Context, devServerID, repoPath, worktreeID string) (connectionID string, err error)
 	Relay(ctx context.Context, connectionID, method string, paramsJSON []byte) (resultJSON []byte, err error)
+}
+
+// SourceProjectRepository is the persistence port for cross-project source
+// sharing. Implemented by internal/adapter/postgres against
+// project.source_projects (migrations/0014).
+type SourceProjectRepository interface {
+	// Link upserts the join row (linked_at bumped on a re-link) — see
+	// postgres adapter's ON CONFLICT clause.
+	Link(ctx context.Context, sp domain.SourceProject) (domain.SourceProject, error)
+	// Unlink is idempotent: deleting an absent row is a no-op, not an
+	// error — matches the legacy TS reference implementation
+	// (OrcaProjectSourceProjectService.unlinkProject).
+	Unlink(ctx context.Context, containerProjectID, sourceProjectID string) error
+	List(ctx context.Context, containerProjectID string) ([]domain.SourceProject, error)
+	// Get returns domain.ErrSourceProjectNotFound (wrapped) if no link row
+	// matches — usecase.GetSharedProjectData's "is sourceProjectID actually
+	// linked into containerProjectID" check.
+	Get(ctx context.Context, containerProjectID, sourceProjectID string) (domain.SourceProject, error)
 }
 
 // HostSetupRepository is the persistence port for the pre-project

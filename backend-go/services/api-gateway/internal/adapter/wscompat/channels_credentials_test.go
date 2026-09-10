@@ -2,6 +2,7 @@ package wscompat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -386,6 +387,29 @@ func TestCredentialsList_MergesJiraAndLinear(t *testing.T) {
 	}
 	if len(view.Services) != 2 || view.Services[0] != "jira" || view.Services[1] != "linear" {
 		t.Errorf("expected [jira linear], got %v", view.Services)
+	}
+}
+
+// TestCredentialsList_EmptyResult_ReturnsEmptyArrayNotNull is the direct
+// regression test for BUG-005 (specs/backend-go/bugs/missing-v2/):
+// handleCredentialsList declares `var services []string`, which stays nil
+// when neither upstream service reports any configured credential —
+// Registry.Dispatch must normalize that to [] before it reaches the
+// frontend, which reads view.Services with no null-guard.
+func TestCredentialsList_EmptyResult_ReturnsEmptyArrayNotNull(t *testing.T) {
+	r := NewRegistry()
+	registerCredentialsChannels(r, noopScmFake(), noopIssueFake())
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "credentials.list", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	b, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	if string(b) != `{"services":[],"mode":"server"}` {
+		t.Errorf(`expected {"services":[],"mode":"server"}, got %s`, b)
 	}
 }
 

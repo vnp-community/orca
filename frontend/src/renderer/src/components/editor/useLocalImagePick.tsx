@@ -5,7 +5,7 @@ import { insertRichMarkdownImageFromPath } from './rich-markdown-image-insert'
 import { insertRichMarkdownImageFromDevServerPath } from './rich-markdown-image-insert-dev-server'
 import { extractIpcErrorMessage } from './rich-markdown-ipc-error-message'
 import { isWebClientLocation } from '../../lib/web-client-location'
-import { useActiveDevServer } from '../../store/slices/dev-servers'
+import { useActiveDevServer } from '../../store/slices/dev-servers-selectors'
 import { DevServerFilePickerDialog } from '../remote-browser/DevServerFilePickerDialog'
 
 import { shellPickImage } from '../../runtime/runtime-shell-client'

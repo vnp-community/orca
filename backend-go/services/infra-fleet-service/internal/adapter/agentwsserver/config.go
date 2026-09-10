@@ -35,18 +35,37 @@ type Config struct {
 	// this process — see capacity.go (TASK-AWS-02-03). <= 0 disables the
 	// check.
 	MaxConcurrentSessions int
+	// DefaultTenantID is the tenant a direct-websocket agent's dev_servers
+	// row is registered under (see ResolveDirectWebSocketDevServer's doc
+	// comment for why this can't come from request context the normal way).
+	// ORCA_AGENT_DEFAULT_TENANT_ID, falling back to the well-known bootstrap
+	// tenant sentinel every fresh deployment's admin account is seeded
+	// under (00000000-0000-0000-0000-000000000001) — correct for today's
+	// single-tenant-per-deployment reality; a true multi-tenant agent-token
+	// flow would need this configurable per token, not per deployment.
+	DefaultTenantID string
 }
+
+// defaultBootstrapTenantID mirrors the sentinel bootstrap tenant every
+// fresh deployment's admin account is seeded under (live-verified against
+// b15.openledger.vn's auth.users row).
+const defaultBootstrapTenantID = "00000000-0000-0000-0000-000000000001"
 
 // LoadConfigFromEnv reads ORCA_AGENT_API_SECRET and combines it with
 // port/orcaVersion supplied by the caller — main.go already computes both
 // (svcconfig.Config.HTTPPort and devserveragent's LoadConfigFromEnv().OrcaVersion)
 // so this avoids re-reading ORCA_VERSION redundantly.
 func LoadConfigFromEnv(port int, orcaVersion string) Config {
+	tenantID := os.Getenv("ORCA_AGENT_DEFAULT_TENANT_ID")
+	if tenantID == "" {
+		tenantID = defaultBootstrapTenantID
+	}
 	return Config{
 		Port:                  port,
 		APISecret:             os.Getenv("ORCA_AGENT_API_SECRET"),
 		OrcaVersion:           orcaVersion,
 		MinAgentVersion:       os.Getenv("ORCA_AGENT_MIN_VERSION"), // e.g. "1.0.0"; empty = no check
 		MaxConcurrentSessions: 500,                                 // circuit-breaker default, see capacity.go's doc comment — not a tuned production limit
+		DefaultTenantID:       tenantID,
 	}
 }

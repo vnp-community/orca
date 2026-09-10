@@ -68,7 +68,7 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
           if (!state.repos.some((r) => r.id === repo.id)) {
             useAppStore.setState({ repos: [...state.repos, repo] })
           }
-          await markOnboardingProjectAdded('addedFolder')
+          await markOnboardingProjectAdded('addedFolder', state.settings)
           await state.fetchWorktrees(repo.id)
           // Why: mirror the local non-git folder flow — without this the
           // dialog closes and the UI shows no visible change, making the
@@ -76,9 +76,9 @@ const NonGitFolderDialog = React.memo(function NonGitFolderDialog() {
           // worktree reveals it in the sidebar and opens the workspace.
           const folderWorktree = useAppStore.getState().worktreesByRepo[repo.id]?.[0]
           if (folderWorktree) {
-            const onboarding = await getRuntimeOnboardingState(useAppStore.getState().settings).catch(
-              () => null
-            )
+            const onboarding = await getRuntimeOnboardingState(
+              useAppStore.getState().settings
+            ).catch(() => null)
             // Why: SSH users can hit this dialog from Add Project after
             // dismissing onboarding, bypassing the local addNonGitFolder path.
             const startup = buildDismissedOnboardingFolderAgentStartup(

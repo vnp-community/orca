@@ -25,43 +25,30 @@ function getRepeatedValues(values: readonly string[]): Set<string> {
   return repeated
 }
 
+// A Project has at most one ready setup now (Phase 10: no cross-host merging),
+// so a project's own detail is just that single directory's formatting — no
+// "+N more" aggregation across setups of the same project is possible anymore.
 function getProjectDirectoryDetail(
-  directories: readonly ProjectSetupDirectory[],
+  directory: ProjectSetupDirectory | undefined,
   hostLabelById: ReadonlyMap<ExecutionHostId, string>,
   mode: ProjectDirectoryDetailMode
 ): string | null {
-  const detailByKey = new Map<string, string>()
-  for (const directory of directories) {
-    const path = directory.path.trim()
-    if (!path) {
-      continue
-    }
-    const hostLabel =
-      hostLabelById.get(directory.hostId)?.trim() || getExecutionHostLabel(directory.hostId)
-    const detail =
-      mode === 'path'
-        ? path
-        : mode === 'host-id'
-          ? `${hostLabel} (${directory.hostId}) · ${path}`
-          : `${hostLabel} · ${path}`
-    const key = mode === 'path' ? path : `${directory.hostId}\0${path}`
-    detailByKey.set(key, detail)
-  }
-
-  const distinctDetails = [...detailByKey.values()].sort()
-  if (distinctDetails.length === 0) {
+  const path = directory?.path.trim()
+  if (!directory || !path) {
     return null
   }
-
-  const [firstDetail] = distinctDetails
-  return distinctDetails.length === 1
-    ? firstDetail
-    : `${firstDetail} (+${distinctDetails.length - 1} more)`
+  const hostLabel =
+    hostLabelById.get(directory.hostId)?.trim() || getExecutionHostLabel(directory.hostId)
+  return mode === 'path'
+    ? path
+    : mode === 'host-id'
+      ? `${hostLabel} (${directory.hostId}) · ${path}`
+      : `${hostLabel} · ${path}`
 }
 
 export function getDuplicateProjectDetailsById(
   options: readonly ProjectOptionDraft[],
-  setupDirectoriesByProjectId: ReadonlyMap<string, readonly ProjectSetupDirectory[]>,
+  setupDirectoriesByProjectId: ReadonlyMap<string, ProjectSetupDirectory>,
   hostLabelById: ReadonlyMap<ExecutionHostId, string>
 ): Map<string, string> {
   const optionsByName = new Map<string, ProjectOptionDraft[]>()
@@ -93,7 +80,7 @@ export function getDuplicateProjectDetailsById(
     const pathOnlyDetailsById = new Map<string, string>()
     for (const option of ambiguousOptions) {
       const detail = getProjectDirectoryDetail(
-        setupDirectoriesByProjectId.get(option.projectId) ?? [],
+        setupDirectoriesByProjectId.get(option.projectId),
         hostLabelById,
         'path'
       )
@@ -110,7 +97,7 @@ export function getDuplicateProjectDetailsById(
         continue
       }
       const detail = getProjectDirectoryDetail(
-        setupDirectoriesByProjectId.get(option.projectId) ?? [],
+        setupDirectoriesByProjectId.get(option.projectId),
         hostLabelById,
         'host-label'
       )
@@ -133,7 +120,7 @@ export function getDuplicateProjectDetailsById(
           // stable host id only when the final visible detail still repeats.
           detail =
             getProjectDirectoryDetail(
-              setupDirectoriesByProjectId.get(option.projectId) ?? [],
+              setupDirectoriesByProjectId.get(option.projectId),
               hostLabelById,
               'host-id'
             ) ?? detail

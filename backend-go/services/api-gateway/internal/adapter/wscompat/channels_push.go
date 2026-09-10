@@ -36,6 +36,7 @@ type NotificationStreamOpener func(ctx context.Context, userID string) (notifica
 // alongside (not instead of) RegisterRealChannels.
 func RegisterPushChannels(r *Registry, notificationStreamOpener NotificationStreamOpener, bus *ClientEventBus, infraFleetClient infrafleetv1.InfraFleetServiceClient) {
 	registerNotificationStreamChannel(r, notificationStreamOpener)
+	registerStarNagVisibilityStreamChannel(r, notificationStreamOpener)
 	registerClientEventsChannel(r, bus)
 	registerWorkspacePortsStreamChannel(r, infraFleetClient)
 }

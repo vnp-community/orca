@@ -10,7 +10,7 @@ itself.
 - `agent/src/relay/agent-rpc-dispatch.ts`
 - (no changes to `git-handler-status-ops.ts`, `git-handler-ops.ts`,
   `git-handler-worktree-ops.ts`, etc. — this reuses that logic verbatim)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 2 task(s) (TASK-227–228) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

@@ -141,7 +141,7 @@ type agentExecPromptResult struct {
 	TimedOut bool   `json:"timedOut"`
 }
 
-func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID string) (string, error) {
+func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
 	task, err := s.tasks.Get(ctx, tenantID, taskID)
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: load task: %w", err)
@@ -193,9 +193,14 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	// here rather than picking one: the prompt always carries the task's
 	// dependency context, and the env always at least carries the base
 	// ORCA_TASK_ID/ORCA_PROJECT_ID pair (TASK-TG-04-06) even when no
-	// profile resolves.
+	// profile resolves. An explicit prompt argument (docs/backlog/BACKLOG-016)
+	// overrides the built default entirely when non-empty.
+	effectivePrompt := prompt
+	if effectivePrompt == "" {
+		effectivePrompt = buildExecutePrompt(task, parent, completedDeps)
+	}
 	params := agentExecPromptParams{
-		Prompt:       buildExecutePrompt(task, parent, completedDeps),
+		Prompt:       effectivePrompt,
 		WorktreePath: worktreePath,
 		StepID:       requestID,
 		Env:          map[string]string{"ORCA_TASK_ID": task.ID, "ORCA_PROJECT_ID": task.ProjectID},

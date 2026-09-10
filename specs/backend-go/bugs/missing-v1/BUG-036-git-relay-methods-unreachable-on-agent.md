@@ -3,7 +3,7 @@
 **Service:** `git-gateway-service` (caller) + `agent/` (missing handler registration)
 **File:** `services/git-gateway-service/internal/adapter/grpcclient/relay_executor.go`, `agent/src/relay/agent-rpc-dispatch.ts`
 **Severity:** Critical — this is not a missing-feature gap like the other 34 bugs in this directory; it means the data flow frontend→backend→agent→backend→frontend is **broken today** for the 2 `git.*` methods currently marked "wired" (`git.status`, `git.diff`), and will silently break every method BUG-032/SOL-032 plans to add the same way, unless fixed first
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-227–228 (2 task(s), all DONE) for implementation evidence.
 
 ---
 

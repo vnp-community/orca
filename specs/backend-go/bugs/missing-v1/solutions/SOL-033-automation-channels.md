@@ -11,7 +11,7 @@
 - `backend-go/services/automation-service/internal/adapter/grpc/server.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 - `backend-go/services/automation-service/internal/usecase/run_now_e2e_test.go` (new — runtime verification, see final section)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 5 task(s) (TASK-217–221) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

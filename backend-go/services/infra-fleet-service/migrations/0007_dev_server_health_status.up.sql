@@ -1,0 +1,26 @@
+-- Placeholder — reconstructs the migration-sequence slot for version 7.
+--
+-- This file was never present in this branch's working tree (a different,
+-- concurrently-in-flight, uncommitted migration was applied directly
+-- against the shared b15 Postgres by another session, adding
+-- infra.dev_servers.status/platform/arch/node_version/agent_version/
+-- last_provisioned_at/tags — a health/bootstrap-status concept, unrelated
+-- to CR-DS-006's approval workflow). By the time this was discovered, those
+-- columns already existed on the real database and schema_migrations was
+-- left at version=7 (dirty), blocking every subsequent migration —
+-- including this branch's own version-8 addition (renamed away from a
+-- conflicting "0007" to avoid the collision, see
+-- docs/crs/v2/dev-server/CR-DS-006-dev-server-approval-and-grouping.md's
+-- "Cập nhật triển khai" note).
+--
+-- This placeholder is intentionally a no-op: the real schema change it
+-- stands in for is already applied. Its purpose is only to give
+-- golang-migrate's file source driver a version-7 file to resolve against
+-- so migration 8 can run — it must never re-run the real ALTER TABLE
+-- (would fail with "column already exists", the exact error this whole
+-- investigation started from).
+--
+-- Whoever owns that other migration: please replace this placeholder with
+-- the real committed 0007 up/down pair (matching what's actually on the
+-- server) once merged, so this no-op stops being the source of truth.
+SELECT 1;

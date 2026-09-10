@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { EventEmitter } from 'node:events'
 import { createSession } from '../agent-session'
-import { HEADER_SIZE } from '../agent-wire'
+import { HEADER_SIZE } from 'orca-dev-agent-transport'
 import type { AgentConfig } from '../agent-config'
 import type { ToolDefinition } from '../agent-tool-registry'
 import type { AgentLogger } from '../agent-logger'
@@ -12,6 +12,11 @@ class MockWs extends EventEmitter {
   readyState = 1  // WebSocket.OPEN
   send = vi.fn()
   close = vi.fn()
+  // ping/terminate: the liveness monitor (startRemoteRuntimeSocketLiveness)
+  // calls these, not close() — see agent-session.ts's `liveness` field doc
+  // comment for why close() alone can't detect/recover a half-open socket.
+  ping = vi.fn()
+  terminate = vi.fn()
 }
 
 // ─── Test helpers ─────────────────────────────────────────────────────────────
@@ -204,50 +209,96 @@ describe('keepalive', () => {
 })
 
 // Why: AGENT_TIMEOUT_MS was declared as a wire-protocol constant but never
-// enforced — specs/agent/api/gaps-and-findings.md #8.
-describe('idle watchdog (AGENT_TIMEOUT_MS enforcement)', () => {
+// enforced — specs/agent/api/gaps-and-findings.md #8. First fix used
+// ws.close(), which still failed to recover a genuinely half-open socket
+// live in production (close() needs the peer to answer the closing
+// handshake) — now backed by the shared liveness monitor
+// (startRemoteRuntimeSocketLiveness), which calls ws.terminate() instead.
+describe('liveness monitor (AGENT_TIMEOUT_MS enforcement, terminate() not close())', () => {
   beforeEach(() => vi.useFakeTimers())
   afterEach(() => vi.useRealTimers())
 
-  it('closes the connection after 20s with no frames received', async () => {
+  it('terminates the connection after 20s with no frames/pings/pongs received', async () => {
     const ws = new MockWs()
     createTestSession(mockConfig).start(ws as any)
     await Promise.resolve()  // drain microtask queue
-    ws.close.mockClear()
+    ws.terminate.mockClear()
 
-    // Watchdog checks every 5s (AGENT_KEEPALIVE_INTERVAL_MS) — advance past
-    // the tick that lands at-or-after the 20s threshold.
+    // Liveness monitor checks every 5s (AGENT_KEEPALIVE_INTERVAL_MS) —
+    // advance past the tick that lands at-or-after the 20s threshold.
     vi.advanceTimersByTime(25001)
 
-    expect(ws.close).toHaveBeenCalledWith(1001, expect.stringContaining('idle timeout'))
+    expect(ws.terminate).toHaveBeenCalledOnce()
   })
 
-  it('does not close the connection while frames keep arriving', async () => {
+  it('never calls ws.close() to recover a dead connection — only terminate()', async () => {
+    // Regression guard for the actual live incident: close() can hang
+    // indefinitely on a truly half-open socket (no peer to answer the
+    // closing handshake), which is exactly why three production agents
+    // never recovered for hours under the old close()-based watchdog.
+    const ws = new MockWs()
+    createTestSession(mockConfig).start(ws as any)
+    await Promise.resolve()
+    ws.close.mockClear()
+
+    vi.advanceTimersByTime(25001)
+
+    expect(ws.close).not.toHaveBeenCalled()
+  })
+
+  it('pings the socket on a 5s cadence', async () => {
+    const ws = new MockWs()
+    createTestSession(mockConfig).start(ws as any)
+    await Promise.resolve()
+    ws.ping.mockClear()
+
+    vi.advanceTimersByTime(5001)
+
+    expect(ws.ping).toHaveBeenCalled()
+  })
+
+  it('does not terminate while frames keep arriving', async () => {
     const ws = new MockWs()
     createTestSession(mockConfig).start(ws as any)
     await Promise.resolve()  // drain microtask queue
-    ws.close.mockClear()
+    ws.terminate.mockClear()
 
     // Simulate the peer's own keepalive arriving every 5s, well under the
-    // 20s idle threshold each time — the watchdog should never trip.
+    // 20s idle threshold each time — the monitor should never trip.
     for (let i = 0; i < 5; i++) {
       vi.advanceTimersByTime(5000)
       ws.emit('message', buildKeepaliveFrame())
     }
 
-    expect(ws.close).not.toHaveBeenCalled()
+    expect(ws.terminate).not.toHaveBeenCalled()
   })
 
-  it('does not close an already-idle connection once ws is no longer OPEN', async () => {
+  it('does not terminate while pong frames keep arriving with no data frames at all', async () => {
+    const ws = new MockWs()
+    createTestSession(mockConfig).start(ws as any)
+    await Promise.resolve()
+
+    // No message frames at all — only RFC 6455 pong replies to our own
+    // pings, exactly the scenario a half-open app-level KeepAlive stream
+    // but healthy TCP-level connection would produce.
+    for (let i = 0; i < 5; i++) {
+      vi.advanceTimersByTime(5000)
+      ws.emit('pong')
+    }
+
+    expect(ws.terminate).not.toHaveBeenCalled()
+  })
+
+  it('does not terminate an already-idle connection once ws is no longer OPEN', async () => {
     const ws = new MockWs()
     createTestSession(mockConfig).start(ws as any)
     await Promise.resolve()  // drain microtask queue
-    ws.close.mockClear()
+    ws.terminate.mockClear()
     ws.readyState = 3  // WebSocket.CLOSED
 
-    vi.advanceTimersByTime(20001)
+    vi.advanceTimersByTime(25001)
 
-    expect(ws.close).not.toHaveBeenCalled()
+    expect(ws.terminate).not.toHaveBeenCalled()
   })
 })
 

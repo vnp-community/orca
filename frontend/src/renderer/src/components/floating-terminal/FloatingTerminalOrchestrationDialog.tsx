@@ -22,6 +22,7 @@ import {
   useInstalledAgentSkill
 } from '@/hooks/useInstalledAgentSkills'
 import { useActiveProjectSkillRuntime } from '@/hooks/useActiveProjectSkillRuntime'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { useAppStore } from '@/store'
 import {
   buildSkillCommandForRuntime,
@@ -29,7 +30,10 @@ import {
   getWslCliDistroRequest
 } from '@/components/settings/CliSkillRuntimeSetup'
 import { translate } from '@/i18n/i18n'
-import { getRuntimeCliInstallStatus, getRuntimeWslCliInstallStatus } from '@/runtime/runtime-cli-client'
+import {
+  getRuntimeCliInstallStatus,
+  getRuntimeWslCliInstallStatus
+} from '@/runtime/runtime-cli-client'
 
 type FloatingTerminalOrchestrationDialogProps = {
   open: boolean
@@ -43,6 +47,15 @@ export function FloatingTerminalOrchestrationDialog({
   onSetupStateChange
 }: FloatingTerminalOrchestrationDialogProps): React.JSX.Element {
   const activeSkillRuntime = useActiveProjectSkillRuntime()
+  // Why: this panel's setup terminal has no project/repo behind it, so it
+  // has no natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   const installCommand = !activeSkillRuntime.installDisabledReason
     ? buildSkillCommandForRuntime(
         ORCHESTRATION_SKILL_INSTALL_COMMAND,
@@ -132,6 +145,7 @@ export function FloatingTerminalOrchestrationDialog({
           terminalTitle="Orchestration setup"
           terminalAriaLabel="Orchestration skill install terminal"
           terminalWorktreeId="floating-terminal-orchestration-skill-terminal"
+          devServerId={devServerId}
           terminalShellOverride={activeSkillRuntime.terminalShellOverride}
           installed={orchestrationSkillDetected}
           loading={orchestrationSkillLoading}

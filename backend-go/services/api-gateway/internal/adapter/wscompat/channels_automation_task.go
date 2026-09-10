@@ -57,6 +57,32 @@ func parseStepType(v string) workflowv1.StepType {
 	return workflowv1.StepType_STEP_TYPE_UNSPECIFIED
 }
 
+// parseEdgeType mirrors parseStepType's convention for taskv1.EdgeType —
+// see task.addEdge below.
+func parseEdgeType(v string) taskv1.EdgeType {
+	name := strings.ToUpper(v)
+	if !strings.HasPrefix(name, "EDGE_TYPE_") {
+		name = "EDGE_TYPE_" + name
+	}
+	if n, ok := taskv1.EdgeType_value[name]; ok {
+		return taskv1.EdgeType(n)
+	}
+	return taskv1.EdgeType_EDGE_TYPE_UNSPECIFIED
+}
+
+// parseGrantLevel mirrors parseStepType's convention for taskv1.GrantLevel —
+// see task.grant below.
+func parseGrantLevel(v string) taskv1.GrantLevel {
+	name := strings.ToUpper(v)
+	if !strings.HasPrefix(name, "GRANT_LEVEL_") {
+		name = "GRANT_LEVEL_" + name
+	}
+	if n, ok := taskv1.GrantLevel_value[name]; ok {
+		return taskv1.GrantLevel(n)
+	}
+	return taskv1.GrantLevel_GRANT_LEVEL_UNSPECIFIED
+}
+
 // registerAutomationTaskChannels registers every automation.*/task.*
 // channel this scope (TASK-217/219/222/225) adds. See this file's package
 // doc comment for the wiring call site this still needs in channels.go and
@@ -64,6 +90,20 @@ func parseStepType(v string) workflowv1.StepType {
 func registerAutomationTaskChannels(r *Registry, automationClient automationv1.AutomationServiceClient, taskClient taskv1.TaskServiceClient) {
 	registerAutomationCRUDChannels(r, automationClient)
 	registerTaskCRUDChannels(r, taskClient)
+}
+
+// automationRunsListView/automationsListView are plain (non-proto.Message)
+// mirrors of ListRunsResponse/ListAutomationsResponse — see the automation.
+// runs/automation.list handlers below for why returning the proto response
+// directly would silently reach the caller as JSON `null` for an empty list.
+type automationRunsListView struct {
+	Runs          []*automationv1.AutomationRun `json:"runs"`
+	NextPageToken string                        `json:"nextPageToken"`
+}
+
+type automationsListView struct {
+	Automations   []*automationv1.Automation `json:"automations"`
+	NextPageToken string                     `json:"nextPageToken"`
 }
 
 // ── automation.create / automation.runs (TASK-217) and
@@ -113,7 +153,14 @@ func registerAutomationCRUDChannels(r *Registry, client automationv1.AutomationS
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		// Why: returning resp directly would skip Dispatch's normalizeNilSlices
+		// guard (specs/backend-go/bugs/missing-v2/BUG-005) — resp implements
+		// proto.Message, which that normalizer deliberately never reaches
+		// into, so a zero-runs response's `Runs` field would stay the nil
+		// slice proto3's generated getter returns, serializing as JSON `null`
+		// instead of `[]` (live-reproduced on the Automation page's initial,
+		// no-automation-selected "all runs" load).
+		return automationRunsListView{Runs: resp.GetRuns(), NextPageToken: resp.GetNextPageToken()}, nil
 	})
 
 	r.Register("automation.list", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -131,7 +178,9 @@ func registerAutomationCRUDChannels(r *Registry, client automationv1.AutomationS
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		// Why: same BUG-005 gap as automation.runs above — resp implements
+		// proto.Message, so Dispatch's normalizeNilSlices skips it entirely.
+		return automationsListView{Automations: resp.GetAutomations(), NextPageToken: resp.GetNextPageToken()}, nil
 	})
 
 	r.Register("automation.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -201,12 +250,16 @@ func registerTaskCRUDChannels(r *Registry, client taskv1.TaskServiceClient) {
 		type executeArgs struct {
 			TaskID    string `json:"taskId"`
 			RequestID string `json:"requestId"`
+			// Prompt: TaskPromptEditor.tsx's user-edited override — see
+			// TaskServiceExecuteRequest.prompt's own doc comment
+			// (docs/backlog/BACKLOG-016). Empty = executor's own default.
+			Prompt string `json:"prompt"`
 		}
 		in, err := decodeArg[executeArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.Execute(ctx, &taskv1.TaskServiceExecuteRequest{TaskId: in.TaskID, RequestId: in.RequestID})
+		resp, err := client.Execute(ctx, &taskv1.TaskServiceExecuteRequest{TaskId: in.TaskID, RequestId: in.RequestID, Prompt: in.Prompt})
 		if err != nil {
 			return nil, err
 		}
@@ -234,9 +287,10 @@ func registerTaskCRUDChannels(r *Registry, client taskv1.TaskServiceClient) {
 
 	r.Register("task.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type updateArgs struct {
-			ID     string  `json:"id"`
-			Title  *string `json:"title"`
-			Status *string `json:"status"`
+			ID                 string  `json:"id"`
+			Title              *string `json:"title"`
+			Status             *string `json:"status"`
+			WorkflowTemplateID *string `json:"workflowTemplateId"`
 		}
 		in, err := decodeArg[updateArgs](args, 0)
 		if err != nil {
@@ -248,6 +302,9 @@ func registerTaskCRUDChannels(r *Registry, client taskv1.TaskServiceClient) {
 		}
 		if in.Status != nil {
 			req.Status = wrapperspb.String(*in.Status)
+		}
+		if in.WorkflowTemplateID != nil {
+			req.WorkflowTemplateId = wrapperspb.String(*in.WorkflowTemplateID)
 		}
 		resp, err := client.UpdateTask(ctx, req)
 		if err != nil {
@@ -283,6 +340,68 @@ func registerTaskCRUDChannels(r *Registry, client taskv1.TaskServiceClient) {
 			return nil, err
 		}
 		return resp.GetDependencies(), nil
+	})
+
+	// BACKLOG-015: AddEdge/Grant/ResolvePermission already exist as real
+	// proto/usecase RPCs (task-service.md) but were never registered here —
+	// wiring only, same pattern as every other handler in this function.
+	r.Register("task.addEdge", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type addEdgeArgs struct {
+			FromTaskID string `json:"fromTaskId"`
+			ToTaskID   string `json:"toTaskId"`
+			// Type: "parent_child" | "depends_on" — parsed the same
+			// STEP_TYPE_-prefix-and-uppercase way parseStepType above does,
+			// against taskv1.EdgeType_value.
+			Type string `json:"type"`
+		}
+		in, err := decodeArg[addEdgeArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := client.AddEdge(ctx, &taskv1.AddEdgeRequest{
+			FromTaskId: in.FromTaskID, ToTaskId: in.ToTaskID, Type: parseEdgeType(in.Type),
+		}); err != nil {
+			return nil, err
+		}
+		return map[string]bool{"success": true}, nil
+	})
+
+	r.Register("task.grant", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type grantArgs struct {
+			TaskID    string `json:"taskId"`
+			SubjectID string `json:"subjectId"`
+			// Level: "owner" | "admin" | "user" | "team" | "company" —
+			// parsed against taskv1.GrantLevel_value, same convention as
+			// EdgeType above.
+			Level     string `json:"level"`
+			ApplyTree bool   `json:"applyTree"`
+		}
+		in, err := decodeArg[grantArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if _, err := client.Grant(ctx, &taskv1.GrantRequest{
+			TaskId: in.TaskID, SubjectId: in.SubjectID, Level: parseGrantLevel(in.Level), ApplyTree: in.ApplyTree,
+		}); err != nil {
+			return nil, err
+		}
+		return map[string]bool{"success": true}, nil
+	})
+
+	r.Register("task.resolvePermission", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		type resolvePermArgs struct {
+			TaskID string `json:"taskId"`
+			UserID string `json:"userId"`
+		}
+		in, err := decodeArg[resolvePermArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		resp, err := client.ResolvePermission(ctx, &taskv1.ResolvePermissionRequest{TaskId: in.TaskID, UserId: in.UserID})
+		if err != nil {
+			return nil, err
+		}
+		return map[string]string{"effectiveLevel": strings.ToLower(strings.TrimPrefix(resp.GetEffectiveLevel().String(), "GRANT_LEVEL_"))}, nil
 	})
 
 	r.Register("task.aiDecompose", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {

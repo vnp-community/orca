@@ -36,6 +36,15 @@ type Session struct {
 	LastSeenAt *time.Time // nil until first touch — see ValidateSession (TASK-AUTH-02-06)
 	IP         string     // may be "" for a session created before this migration, or if unresolved
 	UserAgent  string
+	// RefreshTokenHash is the SHA-256 hash of this session's refresh token —
+	// same non-storage-of-the-raw-token principle as TokenHash. Empty for a
+	// session that was never issued a refresh token (CR-RBAC-003/
+	// TASK-BE-011).
+	RefreshTokenHash string
+	// RefreshExpiresAt is typically longer-lived than ExpiresAt (e.g. 30d
+	// vs 24h — exact values are a config decision, not a domain invariant).
+	// Zero for a session with no refresh token.
+	RefreshExpiresAt time.Time
 }
 
 // NewSession constructs a Session, enforcing that every session has a

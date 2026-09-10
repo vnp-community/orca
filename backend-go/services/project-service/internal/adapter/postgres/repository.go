@@ -24,7 +24,7 @@ import (
 // COALESCE — COALESCE(uuid_col, ”) fails at parse time (Postgres unifies
 // the branch types to uuid and tries to parse ” as one), a latent bug this
 // change also fixes on dev_server_id, not just the new created_by column.
-const projectColumns = `id, tenant_id, name, COALESCE(dev_server_id::text, ''), description, default_branch, visibility, COALESCE(created_by::text, ''), created_at, updated_at, issue_status_sync_enabled`
+const projectColumns = `id, tenant_id, name, COALESCE(dev_server_id::text, ''), description, default_branch, visibility, COALESCE(created_by::text, ''), created_at, updated_at, issue_status_sync_enabled, COALESCE(mobile_emulator_agent_id::text, '')`
 
 // Repository implements usecase.ProjectRepository against Postgres via pgx
 // — hand-written SQL (see architecture/04-tech-stack.md: sqlc codegen is the
@@ -71,14 +71,37 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Proje
 	return out, nil
 }
 
-func (r *Repository) List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT `+projectColumns+`
-		FROM project.projects
-		WHERE tenant_id = $1 AND id > $2
-		ORDER BY id
-		LIMIT $3
-	`, tenantID, pageToken, pageSize)
+// List scopes to userID's own project_members rows, not just tenantID —
+// see usecase.ProjectRepository.List's doc comment (found live: a bare
+// tenant_id filter leaked every tenant member's projects to every other
+// member — no RLS guard catches this either, since project_members' own
+// tenant isolation is transitive through projects, not membership-aware).
+func (r *Repository) List(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
+	var rows pgx.Rows
+	var err error
+	if pageToken == "" {
+		// AIP-158: an empty/absent page_token means "from the beginning" —
+		// no cursor comparison at all. See specs/backend-go/bugs/missing-v2/BUG-004:
+		// binding "" into `id > $2` (id is UUID) previously errored on
+		// every first-page call.
+		rows, err = r.pool.Query(ctx, `
+			SELECT `+projectColumns+`
+			FROM project.projects
+			JOIN project.project_members ON project_members.project_id = projects.id
+			WHERE projects.tenant_id = $1 AND project_members.user_id = $2
+			ORDER BY projects.id
+			LIMIT $3
+		`, tenantID, userID, pageSize)
+	} else {
+		rows, err = r.pool.Query(ctx, `
+			SELECT `+projectColumns+`
+			FROM project.projects
+			JOIN project.project_members ON project_members.project_id = projects.id
+			WHERE projects.tenant_id = $1 AND project_members.user_id = $2 AND projects.id > $3
+			ORDER BY projects.id
+			LIMIT $4
+		`, tenantID, userID, pageToken, pageSize)
+	}
 	if err != nil {
 		return nil, "", fmt.Errorf("postgres: query projects: %w", err)
 	}
@@ -178,7 +201,10 @@ func (r *Repository) UpdateDevServerID(ctx context.Context, tenantID, projectID,
 // UpdateProject applies patch's non-empty fields via COALESCE(NULLIF($n,
 // ”), column) — an empty string argument leaves the column unchanged, per
 // domain.ProjectUpdatePatch's "" = no-change semantics. Never references
-// dev_server_id.
+// dev_server_id. mobile_emulator_agent_id IS included here (unlike
+// dev_server_id) — see domain.ProjectUpdatePatch's doc comment; its NULLIF
+// result is explicitly ::uuid-cast before COALESCE, same pattern
+// infra-fleet-service's AssignGroup uses for its own nullable-UUID column.
 func (r *Repository) UpdateProject(ctx context.Context, tenantID, projectID string, patch domain.ProjectUpdatePatch) (domain.Project, error) {
 	row := r.pool.QueryRow(ctx, `
 		UPDATE project.projects
@@ -187,10 +213,11 @@ func (r *Repository) UpdateProject(ctx context.Context, tenantID, projectID stri
 		    default_branch             = COALESCE(NULLIF($5, ''), default_branch),
 		    visibility                 = COALESCE(NULLIF($6, ''), visibility),
 		    issue_status_sync_enabled  = COALESCE($7, issue_status_sync_enabled),
+		    mobile_emulator_agent_id   = COALESCE(NULLIF($8, '')::uuid, mobile_emulator_agent_id),
 		    updated_at                 = now()
 		WHERE tenant_id = $1 AND id = $2
 		RETURNING `+projectColumns,
-		tenantID, projectID, patch.Name, patch.Description, patch.DefaultBranch, patch.Visibility, patch.IssueStatusSyncEnabled,
+		tenantID, projectID, patch.Name, patch.Description, patch.DefaultBranch, patch.Visibility, patch.IssueStatusSyncEnabled, patch.MobileEmulatorAgentID,
 	)
 
 	out, err := scanProject(row)
@@ -318,7 +345,7 @@ func scanProject(row rowScanner) (domain.Project, error) {
 	var p domain.Project
 	if err := row.Scan(
 		&p.ID, &p.TenantID, &p.Name, &p.DevServerID, &p.Description, &p.DefaultBranch, &p.Visibility, &p.CreatedBy,
-		&p.CreatedAt, &p.UpdatedAt, &p.IssueStatusSyncEnabled,
+		&p.CreatedAt, &p.UpdatedAt, &p.IssueStatusSyncEnabled, &p.MobileEmulatorAgentID,
 	); err != nil {
 		return domain.Project{}, err
 	}

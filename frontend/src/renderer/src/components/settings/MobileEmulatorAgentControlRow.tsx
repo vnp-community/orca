@@ -8,6 +8,7 @@ import {
   ensureOrcaCliAvailableForAgentSkillTerminal
 } from '@/lib/agent-skill-cli-prerequisite'
 import { cn } from '@/lib/utils'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 import { useMobileEmulatorAgentSetupState } from '../emulator-pane/use-mobile-emulator-agent-setup-state'
 import { AgentSkillSetupPanel } from './AgentSkillSetupPanel'
 import { buildSkillCommandForRuntime } from './CliSkillRuntimeSetup'
@@ -26,6 +27,15 @@ const EMULATOR_CLI_COMMANDS = [
 
 export function MobileEmulatorAgentControlRow(): React.JSX.Element {
   const setup = useMobileEmulatorAgentSetupState(true)
+  // Why: this row's setup terminal has no project/repo behind it, so it has
+  // no natural dev-server binding to inherit — see
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
   const cliSkillInstallCommand = buildSkillCommandForRuntime(ORCA_CLI_SKILL_INSTALL_COMMAND)
   const cliSkillUpdateCommand = buildSkillCommandForRuntime(ORCA_CLI_SKILL_UPDATE_COMMAND)
 
@@ -157,6 +167,7 @@ export function MobileEmulatorAgentControlRow(): React.JSX.Element {
             terminalTitle="Orca CLI skill setup"
             terminalAriaLabel="Orca CLI skill install terminal"
             terminalWorktreeId="settings-mobile-emulator-orca-cli-skill-terminal"
+            devServerId={devServerId}
             installed={setup.cliSkillInstalled}
             loading={setup.cliSkillLoading}
             error={setup.cliSkillError}

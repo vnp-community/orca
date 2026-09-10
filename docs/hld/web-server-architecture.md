@@ -16,6 +16,16 @@
 
 > **Nguyên tắc cốt lõi:** Frontend KHÔNG tự xử lý nghiệp vụ. Mọi mutation đều là RPC call qua WebSocket đến Backend, sau đó Backend relay tiếp đến Dev Server nếu cần.
 
+> **2026-09-06:** Frontend gọi cùng 1 giao thức WS-RPC (`invoke`/`on`, §5.1) bất kể phía sau là TS
+> `backend/` hay backend Go mới (`backend-go/`, 17 microservices) — frontend **không biết và không cần
+> biết** domain nào đang được xử lý bởi bên nào. Với domain `workflow.*`, Web-mode hiện đã đi qua
+> `api-gateway`'s wscompat tới `workflow-service` (Go) trong khi Electron/local-runtime vẫn đi thẳng vào
+> TS `WorkflowOrchestrator` — 2 engine không tương thích, xem
+> [backend-go-architecture.md §5](./backend-go-architecture.md#5-hai-workflow-engine-song-song-không-tương-thích-nhau)
+> và [ADR-024](../adrs/v2/ADR-024-dual-workflow-engines-migration.md). Domain khác có thể đang/sẽ được
+> cắt tương tự — chưa audit lại toàn bộ RPC namespace trong tài liệu này để xác nhận domain nào đã
+> chuyển sang backend-go.
+
 ---
 
 ## 2. Tech Stack (Browser-side)

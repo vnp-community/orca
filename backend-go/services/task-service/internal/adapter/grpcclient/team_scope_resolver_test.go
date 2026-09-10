@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/stablyai/orca-go/common/tenant"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 )
 
@@ -33,14 +34,18 @@ func TestTeamScopeResolver_ReturnsTeamIDsVerbatim(t *testing.T) {
 	fake := &fakeTenantServiceClient{listTeamsForUserResp: &tenantv1.ListTeamsForUserResponse{TeamIds: []string{"team-a", "team-b"}}}
 	r := NewTeamScopeResolver(fake)
 
-	got, err := r.ResolveTeams(context.Background(), "tenant-1", "user-1")
+	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	got, err := r.ResolveTeams(ctx, "tenant-1", "user-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(got) != 2 || got[0] != "team-a" || got[1] != "team-b" {
 		t.Errorf("expected team IDs to pass through verbatim, got %+v", got)
 	}
-	if fake.gotListTeamsForUser.GetTenantId() != "tenant-1" || fake.gotListTeamsForUser.GetUserId() != "user-1" {
+	// tenant scoping is forwarded via outbound gRPC metadata
+	// (withTenantMetadata), never a request field — see
+	// ListTeamsForUserRequest's proto doc comment.
+	if fake.gotListTeamsForUser.GetUserId() != "user-1" {
 		t.Errorf("unexpected request: %+v", fake.gotListTeamsForUser)
 	}
 }
@@ -53,7 +58,8 @@ func TestTeamScopeResolver_RPCError_PropagatesNotEmptyList(t *testing.T) {
 	fake := &fakeTenantServiceClient{listTeamsForUserErr: errors.New("tenant-service unavailable")}
 	r := NewTeamScopeResolver(fake)
 
-	got, err := r.ResolveTeams(context.Background(), "tenant-1", "user-1")
+	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	got, err := r.ResolveTeams(ctx, "tenant-1", "user-1")
 	if err == nil {
 		t.Fatal("expected an error to propagate from the RPC failure, not a silent empty list")
 	}

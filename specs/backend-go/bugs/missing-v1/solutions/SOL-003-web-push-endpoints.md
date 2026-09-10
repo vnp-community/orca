@@ -7,7 +7,7 @@
 - `backend-go/services/notification-service/internal/usecase/unregister_push_subscription.go` (new)
 - `backend-go/services/api-gateway/internal/adapter/httpgateway/notification_routes.go`
 - `backend-go/services/api-gateway/internal/adapter/httpgateway/router.go`
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 3 task(s) (TASK-009–011) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

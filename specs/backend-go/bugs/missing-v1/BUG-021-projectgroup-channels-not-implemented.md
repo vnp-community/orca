@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** Medium
 **Symptom:** Every `projectGroup.*` call from `repos.ts` (sidebar grouping/folder tree) times out with `channel "projectGroup.X" is not yet implemented in backend-go`
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-136–140 (5 task(s), all DONE) for implementation evidence.
 
 ---
 

@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** High — this is the entire AI-provider account management surface (create/list/update/delete/test/write-credential); without it, users on a backend-go-connected environment cannot configure or rotate any Anthropic/OpenAI/etc. provider account, which is a core onboarding flow.
 **Symptom:** All 6 `aiProvider.*` calls from `ProviderForm.tsx`/`useAIProviders.ts` time out with `channel "aiProvider.X" is not yet implemented in backend-go — see backend-go/docs/execution-plan.md's frontend-compatibility-layer coverage table`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-024–030 (7 task(s), all DONE) for implementation evidence.
 
 ---
 

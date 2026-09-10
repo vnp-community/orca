@@ -17,16 +17,19 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/auditclient"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/policy"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/project-service/internal/config"
@@ -38,6 +41,7 @@ import (
 	projectpostgres "github.com/stablyai/orca-go/services/project-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/project-service/internal/usecase"
 
+	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
@@ -71,9 +75,13 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (see common/secrets.DatabaseCredentialsFromFile's doc comment) —
+	// falls back to DATABASE_DSN itself when the file doesn't exist, which
+	// is what local dev / this scaffold's testcontainers path still uses.
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
+	if err != nil {
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -87,6 +95,8 @@ func run() error {
 	projectGroupRepo := projectpostgres.NewProjectGroupRepository(pool)
 	folderWorkspaceRepo := projectpostgres.NewFolderWorkspaceRepository(pool)
 	hostSetupRepo := projectpostgres.NewHostSetupRepository(pool)
+	sourceProjectRepo := projectpostgres.NewSourceProjectRepository(pool)
+	sparsePresetRepo := projectpostgres.NewSparsePresetRepository(pool)
 	outboxRepo := projectpostgres.NewOutboxRepository(pool)
 
 	// Transactional-outbox relay (SOL-PI-03) — RecordWorktreeCreated/
@@ -204,11 +214,27 @@ func run() error {
 		}
 	}
 
+	// Audit-append client (TASK-BE-018/019, CR-RBAC-005) — requireProjectAccess/
+	// requireRepoAccess (internal/usecase/authorization.go) use this to record
+	// every OPA allow/deny decision to auth-service's audit_log. Lazy dial
+	// (grpc.NewClient doesn't block on connect), same convention as every
+	// other outbound client above.
+	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	if err != nil {
+		return fmt.Errorf("dialing auth-service: %w", err)
+	}
+	defer func() { _ = authConn.Close() }()
+	usecase.SetAuditClient(auditclient.New(authv1.NewAuthServiceClient(authConn)))
+
 	// Shared embedded-OPA evaluator (common/policy) for project-role/
 	// global-admin authorization — mirrors auth-service/annotation-service/
 	// task-service's own composition-root wiring. One Evaluator, pointed at
 	// the same orca-authz bundle, shared by every OPA-gated usecase below.
-	opa := projectopaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
+	evaluator := policy.NewEvaluator(cfg.OPABundlePath)
+	if err := evaluator.Warm(ctx, "data.orca.authz.project.allow"); err != nil {
+		return fmt.Errorf("project-service: OPA bundle failed to load at startup (bundle path %q): %w", cfg.OPABundlePath, err)
+	}
+	opa := projectopaclient.New(evaluator)
 
 	createProjectUC := usecase.NewCreateProject(repo, repoRepo, devServerLister, healthChecker, devServerRelay)
 	getProjectUC := usecase.NewGetProject(repo, opa)
@@ -218,6 +244,7 @@ func run() error {
 	removeMemberUC := usecase.NewRemoveMember(repo, opa)
 	updateMemberRoleUC := usecase.NewUpdateMemberRole(repo, opa)
 	rebindDevServerUC := usecase.NewRebindDevServer(repo, workflowChecker, taskChecker, opa, devServerLister, healthChecker, auditPublisher, memberNotifier)
+	rebindRepoDevServerUC := usecase.NewRebindRepoDevServer(repoRepo, repo, opa, workflowChecker, taskChecker, devServerLister)
 	updateProjectUC := usecase.NewUpdateProject(repo, opa)
 	deleteProjectUC := usecase.NewDeleteProject(repo, workflowChecker, taskChecker, opa)
 	getProjectContextUC := usecase.NewGetProjectContext(repo, repoRepo, hostnameResolver, opa)
@@ -226,11 +253,18 @@ func run() error {
 	// structurally — passed as the membership-lookup port to usecases whose
 	// primary repository dependency is RepoRepository/WorktreeRepository
 	// instead. See usecase.MembershipRepository's doc comment.
-	addRepoUC := usecase.NewAddRepo(repoRepo, repo, opa)
+	addRepoUC := usecase.NewAddRepo(repoRepo, repo, opa, devServerLister)
 	listReposUC := usecase.NewListRepos(repoRepo, repo, opa)
 	reorderReposUC := usecase.NewReorderRepos(repoRepo, repo, opa)
 	removeRepoUC := usecase.NewRemoveRepo(repoRepo, repo, opa)
 	updateRepoUC := usecase.NewUpdateRepo(repoRepo, repo, opa)
+	getRepoUC := usecase.NewGetRepo(repoRepo)
+	assignRepoToProjectUC := usecase.NewAssignRepoToProject(repoRepo, repo, opa)
+
+	addRepoMemberUC := usecase.NewAddRepoMember(repoRepo, repo, opa)
+	listRepoMembersUC := usecase.NewListRepoMembers(repoRepo, repo, opa)
+	removeRepoMemberUC := usecase.NewRemoveRepoMember(repoRepo, repo, opa)
+	updateRepoMemberRoleUC := usecase.NewUpdateRepoMemberRole(repoRepo, repo, opa)
 
 	recordWorktreeCreatedUC := usecase.NewRecordWorktreeCreated(worktreeRepo)
 	recordWorktreeRemovedUC := usecase.NewRecordWorktreeRemoved(worktreeRepo)
@@ -239,6 +273,9 @@ func run() error {
 	setWorktreeActivationUC := usecase.NewSetWorktreeActivation(worktreeRepo)
 	renameWorktreeUC := usecase.NewRenameWorktree(worktreeRepo)
 	getWorktreeByIdempotencyKeyUC := usecase.NewGetWorktreeByIdempotencyKey(worktreeRepo)
+	updateWorktreeMetaUC := usecase.NewUpdateWorktreeMeta(worktreeRepo)
+	setWorktreeLineageUC := usecase.NewSetWorktreeLineage(worktreeRepo)
+	listWorktreeLineageUC := usecase.NewListWorktreeLineage(worktreeRepo)
 
 	createProjectGroupUC := usecase.NewCreateProjectGroup(projectGroupRepo)
 	updateProjectGroupUC := usecase.NewUpdateProjectGroup(projectGroupRepo)
@@ -261,25 +298,47 @@ func run() error {
 	// worktree/project usecase above is wired against.
 	getMobileWorktreeStatusUC := usecase.NewGetMobileWorktreeStatus(worktreeRepo, repo, terminalStatusResolver)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	// repo (usecase.ProjectRepository) satisfies usecase.MembershipRepository
+	// structurally — same reasoning as the repo/worktree usecases above.
+	linkSourceProjectUC := usecase.NewLinkSourceProject(sourceProjectRepo, repo, opa)
+	unlinkSourceProjectUC := usecase.NewUnlinkSourceProject(sourceProjectRepo, repo, opa)
+	listSourceProjectsUC := usecase.NewListSourceProjects(sourceProjectRepo, repo, opa)
+	getSharedProjectDataUC := usecase.NewGetSharedProjectData(repo, repoRepo, worktreeRepo, sourceProjectRepo, repo, opa)
+
+	// repo (usecase.ProjectRepository) satisfies usecase.RepoMembershipRepository
+	// structurally too (via repoRepo's own GetRepoMembership) — same
+	// reasoning as every repo-scoped usecase above.
+	listSparsePresetsUC := usecase.NewListSparsePresets(sparsePresetRepo, repoRepo, repo, opa)
+	saveSparsePresetUC := usecase.NewSaveSparsePreset(sparsePresetRepo, repoRepo, repo, opa)
+	removeSparsePresetUC := usecase.NewRemoveSparsePreset(sparsePresetRepo, repoRepo, repo, opa)
+
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	projectv1.RegisterProjectServiceServer(grpcServer, projectgrpc.New(projectgrpc.Deps{
-		CreateProject:   createProjectUC,
-		GetProject:      getProjectUC,
-		ListProjects:    listProjectsUC,
-		AddMember:       addMemberUC,
-		RebindDevServer: rebindDevServerUC,
-		UpdateProject:   updateProjectUC,
-		DeleteProject:   deleteProjectUC,
+		CreateProject:       createProjectUC,
+		GetProject:          getProjectUC,
+		ListProjects:        listProjectsUC,
+		AddMember:           addMemberUC,
+		RebindDevServer:     rebindDevServerUC,
+		RebindRepoDevServer: rebindRepoDevServerUC,
+		UpdateProject:       updateProjectUC,
+		DeleteProject:       deleteProjectUC,
 
 		ListMembers:      listMembersUC,
 		RemoveMember:     removeMemberUC,
 		UpdateMemberRole: updateMemberRoleUC,
 
-		AddRepo:      addRepoUC,
-		ListRepos:    listReposUC,
-		ReorderRepos: reorderReposUC,
-		RemoveRepo:   removeRepoUC,
-		UpdateRepo:   updateRepoUC,
+		AddRepo:             addRepoUC,
+		ListRepos:           listReposUC,
+		ReorderRepos:        reorderReposUC,
+		RemoveRepo:          removeRepoUC,
+		UpdateRepo:          updateRepoUC,
+		GetRepo:             getRepoUC,
+		AssignRepoToProject: assignRepoToProjectUC,
+
+		AddRepoMember:        addRepoMemberUC,
+		ListRepoMembers:      listRepoMembersUC,
+		RemoveRepoMember:     removeRepoMemberUC,
+		UpdateRepoMemberRole: updateRepoMemberRoleUC,
 
 		RecordWorktreeCreated:       recordWorktreeCreatedUC,
 		RecordWorktreeRemoved:       recordWorktreeRemovedUC,
@@ -288,6 +347,9 @@ func run() error {
 		SetWorktreeActivation:       setWorktreeActivationUC,
 		RenameWorktree:              renameWorktreeUC,
 		GetWorktreeByIdempotencyKey: getWorktreeByIdempotencyKeyUC,
+		UpdateWorktreeMeta:          updateWorktreeMetaUC,
+		SetWorktreeLineage:          setWorktreeLineageUC,
+		ListWorktreeLineage:         listWorktreeLineageUC,
 
 		CreateProjectGroup: createProjectGroupUC,
 		UpdateProjectGroup: updateProjectGroupUC,
@@ -307,6 +369,15 @@ func run() error {
 
 		GetProjectContext:       getProjectContextUC,
 		GetMobileWorktreeStatus: getMobileWorktreeStatusUC,
+
+		LinkSourceProject:    linkSourceProjectUC,
+		UnlinkSourceProject:  unlinkSourceProjectUC,
+		ListSourceProjects:   listSourceProjectsUC,
+		GetSharedProjectData: getSharedProjectDataUC,
+
+		ListSparsePresets:  listSparsePresetsUC,
+		SaveSparsePreset:   saveSparsePresetUC,
+		RemoveSparsePreset: removeSparsePresetUC,
 	}))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

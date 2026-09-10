@@ -2,17 +2,21 @@ package agentwsserver
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"strings"
 	"testing"
 	"time"
+
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
 func newTestIssuer(secret string) (*TokenIssuer, *Registry) {
 	registry := NewRegistry(time.Hour)
-	issuer := NewTokenIssuer(registry, Config{APISecret: secret, OrcaVersion: "test-version", Port: 6768}, nil)
+	issuer := NewTokenIssuer(registry, Config{APISecret: secret, OrcaVersion: "test-version", Port: 6768}, nil, nil, nil)
 	return issuer, registry
 }
 
@@ -180,6 +184,183 @@ func TestTokenEndpoint_CustomDevServerIDAndName(t *testing.T) {
 	token, _ := body["token"].(string)
 	if !strings.HasPrefix(token, "agt-ds-42-") {
 		t.Errorf("token = %q, want prefix agt-ds-42-", token)
+	}
+}
+
+// fakeResolverRepo is a minimal usecase.DevServerRepository for exercising
+// TokenIssuer's Resolver wiring — only Register/FindByHostAndMode matter
+// here, every other method is unreachable from ResolveDirectWebSocketDevServer.
+type fakeResolverRepo struct {
+	registered []domain.DevServer
+}
+
+func (f *fakeResolverRepo) Register(ctx context.Context, ds domain.DevServer) (domain.DevServer, error) {
+	f.registered = append(f.registered, ds)
+	return ds, nil
+}
+func (f *fakeResolverRepo) Get(context.Context, string, string) (domain.DevServer, error) {
+	return domain.DevServer{}, nil
+}
+func (f *fakeResolverRepo) List(context.Context, string) ([]domain.DevServer, error) { return nil, nil }
+func (f *fakeResolverRepo) FindBySshTarget(context.Context, string, string) (domain.DevServer, bool, error) {
+	return domain.DevServer{}, false, nil
+}
+func (f *fakeResolverRepo) FindByHostAndMode(ctx context.Context, tenantID, host string, mode domain.ConnectionMode) (domain.DevServer, bool, error) {
+	return domain.DevServer{}, false, nil // always "not found" — forces Register every call, fine for this test
+}
+func (f *fakeResolverRepo) UpdateApprovalStatus(context.Context, string, string, domain.DevServerStatus) (domain.DevServer, error) {
+	return domain.DevServer{}, nil
+}
+func (f *fakeResolverRepo) ListAllForPolling(context.Context) ([]domain.DevServer, error) {
+	return nil, nil
+}
+func (f *fakeResolverRepo) ListByTag(context.Context, string, string) ([]domain.DevServer, error) {
+	return nil, nil
+}
+func (f *fakeResolverRepo) UpdateProvisionResult(context.Context, string, string, domain.DevServerHealthStatus, usecase.HandshakeInfo, time.Time) error {
+	return nil
+}
+func (f *fakeResolverRepo) AssignGroup(context.Context, string, string, string) (domain.DevServer, error) {
+	return domain.DevServer{}, nil
+}
+
+// TestTokenEndpoint_WithResolver_RegistrySlotKeyIsResolvedUUIDNotRawDevServerID
+// is the regression guard for the live-verified bug this Resolver wiring
+// fixes: 3 real agents connected and handshook successfully while
+// infra.dev_servers stayed empty, because Registry tracked the raw
+// caller-supplied devServerID string, never a row ApproveDevServer/
+// ListDevServers could see. With a Resolver wired, Consume must return the
+// resolved row's real UUID, not "ds-42".
+func TestTokenEndpoint_WithResolver_RegistrySlotKeyIsResolvedUUIDNotRawDevServerID(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	repo := &fakeResolverRepo{}
+	resolver := usecase.NewResolveDirectWebSocketDevServer(repo)
+	issuer := NewTokenIssuer(registry, Config{APISecret: "s3cr3t", OrcaVersion: "test-version", Port: 6768, DefaultTenantID: "tenant-1"}, nil, resolver, nil)
+
+	rec := doRequest(t, issuer, http.MethodPost, `{"devServerId":"ds-42"}`, "s3cr3t")
+	body := decodeJSON(t, rec)
+	token, _ := body["token"].(string)
+
+	if len(repo.registered) != 1 {
+		t.Fatalf("want exactly 1 dev server registered, got %d", len(repo.registered))
+	}
+	registeredID := repo.registered[0].ID
+	if registeredID == "" || registeredID == "ds-42" {
+		t.Fatalf("want a generated UUID, got %q", registeredID)
+	}
+	if repo.registered[0].TenantID != "tenant-1" {
+		t.Errorf("want TenantID from Cfg.DefaultTenantID, got %q", repo.registered[0].TenantID)
+	}
+	if repo.registered[0].Host != "ds-42" {
+		t.Errorf("want Host set to the caller's devServerID, got %q", repo.registered[0].Host)
+	}
+
+	slotKey, ok := registry.Consume(token)
+	if !ok {
+		t.Fatal("want a pending slot for the minted token")
+	}
+	if slotKey != registeredID {
+		t.Errorf("registry slot key = %q, want the resolved row's UUID %q — AttachInboundSession would key devserveragent.Client.sessions by the wrong value", slotKey, registeredID)
+	}
+}
+
+// fakeEphemeralVmRuntimeRepo is a minimal usecase.EphemeralVmRuntimeRepository
+// double — only SetEnvironmentID is exercised by TokenIssuer, the rest exist
+// solely to satisfy the interface.
+type fakeEphemeralVmRuntimeRepo struct {
+	// existingRuntimeIDs is the set of ephemeral_vm_runtimes.id values this
+	// fake pretends exist for the test's tenant — mirrors the real
+	// postgres implementation's "UPDATE ... WHERE id = $2" matching 0 rows
+	// when runtimeID isn't one of these (the common case: most devServerID
+	// values passed to /api/agent-token are not ephemeral VM runtimes).
+	existingRuntimeIDs map[string]bool
+	setCalls           []setEnvironmentIDCall
+}
+
+type setEnvironmentIDCall struct {
+	tenantID, runtimeID, environmentID string
+}
+
+func (f *fakeEphemeralVmRuntimeRepo) SetEnvironmentID(_ context.Context, tenantID, runtimeID, environmentID string) (domain.EphemeralVmRuntime, error) {
+	f.setCalls = append(f.setCalls, setEnvironmentIDCall{tenantID, runtimeID, environmentID})
+	if !f.existingRuntimeIDs[runtimeID] {
+		return domain.EphemeralVmRuntime{}, domain.ErrEphemeralVmRuntimeNotFound
+	}
+	return domain.EphemeralVmRuntime{ID: runtimeID, EnvironmentID: environmentID}, nil
+}
+func (f *fakeEphemeralVmRuntimeRepo) List(context.Context, string) ([]domain.EphemeralVmRuntime, error) {
+	return nil, nil
+}
+func (f *fakeEphemeralVmRuntimeRepo) Get(context.Context, string, string) (domain.EphemeralVmRuntime, error) {
+	return domain.EphemeralVmRuntime{}, nil
+}
+func (f *fakeEphemeralVmRuntimeRepo) GetByWorkspaceID(context.Context, string, string) (domain.EphemeralVmRuntime, error) {
+	return domain.EphemeralVmRuntime{}, nil
+}
+func (f *fakeEphemeralVmRuntimeRepo) UpdateStatus(context.Context, string, string, string, string, string) (domain.EphemeralVmRuntime, error) {
+	return domain.EphemeralVmRuntime{}, nil
+}
+func (f *fakeEphemeralVmRuntimeRepo) UpdateProvisionResult(context.Context, string, string, string, string, string) (domain.EphemeralVmRuntime, error) {
+	return domain.EphemeralVmRuntime{}, nil
+}
+func (f *fakeEphemeralVmRuntimeRepo) FindDevServerByEnvironmentID(context.Context, string, string) (string, bool, error) {
+	return "", false, nil
+}
+
+// TestTokenEndpoint_WithResolverAndRuntimes_LinksMatchingEphemeralVmRuntime
+// covers TASK-BE-EVM-011's decision: when the caller's devServerID happens
+// to match a live ephemeral_vm_runtimes.id (the recipe/VM's agent opted into
+// the DEV_SERVER_ID=<runtimeID> contract), handlePost writes the newly
+// resolved dev_servers.id onto that runtime's environment_id — the only
+// place the real UUID exists, since EphemeralVmRelay.Provision's own
+// "orca-server" event never carries a dev_server_id.
+func TestTokenEndpoint_WithResolverAndRuntimes_LinksMatchingEphemeralVmRuntime(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	devServerRepo := &fakeResolverRepo{}
+	resolver := usecase.NewResolveDirectWebSocketDevServer(devServerRepo)
+	runtimes := &fakeEphemeralVmRuntimeRepo{existingRuntimeIDs: map[string]bool{"runtime-abc": true}}
+	issuer := NewTokenIssuer(registry, Config{APISecret: "s3cr3t", OrcaVersion: "test-version", Port: 6768, DefaultTenantID: "tenant-1"}, nil, resolver, runtimes)
+
+	doRequest(t, issuer, http.MethodPost, `{"devServerId":"runtime-abc"}`, "s3cr3t")
+
+	if len(runtimes.setCalls) != 1 {
+		t.Fatalf("want exactly 1 SetEnvironmentID call, got %d", len(runtimes.setCalls))
+	}
+	call := runtimes.setCalls[0]
+	if call.tenantID != "tenant-1" {
+		t.Errorf("tenantID = %q, want tenant-1", call.tenantID)
+	}
+	if call.runtimeID != "runtime-abc" {
+		t.Errorf("runtimeID = %q, want runtime-abc (the caller's devServerID)", call.runtimeID)
+	}
+	registeredID := devServerRepo.registered[0].ID
+	if call.environmentID != registeredID {
+		t.Errorf("environmentID = %q, want the resolved dev_servers.id %q", call.environmentID, registeredID)
+	}
+}
+
+// TestTokenEndpoint_WithResolverAndRuntimes_NoMatchingRuntimeIsSilent covers
+// the common case (a regular, non-ephemeral agent's devServerID) — a
+// not-found SetEnvironmentID result must not surface as a request error or
+// get logged as one; token issuance succeeds exactly as without the
+// EphemeralVmRuntimes dependency wired at all.
+func TestTokenEndpoint_WithResolverAndRuntimes_NoMatchingRuntimeIsSilent(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	devServerRepo := &fakeResolverRepo{}
+	resolver := usecase.NewResolveDirectWebSocketDevServer(devServerRepo)
+	runtimes := &fakeEphemeralVmRuntimeRepo{existingRuntimeIDs: map[string]bool{}}
+	issuer := NewTokenIssuer(registry, Config{APISecret: "s3cr3t", OrcaVersion: "test-version", Port: 6768, DefaultTenantID: "tenant-1"}, nil, resolver, runtimes)
+
+	rec := doRequest(t, issuer, http.MethodPost, `{"devServerId":"dev-01"}`, "s3cr3t")
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200 — a not-found SetEnvironmentID result must not fail token issuance", rec.Code)
+	}
+	if len(runtimes.setCalls) != 1 {
+		t.Fatalf("want SetEnvironmentID still attempted once, got %d calls", len(runtimes.setCalls))
 	}
 }
 

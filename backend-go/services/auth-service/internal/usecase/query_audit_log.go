@@ -9,13 +9,17 @@ import (
 )
 
 type QueryAuditLogInput struct {
-	TenantID  string
-	Since     time.Time
+	TenantID string
+	Since    time.Time
+	To       time.Time // zero value = no upper bound
+	// ActorID/Action/Outcome are optional filters (TASK-BE-016) — zero
+	// value on each means "no filter," matching AuditRepository.Query's own
+	// empty-means-no-filter convention.
+	ActorID   string
+	Action    string
+	Outcome   domain.Outcome
 	PageToken string
 	PageSize  int32
-	To        time.Time // zero value = no upper bound
-	Action    string    // "" = no filter
-	ActorID   string    // "" = no filter
 }
 
 type QueryAuditLogOutput struct {
@@ -52,6 +56,7 @@ func (uc *QueryAuditLog) Execute(ctx context.Context, in QueryAuditLogInput) (Qu
 		To:       in.To,
 		Action:   in.Action,
 		ActorID:  in.ActorID,
+		Outcome:  in.Outcome,
 	}
 	entries, next, err := uc.audit.Query(ctx, filter, in.PageToken, pageSize)
 	if err != nil {

@@ -17,8 +17,9 @@ type contextKey struct{ name string }
 var (
 	tenantIDKey  = &contextKey{"tenant_id"}
 	userIDKey    = &contextKey{"user_id"}
-	roleKey      = &contextKey{"role"} // NEW
+	roleKey      = &contextKey{"role"}
 	projectIDKey = &contextKey{"project_id"}
+	clientIPKey  = &contextKey{"client_ip"}
 )
 
 // ErrNoTenant is returned by RequireTenantID when the context carries no
@@ -35,6 +36,18 @@ func WithTenantID(ctx context.Context, tenantID string) context.Context {
 // WithUserID attaches the validated acting user ID to ctx.
 func WithUserID(ctx context.Context, userID string) context.Context {
 	return context.WithValue(ctx, userIDKey, userID)
+}
+
+// WithRole attaches the caller's global role ("admin"/"user", matching
+// auth-service's domain.Role values) to ctx — added for CR-DS-006 Phase 2
+// (docs/crs/v2/dev-server/CR-DS-006-dev-server-approval-and-grouping.md),
+// closing the previously-documented gap every service's callerGlobalRole
+// stub described ("no role claim propagates from api-gateway into a
+// service's request context yet" — see project-service/annotation-service's
+// own authorization code). Empty string means "unknown" — callers must
+// treat that as non-admin (fail closed), never as an implicit allow.
+func WithRole(ctx context.Context, role string) context.Context {
+	return context.WithValue(ctx, roleKey, role)
 }
 
 // WithProjectID attaches the current request/execution's project scope to
@@ -59,19 +72,15 @@ func UserID(ctx context.Context) (string, bool) {
 	return v, ok && v != ""
 }
 
-// WithRole attaches the caller's role claim to ctx — populated by the
-// inbound gRPC interceptor once JWT-role-claim propagation from api-gateway
-// lands (tracked at project-service/internal/usecase/authorization.go's
-// callerGlobalRole stub). Not called anywhere in this codebase yet — see
-// Role's doc comment.
-func WithRole(ctx context.Context, role string) context.Context {
-	return context.WithValue(ctx, roleKey, role)
-}
-
-// Role returns the caller's role and whether one was present. Returns
-// ("", false) until the upstream role-claim-propagation gap closes (see
-// WithRole's doc comment) — every caller of this function must treat that
-// as "unknown role" and fail closed (deny), never as an implicit grant.
+// Role returns the caller's global role and whether one was present.
+// Populated end-to-end for both the cookie/session path
+// (authclient.SessionValidator) and, since CR-RBAC-002
+// (BE-SOL-002/TASK-BE-003/004), the bearer-JWT path too
+// (usecase.AuthValidator, via jwtauth.Claims.Role) — a JWT minted before
+// that change simply carries no role claim, which resolves the same as any
+// other absent claim (ok==false), not an error. Every caller of Role must
+// still treat ok==false the same as an empty/non-admin role, never as
+// "trust it."
 func Role(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(roleKey).(string)
 	return v, ok && v != ""
@@ -81,6 +90,28 @@ func Role(ctx context.Context) (string, bool) {
 // see WithProjectID's doc comment.
 func ProjectID(ctx context.Context) (string, bool) {
 	v, ok := ctx.Value(projectIDKey).(string)
+	return v, ok && v != ""
+}
+
+// WithClientIP attaches the caller's real client IP (resolved once, at the
+// api-gateway edge, from the inbound HTTP request — see
+// httpgateway.authMiddleware) to ctx. Two distinct roles share this same
+// accessor pair (TASK-BE-023 / CR-RBAC-005): api-gateway's outbound
+// AttachIdentity reads it back via ClientIP to stamp it onto outgoing gRPC
+// metadata (grpcmw.MetadataClientIP), and an internal service's
+// TenantExtractionInterceptor calls WithClientIP itself after extracting
+// that same metadata key from an inbound request — so a downstream audit
+// call site can always just call ClientIP(ctx), regardless of which hop
+// populated it.
+func WithClientIP(ctx context.Context, ip string) context.Context {
+	return context.WithValue(ctx, clientIPKey, ip)
+}
+
+// ClientIP returns the caller's real client IP and whether one was present.
+// Empty/ok==false for any request path with no HTTP edge in front of it
+// (e.g. a background job) — never an error, same fail-safe posture as Role.
+func ClientIP(ctx context.Context) (string, bool) {
+	v, ok := ctx.Value(clientIPKey).(string)
 	return v, ok && v != ""
 }
 

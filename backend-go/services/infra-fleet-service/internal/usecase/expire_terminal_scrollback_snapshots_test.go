@@ -10,7 +10,7 @@ import (
 
 func TestExpireTerminalScrollbackSnapshots_DeletesOnlyRowsOlderThanTTL(t *testing.T) {
 	now := time.Date(2026, 8, 27, 0, 0, 0, 0, time.UTC)
-	old := now.Add(-domain.ScrollbackSnapshotTTL).Add(-24 * time.Hour)   // 31 days old — should be deleted
+	old := now.Add(-domain.ScrollbackSnapshotTTL).Add(-24 * time.Hour)  // 31 days old — should be deleted
 	fresh := now.Add(-domain.ScrollbackSnapshotTTL).Add(24 * time.Hour) // 29 days old — should survive
 
 	repo := &fakeTerminalScrollbackSnapshotRepository{

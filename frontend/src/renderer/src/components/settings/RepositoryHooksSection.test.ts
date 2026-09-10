@@ -134,6 +134,78 @@ describe('getLocalCommandSourcePolicyNotice', () => {
   })
 })
 
+describe('RepositoryHooksSection Setup Script draft survives unrelated re-renders', () => {
+  it('does not wipe just-typed text when onUpdateHookSettings gets a new identity mid-debounce', () => {
+    // Regression for a live bug: an unmemoized `onUpdateHookSettings` prop
+    // (a new function every parent render, e.g. from live terminal/agent
+    // status updates unrelated to this section) re-ran the resync effect
+    // while `repo.hookSettings` still held the pre-edit value — wiping text
+    // the user had just typed, ~700ms after they stopped typing.
+    vi.useFakeTimers()
+    try {
+      const updates: NonNullable<Repo['hookSettings']>[] = []
+      const onUpdateHookSettingsA = (settings: NonNullable<Repo['hookSettings']>): void => {
+        updates.push(settings)
+      }
+      rendered = renderRepositoryHooksSection({ onUpdateHookSettings: onUpdateHookSettingsA })
+
+      const textarea = rendered.container.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="Setup Script"]'
+      )
+      expect(textarea).toBeTruthy()
+
+      const nativeSetter = Object.getOwnPropertyDescriptor(
+        window.HTMLTextAreaElement.prototype,
+        'value'
+      )!.set!
+      act(() => {
+        nativeSetter.call(textarea, 'pnpm install')
+        textarea!.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      expect(textarea!.value).toBe('pnpm install')
+
+      // Advance past the 700ms autosave debounce — this clears the dirty
+      // flag and calls onUpdateHookSettings, but repo.hookSettings (the
+      // store) has NOT been updated yet in this test, matching the real
+      // async gap between "saved" and "store reflects the save".
+      act(() => {
+        vi.advanceTimersByTime(800)
+      })
+      expect(updates.length).toBeGreaterThan(0)
+
+      // Simulate the exact trigger: an unrelated parent re-render passes a
+      // brand-new onUpdateHookSettings function, with the SAME repo object
+      // (hookSettings unchanged/stale) — this used to re-run the resync
+      // effect and clobber the draft back to the pre-edit (empty) value.
+      const onUpdateHookSettingsB = (settings: NonNullable<Repo['hookSettings']>): void => {
+        updates.push(settings)
+      }
+      act(() => {
+        rendered!.root.render(
+          React.createElement(RepositoryHooksSection, {
+            repo,
+            yamlHooks: null,
+            hasHooksFile: false,
+            hooksInspectionReady: true,
+            mayNeedUpdate: false,
+            copiedTemplate: false,
+            forceVisible: true,
+            onCopyTemplate: () => {},
+            onUpdateHookSettings: onUpdateHookSettingsB
+          })
+        )
+      })
+
+      const textareaAfterRerender = rendered.container.querySelector<HTMLTextAreaElement>(
+        'textarea[aria-label="Setup Script"]'
+      )
+      expect(textareaAfterRerender!.value).toBe('pnpm install')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
 describe('RepositoryHooksSection setup startup policy', () => {
   it('persists wait-for-setup when the repository toggle is checked', () => {
     const updates: NonNullable<Repo['hookSettings']>[] = []

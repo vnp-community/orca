@@ -12,11 +12,11 @@ import (
 )
 
 func TestCreateWorktree_HappyPath(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
 	relay := &fakeGitExecutor{}
-	projects := &fakeProjectClient{recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"}}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{URL: "/repo"}, recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"}}
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	got, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
 	if err != nil {
@@ -33,12 +33,58 @@ func TestCreateWorktree_HappyPath(t *testing.T) {
 	}
 }
 
-func TestCreateWorktree_BookkeepingFails_CompensatesByRemovingWorktree(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+// TestCreateWorktree_UsesRepoProjectIDNotWireProjectID locks in that
+// RecordWorktreeCreated is bookkept under the repo's OWN project (resolved
+// via GetRepo), not the wire's CreateWorktreeInput.ProjectID — no real
+// caller (wscompat's worktree.create) ever sends project_id on this RPC, so
+// trusting the wire field silently recorded every worktree under an empty
+// project id.
+func TestCreateWorktree_UsesRepoProjectIDNotWireProjectID(t *testing.T) {
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
 	relay := &fakeGitExecutor{}
-	projects := &fakeProjectClient{recordCreatedErr: errors.New("project-service unreachable")}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	projects := &fakeProjectClient{
+		getRepoResult:       domain.RepoInfo{URL: "/repo", ProjectID: "proj-from-repo"},
+		recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"},
+	}
+	uc := NewCreateWorktree(reachability, projects, local, relay)
+
+	// ProjectID deliberately left empty on the input, matching every real
+	// caller (wscompat's worktree.create never decodes/sends it).
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if projects.gotRecordCreatedProject != "proj-from-repo" {
+		t.Errorf("expected RecordWorktreeCreated to use the repo's own project id, got %q", projects.gotRecordCreatedProject)
+	}
+}
+
+func TestCreateWorktree_ThreadsLineageThroughToRecordWorktreeCreated(t *testing.T) {
+	reachability := &fakeDevServerReachability{}
+	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{URL: "/repo"}, recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"}}
+	uc := NewCreateWorktree(reachability, projects, local, relay)
+
+	lineage := domain.WorktreeLineageCapture{ParentWorktreeID: "wt-parent", Origin: "orchestration", TaskID: "task_abc123"}
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{
+		ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main", Lineage: lineage,
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if projects.gotRecordCreatedLineage != lineage {
+		t.Errorf("expected lineage %+v to reach RecordWorktreeCreated, got %+v", lineage, projects.gotRecordCreatedLineage)
+	}
+}
+
+func TestCreateWorktree_BookkeepingFails_CompensatesByRemovingWorktree(t *testing.T) {
+	reachability := &fakeDevServerReachability{}
+	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{URL: "/repo"}, recordCreatedErr: errors.New("project-service unreachable")}
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
 	if err == nil {
@@ -60,14 +106,14 @@ func TestCreateWorktree_BookkeepingFails_CompensatesByRemovingWorktree(t *testin
 }
 
 func TestCreateWorktree_BookkeepingFailsAndCompensationFails_ReportsBothFailures(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{
 		createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"},
 		removeWorktreeErr:    errors.New("rollback failed: disk busy"),
 	}
 	relay := &fakeGitExecutor{}
-	projects := &fakeProjectClient{recordCreatedErr: errors.New("bookkeeping unreachable")}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{URL: "/repo"}, recordCreatedErr: errors.New("bookkeeping unreachable")}
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
 	if err == nil {
@@ -86,11 +132,11 @@ func TestCreateWorktree_BookkeepingFailsAndCompensationFails_ReportsBothFailures
 }
 
 func TestCreateWorktree_GitCreateFails_NoBookkeepingOrCompensationAttempted(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{createWorktreeErr: errors.New("git worktree add failed: branch exists")}
 	relay := &fakeGitExecutor{}
-	projects := &fakeProjectClient{}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{URL: "/repo"}}
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
 	if err == nil {
@@ -109,14 +155,14 @@ func TestCreateWorktree_GitCreateFails_NoBookkeepingOrCompensationAttempted(t *t
 }
 
 func TestCreateWorktree_IdempotencyKeyMatch_ReturnsExistingWithoutExecutorCall(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{
 		findByIdempotencyKeyFound:  true,
 		findByIdempotencyKeyResult: domain.WorktreeRecord{ID: "wt-existing", Path: "/repo-feature", Branch: "feature"},
 	}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	got, err := uc.Execute(context.Background(), CreateWorktreeInput{
 		ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main", IdempotencyKey: "dedupe-key",
@@ -142,11 +188,11 @@ func TestCreateWorktree_IdempotencyKeyMatch_ReturnsExistingWithoutExecutorCall(t
 }
 
 func TestCreateWorktree_RepoNotFound_NoExecutorCallAtAll(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{getRepoErr: errors.New("repo not found")}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
 	if err == nil {
@@ -164,11 +210,11 @@ func TestCreateWorktree_RepoNotFound_NoExecutorCallAtAll(t *testing.T) {
 // ── SOL-WT-01: BR-WT-01/04, [A1]/[A2]/[A3] ──────────────────────────────────
 
 func TestCreateWorktree_InvalidName_RejectsBeforeAnyExecutorCall(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main", Name: "Invalid Name!"})
 	if err == nil {
@@ -187,11 +233,11 @@ func TestCreateWorktree_InvalidName_RejectsBeforeAnyExecutorCall(t *testing.T) {
 }
 
 func TestCreateWorktree_PathAlreadyExists_ReturnsSuggestedName_NoGitCallAttempted(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
-	local := &fakeGitExecutor{listWorktreePathsOut: []string{"/repo-feature"}}
+	reachability := &fakeDevServerReachability{}
+	local := &fakeGitExecutor{listWorktreePathsOut: []domain.WorktreeGitInfo{{Path: "/repo-feature"}}}
 	relay := &fakeGitExecutor{}
-	projects := &fakeProjectClient{}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{URL: "/repo"}}
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
 	if err == nil {
@@ -207,7 +253,7 @@ func TestCreateWorktree_PathAlreadyExists_ReturnsSuggestedName_NoGitCallAttempte
 }
 
 func TestCreateWorktree_LimitExceeded_RejectsBeforeGitCall(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{}
 	relay := &fakeGitExecutor{}
 	existing := make([]domain.WorktreeRecord, 20)
@@ -215,7 +261,7 @@ func TestCreateWorktree_LimitExceeded_RejectsBeforeGitCall(t *testing.T) {
 		existing[i] = domain.WorktreeRecord{ID: "wt", RepoID: "repo-1", Active: true}
 	}
 	projects := &fakeProjectClient{listWorktreesResult: existing}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
 	if err == nil {
@@ -231,11 +277,11 @@ func TestCreateWorktree_LimitExceeded_RejectsBeforeGitCall(t *testing.T) {
 }
 
 func TestCreateWorktree_LimitCheckFailsOpen_WhenListWorktreesErrors(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{listWorktreesErr: errors.New("project-service unreachable"), recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"}}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main"})
 	if err != nil {
@@ -247,14 +293,14 @@ func TestCreateWorktree_LimitCheckFailsOpen_WhenListWorktreesErrors(t *testing.T
 }
 
 func TestCreateWorktree_BaseRefNotFound_ClassifiesGitError_AttachesBranchList(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{
 		createWorktreeErr: errors.New("fatal: invalid reference: nonexistent"),
 		branchInfos:       []domain.BranchInfo{{Name: "main"}, {Name: "develop"}},
 	}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "nonexistent"})
 	if err == nil {
@@ -270,11 +316,11 @@ func TestCreateWorktree_BaseRefNotFound_ClassifiesGitError_AttachesBranchList(t 
 }
 
 func TestCreateWorktree_CustomNameAndPath_PassedThroughToExecutor(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/custom/path", HeadSHA: "sha123"}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/custom/path", Branch: "feature"}}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{
 		ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "main", Name: "custom-name", Path: "/custom/path",
@@ -291,11 +337,11 @@ func TestCreateWorktree_CustomNameAndPath_PassedThroughToExecutor(t *testing.T) 
 // regression guard against SOL-WT-04's confirmed silent-drop bug: BaseRef
 // was received but never forwarded to RecordWorktreeCreated.
 func TestCreateWorktree_ForwardsBaseRefToRecordWorktreeCreated(t *testing.T) {
-	resolver := &fakeConnectionResolver{conn: ResolvedConnection{Connected: false, RepoPath: "/repo"}}
+	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{createWorktreeResult: domain.WorktreeCreateResult{Path: "/repo-feature", HeadSHA: "sha123"}}
 	relay := &fakeGitExecutor{}
 	projects := &fakeProjectClient{recordCreatedResult: domain.WorktreeRecord{ID: "wt-1", Path: "/repo-feature", Branch: "feature"}}
-	uc := NewCreateWorktree(resolver, projects, local, relay)
+	uc := NewCreateWorktree(reachability, projects, local, relay)
 
 	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "feature", BaseRef: "develop"})
 	if err != nil {

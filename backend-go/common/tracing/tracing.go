@@ -16,11 +16,33 @@ import (
 	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+
+	"github.com/stablyai/orca-go/common/eventbus"
 )
 
 // Shutdown flushes and stops the tracer provider; call it deferred from
 // cmd/server/main.go.
 type Shutdown func(context.Context) error
+
+// Option configures Init beyond its required serviceName/otlpEndpoint args.
+type Option func(*initConfig)
+
+type initConfig struct {
+	eventPublisher *eventbus.Publisher
+	serviceName    string
+}
+
+// WithTraceEventPublisher additionally publishes every finished span onto
+// pub, at subject "orca.<serviceName>.trace.span" (CR-FFT-002/
+// TASK-BE-FFT-008) — a real-time sink for api-gateway's TracePanel SSE
+// bridge (see httpgateway.TraceBroadcast), separate from and in addition to
+// the batched OTLP export above. pub may be nil (e.g. eventbus
+// unreachable at startup) — publishing is then skipped entirely, matching
+// every other NATS-consuming service's "diagnostic, not fatal" degrade
+// posture in this scaffold.
+func WithTraceEventPublisher(pub *eventbus.Publisher) Option {
+	return func(c *initConfig) { c.eventPublisher = pub }
+}
 
 // Init installs a TracerProvider tagged with the service name. When
 // otlpEndpoint is set, spans are batched and shipped to it over gRPC
@@ -29,7 +51,12 @@ type Shutdown func(context.Context) error
 // intra-cluster trust the shared health/eventbus adapters already assume).
 // otlptracegrpc.New only opens the client; it doesn't dial eagerly, so a
 // service still starts cleanly even if the collector is briefly unreachable.
-func Init(ctx context.Context, serviceName, otlpEndpoint string) (Shutdown, error) {
+func Init(ctx context.Context, serviceName, otlpEndpoint string, opts ...Option) (Shutdown, error) {
+	cfg := initConfig{serviceName: serviceName}
+	for _, opt := range opts {
+		opt(&cfg)
+	}
+
 	res, err := resource.New(ctx, resource.WithAttributes(
 		semconv.ServiceName(serviceName),
 	))
@@ -37,8 +64,8 @@ func Init(ctx context.Context, serviceName, otlpEndpoint string) (Shutdown, erro
 		return nil, err
 	}
 
-	var opts []sdktrace.TracerProviderOption
-	opts = append(opts, sdktrace.WithResource(res))
+	var tpOpts []sdktrace.TracerProviderOption
+	tpOpts = append(tpOpts, sdktrace.WithResource(res))
 	if otlpEndpoint != "" {
 		exporter, err := otlptracegrpc.New(ctx,
 			otlptracegrpc.WithEndpoint(otlpEndpoint),
@@ -47,10 +74,13 @@ func Init(ctx context.Context, serviceName, otlpEndpoint string) (Shutdown, erro
 		if err != nil {
 			return nil, fmt.Errorf("tracing: creating otlp exporter: %w", err)
 		}
-		opts = append(opts, sdktrace.WithBatcher(exporter))
+		tpOpts = append(tpOpts, sdktrace.WithBatcher(exporter))
+	}
+	if cfg.eventPublisher != nil {
+		tpOpts = append(tpOpts, sdktrace.WithSpanProcessor(newEventPublishingProcessor(cfg.eventPublisher, serviceName)))
 	}
 
-	tp := sdktrace.NewTracerProvider(opts...)
+	tp := sdktrace.NewTracerProvider(tpOpts...)
 	otel.SetTracerProvider(tp)
 
 	return func(ctx context.Context) error {

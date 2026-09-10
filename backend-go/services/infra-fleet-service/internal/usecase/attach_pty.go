@@ -119,14 +119,15 @@ func LastOutputPreview(liveStates *sync.Map, ptyID string) string {
 type AttachPty struct {
 	sessions   TerminalSessionRepository
 	resolver   ConnectionResolver
+	devServers DevServerRepository
 	agent      DevServerAgentClient
 	limiter    *ConnectionStreamLimiter
 	liveStates *sync.Map // map[string]*ptyLiveState — shared with GetTerminalAgentStatus, see ptyLiveState's doc comment
 	events     LifecycleEventPublisher
 }
 
-func NewAttachPty(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient, limiter *ConnectionStreamLimiter, liveStates *sync.Map, events LifecycleEventPublisher) *AttachPty {
-	return &AttachPty{sessions: sessions, resolver: resolver, agent: agent, limiter: limiter, liveStates: liveStates, events: events}
+func NewAttachPty(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient, limiter *ConnectionStreamLimiter, liveStates *sync.Map, events LifecycleEventPublisher) *AttachPty {
+	return &AttachPty{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent, limiter: limiter, liveStates: liveStates, events: events}
 }
 
 // Execute starts a goroutine driving the stream and returns immediately with
@@ -161,7 +162,7 @@ func (uc *AttachPty) run(ctx context.Context, inbound <-chan PtyClientMessage, o
 	}
 	ptyID := first.PtyID
 
-	session, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver)
+	session, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		errCh <- err
 		return

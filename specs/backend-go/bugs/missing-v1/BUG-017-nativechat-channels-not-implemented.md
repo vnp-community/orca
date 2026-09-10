@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** Low
 **Symptom:** `nativeChat.readSession` falls through to `registry.go`'s `notImplementedHandler` and returns an error immediately.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-108–109 (2 task(s), all DONE) for implementation evidence.
 
 ---
 

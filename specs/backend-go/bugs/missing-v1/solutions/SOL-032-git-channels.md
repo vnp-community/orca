@@ -11,7 +11,7 @@
 - `backend-go/services/git-gateway-service/internal/adapter/grpcclient/relay_executor.go`
 - `backend-go/services/git-gateway-service/internal/adapter/grpc/server.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 11 task(s) (TASK-206–216) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

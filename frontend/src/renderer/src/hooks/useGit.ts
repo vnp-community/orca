@@ -1,4 +1,5 @@
 import { useCallback, useEffect } from 'react'
+import { useShallow } from 'zustand/react/shallow'
 import { useWorkspace } from '../context/WorkspaceContext'
 import { useAppStore } from '../store'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../runtime/runtime-rpc-client'
@@ -58,12 +59,20 @@ function diffResultToText(diff: GitDiffResult): string {
 
 export function useGit() {
   const { project, currentWorktree, emit, refreshGitStatus } = useWorkspace()
-  const { stagedFiles, unstagedFiles, isPushing, isCommitting } = useAppStore((s) => ({
-    stagedFiles: s.stagedFiles,
-    unstagedFiles: s.unstagedFiles,
-    isPushing: s.isPushing,
-    isCommitting: s.isCommitting
-  }))
+  // Why useShallow: this selector returns a fresh object literal every call.
+  // Zustand v5's React binding hands that straight to React's own
+  // useSyncExternalStore with no built-in memoization, so an unguarded
+  // object selector fails its own snapshot-equality check on every render —
+  // an unconditional infinite re-render loop (React error #185), live-
+  // reproduced simply by mounting GitPanel's default "Changes" tab.
+  const { stagedFiles, unstagedFiles, isPushing, isCommitting } = useAppStore(
+    useShallow((s) => ({
+      stagedFiles: s.stagedFiles,
+      unstagedFiles: s.unstagedFiles,
+      isPushing: s.isPushing,
+      isCommitting: s.isCommitting
+    }))
+  )
 
   // Refresh on mount
   const refreshFiles = useCallback(async () => {

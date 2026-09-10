@@ -1,5 +1,5 @@
 import React from 'react'
-import { AlertTriangle, GitBranch, Loader2, RotateCcw, X } from 'lucide-react'
+import { AlertTriangle, FolderGit2, GitBranch, Loader2, RotateCcw, X } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { retryBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
 import { getCreationProgressLabel } from '@/lib/pending-worktree-creation'
@@ -130,6 +130,27 @@ export default function WorktreeCreationPanel({
                   'Something went wrong while creating the worktree.'
                 )}
             </span>
+            {entry.errorKind === 'not-a-git-repo' && (
+              <button
+                type="button"
+                onClick={() => {
+                  const repo = useAppStore
+                    .getState()
+                    .repos.find((r) => r.id === entry.request.repoId)
+                  useAppStore.getState().openModal('init-repo-as-git', {
+                    creationId,
+                    folderPath: repo?.path ?? ''
+                  })
+                }}
+                className="inline-flex items-center gap-1 text-foreground hover:underline"
+              >
+                <FolderGit2 className="size-3" />
+                {translate(
+                  'auto.components.worktree.creation.WorktreeCreationPanel.initAsGitRepo',
+                  'Initialize as Git repo'
+                )}
+              </button>
+            )}
             <button
               type="button"
               onClick={() => retryBackgroundWorktreeCreation(creationId)}

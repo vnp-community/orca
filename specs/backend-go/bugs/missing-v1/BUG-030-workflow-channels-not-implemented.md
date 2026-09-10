@@ -4,7 +4,7 @@
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** High — workflow automation is a headline feature; the backing RPCs exist and are already REST-wired, only the WS compat wrapper is missing
 **Symptom:** Every `workflow.*` call the automation UI makes (`workflow.execute`, `workflow.cancel`, `workflow.template.create`, `workflow.template.update`) falls through to `notImplementedHandler` and times out client-side, even though the equivalent REST endpoints work today
-**Status: ❌ Open**
+**Status:** ✅ Resolved — see TASK-188–191 (4 task(s), all DONE) for implementation evidence.
 
 ---
 

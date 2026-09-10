@@ -11,7 +11,7 @@
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_orchestration.go` (new file)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_orchestration_test.go` (new file)
 - `backend-go/services/api-gateway/cmd/server/main.go` (pass `orchestrationClient` into `RegisterRealChannels`)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 3 task(s) (TASK-110–112) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

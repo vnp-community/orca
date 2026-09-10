@@ -11,7 +11,7 @@
 - `backend-go/services/git-gateway-service/internal/usecase/*.go` (new use cases)
 - `backend-go/services/project-service/internal/usecase/update_repo.go` (new)
 - `backend-go/services/project-service/internal/adapter/grpc/server.go`
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 11 task(s) (TASK-151–161) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

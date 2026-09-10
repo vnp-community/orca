@@ -9,6 +9,7 @@ import (
 	"context"
 	"encoding/json"
 	"sync"
+	"time"
 
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
@@ -43,6 +44,9 @@ type Server struct {
 	getSshState         *usecase.GetSshState
 	establishConnection *usecase.EstablishConnection
 	killWorkspacePort   *usecase.KillWorkspacePort
+	// teardownConnection backs the confirmed-logout explicit-close RPC
+	// (BE-SOL-STORAGE-003 §5, TASK-BE-STORAGE-012).
+	teardownConnection *usecase.TeardownConnection
 	// --- Terminal/PTY (TASK-185) ---
 	spawnTerminalSession   *usecase.SpawnTerminalSession
 	resizeTerminalSession  *usecase.ResizeTerminalSession
@@ -54,6 +58,7 @@ type Server struct {
 	getTerminalAgentStatus *usecase.GetTerminalAgentStatus
 	inspectTerminalProcess *usecase.InspectTerminalProcess
 	attachPty              *usecase.AttachPty
+	attachScreencast       *usecase.AttachScreencast
 	listBrowserProfiles    *usecase.ListBrowserProfiles
 	createBrowserProfile   *usecase.CreateBrowserProfile
 	deleteBrowserProfile   *usecase.DeleteBrowserProfile
@@ -85,9 +90,6 @@ type Server struct {
 	listAgentTokens  *usecase.ListAgentTokens
 	revokeAgentToken *usecase.RevokeAgentToken
 
-	// --- BR-SSH-13 reconnect cancellation ---
-	teardownConnection *usecase.TeardownConnection
-
 	// --- Auto port-forwarding (SOL-SSH-04) ---
 	createPortForward *usecase.CreatePortForward
 	listPortForwards  *usecase.ListPortForwards
@@ -112,6 +114,35 @@ type Server struct {
 	// populate ListTerminalSessions/SpawnTerminalSession's
 	// TerminalSession.LastOutputPreview (TASK-MB-04-02), never written.
 	liveStates *sync.Map
+
+	// --- CR-DS-006 Phase 2 / CR-DS-007 / CR-DS-008 (dev server access control) ---
+	approveDevServer           *usecase.ApproveDevServer
+	rejectDevServer            *usecase.RejectDevServer
+	assignDevServerGroup       *usecase.AssignDevServerGroup
+	createDevServerGroup       *usecase.CreateDevServerGroup
+	listDevServerGroups        *usecase.ListDevServerGroups
+	grantDevServerGroupAccess  *usecase.GrantDevServerGroupAccess
+	revokeDevServerGroupAccess *usecase.RevokeDevServerGroupAccess
+	listDevServerGroupGrants   *usecase.ListDevServerGroupGrants
+	listDevServersForUser      *usecase.ListDevServersForUser
+	createAccessRequest        *usecase.CreateAccessRequest
+	listPendingAccessRequests  *usecase.ListPendingAccessRequests
+	resolveAccessRequest       *usecase.ResolveAccessRequest
+
+	relayByDevServer     *usecase.RelayByDevServer
+	isDevServerConnected *usecase.IsDevServerConnected
+
+	// --- Ephemeral VM (SOL-004 Group 1/2a, TASK-002/004) ---
+	listEphemeralVmRuntimes *usecase.ListEphemeralVmRuntimes
+	ephemeralVmRelay        *usecase.EphemeralVmRelay
+
+	// getFleetConnectivitySummary backs CR-STORAGE-007's poll-driven health
+	// summary (TASK-BE-STORAGE-006) — see usecase.GetFleetConnectivitySummary's
+	// doc comment.
+	getFleetConnectivitySummary *usecase.GetFleetConnectivitySummary
+
+	// streamFileChanges backs BACKLOG-003's file-watch streaming RPC.
+	streamFileChanges *usecase.StreamFileChanges
 }
 
 func New(
@@ -139,6 +170,7 @@ func New(
 	getTerminalAgentStatus *usecase.GetTerminalAgentStatus,
 	inspectTerminalProcess *usecase.InspectTerminalProcess,
 	attachPty *usecase.AttachPty,
+	attachScreencast *usecase.AttachScreencast,
 	listBrowserProfiles *usecase.ListBrowserProfiles,
 	createBrowserProfile *usecase.CreateBrowserProfile,
 	deleteBrowserProfile *usecase.DeleteBrowserProfile,
@@ -170,6 +202,24 @@ func New(
 	dispatchPrompt *usecase.DispatchPrompt,
 	getQueuedPrompt *usecase.GetQueuedPrompt,
 	liveStates *sync.Map,
+	approveDevServer *usecase.ApproveDevServer,
+	rejectDevServer *usecase.RejectDevServer,
+	assignDevServerGroup *usecase.AssignDevServerGroup,
+	createDevServerGroup *usecase.CreateDevServerGroup,
+	listDevServerGroups *usecase.ListDevServerGroups,
+	grantDevServerGroupAccess *usecase.GrantDevServerGroupAccess,
+	revokeDevServerGroupAccess *usecase.RevokeDevServerGroupAccess,
+	listDevServerGroupGrants *usecase.ListDevServerGroupGrants,
+	listDevServersForUser *usecase.ListDevServersForUser,
+	createAccessRequest *usecase.CreateAccessRequest,
+	listPendingAccessRequests *usecase.ListPendingAccessRequests,
+	resolveAccessRequest *usecase.ResolveAccessRequest,
+	relayByDevServer *usecase.RelayByDevServer,
+	isDevServerConnected *usecase.IsDevServerConnected,
+	listEphemeralVmRuntimes *usecase.ListEphemeralVmRuntimes,
+	ephemeralVmRelay *usecase.EphemeralVmRelay,
+	getFleetConnectivitySummary *usecase.GetFleetConnectivitySummary,
+	streamFileChanges *usecase.StreamFileChanges,
 ) *Server {
 	return &Server{
 		registerDevServer:      registerDevServer,
@@ -226,15 +276,83 @@ func New(
 		deletePortForward:  deletePortForward,
 		portEvents:         portEvents,
 
-		startAgentSession:  startAgentSession,
-		stopAgentSession:   stopAgentSession,
-		killAgentSession:   killAgentSession,
-		resumeAgentSession: resumeAgentSession,
-		switchAgentAccount: switchAgentAccount,
-		dispatchPrompt:         dispatchPrompt,
-		getQueuedPrompt:        getQueuedPrompt,
-		liveStates:             liveStates,
+		startAgentSession:          startAgentSession,
+		stopAgentSession:           stopAgentSession,
+		killAgentSession:           killAgentSession,
+		resumeAgentSession:         resumeAgentSession,
+		switchAgentAccount:         switchAgentAccount,
+		dispatchPrompt:             dispatchPrompt,
+		getQueuedPrompt:            getQueuedPrompt,
+		liveStates:                 liveStates,
+		approveDevServer:           approveDevServer,
+		rejectDevServer:            rejectDevServer,
+		assignDevServerGroup:       assignDevServerGroup,
+		createDevServerGroup:       createDevServerGroup,
+		listDevServerGroups:        listDevServerGroups,
+		grantDevServerGroupAccess:  grantDevServerGroupAccess,
+		revokeDevServerGroupAccess: revokeDevServerGroupAccess,
+		listDevServerGroupGrants:   listDevServerGroupGrants,
+		listDevServersForUser:      listDevServersForUser,
+		createAccessRequest:        createAccessRequest,
+		listPendingAccessRequests:  listPendingAccessRequests,
+		resolveAccessRequest:       resolveAccessRequest,
+		relayByDevServer:           relayByDevServer,
+		isDevServerConnected:       isDevServerConnected,
+
+		listEphemeralVmRuntimes: listEphemeralVmRuntimes,
+		ephemeralVmRelay:        ephemeralVmRelay,
+
+		getFleetConnectivitySummary: getFleetConnectivitySummary,
+
+		streamFileChanges: streamFileChanges,
 	}
+}
+
+// TeardownConnection backs BE-SOL-STORAGE-003 §5's confirmed-logout
+// explicit-close path — tenant scoping comes from the authenticated
+// context, per infrafleet.proto's TeardownConnectionRequest doc comment.
+func (s *Server) TeardownConnection(ctx context.Context, req *infrafleetv1.TeardownConnectionRequest) (*emptypb.Empty, error) {
+	if err := s.teardownConnection.Execute(ctx, req.GetConnectionId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+// GetFleetConnectivitySummary backs CR-STORAGE-007's poll-driven health
+// summary — see usecase.GetFleetConnectivitySummary's doc comment.
+// tenant/user scoping comes from the authenticated identity in ctx, never
+// from req (which is deliberately empty, see infrafleet.proto's
+// GetFleetConnectivitySummaryRequest doc comment).
+func (s *Server) GetFleetConnectivitySummary(ctx context.Context, req *infrafleetv1.GetFleetConnectivitySummaryRequest) (*infrafleetv1.GetFleetConnectivitySummaryResponse, error) {
+	conns, err := s.getFleetConnectivitySummary.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.ConnectionHealthEntry, 0, len(conns))
+	for _, conn := range conns {
+		out = append(out, toProtoConnectionHealthEntry(conn))
+	}
+	return &infrafleetv1.GetFleetConnectivitySummaryResponse{Connections: out}, nil
+}
+
+// toProtoConnectionHealthEntry maps a domain.Connection to the wire shape
+// GetFleetConnectivitySummary returns — LastActivityAt/DegradedSince stay
+// unset (nil) on the proto message when the domain field is nil, never a
+// fabricated zero timestamp (see infrafleet.proto's ConnectionHealthEntry
+// doc comment: "unset if never active" / "unset unless status == degraded").
+func toProtoConnectionHealthEntry(conn domain.Connection) *infrafleetv1.ConnectionHealthEntry {
+	entry := &infrafleetv1.ConnectionHealthEntry{
+		ConnectionId: conn.ID,
+		DevServerId:  conn.DevServerID,
+		Status:       conn.Status,
+	}
+	if conn.LastActivityAt != nil {
+		entry.LastActivityAt = timestamppb.New(*conn.LastActivityAt)
+	}
+	if conn.DegradedSince != nil {
+		entry.DegradedSince = timestamppb.New(*conn.DegradedSince)
+	}
+	return entry
 }
 
 func (s *Server) RegisterDevServer(ctx context.Context, req *infrafleetv1.RegisterDevServerRequest) (*infrafleetv1.RegisterDevServerResponse, error) {
@@ -243,6 +361,7 @@ func (s *Server) RegisterDevServer(ctx context.Context, req *infrafleetv1.Regist
 		Mode:        toDomainConnectionMode(req.GetMode()),
 		SSHTargetID: req.GetSshTargetId(),
 		Tags:        req.GetTags(),
+		Kind:        toDomainAgentKind(req.GetKind()),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -268,6 +387,7 @@ func (s *Server) ResolveConnection(ctx context.Context, req *infrafleetv1.Resolv
 		resp.WorktreeId = out.WorktreeID
 		resp.ConnectionId = out.ConnectionID
 		resp.NodeVersion = out.NodeVersion
+		resp.HiddenTargetId = out.HiddenTargetID
 	}
 	return resp, nil
 }
@@ -275,7 +395,7 @@ func (s *Server) ResolveConnection(ctx context.Context, req *infrafleetv1.Resolv
 // ListDevServers backs the frontend's devServer.list channel (wired through
 // api-gateway's wscompat) — see usecase.ListDevServers's doc comment.
 func (s *Server) ListDevServers(ctx context.Context, req *infrafleetv1.ListDevServersRequest) (*infrafleetv1.ListDevServersResponse, error) {
-	devServers, err := s.listDevServers.Execute(ctx)
+	devServers, err := s.listDevServers.Execute(ctx, toDomainAgentKind(req.GetKind()))
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -301,6 +421,149 @@ func (s *Server) ListDevServersByTag(ctx context.Context, req *infrafleetv1.List
 		out = append(out, toProtoDevServer(ds))
 	}
 	return &infrafleetv1.ListDevServersByTagResponse{DevServers: out}, nil
+}
+
+// --- CR-DS-006 Phase 2 / CR-DS-007 / CR-DS-008 (dev server access control) ---
+
+func (s *Server) ApproveDevServer(ctx context.Context, req *infrafleetv1.ApproveDevServerRequest) (*infrafleetv1.ApproveDevServerResponse, error) {
+	ds, err := s.approveDevServer.Execute(ctx, req.GetDevServerId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.ApproveDevServerResponse{DevServer: toProtoDevServer(ds)}, nil
+}
+
+func (s *Server) RejectDevServer(ctx context.Context, req *infrafleetv1.RejectDevServerRequest) (*infrafleetv1.RejectDevServerResponse, error) {
+	ds, err := s.rejectDevServer.Execute(ctx, usecase.RejectDevServerInput{
+		DevServerID: req.GetDevServerId(),
+		Reason:      req.GetReason(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.RejectDevServerResponse{DevServer: toProtoDevServer(ds)}, nil
+}
+
+func (s *Server) AssignDevServerGroup(ctx context.Context, req *infrafleetv1.AssignDevServerGroupRequest) (*infrafleetv1.AssignDevServerGroupResponse, error) {
+	ds, err := s.assignDevServerGroup.Execute(ctx, usecase.AssignDevServerGroupInput{
+		DevServerID: req.GetDevServerId(),
+		GroupID:     req.GetGroupId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.AssignDevServerGroupResponse{DevServer: toProtoDevServer(ds)}, nil
+}
+
+func (s *Server) CreateDevServerGroup(ctx context.Context, req *infrafleetv1.CreateDevServerGroupRequest) (*infrafleetv1.CreateDevServerGroupResponse, error) {
+	group, err := s.createDevServerGroup.Execute(ctx, usecase.CreateDevServerGroupInput{
+		Name:          req.GetName(),
+		ParentGroupID: req.GetParentGroupId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.CreateDevServerGroupResponse{Group: toProtoDevServerGroup(group)}, nil
+}
+
+func (s *Server) ListDevServerGroups(ctx context.Context, req *infrafleetv1.ListDevServerGroupsRequest) (*infrafleetv1.ListDevServerGroupsResponse, error) {
+	groups, err := s.listDevServerGroups.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.DevServerGroup, 0, len(groups))
+	for _, g := range groups {
+		out = append(out, toProtoDevServerGroup(g))
+	}
+	return &infrafleetv1.ListDevServerGroupsResponse{Groups: out}, nil
+}
+
+func (s *Server) GrantDevServerGroupAccess(ctx context.Context, req *infrafleetv1.GrantDevServerGroupAccessRequest) (*infrafleetv1.GrantDevServerGroupAccessResponse, error) {
+	grant, err := s.grantDevServerGroupAccess.Execute(ctx, usecase.GrantDevServerGroupAccessInput{
+		DevServerGroupID: req.GetDevServerGroupId(),
+		GranteeKind:      toDomainGranteeKind(req.GetGranteeKind()),
+		GranteeID:        req.GetGranteeId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.GrantDevServerGroupAccessResponse{Grant: toProtoGrant(grant)}, nil
+}
+
+func (s *Server) RevokeDevServerGroupAccess(ctx context.Context, req *infrafleetv1.RevokeDevServerGroupAccessRequest) (*infrafleetv1.RevokeDevServerGroupAccessResponse, error) {
+	if err := s.revokeDevServerGroupAccess.Execute(ctx, req.GetGrantId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.RevokeDevServerGroupAccessResponse{}, nil
+}
+
+func (s *Server) ListDevServerGroupGrants(ctx context.Context, req *infrafleetv1.ListDevServerGroupGrantsRequest) (*infrafleetv1.ListDevServerGroupGrantsResponse, error) {
+	grants, err := s.listDevServerGroupGrants.Execute(ctx, req.GetDevServerGroupId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.DevServerGroupGrant, 0, len(grants))
+	for _, g := range grants {
+		out = append(out, toProtoGrant(g))
+	}
+	return &infrafleetv1.ListDevServerGroupGrantsResponse{Grants: out}, nil
+}
+
+func (s *Server) ListDevServersForUser(ctx context.Context, req *infrafleetv1.ListDevServersForUserRequest) (*infrafleetv1.ListDevServersForUserResponse, error) {
+	devServers, err := s.listDevServersForUser.Execute(ctx, usecase.ListDevServersForUserInput{
+		DepartmentID: req.GetDepartmentId(),
+		TeamIDs:      req.GetTeamIds(),
+		Kind:         toDomainAgentKind(req.GetKind()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.DevServer, 0, len(devServers))
+	for _, ds := range devServers {
+		out = append(out, toProtoDevServer(ds))
+	}
+	return &infrafleetv1.ListDevServersForUserResponse{DevServers: out}, nil
+}
+
+func (s *Server) CreateAccessRequest(ctx context.Context, req *infrafleetv1.CreateAccessRequestRequest) (*infrafleetv1.CreateAccessRequestResponse, error) {
+	out, err := s.createAccessRequest.Execute(ctx, usecase.CreateAccessRequestInput{
+		DevServerGroupID: req.GetDevServerGroupId(),
+		Message:          req.GetMessage(),
+		GranteeKind:      toDomainGranteeKind(req.GetGranteeKind()),
+		GranteeID:        req.GetGranteeId(),
+		NowUnixMs:        nowUnixMs(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.CreateAccessRequestResponse{Request: toProtoAccessRequest(out)}, nil
+}
+
+func (s *Server) ListPendingAccessRequests(ctx context.Context, req *infrafleetv1.ListPendingAccessRequestsRequest) (*infrafleetv1.ListPendingAccessRequestsResponse, error) {
+	reqs, err := s.listPendingAccessRequests.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*infrafleetv1.DevServerAccessRequest, 0, len(reqs))
+	for _, r := range reqs {
+		out = append(out, toProtoAccessRequest(r))
+	}
+	return &infrafleetv1.ListPendingAccessRequestsResponse{Requests: out}, nil
+}
+
+func (s *Server) ResolveAccessRequest(ctx context.Context, req *infrafleetv1.ResolveAccessRequestRequest) (*infrafleetv1.ResolveAccessRequestResponse, error) {
+	out, err := s.resolveAccessRequest.Execute(ctx, usecase.ResolveAccessRequestInput{
+		RequestID: req.GetRequestId(),
+		Approve:   req.GetApprove(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	resp := &infrafleetv1.ResolveAccessRequestResponse{Request: toProtoAccessRequest(out.Request)}
+	if req.GetApprove() {
+		resp.Grant = toProtoGrant(out.Grant)
+	}
+	return resp, nil
 }
 
 // CreateConnection is the write path for infra.connections — see
@@ -369,6 +632,70 @@ func (s *Server) RelayStream(req *infrafleetv1.RelayStreamRequest, stream infraf
 		return apperrors.ToGRPCStatus(err)
 	}
 	return nil
+}
+
+func (s *Server) RelayByDevServer(ctx context.Context, req *infrafleetv1.RelayByDevServerRequest) (*infrafleetv1.RelayResponse, error) {
+	var params map[string]any
+	if raw := req.GetParamsJson(); raw != "" {
+		if err := json.Unmarshal([]byte(raw), &params); err != nil {
+			return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInvalidArgument, "INFRA_RELAY_BAD_PARAMS", "params_json must be a JSON object", err))
+		}
+	}
+
+	result, err := s.relayByDevServer.Execute(ctx, usecase.RelayByDevServerInput{
+		DevServerID: req.GetDevServerId(),
+		Method:      req.GetMethod(),
+		Params:      params,
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+
+	resultJSON, err := json.Marshal(result)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInternal, "INFRA_RELAY_ENCODE_FAILED", "failed to encode relay result", err))
+	}
+	return &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}, nil
+}
+
+// StreamFileChanges is BACKLOG-003's streaming counterpart to Relay/
+// RelayByDevServer above — same dual connection_id/dev_server_id
+// addressing, but server-streaming (grpc.ServerStreamingServer's generated
+// method shape takes (req, stream); ctx comes from stream.Context(), same
+// as StreamVmProvision, not a separate parameter).
+func (s *Server) StreamFileChanges(req *infrafleetv1.StreamFileChangesRequest, stream infrafleetv1.InfraFleetService_StreamFileChangesServer) error {
+	events, unsubscribe, err := s.streamFileChanges.Execute(stream.Context(), usecase.StreamFileChangesInput{
+		ConnectionID: req.GetConnectionId(),
+		DevServerID:  req.GetDevServerId(),
+		Path:         req.GetPath(),
+	})
+	if err != nil {
+		return apperrors.ToGRPCStatus(err)
+	}
+	defer unsubscribe()
+	for event := range events {
+		if err := stream.Send(toProtoFileChangeEvent(event)); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func toProtoFileChangeEvent(e usecase.FileChangeEvent) *infrafleetv1.FileChangeEvent {
+	return &infrafleetv1.FileChangeEvent{
+		Kind:            e.Kind,
+		AbsolutePath:    e.Path,
+		OldAbsolutePath: e.OldPath,
+		IsDirectory:     e.IsDirectory,
+	}
+}
+
+func (s *Server) IsDevServerConnected(ctx context.Context, req *infrafleetv1.IsDevServerConnectedRequest) (*infrafleetv1.IsDevServerConnectedResponse, error) {
+	connected, err := s.isDevServerConnected.Execute(ctx, req.GetDevServerId())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &infrafleetv1.IsDevServerConnectedResponse{Connected: connected}, nil
 }
 
 func (s *Server) CreateSshTarget(ctx context.Context, req *infrafleetv1.CreateSshTargetRequest) (*infrafleetv1.CreateSshTargetResponse, error) {
@@ -538,13 +865,6 @@ func (s *Server) EstablishConnection(ctx context.Context, req *infrafleetv1.Esta
 		resp.EstablishedAtUnixMs = conn.LastActivityAt.UnixMilli()
 	}
 	return resp, nil
-}
-
-func (s *Server) TeardownConnection(ctx context.Context, req *infrafleetv1.TeardownConnectionRequest) (*emptypb.Empty, error) {
-	if err := s.teardownConnection.Execute(ctx, usecase.TeardownConnectionInput{ConnectionID: req.GetConnectionId()}); err != nil {
-		return nil, apperrors.ToGRPCStatus(err)
-	}
-	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) KillWorkspacePort(ctx context.Context, req *infrafleetv1.KillWorkspacePortRequest) (*infrafleetv1.KillWorkspacePortResponse, error) {
@@ -728,19 +1048,125 @@ func toProtoConnectionMode(m domain.ConnectionMode) infrafleetv1.ConnectionMode 
 	}
 }
 
+// toDomainAgentKind maps AGENT_KIND_UNSPECIFIED to "" (not
+// domain.AgentKindDevServer) — callers that need the back-compat default
+// apply it themselves (see usecase.RegisterDevServer.Execute), since a list
+// filter needs to tell "unspecified = no filter" apart from an explicit
+// dev-server-kind filter, which register's default-to-dev-server behavior
+// would otherwise mask.
+func toDomainAgentKind(k infrafleetv1.AgentKind) domain.AgentKind {
+	switch k {
+	case infrafleetv1.AgentKind_AGENT_KIND_DEV_SERVER:
+		return domain.AgentKindDevServer
+	case infrafleetv1.AgentKind_AGENT_KIND_MOBILE_EMULATOR:
+		return domain.AgentKindMobileEmulator
+	default:
+		return ""
+	}
+}
+
+func toProtoAgentKind(k domain.AgentKind) infrafleetv1.AgentKind {
+	switch k {
+	case domain.AgentKindDevServer:
+		return infrafleetv1.AgentKind_AGENT_KIND_DEV_SERVER
+	case domain.AgentKindMobileEmulator:
+		return infrafleetv1.AgentKind_AGENT_KIND_MOBILE_EMULATOR
+	default:
+		return infrafleetv1.AgentKind_AGENT_KIND_UNSPECIFIED
+	}
+}
+
+// nowUnixMs stamps DevServerAccessRequest.CreatedAtUnixMs at creation time —
+// the one place in this adapter that reads wall-clock time directly (every
+// other timestamp on the wire round-trips a domain.Time value instead).
+func nowUnixMs() int64 {
+	return time.Now().UnixMilli()
+}
+
 func toProtoDevServer(ds domain.DevServer) *infrafleetv1.DevServer {
 	return &infrafleetv1.DevServer{
-		Id:           ds.ID,
-		TenantId:     ds.TenantID,
-		Host:         ds.Host,
-		Mode:         toProtoConnectionMode(ds.Mode),
-		SshTargetId:  ds.SSHTargetID,
-		Status:       string(ds.Status),
-		Platform:     ds.Platform,
-		Arch:         ds.Arch,
-		NodeVersion:  ds.NodeVersion,
-		AgentVersion: ds.AgentVersion,
-		Tags:         ds.Tags,
+		Id:             ds.ID,
+		TenantId:       ds.TenantID,
+		Host:           ds.Host,
+		Mode:           toProtoConnectionMode(ds.Mode),
+		SshTargetId:    ds.SSHTargetID,
+		ApprovalStatus: string(ds.Status),
+		GroupId:        ds.GroupID,
+		Kind:           toProtoAgentKind(ds.Kind),
+		HealthStatus:   string(ds.HealthStatus),
+		Platform:       ds.Platform,
+		Arch:           ds.Arch,
+		NodeVersion:    ds.NodeVersion,
+		AgentVersion:   ds.AgentVersion,
+		Tags:           ds.Tags,
+	}
+}
+
+func toProtoDevServerGroup(g domain.DevServerGroup) *infrafleetv1.DevServerGroup {
+	return &infrafleetv1.DevServerGroup{
+		Id:            g.ID,
+		TenantId:      g.TenantID,
+		Name:          g.Name,
+		ParentGroupId: g.ParentGroupID,
+	}
+}
+
+func toDomainGranteeKind(k infrafleetv1.DevServerGroupGranteeKind) domain.GranteeKind {
+	switch k {
+	case infrafleetv1.DevServerGroupGranteeKind_DEV_SERVER_GROUP_GRANTEE_KIND_DEPARTMENT:
+		return domain.GranteeKindDepartment
+	case infrafleetv1.DevServerGroupGranteeKind_DEV_SERVER_GROUP_GRANTEE_KIND_TEAM:
+		return domain.GranteeKindTeam
+	default:
+		return ""
+	}
+}
+
+func toProtoGranteeKind(k domain.GranteeKind) infrafleetv1.DevServerGroupGranteeKind {
+	switch k {
+	case domain.GranteeKindDepartment:
+		return infrafleetv1.DevServerGroupGranteeKind_DEV_SERVER_GROUP_GRANTEE_KIND_DEPARTMENT
+	case domain.GranteeKindTeam:
+		return infrafleetv1.DevServerGroupGranteeKind_DEV_SERVER_GROUP_GRANTEE_KIND_TEAM
+	default:
+		return infrafleetv1.DevServerGroupGranteeKind_DEV_SERVER_GROUP_GRANTEE_KIND_UNSPECIFIED
+	}
+}
+
+func toProtoGrant(g domain.DevServerGroupGrant) *infrafleetv1.DevServerGroupGrant {
+	return &infrafleetv1.DevServerGroupGrant{
+		Id:               g.ID,
+		TenantId:         g.TenantID,
+		DevServerGroupId: g.DevServerGroupID,
+		GranteeKind:      toProtoGranteeKind(g.GranteeKind),
+		GranteeId:        g.GranteeID,
+	}
+}
+
+func toDomainAccessRequestStatus(s domain.AccessRequestStatus) infrafleetv1.DevServerAccessRequestStatus {
+	switch s {
+	case domain.AccessRequestStatusPending:
+		return infrafleetv1.DevServerAccessRequestStatus_DEV_SERVER_ACCESS_REQUEST_STATUS_PENDING
+	case domain.AccessRequestStatusApproved:
+		return infrafleetv1.DevServerAccessRequestStatus_DEV_SERVER_ACCESS_REQUEST_STATUS_APPROVED
+	case domain.AccessRequestStatusRejected:
+		return infrafleetv1.DevServerAccessRequestStatus_DEV_SERVER_ACCESS_REQUEST_STATUS_REJECTED
+	default:
+		return infrafleetv1.DevServerAccessRequestStatus_DEV_SERVER_ACCESS_REQUEST_STATUS_UNSPECIFIED
+	}
+}
+
+func toProtoAccessRequest(r domain.DevServerAccessRequest) *infrafleetv1.DevServerAccessRequest {
+	return &infrafleetv1.DevServerAccessRequest{
+		Id:               r.ID,
+		TenantId:         r.TenantID,
+		UserId:           r.UserID,
+		DevServerGroupId: r.DevServerGroupID,
+		Status:           toDomainAccessRequestStatus(r.Status),
+		Message:          r.Message,
+		GranteeKind:      toProtoGranteeKind(r.GranteeKind),
+		GranteeId:        r.GranteeID,
+		CreatedAtUnixMs:  r.CreatedAtUnixMs,
 	}
 }
 
@@ -994,6 +1420,64 @@ func pumpAttachPtyInbound(stream infrafleetv1.InfraFleetService_AttachPtyServer,
 	}
 }
 
+// AttachScreencast mirrors AttachPty's shape exactly (same tenant-extraction
+// workaround, same pump-inbound/pump-outbound structure) — see AttachPty's
+// doc comment for why the manual withTenantFromStreamMetadata call is
+// needed here too.
+func (s *Server) AttachScreencast(stream infrafleetv1.InfraFleetService_AttachScreencastServer) error {
+	ctx := withTenantFromStreamMetadata(stream.Context())
+
+	inbound := make(chan usecase.ScreencastClientMessage)
+	go pumpAttachScreencastInbound(stream, inbound)
+
+	outbound, errCh := s.attachScreencast.Execute(ctx, inbound)
+	for {
+		select {
+		case msg, ok := <-outbound:
+			if !ok {
+				outbound = nil
+				continue
+			}
+			if err := stream.Send(toProtoScreencastServerFrame(msg)); err != nil {
+				return err
+			}
+		case err, ok := <-errCh:
+			if !ok {
+				return nil
+			}
+			if err != nil {
+				return apperrors.ToGRPCStatus(err)
+			}
+			return nil
+		}
+		if outbound == nil {
+			if err := <-errCh; err != nil {
+				return apperrors.ToGRPCStatus(err)
+			}
+			return nil
+		}
+	}
+}
+
+func pumpAttachScreencastInbound(stream infrafleetv1.InfraFleetService_AttachScreencastServer, inbound chan<- usecase.ScreencastClientMessage) {
+	defer close(inbound)
+	for {
+		frame, err := stream.Recv()
+		if err != nil {
+			return
+		}
+		msg, ok := toUsecaseScreencastClientMessage(frame)
+		if !ok {
+			continue
+		}
+		select {
+		case inbound <- msg:
+		case <-stream.Context().Done():
+			return
+		}
+	}
+}
+
 func withTenantFromStreamMetadata(ctx context.Context) context.Context {
 	md, ok := metadata.FromIncomingContext(ctx)
 	if !ok {
@@ -1026,6 +1510,50 @@ func toProtoPtyServerFrame(msg usecase.PtyServerMessage) *infrafleetv1.PtyServer
 		return &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Exited{Exited: &infrafleetv1.PtyExited{ExitCode: msg.ExitCode}}}
 	}
 	return &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Out{Out: &infrafleetv1.PtyOutput{Data: msg.Output}}}
+}
+
+func toUsecaseScreencastClientMessage(frame *infrafleetv1.ScreencastClientFrame) (usecase.ScreencastClientMessage, bool) {
+	switch f := frame.GetFrame().(type) {
+	case *infrafleetv1.ScreencastClientFrame_Start:
+		start := f.Start
+		params := usecase.ScreencastParams{
+			WorktreeID: start.GetWorktreeId(), Page: start.GetPage(), Format: start.GetFormat(),
+			Quality: start.GetQuality(), MaxWidth: start.GetMaxWidth(), MaxHeight: start.GetMaxHeight(),
+			Mobile: start.GetMobile(), EveryNthFrame: start.GetEveryNthFrame(), MinFrameIntervalMs: start.GetMinFrameIntervalMs(),
+		}
+		if start.ViewportWidth != nil {
+			v := start.GetViewportWidth()
+			params.ViewportWidth = &v
+		}
+		if start.ViewportHeight != nil {
+			v := start.GetViewportHeight()
+			params.ViewportHeight = &v
+		}
+		if start.DeviceScaleFactor != nil {
+			v := start.GetDeviceScaleFactor()
+			params.DeviceScaleFactor = &v
+		}
+		return usecase.ScreencastClientMessage{Start: &usecase.ScreencastStartMessage{Params: params}}, true
+	case *infrafleetv1.ScreencastClientFrame_Stop:
+		return usecase.ScreencastClientMessage{Stop: true}, true
+	default:
+		return usecase.ScreencastClientMessage{}, false
+	}
+}
+
+func toProtoScreencastServerFrame(ev usecase.ScreencastEvent) *infrafleetv1.ScreencastServerFrame {
+	switch {
+	case ev.Ready:
+		return &infrafleetv1.ScreencastServerFrame{Frame: &infrafleetv1.ScreencastServerFrame_Ready{Ready: &infrafleetv1.ScreencastReady{
+			SubscriptionId: ev.SubscriptionID, BrowserPageId: ev.BrowserPageID, Format: ev.Format,
+		}}}
+	case ev.Ended:
+		return &infrafleetv1.ScreencastServerFrame{Frame: &infrafleetv1.ScreencastServerFrame_Ended{Ended: &infrafleetv1.ScreencastEnded{}}}
+	case ev.ErrorMsg != "":
+		return &infrafleetv1.ScreencastServerFrame{Frame: &infrafleetv1.ScreencastServerFrame_Error{Error: &infrafleetv1.ScreencastError{Message: ev.ErrorMsg}}}
+	default:
+		return &infrafleetv1.ScreencastServerFrame{Frame: &infrafleetv1.ScreencastServerFrame_FrameData{FrameData: &infrafleetv1.ScreencastFrame{Data: ev.Frame}}}
+	}
 }
 
 // toProtoTerminalSession is a method (not a free function) because

@@ -2,6 +2,7 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -50,6 +51,15 @@ func (f *fakeWorktreeRepository) SetWorktreeActivation(context.Context, string, 
 	return domain.Worktree{}, nil
 }
 func (f *fakeWorktreeRepository) RenameWorktree(context.Context, string, string) (domain.Worktree, error) {
+	return domain.Worktree{}, nil
+}
+func (f *fakeWorktreeRepository) ListLineage(context.Context) ([]domain.Worktree, error) {
+	return nil, nil
+}
+func (f *fakeWorktreeRepository) UpdateWorktreeMeta(context.Context, string, json.RawMessage) (domain.Worktree, error) {
+	return domain.Worktree{}, nil
+}
+func (f *fakeWorktreeRepository) SetWorktreeLineage(context.Context, string, *string) (domain.Worktree, error) {
 	return domain.Worktree{}, nil
 }
 

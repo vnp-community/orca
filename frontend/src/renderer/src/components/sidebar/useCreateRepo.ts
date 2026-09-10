@@ -7,6 +7,11 @@ import { useMountedRef } from '@/hooks/useMountedRef'
 import { activateAndRevealWorktree } from '@/lib/worktree-activation'
 import { markOnboardingProjectAdded } from '@/lib/onboarding-project-checklist'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import {
+  getOrCreateDefaultProject,
+  mergeRepoViewIntoRepo,
+  type RemoteRepoView
+} from '@/store/slices/repos'
 import { isGitRepoKind } from '../../../../shared/repo-kind'
 import type { Repo } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
@@ -24,6 +29,15 @@ export function useCreateRepo(
     hostId?: string | null
     runtimeEnvironmentId?: string | null
     sshTargetId?: string | null
+    // The dev server picked in AddRepoDialog's own Host selector — NOT
+    // the same thing as useAppStore's global activeDevServerId (a
+    // different, unrelated piece of state for the currently active
+    // workspace). Live-verified gap this fixes: the dialog's Host
+    // dropdown could show "test-01 Connected" while this hook still read
+    // the global value (often empty), so repo.create's own
+    // GITGATEWAY_MISSING_DEV_SERVER_ID validation rejected every create
+    // even with a real, connected host selected.
+    devServerId?: string | null
   } = {}
 ) {
   const [createName, setCreateName] = useState('')
@@ -92,15 +106,39 @@ export function useCreateRepo(
     setIsCreating(true)
     setCreateError(null)
     try {
+      // Why activeRuntimeEnvironmentId is nulled out UNLESS a dev server was
+      // picked: normally this hook must not silently piggyback on whatever
+      // runtime environment happens to be globally active elsewhere in the
+      // app (SSH/explicit-environment creates use their own target). But a
+      // devServer-kind Host selection (this dialog's own dropdown) needs the
+      // REAL active environment (web mode's persisted "session-auth" one,
+      // confirmed live) so target.kind becomes 'environment' — nulling it
+      // out here made devServerId-based creates always resolve to
+      // getOrCreateDefaultProject's unsupported 'local' case instead.
       const target = options.runtimeEnvironmentId?.trim()
         ? { kind: 'environment' as const, environmentId: options.runtimeEnvironmentId.trim() }
         : getActiveRuntimeTarget({
             ...useAppStore.getState().settings,
-            activeRuntimeEnvironmentId: null
+            activeRuntimeEnvironmentId: options.devServerId
+              ? useAppStore.getState().settings?.activeRuntimeEnvironmentId
+              : null
           })
       // Why: Create Project is intentionally Git-only; non-Git folders use the
       // existing add-folder flows instead of this path.
       const createKind = 'git' as const
+      // Why options.devServerId, not just target.kind === 'environment': a
+      // web-mode Dev Server host selection (this dialog's own Host
+      // dropdown) parses to `kind: 'devServer'`, not `'runtime'` — so
+      // options.runtimeEnvironmentId stays empty and target falls back to
+      // getActiveRuntimeTarget's own resolution, which resolves 'local'
+      // for a plain web session with no active runtime environment set.
+      // Live-verified gap this fixes: with only `target.kind ===
+      // 'environment'` as the gate, a devServer-kind selection fell
+      // through to window.api.repos.create (the Electron-only local IPC
+      // path) instead of the RPC branch below — callRuntimeRpc's own
+      // 'local' branch (window.api.runtime.call) forwards arbitrary
+      // methods+params correctly regardless of target.kind, confirmed via
+      // a direct repo.create call through it.
       const result = options.sshTargetId
         ? await window.api.repos.createRemote({
             connectionId: options.sshTargetId,
@@ -108,17 +146,50 @@ export function useCreateRepo(
             name,
             kind: createKind
           })
-        : target.kind === 'environment'
-          ? await callRuntimeRpc<{ repo: Repo } | { error: string }>(
-              target,
-              'repo.create',
-              {
-                parentPath,
-                name,
-                kind: createKind
-              },
-              { timeoutMs: 60_000 }
-            )
+        : options.devServerId || target.kind === 'environment'
+          ? await (async (): Promise<{ repo: Repo } | { error: string }> => {
+              // Why a two-step create+add, not one repo.create call: the Go
+              // handler (channels_repo_ssh_status_workspace.go) decodes
+              // {devServerId, destPath, defaultBranch} and only relays to
+              // git-gateway-service's InitRepo — it creates the bare repo on
+              // disk but never registers a project.repos row. repo.add is
+              // the only call that does that (mirrors CreateProjectDialog.
+              // tsx's own create-then-add sequence).
+              const devServerId = options.devServerId ?? ''
+              const destPath = `${parentPath.replace(/[/\\]+$/, '')}/${name}`
+              try {
+                await callRuntimeRpc<{ path: string; defaultBranch: string }>(
+                  target,
+                  'repo.create',
+                  { devServerId, destPath, defaultBranch: '' },
+                  { timeoutMs: 60_000 }
+                )
+              } catch (err) {
+                return { error: err instanceof Error ? err.message : String(err) }
+              }
+              // getOrCreateDefaultProject needs a real environment target —
+              // only reachable if devServerId was set with no active
+              // runtime environment resolved at all, an edge case with no
+              // sensible default project to resolve.
+              if (target.kind !== 'environment') {
+                return {
+                  error:
+                    'No active runtime environment to register the created repo with a project.'
+                }
+              }
+              const projectId = await getOrCreateDefaultProject(target)
+              try {
+                const view = await callRuntimeRpc<RemoteRepoView>(
+                  target,
+                  'repo.add',
+                  { projectId, url: destPath, displayName: name },
+                  { timeoutMs: 15_000 }
+                )
+                return { repo: { ...mergeRepoViewIntoRepo(view), kind: createKind } }
+              } catch (err) {
+                return { error: err instanceof Error ? err.message : String(err) }
+              }
+            })()
           : await window.api.repos.create({
               parentPath,
               name,
@@ -192,7 +263,7 @@ export function useCreateRepo(
         if (folderWorktree) {
           activateAndRevealWorktree(folderWorktree.id, { sidebarRevealBehavior: 'auto' })
         }
-        await markOnboardingProjectAdded('addedFolder')
+        await markOnboardingProjectAdded('addedFolder', useAppStore.getState().settings)
         closeModal()
       }
     } catch (err) {
@@ -223,7 +294,8 @@ export function useCreateRepo(
     closeModal,
     onGitRepoReady,
     options.runtimeEnvironmentId,
-    options.sshTargetId
+    options.sshTargetId,
+    options.devServerId
   ])
 
   return {

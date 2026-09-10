@@ -2558,6 +2558,14 @@ export function useWebSessionTabsSync(): void {
                 )
                 return
               }
+              // session.tabs.subscribeAll is a StreamHandler channel (registry.go)
+              // — its plain invoke ack carries no meaningful value (result: null)
+              // and is now delivered to onResponse too (isSubscriptionResponse
+              // widened for FE-TASK-EVM-002's subscribeRuntimeStreamChannel);
+              // only real push events have an event shape here.
+              if (!response.result) {
+                return
+              }
               const event = response.result as SessionTabsStreamEvent
               const replayed = isRuntimeSubscriptionReplayResponse(response)
               if (event.type === 'snapshots') {
@@ -2651,6 +2659,11 @@ export function useWebSessionTabsSync(): void {
               console.warn('[web-session-tabs-sync] subscription failed:', response.error.message)
               return
             }
+            // Same StreamHandler-ack guard as session.tabs.subscribeAll above —
+            // see that call site's comment.
+            if (!response.result) {
+              return
+            }
             const event = response.result as SessionTabsStreamEvent
             if (event.type !== 'snapshot' && event.type !== 'updated') {
               return
@@ -2686,11 +2699,16 @@ export function useWebSessionTabsSync(): void {
                 applyWebSessionTabsSnapshot(state, event, environmentId)
               )
             }
+            // Why: the host's cwd resolution has no fallback when omitted and
+            // ends up defaulting to the host user's home directory instead of
+            // the worktree's real folder — always pass it explicitly.
+            const activeWorktreePath = syncState.getKnownWorktreeById(activeWorktreeId)?.path
             if (!disposed && shouldBootstrapInitialTerminal) {
               requestedInitialTerminal = true
               void createWebRuntimeSessionTerminal({
                 worktreeId: activeWorktreeId,
                 environmentId,
+                cwd: activeWorktreePath,
                 activate: true
               })
             } else if (
@@ -2704,6 +2722,7 @@ export function useWebSessionTabsSync(): void {
               void createWebRuntimeSessionTerminal({
                 worktreeId: activeWorktreeId,
                 environmentId,
+                cwd: activeWorktreePath,
                 activate: true,
                 selectWorktree: false
               }).finally(() => {

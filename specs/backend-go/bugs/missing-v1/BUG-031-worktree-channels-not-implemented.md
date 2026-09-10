@@ -4,7 +4,7 @@
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** High — worktree lifecycle is core navigation, tightly coupled to `git.*` (already the largest partial gap in this audit: only `git.status`/`git.diff` are wired)
 **Symptom:** Every `worktree.*` call (`list`, `set`, `rm`, `detectedList`, `prefetchCreateBase`, `resolveMrBase`, `resolvePrBase`, `forceDeleteBranch`) falls through to `notImplementedHandler` and times out client-side
-**Status: ❌ Open**
+**Status:** ✅ Resolved — see TASK-192–196 (5 task(s), all DONE) for implementation evidence.
 
 ---
 

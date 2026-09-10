@@ -47,15 +47,24 @@ const (
 // through unchanged as dialectNative — ServeHTTP's existing `default:` case
 // still logs it and keeps the connection open, matching pre-bridge
 // behavior exactly.
+// emptyParams is substituted for a session-client request's absent/null
+// params so decodeArg[T](args, 0) always has an args[0] to decode against
+// — an omitted `params` key and an explicit `"params":null` both mean "no
+// arguments," not "zero arguments were passed at all." See
+// specs/backend-go/bugs/missing-v2/BUG-006.
+var emptyParams = json.RawMessage("{}")
+
 func normalizeInboundMessage(msg InboundMessage) (dialect, InboundMessage) {
 	if msg.Type != "" || msg.Method == "" {
 		return dialectNative, msg
 	}
 	msg.Type = "invoke"
 	msg.Channel = msg.Method
-	if msg.Params != nil {
-		msg.Args = []json.RawMessage{msg.Params}
+	params := msg.Params
+	if params == nil {
+		params = emptyParams
 	}
+	msg.Args = []json.RawMessage{params}
 	return dialectSessionClient, msg
 }
 

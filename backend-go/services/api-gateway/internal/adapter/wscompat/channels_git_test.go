@@ -47,11 +47,13 @@ type fakeGitGatewayClient struct {
 	readFilePreviewFunc             func(ctx context.Context, in *gitgatewayv1.ReadFilePreviewRequest) (*gitgatewayv1.ReadFilePreviewResponse, error)
 	writeFileChunkFunc              func(ctx context.Context, in *gitgatewayv1.WriteFileChunkRequest) (*gitgatewayv1.WriteFileChunkResponse, error)
 	createDirFunc                   func(ctx context.Context, in *gitgatewayv1.CreateDirRequest) (*gitgatewayv1.CreateDirResponse, error)
+	createFileFunc                  func(ctx context.Context, in *gitgatewayv1.CreateFileRequest) (*gitgatewayv1.CreateFileResponse, error)
 	deleteFileFunc                  func(ctx context.Context, in *gitgatewayv1.DeleteFileRequest) (*emptypb.Empty, error)
 	searchFilesFunc                 func(ctx context.Context, in *gitgatewayv1.SearchFilesRequest) (*gitgatewayv1.SearchFilesResponse, error)
 	listAllFilesFunc                func(ctx context.Context, in *gitgatewayv1.ListAllFilesRequest) (*gitgatewayv1.ListAllFilesResponse, error)
 	listMarkdownDocumentsFunc       func(ctx context.Context, in *gitgatewayv1.ListMarkdownDocumentsRequest) (*gitgatewayv1.ListMarkdownDocumentsResponse, error)
 	copyFileFunc                    func(ctx context.Context, in *gitgatewayv1.CopyFileRequest) (*gitgatewayv1.CopyFileResponse, error)
+	getRemoteUrlFunc                func(ctx context.Context, in *gitgatewayv1.GetRemoteUrlRequest) (*gitgatewayv1.GetRemoteUrlResponse, error)
 
 	checkoutFunc          func(ctx context.Context, in *gitgatewayv1.CheckoutRequest) (*gitgatewayv1.CheckoutResponse, error)
 	listLocalBranchesFunc func(ctx context.Context, in *gitgatewayv1.ListLocalBranchesRequest) (*gitgatewayv1.ListLocalBranchesResponse, error)
@@ -79,6 +81,7 @@ type fakeGitGatewayClient struct {
 
 	pushStreamFunc func(ctx context.Context, in *gitgatewayv1.PushRequest) (gitgatewayv1.GitGatewayService_PushStreamClient, error)
 	pullStreamFunc func(ctx context.Context, in *gitgatewayv1.PullRequest) (gitgatewayv1.GitGatewayService_PullStreamClient, error)
+	getStatusFunc  func(ctx context.Context, in *gitgatewayv1.GetStatusRequest) (*gitgatewayv1.GetStatusResponse, error)
 }
 
 func (f *fakeGitGatewayClient) CommitCompare(ctx context.Context, in *gitgatewayv1.CommitCompareRequest, _ ...grpc.CallOption) (*gitgatewayv1.CommitCompareResponse, error) {
@@ -98,6 +101,9 @@ func (f *fakeGitGatewayClient) SubmoduleStatus(ctx context.Context, in *gitgatew
 }
 func (f *fakeGitGatewayClient) Fetch(ctx context.Context, in *gitgatewayv1.FetchRequest, _ ...grpc.CallOption) (*gitgatewayv1.FetchResponse, error) {
 	return f.fetchFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) GetStatus(ctx context.Context, in *gitgatewayv1.GetStatusRequest, _ ...grpc.CallOption) (*gitgatewayv1.GetStatusResponse, error) {
+	return f.getStatusFunc(ctx, in)
 }
 
 func (f *fakeGitGatewayClient) GetDiff(ctx context.Context, in *gitgatewayv1.GetDiffRequest, _ ...grpc.CallOption) (*gitgatewayv1.GetDiffResponse, error) {
@@ -172,6 +178,9 @@ func (f *fakeGitGatewayClient) WriteFileChunk(ctx context.Context, in *gitgatewa
 func (f *fakeGitGatewayClient) CreateDir(ctx context.Context, in *gitgatewayv1.CreateDirRequest, _ ...grpc.CallOption) (*gitgatewayv1.CreateDirResponse, error) {
 	return f.createDirFunc(ctx, in)
 }
+func (f *fakeGitGatewayClient) CreateFile(ctx context.Context, in *gitgatewayv1.CreateFileRequest, _ ...grpc.CallOption) (*gitgatewayv1.CreateFileResponse, error) {
+	return f.createFileFunc(ctx, in)
+}
 func (f *fakeGitGatewayClient) DeleteFile(ctx context.Context, in *gitgatewayv1.DeleteFileRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
 	return f.deleteFileFunc(ctx, in)
 }
@@ -186,6 +195,9 @@ func (f *fakeGitGatewayClient) ListMarkdownDocuments(ctx context.Context, in *gi
 }
 func (f *fakeGitGatewayClient) CopyFile(ctx context.Context, in *gitgatewayv1.CopyFileRequest, _ ...grpc.CallOption) (*gitgatewayv1.CopyFileResponse, error) {
 	return f.copyFileFunc(ctx, in)
+}
+func (f *fakeGitGatewayClient) GetRemoteUrl(ctx context.Context, in *gitgatewayv1.GetRemoteUrlRequest, _ ...grpc.CallOption) (*gitgatewayv1.GetRemoteUrlResponse, error) {
+	return f.getRemoteUrlFunc(ctx, in)
 }
 func (f *fakeGitGatewayClient) Checkout(ctx context.Context, in *gitgatewayv1.CheckoutRequest, _ ...grpc.CallOption) (*gitgatewayv1.CheckoutResponse, error) {
 	return f.checkoutFunc(ctx, in)
@@ -1093,16 +1105,23 @@ func TestFilesCommitUploadChannel_LocalNoOpAck(t *testing.T) {
 	}
 }
 
-func TestFilesUnwatchChannel_LocalNoOpAck(t *testing.T) {
+// TestFilesUnwatchChannel_UnknownSubscriptionStillAcksOK covers BACKLOG-003:
+// files.watch/files.unwatch now have real backing (WatchWorktree), but
+// files.unwatch's own doc comment keeps the OLD backend's always-succeeds
+// contract for an unknown/already-ended subscriptionId (unmount races are
+// expected, not an error condition).
+func TestFilesUnwatchChannel_UnknownSubscriptionStillAcksOK(t *testing.T) {
 	r := NewRegistry()
 	registerFilesChannels(r, &fakeGitGatewayClient{})
 
-	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "files.unwatch", nil)
+	ctx := fileWatchStreamsContext(context.Background(), newFileWatchStreamRegistry())
+	result, err := r.Dispatch(ctx, Identity{TenantID: "t1"}, "files.unwatch", argsJSON(t, map[string]any{"subscriptionId": "no-such-sub"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ok, isMap := result.(map[string]bool); !isMap || !ok["ok"] {
-		t.Errorf("expected local no-op ack {ok:true}, got %+v", result)
+	view, ok := result.(filesUnwatchResultView)
+	if !ok || !view.OK {
+		t.Errorf("expected {ok:true}, got %+v", result)
 	}
 }
 
@@ -1321,6 +1340,43 @@ func TestFilesCreateDirChannels_BothResolveToCreateDirRPC(t *testing.T) {
 	}
 }
 
+func TestFilesCreateFileChannel_Success(t *testing.T) {
+	var got *gitgatewayv1.CreateFileRequest
+	fake := &fakeGitGatewayClient{
+		createFileFunc: func(ctx context.Context, in *gitgatewayv1.CreateFileRequest) (*gitgatewayv1.CreateFileResponse, error) {
+			got = in
+			return &gitgatewayv1.CreateFileResponse{}, nil
+		},
+	}
+	r := NewRegistry()
+	registerFilesChannels(r, fake)
+
+	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "files.createFile",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "new.txt"})); err != nil {
+		t.Fatal(err)
+	}
+	if got.GetWorktreeId() != "wt-1" || got.GetPath() != "new.txt" {
+		t.Errorf("unexpected request: %+v", got)
+	}
+}
+
+func TestFilesCreateFileChannel_ErrorPassesThrough(t *testing.T) {
+	wantErr := errors.New("already exists")
+	fake := &fakeGitGatewayClient{
+		createFileFunc: func(ctx context.Context, in *gitgatewayv1.CreateFileRequest) (*gitgatewayv1.CreateFileResponse, error) {
+			return nil, wantErr
+		},
+	}
+	r := NewRegistry()
+	registerFilesChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "files.createFile",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "new.txt"}))
+	if !errors.Is(err, wantErr) {
+		t.Fatalf("expected error to pass through, got %v", err)
+	}
+}
+
 func TestFilesDeleteChannel_Success(t *testing.T) {
 	var got *gitgatewayv1.DeleteFileRequest
 	fake := &fakeGitGatewayClient{
@@ -1443,6 +1499,113 @@ func TestFilesCopyChannel_KnownGapErrorPassesThrough(t *testing.T) {
 		argsJSON(t, map[string]any{"worktreeId": "wt-1", "fromPath": "a.txt", "toPath": "b.txt"}))
 	if err == nil {
 		t.Fatal("expected the known-gap error to surface as-is, not be swallowed")
+	}
+}
+
+// TestGitStatusChannel_DecodesWorktreeSelector locks in the fix for a live
+// bug: every real caller (WorkspaceContext.tsx, useGit.ts, use-code-review.ts,
+// runtime-git-client.ts, web-preload-api.ts's status) sends the worktree
+// selector under "worktree" (toRuntimeWorktreeSelector, "id:"-prefixed) —
+// never "worktreeId". The old handler decoded "worktreeId", so WorktreeId
+// was always empty and every real call tripped git-gateway-service's
+// GITGATEWAY_MISSING_WORKTREE_ID guard (confirmed live, repeating in
+// git-gateway-service's logs).
+func TestGitStatusChannel_DecodesWorktreeSelector(t *testing.T) {
+	var gotReq *gitgatewayv1.GetStatusRequest
+	fake := &fakeGitGatewayClient{
+		getStatusFunc: func(_ context.Context, in *gitgatewayv1.GetStatusRequest) (*gitgatewayv1.GetStatusResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.GetStatusResponse{}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.status",
+		argsJSON(t, map[string]any{"worktree": "id:wt-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetWorktreeId() != "wt-1" {
+		t.Errorf("WorktreeId = %q, want %q (expected the id: prefix stripped)", gotReq.GetWorktreeId(), "wt-1")
+	}
+}
+
+// ── TASK-032: git.cancelGenerateCommitMessage / cancelGeneratePullRequestFields ──
+
+func TestGitCancelGenerateCommitMessage_CancelsInFlightCall(t *testing.T) {
+	started := make(chan struct{})
+	fake := &fakeGitGatewayClient{
+		generateCommitMessageFunc: func(ctx context.Context, in *gitgatewayv1.GenerateCommitMessageRequest) (*gitgatewayv1.GenerateCommitMessageResponse, error) {
+			close(started)
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	errCh := make(chan error, 1)
+	go func() {
+		_, err := r.Dispatch(context.Background(), Identity{}, "git.generateCommitMessage", argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		errCh <- err
+	}()
+	<-started
+
+	_, err := r.Dispatch(context.Background(), Identity{}, "git.cancelGenerateCommitMessage", argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error from cancel: %v", err)
+	}
+
+	if genErr := <-errCh; genErr == nil {
+		t.Fatal("want the in-flight generate call to fail once cancelled")
+	}
+
+	// A second cancel for the same, now-finished worktree must be a clean no-op.
+	_, err = r.Dispatch(context.Background(), Identity{}, "git.cancelGenerateCommitMessage", argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	if err != nil {
+		t.Fatalf("second cancel: unexpected error: %v", err)
+	}
+}
+
+func TestGitCancelGenerateCommitMessage_NoInFlightCallIsCleanNoOp(t *testing.T) {
+	r := NewRegistry()
+	registerGitDeepChannels(r, &fakeGitGatewayClient{})
+
+	_, err := r.Dispatch(context.Background(), Identity{}, "git.cancelGenerateCommitMessage", argsJSON(t, map[string]any{"worktreeId": "no-such-worktree"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestGitCancelGeneratePullRequestFields_DoesNotCancelCommitMessage(t *testing.T) {
+	commitStarted := make(chan struct{})
+	commitCtx := make(chan context.Context, 1)
+	fake := &fakeGitGatewayClient{
+		generateCommitMessageFunc: func(ctx context.Context, in *gitgatewayv1.GenerateCommitMessageRequest) (*gitgatewayv1.GenerateCommitMessageResponse, error) {
+			commitCtx <- ctx
+			close(commitStarted)
+			<-ctx.Done()
+			return nil, ctx.Err()
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	go r.Dispatch(context.Background(), Identity{}, "git.generateCommitMessage", argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	<-commitStarted
+
+	// Cancelling pullRequestFields for the SAME worktree must not touch the
+	// independent commitMessage in-flight call.
+	_, _ = r.Dispatch(context.Background(), Identity{}, "git.cancelGeneratePullRequestFields", argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+
+	select {
+	case ctx := <-commitCtx:
+		if ctx.Err() != nil {
+			t.Fatal("want commitMessage's context still live — pullRequestFields cancel must not affect it")
+		}
+	default:
+		t.Fatal("expected to have captured the in-flight commitMessage context")
 	}
 }
 

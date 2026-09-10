@@ -3,14 +3,27 @@
 **Nguồn:** Trích xuất từ HLD v1 (C1, C2, C3, C4)
 **Cập nhật:** 2026-08-14 (đợt hiệu đính lớn — đối chiếu lại toàn bộ nội dung với code thật
 `backend/src/**` tính đến commit `72ace6187`. Nguồn: `audit/backend/backend-vs-design-review.md`
-(12 agent, file:line-cited) + `docs/guides/audit-backend-agent-2026-08-13.md` +
-`docs/guides/roadmap-orca-project-task-rbac.md` cho các mục đã được sửa SAU ngày audit gốc
+(12 agent, file:line-cited) + `docs/guides/planning/audit-backend-agent-2026-08-13.md` +
+`docs/guides/planning/roadmap-orca-project-task-rbac.md` cho các mục đã được sửa SAU ngày audit gốc
 2026-08-08. Trước bản này tài liệu mô tả nhiều hành vi aspirational/tương lai như thể đã có —
 bản này chỉ mô tả code đang chạy thật, đánh dấu rõ phần nào còn là đề xuất.)
 
 **Quy ước trạng thái dùng trong tài liệu này:** ✅ đã implement & khớp mô tả · ⚠️ có implement
 nhưng khác chi tiết (tên/port/số lượng...) so với những gì tài liệu từng ghi · 🚧 Proposed /
 chưa implement · ❌ mô tả cũ sai hẳn so với code.
+
+> **2026-09-06 — Đọc trước:** Tài liệu này mô tả **CHỈ** backend TypeScript (`backend/src/main/**` +
+> `desktop/src/main/**`). Một backend **Go** riêng biệt — `backend-go/` (17 microservices, gRPC nội bộ,
+> Postgres-per-service, HashiCorp Vault) — đang chạy **song song**, dần thay thế Control Plane mà tài
+> liệu này mô tả, theo chiến lược strangler-fig (từng domain cắt độc lập, không big-bang). Xem
+> [`backend-go-architecture.md`](./backend-go-architecture.md). Cụ thể ở Web mode (§6.1, §9): domain
+> `workflow.*` hiện đã được Web-mode client route sang `workflow-service` (Go) qua lớp dịch
+> `api-gateway`'s wscompat — xem
+> [ADR-024](../adrs/v2/ADR-024-dual-workflow-engines-migration.md) — trong khi Electron/local-runtime
+> vẫn đi thẳng vào `WorkflowOrchestrator` (TS) mô tả ở §5 bên dưới; 2 engine này **không tương thích, có
+> database riêng biệt**. Domain khác (`auth`, `project`, `ai-provider`, `task`, ...) có thể đã/đang/chưa
+> được cắt tương tự — tài liệu này **chưa được audit lại theo từng domain** để xác nhận domain nào vẫn
+> 100% do TS xử lý; chỉ xác nhận domain `workflow` do đã tìm thấy bằng chứng trực tiếp trong code.
 
 ---
 

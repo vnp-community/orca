@@ -30,8 +30,8 @@ import (
 
 	svcconfig "github.com/stablyai/orca-go/services/automation-service/internal/config"
 
-	automationgrpc "github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpc"
 	automationeventbus "github.com/stablyai/orca-go/services/automation-service/internal/adapter/eventbus"
+	automationgrpc "github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpcclient"
 	automationpostgres "github.com/stablyai/orca-go/services/automation-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/scheduler"

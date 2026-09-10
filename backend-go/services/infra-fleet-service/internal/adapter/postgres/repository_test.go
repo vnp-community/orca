@@ -5,11 +5,6 @@
 // "integration" build tag so `go test ./...` (unit tests only) stays fast
 // and Docker-free; run these explicitly with
 // `go test -tags=integration ./internal/adapter/postgres/...`.
-//
-// Every id/tenant_id below must be a syntactically valid UUID literal — the
-// schema types these columns as UUID (see migrations/0001_init.up.sql), so
-// Postgres rejects a plain string like "ds1" with "invalid input syntax for
-// type uuid", not silently coercing it.
 package postgres
 
 import (
@@ -29,6 +24,17 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
+// testTenant1/testTenant2/testDevServer1/testDevServer2 are shared fixture
+// IDs referenced by several sibling integration test files in this package
+// (dev_server_group_repository_test.go, dev_server_group_grant_repository_test.go,
+// dev_server_access_request_repository_test.go) but never actually defined
+// anywhere — this whole package failed to even compile under
+// `-tags=integration` before this file existed (confirmed: `go vet
+// -tags=integration ./internal/adapter/postgres/...` failed with "undefined:
+// testTenant1" pre-existing, unrelated to this file's own new tests).
+// Defined here since repository_test.go is this package's base/shared test
+// file, matching e.g. testGroupParent/testGroupChild's placement in
+// dev_server_group_repository_test.go.
 const (
 	testTenant1 = "11111111-1111-1111-1111-111111111111"
 	testTenant2 = "22222222-2222-2222-2222-222222222222"
@@ -81,6 +87,62 @@ func setupSshTargetStore(t *testing.T) (*Repository, *SshTargetStore) {
 	t.Cleanup(pool.Close)
 
 	return New(pool), NewSshTargetStore(pool)
+}
+
+// TestFindByHostAndMode_DirectWebSocketWithNullSSHTargetID is the live-bug
+// regression: a direct-websocket dev server always has ssh_target_id NULL
+// (that column only applies to relay-ssh mode) — scanning it directly into
+// a plain string field made this call error on EVERY direct-websocket
+// lookup, which made ResolveDirectWebSocketDevServer silently fall back to
+// the raw external devServerID string as the agent session's registry key
+// instead of the row's real UUID. Confirmed live in production: 3
+// genuinely-connected, handshaked agents were invisible to
+// IsDevServerConnected/ListDevServers for the entire session because of
+// this exact error ("cannot scan NULL into *string").
+func TestFindByHostAndMode_DirectWebSocketWithNullSSHTargetID(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	registered, err := repo.Register(ctx, domain.DevServer{
+		ID:       uuid.NewString(),
+		TenantID: tenantID,
+		Host:     "dev-01",
+		Mode:     domain.ConnectionModeDirectWebSocket,
+		Status:   domain.DevServerStatusApproved,
+		// SSHTargetID intentionally empty — Register must persist this as
+		// SQL NULL for direct-websocket mode, matching production data.
+	})
+	if err != nil {
+		t.Fatalf("Register: %v", err)
+	}
+
+	found, ok, err := repo.FindByHostAndMode(ctx, tenantID, "dev-01", domain.ConnectionModeDirectWebSocket)
+	if err != nil {
+		t.Fatalf("FindByHostAndMode returned an error instead of resolving the row (this is the exact live bug): %v", err)
+	}
+	if !ok {
+		t.Fatal("FindByHostAndMode: want found=true")
+	}
+	if found.ID != registered.ID {
+		t.Errorf("want resolved ID=%q (the real row, reused across reconnects), got %q", registered.ID, found.ID)
+	}
+	if found.SSHTargetID != "" {
+		t.Errorf("want SSHTargetID empty for a direct-websocket row, got %q", found.SSHTargetID)
+	}
+}
+
+func TestFindByHostAndMode_NoMatchReturnsNotFound(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	_, ok, err := repo.FindByHostAndMode(ctx, uuid.NewString(), "no-such-host", domain.ConnectionModeDirectWebSocket)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if ok {
+		t.Error("want found=false for a host with no registered dev server")
+	}
 }
 
 func TestRepository_ResolveConnection_FoundAndNotFound(t *testing.T) {
@@ -302,10 +364,12 @@ func TestSshTargetStore_PersistsPortKnownHostsAndJumpHost(t *testing.T) {
 	}
 }
 
-// TestRepository_UpdateStatusAndGetDevServerByConnection is
-// TASK-SSH-03-07's regression: TeardownConnection's two new repository
-// methods against a real connections/dev_servers join.
-func TestRepository_UpdateStatusAndGetDevServerByConnection(t *testing.T) {
+// TestRepository_UpdateStatus_ClosesConnection is TASK-SSH-03-07/
+// BE-SOL-STORAGE-003's regression: UpdateStatus persists a whole
+// domain.Connection (Status + DegradedSince) against a real row, and a
+// closed connection drops out of GetActiveByDevServer's "not closed" filter
+// — TeardownConnection's CloseExplicitly path relies on both.
+func TestRepository_UpdateStatus_ClosesConnection(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 
@@ -326,15 +390,13 @@ func TestRepository_UpdateStatusAndGetDevServerByConnection(t *testing.T) {
 		t.Fatalf("creating connection: %v", err)
 	}
 
-	gotDS, found, err := repo.GetDevServerByConnection(ctx, testTenant1, created.ID)
-	if err != nil {
-		t.Fatalf("GetDevServerByConnection: %v", err)
-	}
-	if !found || gotDS.ID != testDevServer1 {
-		t.Errorf("expected to resolve dev server %q, got found=%v ds=%+v", testDevServer1, found, gotDS)
+	active, found, err := repo.GetActiveByDevServer(ctx, testTenant1, testDevServer1)
+	if err != nil || !found || active.ID != created.ID {
+		t.Fatalf("expected the newly-created connection to be active, found=%v err=%v", found, err)
 	}
 
-	if err := repo.UpdateStatus(ctx, testTenant1, created.ID, "closed"); err != nil {
+	active.CloseExplicitly()
+	if err := repo.UpdateStatus(ctx, testTenant1, active); err != nil {
 		t.Fatalf("UpdateStatus: %v", err)
 	}
 
@@ -344,15 +406,11 @@ func TestRepository_UpdateStatusAndGetDevServerByConnection(t *testing.T) {
 		t.Errorf("expected no active connection after closing, found=%v err=%v", found, err)
 	}
 
-	// GetDevServerByConnection should still resolve the (now-closed)
-	// connection — TeardownConnection's idempotent-close path relies on this.
-	if _, found, err := repo.GetDevServerByConnection(ctx, testTenant1, created.ID); err != nil || !found {
-		t.Errorf("expected GetDevServerByConnection to still resolve a closed connection, found=%v err=%v", found, err)
-	}
-
-	// An unknown connection id is a clean not-found, not an error.
-	if _, found, err := repo.GetDevServerByConnection(ctx, testTenant1, testUnknownID); err != nil || found {
-		t.Errorf("expected not-found for an unknown connection id, found=%v err=%v", found, err)
+	// UpdateStatus against an unknown connection id in this tenant is a
+	// clean error (0 rows affected), not a silent no-op.
+	unknownConn := domain.Connection{ID: testUnknownID, TenantID: testTenant1, Status: domain.ConnectionStatusClosed}
+	if err := repo.UpdateStatus(ctx, testTenant1, unknownConn); err == nil {
+		t.Error("expected an error updating an unknown connection id")
 	}
 }
 
@@ -545,7 +603,7 @@ func TestRepository_UpdateProvisionResult(t *testing.T) {
 
 	provisionedAt := time.Now().UTC().Truncate(time.Millisecond)
 	info := usecase.HandshakeInfo{Platform: "linux", Arch: "x64", NodeVersion: "v22.0.0", AgentVersion: "5.0.0"}
-	if err := repo.UpdateProvisionResult(ctx, testTenant1, testDevServer1, domain.DevServerStatusHealthy, info, provisionedAt); err != nil {
+	if err := repo.UpdateProvisionResult(ctx, testTenant1, testDevServer1, domain.DevServerHealthHealthy, info, provisionedAt); err != nil {
 		t.Fatalf("update provision result: %v", err)
 	}
 
@@ -555,7 +613,7 @@ func TestRepository_UpdateProvisionResult(t *testing.T) {
 	if err := row.Scan(&status, &platform, &arch, &nodeVersion, &agentVersion, &lastProvisionedAt); err != nil {
 		t.Fatalf("scanning updated row: %v", err)
 	}
-	if status != string(domain.DevServerStatusHealthy) || platform != "linux" || nodeVersion != "v22.0.0" {
+	if status != string(domain.DevServerHealthHealthy) || platform != "linux" || nodeVersion != "v22.0.0" {
 		t.Errorf("expected persisted status/platform/node_version, got status=%q platform=%q node_version=%q", status, platform, nodeVersion)
 	}
 	if !lastProvisionedAt.Equal(provisionedAt) {
@@ -564,7 +622,7 @@ func TestRepository_UpdateProvisionResult(t *testing.T) {
 
 	// Second call updates the same row in place — no duplicate row, status
 	// transitions cleanly.
-	if err := repo.UpdateProvisionResult(ctx, testTenant1, testDevServer1, domain.DevServerStatusDegraded, info, provisionedAt.Add(time.Minute)); err != nil {
+	if err := repo.UpdateProvisionResult(ctx, testTenant1, testDevServer1, domain.DevServerHealthDegraded, info, provisionedAt.Add(time.Minute)); err != nil {
 		t.Fatalf("second update provision result: %v", err)
 	}
 	var count int
@@ -578,7 +636,7 @@ func TestRepository_UpdateProvisionResult(t *testing.T) {
 	if err := repo.pool.QueryRow(ctx, `SELECT status FROM infra.dev_servers WHERE tenant_id = $1 AND id = $2`, testTenant1, testDevServer1).Scan(&status2); err != nil {
 		t.Fatalf("scanning updated status: %v", err)
 	}
-	if status2 != string(domain.DevServerStatusDegraded) {
+	if status2 != string(domain.DevServerHealthDegraded) {
 		t.Errorf("expected status to have transitioned to degraded, got %q", status2)
 	}
 }
@@ -598,15 +656,15 @@ func registerTestDevServer(t *testing.T, repo *Repository, id string) domain.Dev
 	return ds
 }
 
-// TestUpsertFleetHealthAndGetPrevious covers the upsert-by-PK round trip
-// (dev_server_id is fleet_health's primary key) and GetPrevious's
-// found=false-on-no-prior-sample case.
-func TestUpsertFleetHealthAndGetPrevious(t *testing.T) {
+// TestUpsertFleetHealthAndGetDevServerHealth covers the upsert-by-PK round
+// trip (dev_server_id is fleet_health's primary key) and
+// GetDevServerHealth's found=false-on-no-prior-sample case.
+func TestUpsertFleetHealthAndGetDevServerHealth(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 	ds := registerTestDevServer(t, repo, testDevServer1)
 
-	if _, found, err := repo.GetPrevious(ctx, ds.ID); err != nil || found {
+	if _, found, err := repo.GetDevServerHealth(ctx, ds.ID); err != nil || found {
 		t.Fatalf("expected found=false before any sample exists, got found=%v err=%v", found, err)
 	}
 
@@ -618,7 +676,7 @@ func TestUpsertFleetHealthAndGetPrevious(t *testing.T) {
 		t.Fatalf("upsert fleet health: %v", err)
 	}
 
-	got, found, err := repo.GetPrevious(ctx, ds.ID)
+	got, found, err := repo.GetDevServerHealth(ctx, ds.ID)
 	if err != nil {
 		t.Fatalf("get previous: %v", err)
 	}
@@ -636,7 +694,7 @@ func TestUpsertFleetHealthAndGetPrevious(t *testing.T) {
 	if err := repo.UpsertFleetHealth(ctx, sample); err != nil {
 		t.Fatalf("second upsert: %v", err)
 	}
-	got2, _, err := repo.GetPrevious(ctx, ds.ID)
+	got2, _, err := repo.GetDevServerHealth(ctx, ds.ID)
 	if err != nil {
 		t.Fatalf("get previous (2nd): %v", err)
 	}
@@ -729,8 +787,11 @@ func TestListAllForPolling_IsCrossTenant(t *testing.T) {
 }
 
 // TestOutboxEnqueueFetchMarkPublished covers the round trip
-// EnqueueOutboxEvent -> FetchUnpublished -> MarkPublished ->
-// FetchUnpublished (empty) that outbox.Relay drives in production.
+// InsertOutboxEvent -> FetchUnpublished -> MarkPublished ->
+// FetchUnpublished (empty) that outbox.Relay drives in production — the
+// direct-enqueue path usecase.OutboxWriter (PollFleetHealth's disconnect
+// alert) uses, distinct from CreateConnectionWithOutbox's in-tx enqueue
+// covered by TestRepository_Outbox_EnqueueFetchMarkPublished above.
 func TestOutboxEnqueueFetchMarkPublished(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
@@ -738,7 +799,8 @@ func TestOutboxEnqueueFetchMarkPublished(t *testing.T) {
 	id := uuid.NewString()
 	occurredAt := time.Now().UTC().Truncate(time.Millisecond)
 	payload := []byte(`{"devServerId":"ds1","from":"healthy","to":"degraded"}`)
-	if err := repo.EnqueueOutboxEvent(ctx, id, testTenant1, "dev_server.health_degraded", occurredAt, 1, payload); err != nil {
+	event := domain.OutboxEvent{ID: id, TenantID: testTenant1, Subject: "dev_server.health_degraded", OccurredAt: occurredAt, PayloadJSON: payload}
+	if err := repo.InsertOutboxEvent(ctx, event); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
 

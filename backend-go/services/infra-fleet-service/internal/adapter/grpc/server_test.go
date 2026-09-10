@@ -18,27 +18,34 @@ import (
 // newTestServer builds a Server with every usecase field nil except the
 // three under test (CLI agent access, BUG-CLI-02) — each RPC handler this
 // package's tests exercise only touches its own field, so leaving the rest
-// nil is safe and avoids constructing all ~30 of this service's usecases
-// just to contract-test three handlers. The 4 trailing nils before the
-// agent-token trio are the fleet-import/bulk-provision/detect/preflight
-// usecases (BL-FLEET-01..04); the final 3 nils are the persistent
-// agent-token usecases (BL-AWS-03) — both untouched by these tests, which
-// construct their own *Server{...} literals directly (see below) when they
-// need those fields instead.
+// nil is safe and avoids constructing all ~70 of this service's usecases
+// just to contract-test three handlers. Positional args, not a struct
+// literal — see New's own parameter list (server.go) for what each nil
+// group corresponds to; this test constructs its own *Server{...} literals
+// directly (see below) when it needs other fields instead.
 func newTestServer(getAgentTerminalSession *usecase.GetAgentTerminalSession, sendTerminalInput *usecase.SendTerminalInput, getTerminalScrollback *usecase.GetTerminalScrollback) *Server {
 	return New(
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, // 1-13
-		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, // 14-24
-		nil, nil, nil, nil, nil, // listBrowserProfiles..getHostCapabilities, 25-29
-		nil, nil, nil, // scrollback-snapshot usecases (SOL-TM-03), 30-32, unused by this package's tests
-		getAgentTerminalSession, sendTerminalInput, getTerminalScrollback, // 33-35
-		nil, nil, nil, nil, // fleet import/bulk-provision/detect/preflight usecases, 36-39, unused here
-		nil, nil, nil, // persistent agent-token usecases (BL-AWS-03), 40-42, unused here
-		nil,           // teardown-connection usecase (BR-SSH-13), 43, unused here
-		nil, nil, nil, // port-forward CRUD usecases (SOL-SSH-04), 44-46, unused here
-		nil,           // port-forward event broadcaster (TASK-SSH-04-08), 47, unused here
-		nil, nil, nil, nil, nil, // agent-session usecases (TASK-AG-01..04), 48-52, unused here
-		nil, nil, nil, // mobile prompt-dispatch usecases + liveStates registry (SOL-MB-03/TASK-MB-02-01), 53-55, unused here
+		nil, nil, nil, nil, nil, // 1-5
+		nil, nil, nil, nil, nil, // 6-10
+		nil, nil, nil, nil, // 11-14
+		nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, // 15-24
+		nil, nil, nil, nil, // 25-28
+		nil, nil, // emulatorRelay, getHostCapabilities, 29-30
+		nil, nil, nil, // scrollback-snapshot usecases (SOL-TM-03), 31-33, unused by this package's tests
+		getAgentTerminalSession, sendTerminalInput, getTerminalScrollback, // 34-36
+		nil, nil, nil, nil, // fleet import/bulk-provision/detect/preflight usecases, 37-40, unused here
+		nil, nil, nil, // persistent agent-token usecases (BL-AWS-03), 41-43, unused here
+		nil,           // teardown-connection usecase (BR-SSH-13), 44, unused here
+		nil, nil, nil, // port-forward CRUD usecases (SOL-SSH-04), 45-47, unused here
+		nil,                     // port-forward event broadcaster (TASK-SSH-04-08), 48, unused here
+		nil, nil, nil, nil, nil, // agent-session usecases (TASK-AG-01..04), 49-53, unused here
+		nil, nil, // mobile prompt-dispatch usecases (SOL-MB-03), 54-55, unused here
+		nil,                     // liveStates registry (TASK-MB-02-01), 56, unused here
+		nil, nil, nil, nil, nil, // dev-server access control usecases (CR-DS-006/007/008), 57-61, unused here
+		nil, nil, nil, nil, // 62-65
+		nil, nil, nil, // 66-68
+		nil, nil, // relayByDevServer, isDevServerConnected, 69-70
+		nil, nil, nil, nil, // ephemeral-VM + fleet-connectivity + file-changes usecases, 71-74, unused here
 	)
 }
 
@@ -89,6 +96,9 @@ func (f *fakeTerminalSessionRepository) Touch(ctx context.Context, tenantID, pty
 	return nil
 }
 func (f *fakeTerminalSessionRepository) Close(ctx context.Context, tenantID, ptyID string, closedAt time.Time) error {
+	return nil
+}
+func (f *fakeTerminalSessionRepository) CloseAllForConnection(ctx context.Context, tenantID, connectionID string, closedAt time.Time) error {
 	return nil
 }
 
@@ -146,6 +156,9 @@ func (f *fakeDevServerAgentClient) InspectProcess(ctx context.Context, devServer
 	return usecase.InspectProcessResult{}, nil
 }
 func (f *fakeDevServerAgentClient) CancelReconnect(devServerID string) {}
+func (f *fakeDevServerAgentClient) DialHiddenSshTarget(ctx context.Context, devServer domain.DevServer, runtimeID string, target domain.EphemeralVmSshTarget) (string, string, error) {
+	return "", "", nil
+}
 func (f *fakeDevServerAgentClient) SpawnAgent(ctx context.Context, devServer domain.DevServer, in usecase.SpawnAgentInput) (usecase.SpawnAgentResult, error) {
 	return usecase.SpawnAgentResult{}, nil
 }
@@ -157,6 +170,19 @@ func (f *fakeDevServerAgentClient) SendAgentInput(ctx context.Context, devServer
 }
 func (f *fakeDevServerAgentClient) StreamAgentHooks(ctx context.Context, devServer domain.DevServer) (<-chan usecase.AgentHookEvent, func(), error) {
 	return nil, nil, nil
+}
+func (f *fakeDevServerAgentClient) IsConnected(devServerID string) bool { return false }
+func (f *fakeDevServerAgentClient) StreamScreencast(ctx context.Context, devServer domain.DevServer, params usecase.ScreencastParams) (<-chan usecase.ScreencastEvent, func(), error) {
+	return nil, nil, nil
+}
+func (f *fakeDevServerAgentClient) StreamFileChanges(ctx context.Context, devServer domain.DevServer, path string) (<-chan usecase.FileChangeEvent, func(), error) {
+	return nil, nil, nil
+}
+func (f *fakeDevServerAgentClient) StreamVmProvision(ctx context.Context, devServer domain.DevServer, params usecase.VmProvisionParams) (<-chan usecase.VmProvisionEvent, func(), error) {
+	return nil, nil, nil
+}
+func (f *fakeDevServerAgentClient) ReadCredentialFile(ctx context.Context, devServer domain.DevServer, path string) (string, error) {
+	return "", nil
 }
 
 func withTenant(ctx context.Context, tenantID string) context.Context {
@@ -187,7 +213,7 @@ func TestServer_SendTerminalInput_Success_ReturnsEmpty(t *testing.T) {
 		"pty-1": {PtyID: "pty-1", TenantID: "tenant-1", ConnectionID: "conn-1"},
 	}}
 	agent := &fakeDevServerAgentClient{}
-	uc := usecase.NewSendTerminalInput(sessions, resolver, agent)
+	uc := usecase.NewSendTerminalInput(sessions, resolver, &fakeDevServerRepo{}, agent)
 	s := newTestServer(nil, uc, nil)
 
 	resp, err := s.SendTerminalInput(withTenant(context.Background(), "tenant-1"), &infrafleetv1.SendTerminalInputRequest{PtyId: "pty-1", Data: []byte("hi")})
@@ -207,7 +233,7 @@ func TestServer_GetTerminalScrollback_RoundTripsTextAndTruncated(t *testing.T) {
 	events := make(chan usecase.PtyEvent, 1)
 	events <- usecase.PtyEvent{PtyID: "pty-1", Data: []byte("scrollback text")}
 	agent := &fakeDevServerAgentClient{streamPtyEvents: events}
-	uc := usecase.NewGetTerminalScrollback(sessions, resolver, agent)
+	uc := usecase.NewGetTerminalScrollback(sessions, resolver, &fakeDevServerRepo{}, agent)
 	s := newTestServer(nil, nil, uc)
 
 	resp, err := s.GetTerminalScrollback(withTenant(context.Background(), "tenant-1"), &infrafleetv1.GetTerminalScrollbackRequest{PtyId: "pty-1"})
@@ -324,7 +350,7 @@ func (f *fakeDevServerRepo) List(ctx context.Context, tenantID string) ([]domain
 func (f *fakeDevServerRepo) FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (domain.DevServer, bool, error) {
 	return domain.DevServer{}, false, nil
 }
-func (f *fakeDevServerRepo) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info usecase.HandshakeInfo, provisionedAt time.Time) error {
+func (f *fakeDevServerRepo) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerHealthStatus, info usecase.HandshakeInfo, provisionedAt time.Time) error {
 	return nil
 }
 func (f *fakeDevServerRepo) ListAllForPolling(ctx context.Context) ([]domain.DevServer, error) {
@@ -332,6 +358,15 @@ func (f *fakeDevServerRepo) ListAllForPolling(ctx context.Context) ([]domain.Dev
 }
 func (f *fakeDevServerRepo) ListByTag(ctx context.Context, tenantID, tag string) ([]domain.DevServer, error) {
 	return nil, nil
+}
+func (f *fakeDevServerRepo) FindByHostAndMode(ctx context.Context, tenantID, host string, mode domain.ConnectionMode) (domain.DevServer, bool, error) {
+	return domain.DevServer{}, false, nil
+}
+func (f *fakeDevServerRepo) UpdateApprovalStatus(ctx context.Context, tenantID, devServerID string, status domain.DevServerStatus) (domain.DevServer, error) {
+	return domain.DevServer{}, nil
+}
+func (f *fakeDevServerRepo) AssignGroup(ctx context.Context, tenantID, devServerID, groupID string) (domain.DevServer, error) {
+	return domain.DevServer{}, nil
 }
 
 // fakeBulkProvisioner is a minimal usecase.Provisioner fake.
@@ -355,7 +390,7 @@ func TestServer_BulkProvisionFleet_RequestToResponseMarshaling(t *testing.T) {
 	if resp.GetSuccess() != 1 || len(resp.GetOutcomes()) != 1 {
 		t.Errorf("expected success=1 with 1 outcome, got %+v", resp)
 	}
-	if resp.GetOutcomes()[0].GetHost() != "h1.example.com" || resp.GetOutcomes()[0].GetStatus() != string(domain.DevServerStatusHealthy) {
+	if resp.GetOutcomes()[0].GetHost() != "h1.example.com" || resp.GetOutcomes()[0].GetStatus() != string(domain.DevServerHealthHealthy) {
 		t.Errorf("unexpected outcome: %+v", resp.GetOutcomes()[0])
 	}
 }
@@ -438,6 +473,22 @@ func (f *fakeDevServerAgent) SendAgentInput(ctx context.Context, devServer domai
 }
 func (f *fakeDevServerAgent) StreamAgentHooks(ctx context.Context, devServer domain.DevServer) (<-chan usecase.AgentHookEvent, func(), error) {
 	return nil, nil, nil
+}
+func (f *fakeDevServerAgent) IsConnected(devServerID string) bool { return false }
+func (f *fakeDevServerAgent) StreamScreencast(ctx context.Context, devServer domain.DevServer, params usecase.ScreencastParams) (<-chan usecase.ScreencastEvent, func(), error) {
+	return nil, nil, nil
+}
+func (f *fakeDevServerAgent) StreamFileChanges(ctx context.Context, devServer domain.DevServer, path string) (<-chan usecase.FileChangeEvent, func(), error) {
+	return nil, nil, nil
+}
+func (f *fakeDevServerAgent) StreamVmProvision(ctx context.Context, devServer domain.DevServer, params usecase.VmProvisionParams) (<-chan usecase.VmProvisionEvent, func(), error) {
+	return nil, nil, nil
+}
+func (f *fakeDevServerAgent) DialHiddenSshTarget(ctx context.Context, devServer domain.DevServer, runtimeID string, target domain.EphemeralVmSshTarget) (string, string, error) {
+	return "", "", nil
+}
+func (f *fakeDevServerAgent) ReadCredentialFile(ctx context.Context, devServer domain.DevServer, path string) (string, error) {
+	return "", nil
 }
 
 func TestServer_DetectDevServerAgents_RequestToResponseMarshaling(t *testing.T) {

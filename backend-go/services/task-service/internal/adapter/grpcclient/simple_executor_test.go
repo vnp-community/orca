@@ -224,7 +224,7 @@ func TestSimpleExecutor_Execute_RelaysAgentExecPrompt(t *testing.T) {
 	}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
 
-	ref, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1")
+	ref, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -256,7 +256,7 @@ func TestSimpleExecutor_NotConnected_ReturnsTypedError(t *testing.T) {
 	resolver := &fakeProjectExecutionResolver{connected: false}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, &fakeInfraFleetServiceClient{})
 
-	_, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1")
+	_, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "")
 	if err == nil {
 		t.Fatal("expected a real error for a not-connected project, not a synthesized placeholder ref")
 	}
@@ -274,7 +274,7 @@ func TestSimpleExecutor_ConnectedButNoWorktreePath_ReturnsTypedError(t *testing.
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true, worktreePath: ""}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, &fakeInfraFleetServiceClient{})
 
-	_, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1")
+	_, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "")
 	if err == nil {
 		t.Fatal("expected a real error when connected but no worktreePath resolved")
 	}
@@ -286,7 +286,7 @@ func TestSimpleExecutor_ConnectedButNoWorktreePath_ReturnsTypedError(t *testing.
 
 func TestSimpleExecutor_TaskNotFound(t *testing.T) {
 	exec := newTestSimpleExecutor(&fakeTaskRepository{tasks: map[string]domain.Task{}}, &fakeEdgeRepository{}, &fakeProjectExecutionResolver{}, &fakeInfraFleetServiceClient{})
-	if _, err := exec.Execute(context.Background(), "tenant-1", "does-not-exist", "req-1"); err == nil {
+	if _, err := exec.Execute(context.Background(), "tenant-1", "does-not-exist", "req-1", ""); err == nil {
 		t.Fatal("expected an error for a nonexistent task")
 	}
 }
@@ -297,7 +297,7 @@ func TestSimpleExecutor_RelayErrorPropagates(t *testing.T) {
 	relay := &fakeInfraFleetServiceClient{relayErr: errors.New("boom")}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err == nil {
+	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err == nil {
 		t.Fatal("expected an error when the relay call fails")
 	}
 }
@@ -315,7 +315,7 @@ func TestSimpleExecutor_NonZeroExitCode_ReturnsError(t *testing.T) {
 	}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err == nil {
+	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err == nil {
 		t.Fatal("expected an error for a non-zero agent.execPrompt exit code")
 	}
 }
@@ -330,7 +330,7 @@ func TestSimpleExecutor_TimedOut_ReturnsError(t *testing.T) {
 	}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err == nil {
+	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err == nil {
 		t.Fatal("expected an error for a timed-out agent.execPrompt run")
 	}
 }
@@ -421,7 +421,7 @@ func TestSimpleExecutor_MethodStaysAgentExecPrompt_NoRegression(t *testing.T) {
 	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{})
 
 	ctx := tenant.WithUserID(context.Background(), "user-1")
-	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1"); err != nil {
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if relay.gotRelay.GetMethod() != "agent.execPrompt" {
@@ -441,7 +441,7 @@ func TestSimpleExecutor_ResolvableUserID_PopulatesEnvAndModel(t *testing.T) {
 	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{})
 
 	ctx := tenant.WithUserID(context.Background(), "user-1")
-	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1"); err != nil {
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(profiles.calls) != 1 || profiles.calls[0] != "user-1" {
@@ -472,7 +472,7 @@ func TestSimpleExecutor_ProfileResolverError_DegradesToLegacyPassthrough(t *test
 	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{})
 
 	ctx := tenant.WithUserID(context.Background(), "user-1")
-	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1"); err != nil {
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
 		t.Fatalf("expected profile-resolve failure to degrade to legacy passthrough, got error: %v", err)
 	}
 	var sentParams agentExecPromptParams
@@ -500,7 +500,7 @@ func TestSimpleExecutor_ProjectContextResolverError_SpawnStillProceeds(t *testin
 	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, projects)
 
 	ctx := tenant.WithUserID(context.Background(), "user-1")
-	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1"); err != nil {
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var sentParams agentExecPromptParams
@@ -524,7 +524,7 @@ func TestSimpleExecutor_Execute_EnvAlwaysContainsTaskAndProjectID(t *testing.T) 
 	}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err != nil {
+	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var sentParams agentExecPromptParams
@@ -557,7 +557,7 @@ func TestSimpleExecutor_Execute_CompletedDepsThreadIntoPrompt(t *testing.T) {
 	}
 	exec := newTestSimpleExecutor(tasks, edges, resolver, relay)
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1"); err != nil {
+	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var sentParams agentExecPromptParams

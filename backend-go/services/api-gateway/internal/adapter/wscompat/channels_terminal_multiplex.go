@@ -27,17 +27,20 @@
 // a real client falls back to full redraws instead of flow control/
 // snapshot recovery, which is safe, just less optimal.
 //
-// # Subscribe's "terminal" field: ptyId, not a TS-style opaque handle
+// # Subscribe's "terminal" field: the wire key stays "terminal"; the value is a ptyId
 //
 // terminal-stream-protocol.ts's real Subscribe frame carries `{terminal:
 // <opaque handle>, streamId, client?, viewport?, capabilities?}`, resolved
-// server-side via runtime.resolveLiveLeafForHandle. backend-go has no such
-// handle-resolution layer — channels_terminal.go's terminal.create already
-// established (and tests) the convention that the frontend treats the
-// agent-assigned ptyId itself as the terminal handle for every other
-// terminal.* channel (terminal.send/resize/close all key by ptyId, not an
-// opaque handle). This file's Subscribe payload follows that SAME
-// already-confirmed convention: `{ptyId, streamId}`.
+// server-side (in the real backend) via runtime.resolveLiveLeafForHandle.
+// backend-go has no such handle-resolution layer — channels_terminal.go's
+// terminal.create already established (and tests) the convention that the
+// frontend treats the agent-assigned ptyId itself as the terminal handle
+// for every other terminal.* channel (terminal.send/resize/close all key by
+// ptyId, not an opaque handle) — but that convention only changes what
+// VALUE the frontend puts in the field, never the field's KEY. The
+// unmodified frontend still encodes the JSON key as "terminal"; decoding it
+// under a "ptyId" key (an earlier version of this struct did exactly that)
+// silently drops every Subscribe frame — found live 2026-08-30.
 package wscompat
 
 import (
@@ -58,10 +61,19 @@ import (
 const terminalMultiplexControlStreamID uint32 = 0
 
 // terminalMultiplexSubscribePayload is the JSON payload of a
-// TerminalStreamOpcodeSubscribe control frame — see this file's package doc
-// comment for why the field is ptyId, not TS's opaque "terminal" handle.
+// TerminalStreamOpcodeSubscribe control frame. The wire field is genuinely
+// named "terminal" — the real, unmodified frontend
+// (remote-runtime-terminal-multiplexer.ts) encodes `{streamId, terminal:
+// args.terminal, ...}` verbatim, unaware backend-go treats the VALUE it
+// carries as a ptyId (see this file's package doc comment on that
+// convention). This file's earlier `json:"ptyId"` tag assumed the KEY name
+// would also change to match the new semantics, but the frontend is
+// read-only reference here — it was never going to send a "ptyId" key.
+// Every Subscribe frame silently dropped (payload.PtyID == "" below) until
+// this was found live 2026-08-30, immediately after the connectionId/
+// terminal.create fixes finally got a real client subscribing at all.
 type terminalMultiplexSubscribePayload struct {
-	PtyID    string `json:"ptyId"`
+	PtyID    string `json:"terminal"`
 	StreamID uint32 `json:"streamId"`
 }
 

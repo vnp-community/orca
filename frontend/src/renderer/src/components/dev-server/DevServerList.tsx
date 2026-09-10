@@ -1,6 +1,6 @@
 import { Plus } from 'lucide-react'
 import { useState } from 'react'
-import { useDevServers } from '../../store/slices/dev-servers'
+import { useDevServers } from '../../store/slices/dev-servers-selectors'
 import { DevServerCard } from './DevServerCard'
 import { AddDevServerDialog } from './AddDevServerDialog'
 import { Button } from '@/components/ui/button'
@@ -19,11 +19,7 @@ export function DevServerList() {
     <div className="dev-server-list">
       <div className="dev-server-list__header">
         <h3 className="dev-server-list__title">Dev Servers</h3>
-        <Button
-          id="add-dev-server-btn"
-          size="sm"
-          onClick={() => setAddDialogOpen(true)}
-        >
+        <Button id="add-dev-server-btn" size="sm" onClick={() => setAddDialogOpen(true)}>
           <Plus className="mr-1 size-4" />
           Add Server
         </Button>
@@ -44,10 +40,7 @@ export function DevServerList() {
         </div>
       )}
 
-      <AddDevServerDialog
-        open={addDialogOpen}
-        onOpenChange={setAddDialogOpen}
-      />
+      <AddDevServerDialog open={addDialogOpen} onOpenChange={setAddDialogOpen} />
     </div>
   )
 }

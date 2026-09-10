@@ -17,6 +17,17 @@ describe('wsl path helpers', () => {
     expect(isWslUncPath('C:\\Users\\jin\\repo')).toBe(false)
     expect(isWslUncPath('/home/jin/repo')).toBe(false)
   })
+
+  // Regression test: a ProjectHostSetup derived from a bare project-service
+  // Repo (no `path` field on the wire) can reach this with `path` genuinely
+  // undefined at runtime despite the `string` type — found live crashing
+  // the whole sidebar list (worktree-list-groups.ts's
+  // getProjectSetupSurfaceKey), contained by an error boundary but still a
+  // real regression.
+  it('returns null instead of throwing for a missing path', () => {
+    expect(parseWslUncPath(undefined as unknown as string)).toBeNull()
+    expect(parseWslUncPath('')).toBeNull()
+  })
 })
 
 describe('foldWslUncPathCaseInsensitiveParts', () => {

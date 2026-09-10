@@ -7,7 +7,7 @@
 
 > 📌 Xem [Enterprise Migration Impact Assessment](../enterprise-migration-impact-assessment.md) cho deployment checklist và rollback plan.
 
-> ⚠️ **Current vs. Proposed:** Các ADR v2 này và các tài liệu C4 model dưới `docs/hld/v1/` mô tả kiến trúc **v6.0 đề xuất** (proposed target state), chưa được implement — xem "Trạng thái Implementation" ở cuối mỗi ADR. Để biết kiến trúc **hiện tại đã implement thật sự** trong code, xem 3 file ở gốc `docs/hld/`: [`backend-server-architecture.md`](../../hld/backend-server-architecture.md), [`dev-server-architecture.md`](../../hld/dev-server-architecture.md), [`web-server-architecture.md`](../../hld/web-server-architecture.md) — các file này đã được rà soát và sửa lại đúng theo code thật vào tháng 8/2026.
+> ⚠️ **Current vs. Proposed:** ADR-016–020 và các tài liệu C4 model dưới `docs/hld/v1/` mô tả kiến trúc **v6.0 đề xuất** (proposed target state) cho TS system, chưa được implement — xem "Trạng thái Implementation" ở cuối mỗi ADR. Để biết kiến trúc **hiện tại đã implement thật sự** trong code, xem 4 file ở gốc `docs/hld/`: [`backend-server-architecture.md`](../../hld/backend-server-architecture.md), [`dev-server-architecture.md`](../../hld/dev-server-architecture.md), [`web-server-architecture.md`](../../hld/web-server-architecture.md) (TS system, đã rà soát tháng 8/2026), và [`backend-go-architecture.md`](../../hld/backend-go-architecture.md) (Go microservices platform — hệ thống RIÊNG chạy song song với TS system, xem ADR-022–024 ngay dưới đây).
 
 ---
 
@@ -20,6 +20,17 @@
 | [ADR-018](./ADR-018-control-plane-data-plane-separation.md) | Control Plane / Data Plane Separation | 🚧 Proposed | ADR-013 | F22–F25, F33–F37 | README L0–L5 + A0–A4 | 2026-07-30 |
 | [ADR-019](./ADR-019-agent-autonomous-operation-reconnect.md) | Agent Autonomous Operation & Reconnect Strategy | 🚧 Proposed | ADR-013, ADR-017 | F01, F04, F27, F36, F37 | README Principle 8, C4.11 | 2026-07-30 |
 | [ADR-020](./ADR-020-enterprise-rollout-phases-backward-compat.md) | Enterprise Rollout Phases & Backward Compatibility | 🚧 Proposed | ADR-013 Migration Path | F22–F39 | deployment.md | 2026-07-30 |
+| [ADR-021](./ADR-021-unified-postgres-microservices-platform.md) | Hợp nhất Server-mode Data Plane vào Postgres, Microservices theo domain (TS system) | 🚧 Proposed — Phase 0 done | ADR-002, ADR-016 | F22–F39 (data layer, cross-cutting) | backend-server-architecture.md | 2026-08-15 |
+| [ADR-022](./ADR-022-wscompat-protocol-bridge.md) | `wscompat`: lớp dịch giao thức WS-RPC ↔ gRPC nội bộ (**backend-go**) | ✅ Accepted — implemented | — | — | backend-go-architecture.md §4 | 2026-09-06 |
+| [ADR-023](./ADR-023-postgres-per-service-vault-dynamic-credentials.md) | Backend-go: Postgres database-per-service + Vault dynamic DB credentials | ✅ Accepted — ⚠️ Partial (Vault Agent sidecar) | ADR-021 | — | backend-go-architecture.md §6 | 2026-09-06 |
+| [ADR-024](./ADR-024-dual-workflow-engines-migration.md) | Hai workflow engine song song, không tương thích (**backend-go** migration) | ⚠️ Ghi nhận hiện trạng | ADR-009 (v1) | F36 | backend-go-architecture.md §5 | 2026-09-06 |
+
+> **2026-09-06:** ADR-021 mô tả kiến trúc data layer cho TS `backend/`. ADR-022–024 mô tả **`backend-go/`**
+> — một hệ thống Go microservices riêng, viết mới, chạy **song song** với TS `backend/`, không phải phần
+> tiếp theo của ADR-021's Phase 3 (dù cùng chủ đề "tách microservices theo domain", hai codebase khác
+> nhau đi tới hai quyết định vật lý khác nhau — schema-per-service vs. database-per-service, xem
+> ADR-023's mục "Vì sao không thừa hưởng ADR-021 nguyên vẹn"). Xem
+> [docs/hld/backend-go-architecture.md](../../hld/backend-go-architecture.md) trước khi đọc ADR-022–024.
 
 ---
 

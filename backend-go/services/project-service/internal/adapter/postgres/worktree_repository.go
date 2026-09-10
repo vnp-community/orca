@@ -2,6 +2,7 @@ package postgres
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
@@ -13,7 +14,10 @@ import (
 	"github.com/stablyai/orca-go/services/project-service/internal/domain"
 )
 
-const worktreeColumns = `id, project_id, repo_id, path, branch, active, idempotency_key, COALESCE(linked_issue_provider, ''), COALESCE(linked_issue_ref, ''), status, base_ref`
+const worktreeColumns = `id, project_id, repo_id, path, branch, active, created_at,
+	idempotency_key, COALESCE(linked_issue_provider, ''), COALESCE(linked_issue_ref, ''), status, base_ref,
+	parent_worktree_id, origin, capture_source, capture_confidence, task_id,
+	orchestration_run_id, coordinator_handle, created_by_terminal_handle, metadata`
 
 // WorktreeRepository implements usecase.WorktreeRepository against
 // project.worktrees.
@@ -152,13 +156,70 @@ func (r *WorktreeRepository) RenameWorktree(ctx context.Context, worktreeID, bra
 	return out, nil
 }
 
+// UpdateWorktreeMeta shallow-merges patch (a JSON object) into the stored
+// metadata blob via Postgres jsonb's `||` operator — an explicit JSON null
+// in patch overwrites the corresponding key with null (the frontend's own
+// "clear this field" wire convention, see encodePushTargetClearForRuntimeRpc),
+// an omitted key leaves the previously-stored value untouched. patch must be
+// a JSON object, never an array/scalar — `||` on two jsonb objects merges;
+// on anything else it behaves unpredictably, so ports.go's caller contract
+// requires object shape.
+func (r *WorktreeRepository) UpdateWorktreeMeta(ctx context.Context, worktreeID string, patch json.RawMessage) (domain.Worktree, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE project.worktrees SET metadata = metadata || $1::jsonb WHERE id = $2
+		RETURNING `+worktreeColumns,
+		[]byte(patch), worktreeID,
+	)
+
+	out, err := scanWorktree(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Worktree{}, domain.ErrWorktreeNotFound
+	}
+	if err != nil {
+		return domain.Worktree{}, fmt.Errorf("postgres: update worktree metadata: %w", err)
+	}
+	return out, nil
+}
+
+// SetWorktreeLineage re-parents (or, when parentWorktreeID is nil, clears
+// the parent of) an already-created worktree. capture_confidence tracks
+// parent_worktree_id's presence the same way NewWorktree's creation-time
+// capture does (see domain.NewWorktree's doc comment) — "explicit" when a
+// parent is set, cleared alongside it when removed.
+func (r *WorktreeRepository) SetWorktreeLineage(ctx context.Context, worktreeID string, parentWorktreeID *string) (domain.Worktree, error) {
+	var captureConfidence *string
+	if parentWorktreeID != nil {
+		explicit := "explicit"
+		captureConfidence = &explicit
+	}
+	row := r.pool.QueryRow(ctx, `
+		UPDATE project.worktrees SET parent_worktree_id = $1, capture_confidence = $2 WHERE id = $3
+		RETURNING `+worktreeColumns,
+		parentWorktreeID, captureConfidence, worktreeID,
+	)
+
+	out, err := scanWorktree(row)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.Worktree{}, domain.ErrWorktreeNotFound
+	}
+	if err != nil {
+		return domain.Worktree{}, fmt.Errorf("postgres: set worktree lineage: %w", err)
+	}
+	return out, nil
+}
+
 // scanWorktree does NOT convert pgx.ErrNoRows itself — see
 // scanProjectGroup's identical doc comment for why (every caller already
 // checks errors.Is(err, pgx.ErrNoRows) against the raw scan error).
 func scanWorktree(row rowScanner) (domain.Worktree, error) {
 	var wt domain.Worktree
 	var status string
-	if err := row.Scan(&wt.ID, &wt.ProjectID, &wt.RepoID, &wt.Path, &wt.Branch, &wt.Active, &wt.IdempotencyKey, &wt.LinkedIssueProvider, &wt.LinkedIssueRef, &status, &wt.BaseRef); err != nil {
+	if err := row.Scan(
+		&wt.ID, &wt.ProjectID, &wt.RepoID, &wt.Path, &wt.Branch, &wt.Active, &wt.CreatedAt,
+		&wt.IdempotencyKey, &wt.LinkedIssueProvider, &wt.LinkedIssueRef, &status, &wt.BaseRef,
+		&wt.ParentWorktreeID, &wt.Origin, &wt.CaptureSource, &wt.CaptureConfidence, &wt.TaskID,
+		&wt.OrchestrationRunID, &wt.CoordinatorHandle, &wt.CreatedByTerminalHandle, &wt.Metadata,
+	); err != nil {
 		return domain.Worktree{}, err
 	}
 	wt.Status = domain.WorktreeStatus(status)
@@ -182,10 +243,16 @@ func (r *WorktreeRepository) CreateWorktreeWithEvent(ctx context.Context, wt dom
 	defer tx.Rollback(ctx) // no-op after Commit
 
 	row := tx.QueryRow(ctx, `
-		INSERT INTO project.worktrees (id, project_id, repo_id, path, branch, active, idempotency_key, linked_issue_provider, linked_issue_ref, status, base_ref)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), NULLIF($9, ''), $10, $11)
+		INSERT INTO project.worktrees (
+			id, project_id, repo_id, path, branch, active, idempotency_key, linked_issue_provider, linked_issue_ref, status, base_ref,
+			parent_worktree_id, origin, capture_source, capture_confidence, task_id,
+			orchestration_run_id, coordinator_handle, created_by_terminal_handle
+		)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), NULLIF($9, ''), $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
 		RETURNING `+worktreeColumns,
 		wt.ID, wt.ProjectID, wt.RepoID, wt.Path, wt.Branch, wt.Active, wt.IdempotencyKey, wt.LinkedIssueProvider, wt.LinkedIssueRef, string(status), wt.BaseRef,
+		wt.ParentWorktreeID, wt.Origin, wt.CaptureSource, wt.CaptureConfidence, wt.TaskID,
+		wt.OrchestrationRunID, wt.CoordinatorHandle, wt.CreatedByTerminalHandle,
 	)
 	out, err := scanWorktree(row)
 	if err != nil {
@@ -293,4 +360,34 @@ func nullableStringSlice(s []string) []string {
 		return nil
 	}
 	return s
+}
+
+// ListLineage returns every worktree with an explicitly-captured parent,
+// tenant-scoped implicitly via the same RLS policy every other query
+// against this table relies on (see 0004_worktrees.up.sql's tenant_isolation
+// policy) — no explicit tenant filter needed here.
+func (r *WorktreeRepository) ListLineage(ctx context.Context) ([]domain.Worktree, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT `+worktreeColumns+`
+		FROM project.worktrees
+		WHERE parent_worktree_id IS NOT NULL
+		ORDER BY id
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query worktree lineage: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.Worktree
+	for rows.Next() {
+		wt, err := scanWorktree(rows)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: scan worktree lineage row: %w", err)
+		}
+		out = append(out, wt)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate worktree lineage rows: %w", err)
+	}
+	return out, nil
 }

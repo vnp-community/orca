@@ -23,6 +23,10 @@ type UpdateTaskInput struct {
 	Status     *string
 	PRURL      *string
 	WorktreeID *string
+	// WorkflowTemplateID: nil = leave untouched, non-nil = set (an empty
+	// string clears the attachment) — same wrapper-typed field-mask
+	// convention as Title/Status. See docs/backlog/BACKLOG-016.
+	WorkflowTemplateID *string
 }
 
 // UpdateTask is task-service's one client-facing status-edit RPC. It
@@ -82,6 +86,9 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 			return domain.Task{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_INVALID_STATUS_TRANSITION", err.Error(), err)
 		}
 		current = updated
+	}
+	if in.WorkflowTemplateID != nil {
+		current.WorkflowTemplateID = *in.WorkflowTemplateID
 	}
 
 	var events []domain.OutboxEvent

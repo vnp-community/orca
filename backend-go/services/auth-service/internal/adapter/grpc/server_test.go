@@ -74,7 +74,9 @@ func (r *fakeUserRepository) SetActive(ctx context.Context, userID string, activ
 	return nil
 }
 func (r *fakeUserRepository) HasAnyUsers(ctx context.Context) (bool, error) { return true, nil }
-func (r *fakeUserRepository) Count(ctx context.Context) (int32, error)     { return int32(len(r.byEmail)), nil }
+func (r *fakeUserRepository) Count(ctx context.Context) (int32, error) {
+	return int32(len(r.byEmail)), nil
+}
 func (r *fakeUserRepository) UpdateUser(ctx context.Context, userID string, email, name *string, role *domain.Role) (domain.User, error) {
 	u, err := r.GetUserByID(ctx, userID)
 	if err != nil {
@@ -97,6 +99,15 @@ func (r *fakeUserRepository) UpdateUser(ctx context.Context, userID string, emai
 	}
 	r.seed(u, hash)
 	return u, nil
+}
+func (r *fakeUserRepository) SetSsoProvider(ctx context.Context, userID string, provider domain.SsoProvider) error {
+	u, err := r.GetUserByID(ctx, userID)
+	if err != nil {
+		return nil
+	}
+	u.SsoProvider = provider
+	r.seed(u, r.hashes[u.Email])
+	return nil
 }
 
 // fakeSessionRepository is a minimal in-memory usecase.SessionRepository.
@@ -152,6 +163,14 @@ func (r *fakeSessionRepository) ListForTenant(ctx context.Context, tenantID, pag
 	}
 	return out, "", nil
 }
+func (r *fakeSessionRepository) GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (domain.Session, error) {
+	for _, s := range r.byHash {
+		if s.RefreshTokenHash != "" && s.RefreshTokenHash == refreshTokenHash {
+			return s, nil
+		}
+	}
+	return domain.Session{}, usecase.ErrSessionNotFound
+}
 
 // fakeAuditRepository is a minimal in-memory usecase.AuditRepository that
 // records every entry appended, so a test can assert what Login wrote.
@@ -189,7 +208,7 @@ func TestServer_Login(t *testing.T) {
 	users.seed(u, hash)
 
 	login := usecase.NewLogin(users, sessions, audit, hasher, clock, time.Hour)
-	s := New(login, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	s := New(login, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	resp, err := s.Login(context.Background(), &authv1.LoginRequest{
 		Email:     "alice@example.com",
@@ -226,7 +245,7 @@ func TestServer_Login_WrongPasswordWritesFailureAudit(t *testing.T) {
 	users.seed(u, hash)
 
 	login := usecase.NewLogin(users, sessions, audit, hasher, clock, time.Hour)
-	s := New(login, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	s := New(login, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	_, err = s.Login(context.Background(), &authv1.LoginRequest{
 		Email:     "alice@example.com",
@@ -279,7 +298,7 @@ func TestServer_ListSessionsForUser(t *testing.T) {
 	}
 
 	listSessionsForUser := usecase.NewListSessionsForUser(users, sessions, opa)
-	s := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, listSessionsForUser, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
+	s := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, listSessionsForUser, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	ctx := withActor(context.Background(), "t1", "admin1")
 	resp, err := s.ListSessionsForUser(ctx, &authv1.ListSessionsForUserRequest{UserId: "u2"})
@@ -337,7 +356,7 @@ func TestServer_ListSessions(t *testing.T) {
 	}
 
 	listSessions := usecase.NewListSessions(users, sessions, opa)
-	s := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, listSessions, nil, nil, nil, nil, nil, nil)
+	s := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, listSessions, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	ctx := withActor(context.Background(), "t1", "admin1")
 	resp, err := s.ListSessions(ctx, &authv1.ListSessionsRequest{PageSize: 50})
@@ -369,7 +388,7 @@ func TestServer_UpdateUser_PartialRequestOnlySetsGivenFields(t *testing.T) {
 	users.seed(member, "hash")
 
 	updateUser := usecase.NewUpdateUser(users, &fakeAuditRepository{}, fixedClock{now: time.Now()}, &fakeOPAClient{allow: true})
-	s := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, updateUser, nil, nil, nil, nil, nil)
+	s := New(nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, updateUser, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil)
 
 	ctx := withActor(context.Background(), "t1", "admin1")
 	resp, err := s.UpdateUser(ctx, &authv1.UpdateUserRequest{

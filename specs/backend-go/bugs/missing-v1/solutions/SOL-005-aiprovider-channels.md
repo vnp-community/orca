@@ -11,7 +11,7 @@
 - `backend-go/services/ai-provider-service/internal/adapter/postgres/*.go` (repository additions)
 - `backend-go/services/ai-provider-service/internal/adapter/grpcclient/infrafleet_client.go` (new)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_ai_provider.go` (new)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 7 task(s) (TASK-024–030) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

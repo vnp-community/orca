@@ -69,8 +69,16 @@ func withTenant(ctx context.Context, tenantID string) context.Context {
 	return tenant.WithTenantID(ctx, tenantID)
 }
 
+// withAdminTenant is withTenant plus an admin role claim — CR-DS-006 Phase
+// 2's admin-gated usecases (ApproveDevServer, CreateDevServerGroup, etc.)
+// need this instead of withTenant; see requireAdmin's doc comment for why
+// an absent role must never be treated as an implicit allow.
+func withAdminTenant(ctx context.Context, tenantID string) context.Context {
+	return tenant.WithRole(withTenant(ctx, tenantID), "admin")
+}
+
 func TestResolveConnection_RequiresTenantContext(t *testing.T) {
-	uc := NewResolveConnection(&fakeConnectionResolver{})
+	uc := NewResolveConnection(&fakeConnectionResolver{}, nil)
 	_, err := uc.Execute(context.Background(), ResolveConnectionInput{ConnectionID: "conn-1"})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
@@ -79,7 +87,7 @@ func TestResolveConnection_RequiresTenantContext(t *testing.T) {
 
 func TestResolveConnection_EmptyConnectionID_ShortCircuitsToLocal(t *testing.T) {
 	resolver := &fakeConnectionResolver{}
-	uc := NewResolveConnection(resolver)
+	uc := NewResolveConnection(resolver, nil)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	out, err := uc.Execute(ctx, ResolveConnectionInput{})
@@ -101,7 +109,7 @@ func TestResolveConnection_Found_ReturnsConnectedAndDevServer(t *testing.T) {
 		t.Fatalf("building dev server: %v", err)
 	}
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
-	uc := NewResolveConnection(resolver)
+	uc := NewResolveConnection(resolver, nil)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
@@ -137,7 +145,7 @@ func TestResolveConnection_Sessions_EnrichesNodeVersion(t *testing.T) {
 		t.Fatalf("building dev server: %v", err)
 	}
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
-	uc := NewResolveConnection(resolver)
+	uc := NewResolveConnection(resolver, nil)
 	uc.Sessions = fakeHandshakeInfoProvider{byDevServer: map[string]string{"ds1": "20.11.0"}}
 
 	ctx := withTenant(context.Background(), "tenant-1")
@@ -158,7 +166,7 @@ func TestResolveConnection_Sessions_NilLeavesNodeVersionEmpty(t *testing.T) {
 		t.Fatalf("building dev server: %v", err)
 	}
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
-	uc := NewResolveConnection(resolver)
+	uc := NewResolveConnection(resolver, nil)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
@@ -179,7 +187,7 @@ func TestResolveConnection_Sessions_MissLeavesNodeVersionEmpty(t *testing.T) {
 		t.Fatalf("building dev server: %v", err)
 	}
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
-	uc := NewResolveConnection(resolver)
+	uc := NewResolveConnection(resolver, nil)
 	uc.Sessions = fakeHandshakeInfoProvider{byDevServer: map[string]string{}}
 
 	ctx := withTenant(context.Background(), "tenant-1")
@@ -196,7 +204,7 @@ func TestResolveConnection_Sessions_MissLeavesNodeVersionEmpty(t *testing.T) {
 // "execute locally". This must NOT be an error.
 func TestResolveConnection_NotFound_ReturnsNotConnectedWithoutError(t *testing.T) {
 	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{}}
-	uc := NewResolveConnection(resolver)
+	uc := NewResolveConnection(resolver, nil)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "unknown-conn"})
@@ -213,7 +221,7 @@ func TestResolveConnection_NotFound_ReturnsNotConnectedWithoutError(t *testing.T
 
 func TestResolveConnection_RepositoryFailurePropagates(t *testing.T) {
 	resolver := &fakeConnectionResolver{err: errors.New("db unavailable")}
-	uc := NewResolveConnection(resolver)
+	uc := NewResolveConnection(resolver, nil)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	_, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
@@ -242,11 +250,11 @@ func TestResolveConnection_ByDevServerID_MatchesByConnectionID(t *testing.T) {
 	}
 
 	ctx := withTenant(context.Background(), "tenant-1")
-	wantOut, err := NewResolveConnection(byConnID).Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+	wantOut, err := NewResolveConnection(byConnID, nil).Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
 	if err != nil {
 		t.Fatalf("unexpected error resolving by connection id: %v", err)
 	}
-	gotOut, err := NewResolveConnection(byDevServer).Execute(ctx, ResolveConnectionInput{DevServerID: "ds1"})
+	gotOut, err := NewResolveConnection(byDevServer, nil).Execute(ctx, ResolveConnectionInput{DevServerID: "ds1"})
 	if err != nil {
 		t.Fatalf("unexpected error resolving by dev server id: %v", err)
 	}
@@ -256,6 +264,125 @@ func TestResolveConnection_ByDevServerID_MatchesByConnectionID(t *testing.T) {
 	if gotOut.ConnectionID != "conn-1" {
 		t.Errorf("ConnectionID = %q, want conn-1", gotOut.ConnectionID)
 	}
+}
+
+// TestResolveConnection_SshTypeRuntimeReturnsHiddenTargetID is
+// TASK-BE-EVM-018's core Gap 3 test: a connection whose WorktreeID is
+// attached (ephemeralVm.attachWorkspace) to an ssh-type ephemeral VM
+// runtime gets HiddenTargetID populated with that runtime's id (BE-SOL-EVM-004
+// §4's convention: hiddenTargetID == runtimeID).
+func TestResolveConnection_SshTypeRuntimeReturnsHiddenTargetID(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	conn := domain.Connection{ID: "conn-1", TenantID: "tenant-1", DevServerID: "ds1", RepoPath: "/repo", WorktreeID: "wt-1"}
+	resolver := &fakeConnectionResolver{
+		byConnectionID: map[string]domain.DevServer{"conn-1": ds},
+		connByID:       map[string]domain.Connection{"conn-1": conn},
+	}
+	runtimes := &fakeEphemeralVmRuntimeRepository{
+		byWorkspace: map[string]domain.EphemeralVmRuntime{
+			"wt-1": {ID: "rt-1", ConnectionType: "ssh"},
+		},
+	}
+	uc := NewResolveConnection(resolver, runtimes)
+
+	ctx := withTenant(context.Background(), "tenant-1")
+	out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if out.HiddenTargetID != "rt-1" {
+		t.Errorf("HiddenTargetID = %q, want rt-1", out.HiddenTargetID)
+	}
+}
+
+// TestResolveConnection_NonSshRuntimeHiddenTargetIDEmpty is TASK-BE-EVM-018's
+// regression guard: the overwhelming majority of connections either have no
+// attached ephemeral VM runtime at all, or an "orca-server"-type one —
+// HiddenTargetID must stay empty in both cases, and a repository lookup
+// failure (e.g. runtimes==nil, the pre-TASK-BE-EVM-018 default) must never
+// turn into an error.
+func TestResolveConnection_NonSshRuntimeHiddenTargetIDEmpty(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelaySSH, "ssht1", nil)
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+
+	t.Run("no attached runtime at all (not found)", func(t *testing.T) {
+		conn := domain.Connection{ID: "conn-1", TenantID: "tenant-1", DevServerID: "ds1", RepoPath: "/repo", WorktreeID: "wt-1"}
+		resolver := &fakeConnectionResolver{
+			byConnectionID: map[string]domain.DevServer{"conn-1": ds},
+			connByID:       map[string]domain.Connection{"conn-1": conn},
+		}
+		uc := NewResolveConnection(resolver, &fakeEphemeralVmRuntimeRepository{})
+		ctx := withTenant(context.Background(), "tenant-1")
+		out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if out.HiddenTargetID != "" {
+			t.Errorf("HiddenTargetID = %q, want empty", out.HiddenTargetID)
+		}
+	})
+
+	t.Run("attached runtime is orca-server type, not ssh", func(t *testing.T) {
+		conn := domain.Connection{ID: "conn-1", TenantID: "tenant-1", DevServerID: "ds1", RepoPath: "/repo", WorktreeID: "wt-1"}
+		resolver := &fakeConnectionResolver{
+			byConnectionID: map[string]domain.DevServer{"conn-1": ds},
+			connByID:       map[string]domain.Connection{"conn-1": conn},
+		}
+		runtimes := &fakeEphemeralVmRuntimeRepository{
+			byWorkspace: map[string]domain.EphemeralVmRuntime{"wt-1": {ID: "rt-1", ConnectionType: "orca-server"}},
+		}
+		uc := NewResolveConnection(resolver, runtimes)
+		ctx := withTenant(context.Background(), "tenant-1")
+		out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if out.HiddenTargetID != "" {
+			t.Errorf("HiddenTargetID = %q, want empty", out.HiddenTargetID)
+		}
+	})
+
+	t.Run("runtimes repository not wired (nil) — pre-TASK-BE-EVM-018 default", func(t *testing.T) {
+		conn := domain.Connection{ID: "conn-1", TenantID: "tenant-1", DevServerID: "ds1", RepoPath: "/repo", WorktreeID: "wt-1"}
+		resolver := &fakeConnectionResolver{
+			byConnectionID: map[string]domain.DevServer{"conn-1": ds},
+			connByID:       map[string]domain.Connection{"conn-1": conn},
+		}
+		uc := NewResolveConnection(resolver, nil)
+		ctx := withTenant(context.Background(), "tenant-1")
+		out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if out.HiddenTargetID != "" {
+			t.Errorf("HiddenTargetID = %q, want empty", out.HiddenTargetID)
+		}
+	})
+
+	t.Run("no worktree bound to this connection", func(t *testing.T) {
+		conn := domain.Connection{ID: "conn-1", TenantID: "tenant-1", DevServerID: "ds1", RepoPath: "/repo"}
+		resolver := &fakeConnectionResolver{
+			byConnectionID: map[string]domain.DevServer{"conn-1": ds},
+			connByID:       map[string]domain.Connection{"conn-1": conn},
+		}
+		runtimes := &fakeEphemeralVmRuntimeRepository{
+			byWorkspace: map[string]domain.EphemeralVmRuntime{"": {ID: "rt-1", ConnectionType: "ssh"}},
+		}
+		uc := NewResolveConnection(resolver, runtimes)
+		ctx := withTenant(context.Background(), "tenant-1")
+		out, err := uc.Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if out.HiddenTargetID != "" {
+			t.Errorf("HiddenTargetID = %q, want empty (no WorktreeID means never even looked up)", out.HiddenTargetID)
+		}
+	})
 }
 
 // TASK-025/TASK-030: same as above, but keyed by WorktreeID.
@@ -276,11 +403,11 @@ func TestResolveConnection_ByWorktreeID_MatchesByConnectionID(t *testing.T) {
 	}
 
 	ctx := withTenant(context.Background(), "tenant-1")
-	wantOut, err := NewResolveConnection(byConnID).Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
+	wantOut, err := NewResolveConnection(byConnID, nil).Execute(ctx, ResolveConnectionInput{ConnectionID: "conn-1"})
 	if err != nil {
 		t.Fatalf("unexpected error resolving by connection id: %v", err)
 	}
-	gotOut, err := NewResolveConnection(byWorktree).Execute(ctx, ResolveConnectionInput{WorktreeID: "wt-1"})
+	gotOut, err := NewResolveConnection(byWorktree, nil).Execute(ctx, ResolveConnectionInput{WorktreeID: "wt-1"})
 	if err != nil {
 		t.Fatalf("unexpected error resolving by worktree id: %v", err)
 	}

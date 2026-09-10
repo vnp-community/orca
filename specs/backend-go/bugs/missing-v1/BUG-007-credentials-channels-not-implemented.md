@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** Medium — gates Web Server mode (`ORCA_MULTI_USER=1`) integration-token setup (bitbucket/azure-devops/gitea/linear/jira); a real gap, but scoped to a non-default deployment mode and a secondary integrations settings screen, not core daily app usage.
 **Symptom:** All 4 `credentials.*` calls from `CredentialInputForm.tsx`/`runtime-credentials-client.ts` time out with `channel "credentials.X" is not yet implemented in backend-go — see backend-go/docs/execution-plan.md's frontend-compatibility-layer coverage table`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-037–043 (7 task(s), all DONE) for implementation evidence.
 
 ---
 

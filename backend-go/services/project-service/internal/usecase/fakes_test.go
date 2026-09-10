@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"sync"
 	"testing"
@@ -73,11 +74,17 @@ func (f *fakeProjectRepository) Get(ctx context.Context, tenantID, id string) (d
 	return p, nil
 }
 
-func (f *fakeProjectRepository) List(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
+func (f *fakeProjectRepository) List(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
 	var out []domain.Project
 	for _, p := range f.projects {
-		if p.TenantID == tenantID {
-			out = append(out, p)
+		if p.TenantID != tenantID {
+			continue
+		}
+		for _, m := range f.members {
+			if m.ProjectID == p.ID && m.UserID == userID {
+				out = append(out, p)
+				break
+			}
 		}
 	}
 	return out, "", nil
@@ -140,6 +147,9 @@ func (f *fakeProjectRepository) UpdateProject(ctx context.Context, tenantID, pro
 	}
 	if patch.Visibility != "" {
 		p.Visibility = patch.Visibility
+	}
+	if patch.MobileEmulatorAgentID != "" {
+		p.MobileEmulatorAgentID = patch.MobileEmulatorAgentID
 	}
 	f.projects[projectID] = p
 	return p, nil
@@ -237,11 +247,15 @@ func (f *fakeProjectRepository) CountOwners(ctx context.Context, projectID strin
 // calls, so a test can assert exactly what the usecase asked OPA to decide.
 type fakeOPAClient struct {
 	decide func(callerProjectRole, callerGlobalRole, action string) bool
+	// repoDecide is RepoDecision's counterpart to decide — see
+	// repoRegoDecide.
+	repoDecide func(callerProjectRole, callerRepoRole, callerGlobalRole, action string) bool
 
 	allow bool
 	err   error
 
-	calls []opaDecisionCall
+	calls     []opaDecisionCall
+	repoCalls []repoOpaDecisionCall
 }
 
 type opaDecisionCall struct {
@@ -259,6 +273,50 @@ func (f *fakeOPAClient) Decision(ctx context.Context, callerProjectRole, callerG
 		return f.decide(callerProjectRole, callerGlobalRole, action), nil
 	}
 	return f.allow, nil
+}
+
+// repoDecide, repoCalls, and RepoDecision mirror the Decision/decide/calls
+// fields above one tier down (repo, not project) — a separate field set
+// rather than overloading the existing ones, since repo.rego's input shape
+// carries an extra caller_repo_role dimension Decision's input doesn't have.
+type repoOpaDecisionCall struct {
+	CallerProjectRole string
+	CallerRepoRole    string
+	CallerGlobalRole  string
+	Action            string
+}
+
+func (f *fakeOPAClient) RepoDecision(ctx context.Context, callerProjectRole, callerRepoRole, callerGlobalRole, action string) (bool, error) {
+	f.repoCalls = append(f.repoCalls, repoOpaDecisionCall{
+		CallerProjectRole: callerProjectRole, CallerRepoRole: callerRepoRole, CallerGlobalRole: callerGlobalRole, Action: action,
+	})
+	if f.err != nil {
+		return false, f.err
+	}
+	if f.repoDecide != nil {
+		return f.repoDecide(callerProjectRole, callerRepoRole, callerGlobalRole, action), nil
+	}
+	return f.allow, nil
+}
+
+// repoRegoDecide mirrors policy/orca-authz/repo.rego's action_roles table
+// plus its project-owner bypass and global-admin override — used by
+// fakeOPAClient.repoDecide in authorization tests that need realistic
+// role-gating instead of a single static allow/deny answer.
+func repoRegoDecide(callerProjectRole, callerRepoRole, callerGlobalRole, action string) bool {
+	if callerGlobalRole == "admin" || callerProjectRole == "owner" {
+		return true
+	}
+	switch action {
+	case repoActionAdminOnly:
+		return callerRepoRole == "admin"
+	case repoActionLeadOrAdmin:
+		return callerRepoRole == "lead" || callerRepoRole == "admin"
+	case repoActionAnyFunctionalRole:
+		return callerRepoRole == "developer" || callerRepoRole == "lead" || callerRepoRole == "admin"
+	default:
+		return false
+	}
 }
 
 // projectRegoDecide mirrors policy/orca-authz/project.rego's action_roles
@@ -301,14 +359,25 @@ func (f *fakeExecutionChecker) HasActiveExecutions(ctx context.Context, projectI
 
 // fakeRepoRepository is an in-memory RepoRepository.
 type fakeRepoRepository struct {
-	repos map[string]domain.Repo
+	repos       map[string]domain.Repo
+	repoMembers []domain.RepoMember
 
-	addErr     error
-	listErr    error
-	reorderErr error
-	removeErr  error
-	getErr     error
-	updateErr  error
+	addErr             error
+	listErr            error
+	listForTenantErr   error
+	reorderErr         error
+	removeErr          error
+	getErr             error
+	updateErr          error
+	updateDevServerErr error
+	reassignErr        error
+
+	addMemberErr             error
+	getMembershipErr         error
+	listMembersErr           error
+	removeMemberErr          error
+	updateMemberRoleErr      error
+	listIDsWithMembershipErr error
 }
 
 func newFakeRepoRepository() *fakeRepoRepository {
@@ -339,6 +408,17 @@ func (f *fakeRepoRepository) ListRepos(ctx context.Context, projectID string) ([
 		if r.ProjectID == projectID {
 			out = append(out, r)
 		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepoRepository) ListReposForTenant(ctx context.Context) ([]domain.Repo, error) {
+	if f.listForTenantErr != nil {
+		return nil, f.listForTenantErr
+	}
+	var out []domain.Repo
+	for _, r := range f.repos {
+		out = append(out, r)
 	}
 	return out, nil
 }
@@ -382,6 +462,52 @@ func (f *fakeRepoRepository) Update(ctx context.Context, repo domain.Repo) (doma
 	return repo, nil
 }
 
+// UpdateDevServerID implements usecase.RepoRepository.UpdateDevServerID.
+func (f *fakeRepoRepository) UpdateDevServerID(ctx context.Context, repoID, devServerID string) (domain.Repo, error) {
+	if f.updateDevServerErr != nil {
+		return domain.Repo{}, f.updateDevServerErr
+	}
+	r, ok := f.repos[repoID]
+	if !ok {
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
+	r.DevServerID = devServerID
+	f.repos[repoID] = r
+	return r, nil
+}
+
+func (f *fakeRepoRepository) ReassignProject(ctx context.Context, repoID, fromProjectID, targetProjectID string) (domain.Repo, error) {
+	if f.reassignErr != nil {
+		return domain.Repo{}, f.reassignErr
+	}
+	r, ok := f.repos[repoID]
+	if !ok {
+		return domain.Repo{}, domain.ErrRepoNotFound
+	}
+	if r.ProjectID != fromProjectID {
+		return domain.Repo{}, domain.ErrRepoProjectChanged
+	}
+	next := int32(0)
+	for _, other := range f.repos {
+		if other.ProjectID == targetProjectID && other.Position >= next {
+			next = other.Position + 1
+		}
+	}
+	r.ProjectID = targetProjectID
+	r.Position = next
+	f.repos[repoID] = r
+	// Mirrors the real ReassignProject's repo_members cleanup — grants
+	// scoped to the old project's trust must not survive the move.
+	remaining := f.repoMembers[:0]
+	for _, m := range f.repoMembers {
+		if m.RepoID != repoID {
+			remaining = append(remaining, m)
+		}
+	}
+	f.repoMembers = remaining
+	return r, nil
+}
+
 func (f *fakeRepoRepository) RemoveRepo(ctx context.Context, repoID string) error {
 	if f.removeErr != nil {
 		return f.removeErr
@@ -391,6 +517,87 @@ func (f *fakeRepoRepository) RemoveRepo(ctx context.Context, repoID string) erro
 	}
 	delete(f.repos, repoID)
 	return nil
+}
+
+// ── repo_members (functional-role tier) ─────────────────────────────────
+
+func (f *fakeRepoRepository) AddRepoMember(ctx context.Context, m domain.RepoMember) error {
+	if f.addMemberErr != nil {
+		return f.addMemberErr
+	}
+	for i, existing := range f.repoMembers {
+		if existing.RepoID == m.RepoID && existing.UserID == m.UserID {
+			f.repoMembers[i] = m
+			return nil
+		}
+	}
+	f.repoMembers = append(f.repoMembers, m)
+	return nil
+}
+
+func (f *fakeRepoRepository) GetRepoMembership(ctx context.Context, repoID, userID string) (domain.RepoMember, error) {
+	if f.getMembershipErr != nil {
+		return domain.RepoMember{}, f.getMembershipErr
+	}
+	for _, m := range f.repoMembers {
+		if m.RepoID == repoID && m.UserID == userID {
+			return m, nil
+		}
+	}
+	return domain.RepoMember{}, domain.ErrRepoMembershipNotFound
+}
+
+func (f *fakeRepoRepository) ListRepoMembers(ctx context.Context, repoID string) ([]domain.RepoMember, error) {
+	if f.listMembersErr != nil {
+		return nil, f.listMembersErr
+	}
+	var out []domain.RepoMember
+	for _, m := range f.repoMembers {
+		if m.RepoID == repoID {
+			out = append(out, m)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeRepoRepository) RemoveRepoMember(ctx context.Context, repoID, userID string) error {
+	if f.removeMemberErr != nil {
+		return f.removeMemberErr
+	}
+	for i, m := range f.repoMembers {
+		if m.RepoID == repoID && m.UserID == userID {
+			f.repoMembers = append(f.repoMembers[:i], f.repoMembers[i+1:]...)
+			return nil
+		}
+	}
+	return domain.ErrRepoMembershipNotFound
+}
+
+func (f *fakeRepoRepository) UpdateRepoMemberRole(ctx context.Context, repoID, userID string, role domain.RepoRole) (domain.RepoMember, error) {
+	if f.updateMemberRoleErr != nil {
+		return domain.RepoMember{}, f.updateMemberRoleErr
+	}
+	for i, m := range f.repoMembers {
+		if m.RepoID == repoID && m.UserID == userID {
+			f.repoMembers[i].Role = role
+			return f.repoMembers[i], nil
+		}
+	}
+	return domain.RepoMember{}, domain.ErrRepoMembershipNotFound
+}
+
+func (f *fakeRepoRepository) ListRepoIDsWithMembership(ctx context.Context, projectID, userID string) ([]string, error) {
+	if f.listIDsWithMembershipErr != nil {
+		return nil, f.listIDsWithMembershipErr
+	}
+	var out []string
+	for _, m := range f.repoMembers {
+		r, ok := f.repos[m.RepoID]
+		if ok && r.ProjectID == projectID && m.UserID == userID {
+			out = append(out, m.RepoID)
+		}
+	}
+	return out, nil
 }
 
 // fakeWorktreeRepository is an in-memory WorktreeRepository.
@@ -410,6 +617,9 @@ type fakeWorktreeRepository struct {
 	setActivationErr        error
 	renameErr               error
 	findByIdempotencyKeyErr error
+	updateMetaErr           error
+	setLineageErr           error
+	listLineageErr          error
 
 	enqueuedEvents []domain.OutboxEvent
 
@@ -539,6 +749,74 @@ func (f *fakeWorktreeRepository) FindWorktreeByIdempotencyKey(ctx context.Contex
 	return domain.Worktree{}, false, nil
 }
 
+// UpdateWorktreeMeta simulates Postgres jsonb's `||` shallow merge — new
+// keys added, existing keys overwritten (including with a JSON null),
+// keys absent from patch left untouched. Mirrors
+// postgres.WorktreeRepository.UpdateWorktreeMeta's real semantics closely
+// enough for usecase-level tests; the real merge is exercised by
+// worktree_repository_test.go against a live Postgres.
+func (f *fakeWorktreeRepository) UpdateWorktreeMeta(ctx context.Context, worktreeID string, patch json.RawMessage) (domain.Worktree, error) {
+	if f.updateMetaErr != nil {
+		return domain.Worktree{}, f.updateMetaErr
+	}
+	wt, ok := f.worktrees[worktreeID]
+	if !ok {
+		return domain.Worktree{}, domain.ErrWorktreeNotFound
+	}
+	existing := map[string]any{}
+	if len(wt.Metadata) > 0 {
+		if err := json.Unmarshal(wt.Metadata, &existing); err != nil {
+			return domain.Worktree{}, err
+		}
+	}
+	var incoming map[string]any
+	if err := json.Unmarshal(patch, &incoming); err != nil {
+		return domain.Worktree{}, err
+	}
+	for k, v := range incoming {
+		existing[k] = v
+	}
+	merged, err := json.Marshal(existing)
+	if err != nil {
+		return domain.Worktree{}, err
+	}
+	wt.Metadata = merged
+	f.worktrees[worktreeID] = wt
+	return wt, nil
+}
+
+func (f *fakeWorktreeRepository) SetWorktreeLineage(ctx context.Context, worktreeID string, parentWorktreeID *string) (domain.Worktree, error) {
+	if f.setLineageErr != nil {
+		return domain.Worktree{}, f.setLineageErr
+	}
+	wt, ok := f.worktrees[worktreeID]
+	if !ok {
+		return domain.Worktree{}, domain.ErrWorktreeNotFound
+	}
+	wt.ParentWorktreeID = parentWorktreeID
+	if parentWorktreeID != nil {
+		explicit := "explicit"
+		wt.CaptureConfidence = &explicit
+	} else {
+		wt.CaptureConfidence = nil
+	}
+	f.worktrees[worktreeID] = wt
+	return wt, nil
+}
+
+func (f *fakeWorktreeRepository) ListLineage(ctx context.Context) ([]domain.Worktree, error) {
+	if f.listLineageErr != nil {
+		return nil, f.listLineageErr
+	}
+	var out []domain.Worktree
+	for _, wt := range f.worktrees {
+		if wt.ParentWorktreeID != nil {
+			out = append(out, wt)
+		}
+	}
+	return out, nil
+}
+
 // fakeProjectGroupRepository is an in-memory ProjectGroupRepository.
 type fakeProjectGroupRepository struct {
 	groups map[string]domain.ProjectGroup
@@ -628,6 +906,10 @@ type fakeFolderWorkspaceRepository struct {
 	workspaces map[string]domain.FolderWorkspace
 
 	repoPathExists bool
+	// createErr, when set, is returned by Create instead of the normal
+	// duplicate-path check — used to exercise the project_group_id
+	// foreign-key-violation mapping without a real Postgres constraint.
+	createErr error
 
 	findByPathCalls     int
 	repoPathExistsCalls int
@@ -638,6 +920,9 @@ func newFakeFolderWorkspaceRepository() *fakeFolderWorkspaceRepository {
 }
 
 func (f *fakeFolderWorkspaceRepository) Create(ctx context.Context, fw domain.FolderWorkspace) (domain.FolderWorkspace, error) {
+	if f.createErr != nil {
+		return domain.FolderWorkspace{}, f.createErr
+	}
 	for _, existing := range f.workspaces {
 		if existing.TenantID == fw.TenantID && existing.DevServerID == fw.DevServerID && existing.Path == fw.Path {
 			return domain.FolderWorkspace{}, domain.ErrPathAlreadyRegistered
@@ -1090,4 +1375,120 @@ func (f *fakeTerminalStatusResolver) callCount(devServerID string) int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.callsByDevServer[devServerID]
+}
+
+// fakeSourceProjectRepository is an in-memory usecase.SourceProjectRepository.
+type fakeSourceProjectRepository struct {
+	links map[string]domain.SourceProject // keyed by containerProjectID+"|"+sourceProjectID
+
+	linkErr   error
+	unlinkErr error
+	listErr   error
+	getErr    error
+}
+
+func newFakeSourceProjectRepository() *fakeSourceProjectRepository {
+	return &fakeSourceProjectRepository{links: map[string]domain.SourceProject{}}
+}
+
+func sourceProjectKey(containerProjectID, sourceProjectID string) string {
+	return containerProjectID + "|" + sourceProjectID
+}
+
+func (f *fakeSourceProjectRepository) Link(ctx context.Context, sp domain.SourceProject) (domain.SourceProject, error) {
+	if f.linkErr != nil {
+		return domain.SourceProject{}, f.linkErr
+	}
+	f.links[sourceProjectKey(sp.ContainerProjectID, sp.SourceProjectID)] = sp
+	return sp, nil
+}
+
+func (f *fakeSourceProjectRepository) Unlink(ctx context.Context, containerProjectID, sourceProjectID string) error {
+	if f.unlinkErr != nil {
+		return f.unlinkErr
+	}
+	delete(f.links, sourceProjectKey(containerProjectID, sourceProjectID))
+	return nil
+}
+
+func (f *fakeSourceProjectRepository) List(ctx context.Context, containerProjectID string) ([]domain.SourceProject, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []domain.SourceProject
+	for _, sp := range f.links {
+		if sp.ContainerProjectID == containerProjectID {
+			out = append(out, sp)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeSourceProjectRepository) Get(ctx context.Context, containerProjectID, sourceProjectID string) (domain.SourceProject, error) {
+	if f.getErr != nil {
+		return domain.SourceProject{}, f.getErr
+	}
+	sp, ok := f.links[sourceProjectKey(containerProjectID, sourceProjectID)]
+	if !ok {
+		return domain.SourceProject{}, domain.ErrSourceProjectNotFound
+	}
+	return sp, nil
+}
+
+// fakeSparsePresetRepository is an in-memory usecase.SparsePresetRepository.
+type fakeSparsePresetRepository struct {
+	presets map[string]domain.SparsePreset // keyed by preset id
+
+	listErr   error
+	getErr    error
+	saveErr   error
+	removeErr error
+}
+
+func newFakeSparsePresetRepository() *fakeSparsePresetRepository {
+	return &fakeSparsePresetRepository{presets: map[string]domain.SparsePreset{}}
+}
+
+func (f *fakeSparsePresetRepository) ListSparsePresets(ctx context.Context, repoID string) ([]domain.SparsePreset, error) {
+	if f.listErr != nil {
+		return nil, f.listErr
+	}
+	var out []domain.SparsePreset
+	for _, p := range f.presets {
+		if p.RepoID == repoID {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func (f *fakeSparsePresetRepository) GetSparsePreset(ctx context.Context, repoID, presetID string) (domain.SparsePreset, error) {
+	if f.getErr != nil {
+		return domain.SparsePreset{}, f.getErr
+	}
+	p, ok := f.presets[presetID]
+	if !ok || p.RepoID != repoID {
+		return domain.SparsePreset{}, domain.ErrSparsePresetNotFound
+	}
+	return p, nil
+}
+
+func (f *fakeSparsePresetRepository) SaveSparsePreset(ctx context.Context, preset domain.SparsePreset) (domain.SparsePreset, error) {
+	if f.saveErr != nil {
+		return domain.SparsePreset{}, f.saveErr
+	}
+	f.presets[preset.ID] = preset
+	return preset, nil
+}
+
+func (f *fakeSparsePresetRepository) RemoveSparsePreset(ctx context.Context, repoID, presetID string) error {
+	if f.removeErr != nil {
+		return f.removeErr
+	}
+	p, ok := f.presets[presetID]
+	if !ok || p.RepoID != repoID {
+		return domain.ErrSparsePresetNotFound
+	}
+	delete(f.presets, presetID)
+	return nil
 }

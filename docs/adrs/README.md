@@ -64,6 +64,15 @@ docs/adrs/
 | ADR-018 | Control Plane / Data Plane Separation | 🚧 Proposed |
 | ADR-019 | Agent Autonomous Operation & Reconnect Strategy | 🚧 Proposed |
 | ADR-020 | Enterprise Rollout Phases & Backward Compatibility | 🚧 Proposed |
+| ADR-021 | Hợp nhất Server-mode Data Plane vào Postgres, Microservices theo domain (TS system) | 🚧 Proposed — Phase 0 done |
+| ADR-022 | `wscompat`: lớp dịch giao thức WS-RPC ↔ gRPC nội bộ (backend-go) | ✅ Accepted — implemented |
+| ADR-023 | Backend-go: Postgres database-per-service + Vault dynamic DB credentials | ✅ Accepted — ⚠️ Partial (Vault Agent sidecar) |
+| ADR-024 | Hai workflow engine song song, không tương thích (migration TS → Go) | ⚠️ Ghi nhận hiện trạng |
+
+> **2026-09-06:** ADR-022–024 mô tả **backend-go** (`backend-go/`) — bản viết lại Go microservices của
+> Control Plane, chạy **song song** với TS `backend/` mà ADR-001–021 mô tả. Xem
+> [docs/hld/backend-go-architecture.md](../hld/backend-go-architecture.md) cho bối cảnh đầy đủ trước khi
+> đọc 3 ADR này.
 
 ---
 
@@ -96,7 +105,8 @@ docs/adrs/
 
 | Resource | Mô tả |
 |---|---|
-| [docs/hld/](../hld/) | HLD: C1–C4 + security + deployment |
+| [docs/hld/](../hld/) | HLD: C1–C4 + security + deployment (TS system) + [backend-go-architecture.md](../hld/backend-go-architecture.md) (Go microservices platform) |
 | [docs/flows/](../flows/) | Data flow documents F22–F39 |
 | [docs/features/](../features/) | Feature specifications F01–F39 |
 | [docs/crs/](../crs/) | Change Requests (CR-DS-001–005) |
+| [specs/backend-go/](../../specs/backend-go/) | Tài liệu kiến trúc/service nội bộ team backend-go (deep reference cho ADR-022–024) |

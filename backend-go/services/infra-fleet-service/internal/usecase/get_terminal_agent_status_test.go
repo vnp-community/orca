@@ -11,7 +11,7 @@ import (
 )
 
 func TestGetTerminalAgentStatus_RequiresTenantContext(t *testing.T) {
-	uc := NewGetTerminalAgentStatus(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerAgentClient{}, &sync.Map{}, &fakeLifecycleEventPublisher{}, &fakeQueuedPromptRepository{})
+	uc := NewGetTerminalAgentStatus(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerRepository{}, &fakeDevServerAgentClient{}, &sync.Map{}, &fakeLifecycleEventPublisher{}, &fakeQueuedPromptRepository{})
 	_, err := uc.Execute(context.Background(), "pty-1")
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
@@ -28,7 +28,7 @@ func TestGetTerminalAgentStatus_NoLiveStateEntry_RegressionGuard(t *testing.T) {
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
 	agent := &fakeDevServerAgentClient{agentStatusResult: AgentStatusResult{AgentRunning: true, ReadyForInput: true, AgentKind: "claude-code"}}
 	lifecycleEvents := &fakeLifecycleEventPublisher{}
-	uc := NewGetTerminalAgentStatus(sessions, resolver, agent, &sync.Map{}, lifecycleEvents, &fakeQueuedPromptRepository{})
+	uc := NewGetTerminalAgentStatus(sessions, resolver, &fakeDevServerRepository{}, agent, &sync.Map{}, lifecycleEvents, &fakeQueuedPromptRepository{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	result, err := uc.Execute(ctx, "pty-1")
@@ -56,7 +56,7 @@ func TestGetTerminalAgentStatus_QuiescentOutput_ReadyForInputAndPublishesOnce(t 
 	lifecycleEvents := &fakeLifecycleEventPublisher{}
 	liveStates := &sync.Map{}
 	liveStates.Store("pty-1", &ptyLiveState{lastOutputAt: time.Now().Add(-5 * time.Second), agentRunning: true})
-	uc := NewGetTerminalAgentStatus(sessions, resolver, agent, liveStates, lifecycleEvents, &fakeQueuedPromptRepository{})
+	uc := NewGetTerminalAgentStatus(sessions, resolver, &fakeDevServerRepository{}, agent, liveStates, lifecycleEvents, &fakeQueuedPromptRepository{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
 
@@ -99,7 +99,7 @@ func TestGetTerminalAgentStatus_AgentStatusError_DegradesToZeroValue(t *testing.
 	resolver := &fakeConnectionResolver{}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
 	agent := &fakeDevServerAgentClient{agentStatusErr: context.DeadlineExceeded}
-	uc := NewGetTerminalAgentStatus(sessions, resolver, agent, &sync.Map{}, &fakeLifecycleEventPublisher{}, &fakeQueuedPromptRepository{})
+	uc := NewGetTerminalAgentStatus(sessions, resolver, &fakeDevServerRepository{}, agent, &sync.Map{}, &fakeLifecycleEventPublisher{}, &fakeQueuedPromptRepository{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	result, err := uc.Execute(ctx, "pty-1")
@@ -123,7 +123,7 @@ func TestGetTerminalAgentStatus_PopulatesLastOutputPreview(t *testing.T) {
 	agent := &fakeDevServerAgentClient{agentStatusResult: AgentStatusResult{AgentRunning: true, ReadyForInput: false, AgentKind: "claude-code"}}
 	liveStates := &sync.Map{}
 	liveStates.Store("pty-1", &ptyLiveState{lastOutputAt: time.Now(), agentRunning: true, lastOutput: []byte("recent output")})
-	uc := NewGetTerminalAgentStatus(sessions, resolver, agent, liveStates, &fakeLifecycleEventPublisher{}, &fakeQueuedPromptRepository{})
+	uc := NewGetTerminalAgentStatus(sessions, resolver, &fakeDevServerRepository{}, agent, liveStates, &fakeLifecycleEventPublisher{}, &fakeQueuedPromptRepository{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	result, err := uc.Execute(ctx, "pty-1")
@@ -143,7 +143,7 @@ func TestGetTerminalAgentStatus_NoLiveStateEntry_EmptyLastOutputPreview(t *testi
 	resolver := &fakeConnectionResolver{}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
 	agent := &fakeDevServerAgentClient{agentStatusResult: AgentStatusResult{AgentRunning: true, ReadyForInput: true, AgentKind: "claude-code"}}
-	uc := NewGetTerminalAgentStatus(sessions, resolver, agent, &sync.Map{}, &fakeLifecycleEventPublisher{}, &fakeQueuedPromptRepository{})
+	uc := NewGetTerminalAgentStatus(sessions, resolver, &fakeDevServerRepository{}, agent, &sync.Map{}, &fakeLifecycleEventPublisher{}, &fakeQueuedPromptRepository{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	result, err := uc.Execute(ctx, "pty-1")
@@ -172,7 +172,7 @@ func TestGetTerminalAgentStatus_ReadyTransition_DrainsQueuedPrompt(t *testing.T)
 	}}
 	liveStates := &sync.Map{}
 	liveStates.Store("pty-1", &ptyLiveState{lastOutputAt: time.Now().Add(-5 * time.Second), agentRunning: true})
-	uc := NewGetTerminalAgentStatus(sessions, resolver, agent, liveStates, lifecycleEvents, queue)
+	uc := NewGetTerminalAgentStatus(sessions, resolver, &fakeDevServerRepository{}, agent, liveStates, lifecycleEvents, queue)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 

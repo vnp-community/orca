@@ -356,10 +356,10 @@ func containsBothVersions(msg, a, b string) bool {
 // fakeTokenValidator is an in-memory TokenValidator for TASK-AWS-03-06's
 // persistent-token handshake fallback tests.
 type fakeTokenValidator struct {
-	byHash    map[string]struct{ devServerID, tokenID string }
-	revoked   map[string]bool
-	touched   []string
-	findErr   error
+	byHash  map[string]struct{ devServerID, tokenID string }
+	revoked map[string]bool
+	touched []string
+	findErr error
 }
 
 func newFakeTokenValidator() *fakeTokenValidator {

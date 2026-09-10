@@ -223,6 +223,12 @@ func (f *fakeProjectServiceClient) RebindDevServer(_ context.Context, in *projec
 	return f.rebindDevServerResp, nil
 }
 
+// RebindRepoDevServer is not exercised by this file's tests today — a
+// no-op stub is enough to satisfy projectv1.ProjectServiceClient.
+func (f *fakeProjectServiceClient) RebindRepoDevServer(_ context.Context, _ *projectv1.RebindRepoDevServerRequest, _ ...grpc.CallOption) (*projectv1.RebindRepoDevServerResponse, error) {
+	return &projectv1.RebindRepoDevServerResponse{}, nil
+}
+
 func (f *fakeProjectServiceClient) UpdateProject(_ context.Context, in *projectv1.UpdateProjectRequest, _ ...grpc.CallOption) (*projectv1.UpdateProjectResponse, error) {
 	f.lastUpdateProjectReq = in
 	if f.updateProjectErr != nil {
@@ -279,6 +285,72 @@ func (f *fakeProjectServiceClient) UpdateRepo(_ context.Context, in *projectv1.U
 	return f.updateRepoResp, nil
 }
 
+// GetRepo has no REST route (only git-gateway-service calls it, server-to-
+// server) — minimal always-succeed stub, only to satisfy
+// projectv1.ProjectServiceClient.
+func (f *fakeProjectServiceClient) GetRepo(_ context.Context, _ *projectv1.GetRepoRequest, _ ...grpc.CallOption) (*projectv1.GetRepoResponse, error) {
+	return &projectv1.GetRepoResponse{}, nil
+}
+
+// AddRepoMember/ListRepoMembers/RemoveRepoMember/UpdateRepoMemberRole have no
+// REST route yet (repo_members is only reachable via wscompat's repo.*
+// channels) — minimal always-succeed stubs, only to satisfy
+// projectv1.ProjectServiceClient at compile time.
+func (f *fakeProjectServiceClient) AddRepoMember(_ context.Context, _ *projectv1.AddRepoMemberRequest, _ ...grpc.CallOption) (*projectv1.AddRepoMemberResponse, error) {
+	return &projectv1.AddRepoMemberResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) ListRepoMembers(_ context.Context, _ *projectv1.ListRepoMembersRequest, _ ...grpc.CallOption) (*projectv1.ListRepoMembersResponse, error) {
+	return &projectv1.ListRepoMembersResponse{}, nil
+}
+
+// AssignRepoToProject has no REST route — same reasoning as
+// RemoveRepoMember/UpdateRepoMemberRole below (wscompat-only surface).
+func (f *fakeProjectServiceClient) AssignRepoToProject(_ context.Context, _ *projectv1.AssignRepoToProjectRequest, _ ...grpc.CallOption) (*projectv1.AssignRepoToProjectResponse, error) {
+	return &projectv1.AssignRepoToProjectResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) RemoveRepoMember(_ context.Context, _ *projectv1.RemoveRepoMemberRequest, _ ...grpc.CallOption) (*projectv1.RemoveRepoMemberResponse, error) {
+	return &projectv1.RemoveRepoMemberResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) UpdateRepoMemberRole(_ context.Context, _ *projectv1.UpdateRepoMemberRoleRequest, _ ...grpc.CallOption) (*projectv1.UpdateRepoMemberRoleResponse, error) {
+	return &projectv1.UpdateRepoMemberRoleResponse{}, nil
+}
+
+// LinkSourceProject/UnlinkSourceProject/ListSourceProjects/
+// GetSharedProjectData have no REST route (orcaProjects.* is only
+// reachable via wscompat's channels_orca_project_sharing.go) — minimal
+// always-succeed stubs, only to satisfy projectv1.ProjectServiceClient at
+// compile time.
+func (f *fakeProjectServiceClient) LinkSourceProject(_ context.Context, _ *projectv1.LinkSourceProjectRequest, _ ...grpc.CallOption) (*projectv1.LinkSourceProjectResponse, error) {
+	return &projectv1.LinkSourceProjectResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) UnlinkSourceProject(_ context.Context, _ *projectv1.UnlinkSourceProjectRequest, _ ...grpc.CallOption) (*projectv1.UnlinkSourceProjectResponse, error) {
+	return &projectv1.UnlinkSourceProjectResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) ListSourceProjects(_ context.Context, _ *projectv1.ListSourceProjectsRequest, _ ...grpc.CallOption) (*projectv1.ListSourceProjectsResponse, error) {
+	return &projectv1.ListSourceProjectsResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) GetSharedProjectData(_ context.Context, _ *projectv1.GetSharedProjectDataRequest, _ ...grpc.CallOption) (*projectv1.GetSharedProjectDataResponse, error) {
+	return &projectv1.GetSharedProjectDataResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) ListSparsePresets(_ context.Context, _ *projectv1.ListSparsePresetsRequest, _ ...grpc.CallOption) (*projectv1.ListSparsePresetsResponse, error) {
+	return &projectv1.ListSparsePresetsResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) SaveSparsePreset(_ context.Context, _ *projectv1.SaveSparsePresetRequest, _ ...grpc.CallOption) (*projectv1.SaveSparsePresetResponse, error) {
+	return &projectv1.SaveSparsePresetResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) RemoveSparsePreset(_ context.Context, _ *projectv1.RemoveSparsePresetRequest, _ ...grpc.CallOption) (*projectv1.RemoveSparsePresetResponse, error) {
+	return &projectv1.RemoveSparsePresetResponse{}, nil
+}
+
 func (f *fakeProjectServiceClient) RecordWorktreeCreated(_ context.Context, in *projectv1.RecordWorktreeCreatedRequest, _ ...grpc.CallOption) (*projectv1.RecordWorktreeCreatedResponse, error) {
 	f.lastRecordWorktreeCreatedReq = in
 	if f.recordWorktreeCreatedErr != nil {
@@ -310,6 +382,10 @@ func (f *fakeProjectServiceClient) GetWorktree(_ context.Context, in *projectv1.
 	return f.getWorktreeResp, nil
 }
 
+func (f *fakeProjectServiceClient) ListWorktreeLineage(_ context.Context, _ *projectv1.ListWorktreeLineageRequest, _ ...grpc.CallOption) (*projectv1.ListWorktreeLineageResponse, error) {
+	return &projectv1.ListWorktreeLineageResponse{}, nil
+}
+
 func (f *fakeProjectServiceClient) SetWorktreeActivation(_ context.Context, in *projectv1.SetWorktreeActivationRequest, _ ...grpc.CallOption) (*projectv1.SetWorktreeActivationResponse, error) {
 	f.lastSetWorktreeActivationReq = in
 	if f.setWorktreeActivationErr != nil {
@@ -328,6 +404,14 @@ func (f *fakeProjectServiceClient) RenameWorktree(_ context.Context, in *project
 
 func (f *fakeProjectServiceClient) GetWorktreeByIdempotencyKey(_ context.Context, in *projectv1.GetWorktreeByIdempotencyKeyRequest, _ ...grpc.CallOption) (*projectv1.GetWorktreeByIdempotencyKeyResponse, error) {
 	return &projectv1.GetWorktreeByIdempotencyKeyResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) UpdateWorktreeMeta(_ context.Context, _ *projectv1.UpdateWorktreeMetaRequest, _ ...grpc.CallOption) (*projectv1.UpdateWorktreeMetaResponse, error) {
+	return &projectv1.UpdateWorktreeMetaResponse{}, nil
+}
+
+func (f *fakeProjectServiceClient) SetWorktreeLineage(_ context.Context, _ *projectv1.SetWorktreeLineageRequest, _ ...grpc.CallOption) (*projectv1.SetWorktreeLineageResponse, error) {
+	return &projectv1.SetWorktreeLineageResponse{}, nil
 }
 
 func (f *fakeProjectServiceClient) CreateProjectGroup(_ context.Context, in *projectv1.CreateProjectGroupRequest, _ ...grpc.CallOption) (*projectv1.CreateProjectGroupResponse, error) {

@@ -49,15 +49,21 @@ import { createTaskSlice } from './slices/task'
 import { createWorkflowSlice } from './slices/workflow'
 import { createTraceSlice } from './slices/trace'
 import { createRemoteAgentSessionSlice } from './slices/remote-agent-sessions'
+import { createPersistenceStatusSlice } from './slices/persistence-status'
+import { createConnectivitySlice } from './slices/connectivity-status'
 import { e2eConfig } from '@/lib/e2e-config'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
+import { registerClientStateSettingsAccessor } from '@/runtime/runtime-client-state-client'
+import { registerPersistenceStatusSetter } from './backend-go-storage'
 
-// Why: createWorkspaceSlice (legacy OrcaProject scaffolding, superseded by
-// RepoSlice's real project system) used to spread here, after createRepoSlice.
-// It redeclared the same removeProject/updateProject/projects keys with a
-// no-op stub, which silently shadowed RepoSlice's real implementations for
-// every "Remove Project" caller in the app — no RPC, no error, no toast.
-// See frontend/src/renderer/src/store/slices/workspace-slice.ts.
+// Why there's no createWorkspaceSlice here: an early OrcaProject scaffolding
+// slice by that name used to spread after createRepoSlice. It redeclared
+// the same removeProject/updateProject/projects keys with a no-op stub,
+// which silently shadowed RepoSlice's real implementations for every
+// "Remove Project" caller in the app — no RPC, no error, no toast. It was
+// already unspread (dead code) and has since been deleted entirely —
+// OrcaProject state lives in WorkspaceContext (context/WorkspaceContext.tsx),
+// not this store. Don't re-add a same-named slice here.
 export const useAppStore = create<AppState>()((...a) => ({
   ...createRepoSlice(...a),
   ...createSparsePresetsSlice(...a),
@@ -107,10 +113,16 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createTaskSlice(...a),
   ...createWorkflowSlice(...a),
   ...createTraceSlice(...a),
-  ...createRemoteAgentSessionSlice(...a)
+  ...createRemoteAgentSessionSlice(...a),
+  ...createPersistenceStatusSlice(...a),
+  ...createConnectivitySlice(...a)
 }))
 
 registerHttpLinkStoreAccessor(() => useAppStore.getState())
+registerClientStateSettingsAccessor(() => useAppStore.getState().settings)
+registerPersistenceStatusSetter((kind, status, error) =>
+  useAppStore.getState().setPersistenceStatus(kind, status, error)
+)
 
 export type { AppState } from './types'
 

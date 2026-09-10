@@ -11,7 +11,6 @@ import (
 
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 
-	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 )
 
@@ -23,28 +22,47 @@ func NewProjectClient(client projectv1.ProjectServiceClient) *ProjectClient {
 	return &ProjectClient{client: client}
 }
 
-// GetRepo is a CONFIRMED GAP, not a scaffold stub: project.proto's
-// ProjectService has no RPC to look up a single Repo by id — only
-// ListRepos(project_id), which needs a project id this call doesn't have,
-// and AddRepo/ReorderRepos/RemoveRepo, none of which answer "does this
-// repo exist / what project is it under" for an arbitrary repo id.
-// TASK-193 originally sketched this against a project.proto GetRepo RPC
-// and Repo.dev_server_id/Repo.path fields that don't exist in the real
-// proto (backend-go/proto/orca/project/v1/project.proto's Repo message is
-// just {id, project_id, url, display_name, position}). Rather than invent
-// a request/response shape or add an out-of-scope RPC to a different
-// service's proto (git-gateway-service.md's own service boundary, and
-// this task's stated scope, is git-gateway-service only), this returns a
-// typed, catchable error — the same treatment internal/adapter/scmclient
-// gives its own confirmed proto gap. Every caller (CreateWorktree,
-// DetectWorktrees, PrefetchCreateBase, ResolvePrBase, ResolveMrBase) maps
-// this to WORKTREE_REPO_NOT_FOUND today; a real answer needs a follow-up
-// project-service proto task to add a by-id repo lookup.
+// GetRepo backs project.proto's ProjectService.GetRepo RPC (added to close
+// the confirmed gap this doc comment previously described: project.proto
+// had no single-repo-by-id lookup, only ListRepos(project_id)/AddRepo/
+// ReorderRepos/RemoveRepo, none of which answer "does this repo exist /
+// what project is it under" for an arbitrary repo id). Every caller
+// (CreateWorktree, DetectWorktrees, PrefetchCreateBase, ResolvePrBase,
+// ResolveMrBase) still maps a not-found/unreachable result to
+// WORKTREE_REPO_NOT_FOUND itself; this adapter just forwards the real
+// answer (or a real error) instead of an always-failing stub.
 func (p *ProjectClient) GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error) {
-	return domain.RepoInfo{}, apperrors.New(apperrors.KindInternal, "PROJECT_GET_REPO_UNIMPLEMENTED",
-		"project-service has no RPC to fetch a single repo by id yet (only ListRepos(project_id)); see project_client.go's GetRepo doc comment", nil)
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return domain.RepoInfo{}, err
+	}
+	resp, err := p.client.GetRepo(ctx, &projectv1.GetRepoRequest{RepoId: repoID})
+	if err != nil {
+		return domain.RepoInfo{}, err
+	}
+	r := resp.GetRepo()
+	return domain.RepoInfo{
+		ID:          r.GetId(),
+		ProjectID:   r.GetProjectId(),
+		URL:         r.GetUrl(),
+		DisplayName: r.GetDisplayName(),
+		DevServerID: resp.GetDevServerId(),
+		// HiddenTargetID (TASK-BE-EVM-018, BE-SOL-EVM-004 §6c — closes
+		// TASK-BE-EVM-015's gap #2 at the wire level): project-service's
+		// GetRepo does not populate a real value yet (see
+		// project.proto's GetRepoResponse.hidden_target_id doc comment for
+		// the still-open architectural join), so this is always "" today —
+		// but the mapping itself is real, not a stub, ready the moment
+		// project-service starts populating it.
+		HiddenTargetID: resp.GetHiddenTargetId(),
+	}, nil
 }
 
+// RecordWorktreeCreated forwards both baseRef (SOL-WT-04's base_ref
+// backfill, used by CompareWorktrees' BR-WT-13 check) and the full lineage
+// capture (SOL-PI-02/SOL-PI-03 linked-issue fields plus the
+// parent-worktree/orchestration lineage fields) — these are independent
+// optional inputs, not competing shapes for the same field.
 func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch, baseRef string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
 	ctx, err := withTenantMetadata(ctx)
 	if err != nil {
@@ -54,12 +72,19 @@ func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, re
 		ProjectId: projectID, RepoId: repoID, Path: path, Branch: branch,
 		BaseRef: nonEmptyPtr(baseRef),
 	}
-	if lineage.LinkedIssueProvider != "" {
-		req.LinkedIssueProvider = &lineage.LinkedIssueProvider
-	}
-	if lineage.LinkedIssueRef != "" {
-		req.LinkedIssueRef = &lineage.LinkedIssueRef
-	}
+	// Optional string proto fields want a *string, not "" — nonEmptyPtr
+	// keeps every unsupplied lineage field genuinely unset on the wire
+	// rather than an empty-but-present string.
+	req.LinkedIssueProvider = nonEmptyPtr(lineage.LinkedIssueProvider)
+	req.LinkedIssueRef = nonEmptyPtr(lineage.LinkedIssueRef)
+	req.ParentWorktreeId = nonEmptyPtr(lineage.ParentWorktreeID)
+	req.Origin = nonEmptyPtr(lineage.Origin)
+	req.CaptureSource = nonEmptyPtr(lineage.CaptureSource)
+	req.TaskId = nonEmptyPtr(lineage.TaskID)
+	req.OrchestrationRunId = nonEmptyPtr(lineage.OrchestrationRunID)
+	req.CoordinatorHandle = nonEmptyPtr(lineage.CoordinatorHandle)
+	req.CreatedByTerminalHandle = nonEmptyPtr(lineage.CreatedByTerminalHandle)
+
 	resp, err := p.client.RecordWorktreeCreated(ctx, req)
 	if err != nil {
 		return domain.WorktreeRecord{}, err

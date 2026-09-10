@@ -14,6 +14,11 @@ type AddRepoInput struct {
 	ProjectID   string
 	URL         string
 	DisplayName string
+	// DevServerID is this repo's own dev-server binding (Phase 10) — empty
+	// means a local repo (no dev server). Validated against infra-fleet
+	// when non-empty, same as CreateHostSetup's DevServerLister check,
+	// rather than trusting an arbitrary caller-supplied id.
+	DevServerID string
 }
 
 // AddRepo appends a new repo to a project's catalog, at the next available
@@ -29,10 +34,11 @@ type AddRepo struct {
 	repo       RepoRepository
 	membership MembershipRepository
 	opa        OPAClient
+	devServers DevServerLister
 }
 
-func NewAddRepo(repo RepoRepository, membership MembershipRepository, opa OPAClient) *AddRepo {
-	return &AddRepo{repo: repo, membership: membership, opa: opa}
+func NewAddRepo(repo RepoRepository, membership MembershipRepository, opa OPAClient, devServers DevServerLister) *AddRepo {
+	return &AddRepo{repo: repo, membership: membership, opa: opa, devServers: devServers}
 }
 
 func (uc *AddRepo) Execute(ctx context.Context, in AddRepoInput) (domain.Repo, error) {
@@ -40,14 +46,25 @@ func (uc *AddRepo) Execute(ctx context.Context, in AddRepoInput) (domain.Repo, e
 	// though the repo's tenant scoping is transitive through its project_id
 	// FK rather than a tenant_id column of its own — same convention as
 	// AddMember.
-	if _, err := tenant.RequireTenantID(ctx); err != nil {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
 		return domain.Repo{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err)
 	}
 	if err := requireProjectAccess(ctx, uc.membership, uc.opa, in.ProjectID, projectActionOwnerOnly); err != nil {
 		return domain.Repo{}, err
 	}
 
-	r, err := domain.NewRepo(uuid.NewString(), in.ProjectID, in.URL, in.DisplayName)
+	if in.DevServerID != "" {
+		exists, err := uc.devServers.Exists(ctx, tenantID, in.DevServerID)
+		if err != nil {
+			return domain.Repo{}, apperrors.New(apperrors.KindInternal, "PROJECT_DEV_SERVER_LOOKUP_FAILED", "failed to validate dev server", err)
+		}
+		if !exists {
+			return domain.Repo{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_DEV_SERVER_NOT_FOUND", "dev server does not exist", nil)
+		}
+	}
+
+	r, err := domain.NewRepo(uuid.NewString(), in.ProjectID, in.URL, in.DisplayName, in.DevServerID)
 	if err != nil {
 		return domain.Repo{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_REPO_INVALID", err.Error(), err)
 	}

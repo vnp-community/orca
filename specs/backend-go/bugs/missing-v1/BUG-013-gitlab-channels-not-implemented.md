@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** Medium
 **Symptom:** Every `gitlab.*` RPC below (except auth) falls through to `registry.go`'s `notImplementedHandler` and returns an error immediately.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-083–086 (4 task(s), all DONE) for implementation evidence.
 
 ---
 

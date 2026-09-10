@@ -5,9 +5,23 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { OnboardingInlineCommandTerminal } from '@/components/onboarding/OnboardingInlineCommandTerminal'
 import { ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND } from '@/lib/agent-feature-install-commands'
 import { translate } from '@/i18n/i18n'
+import { useActiveDevServer, useConnectedDevServers } from '@/store/slices/dev-servers-selectors'
 
 import { uiWriteClipboardText } from '@/runtime/runtime-ui-client'
 export function CliSkillSetupTerminal(): React.JSX.Element {
+  // Why: this terminal's worktreeId has no backing repo, so it has no
+  // natural dev-server binding to inherit — pick the onboarding-selected
+  // dev server if it's actually connected, otherwise fall back to any
+  // connected one, matching how other pre-project setup steps (folder
+  // browsing, agent detection) pick a dev server. See
+  // OnboardingInlineCommandTerminal's devServerId doc comment.
+  const activeDevServer = useActiveDevServer()
+  const connectedDevServers = useConnectedDevServers()
+  const devServerId =
+    activeDevServer?.status === 'connected'
+      ? activeDevServer.id
+      : (connectedDevServers[0]?.id ?? null)
+
   const handleCopySkillCommand = async (): Promise<void> => {
     try {
       await uiWriteClipboardText(ORCA_CLI_ORCHESTRATION_SKILL_INSTALL_COMMAND)
@@ -77,6 +91,7 @@ export function CliSkillSetupTerminal(): React.JSX.Element {
         descriptionPaddingClassName="px-4 py-2"
         autoScrollIntoView={false}
         worktreeId="feature-tip-cli-skills-terminal"
+        devServerId={devServerId}
       />
     </div>
   )

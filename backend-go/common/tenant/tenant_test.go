@@ -5,34 +5,60 @@ import (
 	"testing"
 )
 
-func TestRole_AbsentOnBareContext(t *testing.T) {
-	role, ok := Role(context.Background())
-	if ok {
-		t.Fatalf("expected ok=false on a bare context, got ok=true role=%q", role)
-	}
-	if role != "" {
-		t.Fatalf("expected empty role, got %q", role)
+func TestRole_ReturnsFalseWhenAbsent(t *testing.T) {
+	if v, ok := Role(context.Background()); ok || v != "" {
+		t.Errorf("want (\"\", false), got (%q, %v)", v, ok)
 	}
 }
 
-func TestRole_RoundTripsThroughWithRole(t *testing.T) {
-	ctx := WithRole(context.Background(), "admin")
-	role, ok := Role(ctx)
-	if !ok {
-		t.Fatal("expected ok=true after WithRole")
-	}
-	if role != "admin" {
-		t.Fatalf("expected role %q, got %q", "admin", role)
-	}
-}
-
-func TestRole_EmptyStringTreatedAsAbsent(t *testing.T) {
+func TestRole_ReturnsFalseForEmptyString(t *testing.T) {
+	// Why: WithRole("") must behave the same as never calling WithRole at
+	// all — an empty role is "unknown," never a distinct falsy-but-present
+	// state a caller could mistakenly treat as "definitely not admin, but
+	// otherwise trusted."
 	ctx := WithRole(context.Background(), "")
-	role, ok := Role(ctx)
-	if ok {
-		t.Fatalf("expected ok=false for an empty role, got ok=true role=%q", role)
+	if v, ok := Role(ctx); ok || v != "" {
+		t.Errorf("want (\"\", false), got (%q, %v)", v, ok)
 	}
-	if role != "" {
-		t.Fatalf("expected empty role, got %q", role)
+}
+
+func TestRole_RoundTrips(t *testing.T) {
+	ctx := WithRole(context.Background(), "admin")
+	v, ok := Role(ctx)
+	if !ok || v != "admin" {
+		t.Errorf("want (\"admin\", true), got (%q, %v)", v, ok)
+	}
+}
+
+func TestClientIP_ReturnsFalseWhenAbsent(t *testing.T) {
+	if v, ok := ClientIP(context.Background()); ok || v != "" {
+		t.Errorf("want (\"\", false), got (%q, %v)", v, ok)
+	}
+}
+
+func TestClientIP_RoundTrips(t *testing.T) {
+	ctx := WithClientIP(context.Background(), "203.0.113.7")
+	v, ok := ClientIP(ctx)
+	if !ok || v != "203.0.113.7" {
+		t.Errorf("want (\"203.0.113.7\", true), got (%q, %v)", v, ok)
+	}
+}
+
+func TestClientIP_ReturnsFalseForEmptyString(t *testing.T) {
+	ctx := WithClientIP(context.Background(), "")
+	if v, ok := ClientIP(ctx); ok || v != "" {
+		t.Errorf("want (\"\", false), got (%q, %v)", v, ok)
+	}
+}
+
+func TestRole_DoesNotLeakBetweenIndependentContexts(t *testing.T) {
+	ctx1 := WithRole(context.Background(), "admin")
+	ctx2 := WithTenantID(context.Background(), "t1") // no WithRole call
+
+	if v, ok := Role(ctx2); ok || v != "" {
+		t.Errorf("expected ctx2 (never given a role) to report absent, got (%q, %v)", v, ok)
+	}
+	if v, ok := Role(ctx1); !ok || v != "admin" {
+		t.Errorf("expected ctx1 to still carry its own role, got (%q, %v)", v, ok)
 	}
 }

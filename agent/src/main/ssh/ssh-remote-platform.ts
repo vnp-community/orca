@@ -1,4 +1,4 @@
-import type { RelayPlatform } from './relay-protocol'
+import type { RelayPlatform } from 'orca-dev-agent-transport'
 
 export type RemotePathFlavor = 'posix' | 'windows'
 export type RemoteCommandDialect = 'posix' | 'powershell'

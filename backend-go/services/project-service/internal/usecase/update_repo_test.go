@@ -43,7 +43,7 @@ func TestUpdateRepo_FieldMaskSemantics(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := newFakeRepoRepository()
 			repo.repos["r1"] = tc.existing
-			uc := NewUpdateRepo(repo, ownerMembership("p1", "u1"), &fakeOPAClient{decide: projectRegoDecide})
+			uc := NewUpdateRepo(repo, ownerMembership("p1", "u1"), &fakeOPAClient{repoDecide: repoRegoDecide})
 			ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
 
 			got, err := uc.Execute(ctx, tc.in)
@@ -53,6 +53,54 @@ func TestUpdateRepo_FieldMaskSemantics(t *testing.T) {
 			if got.URL != tc.wantURL || got.DisplayName != tc.wantDisplayName {
 				t.Errorf("got {URL:%q DisplayName:%q}, want {URL:%q DisplayName:%q}",
 					got.URL, got.DisplayName, tc.wantURL, tc.wantDisplayName)
+			}
+		})
+	}
+}
+
+func TestUpdateRepo_HookSettingsExplicitPresenceSemantics(t *testing.T) {
+	emptyHookSettings := ""
+	newHookSettings := `{"scripts":{"setup":"pnpm install"}}`
+
+	cases := []struct {
+		name             string
+		existing         domain.Repo
+		in               UpdateRepoInput
+		wantHookSettings string
+	}{
+		{
+			name:             "nil HookSettings leaves the existing value unchanged",
+			existing:         domain.Repo{ID: "r1", ProjectID: "p1", URL: "https://old", HookSettings: `{"scripts":{"setup":"old"}}`},
+			in:               UpdateRepoInput{RepoID: "r1"},
+			wantHookSettings: `{"scripts":{"setup":"old"}}`,
+		},
+		{
+			name:             "pointer to empty string explicitly clears hook_settings",
+			existing:         domain.Repo{ID: "r1", ProjectID: "p1", URL: "https://old", HookSettings: `{"scripts":{"setup":"old"}}`},
+			in:               UpdateRepoInput{RepoID: "r1", HookSettings: &emptyHookSettings},
+			wantHookSettings: "",
+		},
+		{
+			name:             "pointer to a value sets hook_settings",
+			existing:         domain.Repo{ID: "r1", ProjectID: "p1", URL: "https://old"},
+			in:               UpdateRepoInput{RepoID: "r1", HookSettings: &newHookSettings},
+			wantHookSettings: newHookSettings,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := newFakeRepoRepository()
+			repo.repos["r1"] = tc.existing
+			uc := NewUpdateRepo(repo, ownerMembership("p1", "u1"), &fakeOPAClient{repoDecide: repoRegoDecide})
+			ctx := withTenantAndUser(context.Background(), "tenant-1", "u1")
+
+			got, err := uc.Execute(ctx, tc.in)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if got.HookSettings != tc.wantHookSettings {
+				t.Errorf("got HookSettings=%q, want %q", got.HookSettings, tc.wantHookSettings)
 			}
 		})
 	}
@@ -81,7 +129,7 @@ func TestUpdateRepo_OwnerAllowedMemberDenied(t *testing.T) {
 	repo.repos["r1"] = domain.Repo{ID: "r1", ProjectID: "p1", URL: "https://old"}
 	membership := newFakeProjectRepository()
 	membership.members = append(membership.members, domain.ProjectMember{ProjectID: "p1", UserID: "member-1", Role: domain.ProjectRoleMember})
-	uc := NewUpdateRepo(repo, membership, &fakeOPAClient{decide: projectRegoDecide})
+	uc := NewUpdateRepo(repo, membership, &fakeOPAClient{repoDecide: repoRegoDecide})
 
 	ctx := withTenantAndUser(context.Background(), "tenant-1", "member-1")
 	_, err := uc.Execute(ctx, UpdateRepoInput{RepoID: "r1", URL: "https://new"})

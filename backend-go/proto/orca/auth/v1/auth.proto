@@ -21,6 +21,26 @@ service AuthService {
   // identity.
   rpc GetJWKS(GetJWKSRequest) returns (GetJWKSResponse);
 
+  // --- CR-CLI-002 (headless CLI credential: mint/revoke/list) ---
+  // IsServiceTokenRevoked backs api-gateway's per-request bearer-JWT
+  // revocation check (usecase.AuthValidator's RevocationChecker,
+  // TASK-BE-CLI-005) — deliberately narrow (just a jti -> bool lookup, not
+  // the full token record) so that check stays a single cheap call, cached
+  // short-term on the caller side (see authclient's RevocationClient doc
+  // comment). No caller-identity gate: any authenticated internal caller
+  // may check any jti's revocation status (this is a yes/no on a random
+  // 32-byte id, not a way to enumerate anything about the owning user).
+  rpc IsServiceTokenRevoked(IsServiceTokenRevokedRequest) returns (IsServiceTokenRevokedResponse);
+  // ListCliTokens/RevokeCliToken are self-service only (TASK-BE-CLI-006) —
+  // user_id always comes from the caller's own resolved identity at
+  // api-gateway (never a request field a client controls), and the
+  // usecase itself re-verifies the caller against tenant.UserID(ctx)
+  // before touching another user's tokens (see
+  // usecase.RevokeCliTokenInput's doc comment) — same self-mint-only
+  // posture as IssueServiceToken (CR-CLI-002, decision 2026-09-09).
+  rpc ListCliTokens(ListCliTokensRequest) returns (ListCliTokensResponse);
+  rpc RevokeCliToken(RevokeCliTokenRequest) returns (google.protobuf.Empty);
+
   // Admin console
   rpc CreateUser(CreateUserRequest) returns (CreateUserResponse);
   rpc ListUsers(ListUsersRequest) returns (ListUsersResponse);
@@ -35,10 +55,24 @@ service AuthService {
   rpc UpdateUser(UpdateUserRequest) returns (UpdateUserResponse);
   rpc RevokeSession(RevokeSessionRequest) returns (RevokeSessionResponse);
   rpc QueryAuditLog(QueryAuditLogRequest) returns (QueryAuditLogResponse);
+  // AppendAuditEntry lets project-service/task-service/annotation-service/
+  // infra-fleet-service append an entry to this service's own audit_log
+  // from their own OPA-gated decisions (TASK-BE-017/019..022) — auth.audit_log
+  // lives only in auth-service's database (bounded-context rule), so this is
+  // the one cross-service write path onto it. No per-call user authorization
+  // gate: every other service authenticates to auth-service via mTLS +
+  // NetworkPolicy (07-security-architecture.md), not caller identity.
+  rpc AppendAuditEntry(AppendAuditEntryRequest) returns (google.protobuf.Empty);
   rpc DeactivateUser(DeactivateUserRequest) returns (DeactivateUserResponse);
   rpc ReactivateUser(ReactivateUserRequest) returns (ReactivateUserResponse);
   rpc ListSessionsForUser(ListSessionsForUserRequest) returns (ListSessionsForUserResponse);
   rpc ForceRevokeAllSessionsForUser(ForceRevokeAllSessionsForUserRequest) returns (ForceRevokeAllSessionsForUserResponse);
+  // ForceRevokeSession is the admin-console single-session kill action for
+  // the Sessions tab's per-row "kill" button — session_id is the token
+  // HASH (as ListSessionsForUser's Session.id already is), NOT the raw
+  // token RevokeSession expects. See force_revoke_session.go's doc comment
+  // for why RevokeSession cannot be reused for this (TASK-BE-002/030).
+  rpc ForceRevokeSession(ForceRevokeSessionRequest) returns (google.protobuf.Empty);
   rpc CreateAccessPolicy(CreateAccessPolicyRequest) returns (AccessPolicy);
   rpc GetAccessPolicy(GetAccessPolicyRequest) returns (AccessPolicy);
   rpc ListAccessPolicies(ListAccessPoliciesRequest) returns (ListAccessPoliciesResponse);
@@ -65,6 +99,35 @@ service AuthService {
   // "mediator hands back decrypted material on demand, never persists it"
   // pattern.
   rpc ResolveDeviceSharedSecret(ResolveDeviceSharedSecretRequest) returns (ResolveDeviceSharedSecretResponse);
+
+  // ListTenantMemberDirectory is the non-admin counterpart to ListUsers —
+  // any authenticated user may look up their OWN tenant's other members by
+  // name/email (member-picker UIs need this; ListUsers itself is
+  // admin-console-only). tenant_id/actor come from the caller's own
+  // identity, never a request field — there is deliberately no way to ask
+  // for another tenant's directory here.
+  rpc ListTenantMemberDirectory(ListTenantMemberDirectoryRequest) returns (ListTenantMemberDirectoryResponse);
+
+  // --- CR-LOGIN-001 (SSO: GitHub / Google / generic OIDC) ---
+  // StartSsoLogin/CompleteSsoLogin are unauthenticated by necessity — like
+  // Login, the caller has no session yet. api-gateway's GET /auth/sso/
+  // {provider} and GET /auth/callback are the only callers.
+  rpc StartSsoLogin(StartSsoLoginRequest) returns (StartSsoLoginResponse);
+  rpc CompleteSsoLogin(CompleteSsoLoginRequest) returns (CompleteSsoLoginResponse);
+
+  // --- CR-RBAC-003 (SSO group->role mapping, session refresh) ---
+  // RefreshSession rotates Orca's own opaque session token — never the
+  // upstream IdP's OAuth refresh_token (out of scope, not touched by this
+  // RPC). Rejects with PermissionDenied (not a generic error) for an
+  // unknown, revoked, or expired refresh token; presenting an
+  // already-rotated-away refresh token is treated as reuse and revokes
+  // every session for that user, not just this one request.
+  rpc RefreshSession(RefreshSessionRequest) returns (RefreshSessionResponse);
+  // UpdateSsoGroupMapping/ListSsoGroupMapping are admin-console operations
+  // on auth.sso_group_role_mapping, gated by requireAdminActor like every
+  // other admin-console RPC on this service.
+  rpc UpdateSsoGroupMapping(UpdateSsoGroupMappingRequest) returns (UpdateSsoGroupMappingResponse);
+  rpc ListSsoGroupMapping(ListSsoGroupMappingRequest) returns (ListSsoGroupMappingResponse);
 }
 
 enum Role {
@@ -81,6 +144,10 @@ message User {
   Role role = 5;
   bool is_active = 6;
   google.protobuf.Timestamp created_at = 7;
+  // provider: "none" for a local-password-only account, otherwise the sso
+  // provider ("github" | "google" | "oidc") this user last authenticated
+  // through — see CR-LOGIN-001.
+  string provider = 8;
 }
 
 message LoginRequest {
@@ -98,6 +165,11 @@ message LoginRequest {
 message LoginResponse {
   string session_token = 1;
   User user = 2;
+  // refresh_token — see RefreshSessionResponse's doc comment (TASK-BE-012):
+  // every session is now issued one at creation, local login included, so
+  // /auth/refresh has something to rotate from on this session's very
+  // first request.
+  string refresh_token = 3;
 }
 
 message LogoutRequest {
@@ -135,23 +207,58 @@ message GetJWKSResponse {
   string jwks_json = 1;
 }
 
+message IsServiceTokenRevokedRequest {
+  string jti = 1;
+}
+
+message IsServiceTokenRevokedResponse {
+  bool revoked = 1;
+}
+
+// CliToken is one auth.issued_service_tokens row's wire shape — the JWT
+// itself is never returned here (it was only ever handed back once, at
+// mint time, IssueServiceTokenResponse.jwt — this is metadata for the
+// list view, not a way to recover a lost token).
+message CliToken {
+  string jti = 1;
+  string audience = 2;
+  google.protobuf.Timestamp issued_at = 3;
+  google.protobuf.Timestamp expires_at = 4;
+  // revoked_at is unset (nil) for a currently-valid token.
+  google.protobuf.Timestamp revoked_at = 5;
+}
+
+message ListCliTokensRequest {
+  string user_id = 1;
+}
+
+message ListCliTokensResponse {
+  repeated CliToken tokens = 1;
+}
+
+message RevokeCliTokenRequest {
+  string jti = 1;
+  string user_id = 2;
+}
+
 message CreateUserRequest {
   string email = 1;
   string name = 2;
   string tenant_id = 3;
   Role role = 4;
-  // password: the admin-chosen initial credential, per this RPC's spec
-  // contract (docs/logic/auth/BL-AUTH-04-admin-user-crud.md). Communicated
-  // to the new user out-of-band (email/Slack/etc.) by the admin — this
-  // service has no email-sending capability and none is added by this
-  // change. Contrast with Bootstrap.EnsureAdmin, which generates+prints its
-  // own password because no admin actor exists yet to supply one for the
-  // very first account.
+  // password: optional. Empty means "auto-generate" — the plaintext is
+  // returned exactly once in CreateUserResponse.generated_password (never
+  // stored, never logged) since there is no invite/reset-link flow yet; the
+  // calling admin is responsible for relaying it to the new user out of
+  // band. A caller-supplied password skips generation entirely.
   string password = 5;
 }
 
 message CreateUserResponse {
   User user = 1;
+  // generated_password is set only when the request's password field was
+  // empty — see CreateUserRequest.password's doc comment.
+  string generated_password = 2;
 }
 
 message ListUsersRequest {
@@ -163,6 +270,22 @@ message ListUsersRequest {
 message ListUsersResponse {
   repeated User users = 1;
   string next_page_token = 2;
+}
+
+// Deliberately empty — see ListTenantMemberDirectory's own doc comment on
+// the service definition for why tenant/actor are never request fields.
+message ListTenantMemberDirectoryRequest {}
+
+// TenantMemberDirectoryEntry is deliberately narrower than User (no role/
+// is_active/created_at) — this backs a member-picker, not an admin view.
+message TenantMemberDirectoryEntry {
+  string id = 1;
+  string name = 2;
+  string email = 3;
+}
+
+message ListTenantMemberDirectoryResponse {
+  repeated TenantMemberDirectoryEntry members = 1;
 }
 
 message UpdateUserRoleRequest {
@@ -192,7 +315,22 @@ message AuditEntry {
   string target_type = 7;
   string target_id = 8;
   string metadata_json = 9;  // JSON-serialized map[string]any
-  string ip_address = 10;
+  string outcome = 10;       // "allowed" | "denied" (TASK-BE-016)
+  string ip_address = 11;
+}
+
+// AppendAuditEntryRequest carries an audit event another service wants
+// recorded in auth-service's audit_log. tenant_id/actor_id come from the
+// calling service's own already-validated context (its RPC caller), never
+// re-validated here — see AppendAuditEntry's doc comment for why there is
+// no admin gate on this RPC.
+message AppendAuditEntryRequest {
+  string tenant_id = 1;
+  string actor_id = 2;
+  string action = 3;      // e.g. "project.update", "repo.remove_member", "ssh.connect"
+  string target = 4;      // resource type + id, e.g. "project:proj-123"
+  string outcome = 5;     // "allowed" | "denied"
+  string ip_address = 6;
 }
 
 message QueryAuditLogRequest {
@@ -201,8 +339,11 @@ message QueryAuditLogRequest {
   string page_token = 3;
   int32 page_size = 4;
   google.protobuf.Timestamp to = 5;
-  string action = 6;
-  string actor_id = 7;
+  // actor_id/action/outcome are optional filters (TASK-BE-016) — empty
+  // means "no filter" on that dimension, matching AuditRepository.Query.
+  string actor_id = 6;
+  string action = 7;
+  string outcome = 8;
 }
 
 message QueryAuditLogResponse {
@@ -228,6 +369,10 @@ message Session {
 }
 message ForceRevokeAllSessionsForUserRequest { string user_id = 1; }
 message ForceRevokeAllSessionsForUserResponse { int32 revoked_count = 1; }
+
+message ForceRevokeSessionRequest {
+  string session_id = 1; // the opaque token HASH, as returned by ListSessionsForUser's Session.id
+}
 
 message AccessPolicy {
   string id = 1;
@@ -321,4 +466,73 @@ message UnpairDeviceRequest { string device_id = 1; }
 message ResolveDeviceSharedSecretRequest { string device_id = 1; }
 message ResolveDeviceSharedSecretResponse {
   bytes shared_secret = 1; // raw 32-byte NaCl box shared secret; caller must not persist it
+}
+
+// --- CR-LOGIN-001 (SSO) ---
+message StartSsoLoginRequest {
+  string provider = 1;     // "github" | "google" | "oidc"
+  string redirect_uri = 2; // api-gateway's own /auth/callback URL — never derived from a request Host header, see api-gateway's auth_routes.go
+}
+message StartSsoLoginResponse {
+  string authorization_url = 1;
+  // state is returned for symmetry/testability; api-gateway doesn't need
+  // it directly — the authorization_url already embeds it.
+  string state = 2;
+}
+
+message CompleteSsoLoginRequest {
+  string code = 1;
+  string state = 2;
+}
+message CompleteSsoLoginResponse {
+  string session_token = 1;
+  User user = 2;
+  // refresh_token — see LoginResponse.refresh_token's doc comment; SSO
+  // login gets one for the same reason local login does (TASK-BE-012).
+  string refresh_token = 3;
+}
+
+// --- CR-RBAC-003 (SSO group->role mapping, session refresh) ---
+message RefreshSessionRequest {
+  string refresh_token = 1;
+}
+message RefreshSessionResponse {
+  string session_token = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  // refresh_token is the NEW refresh token minted by this rotation —
+  // TASK-BE-011 originally shipped this response without it, which made a
+  // second refresh impossible (the client would have no rotated token to
+  // present next time). Added by TASK-BE-012 to close that gap; see
+  // api-gateway's auth_routes.go for how it's stored (orca_refresh cookie).
+  string refresh_token = 3;
+}
+
+message SsoGroupRoleMapping {
+  string id = 1;
+  string provider = 2;    // domain.SsoProvider values: "github" | "google" | "oidc"
+  string group_name = 3;  // e.g. "orca-admins" (OIDC) or "org:my-company" (GitHub)
+  Role role = 4;
+  google.protobuf.Timestamp created_at = 5;
+}
+
+// UpdateSsoGroupMapping upserts one (tenant_id, provider, group_name) row —
+// tenant_id comes from the request field, matching this service's other
+// tenant-scoped admin-console RPCs (e.g. ListUsersRequest.tenant_id).
+message UpdateSsoGroupMappingRequest {
+  string tenant_id = 1;
+  string provider = 2;
+  string group_name = 3;
+  Role role = 4;
+}
+message UpdateSsoGroupMappingResponse {
+  SsoGroupRoleMapping mapping = 1;
+}
+
+message ListSsoGroupMappingRequest {
+  string tenant_id = 1;
+  // provider is an optional filter; empty means "every provider".
+  string provider = 2;
+}
+message ListSsoGroupMappingResponse {
+  repeated SsoGroupRoleMapping mappings = 1;
 }

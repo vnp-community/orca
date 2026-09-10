@@ -17,7 +17,7 @@ func TestSendTerminalInput_WritesExactBytesToAgent(t *testing.T) {
 		"pty-1": {PtyID: "pty-1", TenantID: "tenant-1", ConnectionID: "conn-1"},
 	}}
 	agent := &fakeDevServerAgentClient{}
-	uc := NewSendTerminalInput(sessions, resolver, agent)
+	uc := NewSendTerminalInput(sessions, resolver, &fakeDevServerRepository{}, agent)
 
 	data := []byte("echo hi\n")
 	if err := uc.Execute(withTenant(context.Background(), "tenant-1"), "pty-1", data); err != nil {
@@ -35,7 +35,7 @@ func TestSendTerminalInput_UnknownPtyID_ReturnsNotFoundWithoutWriting(t *testing
 	resolver := &fakeConnectionResolver{}
 	sessions := &fakeTerminalSessionRepository{}
 	agent := &fakeDevServerAgentClient{}
-	uc := NewSendTerminalInput(sessions, resolver, agent)
+	uc := NewSendTerminalInput(sessions, resolver, &fakeDevServerRepository{}, agent)
 
 	err := uc.Execute(withTenant(context.Background(), "tenant-1"), "pty-unknown", []byte("data"))
 	if err == nil {

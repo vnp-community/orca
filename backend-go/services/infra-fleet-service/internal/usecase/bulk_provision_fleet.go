@@ -82,9 +82,9 @@ func (uc *BulkProvisionFleet) Execute(ctx context.Context, in BulkProvisionFleet
 	var result BulkProvisionFleetResult
 	for _, o := range outcomes {
 		switch o.Status {
-		case string(domain.DevServerStatusHealthy):
+		case string(domain.DevServerHealthHealthy):
 			result.Success++
-		case string(domain.DevServerStatusDegraded):
+		case string(domain.DevServerHealthDegraded):
 			result.Skipped++
 		default:
 			result.Failed++
@@ -102,7 +102,7 @@ func (uc *BulkProvisionFleet) Execute(ctx context.Context, in BulkProvisionFleet
 func (uc *BulkProvisionFleet) bulkProvisionOne(ctx context.Context, tenantID string, target domain.SshTarget) ProvisionOutcome {
 	devServer, found, err := uc.devServers.FindBySshTarget(ctx, tenantID, target.ID)
 	if err != nil {
-		return ProvisionOutcome{Host: target.Host, Status: string(domain.DevServerStatusUnhealthy), Error: err.Error()}
+		return ProvisionOutcome{Host: target.Host, Status: string(domain.DevServerHealthUnhealthy), Error: err.Error()}
 	}
 	if !found {
 		devServer, err = domain.NewDevServer(uuid.NewString(), tenantID, target.Host, domain.ConnectionModeRelaySSH, target.ID, nil)
@@ -110,7 +110,7 @@ func (uc *BulkProvisionFleet) bulkProvisionOne(ctx context.Context, tenantID str
 			devServer, err = uc.devServers.Register(ctx, devServer)
 		}
 		if err != nil {
-			return ProvisionOutcome{Host: target.Host, Status: string(domain.DevServerStatusUnhealthy), Error: err.Error()}
+			return ProvisionOutcome{Host: target.Host, Status: string(domain.DevServerHealthUnhealthy), Error: err.Error()}
 		}
 	}
 
@@ -122,19 +122,19 @@ func (uc *BulkProvisionFleet) bulkProvisionOne(ctx context.Context, tenantID str
 			continue // retry deploy/handshake failures up to 3x
 		}
 		if !prereqsMet {
-			_ = uc.devServers.UpdateProvisionResult(ctx, tenantID, devServer.ID, domain.DevServerStatusDegraded, info, time.Now())
-			return ProvisionOutcome{DevServerID: devServer.ID, Host: target.Host, Status: string(domain.DevServerStatusDegraded), Error: "remote host does not meet minimum prerequisites"}
+			_ = uc.devServers.UpdateProvisionResult(ctx, tenantID, devServer.ID, domain.DevServerHealthDegraded, info, time.Now())
+			return ProvisionOutcome{DevServerID: devServer.ID, Host: target.Host, Status: string(domain.DevServerHealthDegraded), Error: "remote host does not meet minimum prerequisites"}
 		}
-		_ = uc.devServers.UpdateProvisionResult(ctx, tenantID, devServer.ID, domain.DevServerStatusHealthy, info, time.Now())
-		return ProvisionOutcome{DevServerID: devServer.ID, Host: target.Host, Status: string(domain.DevServerStatusHealthy)}
+		_ = uc.devServers.UpdateProvisionResult(ctx, tenantID, devServer.ID, domain.DevServerHealthHealthy, info, time.Now())
+		return ProvisionOutcome{DevServerID: devServer.ID, Host: target.Host, Status: string(domain.DevServerHealthHealthy)}
 	}
 
-	_ = uc.devServers.UpdateProvisionResult(ctx, tenantID, devServer.ID, domain.DevServerStatusUnhealthy, HandshakeInfo{}, time.Now())
+	_ = uc.devServers.UpdateProvisionResult(ctx, tenantID, devServer.ID, domain.DevServerHealthUnhealthy, HandshakeInfo{}, time.Now())
 	errMsg := ""
 	if lastErr != nil {
 		errMsg = lastErr.Error()
 	}
-	return ProvisionOutcome{DevServerID: devServer.ID, Host: target.Host, Status: string(domain.DevServerStatusUnhealthy), Error: errMsg}
+	return ProvisionOutcome{DevServerID: devServer.ID, Host: target.Host, Status: string(domain.DevServerHealthUnhealthy), Error: errMsg}
 }
 
 func filterByProject(targets []domain.SshTarget, project string) []domain.SshTarget {

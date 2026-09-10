@@ -77,7 +77,16 @@ vi.mock('sonner', () => ({
 }))
 
 vi.mock('@/runtime/runtime-rpc-client', () => ({
-  getActiveRuntimeTarget: () => ({ kind: 'local' }),
+  // Mirrors the real getActiveRuntimeTarget: 'local' only when
+  // activeRuntimeEnvironmentId is falsy — needed so the devServerId
+  // regression test below (which relies on this resolving to
+  // 'environment' from the store's real, non-nulled settings) is
+  // actually exercising useCreateRepo's own logic, not a mock that
+  // always answers the same way regardless of input.
+  getActiveRuntimeTarget: (settings: { activeRuntimeEnvironmentId?: string | null }) =>
+    settings?.activeRuntimeEnvironmentId
+      ? { kind: 'environment', environmentId: settings.activeRuntimeEnvironmentId }
+      : { kind: 'local' },
   callRuntimeRpc: mocks.callRuntimeRpc
 }))
 
@@ -216,7 +225,9 @@ describe('useCreateRepo default-checkout handoff', () => {
     expect(mocks.activateAndRevealWorktree).toHaveBeenCalledWith(worktree.id, {
       sidebarRevealBehavior: 'auto'
     })
-    expect(mocks.markOnboardingProjectAdded).toHaveBeenCalledWith('addedFolder')
+    // Second arg is whatever settings useAppStore.getState() has at call
+    // time — not this test's concern, only that the checklist item fires.
+    expect(mocks.markOnboardingProjectAdded.mock.calls[0]?.[0]).toBe('addedFolder')
     expect(closeModal).toHaveBeenCalled()
     expect(mocks.onGitRepoReady).not.toHaveBeenCalled()
   })
@@ -246,32 +257,151 @@ describe('useCreateRepo default-checkout handoff', () => {
   })
 
   it('creates projects through the selected runtime environment', async () => {
-    const repo = makeRepo({ executionHostId: 'runtime:env-1', path: '/srv/created' })
-    mocks.callRuntimeRpc.mockResolvedValue({ repo })
+    const repo = makeRepo({
+      id: 'default-project-repo-id',
+      executionHostId: 'runtime:env-1',
+      path: '/projects/created'
+    })
+    // Why a two-step create+add mock, not one repo.create resolution: the Go
+    // handler only relays repo.create to git-gateway-service (bare repo on
+    // disk, no project.repos row) — useCreateRepo now also resolves the
+    // implicit default project (project.list) and calls repo.add to register
+    // it. All three calls share this one mocked callRuntimeRpc, so branch on
+    // method.
+    mocks.callRuntimeRpc.mockImplementation(async (_target: unknown, method: string) => {
+      if (method === 'project.list') {
+        return [
+          {
+            id: 'default-project',
+            name: 'My Repos',
+            defaultBranch: 'main',
+            devServerId: '',
+            visibility: 'private',
+            createdAt: 1,
+            updatedAt: 1
+          }
+        ]
+      }
+      if (method === 'repo.create') {
+        return { path: '/projects/created', defaultBranch: 'main' }
+      }
+      if (method === 'repo.add') {
+        return {
+          id: repo.id,
+          projectId: 'default-project',
+          url: '/projects/created',
+          displayName: 'created',
+          position: 0
+        }
+      }
+      throw new Error(`Unexpected runtime method ${method}`)
+    })
     mocks.fetchWorktrees.mockResolvedValue(true)
     const { useCreateRepo } = await import('./useCreateRepo')
 
     const result = useCreateRepo(mocks.fetchWorktrees, vi.fn(), mocks.onGitRepoReady, {
       hostId: 'runtime:env-1',
-      runtimeEnvironmentId: 'env-1'
+      runtimeEnvironmentId: 'env-1',
+      devServerId: 'ds-1'
     })
     await result.handleCreate()
 
+    // Why devServerId: 'ds-1' here, not undefined: this option is the
+    // dialog's own Host selector — see useCreateRepo.ts's doc comment for
+    // the live-verified bug this regression-guards (the dialog's picked
+    // dev server never reached repo.create, which requires one).
     expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
       { kind: 'environment', environmentId: 'env-1' },
       'repo.create',
       {
-        parentPath: '/projects',
-        name: 'created',
-        kind: 'git'
+        devServerId: 'ds-1',
+        destPath: '/projects/created',
+        defaultBranch: ''
       },
       { timeoutMs: 60_000 }
+    )
+    expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'env-1' },
+      'repo.add',
+      { projectId: 'default-project', url: '/projects/created', displayName: 'created' },
+      { timeoutMs: 15_000 }
     )
     expect(mocks.createRepo).not.toHaveBeenCalled()
     expect(mocks.createRemoteRepo).not.toHaveBeenCalled()
     expect(mocks.fetchWorktrees).toHaveBeenCalledWith(repo.id, {
       requireAuthoritative: true
     })
+    expect(mocks.onGitRepoReady).toHaveBeenCalledWith(repo.id)
+  })
+
+  // Live-verified regression: a web-mode Dev Server Host selection (the
+  // dialog's own dropdown) parses to kind: 'devServer', so
+  // options.runtimeEnvironmentId (only set for kind: 'runtime') stays
+  // empty — unlike the "selected runtime environment" test above, which
+  // exercises the OTHER, already-working case. Before this fix, target
+  // always resolved to 'local' here (activeRuntimeEnvironmentId was
+  // unconditionally nulled out), so the whole create silently fell
+  // through to window.api.repos.create (the Electron-only local IPC
+  // path) instead of ever reaching repo.create with the picked dev
+  // server. Confirmed live: window.api.repos.create's web implementation
+  // still relays repo.create, but with the wrong param shape entirely,
+  // producing GITGATEWAY_MISSING_DEV_SERVER_ID.
+  it('creates projects through a picked dev server with no explicit runtime environment', async () => {
+    const repo = makeRepo({
+      id: 'default-project-repo-id',
+      executionHostId: 'runtime:env-1',
+      path: '/projects/created'
+    })
+    mocks.storeState.settings.activeRuntimeEnvironmentId = 'session-auth'
+    mocks.callRuntimeRpc.mockImplementation(async (_target: unknown, method: string) => {
+      if (method === 'project.list') {
+        return [
+          {
+            id: 'default-project',
+            name: 'My Repos',
+            defaultBranch: 'main',
+            devServerId: '',
+            visibility: 'private',
+            createdAt: 1,
+            updatedAt: 1
+          }
+        ]
+      }
+      if (method === 'repo.create') {
+        return { path: '/projects/created', defaultBranch: 'main' }
+      }
+      if (method === 'repo.add') {
+        return {
+          id: repo.id,
+          projectId: 'default-project',
+          url: '/projects/created',
+          displayName: 'created',
+          position: 0
+        }
+      }
+      throw new Error(`Unexpected runtime method ${method}`)
+    })
+    mocks.fetchWorktrees.mockResolvedValue(true)
+    const { useCreateRepo } = await import('./useCreateRepo')
+
+    // No hostId/runtimeEnvironmentId — only devServerId, matching exactly
+    // what AddRepoDialog.tsx passes for a devServer-kind Host selection.
+    const result = useCreateRepo(mocks.fetchWorktrees, vi.fn(), mocks.onGitRepoReady, {
+      devServerId: 'ds-1'
+    })
+    await result.handleCreate()
+
+    expect(mocks.callRuntimeRpc).toHaveBeenCalledWith(
+      { kind: 'environment', environmentId: 'session-auth' },
+      'repo.create',
+      {
+        devServerId: 'ds-1',
+        destPath: '/projects/created',
+        defaultBranch: ''
+      },
+      { timeoutMs: 60_000 }
+    )
+    expect(mocks.createRepo).not.toHaveBeenCalled()
     expect(mocks.onGitRepoReady).toHaveBeenCalledWith(repo.id)
   })
 })

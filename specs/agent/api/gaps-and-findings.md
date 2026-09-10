@@ -411,6 +411,29 @@ not covered here.
   assertion mismatch, both confirmed via `git stash` to predate this work),
   zero new regressions.
 
+**2026-09-03 correction — Stack A's "✅ Fixed" was real but incomplete.**
+Three production agents (direct-websocket mode) ran this exact watchdog for
+hours without recovering from a genuinely half-open WS to Orca (server
+container recreated, no clean close/RST reached the agent). Root cause:
+the watchdog called `ws.close(1001, ...)`, which performs the real WS
+closing handshake — that handshake needs the *peer* to answer, and on a
+true half-open socket (peer already gone) it can hang for the OS's TCP
+retransmission timeout, so the "fixed" watchdog's own recovery path never
+actually completed. Fixed by switching to `ws.terminate()` (tears the
+socket down locally, no peer round-trip needed), via the already-existing,
+separately-proven `agent/src/shared/remote-runtime-socket-liveness.ts`
+utility (`startRemoteRuntimeSocketLiveness`) rather than a second bespoke
+timer — see `agent-session.ts`'s `liveness` field and `agent/src/relay/
+__tests__/agent-session.test.ts`'s "liveness monitor" describe block
+(explicit regression test: asserts `ws.terminate()` fires and `ws.close()`
+is never called to recover a dead connection). New end-to-end coverage of
+the outer reconnect loop itself also added:
+`agent/src/relay/__tests__/agent-connection-direct.test.ts` (none existed
+before). Live-verified on all three affected hosts (dev-01/dev-ai/test-01):
+killing `infra-fleet-service` mid-session now self-recovers with no manual
+`systemctl restart`, confirmed via `infra.fleet_health` flipping back to
+`reachable=true` unattended.
+
 Both wire-protocol stacks declare a 20-second idle-timeout constant
 (`agent-wire-protocol.ts:22`, `protocol.ts:44`) with a comment describing the
 intended contract ("if no frame received in 20000ms → close connection"), but

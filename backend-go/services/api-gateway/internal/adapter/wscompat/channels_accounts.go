@@ -1,7 +1,7 @@
 // Package wscompat — accounts.* channels.
 //
 // accounts.selectClaude/selectCodex/removeClaude/removeCodex relay through
-// infra-fleet-service's existing generic Relay RPC — see SOL-004
+// infra-fleet-service's Relay-family RPCs — see SOL-004
 // (specs/backend-go/bugs/missing-v1/solutions/SOL-004-accounts-channels.md)
 // for why this is not a new service or new backend-side storage: reading/
 // writing the Claude/Codex CLI's login config is filesystem-shaped work on
@@ -11,10 +11,22 @@
 // AGENT-SIDE WORK LANDED (TASK-023, specs/backend-go/bugs/missing-v1/tasks/
 // TASK-023-document-accounts-agent-gap.md): agent/src/relay/accounts-handler.ts
 // implements all 4 relayed methods below for real, plus the read-only
-// accounts.getSnapshot registerAccountsSubscribeChannel polls. Reachability
-// still requires a connectionId the frontend's documented call sites don't
-// send today — see accountsRelayArgs's doc comment and TASK-023's "Open
-// prerequisite" note, unchanged by this file.
+// accounts.getSnapshot registerAccountsSubscribeChannel polls.
+//
+// Live bug (user-reported): every one of these channels used to route
+// through ConnectionResolver.ResolveConnection — "is there an
+// infra.connections DB row for this dev server", a DIFFERENT concept from
+// "is the agent's session live" (see usecase.RelayByDevServer's doc
+// comment on infra-fleet-service, and this same fix applied to
+// devServer.browseDir/onboarding.detectAgents earlier). A dev server has
+// no connections row until a repo/worktree is bound to it — the AI
+// Provider Accounts picker has nothing to do with any bound project, so a
+// perfectly live, connected dev server always showed "This dev server is
+// not currently connected." Fixed by relaying through RelayByDevServer
+// (devServerId-keyed, bypasses infra.connections) instead of Relay
+// (connectionId-keyed) throughout this file. The wire field is still named
+// `connectionId` on purpose — see accountsRelayArgs's doc comment — no
+// frontend change was needed.
 package wscompat
 
 import (
@@ -43,35 +55,36 @@ func registerAccountsChannels(r *Registry, client infrafleetv1.InfraFleetService
 }
 
 // accountsResolveDevServerConnectionArgs — TASK-023's frontend dev-server
-// picker sends the devServerId the user explicitly chose; this channel is
-// the missing link turning that choice into the connectionId the 4 relay
-// channels/accounts.subscribe above require. Named specifically for
-// accounts.*'s picker rather than a bare generic "resolve any devServerId"
-// channel, per this task's naming guidance.
+// picker sends the devServerId the user explicitly chose; this channel
+// turns that choice into the identifier the 4 relay channels/
+// accounts.subscribe below require. Named specifically for accounts.*'s
+// picker rather than a bare generic "resolve any devServerId" channel, per
+// this task's naming guidance.
 type accountsResolveDevServerConnectionArgs struct {
 	DevServerID string `json:"devServerId"`
 }
 
-// accountsResolveDevServerConnectionResult mirrors only
-// ResolveConnectionResponse's connected/connection_id fields — the picker
-// needs nothing else, and returning less than the full proto response
-// avoids leaking DevServer/repo_path/worktree details this channel was
-// never asked to expose.
+// accountsResolveDevServerConnectionResult's ConnectionID is, despite the
+// name, the devServerId echoed back verbatim — see this file's package doc
+// comment for why. Kept named "connectionId" on the wire so the existing
+// frontend contract (accounts-dev-server-connection.ts, which treats this
+// as an opaque token it passes straight into the next accounts.* call)
+// needed zero changes.
 type accountsResolveDevServerConnectionResult struct {
 	Connected    bool   `json:"connected"`
 	ConnectionID string `json:"connectionId"`
 }
 
-// registerAccountsResolveDevServerConnectionChannel resolves a chosen dev
-// server to its current live connectionId via ResolveConnection's
-// dev_server_id lookup (infrafleet.proto: "dev_server_id resolves the dev
-// server's current active connectionId") — the same RPC
-// registerBrowserRelay (channels_browser.go) already uses for its
-// worktree_id variant, reused here rather than duplicated. Deliberately
-// does NOT fail when Connected is false: "this dev server has no live
-// connection right now" is a legitimate, displayable picker state, not an
-// error — callers (runtime-provider-accounts-client.ts) check `connected`
-// themselves before attempting a relay call.
+// registerAccountsResolveDevServerConnectionChannel reports whether the
+// chosen dev server's agent has a live session right now, via
+// IsDevServerConnected (a pure peek at the agent's actual session state —
+// see devserveragent.Client.IsConnected's doc comment) — NOT
+// ResolveConnection, which answers a different question (does an
+// infra.connections DB row exist) that's unrelated to account management.
+// Deliberately does NOT fail when Connected is false: "this dev server has
+// no live connection right now" is a legitimate, displayable picker state,
+// not an error — callers (runtime-provider-accounts-client.ts) check
+// `connected` themselves before attempting a relay call.
 func registerAccountsResolveDevServerConnectionChannel(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
 	r.Register("accounts.resolveDevServerConnection", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		in, err := decodeArg[accountsResolveDevServerConnectionArgs](args, 0)
@@ -84,20 +97,20 @@ func registerAccountsResolveDevServerConnectionChannel(r *Registry, client infra
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		rpcCtx, cancel := context.WithTimeout(ctx, rpcTimeout)
 		defer cancel()
-		resolved, err := client.ResolveConnection(rpcCtx, &infrafleetv1.ResolveConnectionRequest{DevServerId: in.DevServerID})
+		resp, err := client.IsDevServerConnected(rpcCtx, &infrafleetv1.IsDevServerConnectedRequest{DevServerId: in.DevServerID})
 		if err != nil {
 			return nil, err
 		}
 		return accountsResolveDevServerConnectionResult{
-			Connected:    resolved.GetConnected(),
-			ConnectionID: resolved.GetConnectionId(),
+			Connected:    resp.GetConnected(),
+			ConnectionID: in.DevServerID,
 		}, nil
 	})
 }
 
 // accountsRelayArgs is shared by all 4 channels — accountId plus the
-// connectionId prerequisite (see this file's package doc comment and
-// TASK-023's "Open prerequisite" note).
+// devServerId (still named connectionId on the wire, see this file's
+// package doc comment) accounts.resolveDevServerConnection resolved.
 type accountsRelayArgs struct {
 	AccountID    string `json:"accountId"`
 	ConnectionID string `json:"connectionId"`
@@ -113,21 +126,17 @@ func registerAccountsRelay(r *Registry, client infrafleetv1.InfraFleetServiceCli
 			return nil, err
 		}
 		if in.ConnectionID == "" {
-			// See TASK-023 — accounts.* has no connectionId in today's
-			// documented frontend params; fail loudly rather than guessing
-			// (e.g. "the tenant's only connection" would silently break
-			// multi-environment tenants).
-			return nil, fmt.Errorf("ACCOUNTS_NO_CONNECTION: connectionId is required until the frontend contract adds it")
+			return nil, fmt.Errorf("ACCOUNTS_NO_CONNECTION: connectionId (devServerId) is required — pick a dev server first")
 		}
 		paramsJSON, err := json.Marshal(map[string]any{"accountId": in.AccountID})
 		if err != nil {
 			return nil, err
 		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		resp, err := client.Relay(ctx, &infrafleetv1.RelayRequest{
-			ConnectionId: in.ConnectionID,
-			Method:       agentMethod,
-			ParamsJson:   string(paramsJSON),
+		resp, err := client.RelayByDevServer(ctx, &infrafleetv1.RelayByDevServerRequest{
+			DevServerId: in.ConnectionID,
+			Method:      agentMethod,
+			ParamsJson:  string(paramsJSON),
 		})
 		if err != nil {
 			return nil, err
@@ -150,6 +159,8 @@ func registerAccountsRelay(r *Registry, client infrafleetv1.InfraFleetServiceCli
 // (ConnectionID: "") so the explicit ACCOUNTS_NO_CONNECTION check below can
 // fire with its specific message, not a generic "missing arg[0]" decode
 // error that would obscure the real, already-documented TASK-023 gap.
+// ConnectionID is, like accountsRelayArgs.ConnectionID, actually a
+// devServerId on the wire — see this file's package doc comment.
 type accountsSubscribeArgs struct {
 	ConnectionID string `json:"connectionId"`
 }
@@ -175,9 +186,7 @@ func registerAccountsSubscribeChannel(r *Registry, client infrafleetv1.InfraFlee
 	r.RegisterStream("accounts.subscribe", func(ctx context.Context, id Identity, args []json.RawMessage) (<-chan PushEvent, error) {
 		in := decodeOptionalArg[accountsSubscribeArgs](args, 0)
 		if in.ConnectionID == "" {
-			// Same fail-loud-not-guess posture as registerAccountsRelay above —
-			// see TASK-023's "Open prerequisite" note.
-			return nil, fmt.Errorf("ACCOUNTS_NO_CONNECTION: connectionId is required until the frontend contract adds it")
+			return nil, fmt.Errorf("ACCOUNTS_NO_CONNECTION: connectionId (devServerId) is required — pick a dev server first")
 		}
 		relayCtx := gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		// Fail the subscribe call itself on the FIRST fetch — a connectionId
@@ -232,12 +241,14 @@ func registerAccountsSubscribeChannel(r *Registry, client infrafleetv1.InfraFlee
 
 // fetchAccountsSnapshot relays accounts.getSnapshot — the read-only method
 // agent/src/relay/accounts-handler.ts added specifically to back this poll
-// loop (see that file's getAccountsSnapshot doc comment).
-func fetchAccountsSnapshot(ctx context.Context, client infrafleetv1.InfraFleetServiceClient, connectionID string) (map[string]any, error) {
-	resp, err := client.Relay(ctx, &infrafleetv1.RelayRequest{
-		ConnectionId: connectionID,
-		Method:       "accounts.getSnapshot",
-		ParamsJson:   "{}",
+// loop (see that file's getAccountsSnapshot doc comment). devServerID is,
+// like the rest of this file, the value callers still name "connectionId"
+// on the wire — see the package doc comment.
+func fetchAccountsSnapshot(ctx context.Context, client infrafleetv1.InfraFleetServiceClient, devServerID string) (map[string]any, error) {
+	resp, err := client.RelayByDevServer(ctx, &infrafleetv1.RelayByDevServerRequest{
+		DevServerId: devServerID,
+		Method:      "accounts.getSnapshot",
+		ParamsJson:  "{}",
 	})
 	if err != nil {
 		return nil, err

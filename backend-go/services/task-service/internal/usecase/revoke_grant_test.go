@@ -10,7 +10,7 @@ import (
 )
 
 func newRevokeGrantForTest(tasks *fakeTaskRepository, grants *fakeGrantRepository, events EventPublisher, opaAllow bool) *RevokeGrant {
-	resolvePermission := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: opaAllow})
+	resolvePermission := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: opaAllow}, nil)
 	return NewRevokeGrant(grants, resolvePermission, events)
 }
 

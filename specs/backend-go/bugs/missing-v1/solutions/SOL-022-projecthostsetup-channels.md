@@ -10,7 +10,7 @@
 - `backend-go/services/project-service/internal/usecase/create_host_setup.go` / `list_host_setups.go` / `update_host_setup.go` / `delete_host_setup.go` / `setup_existing_folder.go` (new)
 - `backend-go/services/project-service/internal/adapter/postgres/host_setup_repository.go` (new)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (new `registerProjectHostSetupChannels`)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 5 task(s) (TASK-141–145) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

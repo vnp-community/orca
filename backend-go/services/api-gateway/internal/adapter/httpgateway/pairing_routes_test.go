@@ -26,6 +26,8 @@ import (
 // pass-throughs, present only because Go requires every interface method to
 // compile.
 type fakePairingAuthServiceClient struct {
+	authv1.AuthServiceClient // embed: panics on any unimplemented method, intentional — see fakeTenantServiceClient's identical convention
+
 	initiateResp *authv1.InitiateDevicePairingResponse
 	completeResp *authv1.CompleteDevicePairingResponse
 	listResp     *authv1.ListPairedDevicesResponse
@@ -95,8 +97,6 @@ func (f *fakePairingAuthServiceClient) ListSessions(ctx context.Context, in *aut
 func (f *fakePairingAuthServiceClient) UpdateUser(ctx context.Context, in *authv1.UpdateUserRequest, opts ...grpc.CallOption) (*authv1.UpdateUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by this test")
 }
-
-
 
 func (f *fakePairingAuthServiceClient) ForceRevokeAllSessionsForUser(ctx context.Context, in *authv1.ForceRevokeAllSessionsForUserRequest, opts ...grpc.CallOption) (*authv1.ForceRevokeAllSessionsForUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by this test")

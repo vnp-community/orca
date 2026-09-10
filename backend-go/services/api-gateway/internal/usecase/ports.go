@@ -49,3 +49,14 @@ type AgentSpawner interface {
 type PromptInjector interface {
 	InjectPrompt(ctx context.Context, connectionID, ptyID, prompt string) error
 }
+
+// RevocationChecker checks whether a verified JWT's jti has been revoked
+// (CR-CLI-002/TASK-BE-CLI-005) — see AuthValidator.Revocation's doc comment
+// for the nil-tolerant, fail-closed contract every caller must honor.
+// Implemented by internal/adapter/authclient.RevocationClient against
+// auth-service's IsServiceTokenRevoked RPC.
+type RevocationChecker interface {
+	// IsRevoked reports whether jti has been revoked. An unknown jti (never
+	// existed) reports false, not an error.
+	IsRevoked(ctx context.Context, jti string) (bool, error)
+}

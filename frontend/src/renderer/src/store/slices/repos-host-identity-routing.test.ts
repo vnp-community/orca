@@ -89,10 +89,18 @@ beforeEach(() => {
 
 describe('repo slice host identity routing', () => {
   it('updates only the focused host row when repo ids are duplicated across hosts', async () => {
+    // repo.update's real wire response is a bare repoView (RemoteRepoView),
+    // never wrapped in `{ repo: ... }` — see channels_repo_ssh_status_workspace.go.
     runtimeEnvironmentCall.mockResolvedValue({
       id: 'rpc-duplicate-update',
       ok: true,
-      result: { repo: { ...remoteDuplicate, displayName: 'Remote Renamed' } },
+      result: {
+        id: remoteDuplicate.id,
+        projectId: '',
+        url: remoteDuplicate.path,
+        displayName: 'Remote Renamed',
+        position: 0
+      },
       _meta: { runtimeId: 'runtime-remote' }
     })
     const store = createTestStore()
@@ -111,7 +119,7 @@ describe('repo slice host identity routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.update',
-      params: { repo: 'same-repo', updates: { displayName: 'Remote Renamed' } },
+      params: { repoId: 'same-repo', displayName: 'Remote Renamed' },
       timeoutMs: 15_000
     })
   })
@@ -141,21 +149,25 @@ describe('repo slice host identity routing', () => {
     const firstUpdate = deferred<{
       id: string
       ok: true
-      result: { repo: Repo }
+      result: { id: string; projectId: string; url: string; displayName: string; position: number }
       _meta: { runtimeId: string }
     }>()
     runtimeEnvironmentCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
       if (args.method === 'repo.update') {
-        const { updates } = (args as unknown as { params: { updates: { displayName: string } } })
-          .params
-        const displayName = updates.displayName
+        const { displayName } = (args as unknown as { params: { displayName: string } }).params
         if (displayName === 'Remote slow') {
           return firstUpdate.promise
         }
         return Promise.resolve({
           id: 'rpc-queued-update',
           ok: true,
-          result: { repo: { ...remoteDuplicate, displayName } },
+          result: {
+            id: remoteDuplicate.id,
+            projectId: '',
+            url: remoteDuplicate.path,
+            displayName,
+            position: 0
+          },
           _meta: { runtimeId: 'runtime-remote' }
         })
       }
@@ -178,7 +190,7 @@ describe('repo slice host identity routing', () => {
         expect.objectContaining({
           selector: 'env-1',
           method: 'repo.update',
-          params: { repo: 'same-repo', updates: { displayName: 'Remote slow' } }
+          params: { repoId: 'same-repo', displayName: 'Remote slow' }
         })
       )
     })
@@ -188,7 +200,13 @@ describe('repo slice host identity routing', () => {
     firstUpdate.resolve({
       id: 'rpc-first-update',
       ok: true,
-      result: { repo: { ...remoteDuplicate, displayName: 'Remote slow' } },
+      result: {
+        id: remoteDuplicate.id,
+        projectId: '',
+        url: remoteDuplicate.path,
+        displayName: 'Remote slow',
+        position: 0
+      },
       _meta: { runtimeId: 'runtime-remote' }
     })
 
@@ -198,7 +216,7 @@ describe('repo slice host identity routing', () => {
       expect.objectContaining({
         selector: 'env-1',
         method: 'repo.update',
-        params: { repo: 'same-repo', updates: { displayName: 'Remote queued' } }
+        params: { repoId: 'same-repo', displayName: 'Remote queued' }
       })
     )
     expect(runtimeEnvironmentCall).not.toHaveBeenCalledWith(
@@ -304,7 +322,7 @@ describe('repo slice host identity routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.rm',
-      params: { repo: 'same-repo' },
+      params: { repoId: 'same-repo' },
       timeoutMs: 15_000
     })
     expect(reposRemoveForHost).not.toHaveBeenCalled()
@@ -396,7 +414,7 @@ describe('repo slice host identity routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.rm',
-      params: { repo: 'same-repo' },
+      params: { repoId: 'same-repo' },
       timeoutMs: 15_000
     })
     expect(reposRemove).not.toHaveBeenCalled()
@@ -422,7 +440,10 @@ describe('repo slice host identity routing', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.reorder',
-      params: { orderedIds: ['same-repo'] },
+      // Why projectId: '' — remoteDuplicate has no projectId set, and the
+      // reorder call site falls back to '' when the reordered repo at the
+      // head of this host's group doesn't carry one.
+      params: { projectId: '', repoIdsInOrder: ['same-repo'] },
       timeoutMs: 15_000
     })
   })

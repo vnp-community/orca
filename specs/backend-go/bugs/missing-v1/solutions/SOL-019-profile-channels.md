@@ -14,7 +14,7 @@
 - `backend-go/services/tenant-service/internal/adapter/postgres/*.go` (repository methods backing the above)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (new `registerProfileChannels`)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_test.go`
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 5 task(s) (TASK-126–130) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

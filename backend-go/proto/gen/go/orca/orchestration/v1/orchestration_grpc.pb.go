@@ -19,12 +19,14 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	OrchestrationService_CreateDispatchContext_FullMethodName      = "/orca.orchestration.v1.OrchestrationService/CreateDispatchContext"
-	OrchestrationService_CreateGate_FullMethodName                 = "/orca.orchestration.v1.OrchestrationService/CreateGate"
-	OrchestrationService_ResolveGate_FullMethodName                = "/orca.orchestration.v1.OrchestrationService/ResolveGate"
-	OrchestrationService_UpdateTaskStatusAndPromote_FullMethodName = "/orca.orchestration.v1.OrchestrationService/UpdateTaskStatusAndPromote"
-	OrchestrationService_GetDispatchContextForTask_FullMethodName  = "/orca.orchestration.v1.OrchestrationService/GetDispatchContextForTask"
-	OrchestrationService_StartCoordinatorRun_FullMethodName        = "/orca.orchestration.v1.OrchestrationService/StartCoordinatorRun"
+	OrchestrationService_CreateDispatchContext_FullMethodName             = "/orca.orchestration.v1.OrchestrationService/CreateDispatchContext"
+	OrchestrationService_CreateGate_FullMethodName                        = "/orca.orchestration.v1.OrchestrationService/CreateGate"
+	OrchestrationService_ResolveGate_FullMethodName                       = "/orca.orchestration.v1.OrchestrationService/ResolveGate"
+	OrchestrationService_UpdateTaskStatusAndPromote_FullMethodName        = "/orca.orchestration.v1.OrchestrationService/UpdateTaskStatusAndPromote"
+	OrchestrationService_GetDispatchContextForTask_FullMethodName         = "/orca.orchestration.v1.OrchestrationService/GetDispatchContextForTask"
+	OrchestrationService_StartCoordinatorRun_FullMethodName               = "/orca.orchestration.v1.OrchestrationService/StartCoordinatorRun"
+	OrchestrationService_ListActiveDispatchContextsForUser_FullMethodName = "/orca.orchestration.v1.OrchestrationService/ListActiveDispatchContextsForUser"
+	OrchestrationService_FailDispatch_FullMethodName                      = "/orca.orchestration.v1.OrchestrationService/FailDispatch"
 )
 
 // OrchestrationServiceClient is the client API for OrchestrationService service.
@@ -55,6 +57,22 @@ type OrchestrationServiceClient interface {
 	// task-service (ReportTaskExecutionResult) to report the terminal
 	// result; it never blocks task-service synchronously for it.
 	StartCoordinatorRun(ctx context.Context, in *StartCoordinatorRunRequest, opts ...grpc.CallOption) (*StartCoordinatorRunResponse, error)
+	// ListActiveDispatchContextsForUser: every non-terminal dispatch context
+	// for the calling user (tenant/user from identity, not a request field).
+	// Added for CR-STORAGE-006/007 — see
+	// docs/backlog/BACKLOG-006-dispatch-context-user-linkage-decision.md.
+	ListActiveDispatchContextsForUser(ctx context.Context, in *ListActiveDispatchContextsForUserRequest, opts ...grpc.CallOption) (*ListActiveDispatchContextsForUserResponse, error)
+	// FailDispatch records a real dispatch-attempt failure against
+	// dispatch_context_id, tripping the circuit breaker at
+	// failure_count >= 3 (orchestration-service.md §4). The caller passes the
+	// gRPC status code its own failed dispatch/relay call returned so this
+	// RPC can classify transport-vs-real failure the same way
+	// ClassifyDispatchFailure does for an in-process caller — a transport
+	// failure (UNAVAILABLE/DEADLINE_EXCEEDED) is intentionally NOT recorded,
+	// matching BE-SOL-STORAGE-003 §4's "a transient network blip must not
+	// trip the circuit breaker" rule. See
+	// docs/backlog/BACKLOG-009-orchestration-service-fail-dispatch-missing.md.
+	FailDispatch(ctx context.Context, in *FailDispatchRequest, opts ...grpc.CallOption) (*FailDispatchResponse, error)
 }
 
 type orchestrationServiceClient struct {
@@ -125,6 +143,26 @@ func (c *orchestrationServiceClient) StartCoordinatorRun(ctx context.Context, in
 	return out, nil
 }
 
+func (c *orchestrationServiceClient) ListActiveDispatchContextsForUser(ctx context.Context, in *ListActiveDispatchContextsForUserRequest, opts ...grpc.CallOption) (*ListActiveDispatchContextsForUserResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListActiveDispatchContextsForUserResponse)
+	err := c.cc.Invoke(ctx, OrchestrationService_ListActiveDispatchContextsForUser_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *orchestrationServiceClient) FailDispatch(ctx context.Context, in *FailDispatchRequest, opts ...grpc.CallOption) (*FailDispatchResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(FailDispatchResponse)
+	err := c.cc.Invoke(ctx, OrchestrationService_FailDispatch_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // OrchestrationServiceServer is the server API for OrchestrationService service.
 // All implementations must embed UnimplementedOrchestrationServiceServer
 // for forward compatibility.
@@ -153,6 +191,22 @@ type OrchestrationServiceServer interface {
 	// task-service (ReportTaskExecutionResult) to report the terminal
 	// result; it never blocks task-service synchronously for it.
 	StartCoordinatorRun(context.Context, *StartCoordinatorRunRequest) (*StartCoordinatorRunResponse, error)
+	// ListActiveDispatchContextsForUser: every non-terminal dispatch context
+	// for the calling user (tenant/user from identity, not a request field).
+	// Added for CR-STORAGE-006/007 — see
+	// docs/backlog/BACKLOG-006-dispatch-context-user-linkage-decision.md.
+	ListActiveDispatchContextsForUser(context.Context, *ListActiveDispatchContextsForUserRequest) (*ListActiveDispatchContextsForUserResponse, error)
+	// FailDispatch records a real dispatch-attempt failure against
+	// dispatch_context_id, tripping the circuit breaker at
+	// failure_count >= 3 (orchestration-service.md §4). The caller passes the
+	// gRPC status code its own failed dispatch/relay call returned so this
+	// RPC can classify transport-vs-real failure the same way
+	// ClassifyDispatchFailure does for an in-process caller — a transport
+	// failure (UNAVAILABLE/DEADLINE_EXCEEDED) is intentionally NOT recorded,
+	// matching BE-SOL-STORAGE-003 §4's "a transient network blip must not
+	// trip the circuit breaker" rule. See
+	// docs/backlog/BACKLOG-009-orchestration-service-fail-dispatch-missing.md.
+	FailDispatch(context.Context, *FailDispatchRequest) (*FailDispatchResponse, error)
 	mustEmbedUnimplementedOrchestrationServiceServer()
 }
 
@@ -180,6 +234,12 @@ func (UnimplementedOrchestrationServiceServer) GetDispatchContextForTask(context
 }
 func (UnimplementedOrchestrationServiceServer) StartCoordinatorRun(context.Context, *StartCoordinatorRunRequest) (*StartCoordinatorRunResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method StartCoordinatorRun not implemented")
+}
+func (UnimplementedOrchestrationServiceServer) ListActiveDispatchContextsForUser(context.Context, *ListActiveDispatchContextsForUserRequest) (*ListActiveDispatchContextsForUserResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListActiveDispatchContextsForUser not implemented")
+}
+func (UnimplementedOrchestrationServiceServer) FailDispatch(context.Context, *FailDispatchRequest) (*FailDispatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method FailDispatch not implemented")
 }
 func (UnimplementedOrchestrationServiceServer) mustEmbedUnimplementedOrchestrationServiceServer() {}
 func (UnimplementedOrchestrationServiceServer) testEmbeddedByValue()                              {}
@@ -310,6 +370,42 @@ func _OrchestrationService_StartCoordinatorRun_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _OrchestrationService_ListActiveDispatchContextsForUser_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListActiveDispatchContextsForUserRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestrationServiceServer).ListActiveDispatchContextsForUser(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestrationService_ListActiveDispatchContextsForUser_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestrationServiceServer).ListActiveDispatchContextsForUser(ctx, req.(*ListActiveDispatchContextsForUserRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _OrchestrationService_FailDispatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(FailDispatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(OrchestrationServiceServer).FailDispatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: OrchestrationService_FailDispatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(OrchestrationServiceServer).FailDispatch(ctx, req.(*FailDispatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // OrchestrationService_ServiceDesc is the grpc.ServiceDesc for OrchestrationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -340,6 +436,14 @@ var OrchestrationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "StartCoordinatorRun",
 			Handler:    _OrchestrationService_StartCoordinatorRun_Handler,
+		},
+		{
+			MethodName: "ListActiveDispatchContextsForUser",
+			Handler:    _OrchestrationService_ListActiveDispatchContextsForUser_Handler,
+		},
+		{
+			MethodName: "FailDispatch",
+			Handler:    _OrchestrationService_FailDispatch_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

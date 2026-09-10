@@ -32,12 +32,17 @@ import (
 
 	authbcrypt "github.com/stablyai/orca-go/services/auth-service/internal/adapter/bcrypt"
 	authgrpc "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpc"
+	authgrpcclient "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpcclient"
 	authnacl "github.com/stablyai/orca-go/services/auth-service/internal/adapter/nacl"
 	authnatsconsumer "github.com/stablyai/orca-go/services/auth-service/internal/adapter/natsconsumer"
+	authoauth "github.com/stablyai/orca-go/services/auth-service/internal/adapter/oauth"
+	authoauthstate "github.com/stablyai/orca-go/services/auth-service/internal/adapter/oauthstate"
 	authopaclient "github.com/stablyai/orca-go/services/auth-service/internal/adapter/opaclient"
 	authpolicypublisher "github.com/stablyai/orca-go/services/auth-service/internal/adapter/policypublisher"
 	authpostgres "github.com/stablyai/orca-go/services/auth-service/internal/adapter/postgres"
+	authproviderregistry "github.com/stablyai/orca-go/services/auth-service/internal/adapter/providerregistry"
 	authvault "github.com/stablyai/orca-go/services/auth-service/internal/adapter/vault"
+	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
 	"github.com/stablyai/orca-go/services/auth-service/internal/usecase"
 
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
@@ -71,9 +76,13 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (see common/secrets.DatabaseCredentialsFromFile's doc comment) —
+	// falls back to DATABASE_DSN itself when the file doesn't exist, which
+	// is what local dev / this scaffold's testcontainers path still uses.
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
+	if err != nil {
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -114,6 +123,9 @@ func run() error {
 	// query string (common/policy.Evaluator's own cache) and is shared by
 	// every requireAdminActor call for this process's lifetime.
 	opaEvaluator := policy.NewEvaluator(cfg.OPABundlePath)
+	if err := opaEvaluator.Warm(ctx, "data.orca.authz.admin.allow"); err != nil {
+		return fmt.Errorf("auth-service: OPA bundle failed to load at startup (bundle path %q): %w", cfg.OPABundlePath, err)
+	}
 	opaClient := authopaclient.New(opaEvaluator)
 
 	loginUC := usecase.NewLogin(repo, repo, repo, hasher, clock, cfg.SessionTTL)
@@ -124,24 +136,41 @@ func run() error {
 	updateUserRoleUC := usecase.NewUpdateUserRole(repo, repo, clock, opaClient)
 	revokeSessionUC := usecase.NewRevokeSession(repo, repo, repo, clock, opaClient)
 	queryAuditLogUC := usecase.NewQueryAuditLog(repo, repo, opaClient)
-	issueServiceTokenUC := usecase.NewIssueServiceToken(repo, tokenSigner, clock, cfg.ServiceTokenTTL)
+	appendAuditEntryUC := usecase.NewAppendAuditEntry(repo, clock)
+	issueServiceTokenUC := usecase.NewIssueServiceToken(repo, repo, repo, tokenSigner, clock, cfg.ServiceTokenTTL)
 	getJWKSUC := usecase.NewGetJWKS(tokenSigner)
+	isServiceTokenRevokedUC := usecase.NewIsServiceTokenRevoked(repo)
+	listCliTokensUC := usecase.NewListCliTokens(repo)
+	revokeCliTokenUC := usecase.NewRevokeCliToken(repo, repo, repo, clock)
 
 	deactivateUserUC := usecase.NewDeactivateUser(repo, repo, clock, opaClient)
 	reactivateUserUC := usecase.NewReactivateUser(repo, repo, clock, opaClient)
 	listSessionsForUserUC := usecase.NewListSessionsForUser(repo, repo, opaClient)
 	forceRevokeAllSessionsForUserUC := usecase.NewForceRevokeAllSessionsForUser(repo, repo, repo, clock, opaClient)
+	forceRevokeSessionUC := usecase.NewForceRevokeSession(repo, repo, repo, clock, opaClient)
 
-	// policyPublisher is a logging-only stub — no real OPA bundle-registry
-	// integration exists in this codebase yet. See
-	// internal/adapter/policypublisher's package doc comment.
-	policyPublisher := authpolicypublisher.New(logger)
-	createAccessPolicyUC := usecase.NewCreateAccessPolicy(repo, repo, clock, opaClient)
+	// policyPublisher writes a changed AccessPolicy's document_json into the
+	// shared OPA bundle path (TASK-BE-027/CR-RBAC-006) so
+	// create/update/delete take effect without a process restart, paired
+	// with opaEvaluator's own self-invalidation (TASK-BE-024). Set
+	// OPA_POLICY_PUBLISH_DISABLED=true to fall back to the old logging-only
+	// NoopPublisher stub as a rollback lever, mirroring
+	// common/policy.Evaluator's checkPeriod:0 rollback path — see
+	// config.Config.DisablePolicyPublish's doc comment.
+	var policyPublisher usecase.PolicyDataPublisher
+	if cfg.DisablePolicyPublish {
+		logger.WarnContext(ctx, "auth-service: OPA_POLICY_PUBLISH_DISABLED=true — policy changes will be persisted but NOT published to the OPA bundle")
+		policyPublisher = authpolicypublisher.New(logger)
+	} else {
+		policyPublisher = authpolicypublisher.NewFilePublisher(cfg.OPABundlePath, opaEvaluator)
+	}
+	createAccessPolicyUC := usecase.NewCreateAccessPolicy(repo, repo, policyPublisher, clock, opaClient)
 	getAccessPolicyUC := usecase.NewGetAccessPolicy(repo, repo, opaClient)
 	listAccessPoliciesUC := usecase.NewListAccessPolicies(repo, repo, opaClient)
 	updateAccessPolicyUC := usecase.NewUpdateAccessPolicy(repo, repo, policyPublisher, clock, opaClient)
-	deleteAccessPolicyUC := usecase.NewDeleteAccessPolicy(repo, repo, opaClient)
+	deleteAccessPolicyUC := usecase.NewDeleteAccessPolicy(repo, repo, policyPublisher, clock, opaClient)
 	getAdminStatsUC := usecase.NewGetAdminStats(repo, repo, repo, clock, opaClient)
+	listTenantMemberDirectoryUC := usecase.NewListTenantMemberDirectory(repo)
 
 	listSessionsUC := usecase.NewListSessions(repo, repo, opaClient)
 	updateUserUC := usecase.NewUpdateUser(repo, repo, clock, opaClient)
@@ -187,23 +216,34 @@ func run() error {
 
 	// Runs once, before the server starts accepting traffic — see
 	// internal/usecase/bootstrap.go's doc comment for why this isn't an
-	// RPC. No-op unless BOOTSTRAP_TENANT_ID/BOOTSTRAP_ADMIN_EMAIL are set
-	// AND no user already exists anywhere.
-	bootstrap := usecase.NewBootstrap(repo, repo, hasher, clock)
-	generatedPassword, err := bootstrap.EnsureAdmin(ctx, usecase.BootstrapConfig{
-		TenantID: cfg.BootstrapTenantID,
-		Email:    cfg.BootstrapAdminEmail,
-		Password: cfg.BootstrapAdminPassword,
-	}, logger)
-	if err != nil {
-		return fmt.Errorf("bootstrapping admin user: %w", err)
-	}
-	if generatedPassword != "" {
-		// Printed once, at first boot, never stored — same contract the
-		// old TS backend used for an auto-generated admin password.
-		logger.Warn("auth-service: AUTO-GENERATED ADMIN PASSWORD (save this now, it will not be shown again)",
-			slog.String("email", cfg.BootstrapAdminEmail),
-			slog.String("password", generatedPassword))
+	// RPC. No-op unless BOOTSTRAP_ADMIN_EMAIL is set AND no user already
+	// exists anywhere. Only dial tenant-service when bootstrap will
+	// actually run — avoids adding an always-on startup dependency on
+	// tenant-service being reachable for every ordinary (already
+	// bootstrapped) boot.
+	if cfg.BootstrapAdminEmail != "" {
+		tenantProvisioner, err := authgrpcclient.NewTenantProvisioner(cfg.TenantServiceAddr)
+		if err != nil {
+			return fmt.Errorf("dialing tenant-service: %w", err)
+		}
+		defer func() { _ = tenantProvisioner.Close() }()
+
+		bootstrap := usecase.NewBootstrap(repo, repo, hasher, clock, tenantProvisioner)
+		generatedPassword, err := bootstrap.EnsureAdmin(ctx, usecase.BootstrapConfig{
+			CompanyName: cfg.BootstrapCompanyName,
+			Email:       cfg.BootstrapAdminEmail,
+			Password:    cfg.BootstrapAdminPassword,
+		}, logger)
+		if err != nil {
+			return fmt.Errorf("bootstrapping admin user: %w", err)
+		}
+		if generatedPassword != "" {
+			// Printed once, at first boot, never stored — same contract the
+			// old TS backend used for an auto-generated admin password.
+			logger.Warn("auth-service: AUTO-GENERATED ADMIN PASSWORD (save this now, it will not be shown again)",
+				slog.String("email", cfg.BootstrapAdminEmail),
+				slog.String("password", generatedPassword))
+		}
 	}
 
 	// Session reaper: purges rows expired/revoked more than 7 days ago.
@@ -227,16 +267,91 @@ func run() error {
 		}
 	}()
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	// --- CR-LOGIN-001 (SSO: GitHub / Google / generic OIDC) ---
+	// Each provider is registered only when its SSO_*_CLIENT_ID is set —
+	// an unconfigured provider is simply absent from the registry map, and
+	// StartSsoLogin surfaces AUTH_SSO_PROVIDER_UNSUPPORTED for it, the same
+	// "absent, not zero-valued" convention scm-integration-service's own
+	// OAuth registry uses.
+	ssoExchangers := map[domain.SsoProvider]usecase.SsoExchanger{}
+	if cfg.Sso.GitHub.ClientID != "" {
+		ssoExchangers[domain.SsoProviderGitHub] = authoauth.NewGitHub(nil, authoauth.GitHubConfig{
+			ClientID: cfg.Sso.GitHub.ClientID, ClientSecret: cfg.Sso.GitHub.ClientSecret,
+		})
+	}
+	if cfg.Sso.Google.ClientID != "" {
+		// Google's OIDC endpoints are fixed, well-known constants — its
+		// CR-LOGIN-001 env var list has no DISCOVERY_URL, unlike generic OIDC.
+		ssoExchangers[domain.SsoProviderGoogle] = authoauth.NewOidc(nil, domain.SsoProviderGoogle, authoauth.OidcConfig{
+			AuthorizeURL: "https://accounts.google.com/o/oauth2/v2/auth",
+			TokenURL:     "https://oauth2.googleapis.com/token",
+			UserInfoURL:  "https://openidconnect.googleapis.com/v1/userinfo",
+			ClientID:     cfg.Sso.Google.ClientID, ClientSecret: cfg.Sso.Google.ClientSecret,
+		})
+	}
+	if cfg.Sso.OIDC.ClientID != "" && cfg.Sso.OidcDiscoveryURL != "" {
+		// Resolved once at startup, not per-request — see
+		// FetchDiscoveryDocument's doc comment. Fails startup loudly on an
+		// unreachable/malformed discovery document, same "fail fast, not
+		// silently degraded" posture as the Vault Transit key check above.
+		discoveryCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		authorizeURL, tokenURL, userInfoURL, err := authoauth.FetchDiscoveryDocument(discoveryCtx, nil, cfg.Sso.OidcDiscoveryURL)
+		cancel()
+		if err != nil {
+			return fmt.Errorf("fetching oidc discovery document from %q: %w", cfg.Sso.OidcDiscoveryURL, err)
+		}
+		ssoExchangers[domain.SsoProviderOIDC] = authoauth.NewOidc(nil, domain.SsoProviderOIDC, authoauth.OidcConfig{
+			AuthorizeURL: authorizeURL, TokenURL: tokenURL, UserInfoURL: userInfoURL,
+			ClientID: cfg.Sso.OIDC.ClientID, ClientSecret: cfg.Sso.OIDC.ClientSecret,
+		})
+	}
+	ssoRegistry := authproviderregistry.NewSsoRegistry(ssoExchangers)
+	ssoStates := authoauthstate.New(cfg.SsoStateSecret)
+
+	// tenantResolver is only dialed when at least one SSO provider is
+	// registered — same "avoid an always-on startup dependency for a
+	// feature that isn't configured" rule Bootstrap's TenantProvisioner
+	// dial follows above.
+	var tenantResolver *authgrpcclient.TenantResolver
+	if len(ssoExchangers) > 0 {
+		tenantResolver, err = authgrpcclient.NewTenantResolver(cfg.TenantServiceAddr)
+		if err != nil {
+			return fmt.Errorf("dialing tenant-service for sso provisioning: %w", err)
+		}
+		defer func() { _ = tenantResolver.Close() }()
+	}
+
+	startSsoLoginUC := usecase.NewStartSsoLogin(ssoRegistry, ssoStates, nil)
+	// tenantResolver may be a nil-but-typed *TenantResolver here (when no
+	// provider is configured) — safe, because LoginOrProvisionSsoUser only
+	// ever reaches uc.tenants.ResolveDefaultTenant via CompleteSsoLogin,
+	// which itself only runs after SsoExchangerRegistry.Resolve succeeds
+	// for a request's provider, which requires len(ssoExchangers) > 0,
+	// which is exactly the condition tenantResolver was dialed under above.
+	loginOrProvisionSsoUserUC := usecase.NewLoginOrProvisionSsoUser(repo, repo, repo, repo, hasher, tenantResolver, repo, clock, cfg.SessionTTL)
+	completeSsoLoginUC := usecase.NewCompleteSsoLogin(ssoRegistry, ssoStates, loginOrProvisionSsoUserUC)
+
+	// --- CR-RBAC-003 (SSO group->role mapping, session refresh) ---
+	refreshSessionUC := usecase.NewRefreshSession(repo, clock, cfg.SessionTTL, usecase.DefaultRefreshTokenTTL)
+	updateSsoGroupMappingUC := usecase.NewUpdateSsoGroupMapping(repo, repo, clock, opaClient)
+	listSsoGroupMappingUC := usecase.NewListSsoGroupMapping(repo, repo, opaClient)
+
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	authv1.RegisterAuthServiceServer(grpcServer, authgrpc.New(
 		loginUC, logoutUC, validateSessionUC,
 		createUserUC, listUsersUC, updateUserRoleUC, revokeSessionUC, queryAuditLogUC,
+		appendAuditEntryUC,
 		issueServiceTokenUC, getJWKSUC,
+		isServiceTokenRevokedUC, listCliTokensUC, revokeCliTokenUC,
 		deactivateUserUC, reactivateUserUC, listSessionsForUserUC, forceRevokeAllSessionsForUserUC,
+		forceRevokeSessionUC,
 		createAccessPolicyUC, getAccessPolicyUC, listAccessPoliciesUC, updateAccessPolicyUC, deleteAccessPolicyUC,
 		getAdminStatsUC,
 		listSessionsUC, updateUserUC,
 		initiateDevicePairingUC, completeDevicePairingUC, listPairedDevicesUC, unpairDeviceUC, resolveDeviceSharedSecretUC,
+		listTenantMemberDirectoryUC,
+		startSsoLoginUC, completeSsoLoginUC,
+		refreshSessionUC, updateSsoGroupMappingUC, listSsoGroupMappingUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

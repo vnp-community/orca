@@ -22,8 +22,12 @@ package wscompat
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
 
 	"golang.org/x/sync/errgroup"
+	"google.golang.org/protobuf/types/known/structpb"
 
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
@@ -50,27 +54,83 @@ func registerWorktreeChannels(
 	fanOutUseCase *usecase.FanOutCreateWorktrees,
 ) {
 	r.Register("worktree.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// Field names/shape mirror the ONLY real callers — web-preload-api.ts's
+		// worktrees.create and worktrees.ts's createWorktree (both frontend/src)
+		// — never {projectId, repoId, branch, baseRef}, which nothing sends.
+		// project_id is deliberately not decoded here: CreateWorktree.Execute
+		// now resolves it server-side from the repo (see create_worktree.go).
 		type createArgs struct {
-			ProjectID string `json:"projectId"`
-			RepoID    string `json:"repoId"`
-			Branch    string `json:"branch"`
-			BaseRef   string `json:"baseRef"`
-			Name      string `json:"name"`
-			Path      string `json:"path"`
+			RepoID             string  `json:"repo"`
+			Name               string  `json:"name"`
+			BaseBranch         string  `json:"baseBranch"`
+			BranchNameOverride string  `json:"branchNameOverride"`
+			DisplayName        string  `json:"displayName"`
+			LinkedIssue        *int32  `json:"linkedIssue"`
+			LinkedPR           *int32  `json:"linkedPR"`
+			LinkedLinearIssue  *string `json:"linkedLinearIssue"`
+
+			// Optional lineage-capture context — see
+			// proto/orca/project/v1/project.proto's WorktreeLineageEntry doc
+			// comment. Explicit-capture only; omitted fields mean "no
+			// lineage captured", the common case.
+			ParentWorktreeID        string `json:"parentWorktreeId"`
+			Origin                  string `json:"origin"`
+			CaptureSource           string `json:"captureSource"`
+			TaskID                  string `json:"taskId"`
+			OrchestrationRunID      string `json:"orchestrationRunId"`
+			CoordinatorHandle       string `json:"coordinatorHandle"`
+			CreatedByTerminalHandle string `json:"createdByTerminalHandle"`
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
+		// branchNameOverride wins when present — worktrees.ts's own
+		// retry-name-conflict loop retries both under this same rule.
+		branch := in.Name
+		if in.BranchNameOverride != "" {
+			branch = in.BranchNameOverride
+		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
 		resp, err := gitClient.CreateWorktree(ctx, &gitgatewayv1.CreateWorktreeRequest{
-			ProjectId: in.ProjectID, RepoId: in.RepoID, Branch: in.Branch, BaseRef: in.BaseRef,
-			Name: nonEmptyPtr(in.Name), Path: nonEmptyPtr(in.Path),
+			RepoId: in.RepoID, Branch: branch, BaseRef: in.BaseBranch,
+			ParentWorktreeId:        nonEmptyPtr(in.ParentWorktreeID),
+			Origin:                  nonEmptyPtr(in.Origin),
+			CaptureSource:           nonEmptyPtr(in.CaptureSource),
+			TaskId:                  nonEmptyPtr(in.TaskID),
+			OrchestrationRunId:      nonEmptyPtr(in.OrchestrationRunID),
+			CoordinatorHandle:       nonEmptyPtr(in.CoordinatorHandle),
+			CreatedByTerminalHandle: nonEmptyPtr(in.CreatedByTerminalHandle),
 		})
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+
+		displayName := in.DisplayName
+		if displayName == "" {
+			displayName = displayNameForDetectedWorktree(branch, resp.GetPath())
+		}
+		now := time.Now().UnixMilli()
+		// {worktree: ...} — the frontend (worktrees.ts's createWorktree) reads
+		// result.worktree.id/.path straight off this response; CreateWorktreeResponse
+		// itself only carries worktree_id/path/head_sha, so the rest of the rich
+		// client Worktree shape is filled in here from the request + safe
+		// defaults, same convention as detectedWorktreeView below.
+		return map[string]any{
+			"worktree": worktreeView{
+				ID:                resp.GetWorktreeId(),
+				RepoID:            in.RepoID,
+				DisplayName:       displayName,
+				LinkedIssue:       in.LinkedIssue,
+				LinkedPR:          in.LinkedPR,
+				LinkedLinearIssue: in.LinkedLinearIssue,
+				LastActivityAt:    now,
+				CreatedAt:         now,
+				Path:              resp.GetPath(),
+				Head:              resp.GetHeadSha(),
+				Branch:            branch,
+			},
+		}, nil
 	})
 
 	// worktree.createFromIssue — CreateWorktreeFromIssue's saga (SOL-PI-02),
@@ -127,8 +187,11 @@ func registerWorktreeChannels(
 
 	r.Register("worktree.rm", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type rmArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			Force      bool   `json:"force"`
+			// The frontend always sends toRuntimeWorktreeSelector(worktreeId)
+			// (runtime-worktree-selector.ts) under the key "worktree", never
+			// "worktreeId" — and always "id:"-prefixed.
+			Worktree string `json:"worktree"`
+			Force    bool   `json:"force"`
 			// AllowOpenPR defaults to false when absent — BR-AT-12's
 			// open-PR safety check protects every existing manual-delete
 			// caller by default; an intentional behavior change from
@@ -141,8 +204,9 @@ func registerWorktreeChannels(
 			return nil, err
 		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		worktreeID := stripWorktreeSelectorPrefix(in.Worktree)
 		resp, err := gitClient.RemoveWorktree(ctx, &gitgatewayv1.RemoveWorktreeRequest{
-			WorktreeId: in.WorktreeID, Force: in.Force, AllowOpenPr: in.AllowOpenPR, StopAgents: in.StopAgents,
+			WorktreeId: worktreeID, Force: in.Force, AllowOpenPr: in.AllowOpenPR, StopAgents: in.StopAgents,
 		})
 		if err != nil {
 			return nil, err
@@ -212,16 +276,22 @@ func registerWorktreeChannels(
 	})
 
 	r.Register("worktree.forceDeleteBranch", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// forceDeletePreservedBranch (worktrees.ts) sends "branchName", not
+		// "branch" — expectedHead is decoded but currently unused: neither
+		// ForceDeleteBranchRequest nor ForceDeleteBranch.Execute has a
+		// head-check guard yet (a known gap, not addressed by this fix).
 		type forceDeleteArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			Branch     string `json:"branch"`
+			Worktree     string `json:"worktree"`
+			BranchName   string `json:"branchName"`
+			ExpectedHead string `json:"expectedHead"`
 		}
 		in, err := decodeArg[forceDeleteArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		if _, err := gitClient.ForceDeleteBranch(ctx, &gitgatewayv1.ForceDeleteBranchRequest{WorktreeId: in.WorktreeID, Branch: in.Branch}); err != nil {
+		worktreeID := stripWorktreeSelectorPrefix(in.Worktree)
+		if _, err := gitClient.ForceDeleteBranch(ctx, &gitgatewayv1.ForceDeleteBranchRequest{WorktreeId: worktreeID, Branch: in.BranchName}); err != nil {
 			return nil, err
 		}
 		return map[string]bool{"ok": true}, nil
@@ -298,6 +368,17 @@ func registerWorktreeChannels(
 	})
 
 	r.Register("worktree.list", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// NOTE: ListWorktreesRequest is project-scoped only (no repo_id
+		// filter) — verified NOT a genuine gap: the one real repoId-only
+		// call site (worktrees.ts's listDetectedWorktreesForRepo local-mode
+		// fallback) already has projectId in scope via repoProjectId()
+		// before it falls back to the narrower worktreesApi.list({repoId})
+		// interface, and that whole fallback path is worktrees.ts's own
+		// documented "never reachable on this deployment" case (only used
+		// when a runtime server lacks worktree.detectedList, which this one
+		// doesn't). The live path (worktree.detectedList) already scopes by
+		// repo correctly via git-gateway's DetectWorktrees(RepoId) + a
+		// path-based join — see mergeDetectedWorktrees below.
 		type listArgs struct {
 			ProjectID string `json:"projectId"`
 		}
@@ -310,24 +391,110 @@ func registerWorktreeChannels(
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetWorktrees(), nil
+		protoWorktrees := resp.GetWorktrees()
+		views := make([]map[string]any, 0, len(protoWorktrees))
+		for _, w := range protoWorktrees {
+			views = append(views, worktreeResponseFromProto(w))
+		}
+		// {worktrees: [...]} — every caller (web-preload-api.ts's list/
+		// listAllRuntimeWorktrees, worktrees.ts's legacy fallback) reads
+		// result.worktrees, not a bare array.
+		return map[string]any{"worktrees": views}, nil
 	})
 
+	// worktree.set serves THREE distinct frontend purposes under one wire
+	// channel name (worktrees.ts's persistWorktreeMeta/
+	// setWorktreeLineageForRuntime/the activation toggle all call it) —
+	// dispatch on which top-level keys the caller actually sent, calling
+	// as many of the three usecases below as apply, rather than assuming
+	// only one shape. All three are keyed on {worktree: "id:<uuid>"} (never
+	// "worktreeId"); "active"/"parentWorktree"/"noParent" are activation/
+	// lineage fields, and every other top-level key is a WorktreeMeta
+	// partial-update patch (displayName/comment/isPinned/pushTarget/
+	// sparse*/... — frontend/src/shared/types.ts's WorktreeMeta) merged
+	// into project.worktrees' metadata JSONB column via UpdateWorktreeMeta.
+	// Previously only "active" was ever forwarded anywhere — every other
+	// field was silently decoded and dropped, even though desktop already
+	// durably persists all of them locally (orca-data.json) — see this
+	// session's CR solutions doc for the fuller design rationale.
 	r.Register("worktree.set", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		type setArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			Active     bool   `json:"active"`
-		}
-		in, err := decodeArg[setArgs](args, 0)
+		raw, err := decodeArg[map[string]json.RawMessage](args, 0)
 		if err != nil {
 			return nil, err
 		}
+		var worktreeSelector string
+		if v, ok := raw["worktree"]; ok {
+			if err := json.Unmarshal(v, &worktreeSelector); err != nil {
+				return nil, fmt.Errorf("decoding \"worktree\": %w", err)
+			}
+		}
+		worktreeID := stripWorktreeSelectorPrefix(worktreeSelector)
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		resp, err := projectClient.SetWorktreeActivation(ctx, &projectv1.SetWorktreeActivationRequest{WorktreeId: in.WorktreeID, Active: in.Active})
-		if err != nil {
-			return nil, err
+
+		var current *projectv1.Worktree
+
+		if v, ok := raw["active"]; ok {
+			var active bool
+			if err := json.Unmarshal(v, &active); err != nil {
+				return nil, fmt.Errorf("decoding \"active\": %w", err)
+			}
+			resp, err := projectClient.SetWorktreeActivation(ctx, &projectv1.SetWorktreeActivationRequest{WorktreeId: worktreeID, Active: active})
+			if err != nil {
+				return nil, err
+			}
+			current = resp.GetWorktree()
 		}
-		return resp.GetWorktree(), nil
+
+		parentRaw, hasParent := raw["parentWorktree"]
+		noParentRaw, hasNoParent := raw["noParent"]
+		if hasParent || hasNoParent {
+			var clearParent bool
+			if hasNoParent {
+				if err := json.Unmarshal(noParentRaw, &clearParent); err != nil {
+					return nil, fmt.Errorf("decoding \"noParent\": %w", err)
+				}
+			}
+			var parentWorktreeID *string
+			if hasParent && !clearParent {
+				var parentSelector string
+				if err := json.Unmarshal(parentRaw, &parentSelector); err != nil {
+					return nil, fmt.Errorf("decoding \"parentWorktree\": %w", err)
+				}
+				stripped := stripWorktreeSelectorPrefix(parentSelector)
+				parentWorktreeID = &stripped
+			}
+			resp, err := projectClient.SetWorktreeLineage(ctx, &projectv1.SetWorktreeLineageRequest{
+				WorktreeId:       worktreeID,
+				ParentWorktreeId: parentWorktreeID,
+				ClearParent:      clearParent,
+			})
+			if err != nil {
+				return nil, err
+			}
+			current = resp.GetWorktree()
+		}
+
+		metaPatch := make(map[string]json.RawMessage, len(raw))
+		for k, v := range raw {
+			switch k {
+			case "worktree", "active", "parentWorktree", "noParent":
+				continue
+			}
+			metaPatch[k] = v
+		}
+		if len(metaPatch) > 0 || current == nil {
+			patch, err := structFromRawJSONPatch(metaPatch)
+			if err != nil {
+				return nil, fmt.Errorf("decoding metadata patch: %w", err)
+			}
+			resp, err := projectClient.UpdateWorktreeMeta(ctx, &projectv1.UpdateWorktreeMetaRequest{WorktreeId: worktreeID, Metadata: patch})
+			if err != nil {
+				return nil, err
+			}
+			current = resp.GetWorktree()
+		}
+
+		return map[string]any{"worktree": worktreeResponseFromProto(current)}, nil
 	})
 
 	// worktree.detectedList — the one aggregation. Parallel calls, merged
@@ -360,17 +527,33 @@ func registerWorktreeChannels(
 			return nil, err
 		}
 
-		knownPaths := make(map[string]bool, len(known.GetWorktrees()))
-		for _, w := range known.GetWorktrees() {
-			knownPaths[w.GetPath()] = true
+		return map[string]any{
+			"repoId":        in.RepoID,
+			"authoritative": true,
+			"source":        "git",
+			"worktrees":     mergeDetectedWorktrees(in.RepoID, in.ProjectID, onDisk.GetOnDiskWorktrees(), known.GetWorktrees()),
+		}, nil
+	})
+
+	// worktree.lineageList — no args (tenant-scoped via identity + RLS,
+	// matching the old TS backend's params:null handler). Explicit-capture
+	// only and workspaceLineage is always {} — see
+	// proto/orca/project/v1/project.proto's WorktreeLineageEntry doc
+	// comment and this file's package-level scope-cut note for why.
+	r.Register("worktree.lineageList", func(ctx context.Context, id Identity, _ []json.RawMessage) (any, error) {
+		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+		resp, err := projectClient.ListWorktreeLineage(ctx, &projectv1.ListWorktreeLineageRequest{})
+		if err != nil {
+			return nil, err
 		}
-		orphaned := make([]string, 0, len(onDisk.GetOnDiskPaths()))
-		for _, p := range onDisk.GetOnDiskPaths() {
-			if !knownPaths[p] {
-				orphaned = append(orphaned, p)
-			}
+		lineage := make(map[string]worktreeLineageView, len(resp.GetLineage()))
+		for _, e := range resp.GetLineage() {
+			lineage[e.GetWorktreeId()] = toWorktreeLineageView(e)
 		}
-		return map[string]any{"orphanedPaths": orphaned}, nil
+		return map[string]any{
+			"lineage":          lineage,
+			"workspaceLineage": map[string]any{},
+		}, nil
 	})
 
 	// worktree.fanOut — SOL-WT-02's "create N worktrees, spawn N agents,
@@ -401,4 +584,240 @@ func registerWorktreeChannels(
 		}
 		return map[string]any{"items": results}, nil
 	})
+}
+
+// worktreeLineageView is the wire shape worktree.lineageList returns —
+// mirrors frontend/src/shared/types.ts's WorktreeLineage. worktreeInstanceId/
+// parentWorktreeInstanceId mirror worktreeId/parentWorktreeId 1:1: backend-go
+// has no separate "instance" concept the way the old TS backend's
+// per-process worktree registration did.
+type worktreeLineageView struct {
+	WorktreeID               string  `json:"worktreeId"`
+	WorktreeInstanceID       string  `json:"worktreeInstanceId"`
+	ParentWorktreeID         *string `json:"parentWorktreeId,omitempty"`
+	ParentWorktreeInstanceID *string `json:"parentWorktreeInstanceId,omitempty"`
+	Origin                   *string `json:"origin,omitempty"`
+	CaptureSource            *string `json:"captureSource,omitempty"`
+	CaptureConfidence        *string `json:"captureConfidence,omitempty"`
+	TaskID                   *string `json:"taskId,omitempty"`
+	OrchestrationRunID       *string `json:"orchestrationRunId,omitempty"`
+	CoordinatorHandle        *string `json:"coordinatorHandle,omitempty"`
+	CreatedByTerminalHandle  *string `json:"createdByTerminalHandle,omitempty"`
+	CreatedAt                int64   `json:"createdAt"`
+}
+
+func toWorktreeLineageView(e *projectv1.WorktreeLineageEntry) worktreeLineageView {
+	return worktreeLineageView{
+		WorktreeID:               e.GetWorktreeId(),
+		WorktreeInstanceID:       e.GetWorktreeId(),
+		ParentWorktreeID:         e.ParentWorktreeId,
+		ParentWorktreeInstanceID: e.ParentWorktreeId,
+		Origin:                   e.Origin,
+		CaptureSource:            e.CaptureSource,
+		CaptureConfidence:        e.CaptureConfidence,
+		TaskID:                   e.TaskId,
+		OrchestrationRunID:       e.OrchestrationRunId,
+		CoordinatorHandle:        e.CoordinatorHandle,
+		CreatedByTerminalHandle:  e.CreatedByTerminalHandle,
+		CreatedAt:                e.GetCreatedAtUnixMs(),
+	}
+}
+
+// worktreeView is the wire shape worktree.create/worktree.list/worktree.set
+// return — mirrors frontend/src/shared/types.ts's rich client Worktree type.
+// git-gateway-service's CreateWorktreeResponse and project-service's Worktree
+// proto message both carry far fewer fields than the client type requires;
+// every field this backend has no data source for yet gets the same safe
+// default detectedWorktreeView below already established.
+type worktreeView struct {
+	ID                string  `json:"id"`
+	RepoID            string  `json:"repoId"`
+	ProjectID         string  `json:"projectId,omitempty"`
+	DisplayName       string  `json:"displayName"`
+	Comment           string  `json:"comment"`
+	LinkedIssue       *int32  `json:"linkedIssue"`
+	LinkedPR          *int32  `json:"linkedPR"`
+	LinkedLinearIssue *string `json:"linkedLinearIssue"`
+	IsArchived        bool    `json:"isArchived"`
+	IsUnread          bool    `json:"isUnread"`
+	IsPinned          bool    `json:"isPinned"`
+	SortOrder         int32   `json:"sortOrder"`
+	LastActivityAt    int64   `json:"lastActivityAt"`
+	CreatedAt         int64   `json:"createdAt,omitempty"`
+	Path              string  `json:"path"`
+	Head              string  `json:"head"`
+	Branch            string  `json:"branch"`
+	IsBare            bool    `json:"isBare"`
+	IsMainWorktree    bool    `json:"isMainWorktree"`
+}
+
+// worktreeResponseFromProto reshapes project-service's raw Worktree proto
+// message (worktree.list/worktree.set's response) into the client's rich
+// shape — same treatment worktree.create's response gets, just from a
+// different source message. Unlike worktree.create's hand-built worktreeView
+// (which has no metadata to read back — see this file's worktree.create doc
+// comment), this is a map so the real persisted WorktreeMeta blob
+// (displayName/comment/isPinned/pushTarget/sparse*/...) can be spread on
+// top of the typed core-git fields — the whole reason UpdateWorktreeMeta
+// exists (see this file's worktree.set doc comment).
+func worktreeResponseFromProto(w *projectv1.Worktree) map[string]any {
+	out := map[string]any{
+		"id":        w.GetId(),
+		"repoId":    w.GetRepoId(),
+		"projectId": w.GetProjectId(),
+		"path":      w.GetPath(),
+		"branch":    w.GetBranch(),
+		// Fallback default for a worktree with no persisted displayName yet
+		// (created, or never UpdateWorktreeMeta'd, before this field
+		// existed) — same convention displayNameForDetectedWorktree
+		// already establishes elsewhere in this file; overridden below if
+		// metadata carries a real one.
+		"displayName":    displayNameForDetectedWorktree(w.GetBranch(), w.GetPath()),
+		"lastActivityAt": w.GetCreatedAtUnixMs(),
+		"createdAt":      w.GetCreatedAtUnixMs(),
+	}
+	if meta := w.GetMetadata(); meta != nil {
+		for k, v := range meta.AsMap() {
+			out[k] = v
+		}
+	}
+	return out
+}
+
+// structFromRawJSONPatch converts a worktree.set call's leftover top-level
+// keys (already-decoded json.RawMessage values, keyed by field name) into
+// the google.protobuf.Struct UpdateWorktreeMetaRequest.metadata expects —
+// re-serializing rather than hand-building preserves JSON null (the
+// frontend's explicit "clear this field" wire convention, see
+// encodePushTargetClearForRuntimeRpc) through structpb's own null handling.
+func structFromRawJSONPatch(patch map[string]json.RawMessage) (*structpb.Struct, error) {
+	b, err := json.Marshal(patch)
+	if err != nil {
+		return nil, err
+	}
+	var m map[string]any
+	if err := json.Unmarshal(b, &m); err != nil {
+		return nil, err
+	}
+	return structpb.NewStruct(m)
+}
+
+// stripWorktreeSelectorPrefix undoes toRuntimeWorktreeSelector's "id:" prefix
+// convention (frontend/src/renderer/src/runtime/runtime-worktree-selector.ts)
+// — every real caller of worktree.set/rm/forceDeleteBranch sends a
+// "worktree" arg through that selector, always "id:"-prefixed.
+func stripWorktreeSelectorPrefix(selector string) string {
+	return strings.TrimPrefix(selector, "id:")
+}
+
+// detectedWorktreeView mirrors the frontend's DetectedWorktree type
+// (shared/types.ts: Worktree & {ownership, selectedCheckout, visible}) —
+// worktree.detectedList's real response shape, replacing the earlier
+// {orphanedPaths: [...]} stub this handler shipped with (see the spec
+// doc's "Thirtieth"/"Thirty-first"/"Thirty-second" entries for that
+// history). Every field this backend has no data source for gets the
+// exact same safe default the frontend's OWN legacy-fallback synthesis
+// (toLegacyDetectedWorktreeResult in store/slices/worktrees.ts and
+// web-preload-api.ts) already established, so a worktree this handler
+// discovers is shape-identical to one that path already produced.
+type detectedWorktreeView struct {
+	ID                string  `json:"id"`
+	RepoID            string  `json:"repoId"`
+	ProjectID         string  `json:"projectId,omitempty"`
+	DisplayName       string  `json:"displayName"`
+	Comment           string  `json:"comment"`
+	LinkedIssue       *int32  `json:"linkedIssue"`
+	LinkedPR          *int32  `json:"linkedPR"`
+	LinkedLinearIssue *string `json:"linkedLinearIssue"`
+	IsArchived        bool    `json:"isArchived"`
+	IsUnread          bool    `json:"isUnread"`
+	IsPinned          bool    `json:"isPinned"`
+	SortOrder         int32   `json:"sortOrder"`
+	LastActivityAt    int64   `json:"lastActivityAt"`
+	Path              string  `json:"path"`
+	Head              string  `json:"head"`
+	Branch            string  `json:"branch"`
+	IsBare            bool    `json:"isBare"`
+	IsMainWorktree    bool    `json:"isMainWorktree"`
+	Ownership         string  `json:"ownership"`
+	SelectedCheckout  bool    `json:"selectedCheckout"`
+	Visible           bool    `json:"visible"`
+}
+
+// mergeDetectedWorktrees combines git-gateway-service's on-disk ground
+// truth (real paths, guaranteed to exist right now) with project-service's
+// bookkeeping (the worktree's real id/lineage, when Orca created it) —
+// per this file's own top-of-file doc comment, this merge is deliberately
+// computed here at api-gateway's edge, not inside either owning service.
+//
+// A bookkept worktree missing from onDisk is deliberately NOT included —
+// the frontend's own reconciliation (getRemovedWorktreeIdsAfterAuthoritative-
+// Scan in store/slices/worktrees.ts) already purges a bookkept id that
+// isn't in this result's ids, comparing against its own separately-fetched
+// worktreesByRepo state; duplicating that purge decision here would be a
+// second, harder-to-keep-in-sync source of truth for the same decision.
+func mergeDetectedWorktrees(repoID, projectID string, onDisk []*gitgatewayv1.DetectedWorktreeGitInfo, known []*projectv1.Worktree) []detectedWorktreeView {
+	knownByPath := make(map[string]*projectv1.Worktree, len(known))
+	for _, w := range known {
+		knownByPath[w.GetPath()] = w
+	}
+
+	out := make([]detectedWorktreeView, 0, len(onDisk))
+	for i, info := range onDisk {
+		view := detectedWorktreeView{
+			ProjectID:        projectID,
+			Path:             info.GetPath(),
+			Head:             info.GetHead(),
+			Branch:           info.GetBranch(),
+			IsMainWorktree:   i == 0,
+			SelectedCheckout: false,
+			Visible:          true,
+		}
+		if w, ok := knownByPath[info.GetPath()]; ok {
+			// Bookkept by project-service — a worktree Orca itself created
+			// (or previously reconciled). Reuse its real id so the
+			// frontend's own already-fetched worktreesByRepo state matches
+			// up by id, not just by path.
+			view.ID = w.GetId()
+			view.RepoID = w.GetRepoId()
+			view.Ownership = "orca-managed"
+			view.LastActivityAt = w.GetCreatedAtUnixMs()
+		} else {
+			// On disk, but Orca has no bookkeeping row for it — created
+			// outside Orca's own worktree.create flow (a manual
+			// `git worktree add`, or an import this pass doesn't attempt to
+			// resolve). Synthesize the same id shape every other worktree
+			// id in this codebase uses (see shared/worktree-id.ts).
+			view.ID = repoID + "::" + info.GetPath()
+			view.RepoID = repoID
+			view.Ownership = "external"
+		}
+		view.DisplayName = displayNameForDetectedWorktree(view.Branch, view.Path)
+		out = append(out, view)
+	}
+	return out
+}
+
+// displayNameForDetectedWorktree picks a reasonable label for a worktree
+// this backend has no explicit display_name for (project.worktrees has no
+// such column) — the branch name when one exists (the common, meaningful
+// case), else the path's own basename (a detached-HEAD worktree, or one
+// git couldn't resolve a branch for).
+func displayNameForDetectedWorktree(branch, path string) string {
+	if short, ok := strings.CutPrefix(branch, "refs/heads/"); ok && short != "" {
+		return short
+	}
+	if branch != "" {
+		return branch
+	}
+	trimmed := strings.TrimRight(path, "/\\")
+	if base := trimmed; base != "" {
+		if idx := strings.LastIndexAny(trimmed, "/\\"); idx != -1 {
+			base = trimmed[idx+1:]
+		}
+		if base != "" {
+			return base
+		}
+	}
+	return path
 }

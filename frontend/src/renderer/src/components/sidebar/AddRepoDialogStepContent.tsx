@@ -220,6 +220,7 @@ export function AddRepoDialogStepContent({
         disableDestinationPicker={isRuntimeEnvironmentActive}
         runtimeEnvironmentId={activeRuntimeEnvironmentId}
         sshTargetId={selectedSshTargetId}
+        devServerId={activeDevServerId}
         cloneTargetLabel={
           isRuntimeEnvironmentActive || selectedSshTargetId ? selectedHostLabel : null
         }
@@ -262,6 +263,7 @@ export function AddRepoDialogStepContent({
         manualParentEntry={manualCreateParentEntry}
         runtimeEnvironmentId={activeRuntimeEnvironmentId}
         sshTargetId={selectedSshTargetId}
+        devServerId={activeDevServerId}
         onNameChange={onCreateNameChange}
         onParentChange={onCreateParentChange}
         onPickParent={onPickCreateParent}

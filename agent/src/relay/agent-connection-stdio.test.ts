@@ -9,7 +9,7 @@ import { StdioWebSocketAdapter, connectStdio, runDetachedStdioMode } from './age
 import { runConnectBridgeMode } from './relay-detach-bridge'
 import { existsSync, readFileSync } from 'node:fs'
 import { createSession } from './agent-session'
-import { HEADER_SIZE, createWireState, decodeFrame, encodeDataFrame, parseJsonPayload } from './agent-wire'
+import { HEADER_SIZE, createWireState, decodeFrame, encodeDataFrame, parseJsonPayload } from 'orca-dev-agent-transport'
 import type { AgentConfig } from './agent-config'
 import type { ToolDefinition } from './agent-tool-registry'
 import type { AgentLogger } from './agent-logger'

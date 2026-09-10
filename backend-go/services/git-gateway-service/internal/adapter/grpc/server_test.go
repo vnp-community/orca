@@ -82,6 +82,10 @@ func (fakeExecutor) RemoteFileURL(context.Context, string, string, string) (stri
 	return "https://example.com/blob/main/a.txt", nil
 }
 
+func (fakeExecutor) RemoteURL(context.Context, string, string) (string, error) {
+	return "git@github.com:example/repo.git", nil
+}
+
 func (fakeExecutor) Fetch(context.Context, string, *domain.PushTargetInput) (domain.SimpleResult, error) {
 	return domain.SimpleResult{Success: true}, nil
 }
@@ -139,7 +143,9 @@ func (fakeExecutor) WriteFileChunk(context.Context, string, string, int64, []byt
 }
 
 func (fakeExecutor) CreateDir(context.Context, string, string, bool, bool) error { return nil }
-func (fakeExecutor) Delete(context.Context, string, string, bool) error          { return nil }
+
+func (fakeExecutor) CreateFile(context.Context, string, string) error   { return nil }
+func (fakeExecutor) Delete(context.Context, string, string, bool) error { return nil }
 
 func (fakeExecutor) Stat(context.Context, string, string) (domain.FileStat, error) {
 	return domain.FileStat{Exists: true, SizeBytes: 7}, nil
@@ -160,8 +166,8 @@ func (fakeExecutor) Clone(context.Context, string, string) (string, string, erro
 	return "/repo/cloned", "main", nil
 }
 
-func (fakeExecutor) InitRepo(context.Context, string, string) (string, string, error) {
-	return "/repo/init", "main", nil
+func (fakeExecutor) InitRepo(context.Context, string, string, string, string) (string, string, bool, error) {
+	return "/repo/init", "main", false, nil
 }
 
 func (fakeExecutor) BaseRefDefault(context.Context, string) (string, error) {
@@ -212,8 +218,8 @@ func (fakeExecutor) FetchAndResolveRef(context.Context, string, string) (string,
 	return "resolvedsha", nil
 }
 
-func (fakeExecutor) ListWorktreePaths(context.Context, string) ([]string, error) {
-	return []string{"/repo", "/repo-branch"}, nil
+func (fakeExecutor) ListWorktreePaths(context.Context, string) ([]domain.WorktreeGitInfo, error) {
+	return []domain.WorktreeGitInfo{{Path: "/repo"}, {Path: "/repo-branch"}}, nil
 }
 
 func (fakeExecutor) ForceDeleteBranch(context.Context, string, string) error {
@@ -402,7 +408,7 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 	reachability := fakeReachability{reachable: false}
 	projects := fakeProjectClient{}
 	scm := fakeSCMClient{}
-	createWorktreeUC := usecase.NewCreateWorktree(resolver, projects, exec, exec)
+	createWorktreeUC := usecase.NewCreateWorktree(reachability, projects, exec, exec)
 	getDiffUC := usecase.NewGetDiff(resolver, exec, exec)
 	completer := fakeAICompleter{message: "generated message"}
 	historyUC := usecase.NewHistory(resolver, exec, exec)
@@ -428,6 +434,7 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewSubmoduleStatus(resolver, exec, exec),
 		usecase.NewRemoteCommitURL(resolver, exec, exec),
 		usecase.NewRemoteFileURL(resolver, exec, exec),
+		usecase.NewGetRemoteURL(reachability, projects, exec, exec),
 		usecase.NewFetch(resolver, exec, exec),
 		usecase.NewGeneratePullRequestFields(resolver, getStatusUC, getDiffUC, completer),
 		usecase.NewDiscoverCommitMessageModels(fakeAIProviderResolver{}),
@@ -438,6 +445,7 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewWriteFileUseCase(resolver, exec, exec),
 		usecase.NewWriteFileChunkUseCase(resolver, exec, exec),
 		usecase.NewCreateDirUseCase(resolver, exec, exec),
+		usecase.NewCreateFileUseCase(resolver, exec, exec),
 		usecase.NewDeleteFileUseCase(resolver, exec, exec),
 		usecase.NewStatFileUseCase(resolver, exec, exec),
 		usecase.NewSearchFilesUseCase(resolver, exec, exec),
@@ -447,20 +455,20 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewCopyFileUseCase(resolver, exec),
 		usecase.NewClone(reachability, exec, exec),
 		usecase.NewInitRepo(reachability, exec, exec),
-		usecase.NewBaseRefDefault(resolver, exec, exec),
-		usecase.NewSearchRefs(resolver, exec, exec),
-		usecase.NewCheckHooks(resolver, exec, exec),
-		usecase.NewReadIssueCommand(resolver, exec, exec),
-		usecase.NewWriteIssueCommand(resolver, exec, exec),
-		usecase.NewScanSetupScriptImports(resolver, exec, exec),
+		usecase.NewBaseRefDefault(reachability, projects, exec, exec),
+		usecase.NewSearchRefs(reachability, projects, exec, exec),
+		usecase.NewCheckHooks(reachability, projects, exec, exec),
+		usecase.NewReadIssueCommand(reachability, projects, exec, exec),
+		usecase.NewWriteIssueCommand(reachability, projects, exec, exec),
+		usecase.NewScanSetupScriptImports(reachability, projects, exec, exec),
 		createWorktreeUC,
 		usecase.NewCreateWorktreeFromIssue(fakeIssueSourceClient{}, createWorktreeUC, fakeAgentSpawner{}, projects),
 		usecase.NewRemoveWorktree(resolver, projects, fakeScrollbackCleaner{}, scm, exec, exec, fakeTerminalSessionLister{}),
 		usecase.NewForceDeleteBranch(resolver, exec, exec),
-		usecase.NewDetectWorktrees(resolver, projects, exec, exec),
-		usecase.NewPrefetchCreateBase(resolver, projects, exec, exec),
-		usecase.NewResolvePrBase(scm, resolver, projects, exec, exec),
-		usecase.NewResolveMrBase(scm, resolver, projects, exec, exec),
+		usecase.NewDetectWorktrees(reachability, projects, exec, exec),
+		usecase.NewPrefetchCreateBase(reachability, projects, exec, exec),
+		usecase.NewResolvePrBase(scm, reachability, projects, exec, exec),
+		usecase.NewResolveMrBase(scm, reachability, projects, exec, exec),
 		usecase.NewCheckout(resolver, exec, exec),
 		usecase.NewListLocalBranches(resolver, exec, exec),
 		usecase.NewFastForward(resolver, exec, exec),
@@ -479,6 +487,11 @@ func newTestServerWithResolver(resolver *fakeResolver) *Server {
 		usecase.NewStashPop(resolver, exec, exec),
 		usecase.NewCreateBranch(resolver, exec, exec),
 		usecase.NewDeleteBranch(resolver, exec, exec),
+		usecase.NewReadEphemeralVmRecipes(reachability, projects, exec, exec),
+		// nil FileWatchStreamer: this test only exercises server construction
+		// wiring, not WatchWorktree's own behavior (no dedicated test needs
+		// one yet — BACKLOG-003).
+		usecase.NewWatchWorktreeFiles(resolver, nil),
 	)
 }
 
@@ -774,6 +787,17 @@ func TestDeleteBranch_Server_TranslatesResult(t *testing.T) {
 	}
 	if !resp.GetSuccess() {
 		t.Errorf("unexpected response: %+v", resp)
+	}
+}
+
+func TestServer_CreateFile_Success(t *testing.T) {
+	s := newTestServer()
+	resp, err := s.CreateFile(context.Background(), &gitgatewayv1.CreateFileRequest{WorktreeId: "wt-1", Path: "new.txt"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if resp == nil {
+		t.Fatal("expected non-nil response")
 	}
 }
 

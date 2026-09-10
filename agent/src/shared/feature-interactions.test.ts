@@ -198,7 +198,14 @@ describe('feature interactions', () => {
     })
   })
 
-  it('keeps every catalog id wired to a production writer', () => {
+  // Skipped in agent/: this check scans src/renderer/src and src/preload for
+  // recordFeatureInteraction/useContextualTour call sites, but agent/ is a
+  // headless relay/dev-server package split from desktop/ — it ships the
+  // shared feature-interactions catalog (used by main/persistence.ts for
+  // typing/normalizing persisted state) but has no renderer or preload UI
+  // code at all, so there are no "production writers" here to find. The real
+  // check still runs in desktop/, where the UI that owns these ids lives.
+  it.skip('keeps every catalog id wired to a production writer', () => {
     const productionText = collectProductionSourceText()
     const missingWriters = FEATURE_INTERACTIONS.map((feature) => feature.id).filter((id) => {
       const escaped = escapeRegExp(id)

@@ -45,6 +45,7 @@ func (uc *Clone) Execute(ctx context.Context, in CloneInput) (CloneResult, error
 
 	executor := uc.local
 	if reachable {
+		ctx = WithDevServerID(ctx, in.DevServerID)
 		executor = uc.relay
 	}
 	worktreePath, defaultBranch, err := executor.Clone(ctx, in.URL, in.DestPath)

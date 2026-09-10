@@ -3,7 +3,7 @@
 #
 # No migrations to copy into the runtime stage — per git-gateway-service.md
 # §5, this service owns no database.
-FROM golang:1.23-bookworm AS build
+FROM golang:1.25-bookworm AS build
 WORKDIR /src
 
 # go.work-aware build: the whole workspace is needed at build time because
@@ -12,7 +12,7 @@ WORKDIR /src
 COPY go.work go.work.sum* ./
 COPY common ./common
 COPY proto ./proto
-COPY services/git-gateway-service ./services/git-gateway-service
+COPY services ./services
 
 WORKDIR /src/services/git-gateway-service
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -ldflags="-s -w -X main.version=${VERSION:-dev}" \

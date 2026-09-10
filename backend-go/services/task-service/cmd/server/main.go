@@ -17,9 +17,12 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/auditclient"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
@@ -38,6 +41,7 @@ import (
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
+	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	orchestrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1"
@@ -167,6 +171,9 @@ func run() error {
 	// query string (common/policy.Evaluator's own cache) and is shared by
 	// every ResolvePermission call for this process's lifetime.
 	opaEvaluator := policy.NewEvaluator(cfg.OPABundlePath)
+	if err := opaEvaluator.Warm(ctx, "data.orca.authz.task.allow"); err != nil {
+		return fmt.Errorf("task-service: OPA bundle failed to load at startup (bundle path %q): %w", cfg.OPABundlePath, err)
+	}
 	opaClient := taskopaclient.New(opaEvaluator)
 
 	// Transactional-outbox relay (TASK-TG-03-07): Grant/RevokeGrant durably
@@ -197,13 +204,24 @@ func run() error {
 	}
 	eventPublisher := taskeventbus.New(repo, logger)
 
+	// Audit-append client (TASK-BE-018/020, CR-RBAC-005) — ResolvePermission
+	// uses this to record every OPA allow/deny decision to auth-service's
+	// audit_log. Lazy dial (grpc.NewClient doesn't block on connect), same
+	// convention as every other outbound client above.
+	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	if err != nil {
+		return fmt.Errorf("dialing auth-service: %w", err)
+	}
+	defer func() { _ = authConn.Close() }()
+	auditClient := auditclient.New(authv1.NewAuthServiceClient(authConn))
+
 	createTaskUC := usecase.NewCreateTask(repo)
 	getTaskUC := usecase.NewGetTask(repo)
 	addEdgeUC := usecase.NewAddEdge(repo)
 	// resolvePermissionUC must be constructed before grantUC — Grant now
 	// requires 'manage' access to a task before writing a new grant on it,
 	// closing a live authorization gap (TASK-TG-03-01).
-	resolvePermissionUC := usecase.NewResolvePermission(repo, repo, teamScopeResolver, opaClient)
+	resolvePermissionUC := usecase.NewResolvePermission(repo, repo, teamScopeResolver, opaClient, auditClient)
 	grantUC := usecase.NewGrant(repo, resolvePermissionUC, eventPublisher)
 	revokeGrantUC := usecase.NewRevokeGrant(repo, resolvePermissionUC, eventPublisher)
 	listGrantsUC := usecase.NewListGrants(repo, resolvePermissionUC)
@@ -254,7 +272,7 @@ func run() error {
 	reportExecutionResultUC := usecase.NewReportTaskExecutionResult(repo)
 	findTaskByNumberUC := usecase.NewFindTaskByNumber(repo)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
 		createTaskUC, getTaskUC, addEdgeUC, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
 		listTasksUC, updateTaskUC, deleteTaskUC, getDependenciesUC, aiDecomposeUC, aiApplyUC, generateAgentPromptUC,

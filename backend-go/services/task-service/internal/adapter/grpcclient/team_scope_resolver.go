@@ -31,7 +31,15 @@ func (r *TeamScopeResolver) ResolveTeams(ctx context.Context, tenantID, userID s
 	if userID == "" {
 		return nil, nil // anonymous/system callers have no team membership — not an error
 	}
-	resp, err := r.tenant.ListTeamsForUser(ctx, &tenantv1.ListTeamsForUserRequest{TenantId: tenantID, UserId: userID})
+	// tenant-service derives the scoping company from the validated request
+	// context (tenant.RequireTenantID), never a client-supplied field — see
+	// ListTeamsForUserRequest's proto doc comment. withTenantMetadata
+	// attaches tenantID onto outbound gRPC metadata for that.
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := r.tenant.ListTeamsForUser(ctx, &tenantv1.ListTeamsForUserRequest{UserId: userID})
 	if err != nil {
 		return nil, fmt.Errorf("grpcclient: resolve team membership: %w", err)
 	}

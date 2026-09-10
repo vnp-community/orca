@@ -16,6 +16,11 @@ import (
 // see backend-go/policy/orca-authz/project.rego.
 const decisionQuery = "data.orca.authz.project.allow"
 
+// repoDecisionQuery is RepoDecision's rule — see
+// backend-go/policy/orca-authz/repo.rego, the repo-scoped functional-role
+// tier layered on top of project.rego's owner/member tier above.
+const repoDecisionQuery = "data.orca.authz.repo.allow"
+
 // Client evaluates project-service's project-role/global-admin
 // authorization policy via the shared embedded-OPA evaluator
 // (common/policy).
@@ -36,6 +41,19 @@ func New(evaluator *policy.Evaluator) *Client {
 func (c *Client) Decision(ctx context.Context, callerProjectRole, callerGlobalRole, action string) (bool, error) {
 	return c.evaluator.Decision(ctx, decisionQuery, map[string]any{
 		"caller_project_role": callerProjectRole,
+		"caller_global_role":  callerGlobalRole,
+		"action":              action,
+	})
+}
+
+// RepoDecision reports whether callerProjectRole/callerRepoRole/
+// callerGlobalRole authorizes action, per repo.rego's
+// {"caller_project_role", "caller_repo_role", "caller_global_role",
+// "action"} input contract.
+func (c *Client) RepoDecision(ctx context.Context, callerProjectRole, callerRepoRole, callerGlobalRole, action string) (bool, error) {
+	return c.evaluator.Decision(ctx, repoDecisionQuery, map[string]any{
+		"caller_project_role": callerProjectRole,
+		"caller_repo_role":    callerRepoRole,
 		"caller_global_role":  callerGlobalRole,
 		"action":              action,
 	})

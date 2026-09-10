@@ -86,6 +86,22 @@ func (f *scriptedAgent) StreamAgentHooks(ctx context.Context, devServer domain.D
 func (f *scriptedAgent) ExecStream(ctx context.Context, devServer domain.DevServer, method string, params map[string]any) (<-chan map[string]any, func(), error) {
 	return nil, nil, errors.New("not used")
 }
+func (f *scriptedAgent) IsConnected(devServerID string) bool { return false }
+func (f *scriptedAgent) StreamScreencast(ctx context.Context, devServer domain.DevServer, params ScreencastParams) (<-chan ScreencastEvent, func(), error) {
+	return nil, nil, errors.New("not used")
+}
+func (f *scriptedAgent) StreamFileChanges(ctx context.Context, devServer domain.DevServer, path string) (<-chan FileChangeEvent, func(), error) {
+	return nil, nil, errors.New("not used")
+}
+func (f *scriptedAgent) StreamVmProvision(ctx context.Context, devServer domain.DevServer, params VmProvisionParams) (<-chan VmProvisionEvent, func(), error) {
+	return nil, nil, errors.New("not used")
+}
+func (f *scriptedAgent) DialHiddenSshTarget(ctx context.Context, devServer domain.DevServer, runtimeID string, target domain.EphemeralVmSshTarget) (string, string, error) {
+	return "", "", errors.New("not used")
+}
+func (f *scriptedAgent) ReadCredentialFile(ctx context.Context, devServer domain.DevServer, path string) (string, error) {
+	return "", errors.New("not used")
+}
 
 // fakePortAllocator hands out sequential fake ports — no real net.Listen.
 type fakePortAllocator struct {

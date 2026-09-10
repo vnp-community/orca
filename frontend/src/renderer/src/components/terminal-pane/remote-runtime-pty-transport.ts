@@ -35,7 +35,6 @@ import {
   createRemoteRuntimeViewportBatcher
 } from './remote-runtime-pty-batching'
 import { createBrowserUuid } from '@/lib/browser-uuid'
-import { logBugFePty001 } from '@/lib/bug-fe-pty-001-diagnostic-log'
 import { setFitOverride } from '@/lib/pane-manager/mobile-fit-overrides'
 import { setDriverForPty } from '@/lib/pane-manager/mobile-driver-state'
 import { isWebTerminalSurfaceTabId, toHostSessionTabId } from '@/runtime/web-terminal-surface-id'
@@ -60,6 +59,31 @@ function isRemoteTerminalGoneMessage(message: string): boolean {
     message.includes('terminal_gone') ||
     message.includes('no_connected_pty')
   )
+}
+
+// Why: a silent WS reconnect (network blip, idle timeout, api-gateway
+// restart/redeploy) mints a brand-new, empty per-connection terminal-stream
+// registry backend-side (channels_terminal.go's own package doc comment) —
+// this pane's still-alive ptyId then has no live AttachPty stream there
+// anymore, and every terminal.send for it fails with this exact message
+// forever, since nothing here ever re-issues terminal.create after a
+// reconnect. Live-reproduced on b15.openledger.vn: a terminal that was
+// already open and typing fine started rejecting every keystroke with this
+// error the moment the underlying WS reconnected mid-session.
+function isNoLiveAttachPtyStreamMessage(message: string): boolean {
+  return message.includes('no live AttachPty stream')
+}
+
+// SOL-008 (specs/backend-go/bugs/missing-v3/): infra-fleet-service's
+// SpawnTerminalSession returns this code when a runtime:<environmentId>
+// target has no dev-server/SSH connection bound yet — a fixable
+// precondition, not a bug. AppError.ToStatus() formats the gRPC status
+// message as "<CODE>: <text>", so match on the code prefix rather than the
+// full message (the message text itself is not a stable contract).
+const NO_COMPUTE_BOUND_ERROR_CODE = 'INFRA_TERMINAL_NO_COMPUTE_BOUND'
+
+function isNoComputeBoundMessage(message: string): boolean {
+  return message.includes(NO_COMPUTE_BOUND_ERROR_CODE)
 }
 
 // FIX BUG-FE-PTY-001: a fresh local tab's connect() and its own host-session
@@ -129,6 +153,7 @@ export function createRemoteRuntimePtyTransport(
     launchConfig,
     launchToken,
     launchAgent,
+    connectionId,
     worktreeId,
     tabId,
     leafId,
@@ -169,12 +194,6 @@ export function createRemoteRuntimePtyTransport(
     }
     viewportClaimReadyWaiters.clear()
   }
-  // TEMP DIAG BUG-FE-PTY-001: log every transport instantiation with its
-  // tabId/leafId + call stack, to catch a second transport being created for
-  // the same tab while the first one's terminal.create is still in flight.
-  logBugFePty001(
-    `transport CREATED tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId}\n${new Error('create call site').stack}`
-  )
   // Why: tab/leaf ids identify the mirrored host pane, so every paired viewer
   // shares them. The instance suffix keeps one viewer's refresh off peer records.
   const clientId = `desktop:${tabId ?? 'tab'}:${leafId ?? 'leaf'}:${createBrowserUuid()}`
@@ -435,12 +454,7 @@ export function createRemoteRuntimePtyTransport(
         }
         // Why: acknowledged sends are ordered behind any pending debounce text,
         // but they must not collapse large paste input back into one remote RPC.
-        const result = await callRuntime<{ send: RuntimeTerminalSend }>('terminal.send', {
-          terminal: targetHandle,
-          text: chunk,
-          client: { id: clientId, type: 'desktop' },
-          ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
-        })
+        const result = await sendTerminalSendAckWithReattachRetry(targetHandle, chunk)
         if (result.send.accepted !== true) {
           return false
         }
@@ -454,6 +468,33 @@ export function createRemoteRuntimePtyTransport(
     }
   }
 
+  // Why a separate typed sibling of sendTerminalTextWithReattachRetry: this
+  // caller needs terminal.send's real {send:{accepted}} ack (Enter/Ctrl-C
+  // must know whether the write was actually accepted), not the fire-and-
+  // forget void the plain-typing paths use. See
+  // isNoLiveAttachPtyStreamMessage's doc comment for why the reattach retry
+  // exists at all.
+  async function sendTerminalSendAckWithReattachRetry(
+    targetHandle: string,
+    text: string
+  ): Promise<{ send: RuntimeTerminalSend }> {
+    try {
+      return await callRuntime<{ send: RuntimeTerminalSend }>(
+        'terminal.send',
+        buildTerminalSendPayload(targetHandle, text)
+      )
+    } catch (error) {
+      if (!isNoLiveAttachPtyStreamMessage(runtimeTerminalErrorMessage(error))) {
+        throw error
+      }
+      await callRuntime('terminal.reattachSend', { terminal: targetHandle })
+      return callRuntime<{ send: RuntimeTerminalSend }>(
+        'terminal.send',
+        buildTerminalSendPayload(targetHandle, text)
+      )
+    }
+  }
+
   const inputBatcher = createRemoteRuntimePtyTextBatcher(REMOTE_TERMINAL_INPUT_FLUSH_MS, (text) => {
     const targetHandle = handle
     if (!connected || !targetHandle) {
@@ -463,20 +504,26 @@ export function createRemoteRuntimePtyTransport(
     if (stream?.sendInput(text)) {
       return
     }
-    if (pendingViewportClaim) {
+    // Why !getCurrentMultiplexedStream(targetHandle): pendingViewportClaim
+    // alone is not a safe hold condition — the JSON/session-auth fallback
+    // transport (remote-runtime-terminal-json-subscribe.ts) has a permanent
+    // stream record whose sendInput/claimViewport are deliberate no-op stubs
+    // (that transport has no persistent input channel; callers always fall
+    // back to terminal.send below), so its first claim-resize latches
+    // pendingViewportClaim true forever — it only clears on an actual
+    // resubscribe, which this transport's single generation-1 session never
+    // hits. Without this guard, every keystroke silently queues into
+    // pendingClaimInput and never reaches terminal.send — live-reproduced:
+    // a fresh b15.openledger.vn terminal that opens fine but accepts no
+    // typed input. Mirrors sendInputAcceptedToRuntime's existing, correct
+    // guard (only hold input while truly no stream record exists yet).
+    if (pendingViewportClaim && !getCurrentMultiplexedStream(targetHandle)) {
       // Why: a claim during subscribe/reconnect has no stream record to own
       // yet. Hold its input until the stream can emit claim+input in one order.
       pendingClaimInput += text
       return
     }
-    void callRuntime('terminal.send', {
-      terminal: targetHandle,
-      text,
-      client: { id: clientId, type: 'desktop' },
-      ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
-    }).catch((error) => {
-      handleRemoteTerminalError(error)
-    })
+    void sendTerminalTextWithReattachRetry(targetHandle, text)
   })
 
   function sendViewportUpdate(cols: number, rows: number, claim = false): void {
@@ -562,6 +609,44 @@ export function createRemoteRuntimePtyTransport(
     storedCallbacks.onError?.(message)
   }
 
+  function buildTerminalSendPayload(targetHandle: string, text: string): Record<string, unknown> {
+    return {
+      terminal: targetHandle,
+      text,
+      client: { id: clientId, type: 'desktop' },
+      ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
+    }
+  }
+
+  // Why a reattach-then-retry wrapper, not just calling terminal.send
+  // directly: see isNoLiveAttachPtyStreamMessage's doc comment — a silent WS
+  // reconnect leaves this pane's ptyId with no live backend-side AttachPty
+  // stream, and terminal.send alone can never recover from that (nothing
+  // re-issues terminal.create after a reconnect). terminal.reattachSend
+  // re-registers the SAME still-alive pty (it does not spawn a new one,
+  // unlike terminal.create), so a single retry after it succeeds is enough;
+  // any other error, or a reattach/retry failure, still falls through to
+  // the normal error handling.
+  async function sendTerminalTextWithReattachRetry(
+    targetHandle: string,
+    text: string
+  ): Promise<void> {
+    try {
+      await callRuntime('terminal.send', buildTerminalSendPayload(targetHandle, text))
+    } catch (error) {
+      if (!isNoLiveAttachPtyStreamMessage(runtimeTerminalErrorMessage(error))) {
+        handleRemoteTerminalError(error)
+        return
+      }
+      try {
+        await callRuntime('terminal.reattachSend', { terminal: targetHandle })
+        await callRuntime('terminal.send', buildTerminalSendPayload(targetHandle, text))
+      } catch (retryError) {
+        handleRemoteTerminalError(retryError)
+      }
+    }
+  }
+
   // Why: after a transport drop the host may have re-minted this pane's
   // handle (reconnect, epoch or PTY change). Re-derive it from the current
   // session snapshot instead of resubscribing the stale closure value, which
@@ -630,28 +715,13 @@ export function createRemoteRuntimePtyTransport(
       !transportClosed &&
       generation === subscriptionGeneration &&
       isCurrentRemoteTerminal(subscribedHandle, subscribedPtyId)
-    // TEMP DIAG BUG-FE-PTY-001 (double-prompt follow-up): log a short preview
-    // of the snapshot and the first few live chunks so a duplicated prompt
-    // can be traced to "server sent it twice" (both previews show the same
-    // text) vs "client wrote it twice" (only one preview shows it).
-    let diagOnDataCallCount = 0
-    const DIAG_ON_DATA_LOG_LIMIT = 5
     const subscribeCallbacks: RemoteRuntimeMultiplexedTerminalCallbacks = {
       onData: (data, meta) => {
         if (isCurrentSubscription()) {
-          if (diagOnDataCallCount < DIAG_ON_DATA_LOG_LIMIT) {
-            diagOnDataCallCount += 1
-            logBugFePty001(
-              `subscribeToHandle onData tabId=${tabId} leafId=${leafId} handle=${subscribedHandle} gen=${generation} seq=${meta?.seq} preview=${JSON.stringify(data.slice(-80))}`
-            )
-          }
           outputProcessor.processData(data, storedCallbacks, undefined, meta)
         }
       },
       onSnapshot: (data, meta) => {
-        logBugFePty001(
-          `subscribeToHandle onSnapshot tabId=${tabId} leafId=${leafId} handle=${subscribedHandle} gen=${generation} preview=${JSON.stringify(data.slice(-80))}`
-        )
         // Why: a snapshot with no body can still carry a pending mid-escape
         // tail that must be replayed so the next live chunk completes it.
         if ((data || meta?.pendingEscapeTailAnsi) && isCurrentSubscription()) {
@@ -725,10 +795,23 @@ export function createRemoteRuntimePtyTransport(
       viewport: subscribedViewport ?? undefined,
       callbacks: subscribeCallbacks
     }
-    // Why: the web session client's Unix-socket-proxied transport has no
-    // binary-frame capability at any layer, so terminal.multiplex (which
-    // requires sendBinary/registerBinaryStreamHandler) can never work there —
-    // fall back to the plain-JSON terminal.subscribe RPC instead.
+    // Why: 'session-auth' (backend-go's WebSessionClient) genuinely cannot
+    // carry binary WS frames — confirmed by reading the client itself:
+    // handleSocketMessage's `if (typeof rawData !== 'string') return` drops
+    // every binary frame outright, and subscribe()'s returned sendBinary
+    // unconditionally throws ("Binary frames not supported in session mode
+    // over this channel"). An earlier pass here assumed WebSessionClient
+    // supported binary because the TS interface declares sendBinary/onBinary
+    // (satisfying RemoteRuntimeMultiplexedTerminalCallbacks structurally) —
+    // wrong; those fields exist only to satisfy the type, the implementation
+    // stubs them. terminal.multiplex is for WebRuntimeClient (paired/E2EE)
+    // only. 'session-auth' must use the plain-JSON fallback — which needs
+    // backend-go to actually implement terminal.subscribe/unsubscribe (see
+    // channels_terminal_subscribe.go) — found live 2026-08-30 via direct WS
+    // frame capture (script-based, not a screenshot): confirmed the create
+    // RPC, the multiplex RPC ack, and the initial prompt all succeed, but
+    // zero binary frames ever cross the wire and every later terminal.* RPC
+    // silently no-ops or 404s.
     const nextStream =
       currentRuntimeEnvironmentId === 'session-auth'
         ? await subscribeTerminalViaJson({
@@ -761,8 +844,12 @@ export function createRemoteRuntimePtyTransport(
       pendingViewportClaim = false
       const queuedInput = pendingClaimInput
       pendingClaimInput = ''
-      if (queuedInput) {
-        nextStream.sendInput(queuedInput)
+      // Why the terminal.send fallback: nextStream.sendInput can legitimately
+      // be a permanent no-op (the JSON/session-auth fallback transport, see
+      // this file's other pendingViewportClaim guard comment) — input queued
+      // during the brief pre-subscribe window must still reach the wire.
+      if (queuedInput && !nextStream.sendInput(queuedInput)) {
+        void sendTerminalTextWithReattachRetry(subscribedHandle, queuedInput)
       }
       for (const resolve of viewportClaimReadyWaiters) {
         resolve(true)
@@ -801,6 +888,14 @@ export function createRemoteRuntimePtyTransport(
           'terminal.create',
           {
             worktree: toRuntimeTerminalWorktreeSelector(worktreeId),
+            // Why: backend-go's terminal.create (channels_terminal.go) only
+            // reads connectionId, never worktree — SpawnTerminalSession takes
+            // an empty ConnectionID as "spawn a host-local PTY", which the
+            // web deployment cannot do (INFRA_TERMINAL_NO_COMPUTE_BOUND,
+            // found live 2026-08-30; see isNoComputeBoundMessage above).
+            // Every dev-server-bound terminal on web rides this transport, so
+            // connectionId must travel with it.
+            ...(connectionId ? { connectionId } : {}),
             ...(commandToSend !== undefined ? { command: commandToSend } : {}),
             ...(startupCommandDeliveryToSend !== undefined
               ? { startupCommandDelivery: startupCommandDeliveryToSend }
@@ -820,12 +915,6 @@ export function createRemoteRuntimePtyTransport(
         )
         handle = created.terminal.handle
         if (destroyed) {
-          // TEMP DIAG BUG-FE-PTY-001: this is the exact "created then
-          // immediately destroyed" race — logs which tab/leaf raced and how
-          // long the create() round-trip took before destroy() beat it.
-          logBugFePty001(
-            `connect() found destroyed=true right after terminal.create resolved — grace-closing PTY tabId=${tabId} leafId=${leafId} worktreeId=${worktreeId} handle=${created.terminal.handle}`
-          )
           // FIX BUG-FE-PTY-001: this is USUALLY a cancelled launch (rapid
           // tab-open/tab-close) — close the server PTY so it doesn't leak.
           // But it's also exactly what happens when this same leaf's own
@@ -857,7 +946,14 @@ export function createRemoteRuntimePtyTransport(
           replay: ''
         } satisfies PtyConnectResult
       } catch (error) {
-        storedCallbacks.onError?.(runtimeTerminalErrorMessage(error))
+        const message = runtimeTerminalErrorMessage(error)
+        if (isNoComputeBoundMessage(message)) {
+          storedCallbacks.onError?.(
+            'This environment has no compute attached — attach a dev server or SSH connection to this environment before opening a terminal.'
+          )
+        } else {
+          storedCallbacks.onError?.(message)
+        }
         return undefined
       }
     },
@@ -1017,18 +1113,15 @@ export function createRemoteRuntimePtyTransport(
       if (stream?.sendInput(text)) {
         return true
       }
-      if (pendingViewportClaim) {
+      // Why !getCurrentMultiplexedStream(targetHandle): same fix as the
+      // inputBatcher flush callback above — see its comment for the full
+      // reasoning (stuck pendingViewportClaim latch on the JSON/session-auth
+      // fallback transport).
+      if (pendingViewportClaim && !getCurrentMultiplexedStream(targetHandle)) {
         pendingClaimInput += text
         return true
       }
-      void callRuntime('terminal.send', {
-        terminal: targetHandle,
-        text,
-        client: { id: clientId, type: 'desktop' },
-        ...(desiredViewport ? { viewport: desiredViewport, claimViewport: true as const } : {})
-      }).catch((error) => {
-        handleRemoteTerminalError(error)
-      })
+      void sendTerminalTextWithReattachRetry(targetHandle, text)
       return true
     },
 
@@ -1069,7 +1162,7 @@ export function createRemoteRuntimePtyTransport(
     },
 
     getConnectionId() {
-      return null
+      return connectionId ?? null
     },
 
     getRuntimeEnvironmentId() {
@@ -1084,12 +1177,6 @@ export function createRemoteRuntimePtyTransport(
     },
 
     destroy() {
-      // TEMP DIAG BUG-FE-PTY-001: pairs with the "transport CREATED" log —
-      // correlate by tabId/leafId to see whether a second transport for the
-      // same tab triggered this teardown before connect() finished.
-      logBugFePty001(
-        `transport DESTROY called tabId=${tabId} leafId=${leafId} handle=${handle} connected=${connected}\n${new Error('destroy call site').stack}`
-      )
       destroyed = true
       this.disconnect()
       inputBatcher.clear()

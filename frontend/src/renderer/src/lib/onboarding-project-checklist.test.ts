@@ -32,7 +32,7 @@ describe('markOnboardingProjectAdded', () => {
   })
 
   it('marks an added Git project and emits activation checklist telemetry', async () => {
-    await markOnboardingProjectAdded('addedRepo')
+    await markOnboardingProjectAdded('addedRepo', null)
 
     expect(mocks.onboardingUpdate).toHaveBeenCalledWith({
       checklist: { addedRepo: true }
@@ -44,7 +44,7 @@ describe('markOnboardingProjectAdded', () => {
   })
 
   it('marks an added folder and emits activation checklist telemetry', async () => {
-    await markOnboardingProjectAdded('addedFolder')
+    await markOnboardingProjectAdded('addedFolder', null)
 
     expect(mocks.onboardingUpdate).toHaveBeenCalledWith({
       checklist: { addedFolder: true }
@@ -61,7 +61,7 @@ describe('markOnboardingProjectAdded', () => {
       checklist: { ...getDefaultOnboardingState().checklist, addedRepo: true }
     })
 
-    await markOnboardingProjectAdded('addedRepo')
+    await markOnboardingProjectAdded('addedRepo', null)
 
     expect(mocks.onboardingUpdate).not.toHaveBeenCalled()
     expect(mocks.track).not.toHaveBeenCalled()

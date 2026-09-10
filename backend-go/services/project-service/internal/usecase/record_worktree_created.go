@@ -24,6 +24,7 @@ type RecordWorktreeCreatedInput struct {
 	// CreateWorktree call.
 	LinkedIssueProvider string
 	LinkedIssueRef      string
+	Lineage             domain.WorktreeLineageCapture
 }
 
 // RecordWorktreeCreated is called by git-gateway-service AFTER the real
@@ -49,7 +50,7 @@ func (uc *RecordWorktreeCreated) Execute(ctx context.Context, in RecordWorktreeC
 		return domain.Worktree{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err)
 	}
 
-	wt, err := domain.NewWorktree(uuid.NewString(), in.ProjectID, in.RepoID, in.Path, in.Branch, in.IdempotencyKey, in.BaseRef)
+	wt, err := domain.NewWorktree(uuid.NewString(), in.ProjectID, in.RepoID, in.Path, in.Branch, in.IdempotencyKey, in.BaseRef, in.Lineage)
 	if err != nil {
 		return domain.Worktree{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_WORKTREE_INVALID", err.Error(), err)
 	}

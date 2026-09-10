@@ -11,7 +11,7 @@ import (
 )
 
 func TestCreatePublicLink_RequiresTenantContext(t *testing.T) {
-	uc := NewCreatePublicLink(newFakeShareLinkRepository(), NewResolvePermission(newFakeTaskRepository(), &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}))
+	uc := NewCreatePublicLink(newFakeShareLinkRepository(), NewResolvePermission(newFakeTaskRepository(), &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil))
 	if _, _, err := uc.Execute(context.Background(), "t1"); err == nil {
 		t.Fatal("expected an error when no tenant is in context")
 	}
@@ -23,7 +23,7 @@ func TestCreatePublicLink_RequiresManageAccess(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "someone-else"}
 	links := newFakeShareLinkRepository()
-	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	uc := NewCreatePublicLink(links, resolvePermission)
 	ctx := withIdentity(context.Background(), "tenant-1", "attacker")
 
@@ -47,7 +47,7 @@ func TestCreatePublicLink_StoresOnlyTheHash_NeverThePlaintext(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "user-1"}
 	links := newFakeShareLinkRepository()
-	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	uc := NewCreatePublicLink(links, resolvePermission)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -74,7 +74,7 @@ func TestResolvePublicLink_ValidToken_ReturnsTaskID(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "user-1"}
 	links := newFakeShareLinkRepository()
-	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	createUC := NewCreatePublicLink(links, resolvePermission)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -99,7 +99,7 @@ func TestResolvePublicLink_RevokedToken_ReturnsNotFound(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "user-1"}
 	links := newFakeShareLinkRepository()
-	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	createUC := NewCreatePublicLink(links, resolvePermission)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -149,7 +149,7 @@ func TestRevokePublicLink_RequiresManageAccess(t *testing.T) {
 	tasks.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", OwnerID: "owner"}
 	links := newFakeShareLinkRepository()
 	links.links["link-1"] = fakeShareLink{tenantID: "tenant-1", taskID: "t1", tokenHash: "abc"}
-	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	uc := NewRevokePublicLink(links, resolvePermission, tasks)
 	ctx := withIdentity(context.Background(), "tenant-1", "attacker")
 
@@ -166,7 +166,7 @@ func TestRevokePublicLink_RequiresManageAccess(t *testing.T) {
 func TestRevokePublicLink_NonexistentLink_ReturnsNotFound(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	links := newFakeShareLinkRepository()
-	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(tasks, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	uc := NewRevokePublicLink(links, resolvePermission, tasks)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 

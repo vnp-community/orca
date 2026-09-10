@@ -99,6 +99,9 @@ message Task {
   // Set by the PR-creation write-back saga — empty until a PR
   // referencing this task's #TG-N is created.
   string pr_url = 23;
+  // workflow_template_id: optional workflow-service template attached to
+  // this task (Engine 3). Empty = none attached. See docs/backlog/BACKLOG-016.
+  string workflow_template_id = 24;
 }
 
 message CreateTaskRequest {
@@ -183,6 +186,13 @@ message ResolvePermissionResponse {
 message TaskServiceExecuteRequest {
   string task_id = 1;
   string request_id = 2;
+  // prompt: caller-supplied override for the agent prompt (TaskPromptEditor.tsx
+  // lets the user edit it before running). Empty = fall back to the
+  // executor's own default prompt built from the task (e.g.
+  // SimpleExecutor.buildExecutePrompt's plain "Complete the following
+  // task: <title>"). Not persisted — a per-execution input, not a task
+  // field. See docs/backlog/BACKLOG-016.
+  string prompt = 3;
 }
 
 message TaskServiceExecuteResponse {
@@ -228,6 +238,11 @@ message UpdateTaskRequest {
   google.protobuf.StringValue visibility = 12;
   google.protobuf.StringValue pr_url = 13;
   google.protobuf.StringValue worktree_id = 14;
+  // workflow_template_id: set (even to "") to change which workflow-service
+  // template is attached; unset (field absent) leaves it untouched — same
+  // wrapper-typed field-mask shape as title/status above. See
+  // docs/backlog/BACKLOG-016.
+  google.protobuf.StringValue workflow_template_id = 15;
 }
 message UpdateTaskResponse {
   Task task = 1;

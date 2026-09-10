@@ -10,7 +10,7 @@
 - `backend-go/services/tenant-service/internal/adapter/postgres/team_repository.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_team_test.go` (new)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 4 task(s) (TASK-176–179) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

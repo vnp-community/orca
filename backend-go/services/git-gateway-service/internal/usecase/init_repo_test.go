@@ -46,4 +46,36 @@ func TestInitRepo_DispatchesByReachability(t *testing.T) {
 			t.Error("expected local executor to be called, not relay")
 		}
 	})
+
+	t.Run("passes RemoteName/RemoteURL through and reports RemoteAdded", func(t *testing.T) {
+		reachability := &fakeDevServerReachability{reachable: true}
+		relay := &fakeGitExecutor{initPath: "/srv/repo", defaultBranch: "main"}
+		local := &fakeGitExecutor{}
+		uc := NewInitRepo(reachability, local, relay)
+
+		got, err := uc.Execute(context.Background(), InitRepoInput{
+			DevServerID: "ds1", DestPath: "/srv/repo",
+			RemoteName: "upstream", RemoteURL: "https://example.com/org/repo.git",
+		})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !got.RemoteAdded {
+			t.Error("expected RemoteAdded to be true when RemoteURL is set")
+		}
+	})
+
+	t.Run("no remote added when RemoteURL is empty", func(t *testing.T) {
+		reachability := &fakeDevServerReachability{reachable: true}
+		relay := &fakeGitExecutor{initPath: "/srv/repo", defaultBranch: "main"}
+		uc := NewInitRepo(reachability, &fakeGitExecutor{}, relay)
+
+		got, err := uc.Execute(context.Background(), InitRepoInput{DevServerID: "ds1", DestPath: "/srv/repo"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.RemoteAdded {
+			t.Error("expected RemoteAdded to be false when RemoteURL is empty")
+		}
+	})
 }

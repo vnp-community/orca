@@ -4,7 +4,7 @@
 **File:** `internal/adapter/wscompat/handler.go`
 **Severity:** High — blocks every real-time/live-update feature that depends on the legacy `/ws` protocol, not just one namespace
 **Symptom:** The frontend's `WebSocketRpcClient` can send `invoke`/`send` frames and get `result`/`error` replies, but the server can never spontaneously push a `{type:"push",channel,args}` frame back — anything that used to arrive as a live update instead never arrives at all (no error, no timeout, just silence)
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-012–016 (5 task(s), all DONE) for implementation evidence.
 
 ---
 

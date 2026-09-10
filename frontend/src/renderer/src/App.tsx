@@ -48,6 +48,7 @@ import { isRemoteWorkspaceSnapshotApplyInProgress, useIpcEvents } from './hooks/
 import { useAutomationDispatchEvents } from './hooks/useAutomationDispatchEvents'
 import RetainedAgentsSyncGate from './components/dashboard/RetainedAgentsSyncGate'
 import { AgentHibernationGate } from './components/AgentHibernationGate'
+import { DepartmentGate } from './components/DepartmentGate'
 import { ActivityTitlebarControls } from './components/activity/ActivityTitlebarControls'
 import Sidebar from './components/Sidebar'
 import { shutdownBufferCaptures } from './components/terminal-pane/shutdown-buffer-captures'
@@ -186,6 +187,8 @@ import {
 } from './components/terminal/background-terminal-worktree-mount'
 
 import { uiGet, uiSet } from '@/runtime/runtime-ui-client'
+import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
+import { installConnectivityPolling } from '@/store/slices/connectivity-status'
 // Why: agents alive during a hard kill (crash, forced update install) need a
 // reasonably fresh resume record on disk; one minute bounds the lost window
 // without measurable per-tick cost (the capture skips unchanged records).
@@ -345,6 +348,7 @@ const FeatureWallModal = lazy(() => import('./components/feature-wall/FeatureWal
 const FeatureTipsModal = lazy(() => import('./components/feature-tips/FeatureTipsModal'))
 const AddRepoDialog = lazy(() => import('./components/sidebar/AddRepoDialog'))
 const NonGitFolderDialog = lazy(() => import('./components/sidebar/NonGitFolderDialog'))
+const InitRepoAsGitDialog = lazy(() => import('./components/worktree-creation/InitRepoAsGitDialog'))
 const AddProjectFromFolderDialog = lazy(
   () => import('./components/sidebar/AddProjectFromFolderDialog')
 )
@@ -1337,7 +1341,9 @@ function App(): React.JSX.Element {
         )
         if (hydratedTargetIds.length > 0) {
           void localWrite
-            .then(() => setRemoteWorkspaceForConnectedTargets(state.settings, { hydratedTargetIds }))
+            .then(() =>
+              setRemoteWorkspaceForConnectedTargets(state.settings, { hydratedTargetIds })
+            )
             .then((results) => {
               for (const { targetId, result } of results ?? []) {
                 applyRemoteWorkspacePatchStatus(targetId, result)
@@ -1416,6 +1422,21 @@ function App(): React.JSX.Element {
       useAppStore.getState().captureAllSleepingAgentSessions()
     }, SLEEPING_AGENT_RESUME_CAPTURE_INTERVAL_MS)
     return () => window.clearInterval(timer)
+  }, [])
+
+  // FE-TASK-STORAGE-014 (CR-STORAGE-007): connectivity.getSummary poll —
+  // every 30s while the app is open, plus an immediate re-run whenever the
+  // window regains foreground. See installConnectivityPolling's own doc
+  // comment for why it reuses installWindowVisibilityInterval instead of a
+  // 2nd hand-rolled visibilitychange listener. The 3rd CR-STORAGE-007
+  // trigger (poll right after a connectivity-looking RPC write failure) is
+  // `maybeTriggerConnectivityPollAfterRpcFailure`, called directly from call
+  // sites' catch blocks, not from this effect.
+  useEffect(() => {
+    return installConnectivityPolling({
+      getTarget: () => getActiveRuntimeTarget(useAppStore.getState().settings),
+      pollConnectivitySummary: (target) => useAppStore.getState().pollConnectivitySummary(target)
+    })
   }, [])
 
   // Own the single window-close-request subscription at the always-mounted App
@@ -2269,6 +2290,7 @@ function App(): React.JSX.Element {
             subscriptions from re-rendering the App tree. */}
             <RetainedAgentsSyncGate />
             <AgentHibernationGate />
+            <DepartmentGate />
             {/* Why: workspace activation is a hot path; including activeWorktreeId
             in reset keys remounts whole surfaces during wake. */}
             <RecoverableRenderErrorBoundary
@@ -2603,6 +2625,16 @@ function App(): React.JSX.Element {
                   compact
                 >
                   <NonGitFolderDialog />
+                </RecoverableRenderErrorBoundary>
+              ) : null}
+              {activeModal === 'init-repo-as-git' ? (
+                <RecoverableRenderErrorBoundary
+                  boundaryId="modal.init-repo-as-git"
+                  surface="modal"
+                  resetKey
+                  compact
+                >
+                  <InitRepoAsGitDialog />
                 </RecoverableRenderErrorBoundary>
               ) : null}
               {activeModal === 'confirm-add-project-from-folder' ? (

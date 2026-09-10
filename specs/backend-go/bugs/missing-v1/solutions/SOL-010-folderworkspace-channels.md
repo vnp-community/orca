@@ -11,7 +11,7 @@
 - `backend-go/services/project-service/migrations/NNNN_create_folder_workspaces.sql`
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (new `registerFolderWorkspaceChannels`)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_test.go`
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 7 task(s) (TASK-061–067) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

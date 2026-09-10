@@ -2,6 +2,7 @@ package devserveragent
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -70,6 +71,14 @@ type HandshakeInfo struct {
 type pendingCall struct {
 	resultCh chan JSONRPCResponse
 	streamCh chan JSONRPCResponse
+	// streaming marks a call whose response arrives as MULTIPLE frames
+	// sharing this call's request id (vm.provision's stream.started/
+	// stream.chunk/stream.end shape — see streamCall's doc comment). readLoop
+	// must not auto-delete this pending entry after its first frame the way
+	// it does for an ordinary call() — the caller (streamCall/its consumer)
+	// owns calling the returned complete func exactly once, on the terminal
+	// frame or early cancellation.
+	streaming bool
 }
 
 // session is one persistent connection to a single dev server's agent —
@@ -86,8 +95,8 @@ type managedMode int
 
 const (
 	managedModeNone             managedMode = iota // relay-websocket: backgroundReconnect dials as before
-	managedModeInboundOnly                          // direct-websocket: agent re-dials on its own
-	managedModeRelaySSHReattach                     // relay-ssh: relaySSHReconnect (reattach, not redeploy)
+	managedModeInboundOnly                         // direct-websocket: agent re-dials on its own
+	managedModeRelaySSHReattach                    // relay-ssh: relaySSHReconnect (reattach, not redeploy)
 )
 
 type session struct {
@@ -130,6 +139,28 @@ type session struct {
 	// agent.hook notification, unlike ptySubs's per-pty-id keying.
 	hookMu   sync.Mutex
 	hookSubs []chan rawAgentHookNotification
+
+	// screencastMu/screencastSubs is the same demux pattern as ptyMu/ptySubs,
+	// for browser.screencastReady/Frame/Ended/Error notifications
+	// (StreamScreencast) — keyed by worktree_id rather than a pty id, since
+	// (unlike a pty, which already exists by the time StreamPty subscribes)
+	// a screencast's subscription_id/browser_page_id are only assigned by
+	// the agent's browser.screencastReady response, so worktree_id (known
+	// up front, caller-supplied) is the only viable subscribe-before-call
+	// correlation key. Own mutex for the same never-contend-with-call()
+	// reason ptyMu has its own.
+	screencastMu   sync.Mutex
+	screencastSubs map[string][]chan rawScreencastNotification
+
+	// fileWatchMu/fileWatchSubs is the same demux pattern again, for
+	// fs.changed notifications (StreamFileChanges, BACKLOG-003) — keyed by
+	// the watched absolute path, exactly what fs.watch/fs.unwatch/fs.changed
+	// all key by agent-side (agent/src/relay/fs-agent-extensions.ts's
+	// AGENT_WATCH_MAP), so no separate id-assignment step exists to race the
+	// way screencastSubs's subscription_id does. Own mutex for the same
+	// never-contend-with-call() reason ptyMu/screencastMu have their own.
+	fileWatchMu   sync.Mutex
+	fileWatchSubs map[string][]chan rawFileWatchNotification
 
 	reconnectAttempt int
 
@@ -270,11 +301,25 @@ func (s *session) runInitiatorHandshake(ctx context.Context, conn *websocket.Con
 }
 
 // readLoop decodes every subsequent frame and routes JSON-RPC responses to
-// their pending caller by ID. Runs until the transport errors/closes.
+// their pending caller by ID. Runs until the transport errors/closes, or
+// cfg.IdleTimeout elapses with no frame received at all (including
+// keepalives) — see the fresh per-iteration deadline below.
+//
+// Why a per-iteration context.WithTimeout, not one long-lived context plus a
+// separate watchdog goroutine comparing timestamps: Transport.ReadFrame's
+// own doc comment guarantees it returns once ctx is cancelled, and
+// wsTransport delegates straight to coder/websocket's conn.Read(ctx), which
+// already does exactly this (cancel → Read errors, connection torn down) —
+// no extra goroutine, no extra mutex-protected "last frame at" field, no
+// second code path to keep in sync with handleDisconnect. Was previously a
+// gap the agent side (Phase 8) had already fixed and documented as "must
+// terminate(), never rely on close() eventually timing out" — this closes
+// the mirror-image gap on the backend-go side of the same connection.
 func (s *session) readLoop(t Transport) {
-	ctx := context.Background()
 	for {
+		ctx, cancel := context.WithTimeout(context.Background(), s.cfg.IdleTimeout)
 		decoded, err := t.ReadFrame(ctx)
+		cancel()
 		if err != nil {
 			s.handleDisconnect(t, err)
 			return
@@ -309,7 +354,16 @@ func (s *session) readLoop(t Transport) {
 				}
 				continue
 			}
-			delete(s.pending, resp.ID)
+			// A streaming call's pending entry stays registered across
+			// multiple response frames — only an ordinary (non-streaming)
+			// call is auto-cleared on its one response. An error response is
+			// always terminal even for a streaming call (e.g. vm.provision
+			// dispatch-time "method not found": the dispatcher never even
+			// sends 'stream.started', see streamCall's doc comment), so it
+			// clears the entry regardless of streaming.
+			if call != nil && (resp.Error != nil || !call.streaming) {
+				delete(s.pending, resp.ID)
+			}
 			s.mu.Unlock()
 			if call != nil {
 				call.resultCh <- resp
@@ -360,13 +414,20 @@ type ptyNotificationParams struct {
 // routeNotification demuxes an incoming notification by method — pty.*
 // notifications route by pty id (routePtyNotification), agent.hook fans out
 // to every subscriber on this session (routeAgentHookNotification, TASK-AG-03-03,
-// unkeyed — see hookSubs's doc comment).
+// unkeyed — see hookSubs's doc comment), browser.screencast* routes by
+// worktree id (routeScreencastNotification, StreamScreencast), and
+// fs.changed routes by watched path (routeFileWatchNotification,
+// StreamFileChanges).
 func (s *session) routeNotification(n JSONRPCNotification) {
 	switch n.Method {
 	case "pty.data", "pty.exit", "pty.replay":
 		s.routePtyNotification(n)
 	case "agent.hook":
 		s.routeAgentHookNotification(n)
+	case "browser.screencastReady", "browser.screencastFrame", "browser.screencastEnded", "browser.screencastError":
+		s.routeScreencastNotification(n)
+	case "fs.changed":
+		s.routeFileWatchNotification(n)
 	default:
 		return // not a notification this client demuxes, see package doc comment's "Two RPC surfaces" note
 	}
@@ -491,6 +552,81 @@ func (s *session) routeAgentHookNotification(n JSONRPCNotification) {
 	}
 }
 
+// rawScreencastNotification is session.go's internal decoding of one
+// browser.screencastReady/Frame/Ended/Error notification — StreamScreencast
+// (client.go) wraps this into the exported usecase.ScreencastEvent shape.
+// Exactly one of Ready/Frame/Ended/ErrorMsg is meaningfully set per value,
+// matching rawPtyNotification's "one raw struct, caller narrows by which
+// notification method produced it" convention.
+type rawScreencastNotification struct {
+	Ready          bool
+	SubscriptionID string
+	BrowserPageID  string
+	Format         string
+	Frame          []byte
+	Ended          bool
+	ErrorMsg       string
+}
+
+// screencastNotificationParams is this adapter's decoding of
+// browser.screencastReady/Frame/Ended/Error notification params — unlike
+// ptyNotificationParams, this shape is NOT a best-effort guess: both this
+// adapter and agent/src/relay/browser-screencast-handler.ts (this same
+// implementation pass) were written together, so the field names below are
+// the actual, verified contract, not a FLAGGED placeholder.
+type screencastNotificationParams struct {
+	WorktreeID     string `json:"worktreeId"`
+	SubscriptionID string `json:"subscriptionId"`
+	BrowserPageID  string `json:"browserPageId"`
+	Format         string `json:"format"`
+	DataBase64     string `json:"dataBase64"`
+	Message        string `json:"message"`
+}
+
+// routeScreencastNotification is routeNotification's screencast counterpart
+// — same demux-by-correlation-key-then-non-blocking-fanout shape as
+// routePtyNotification, keyed by worktree_id (see screencastSubs's doc
+// comment for why).
+func (s *session) routeScreencastNotification(n JSONRPCNotification) {
+	var p screencastNotificationParams
+	if len(n.Params) > 0 {
+		_ = json.Unmarshal(n.Params, &p)
+	}
+	if p.WorktreeID == "" {
+		return
+	}
+
+	raw := rawScreencastNotification{}
+	switch n.Method {
+	case "browser.screencastReady":
+		raw.Ready = true
+		raw.SubscriptionID = p.SubscriptionID
+		raw.BrowserPageID = p.BrowserPageID
+		raw.Format = p.Format
+	case "browser.screencastFrame":
+		decoded, err := base64.StdEncoding.DecodeString(p.DataBase64)
+		if err != nil {
+			return // malformed frame — drop rather than forward garbage bytes
+		}
+		raw.Frame = decoded
+	case "browser.screencastEnded":
+		raw.Ended = true
+	case "browser.screencastError":
+		raw.ErrorMsg = p.Message
+	}
+
+	s.screencastMu.Lock()
+	subs := append([]chan rawScreencastNotification(nil), s.screencastSubs[p.WorktreeID]...)
+	s.screencastMu.Unlock()
+
+	for _, ch := range subs {
+		select {
+		case ch <- raw:
+		default: // slow/gone consumer — drop rather than block the read loop
+		}
+	}
+}
+
 // subscribeAgentHooks registers a new listener for every agent.hook
 // notification on this session (unkeyed — see routeAgentHookNotification's
 // doc comment). Exactly one long-lived subscriber per devServer connection
@@ -515,6 +651,142 @@ func (s *session) unsubscribeAgentHooks(ch chan rawAgentHookNotification) {
 		}
 	}
 	s.hookMu.Unlock()
+	close(ch)
+}
+
+// subscribeScreencast registers a new listener for worktreeID's screencast
+// notifications — StreamScreencast's implementation. MUST be called BEFORE
+// issuing the browser.screencastStart call (see StreamScreencast) so a fast
+// agent response can never arrive before the subscription exists.
+func (s *session) subscribeScreencast(worktreeID string) chan rawScreencastNotification {
+	ch := make(chan rawScreencastNotification, 64)
+	s.screencastMu.Lock()
+	if s.screencastSubs == nil {
+		s.screencastSubs = make(map[string][]chan rawScreencastNotification)
+	}
+	s.screencastSubs[worktreeID] = append(s.screencastSubs[worktreeID], ch)
+	s.screencastMu.Unlock()
+	return ch
+}
+
+// unsubscribeScreencast removes and closes ch — MUST be called exactly once
+// by whoever called subscribeScreencast (see StreamScreencast's returned
+// unsubscribe func).
+func (s *session) unsubscribeScreencast(worktreeID string, ch chan rawScreencastNotification) {
+	s.screencastMu.Lock()
+	subs := s.screencastSubs[worktreeID]
+	for i, c := range subs {
+		if c == ch {
+			s.screencastSubs[worktreeID] = append(subs[:i], subs[i+1:]...)
+			break
+		}
+	}
+	if len(s.screencastSubs[worktreeID]) == 0 {
+		delete(s.screencastSubs, worktreeID)
+	}
+	s.screencastMu.Unlock()
+	close(ch)
+}
+
+// rawFileWatchNotification is session.go's internal decoding of one
+// fs.changed notification — StreamFileChanges (client.go) wraps this into
+// the exported usecase.FileChangeEvent shape. Path is the watched ROOT
+// (what fs.watch was called with, and what fileWatchSubs is keyed by, not
+// the individual changed file) — see fsChangedParams's doc comment.
+type rawFileWatchNotification struct {
+	Path     string
+	Kind     string // "create" | "update" | "delete" | "rename" | "overflow"
+	Filename string // root-relative, "" when the root itself is the changed entry
+}
+
+// fsChangedParams is fs.changed's real wire shape — confirmed against
+// agent/src/relay/fs-agent-extensions.ts's handleFsWatch/
+// handleLinuxWatchEvent notify() call sites (unlike ptyNotificationParams,
+// this one IS verified, not a best-effort guess).
+type fsChangedParams struct {
+	Path      string `json:"path"`      // the watched root, same value fs.watch({path}) was called with
+	EventType string `json:"eventType"` // "rename" | "change" | "error" — Node fs.watch's own two kinds, plus the agent's synthesized "error"
+	Filename  string `json:"filename"`  // root-relative path of the changed entry, "" when unknown/root itself
+	Error     string `json:"error"`     // set only when eventType == "error"
+}
+
+// routeFileWatchNotification decodes one fs.changed notification and fans
+// it out to every subscriber registered for its watched root path — see
+// routePtyNotification's doc comment for the same non-blocking-send
+// discipline. Kind mapping mirrors the legacy Node backend's own
+// battle-tested approximation (backend/src/main/providers/
+// dev-server-filesystem-provider.ts's watchViaPush): Node's fs.watch only
+// ever reports "rename" (create/delete/rename, indistinguishable) or
+// "change" (content) — not the finer create/update/delete split
+// FileChangeEvent.kind's shape otherwise suggests — so "rename" maps to
+// "rename" and everything else maps to "update"; "error" maps to the
+// dedicated "overflow" kind (matching the legacy mapping's own choice: no
+// FsChangeEvent.kind value means "watch itself broke", "overflow" is the
+// closest existing one and every caller already treats it as "give up on
+// deltas, do a full re-read").
+func (s *session) routeFileWatchNotification(n JSONRPCNotification) {
+	var p fsChangedParams
+	if len(n.Params) > 0 {
+		_ = json.Unmarshal(n.Params, &p)
+	}
+	if p.Path == "" {
+		return
+	}
+
+	raw := rawFileWatchNotification{Path: p.Path, Filename: p.Filename}
+	switch {
+	case p.EventType == "error":
+		raw.Kind = "overflow"
+	case p.EventType == "rename":
+		raw.Kind = "rename"
+	default:
+		raw.Kind = "update"
+	}
+
+	s.fileWatchMu.Lock()
+	subs := append([]chan rawFileWatchNotification(nil), s.fileWatchSubs[p.Path]...)
+	s.fileWatchMu.Unlock()
+
+	for _, ch := range subs {
+		select {
+		case ch <- raw:
+		default: // slow/gone consumer — drop rather than block the read loop
+		}
+	}
+}
+
+// subscribeFileWatch registers a new listener for path's fs.changed
+// notifications — StreamFileChanges's implementation. MUST be called BEFORE
+// issuing the fs.watch call (same subscribe-before-call discipline
+// StreamScreencast's doc comment explains) so a fast agent notification can
+// never arrive before the subscription exists.
+func (s *session) subscribeFileWatch(path string) chan rawFileWatchNotification {
+	ch := make(chan rawFileWatchNotification, 64)
+	s.fileWatchMu.Lock()
+	if s.fileWatchSubs == nil {
+		s.fileWatchSubs = make(map[string][]chan rawFileWatchNotification)
+	}
+	s.fileWatchSubs[path] = append(s.fileWatchSubs[path], ch)
+	s.fileWatchMu.Unlock()
+	return ch
+}
+
+// unsubscribeFileWatch removes and closes ch — MUST be called exactly once
+// by whoever called subscribeFileWatch (see StreamFileChanges's returned
+// unsubscribe func).
+func (s *session) unsubscribeFileWatch(path string, ch chan rawFileWatchNotification) {
+	s.fileWatchMu.Lock()
+	subs := s.fileWatchSubs[path]
+	for i, c := range subs {
+		if c == ch {
+			s.fileWatchSubs[path] = append(subs[:i], subs[i+1:]...)
+			break
+		}
+	}
+	if len(s.fileWatchSubs[path]) == 0 {
+		delete(s.fileWatchSubs, path)
+	}
+	s.fileWatchMu.Unlock()
 	close(ch)
 }
 
@@ -883,6 +1155,86 @@ func isTerminalStreamResponse(resp JSONRPCResponse) bool {
 		return false
 	}
 	return probe.Type == "stream.end"
+}
+
+// streamCall sends method and blocks for exactly the FIRST response frame —
+// mirroring call()'s wait — then hands back a channel for every SUBSEQUENT
+// frame sharing this request's id, until the caller invokes the returned
+// complete func exactly once (on a terminal frame or early cancellation),
+// matching StreamPty/StreamScreencast's subscribe/unsubscribe contract.
+//
+// This is vm.provision's real wire shape (agent-ephemeral-vm-handler.ts's
+// handleVmProvision, mirroring agent-git-handler.ts's handleGitExecStream —
+// the confirmed precedent): the RPC dispatcher answers the original request
+// id immediately with {result:{type:'stream.started'}} BEFORE the handler
+// even starts running, then the handler pushes zero-or-more
+// {result:{type:'stream.chunk',...}} frames and exactly one terminal
+// {result:{type:'stream.end',...}} frame — all sharing that same id. This is
+// NOT the pty.data/browser.screencastReady notification demux shape (a
+// separate method+params push with no id) that subscribePty/
+// subscribeScreencast handle — it's multiple RESPONSE frames for one
+// request, which ordinary call() cannot receive (its pendingCall is deleted
+// after the first frame). See pendingCall.streaming's doc comment for the
+// readLoop-side half of this.
+func (s *session) streamCall(ctx context.Context, method string, params any) (firstResult json.RawMessage, rest <-chan JSONRPCResponse, complete func(), err error) {
+	s.mu.Lock()
+	if s.transport == nil || !s.handshaked {
+		s.mu.Unlock()
+		return nil, nil, nil, fmt.Errorf("devserveragent: not connected")
+	}
+	t := s.transport
+	reqID := s.nextRequestID
+	s.nextRequestID++
+	frameID := s.nextFrameID
+	s.nextFrameID++
+	ack := s.highestPeerSeq
+	call := &pendingCall{resultCh: make(chan JSONRPCResponse, 256), streaming: true}
+	s.pending[reqID] = call
+	s.mu.Unlock()
+
+	complete = func() {
+		s.mu.Lock()
+		if s.pending[reqID] == call {
+			delete(s.pending, reqID)
+		}
+		s.mu.Unlock()
+	}
+
+	var paramsRaw json.RawMessage
+	if params != nil {
+		encoded, encErr := json.Marshal(params)
+		if encErr != nil {
+			complete()
+			return nil, nil, nil, encErr
+		}
+		paramsRaw = encoded
+	}
+	req := JSONRPCRequest{JSONRPC: "2.0", ID: reqID, Method: method, Params: paramsRaw}
+	frame, encErr := EncodeJSONRPCFrame(req, frameID, ack)
+	if encErr != nil {
+		complete()
+		return nil, nil, nil, encErr
+	}
+
+	callCtx, cancel := context.WithTimeout(ctx, s.cfg.RequestTimeout)
+	defer cancel()
+
+	if writeErr := t.WriteFrame(callCtx, frame); writeErr != nil {
+		complete()
+		return nil, nil, nil, fmt.Errorf("devserveragent: sending %q: %w", method, writeErr)
+	}
+
+	select {
+	case resp := <-call.resultCh:
+		if resp.Error != nil {
+			complete() // no-op if readLoop already cleared it (it does, for an error frame)
+			return nil, nil, nil, resp.Error
+		}
+		return resp.Result, call.resultCh, complete, nil
+	case <-callCtx.Done():
+		complete()
+		return nil, nil, nil, fmt.Errorf("devserveragent: request %q timed out: %w", method, callCtx.Err())
+	}
 }
 
 func (s *session) dropPending(id uint32) {

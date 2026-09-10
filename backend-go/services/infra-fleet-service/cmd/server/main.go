@@ -20,10 +20,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
+	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/auditclient"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
@@ -35,7 +37,9 @@ import (
 	svcconfig "github.com/stablyai/orca-go/services/infra-fleet-service/internal/config"
 
 	infraagentwsserver "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/agentwsserver"
+	infrabackendrelaysshprovisioner "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/backendrelaysshprovisioner"
 	infradevserveragent "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
+	infraephemeralsshconn "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/ephemeralsshconn"
 	infraeventbus "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/eventbus"
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
 	infragrpcclient "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpcclient"
@@ -50,6 +54,7 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
+	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
 
@@ -75,15 +80,33 @@ func run() error {
 	logger := logging.New(cfg.ServiceName, version)
 	slog.SetDefault(logger)
 
-	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
+	// NATS connect moved ahead of tracing.Init (TASK-BE-FFT-008) so pub
+	// exists in time to pass to tracing.WithTraceEventPublisher. Same
+	// non-fatal degrade posture infra-fleet-service already had: rows
+	// still write durably to the outbox even when NATS is down at startup.
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, dev-server-disconnected alerts will queue until a future restart", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.*.trace.span"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure TRACE jetstream stream", slog.Any("error", err))
+		}
+	}
+
+	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint, tracing.WithTraceEventPublisher(pub))
 	if err != nil {
 		return fmt.Errorf("initializing tracing: %w", err)
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (see common/secrets.DatabaseCredentialsFromFile's doc comment) —
+	// falls back to DATABASE_DSN itself when the file doesn't exist, which
+	// is what local dev / this scaffold's testcontainers path still uses.
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
+	if err != nil {
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
 	pool, err := pgxpool.New(ctx, dsn)
 	if err != nil {
@@ -115,12 +138,11 @@ func run() error {
 	// startup, connection writes still succeed (the request path never
 	// touches NATS directly), rows just queue up unpublished until an
 	// operator restarts this process once NATS recovers.
+	// Reuses the single NATS connection established above (line ~87) for
+	// TRACE — pub is nil when NATS was unreachable at startup, which
+	// degrades this relay the same non-fatal way it always has.
 	var relay *outbox.Relay
-	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
-	if err != nil {
-		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
-	} else {
-		defer func() { _ = closeBus() }()
+	if pub != nil {
 		if err := pub.EnsureStream(ctx, "INFRAFLEET", []string{"orca.infrafleet.>"}); err != nil {
 			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
 		} else {
@@ -229,9 +251,14 @@ func run() error {
 	}
 
 	registerDevServerUC := usecase.NewRegisterDevServer(repo)
-	resolveConnectionUC := usecase.NewResolveConnection(repo)
-	resolveConnectionUC.Sessions = handshakeInfoProvider{client: agentClient} // TASK-INT-03-02: optional node_version enrichment
+	resolveDirectWebSocketDevServerUC := usecase.NewResolveDirectWebSocketDevServer(repo)
 	createSshTargetUC := usecase.NewCreateSshTarget(sshTargetStore)
+	// bulkProvisionFleetUC (TASK-BE-FLEET-001/003, CR-FLEET-001) needs
+	// bulkProvisioner (the relay-ssh SSH-connect -> prereq-check -> deploy ->
+	// handshake pipeline, or its unavailable-degrade stand-in) constructed
+	// above — NOT createSshTargetUC/registerDevServerUC, which is a
+	// different, incompatible shape BulkProvisionFleet no longer takes.
+	bulkProvisionFleetUC := usecase.NewBulkProvisionFleet(sshTargetStore, repo, bulkProvisioner)
 	getFleetHealthUC := usecase.NewGetFleetHealth(repo)
 	scanWorkspacePortsUC := usecase.NewScanWorkspacePorts(repo, agentClient)
 	listDevServersUC := usecase.NewListDevServers(repo)
@@ -239,32 +266,68 @@ func run() error {
 	createConnectionUC := usecase.NewCreateConnection(repo)
 	relayUC := usecase.NewRelay(repo, agentClient)
 	relayStreamUC := usecase.NewRelayStream(repo, agentClient)
+	relayByDevServerUC := usecase.NewRelayByDevServer(repo, agentClient)
+	// streamFileChangesUC (BACKLOG-003) — repo implements both
+	// ConnectionResolver and DevServerRepository, same dual-role convention
+	// relayUC/relayByDevServerUC each use separately.
+	streamFileChangesUC := usecase.NewStreamFileChanges(repo, repo, agentClient)
+	isDevServerConnectedUC := usecase.NewIsDevServerConnected(repo, agentClient)
 	listSshTargetsUC := usecase.NewListSshTargets(sshTargetStore)
 	getSshStateUC := usecase.NewGetSshState(sshTargetStore, repo, repo)
-	establishConnectionUC := usecase.NewEstablishConnection(sshTargetStore, repo, repo, agentClient)
+
+	// Audit-append client (TASK-BE-018/022, CR-RBAC-005) — EstablishConnection
+	// uses this to record every "ssh.connect" allow/deny outcome to
+	// auth-service's audit_log. Lazy dial (grpc.NewClient doesn't block on
+	// connect), same convention as every other outbound client above.
+	authConn, err := grpc.NewClient(cfg.AuthServiceAddr, grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler()))
+	if err != nil {
+		return fmt.Errorf("dialing auth-service: %w", err)
+	}
+	defer func() { _ = authConn.Close() }()
+	auditClient := auditclient.New(authv1.NewAuthServiceClient(authConn))
+
+	establishConnectionUC := usecase.NewEstablishConnection(sshTargetStore, repo, repo, agentClient, auditClient)
 	killWorkspacePortUC := usecase.NewKillWorkspacePort(repo, agentClient)
+	// TeardownConnection (BE-SOL-STORAGE-003 §5, TASK-BE-STORAGE-012) — the
+	// confirmed-logout explicit-close path; repo implements both
+	// ConnectionResolver (lookup) and ConnectionRepository (persist), same
+	// dual-role convention as its use elsewhere in this file.
+	teardownConnectionUC := usecase.NewTeardownConnection(repo, repo, terminalSessionStore, agentClient)
 
 	// --- Terminal/PTY (TASK-185) --- one ConnectionStreamLimiter shared by
 	// AttachPty across every stream this process serves.
 	ptyStreamLimiter := usecase.NewConnectionStreamLimiter(0)
-	spawnTerminalSessionUC := usecase.NewSpawnTerminalSession(repo, agentClient, terminalSessionStore, cfg.ServerDeployment)
-	resizeTerminalSessionUC := usecase.NewResizeTerminalSession(terminalSessionStore, repo, agentClient)
-	killTerminalSessionUC := usecase.NewKillTerminalSession(terminalSessionStore, repo, agentClient)
-	stopTerminalProcessUC := usecase.NewStopTerminalProcess(terminalSessionStore, repo, agentClient)
+	// ephemeralVmRuntimeStore is constructed here (earlier than the rest of
+	// the "Ephemeral VM" wiring block below) because SpawnTerminalSession
+	// needs it too, for TASK-BE-EVM-007's environmentId resolution fallback
+	// — the block below still uses this same instance.
+	ephemeralVmRuntimeStore := infrapostgres.NewEphemeralVmRuntimeStore(pool)
+	// resolveConnectionUC (TASK-BE-EVM-018, BE-SOL-EVM-004 §6c) needs
+	// ephemeralVmRuntimeStore for its HiddenTargetID lookup — constructed
+	// here, after that store exists, rather than up with the rest of the
+	// "core dispatch" usecases above (which predate this dependency).
+	resolveConnectionUC := usecase.NewResolveConnection(repo, ephemeralVmRuntimeStore)
+	resolveConnectionUC.Sessions = handshakeInfoProvider{client: agentClient} // TASK-INT-03-02: optional node_version enrichment
+	spawnTerminalSessionUC := usecase.NewSpawnTerminalSession(repo, repo, agentClient, terminalSessionStore, ephemeralVmRuntimeStore, cfg.ServerDeployment)
+	resizeTerminalSessionUC := usecase.NewResizeTerminalSession(terminalSessionStore, repo, repo, agentClient)
+	killTerminalSessionUC := usecase.NewKillTerminalSession(terminalSessionStore, repo, repo, agentClient)
+	stopTerminalProcessUC := usecase.NewStopTerminalProcess(terminalSessionStore, repo, repo, agentClient)
 	listTerminalSessionsUC := usecase.NewListTerminalSessions(terminalSessionStore)
-	waitTerminalSessionUC := usecase.NewWaitTerminalSession(terminalSessionStore, repo, agentClient)
+	waitTerminalSessionUC := usecase.NewWaitTerminalSession(terminalSessionStore, repo, repo, agentClient)
 	focusTerminalSessionUC := usecase.NewFocusTerminalSession(terminalSessionStore)
-	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, agentClient, terminalLiveStates, lifecycleEvents, queuedPromptStore)
-	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, agentClient)
-	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, agentClient, ptyStreamLimiter, terminalLiveStates, lifecycleEvents)
+	getTerminalAgentStatusUC := usecase.NewGetTerminalAgentStatus(terminalSessionStore, repo, repo, agentClient, terminalLiveStates, lifecycleEvents, queuedPromptStore)
+	inspectTerminalProcessUC := usecase.NewInspectTerminalProcess(terminalSessionStore, repo, repo, agentClient)
+	attachPtyUC := usecase.NewAttachPty(terminalSessionStore, repo, repo, agentClient, ptyStreamLimiter, terminalLiveStates, lifecycleEvents)
+	screencastStreamLimiter := usecase.NewConnectionStreamLimiter(0)
+	attachScreencastUC := usecase.NewAttachScreencast(repo, agentClient, screencastStreamLimiter)
 	listBrowserProfilesUC := usecase.NewListBrowserProfiles(browserProfileStore)
 	createBrowserProfileUC := usecase.NewCreateBrowserProfile(browserProfileStore, uuid.NewString)
 	deleteBrowserProfileUC := usecase.NewDeleteBrowserProfile(browserProfileStore)
 	// dispatchPrompt/getQueuedPrompt (TASK-MB-03-05) share queuedPromptStore
 	// with getTerminalAgentStatusUC above — the SAME instance the
 	// ready-transition queue-drain hook needs.
-	dispatchPromptUC := usecase.NewDispatchPrompt(terminalSessionStore, repo, agentClient, queuedPromptStore)
-	getQueuedPromptUC := usecase.NewGetQueuedPrompt(terminalSessionStore, repo, queuedPromptStore)
+	dispatchPromptUC := usecase.NewDispatchPrompt(terminalSessionStore, repo, repo, agentClient, queuedPromptStore)
+	getQueuedPromptUC := usecase.NewGetQueuedPrompt(terminalSessionStore, repo, repo, queuedPromptStore)
 
 	// --- Emulator relay (TASK-048) / host capabilities relay (TASK-070) ---
 	// Shipped-but-honestly-inert until agent/ gains device.*/host.capabilities
@@ -279,11 +342,10 @@ func run() error {
 
 	// --- CLI agent access (BUG-CLI-02) ---
 	getAgentTerminalSessionUC := usecase.NewGetAgentTerminalSession(repo, terminalSessionStore)
-	sendTerminalInputUC := usecase.NewSendTerminalInput(terminalSessionStore, repo, agentClient)
-	getTerminalScrollbackUC := usecase.NewGetTerminalScrollback(terminalSessionStore, repo, agentClient)
+	sendTerminalInputUC := usecase.NewSendTerminalInput(terminalSessionStore, repo, repo, agentClient)
+	getTerminalScrollbackUC := usecase.NewGetTerminalScrollback(terminalSessionStore, repo, repo, agentClient)
 
 	importFleetInventoryUC := usecase.NewImportFleetInventory(sshTargetStore)
-	bulkProvisionFleetUC := usecase.NewBulkProvisionFleet(sshTargetStore, repo, bulkProvisioner)
 	detectDevServerAgentsUC := usecase.NewDetectDevServerAgents(repo, agentClient)
 	checkDevServerPreflightUC := usecase.NewCheckDevServerPreflight(repo, agentClient)
 
@@ -311,19 +373,23 @@ func run() error {
 	fleetCollector := inframetrics.NewFleetCollector()
 	fleetMetricsRegistry.MustRegister(fleetCollector)
 
+	// pollFleetHealthUC combines SOL-FLEET-03's CPU/RAM/disk sampling +
+	// status-change event/webhook/metrics wiring with BE-SOL-STORAGE-003's
+	// connection degraded/reestablish state machine + outbox disconnect
+	// alert — see usecase.PollFleetHealth's doc comment. repo implements
+	// FleetHealthPollerRepository/FleetHealthWriter/OutboxWriter/
+	// PollLockPort/ConnectionRepository all at once, same dual/multi-role
+	// convention as its use elsewhere in this file. Driven by the ticker
+	// goroutine further down (poll once on startup, then every
+	// cfg.FleetPollInterval), not a self-ticking Run call here.
 	pollFleetHealthUC := usecase.NewPollFleetHealth(
-		repo, repo, agentClient, repo, healthEventPublisherUC, webhookAlerterUC, fleetCollector, logger,
+		repo, repo, repo, agentClient, repo, repo, terminalSessionStore, healthEventPublisherUC, webhookAlerterUC, fleetCollector, logger,
 	)
-	go pollFleetHealthUC.Run(ctx, cfg.FleetPollInterval)
 
 	// --- Persistent agent tokens (BL-AWS-03) ---
 	createAgentTokenUC := usecase.NewCreateAgentToken(agentTokenStore, repo, credentialBrokerClient)
 	listAgentTokensUC := usecase.NewListAgentTokens(agentTokenStore)
 	revokeAgentTokenUC := usecase.NewRevokeAgentToken(agentTokenStore, agentClient)
-
-	// BR-SSH-13: cancel an in-flight relaySSHReconnect/backgroundReconnect
-	// loop and mark the connection closed.
-	teardownConnectionUC := usecase.NewTeardownConnection(repo, agentClient)
 
 	// --- Auto port-forwarding (SOL-SSH-04) ---
 	portForwardStore := infrapostgres.NewPortForwardStore(pool)
@@ -412,7 +478,82 @@ func run() error {
 	resumeAgentSessionUC := usecase.NewResumeAgentSession(agentSessionStore, repo, startAgentSessionUC)
 	switchAgentAccountUC := usecase.NewSwitchAgentAccount(agentSessionStore, killAgentSessionUC, aiProviderResolver, startAgentSessionUC, resumeAgentSessionUC)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
+	// --- CR-DS-006 Phase 2 / CR-DS-007 / CR-DS-008 (dev server access control) ---
+	devServerGroupStore := infrapostgres.NewDevServerGroupStore(pool)
+	devServerGroupGrantStore := infrapostgres.NewDevServerGroupGrantStore(pool)
+	devServerAccessRequestStore := infrapostgres.NewDevServerAccessRequestStore(pool)
+	approveDevServerUC := usecase.NewApproveDevServer(repo)
+	rejectDevServerUC := usecase.NewRejectDevServer(repo)
+	assignDevServerGroupUC := usecase.NewAssignDevServerGroup(repo)
+	createDevServerGroupUC := usecase.NewCreateDevServerGroup(devServerGroupStore)
+	listDevServerGroupsUC := usecase.NewListDevServerGroups(devServerGroupStore)
+	grantDevServerGroupAccessUC := usecase.NewGrantDevServerGroupAccess(devServerGroupGrantStore)
+	revokeDevServerGroupAccessUC := usecase.NewRevokeDevServerGroupAccess(devServerGroupGrantStore)
+	listDevServerGroupGrantsUC := usecase.NewListDevServerGroupGrants(devServerGroupGrantStore)
+	listDevServersForUserUC := usecase.NewListDevServersForUser(repo, devServerGroupStore, devServerGroupGrantStore)
+	createAccessRequestUC := usecase.NewCreateAccessRequest(devServerAccessRequestStore)
+	listPendingAccessRequestsUC := usecase.NewListPendingAccessRequests(devServerAccessRequestStore)
+	resolveAccessRequestUC := usecase.NewResolveAccessRequest(devServerAccessRequestStore, devServerGroupGrantStore)
+
+	// --- Ephemeral VM (SOL-004 Group 1/2a, TASK-002/004) --- ephemeralVmRuntimeStore
+	// itself is constructed earlier, alongside spawnTerminalSessionUC (see
+	// that line's comment) — reused here.
+	listEphemeralVmRuntimesUC := usecase.NewListEphemeralVmRuntimes(ephemeralVmRuntimeStore)
+	// --- Ephemeral VM ssh-type provisioner wiring (TASK-BE-EVM-012/014) ---
+	// Hướng A (agent-outbound) only — Hướng B (backend-relay-deploy,
+	// TASK-BE-EVM-013) wires its own usecase.WithSshProvisioner option
+	// separately; cfg.EphemeralVmSshMode's default
+	// ("backend-relay-deploy") stays inert here until that wiring lands.
+	ephemeralVmSshTargetStore := infrapostgres.NewEphemeralVmSshTargetStore(pool)
+	var ephemeralVmRelayOpts []usecase.EphemeralVmRelayOption
+	if cfg.EphemeralVmSshMode == "agent-outbound" {
+		// GAP 1/2 FIX (TASK-BE-EVM-016, BE-SOL-EVM-004 §6a/§6b): no Vault
+		// client and no devServer-resolver placeholder needed anymore —
+		// AgentOutboundSshProvisioner no longer resolves credential
+		// material from Vault (identityFile was never a Vault pointer,
+		// see domain.EphemeralVmSshTarget's doc comment), and
+		// EphemeralVmSshProvisioner.Provision now receives sourceDevServer
+		// directly from EphemeralVmRelay.Provision instead of needing a
+		// separate lookup port. repo satisfies usecase.ConnectionRepository
+		// (used to register a real infra.connections row), same as it
+		// already does for Hướng B just below.
+		agentOutboundProvisioner := usecase.NewAgentOutboundSshProvisioner(
+			agentClient, repo, ephemeralVmSshTargetStore)
+		ephemeralVmRelayOpts = append(ephemeralVmRelayOpts, usecase.WithSshProvisioner(agentOutboundProvisioner))
+	} else {
+		// Hướng B (backend-relay-deploy, TASK-BE-EVM-013/017) — the default
+		// mode (config.Load's EphemeralVmSshMode fail-safe default). Reuses
+		// the EXACT same agent/out/agent.js deploy+launch+handshake
+		// pipeline as the ordinary relay-ssh wiring just above
+		// (infrasshrelay.Provisioner), only swapping auth
+		// (adapter/ephemeralsshconn's recipe-credential dial instead of
+		// adapter/sshconn's Vault-cert dial) — see
+		// adapter/backendrelaysshprovisioner's package doc comment. Does
+		// not call Vault at all (TASK-BE-EVM-017: credential bytes come
+		// from DevServerAgentClient.ReadCredentialFile against the source
+		// dev server instead), so it stays available even when Vault
+		// client construction failed.
+		backendRelaySshRelayCfg := infrasshrelay.LoadConfigFromEnv(agentCfg.OrcaVersion)
+		if backendRelaySshRelayCfg.BundlePath == "" {
+			logger.Warn("ORCA_RELAY_BUNDLE_PATH is not set — EPHEMERAL_VM_SSH_MODE=backend-relay-deploy ssh-type ephemeral VMs will fail to provision until it points at a built agent/out/agent.js")
+		}
+		// ephemeralVmSshTargetStore (TASK-BE-EVM-019, BE-SOL-EVM-004 §6d) is
+		// the SAME store Hướng A's audit row uses (migrations/0015/0016) —
+		// only one of Hướng A/B is active per deployment (EphemeralVmSshMode),
+		// so no write-owner conflict; here it backs TOFU host-key
+		// fingerprint persistence instead of the identity-path audit trail.
+		backendRelaySshProvisioner := infrabackendrelaysshprovisioner.NewProvisioner(
+			repo, repo, ephemeralVmRuntimeStore, agentClient,
+			backendRelaySshRelayCfg, infraephemeralsshconn.LoadConfigFromEnv(), uuid.NewString,
+			ephemeralVmSshTargetStore)
+		ephemeralVmRelayOpts = append(ephemeralVmRelayOpts, usecase.WithSshProvisioner(backendRelaySshProvisioner))
+	}
+	ephemeralVmRelayUC := usecase.NewEphemeralVmRelay(repo, agentClient, ephemeralVmRuntimeStore, ephemeralVmRelayOpts...)
+
+	// --- Fleet connectivity summary (CR-STORAGE-007, TASK-BE-STORAGE-006) ---
+	getFleetConnectivitySummaryUC := usecase.NewGetFleetConnectivitySummary(repo)
+
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
 		registerDevServerUC,
 		resolveConnectionUC,
@@ -438,6 +579,7 @@ func run() error {
 		getTerminalAgentStatusUC,
 		inspectTerminalProcessUC,
 		attachPtyUC,
+		attachScreencastUC,
 		listBrowserProfilesUC,
 		createBrowserProfileUC,
 		deleteBrowserProfileUC,
@@ -469,6 +611,24 @@ func run() error {
 		dispatchPromptUC,
 		getQueuedPromptUC,
 		terminalLiveStates,
+		approveDevServerUC,
+		rejectDevServerUC,
+		assignDevServerGroupUC,
+		createDevServerGroupUC,
+		listDevServerGroupsUC,
+		grantDevServerGroupAccessUC,
+		revokeDevServerGroupAccessUC,
+		listDevServerGroupGrantsUC,
+		listDevServersForUserUC,
+		createAccessRequestUC,
+		listPendingAccessRequestsUC,
+		resolveAccessRequestUC,
+		relayByDevServerUC,
+		isDevServerConnectedUC,
+		listEphemeralVmRuntimesUC,
+		ephemeralVmRelayUC,
+		getFleetConnectivitySummaryUC,
+		streamFileChangesUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
@@ -487,7 +647,7 @@ func run() error {
 	agentWSServer := infraagentwsserver.New(slotRegistry, agentClient, agentWSCfg, logger)
 	agentWSServer.Sessions = agentClient                              // TASK-AWS-02-03: agentClient already implements LiveSessionCount
 	agentWSServer.Tokens = agentTokenValidator{repo: agentTokenStore} // TASK-AWS-03-06: persistent-token handshake fallback
-	agentTokenIssuer := infraagentwsserver.NewTokenIssuer(slotRegistry, agentWSCfg, logger)
+	agentTokenIssuer := infraagentwsserver.NewTokenIssuer(slotRegistry, agentWSCfg, logger, resolveDirectWebSocketDevServerUC, ephemeralVmRuntimeStore)
 
 	mux := http.NewServeMux()
 	mux.Handle("/", healthSrv.Handler())
@@ -523,6 +683,34 @@ func run() error {
 		}
 	}()
 
+	// Fleet-health poller — specs/backend-go/services/infra-fleet-service.md
+	// §8's 30s cadence. A poll failure never reaches errCh: one bad tick
+	// (e.g. a transient DB error) should not take the whole service down,
+	// only skip that round — see PollFleetHealth's own doc comment for the
+	// per-dev-server error handling this relies on.
+	go func() {
+		const fleetHealthPollInterval = 30 * time.Second
+		// Poll once immediately on startup — otherwise a freshly-started
+		// service (or one that just came back up) leaves every dev server
+		// unreachable-by-default in fleet_health for a full interval before
+		// its first real sample lands.
+		if err := pollFleetHealthUC.Execute(ctx); err != nil {
+			logger.WarnContext(ctx, "fleet health poll failed", slog.Any("error", err))
+		}
+		ticker := time.NewTicker(fleetHealthPollInterval)
+		defer ticker.Stop()
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			case <-ticker.C:
+				if err := pollFleetHealthUC.Execute(ctx); err != nil {
+					logger.WarnContext(ctx, "fleet health poll failed", slog.Any("error", err))
+				}
+			}
+		}
+	}()
+
 	select {
 	case <-ctx.Done():
 		logger.Info("shutdown signal received, draining in-flight requests")
@@ -540,7 +728,8 @@ func run() error {
 
 	// Wait for the outbox relay goroutine (if started) to observe ctx
 	// cancellation and return, so it doesn't outlive the rest of the
-	// server on shutdown — same pattern usage-service's main.go uses.
+	// server on shutdown — same pattern usage-service/notification-service's
+	// own main.go use for their background loops.
 	relayWG.Wait()
 
 	return nil

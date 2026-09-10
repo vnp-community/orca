@@ -21,14 +21,15 @@ import (
 // stance (trace-sse-routes.ts's isAuthorized() comment) — mounted outside
 // authMiddleware in router.go, same group as /auth/local and /ws.
 //
-// Known gap: this only keeps the connection alive (heartbeats) — it does
-// NOT forward any real trace/debug events yet, since backend-go has no
-// equivalent to the old backend's global registerTraceSink() fan-out.
-// TracePanel will show a live-but-empty stream rather than the 404 that
-// was breaking EventSource's connection state before this existed. Wiring
-// real event forwarding (e.g. from common/eventbus) is tracked as a
-// follow-up in docs/execution-plan.md, not attempted here.
-func mountTraceRoutes(mux chi.Router) {
+// broadcast forwards real backend spans (TASK-BE-FFT-009/010) — every
+// currently-connected client subscribes to the same *TraceBroadcast hub
+// cmd/server/main.go feeds from the TRACE JetStream stream. frontend's
+// EventSource.onmessage (browser.ts) parses each `data:` line as JSON
+// directly, no `event:` field needed (default "message" event).
+func mountTraceRoutes(mux chi.Router, broadcast *TraceBroadcast) {
+	if broadcast == nil {
+		broadcast = NewTraceBroadcast()
+	}
 	mux.Get("/api/trace-stream", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method != http.MethodGet {
 			writeJSONError(w, http.StatusMethodNotAllowed, "METHOD_NOT_ALLOWED", "GET only")
@@ -51,6 +52,9 @@ func mountTraceRoutes(mux chi.Router) {
 		_, _ = w.Write([]byte(": connected\n\n"))
 		flusher.Flush()
 
+		events, unsubscribe := broadcast.Subscribe()
+		defer unsubscribe()
+
 		ticker := time.NewTicker(15 * time.Second)
 		defer ticker.Stop()
 
@@ -59,6 +63,17 @@ func mountTraceRoutes(mux chi.Router) {
 			select {
 			case <-ctx.Done():
 				return
+			case payload := <-events:
+				if _, err := w.Write([]byte("data: ")); err != nil {
+					return
+				}
+				if _, err := w.Write(payload); err != nil {
+					return
+				}
+				if _, err := w.Write([]byte("\n\n")); err != nil {
+					return
+				}
+				flusher.Flush()
 			case <-ticker.C:
 				if _, err := w.Write([]byte(": heartbeat\n\n")); err != nil {
 					return

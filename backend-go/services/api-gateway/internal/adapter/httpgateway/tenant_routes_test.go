@@ -74,6 +74,30 @@ func (f *fakeTenantServiceClient) CreateCompany(_ context.Context, _ *tenantv1.C
 	return f.createCompanyResp, nil
 }
 
+// GetCompany is unused by this file's tests today — a minimal stub keeps
+// fakeTenantServiceClient satisfying tenantv1.TenantServiceClient (this
+// fake predates the embed-the-nil-interface pattern used elsewhere in this
+// package, so every new interface method needs an explicit stub here).
+func (f *fakeTenantServiceClient) GetCompany(_ context.Context, _ *tenantv1.GetCompanyRequest, _ ...grpc.CallOption) (*tenantv1.GetCompanyResponse, error) {
+	return &tenantv1.GetCompanyResponse{}, nil
+}
+
+// GetOnboardingState/SetOnboardingState are unused by this file's tests
+// today — same stub rationale as GetCompany above.
+func (f *fakeTenantServiceClient) GetOnboardingState(_ context.Context, _ *tenantv1.GetOnboardingStateRequest, _ ...grpc.CallOption) (*tenantv1.GetOnboardingStateResponse, error) {
+	return &tenantv1.GetOnboardingStateResponse{}, nil
+}
+
+func (f *fakeTenantServiceClient) SetOnboardingState(_ context.Context, _ *tenantv1.SetOnboardingStateRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
+}
+
+// ListCompanies is unused by this file's tests today — same stub rationale
+// as GetCompany above.
+func (f *fakeTenantServiceClient) ListCompanies(_ context.Context, _ *tenantv1.ListCompaniesRequest, _ ...grpc.CallOption) (*tenantv1.ListCompaniesResponse, error) {
+	return &tenantv1.ListCompaniesResponse{}, nil
+}
+
 func (f *fakeTenantServiceClient) ValidateTenant(_ context.Context, _ *tenantv1.ValidateTenantRequest, _ ...grpc.CallOption) (*tenantv1.ValidateTenantResponse, error) {
 	if f.validateTenantErr != nil {
 		return nil, f.validateTenantErr
@@ -174,6 +198,91 @@ func (f *fakeTenantServiceClient) ListTeams(_ context.Context, _ *tenantv1.ListT
 }
 
 func (f *fakeTenantServiceClient) RemoveTeamMember(_ context.Context, _ *tenantv1.RemoveTeamMemberRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) AddCompanyEmailDomain(_ context.Context, _ *tenantv1.AddCompanyEmailDomainRequest, _ ...grpc.CallOption) (*tenantv1.AddCompanyEmailDomainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) RemoveCompanyEmailDomain(_ context.Context, _ *tenantv1.RemoveCompanyEmailDomainRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) ListCompanyEmailDomains(_ context.Context, _ *tenantv1.ListCompanyEmailDomainsRequest, _ ...grpc.CallOption) (*tenantv1.ListCompanyEmailDomainsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) ResolveCompanyByEmailDomain(_ context.Context, _ *tenantv1.ResolveCompanyByEmailDomainRequest, _ ...grpc.CallOption) (*tenantv1.ResolveCompanyByEmailDomainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+// The starNag.* RPCs below (TASK-011/012) are not exercised by
+// tenant_routes_test.go (an HTTP-routes test, not a wscompat one) — added
+// only because this fake implements tenantv1.TenantServiceClient
+// explicitly (no embedded interface), so every new interface method needs
+// a stub here to keep compiling.
+func (f *fakeTenantServiceClient) DismissStarNag(_ context.Context, _ *tenantv1.DismissStarNagRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) DeferStarNag(_ context.Context, _ *tenantv1.DeferStarNagRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) CompleteStarNag(_ context.Context, _ *tenantv1.CompleteStarNagRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) DisableStarNag(_ context.Context, _ *tenantv1.DisableStarNagRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) ForceShowStarNag(_ context.Context, _ *tenantv1.ForceShowStarNagRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) NotifyStarNagOnboardingCompleted(_ context.Context, _ *tenantv1.NotifyStarNagOnboardingCompletedRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) OpenWebStarNag(_ context.Context, _ *tenantv1.OpenWebStarNagRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) StarOrcaFromNag(_ context.Context, _ *tenantv1.StarOrcaFromNagRequest, _ ...grpc.CallOption) (*tenantv1.StarOrcaFromNagResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) PrepareStarNagAgentValueMoment(_ context.Context, _ *tenantv1.PrepareStarNagAgentValueMomentRequest, _ ...grpc.CallOption) (*tenantv1.StarNagAgentValueMomentPreparation, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) ShowPreparedStarNagAgentValueMoment(_ context.Context, _ *tenantv1.ShowPreparedStarNagAgentValueMomentRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+// The clientState.*/workspaceSession.* RPCs below (CR-STORAGE-001/003/004)
+// are not exercised by tenant_routes_test.go either — same reason as the
+// starNag.* stubs above, this fake has no embedded interface so every new
+// TenantServiceClient method needs a stub here to keep compiling.
+func (f *fakeTenantServiceClient) GetClientState(_ context.Context, _ *tenantv1.GetClientStateRequest, _ ...grpc.CallOption) (*tenantv1.GetClientStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) SetClientState(_ context.Context, _ *tenantv1.SetClientStateRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) GetWorkspaceSession(_ context.Context, _ *tenantv1.GetWorkspaceSessionRequest, _ ...grpc.CallOption) (*tenantv1.GetWorkspaceSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) SetWorkspaceSession(_ context.Context, _ *tenantv1.SetWorkspaceSessionRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
+}
+
+func (f *fakeTenantServiceClient) PatchWorkspaceSession(_ context.Context, _ *tenantv1.PatchWorkspaceSessionRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "not used by tenant_routes_test.go")
 }
 

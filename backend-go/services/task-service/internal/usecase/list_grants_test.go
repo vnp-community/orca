@@ -8,7 +8,7 @@ import (
 )
 
 func newListGrantsForTest(tasks *fakeTaskRepository, grants *fakeGrantRepository, opaAllow bool) *ListGrants {
-	resolvePermission := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: opaAllow})
+	resolvePermission := NewResolvePermission(tasks, grants, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: opaAllow}, nil)
 	return NewListGrants(grants, resolvePermission)
 }
 

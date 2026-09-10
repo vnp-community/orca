@@ -27,6 +27,7 @@ const (
 	ProjectService_RemoveMember_FullMethodName                 = "/orca.project.v1.ProjectService/RemoveMember"
 	ProjectService_UpdateMemberRole_FullMethodName             = "/orca.project.v1.ProjectService/UpdateMemberRole"
 	ProjectService_RebindDevServer_FullMethodName              = "/orca.project.v1.ProjectService/RebindDevServer"
+	ProjectService_RebindRepoDevServer_FullMethodName          = "/orca.project.v1.ProjectService/RebindRepoDevServer"
 	ProjectService_UpdateProject_FullMethodName                = "/orca.project.v1.ProjectService/UpdateProject"
 	ProjectService_DeleteProject_FullMethodName                = "/orca.project.v1.ProjectService/DeleteProject"
 	ProjectService_AddRepo_FullMethodName                      = "/orca.project.v1.ProjectService/AddRepo"
@@ -34,12 +35,24 @@ const (
 	ProjectService_ReorderRepos_FullMethodName                 = "/orca.project.v1.ProjectService/ReorderRepos"
 	ProjectService_RemoveRepo_FullMethodName                   = "/orca.project.v1.ProjectService/RemoveRepo"
 	ProjectService_UpdateRepo_FullMethodName                   = "/orca.project.v1.ProjectService/UpdateRepo"
+	ProjectService_AssignRepoToProject_FullMethodName          = "/orca.project.v1.ProjectService/AssignRepoToProject"
+	ProjectService_GetRepo_FullMethodName                      = "/orca.project.v1.ProjectService/GetRepo"
+	ProjectService_AddRepoMember_FullMethodName                = "/orca.project.v1.ProjectService/AddRepoMember"
+	ProjectService_ListRepoMembers_FullMethodName              = "/orca.project.v1.ProjectService/ListRepoMembers"
+	ProjectService_RemoveRepoMember_FullMethodName             = "/orca.project.v1.ProjectService/RemoveRepoMember"
+	ProjectService_UpdateRepoMemberRole_FullMethodName         = "/orca.project.v1.ProjectService/UpdateRepoMemberRole"
+	ProjectService_ListSparsePresets_FullMethodName            = "/orca.project.v1.ProjectService/ListSparsePresets"
+	ProjectService_SaveSparsePreset_FullMethodName             = "/orca.project.v1.ProjectService/SaveSparsePreset"
+	ProjectService_RemoveSparsePreset_FullMethodName           = "/orca.project.v1.ProjectService/RemoveSparsePreset"
 	ProjectService_RecordWorktreeCreated_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeCreated"
 	ProjectService_RecordWorktreeRemoved_FullMethodName        = "/orca.project.v1.ProjectService/RecordWorktreeRemoved"
 	ProjectService_ListWorktrees_FullMethodName                = "/orca.project.v1.ProjectService/ListWorktrees"
 	ProjectService_GetWorktree_FullMethodName                  = "/orca.project.v1.ProjectService/GetWorktree"
 	ProjectService_SetWorktreeActivation_FullMethodName        = "/orca.project.v1.ProjectService/SetWorktreeActivation"
 	ProjectService_RenameWorktree_FullMethodName               = "/orca.project.v1.ProjectService/RenameWorktree"
+	ProjectService_UpdateWorktreeMeta_FullMethodName           = "/orca.project.v1.ProjectService/UpdateWorktreeMeta"
+	ProjectService_SetWorktreeLineage_FullMethodName           = "/orca.project.v1.ProjectService/SetWorktreeLineage"
+	ProjectService_ListWorktreeLineage_FullMethodName          = "/orca.project.v1.ProjectService/ListWorktreeLineage"
 	ProjectService_GetWorktreeByIdempotencyKey_FullMethodName  = "/orca.project.v1.ProjectService/GetWorktreeByIdempotencyKey"
 	ProjectService_CreateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/CreateProjectGroup"
 	ProjectService_UpdateProjectGroup_FullMethodName           = "/orca.project.v1.ProjectService/UpdateProjectGroup"
@@ -60,6 +73,10 @@ const (
 	ProjectService_SetupExistingFolder_FullMethodName          = "/orca.project.v1.ProjectService/SetupExistingFolder"
 	ProjectService_GetProjectContext_FullMethodName            = "/orca.project.v1.ProjectService/GetProjectContext"
 	ProjectService_GetMobileWorktreeStatus_FullMethodName      = "/orca.project.v1.ProjectService/GetMobileWorktreeStatus"
+	ProjectService_LinkSourceProject_FullMethodName            = "/orca.project.v1.ProjectService/LinkSourceProject"
+	ProjectService_UnlinkSourceProject_FullMethodName          = "/orca.project.v1.ProjectService/UnlinkSourceProject"
+	ProjectService_ListSourceProjects_FullMethodName           = "/orca.project.v1.ProjectService/ListSourceProjects"
+	ProjectService_GetSharedProjectData_FullMethodName         = "/orca.project.v1.ProjectService/GetSharedProjectData"
 )
 
 // ProjectServiceClient is the client API for ProjectService service.
@@ -77,6 +94,12 @@ type ProjectServiceClient interface {
 	RemoveMember(ctx context.Context, in *RemoveMemberRequest, opts ...grpc.CallOption) (*RemoveMemberResponse, error)
 	UpdateMemberRole(ctx context.Context, in *UpdateMemberRoleRequest, opts ...grpc.CallOption) (*UpdateMemberRoleResponse, error)
 	RebindDevServer(ctx context.Context, in *RebindDevServerRequest, opts ...grpc.CallOption) (*RebindDevServerResponse, error)
+	// RebindRepoDevServer is Phase 10's repo-scoped replacement for
+	// RebindDevServer — dev-server ownership now lives on Repo, not Project
+	// (see Repo.dev_server_id's doc comment). RebindDevServer stays wired
+	// during the deprecation window but is no longer what git-gateway-service
+	// reads for anything.
+	RebindRepoDevServer(ctx context.Context, in *RebindRepoDevServerRequest, opts ...grpc.CallOption) (*RebindRepoDevServerResponse, error)
 	// UpdateProject's field list deliberately excludes dev_server_id —
 	// RebindDevServer (with its active-execution guard) stays the sole path
 	// that may change it, per project-service.md §3's explicit note. An empty
@@ -89,6 +112,35 @@ type ProjectServiceClient interface {
 	ReorderRepos(ctx context.Context, in *ReorderReposRequest, opts ...grpc.CallOption) (*ReorderReposResponse, error)
 	RemoveRepo(ctx context.Context, in *RemoveRepoRequest, opts ...grpc.CallOption) (*RemoveRepoResponse, error)
 	UpdateRepo(ctx context.Context, in *UpdateRepoRequest, opts ...grpc.CallOption) (*UpdateRepoResponse, error)
+	// AssignRepoToProject moves an EXISTING repo (already in some other
+	// project) into a different project — distinct from AddRepo, which
+	// always creates a brand-new repo row. Backs Project Settings' "Repos"
+	// tab candidate picker (attach an already-known repo to this project).
+	AssignRepoToProject(ctx context.Context, in *AssignRepoToProjectRequest, opts ...grpc.CallOption) (*AssignRepoToProjectResponse, error)
+	// GetRepo answers git-gateway-service's "does this repo exist, and which
+	// dev server does it live on" — ListRepos(project_id) was the only repo
+	// lookup RPC before this, unusable when a caller only has a repo_id (see
+	// git-gateway-service's project_client.go GetRepo doc comment for the
+	// confirmed gap this closes).
+	GetRepo(ctx context.Context, in *GetRepoRequest, opts ...grpc.CallOption) (*GetRepoResponse, error)
+	// repo_members — a functional-role tier (developer/lead/admin) layered on
+	// top of project membership (AddMember/ListMembers/... above): decides
+	// what a project member can do on ONE specific repo, not the project as a
+	// whole. See policy/orca-authz/repo.rego and project-service's
+	// requireRepoAccess.
+	AddRepoMember(ctx context.Context, in *AddRepoMemberRequest, opts ...grpc.CallOption) (*AddRepoMemberResponse, error)
+	ListRepoMembers(ctx context.Context, in *ListRepoMembersRequest, opts ...grpc.CallOption) (*ListRepoMembersResponse, error)
+	RemoveRepoMember(ctx context.Context, in *RemoveRepoMemberRequest, opts ...grpc.CallOption) (*RemoveRepoMemberResponse, error)
+	UpdateRepoMemberRole(ctx context.Context, in *UpdateRepoMemberRoleRequest, opts ...grpc.CallOption) (*UpdateRepoMemberRoleResponse, error)
+	// sparse_presets — saved directory sets for sparse worktree creation,
+	// scoped to one repo. Ports backend/src/main/runtime/rpc/methods/
+	// sparse-presets.ts (legacy TS reference). Gated by the same
+	// repo_any_functional_role tier as repo visibility (requireRepoAccess) —
+	// these are per-repo convenience config, not a separate authorization
+	// dimension of their own.
+	ListSparsePresets(ctx context.Context, in *ListSparsePresetsRequest, opts ...grpc.CallOption) (*ListSparsePresetsResponse, error)
+	SaveSparsePreset(ctx context.Context, in *SaveSparsePresetRequest, opts ...grpc.CallOption) (*SaveSparsePresetResponse, error)
+	RemoveSparsePreset(ctx context.Context, in *RemoveSparsePresetRequest, opts ...grpc.CallOption) (*RemoveSparsePresetResponse, error)
 	// Worktree surface — metadata only, never authoritative for on-disk
 	// existence (git-gateway-service reconciles on demand, per
 	// project-service.md §4's Worktree note).
@@ -102,6 +154,27 @@ type ProjectServiceClient interface {
 	GetWorktree(ctx context.Context, in *GetWorktreeRequest, opts ...grpc.CallOption) (*Worktree, error)
 	SetWorktreeActivation(ctx context.Context, in *SetWorktreeActivationRequest, opts ...grpc.CallOption) (*SetWorktreeActivationResponse, error)
 	RenameWorktree(ctx context.Context, in *RenameWorktreeRequest, opts ...grpc.CallOption) (*RenameWorktreeResponse, error)
+	// UpdateWorktreeMeta persists the frontend's WorktreeMeta fields
+	// (displayName/comment/isPinned/pushTarget/sparse*/... — see
+	// frontend/src/shared/types.ts's WorktreeMeta) that desktop already
+	// durably persists locally (orca-data.json) but backend-go previously
+	// dropped entirely (worktree.set only ever forwarded `active`). metadata
+	// is a partial patch, merged shallowly into the stored JSON blob — an
+	// explicit JSON null clears a field, an omitted key leaves it untouched,
+	// matching the frontend's own Partial<WorktreeMeta> spread semantics.
+	// Deliberately NOT a per-field message: WorktreeMeta gains fields often
+	// and independently of this proto; a typed field per key would drift
+	// constantly and buys no real validation this backend can act on anyway.
+	UpdateWorktreeMeta(ctx context.Context, in *UpdateWorktreeMetaRequest, opts ...grpc.CallOption) (*UpdateWorktreeMetaResponse, error)
+	// SetWorktreeLineage re-parents (or clears the parent of) an
+	// already-created worktree — worktrees.ts's setWorktreeLineageForRuntime,
+	// distinct from RecordWorktreeCreated's creation-time lineage capture.
+	SetWorktreeLineage(ctx context.Context, in *SetWorktreeLineageRequest, opts ...grpc.CallOption) (*SetWorktreeLineageResponse, error)
+	// ListWorktreeLineage returns every worktree with an explicitly-captured
+	// parent (tenant-scoped via RLS, no request params — mirrors the old TS
+	// backend's worktree.lineageList, explicit-capture only per
+	// docs/execution-plan.md's frontend-compatibility-layer coverage table).
+	ListWorktreeLineage(ctx context.Context, in *ListWorktreeLineageRequest, opts ...grpc.CallOption) (*ListWorktreeLineageResponse, error)
 	// GetWorktreeByIdempotencyKey backs BR-CLI-01 — git-gateway-service's
 	// CreateWorktree saga calls this before running `git worktree add`.
 	// found=false means "no dedupe match yet", not an error.
@@ -146,6 +219,18 @@ type ProjectServiceClient interface {
 	// binding validation), so this extends that existing edge rather than
 	// adding a new cross-service dependency.
 	GetMobileWorktreeStatus(ctx context.Context, in *GetMobileWorktreeStatusRequest, opts ...grpc.CallOption) (*GetMobileWorktreeStatusResponse, error)
+	// ── orcaProjects.* — cross-project source sharing ─────────────────────
+	// Links another Project's repos/worktrees into this Project's ("the
+	// container") shared view. Both sides are ordinary Projects — there is
+	// no separate "OrcaProject" entity in this service; the legacy Electron
+	// backend's OrcaProject IS this service's Project, and its per-user-JSON
+	// "Project" concept has no equivalent here (everything is already a
+	// real, RBAC'd row). See wscompat's channels_orca_project_sharing.go for
+	// the orcaProjects.* wire-channel names this maps to.
+	LinkSourceProject(ctx context.Context, in *LinkSourceProjectRequest, opts ...grpc.CallOption) (*LinkSourceProjectResponse, error)
+	UnlinkSourceProject(ctx context.Context, in *UnlinkSourceProjectRequest, opts ...grpc.CallOption) (*UnlinkSourceProjectResponse, error)
+	ListSourceProjects(ctx context.Context, in *ListSourceProjectsRequest, opts ...grpc.CallOption) (*ListSourceProjectsResponse, error)
+	GetSharedProjectData(ctx context.Context, in *GetSharedProjectDataRequest, opts ...grpc.CallOption) (*GetSharedProjectDataResponse, error)
 }
 
 type projectServiceClient struct {
@@ -236,6 +321,16 @@ func (c *projectServiceClient) RebindDevServer(ctx context.Context, in *RebindDe
 	return out, nil
 }
 
+func (c *projectServiceClient) RebindRepoDevServer(ctx context.Context, in *RebindRepoDevServerRequest, opts ...grpc.CallOption) (*RebindRepoDevServerResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RebindRepoDevServerResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RebindRepoDevServer_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *projectServiceClient) UpdateProject(ctx context.Context, in *UpdateProjectRequest, opts ...grpc.CallOption) (*UpdateProjectResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdateProjectResponse)
@@ -306,6 +401,96 @@ func (c *projectServiceClient) UpdateRepo(ctx context.Context, in *UpdateRepoReq
 	return out, nil
 }
 
+func (c *projectServiceClient) AssignRepoToProject(ctx context.Context, in *AssignRepoToProjectRequest, opts ...grpc.CallOption) (*AssignRepoToProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AssignRepoToProjectResponse)
+	err := c.cc.Invoke(ctx, ProjectService_AssignRepoToProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) GetRepo(ctx context.Context, in *GetRepoRequest, opts ...grpc.CallOption) (*GetRepoResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRepoResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetRepo_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) AddRepoMember(ctx context.Context, in *AddRepoMemberRequest, opts ...grpc.CallOption) (*AddRepoMemberResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddRepoMemberResponse)
+	err := c.cc.Invoke(ctx, ProjectService_AddRepoMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListRepoMembers(ctx context.Context, in *ListRepoMembersRequest, opts ...grpc.CallOption) (*ListRepoMembersResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListRepoMembersResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListRepoMembers_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) RemoveRepoMember(ctx context.Context, in *RemoveRepoMemberRequest, opts ...grpc.CallOption) (*RemoveRepoMemberResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveRepoMemberResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RemoveRepoMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UpdateRepoMemberRole(ctx context.Context, in *UpdateRepoMemberRoleRequest, opts ...grpc.CallOption) (*UpdateRepoMemberRoleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateRepoMemberRoleResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateRepoMemberRole_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListSparsePresets(ctx context.Context, in *ListSparsePresetsRequest, opts ...grpc.CallOption) (*ListSparsePresetsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSparsePresetsResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListSparsePresets_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) SaveSparsePreset(ctx context.Context, in *SaveSparsePresetRequest, opts ...grpc.CallOption) (*SaveSparsePresetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SaveSparsePresetResponse)
+	err := c.cc.Invoke(ctx, ProjectService_SaveSparsePreset_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) RemoveSparsePreset(ctx context.Context, in *RemoveSparsePresetRequest, opts ...grpc.CallOption) (*RemoveSparsePresetResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveSparsePresetResponse)
+	err := c.cc.Invoke(ctx, ProjectService_RemoveSparsePreset_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *projectServiceClient) RecordWorktreeCreated(ctx context.Context, in *RecordWorktreeCreatedRequest, opts ...grpc.CallOption) (*RecordWorktreeCreatedResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RecordWorktreeCreatedResponse)
@@ -360,6 +545,36 @@ func (c *projectServiceClient) RenameWorktree(ctx context.Context, in *RenameWor
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RenameWorktreeResponse)
 	err := c.cc.Invoke(ctx, ProjectService_RenameWorktree_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UpdateWorktreeMeta(ctx context.Context, in *UpdateWorktreeMetaRequest, opts ...grpc.CallOption) (*UpdateWorktreeMetaResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UpdateWorktreeMetaResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UpdateWorktreeMeta_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) SetWorktreeLineage(ctx context.Context, in *SetWorktreeLineageRequest, opts ...grpc.CallOption) (*SetWorktreeLineageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetWorktreeLineageResponse)
+	err := c.cc.Invoke(ctx, ProjectService_SetWorktreeLineage_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListWorktreeLineage(ctx context.Context, in *ListWorktreeLineageRequest, opts ...grpc.CallOption) (*ListWorktreeLineageResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListWorktreeLineageResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListWorktreeLineage_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -566,6 +781,46 @@ func (c *projectServiceClient) GetMobileWorktreeStatus(ctx context.Context, in *
 	return out, nil
 }
 
+func (c *projectServiceClient) LinkSourceProject(ctx context.Context, in *LinkSourceProjectRequest, opts ...grpc.CallOption) (*LinkSourceProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LinkSourceProjectResponse)
+	err := c.cc.Invoke(ctx, ProjectService_LinkSourceProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) UnlinkSourceProject(ctx context.Context, in *UnlinkSourceProjectRequest, opts ...grpc.CallOption) (*UnlinkSourceProjectResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnlinkSourceProjectResponse)
+	err := c.cc.Invoke(ctx, ProjectService_UnlinkSourceProject_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) ListSourceProjects(ctx context.Context, in *ListSourceProjectsRequest, opts ...grpc.CallOption) (*ListSourceProjectsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListSourceProjectsResponse)
+	err := c.cc.Invoke(ctx, ProjectService_ListSourceProjects_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *projectServiceClient) GetSharedProjectData(ctx context.Context, in *GetSharedProjectDataRequest, opts ...grpc.CallOption) (*GetSharedProjectDataResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetSharedProjectDataResponse)
+	err := c.cc.Invoke(ctx, ProjectService_GetSharedProjectData_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ProjectServiceServer is the server API for ProjectService service.
 // All implementations must embed UnimplementedProjectServiceServer
 // for forward compatibility.
@@ -581,6 +836,12 @@ type ProjectServiceServer interface {
 	RemoveMember(context.Context, *RemoveMemberRequest) (*RemoveMemberResponse, error)
 	UpdateMemberRole(context.Context, *UpdateMemberRoleRequest) (*UpdateMemberRoleResponse, error)
 	RebindDevServer(context.Context, *RebindDevServerRequest) (*RebindDevServerResponse, error)
+	// RebindRepoDevServer is Phase 10's repo-scoped replacement for
+	// RebindDevServer — dev-server ownership now lives on Repo, not Project
+	// (see Repo.dev_server_id's doc comment). RebindDevServer stays wired
+	// during the deprecation window but is no longer what git-gateway-service
+	// reads for anything.
+	RebindRepoDevServer(context.Context, *RebindRepoDevServerRequest) (*RebindRepoDevServerResponse, error)
 	// UpdateProject's field list deliberately excludes dev_server_id —
 	// RebindDevServer (with its active-execution guard) stays the sole path
 	// that may change it, per project-service.md §3's explicit note. An empty
@@ -593,6 +854,35 @@ type ProjectServiceServer interface {
 	ReorderRepos(context.Context, *ReorderReposRequest) (*ReorderReposResponse, error)
 	RemoveRepo(context.Context, *RemoveRepoRequest) (*RemoveRepoResponse, error)
 	UpdateRepo(context.Context, *UpdateRepoRequest) (*UpdateRepoResponse, error)
+	// AssignRepoToProject moves an EXISTING repo (already in some other
+	// project) into a different project — distinct from AddRepo, which
+	// always creates a brand-new repo row. Backs Project Settings' "Repos"
+	// tab candidate picker (attach an already-known repo to this project).
+	AssignRepoToProject(context.Context, *AssignRepoToProjectRequest) (*AssignRepoToProjectResponse, error)
+	// GetRepo answers git-gateway-service's "does this repo exist, and which
+	// dev server does it live on" — ListRepos(project_id) was the only repo
+	// lookup RPC before this, unusable when a caller only has a repo_id (see
+	// git-gateway-service's project_client.go GetRepo doc comment for the
+	// confirmed gap this closes).
+	GetRepo(context.Context, *GetRepoRequest) (*GetRepoResponse, error)
+	// repo_members — a functional-role tier (developer/lead/admin) layered on
+	// top of project membership (AddMember/ListMembers/... above): decides
+	// what a project member can do on ONE specific repo, not the project as a
+	// whole. See policy/orca-authz/repo.rego and project-service's
+	// requireRepoAccess.
+	AddRepoMember(context.Context, *AddRepoMemberRequest) (*AddRepoMemberResponse, error)
+	ListRepoMembers(context.Context, *ListRepoMembersRequest) (*ListRepoMembersResponse, error)
+	RemoveRepoMember(context.Context, *RemoveRepoMemberRequest) (*RemoveRepoMemberResponse, error)
+	UpdateRepoMemberRole(context.Context, *UpdateRepoMemberRoleRequest) (*UpdateRepoMemberRoleResponse, error)
+	// sparse_presets — saved directory sets for sparse worktree creation,
+	// scoped to one repo. Ports backend/src/main/runtime/rpc/methods/
+	// sparse-presets.ts (legacy TS reference). Gated by the same
+	// repo_any_functional_role tier as repo visibility (requireRepoAccess) —
+	// these are per-repo convenience config, not a separate authorization
+	// dimension of their own.
+	ListSparsePresets(context.Context, *ListSparsePresetsRequest) (*ListSparsePresetsResponse, error)
+	SaveSparsePreset(context.Context, *SaveSparsePresetRequest) (*SaveSparsePresetResponse, error)
+	RemoveSparsePreset(context.Context, *RemoveSparsePresetRequest) (*RemoveSparsePresetResponse, error)
 	// Worktree surface — metadata only, never authoritative for on-disk
 	// existence (git-gateway-service reconciles on demand, per
 	// project-service.md §4's Worktree note).
@@ -606,6 +896,27 @@ type ProjectServiceServer interface {
 	GetWorktree(context.Context, *GetWorktreeRequest) (*Worktree, error)
 	SetWorktreeActivation(context.Context, *SetWorktreeActivationRequest) (*SetWorktreeActivationResponse, error)
 	RenameWorktree(context.Context, *RenameWorktreeRequest) (*RenameWorktreeResponse, error)
+	// UpdateWorktreeMeta persists the frontend's WorktreeMeta fields
+	// (displayName/comment/isPinned/pushTarget/sparse*/... — see
+	// frontend/src/shared/types.ts's WorktreeMeta) that desktop already
+	// durably persists locally (orca-data.json) but backend-go previously
+	// dropped entirely (worktree.set only ever forwarded `active`). metadata
+	// is a partial patch, merged shallowly into the stored JSON blob — an
+	// explicit JSON null clears a field, an omitted key leaves it untouched,
+	// matching the frontend's own Partial<WorktreeMeta> spread semantics.
+	// Deliberately NOT a per-field message: WorktreeMeta gains fields often
+	// and independently of this proto; a typed field per key would drift
+	// constantly and buys no real validation this backend can act on anyway.
+	UpdateWorktreeMeta(context.Context, *UpdateWorktreeMetaRequest) (*UpdateWorktreeMetaResponse, error)
+	// SetWorktreeLineage re-parents (or clears the parent of) an
+	// already-created worktree — worktrees.ts's setWorktreeLineageForRuntime,
+	// distinct from RecordWorktreeCreated's creation-time lineage capture.
+	SetWorktreeLineage(context.Context, *SetWorktreeLineageRequest) (*SetWorktreeLineageResponse, error)
+	// ListWorktreeLineage returns every worktree with an explicitly-captured
+	// parent (tenant-scoped via RLS, no request params — mirrors the old TS
+	// backend's worktree.lineageList, explicit-capture only per
+	// docs/execution-plan.md's frontend-compatibility-layer coverage table).
+	ListWorktreeLineage(context.Context, *ListWorktreeLineageRequest) (*ListWorktreeLineageResponse, error)
 	// GetWorktreeByIdempotencyKey backs BR-CLI-01 — git-gateway-service's
 	// CreateWorktree saga calls this before running `git worktree add`.
 	// found=false means "no dedupe match yet", not an error.
@@ -650,6 +961,18 @@ type ProjectServiceServer interface {
 	// binding validation), so this extends that existing edge rather than
 	// adding a new cross-service dependency.
 	GetMobileWorktreeStatus(context.Context, *GetMobileWorktreeStatusRequest) (*GetMobileWorktreeStatusResponse, error)
+	// ── orcaProjects.* — cross-project source sharing ─────────────────────
+	// Links another Project's repos/worktrees into this Project's ("the
+	// container") shared view. Both sides are ordinary Projects — there is
+	// no separate "OrcaProject" entity in this service; the legacy Electron
+	// backend's OrcaProject IS this service's Project, and its per-user-JSON
+	// "Project" concept has no equivalent here (everything is already a
+	// real, RBAC'd row). See wscompat's channels_orca_project_sharing.go for
+	// the orcaProjects.* wire-channel names this maps to.
+	LinkSourceProject(context.Context, *LinkSourceProjectRequest) (*LinkSourceProjectResponse, error)
+	UnlinkSourceProject(context.Context, *UnlinkSourceProjectRequest) (*UnlinkSourceProjectResponse, error)
+	ListSourceProjects(context.Context, *ListSourceProjectsRequest) (*ListSourceProjectsResponse, error)
+	GetSharedProjectData(context.Context, *GetSharedProjectDataRequest) (*GetSharedProjectDataResponse, error)
 	mustEmbedUnimplementedProjectServiceServer()
 }
 
@@ -684,6 +1007,9 @@ func (UnimplementedProjectServiceServer) UpdateMemberRole(context.Context, *Upda
 func (UnimplementedProjectServiceServer) RebindDevServer(context.Context, *RebindDevServerRequest) (*RebindDevServerResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RebindDevServer not implemented")
 }
+func (UnimplementedProjectServiceServer) RebindRepoDevServer(context.Context, *RebindRepoDevServerRequest) (*RebindRepoDevServerResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RebindRepoDevServer not implemented")
+}
 func (UnimplementedProjectServiceServer) UpdateProject(context.Context, *UpdateProjectRequest) (*UpdateProjectResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateProject not implemented")
 }
@@ -705,6 +1031,33 @@ func (UnimplementedProjectServiceServer) RemoveRepo(context.Context, *RemoveRepo
 func (UnimplementedProjectServiceServer) UpdateRepo(context.Context, *UpdateRepoRequest) (*UpdateRepoResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdateRepo not implemented")
 }
+func (UnimplementedProjectServiceServer) AssignRepoToProject(context.Context, *AssignRepoToProjectRequest) (*AssignRepoToProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AssignRepoToProject not implemented")
+}
+func (UnimplementedProjectServiceServer) GetRepo(context.Context, *GetRepoRequest) (*GetRepoResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRepo not implemented")
+}
+func (UnimplementedProjectServiceServer) AddRepoMember(context.Context, *AddRepoMemberRequest) (*AddRepoMemberResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddRepoMember not implemented")
+}
+func (UnimplementedProjectServiceServer) ListRepoMembers(context.Context, *ListRepoMembersRequest) (*ListRepoMembersResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListRepoMembers not implemented")
+}
+func (UnimplementedProjectServiceServer) RemoveRepoMember(context.Context, *RemoveRepoMemberRequest) (*RemoveRepoMemberResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveRepoMember not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateRepoMemberRole(context.Context, *UpdateRepoMemberRoleRequest) (*UpdateRepoMemberRoleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateRepoMemberRole not implemented")
+}
+func (UnimplementedProjectServiceServer) ListSparsePresets(context.Context, *ListSparsePresetsRequest) (*ListSparsePresetsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSparsePresets not implemented")
+}
+func (UnimplementedProjectServiceServer) SaveSparsePreset(context.Context, *SaveSparsePresetRequest) (*SaveSparsePresetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SaveSparsePreset not implemented")
+}
+func (UnimplementedProjectServiceServer) RemoveSparsePreset(context.Context, *RemoveSparsePresetRequest) (*RemoveSparsePresetResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveSparsePreset not implemented")
+}
 func (UnimplementedProjectServiceServer) RecordWorktreeCreated(context.Context, *RecordWorktreeCreatedRequest) (*RecordWorktreeCreatedResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RecordWorktreeCreated not implemented")
 }
@@ -722,6 +1075,15 @@ func (UnimplementedProjectServiceServer) SetWorktreeActivation(context.Context, 
 }
 func (UnimplementedProjectServiceServer) RenameWorktree(context.Context, *RenameWorktreeRequest) (*RenameWorktreeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RenameWorktree not implemented")
+}
+func (UnimplementedProjectServiceServer) UpdateWorktreeMeta(context.Context, *UpdateWorktreeMetaRequest) (*UpdateWorktreeMetaResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateWorktreeMeta not implemented")
+}
+func (UnimplementedProjectServiceServer) SetWorktreeLineage(context.Context, *SetWorktreeLineageRequest) (*SetWorktreeLineageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetWorktreeLineage not implemented")
+}
+func (UnimplementedProjectServiceServer) ListWorktreeLineage(context.Context, *ListWorktreeLineageRequest) (*ListWorktreeLineageResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListWorktreeLineage not implemented")
 }
 func (UnimplementedProjectServiceServer) GetWorktreeByIdempotencyKey(context.Context, *GetWorktreeByIdempotencyKeyRequest) (*GetWorktreeByIdempotencyKeyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetWorktreeByIdempotencyKey not implemented")
@@ -782,6 +1144,18 @@ func (UnimplementedProjectServiceServer) GetProjectContext(context.Context, *Get
 }
 func (UnimplementedProjectServiceServer) GetMobileWorktreeStatus(context.Context, *GetMobileWorktreeStatusRequest) (*GetMobileWorktreeStatusResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMobileWorktreeStatus not implemented")
+}
+func (UnimplementedProjectServiceServer) LinkSourceProject(context.Context, *LinkSourceProjectRequest) (*LinkSourceProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LinkSourceProject not implemented")
+}
+func (UnimplementedProjectServiceServer) UnlinkSourceProject(context.Context, *UnlinkSourceProjectRequest) (*UnlinkSourceProjectResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnlinkSourceProject not implemented")
+}
+func (UnimplementedProjectServiceServer) ListSourceProjects(context.Context, *ListSourceProjectsRequest) (*ListSourceProjectsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListSourceProjects not implemented")
+}
+func (UnimplementedProjectServiceServer) GetSharedProjectData(context.Context, *GetSharedProjectDataRequest) (*GetSharedProjectDataResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetSharedProjectData not implemented")
 }
 func (UnimplementedProjectServiceServer) mustEmbedUnimplementedProjectServiceServer() {}
 func (UnimplementedProjectServiceServer) testEmbeddedByValue()                        {}
@@ -948,6 +1322,24 @@ func _ProjectService_RebindDevServer_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_RebindRepoDevServer_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RebindRepoDevServerRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RebindRepoDevServer(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RebindRepoDevServer_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RebindRepoDevServer(ctx, req.(*RebindRepoDevServerRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ProjectService_UpdateProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(UpdateProjectRequest)
 	if err := dec(in); err != nil {
@@ -1074,6 +1466,168 @@ func _ProjectService_UpdateRepo_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_AssignRepoToProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AssignRepoToProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).AssignRepoToProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_AssignRepoToProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).AssignRepoToProject(ctx, req.(*AssignRepoToProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_GetRepo_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRepoRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetRepo(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetRepo_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetRepo(ctx, req.(*GetRepoRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_AddRepoMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddRepoMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).AddRepoMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_AddRepoMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).AddRepoMember(ctx, req.(*AddRepoMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListRepoMembers_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListRepoMembersRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListRepoMembers(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListRepoMembers_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListRepoMembers(ctx, req.(*ListRepoMembersRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_RemoveRepoMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveRepoMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RemoveRepoMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RemoveRepoMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RemoveRepoMember(ctx, req.(*RemoveRepoMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UpdateRepoMemberRole_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateRepoMemberRoleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateRepoMemberRole(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateRepoMemberRole_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateRepoMemberRole(ctx, req.(*UpdateRepoMemberRoleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListSparsePresets_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSparsePresetsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListSparsePresets(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListSparsePresets_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListSparsePresets(ctx, req.(*ListSparsePresetsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_SaveSparsePreset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SaveSparsePresetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).SaveSparsePreset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_SaveSparsePreset_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).SaveSparsePreset(ctx, req.(*SaveSparsePresetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_RemoveSparsePreset_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveSparsePresetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).RemoveSparsePreset(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_RemoveSparsePreset_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).RemoveSparsePreset(ctx, req.(*RemoveSparsePresetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ProjectService_RecordWorktreeCreated_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RecordWorktreeCreatedRequest)
 	if err := dec(in); err != nil {
@@ -1178,6 +1732,60 @@ func _ProjectService_RenameWorktree_Handler(srv interface{}, ctx context.Context
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(ProjectServiceServer).RenameWorktree(ctx, req.(*RenameWorktreeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UpdateWorktreeMeta_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateWorktreeMetaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UpdateWorktreeMeta(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UpdateWorktreeMeta_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UpdateWorktreeMeta(ctx, req.(*UpdateWorktreeMetaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_SetWorktreeLineage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetWorktreeLineageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).SetWorktreeLineage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_SetWorktreeLineage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).SetWorktreeLineage(ctx, req.(*SetWorktreeLineageRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListWorktreeLineage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListWorktreeLineageRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListWorktreeLineage(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListWorktreeLineage_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListWorktreeLineage(ctx, req.(*ListWorktreeLineageRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1542,6 +2150,78 @@ func _ProjectService_GetMobileWorktreeStatus_Handler(srv interface{}, ctx contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ProjectService_LinkSourceProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LinkSourceProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).LinkSourceProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_LinkSourceProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).LinkSourceProject(ctx, req.(*LinkSourceProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_UnlinkSourceProject_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnlinkSourceProjectRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).UnlinkSourceProject(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_UnlinkSourceProject_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).UnlinkSourceProject(ctx, req.(*UnlinkSourceProjectRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_ListSourceProjects_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListSourceProjectsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).ListSourceProjects(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_ListSourceProjects_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).ListSourceProjects(ctx, req.(*ListSourceProjectsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ProjectService_GetSharedProjectData_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetSharedProjectDataRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ProjectServiceServer).GetSharedProjectData(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ProjectService_GetSharedProjectData_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ProjectServiceServer).GetSharedProjectData(ctx, req.(*GetSharedProjectDataRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ProjectService_ServiceDesc is the grpc.ServiceDesc for ProjectService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1582,6 +2262,10 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ProjectService_RebindDevServer_Handler,
 		},
 		{
+			MethodName: "RebindRepoDevServer",
+			Handler:    _ProjectService_RebindRepoDevServer_Handler,
+		},
+		{
 			MethodName: "UpdateProject",
 			Handler:    _ProjectService_UpdateProject_Handler,
 		},
@@ -1610,6 +2294,42 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _ProjectService_UpdateRepo_Handler,
 		},
 		{
+			MethodName: "AssignRepoToProject",
+			Handler:    _ProjectService_AssignRepoToProject_Handler,
+		},
+		{
+			MethodName: "GetRepo",
+			Handler:    _ProjectService_GetRepo_Handler,
+		},
+		{
+			MethodName: "AddRepoMember",
+			Handler:    _ProjectService_AddRepoMember_Handler,
+		},
+		{
+			MethodName: "ListRepoMembers",
+			Handler:    _ProjectService_ListRepoMembers_Handler,
+		},
+		{
+			MethodName: "RemoveRepoMember",
+			Handler:    _ProjectService_RemoveRepoMember_Handler,
+		},
+		{
+			MethodName: "UpdateRepoMemberRole",
+			Handler:    _ProjectService_UpdateRepoMemberRole_Handler,
+		},
+		{
+			MethodName: "ListSparsePresets",
+			Handler:    _ProjectService_ListSparsePresets_Handler,
+		},
+		{
+			MethodName: "SaveSparsePreset",
+			Handler:    _ProjectService_SaveSparsePreset_Handler,
+		},
+		{
+			MethodName: "RemoveSparsePreset",
+			Handler:    _ProjectService_RemoveSparsePreset_Handler,
+		},
+		{
 			MethodName: "RecordWorktreeCreated",
 			Handler:    _ProjectService_RecordWorktreeCreated_Handler,
 		},
@@ -1632,6 +2352,18 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RenameWorktree",
 			Handler:    _ProjectService_RenameWorktree_Handler,
+		},
+		{
+			MethodName: "UpdateWorktreeMeta",
+			Handler:    _ProjectService_UpdateWorktreeMeta_Handler,
+		},
+		{
+			MethodName: "SetWorktreeLineage",
+			Handler:    _ProjectService_SetWorktreeLineage_Handler,
+		},
+		{
+			MethodName: "ListWorktreeLineage",
+			Handler:    _ProjectService_ListWorktreeLineage_Handler,
 		},
 		{
 			MethodName: "GetWorktreeByIdempotencyKey",
@@ -1712,6 +2444,22 @@ var ProjectService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMobileWorktreeStatus",
 			Handler:    _ProjectService_GetMobileWorktreeStatus_Handler,
+		},
+		{
+			MethodName: "LinkSourceProject",
+			Handler:    _ProjectService_LinkSourceProject_Handler,
+		},
+		{
+			MethodName: "UnlinkSourceProject",
+			Handler:    _ProjectService_UnlinkSourceProject_Handler,
+		},
+		{
+			MethodName: "ListSourceProjects",
+			Handler:    _ProjectService_ListSourceProjects_Handler,
+		},
+		{
+			MethodName: "GetSharedProjectData",
+			Handler:    _ProjectService_GetSharedProjectData_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

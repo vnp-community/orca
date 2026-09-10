@@ -16,7 +16,7 @@ import { getNotificationSoundOptions } from '@/components/notification-sound-opt
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
 import { isWebClientLocation } from '../../lib/web-client-location'
-import { useActiveDevServer } from '../../store/slices/dev-servers'
+import { useActiveDevServer } from '../../store/slices/dev-servers-selectors'
 import { DevServerFilePickerDialog } from '../remote-browser/DevServerFilePickerDialog'
 
 import { shellPickAudio } from '../../runtime/runtime-shell-client'
@@ -127,104 +127,104 @@ export function NotificationSoundSection({
 
   return (
     <>
-    <div className="space-y-2 py-2">
-      <div className="space-y-0.5">
-        <div className="flex items-center gap-2">
-          <FileAudio className="size-4" />
-          <Label>
+      <div className="space-y-2 py-2">
+        <div className="space-y-0.5">
+          <div className="flex items-center gap-2">
+            <FileAudio className="size-4" />
+            <Label>
+              {translate(
+                'auto.components.settings.NotificationsPane.88686e6ca8',
+                'Notification Sound'
+              )}
+            </Label>
+          </div>
+          <p className="text-xs text-muted-foreground">
             {translate(
-              'auto.components.settings.NotificationsPane.88686e6ca8',
-              'Notification Sound'
+              'auto.components.settings.NotificationsPane.2a2033c388',
+              'Choose the alert Orca plays when a desktop notification is delivered.'
             )}
-          </Label>
+          </p>
         </div>
-        <p className="text-xs text-muted-foreground">
-          {translate(
-            'auto.components.settings.NotificationsPane.2a2033c388',
-            'Choose the alert Orca plays when a desktop notification is delivered.'
-          )}
-        </p>
-      </div>
-      <Select
-        value={selectedSoundId}
-        disabled={!notificationsEnabled || isPickingSound}
-        onValueChange={(value) => void handleSoundSelect(value as NotificationSoundSelectValue)}
-      >
-        <SelectTrigger className="w-full max-w-[360px]" size="sm">
-          <SelectValue
-            placeholder={translate(
-              'auto.components.settings.NotificationsPane.c258cb96dc',
-              'Choose notification sound'
-            )}
-          />
-        </SelectTrigger>
-        <SelectContent align="start" className="w-[--radix-select-trigger-width]">
-          {soundOptions.map((option) => {
-            const OptionIcon = option.icon
-            return (
-              <SelectItem key={option.id} value={option.id}>
-                <OptionIcon className="size-4" />
-                <span className="truncate">{option.title}</span>
-              </SelectItem>
-            )
-          })}
-          <SelectSeparator />
-          <SelectItem value={CHOOSE_CUSTOM_SOUND_VALUE}>
-            <Upload className="size-4" />
-            <span>
-              {notificationSettings.customSoundPath
-                ? translate(
-                    'auto.components.settings.NotificationsPane.76e02467b8',
-                    'Change Custom File'
-                  )
-                : translate(
-                    'auto.components.settings.NotificationsPane.6e6df3a09a',
-                    'Choose Custom File'
-                  )}
-            </span>
-          </SelectItem>
-        </SelectContent>
-      </Select>
-      {notificationSettings.customSoundPath ? (
-        <p
-          className="truncate font-mono text-[11px] text-muted-foreground"
-          title={notificationSettings.customSoundPath}
+        <Select
+          value={selectedSoundId}
+          disabled={!notificationsEnabled || isPickingSound}
+          onValueChange={(value) => void handleSoundSelect(value as NotificationSoundSelectValue)}
         >
-          {translate('auto.components.settings.NotificationsPane.4aa5085cd7', 'Custom:')}
-          {notificationSettings.customSoundPath}
-        </p>
-      ) : null}
-      {selectedSoundId !== 'system' ? (
-        <div className="flex items-center gap-3 pt-1">
-          <Volume2 className="size-4 text-muted-foreground" />
-          <Slider
-            value={[volumeDraft]}
-            min={0}
-            max={100}
-            step={5}
-            disabled={!notificationsEnabled}
-            onValueChange={([value]) => onVolumeDraftChange(value)}
-            onValueCommit={([value]) => onVolumeCommit(value)}
-            className="flex-1"
-            aria-label={translate(
-              'auto.components.settings.NotificationsPane.2a42dd8d6f',
-              'Notification sound volume'
-            )}
-          />
-          <span className="w-10 text-right font-mono text-xs tabular-nums text-muted-foreground">
-            {volumeDraft}%
-          </span>
-        </div>
-      ) : null}
-    </div>
-    <DevServerFilePickerDialog
-      open={pickerOpen}
-      mode="file"
-      extensions={AUDIO_EXTENSIONS}
-      title="Choose a notification sound"
-      onSelect={(path) => void handlePickerSelect(path)}
-      onClose={() => setPickerOpen(false)}
-    />
+          <SelectTrigger className="w-full max-w-[360px]" size="sm">
+            <SelectValue
+              placeholder={translate(
+                'auto.components.settings.NotificationsPane.c258cb96dc',
+                'Choose notification sound'
+              )}
+            />
+          </SelectTrigger>
+          <SelectContent align="start" className="w-[--radix-select-trigger-width]">
+            {soundOptions.map((option) => {
+              const OptionIcon = option.icon
+              return (
+                <SelectItem key={option.id} value={option.id}>
+                  <OptionIcon className="size-4" />
+                  <span className="truncate">{option.title}</span>
+                </SelectItem>
+              )
+            })}
+            <SelectSeparator />
+            <SelectItem value={CHOOSE_CUSTOM_SOUND_VALUE}>
+              <Upload className="size-4" />
+              <span>
+                {notificationSettings.customSoundPath
+                  ? translate(
+                      'auto.components.settings.NotificationsPane.76e02467b8',
+                      'Change Custom File'
+                    )
+                  : translate(
+                      'auto.components.settings.NotificationsPane.6e6df3a09a',
+                      'Choose Custom File'
+                    )}
+              </span>
+            </SelectItem>
+          </SelectContent>
+        </Select>
+        {notificationSettings.customSoundPath ? (
+          <p
+            className="truncate font-mono text-[11px] text-muted-foreground"
+            title={notificationSettings.customSoundPath}
+          >
+            {translate('auto.components.settings.NotificationsPane.4aa5085cd7', 'Custom:')}
+            {notificationSettings.customSoundPath}
+          </p>
+        ) : null}
+        {selectedSoundId !== 'system' ? (
+          <div className="flex items-center gap-3 pt-1">
+            <Volume2 className="size-4 text-muted-foreground" />
+            <Slider
+              value={[volumeDraft]}
+              min={0}
+              max={100}
+              step={5}
+              disabled={!notificationsEnabled}
+              onValueChange={([value]) => onVolumeDraftChange(value)}
+              onValueCommit={([value]) => onVolumeCommit(value)}
+              className="flex-1"
+              aria-label={translate(
+                'auto.components.settings.NotificationsPane.2a42dd8d6f',
+                'Notification sound volume'
+              )}
+            />
+            <span className="w-10 text-right font-mono text-xs tabular-nums text-muted-foreground">
+              {volumeDraft}%
+            </span>
+          </div>
+        ) : null}
+      </div>
+      <DevServerFilePickerDialog
+        open={pickerOpen}
+        mode="file"
+        extensions={AUDIO_EXTENSIONS}
+        title="Choose a notification sound"
+        onSelect={(path) => void handlePickerSelect(path)}
+        onClose={() => setPickerOpen(false)}
+      />
     </>
   )
 }

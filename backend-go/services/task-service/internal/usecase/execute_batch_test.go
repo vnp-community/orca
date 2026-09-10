@@ -24,7 +24,7 @@ import (
 // whichever of the two a given task actually takes.
 func newExecuteBatchForTest(t *testing.T, repo *fakeTaskRepository, edges *fakeEdgeRepository, simple SimpleExecutor, complex ComplexExecutor) *ExecuteBatch {
 	t.Helper()
-	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true})
+	resolvePermission := NewResolvePermission(repo, &fakeGrantRepository{}, &fakeTeamScopeResolver{}, &fakeOPAClient{allow: true}, nil)
 	worktrees := &fakeWorktreeProvisioner{worktreeID: "wt-1"}
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}
 	clock := &fakeClock{now: time.Unix(1000, 0)}
@@ -74,7 +74,7 @@ func (s *sharedTracker) snapshot() []string {
 // exercised together.
 type orderTrackingSimpleExecutor struct{ tracker *sharedTracker }
 
-func (f *orderTrackingSimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID string) (string, error) {
+func (f *orderTrackingSimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
 	f.tracker.record(taskID)
 	return "ref-" + taskID, nil
 }
@@ -94,7 +94,7 @@ type failingSimpleExecutor struct {
 	failFor string
 }
 
-func (f *failingSimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID string) (string, error) {
+func (f *failingSimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
 	f.tracker.record(taskID)
 	if taskID == f.failFor {
 		return "", errors.New("boom")
@@ -128,7 +128,7 @@ type concurrencyTrackingExecutor struct {
 	wantOverlap int32
 }
 
-func (f *concurrencyTrackingExecutor) Execute(ctx context.Context, tenantID, taskID, requestID string) (string, error) {
+func (f *concurrencyTrackingExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
 	atomic.AddInt32(&f.callCount, 1)
 	cur := atomic.AddInt32(&f.inFlight, 1)
 	for {

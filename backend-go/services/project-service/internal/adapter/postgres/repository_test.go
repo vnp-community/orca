@@ -9,12 +9,14 @@ package postgres
 
 import (
 	"context"
+	"fmt"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/common/testutil"
@@ -143,5 +145,103 @@ func TestRepository_UpdateDevServerID(t *testing.T) {
 	}
 	if updated.DevServerID != "33333333-3333-3333-3333-333333333333" {
 		t.Errorf("expected dev_server_id to be updated, got %q", updated.DevServerID)
+	}
+}
+
+// TestRepository_List_EmptyPageToken_ReturnsFirstPage is the regression test
+// for BUG-004: List previously bound pageToken="" straight into `id > $2`
+// (id is UUID), which Postgres rejected as "invalid input syntax for type
+// uuid" on every first-page call.
+func TestRepository_List_EmptyPageToken_ReturnsFirstPage(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "44444444-4444-4444-4444-444444444444"
+	userID := uuid.NewString()
+
+	for i := 0; i < 3; i++ {
+		p := newTestProject(uuid.NewString(), tenantID, fmt.Sprintf("project-%d", i))
+		if _, err := repo.Create(ctx, p); err != nil {
+			t.Fatalf("seeding project %d: %v", i, err)
+		}
+		if err := repo.AddMember(ctx, domain.ProjectMember{ProjectID: p.ID, UserID: userID, Role: domain.ProjectRoleOwner}); err != nil {
+			t.Fatalf("seeding membership for project %d: %v", i, err)
+		}
+	}
+
+	got, _, err := repo.List(ctx, tenantID, userID, "", 10)
+	if err != nil {
+		t.Fatalf("List with empty pageToken: %v", err)
+	}
+	if len(got) != 3 {
+		t.Errorf("expected 3 projects, got %d", len(got))
+	}
+}
+
+// TestRepository_List_ScopesToMembership is the direct regression test for
+// the "one private default project per user" pass: a bare tenant_id filter
+// previously leaked every tenant member's projects to every other member.
+func TestRepository_List_ScopesToMembership(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "66666666-6666-6666-6666-666666666666"
+	mine := uuid.NewString()
+	theirs := uuid.NewString()
+
+	mineProject := newTestProject(uuid.NewString(), tenantID, "mine")
+	if _, err := repo.Create(ctx, mineProject); err != nil {
+		t.Fatalf("create mine: %v", err)
+	}
+	if err := repo.AddMember(ctx, domain.ProjectMember{ProjectID: mineProject.ID, UserID: mine, Role: domain.ProjectRoleOwner}); err != nil {
+		t.Fatalf("add member to mine: %v", err)
+	}
+
+	theirsProject := newTestProject(uuid.NewString(), tenantID, "theirs")
+	if _, err := repo.Create(ctx, theirsProject); err != nil {
+		t.Fatalf("create theirs: %v", err)
+	}
+	if err := repo.AddMember(ctx, domain.ProjectMember{ProjectID: theirsProject.ID, UserID: theirs, Role: domain.ProjectRoleOwner}); err != nil {
+		t.Fatalf("add member to theirs: %v", err)
+	}
+
+	got, _, err := repo.List(ctx, tenantID, mine, "", 10)
+	if err != nil {
+		t.Fatalf("List: %v", err)
+	}
+	if len(got) != 1 || got[0].ID != mineProject.ID {
+		t.Fatalf("want only [mine], got %+v", got)
+	}
+}
+
+func TestRepository_List_ValidCursor_ReturnsNextPage(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "55555555-5555-5555-5555-555555555555"
+	userID := uuid.NewString()
+
+	for i := 0; i < 3; i++ {
+		p := newTestProject(uuid.NewString(), tenantID, fmt.Sprintf("project-%d", i))
+		if _, err := repo.Create(ctx, p); err != nil {
+			t.Fatalf("seeding project %d: %v", i, err)
+		}
+		if err := repo.AddMember(ctx, domain.ProjectMember{ProjectID: p.ID, UserID: userID, Role: domain.ProjectRoleOwner}); err != nil {
+			t.Fatalf("seeding membership for project %d: %v", i, err)
+		}
+	}
+
+	firstPage, next, err := repo.List(ctx, tenantID, userID, "", 2)
+	if err != nil {
+		t.Fatalf("List (first page): %v", err)
+	}
+	if len(firstPage) != 2 || next == "" {
+		t.Fatalf("expected 2 results and a non-empty cursor, got %d results, next=%q", len(firstPage), next)
+	}
+
+	// Guards the fix didn't break the already-working cursor path.
+	secondPage, _, err := repo.List(ctx, tenantID, userID, next, 2)
+	if err != nil {
+		t.Fatalf("List (second page, real cursor): %v", err)
+	}
+	if len(secondPage) != 1 {
+		t.Errorf("expected 1 remaining project on the second page, got %d", len(secondPage))
 	}
 }

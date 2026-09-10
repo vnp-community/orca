@@ -48,7 +48,7 @@ func (uc *UpdateUser) Execute(ctx context.Context, in UpdateUserInput) (domain.U
 	// "user.updated", distinct from update_user_role.go's "user.role_updated"
 	// when role also changes — SOL-AUTH-05's metadata field is where the
 	// before/after diff eventually lands; a bare Target-only entry for now.
-	if entry, err := domain.NewAuditEntry(uuid.NewString(), user.TenantID, actor.ID, "user.updated", "user", user.ID, map[string]any{}, "", uc.clock.Now()); err == nil {
+	if entry, err := domain.NewAuditEntry(uuid.NewString(), user.TenantID, actor.ID, "user.updated", "", "user", user.ID, map[string]any{}, domain.OutcomeAllowed, "", uc.clock.Now()); err == nil {
 		_ = uc.audit.Append(ctx, entry)
 	}
 	return user, nil

@@ -11,13 +11,14 @@ import (
 // stream — see SendTerminalInputRequest's proto doc comment for why a
 // stateless REST/CLI caller needs this sibling to terminal.send.
 type SendTerminalInput struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	agent      DevServerAgentClient
 }
 
-func NewSendTerminalInput(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient) *SendTerminalInput {
-	return &SendTerminalInput{sessions: sessions, resolver: resolver, agent: agent}
+func NewSendTerminalInput(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient) *SendTerminalInput {
+	return &SendTerminalInput{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent}
 }
 
 func (uc *SendTerminalInput) Execute(ctx context.Context, ptyID string, data []byte) error {
@@ -26,7 +27,7 @@ func (uc *SendTerminalInput) Execute(ctx context.Context, ptyID string, data []b
 		return apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver)
+	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		return err
 	}

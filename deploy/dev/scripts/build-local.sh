@@ -48,6 +48,7 @@ check_cmd() {
 }
 check_cmd go
 check_cmd pnpm
+check_cmd docker
 
 TARGET_SERVICES=("${ALL_SERVICES[@]}")
 if [ "$#" -eq 1 ]; then
@@ -65,7 +66,7 @@ echo ""
 
 mkdir -p "${BIN_DIR}" "${DIST_DIR}"
 
-echo "[1/2] Building backend-go binaries (CGO_ENABLED=0, linux/amd64)..."
+echo "[1/3] Building backend-go binaries (CGO_ENABLED=0, linux/amd64)..."
 FAIL=0
 for svc in "${TARGET_SERVICES[@]}"; do
   svc_dir="${BACKEND_GO_DIR}/services/${svc}"
@@ -103,17 +104,49 @@ if [ "${FAIL}" -ne 0 ]; then
 fi
 
 echo ""
-echo "[2/2] Building frontend/ (vite build)..."
+echo "[2/3] Building frontend/ (vite build)..."
 (cd "${REPO_ROOT}/frontend" && [ -d node_modules ] || pnpm install)
 (cd "${REPO_ROOT}/frontend" && pnpm run build)
 rm -rf "${DIST_DIR}"
 cp -r "${REPO_ROOT}/frontend/out/web" "${DIST_DIR}"
+
+# Why: docker-compose.yml's OPA policy bind mounts must resolve to a real
+# path on the SERVER after sync-to-server.sh — that script only ships this
+# directory's own tree (bin/dist/config), never the full backend-go/ source
+# checkout, so a mount source written as "../../backend-go/policy/orca-authz"
+# (relative to the compose file's location once copied to
+# ~/orca-go-deploy/) resolves to a nonexistent path there. Docker silently
+# bind-mounts an empty directory for a missing host path instead of erroring,
+# so every OPA-gated call (auth-service's requireAdminActor, and
+# task-service/annotation-service/project-service's own admin checks) failed
+# closed for every caller regardless of role — live-verified 2026-08-29
+# (admin.listUsers returned AUTH_NOT_ADMIN for the actual bootstrap admin).
+# Copying the policy directory into deploy/dev/policy/ here means it's
+# already covered by sync-to-server.sh's existing "rsync everything in
+# deploy/dev except bin/dist/.env" step — no separate sync step needed, and
+# docker-compose.yml's mount source becomes "./policy/orca-authz", correctly
+# relative to wherever the compose file itself ends up.
+POLICY_DIR="${DEPLOY_DIR}/policy"
+rm -rf "${POLICY_DIR}"
+mkdir -p "${POLICY_DIR}"
+cp -r "${BACKEND_GO_DIR}/policy/orca-authz" "${POLICY_DIR}/orca-authz"
+
+echo ""
+echo "[3/3] Building git-gateway-service's own runtime image (needs a real"
+echo "  git binary — see docker-compose.yml's git-gateway-service comment)..."
+docker build \
+  --platform linux/amd64 \
+  -t "orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}" \
+  -f "${DEPLOY_DIR}/docker/git-gateway-runtime.Dockerfile" \
+  "${DEPLOY_DIR}/docker"
+echo "✅ Built orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}"
 
 echo ""
 echo "======================================================"
 echo " ✅ Build OK."
 echo "   backend-go binaries: $(du -sh "${BIN_DIR}" 2>/dev/null | cut -f1)  (${BIN_DIR}/)"
 echo "   frontend static:     $(du -sh "${DIST_DIR}" 2>/dev/null | cut -f1)  (${DIST_DIR}/)"
+echo "   OPA policy bundle:   $(du -sh "${POLICY_DIR}" 2>/dev/null | cut -f1)  (${POLICY_DIR}/)"
 echo ""
 echo "  Next step:"
 echo "    ./deploy/dev/scripts/sync-to-server.sh <version>"

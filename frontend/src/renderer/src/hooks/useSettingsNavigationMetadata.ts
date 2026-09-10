@@ -113,7 +113,8 @@ export function buildSettingsNavigationMetadata({
   isWindowsTerminalHost = isWindows,
   isWebClient,
   isDev = import.meta.env.DEV,
-  repos
+  repos,
+  isAdmin = false
 }: {
   isMac: boolean
   isWindows: boolean
@@ -121,6 +122,8 @@ export function buildSettingsNavigationMetadata({
   isWebClient: boolean
   isDev?: boolean
   repos: readonly Repo[]
+  /** CR-DS-006/007/008: gates the Admin console nav section. */
+  isAdmin?: boolean
 }): SettingsNavSection[] {
   const showDesktopOnlySettings = !isWebClient
   const terminalPaneSearchEntries = getTerminalPaneSearchEntries({
@@ -462,10 +465,7 @@ export function buildSettingsNavigationMetadata({
     },
     {
       id: 'dev-servers',
-      title: translate(
-        'auto.hooks.useSettingsNavigationMetadata.devServersTitle',
-        'Dev Servers'
-      ),
+      title: translate('auto.hooks.useSettingsNavigationMetadata.devServersTitle', 'Dev Servers'),
       description: translate(
         'auto.hooks.useSettingsNavigationMetadata.devServersDesc',
         'Connect remote developer machines so Orca agents run on your actual dev environment.'
@@ -474,6 +474,38 @@ export function buildSettingsNavigationMetadata({
       searchEntries: getDevServerPaneSearchEntries(),
       group: 'remote'
     },
+    ...(isAdmin
+      ? [
+          {
+            id: 'admin-dev-servers',
+            title: translate(
+              'auto.hooks.useSettingsNavigationMetadata.adminDevServersTitle',
+              'Admin console'
+            ),
+            description: translate(
+              'auto.hooks.useSettingsNavigationMetadata.adminDevServersDesc',
+              'Approve dev server agents, assign groups, and resolve access requests.'
+            ),
+            icon: ShieldCheck,
+            searchEntries: [],
+            group: 'remote'
+          },
+          {
+            id: 'admin-org',
+            title: translate(
+              'auto.hooks.useSettingsNavigationMetadata.adminOrgTitle',
+              'Organization'
+            ),
+            description: translate(
+              'auto.hooks.useSettingsNavigationMetadata.adminOrgDesc',
+              'Manage departments and user accounts.'
+            ),
+            icon: UserCog,
+            searchEntries: [],
+            group: 'remote'
+          }
+        ]
+      : []),
     ...(showDesktopOnlySettings && isMac
       ? [
           {
@@ -574,6 +606,7 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
   const activeLocale = i18n.language
   const repos = useAppStore((state) => state.repos)
   const settings = useAppStore((state) => state.settings)
+  const isAdmin = useAppStore((state) => state.currentUser?.role === 'admin')
   const isMac = isMacUserAgent()
   const isWindows = isWindowsUserAgent()
   const isWebClient = isWebClientLocation()
@@ -600,9 +633,10 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
         isWindowsTerminalHost,
         isWebClient,
         isDev: import.meta.env.DEV,
-        repos
+        repos,
+        isAdmin
       }),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- activeLocale is read implicitly by the translate() calls inside buildSettingsNavigationMetadata; without it the memo keeps the previous language's sections.
-    [isMac, isWindows, isWindowsTerminalHost, isWebClient, repos, activeLocale]
+    [isMac, isWindows, isWindowsTerminalHost, isWebClient, repos, activeLocale, isAdmin]
   )
 }

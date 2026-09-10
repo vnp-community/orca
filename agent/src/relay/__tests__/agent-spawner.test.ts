@@ -7,7 +7,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { tmpdir } from 'node:os'
 import type WebSocket from 'ws'
-import type { WireState } from '../agent-wire'
+import type { WireState } from 'orca-dev-agent-transport'
 import {
   SubAgentSpawner,
   resolveAgentSpec,

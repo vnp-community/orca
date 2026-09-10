@@ -257,10 +257,16 @@ describe('runBackgroundWorktreeCreation', () => {
       expect.objectContaining({ phase: 'provisioning-vm' })
     )
     await vi.waitFor(() => expect(store.createWorktree).toHaveBeenCalled())
+    // Phase 10: getProjectIdentityKey always returns `repo:${repo.id}` now, so
+    // resolvePortableEphemeralVmProjectId's `key.startsWith('github:')` gate
+    // in ephemeral-vm-worktree-creation.ts can never match anymore — the repo's
+    // gitRemoteIdentity fixture above no longer produces a portable
+    // `github:owner/repo` project id. This falls through to the recipe's own
+    // projectId ('project-1' from makeRequest below) instead.
     expect(prepareEphemeralVmWorkspaceTargetMock).toHaveBeenCalledWith({
       repoId: 'repo-1',
       recipeId: 'cloud-sandbox',
-      projectId: 'github:stablyai/orca',
+      projectId: 'project-1',
       workspaceName: 'feature',
       provisionId: 'creation-1',
       setupExistingFolder: store.setupProjectExistingFolder

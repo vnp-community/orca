@@ -44,6 +44,10 @@ type FolderWorkspace struct {
 	Name        string
 	AddedBy     string
 	CreatedAt   time.Time
+	// ProjectGroupID is "" when this folder workspace isn't in any group —
+	// same empty-string-sentinel convention as ProjectGroup.ParentGroupID/
+	// HostSetup.ProjectID, not a pointer.
+	ProjectGroupID string
 }
 
 // PathStatus is GetFolderWorkspacePathStatus's result.
@@ -57,7 +61,7 @@ type PathStatus struct {
 // a record must satisfy to be meaningful. Position/CreatedAt aren't
 // constructor parameters — CreatedAt is assigned by the repository on
 // insert, matching this package's other entities' convention.
-func NewFolderWorkspace(id, tenantID, devServerID, path, name, addedBy string) (FolderWorkspace, error) {
+func NewFolderWorkspace(id, tenantID, devServerID, path, name, addedBy, projectGroupID string) (FolderWorkspace, error) {
 	if tenantID == "" {
 		return FolderWorkspace{}, ErrEmptyTenantID
 	}
@@ -68,11 +72,12 @@ func NewFolderWorkspace(id, tenantID, devServerID, path, name, addedBy string) (
 		return FolderWorkspace{}, ErrEmptyPath
 	}
 	return FolderWorkspace{
-		ID:          id,
-		TenantID:    tenantID,
-		DevServerID: devServerID,
-		Path:        path,
-		Name:        name,
-		AddedBy:     addedBy,
+		ID:             id,
+		TenantID:       tenantID,
+		DevServerID:    devServerID,
+		Path:           path,
+		Name:           name,
+		ProjectGroupID: projectGroupID,
+		AddedBy:        addedBy,
 	}, nil
 }

@@ -110,6 +110,10 @@ func (f *fakeAdminAuthServiceClient) UpdateUserRole(ctx context.Context, in *aut
 	return nil, status.Error(codes.Unimplemented, "not used by this test")
 }
 
+func (f *fakeAdminAuthServiceClient) ListTenantMemberDirectory(ctx context.Context, in *authv1.ListTenantMemberDirectoryRequest, opts ...grpc.CallOption) (*authv1.ListTenantMemberDirectoryResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
 func (f *fakeAdminAuthServiceClient) RevokeSession(ctx context.Context, in *authv1.RevokeSessionRequest, opts ...grpc.CallOption) (*authv1.RevokeSessionResponse, error) {
 	if f.err != nil {
 		return nil, f.err
@@ -159,6 +163,13 @@ func (f *fakeAdminAuthServiceClient) ForceRevokeAllSessionsForUser(ctx context.C
 		return nil, f.err
 	}
 	return f.forceRevokeAllResp, nil
+}
+
+// ForceRevokeSession (TASK-BE-002): unused by this file's tests — stub
+// added only so this fake keeps satisfying AuthServiceClient after the
+// interface grew this method.
+func (f *fakeAdminAuthServiceClient) ForceRevokeSession(ctx context.Context, in *authv1.ForceRevokeSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
 }
 
 func (f *fakeAdminAuthServiceClient) CreateAccessPolicy(ctx context.Context, in *authv1.CreateAccessPolicyRequest, opts ...grpc.CallOption) (*authv1.AccessPolicy, error) {
@@ -251,6 +262,46 @@ func (f *fakeAdminAuthServiceClient) ResolveDeviceSharedSecret(ctx context.Conte
 	return nil, status.Error(codes.Unimplemented, "fakeAdminAuthServiceClient: ResolveDeviceSharedSecret not stubbed")
 }
 
+func (f *fakeAdminAuthServiceClient) StartSsoLogin(ctx context.Context, in *authv1.StartSsoLoginRequest, opts ...grpc.CallOption) (*authv1.StartSsoLoginResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) CompleteSsoLogin(ctx context.Context, in *authv1.CompleteSsoLoginRequest, opts ...grpc.CallOption) (*authv1.CompleteSsoLoginResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+// AppendAuditEntry/RefreshSession/UpdateSsoGroupMapping/ListSsoGroupMapping:
+// unused pass-throughs, present only so this fake keeps satisfying
+// authv1.AuthServiceClient as the interface grows (TASK-BE-017,
+// CR-RBAC-003) — none of this file's tests exercise them.
+func (f *fakeAdminAuthServiceClient) AppendAuditEntry(ctx context.Context, in *authv1.AppendAuditEntryRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) IsServiceTokenRevoked(ctx context.Context, in *authv1.IsServiceTokenRevokedRequest, opts ...grpc.CallOption) (*authv1.IsServiceTokenRevokedResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) ListCliTokens(ctx context.Context, in *authv1.ListCliTokensRequest, opts ...grpc.CallOption) (*authv1.ListCliTokensResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) RevokeCliToken(ctx context.Context, in *authv1.RevokeCliTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) RefreshSession(ctx context.Context, in *authv1.RefreshSessionRequest, opts ...grpc.CallOption) (*authv1.RefreshSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) UpdateSsoGroupMapping(ctx context.Context, in *authv1.UpdateSsoGroupMappingRequest, opts ...grpc.CallOption) (*authv1.UpdateSsoGroupMappingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
+func (f *fakeAdminAuthServiceClient) ListSsoGroupMapping(ctx context.Context, in *authv1.ListSsoGroupMappingRequest, opts ...grpc.CallOption) (*authv1.ListSsoGroupMappingResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "not used by this test")
+}
+
 var _ authv1.AuthServiceClient = (*fakeAdminAuthServiceClient)(nil)
 
 // testAuthAdminRouter mounts mountAuthAdminRoutes standalone and injects a
@@ -287,12 +338,17 @@ func TestHandleListUsers_SuccessRoundTrip(t *testing.T) {
 		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
 	}
 
+	// usersListJSON's shape (camelCase nextPageToken, plus the total field
+	// the old raw-proto passthrough dropped) — see auth_admin_routes.go's
+	// doc comment (specs/backend-go/bugs/missing-v2/ follow-up).
 	var body struct {
 		Users []struct {
 			ID    string `json:"id"`
 			Email string `json:"email"`
+			Role  string `json:"role"`
 		} `json:"users"`
-		NextPageToken string `json:"next_page_token"`
+		Total         int    `json:"total"`
+		NextPageToken string `json:"nextPageToken"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
 		t.Fatalf("response body is not the expected JSON shape: %v; body=%s", err, rec.Body.String())
@@ -300,8 +356,14 @@ func TestHandleListUsers_SuccessRoundTrip(t *testing.T) {
 	if len(body.Users) != 1 || body.Users[0].ID != "user-1" || body.Users[0].Email != "a@example.com" {
 		t.Fatalf("unexpected users in response: %+v", body.Users)
 	}
+	if body.Users[0].Role != "admin" {
+		t.Fatalf("role = %q, want %q (string, not the numeric proto enum)", body.Users[0].Role, "admin")
+	}
+	if body.Total != 1 {
+		t.Fatalf("total = %d, want %d", body.Total, 1)
+	}
 	if body.NextPageToken != "next-token" {
-		t.Fatalf("next_page_token = %q, want %q", body.NextPageToken, "next-token")
+		t.Fatalf("nextPageToken = %q, want %q", body.NextPageToken, "next-token")
 	}
 }
 

@@ -119,7 +119,8 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     {
       hostId: hostSelection.selectedHostId,
       runtimeEnvironmentId: selectedRuntimeEnvironmentId,
-      sshTargetId: hostSelection.selectedSshTargetId
+      sshTargetId: hostSelection.selectedSshTargetId,
+      devServerId: selectedDevServerId
     }
   )
 
@@ -154,6 +155,7 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
     step,
     activeRuntimeEnvironmentId: selectedRuntimeEnvironmentId,
     sshTargetId: hostSelection.selectedSshTargetId,
+    devServerId: selectedDevServerId,
     workspaceDir: settings?.workspaceDir,
     fetchWorktrees,
     onGitRepoReady: completeGitRepoAdd
@@ -345,7 +347,9 @@ const AddRepoDialog = React.memo(function AddRepoDialog() {
         createGitAvailability={createGitAvailability}
         createRuntimeParentStatus={createRuntimeParentStatus}
         createParentDefaultPending={createParentDefaultPending}
-        manualCreateParentEntry={isRuntimeEnvironmentActive || selectedHostKind === 'ssh' || !!selectedDevServerId}
+        manualCreateParentEntry={
+          isRuntimeEnvironmentActive || selectedHostKind === 'ssh' || !!selectedDevServerId
+        }
         onBrowse={
           selectedHostKind === 'ssh'
             ? () => void handleOpenRemoteStep(hostSelection.selectedSshTargetId)

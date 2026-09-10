@@ -14,6 +14,7 @@
 //   1 = startup failure or unrecoverable error
 
 import WebSocket from 'ws'
+import type { Socket } from 'node:net'
 import type { AgentConfig } from './agent-config'
 import type { ToolDefinition } from './agent-tool-registry'
 import { createSession } from './agent-session'
@@ -57,7 +58,6 @@ export async function connectDirect(
   tools: ToolDefinition[],
   log: AgentLogger
 ): Promise<never> {
-
   // ── Token manager: handles initial fetch + proactive renewal ──────────────
   // Requires ORCA_AGENT_API_SECRET. If absent, falls back to AGENT_TOKEN env
   // var (legacy one-shot mode — no renewal, systemd restart on disconnect).
@@ -67,16 +67,27 @@ export async function connectDirect(
     tokenManager = new AgentTokenManager({
       orcaHttpUrl: config.orcaHttpUrl,
       devServerId: config.devServerId,
-      name:        config.devServerId,
-      apiSecret:   config.apiSecret,
-      ttlSec:      AGENT_TOKEN_DEFAULT_TTL_SEC,
-      log,
+      name: config.devServerId,
+      apiSecret: config.apiSecret,
+      ttlSec: AGENT_TOKEN_DEFAULT_TTL_SEC,
+      log
     })
     await tokenManager.init()
 
-    // Graceful cleanup on shutdown
-    process.on('SIGINT',  () => { tokenManager?.dispose(); process.exit(0) })
-    process.on('SIGTERM', () => { tokenManager?.dispose(); process.exit(0) })
+    // Graceful cleanup on shutdown. dispose() is wrapped defensively — an
+    // exception here must never prevent process.exit() (agent-entry.ts's
+    // own SIGTERM listener already logs and exits; this one exists so
+    // token-renewal state is cleaned up too, not as the sole exit path).
+    const disposeAndExit = (): void => {
+      try {
+        tokenManager?.dispose()
+      } catch {
+        /* best effort — still exit */
+      }
+      process.exit(0)
+    }
+    process.on('SIGINT', disposeAndExit)
+    process.on('SIGTERM', disposeAndExit)
   } else {
     // Legacy: AGENT_TOKEN from env, no renewal
     if (!config.agentToken) {
@@ -84,7 +95,9 @@ export async function connectDirect(
       log.error('Set ORCA_AGENT_API_SECRET to enable automatic token renewal.')
       process.exit(1)
     }
-    log.warn('[TokenManager] ORCA_AGENT_API_SECRET not set — using static AGENT_TOKEN (no renewal).')
+    log.warn(
+      '[TokenManager] ORCA_AGENT_API_SECRET not set — using static AGENT_TOKEN (no renewal).'
+    )
   }
 
   // ── Reconnect loop ────────────────────────────────────────────────────────
@@ -100,7 +113,7 @@ export async function connectDirect(
 
       const ws = new WebSocket(config.orcaUrl, {
         headers: { 'User-Agent': 'orca-dev-agent/2.1.0' },
-        rejectUnauthorized: config.tlsRejectUnauthorized,
+        rejectUnauthorized: config.tlsRejectUnauthorized
       })
 
       // TEMP DIAG BUG-FE-PTY-001: no application code was found calling
@@ -127,7 +140,7 @@ export async function connectDirect(
       // see which side/reason the 'ws' library attributes it to before any
       // of our own 'close' handling runs.
       ws.once('open', () => {
-        const sock = (ws as unknown as { _socket?: import('node:net').Socket })._socket
+        const sock = (ws as unknown as { _socket?: Socket })._socket
         sock?.once('end', () => log.error('[DIAG BUG-FE-PTY-001] raw socket "end" (peer sent FIN)'))
         sock?.once('close', (hadError: boolean) =>
           log.error(`[DIAG BUG-FE-PTY-001] raw socket "close" hadError=${hadError}`)
@@ -152,7 +165,11 @@ export async function connectDirect(
         connSpan.step('handshake-ok')
         log.info('Connection established and authenticated.')
         keepAliveTimer = setInterval(() => {
-          try { ws.ping() } catch { /* socket already closing — 'close' handles cleanup */ }
+          try {
+            ws.ping()
+          } catch {
+            /* socket already closing — 'close' handles cleanup */
+          }
         }, KEEPALIVE_PING_MS)
       })
       session.start(ws)
@@ -196,7 +213,6 @@ export async function connectDirect(
           // failing once first (see BUG-DS-AWS below for the same fix on the
           // outright-rejected path).
           resolve('reconnect-renew')
-          return
         } else {
           connSpan.fail(`closed before handshake`, { code })
           log.warn(`Connection closed before handshake (code=${code}). Reconnecting...`)
@@ -208,7 +224,6 @@ export async function connectDirect(
           // ws.close() with no code surfaces as 1005, not 1008). Without this,
           // the agent retries the same dead token forever instead of renewing it.
           resolve('reconnect-auth-failed')
-          return
         }
       })
 
@@ -238,7 +253,9 @@ export async function connectDirect(
       try {
         await tokenManager.forceRenew()
       } catch (err) {
-        log.error(`Failed to force renew token: ${err instanceof Error ? err.message : String(err)}`)
+        log.error(
+          `Failed to force renew token: ${err instanceof Error ? err.message : String(err)}`
+        )
       }
     }
 
@@ -251,5 +268,5 @@ export async function connectDirect(
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise(resolve => setTimeout(resolve, ms))
+  return new Promise((resolve) => setTimeout(resolve, ms))
 }

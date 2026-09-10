@@ -42,23 +42,36 @@ export function GeneralSupportSection({
   // doesn't shift; anything below (nothing today, but future-proof) eases up.
   const [starState, setStarState] = useState<SupportState>('loading')
   const settings = useAppStore((s) => s.settings)
+  // Why: only the active runtime environment affects which target
+  // checkRuntimeOrcaStarred hits — depend on that field instead of the
+  // whole settings object so unrelated setting changes don't re-fire this.
+  const activeRuntimeEnvironmentId = settings?.activeRuntimeEnvironmentId ?? null
 
   useEffect(() => {
     let cancelled = false
-    void checkRuntimeOrcaStarred(settings).then((result) => {
-      if (cancelled) {
-        return
-      }
-      if (result === null) {
-        setStarState('web-fallback')
-      } else {
-        setStarState(result ? 'starred' : 'not-starred')
-      }
-    })
+    void checkRuntimeOrcaStarred({ activeRuntimeEnvironmentId })
+      .then((result) => {
+        if (cancelled) {
+          return
+        }
+        if (result === null) {
+          setStarState('web-fallback')
+        } else {
+          setStarState(result ? 'starred' : 'not-starred')
+        }
+      })
+      // Why: a runtime-RPC rejection here is exactly as "unable to
+      // determine" as the already-handled `result === null` case — fall
+      // back the same way instead of leaving an uncaught rejection.
+      .catch(() => {
+        if (!cancelled) {
+          setStarState('web-fallback')
+        }
+      })
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [activeRuntimeEnvironmentId])
 
   const handleStarClick = async (): Promise<void> => {
     if (starState === 'web-fallback') {

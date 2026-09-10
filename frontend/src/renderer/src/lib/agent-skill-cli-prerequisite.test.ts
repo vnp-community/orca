@@ -16,22 +16,19 @@ vi.mock('sonner', () => ({
   }
 }))
 
+// getRuntimeCliInstallStatus/installRuntimeCli call window.api.cli.* directly
+// now (not the generic window.api.runtime.call relay) so devServerId-aware
+// calls reach backend-go's real cli.* channels on the web build — see
+// runtime-cli-client.ts's doc comment.
 function stubRuntimeCli(
   getInstallStatus: () => Promise<CliInstallStatus>,
   install: () => Promise<CliInstallStatus>
 ) {
   return {
     api: {
-      runtime: {
-        call: vi.fn(async ({ method }: { method: string }) => {
-          if (method === 'cli.getInstallStatus') {
-            return { ok: true, result: await getInstallStatus() }
-          }
-          if (method === 'cli.install') {
-            return { ok: true, result: await install() }
-          }
-          throw new Error(`Unexpected runtime.call method in test stub: ${method}`)
-        })
+      cli: {
+        getInstallStatus: vi.fn(getInstallStatus),
+        install: vi.fn(install)
       }
     }
   }

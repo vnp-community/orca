@@ -279,6 +279,20 @@ func (e *Executor) RemoteFileURL(ctx context.Context, repoPath, path, ref string
 	return base + "/blob/" + ref + "/" + path, nil
 }
 
+// RemoteURL returns remoteName's raw configured URL — no web-permalink
+// mangling, unlike RemoteCommitURL/RemoteFileURL/remoteWebBaseURL below.
+// remoteName empty defaults to "origin".
+func (e *Executor) RemoteURL(ctx context.Context, repoPath, remoteName string) (string, error) {
+	if remoteName == "" {
+		remoteName = "origin"
+	}
+	raw, err := e.run(ctx, repoPath, "remote", "get-url", remoteName)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(raw), nil
+}
+
 // remoteWebBaseURL converts `git remote get-url origin`'s SSH or HTTPS form
 // into a browsable https://<host>/<org>/<repo> base URL.
 func (e *Executor) remoteWebBaseURL(ctx context.Context, repoPath string) (string, error) {
@@ -316,9 +330,13 @@ func (e *Executor) Clone(ctx context.Context, url, destPath string) (string, str
 // InitRepo runs `git init` (optionally with -b <defaultBranch>, Git 2.28+;
 // falls back to a plain `git init` + `git symbolic-ref` rename for older
 // Git per docs/reference/git-compatibility.md's 2.25 baseline) at destPath.
-func (e *Executor) InitRepo(ctx context.Context, destPath, defaultBranch string) (string, string, error) {
+// remoteURL empty = no remote added ("Initialize as Git repo" feature's
+// optional second step, done in the same call as init so the caller
+// doesn't need a follow-up round trip). remoteName defaults to "origin"
+// when empty and remoteURL is set.
+func (e *Executor) InitRepo(ctx context.Context, destPath, defaultBranch, remoteName, remoteURL string) (string, string, bool, error) {
 	if err := os.MkdirAll(destPath, 0o755); err != nil {
-		return "", "", fmt.Errorf("mkdir dest path: %w", err)
+		return "", "", false, fmt.Errorf("mkdir dest path: %w", err)
 	}
 	args := []string{"init"}
 	if defaultBranch != "" {
@@ -329,30 +347,103 @@ func (e *Executor) InitRepo(ctx context.Context, destPath, defaultBranch string)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {
-		return "", "", fmt.Errorf("git init: %w: %s", err, strings.TrimSpace(stderr.String()))
+		return "", "", false, fmt.Errorf("git init: %w: %s", err, strings.TrimSpace(stderr.String()))
 	}
+
+	remoteAdded := false
+	if remoteURL != "" {
+		name := remoteName
+		if name == "" {
+			name = "origin"
+		}
+		if _, err := e.run(ctx, destPath, "remote", "add", name, remoteURL); err != nil {
+			return destPath, defaultBranch, false, fmt.Errorf("git remote add: %w", err)
+		}
+		remoteAdded = true
+	}
+
 	branch, err := e.run(ctx, destPath, "symbolic-ref", "--short", "HEAD")
 	if err != nil {
-		return destPath, defaultBranch, nil // best-effort: init succeeded even if branch read fails
+		return destPath, defaultBranch, remoteAdded, nil // best-effort: init succeeded even if branch read fails
 	}
-	return destPath, strings.TrimSpace(branch), nil
+	return destPath, strings.TrimSpace(branch), remoteAdded, nil
 }
 
 // BaseRefDefault resolves the remote's default branch via
-// `git symbolic-ref refs/remotes/origin/HEAD` (falls back to `git remote
-// show origin`'s "HEAD branch:" line pre-Git 2.8, if that boundary ever
-// matters for this baseline).
+// `git symbolic-ref refs/remotes/origin/HEAD` — the fast, purely-local path
+// that a real `git clone` always populates.
+//
+// That ref is NEVER set by `git init` + `git remote add` (InitRepo, the
+// "Initialize as Git repo" feature) — not even after a `git fetch` — only
+// `git clone` or an explicit `git remote set-head origin -a` create it.
+// Every repo onboarded that way would otherwise fail this lookup
+// permanently. Fall back to asking the remote directly via
+// `git ls-remote --symref` (no local commit or full clone required, no
+// mutation) before giving up.
 func (e *Executor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {
 	out, err := e.run(ctx, repoPath, "symbolic-ref", "refs/remotes/origin/HEAD")
+	if err == nil {
+		return lastRefSegment(out), nil
+	}
+	branch, remoteErr := e.defaultBranchFromRemoteHead(ctx, repoPath)
+	if remoteErr == nil && branch != "" {
+		return branch, nil
+	}
+	// Last resort: a repo `git init`'d then `git remote add`'d (InitRepo)
+	// before its first commit ever landed either locally or on the remote —
+	// ls-remote succeeds but returns nothing (empty remote), so fall back to
+	// whatever branch `git init` already set up locally. `git symbolic-ref
+	// HEAD` resolves even with zero commits, unlike `git branch`/`git log`.
+	if localBranch, localErr := e.currentLocalBranch(ctx, repoPath); localErr == nil && localBranch != "" {
+		return localBranch, nil
+	}
+	return "", err
+}
+
+// currentLocalBranch returns the branch HEAD points at, even in a
+// freshly-`git init`'d repo with no commits yet (unlike `git branch --show-current`
+// on some git versions, `git symbolic-ref HEAD` never depends on a commit existing).
+func (e *Executor) currentLocalBranch(ctx context.Context, repoPath string) (string, error) {
+	out, err := e.run(ctx, repoPath, "symbolic-ref", "HEAD")
 	if err != nil {
 		return "", err
 	}
-	// "refs/remotes/origin/main" -> "main"
-	ref := strings.TrimSpace(out)
+	return lastRefSegment(out), nil
+}
+
+// defaultBranchFromRemoteHead asks the remote itself which branch HEAD
+// points at, via `git ls-remote --symref origin HEAD`:
+//
+//	ref: refs/heads/main	HEAD
+//	<sha>	HEAD
+func (e *Executor) defaultBranchFromRemoteHead(ctx context.Context, repoPath string) (string, error) {
+	out, err := e.run(ctx, repoPath, "ls-remote", "--symref", "origin", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	const prefix = "ref: refs/heads/"
+	for _, line := range strings.Split(out, "\n") {
+		if !strings.HasPrefix(line, prefix) {
+			continue
+		}
+		rest := strings.TrimPrefix(line, prefix)
+		if idx := strings.IndexByte(rest, '\t'); idx >= 0 {
+			rest = rest[:idx]
+		}
+		if rest = strings.TrimSpace(rest); rest != "" {
+			return rest, nil
+		}
+	}
+	return "", nil
+}
+
+// lastRefSegment turns "refs/remotes/origin/main" into "main".
+func lastRefSegment(ref string) string {
+	ref = strings.TrimSpace(ref)
 	if idx := strings.LastIndex(ref, "/"); idx >= 0 {
 		ref = ref[idx+1:]
 	}
-	return ref, nil
+	return ref
 }
 
 // SearchRefs runs `git for-each-ref` filtered by query as a substring match
@@ -511,21 +602,38 @@ func (e *Executor) FetchAndResolveRef(ctx context.Context, repoPath, ref string)
 	return strings.TrimSpace(sha), nil
 }
 
-// ListWorktreePaths runs `git worktree list --porcelain` and extracts
-// every `worktree <path>` line — the raw on-disk truth DetectWorktrees
-// needs, with no bookkeeping join.
-func (e *Executor) ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error) {
+// ListWorktreePaths runs `git worktree list --porcelain` and parses each
+// entry's path + HEAD sha + branch — the raw on-disk truth DetectWorktrees
+// needs, with no bookkeeping join. Porcelain entries are separated by a
+// blank line and always start with `worktree <path>`, followed by
+// `HEAD <sha>`, then either `branch <ref>` or a bare `detached` line — see
+// git-worktree(1)'s PORCELAIN FORMAT.
+func (e *Executor) ListWorktreePaths(ctx context.Context, repoPath string) ([]domain.WorktreeGitInfo, error) {
 	out, err := e.run(ctx, repoPath, "worktree", "list", "--porcelain")
 	if err != nil {
 		return nil, err
 	}
-	var paths []string
+	var infos []domain.WorktreeGitInfo
+	var current *domain.WorktreeGitInfo
 	for _, line := range strings.Split(out, "\n") {
-		if p, ok := strings.CutPrefix(line, "worktree "); ok {
-			paths = append(paths, p)
+		switch {
+		case strings.HasPrefix(line, "worktree "):
+			if current != nil {
+				infos = append(infos, *current)
+			}
+			current = &domain.WorktreeGitInfo{Path: strings.TrimPrefix(line, "worktree ")}
+		case current == nil:
+			// Blank/unexpected line before any `worktree` line — ignore.
+		case strings.HasPrefix(line, "HEAD "):
+			current.Head = strings.TrimPrefix(line, "HEAD ")
+		case strings.HasPrefix(line, "branch "):
+			current.Branch = strings.TrimPrefix(line, "branch ")
 		}
 	}
-	return paths, nil
+	if current != nil {
+		infos = append(infos, *current)
+	}
+	return infos, nil
 }
 
 // ForceDeleteBranch runs `git branch -D <branch>` — force delete, no

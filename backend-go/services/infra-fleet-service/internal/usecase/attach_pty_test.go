@@ -41,7 +41,7 @@ func (f *fakeLifecycleEventPublisher) callsSnapshot() []lifecycleEventCall {
 }
 
 func TestAttachPty_RequiresAttachFirstFrame(t *testing.T) {
-	uc := NewAttachPty(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerAgentClient{}, NewConnectionStreamLimiter(0), &sync.Map{}, &fakeLifecycleEventPublisher{})
+	uc := NewAttachPty(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerRepository{}, &fakeDevServerAgentClient{}, NewConnectionStreamLimiter(0), &sync.Map{}, &fakeLifecycleEventPublisher{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	inbound := make(chan PtyClientMessage, 1)
@@ -59,7 +59,7 @@ func TestAttachPty_RequiresAttachFirstFrame(t *testing.T) {
 }
 
 func TestAttachPty_UnknownPtyID_ReturnsError(t *testing.T) {
-	uc := NewAttachPty(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerAgentClient{}, NewConnectionStreamLimiter(0), &sync.Map{}, &fakeLifecycleEventPublisher{})
+	uc := NewAttachPty(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerRepository{}, &fakeDevServerAgentClient{}, NewConnectionStreamLimiter(0), &sync.Map{}, &fakeLifecycleEventPublisher{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	inbound := make(chan PtyClientMessage, 1)
@@ -101,7 +101,7 @@ func TestAttachPty_RelaysInputAndResizeToAgent(t *testing.T) {
 	resolver := &fakeConnectionResolver{}
 	agent := &fakeDevServerAgentClient{streamPtyEvents: make(chan PtyEvent)}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
-	uc := NewAttachPty(sessions, resolver, agent, NewConnectionStreamLimiter(0), &sync.Map{}, &fakeLifecycleEventPublisher{})
+	uc := NewAttachPty(sessions, resolver, &fakeDevServerRepository{}, agent, NewConnectionStreamLimiter(0), &sync.Map{}, &fakeLifecycleEventPublisher{})
 
 	ctx, cancel := context.WithCancel(withTenant(context.Background(), "tenant-1"))
 	defer cancel()
@@ -144,7 +144,7 @@ func TestAttachPty_RelaysAgentOutputAndExit(t *testing.T) {
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
 	liveStates := &sync.Map{}
 	lifecycleEvents := &fakeLifecycleEventPublisher{}
-	uc := NewAttachPty(sessions, resolver, agent, NewConnectionStreamLimiter(0), liveStates, lifecycleEvents)
+	uc := NewAttachPty(sessions, resolver, &fakeDevServerRepository{}, agent, NewConnectionStreamLimiter(0), liveStates, lifecycleEvents)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	inbound := make(chan PtyClientMessage, 1)
@@ -223,7 +223,7 @@ func TestAttachPty_ExitCodeZero_PublishesAgentCompleted(t *testing.T) {
 	agent := &fakeDevServerAgentClient{streamPtyEvents: events}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
 	lifecycleEvents := &fakeLifecycleEventPublisher{}
-	uc := NewAttachPty(sessions, resolver, agent, NewConnectionStreamLimiter(0), &sync.Map{}, lifecycleEvents)
+	uc := NewAttachPty(sessions, resolver, &fakeDevServerRepository{}, agent, NewConnectionStreamLimiter(0), &sync.Map{}, lifecycleEvents)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	inbound := make(chan PtyClientMessage, 1)
@@ -298,7 +298,7 @@ func TestAttachPty_AccumulatesOutputBuffer_AcrossMultipleChunks(t *testing.T) {
 	agent := &fakeDevServerAgentClient{streamPtyEvents: events}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
 	liveStates := &sync.Map{}
-	uc := NewAttachPty(sessions, resolver, agent, NewConnectionStreamLimiter(0), liveStates, &fakeLifecycleEventPublisher{})
+	uc := NewAttachPty(sessions, resolver, &fakeDevServerRepository{}, agent, NewConnectionStreamLimiter(0), liveStates, &fakeLifecycleEventPublisher{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	inbound := make(chan PtyClientMessage, 1)
@@ -332,7 +332,7 @@ func TestAttachPty_StreamLimitReached(t *testing.T) {
 	}
 	defer release()
 
-	uc := NewAttachPty(sessions, resolver, agent, limiter, &sync.Map{}, &fakeLifecycleEventPublisher{})
+	uc := NewAttachPty(sessions, resolver, &fakeDevServerRepository{}, agent, limiter, &sync.Map{}, &fakeLifecycleEventPublisher{})
 	ctx := withTenant(context.Background(), "tenant-1")
 	inbound := make(chan PtyClientMessage, 1)
 	inbound <- PtyClientMessage{Attach: &PtyAttachMessage{PtyID: "pty-1"}}

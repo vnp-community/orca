@@ -20,6 +20,7 @@ import { buildPrelaunchedEmulatorSessionState } from './emulator-prelaunched-ses
 import { useEmulatorPaneManualLaunchEvents } from './use-emulator-pane-manual-launch-events'
 import { buildEmulatorPaneSessionView } from './emulator-pane-session-view'
 import { resolveEmulatorAttachTarget } from './emulator-attach-target'
+import { resolveEmulatorPaneRuntimeTarget } from './emulator-pane-runtime-target'
 import { useEmulatorPaneLifecycle } from './use-emulator-pane-lifecycle'
 import { useEmulatorPaneShutdown } from './use-emulator-pane-shutdown'
 import { emulatorPaneErrorMessage } from './emulator-pane-error-message'
@@ -70,10 +71,11 @@ export function useEmulatorPaneSession({
   const refreshDevices = useCallback(async (bootedTarget?: string | null) => {
     try {
       // Unified list so Android devices/AVDs appear alongside iOS simulators.
+      const { target, projectId } = resolveEmulatorPaneRuntimeTarget(worktreeId)
       const raw = (await callRuntimeRpc(
-        { kind: 'local' },
+        target,
         'emulator.listDevices',
-        {}
+        { projectId }
       )) as RawEmulatorDevice[]
       const list = toSimulatorDeviceRows(raw)
       const next = markSimulatorDeviceBooted(list, bootedTarget)
@@ -95,7 +97,7 @@ export function useEmulatorPaneSession({
       }
       return []
     }
-  }, [])
+  }, [worktreeId])
 
   const applySession = useCallback(
     (info: EmulatorPaneSession['info'], attached = true, deviceRows = devices) => {
@@ -196,10 +198,12 @@ export function useEmulatorPaneSession({
           liveTargetRef.current = null
           resetVisualOrientation()
         }
-        const res = (await callRuntimeRpc({ kind: 'local' }, 'emulator.attach', {
+        const { target: rpcTarget, projectId } = resolveEmulatorPaneRuntimeTarget(worktreeId)
+        const res = (await callRuntimeRpc(rpcTarget, 'emulator.attach', {
           device: target,
           worktree: worktreeId,
-          focus: false
+          focus: false,
+          projectId
         })) as { attached?: boolean; info?: EmulatorPaneSession['info'] }
         if (!mountedRef.current) {
           // Why: attach can finish after the tab closes, after the earlier

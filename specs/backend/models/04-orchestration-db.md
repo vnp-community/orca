@@ -49,7 +49,7 @@
 ## 4. Luồng nghiệp vụ
 
 Đây là backend của pipeline **Source → Plan → Execute "complex path"**
-(`docs/guides/task-automation-orchestration-integration.md §9.2/§9.4.2/§9.4.4`): 1 task kanban (`orca_tasks`)
+(`docs/guides/task-automation/task-automation-orchestration-integration.md §9.2/§9.4.2/§9.4.4`): 1 task kanban (`orca_tasks`)
 được mở rộng thành DAG sub-task trong `OrchestrationDb`, `Coordinator` dispatch task sẵn sàng tới các
 terminal-hosted AI agent worker qua mailbox `messages`, theo dõi liveness/failure qua `dispatch_contexts`,
 resolve các điểm quyết định con người qua `decision_gates`, và promote task phụ thuộc khi dependency hoàn

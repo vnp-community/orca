@@ -4,7 +4,7 @@
 **File:** `internal/adapter/wscompat/channels.go`
 **Severity:** High — SSH connectivity underlies most remote-dev-server workflows; `ssh.connect`/`ssh.getState`/`ssh.listTargets` block any SSH-backed dev server from becoming usable.
 **Symptom:** Every `ssh.*` `callRuntimeRpc` from the renderer falls through to `registry.go`'s `notImplementedHandler` and returns `channel "ssh.X" is not yet implemented in backend-go`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-162–166 (5 task(s), all DONE) for implementation evidence.
 
 ---
 

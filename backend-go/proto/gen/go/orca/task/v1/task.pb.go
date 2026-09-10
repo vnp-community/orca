@@ -162,9 +162,12 @@ type Task struct {
 	TaskNumber int64 `protobuf:"varint,22,opt,name=task_number,json=taskNumber,proto3" json:"task_number,omitempty"`
 	// Set by the PR-creation write-back saga — empty until a PR
 	// referencing this task's #TG-N is created.
-	PrUrl         string `protobuf:"bytes,23,opt,name=pr_url,json=prUrl,proto3" json:"pr_url,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	PrUrl string `protobuf:"bytes,23,opt,name=pr_url,json=prUrl,proto3" json:"pr_url,omitempty"`
+	// workflow_template_id: optional workflow-service template attached to
+	// this task (Engine 3). Empty = none attached. See docs/backlog/BACKLOG-016.
+	WorkflowTemplateId string `protobuf:"bytes,24,opt,name=workflow_template_id,json=workflowTemplateId,proto3" json:"workflow_template_id,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *Task) Reset() {
@@ -354,6 +357,13 @@ func (x *Task) GetTaskNumber() int64 {
 func (x *Task) GetPrUrl() string {
 	if x != nil {
 		return x.PrUrl
+	}
+	return ""
+}
+
+func (x *Task) GetWorkflowTemplateId() string {
+	if x != nil {
+		return x.WorkflowTemplateId
 	}
 	return ""
 }
@@ -957,9 +967,16 @@ func (x *ResolvePermissionResponse) GetEffectiveLevel() GrantLevel {
 // Execute branches by complexity: simple tasks relay to infra-fleet-service
 // (agent.exec-equivalent), complex ones route through orchestration-service.
 type TaskServiceExecuteRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	TaskId        string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	TaskId    string                 `protobuf:"bytes,1,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
+	RequestId string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	// prompt: caller-supplied override for the agent prompt (TaskPromptEditor.tsx
+	// lets the user edit it before running). Empty = fall back to the
+	// executor's own default prompt built from the task (e.g.
+	// SimpleExecutor.buildExecutePrompt's plain "Complete the following
+	// task: <title>"). Not persisted — a per-execution input, not a task
+	// field. See docs/backlog/BACKLOG-016.
+	Prompt        string `protobuf:"bytes,3,opt,name=prompt,proto3" json:"prompt,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1004,6 +1021,13 @@ func (x *TaskServiceExecuteRequest) GetTaskId() string {
 func (x *TaskServiceExecuteRequest) GetRequestId() string {
 	if x != nil {
 		return x.RequestId
+	}
+	return ""
+}
+
+func (x *TaskServiceExecuteRequest) GetPrompt() string {
+	if x != nil {
+		return x.Prompt
 	}
 	return ""
 }
@@ -1281,8 +1305,13 @@ type UpdateTaskRequest struct {
 	Visibility     *wrapperspb.StringValue `protobuf:"bytes,12,opt,name=visibility,proto3" json:"visibility,omitempty"`
 	PrUrl          *wrapperspb.StringValue `protobuf:"bytes,13,opt,name=pr_url,json=prUrl,proto3" json:"pr_url,omitempty"`
 	WorktreeId     *wrapperspb.StringValue `protobuf:"bytes,14,opt,name=worktree_id,json=worktreeId,proto3" json:"worktree_id,omitempty"`
-	unknownFields  protoimpl.UnknownFields
-	sizeCache      protoimpl.SizeCache
+	// workflow_template_id: set (even to "") to change which workflow-service
+	// template is attached; unset (field absent) leaves it untouched — same
+	// wrapper-typed field-mask shape as title/status above. See
+	// docs/backlog/BACKLOG-016.
+	WorkflowTemplateId *wrapperspb.StringValue `protobuf:"bytes,15,opt,name=workflow_template_id,json=workflowTemplateId,proto3" json:"workflow_template_id,omitempty"`
+	unknownFields      protoimpl.UnknownFields
+	sizeCache          protoimpl.SizeCache
 }
 
 func (x *UpdateTaskRequest) Reset() {
@@ -1409,6 +1438,13 @@ func (x *UpdateTaskRequest) GetPrUrl() *wrapperspb.StringValue {
 func (x *UpdateTaskRequest) GetWorktreeId() *wrapperspb.StringValue {
 	if x != nil {
 		return x.WorktreeId
+	}
+	return nil
+}
+
+func (x *UpdateTaskRequest) GetWorkflowTemplateId() *wrapperspb.StringValue {
+	if x != nil {
+		return x.WorkflowTemplateId
 	}
 	return nil
 }
@@ -3041,7 +3077,7 @@ var File_orca_task_v1_task_proto protoreflect.FileDescriptor
 
 const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\n" +
-	"\x17orca/task/v1/task.proto\x12\forca.task.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\"\xab\x06\n" +
+	"\x17orca/task/v1/task.proto\x12\forca.task.v1\x1a\x1bgoogle/protobuf/empty.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1egoogle/protobuf/wrappers.proto\"\xdd\x06\n" +
 	"\x04Task\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x14\n" +
@@ -3074,7 +3110,8 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\x10progress_percent\x18\x15 \x01(\x05R\x0fprogressPercent\x12\x1f\n" +
 	"\vtask_number\x18\x16 \x01(\x03R\n" +
 	"taskNumber\x12\x15\n" +
-	"\x06pr_url\x18\x17 \x01(\tR\x05prUrl\"\xe4\x03\n" +
+	"\x06pr_url\x18\x17 \x01(\tR\x05prUrl\x120\n" +
+	"\x14workflow_template_id\x18\x18 \x01(\tR\x12workflowTemplateId\"\xe4\x03\n" +
 	"\x11CreateTaskRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x14\n" +
 	"\x05title\x18\x02 \x01(\tR\x05title\x12\x1b\n" +
@@ -3124,11 +3161,12 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\auser_id\x18\x02 \x01(\tR\x06userId\x12\x16\n" +
 	"\x06action\x18\x03 \x01(\tR\x06action\"^\n" +
 	"\x19ResolvePermissionResponse\x12A\n" +
-	"\x0feffective_level\x18\x01 \x01(\x0e2\x18.orca.task.v1.GrantLevelR\x0eeffectiveLevel\"S\n" +
+	"\x0feffective_level\x18\x01 \x01(\x0e2\x18.orca.task.v1.GrantLevelR\x0eeffectiveLevel\"k\n" +
 	"\x19TaskServiceExecuteRequest\x12\x17\n" +
 	"\atask_id\x18\x01 \x01(\tR\x06taskId\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x02 \x01(\tR\trequestId\"W\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\x12\x16\n" +
+	"\x06prompt\x18\x03 \x01(\tR\x06prompt\"W\n" +
 	"\x1aTaskServiceExecuteResponse\x12#\n" +
 	"\rexecution_ref\x18\x01 \x01(\tR\fexecutionRef\x12\x14\n" +
 	"\x05async\x18\x02 \x01(\bR\x05async\";\n" +
@@ -3146,7 +3184,7 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\tpage_size\x18\x03 \x01(\x05R\bpageSize\"e\n" +
 	"\x11ListTasksResponse\x12(\n" +
 	"\x05tasks\x18\x01 \x03(\v2\x12.orca.task.v1.TaskR\x05tasks\x12&\n" +
-	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xb5\x06\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\x85\a\n" +
 	"\x11UpdateTaskRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x122\n" +
 	"\x05title\x18\x02 \x01(\v2\x1c.google.protobuf.StringValueR\x05title\x124\n" +
@@ -3167,7 +3205,8 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"visibility\x123\n" +
 	"\x06pr_url\x18\r \x01(\v2\x1c.google.protobuf.StringValueR\x05prUrl\x12=\n" +
 	"\vworktree_id\x18\x0e \x01(\v2\x1c.google.protobuf.StringValueR\n" +
-	"worktreeId\"<\n" +
+	"worktreeId\x12N\n" +
+	"\x14workflow_template_id\x18\x0f \x01(\v2\x1c.google.protobuf.StringValueR\x12workflowTemplateId\"<\n" +
 	"\x12UpdateTaskResponse\x12&\n" +
 	"\x04task\x18\x01 \x01(\v2\x12.orca.task.v1.TaskR\x04task\"Y\n" +
 	"\x17FindTaskByNumberRequest\x12\x1d\n" +
@@ -3411,75 +3450,76 @@ var file_orca_task_v1_task_proto_depIdxs = []int32{
 	53, // 22: orca.task.v1.UpdateTaskRequest.visibility:type_name -> google.protobuf.StringValue
 	53, // 23: orca.task.v1.UpdateTaskRequest.pr_url:type_name -> google.protobuf.StringValue
 	53, // 24: orca.task.v1.UpdateTaskRequest.worktree_id:type_name -> google.protobuf.StringValue
-	2,  // 25: orca.task.v1.UpdateTaskResponse.task:type_name -> orca.task.v1.Task
-	2,  // 26: orca.task.v1.FindTaskByNumberResponse.task:type_name -> orca.task.v1.Task
-	2,  // 27: orca.task.v1.GetDependenciesResponse.dependencies:type_name -> orca.task.v1.Task
-	52, // 28: orca.task.v1.SubtaskProposal.estimated_hours:type_name -> google.protobuf.DoubleValue
-	27, // 29: orca.task.v1.AIDecomposeResponse.proposals:type_name -> orca.task.v1.SubtaskProposal
-	27, // 30: orca.task.v1.AIApplyRequest.proposals:type_name -> orca.task.v1.SubtaskProposal
-	2,  // 31: orca.task.v1.AIApplyResponse.created_subtasks:type_name -> orca.task.v1.Task
-	2,  // 32: orca.task.v1.GetSubtreeResponse.tasks:type_name -> orca.task.v1.Task
-	7,  // 33: orca.task.v1.GetSubtreeResponse.depends_on_edges:type_name -> orca.task.v1.AddEdgeRequest
-	36, // 34: orca.task.v1.ListCommentsResponse.comments:type_name -> orca.task.v1.AddCommentResponse
-	1,  // 35: orca.task.v1.Grant.level:type_name -> orca.task.v1.GrantLevel
-	51, // 36: orca.task.v1.Grant.expires_at:type_name -> google.protobuf.Timestamp
-	43, // 37: orca.task.v1.ListGrantsResponse.grants:type_name -> orca.task.v1.Grant
-	51, // 38: orca.task.v1.CreatePublicLinkRequest.expires_at:type_name -> google.protobuf.Timestamp
-	3,  // 39: orca.task.v1.TaskService.CreateTask:input_type -> orca.task.v1.CreateTaskRequest
-	5,  // 40: orca.task.v1.TaskService.GetTask:input_type -> orca.task.v1.GetTaskRequest
-	7,  // 41: orca.task.v1.TaskService.AddEdge:input_type -> orca.task.v1.AddEdgeRequest
-	9,  // 42: orca.task.v1.TaskService.Grant:input_type -> orca.task.v1.GrantRequest
-	11, // 43: orca.task.v1.TaskService.ResolvePermission:input_type -> orca.task.v1.ResolvePermissionRequest
-	13, // 44: orca.task.v1.TaskService.Execute:input_type -> orca.task.v1.TaskServiceExecuteRequest
-	15, // 45: orca.task.v1.TaskService.HasActiveExecutions:input_type -> orca.task.v1.HasActiveExecutionsRequest
-	17, // 46: orca.task.v1.TaskService.ListTasks:input_type -> orca.task.v1.ListTasksRequest
-	19, // 47: orca.task.v1.TaskService.UpdateTask:input_type -> orca.task.v1.UpdateTaskRequest
-	23, // 48: orca.task.v1.TaskService.DeleteTask:input_type -> orca.task.v1.DeleteTaskRequest
-	24, // 49: orca.task.v1.TaskService.GetDependencies:input_type -> orca.task.v1.GetDependenciesRequest
-	21, // 50: orca.task.v1.TaskService.FindTaskByNumber:input_type -> orca.task.v1.FindTaskByNumberRequest
-	26, // 51: orca.task.v1.TaskService.AIDecompose:input_type -> orca.task.v1.AIDecomposeRequest
-	29, // 52: orca.task.v1.TaskService.AIApply:input_type -> orca.task.v1.AIApplyRequest
-	31, // 53: orca.task.v1.TaskService.GetSubtree:input_type -> orca.task.v1.GetSubtreeRequest
-	33, // 54: orca.task.v1.TaskService.RecalculateProgress:input_type -> orca.task.v1.RecalculateProgressRequest
-	35, // 55: orca.task.v1.TaskService.AddComment:input_type -> orca.task.v1.AddCommentRequest
-	37, // 56: orca.task.v1.TaskService.ListComments:input_type -> orca.task.v1.ListCommentsRequest
-	39, // 57: orca.task.v1.TaskService.GenerateAgentPrompt:input_type -> orca.task.v1.GenerateAgentPromptRequest
-	41, // 58: orca.task.v1.TaskService.RevokeGrant:input_type -> orca.task.v1.RevokeGrantRequest
-	42, // 59: orca.task.v1.TaskService.ListGrants:input_type -> orca.task.v1.ListGrantsRequest
-	45, // 60: orca.task.v1.TaskService.CreatePublicLink:input_type -> orca.task.v1.CreatePublicLinkRequest
-	47, // 61: orca.task.v1.TaskService.RevokePublicLink:input_type -> orca.task.v1.RevokePublicLinkRequest
-	48, // 62: orca.task.v1.TaskService.ResolvePublicLink:input_type -> orca.task.v1.ResolvePublicLinkRequest
-	50, // 63: orca.task.v1.TaskService.ReportTaskExecutionResult:input_type -> orca.task.v1.ReportTaskExecutionResultRequest
-	4,  // 64: orca.task.v1.TaskService.CreateTask:output_type -> orca.task.v1.CreateTaskResponse
-	6,  // 65: orca.task.v1.TaskService.GetTask:output_type -> orca.task.v1.GetTaskResponse
-	8,  // 66: orca.task.v1.TaskService.AddEdge:output_type -> orca.task.v1.AddEdgeResponse
-	10, // 67: orca.task.v1.TaskService.Grant:output_type -> orca.task.v1.GrantResponse
-	12, // 68: orca.task.v1.TaskService.ResolvePermission:output_type -> orca.task.v1.ResolvePermissionResponse
-	14, // 69: orca.task.v1.TaskService.Execute:output_type -> orca.task.v1.TaskServiceExecuteResponse
-	16, // 70: orca.task.v1.TaskService.HasActiveExecutions:output_type -> orca.task.v1.HasActiveExecutionsResponse
-	18, // 71: orca.task.v1.TaskService.ListTasks:output_type -> orca.task.v1.ListTasksResponse
-	20, // 72: orca.task.v1.TaskService.UpdateTask:output_type -> orca.task.v1.UpdateTaskResponse
-	54, // 73: orca.task.v1.TaskService.DeleteTask:output_type -> google.protobuf.Empty
-	25, // 74: orca.task.v1.TaskService.GetDependencies:output_type -> orca.task.v1.GetDependenciesResponse
-	22, // 75: orca.task.v1.TaskService.FindTaskByNumber:output_type -> orca.task.v1.FindTaskByNumberResponse
-	28, // 76: orca.task.v1.TaskService.AIDecompose:output_type -> orca.task.v1.AIDecomposeResponse
-	30, // 77: orca.task.v1.TaskService.AIApply:output_type -> orca.task.v1.AIApplyResponse
-	32, // 78: orca.task.v1.TaskService.GetSubtree:output_type -> orca.task.v1.GetSubtreeResponse
-	34, // 79: orca.task.v1.TaskService.RecalculateProgress:output_type -> orca.task.v1.RecalculateProgressResponse
-	36, // 80: orca.task.v1.TaskService.AddComment:output_type -> orca.task.v1.AddCommentResponse
-	38, // 81: orca.task.v1.TaskService.ListComments:output_type -> orca.task.v1.ListCommentsResponse
-	40, // 82: orca.task.v1.TaskService.GenerateAgentPrompt:output_type -> orca.task.v1.GenerateAgentPromptResponse
-	54, // 83: orca.task.v1.TaskService.RevokeGrant:output_type -> google.protobuf.Empty
-	44, // 84: orca.task.v1.TaskService.ListGrants:output_type -> orca.task.v1.ListGrantsResponse
-	46, // 85: orca.task.v1.TaskService.CreatePublicLink:output_type -> orca.task.v1.CreatePublicLinkResponse
-	54, // 86: orca.task.v1.TaskService.RevokePublicLink:output_type -> google.protobuf.Empty
-	49, // 87: orca.task.v1.TaskService.ResolvePublicLink:output_type -> orca.task.v1.ResolvePublicLinkResponse
-	54, // 88: orca.task.v1.TaskService.ReportTaskExecutionResult:output_type -> google.protobuf.Empty
-	64, // [64:89] is the sub-list for method output_type
-	39, // [39:64] is the sub-list for method input_type
-	39, // [39:39] is the sub-list for extension type_name
-	39, // [39:39] is the sub-list for extension extendee
-	0,  // [0:39] is the sub-list for field type_name
+	53, // 25: orca.task.v1.UpdateTaskRequest.workflow_template_id:type_name -> google.protobuf.StringValue
+	2,  // 26: orca.task.v1.UpdateTaskResponse.task:type_name -> orca.task.v1.Task
+	2,  // 27: orca.task.v1.FindTaskByNumberResponse.task:type_name -> orca.task.v1.Task
+	2,  // 28: orca.task.v1.GetDependenciesResponse.dependencies:type_name -> orca.task.v1.Task
+	52, // 29: orca.task.v1.SubtaskProposal.estimated_hours:type_name -> google.protobuf.DoubleValue
+	27, // 30: orca.task.v1.AIDecomposeResponse.proposals:type_name -> orca.task.v1.SubtaskProposal
+	27, // 31: orca.task.v1.AIApplyRequest.proposals:type_name -> orca.task.v1.SubtaskProposal
+	2,  // 32: orca.task.v1.AIApplyResponse.created_subtasks:type_name -> orca.task.v1.Task
+	2,  // 33: orca.task.v1.GetSubtreeResponse.tasks:type_name -> orca.task.v1.Task
+	7,  // 34: orca.task.v1.GetSubtreeResponse.depends_on_edges:type_name -> orca.task.v1.AddEdgeRequest
+	36, // 35: orca.task.v1.ListCommentsResponse.comments:type_name -> orca.task.v1.AddCommentResponse
+	1,  // 36: orca.task.v1.Grant.level:type_name -> orca.task.v1.GrantLevel
+	51, // 37: orca.task.v1.Grant.expires_at:type_name -> google.protobuf.Timestamp
+	43, // 38: orca.task.v1.ListGrantsResponse.grants:type_name -> orca.task.v1.Grant
+	51, // 39: orca.task.v1.CreatePublicLinkRequest.expires_at:type_name -> google.protobuf.Timestamp
+	3,  // 40: orca.task.v1.TaskService.CreateTask:input_type -> orca.task.v1.CreateTaskRequest
+	5,  // 41: orca.task.v1.TaskService.GetTask:input_type -> orca.task.v1.GetTaskRequest
+	7,  // 42: orca.task.v1.TaskService.AddEdge:input_type -> orca.task.v1.AddEdgeRequest
+	9,  // 43: orca.task.v1.TaskService.Grant:input_type -> orca.task.v1.GrantRequest
+	11, // 44: orca.task.v1.TaskService.ResolvePermission:input_type -> orca.task.v1.ResolvePermissionRequest
+	13, // 45: orca.task.v1.TaskService.Execute:input_type -> orca.task.v1.TaskServiceExecuteRequest
+	15, // 46: orca.task.v1.TaskService.HasActiveExecutions:input_type -> orca.task.v1.HasActiveExecutionsRequest
+	17, // 47: orca.task.v1.TaskService.ListTasks:input_type -> orca.task.v1.ListTasksRequest
+	19, // 48: orca.task.v1.TaskService.UpdateTask:input_type -> orca.task.v1.UpdateTaskRequest
+	23, // 49: orca.task.v1.TaskService.DeleteTask:input_type -> orca.task.v1.DeleteTaskRequest
+	24, // 50: orca.task.v1.TaskService.GetDependencies:input_type -> orca.task.v1.GetDependenciesRequest
+	21, // 51: orca.task.v1.TaskService.FindTaskByNumber:input_type -> orca.task.v1.FindTaskByNumberRequest
+	26, // 52: orca.task.v1.TaskService.AIDecompose:input_type -> orca.task.v1.AIDecomposeRequest
+	29, // 53: orca.task.v1.TaskService.AIApply:input_type -> orca.task.v1.AIApplyRequest
+	31, // 54: orca.task.v1.TaskService.GetSubtree:input_type -> orca.task.v1.GetSubtreeRequest
+	33, // 55: orca.task.v1.TaskService.RecalculateProgress:input_type -> orca.task.v1.RecalculateProgressRequest
+	35, // 56: orca.task.v1.TaskService.AddComment:input_type -> orca.task.v1.AddCommentRequest
+	37, // 57: orca.task.v1.TaskService.ListComments:input_type -> orca.task.v1.ListCommentsRequest
+	39, // 58: orca.task.v1.TaskService.GenerateAgentPrompt:input_type -> orca.task.v1.GenerateAgentPromptRequest
+	41, // 59: orca.task.v1.TaskService.RevokeGrant:input_type -> orca.task.v1.RevokeGrantRequest
+	42, // 60: orca.task.v1.TaskService.ListGrants:input_type -> orca.task.v1.ListGrantsRequest
+	45, // 61: orca.task.v1.TaskService.CreatePublicLink:input_type -> orca.task.v1.CreatePublicLinkRequest
+	47, // 62: orca.task.v1.TaskService.RevokePublicLink:input_type -> orca.task.v1.RevokePublicLinkRequest
+	48, // 63: orca.task.v1.TaskService.ResolvePublicLink:input_type -> orca.task.v1.ResolvePublicLinkRequest
+	50, // 64: orca.task.v1.TaskService.ReportTaskExecutionResult:input_type -> orca.task.v1.ReportTaskExecutionResultRequest
+	4,  // 65: orca.task.v1.TaskService.CreateTask:output_type -> orca.task.v1.CreateTaskResponse
+	6,  // 66: orca.task.v1.TaskService.GetTask:output_type -> orca.task.v1.GetTaskResponse
+	8,  // 67: orca.task.v1.TaskService.AddEdge:output_type -> orca.task.v1.AddEdgeResponse
+	10, // 68: orca.task.v1.TaskService.Grant:output_type -> orca.task.v1.GrantResponse
+	12, // 69: orca.task.v1.TaskService.ResolvePermission:output_type -> orca.task.v1.ResolvePermissionResponse
+	14, // 70: orca.task.v1.TaskService.Execute:output_type -> orca.task.v1.TaskServiceExecuteResponse
+	16, // 71: orca.task.v1.TaskService.HasActiveExecutions:output_type -> orca.task.v1.HasActiveExecutionsResponse
+	18, // 72: orca.task.v1.TaskService.ListTasks:output_type -> orca.task.v1.ListTasksResponse
+	20, // 73: orca.task.v1.TaskService.UpdateTask:output_type -> orca.task.v1.UpdateTaskResponse
+	54, // 74: orca.task.v1.TaskService.DeleteTask:output_type -> google.protobuf.Empty
+	25, // 75: orca.task.v1.TaskService.GetDependencies:output_type -> orca.task.v1.GetDependenciesResponse
+	22, // 76: orca.task.v1.TaskService.FindTaskByNumber:output_type -> orca.task.v1.FindTaskByNumberResponse
+	28, // 77: orca.task.v1.TaskService.AIDecompose:output_type -> orca.task.v1.AIDecomposeResponse
+	30, // 78: orca.task.v1.TaskService.AIApply:output_type -> orca.task.v1.AIApplyResponse
+	32, // 79: orca.task.v1.TaskService.GetSubtree:output_type -> orca.task.v1.GetSubtreeResponse
+	34, // 80: orca.task.v1.TaskService.RecalculateProgress:output_type -> orca.task.v1.RecalculateProgressResponse
+	36, // 81: orca.task.v1.TaskService.AddComment:output_type -> orca.task.v1.AddCommentResponse
+	38, // 82: orca.task.v1.TaskService.ListComments:output_type -> orca.task.v1.ListCommentsResponse
+	40, // 83: orca.task.v1.TaskService.GenerateAgentPrompt:output_type -> orca.task.v1.GenerateAgentPromptResponse
+	54, // 84: orca.task.v1.TaskService.RevokeGrant:output_type -> google.protobuf.Empty
+	44, // 85: orca.task.v1.TaskService.ListGrants:output_type -> orca.task.v1.ListGrantsResponse
+	46, // 86: orca.task.v1.TaskService.CreatePublicLink:output_type -> orca.task.v1.CreatePublicLinkResponse
+	54, // 87: orca.task.v1.TaskService.RevokePublicLink:output_type -> google.protobuf.Empty
+	49, // 88: orca.task.v1.TaskService.ResolvePublicLink:output_type -> orca.task.v1.ResolvePublicLinkResponse
+	54, // 89: orca.task.v1.TaskService.ReportTaskExecutionResult:output_type -> google.protobuf.Empty
+	65, // [65:90] is the sub-list for method output_type
+	40, // [40:65] is the sub-list for method input_type
+	40, // [40:40] is the sub-list for extension type_name
+	40, // [40:40] is the sub-list for extension extendee
+	0,  // [0:40] is the sub-list for field type_name
 }
 
 func init() { file_orca_task_v1_task_proto_init() }

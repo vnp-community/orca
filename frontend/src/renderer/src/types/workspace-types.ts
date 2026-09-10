@@ -1,46 +1,103 @@
 // workspace-types.ts — Shared types for Workspace + File Explorer (TDD-FE-12, 17)
 
+// Why no repoPath: matches project.proto's Project message exactly — a repo
+// path is a property of a Repo (project.repos, a separate resource FK'd to
+// a project), never of the project itself. CreateProjectDialog collects a
+// repo path only to make a follow-up repo.add call after project.create.
 export type OrcaProject = {
-  id:            string
-  name:          string
-  description?:  string
-  repoPath:      string
+  id: string
+  name: string
+  description?: string
   defaultBranch: string
-  devServerId:   string
-  visibility:    'private' | 'team' | 'public'
-  createdAt:     number
-  updatedAt:     number
+  devServerId: string
+  // CR-DS-009 / TASK-EMU-008: independent from devServerId — points at a
+  // DevServer registered with kind 'mobile-emulator'. Empty/absent means
+  // "no Mobile Emulator Agent bound yet" (optional, unlike devServerId).
+  mobileEmulatorAgentId?: string
+  visibility: 'private' | 'team' | 'department' | 'company'
+  createdAt: number
+  updatedAt: number
 }
 
+// ─── Repo (a single entry in an OrcaProject's repo list) ─────────────────────
+// Mirrors repo.add/repo.list's camelCase wire view of project.repos exactly
+// (project.pb.go's Repo message). Phase 10 gave each repo its OWN
+// dev_server_id — previously only OrcaProject.devServerId existed and a
+// repo's host was only ever inferred from its project. Empty devServerId
+// means local / no dev server bound to this repo yet.
+export type Repo = {
+  id: string
+  projectId: string
+  url: string
+  displayName: string
+  position: number
+  devServerId: string
+}
+
+// Why role is only 'owner'|'member': matches project.project_members' DB
+// CHECK constraint and project.rego's action_roles exactly — this is the
+// project-level *access* tier (who's in the project at all), not the
+// per-repo functional-role tier (admin/developer/lead) that's a separate,
+// repo-scoped concept. Why no email/name: project.proto's Member message
+// carries only user_id + role — no profile fields to display yet.
 export type ProjectMember = {
   userId: string
-  email:  string
-  name:   string
-  role:   'owner' | 'member' | 'viewer'
+  role: 'owner' | 'member'
+}
+
+// ─── OrcaProject source-project sharing (orca_project_source_projects) ────────
+// BUG-FE-PW-002: links a caller-owned per-user Project (frontend/src/shared/
+// types.ts's Project — the legacy, multi-host, per-user-JSON model) into an
+// OrcaProject so other OrcaProject members can view it. Shapes below mirror
+// backend/src/main/project/OrcaProjectSourceProjectService.ts's SourceProjectRef
+// and orca-project-sharing-rpc-handler.ts's RPC params/results exactly.
+
+export type SourceProjectRef = {
+  ownerUserId: string
+  projectId: string
+}
+
+export type LinkSourceProjectParam = {
+  orcaProjectId: string
+  projectId: string
+}
+
+export type UnlinkSourceProjectParam = {
+  orcaProjectId: string
+  projectId: string
+}
+
+export type OrcaProjectListItemWithSources = {
+  orcaProject: OrcaProject
+  sourceProjects: SourceProjectRef[]
 }
 
 export type FileNode = {
-  name:       string
-  path:       string          // relative to project root
-  type:       'file' | 'directory'
-  size?:      number          // bytes (files only)
-  children?:  FileNode[]      // lazy loaded
+  name: string
+  path: string // relative to project root
+  type: 'file' | 'directory'
+  size?: number // bytes (files only)
+  children?: FileNode[] // lazy loaded
   isLoading?: boolean
 }
 
+// branch is optional: undefined is a legitimate state (detached HEAD, or the underlying `git
+// status` call itself failing on the host) — GitPanel tells these apart via branchUnavailable
+// instead of collapsing both into one "(no branch)" string (CR-PW-001).
 export type GitStatus = {
-  branch:         string
-  aheadBy:        number
-  behindBy:       number
+  branch?: string
+  branchUnavailable?: 'detached-head' | 'status-unavailable'
+  aheadBy: number
+  behindBy: number
   hasUncommitted: boolean
-  staged:         number
-  unstaged:       number
+  staged: number
+  unstaged: number
 }
 
 export type Worktree = {
-  id:          string
-  path:        string          // absolute path on dev server
-  branch:      string
-  isMain:      boolean
-  createdAt?:  number
+  id: string
+  path: string // absolute path on dev server
+  branch: string
+  isMain: boolean
+  createdAt?: number
 }

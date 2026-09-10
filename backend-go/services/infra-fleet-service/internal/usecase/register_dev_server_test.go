@@ -37,13 +37,56 @@ type fakeDevServerRepository struct {
 	// bulk_provision_fleet_test.go/establish_connection_test.go.
 	updateProvisionResultErr   error
 	updateProvisionResultCalls int
-	lastProvisionStatus        domain.DevServerStatus
+	lastProvisionStatus        domain.DevServerHealthStatus
 	lastProvisionInfo          HandshakeInfo
 	lastProvisionAt            time.Time
 
 	// byTagErr drives ListByTag's fake error path — used by
 	// list_dev_servers_by_tag_test.go.
 	byTagErr error
+
+	// CR-DS-006 Phase 2 fakes — approve_dev_server_test.go/
+	// reject_dev_server_test.go/assign_dev_server_group_test.go.
+	updateApprovalStatusErr error
+	assignGroupErr          error
+
+	// found/byHostAndMode/findByHostErr drive FindByHostAndMode's fake
+	// answer — used by resolve_direct_websocket_dev_server_test.go. Kept
+	// separate from found/bySshTarget/findErr above so a test exercising
+	// both find methods can set independent answers.
+	foundByHost   bool
+	byHostAndMode domain.DevServer
+	findByHostErr error
+}
+
+func (f *fakeDevServerRepository) FindByHostAndMode(ctx context.Context, tenantID, host string, mode domain.ConnectionMode) (domain.DevServer, bool, error) {
+	if f.findByHostErr != nil {
+		return domain.DevServer{}, false, f.findByHostErr
+	}
+	if !f.foundByHost {
+		return domain.DevServer{}, false, nil
+	}
+	return f.byHostAndMode, true, nil
+}
+
+func (f *fakeDevServerRepository) UpdateApprovalStatus(ctx context.Context, tenantID, devServerID string, status domain.DevServerStatus) (domain.DevServer, error) {
+	if f.updateApprovalStatusErr != nil {
+		return domain.DevServer{}, f.updateApprovalStatusErr
+	}
+	ds := f.byID[devServerID]
+	ds.Status = status
+	f.byID[devServerID] = ds
+	return ds, nil
+}
+
+func (f *fakeDevServerRepository) AssignGroup(ctx context.Context, tenantID, devServerID, groupID string) (domain.DevServer, error) {
+	if f.assignGroupErr != nil {
+		return domain.DevServer{}, f.assignGroupErr
+	}
+	ds := f.byID[devServerID]
+	ds.GroupID = groupID
+	f.byID[devServerID] = ds
+	return ds, nil
 }
 
 // ListAllForPolling implements usecase.DevServerRepository.ListAllForPolling.
@@ -61,7 +104,7 @@ func (f *fakeDevServerRepository) ListAllForPolling(ctx context.Context) ([]doma
 }
 
 // UpdateProvisionResult implements usecase.DevServerRepository.UpdateProvisionResult.
-func (f *fakeDevServerRepository) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info HandshakeInfo, provisionedAt time.Time) error {
+func (f *fakeDevServerRepository) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerHealthStatus, info HandshakeInfo, provisionedAt time.Time) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	f.updateProvisionResultCalls++

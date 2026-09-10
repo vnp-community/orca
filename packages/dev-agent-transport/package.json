@@ -1,0 +1,17 @@
+{
+  "name": "orca-dev-agent-transport",
+  "version": "0.1.0",
+  "description": "Shared wire-protocol codec (13-byte binary framing, seq/ack, keepalive, JSON-RPC parsing) for Orca's Dev Server Agent (agent/) and Mobile Emulator Agent (emulator/). Pure codec only — no dispatcher/domain logic.",
+  "homepage": "https://github.com/stablyai/orca",
+  "author": "stablyai",
+  "private": true,
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.6.0"
+  }
+}

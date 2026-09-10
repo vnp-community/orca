@@ -25,6 +25,14 @@ var (
 	ErrUserAlreadyExists = errors.New("usecase: a user with this email already exists in this tenant")
 	ErrSessionNotFound   = errors.New("usecase: session not found")
 	ErrPolicyNotFound    = errors.New("usecase: access policy not found")
+	// ErrSsoIdentityNotFound is returned when no auth.sso_identities row
+	// matches a (provider, external_subject) lookup — the "this IdP
+	// identity has never logged in here before" case
+	// LoginOrProvisionSsoUser branches on.
+	ErrSsoIdentityNotFound = errors.New("usecase: sso identity not found")
+	// ErrServiceTokenNotFound is returned when no auth.issued_service_tokens
+	// row matches a jti lookup — RevokeCliToken's "nothing to revoke" case.
+	ErrServiceTokenNotFound = errors.New("usecase: issued service token not found")
 )
 
 // UserRepository is the persistence port for users. Implemented by
@@ -68,6 +76,11 @@ type UserRepository interface {
 	// (COALESCE semantics at the SQL layer). Distinct from UpdateUserRole
 	// (kept as-is, a narrower single-field update).
 	UpdateUser(ctx context.Context, userID string, email, name *string, role *domain.Role) (domain.User, error)
+	// SetSsoProvider records provider as the given user's most recent SSO
+	// login provider — see domain.User.SsoProvider's doc comment. Called
+	// by LoginOrProvisionSsoUser on every successful SSO login, never by
+	// local-password Login.
+	SetSsoProvider(ctx context.Context, userID string, provider domain.SsoProvider) error
 }
 
 // SessionRepository is the persistence port for sessions. Only the SHA-256
@@ -112,6 +125,44 @@ type SessionRepository interface {
 	// session's owning user's email (denormalized to avoid an N+1 lookup in
 	// the admin dashboard).
 	ListForTenant(ctx context.Context, tenantID, pageToken string, pageSize int32) ([]domain.SessionWithUser, string, error)
+
+	// GetSessionByRefreshTokenHash looks up a session by its refresh token's
+	// hash — RefreshSession's lookup (CR-RBAC-003/TASK-BE-011). Returns an
+	// error satisfying errors.Is(err, ErrSessionNotFound) when no row has
+	// this refresh_token_hash (never populated, or never issued one).
+	GetSessionByRefreshTokenHash(ctx context.Context, refreshTokenHash string) (domain.Session, error)
+}
+
+// ServiceTokenRepository is the persistence port for
+// auth.issued_service_tokens — the revocation-list entry IssueServiceToken
+// records for every CLI/service JWT it mints (CR-CLI-002/TASK-BE-CLI-005).
+// Unlike SessionRepository, there is no "get by jti" method returning the
+// full row for validation purposes — the JWT itself is still verified by
+// signature/exp (JWKS), this port only answers "has this jti been
+// revoked", kept as its own narrow IsRevoked query so api-gateway's
+// per-request revocation check (usecase.AuthValidator) stays a single
+// cheap lookup, not a full row fetch.
+type ServiceTokenRepository interface {
+	// RecordIssuedToken persists a new issued-token row — called once, by
+	// IssueServiceToken, right after a successful Sign.
+	RecordIssuedToken(ctx context.Context, token domain.IssuedServiceToken) error
+	// IsRevoked reports whether jti has been revoked. A jti this
+	// repository has never seen (e.g. a JWT minted before this table
+	// existed) reports false, not an error — see RevocationChecker's
+	// (api-gateway) doc comment for why an unknown jti must never fail
+	// closed here.
+	IsRevoked(ctx context.Context, jti string) (bool, error)
+	// Revoke marks jti revoked as of now. Returns an error satisfying
+	// errors.Is(err, ErrServiceTokenNotFound) if jti has no row.
+	Revoke(ctx context.Context, jti string, revokedAt time.Time) error
+	// ListServiceTokensForUser returns every issued token (revoked or not,
+	// expired or not) for userID, newest first — mirrors
+	// SessionRepository.ListForUser's "full history" shape. Named
+	// distinctly (not ListForUser) because both interfaces are implemented
+	// by the same *postgres.Repository — Go methods are per-receiver-type,
+	// not per-interface, so a same-named method with a different signature
+	// on the same type is a compile error, not overloading.
+	ListServiceTokensForUser(ctx context.Context, userID string) ([]domain.IssuedServiceToken, error)
 }
 
 // AccessPolicyRepository is the persistence port for admin-console access
@@ -151,6 +202,11 @@ type PolicyDataPublisher interface {
 // doc comment.
 type AuditRepository interface {
 	Append(ctx context.Context, entry domain.AuditEntry) error
+	// Query returns entries matching filter — see AuditQueryFilter's doc
+	// comment. TASK-BE-015: the call sites that predate the ActorID/Action/
+	// Outcome filters pass all three empty, preserving their exact prior
+	// behavior (empty-means-no-filter, this codebase's established
+	// convention — see ListAnnotations' filePath parameter).
 	Query(ctx context.Context, filter AuditQueryFilter, pageToken string, pageSize int32) ([]domain.AuditEntry, string, error)
 }
 
@@ -160,9 +216,10 @@ type AuditRepository interface {
 type AuditQueryFilter struct {
 	TenantID string
 	Since    time.Time
-	To       time.Time // zero value = no upper bound
-	Action   string    // "" = no filter
-	ActorID  string    // "" = no filter
+	To       time.Time      // zero value = no upper bound
+	Action   string         // "" = no filter
+	ActorID  string         // "" = no filter
+	Outcome  domain.Outcome // "" = no filter
 }
 
 // PasswordHasher hashes and verifies passwords. Implemented by
@@ -198,6 +255,133 @@ type OPAClient interface {
 	// Decision reports whether actor is authorized as admin, per
 	// admin.rego's {"actor": {"id", "role"}} input contract.
 	Decision(ctx context.Context, actor domain.User) (bool, error)
+}
+
+// SsoIdentityRepository is the persistence port for auth.sso_identities.
+// Implemented by internal/adapter/postgres, mirroring UserRepository's
+// shape/conventions.
+type SsoIdentityRepository interface {
+	// FindByProviderSubject looks up the local user linked to an IdP
+	// identity — the first lookup LoginOrProvisionSsoUser performs on
+	// every SSO login. Returns an error satisfying errors.Is(err,
+	// ErrSsoIdentityNotFound) when no row matches.
+	FindByProviderSubject(ctx context.Context, provider domain.SsoProvider, externalSubject string) (domain.SsoIdentity, error)
+	// Link persists a new provider/external_subject -> user_id row —
+	// called once, either at brand-new-user provisioning or when an
+	// existing local account is claimed via a verified-email match. See
+	// login_or_provision_sso_user.go's account-collision policy.
+	Link(ctx context.Context, identity domain.SsoIdentity) error
+	// TouchLastLogin updates last_login_at for a returning identity —
+	// best-effort bookkeeping, not part of the auth decision itself.
+	TouchLastLogin(ctx context.Context, id string, at time.Time) error
+}
+
+// VerifiedSsoIdentity is what a successful provider token-exchange +
+// userinfo call yields — the trust boundary LoginOrProvisionSsoUser
+// operates on. EmailVerified drives the account-collision policy in
+// login_or_provision_sso_user.go: only a verified email may auto-link to an
+// existing local account.
+type VerifiedSsoIdentity struct {
+	Provider      domain.SsoProvider
+	Subject       string // the IdP's stable subject (GitHub numeric id as text, or OIDC "sub")
+	Email         string
+	EmailVerified bool
+	Name          string
+	// Groups is the IdP's group/org/team membership at login time — only
+	// populated for providers this CR wires (OIDC/Keycloak via the `groups`
+	// claim, GitHub via org/team membership REST calls). Empty for Google
+	// (no group claim in a standard OIDC token — Directory API integration
+	// is a documented, separate backlog item, not attempted here).
+	Groups []string
+}
+
+// SsoExchanger performs one provider's half of the OAuth2/OIDC
+// authorization-code flow: building the authorization URL the browser is
+// redirected to (with PKCE), and exchanging a callback code for a verified
+// identity. Mirrors scm-integration-service's OAuthExchanger shape/rationale
+// — kept as its own interface so usecase/ code never imports a provider's
+// HTTP client package directly.
+type SsoExchanger interface {
+	// AuthorizationURL builds the URL to redirect the browser to. No
+	// network call — pure string construction from state/redirectURI/
+	// codeChallenge (PKCE, RFC 7636 S256).
+	AuthorizationURL(state, redirectURI, codeChallenge string) string
+	// ExchangeAndVerify calls the provider's token endpoint for real, then
+	// resolves the caller's verified identity (GitHub: GET /user +
+	// /user/emails; Google/OIDC: the provider's userinfo endpoint) — see
+	// internal/adapter/oauth's package doc comment for why this is one
+	// userinfo-REST-call shape across all three providers rather than
+	// local id_token JWT verification.
+	ExchangeAndVerify(ctx context.Context, code, redirectURI, codeVerifier string) (VerifiedSsoIdentity, error)
+}
+
+// SsoExchangerRegistry resolves which SsoExchanger to use for a given
+// provider — mirrors scm-integration-service's OAuthExchangerRegistry. A
+// provider with no configured client_id/secret is simply absent from the
+// registry; Resolve errors for it.
+type SsoExchangerRegistry interface {
+	Resolve(provider domain.SsoProvider) (SsoExchanger, error)
+}
+
+// SsoState is the payload carried by StartSsoLogin's opaque state token and
+// recovered by CompleteSsoLogin. Unlike scm-integration-service's
+// OAuthState, this carries no TenantID/UserID — SSO's Start endpoint runs
+// before any session exists, so there is no caller identity yet to bind.
+type SsoState struct {
+	Provider     domain.SsoProvider
+	RedirectURI  string
+	CodeVerifier string // PKCE verifier (RFC 7636), reproduced at token-exchange time
+	ExpiresAt    time.Time
+}
+
+// SsoStateCodec creates and verifies the state token exchanged during the
+// SSO flow. Stateless (signed, not looked up) — api-gateway owns no
+// database (see its config.go's package doc comment), so the state token
+// itself must carry everything CompleteSsoLogin needs, integrity-protected
+// against tampering. This also means any gateway instance can decode a
+// token any other instance minted, since the HMAC secret is shared config,
+// not in-memory state — required for a multi-instance deployment.
+type SsoStateCodec interface {
+	Encode(state SsoState) (string, error)
+	// Decode verifies the token's signature and expiry, returning an error
+	// for a tampered, expired, or malformed token — CompleteSsoLogin must
+	// treat any Decode error as a rejected callback, never a best-effort
+	// partial decode.
+	Decode(token string) (SsoState, error)
+}
+
+// TenantResolver resolves which tenant a brand-new SSO-provisioned user
+// belongs to, given their verified email. Implemented by
+// internal/adapter/grpcclient against tenant-service's
+// ResolveCompanyByEmailDomain RPC (multi-tenant: the domain half of the
+// email, e.g. "vnpay.vn", must have been registered to a company via
+// tenant-service's AddCompanyEmailDomain admin operation), falling back to
+// the single-existing-company case for deployments that haven't registered
+// any domains yet (back-compat with this service's original
+// single-tenant-only design). Fails closed (an error, not a guess) when
+// neither resolves — no per-login tenant discriminator beyond the email's
+// own domain exists in this system (see GetUserByEmail's doc comment
+// above).
+type TenantResolver interface {
+	ResolveTenantForEmail(ctx context.Context, email string) (tenantID string, err error)
+}
+
+// SsoGroupRoleMappingRepository is the persistence port for
+// auth.sso_group_role_mapping — the admin-editable (tenant_id, provider,
+// group_name) -> role table CR-RBAC-003's group->role resolution reads
+// (TASK-BE-010, a later task) and UpdateSsoGroupMapping/ListSsoGroupMapping
+// write/read here (TASK-BE-009).
+type SsoGroupRoleMappingRepository interface {
+	// Upsert inserts a new mapping row, or updates role on an existing
+	// (tenant_id, provider, group_name) row — mirrors the table's own
+	// UNIQUE constraint. Returns the resulting row (with its id, whether
+	// newly generated or the pre-existing one).
+	Upsert(ctx context.Context, m domain.SsoGroupRoleMapping) (domain.SsoGroupRoleMapping, error)
+	// ListForProvider returns every mapping row for tenantID, optionally
+	// narrowed to one provider — an empty provider means "every provider",
+	// matching this codebase's established empty-means-no-filter convention
+	// (see AuditRepository.Query's doc comment).
+	ListForProvider(ctx context.Context, tenantID string, provider domain.SsoProvider) ([]domain.SsoGroupRoleMapping, error)
 }
 
 // TokenSigner is the port IssueServiceToken/GetJWKS sign and publish JWTs

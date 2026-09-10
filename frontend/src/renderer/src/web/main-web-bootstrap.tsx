@@ -13,7 +13,6 @@ import {
 import {
   createSessionWebRuntimeEnvironment,
   createStoredWebRuntimeEnvironment,
-  clearStoredWebRuntimeEnvironment,
   readStoredWebRuntimeEnvironment,
   saveStoredWebRuntimeEnvironment
 } from './web-runtime-environment'
@@ -23,20 +22,16 @@ import { translate } from '../i18n/i18n'
 import { RecoverableRenderErrorBoundary } from '../components/error-boundaries/RecoverableRenderErrorBoundary'
 import { ConnectionStatusProvider } from './ConnectionStatusProvider'
 import { ConnectionStatusBanner } from './ConnectionStatusBanner'
-import {
-  useConnectionStatus,
-  useConnectionRetry
-} from './ConnectionStatusProvider'
+import { useConnectionStatus, useConnectionRetry } from './ConnectionStatusProvider'
 import { WebSocketRpcClient } from '../../../platform/adapters/web/rpc-client'
 import type { IRpcClient } from '../../../platform/rpc-client-interface'
-import { fetchCurrentUser, fetchAuthConfig } from '../auth/auth-api-client'
+import { fetchCurrentUser, fetchAuthConfig, refreshSession } from '../auth/auth-api-client'
 import type { AuthUser, SsoProvider } from '../auth/auth-types'
 import { useLogout } from '../hooks/useLogout'
 import { initBrowserTrace } from '../../../shared/trace/browser'
 import { TracePanel } from '../components/trace/TracePanel'
 import { useAppStore } from '../store'
 
-const WebConnect = lazy(() => import('./WebConnect'))
 const App = lazy(() => import('../App'))
 import { WorkspaceProvider } from '../context/WorkspaceContext'
 const LoginPage = lazy(() => import('./login/LoginPage').then((m) => ({ default: m.LoginPage })))
@@ -71,8 +66,17 @@ function showErrorUi(rootEl: HTMLElement): void {
  * Listen for `orca:auth-failed` events emitted by WebSessionClient / WebRuntimeClient
  * when the WebSocket closes with code 4401 (session cookie missing/expired).
  *
- * On auth failure: clear all browser-side state and redirect to /login so the
- * user can sign in again with a fresh session — no manual intervention required.
+ * On auth failure: redirect to /login so the user can sign in again — no
+ * manual intervention required.
+ *
+ * FE-SOL-STORAGE-007(a): a 401/expired-token/transient disconnect is NOT a
+ * logout intent, so this must NOT wipe localStorage/sessionStorage.
+ * workspaceSession / orca.saved-instances / accountsDevServer stay put so
+ * re-authenticating (as the SAME user) restores dev-server/agent state
+ * exactly as it was before the disconnect. A genuine user switch is instead
+ * caught after re-auth by enforceWorkspaceOwnerOnReauth() below, which does
+ * the wipe when it actually applies. Explicit logout (FE-TASK-STORAGE-016)
+ * keeps its own unconditional clear — that IS a real wipe intent.
  *
  * Guards: only runs once (redirected flag), only for session-auth environments.
  * (E2EE pairing is no longer reachable from the multi-user bootstrap path —
@@ -80,27 +84,81 @@ function showErrorUi(rootEl: HTMLElement): void {
  * because bootstrapWebApp() and main.tsx's WebRoot still share this file's
  * exported helpers with tests.)
  */
-function installAuthFailedRedirect(): void {
+export function installAuthFailedRedirect(): void {
   let redirected = false
   window.addEventListener('orca:auth-failed', () => {
-    if (redirected) {return}
+    if (redirected) {
+      return
+    }
     const env = readStoredWebRuntimeEnvironment()
-    if (env?.id !== 'session-auth') {return}
+    if (env?.id !== 'session-auth') {
+      return
+    }
     redirected = true
-    console.warn('[Orca] Auth failed — clearing session and redirecting to /login')
-    try { localStorage.clear() } catch { /* sandboxed iframe */ }
-    try { sessionStorage.clear() } catch { /* sandboxed iframe */ }
+    console.warn('[Orca] Auth failed — redirecting to /login (local state preserved)')
     document.cookie.split(';').forEach((c) => {
       const name = c.split('=')[0].trim()
-      if (!name) {return}
+      if (!name) {
+        return
+      }
       const exp = 'expires=Thu, 01 Jan 1970 00:00:00 GMT'
       document.cookie = `${name}=; ${exp}; path=/`
       document.cookie = `${name}=; ${exp}; path=/; domain=${location.hostname}`
       document.cookie = `${name}=; ${exp}; path=/; domain=.${location.hostname}`
     })
-    clearStoredWebRuntimeEnvironment()
     window.location.href = '/login'
   })
+}
+
+// Duplicated from web-preload-api.ts's (unexported) SESSION_STORAGE_KEY — kept
+// as a plain string here rather than importing that module, since pulling in
+// web-preload-api.ts's full session-hydration/remote-sync surface for one key
+// name is out of scope for FE-TASK-STORAGE-015. Must stay in sync with it.
+const WORKSPACE_SESSION_STORAGE_KEY = 'orca.web.workspaceSession.v1'
+
+/**
+ * FE-SOL-STORAGE-007(a) — mandatory safety check paired with the auth-failure
+ * handler above no longer wiping state: after a successful (re-)auth, compare
+ * the signed-in user's id against `ownerUserId` recorded on the persisted
+ * WorkspaceSessionState. Same user (or first-ever login, no owner recorded
+ * yet) → keep everything, just (re)stamp ownership. Different user → this is
+ * a genuine account switch, not a resume, so wipe local state exactly like
+ * logout does before stamping the new owner.
+ */
+export function enforceWorkspaceOwnerOnReauth(userId: string): void {
+  let previousOwnerId: string | undefined
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_SESSION_STORAGE_KEY)
+    if (raw) {
+      previousOwnerId = (JSON.parse(raw) as { ownerUserId?: string }).ownerUserId
+    }
+  } catch {
+    // Malformed JSON — treat as "no recorded owner" rather than blocking login.
+  }
+
+  if (previousOwnerId && previousOwnerId !== userId) {
+    try {
+      localStorage.clear()
+    } catch {
+      /* sandboxed iframe */
+    }
+    try {
+      sessionStorage.clear()
+    } catch {
+      /* sandboxed iframe */
+    }
+  }
+
+  try {
+    const raw = window.localStorage.getItem(WORKSPACE_SESSION_STORAGE_KEY)
+    const stored = raw ? (JSON.parse(raw) as Record<string, unknown>) : {}
+    window.localStorage.setItem(
+      WORKSPACE_SESSION_STORAGE_KEY,
+      JSON.stringify({ ...stored, ownerUserId: userId })
+    )
+  } catch {
+    /* sandboxed iframe / storage quota */
+  }
 }
 
 // Why: banner wrapper reads from ConnectionStatusProvider context so it stays
@@ -146,7 +204,7 @@ function WebRoot({
     return decision
   }, [initialPairingInput])
 
-  const [hasEnvironment, setHasEnvironment] = useState(() => {
+  const [hasEnvironment] = useState(() => {
     if (startupDecision.kind === 'auto-save-runtime-offer') {
       saveStoredWebRuntimeEnvironment(
         createStoredWebRuntimeEnvironment({ name: 'Orca Server', offer: startupDecision.offer })
@@ -155,6 +213,33 @@ function WebRoot({
     }
     return startupDecision.kind === 'use-stored-environment'
   })
+
+  // Why: `sessionUser` was resolved here (WebRootBoundary's fetchCurrentUser
+  // call) and used ONLY to decide LoginPage vs App — it was never wired into
+  // useAppStore's authSlice, so `currentUser`/`currentUser.role` read null/
+  // undefined everywhere below <App/> (live-verified: DepartmentGate's admin
+  // bypass never fired for the actual bootstrap admin account, and Settings'
+  // Admin Console never rendered for anyone). Mirror it into the store once
+  // per sessionUser identity change so `useAppStore(s => s.currentUser)`
+  // consumers (DepartmentGate, Settings, OnboardingFlow's skip branch) see
+  // the real signed-in user instead of null.
+  useEffect(() => {
+    if (sessionUser === null) {
+      return
+    }
+    // FE-SOL-STORAGE-007(a): must run before anything reads persisted
+    // workspace state — a different user re-authenticating wipes it here.
+    enforceWorkspaceOwnerOnReauth(sessionUser.id)
+    const store = useAppStore.getState()
+    store.setCurrentUser({
+      id: sessionUser.id,
+      email: sessionUser.email,
+      name: sessionUser.name,
+      avatarUrl: sessionUser.avatarUrl,
+      role: sessionUser.role
+    })
+    store.setAuthStatus('authenticated')
+  }, [sessionUser])
 
   // CR-LOGIN-001: if the user is already authenticated via session cookie,
   // skip the WebConnect / pairing flow entirely and render the App directly.
@@ -174,9 +259,9 @@ function WebRoot({
       <ConnectionStatusProvider client={client}>
         <WebConnectionBannerWrapper />
         <Suspense fallback={<div className="min-h-dvh bg-background" />}>
-        <WorkspaceProvider>
-          <App />
-        </WorkspaceProvider>
+          <WorkspaceProvider>
+            <App />
+          </WorkspaceProvider>
         </Suspense>
       </ConnectionStatusProvider>
     )
@@ -190,7 +275,9 @@ function WebRoot({
       <Suspense fallback={<div className="min-h-dvh bg-background" />}>
         <LoginPage
           availableProviders={availableProviders}
-          onLoginSuccess={() => { window.location.href = '/' }}
+          onLoginSuccess={() => {
+            window.location.href = '/'
+          }}
         />
       </Suspense>
     )
@@ -206,6 +293,12 @@ function WebRoot({
     </ConnectionStatusProvider>
   )
 }
+
+// CR-RBAC-003: session Orca tự issue có TTL cố định phía server (xem
+// backend-go's domain.Session) — refresh định kỳ ở khoảng thời gian ngắn hơn
+// hẳn TTL đó (ví dụ 15 phút nếu TTL là 24h) để không bao giờ chạm hạn khi tab
+// vẫn mở, mà không cần backend trả expiresAt (giữ AuthUser shape không đổi).
+const SESSION_REFRESH_INTERVAL_MS = 15 * 60 * 1000
 
 function WebRootBoundary({ client }: WebRootProps): React.JSX.Element {
   useTranslation()
@@ -226,6 +319,27 @@ function WebRootBoundary({ client }: WebRootProps): React.JSX.Element {
     })
   }, [])
 
+  useEffect(() => {
+    if (sessionUser === null) {
+      return
+    }
+    const timer = setInterval(() => {
+      refreshSession()
+        .then((refreshed) => {
+          if (refreshed === null) {
+            // Session đã bị revoke — không silently issue token mới (đúng
+            // tiêu chí chấp nhận CR-003). Đăng xuất mềm: reload để
+            // WebRootBoundary tự phát hiện lại qua fetchCurrentUser().
+            window.location.href = '/'
+          }
+        })
+        .catch(() => {
+          // Lỗi mạng thoáng qua — không logout, thử lại ở lần interval kế tiếp.
+        })
+    }, SESSION_REFRESH_INTERVAL_MS)
+    return () => clearInterval(timer)
+  }, [sessionUser])
+
   if (!authResolved) {
     // Minimal blank splash while auth check is in flight
     return <div className="min-h-dvh bg-background" />
@@ -241,11 +355,7 @@ function WebRootBoundary({ client }: WebRootProps): React.JSX.Element {
         'Retry the web client or reconnect to the paired runtime.'
       )}
     >
-      <WebRoot
-        client={client}
-        sessionUser={sessionUser}
-        availableProviders={availableProviders}
-      />
+      <WebRoot client={client} sessionUser={sessionUser} availableProviders={availableProviders} />
     </RecoverableRenderErrorBoundary>
   )
 }
@@ -255,12 +365,7 @@ function WebRootBoundary({ client }: WebRootProps): React.JSX.Element {
  * Extracted from main.tsx so the startup sequence can be exercised in Vitest.
  */
 export async function bootstrapWebApp(options: BootstrapOptions = {}): Promise<void> {
-  const {
-    rootElementId = 'root',
-    maxRetries = 3,
-    retryDelayMs = 2000,
-    wsUrl
-  } = options
+  const { rootElementId = 'root', maxRetries = 3, retryDelayMs = 2000, wsUrl } = options
 
   const rootEl = document.getElementById(rootElementId)
   if (!rootEl) {

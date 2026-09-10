@@ -12,9 +12,10 @@ import (
 )
 
 // mobileWorktreeStatusPageSize bounds each ProjectRepository.List page
-// while GetMobileWorktreeStatus walks every project for the tenant — the
-// RPC itself takes no pagination params (BL-MB-04's response is the whole
-// tenant-wide list), so this is purely an internal fetch-batch size.
+// while GetMobileWorktreeStatus walks every project the caller is a member
+// of — the RPC itself takes no pagination params (BL-MB-04's response is
+// the caller's whole project list), so this is purely an internal
+// fetch-batch size.
 const mobileWorktreeStatusPageSize = 200
 
 // MobileWorktreeStatus mirrors project.proto's MobileWorktreeStatus message
@@ -67,8 +68,16 @@ func (uc *GetMobileWorktreeStatus) Execute(ctx context.Context) (MobileStatusRes
 	if err != nil {
 		return MobileStatusResult{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_TENANT", "no tenant in request context", err)
 	}
+	// userID, not just tenantID: ProjectRepository.List is member-scoped,
+	// not bare-tenant-scoped (see that method's doc comment — a tenant-wide
+	// list here would leak every other member's private projects to this
+	// caller, the exact bug that scoping closed).
+	userID, ok := tenant.UserID(ctx)
+	if !ok {
+		return MobileStatusResult{}, apperrors.New(apperrors.KindUnauthenticated, "PROJECT_NO_USER", "no user in request context", nil)
+	}
 
-	projects, err := uc.listAllProjects(ctx, tenantID)
+	projects, err := uc.listAllProjects(ctx, tenantID, userID)
 	if err != nil {
 		return MobileStatusResult{}, err
 	}
@@ -121,13 +130,14 @@ func (uc *GetMobileWorktreeStatus) Execute(ctx context.Context) (MobileStatusRes
 }
 
 // listAllProjects walks ProjectRepository.List's id-cursor pagination to
-// completion — GetMobileWorktreeStatus needs every project the tenant owns
-// (to find every dev-server-bound worktree), not one page of them.
-func (uc *GetMobileWorktreeStatus) listAllProjects(ctx context.Context, tenantID string) ([]domain.Project, error) {
+// completion — GetMobileWorktreeStatus needs every project userID is a
+// member of (to find every dev-server-bound worktree they can see), not one
+// page of them.
+func (uc *GetMobileWorktreeStatus) listAllProjects(ctx context.Context, tenantID, userID string) ([]domain.Project, error) {
 	var all []domain.Project
 	pageToken := ""
 	for {
-		projects, next, err := uc.projects.List(ctx, tenantID, pageToken, mobileWorktreeStatusPageSize)
+		projects, next, err := uc.projects.List(ctx, tenantID, userID, pageToken, mobileWorktreeStatusPageSize)
 		if err != nil {
 			return nil, apperrors.New(apperrors.KindInternal, "PROJECT_MOBILE_STATUS_LIST_PROJECTS_FAILED", "failed to list projects", err)
 		}

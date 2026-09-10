@@ -4,7 +4,7 @@
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go` (absent), `backend-go/services/api-gateway/internal/adapter/wscompat/registry.go` (falls through to `notImplementedHandler`)
 **Severity:** Medium — used by the repos store for folder-workspace CRUD and path-status checks (adding/managing non-git folder workspaces), a real but secondary path relative to core git-repo workflows.
 **Symptom:** Every `folderWorkspace.*` call from `repos.ts` times out with `channel "folderWorkspace.X" is not yet implemented in backend-go — see backend-go/docs/execution-plan.md's frontend-compatibility-layer coverage table`.
-**Status:** ❌ Open
+**Status:** ✅ Resolved — see TASK-061–067 (7 task(s), all DONE) for implementation evidence.
 
 ---
 

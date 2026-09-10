@@ -24,7 +24,7 @@ func TestNewAuditEntry_ValidatesInvariants(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := NewAuditEntry(tt.id, tt.tenantID, "actor-1", tt.action, "user", "target-1", nil, "", tt.occurredAt)
+			_, err := NewAuditEntry(tt.id, tt.tenantID, "actor-1", tt.action, "", "user", "target-1", nil, OutcomeAllowed, "", tt.occurredAt)
 			if tt.wantErr == nil && err != nil {
 				t.Fatalf("expected no error, got %v", err)
 			}
@@ -38,7 +38,7 @@ func TestNewAuditEntry_ValidatesInvariants(t *testing.T) {
 func TestNewAuditEntry_AllowsEmptyActorID(t *testing.T) {
 	// A system-initiated event (e.g. the session reaper) has no actor —
 	// that's a valid domain state, not an invariant violation.
-	entry, err := NewAuditEntry("a1", "t1", "", "session.expired", "session", "session-1", nil, "", time.Now())
+	entry, err := NewAuditEntry("a1", "t1", "", "session.expired", "", "session", "session-1", nil, OutcomeAllowed, "", time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -50,7 +50,7 @@ func TestNewAuditEntry_AllowsEmptyActorID(t *testing.T) {
 func TestNewAuditEntry_AllowsEmptyTargetTypeAndID(t *testing.T) {
 	// A system-initiated event with no single resource target (e.g. the
 	// session reaper's batch purge) is a valid domain state.
-	entry, err := NewAuditEntry("a1", "t1", "", "session.reap_batch", "", "", nil, "", time.Now())
+	entry, err := NewAuditEntry("a1", "t1", "", "session.reap_batch", "", "", "", nil, OutcomeAllowed, "", time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -60,7 +60,7 @@ func TestNewAuditEntry_AllowsEmptyTargetTypeAndID(t *testing.T) {
 }
 
 func TestNewAuditEntry_NilMetadataNormalizesToEmptyMap(t *testing.T) {
-	entry, err := NewAuditEntry("a1", "t1", "actor-1", "user.login", "user", "u1", nil, "", time.Now())
+	entry, err := NewAuditEntry("a1", "t1", "actor-1", "user.login", "", "user", "u1", nil, OutcomeAllowed, "", time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -73,8 +73,8 @@ func TestNewAuditEntry_NilMetadataNormalizesToEmptyMap(t *testing.T) {
 }
 
 func TestNewAuditEntry_PreservesGivenMetadata(t *testing.T) {
-	entry, err := NewAuditEntry("a1", "t1", "actor-1", "user.role_updated", "user", "u1",
-		map[string]any{"from": "user", "to": "admin"}, "203.0.113.7", time.Now())
+	entry, err := NewAuditEntry("a1", "t1", "actor-1", "user.role_updated", "", "user", "u1",
+		map[string]any{"from": "user", "to": "admin"}, OutcomeAllowed, "203.0.113.7", time.Now())
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -83,5 +83,43 @@ func TestNewAuditEntry_PreservesGivenMetadata(t *testing.T) {
 	}
 	if entry.IPAddress != "203.0.113.7" {
 		t.Errorf("expected IPAddress to round-trip, got %q", entry.IPAddress)
+	}
+}
+
+// TestNewAuditEntry_DefaultsEmptyOutcomeToAllowed guards backward
+// compatibility (TASK-BE-014/CR-RBAC-005): a call site that predates
+// Outcome (passing "") must keep meaning "allowed", not fail or default to
+// denied.
+func TestNewAuditEntry_DefaultsEmptyOutcomeToAllowed(t *testing.T) {
+	entry, err := NewAuditEntry("a1", "t1", "actor-1", "user.login", "target-1", "", "", nil, "", "", time.Now())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if entry.Outcome != OutcomeAllowed {
+		t.Errorf("expected empty Outcome to default to %q, got %q", OutcomeAllowed, entry.Outcome)
+	}
+}
+
+// TestNewAuditEntry_RejectsInvalidOutcome guards the closed enum: any value
+// outside OutcomeAllowed/OutcomeDenied is rejected, not silently accepted.
+func TestNewAuditEntry_RejectsInvalidOutcome(t *testing.T) {
+	_, err := NewAuditEntry("a1", "t1", "actor-1", "user.login", "target-1", "", "", nil, Outcome("bogus"), "", time.Now())
+	if err != ErrInvalidOutcome {
+		t.Fatalf("expected ErrInvalidOutcome, got %v", err)
+	}
+}
+
+// TestNewAuditEntry_PersistsOutcomeAndIPAddress guards the two new fields
+// actually round-tripping onto the constructed AuditEntry.
+func TestNewAuditEntry_PersistsOutcomeAndIPAddress(t *testing.T) {
+	entry, err := NewAuditEntry("a1", "t1", "actor-1", "auth.login.failed", "target-1", "", "", nil, OutcomeDenied, "203.0.113.7", time.Now())
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if entry.Outcome != OutcomeDenied {
+		t.Errorf("expected Outcome=%q, got %q", OutcomeDenied, entry.Outcome)
+	}
+	if entry.IPAddress != "203.0.113.7" {
+		t.Errorf("expected IPAddress=203.0.113.7, got %q", entry.IPAddress)
 	}
 }

@@ -4,7 +4,7 @@
 **Service:** `api-gateway` only — wraps whichever service ends up owning `files.*`
 **Affected files (proposed):**
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels.go`
-**Status:** 📋 Proposed — blocked on `files.*` (BUG-009) getting a backing RPC; not yet implemented
+**Status:** ✅ Implemented — all 1 task(s) (TASK-168) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

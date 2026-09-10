@@ -68,8 +68,11 @@ func TestTerminalScrollbackSave_RoundTripsThroughFakeClient(t *testing.T) {
 }
 
 // TestTerminalScrollbackSave_RPCFailurePropagates guards that a save RPC
-// error surfaces to the caller (and {ok: false} is still the returned
-// shape, matching the ok: err == nil convention).
+// error surfaces to the caller. Registry.Dispatch discards any handler
+// result once err is non-nil (see its doc comment) — matching
+// handler.go's own wire behavior, which only ever writes an error frame in
+// that case and never the result — so {ok: false} is never actually
+// observed by a caller; only the error matters.
 func TestTerminalScrollbackSave_RPCFailurePropagates(t *testing.T) {
 	fake := &fakeScrollbackInfraFleetClient{
 		saveFunc: func(*infrafleetv1.SaveTerminalScrollbackSnapshotRequest) error {
@@ -84,9 +87,8 @@ func TestTerminalScrollbackSave_RPCFailurePropagates(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected the save RPC error to propagate")
 	}
-	view, ok := result.(map[string]bool)
-	if !ok || view["ok"] {
-		t.Errorf("expected {ok: false}, got %+v", result)
+	if result != nil {
+		t.Errorf("expected Dispatch to discard the result on error, got %+v", result)
 	}
 }
 

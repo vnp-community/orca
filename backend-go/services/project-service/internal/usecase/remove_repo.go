@@ -15,9 +15,10 @@ type RemoveRepoInput struct {
 
 // RemoveRepo deletes a repo from its project's catalog.
 //
-// Authorization is the same judgment call as AddRepo (see that usecase's
-// doc comment): owner-or-admin. RemoveRepoInput carries only a repo_id, not
-// a project_id, so Execute resolves the repo's owning project via
+// Authorization: repo_admin_only — a project owner always passes (see
+// requireRepoAccess), or a caller holding an "admin" repo_members grant on
+// this specific repo. RemoveRepoInput carries only a repo_id, not a
+// project_id, so Execute resolves the repo's owning project via
 // RepoRepository.GetRepo before it can check the caller's role against it.
 type RemoveRepo struct {
 	repo       RepoRepository
@@ -44,7 +45,7 @@ func (uc *RemoveRepo) Execute(ctx context.Context, in RemoveRepoInput) error {
 	if err != nil {
 		return apperrors.New(apperrors.KindInternal, "PROJECT_REPO_FETCH_FAILED", "failed to fetch repo", err)
 	}
-	if err := requireProjectAccess(ctx, uc.membership, uc.opa, existing.ProjectID, projectActionOwnerOnly); err != nil {
+	if err := requireRepoAccess(ctx, uc.membership, uc.repo, uc.opa, existing.ProjectID, existing.ID, repoActionAdminOnly); err != nil {
 		return err
 	}
 

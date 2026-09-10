@@ -31,6 +31,87 @@ func (m ConnectionMode) Valid() bool {
 	}
 }
 
+// DevServerStatus is the admin-approval state a DevServer is in — see
+// docs/crs/v2/dev-server/CR-DS-006-dev-server-approval-and-grouping.md.
+// NOT enforced anywhere yet (Phase 1: data model only) — a
+// StatusPendingApproval dev server works exactly like an approved one today.
+type DevServerStatus string
+
+const (
+	// DevServerStatusPendingApproval is what NewDevServer sets for every
+	// freshly-registered dev server — an admin has not yet reviewed it.
+	DevServerStatusPendingApproval DevServerStatus = "pending_approval"
+	DevServerStatusApproved        DevServerStatus = "approved"
+	DevServerStatusRejected        DevServerStatus = "rejected"
+)
+
+// Valid reports whether s is one of the known enum values.
+func (s DevServerStatus) Valid() bool {
+	switch s {
+	case DevServerStatusPendingApproval, DevServerStatusApproved, DevServerStatusRejected:
+		return true
+	default:
+		return false
+	}
+}
+
+// DevServerHealthStatus is the coarse connectivity/health state of a
+// DevServer — a DIFFERENT concept from DevServerStatus (admin approval,
+// above) and from the frontend's own client-side "connected/disconnected"
+// live relay state. Backed by infra.dev_servers.status, a column added
+// directly against production by a separate, concurrent effort (see that
+// column's own migration-slot placeholder,
+// migrations/0007_dev_server_health_status.up.sql, for the full history) —
+// this type/field is this session's first Go-side exposure of it, reusing
+// the column exactly as committed rather than adding a new one. See
+// docs/backlog/BACKLOG-007-dev-server-bootstrap-status-proto-field.md
+// (option 2: reuse the coarse status instead of a dedicated bootstrap-step
+// field).
+type DevServerHealthStatus string
+
+const (
+	// DevServerHealthPending is the column's DB default — set when a dev
+	// server is registered and not yet confirmed healthy. bootstrap.ts
+	// treats this as "still bootstrapping" (option 2's whole point: no
+	// dedicated per-step tracking, just this coarse signal).
+	DevServerHealthPending   DevServerHealthStatus = "pending"
+	DevServerHealthHealthy   DevServerHealthStatus = "healthy"
+	DevServerHealthDegraded  DevServerHealthStatus = "degraded"
+	DevServerHealthUnhealthy DevServerHealthStatus = "unhealthy"
+)
+
+// Valid reports whether s is one of the known enum values — mirrors the
+// live table's own dev_servers_status_check constraint.
+func (s DevServerHealthStatus) Valid() bool {
+	switch s {
+	case DevServerHealthPending, DevServerHealthHealthy, DevServerHealthDegraded, DevServerHealthUnhealthy:
+		return true
+	default:
+		return false
+	}
+}
+
+// AgentKind distinguishes a Dev Server Agent registration from a Mobile
+// Emulator Agent registration — both share this same registry via
+// RegisterDevServer, see docs/crs/v2/dev-server/
+// CR-DS-009-mobile-emulator-agent-separation.md §3.1.
+type AgentKind string
+
+const (
+	AgentKindDevServer      AgentKind = "dev_server"
+	AgentKindMobileEmulator AgentKind = "mobile_emulator"
+)
+
+// Valid reports whether k is one of the known enum values.
+func (k AgentKind) Valid() bool {
+	switch k {
+	case AgentKindDevServer, AgentKindMobileEmulator:
+		return true
+	default:
+		return false
+	}
+}
+
 var (
 	// ErrEmptyDevServerTenant is returned when TenantID is empty — a dev
 	// server with no owning tenant is never a valid domain state.
@@ -61,7 +142,22 @@ type DevServer struct {
 	Host        string
 	Mode        ConnectionMode
 	SSHTargetID string
-	Status      DevServerStatus
+	// Status and GroupID are CR-DS-006 Phase 1 additions — see that CR and
+	// this file's DevServerStatus doc comment. Neither is enforced by any
+	// usecase yet; GroupID empty means "ungrouped", a valid state.
+	Status  DevServerStatus
+	GroupID string
+	// HealthStatus — see DevServerHealthStatus's doc comment. Defaults to
+	// DevServerHealthPending in the database; NewDevServer below does not
+	// set it explicitly (zero value would be "", not a valid enum member)
+	// since every INSERT relies on the column's own DB DEFAULT instead —
+	// see Repository.RegisterDevServer.
+	HealthStatus DevServerHealthStatus
+	// Kind is CR-DS-009's Dev Server Agent vs Mobile Emulator Agent
+	// distinction — see AgentKind's doc comment. NewDevServer defaults this
+	// to AgentKindDevServer; usecase.RegisterDevServer overrides it when the
+	// caller supplies a valid explicit kind (e.g. AgentKindMobileEmulator).
+	Kind        AgentKind
 	Platform    string
 	Arch        string
 	NodeVersion string
@@ -80,24 +176,15 @@ type DevServer struct {
 	Tags []string
 }
 
-// DevServerStatus is the provisioning/health lifecycle state a DevServer
-// sits in — closes BUG-FLEET-02's "no degraded/unhealthy status field to
-// persist into" gap. BulkProvisionFleet (TASK-FLEET-02-05) is the primary
-// writer; SOL-FLEET-03's health poller also transitions Healthy<->Degraded.
-type DevServerStatus string
-
-const (
-	DevServerStatusPending   DevServerStatus = "pending" // registered, never provisioned
-	DevServerStatusHealthy   DevServerStatus = "healthy"
-	DevServerStatusDegraded  DevServerStatus = "degraded"  // prerequisites marginal or health degraded
-	DevServerStatusUnhealthy DevServerStatus = "unhealthy" // provisioning/deploy failed after retries
-)
-
 // NewDevServer constructs a DevServer, enforcing the invariants a record
 // must satisfy to be meaningful — this is where "infra-fleet-service owns
 // this data's correctness" actually lives, not scattered validation in the
-// gRPC handler. Status defaults to DevServerStatusPending — registration
-// alone doesn't provision, so "pending" is the honest initial value.
+// gRPC handler. Status defaults to DevServerStatusPendingApproval (CR-DS-006:
+// an admin has not yet reviewed it) — registration alone doesn't grant
+// access. HealthStatus is deliberately left unset here (relies on the
+// dev_servers.status column's own DB DEFAULT — see DevServerHealthStatus's
+// doc comment); provisioning/health outcomes are persisted later via
+// DevServerRepository.UpdateProvisionResult, not at registration time.
 func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID string, tags []string) (DevServer, error) {
 	if tenantID == "" {
 		return DevServer{}, ErrEmptyDevServerTenant
@@ -111,7 +198,16 @@ func NewDevServer(id, tenantID, host string, mode ConnectionMode, sshTargetID st
 	if mode == ConnectionModeRelaySSH && sshTargetID == "" {
 		return DevServer{}, ErrMissingSSHTargetForRelaySSH
 	}
-	return DevServer{ID: id, TenantID: tenantID, Host: host, Mode: mode, SSHTargetID: sshTargetID, Status: DevServerStatusPending, Tags: tags}, nil
+	return DevServer{
+		ID:          id,
+		TenantID:    tenantID,
+		Host:        host,
+		Mode:        mode,
+		SSHTargetID: sshTargetID,
+		Status:      DevServerStatusPendingApproval,
+		Kind:        AgentKindDevServer,
+		Tags:        tags,
+	}, nil
 }
 
 // IsZero reports whether ds is the zero-value DevServer — used by

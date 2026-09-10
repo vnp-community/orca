@@ -11,7 +11,7 @@ today — see "Out-of-scope dependency" below; the immediate fix does not.
 - `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`
 - `backend-go/services/infra-fleet-service/internal/usecase/get_host_capabilities.go`
 - `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/methods.go`
-**Status:** 📋 Proposed — immediate fix is low-effort and shippable now; the
+**Status:** ✅ Implemented — all 3 task(s) (TASK-068–070) DONE; see each task file's own Status/Verify section for evidence.
 per-target design is documented but blocked.
 
 ---

@@ -166,6 +166,7 @@ func run() error {
 
 	remoteCommitURLUC := usecase.NewRemoteCommitURL(resolver, local, relay)
 	remoteFileURLUC := usecase.NewRemoteFileURL(resolver, local, relay)
+	getRemoteURLUC := usecase.NewGetRemoteURL(devServerReachability, projectClient, local, relay)
 	// Fetch: TASK-227 (relay reachability) and PushTargetInput (TASK-207)
 	// are both now real, unblocking this per TASK-210's Contract correction.
 	fetchUC := usecase.NewFetch(resolver, local, relay)
@@ -180,6 +181,7 @@ func run() error {
 	writeFileUC := usecase.NewWriteFileUseCase(resolver, localFS, relayFS)
 	writeFileChunkUC := usecase.NewWriteFileChunkUseCase(resolver, localFS, relayFS)
 	createDirUC := usecase.NewCreateDirUseCase(resolver, localFS, relayFS)
+	createFileUC := usecase.NewCreateFileUseCase(resolver, localFS, relayFS)
 	deleteFileUC := usecase.NewDeleteFileUseCase(resolver, localFS, relayFS)
 	statFileUC := usecase.NewStatFileUseCase(resolver, localFS, relayFS)
 	searchFilesUC := usecase.NewSearchFilesUseCase(resolver, localFS, relayFS)
@@ -189,12 +191,12 @@ func run() error {
 	copyFileUC := usecase.NewCopyFileUseCase(resolver, localFS)
 	cloneUC := usecase.NewClone(devServerReachability, local, relay)
 	initRepoUC := usecase.NewInitRepo(devServerReachability, local, relay)
-	baseRefDefaultUC := usecase.NewBaseRefDefault(resolver, local, relay)
-	searchRefsUC := usecase.NewSearchRefs(resolver, local, relay)
-	checkHooksUC := usecase.NewCheckHooks(resolver, local, relay)
-	readIssueCommandUC := usecase.NewReadIssueCommand(resolver, local, relay)
-	writeIssueCommandUC := usecase.NewWriteIssueCommand(resolver, local, relay)
-	scanSetupScriptImportsUC := usecase.NewScanSetupScriptImports(resolver, local, relay)
+	baseRefDefaultUC := usecase.NewBaseRefDefault(devServerReachability, projectClient, local, relay)
+	searchRefsUC := usecase.NewSearchRefs(devServerReachability, projectClient, local, relay)
+	checkHooksUC := usecase.NewCheckHooks(devServerReachability, projectClient, local, relay)
+	readIssueCommandUC := usecase.NewReadIssueCommand(devServerReachability, projectClient, local, relay)
+	writeIssueCommandUC := usecase.NewWriteIssueCommand(devServerReachability, projectClient, local, relay)
+	scanSetupScriptImportsUC := usecase.NewScanSetupScriptImports(devServerReachability, projectClient, local, relay)
 
 	scrollbackCleaner := grpcclient.NewScrollbackCleaner(infraFleetClient)
 	// terminalSessionLister backs BR-WT-09/10's server-side agent-running
@@ -203,16 +205,22 @@ func run() error {
 	// infra-fleet-service dependency edge (SOL-WT-03), not a new one.
 	terminalSessionLister := infraclient.NewTerminalSessionLister(infraFleetClient)
 
-	createWorktreeUC := usecase.NewCreateWorktree(resolver, projectClient, local, relay)
+	// CreateWorktree/DetectWorktrees/PrefetchCreateBase/ResolvePrBase/
+	// ResolveMrBase are repo-scoped (no worktree/connection id yet to
+	// resolve through ConnectionResolver) — they dispatch via
+	// DevServerReachability, not resolver. See
+	// dispatchExecutorForRepo's doc comment in internal/usecase/ports.go
+	// for why routing these through resolver never worked.
+	createWorktreeUC := usecase.NewCreateWorktree(devServerReachability, projectClient, local, relay)
 	removeWorktreeUC := usecase.NewRemoveWorktree(resolver, projectClient, scrollbackCleaner, scmClient, local, relay, terminalSessionLister)
 	checkWorktreeDeleteSafetyUC := usecase.NewCheckWorktreeDeleteSafety(resolver, local, relay, terminalSessionLister)
 	compareWorktreesUC := usecase.NewCompareWorktrees(resolver, projectClient, local, relay)
 	mergeWorktreeIntoBaseUC := usecase.NewMergeWorktreeIntoBase(resolver, projectClient, local, relay)
 	forceDeleteBranchUC := usecase.NewForceDeleteBranch(resolver, local, relay)
-	detectWorktreesUC := usecase.NewDetectWorktrees(resolver, projectClient, local, relay)
-	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(resolver, projectClient, local, relay)
-	resolvePrBaseUC := usecase.NewResolvePrBase(scmClient, resolver, projectClient, local, relay)
-	resolveMrBaseUC := usecase.NewResolveMrBase(scmClient, resolver, projectClient, local, relay)
+	detectWorktreesUC := usecase.NewDetectWorktrees(devServerReachability, projectClient, local, relay)
+	prefetchCreateBaseUC := usecase.NewPrefetchCreateBase(devServerReachability, projectClient, local, relay)
+	resolvePrBaseUC := usecase.NewResolvePrBase(scmClient, devServerReachability, projectClient, local, relay)
+	resolveMrBaseUC := usecase.NewResolveMrBase(scmClient, devServerReachability, projectClient, local, relay)
 	createWorktreeFromIssueUC := usecase.NewCreateWorktreeFromIssue(issueSourceClient, createWorktreeUC, agentSpawner, projectClient)
 
 	// Group A — branch/ref operations (TASK-207). Checkout/ListLocalBranches/
@@ -238,6 +246,14 @@ func run() error {
 	stashPopUC := usecase.NewStashPop(resolver, local, relay)
 	createBranchUC := usecase.NewCreateBranch(resolver, local, relay)
 	deleteBranchUC := usecase.NewDeleteBranch(resolver, local, relay)
+	// SOL-004 Group 1 (TASK-001/002): readEphemeralVmRecipes dispatches a
+	// FilesystemExecutor (localFS/relayFS), not a GitExecutor (local/relay)
+	// — see usecase.ReadEphemeralVmRecipes's doc comment for why.
+	readEphemeralVmRecipesUC := usecase.NewReadEphemeralVmRecipes(devServerReachability, projectClient, localFS, relayFS)
+	// watchWorktreeFilesUC (BACKLOG-003) — relay also satisfies
+	// usecase.FileWatchStreamer, same "one adapter, many small ports"
+	// convention relayFS's comment above documents.
+	watchWorktreeFilesUC := usecase.NewWatchWorktreeFiles(resolver, relay)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger))
 	gitgatewayv1.RegisterGitGatewayServiceServer(grpcServer, gitgatewaygrpc.New(
@@ -245,10 +261,10 @@ func run() error {
 		stageUC, unstageUC,
 		historyUC, checkIgnoredUC, forkSyncUC, upstreamStatusUC,
 		commitCompareUC, branchCompareUC, commitDiffUC, branchDiffUC, submoduleStatusUC,
-		remoteCommitURLUC, remoteFileURLUC, fetchUC,
+		remoteCommitURLUC, remoteFileURLUC, getRemoteURLUC, fetchUC,
 		generatePullRequestFieldsUC, discoverCommitMessageModelsUC,
 		readFileUC, readFileChunkUC, readFilePreviewUC, readDirUC, writeFileUC, writeFileChunkUC,
-		createDirUC, deleteFileUC, statFileUC, searchFilesUC, listAllFilesUC, listMarkdownDocumentsUC,
+		createDirUC, createFileUC, deleteFileUC, statFileUC, searchFilesUC, listAllFilesUC, listMarkdownDocumentsUC,
 		renameFileUC, copyFileUC,
 		cloneUC, initRepoUC, baseRefDefaultUC, searchRefsUC, checkHooksUC,
 		readIssueCommandUC, writeIssueCommandUC, scanSetupScriptImportsUC,
@@ -259,6 +275,8 @@ func run() error {
 		discardUC, bulkDiscardUC,
 		checkWorktreeDeleteSafetyUC, compareWorktreesUC, mergeWorktreeIntoBaseUC,
 		mergeIntoBranchUC, stashPushUC, stashPopUC, createBranchUC, deleteBranchUC,
+		readEphemeralVmRecipesUC,
+		watchWorktreeFilesUC,
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

@@ -7,7 +7,7 @@ import (
 )
 
 func TestGetQueuedPrompt_RequiresTenantContext(t *testing.T) {
-	uc := NewGetQueuedPrompt(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeQueuedPromptRepository{})
+	uc := NewGetQueuedPrompt(&fakeTerminalSessionRepository{}, &fakeConnectionResolver{}, &fakeDevServerRepository{}, &fakeQueuedPromptRepository{})
 	_, _, _, err := uc.Execute(context.Background(), "pty-1")
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
@@ -18,7 +18,7 @@ func TestGetQueuedPrompt_NoQueuedPrompt(t *testing.T) {
 	sessions := &fakeTerminalSessionRepository{}
 	resolver := &fakeConnectionResolver{}
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
-	uc := NewGetQueuedPrompt(sessions, resolver, &fakeQueuedPromptRepository{})
+	uc := NewGetQueuedPrompt(sessions, resolver, &fakeDevServerRepository{}, &fakeQueuedPromptRepository{})
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	has, prompt, queuedAt, err := uc.Execute(ctx, "pty-1")
@@ -41,7 +41,7 @@ func TestGetQueuedPrompt_ReturnsQueuedPrompt(t *testing.T) {
 	if err := queue.Upsert(context.Background(), prompt); err != nil {
 		t.Fatalf("seed upsert failed: %v", err)
 	}
-	uc := NewGetQueuedPrompt(sessions, resolver, queue)
+	uc := NewGetQueuedPrompt(sessions, resolver, &fakeDevServerRepository{}, queue)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	has, gotPrompt, queuedAt, err := uc.Execute(ctx, "pty-1")

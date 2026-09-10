@@ -45,8 +45,10 @@ full rationale.
 
 ```
 deploy/dev/
-├── docker-compose.yml           # postgres, vault, vault-init, nats, 17 backend-go services, frontend, 14 migrate-* one-shots
+├── docker-compose.yml           # postgres, nats, 17 backend-go services, frontend, 14 migrate-* one-shots (Vault is external — see below)
 ├── .env.example / .env          # config (backend-go + frontend only — agent config is deploy/agent/.env.example)
+├── orca-policy.hcl              # Vault policy applied to the SHARED vnp-domain Vault (172.20.2.21), not run by this compose file
+├── VAULT-SHARED-MIGRATION.md    # migration record: throwaway local Vault -> shared persistent Vault
 ├── docker/
 │   ├── postgres/init-databases.sh   # creates the 14 per-service databases on first boot
 │   └── nginx/orca.conf              # frontend: serves the SPA + reverse-proxies /v1/* to api-gateway
@@ -111,12 +113,21 @@ being true at some point (build time becomes a real bottleneck),
 
 ## Known limitations (read before treating this as production)
 
-- **Vault runs in dev mode** (`VAULT_DEV_ROOT_TOKEN_ID`, in-memory storage,
-  single node) — secrets do not survive a container restart, and this is
-  explicitly not the HA/auto-unseal setup
+- **Vault is the shared, persistent vnp-domain instance (172.20.2.21), not a
+  local dev-mode container** (as of 2026-09-07 — see
+  [`VAULT-SHARED-MIGRATION.md`](./VAULT-SHARED-MIGRATION.md) for the
+  migration record and [`orca-policy.hcl`](./orca-policy.hcl) for exactly
+  what's granted). This replaced the original throwaway dev-mode Vault
+  (`VAULT_DEV_ROOT_TOKEN_ID`, in-memory, wiped on every restart) after a real
+  incident: a 172.20.2.39 reboot wiped it, and `auth-service`/
+  `credential-broker-service` crash-looped until manual recovery. The shared
+  instance uses `file` storage (persists across restarts) and requires
+  `VAULT_TOKEN` in `.env` to be set to the real orca-scoped token — there is
+  no insecure default anymore (`docker compose up` fails loudly if unset,
+  see `x-go-common-env` in docker-compose.yml). This is still not the full
+  HA/auto-unseal setup
   [`specs/backend-go/architecture/06-secrets-vault-architecture.md`](../../specs/backend-go/architecture/06-secrets-vault-architecture.md)
-  specifies for real production. Fine for a dev server; do not point real
-  tenant secrets at this.
+  specifies for real production, but it no longer loses data on reboot.
 - **No mTLS / service mesh** — containers talk to each other in plaintext
   over the `orca-go-net` bridge network. `architecture/07-security-architecture.md`
   specifies mTLS via a service mesh for production; this Docker Compose
@@ -133,3 +144,35 @@ being true at some point (build time becomes a real bottleneck),
   [`backend-go/docs/execution-plan.md`](../../backend-go/docs/execution-plan.md)).
   This deploy set makes the *infrastructure* real; it doesn't make the
   *application* feature-complete.
+- **SSO (CR-LOGIN-001) is off by default and single-tenant-only when on.**
+  Every `SSO_*`/`AUTH_MODE`/`PUBLIC_BASE_URL` var in `.env.example` is
+  optional — leaving them unset keeps local-password login working exactly
+  as before. Turning SSO on requires `PUBLIC_BASE_URL` to be this
+  deployment's real externally-reachable URL (never guessed from a request)
+  and each configured provider's redirect URI registered to match it
+  exactly. A brand-new SSO user's tenant is auto-resolved only when exactly
+  one company/tenant exists in this deployment — see
+  `backend-go/services/auth-service/README.md`'s SSO entry for the full
+  account-linking policy and remaining known gaps.
+
+## Vault (shared instance) — no local re-init needed anymore
+
+Orca's own `vault`/`vault-init` services and the `orca-vault-init.service`
+systemd unit that used to recover them after a host reboot are **gone**
+(removed 2026-09-07, see `VAULT-SHARED-MIGRATION.md`) — there is nothing
+local to re-initialize on this host anymore. The shared Vault at
+172.20.2.21 is a separate, persistent instance managed by whoever owns
+`vnp-domain/vault/`; if IT is ever sealed (its own host reboot, an operator
+action), `deploy/dev`'s services will fail closed against it (transit/
+credential-secrets calls error) until someone runs `vault-unseal` **over
+there** — that recovery is out of this deploy's scope, same as any other
+shared dependency this deploy doesn't own (see vnp-domain/vault/README.md).
+
+If `orca-vault-init.service` is still installed/enabled on an older host
+from before this migration, disable it — it references a `vault-init`
+compose service that no longer exists and will fail on the next boot:
+```bash
+sudo systemctl disable --now orca-vault-init.service
+sudo rm -f /etc/systemd/system/orca-vault-init.service
+sudo systemctl daemon-reload
+```

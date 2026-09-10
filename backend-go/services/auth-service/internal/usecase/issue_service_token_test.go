@@ -22,7 +22,7 @@ func TestIssueServiceToken_SucceedsForExistingUser(t *testing.T) {
 	}
 	users.seed(u, "irrelevant-hash")
 
-	uc := NewIssueServiceToken(users, signer, clock, 15*time.Minute)
+	uc := NewIssueServiceToken(users, newFakeServiceTokenRepository(), &fakeAuditRepository{}, signer, clock, 15*time.Minute)
 	out, err := uc.Execute(context.Background(), IssueServiceTokenInput{UserID: "u1", Audience: "api-gateway"})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -51,7 +51,7 @@ func TestIssueServiceToken_SucceedsForExistingUser(t *testing.T) {
 
 func TestIssueServiceToken_UnknownUserFails(t *testing.T) {
 	users := newFakeUserRepository()
-	uc := NewIssueServiceToken(users, &fakeTokenSigner{}, &fakeClock{now: time.Now()}, 15*time.Minute)
+	uc := NewIssueServiceToken(users, newFakeServiceTokenRepository(), &fakeAuditRepository{}, &fakeTokenSigner{}, &fakeClock{now: time.Now()}, 15*time.Minute)
 
 	_, err := uc.Execute(context.Background(), IssueServiceTokenInput{UserID: "nobody", Audience: "api-gateway"})
 	if err == nil {
@@ -63,7 +63,7 @@ func TestIssueServiceToken_RequiresUserIDAndAudience(t *testing.T) {
 	users := newFakeUserRepository()
 	u, _ := domain.NewUser("u1", "t1", "alice@example.com", "Alice", domain.RoleUser, true, time.Now())
 	users.seed(u, "irrelevant-hash")
-	uc := NewIssueServiceToken(users, &fakeTokenSigner{}, &fakeClock{now: time.Now()}, 15*time.Minute)
+	uc := NewIssueServiceToken(users, newFakeServiceTokenRepository(), &fakeAuditRepository{}, &fakeTokenSigner{}, &fakeClock{now: time.Now()}, 15*time.Minute)
 
 	if _, err := uc.Execute(context.Background(), IssueServiceTokenInput{UserID: "", Audience: "x"}); err == nil {
 		t.Error("expected an error for empty user_id")
@@ -79,7 +79,7 @@ func TestIssueServiceToken_SignerFailurePropagates(t *testing.T) {
 	users.seed(u, "irrelevant-hash")
 	signer := &fakeTokenSigner{signErr: errSignFailed}
 
-	uc := NewIssueServiceToken(users, signer, &fakeClock{now: time.Now()}, 15*time.Minute)
+	uc := NewIssueServiceToken(users, newFakeServiceTokenRepository(), &fakeAuditRepository{}, signer, &fakeClock{now: time.Now()}, 15*time.Minute)
 	if _, err := uc.Execute(context.Background(), IssueServiceTokenInput{UserID: "u1", Audience: "x"}); err == nil {
 		t.Fatal("expected the signer's error to propagate")
 	}

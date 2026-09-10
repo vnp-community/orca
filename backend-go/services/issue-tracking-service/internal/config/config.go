@@ -26,6 +26,14 @@ type Config struct {
 	// dialed for real by internal/adapter/credential as of Epic B
 	// (docs/execution-plan.md §8).
 	CredentialBrokerAddr string
+
+	// DatabaseCredentialsFile is the path a Vault Agent sidecar renders
+	// dynamic Postgres credentials to in production (see
+	// common/secrets.DatabaseCredentialsFromFile) — same convention as
+	// usage-service's config. Falls back to DATABASE_DSN (via Base) when
+	// the file doesn't exist, which is what local dev and this scaffold's
+	// testcontainers path use instead.
+	DatabaseCredentialsFile string
 }
 
 func Load() (Config, error) {
@@ -34,8 +42,9 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:                 base,
-		NATSURL:              commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
-		CredentialBrokerAddr: commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
+		Base:                    base,
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		CredentialBrokerAddr:    commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
+		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 	}, nil
 }

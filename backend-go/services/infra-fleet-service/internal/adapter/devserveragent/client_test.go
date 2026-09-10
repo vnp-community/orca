@@ -48,6 +48,15 @@ type fakeAgent struct {
 	// not just that some pre-registered result came back.
 	paramsMu       sync.Mutex
 	receivedParams map[string]json.RawMessage
+
+	// vmProvisionFrames, when set, is a canned sequence of `result` payloads
+	// sent back-to-back for a "vm.provision" request, ALL sharing that
+	// request's real id — TASK-BE-EVM-003's regression tests for the
+	// stream.started/stream.chunk/stream.end wire shape (see
+	// agent-ephemeral-vm-handler.ts's handleVmProvision, the real
+	// precedent). Takes precedence over the generic single-result `results`
+	// map for method=="vm.provision".
+	vmProvisionFrames []map[string]any
 }
 
 // lastParams returns the raw params this fake agent most recently received
@@ -165,6 +174,18 @@ func (f *fakeAgent) handler(w http.ResponseWriter, r *http.Request) {
 				resp := JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: encoded}
 				frame, _ := EncodeJSONRPCFrame(resp, uint32(10+i), decoded.ID)
 				if err := conn.Write(ctx, websocket.MessageBinary, frame); err != nil {
+					return
+				}
+			}
+			continue
+		}
+
+		if req.Method == "vm.provision" && f.vmProvisionFrames != nil {
+			for _, frame := range f.vmProvisionFrames {
+				encoded, _ := json.Marshal(frame)
+				resp := JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: encoded}
+				fr, _ := EncodeJSONRPCFrame(resp, 2, decoded.ID)
+				if err := conn.Write(ctx, websocket.MessageBinary, fr); err != nil {
 					return
 				}
 			}
@@ -308,6 +329,53 @@ func TestClientHealthReflectsHandshake(t *testing.T) {
 	}
 	if !healthy {
 		t.Error("Health = false, want true against a live fake agent")
+	}
+}
+
+// TestClientIsConnected_NoSessionYetIsFalseAndNeverDials verifies
+// IsConnected is a pure peek — a devServerID nobody has ever
+// Health()/Exec()'d against reports false immediately, without attempting
+// any network dial (there is no fake agent server running at all here;
+// if IsConnected tried to dial, this test would hang or error).
+func TestClientIsConnected_NoSessionYetIsFalseAndNeverDials(t *testing.T) {
+	client := newTestClientWithToken(0, fakeAgentToken)
+	t.Cleanup(client.Close)
+
+	if client.IsConnected("never-seen-dev-server") {
+		t.Error("IsConnected = true, want false for a devServerId with no session at all")
+	}
+}
+
+// TestClientIsConnected_ReflectsLiveHandshake verifies IsConnected reports
+// true once a real session has handshaked (via Health), and false again
+// once that session is gone — the live bug this fixes: devServer.list's
+// Status was hardcoded to "disconnected" regardless of the agent's real
+// state, and devServer.browseDir/onboarding.detectAgents incorrectly used
+// the infra.connections table (a different concept, see ResolveConnection's
+// doc comment) as a proxy for "is the agent live", which is false for a
+// freshly-connected dev server with no project/repo bound to it yet.
+func TestClientIsConnected_ReflectsLiveHandshake(t *testing.T) {
+	agent := &fakeAgent{t: t, requireToken: fakeAgentToken, results: map[string]any{}}
+	host, port := startFakeAgent(t, agent)
+
+	client := newTestClientWithToken(port, fakeAgentToken)
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-4", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	if client.IsConnected(devServer.ID) {
+		t.Error("IsConnected = true before any session was ever established")
+	}
+
+	if _, err := client.Health(context.Background(), devServer); err != nil {
+		t.Fatalf("Health: %v", err)
+	}
+
+	if !client.IsConnected(devServer.ID) {
+		t.Error("IsConnected = false, want true right after a live handshake")
 	}
 }
 

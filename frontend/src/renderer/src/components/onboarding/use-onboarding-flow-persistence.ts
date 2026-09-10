@@ -147,7 +147,14 @@ export function useCloseWith({
         // Why: closeWith updates parent state synchronously from this hook's
         // perspective, but the modal unmounts on the next React commit.
         window.setTimeout(() => {
-          void notifyRuntimeStarNagOnboardingCompleted(useAppStore.getState().settings)
+          // Why: fire-and-forget by design (onboarding already closed above) —
+          // but was missing a .catch, so a paired-environment caller hitting a
+          // not-yet-implemented backend-go channel (starNag.onboardingCompleted
+          // isn't wired for the runtime-environment relay path yet) surfaced as
+          // an uncaught promise rejection in the console for something purely
+          // cosmetic (a "star this repo" nudge), well after onboarding itself
+          // had already finished.
+          notifyRuntimeStarNagOnboardingCompleted(useAppStore.getState().settings).catch(() => {})
         }, 0)
       } else if (outcome === 'dismissed') {
         trackOnboardingDismissed(lastStepReached, dismissedExtras)
@@ -213,6 +220,18 @@ export function usePersistCurrentStep({
             time_since_completed_ms: 0
           })
         }
+        return { ok: true }
+      }
+      if (currentStepId === 'dev_server') {
+        // Why: live-verified bug — this step (stepNumber 0) had no case here
+        // at all, so flow.next() always fell through to `return { ok: false }`
+        // below and silently refused to advance past it, with no error shown
+        // (DevServerStep's own "Continue"/"Use this dev server" buttons both
+        // call flow.next() directly, matching every other step). No extra
+        // settings update needed — the actual selection (activeDevServerId)
+        // already persists via DevServerStep's own updateSettings call before
+        // onNext() runs; this only needs to mark the step itself complete.
+        onOnboardingChange(await persistStep(0))
         return { ok: true }
       }
       if (currentStepId === 'theme') {

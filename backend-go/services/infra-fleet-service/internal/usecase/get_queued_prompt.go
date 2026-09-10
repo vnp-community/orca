@@ -11,13 +11,14 @@ import (
 // (SOL-MB-03) — backs the mobile client's poll/refresh of a
 // BR-MB-10-queued prompt while it waits for delivery.
 type GetQueuedPrompt struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	queue    QueuedPromptRepository
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	queue      QueuedPromptRepository
 }
 
-func NewGetQueuedPrompt(sessions TerminalSessionRepository, resolver ConnectionResolver, queue QueuedPromptRepository) *GetQueuedPrompt {
-	return &GetQueuedPrompt{sessions: sessions, resolver: resolver, queue: queue}
+func NewGetQueuedPrompt(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, queue QueuedPromptRepository) *GetQueuedPrompt {
+	return &GetQueuedPrompt{sessions: sessions, resolver: resolver, devServers: devServers, queue: queue}
 }
 
 // Execute returns (hasQueuedPrompt, prompt, queuedAtUnixMs, err).
@@ -26,7 +27,7 @@ func (uc *GetQueuedPrompt) Execute(ctx context.Context, ptyID string) (bool, str
 	if err != nil {
 		return false, "", 0, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
-	if _, _, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver); err != nil {
+	if _, _, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver, uc.devServers); err != nil {
 		return false, "", 0, err
 	}
 	prompt, ok, err := uc.queue.Get(ctx, ptyID)

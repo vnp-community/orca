@@ -8,7 +8,7 @@
 - `backend-go/services/auth-service/internal/adapter/postgres/*.go` (new repository methods)
 - `backend-go/services/api-gateway/internal/adapter/httpgateway/admin_routes.go` (new file)
 - `backend-go/services/api-gateway/internal/adapter/httpgateway/router.go` (mount call)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 6 task(s) (TASK-001–006) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

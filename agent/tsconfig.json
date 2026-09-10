@@ -1,9 +1,8 @@
 {
   "extends": "@electron-toolkit/tsconfig/tsconfig.node.json",
   "include": [
+    "./src/main/**/*",
     "./src/relay/**/*",
-    "./src/main/pty/overlay-mirror.ts",
-    "./src/main/pty/shell-startup-env.ts",
     "./src/shared/**/*",
     "./src/types/**/*"
   ],

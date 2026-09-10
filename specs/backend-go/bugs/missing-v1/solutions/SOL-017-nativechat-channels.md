@@ -6,7 +6,7 @@
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_nativechat.go` (new file)
 - `backend-go/services/api-gateway/internal/adapter/wscompat/channels_nativechat_test.go` (new file)
 - `backend-go/services/api-gateway/cmd/server/main.go` (`registerNativeChatChannels` call — reuses the already-dialed `infraFleetClient`)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — all 2 task(s) (TASK-108–109) DONE; see each task file's own Status/Verify section for evidence.
 
 ---
 

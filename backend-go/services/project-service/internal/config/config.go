@@ -29,6 +29,11 @@ type Config struct {
 	// Also doubles as the transactional-outbox relay's NATS JetStream
 	// target (SOL-PI-03) — mirrors issue-tracking-service's own NATSURL field.
 	NATSURL string
+	// AuthServiceAddr is requireProjectAccess/requireRepoAccess's audit-append
+	// dependency (TASK-BE-019/CR-RBAC-005, common/auditclient) — the only
+	// other service this one talks to purely to write audit_log rows, never
+	// to read anything back.
+	AuthServiceAddr string
 	// OPABundlePath points requireProjectAccess's OPA client
 	// (internal/adapter/opaclient, via common/policy.Evaluator) at the
 	// orca-authz Rego bundle directory. Defaults to the bundle's location
@@ -38,6 +43,12 @@ type Config struct {
 	// own OPABundlePath, for identical override behavior in every
 	// deployment environment.
 	OPABundlePath string
+	// DatabaseCredentialsFile is the path a Vault Agent sidecar renders
+	// dynamic Postgres credentials to in production (see
+	// common/secrets.DatabaseCredentialsFromFile). Falls back to DATABASE_DSN
+	// (via Base) when the file doesn't exist, which is what local dev and
+	// this scaffold's testcontainers path use instead.
+	DatabaseCredentialsFile string
 }
 
 func Load() (Config, error) {
@@ -46,12 +57,14 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:                  base,
-		WorkflowServiceAddr:   commonconfig.StringEnv("WORKFLOW_SERVICE_ADDR", "workflow-service:9090"),
-		TaskServiceAddr:       commonconfig.StringEnv("TASK_SERVICE_ADDR", "task-service:9090"),
-		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
-		TenantServiceAddr:     commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
-		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
-		OPABundlePath:         commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		Base:                    base,
+		WorkflowServiceAddr:     commonconfig.StringEnv("WORKFLOW_SERVICE_ADDR", "workflow-service:9090"),
+		TaskServiceAddr:         commonconfig.StringEnv("TASK_SERVICE_ADDR", "task-service:9090"),
+		InfraFleetServiceAddr:   commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		TenantServiceAddr:       commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		AuthServiceAddr:         commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
+		OPABundlePath:           commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
+		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 	}, nil
 }

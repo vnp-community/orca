@@ -1140,7 +1140,7 @@ describe('fetchWorktrees', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'worktree.detectedList',
-      params: { repo: 'repo1' },
+      params: { projectId: '', repoId: 'repo1' },
       timeoutMs: 15_000
     })
     expect(mockApi.worktrees.listDetected).not.toHaveBeenCalled()
@@ -1173,7 +1173,10 @@ describe('fetchWorktrees', () => {
 
     await store.getState().fetchWorktrees('repo-ssh')
 
-    expect(mockApi.worktrees.listDetected).toHaveBeenCalledWith({ repoId: 'repo-ssh' })
+    expect(mockApi.worktrees.listDetected).toHaveBeenCalledWith({
+      repoId: 'repo-ssh',
+      projectId: ''
+    })
     expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
     // Why: SSH worktrees are fetched via local IPC but belong to the SSH host;
     // they must carry the repo's ssh host id, not the local default.
@@ -1323,13 +1326,13 @@ describe('fetchWorktrees', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'worktree.detectedList',
-      params: { repo: 'repo1' },
+      params: { projectId: '', repoId: 'repo1' },
       timeoutMs: 15_000
     })
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'worktree.list',
-      params: { repo: 'repo1', limit: 10_000 },
+      params: { projectId: '' },
       timeoutMs: 15_000
     })
   })
@@ -6053,11 +6056,14 @@ describe('fetchAllWorktrees hydration-time purge (design §4.4)', () => {
         expect.objectContaining({ id: refreshedRemoteWorktree.id, hostId: 'runtime:env-1' })
       ])
     )
-    expect(mockApi.worktrees.listDetected).toHaveBeenCalledWith({ repoId: 'same-repo' })
+    expect(mockApi.worktrees.listDetected).toHaveBeenCalledWith({
+      repoId: 'same-repo',
+      projectId: ''
+    })
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'worktree.detectedList',
-      params: { repo: 'same-repo' },
+      params: { projectId: '', repoId: 'same-repo' },
       timeoutMs: 15_000
     })
   })

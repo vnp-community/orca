@@ -108,8 +108,14 @@ describe('new-workspace-composer-repo', () => {
     const repos = [otherProject, localOrca, runtimeOrca]
     const eligibleRepos = getComposerEligibleRepos(repos)
 
-    it('maps an active runtime-owned SSH repo to its local same-project sibling', () => {
-      expect(resolveComposerActiveRepoId(repos, eligibleRepos, 'runtime-orca')).toBe('local-orca')
+    // Phase 10: a legacy Project is always exactly one repo now, so sharing a
+    // GitHub identity (both repos point at stablyai/orca here) no longer makes
+    // two repos "the same project" — getProjectIdentityKey returns a distinct
+    // `repo:<id>` key per repo, so no sibling is ever found this way anymore.
+    // The runtime-owned repo id passes through unchanged, same as when no
+    // sibling exists at all.
+    it('keeps the runtime repo id even when another repo shares its GitHub identity (Phase 10: no cross-repo project merging)', () => {
+      expect(resolveComposerActiveRepoId(repos, eligibleRepos, 'runtime-orca')).toBe('runtime-orca')
     })
 
     it('leaves a normal active repo unchanged', () => {

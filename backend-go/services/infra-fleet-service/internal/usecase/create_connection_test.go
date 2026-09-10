@@ -26,17 +26,11 @@ type fakeConnectionRepository struct {
 	activeConn domain.Connection
 	activeErr  error
 
-	// updatedStatuses records every UpdateStatus call — used by
-	// teardown_connection_test.go.
-	updatedStatuses []string
-	updateStatusErr error
-
-	// devServerByConnection/devServerByConnectionFound/devServerByConnectionErr
-	// drive GetDevServerByConnection's fake answer — used by
-	// teardown_connection_test.go.
-	devServerByConnection      domain.DevServer
-	devServerByConnectionFound bool
-	devServerByConnectionErr   error
+	// updated/updateErr drive UpdateStatus's fake behavior — used by
+	// poll_fleet_health_test.go's degraded/reestablish coverage and by
+	// teardown_connection_test.go's close-path coverage.
+	updated   []domain.Connection
+	updateErr error
 }
 
 func (f *fakeConnectionRepository) CreateConnection(ctx context.Context, conn domain.Connection) (domain.Connection, error) {
@@ -69,23 +63,13 @@ func (f *fakeConnectionRepository) GetActiveByDevServer(ctx context.Context, ten
 }
 
 // UpdateStatus implements usecase.ConnectionRepository.UpdateStatus.
-func (f *fakeConnectionRepository) UpdateStatus(ctx context.Context, tenantID, connectionID, status string) error {
-	if f.updateStatusErr != nil {
-		return f.updateStatusErr
+func (f *fakeConnectionRepository) UpdateStatus(ctx context.Context, tenantID string, conn domain.Connection) error {
+	if f.updateErr != nil {
+		return f.updateErr
 	}
-	f.updatedStatuses = append(f.updatedStatuses, connectionID+":"+status)
+	f.updated = append(f.updated, conn)
+	f.activeConn = conn
 	return nil
-}
-
-// GetDevServerByConnection implements usecase.ConnectionRepository.GetDevServerByConnection.
-func (f *fakeConnectionRepository) GetDevServerByConnection(ctx context.Context, tenantID, connectionID string) (domain.DevServer, bool, error) {
-	if f.devServerByConnectionErr != nil {
-		return domain.DevServer{}, false, f.devServerByConnectionErr
-	}
-	if !f.devServerByConnectionFound {
-		return domain.DevServer{}, false, nil
-	}
-	return f.devServerByConnection, true, nil
 }
 
 func TestCreateConnection_RequiresTenantContext(t *testing.T) {

@@ -11,6 +11,7 @@ import (
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
+	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
 )
 
 // RelayExecutor implements usecase.GitExecutor and usecase.FilesystemExecutor
@@ -37,23 +38,51 @@ func NewRelayExecutor(client infrafleetv1.InfraFleetServiceClient) *RelayExecuto
 	return &RelayExecutor{client: client}
 }
 
-// relay marshals params, calls infra-fleet-service's Relay RPC for
-// connectionID/method, and unmarshals the result into out.
+// relay marshals params and calls infra-fleet-service's agent-execution
+// plane for connectionID/method, unmarshalling the result into out.
 //
-// Known gap: usecase.GitExecutor's methods only receive repoPath, not the
-// worktreeID/connectionId ConnectionResolver resolved it from (§
-// dispatchExecutor in usecase/ports.go forwards ResolvedConnection.RepoPath
-// to GitExecutor but drops ConnectionID). Every caller below therefore
-// passes its repoPath argument through as this relay's connectionID too —
-// correct only if RelayRequest.ConnectionId ends up identical to the
-// worktreeID that resolved to it, which holds today because
-// ConnectionResolver.ResolveConnection echoes worktreeID as
-// ResolvedConnection.ConnectionID but sources RepoPath from
-// infra-fleet-service's own answer (resp.GetRepoPath()) — those two need
-// not always match. Threading ConnectionID through GitExecutor's signature
-// is the real fix; not done here since ports.go is out of scope for this
-// change.
+// Fixed gap (was: "Threading ConnectionID through GitExecutor's signature
+// is the real fix; not done here"): usecase.GitExecutor's methods still
+// only receive repoPath, not a resolved connectionId — but repoPath was
+// never a valid infra.connections.id to begin with (a filesystem path
+// can't satisfy that column's uuid type), so passing it as Relay's
+// ConnectionId could never have resolved for ANY caller, live-confirmed as
+// this exact call's own root cause (INFRA_RESOLVE_FAILED, once dispatch
+// finally started reaching here at all — see PollFleetHealth's commit for
+// why it never had before). dispatchExecutorForRepo now threads the repo's
+// dev server id through ctx (usecase.WithDevServerID) instead: when
+// present, call RelayByDevServer — infra-fleet-service's purpose-built
+// bypass for "reach this dev server's agent before any infra.connections
+// row exists for it" (see usecase.RelayByDevServer's own doc comment,
+// infra-fleet-service) — rather than the connectionId-keyed Relay RPC.
+// dispatchExecutor's worktree-keyed callers (e.g. RemoveWorktree) don't set
+// this and still fall through to Relay with repoPath-as-connectionId; that
+// path is currently moot (infra.connections has zero rows system-wide, so
+// ConnectionResolver.ResolveConnection there always answers
+// Connected=false today) but remains a separate, still-open gap, not fixed
+// in this pass.
 func (r *RelayExecutor) relay(ctx context.Context, connectionID, method string, params map[string]any, out any) error {
+	// TASK-BE-EVM-015 (BE-SOL-EVM-004 §4's decision 3): a repo living on a
+	// ssh-type ephemeral VM's hidden target routes through a DIFFERENT
+	// agent method name (mirroring ExecViaHiddenSshTarget's
+	// "*ViaHiddenTarget" convention, TASK-BE-EVM-014) carrying hiddenTargetId
+	// as an extra param — same devServer/agent session as any other repo on
+	// this Dev Server (dispatchExecutorForRepo/dispatchFilesystemExecutorForRepo
+	// already resolved that via WithDevServerID above this call), no new
+	// transport, no new provider_registry_entries value. This is read from
+	// ctx (WithHiddenTargetID), not a new parameter, for the exact reason
+	// DevServerIDFromContext already reads from ctx here: relay is the ONE
+	// shared chokepoint every GitExecutor/FilesystemExecutor method (~52 of
+	// them) already funnels through, so this covers all of them without
+	// widening any of their signatures.
+	if hiddenTargetID, ok := usecase.HiddenTargetIDFromContext(ctx); ok {
+		method += "ViaHiddenTarget"
+		if params == nil {
+			params = map[string]any{}
+		}
+		params["hiddenTargetId"] = hiddenTargetID
+	}
+
 	ctx, err := withTenantMetadata(ctx)
 	if err != nil {
 		return err
@@ -64,19 +93,66 @@ func (r *RelayExecutor) relay(ctx context.Context, connectionID, method string, 
 		return fmt.Errorf("grpcclient: marshal params for %s: %w", method, err)
 	}
 
-	resp, err := r.client.Relay(ctx, &infrafleetv1.RelayRequest{
-		ConnectionId: connectionID,
-		Method:       method,
-		ParamsJson:   string(paramsJSON),
-	})
-	if err != nil {
-		return fmt.Errorf("grpcclient: relay %s: %w", method, err)
+	var resultJSON string
+	if devServerID, ok := usecase.DevServerIDFromContext(ctx); ok {
+		resp, err := r.client.RelayByDevServer(ctx, &infrafleetv1.RelayByDevServerRequest{
+			DevServerId: devServerID,
+			Method:      method,
+			ParamsJson:  string(paramsJSON),
+		})
+		if err != nil {
+			return fmt.Errorf("grpcclient: relayByDevServer %s: %w", method, err)
+		}
+		resultJSON = resp.GetResultJson()
+	} else {
+		resp, err := r.client.Relay(ctx, &infrafleetv1.RelayRequest{
+			ConnectionId: connectionID,
+			Method:       method,
+			ParamsJson:   string(paramsJSON),
+		})
+		if err != nil {
+			return fmt.Errorf("grpcclient: relay %s: %w", method, err)
+		}
+		resultJSON = resp.GetResultJson()
 	}
 
-	if out == nil || resp.GetResultJson() == "" {
+	// Bug found live (2026-09-02/03, worktree-create-fix follow-up): a
+	// JSON-RPC-shaped error response from the agent (e.g. handleGitWorktreeAdd's
+	// validation failures) arrives here as a perfectly normal gRPC "ok" —
+	// RelayByDevServer/Relay only fail at the gRPC layer for transport/session
+	// problems, never for the agent's own {jsonrpc, error:{...}} responses.
+	// Every caller of relay() (52 methods) was silently treating that shape as
+	// success: out==nil skipped inspecting resultJSON entirely, and even a
+	// non-nil out just leaves its zero value on a shape mismatch (Go's
+	// json.Unmarshal doesn't error on missing fields). Concretely: CreateWorktree's
+	// first call (git.worktree.add, out=nil) swallowed the real failure, then its
+	// follow-up rev-parse call failed for an unrelated reason (targetPath never
+	// existed) — the ONLY error that ever surfaced was that second, misleading one.
+	// Check for the embedded error unconditionally, before the out==nil shortcut.
+	//
+	// Code is json.Number, not string: the real agent's AgentErrorCode is a
+	// JSON-RPC numeric code (e.g. -32000, -33003 — agent/src/shared/agent-wire-protocol.ts).
+	// An earlier version of this fix typed Code as string, which made
+	// json.Unmarshal fail (number into a string field) on every real error
+	// envelope — silently falling through to "no error" again, the exact
+	// bug this block exists to close. Caught before ever reaching a live
+	// worktree.create retry; covered by TestRelayExecutor_Stat_AgentErrorEnvelope_NumericCode.
+	var envelope struct {
+		Error *struct {
+			Code    json.Number `json:"code"`
+			Message string      `json:"message"`
+		} `json:"error"`
+	}
+	if resultJSON != "" {
+		if unmarshalErr := json.Unmarshal([]byte(resultJSON), &envelope); unmarshalErr == nil && envelope.Error != nil {
+			return fmt.Errorf("grpcclient: agent rejected %s: %s (%s)", method, envelope.Error.Message, envelope.Error.Code)
+		}
+	}
+
+	if out == nil || resultJSON == "" {
 		return nil
 	}
-	if err := json.Unmarshal([]byte(resp.GetResultJson()), out); err != nil {
+	if err := json.Unmarshal([]byte(resultJSON), out); err != nil {
 		return fmt.Errorf("grpcclient: unmarshal %s result: %w", method, err)
 	}
 	return nil
@@ -238,19 +314,62 @@ func (r *RelayExecutor) Stage(ctx context.Context, repoPath string, paths []stri
 	return result, err
 }
 
-// CreateWorktree/RemoveWorktree/FetchAndResolveRef/ListWorktreePaths below
-// follow this file's existing relay(...) helper pattern exactly (SOL-031 /
-// TASK-193). Same best-effort-param-shape caveat this file's doc comment
-// already states for git.status/git.diff/etc. applies here — git.worktreeAdd/
-// git.worktreeRemove/git.fetchRef/git.worktreeList are not verified against
-// a real Dev Server Agent handler; reconcile before removing this note.
-
+// CreateWorktree relays via "git.worktree.add" (not "git.worktreeAdd" — a
+// typo; the agent only registers the dotted name, matching its
+// worktree.remove/worktree.list siblings) and matches the agent's actual
+// param shape: handleGitWorktreeAdd reads params.path as the NEW worktree's
+// destination directory and params.cwd as the EXISTING repo root to run
+// from — not a single "repoPath" — and has no response body beyond
+// git.exec's raw {stdout,stderr,exitCode}, so path/HeadSHA must be
+// computed/fetched here, not unmarshalled from the agent's reply).
+// targetPath, if non-empty, overrides the default repoPath+"-"+sanitize(branch)
+// convention — see SOL-WT-01's custom name/path input support (mirrors
+// localgit.Executor.CreateWorktree's own same-named param). createBranch is
+// always true: CreateWorktreeInput/the usecase layer has no "checkout an
+// existing branch" signal — this call always represents the "Create
+// worktree" UI flow's new-branch intent, same as localgit's own CreateWorktree
+// which unconditionally passes `-b`.
 func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef, targetPath string) (domain.WorktreeCreateResult, error) {
-	var result domain.WorktreeCreateResult
-	err := r.relay(ctx, repoPath, "git.worktreeAdd", map[string]any{
-		"repoPath": repoPath, "branch": branch, "baseRef": baseRef, "targetPath": targetPath,
-	}, &result)
-	return result, err
+	if targetPath == "" {
+		targetPath = repoPath + "-" + sanitizeBranchForRelayPath(branch)
+	}
+
+	params := map[string]any{
+		"path":         targetPath,
+		"branch":       branch,
+		"createBranch": true,
+		"cwd":          repoPath,
+	}
+	if baseRef != "" {
+		params["baseRef"] = baseRef
+	}
+	if err := r.relay(ctx, repoPath, "git.worktree.add", params, nil); err != nil {
+		return domain.WorktreeCreateResult{}, err
+	}
+
+	// The agent's git.worktree.add has no structured result to unmarshal
+	// (see doc comment above) — fetch HEAD via the already-relayed, already-
+	// whitelisted git.exec (rev-parse is in agent-git-handler.ts's
+	// ALLOWED_GIT_SUBCOMMANDS), same follow-up shape as localgit's own
+	// CreateWorktree.
+	var execResult gitExecResult
+	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
+		"args": []string{"rev-parse", "HEAD"},
+		"cwd":  targetPath,
+	}, &execResult)
+	if err != nil {
+		return domain.WorktreeCreateResult{}, err
+	}
+	return domain.WorktreeCreateResult{Path: targetPath, HeadSHA: strings.TrimSpace(execResult.Stdout)}, nil
+}
+
+// sanitizeBranchForRelayPath mirrors localgit.Executor's own
+// sanitizeBranchForPath (unexported in that package, so duplicated here —
+// same reasoning as parseForEachRefBranches' own duplicate-rather-than-share
+// comment below): replaces '/' (e.g. "feature/foo") so the worktree's
+// directory name is filesystem-safe.
+func sanitizeBranchForRelayPath(branch string) string {
+	return strings.ReplaceAll(branch, "/", "-")
 }
 
 // Unstage always relays to "git.bulkUnstage" — same reasoning as Stage
@@ -527,6 +646,27 @@ func (r *RelayExecutor) RemoteFileURL(ctx context.Context, repoPath, path, ref s
 	return result.URL, err
 }
 
+// RemoteURL relays via the already-whitelisted git.exec ("remote" is an
+// ALLOWED_GIT_SUBCOMMANDS entry, git-exec-validator.ts — read-only
+// subcommands only, "remote get-url" isn't in REMOTE_WRITE_SUBCOMMANDS) —
+// unlike RemoteCommitURL/RemoteFileURL, there is no dedicated
+// git.remoteUrl agent RPC (and none is needed: git.exec already covers
+// this read).
+func (r *RelayExecutor) RemoteURL(ctx context.Context, repoPath, remoteName string) (string, error) {
+	if remoteName == "" {
+		remoteName = "origin"
+	}
+	var result gitExecResult
+	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
+		"args": []string{"remote", "get-url", remoteName},
+		"cwd":  repoPath,
+	}, &result)
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(result.Stdout), nil
+}
+
 // Clone and InitRepo have no repoPath/connectionId yet (they create the
 // worktree) — destPath doubles as the relay's connectionID, consistent
 // with this file's existing "repoPath doubles as connectionId" convention
@@ -542,15 +682,17 @@ func (r *RelayExecutor) Clone(ctx context.Context, url, destPath string) (string
 	return result.WorktreePath, result.DefaultBranch, err
 }
 
-func (r *RelayExecutor) InitRepo(ctx context.Context, destPath, defaultBranch string) (string, string, error) {
+func (r *RelayExecutor) InitRepo(ctx context.Context, destPath, defaultBranch, remoteName, remoteURL string) (string, string, bool, error) {
 	var result struct {
 		Path          string `json:"path"`
 		DefaultBranch string `json:"defaultBranch"`
+		RemoteAdded   bool   `json:"remoteAdded"`
 	}
 	err := r.relay(ctx, destPath, "git.init", map[string]any{
 		"destPath": destPath, "defaultBranch": defaultBranch,
+		"remoteName": remoteName, "remoteUrl": remoteURL,
 	}, &result)
-	return result.Path, result.DefaultBranch, err
+	return result.Path, result.DefaultBranch, result.RemoteAdded, err
 }
 
 func (r *RelayExecutor) BaseRefDefault(ctx context.Context, repoPath string) (string, error) {
@@ -599,9 +741,18 @@ func (r *RelayExecutor) ScanSetupScriptImports(ctx context.Context, repoPath str
 	return result.ImportedPaths, err
 }
 
+// Method name and param key fixed to match the agent's real
+// git.worktree.remove handler (agent-git-handler.ts's handleGitWorktreeRemove
+// reads params.path, not params.worktreePath) — same v5.0 dotted-name/
+// contract drift as ListWorktreePaths's own fix, see that method's doc
+// comment for the full context. CreateWorktree below has the same
+// dotted-name mismatch but ALSO needs the new worktree's target path
+// computed (the agent's git.worktree.add wants an explicit "path", which
+// this call site never derives today) — left as a separate, still-open gap,
+// not fixed in this pass.
 func (r *RelayExecutor) RemoveWorktree(ctx context.Context, worktreePath string, force bool) error {
-	return r.relay(ctx, worktreePath, "git.worktreeRemove", map[string]any{
-		"worktreePath": worktreePath, "force": force,
+	return r.relay(ctx, worktreePath, "git.worktree.remove", map[string]any{
+		"path": worktreePath, "force": force,
 	}, nil)
 }
 
@@ -615,14 +766,38 @@ func (r *RelayExecutor) FetchAndResolveRef(ctx context.Context, repoPath, ref st
 	return result.SHA, err
 }
 
-func (r *RelayExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]string, error) {
+// ListWorktreePaths: the previously-documented "agent has no git.worktreeList
+// method at all" gap was stale — agent-rpc-dispatch.ts's v5.0 pass added a
+// real handler, just under a dotted method name (git.worktree.list, matching
+// its git.worktree.add/git.worktree.remove siblings) and a different
+// contract than this call originally assumed: the param is "cwd" (the
+// directory `git worktree list` runs from), not "repoPath", and the
+// response is {worktrees: [{path, head, branch, ...}]} (agent-git-handler.ts's
+// handleGitWorktreeList, backed by the same parseWorktreePorcelain this
+// service's own local executor.go uses) — not a bare {paths: string[]}.
+// Live-reproduced as WORKTREE_DETECT_FAILED for a genuinely-connected,
+// genuinely-reachable dev server once dispatchExecutorForRepo started
+// actually routing here (see PollFleetHealth's own commit message for why
+// that routing itself was previously dead).
+func (r *RelayExecutor) ListWorktreePaths(ctx context.Context, repoPath string) ([]domain.WorktreeGitInfo, error) {
 	var result struct {
-		Paths []string `json:"paths"`
+		Worktrees []struct {
+			Path   string `json:"path"`
+			Head   string `json:"head"`
+			Branch string `json:"branch"`
+		} `json:"worktrees"`
 	}
-	err := r.relay(ctx, repoPath, "git.worktreeList", map[string]any{
-		"repoPath": repoPath,
+	err := r.relay(ctx, repoPath, "git.worktree.list", map[string]any{
+		"cwd": repoPath,
 	}, &result)
-	return result.Paths, err
+	if err != nil {
+		return nil, err
+	}
+	infos := make([]domain.WorktreeGitInfo, 0, len(result.Worktrees))
+	for _, w := range result.Worktrees {
+		infos = append(infos, domain.WorktreeGitInfo{Path: w.Path, Head: w.Head, Branch: w.Branch})
+	}
+	return infos, nil
 }
 
 // ForceDeleteBranch implements the REQUIRED (TASK-194) GitExecutor method —
@@ -1004,6 +1179,29 @@ func (r *RelayExecutor) CreateDir(ctx context.Context, repoPath, relPath string,
 	}, nil)
 }
 
+// CreateFile has no dedicated Dev Server Agent method — the agent's
+// fs.writeFile (agent/src/relay/fs-agent-extensions.ts's handleFsWriteFile)
+// always overwrites, with no exclusive/no-clobber flag. Stat-then-write is
+// best-effort (a TOCTOU race remains, same class of gap the agent's own
+// fs.mkdir already accepts by silently ignoring CreateDir's noClobber
+// param) rather than a hard blocker, since the common "New File" case
+// isn't a concurrent-writer race.
+func (r *RelayExecutor) CreateFile(ctx context.Context, repoPath, relPath string) error {
+	stat, err := r.Stat(ctx, repoPath, relPath)
+	if err != nil {
+		return err
+	}
+	if stat.Exists {
+		return fmt.Errorf("relay: %s already exists", relPath)
+	}
+	return r.relay(ctx, repoPath, "fs.writeFile", map[string]any{
+		"path":          filepath.Join(repoPath, relPath),
+		"content":       "",
+		"encoding":      "utf-8",
+		"createParents": true,
+	}, nil)
+}
+
 func (r *RelayExecutor) Delete(ctx context.Context, repoPath, relPath string, recursive bool) error {
 	return r.relay(ctx, repoPath, "fs.rmdir", map[string]any{
 		"path":      filepath.Join(repoPath, relPath),
@@ -1043,6 +1241,48 @@ func (r *RelayExecutor) Glob(ctx context.Context, repoPath, pattern string, maxR
 		"maxResults": maxResults,
 	}, &result)
 	return result.Paths, err
+}
+
+// StreamFileChanges implements usecase.FileWatchStreamer (BACKLOG-003) by
+// opening infra-fleet-service's StreamFileChanges RPC — the one relay()
+// call site in this file that ISN'T a Relay/RelayByDevServer unary passthrough,
+// since fs.changed is a push stream relay()'s request/response shape can't
+// carry (see infrafleetv1.InfraFleetService's StreamFileChanges doc
+// comment). Owns its own cancelable ctx, independent of the caller's —
+// unsubscribe MUST be called exactly once (mirrors every Stream* method in
+// devserveragent/client.go one layer down).
+func (r *RelayExecutor) StreamFileChanges(ctx context.Context, connectionID, path string) (<-chan usecase.FileChangeEvent, func(), error) {
+	streamCtx, cancel := context.WithCancel(ctx)
+	stream, err := r.client.StreamFileChanges(streamCtx, &infrafleetv1.StreamFileChangesRequest{
+		ConnectionId: connectionID,
+		Path:         path,
+	})
+	if err != nil {
+		cancel()
+		return nil, nil, fmt.Errorf("grpcclient: opening StreamFileChanges for path %q: %w", path, err)
+	}
+
+	out := make(chan usecase.FileChangeEvent, 64)
+	go func() {
+		defer close(out)
+		for {
+			ev, err := stream.Recv()
+			if err != nil {
+				return // stream ended — io.EOF on clean close (ctx canceled), or a real transport error
+			}
+			select {
+			case out <- usecase.FileChangeEvent{
+				Kind: ev.GetKind(), Path: ev.GetAbsolutePath(),
+				OldPath: ev.GetOldAbsolutePath(), IsDirectory: ev.GetIsDirectory(),
+			}:
+			case <-streamCtx.Done():
+				return
+			}
+		}
+	}()
+
+	unsubscribe := func() { cancel() }
+	return out, unsubscribe, nil
 }
 
 // decodeFileContent turns the agent's {content, encoding} pair into raw

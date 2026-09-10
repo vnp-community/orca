@@ -2,7 +2,9 @@ package wscompat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -88,9 +90,45 @@ func TestAutomationListChannel_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	resp, ok := result.(*automationv1.ListAutomationsResponse)
-	if !ok || len(resp.GetAutomations()) != 2 {
+	view, ok := result.(automationsListView)
+	if !ok || len(view.Automations) != 2 {
 		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+// TestAutomationListChannel_EmptyResultSerializesAsEmptyArrayNotNull is the
+// BUG-005 regression this specific channel needed: automation.list returns
+// the whole ListAutomationsResponse (not the bare resp.GetAutomations()
+// slice other list channels return), so Dispatch's normalizeNilSlices
+// — which deliberately never reaches into a proto.Message — never touched
+// it. A tenant with zero automations got a response with no `automations`
+// key at all, crashing AutomationsPage's refresh() on `nextAutomations.some`.
+func TestAutomationListChannel_EmptyResultSerializesAsEmptyArrayNotNull(t *testing.T) {
+	fake := &fakeAutomationServiceClient{
+		listAutomationsFunc: func(ctx context.Context, in *automationv1.ListAutomationsRequest) (*automationv1.ListAutomationsResponse, error) {
+			return &automationv1.ListAutomationsResponse{}, nil // Automations left nil, as the real empty-tenant case does
+		},
+	}
+	r := NewRegistry()
+	registerAutomationCRUDChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "automation.list", argsJSON(t, map[string]any{}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	view, ok := result.(automationsListView)
+	if !ok {
+		t.Fatalf("unexpected result type: %+v", result)
+	}
+	if view.Automations == nil {
+		t.Error("expected Automations to be normalized to an empty slice, got nil")
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(encoded), `"automations":[]`) {
+		t.Errorf("expected JSON to contain \"automations\":[], got %s", encoded)
 	}
 }
 
@@ -149,6 +187,39 @@ func TestAutomationDeleteChannel_Success(t *testing.T) {
 	}
 }
 
+// TestAutomationRunsChannel_EmptyResultSerializesAsEmptyArrayNotNull mirrors
+// TestAutomationListChannel_EmptyResultSerializesAsEmptyArrayNotNull for
+// automation.runs — the exact channel the live AUTOMATION_LIST_RUNS_FAILED
+// bug report traced back to.
+func TestAutomationRunsChannel_EmptyResultSerializesAsEmptyArrayNotNull(t *testing.T) {
+	fake := &fakeAutomationServiceClient{
+		listRunsFunc: func(ctx context.Context, in *automationv1.ListRunsRequest) (*automationv1.ListRunsResponse, error) {
+			return &automationv1.ListRunsResponse{}, nil // Runs left nil, as the real zero-runs case does
+		},
+	}
+	r := NewRegistry()
+	registerAutomationCRUDChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "automation.runs", argsJSON(t, map[string]any{}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	view, ok := result.(automationRunsListView)
+	if !ok {
+		t.Fatalf("unexpected result type: %+v", result)
+	}
+	if view.Runs == nil {
+		t.Error("expected Runs to be normalized to an empty slice, got nil")
+	}
+	encoded, err := json.Marshal(view)
+	if err != nil {
+		t.Fatalf("marshal: %v", err)
+	}
+	if !strings.Contains(string(encoded), `"runs":[]`) {
+		t.Errorf("expected JSON to contain \"runs\":[], got %s", encoded)
+	}
+}
+
 func TestAutomationRunsChannel_PropagatesError(t *testing.T) {
 	wantErr := errors.New("automation-service unavailable")
 	fake := &fakeAutomationServiceClient{
@@ -180,6 +251,9 @@ type fakeTaskServiceClient struct {
 	aiDecomposeFunc         func(ctx context.Context, in *taskv1.AIDecomposeRequest) (*taskv1.AIDecomposeResponse, error)
 	aiApplyFunc             func(ctx context.Context, in *taskv1.AIApplyRequest) (*taskv1.AIApplyResponse, error)
 	hasActiveExecutionsFunc func(ctx context.Context, in *taskv1.HasActiveExecutionsRequest) (*taskv1.HasActiveExecutionsResponse, error)
+	addEdgeFunc             func(ctx context.Context, in *taskv1.AddEdgeRequest) (*taskv1.AddEdgeResponse, error)
+	grantFunc               func(ctx context.Context, in *taskv1.GrantRequest) (*taskv1.GrantResponse, error)
+	resolvePermissionFunc   func(ctx context.Context, in *taskv1.ResolvePermissionRequest) (*taskv1.ResolvePermissionResponse, error)
 
 	lastHasActiveExecutionsRequest *taskv1.HasActiveExecutionsRequest
 }
@@ -226,6 +300,18 @@ func (f *fakeTaskServiceClient) HasActiveExecutions(ctx context.Context, in *tas
 		return f.hasActiveExecutionsFunc(ctx, in)
 	}
 	return &taskv1.HasActiveExecutionsResponse{HasActive: false}, nil
+}
+
+func (f *fakeTaskServiceClient) AddEdge(ctx context.Context, in *taskv1.AddEdgeRequest, _ ...grpc.CallOption) (*taskv1.AddEdgeResponse, error) {
+	return f.addEdgeFunc(ctx, in)
+}
+
+func (f *fakeTaskServiceClient) Grant(ctx context.Context, in *taskv1.GrantRequest, _ ...grpc.CallOption) (*taskv1.GrantResponse, error) {
+	return f.grantFunc(ctx, in)
+}
+
+func (f *fakeTaskServiceClient) ResolvePermission(ctx context.Context, in *taskv1.ResolvePermissionRequest, _ ...grpc.CallOption) (*taskv1.ResolvePermissionResponse, error) {
+	return f.resolvePermissionFunc(ctx, in)
 }
 
 // TestTaskCreateGetChannels_StillRegistered guards the "keep, don't
@@ -298,6 +384,79 @@ func TestTaskExecuteChannel_Success(t *testing.T) {
 	}
 	resp, ok := result.(*taskv1.TaskServiceExecuteResponse)
 	if !ok || resp.GetExecutionRef() != "exec-1" {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+// TestTaskAddEdgeChannel_ParsesTypeAndForwards covers BACKLOG-015's wiring
+// addition — task.addEdge previously wasn't registered at all.
+func TestTaskAddEdgeChannel_ParsesTypeAndForwards(t *testing.T) {
+	var gotReq *taskv1.AddEdgeRequest
+	fake := &fakeTaskServiceClient{
+		addEdgeFunc: func(ctx context.Context, in *taskv1.AddEdgeRequest) (*taskv1.AddEdgeResponse, error) {
+			gotReq = in
+			return &taskv1.AddEdgeResponse{}, nil
+		},
+	}
+	r := NewRegistry()
+	registerTaskCRUDChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "task.addEdge", argsJSON(t, map[string]any{
+		"fromTaskId": "t1", "toTaskId": "t2", "type": "depends_on",
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.FromTaskId != "t1" || gotReq.ToTaskId != "t2" || gotReq.Type != taskv1.EdgeType_EDGE_TYPE_DEPENDS_ON {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	if m, ok := result.(map[string]bool); !ok || !m["success"] {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestTaskGrantChannel_ParsesLevelAndForwards(t *testing.T) {
+	var gotReq *taskv1.GrantRequest
+	fake := &fakeTaskServiceClient{
+		grantFunc: func(ctx context.Context, in *taskv1.GrantRequest) (*taskv1.GrantResponse, error) {
+			gotReq = in
+			return &taskv1.GrantResponse{}, nil
+		},
+	}
+	r := NewRegistry()
+	registerTaskCRUDChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "task.grant", argsJSON(t, map[string]any{
+		"taskId": "t1", "subjectId": "user-1", "level": "admin", "applyTree": true,
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.TaskId != "t1" || gotReq.SubjectId != "user-1" || gotReq.Level != taskv1.GrantLevel_GRANT_LEVEL_ADMIN || !gotReq.ApplyTree {
+		t.Errorf("unexpected request: %+v", gotReq)
+	}
+	if m, ok := result.(map[string]bool); !ok || !m["success"] {
+		t.Errorf("unexpected result: %+v", result)
+	}
+}
+
+func TestTaskResolvePermissionChannel_ReturnsLowercaseLevel(t *testing.T) {
+	fake := &fakeTaskServiceClient{
+		resolvePermissionFunc: func(ctx context.Context, in *taskv1.ResolvePermissionRequest) (*taskv1.ResolvePermissionResponse, error) {
+			return &taskv1.ResolvePermissionResponse{EffectiveLevel: taskv1.GrantLevel_GRANT_LEVEL_TEAM}, nil
+		},
+	}
+	r := NewRegistry()
+	registerTaskCRUDChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1"}, "task.resolvePermission", argsJSON(t, map[string]any{
+		"taskId": "t1", "userId": "user-1",
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]string)
+	if !ok || m["effectiveLevel"] != "team" {
 		t.Errorf("unexpected result: %+v", result)
 	}
 }

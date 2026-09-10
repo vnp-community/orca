@@ -35,7 +35,75 @@ func mountTenantRoutes(r chi.Router, client tenantv1.TenantServiceClient) {
 		sub.Post("/teams", handleCreateTeam(client))
 		sub.Post("/teams/{id}/members", handleAddTeamMember(client))
 		sub.Get("/teams/{id}/members", handleListTeamMembers(client))
+
+		// Multi-tenant SSO follow-up (CR-LOGIN-001) — admin-console domain
+		// management. Same "no explicit admin-role check at this layer" gap
+		// every other route in this file already has (see this function's
+		// own doc comment); not introduced here, just matched.
+		sub.Post("/companies/{id}/email-domains", handleAddCompanyEmailDomain(client))
+		sub.Get("/companies/{id}/email-domains", handleListCompanyEmailDomains(client))
+		sub.Delete("/email-domains/{domain}", handleRemoveCompanyEmailDomain(client))
 	})
+}
+
+// addCompanyEmailDomainRequestBody is the REST request shape for POST
+// /v1/tenants/companies/{id}/email-domains — the path's {id} is the company.
+type addCompanyEmailDomainRequestBody struct {
+	EmailDomain string `json:"email_domain"`
+}
+
+func handleAddCompanyEmailDomain(client tenantv1.TenantServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		companyID := chi.URLParam(r, "id")
+
+		var body addCompanyEmailDomainRequestBody
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			writeJSONError(w, http.StatusBadRequest, "INVALID_ARGUMENT", "invalid JSON body: "+err.Error())
+			return
+		}
+
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		resp, err := client.AddCompanyEmailDomain(ctx, &tenantv1.AddCompanyEmailDomainRequest{
+			CompanyId:   companyID,
+			EmailDomain: body.EmailDomain,
+		})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusCreated, resp)
+	}
+}
+
+func handleListCompanyEmailDomains(client tenantv1.TenantServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		companyID := chi.URLParam(r, "id")
+
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		resp, err := client.ListCompanyEmailDomains(ctx, &tenantv1.ListCompanyEmailDomainsRequest{CompanyId: companyID})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusOK, resp)
+	}
+}
+
+func handleRemoveCompanyEmailDomain(client tenantv1.TenantServiceClient) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		identity, _ := identityFromContext(r.Context())
+		emailDomain := chi.URLParam(r, "domain")
+
+		ctx := gatewaygrpc.AttachIdentity(r.Context(), identity)
+		_, err := client.RemoveCompanyEmailDomain(ctx, &tenantv1.RemoveCompanyEmailDomainRequest{EmailDomain: emailDomain})
+		if err != nil {
+			writeGRPCError(w, err)
+			return
+		}
+		writeJSON(w, http.StatusNoContent, nil)
+	}
 }
 
 // createCompanyRequestBody is the REST request shape for POST

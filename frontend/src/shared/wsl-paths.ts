@@ -4,6 +4,19 @@ export type WslUncPathInfo = {
 }
 
 export function parseWslUncPath(path: string): WslUncPathInfo | null {
+  // Why the guard: a ProjectHostSetup derived locally from a bare
+  // project-service Repo/RemoteRepoView (no `path` field on the wire —
+  // only `url`) can reach this via worktree-list-groups.ts's
+  // getProjectSetupSurfaceKey with `path` genuinely undefined at runtime,
+  // even though the TS type says `string`. Same bug class as
+  // repo-display-labels.ts's normalizePathSegments guard (found live:
+  // once the sidebar's "local-first" bootstrap fetch (web-preload-api.ts)
+  // actually reached this projection for a real project-scoped repo, an
+  // undefined path crashed the whole sidebar list, contained by an error
+  // boundary but still a real regression).
+  if (!path) {
+    return null
+  }
   const normalized = path.replace(/\\/g, '/')
   const match = normalized.match(/^\/\/(wsl\.localhost|wsl\$)\/([^/]+)(\/.*)?$/i)
   if (!match) {

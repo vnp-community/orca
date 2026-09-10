@@ -383,8 +383,8 @@ func TestRepository_AuditLog_AppendAndQueryFiltersByTenant(t *testing.T) {
 	tenant1 := uuid.NewString()
 	tenant2 := uuid.NewString()
 
-	e1, _ := domain.NewAuditEntry(uuid.NewString(), tenant1, uuid.NewString(), "user.login", "user", "target-1", nil, "", time.Now())
-	e2, _ := domain.NewAuditEntry(uuid.NewString(), tenant2, uuid.NewString(), "user.login", "user", "target-2", nil, "", time.Now())
+	e1, _ := domain.NewAuditEntry(uuid.NewString(), tenant1, uuid.NewString(), "user.login", "", "user", "target-1", nil, domain.OutcomeAllowed, "", time.Now())
+	e2, _ := domain.NewAuditEntry(uuid.NewString(), tenant2, uuid.NewString(), "user.login", "", "user", "target-2", nil, domain.OutcomeAllowed, "", time.Now())
 	if err := repo.Append(ctx, e1); err != nil {
 		t.Fatalf("append e1: %v", err)
 	}
@@ -409,8 +409,8 @@ func TestAuditRepository_AppendRoundTripsMetadataAndIP(t *testing.T) {
 	actorID := uuid.NewString()
 	now := time.Now()
 
-	entry, err := domain.NewAuditEntry(uuid.NewString(), tenantID, actorID, "user.role_updated", "user", "u2",
-		map[string]any{"from": "user", "to": "admin", "nested": map[string]any{"a": float64(1)}}, "203.0.113.7", now)
+	entry, err := domain.NewAuditEntry(uuid.NewString(), tenantID, actorID, "user.role_updated", "", "user", "u2",
+		map[string]any{"from": "user", "to": "admin", "nested": map[string]any{"a": float64(1)}}, domain.OutcomeAllowed, "203.0.113.7", now)
 	if err != nil {
 		t.Fatalf("building entry: %v", err)
 	}
@@ -460,7 +460,7 @@ func TestAuditRepository_Query_FiltersByActionActorIDAndTo(t *testing.T) {
 		{"user.created", actor2, now.Add(2 * time.Minute)},
 	}
 	for _, e := range entries {
-		entry, err := domain.NewAuditEntry(uuid.NewString(), tenantID, e.actorID, e.action, "user", "target", nil, "", e.when)
+		entry, err := domain.NewAuditEntry(uuid.NewString(), tenantID, e.actorID, e.action, "", "user", "target", nil, domain.OutcomeAllowed, "", e.when)
 		if err != nil {
 			t.Fatalf("building entry: %v", err)
 		}

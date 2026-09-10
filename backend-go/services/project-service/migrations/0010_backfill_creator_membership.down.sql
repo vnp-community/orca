@@ -1,0 +1,8 @@
+-- Intentional no-op: a backfilled owner-membership row is indistinguishable
+-- from one a real, working AddMember call would have inserted afterward
+-- (same project_id/user_id/role shape, no placeholder marker to filter on
+-- the way 0002_backfill_legacy_bootstrap_company's down migration could).
+-- Deleting rows here would risk stripping access from a project that
+-- started depending on this row for real. Rolling back to before this
+-- migration just means any project.create-before-the-Twenty-third-fix
+-- project goes back to having no creator membership row.

@@ -30,15 +30,16 @@ type GetTerminalScrollbackResult struct {
 // is an honest "we don't know" rather than a fabricated true/false — see
 // PtyEvent's doc comment for the gap.
 type GetTerminalScrollback struct {
-	sessions TerminalSessionRepository
-	resolver ConnectionResolver
-	agent    DevServerAgentClient
+	sessions   TerminalSessionRepository
+	resolver   ConnectionResolver
+	devServers DevServerRepository
+	agent      DevServerAgentClient
 
 	drainWindow time.Duration // overridable by tests; defaults to scrollbackDrainWindow
 }
 
-func NewGetTerminalScrollback(sessions TerminalSessionRepository, resolver ConnectionResolver, agent DevServerAgentClient) *GetTerminalScrollback {
-	return &GetTerminalScrollback{sessions: sessions, resolver: resolver, agent: agent, drainWindow: scrollbackDrainWindow}
+func NewGetTerminalScrollback(sessions TerminalSessionRepository, resolver ConnectionResolver, devServers DevServerRepository, agent DevServerAgentClient) *GetTerminalScrollback {
+	return &GetTerminalScrollback{sessions: sessions, resolver: resolver, devServers: devServers, agent: agent, drainWindow: scrollbackDrainWindow}
 }
 
 func (uc *GetTerminalScrollback) Execute(ctx context.Context, ptyID string) (GetTerminalScrollbackResult, error) {
@@ -47,7 +48,7 @@ func (uc *GetTerminalScrollback) Execute(ctx context.Context, ptyID string) (Get
 		return GetTerminalScrollbackResult{}, apperrors.New(apperrors.KindUnauthenticated, "INFRA_NO_TENANT", "no tenant in request context", err)
 	}
 
-	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver)
+	_, devServer, err := resolveTerminalSession(ctx, tenantID, ptyID, uc.sessions, uc.resolver, uc.devServers)
 	if err != nil {
 		return GetTerminalScrollbackResult{}, err
 	}

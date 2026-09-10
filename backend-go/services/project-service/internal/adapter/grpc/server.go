@@ -7,7 +7,9 @@ package grpc
 
 import (
 	"context"
+	"encoding/json"
 
+	"google.golang.org/protobuf/types/known/structpb"
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
@@ -22,23 +24,31 @@ import (
 type Server struct {
 	projectv1.UnimplementedProjectServiceServer
 
-	createProject   *usecase.CreateProject
-	getProject      *usecase.GetProject
-	listProjects    *usecase.ListProjects
-	addMember       *usecase.AddMember
-	rebindDevServer *usecase.RebindDevServer
-	updateProject   *usecase.UpdateProject
-	deleteProject   *usecase.DeleteProject
+	createProject       *usecase.CreateProject
+	getProject          *usecase.GetProject
+	listProjects        *usecase.ListProjects
+	addMember           *usecase.AddMember
+	rebindDevServer     *usecase.RebindDevServer
+	rebindRepoDevServer *usecase.RebindRepoDevServer
+	updateProject       *usecase.UpdateProject
+	deleteProject       *usecase.DeleteProject
 
 	listMembers      *usecase.ListMembers
 	removeMember     *usecase.RemoveMember
 	updateMemberRole *usecase.UpdateMemberRole
 
-	addRepo      *usecase.AddRepo
-	listRepos    *usecase.ListRepos
-	reorderRepos *usecase.ReorderRepos
-	removeRepo   *usecase.RemoveRepo
-	updateRepo   *usecase.UpdateRepo
+	addRepo             *usecase.AddRepo
+	listRepos           *usecase.ListRepos
+	reorderRepos        *usecase.ReorderRepos
+	removeRepo          *usecase.RemoveRepo
+	updateRepo          *usecase.UpdateRepo
+	getRepo             *usecase.GetRepo
+	assignRepoToProject *usecase.AssignRepoToProject
+
+	addRepoMember        *usecase.AddRepoMember
+	listRepoMembers      *usecase.ListRepoMembers
+	removeRepoMember     *usecase.RemoveRepoMember
+	updateRepoMemberRole *usecase.UpdateRepoMemberRole
 
 	recordWorktreeCreated       *usecase.RecordWorktreeCreated
 	recordWorktreeRemoved       *usecase.RecordWorktreeRemoved
@@ -47,6 +57,9 @@ type Server struct {
 	setWorktreeActivation       *usecase.SetWorktreeActivation
 	renameWorktree              *usecase.RenameWorktree
 	getWorktreeByIdempotencyKey *usecase.GetWorktreeByIdempotencyKey
+	updateWorktreeMeta          *usecase.UpdateWorktreeMeta
+	setWorktreeLineage          *usecase.SetWorktreeLineage
+	listWorktreeLineage         *usecase.ListWorktreeLineage
 
 	createProjectGroup *usecase.CreateProjectGroup
 	updateProjectGroup *usecase.UpdateProjectGroup
@@ -66,29 +79,46 @@ type Server struct {
 
 	getProjectContext       *usecase.GetProjectContext
 	getMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
+
+	linkSourceProject    *usecase.LinkSourceProject
+	unlinkSourceProject  *usecase.UnlinkSourceProject
+	listSourceProjects   *usecase.ListSourceProjects
+	getSharedProjectData *usecase.GetSharedProjectData
+
+	listSparsePresets  *usecase.ListSparsePresets
+	saveSparsePreset   *usecase.SaveSparsePreset
+	removeSparsePreset *usecase.RemoveSparsePreset
 }
 
 // Deps groups every usecase Server needs — a plain constructor with 20
 // positional *usecase.X params would be unreadable and error-prone to call
 // correctly at the composition root, so New takes this struct instead.
 type Deps struct {
-	CreateProject   *usecase.CreateProject
-	GetProject      *usecase.GetProject
-	ListProjects    *usecase.ListProjects
-	AddMember       *usecase.AddMember
-	RebindDevServer *usecase.RebindDevServer
-	UpdateProject   *usecase.UpdateProject
-	DeleteProject   *usecase.DeleteProject
+	CreateProject       *usecase.CreateProject
+	GetProject          *usecase.GetProject
+	ListProjects        *usecase.ListProjects
+	AddMember           *usecase.AddMember
+	RebindDevServer     *usecase.RebindDevServer
+	RebindRepoDevServer *usecase.RebindRepoDevServer
+	UpdateProject       *usecase.UpdateProject
+	DeleteProject       *usecase.DeleteProject
 
 	ListMembers      *usecase.ListMembers
 	RemoveMember     *usecase.RemoveMember
 	UpdateMemberRole *usecase.UpdateMemberRole
 
-	AddRepo      *usecase.AddRepo
-	ListRepos    *usecase.ListRepos
-	ReorderRepos *usecase.ReorderRepos
-	RemoveRepo   *usecase.RemoveRepo
-	UpdateRepo   *usecase.UpdateRepo
+	AddRepo             *usecase.AddRepo
+	ListRepos           *usecase.ListRepos
+	ReorderRepos        *usecase.ReorderRepos
+	RemoveRepo          *usecase.RemoveRepo
+	UpdateRepo          *usecase.UpdateRepo
+	GetRepo             *usecase.GetRepo
+	AssignRepoToProject *usecase.AssignRepoToProject
+
+	AddRepoMember        *usecase.AddRepoMember
+	ListRepoMembers      *usecase.ListRepoMembers
+	RemoveRepoMember     *usecase.RemoveRepoMember
+	UpdateRepoMemberRole *usecase.UpdateRepoMemberRole
 
 	RecordWorktreeCreated       *usecase.RecordWorktreeCreated
 	RecordWorktreeRemoved       *usecase.RecordWorktreeRemoved
@@ -97,6 +127,9 @@ type Deps struct {
 	SetWorktreeActivation       *usecase.SetWorktreeActivation
 	RenameWorktree              *usecase.RenameWorktree
 	GetWorktreeByIdempotencyKey *usecase.GetWorktreeByIdempotencyKey
+	UpdateWorktreeMeta          *usecase.UpdateWorktreeMeta
+	SetWorktreeLineage          *usecase.SetWorktreeLineage
+	ListWorktreeLineage         *usecase.ListWorktreeLineage
 
 	CreateProjectGroup *usecase.CreateProjectGroup
 	UpdateProjectGroup *usecase.UpdateProjectGroup
@@ -116,27 +149,44 @@ type Deps struct {
 
 	GetProjectContext       *usecase.GetProjectContext
 	GetMobileWorktreeStatus *usecase.GetMobileWorktreeStatus
+
+	LinkSourceProject    *usecase.LinkSourceProject
+	UnlinkSourceProject  *usecase.UnlinkSourceProject
+	ListSourceProjects   *usecase.ListSourceProjects
+	GetSharedProjectData *usecase.GetSharedProjectData
+
+	ListSparsePresets  *usecase.ListSparsePresets
+	SaveSparsePreset   *usecase.SaveSparsePreset
+	RemoveSparsePreset *usecase.RemoveSparsePreset
 }
 
 func New(deps Deps) *Server {
 	return &Server{
-		createProject:   deps.CreateProject,
-		getProject:      deps.GetProject,
-		listProjects:    deps.ListProjects,
-		addMember:       deps.AddMember,
-		rebindDevServer: deps.RebindDevServer,
-		updateProject:   deps.UpdateProject,
-		deleteProject:   deps.DeleteProject,
+		createProject:       deps.CreateProject,
+		getProject:          deps.GetProject,
+		listProjects:        deps.ListProjects,
+		addMember:           deps.AddMember,
+		rebindDevServer:     deps.RebindDevServer,
+		rebindRepoDevServer: deps.RebindRepoDevServer,
+		updateProject:       deps.UpdateProject,
+		deleteProject:       deps.DeleteProject,
 
 		listMembers:      deps.ListMembers,
 		removeMember:     deps.RemoveMember,
 		updateMemberRole: deps.UpdateMemberRole,
 
-		addRepo:      deps.AddRepo,
-		listRepos:    deps.ListRepos,
-		reorderRepos: deps.ReorderRepos,
-		removeRepo:   deps.RemoveRepo,
-		updateRepo:   deps.UpdateRepo,
+		addRepo:             deps.AddRepo,
+		listRepos:           deps.ListRepos,
+		reorderRepos:        deps.ReorderRepos,
+		removeRepo:          deps.RemoveRepo,
+		updateRepo:          deps.UpdateRepo,
+		getRepo:             deps.GetRepo,
+		assignRepoToProject: deps.AssignRepoToProject,
+
+		addRepoMember:        deps.AddRepoMember,
+		listRepoMembers:      deps.ListRepoMembers,
+		removeRepoMember:     deps.RemoveRepoMember,
+		updateRepoMemberRole: deps.UpdateRepoMemberRole,
 
 		recordWorktreeCreated:       deps.RecordWorktreeCreated,
 		recordWorktreeRemoved:       deps.RecordWorktreeRemoved,
@@ -145,6 +195,9 @@ func New(deps Deps) *Server {
 		setWorktreeActivation:       deps.SetWorktreeActivation,
 		renameWorktree:              deps.RenameWorktree,
 		getWorktreeByIdempotencyKey: deps.GetWorktreeByIdempotencyKey,
+		updateWorktreeMeta:          deps.UpdateWorktreeMeta,
+		setWorktreeLineage:          deps.SetWorktreeLineage,
+		listWorktreeLineage:         deps.ListWorktreeLineage,
 
 		createProjectGroup: deps.CreateProjectGroup,
 		updateProjectGroup: deps.UpdateProjectGroup,
@@ -164,6 +217,15 @@ func New(deps Deps) *Server {
 
 		getProjectContext:       deps.GetProjectContext,
 		getMobileWorktreeStatus: deps.GetMobileWorktreeStatus,
+
+		linkSourceProject:    deps.LinkSourceProject,
+		unlinkSourceProject:  deps.UnlinkSourceProject,
+		listSourceProjects:   deps.ListSourceProjects,
+		getSharedProjectData: deps.GetSharedProjectData,
+
+		listSparsePresets:  deps.ListSparsePresets,
+		saveSparsePreset:   deps.SaveSparsePreset,
+		removeSparsePreset: deps.RemoveSparsePreset,
 	}
 }
 
@@ -268,6 +330,17 @@ func (s *Server) RebindDevServer(ctx context.Context, req *projectv1.RebindDevSe
 	return &projectv1.RebindDevServerResponse{Project: toProtoProject(project)}, nil
 }
 
+func (s *Server) RebindRepoDevServer(ctx context.Context, req *projectv1.RebindRepoDevServerRequest) (*projectv1.RebindRepoDevServerResponse, error) {
+	repo, err := s.rebindRepoDevServer.Execute(ctx, usecase.RebindRepoDevServerInput{
+		RepoID:         req.GetRepoId(),
+		NewDevServerID: req.GetNewDevServerId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RebindRepoDevServerResponse{Repo: toProtoRepo(repo)}, nil
+}
+
 func (s *Server) UpdateProject(ctx context.Context, req *projectv1.UpdateProjectRequest) (*projectv1.UpdateProjectResponse, error) {
 	project, err := s.updateProject.Execute(ctx, usecase.UpdateProjectInput{
 		ProjectID:              req.GetProjectId(),
@@ -276,6 +349,7 @@ func (s *Server) UpdateProject(ctx context.Context, req *projectv1.UpdateProject
 		DefaultBranch:          req.GetDefaultBranch(),
 		Visibility:             req.GetVisibility(),
 		IssueStatusSyncEnabled: req.IssueStatusSyncEnabled,
+		MobileEmulatorAgentID:  req.GetMobileEmulatorAgentId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -295,6 +369,7 @@ func (s *Server) AddRepo(ctx context.Context, req *projectv1.AddRepoRequest) (*p
 		ProjectID:   req.GetProjectId(),
 		URL:         req.GetUrl(),
 		DisplayName: req.GetDisplayName(),
+		DevServerID: req.GetDevServerId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -333,14 +408,105 @@ func (s *Server) RemoveRepo(ctx context.Context, req *projectv1.RemoveRepoReques
 
 func (s *Server) UpdateRepo(ctx context.Context, req *projectv1.UpdateRepoRequest) (*projectv1.UpdateRepoResponse, error) {
 	repo, err := s.updateRepo.Execute(ctx, usecase.UpdateRepoInput{
-		RepoID:      req.GetRepoId(),
-		URL:         req.GetUrl(),
-		DisplayName: req.GetDisplayName(),
+		RepoID:       req.GetRepoId(),
+		URL:          req.GetUrl(),
+		DisplayName:  req.GetDisplayName(),
+		HookSettings: req.HookSettings,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &projectv1.UpdateRepoResponse{Repo: toProtoRepo(repo)}, nil
+}
+
+func (s *Server) AssignRepoToProject(ctx context.Context, req *projectv1.AssignRepoToProjectRequest) (*projectv1.AssignRepoToProjectResponse, error) {
+	repo, err := s.assignRepoToProject.Execute(ctx, usecase.AssignRepoToProjectInput{
+		RepoID:          req.GetRepoId(),
+		TargetProjectID: req.GetTargetProjectId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.AssignRepoToProjectResponse{Repo: toProtoRepo(repo)}, nil
+}
+
+func (s *Server) GetRepo(ctx context.Context, req *projectv1.GetRepoRequest) (*projectv1.GetRepoResponse, error) {
+	result, err := s.getRepo.Execute(ctx, usecase.GetRepoInput{RepoID: req.GetRepoId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.GetRepoResponse{Repo: toProtoRepo(result.Repo), DevServerId: result.DevServerID}, nil
+}
+
+func (s *Server) AddRepoMember(ctx context.Context, req *projectv1.AddRepoMemberRequest) (*projectv1.AddRepoMemberResponse, error) {
+	member, err := s.addRepoMember.Execute(ctx, usecase.AddRepoMemberInput{
+		RepoID: req.GetRepoId(), UserID: req.GetUserId(), Role: toDomainRepoRole(req.GetRole()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.AddRepoMemberResponse{Member: toProtoRepoMember(member)}, nil
+}
+
+func (s *Server) ListRepoMembers(ctx context.Context, req *projectv1.ListRepoMembersRequest) (*projectv1.ListRepoMembersResponse, error) {
+	members, err := s.listRepoMembers.Execute(ctx, usecase.ListRepoMembersInput{RepoID: req.GetRepoId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.RepoMember, 0, len(members))
+	for _, m := range members {
+		out = append(out, toProtoRepoMember(m))
+	}
+	return &projectv1.ListRepoMembersResponse{Members: out}, nil
+}
+
+func (s *Server) RemoveRepoMember(ctx context.Context, req *projectv1.RemoveRepoMemberRequest) (*projectv1.RemoveRepoMemberResponse, error) {
+	err := s.removeRepoMember.Execute(ctx, usecase.RemoveRepoMemberInput{
+		RepoID: req.GetRepoId(), UserID: req.GetUserId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RemoveRepoMemberResponse{}, nil
+}
+
+func (s *Server) UpdateRepoMemberRole(ctx context.Context, req *projectv1.UpdateRepoMemberRoleRequest) (*projectv1.UpdateRepoMemberRoleResponse, error) {
+	member, err := s.updateRepoMemberRole.Execute(ctx, usecase.UpdateRepoMemberRoleInput{
+		RepoID: req.GetRepoId(), UserID: req.GetUserId(), Role: toDomainRepoRole(req.GetRole()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UpdateRepoMemberRoleResponse{Member: toProtoRepoMember(member)}, nil
+}
+
+func (s *Server) ListSparsePresets(ctx context.Context, req *projectv1.ListSparsePresetsRequest) (*projectv1.ListSparsePresetsResponse, error) {
+	presets, err := s.listSparsePresets.Execute(ctx, usecase.ListSparsePresetsInput{RepoID: req.GetRepoId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.SparsePreset, 0, len(presets))
+	for _, p := range presets {
+		out = append(out, toProtoSparsePreset(p))
+	}
+	return &projectv1.ListSparsePresetsResponse{Presets: out}, nil
+}
+
+func (s *Server) SaveSparsePreset(ctx context.Context, req *projectv1.SaveSparsePresetRequest) (*projectv1.SaveSparsePresetResponse, error) {
+	preset, err := s.saveSparsePreset.Execute(ctx, usecase.SaveSparsePresetInput{
+		RepoID: req.GetRepoId(), ID: req.GetId(), Name: req.GetName(), Directories: req.GetDirectories(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.SaveSparsePresetResponse{Preset: toProtoSparsePreset(preset)}, nil
+}
+
+func (s *Server) RemoveSparsePreset(ctx context.Context, req *projectv1.RemoveSparsePresetRequest) (*projectv1.RemoveSparsePresetResponse, error) {
+	if err := s.removeSparsePreset.Execute(ctx, usecase.RemoveSparsePresetInput{RepoID: req.GetRepoId(), PresetID: req.GetPresetId()}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.RemoveSparsePresetResponse{}, nil
 }
 
 func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.RecordWorktreeCreatedRequest) (*projectv1.RecordWorktreeCreatedResponse, error) {
@@ -353,6 +519,15 @@ func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.Recor
 		BaseRef:             req.GetBaseRef(),
 		LinkedIssueProvider: req.GetLinkedIssueProvider(),
 		LinkedIssueRef:      req.GetLinkedIssueRef(),
+		Lineage: domain.WorktreeLineageCapture{
+			ParentWorktreeID:        req.GetParentWorktreeId(),
+			Origin:                  req.GetOrigin(),
+			CaptureSource:           req.GetCaptureSource(),
+			TaskID:                  req.GetTaskId(),
+			OrchestrationRunID:      req.GetOrchestrationRunId(),
+			CoordinatorHandle:       req.GetCoordinatorHandle(),
+			CreatedByTerminalHandle: req.GetCreatedByTerminalHandle(),
+		},
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -424,6 +599,62 @@ func (s *Server) GetWorktreeByIdempotencyKey(ctx context.Context, req *projectv1
 		resp.Worktree = toProtoWorktree(wt)
 	}
 	return resp, nil
+}
+
+func (s *Server) UpdateWorktreeMeta(ctx context.Context, req *projectv1.UpdateWorktreeMetaRequest) (*projectv1.UpdateWorktreeMetaResponse, error) {
+	patch, err := fromProtoWorktreeMetadata(req.GetMetadata())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindInvalidArgument, "PROJECT_WORKTREE_METADATA_INVALID", "metadata must be a JSON object", err))
+	}
+	wt, err := s.updateWorktreeMeta.Execute(ctx, usecase.UpdateWorktreeMetaInput{
+		WorktreeID: req.GetWorktreeId(),
+		Metadata:   patch,
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UpdateWorktreeMetaResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+// fromProtoWorktreeMetadata is toProtoWorktreeMetadata's inverse — nil
+// (unset) becomes "{}" (a harmless empty-patch no-op), never a nil
+// json.RawMessage.
+func fromProtoWorktreeMetadata(s *structpb.Struct) (json.RawMessage, error) {
+	if s == nil {
+		return json.RawMessage("{}"), nil
+	}
+	b, err := s.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+	return json.RawMessage(b), nil
+}
+
+func (s *Server) SetWorktreeLineage(ctx context.Context, req *projectv1.SetWorktreeLineageRequest) (*projectv1.SetWorktreeLineageResponse, error) {
+	var parentWorktreeID *string
+	if !req.GetClearParent() {
+		parentWorktreeID = req.ParentWorktreeId
+	}
+	wt, err := s.setWorktreeLineage.Execute(ctx, usecase.SetWorktreeLineageInput{
+		WorktreeID:       req.GetWorktreeId(),
+		ParentWorktreeID: parentWorktreeID,
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.SetWorktreeLineageResponse{Worktree: toProtoWorktree(wt)}, nil
+}
+
+func (s *Server) ListWorktreeLineage(ctx context.Context, _ *projectv1.ListWorktreeLineageRequest) (*projectv1.ListWorktreeLineageResponse, error) {
+	worktrees, err := s.listWorktreeLineage.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.WorktreeLineageEntry, 0, len(worktrees))
+	for _, wt := range worktrees {
+		out = append(out, toProtoWorktreeLineageEntry(wt))
+	}
+	return &projectv1.ListWorktreeLineageResponse{Lineage: out}, nil
 }
 
 func (s *Server) CreateProjectGroup(ctx context.Context, req *projectv1.CreateProjectGroupRequest) (*projectv1.CreateProjectGroupResponse, error) {
@@ -569,6 +800,75 @@ func (s *Server) SetupExistingFolder(ctx context.Context, req *projectv1.SetupEx
 	return resp, nil
 }
 
+// ── orcaProjects.* — cross-project source sharing ─────────────────────────
+
+func (s *Server) LinkSourceProject(ctx context.Context, req *projectv1.LinkSourceProjectRequest) (*projectv1.LinkSourceProjectResponse, error) {
+	sp, err := s.linkSourceProject.Execute(ctx, usecase.LinkSourceProjectInput{
+		ContainerProjectID: req.GetContainerProjectId(),
+		SourceProjectID:    req.GetSourceProjectId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.LinkSourceProjectResponse{SourceProject: toProtoSourceProject(sp)}, nil
+}
+
+func (s *Server) UnlinkSourceProject(ctx context.Context, req *projectv1.UnlinkSourceProjectRequest) (*projectv1.UnlinkSourceProjectResponse, error) {
+	err := s.unlinkSourceProject.Execute(ctx, usecase.UnlinkSourceProjectInput{
+		ContainerProjectID: req.GetContainerProjectId(),
+		SourceProjectID:    req.GetSourceProjectId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &projectv1.UnlinkSourceProjectResponse{}, nil
+}
+
+func (s *Server) ListSourceProjects(ctx context.Context, req *projectv1.ListSourceProjectsRequest) (*projectv1.ListSourceProjectsResponse, error) {
+	list, err := s.listSourceProjects.Execute(ctx, usecase.ListSourceProjectsInput{ContainerProjectID: req.GetContainerProjectId()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	out := make([]*projectv1.SourceProject, 0, len(list))
+	for _, sp := range list {
+		out = append(out, toProtoSourceProject(sp))
+	}
+	return &projectv1.ListSourceProjectsResponse{SourceProjects: out}, nil
+}
+
+func (s *Server) GetSharedProjectData(ctx context.Context, req *projectv1.GetSharedProjectDataRequest) (*projectv1.GetSharedProjectDataResponse, error) {
+	result, err := s.getSharedProjectData.Execute(ctx, usecase.GetSharedProjectDataInput{
+		ContainerProjectID: req.GetContainerProjectId(),
+		SourceProjectID:    req.GetSourceProjectId(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	repos := make([]*projectv1.Repo, 0, len(result.Repos))
+	for _, r := range result.Repos {
+		repos = append(repos, toProtoRepo(r))
+	}
+	worktrees := make([]*projectv1.Worktree, 0, len(result.Worktrees))
+	for _, wt := range result.Worktrees {
+		worktrees = append(worktrees, toProtoWorktree(wt))
+	}
+	return &projectv1.GetSharedProjectDataResponse{
+		Project:   toProtoProject(result.Project),
+		Repos:     repos,
+		Worktrees: worktrees,
+	}, nil
+}
+
+func toProtoSourceProject(sp domain.SourceProject) *projectv1.SourceProject {
+	return &projectv1.SourceProject{
+		Id:                 sp.ID,
+		ContainerProjectId: sp.ContainerProjectID,
+		SourceProjectId:    sp.SourceProjectID,
+		LinkedBy:           sp.LinkedBy,
+		LinkedAt:           timestamppb.New(sp.LinkedAt),
+	}
+}
+
 func toDomainRole(r projectv1.ProjectRole) domain.ProjectRole {
 	switch r {
 	case projectv1.ProjectRole_PROJECT_ROLE_OWNER:
@@ -604,6 +904,7 @@ func toProtoProject(p domain.Project) *projectv1.Project {
 		Visibility:             p.Visibility,
 		CreatedBy:              p.CreatedBy,
 		IssueStatusSyncEnabled: p.IssueStatusSyncEnabled,
+		MobileEmulatorAgentId:  p.MobileEmulatorAgentID,
 	}
 	if !p.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(p.CreatedAt)
@@ -614,13 +915,57 @@ func toProtoProject(p domain.Project) *projectv1.Project {
 	return out
 }
 
+func toDomainRepoRole(r projectv1.RepoRole) domain.RepoRole {
+	switch r {
+	case projectv1.RepoRole_REPO_ROLE_DEVELOPER:
+		return domain.RepoRoleDeveloper
+	case projectv1.RepoRole_REPO_ROLE_LEAD:
+		return domain.RepoRoleLead
+	case projectv1.RepoRole_REPO_ROLE_ADMIN:
+		return domain.RepoRoleAdmin
+	default:
+		return ""
+	}
+}
+
+// toProtoRepoRole is toDomainRepoRole's inverse.
+func toProtoRepoRole(r domain.RepoRole) projectv1.RepoRole {
+	switch r {
+	case domain.RepoRoleDeveloper:
+		return projectv1.RepoRole_REPO_ROLE_DEVELOPER
+	case domain.RepoRoleLead:
+		return projectv1.RepoRole_REPO_ROLE_LEAD
+	case domain.RepoRoleAdmin:
+		return projectv1.RepoRole_REPO_ROLE_ADMIN
+	default:
+		return projectv1.RepoRole_REPO_ROLE_UNSPECIFIED
+	}
+}
+
+func toProtoRepoMember(m domain.RepoMember) *projectv1.RepoMember {
+	return &projectv1.RepoMember{RepoId: m.RepoID, UserId: m.UserID, Role: toProtoRepoRole(m.Role)}
+}
+
+func toProtoSparsePreset(p domain.SparsePreset) *projectv1.SparsePreset {
+	return &projectv1.SparsePreset{
+		Id:          p.ID,
+		RepoId:      p.RepoID,
+		Name:        p.Name,
+		Directories: p.Directories,
+		CreatedAt:   timestamppb.New(p.CreatedAt),
+		UpdatedAt:   timestamppb.New(p.UpdatedAt),
+	}
+}
+
 func toProtoRepo(r domain.Repo) *projectv1.Repo {
 	return &projectv1.Repo{
-		Id:          r.ID,
-		ProjectId:   r.ProjectID,
-		Url:         r.URL,
-		DisplayName: r.DisplayName,
-		Position:    r.Position,
+		Id:           r.ID,
+		ProjectId:    r.ProjectID,
+		Url:          r.URL,
+		DisplayName:  r.DisplayName,
+		Position:     r.Position,
+		DevServerId:  r.DevServerID,
+		HookSettings: r.HookSettings,
 	}
 }
 
@@ -635,6 +980,17 @@ func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
 		IdempotencyKey: wt.IdempotencyKey,
 		Status:         string(wt.Status),
 		BaseRef:        wt.BaseRef, // NEW (SOL-WT-04)
+
+		ParentWorktreeId:        wt.ParentWorktreeID,
+		Origin:                  wt.Origin,
+		CaptureSource:           wt.CaptureSource,
+		CaptureConfidence:       wt.CaptureConfidence,
+		TaskId:                  wt.TaskID,
+		OrchestrationRunId:      wt.OrchestrationRunID,
+		CoordinatorHandle:       wt.CoordinatorHandle,
+		CreatedByTerminalHandle: wt.CreatedByTerminalHandle,
+		CreatedAtUnixMs:         wt.CreatedAt.UnixMilli(),
+		Metadata:                toProtoWorktreeMetadata(wt.Metadata),
 	}
 	if wt.LinkedIssueProvider != "" {
 		out.LinkedIssueProvider = &wt.LinkedIssueProvider
@@ -643,6 +999,46 @@ func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
 		out.LinkedIssueRef = &wt.LinkedIssueRef
 	}
 	return out
+}
+
+// toProtoWorktreeMetadata decodes the stored metadata JSONB blob into a
+// google.protobuf.Struct for the wire — nil for an empty/malformed blob
+// (never a hard error: the column is jsonb and every write path this
+// service owns stores a JSON object, but this is display data, not a
+// value this service validates, so a bad blob degrades to "no metadata"
+// rather than failing the whole response).
+func toProtoWorktreeMetadata(raw json.RawMessage) *structpb.Struct {
+	if len(raw) == 0 {
+		return nil
+	}
+	var m map[string]any
+	if err := json.Unmarshal(raw, &m); err != nil {
+		return nil
+	}
+	s, err := structpb.NewStruct(m)
+	if err != nil {
+		return nil
+	}
+	return s
+}
+
+// toProtoWorktreeLineageEntry mirrors toProtoWorktree's lineage fields —
+// kept separate (rather than reusing Worktree wholesale) since
+// ListWorktreeLineage's wire contract is deliberately narrower than the
+// full Worktree message (see WorktreeLineageEntry's doc comment).
+func toProtoWorktreeLineageEntry(wt domain.Worktree) *projectv1.WorktreeLineageEntry {
+	return &projectv1.WorktreeLineageEntry{
+		WorktreeId:              wt.ID,
+		ParentWorktreeId:        wt.ParentWorktreeID,
+		Origin:                  wt.Origin,
+		CaptureSource:           wt.CaptureSource,
+		CaptureConfidence:       wt.CaptureConfidence,
+		TaskId:                  wt.TaskID,
+		OrchestrationRunId:      wt.OrchestrationRunID,
+		CoordinatorHandle:       wt.CoordinatorHandle,
+		CreatedByTerminalHandle: wt.CreatedByTerminalHandle,
+		CreatedAtUnixMs:         wt.CreatedAt.UnixMilli(),
+	}
 }
 
 func toProtoProjectGroup(g domain.ProjectGroup) *projectv1.ProjectGroup {
@@ -664,9 +1060,10 @@ func toProtoHostSetup(s domain.HostSetup) *projectv1.HostSetup {
 
 func (s *Server) CreateFolderWorkspace(ctx context.Context, req *projectv1.CreateFolderWorkspaceRequest) (*projectv1.CreateFolderWorkspaceResponse, error) {
 	fw, err := s.folderWorkspaces.Create(ctx, usecase.CreateFolderWorkspaceInput{
-		DevServerID: req.GetDevServerId(),
-		Path:        req.GetPath(),
-		Name:        req.GetName(),
+		DevServerID:    req.GetDevServerId(),
+		Path:           req.GetPath(),
+		Name:           req.GetName(),
+		ProjectGroupID: req.GetProjectGroupId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -746,11 +1143,12 @@ func (s *Server) GetMobileWorktreeStatus(ctx context.Context, req *projectv1.Get
 
 func toProtoFolderWorkspace(fw domain.FolderWorkspace) *projectv1.FolderWorkspace {
 	out := &projectv1.FolderWorkspace{
-		Id:          fw.ID,
-		DevServerId: fw.DevServerID,
-		Path:        fw.Path,
-		Name:        fw.Name,
-		AddedBy:     fw.AddedBy,
+		Id:             fw.ID,
+		DevServerId:    fw.DevServerID,
+		Path:           fw.Path,
+		Name:           fw.Name,
+		AddedBy:        fw.AddedBy,
+		ProjectGroupId: fw.ProjectGroupID,
 	}
 	if !fw.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(fw.CreatedAt)

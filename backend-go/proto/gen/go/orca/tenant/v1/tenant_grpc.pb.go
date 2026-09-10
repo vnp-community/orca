@@ -20,22 +20,45 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	TenantService_CreateCompany_FullMethodName      = "/orca.tenant.v1.TenantService/CreateCompany"
-	TenantService_ValidateTenant_FullMethodName     = "/orca.tenant.v1.TenantService/ValidateTenant"
-	TenantService_CreateDepartment_FullMethodName   = "/orca.tenant.v1.TenantService/CreateDepartment"
-	TenantService_SetUserDepartment_FullMethodName  = "/orca.tenant.v1.TenantService/SetUserDepartment"
-	TenantService_GetResolvedProfile_FullMethodName = "/orca.tenant.v1.TenantService/GetResolvedProfile"
-	TenantService_CreateTeam_FullMethodName         = "/orca.tenant.v1.TenantService/CreateTeam"
-	TenantService_AddTeamMember_FullMethodName      = "/orca.tenant.v1.TenantService/AddTeamMember"
-	TenantService_ListTeamMembers_FullMethodName    = "/orca.tenant.v1.TenantService/ListTeamMembers"
-	TenantService_ListTeamsForUser_FullMethodName   = "/orca.tenant.v1.TenantService/ListTeamsForUser"
-	TenantService_GetUserProfile_FullMethodName     = "/orca.tenant.v1.TenantService/GetUserProfile"
-	TenantService_ListDepartments_FullMethodName    = "/orca.tenant.v1.TenantService/ListDepartments"
-	TenantService_UpdateCompany_FullMethodName      = "/orca.tenant.v1.TenantService/UpdateCompany"
-	TenantService_UpdateDepartment_FullMethodName   = "/orca.tenant.v1.TenantService/UpdateDepartment"
-	TenantService_UpdateUserProfile_FullMethodName  = "/orca.tenant.v1.TenantService/UpdateUserProfile"
-	TenantService_ListTeams_FullMethodName          = "/orca.tenant.v1.TenantService/ListTeams"
-	TenantService_RemoveTeamMember_FullMethodName   = "/orca.tenant.v1.TenantService/RemoveTeamMember"
+	TenantService_CreateCompany_FullMethodName                       = "/orca.tenant.v1.TenantService/CreateCompany"
+	TenantService_GetCompany_FullMethodName                          = "/orca.tenant.v1.TenantService/GetCompany"
+	TenantService_ListCompanies_FullMethodName                       = "/orca.tenant.v1.TenantService/ListCompanies"
+	TenantService_ValidateTenant_FullMethodName                      = "/orca.tenant.v1.TenantService/ValidateTenant"
+	TenantService_CreateDepartment_FullMethodName                    = "/orca.tenant.v1.TenantService/CreateDepartment"
+	TenantService_SetUserDepartment_FullMethodName                   = "/orca.tenant.v1.TenantService/SetUserDepartment"
+	TenantService_GetResolvedProfile_FullMethodName                  = "/orca.tenant.v1.TenantService/GetResolvedProfile"
+	TenantService_CreateTeam_FullMethodName                          = "/orca.tenant.v1.TenantService/CreateTeam"
+	TenantService_AddTeamMember_FullMethodName                       = "/orca.tenant.v1.TenantService/AddTeamMember"
+	TenantService_ListTeamMembers_FullMethodName                     = "/orca.tenant.v1.TenantService/ListTeamMembers"
+	TenantService_ListTeamsForUser_FullMethodName                    = "/orca.tenant.v1.TenantService/ListTeamsForUser"
+	TenantService_GetUserProfile_FullMethodName                      = "/orca.tenant.v1.TenantService/GetUserProfile"
+	TenantService_ListDepartments_FullMethodName                     = "/orca.tenant.v1.TenantService/ListDepartments"
+	TenantService_UpdateCompany_FullMethodName                       = "/orca.tenant.v1.TenantService/UpdateCompany"
+	TenantService_UpdateDepartment_FullMethodName                    = "/orca.tenant.v1.TenantService/UpdateDepartment"
+	TenantService_UpdateUserProfile_FullMethodName                   = "/orca.tenant.v1.TenantService/UpdateUserProfile"
+	TenantService_ListTeams_FullMethodName                           = "/orca.tenant.v1.TenantService/ListTeams"
+	TenantService_RemoveTeamMember_FullMethodName                    = "/orca.tenant.v1.TenantService/RemoveTeamMember"
+	TenantService_GetOnboardingState_FullMethodName                  = "/orca.tenant.v1.TenantService/GetOnboardingState"
+	TenantService_SetOnboardingState_FullMethodName                  = "/orca.tenant.v1.TenantService/SetOnboardingState"
+	TenantService_GetClientState_FullMethodName                      = "/orca.tenant.v1.TenantService/GetClientState"
+	TenantService_SetClientState_FullMethodName                      = "/orca.tenant.v1.TenantService/SetClientState"
+	TenantService_GetWorkspaceSession_FullMethodName                 = "/orca.tenant.v1.TenantService/GetWorkspaceSession"
+	TenantService_SetWorkspaceSession_FullMethodName                 = "/orca.tenant.v1.TenantService/SetWorkspaceSession"
+	TenantService_PatchWorkspaceSession_FullMethodName               = "/orca.tenant.v1.TenantService/PatchWorkspaceSession"
+	TenantService_AddCompanyEmailDomain_FullMethodName               = "/orca.tenant.v1.TenantService/AddCompanyEmailDomain"
+	TenantService_RemoveCompanyEmailDomain_FullMethodName            = "/orca.tenant.v1.TenantService/RemoveCompanyEmailDomain"
+	TenantService_ListCompanyEmailDomains_FullMethodName             = "/orca.tenant.v1.TenantService/ListCompanyEmailDomains"
+	TenantService_ResolveCompanyByEmailDomain_FullMethodName         = "/orca.tenant.v1.TenantService/ResolveCompanyByEmailDomain"
+	TenantService_DismissStarNag_FullMethodName                      = "/orca.tenant.v1.TenantService/DismissStarNag"
+	TenantService_DeferStarNag_FullMethodName                        = "/orca.tenant.v1.TenantService/DeferStarNag"
+	TenantService_CompleteStarNag_FullMethodName                     = "/orca.tenant.v1.TenantService/CompleteStarNag"
+	TenantService_DisableStarNag_FullMethodName                      = "/orca.tenant.v1.TenantService/DisableStarNag"
+	TenantService_ForceShowStarNag_FullMethodName                    = "/orca.tenant.v1.TenantService/ForceShowStarNag"
+	TenantService_NotifyStarNagOnboardingCompleted_FullMethodName    = "/orca.tenant.v1.TenantService/NotifyStarNagOnboardingCompleted"
+	TenantService_OpenWebStarNag_FullMethodName                      = "/orca.tenant.v1.TenantService/OpenWebStarNag"
+	TenantService_StarOrcaFromNag_FullMethodName                     = "/orca.tenant.v1.TenantService/StarOrcaFromNag"
+	TenantService_PrepareStarNagAgentValueMoment_FullMethodName      = "/orca.tenant.v1.TenantService/PrepareStarNagAgentValueMoment"
+	TenantService_ShowPreparedStarNagAgentValueMoment_FullMethodName = "/orca.tenant.v1.TenantService/ShowPreparedStarNagAgentValueMoment"
 )
 
 // TenantServiceClient is the client API for TenantService service.
@@ -46,6 +69,16 @@ const (
 // This is the origin of tenant_id for every other service. See specs/backend-go/services/tenant-service.md.
 type TenantServiceClient interface {
 	CreateCompany(ctx context.Context, in *CreateCompanyRequest, opts ...grpc.CallOption) (*CreateCompanyResponse, error)
+	// GetCompany — the missing read half of Create/UpdateCompany (CR-DS-006/
+	// 007/008 follow-up: the Admin Console's Company tab needs to display the
+	// caller's own company name before offering to rename it).
+	GetCompany(ctx context.Context, in *GetCompanyRequest, opts ...grpc.CallOption) (*GetCompanyResponse, error)
+	// ListCompanies — cross-tenant by nature (tenant.companies has no
+	// tenant_id column, this table IS the tenant root); the caller MUST
+	// admin-gate. Added because a company created via CreateCompany was
+	// otherwise unreachable after the creating session ended — see
+	// wscompat's profile.listCompanies.
+	ListCompanies(ctx context.Context, in *ListCompaniesRequest, opts ...grpc.CallOption) (*ListCompaniesResponse, error)
 	ValidateTenant(ctx context.Context, in *ValidateTenantRequest, opts ...grpc.CallOption) (*ValidateTenantResponse, error)
 	CreateDepartment(ctx context.Context, in *CreateDepartmentRequest, opts ...grpc.CallOption) (*CreateDepartmentResponse, error)
 	SetUserDepartment(ctx context.Context, in *SetUserDepartmentRequest, opts ...grpc.CallOption) (*SetUserDepartmentResponse, error)
@@ -53,6 +86,11 @@ type TenantServiceClient interface {
 	CreateTeam(ctx context.Context, in *CreateTeamRequest, opts ...grpc.CallOption) (*CreateTeamResponse, error)
 	AddTeamMember(ctx context.Context, in *AddTeamMemberRequest, opts ...grpc.CallOption) (*AddTeamMemberResponse, error)
 	ListTeamMembers(ctx context.Context, in *ListTeamMembersRequest, opts ...grpc.CallOption) (*ListTeamMembersResponse, error)
+	// ListTeamsForUser answers "which teams is this user a member of" without
+	// the ListTeams(company)+ListTeamMembers(team) N+1 fan-out
+	// devServer.listForUser's handler doc comment deliberately avoids — added
+	// to unblock team-based dev-server access grants (BUG-013,
+	// CR-DS-007 §3's recorded "Known gap ghi nhận khi triển khai").
 	ListTeamsForUser(ctx context.Context, in *ListTeamsForUserRequest, opts ...grpc.CallOption) (*ListTeamsForUserResponse, error)
 	// ── profile.* surface (tenant-service.md §3) ──────────────────────────
 	GetUserProfile(ctx context.Context, in *GetUserProfileRequest, opts ...grpc.CallOption) (*GetUserProfileResponse, error)
@@ -66,6 +104,65 @@ type TenantServiceClient interface {
 	ListTeams(ctx context.Context, in *ListTeamsRequest, opts ...grpc.CallOption) (*ListTeamsResponse, error)
 	// RemoveTeamMember — documented gap, services/tenant-service/README.md:101.
 	RemoveTeamMember(ctx context.Context, in *RemoveTeamMemberRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetOnboardingState/SetOnboardingState — per-user onboarding wizard
+	// progress, opaque JSON as far as this service is concerned (api-gateway's
+	// onboarding.get/update wscompat channels own decoding it). Added because
+	// nothing ever persisted this: every page reload re-showed the onboarding
+	// wizard forever. See UserProfileRepository.GetOnboardingState's doc
+	// comment for why this is a dedicated store, not settings_json.
+	GetOnboardingState(ctx context.Context, in *GetOnboardingStateRequest, opts ...grpc.CallOption) (*GetOnboardingStateResponse, error)
+	SetOnboardingState(ctx context.Context, in *SetOnboardingStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ── Client-local state (CR-STORAGE-001/003/004a,b) ────────────────────
+	// GetClientState/SetClientState — 5 opaque per-user JSON blobs
+	// (keybindings/UI local state/saved runtime environments/settings/
+	// accounts->dev-server map) parameterized by ClientStateKind rather than
+	// 5 near-identical RPC pairs — see
+	// specs/backend-go/crs/v3/storage/solutions/
+	// BE-SOL-STORAGE-001-user-profile-json-columns.md §5 for why. user_id is
+	// NOT trusted as the scoping identity by itself — the caller
+	// (api-gateway) always sends the authenticated caller's own user_id, same
+	// convention as GetOnboardingStateRequest.
+	GetClientState(ctx context.Context, in *GetClientStateRequest, opts ...grpc.CallOption) (*GetClientStateResponse, error)
+	SetClientState(ctx context.Context, in *SetClientStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetWorkspaceSession/SetWorkspaceSession/PatchWorkspaceSession
+	// (CR-STORAGE-004a) — a separate table keyed by (user_id, host_id), not a
+	// 6th ClientStateKind: one user can have N sessions, one per host/
+	// environment (BE-SOL-STORAGE-001 §3).
+	GetWorkspaceSession(ctx context.Context, in *GetWorkspaceSessionRequest, opts ...grpc.CallOption) (*GetWorkspaceSessionResponse, error)
+	SetWorkspaceSession(ctx context.Context, in *SetWorkspaceSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	PatchWorkspaceSession(ctx context.Context, in *PatchWorkspaceSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ── Multi-tenant SSO follow-up (CR-LOGIN-001) ─────────────────────────
+	// Add/Remove/ListCompanyEmailDomains are admin-console operations (caller
+	// MUST admin-gate — see AddCompanyEmailDomain's doc comment).
+	// ResolveCompanyByEmailDomain is a system-internal read auth-service
+	// calls server-to-server to decide a brand-new SSO signup's tenant — NOT
+	// an admin-console operation, never exposed as an end-user REST route.
+	AddCompanyEmailDomain(ctx context.Context, in *AddCompanyEmailDomainRequest, opts ...grpc.CallOption) (*AddCompanyEmailDomainResponse, error)
+	RemoveCompanyEmailDomain(ctx context.Context, in *RemoveCompanyEmailDomainRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ListCompanyEmailDomains(ctx context.Context, in *ListCompanyEmailDomainsRequest, opts ...grpc.CallOption) (*ListCompanyEmailDomainsResponse, error)
+	ResolveCompanyByEmailDomain(ctx context.Context, in *ResolveCompanyByEmailDomainRequest, opts ...grpc.CallOption) (*ResolveCompanyByEmailDomainResponse, error)
+	// ── starNag.* surface (BUG-005/SOL-005) ───────────────────────────────
+	// Per-user "star Orca on GitHub" nag state — dismissal/cooldown/threshold/
+	// completion — folded into tenant-service per SOL-005's "small per-user
+	// preference state, no natural owning service" verdict, same shape as
+	// GetOnboardingState/SetOnboardingState above. Every request carries only
+	// user_id (never company_id — same convention as GetOnboardingStateRequest:
+	// the scoping company comes from tenant.RequireTenantID(ctx), not a
+	// message field).
+	DismissStarNag(ctx context.Context, in *DismissStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	DeferStarNag(ctx context.Context, in *DeferStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	CompleteStarNag(ctx context.Context, in *CompleteStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	DisableStarNag(ctx context.Context, in *DisableStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	ForceShowStarNag(ctx context.Context, in *ForceShowStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	NotifyStarNagOnboardingCompleted(ctx context.Context, in *NotifyStarNagOnboardingCompletedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	OpenWebStarNag(ctx context.Context, in *OpenWebStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// StarOrcaFromNag performs (or attempts) the actual GitHub star action.
+	// starred=false + ok=false (see StarOrcaFromNagResponse) means "unable to
+	// determine/perform" — not an error — same shape as
+	// github.checkOrcaStarred's null today (channels_scm.go:56-70).
+	StarOrcaFromNag(ctx context.Context, in *StarOrcaFromNagRequest, opts ...grpc.CallOption) (*StarOrcaFromNagResponse, error)
+	PrepareStarNagAgentValueMoment(ctx context.Context, in *PrepareStarNagAgentValueMomentRequest, opts ...grpc.CallOption) (*StarNagAgentValueMomentPreparation, error)
+	ShowPreparedStarNagAgentValueMoment(ctx context.Context, in *ShowPreparedStarNagAgentValueMomentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type tenantServiceClient struct {
@@ -80,6 +177,26 @@ func (c *tenantServiceClient) CreateCompany(ctx context.Context, in *CreateCompa
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateCompanyResponse)
 	err := c.cc.Invoke(ctx, TenantService_CreateCompany_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) GetCompany(ctx context.Context, in *GetCompanyRequest, opts ...grpc.CallOption) (*GetCompanyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetCompanyResponse)
+	err := c.cc.Invoke(ctx, TenantService_GetCompany_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) ListCompanies(ctx context.Context, in *ListCompaniesRequest, opts ...grpc.CallOption) (*ListCompaniesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCompaniesResponse)
+	err := c.cc.Invoke(ctx, TenantService_ListCompanies_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -236,6 +353,216 @@ func (c *tenantServiceClient) RemoveTeamMember(ctx context.Context, in *RemoveTe
 	return out, nil
 }
 
+func (c *tenantServiceClient) GetOnboardingState(ctx context.Context, in *GetOnboardingStateRequest, opts ...grpc.CallOption) (*GetOnboardingStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetOnboardingStateResponse)
+	err := c.cc.Invoke(ctx, TenantService_GetOnboardingState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) SetOnboardingState(ctx context.Context, in *SetOnboardingStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_SetOnboardingState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) GetClientState(ctx context.Context, in *GetClientStateRequest, opts ...grpc.CallOption) (*GetClientStateResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetClientStateResponse)
+	err := c.cc.Invoke(ctx, TenantService_GetClientState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) SetClientState(ctx context.Context, in *SetClientStateRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_SetClientState_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) GetWorkspaceSession(ctx context.Context, in *GetWorkspaceSessionRequest, opts ...grpc.CallOption) (*GetWorkspaceSessionResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetWorkspaceSessionResponse)
+	err := c.cc.Invoke(ctx, TenantService_GetWorkspaceSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) SetWorkspaceSession(ctx context.Context, in *SetWorkspaceSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_SetWorkspaceSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) PatchWorkspaceSession(ctx context.Context, in *PatchWorkspaceSessionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_PatchWorkspaceSession_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) AddCompanyEmailDomain(ctx context.Context, in *AddCompanyEmailDomainRequest, opts ...grpc.CallOption) (*AddCompanyEmailDomainResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AddCompanyEmailDomainResponse)
+	err := c.cc.Invoke(ctx, TenantService_AddCompanyEmailDomain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) RemoveCompanyEmailDomain(ctx context.Context, in *RemoveCompanyEmailDomainRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_RemoveCompanyEmailDomain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) ListCompanyEmailDomains(ctx context.Context, in *ListCompanyEmailDomainsRequest, opts ...grpc.CallOption) (*ListCompanyEmailDomainsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListCompanyEmailDomainsResponse)
+	err := c.cc.Invoke(ctx, TenantService_ListCompanyEmailDomains_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) ResolveCompanyByEmailDomain(ctx context.Context, in *ResolveCompanyByEmailDomainRequest, opts ...grpc.CallOption) (*ResolveCompanyByEmailDomainResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveCompanyByEmailDomainResponse)
+	err := c.cc.Invoke(ctx, TenantService_ResolveCompanyByEmailDomain_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) DismissStarNag(ctx context.Context, in *DismissStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_DismissStarNag_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) DeferStarNag(ctx context.Context, in *DeferStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_DeferStarNag_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) CompleteStarNag(ctx context.Context, in *CompleteStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_CompleteStarNag_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) DisableStarNag(ctx context.Context, in *DisableStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_DisableStarNag_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) ForceShowStarNag(ctx context.Context, in *ForceShowStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_ForceShowStarNag_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) NotifyStarNagOnboardingCompleted(ctx context.Context, in *NotifyStarNagOnboardingCompletedRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_NotifyStarNagOnboardingCompleted_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) OpenWebStarNag(ctx context.Context, in *OpenWebStarNagRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_OpenWebStarNag_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) StarOrcaFromNag(ctx context.Context, in *StarOrcaFromNagRequest, opts ...grpc.CallOption) (*StarOrcaFromNagResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StarOrcaFromNagResponse)
+	err := c.cc.Invoke(ctx, TenantService_StarOrcaFromNag_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) PrepareStarNagAgentValueMoment(ctx context.Context, in *PrepareStarNagAgentValueMomentRequest, opts ...grpc.CallOption) (*StarNagAgentValueMomentPreparation, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(StarNagAgentValueMomentPreparation)
+	err := c.cc.Invoke(ctx, TenantService_PrepareStarNagAgentValueMoment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *tenantServiceClient) ShowPreparedStarNagAgentValueMoment(ctx context.Context, in *ShowPreparedStarNagAgentValueMomentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, TenantService_ShowPreparedStarNagAgentValueMoment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // TenantServiceServer is the server API for TenantService service.
 // All implementations must embed UnimplementedTenantServiceServer
 // for forward compatibility.
@@ -244,6 +571,16 @@ func (c *tenantServiceClient) RemoveTeamMember(ctx context.Context, in *RemoveTe
 // This is the origin of tenant_id for every other service. See specs/backend-go/services/tenant-service.md.
 type TenantServiceServer interface {
 	CreateCompany(context.Context, *CreateCompanyRequest) (*CreateCompanyResponse, error)
+	// GetCompany — the missing read half of Create/UpdateCompany (CR-DS-006/
+	// 007/008 follow-up: the Admin Console's Company tab needs to display the
+	// caller's own company name before offering to rename it).
+	GetCompany(context.Context, *GetCompanyRequest) (*GetCompanyResponse, error)
+	// ListCompanies — cross-tenant by nature (tenant.companies has no
+	// tenant_id column, this table IS the tenant root); the caller MUST
+	// admin-gate. Added because a company created via CreateCompany was
+	// otherwise unreachable after the creating session ended — see
+	// wscompat's profile.listCompanies.
+	ListCompanies(context.Context, *ListCompaniesRequest) (*ListCompaniesResponse, error)
 	ValidateTenant(context.Context, *ValidateTenantRequest) (*ValidateTenantResponse, error)
 	CreateDepartment(context.Context, *CreateDepartmentRequest) (*CreateDepartmentResponse, error)
 	SetUserDepartment(context.Context, *SetUserDepartmentRequest) (*SetUserDepartmentResponse, error)
@@ -251,6 +588,11 @@ type TenantServiceServer interface {
 	CreateTeam(context.Context, *CreateTeamRequest) (*CreateTeamResponse, error)
 	AddTeamMember(context.Context, *AddTeamMemberRequest) (*AddTeamMemberResponse, error)
 	ListTeamMembers(context.Context, *ListTeamMembersRequest) (*ListTeamMembersResponse, error)
+	// ListTeamsForUser answers "which teams is this user a member of" without
+	// the ListTeams(company)+ListTeamMembers(team) N+1 fan-out
+	// devServer.listForUser's handler doc comment deliberately avoids — added
+	// to unblock team-based dev-server access grants (BUG-013,
+	// CR-DS-007 §3's recorded "Known gap ghi nhận khi triển khai").
 	ListTeamsForUser(context.Context, *ListTeamsForUserRequest) (*ListTeamsForUserResponse, error)
 	// ── profile.* surface (tenant-service.md §3) ──────────────────────────
 	GetUserProfile(context.Context, *GetUserProfileRequest) (*GetUserProfileResponse, error)
@@ -264,6 +606,65 @@ type TenantServiceServer interface {
 	ListTeams(context.Context, *ListTeamsRequest) (*ListTeamsResponse, error)
 	// RemoveTeamMember — documented gap, services/tenant-service/README.md:101.
 	RemoveTeamMember(context.Context, *RemoveTeamMemberRequest) (*emptypb.Empty, error)
+	// GetOnboardingState/SetOnboardingState — per-user onboarding wizard
+	// progress, opaque JSON as far as this service is concerned (api-gateway's
+	// onboarding.get/update wscompat channels own decoding it). Added because
+	// nothing ever persisted this: every page reload re-showed the onboarding
+	// wizard forever. See UserProfileRepository.GetOnboardingState's doc
+	// comment for why this is a dedicated store, not settings_json.
+	GetOnboardingState(context.Context, *GetOnboardingStateRequest) (*GetOnboardingStateResponse, error)
+	SetOnboardingState(context.Context, *SetOnboardingStateRequest) (*emptypb.Empty, error)
+	// ── Client-local state (CR-STORAGE-001/003/004a,b) ────────────────────
+	// GetClientState/SetClientState — 5 opaque per-user JSON blobs
+	// (keybindings/UI local state/saved runtime environments/settings/
+	// accounts->dev-server map) parameterized by ClientStateKind rather than
+	// 5 near-identical RPC pairs — see
+	// specs/backend-go/crs/v3/storage/solutions/
+	// BE-SOL-STORAGE-001-user-profile-json-columns.md §5 for why. user_id is
+	// NOT trusted as the scoping identity by itself — the caller
+	// (api-gateway) always sends the authenticated caller's own user_id, same
+	// convention as GetOnboardingStateRequest.
+	GetClientState(context.Context, *GetClientStateRequest) (*GetClientStateResponse, error)
+	SetClientState(context.Context, *SetClientStateRequest) (*emptypb.Empty, error)
+	// GetWorkspaceSession/SetWorkspaceSession/PatchWorkspaceSession
+	// (CR-STORAGE-004a) — a separate table keyed by (user_id, host_id), not a
+	// 6th ClientStateKind: one user can have N sessions, one per host/
+	// environment (BE-SOL-STORAGE-001 §3).
+	GetWorkspaceSession(context.Context, *GetWorkspaceSessionRequest) (*GetWorkspaceSessionResponse, error)
+	SetWorkspaceSession(context.Context, *SetWorkspaceSessionRequest) (*emptypb.Empty, error)
+	PatchWorkspaceSession(context.Context, *PatchWorkspaceSessionRequest) (*emptypb.Empty, error)
+	// ── Multi-tenant SSO follow-up (CR-LOGIN-001) ─────────────────────────
+	// Add/Remove/ListCompanyEmailDomains are admin-console operations (caller
+	// MUST admin-gate — see AddCompanyEmailDomain's doc comment).
+	// ResolveCompanyByEmailDomain is a system-internal read auth-service
+	// calls server-to-server to decide a brand-new SSO signup's tenant — NOT
+	// an admin-console operation, never exposed as an end-user REST route.
+	AddCompanyEmailDomain(context.Context, *AddCompanyEmailDomainRequest) (*AddCompanyEmailDomainResponse, error)
+	RemoveCompanyEmailDomain(context.Context, *RemoveCompanyEmailDomainRequest) (*emptypb.Empty, error)
+	ListCompanyEmailDomains(context.Context, *ListCompanyEmailDomainsRequest) (*ListCompanyEmailDomainsResponse, error)
+	ResolveCompanyByEmailDomain(context.Context, *ResolveCompanyByEmailDomainRequest) (*ResolveCompanyByEmailDomainResponse, error)
+	// ── starNag.* surface (BUG-005/SOL-005) ───────────────────────────────
+	// Per-user "star Orca on GitHub" nag state — dismissal/cooldown/threshold/
+	// completion — folded into tenant-service per SOL-005's "small per-user
+	// preference state, no natural owning service" verdict, same shape as
+	// GetOnboardingState/SetOnboardingState above. Every request carries only
+	// user_id (never company_id — same convention as GetOnboardingStateRequest:
+	// the scoping company comes from tenant.RequireTenantID(ctx), not a
+	// message field).
+	DismissStarNag(context.Context, *DismissStarNagRequest) (*emptypb.Empty, error)
+	DeferStarNag(context.Context, *DeferStarNagRequest) (*emptypb.Empty, error)
+	CompleteStarNag(context.Context, *CompleteStarNagRequest) (*emptypb.Empty, error)
+	DisableStarNag(context.Context, *DisableStarNagRequest) (*emptypb.Empty, error)
+	ForceShowStarNag(context.Context, *ForceShowStarNagRequest) (*emptypb.Empty, error)
+	NotifyStarNagOnboardingCompleted(context.Context, *NotifyStarNagOnboardingCompletedRequest) (*emptypb.Empty, error)
+	OpenWebStarNag(context.Context, *OpenWebStarNagRequest) (*emptypb.Empty, error)
+	// StarOrcaFromNag performs (or attempts) the actual GitHub star action.
+	// starred=false + ok=false (see StarOrcaFromNagResponse) means "unable to
+	// determine/perform" — not an error — same shape as
+	// github.checkOrcaStarred's null today (channels_scm.go:56-70).
+	StarOrcaFromNag(context.Context, *StarOrcaFromNagRequest) (*StarOrcaFromNagResponse, error)
+	PrepareStarNagAgentValueMoment(context.Context, *PrepareStarNagAgentValueMomentRequest) (*StarNagAgentValueMomentPreparation, error)
+	ShowPreparedStarNagAgentValueMoment(context.Context, *ShowPreparedStarNagAgentValueMomentRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedTenantServiceServer()
 }
 
@@ -276,6 +677,12 @@ type UnimplementedTenantServiceServer struct{}
 
 func (UnimplementedTenantServiceServer) CreateCompany(context.Context, *CreateCompanyRequest) (*CreateCompanyResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateCompany not implemented")
+}
+func (UnimplementedTenantServiceServer) GetCompany(context.Context, *GetCompanyRequest) (*GetCompanyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetCompany not implemented")
+}
+func (UnimplementedTenantServiceServer) ListCompanies(context.Context, *ListCompaniesRequest) (*ListCompaniesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCompanies not implemented")
 }
 func (UnimplementedTenantServiceServer) ValidateTenant(context.Context, *ValidateTenantRequest) (*ValidateTenantResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ValidateTenant not implemented")
@@ -322,6 +729,69 @@ func (UnimplementedTenantServiceServer) ListTeams(context.Context, *ListTeamsReq
 func (UnimplementedTenantServiceServer) RemoveTeamMember(context.Context, *RemoveTeamMemberRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveTeamMember not implemented")
 }
+func (UnimplementedTenantServiceServer) GetOnboardingState(context.Context, *GetOnboardingStateRequest) (*GetOnboardingStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetOnboardingState not implemented")
+}
+func (UnimplementedTenantServiceServer) SetOnboardingState(context.Context, *SetOnboardingStateRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetOnboardingState not implemented")
+}
+func (UnimplementedTenantServiceServer) GetClientState(context.Context, *GetClientStateRequest) (*GetClientStateResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetClientState not implemented")
+}
+func (UnimplementedTenantServiceServer) SetClientState(context.Context, *SetClientStateRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetClientState not implemented")
+}
+func (UnimplementedTenantServiceServer) GetWorkspaceSession(context.Context, *GetWorkspaceSessionRequest) (*GetWorkspaceSessionResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetWorkspaceSession not implemented")
+}
+func (UnimplementedTenantServiceServer) SetWorkspaceSession(context.Context, *SetWorkspaceSessionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetWorkspaceSession not implemented")
+}
+func (UnimplementedTenantServiceServer) PatchWorkspaceSession(context.Context, *PatchWorkspaceSessionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method PatchWorkspaceSession not implemented")
+}
+func (UnimplementedTenantServiceServer) AddCompanyEmailDomain(context.Context, *AddCompanyEmailDomainRequest) (*AddCompanyEmailDomainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AddCompanyEmailDomain not implemented")
+}
+func (UnimplementedTenantServiceServer) RemoveCompanyEmailDomain(context.Context, *RemoveCompanyEmailDomainRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveCompanyEmailDomain not implemented")
+}
+func (UnimplementedTenantServiceServer) ListCompanyEmailDomains(context.Context, *ListCompanyEmailDomainsRequest) (*ListCompanyEmailDomainsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListCompanyEmailDomains not implemented")
+}
+func (UnimplementedTenantServiceServer) ResolveCompanyByEmailDomain(context.Context, *ResolveCompanyByEmailDomainRequest) (*ResolveCompanyByEmailDomainResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveCompanyByEmailDomain not implemented")
+}
+func (UnimplementedTenantServiceServer) DismissStarNag(context.Context, *DismissStarNagRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DismissStarNag not implemented")
+}
+func (UnimplementedTenantServiceServer) DeferStarNag(context.Context, *DeferStarNagRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DeferStarNag not implemented")
+}
+func (UnimplementedTenantServiceServer) CompleteStarNag(context.Context, *CompleteStarNagRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method CompleteStarNag not implemented")
+}
+func (UnimplementedTenantServiceServer) DisableStarNag(context.Context, *DisableStarNagRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method DisableStarNag not implemented")
+}
+func (UnimplementedTenantServiceServer) ForceShowStarNag(context.Context, *ForceShowStarNagRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ForceShowStarNag not implemented")
+}
+func (UnimplementedTenantServiceServer) NotifyStarNagOnboardingCompleted(context.Context, *NotifyStarNagOnboardingCompletedRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method NotifyStarNagOnboardingCompleted not implemented")
+}
+func (UnimplementedTenantServiceServer) OpenWebStarNag(context.Context, *OpenWebStarNagRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method OpenWebStarNag not implemented")
+}
+func (UnimplementedTenantServiceServer) StarOrcaFromNag(context.Context, *StarOrcaFromNagRequest) (*StarOrcaFromNagResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method StarOrcaFromNag not implemented")
+}
+func (UnimplementedTenantServiceServer) PrepareStarNagAgentValueMoment(context.Context, *PrepareStarNagAgentValueMomentRequest) (*StarNagAgentValueMomentPreparation, error) {
+	return nil, status.Error(codes.Unimplemented, "method PrepareStarNagAgentValueMoment not implemented")
+}
+func (UnimplementedTenantServiceServer) ShowPreparedStarNagAgentValueMoment(context.Context, *ShowPreparedStarNagAgentValueMomentRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method ShowPreparedStarNagAgentValueMoment not implemented")
+}
 func (UnimplementedTenantServiceServer) mustEmbedUnimplementedTenantServiceServer() {}
 func (UnimplementedTenantServiceServer) testEmbeddedByValue()                       {}
 
@@ -357,6 +827,42 @@ func _TenantService_CreateCompany_Handler(srv interface{}, ctx context.Context, 
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TenantServiceServer).CreateCompany(ctx, req.(*CreateCompanyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_GetCompany_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetCompanyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).GetCompany(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_GetCompany_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).GetCompany(ctx, req.(*GetCompanyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_ListCompanies_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCompaniesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ListCompanies(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ListCompanies_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ListCompanies(ctx, req.(*ListCompaniesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -631,6 +1137,384 @@ func _TenantService_RemoveTeamMember_Handler(srv interface{}, ctx context.Contex
 	return interceptor(ctx, in, info, handler)
 }
 
+func _TenantService_GetOnboardingState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetOnboardingStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).GetOnboardingState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_GetOnboardingState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).GetOnboardingState(ctx, req.(*GetOnboardingStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_SetOnboardingState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetOnboardingStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).SetOnboardingState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_SetOnboardingState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).SetOnboardingState(ctx, req.(*SetOnboardingStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_GetClientState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetClientStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).GetClientState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_GetClientState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).GetClientState(ctx, req.(*GetClientStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_SetClientState_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetClientStateRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).SetClientState(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_SetClientState_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).SetClientState(ctx, req.(*SetClientStateRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_GetWorkspaceSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetWorkspaceSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).GetWorkspaceSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_GetWorkspaceSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).GetWorkspaceSession(ctx, req.(*GetWorkspaceSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_SetWorkspaceSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetWorkspaceSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).SetWorkspaceSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_SetWorkspaceSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).SetWorkspaceSession(ctx, req.(*SetWorkspaceSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_PatchWorkspaceSession_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PatchWorkspaceSessionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).PatchWorkspaceSession(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_PatchWorkspaceSession_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).PatchWorkspaceSession(ctx, req.(*PatchWorkspaceSessionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_AddCompanyEmailDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AddCompanyEmailDomainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).AddCompanyEmailDomain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_AddCompanyEmailDomain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).AddCompanyEmailDomain(ctx, req.(*AddCompanyEmailDomainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_RemoveCompanyEmailDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveCompanyEmailDomainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).RemoveCompanyEmailDomain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_RemoveCompanyEmailDomain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).RemoveCompanyEmailDomain(ctx, req.(*RemoveCompanyEmailDomainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_ListCompanyEmailDomains_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListCompanyEmailDomainsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ListCompanyEmailDomains(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ListCompanyEmailDomains_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ListCompanyEmailDomains(ctx, req.(*ListCompanyEmailDomainsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_ResolveCompanyByEmailDomain_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveCompanyByEmailDomainRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ResolveCompanyByEmailDomain(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ResolveCompanyByEmailDomain_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ResolveCompanyByEmailDomain(ctx, req.(*ResolveCompanyByEmailDomainRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_DismissStarNag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DismissStarNagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).DismissStarNag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_DismissStarNag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).DismissStarNag(ctx, req.(*DismissStarNagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_DeferStarNag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeferStarNagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).DeferStarNag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_DeferStarNag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).DeferStarNag(ctx, req.(*DeferStarNagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_CompleteStarNag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CompleteStarNagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).CompleteStarNag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_CompleteStarNag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).CompleteStarNag(ctx, req.(*CompleteStarNagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_DisableStarNag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DisableStarNagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).DisableStarNag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_DisableStarNag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).DisableStarNag(ctx, req.(*DisableStarNagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_ForceShowStarNag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ForceShowStarNagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ForceShowStarNag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ForceShowStarNag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ForceShowStarNag(ctx, req.(*ForceShowStarNagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_NotifyStarNagOnboardingCompleted_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NotifyStarNagOnboardingCompletedRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).NotifyStarNagOnboardingCompleted(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_NotifyStarNagOnboardingCompleted_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).NotifyStarNagOnboardingCompleted(ctx, req.(*NotifyStarNagOnboardingCompletedRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_OpenWebStarNag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OpenWebStarNagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).OpenWebStarNag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_OpenWebStarNag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).OpenWebStarNag(ctx, req.(*OpenWebStarNagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_StarOrcaFromNag_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(StarOrcaFromNagRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).StarOrcaFromNag(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_StarOrcaFromNag_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).StarOrcaFromNag(ctx, req.(*StarOrcaFromNagRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_PrepareStarNagAgentValueMoment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(PrepareStarNagAgentValueMomentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).PrepareStarNagAgentValueMoment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_PrepareStarNagAgentValueMoment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).PrepareStarNagAgentValueMoment(ctx, req.(*PrepareStarNagAgentValueMomentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TenantService_ShowPreparedStarNagAgentValueMoment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ShowPreparedStarNagAgentValueMomentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TenantServiceServer).ShowPreparedStarNagAgentValueMoment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TenantService_ShowPreparedStarNagAgentValueMoment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TenantServiceServer).ShowPreparedStarNagAgentValueMoment(ctx, req.(*ShowPreparedStarNagAgentValueMomentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // TenantService_ServiceDesc is the grpc.ServiceDesc for TenantService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -641,6 +1525,14 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateCompany",
 			Handler:    _TenantService_CreateCompany_Handler,
+		},
+		{
+			MethodName: "GetCompany",
+			Handler:    _TenantService_GetCompany_Handler,
+		},
+		{
+			MethodName: "ListCompanies",
+			Handler:    _TenantService_ListCompanies_Handler,
 		},
 		{
 			MethodName: "ValidateTenant",
@@ -701,6 +1593,90 @@ var TenantService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "RemoveTeamMember",
 			Handler:    _TenantService_RemoveTeamMember_Handler,
+		},
+		{
+			MethodName: "GetOnboardingState",
+			Handler:    _TenantService_GetOnboardingState_Handler,
+		},
+		{
+			MethodName: "SetOnboardingState",
+			Handler:    _TenantService_SetOnboardingState_Handler,
+		},
+		{
+			MethodName: "GetClientState",
+			Handler:    _TenantService_GetClientState_Handler,
+		},
+		{
+			MethodName: "SetClientState",
+			Handler:    _TenantService_SetClientState_Handler,
+		},
+		{
+			MethodName: "GetWorkspaceSession",
+			Handler:    _TenantService_GetWorkspaceSession_Handler,
+		},
+		{
+			MethodName: "SetWorkspaceSession",
+			Handler:    _TenantService_SetWorkspaceSession_Handler,
+		},
+		{
+			MethodName: "PatchWorkspaceSession",
+			Handler:    _TenantService_PatchWorkspaceSession_Handler,
+		},
+		{
+			MethodName: "AddCompanyEmailDomain",
+			Handler:    _TenantService_AddCompanyEmailDomain_Handler,
+		},
+		{
+			MethodName: "RemoveCompanyEmailDomain",
+			Handler:    _TenantService_RemoveCompanyEmailDomain_Handler,
+		},
+		{
+			MethodName: "ListCompanyEmailDomains",
+			Handler:    _TenantService_ListCompanyEmailDomains_Handler,
+		},
+		{
+			MethodName: "ResolveCompanyByEmailDomain",
+			Handler:    _TenantService_ResolveCompanyByEmailDomain_Handler,
+		},
+		{
+			MethodName: "DismissStarNag",
+			Handler:    _TenantService_DismissStarNag_Handler,
+		},
+		{
+			MethodName: "DeferStarNag",
+			Handler:    _TenantService_DeferStarNag_Handler,
+		},
+		{
+			MethodName: "CompleteStarNag",
+			Handler:    _TenantService_CompleteStarNag_Handler,
+		},
+		{
+			MethodName: "DisableStarNag",
+			Handler:    _TenantService_DisableStarNag_Handler,
+		},
+		{
+			MethodName: "ForceShowStarNag",
+			Handler:    _TenantService_ForceShowStarNag_Handler,
+		},
+		{
+			MethodName: "NotifyStarNagOnboardingCompleted",
+			Handler:    _TenantService_NotifyStarNagOnboardingCompleted_Handler,
+		},
+		{
+			MethodName: "OpenWebStarNag",
+			Handler:    _TenantService_OpenWebStarNag_Handler,
+		},
+		{
+			MethodName: "StarOrcaFromNag",
+			Handler:    _TenantService_StarOrcaFromNag_Handler,
+		},
+		{
+			MethodName: "PrepareStarNagAgentValueMoment",
+			Handler:    _TenantService_PrepareStarNagAgentValueMoment_Handler,
+		},
+		{
+			MethodName: "ShowPreparedStarNagAgentValueMoment",
+			Handler:    _TenantService_ShowPreparedStarNagAgentValueMoment_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

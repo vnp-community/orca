@@ -18,13 +18,13 @@ type fakeTerminalScrollbackSnapshotRepository struct {
 
 	sumBytesByWorktree map[string]int64 // key: tenantID+"/"+worktreeID, excludePaneKey ignored by the fake unless sumErr is set
 
-	upsertErr  error
-	getErr     error
-	sumErr     error
-	deleteErr  error
-	expireErr  error
-	expireN    int
-	upsertCalls []domain.TerminalScrollbackSnapshot
+	upsertErr             error
+	getErr                error
+	sumErr                error
+	deleteErr             error
+	expireErr             error
+	expireN               int
+	upsertCalls           []domain.TerminalScrollbackSnapshot
 	deleteByWorktreeCalls []struct{ tenantID, worktreeID string }
 	deleteExpiredCalls    []time.Time
 }

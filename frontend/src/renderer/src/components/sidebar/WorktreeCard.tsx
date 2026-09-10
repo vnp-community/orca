@@ -156,7 +156,19 @@ function isWebClient(): boolean {
   return Boolean((window as unknown as { __ORCA_WEB_CLIENT__?: boolean }).__ORCA_WEB_CLIENT__)
 }
 
-function getDirectoryName(folderPath: string): string {
+// Why the guard: a repo/worktree created through project-service's Repo
+// model ({id, projectId, url, displayName, position} — no `path` field at
+// all) can reach this card via the legacy tenant-wide repo.list fetch
+// (store/slices/repos.ts's fetchRepoCatalogForTarget has no project filter)
+// before the sidebar has any real notion of that model — live-reproduced:
+// worktree.path undefined here threw "Cannot read properties of undefined
+// (reading 'replace')", crashing the whole sidebar list (contained by an
+// error boundary, but still a real regression). Full reconciliation of the
+// two Repo shapes is out of scope here — this only stops the crash.
+export function getDirectoryName(folderPath: string | undefined): string {
+  if (!folderPath) {
+    return ''
+  }
   const normalized = folderPath.replace(/[\\/]+$/, '')
   const parts = normalized.split(/[\\/]+/)
   return parts.at(-1) || normalized || folderPath

@@ -7,29 +7,37 @@ import (
 )
 
 type BaseRefDefaultInput struct {
-	WorktreeID string
+	RepoID string
 }
 
-// BaseRefDefault resolves the worktree's owning host and returns its
-// default base ref — same resolve -> dispatch -> translate flow as
-// GetStatus (get_status.go).
+// BaseRefDefault resolves repoID's owning host and returns its default base
+// ref. Repo-scoped, like PrefetchCreateBase (see that file's doc comment and
+// dispatchExecutorForRepo's own doc comment in ports.go for why this can't
+// route through ConnectionResolver/dispatchExecutor: this usecase is called
+// from repo-scoped contexts — Settings, SourceControl's default-branch hint —
+// that have no worktree/connection id to resolve.
 type BaseRefDefault struct {
-	resolver ConnectionResolver
-	local    GitExecutor
-	relay    GitExecutor
+	reachability DevServerReachability
+	projects     ProjectClient
+	local        GitExecutor
+	relay        GitExecutor
 }
 
-func NewBaseRefDefault(resolver ConnectionResolver, local, relay GitExecutor) *BaseRefDefault {
-	return &BaseRefDefault{resolver: resolver, local: local, relay: relay}
+func NewBaseRefDefault(reachability DevServerReachability, projects ProjectClient, local, relay GitExecutor) *BaseRefDefault {
+	return &BaseRefDefault{reachability: reachability, projects: projects, local: local, relay: relay}
 }
 
 func (uc *BaseRefDefault) Execute(ctx context.Context, in BaseRefDefaultInput) (string, error) {
-	if in.WorktreeID == "" {
-		return "", apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_WORKTREE_ID", "worktree_id is required", nil)
+	if in.RepoID == "" {
+		return "", apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_REPO_ID", "repo_id is required", nil)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	repo, err := uc.projects.GetRepo(ctx, in.RepoID)
 	if err != nil {
-		return "", apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
+		return "", apperrors.New(apperrors.KindNotFound, "WORKTREE_REPO_NOT_FOUND", "repo does not exist", err)
+	}
+	ctx, executor, repoPath, err := dispatchExecutorForRepo(ctx, uc.reachability, uc.local, uc.relay, repo)
+	if err != nil {
+		return "", apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve repo's owning host", err)
 	}
 	ref, err := executor.BaseRefDefault(ctx, repoPath)
 	if err != nil {

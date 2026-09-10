@@ -16,7 +16,7 @@ func TestDispatchPrompt_AgentNotRunning_InjectsImmediately(t *testing.T) {
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
 	agent := &fakeDevServerAgentClient{agentStatusResult: AgentStatusResult{AgentRunning: false}}
 	queue := &fakeQueuedPromptRepository{}
-	uc := NewDispatchPrompt(sessions, resolver, agent, queue)
+	uc := NewDispatchPrompt(sessions, resolver, &fakeDevServerRepository{}, agent, queue)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	out, err := uc.Execute(ctx, DispatchPromptInput{PtyID: "pty-1", Prompt: "do the thing", DeviceID: "device-1"})
@@ -42,7 +42,7 @@ func TestDispatchPrompt_AgentRunningNotReady_Queues(t *testing.T) {
 	seedSession(t, sessions, resolver, "tenant-1", "pty-1", "conn-1")
 	agent := &fakeDevServerAgentClient{agentStatusResult: AgentStatusResult{AgentRunning: true, ReadyForInput: false}}
 	queue := &fakeQueuedPromptRepository{}
-	uc := NewDispatchPrompt(sessions, resolver, agent, queue)
+	uc := NewDispatchPrompt(sessions, resolver, &fakeDevServerRepository{}, agent, queue)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	out, err := uc.Execute(ctx, DispatchPromptInput{PtyID: "pty-1", Prompt: "do the thing", DeviceID: "device-1"})
@@ -78,7 +78,7 @@ func TestDispatchPrompt_ExistingQueuedPrompt_RejectsWithoutOverwrite(t *testing.
 	if err := queue.Upsert(context.Background(), mustQueuedPrompt(t, "pty-1", "tenant-1", string(longPrompt), "device-0")); err != nil {
 		t.Fatalf("seed upsert failed: %v", err)
 	}
-	uc := NewDispatchPrompt(sessions, resolver, agent, queue)
+	uc := NewDispatchPrompt(sessions, resolver, &fakeDevServerRepository{}, agent, queue)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	out, err := uc.Execute(ctx, DispatchPromptInput{PtyID: "pty-1", Prompt: "new prompt", DeviceID: "device-1"})
@@ -114,7 +114,7 @@ func TestDispatchPrompt_ExistingQueuedPrompt_OverwriteReplacesRow(t *testing.T) 
 	if err := queue.Upsert(context.Background(), mustQueuedPrompt(t, "pty-1", "tenant-1", "old prompt", "device-0")); err != nil {
 		t.Fatalf("seed upsert failed: %v", err)
 	}
-	uc := NewDispatchPrompt(sessions, resolver, agent, queue)
+	uc := NewDispatchPrompt(sessions, resolver, &fakeDevServerRepository{}, agent, queue)
 
 	ctx := withTenant(context.Background(), "tenant-1")
 	out, err := uc.Execute(ctx, DispatchPromptInput{PtyID: "pty-1", Prompt: "new prompt", Overwrite: true, DeviceID: "device-1"})

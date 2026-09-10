@@ -58,6 +58,38 @@ func (r *CompanyRepository) Get(ctx context.Context, id string) (domain.Company,
 	return c, true, nil
 }
 
+// List returns every company row, ordered by name for a stable admin-list
+// display. Deliberately unfiltered — see usecase.CompanyRepository.List's
+// doc comment on the admin-gating requirement this pushes onto callers.
+func (r *CompanyRepository) List(ctx context.Context) ([]domain.Company, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, name, settings_json FROM tenant.companies ORDER BY name
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list companies: %w", err)
+	}
+	defer rows.Close()
+
+	companies := make([]domain.Company, 0)
+	for rows.Next() {
+		var c domain.Company
+		var settingsJSON string
+		if err := rows.Scan(&c.ID, &c.Name, &settingsJSON); err != nil {
+			return nil, fmt.Errorf("postgres: scan company row: %w", err)
+		}
+		settings, err := unmarshalSettings(settingsJSON)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: unmarshal company settings: %w", err)
+		}
+		c.Settings = settings
+		companies = append(companies, c)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate company rows: %w", err)
+	}
+	return companies, nil
+}
+
 func (r *CompanyRepository) Exists(ctx context.Context, id string) (bool, error) {
 	var exists bool
 	err := r.pool.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM tenant.companies WHERE id = $1)`, id).Scan(&exists)

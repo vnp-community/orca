@@ -455,6 +455,31 @@ import type {
   WorkspaceCleanupScanResult
 } from '../shared/workspace-cleanup'
 import type { KeybindingActionId, KeybindingFileSnapshot } from '../shared/keybindings'
+import type {
+  RemotePreflightStatus,
+  WindowsTerminalCapabilities,
+  DevServer,
+  DevServerInput,
+  DevServerListFilter,
+  ConnectionTestResult,
+  DevServerStatus,
+  AgentTokenInfo,
+  DevServerAccessRequest,
+  DevServerGroup,
+  DevServerGranteeKind,
+  DevServerGroupGrant
+} from '../shared/dev-server-types'
+import type {
+  TenantUserProfile,
+  TenantDepartment,
+  TenantTeam,
+  TenantCompany
+} from '../shared/tenant-user-profile-types'
+import type { AdminUserRole, AdminUser } from '../shared/admin-user-types'
+import type { AdminAccessPolicy } from '../shared/admin-policy-types'
+import type { AdminSession } from '../shared/admin-session-types'
+import type { AdminAuditEntry, AdminAuditQuery } from '../shared/admin-audit-types'
+import type { AdminTeam, AdminTeamMember } from '../shared/admin-team-types'
 
 type GitLabRepoSelectorArgs = {
   repoPath: string
@@ -1134,7 +1159,14 @@ export type PreloadApi = {
   }
   worktrees: {
     list: (args: { repoId: string }) => Promise<Worktree[]>
-    listDetected: (args: { repoId: string }) => Promise<DetectedWorktreeListResult>
+    // Why projectId is optional: only the web preload shim's project-scoped
+    // worktree.detectedList RPC needs it (see web-preload-api.ts) — the
+    // Electron desktop implementation has no OrcaProject concept and
+    // ignores it.
+    listDetected: (args: {
+      repoId: string
+      projectId?: string
+    }) => Promise<DetectedWorktreeListResult>
     listAll: () => Promise<Worktree[]>
     create: (args: CreateWorktreeArgs) => Promise<CreateWorktreeResult>
     /** Two-phase progress for a background `create`, correlated by
@@ -2148,13 +2180,28 @@ export type PreloadApi = {
       wslDistro?: string | null
     }) => Promise<ClaudeRateLimitAccountsState>
   }
+  // devServerId (all 6 methods, added alongside distro on the WSL 3): on
+  // desktop it's unused (registration always targets the local machine); on
+  // the web build it's what lets createCliApi relay to a connected Dev
+  // Server's agent (wscompat/channels_cli.go) instead of returning its
+  // "unsupported in the browser" stub — see runtime-cli-client.ts's doc
+  // comment.
   cli: {
-    getInstallStatus: () => Promise<CliInstallStatus>
-    install: () => Promise<CliInstallStatus>
-    remove: () => Promise<CliInstallStatus>
-    getWslInstallStatus: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
-    installWsl: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
-    removeWsl: (args?: { distro?: string | null }) => Promise<CliInstallStatus>
+    getInstallStatus: (args?: { devServerId?: string }) => Promise<CliInstallStatus>
+    install: (args?: { devServerId?: string }) => Promise<CliInstallStatus>
+    remove: (args?: { devServerId?: string }) => Promise<CliInstallStatus>
+    getWslInstallStatus: (args?: {
+      devServerId?: string
+      distro?: string | null
+    }) => Promise<CliInstallStatus>
+    installWsl: (args?: {
+      devServerId?: string
+      distro?: string | null
+    }) => Promise<CliInstallStatus>
+    removeWsl: (args?: {
+      devServerId?: string
+      distro?: string | null
+    }) => Promise<CliInstallStatus>
   }
   agentHooks: {
     claudeStatus: () => Promise<AgentHookInstallStatus>
@@ -2215,12 +2262,8 @@ export type PreloadApi = {
     getPreflightStatus: (params: {
       devServerId: string
       force?: boolean
-    }) => Promise<import('../shared/dev-server-types').RemotePreflightStatus>
-    setGitIdentity: (params: {
-      devServerId: string
-      name: string
-      email: string
-    }) => Promise<void>
+    }) => Promise<RemotePreflightStatus>
+    setGitIdentity: (params: { devServerId: string; name: string; email: string }) => Promise<void>
     openGhAuthTerminal: (params: {
       devServerId: string
     }) => Promise<{ ptyId: string; devServerId: string }>
@@ -2229,7 +2272,7 @@ export type PreloadApi = {
     }) => Promise<{ configPath: string | null; themeDir: string | null }>
     detectWindowsCapabilities: (params: {
       devServerId: string
-    }) => Promise<import('../shared/dev-server-types').WindowsTerminalCapabilities>
+    }) => Promise<WindowsTerminalCapabilities>
     markChecklistItem: (params: {
       item: string
       devServerId?: string
@@ -2237,27 +2280,31 @@ export type PreloadApi = {
     }) => Promise<void>
   }
   devServer: {
-    /** Return all persisted dev servers (with their runtime status populated) */
-    list: () => Promise<import('../shared/dev-server-types').DevServer[]>
+    /**
+     * Return all persisted dev servers (with their runtime status populated).
+     * CR-DS-009: an optional `{ kind }` filter narrows to Dev Server Agents
+     * or Mobile Emulator Agents; omitted (or unsupported by the current
+     * backend) returns every dev server, unfiltered — same convention as
+     * backend-go's empty-kind-means-no-filter (TASK-EMU-007). Desktop/local
+     * runtimes ignore this filter today (no local Mobile Emulator Agent
+     * registry exists yet) and always return the unfiltered list.
+     */
+    list: (filter?: DevServerListFilter) => Promise<DevServer[]>
     /** Add a new dev server entry (does not connect automatically) */
-    add: (
-      input: import('../shared/dev-server-types').DevServerInput
-    ) => Promise<import('../shared/dev-server-types').DevServer>
+    add: (input: DevServerInput) => Promise<DevServer>
     /** Remove a dev server and disconnect if connected */
     remove: (id: string) => Promise<void>
     /** Run a connectivity test without persisting the server */
-    testConnection: (
-      input: import('../shared/dev-server-types').DevServerInput
-    ) => Promise<import('../shared/dev-server-types').ConnectionTestResult>
+    testConnection: (input: DevServerInput) => Promise<ConnectionTestResult>
     /** Open the relay connection for a persisted server */
-    connect: (id: string) => Promise<import('../shared/dev-server-types').DevServer>
+    connect: (id: string) => Promise<DevServer>
     /** Close the relay connection for a persisted server */
     disconnect: (id: string) => Promise<void>
     /** Subscribe to push events when a server's connection status changes */
     onStatusChanged: (
       handler: (event: {
         id: string
-        status: import('../shared/dev-server-types').DevServerStatus
+        status: DevServerStatus
         platform?: NodeJS.Platform
         error?: string
       }) => void
@@ -2266,7 +2313,7 @@ export type PreloadApi = {
      * List SSH targets from the Orca server DB (server-mode only).
      * Bypasses the desktop-only ssh.listTargets ipc guard.
      */
-    listSshTargets: () => Promise<import('../shared/ssh-types').SshTarget[]>
+    listSshTargets: () => Promise<SshTarget[]>
     /**
      * Create a new SSH target in the Orca server DB.
      * Used by AddDevServerDialog inline host form (no Settings → SSH Hosts needed).
@@ -2276,29 +2323,22 @@ export type PreloadApi = {
       host: string
       port?: number
       username?: string
-    }) => Promise<import('../shared/ssh-types').SshTarget>
+    }) => Promise<SshTarget>
     /**
      * Subscribe to push events when a direct-websocket agent token is generated.
      * The handler is called once per Connect attempt with the one-time token
      * and Orca URL the agent should use.
      */
-    onAgentToken: (
-      handler: (info: import('../shared/dev-server-types').AgentTokenInfo) => void
-    ) => void | (() => void)
+    onAgentToken: (handler: (info: AgentTokenInfo) => void) => void | (() => void)
     /** Unsubscribe a previously registered onAgentToken handler */
-    offAgentToken: (
-      handler: (info: import('../shared/dev-server-types').AgentTokenInfo) => void
-    ) => void
+    offAgentToken: (handler: (info: AgentTokenInfo) => void) => void
     /**
      * Browse a directory on a connected dev server via the agent relay.
      * Returns the resolved absolute path and a list of directory entries.
      * Used by the web-mode folder picker (RemoteFileBrowser) when the
      * selected host is a Dev Server rather than an Orca runtime environment.
      */
-    browseDir?: (args: {
-      id: string
-      path: string
-    }) => Promise<{
+    browseDir?: (args: { id: string; path: string }) => Promise<{
       resolvedPath: string
       entries: { name: string; isDirectory: boolean; isSymlink: boolean }[]
     }>
@@ -2306,6 +2346,163 @@ export type PreloadApi = {
     mkdir?: (args: { id: string; path: string }) => Promise<{ path: string }>
     /** Removes a directory from a connected dev server. */
     rmdir?: (args: { id: string; path: string }) => Promise<void>
+    // ── CR-DS-006/007/008: admin approval, grouping, department access ──
+    /** Admin-only: approve a pending_approval dev server. */
+    approve: (id: string) => Promise<DevServer>
+    /** Admin-only: reject a pending_approval dev server. */
+    reject: (id: string, reason?: string) => Promise<DevServer>
+    /** Admin-only: assign an approved dev server to a group. */
+    assignGroup: (id: string, groupId: string) => Promise<DevServer>
+    /**
+     * The department-filtered view of approved dev servers for the calling
+     * (non-admin) user — resolves the caller's department server-side and
+     * excludes ungrouped/non-approved servers.
+     */
+    listForUser: (filter?: DevServerListFilter) => Promise<DevServer[]>
+    /** File an access request for a dev server group (non-admin). */
+    requestAccess: (params: {
+      devServerGroupId: string
+      message?: string
+    }) => Promise<DevServerAccessRequest>
+    /** Admin-only: list all pending access requests awaiting resolution. */
+    listPendingAccessRequests: () => Promise<DevServerAccessRequest[]>
+    /** Admin-only: approve or reject a pending access request. */
+    resolveAccessRequest: (params: { requestId: string; approve: boolean }) => Promise<{
+      request: DevServerAccessRequest
+      grant: DevServerGroupGrant | null
+    }>
+  }
+  devServerGroup: {
+    /** Admin-only: create a new dev server group (optionally nested). */
+    create: (params: { name: string; parentGroupId?: string }) => Promise<DevServerGroup>
+    /** List all dev server groups for the caller's tenant. */
+    list: () => Promise<DevServerGroup[]>
+    /** Admin-only: grant a department/team access to a dev server group. */
+    grant: (params: {
+      devServerGroupId: string
+      granteeKind: DevServerGranteeKind
+      granteeId: string
+    }) => Promise<DevServerGroupGrant>
+    /** Admin-only: revoke a previously created grant. */
+    revoke: (grantId: string) => Promise<void>
+    /** Admin-only: list every grant for a given group. */
+    listGrants: (devServerGroupId: string) => Promise<DevServerGroupGrant[]>
+  }
+  tenantProfile: {
+    /** The caller's own tenant-service user profile (department, company). */
+    getUserProfile: () => Promise<TenantUserProfile>
+    /** Departments in the caller's company. */
+    listDepartments: () => Promise<TenantDepartment[]>
+    /** Admin-only: lists teams in the caller's tenant (mirror listDepartments). */
+    listTeams: () => Promise<TenantTeam[]>
+    /** Sets (or clears) the caller's own department. */
+    setUserDepartment: (params: { departmentId: string }) => Promise<TenantUserProfile>
+    /** Admin-only: sets (or clears) any user's department by id. */
+    setUserDepartmentFor: (params: {
+      userId: string
+      departmentId: string
+    }) => Promise<TenantUserProfile>
+    /** The caller's own company by default; pass id to look up a different
+     *  one (e.g. one just created — see admin.listCompanies). */
+    getCompany: (params?: { id?: string }) => Promise<TenantCompany>
+    /** Admin-only: renames/updates the caller's own company. */
+    updateCompany: (params: {
+      id: string
+      name: string
+      settingsJson?: string
+    }) => Promise<TenantCompany>
+    /** Admin-only: creates a new company (tenant). Rarely needed — most
+     *  deployments have exactly one, created at bootstrap. */
+    createCompany: (params: { name: string }) => Promise<TenantCompany>
+    /** Admin-only, cross-tenant: lists every company — the browsable list a
+     *  newly-created company (profile.createCompany) was otherwise missing
+     *  from once the creating session ended. */
+    listCompanies: () => Promise<TenantCompany[]>
+    /** Admin-only: creates a department under a company (defaults to the
+     *  caller's own company). */
+    createDepartment: (params: { name: string; companyId?: string }) => Promise<TenantDepartment>
+  }
+  admin: {
+    /** Admin-only: creates a user. tenantId defaults to the caller's own
+     *  company — pass a different one only to bootstrap a brand-new
+     *  company's first admin (see tenantProfile.createCompany). Leave
+     *  password empty to auto-generate one — it's returned exactly once
+     *  in generatedPassword since there's no invite-email flow; relay it
+     *  to the new user out of band. */
+    createUser: (params: {
+      email: string
+      name: string
+      role: AdminUserRole
+      tenantId?: string
+      password?: string
+    }) => Promise<{
+      user: AdminUser
+      generatedPassword: string
+    }>
+    /** Admin-only: lists users in the caller's tenant. */
+    listUsers: (params?: { pageToken?: string; pageSize?: number }) => Promise<{
+      users: AdminUser[]
+      nextPageToken: string
+    }>
+    /** Admin-only: promotes/demotes a user's role. */
+    updateUserRole: (params: { userId: string; role: AdminUserRole }) => Promise<AdminUser>
+    /** Admin-only: deactivates a user (blocks future logins). */
+    deactivateUser: (params: { userId: string }) => Promise<AdminUser>
+    /** Admin-only: reactivates a previously deactivated user. */
+    reactivateUser: (params: { userId: string }) => Promise<AdminUser>
+
+    // ── Policies (CR-RBAC-001, FE-TASK-017/018) — bridges admin.listPolicies
+    // /createPolicy/updatePolicy/deletePolicy (channels_admin_policies.go).
+    // Editing has no real enforcement effect until CR-RBAC-006's OPA bundle
+    // publish pipeline lands — see AdminAccessPolicy's doc comment. */
+    listPolicies: (params?: { pageToken?: string; pageSize?: number }) => Promise<{
+      policies: AdminAccessPolicy[]
+      nextPageToken: string
+    }>
+    createPolicy: (params: {
+      name: string
+      kind: string
+      documentJson: string
+    }) => Promise<AdminAccessPolicy>
+    updatePolicy: (params: {
+      policyId: string
+      documentJson: string
+      expectedVersion: number
+    }) => Promise<AdminAccessPolicy>
+    deletePolicy: (params: { policyId: string }) => Promise<{ ok: true }>
+
+    // ── Teams (CR-RBAC-001, FE-TASK-017/020) — bridges to the team.* wire
+    // channels (channels_team.go), NOT a dedicated admin.*Team* channel
+    // group (pivoted away, see admin-team-types.ts's doc comment). Namespaced
+    // under `admin` on the frontend because the only consumer is the Admin
+    // Console's Teams tab; `tenantProfile.listTeams` (FE-TASK-011) is a
+    // separate, narrower read-only bridge to the same team.list channel for
+    // the team-grant picker.
+    listTeams: () => Promise<AdminTeam[]>
+    createTeam: (params: { name: string; settingsJson?: string }) => Promise<AdminTeam>
+    addTeamMember: (params: {
+      teamId: string
+      userId: string
+      priority?: number
+    }) => Promise<{ ok: true }>
+    removeTeamMember: (params: { teamId: string; userId: string }) => Promise<{ ok: true }>
+    listTeamMembers: (params: { teamId: string }) => Promise<AdminTeamMember[]>
+
+    // ── Sessions (CR-RBAC-001, FE-TASK-017/021) — bridges
+    // admin.listSessions/forceRevokeSession/forceRevokeAllSessions
+    // (channels_admin_sessions.go). Scoped per-user only — there is no
+    // cross-user "list all sessions" RPC, see AdminSession's doc comment.
+    listSessions: (params: { userId: string }) => Promise<{ sessions: AdminSession[] }>
+    forceRevokeSession: (params: { sessionId: string }) => Promise<{ ok: true }>
+    forceRevokeAllSessions: (params: { userId: string }) => Promise<{ revokedCount: number }>
+
+    // ── Audit (CR-RBAC-001/005, FE-TASK-017/019 base fields; FE-TASK-014/015
+    // extend the filter to actorId/action/outcome) — bridges
+    // admin.queryAuditLog (channels_admin_audit.go).
+    queryAuditLog: (params?: AdminAuditQuery) => Promise<{
+      entries: AdminAuditEntry[]
+      nextPageToken: string
+    }>
   }
   developerPermissions: {
     getStatus: () => Promise<DeveloperPermissionState[]>
@@ -3214,23 +3411,16 @@ export type PreloadApi = {
     }>
     /** Subscribe to streaming progress events during fleet config import.
      *  Returns an unsubscribe function. */
-    onFleetImportProgress: (
-      callback: (status: FleetImportStatus) => void
-    ) => () => void
+    onFleetImportProgress: (callback: (status: FleetImportStatus) => void) => () => void
     // ── Bulk Provisioning Methods (CR-003) ────────────────────────────────────
     /** Trigger bulk relay deployment to the given server IDs.
      *  Progress events are emitted via onProvisioningProgress. */
-    provisionFleetServers: (args: {
-      serverIds: string[]
-      concurrency?: number
-    }) => Promise<void>
+    provisionFleetServers: (args: { serverIds: string[]; concurrency?: number }) => Promise<void>
     /** Cancel the currently running provisioning session. */
     cancelProvisioning: () => Promise<void>
     /** Subscribe to per-server provisioning progress events.
      *  Returns an unsubscribe function. */
-    onProvisioningProgress: (
-      callback: (event: ProvisioningProgressEvent) => void
-    ) => () => void
+    onProvisioningProgress: (callback: (event: ProvisioningProgressEvent) => void) => () => void
     // ── Fleet Health Monitoring (CR-005) ─────────────────────────────────────
     /** Fetch current health snapshot for all connected SSH targets. */
     getFleetHealth: () => Promise<{
@@ -3261,9 +3451,7 @@ export type PreloadApi = {
     cancelBootstrap: (serverId: string) => Promise<void>
     /** Subscribe to streaming bootstrap progress events.
      *  Returns an unsubscribe function. */
-    onBootstrapProgress: (
-      callback: (event: BootstrapProgressEvent) => void
-    ) => () => void
+    onBootstrapProgress: (callback: (event: BootstrapProgressEvent) => void) => () => void
   }
   /** Auth namespace — SSO and user identity (CR-006, Phase 2). */
   auth?: {
@@ -3287,9 +3475,7 @@ export type PreloadApi = {
           email: string
           name: string
           avatarUrl?: string
-          teams: string[]
-          projects: string[]
-          role: 'developer' | 'lead' | 'admin'
+          role: 'developer' | 'admin' // was: 'developer' | 'lead' | 'admin'
         }
         error?: string
       }) => void

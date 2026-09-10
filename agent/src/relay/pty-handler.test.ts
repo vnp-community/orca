@@ -169,7 +169,16 @@ describe('PtyHandler', () => {
 
   it('spawns a PTY and returns an id', async () => {
     const result = await dispatcher.callRequest('pty.spawn', { cols: 80, rows: 24 })
-    expect(result).toEqual({ id: 'pty-1' })
+    // spawn()'s own return type (Promise<{ id; cols; rows; cwd; shell }>) echoes
+    // the resolved size/cwd/shell back to the caller — assert the full contract
+    // instead of the stale id-only shape.
+    expect(result).toEqual({
+      id: 'pty-1',
+      cols: 80,
+      rows: 24,
+      cwd: ptyShellUtils.resolveDefaultCwd(),
+      shell: ptyShellUtils.resolveDefaultShell()
+    })
     expect(mockPtySpawn).toHaveBeenCalled()
     expect(handler.activePtyCount).toBe(1)
   })

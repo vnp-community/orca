@@ -8,13 +8,40 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"time"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
+	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+// protoTimeToRFC3339 formats a possibly-nil *timestamppb.Timestamp for the
+// wire — every camelCase view struct in this file/channels_tenant_project.go
+// uses it instead of returning the raw Timestamp (which plain encoding/json
+// would serialize as its internal {seconds, nanos} fields, not a date
+// string). Nil returns "" (falsy on the frontend), not the 1970 epoch
+// AsTime() would otherwise produce — checked on the concrete *Timestamp,
+// not an interface, so a nil pointer is actually caught (a nil pointer
+// boxed into an interface value is itself a non-nil interface).
+func protoTimeToRFC3339(t *timestamppb.Timestamp) string {
+	if t == nil {
+		return ""
+	}
+	return t.AsTime().Format(time.RFC3339)
+}
+
+// protoTimeMillis is protoTimeToRFC3339's epoch-milliseconds counterpart,
+// for view structs (projectView) whose frontend type expects a number
+// (OrcaProject.createdAt/updatedAt), not a date string.
+func protoTimeMillis(t *timestamppb.Timestamp) int64 {
+	if t == nil {
+		return 0
+	}
+	return t.AsTime().UnixMilli()
+}
 
 // registerEmulatorFolderWorkspaceHostChannels wires every channel this
 // file gives real backend-go implementations to: emulator.* (relay when a
@@ -23,7 +50,7 @@ import (
 // TASK-070; honest local-answer stub otherwise, TASK-068), and
 // folderWorkspace.* (real project-service CRUD, TASK-066).
 func registerEmulatorFolderWorkspaceHostChannels(r *Registry, projectClient projectv1.ProjectServiceClient, infraFleetClient infrafleetv1.InfraFleetServiceClient) {
-	registerEmulatorChannels(r, infraFleetClient)
+	registerEmulatorChannels(r, projectClient, infraFleetClient)
 	registerHostChannels(r, infraFleetClient)
 	registerFolderWorkspaceChannels(r, projectClient)
 }
@@ -34,40 +61,92 @@ func registerEmulatorFolderWorkspaceHostChannels(r *Registry, projectClient proj
 // no backend-go-local implementation and, per
 // 02-microservices-decomposition.md's "What's deliberately not a separate
 // service" section, is explicitly excluded from the Go server deployment
-// by design. The architecturally sound alternative — relay to the Dev
-// Server Agent via infra-fleet-service's real ListEmulatorDevices/
+// by design. The architecturally sound alternative — relay to the Mobile
+// Emulator Agent via infra-fleet-service's real ListEmulatorDevices/
 // GetEmulatorAvailability/AttachEmulatorSession/SendEmulatorTap/
 // SendEmulatorGesture/SendEmulatorButton/RotateEmulator/ShutdownEmulator
 // RPCs (TASK-048) — is now wired for real below, but is honestly inert
-// until agent/ gains a device.* JSON-RPC surface: every relay call reaches
-// a real agent and gets back a real, permanent
+// until emulator/ gains a device.* JSON-RPC surface: every relay call
+// reaches a real agent and gets back a real, permanent
 // FailedPrecondition/INFRA_EMULATOR_UNSUPPORTED (see
 // usecase.EmulatorRelay in infra-fleet-service), which this file surfaces
 // as-is rather than translating further.
 //
+// CR-DS-009 §3.3 (docs/crs/v2/dev-server/CR-DS-009-mobile-emulator-agent-separation.md):
+// the connectionId these channels relay with is no longer trusted directly
+// from the client — a Mobile Emulator Agent has no git/worktree concept, so
+// a git/worktree-shaped connectionId was the wrong identifier to route on
+// in the first place (TASK-046's original contract, before Mobile Emulator
+// Agent existed as a separate agent kind). Every channel below instead
+// takes a projectId and resolves the real connectionId itself:
+// projectId -> ProjectService.GetProject().mobileEmulatorAgentId ->
+// InfraFleetService.ResolveConnection({devServerId: mobileEmulatorAgentId})
+// -> connectionId. See resolveEmulatorConnectionID's doc comment.
+//
 // Per TASK-048's own design, there is NO local/backend-host fallback: a
-// call with no connectionId (or one that can't be resolved) gets the same
-// permanent errEmulatorNotSupported answer TASK-046 shipped, not a
-// disguised relay attempt — driving emulators on the shared backend-go
-// host is out of scope by design, unlike host.* below, which DOES have an
-// honest local answer to fall back to.
+// call that resolves to no connectionId (empty projectId, no
+// mobileEmulatorAgentId bound yet, or that dev server has no live
+// connection) gets the same permanent errEmulatorNotSupported answer
+// TASK-046 shipped, not a disguised relay attempt — driving emulators on
+// the shared backend-go host is out of scope by design, unlike host.*
+// below, which DOES have an honest local answer to fall back to.
 var errEmulatorNotSupported = errors.New(
 	"mobile emulator control is not supported by the Go backend — " +
 		"see specs/backend-go/bugs/missing-v1/solutions/SOL-008-emulator-channels.md")
 
-type emulatorConnectionArgs struct {
-	ConnectionID string `json:"connectionId"`
+type emulatorProjectArgs struct {
+	ProjectID string `json:"projectId"`
 }
 
-func registerEmulatorChannels(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
+// resolveEmulatorConnectionID is CR-DS-009 §3.3's routing change: it turns
+// a projectId into the connectionId every emulator.* RPC below still keys
+// on, by way of the project's mobileEmulatorAgentId binding (F34's
+// CR-DS-009 extension) rather than trusting a client-supplied connectionId.
+// Returns ("", nil) — not an error — for every "can't resolve, but that's
+// an honest state" case (empty projectId, no mobileEmulatorAgentId bound,
+// or ResolveConnection reports no live connection for it): callers treat
+// "" exactly like TASK-046's original empty-connectionId case, so this
+// function doesn't special-case them itself. A real error (GetProject/
+// ResolveConnection RPC failure) propagates as-is.
+func resolveEmulatorConnectionID(ctx context.Context, id Identity, projectClient projectv1.ProjectServiceClient, infraClient infrafleetv1.InfraFleetServiceClient, projectID string) (string, error) {
+	if projectID == "" {
+		return "", nil
+	}
+	identCtx := gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
+
+	projCtx, cancel := context.WithTimeout(identCtx, rpcTimeout)
+	defer cancel()
+	projResp, err := projectClient.GetProject(projCtx, &projectv1.GetProjectRequest{Id: projectID})
+	if err != nil {
+		return "", err
+	}
+	mobileEmulatorAgentID := projResp.GetProject().GetMobileEmulatorAgentId()
+	if mobileEmulatorAgentID == "" {
+		return "", nil
+	}
+
+	resolveCtx, cancel2 := context.WithTimeout(identCtx, rpcTimeout)
+	defer cancel2()
+	resolveResp, err := infraClient.ResolveConnection(resolveCtx, &infrafleetv1.ResolveConnectionRequest{DevServerId: mobileEmulatorAgentID})
+	if err != nil {
+		return "", err
+	}
+	return resolveResp.GetConnectionId(), nil
+}
+
+func registerEmulatorChannels(r *Registry, projectClient projectv1.ProjectServiceClient, client infrafleetv1.InfraFleetServiceClient) {
 	r.Register("emulator.listDevices", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		in := decodeOptionalArg[emulatorConnectionArgs](args, 0)
-		if in.ConnectionID == "" {
+		in := decodeOptionalArg[emulatorProjectArgs](args, 0)
+		connectionID, err := resolveEmulatorConnectionID(ctx, id, projectClient, client, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if connectionID == "" {
 			return nil, errEmulatorNotSupported
 		}
 		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
 		defer cancel()
-		resp, err := client.ListEmulatorDevices(rpcCtx, &infrafleetv1.ListEmulatorDevicesRequest{ConnectionId: in.ConnectionID})
+		resp, err := client.ListEmulatorDevices(rpcCtx, &infrafleetv1.ListEmulatorDevicesRequest{ConnectionId: connectionID})
 		if err != nil {
 			return nil, err
 		}
@@ -75,15 +154,19 @@ func registerEmulatorChannels(r *Registry, client infrafleetv1.InfraFleetService
 	})
 
 	r.Register("emulator.availability", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		in := decodeOptionalArg[emulatorConnectionArgs](args, 0)
+		in := decodeOptionalArg[emulatorProjectArgs](args, 0)
+		connectionID, err := resolveEmulatorConnectionID(ctx, id, projectClient, client, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
 		// Unlike every other emulator.* channel, GetEmulatorAvailability has
 		// no connectionId requirement on infra-fleet-service's side either
-		// (see its usecase's doc comment) — always relay so a genuinely
-		// empty connectionId still gets infra-fleet-service's honest
-		// false/reason answer instead of this file's harder permanent error.
+		// (see its usecase's doc comment) — always relay so an unresolved
+		// connectionId still gets infra-fleet-service's honest false/reason
+		// answer instead of this file's harder permanent error.
 		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
 		defer cancel()
-		resp, err := client.GetEmulatorAvailability(rpcCtx, &infrafleetv1.GetEmulatorAvailabilityRequest{ConnectionId: in.ConnectionID})
+		resp, err := client.GetEmulatorAvailability(rpcCtx, &infrafleetv1.GetEmulatorAvailabilityRequest{ConnectionId: connectionID})
 		if err != nil {
 			return nil, err
 		}
@@ -92,55 +175,67 @@ func registerEmulatorChannels(r *Registry, client infrafleetv1.InfraFleetService
 
 	r.Register("emulator.attach", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type attachArgs struct {
-			ConnectionID string `json:"connectionId"`
-			DeviceID     string `json:"deviceId"`
+			ProjectID string `json:"projectId"`
+			DeviceID  string `json:"deviceId"`
 		}
 		in := decodeOptionalArg[attachArgs](args, 0)
-		if in.ConnectionID == "" {
+		connectionID, err := resolveEmulatorConnectionID(ctx, id, projectClient, client, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if connectionID == "" {
 			return nil, errEmulatorNotSupported
 		}
 		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
 		defer cancel()
-		return client.AttachEmulatorSession(rpcCtx, &infrafleetv1.AttachEmulatorSessionRequest{ConnectionId: in.ConnectionID, DeviceId: in.DeviceID})
+		return client.AttachEmulatorSession(rpcCtx, &infrafleetv1.AttachEmulatorSessionRequest{ConnectionId: connectionID, DeviceId: in.DeviceID})
 	})
 
 	r.Register("emulator.tap", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type tapArgs struct {
-			ConnectionID string `json:"connectionId"`
-			SessionID    string `json:"sessionId"`
-			X            int32  `json:"x"`
-			Y            int32  `json:"y"`
+			ProjectID string `json:"projectId"`
+			SessionID string `json:"sessionId"`
+			X         int32  `json:"x"`
+			Y         int32  `json:"y"`
 		}
 		in := decodeOptionalArg[tapArgs](args, 0)
-		if in.ConnectionID == "" {
+		connectionID, err := resolveEmulatorConnectionID(ctx, id, projectClient, client, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if connectionID == "" {
 			return nil, errEmulatorNotSupported
 		}
 		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
 		defer cancel()
-		_, err := client.SendEmulatorTap(rpcCtx, &infrafleetv1.SendEmulatorTapRequest{
-			ConnectionId: in.ConnectionID, SessionId: in.SessionID, X: in.X, Y: in.Y,
+		_, err = client.SendEmulatorTap(rpcCtx, &infrafleetv1.SendEmulatorTapRequest{
+			ConnectionId: connectionID, SessionId: in.SessionID, X: in.X, Y: in.Y,
 		})
 		return map[string]bool{"ok": err == nil}, err
 	})
 
 	r.Register("emulator.gesture", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type gestureArgs struct {
-			ConnectionID string `json:"connectionId"`
-			SessionID    string `json:"sessionId"`
-			StartX       int32  `json:"startX"`
-			StartY       int32  `json:"startY"`
-			EndX         int32  `json:"endX"`
-			EndY         int32  `json:"endY"`
-			DurationMs   int32  `json:"durationMs"`
+			ProjectID  string `json:"projectId"`
+			SessionID  string `json:"sessionId"`
+			StartX     int32  `json:"startX"`
+			StartY     int32  `json:"startY"`
+			EndX       int32  `json:"endX"`
+			EndY       int32  `json:"endY"`
+			DurationMs int32  `json:"durationMs"`
 		}
 		in := decodeOptionalArg[gestureArgs](args, 0)
-		if in.ConnectionID == "" {
+		connectionID, err := resolveEmulatorConnectionID(ctx, id, projectClient, client, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if connectionID == "" {
 			return nil, errEmulatorNotSupported
 		}
 		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
 		defer cancel()
-		_, err := client.SendEmulatorGesture(rpcCtx, &infrafleetv1.SendEmulatorGestureRequest{
-			ConnectionId: in.ConnectionID, SessionId: in.SessionID,
+		_, err = client.SendEmulatorGesture(rpcCtx, &infrafleetv1.SendEmulatorGestureRequest{
+			ConnectionId: connectionID, SessionId: in.SessionID,
 			StartX: in.StartX, StartY: in.StartY, EndX: in.EndX, EndY: in.EndY, DurationMs: in.DurationMs,
 		})
 		return map[string]bool{"ok": err == nil}, err
@@ -148,53 +243,65 @@ func registerEmulatorChannels(r *Registry, client infrafleetv1.InfraFleetService
 
 	r.Register("emulator.button", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type buttonArgs struct {
-			ConnectionID string `json:"connectionId"`
-			SessionID    string `json:"sessionId"`
-			Button       string `json:"button"`
+			ProjectID string `json:"projectId"`
+			SessionID string `json:"sessionId"`
+			Button    string `json:"button"`
 		}
 		in := decodeOptionalArg[buttonArgs](args, 0)
-		if in.ConnectionID == "" {
+		connectionID, err := resolveEmulatorConnectionID(ctx, id, projectClient, client, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if connectionID == "" {
 			return nil, errEmulatorNotSupported
 		}
 		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
 		defer cancel()
-		_, err := client.SendEmulatorButton(rpcCtx, &infrafleetv1.SendEmulatorButtonRequest{
-			ConnectionId: in.ConnectionID, SessionId: in.SessionID, Button: in.Button,
+		_, err = client.SendEmulatorButton(rpcCtx, &infrafleetv1.SendEmulatorButtonRequest{
+			ConnectionId: connectionID, SessionId: in.SessionID, Button: in.Button,
 		})
 		return map[string]bool{"ok": err == nil}, err
 	})
 
 	r.Register("emulator.rotate", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type rotateArgs struct {
-			ConnectionID string `json:"connectionId"`
-			SessionID    string `json:"sessionId"`
-			Orientation  string `json:"orientation"`
+			ProjectID   string `json:"projectId"`
+			SessionID   string `json:"sessionId"`
+			Orientation string `json:"orientation"`
 		}
 		in := decodeOptionalArg[rotateArgs](args, 0)
-		if in.ConnectionID == "" {
+		connectionID, err := resolveEmulatorConnectionID(ctx, id, projectClient, client, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if connectionID == "" {
 			return nil, errEmulatorNotSupported
 		}
 		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
 		defer cancel()
-		_, err := client.RotateEmulator(rpcCtx, &infrafleetv1.RotateEmulatorRequest{
-			ConnectionId: in.ConnectionID, SessionId: in.SessionID, Orientation: in.Orientation,
+		_, err = client.RotateEmulator(rpcCtx, &infrafleetv1.RotateEmulatorRequest{
+			ConnectionId: connectionID, SessionId: in.SessionID, Orientation: in.Orientation,
 		})
 		return map[string]bool{"ok": err == nil}, err
 	})
 
 	r.Register("emulator.shutdown", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type shutdownArgs struct {
-			ConnectionID string `json:"connectionId"`
-			SessionID    string `json:"sessionId"`
+			ProjectID string `json:"projectId"`
+			SessionID string `json:"sessionId"`
 		}
 		in := decodeOptionalArg[shutdownArgs](args, 0)
-		if in.ConnectionID == "" {
+		connectionID, err := resolveEmulatorConnectionID(ctx, id, projectClient, client, in.ProjectID)
+		if err != nil {
+			return nil, err
+		}
+		if connectionID == "" {
 			return nil, errEmulatorNotSupported
 		}
 		rpcCtx, cancel := context.WithTimeout(gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID}), rpcTimeout)
 		defer cancel()
-		_, err := client.ShutdownEmulator(rpcCtx, &infrafleetv1.ShutdownEmulatorRequest{
-			ConnectionId: in.ConnectionID, SessionId: in.SessionID,
+		_, err = client.ShutdownEmulator(rpcCtx, &infrafleetv1.ShutdownEmulatorRequest{
+			ConnectionId: connectionID, SessionId: in.SessionID,
 		})
 		return map[string]bool{"ok": err == nil}, err
 	})
@@ -274,6 +381,37 @@ func resolveHostCapabilities(ctx context.Context, id Identity, client infrafleet
 	return client.GetHostCapabilities(rpcCtx, &infrafleetv1.GetHostCapabilitiesRequest{ConnectionId: in.ConnectionID})
 }
 
+// folderWorkspaceView/toFolderWorkspaceView: protoc-gen-go's own
+// encoding/json struct tags are snake_case (e.g. `json:"dev_server_id"`,
+// `json:"project_group_id"`), but this envelope's Result field
+// (envelope.go) is serialized via plain encoding/json (wsjson.Write), not
+// protojson — returning the raw *projectv1.FolderWorkspace silently ships
+// dev_server_id/added_by/created_at/project_group_id (all undefined to a
+// camelCase-only frontend). Same bug class already fixed for profile.* in
+// channels_tenant_project.go (see that file's userProfileView) — found
+// live here during Phase 4b's folder-workspace grouping pass. CreatedAt is
+// formatted as RFC3339 (not epoch millis) to match
+// createFolderWorkspace/mergeCreatedFolderWorkspaceResponse's
+// `new Date(result.createdAt).getTime()` parsing on the frontend.
+type folderWorkspaceView struct {
+	ID             string `json:"id"`
+	DevServerID    string `json:"devServerId"`
+	Path           string `json:"path"`
+	Name           string `json:"name"`
+	AddedBy        string `json:"addedBy"`
+	CreatedAt      string `json:"createdAt,omitempty"`
+	ProjectGroupID string `json:"projectGroupId"`
+}
+
+func toFolderWorkspaceView(fw *projectv1.FolderWorkspace) folderWorkspaceView {
+	return folderWorkspaceView{
+		ID: fw.GetId(), DevServerID: fw.GetDevServerId(), Path: fw.GetPath(),
+		Name: fw.GetName(), AddedBy: fw.GetAddedBy(),
+		CreatedAt:      protoTimeToRFC3339(fw.GetCreatedAt()),
+		ProjectGroupID: fw.GetProjectGroupId(),
+	}
+}
+
 // ── folderWorkspace.* ─────────────────────────────────────────────────────
 //
 // Straightforward CRUD dispatch against project-service's FolderWorkspace
@@ -290,21 +428,22 @@ func resolveHostCapabilities(ctx context.Context, id Identity, client infrafleet
 func registerFolderWorkspaceChannels(r *Registry, client projectv1.ProjectServiceClient) {
 	r.Register("folderWorkspace.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
-			DevServerID string `json:"devServerId"`
-			Path        string `json:"path"`
-			Name        string `json:"name"`
+			DevServerID    string `json:"devServerId"`
+			Path           string `json:"path"`
+			Name           string `json:"name"`
+			ProjectGroupID string `json:"projectGroupId"`
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
 		resp, err := client.CreateFolderWorkspace(ctx, &projectv1.CreateFolderWorkspaceRequest{
-			DevServerId: in.DevServerID, Path: in.Path, Name: in.Name,
+			DevServerId: in.DevServerID, Path: in.Path, Name: in.Name, ProjectGroupId: in.ProjectGroupID,
 		})
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetFolderWorkspace(), nil
+		return toFolderWorkspaceView(resp.GetFolderWorkspace()), nil
 	})
 
 	r.Register("folderWorkspace.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -320,7 +459,7 @@ func registerFolderWorkspaceChannels(r *Registry, client projectv1.ProjectServic
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetFolderWorkspace(), nil
+		return toFolderWorkspaceView(resp.GetFolderWorkspace()), nil
 	})
 
 	r.Register("folderWorkspace.delete", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -342,7 +481,15 @@ func registerFolderWorkspaceChannels(r *Registry, client projectv1.ProjectServic
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetFolderWorkspaces(), nil
+		// Why {folderWorkspaces: [...]}, not a bare array: repos.ts's
+		// fetchFolderWorkspacesForTarget reads `.folderWorkspaces` off this
+		// response — matches that established wrapper shape.
+		fws := resp.GetFolderWorkspaces()
+		views := make([]folderWorkspaceView, 0, len(fws))
+		for _, fw := range fws {
+			views = append(views, toFolderWorkspaceView(fw))
+		}
+		return map[string]any{"folderWorkspaces": views}, nil
 	})
 
 	r.Register("folderWorkspace.getPathStatus", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -360,6 +507,12 @@ func registerFolderWorkspaceChannels(r *Registry, client projectv1.ProjectServic
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		// Why a view, not raw resp: existing_folder_workspace_id is the only
+		// multi-word field here (status is already a plain string, not an
+		// enum) — same camelCase bug as folderWorkspaceView above.
+		return map[string]any{
+			"status":                    resp.GetStatus(),
+			"existingFolderWorkspaceId": resp.GetExistingFolderWorkspaceId(),
+		}, nil
 	})
 }

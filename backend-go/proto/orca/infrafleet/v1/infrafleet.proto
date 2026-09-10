@@ -24,6 +24,19 @@ service InfraFleetService {
   // dispatch-target shape (TASK-WF-02-02/04) — load-balance across this
   // tenant's healthy dev servers carrying tag.
   rpc ListDevServersByTag(ListDevServersByTagRequest) returns (ListDevServersByTagResponse);
+  // --- CR-DS-006 Phase 2 / CR-DS-007 / CR-DS-008 (dev server access control) ---
+  rpc ApproveDevServer(ApproveDevServerRequest) returns (ApproveDevServerResponse);
+  rpc RejectDevServer(RejectDevServerRequest) returns (RejectDevServerResponse);
+  rpc AssignDevServerGroup(AssignDevServerGroupRequest) returns (AssignDevServerGroupResponse);
+  rpc CreateDevServerGroup(CreateDevServerGroupRequest) returns (CreateDevServerGroupResponse);
+  rpc ListDevServerGroups(ListDevServerGroupsRequest) returns (ListDevServerGroupsResponse);
+  rpc GrantDevServerGroupAccess(GrantDevServerGroupAccessRequest) returns (GrantDevServerGroupAccessResponse);
+  rpc RevokeDevServerGroupAccess(RevokeDevServerGroupAccessRequest) returns (RevokeDevServerGroupAccessResponse);
+  rpc ListDevServerGroupGrants(ListDevServerGroupGrantsRequest) returns (ListDevServerGroupGrantsResponse);
+  rpc ListDevServersForUser(ListDevServersForUserRequest) returns (ListDevServersForUserResponse);
+  rpc CreateAccessRequest(CreateAccessRequestRequest) returns (CreateAccessRequestResponse);
+  rpc ListPendingAccessRequests(ListPendingAccessRequestsRequest) returns (ListPendingAccessRequestsResponse);
+  rpc ResolveAccessRequest(ResolveAccessRequestRequest) returns (ResolveAccessRequestResponse);
   // CreateConnection is the write path for infra.connections
   // (migrations/0002_connections) — binds a dev server to a worktree/repo
   // path, producing the connectionId ResolveConnection/Relay resolve
@@ -45,18 +58,53 @@ service InfraFleetService {
   // JSON-RPC response frame's result, encoded verbatim — same "no per-method
   // translation" contract as RelayResponse.result_json, just repeated.
   rpc RelayStream(RelayStreamRequest) returns (stream RelayStreamFrame);
+  // RelayByDevServer is Relay's devServerId-keyed counterpart — see
+  // usecase.RelayByDevServer's doc comment for why: a dev server has no
+  // infra.connections row (what Relay resolves through) until a repo/
+  // worktree is bound to it, but "browse this dev server's filesystem to
+  // pick the first repo/worktree" needs to reach the agent BEFORE that
+  // exists. Bypasses infra.connections entirely.
+  rpc RelayByDevServer(RelayByDevServerRequest) returns (RelayResponse);
+  // StreamFileChanges subscribes to fs.changed push notifications for one
+  // watched path (BACKLOG-003) — Relay/RelayByDevServer above are unary
+  // request/response only, so they can carry fs.watch's initial ack but not
+  // the ongoing push stream the agent's watcher emits afterward. Same dual
+  // connection_id/dev_server_id addressing as Relay/RelayByDevServer
+  // (exactly one set); see devserveragent.Client.StreamFileChanges's doc
+  // comment for the fs.watch/fs.unwatch/fs.changed wire contract this
+  // subscribes to, and this RPC's own usecase for why it's plain
+  // server-streaming (no inbound frame needed — unlike AttachPty/
+  // AttachScreencast, there's no interactive input to send once watching
+  // starts; the caller ends the subscription by canceling this call's ctx).
+  rpc StreamFileChanges(StreamFileChangesRequest) returns (stream FileChangeEvent);
+  // IsDevServerConnected answers "does this dev server have a live agent
+  // session right now" — cheap, side-effect-free (never dials). Replaces
+  // the hardcoded "disconnected" wscompat's devServer.list/listForUser used
+  // to always report regardless of the agent's real state.
+  rpc IsDevServerConnected(IsDevServerConnectedRequest) returns (IsDevServerConnectedResponse);
   // ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
   // latter derives from this same read — see wscompat's registerSshChannels).
   rpc ListSshTargets(ListSshTargetsRequest) returns (ListSshTargetsResponse);
   // GetSshState is a local read (no dial) of whichever connection (if any)
   // currently binds this SSH target's dev server.
   rpc GetSshState(GetSshStateRequest) returns (GetSshStateResponse);
+  // GetFleetConnectivitySummary is CR-STORAGE-007's poll-driven health
+  // summary — a plain Postgres read (no dial) over every connections row
+  // scoped to the caller's tenant, joined with dev_servers. Request is
+  // deliberately empty: tenant/user scoping comes from gRPC metadata
+  // (identity), never a request field — see BE-SOL-STORAGE-002 §5.
+  rpc GetFleetConnectivitySummary(GetFleetConnectivitySummaryRequest) returns (GetFleetConnectivitySummaryResponse);
   // EstablishConnection performs the actual SSH + Dev Server Agent
   // handshake synchronously — it IS the connection-establishment act, not
   // a record of one requested. See usecase.EstablishConnection's doc comment.
   rpc EstablishConnection(EstablishConnectionRequest) returns (Connection);
-  // TeardownConnection is BR-SSH-13's "Cancel" action: marks the connection
-  // closed and stops any in-flight relaySSHReconnect backoff loop.
+  // TeardownConnection serves two callers: BR-SSH-13's "Cancel" action
+  // (marks the connection closed and stops any in-flight relaySSHReconnect
+  // backoff loop) and the confirmed-logout explicit-close path
+  // (BE-SOL-STORAGE-003 §5, TASK-BE-STORAGE-012) — the one deliberate
+  // exception to the reconnect-resume grace period (BE-SOL-STORAGE-003 §2):
+  // established|degraded -> closed immediately, no waiting for
+  // grace_period_seconds to elapse.
   rpc TeardownConnection(TeardownConnectionRequest) returns (google.protobuf.Empty);
   rpc KillWorkspacePort(KillWorkspacePortRequest) returns (KillWorkspacePortResponse);
 
@@ -127,6 +175,19 @@ service InfraFleetService {
   // RPC is opened once per terminal.create by api-gateway's wscompat bridge
   // (TASK-186) and piped into `push` frames via TASK-012's pipePush.
   rpc AttachPty(stream PtyClientFrame) returns (stream PtyServerFrame);
+
+  // AttachScreencast is browser.screencast's transport — the remote-
+  // headless-browser live-view stream, mirroring AttachPty's bidi shape
+  // exactly (see docs/execution-plan.md and TASK-036's "Status by layer"
+  // section for why this exists: the agent+backend-go layers of the 12-op
+  // browser.* relay were already real, but the live view was missing).
+  // frame_data carries opaque, already-encoded bytes produced agent-side
+  // by encodeBrowserScreencastFrame (frontend/src/shared/browser-screencast-protocol.ts,
+  // copied verbatim into agent/src/shared/) — infra-fleet-service and
+  // api-gateway never parse image bytes, they relay them byte-for-byte.
+  // dialog/dialogClosed are deliberately NOT modeled here — see
+  // channels_browser_screencast.go's doc comment for the scope cut.
+  rpc AttachScreencast(stream ScreencastClientFrame) returns (stream ScreencastServerFrame);
 
   // ListBrowserProfiles/CreateBrowserProfile/DeleteBrowserProfile back
   // api-gateway's browser.profileList/profileCreate/profileDelete channels
@@ -212,6 +273,36 @@ service InfraFleetService {
   // resolve a replacement account excluding the one just switched away
   // from, then resume/start with the new account.
   rpc SwitchAgentAccount(SwitchAgentAccountRequest) returns (AgentSession);
+
+  // ListEphemeralVmRuntimes is a plain tenant-scoped Postgres read (no
+  // relay) of every non-destroyed ephemeral_vm_runtimes row — SOL-004
+  // Group 1's second read. Written to by EphemeralVmRelay (TASK-004).
+  rpc ListEphemeralVmRuntimes(ListEphemeralVmRuntimesRequest) returns (ListEphemeralVmRuntimesResponse);
+
+  // AttachEphemeralVmWorkspace is pure bookkeeping (no agent relay) — binds
+  // an already-provisioned runtime to a workspace/worktree id. See
+  // EphemeralVmRelay's doc comment for why this differs from SOL-004's own
+  // sketch (which incorrectly modeled it as a create-command exec).
+  rpc AttachEphemeralVmWorkspace(AttachEphemeralVmWorkspaceRequest) returns (EphemeralVmRuntime);
+  // SuspendEphemeralVmWorkspace/ResumeEphemeralVmWorkspace/CleanupEphemeralVmWorkspace
+  // relay `command` (the recipe's suspend/resume/destroy shell command,
+  // resolved by api-gateway's wscompat layer via git-gateway-service's
+  // ReadEphemeralVmRecipes — see TASK-005) to the repo's Dev Server via a
+  // new agent-side `vm.exec` method that does not exist today. Every call
+  // reaches a real agent and fails with a typed, permanent
+  // INFRA_EPHEMERAL_VM_UNSUPPORTED FailedPrecondition until agent/ gains
+  // one — see EmulatorRelay's identical, already-shipped pattern.
+  rpc SuspendEphemeralVmWorkspace(SuspendEphemeralVmWorkspaceRequest) returns (EphemeralVmRuntime);
+  rpc ResumeEphemeralVmWorkspace(ResumeEphemeralVmWorkspaceRequest) returns (EphemeralVmRuntime);
+  rpc CleanupEphemeralVmWorkspace(CleanupEphemeralVmWorkspaceRequest) returns (EphemeralVmRuntime);
+
+  // StreamVmProvision runs a recipe's provision command against the Dev
+  // Server Agent and streams its stdout/stderr back live, mirroring
+  // AttachScreencast/AttachPty's precedent (BE-SOL-EVM-002 §2) rather than a
+  // unary call — provisioning a real VM can take minutes. The terminal
+  // "result"-typed event carries VmProvisionResult; the "ssh" branch is
+  // pass-through only here (no dial) — see BE-SOL-EVM-004 for that.
+  rpc StreamVmProvision(StreamVmProvisionRequest) returns (stream VmProvisionEvent);
 }
 
 enum ConnectionMode {
@@ -219,6 +310,95 @@ enum ConnectionMode {
   CONNECTION_MODE_RELAY_SSH = 1;
   CONNECTION_MODE_RELAY_WEBSOCKET = 2;
   CONNECTION_MODE_DIRECT_WEBSOCKET = 3;
+}
+
+// AgentKind distinguishes a Dev Server Agent registration (agent/, drives
+// git/fs/pty/browser on the machine holding the project's code) from a
+// Mobile Emulator Agent registration (emulator/, drives Android/iOS
+// device.* control on whichever machine has Android Studio/Xcode) — both
+// register through the same RegisterDevServer RPC and share this same
+// registry/approval/grouping infra, they just carry a different kind. See
+// docs/crs/v2/dev-server/CR-DS-009-mobile-emulator-agent-separation.md §3.1.
+// UNSPECIFIED on RegisterDevServerRequest is treated as AGENT_KIND_DEV_SERVER
+// by the usecase (back-compat default for agent/ builds that predate this
+// field and never set it).
+enum AgentKind {
+  AGENT_KIND_UNSPECIFIED = 0;
+  AGENT_KIND_DEV_SERVER = 1;
+  AGENT_KIND_MOBILE_EMULATOR = 2;
+}
+
+// ListEphemeralVmRuntimesRequest carries no fields — tenant scoping comes
+// from the caller's gRPC metadata via tenant.RequireTenantID, the same
+// convention EmulatorRelay's methods use.
+message ListEphemeralVmRuntimesRequest {}
+message ListEphemeralVmRuntimesResponse { repeated EphemeralVmRuntime runtimes = 1; }
+message EphemeralVmRuntime {
+  string id = 1;
+  string repo_id = 2;
+  string recipe_id = 3;
+  string connection_type = 4;   // "orca-server" | "ssh" | "" (unset until create/resume's result is parsed)
+  string status = 5;            // "provisioning" | "active" | "suspended" | "error" | "destroyed"
+  string environment_id = 6;    // set once an orca-server-type recipe's pairing succeeds
+  string workspace_id = 7;      // set by AttachWorkspace (TASK-004); empty until attached
+  string last_error = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+}
+
+message AttachEphemeralVmWorkspaceRequest { string runtime_id = 1; string workspace_id = 2; }
+message SuspendEphemeralVmWorkspaceRequest { string connection_id = 1; string workspace_id = 2; string command = 3; }
+message ResumeEphemeralVmWorkspaceRequest { string connection_id = 1; string workspace_id = 2; string command = 3; }
+message CleanupEphemeralVmWorkspaceRequest { string connection_id = 1; string runtime_id = 2; string command = 3; }
+
+message StreamVmProvisionRequest {
+  string connection_id = 1;
+  string recipe_id = 2;
+  string runtime_id = 3;
+  // command is the recipe's resolved `create` shell command — resolved
+  // server-side by api-gateway's wscompat layer via git-gateway-service's
+  // ReadEphemeralVmRecipes (TASK-BE-EVM-005), the same pattern
+  // Suspend/Resume/CleanupEphemeralVmWorkspaceRequest already use for their
+  // own `command` field. infra-fleet-service must not gain a dependency on
+  // git-gateway-service (EphemeralVmRelay's doc comment — the existing
+  // dependency direction is the other way), so it cannot resolve this
+  // itself; added here (missing from this message's original TASK-BE-EVM-002
+  // pass) once TASK-BE-EVM-004's Provision usecase confirmed it needs one,
+  // mirroring the 3 sibling request messages' shape.
+  string command = 4;
+}
+message VmProvisionEvent {
+  string type = 1;   // "stdout" | "stderr" | "result" | "error"
+  string chunk = 2;
+  VmProvisionResult result = 3; // set only when type == "result"
+}
+message VmProvisionResult {
+  string type = 1;          // "orca-server" | "ssh"
+  string pairing_code = 2;  // set when type == "orca-server"
+  string project_root = 3;
+  EphemeralVmRecipeSshTarget ssh_target = 4; // set when type == "ssh"
+}
+// EphemeralVmRecipeSshTarget mirrors frontend/src/shared/ephemeral-vm-recipes.ts's
+// EphemeralVmRecipeSshTargetSchema field-for-field, with two deliberate
+// omissions (BE-SOL-EVM-002 §6 field cross-check):
+//  - config_host: frontend-only, display-label derived from the recipe's
+//    source ssh/config Host entry — never used as SSH dial input, so it
+//    carries nothing this pass-through result needs.
+//  - port_forwards: local port-forward config for the actual SSH dial,
+//    which is explicitly out of scope here (§5: the "ssh" branch is
+//    pass-through only, never dialed — see BE-SOL-EVM-004/CR-EVM-005).
+//    Add it to this message when that task wires a real dial.
+message EphemeralVmRecipeSshTarget {
+  string label = 1;
+  string host = 2;
+  int32 port = 3;
+  string username = 4;
+  string identity_file = 5;
+  string identity_agent = 6;
+  bool identities_only = 7;
+  string proxy_command = 8;
+  string jump_host = 9;
+  int32 relay_grace_period_seconds = 10;
 }
 
 message DevServer {
@@ -232,21 +412,38 @@ message DevServer {
   // "DevServer<->SshTarget linkage the domain model doesn't have yet" gap
   // this service's README flagged (Epic A third pass).
   string ssh_target_id = 5;
-  // status is domain.DevServerStatus verbatim: pending|healthy|degraded|
-  // unhealthy — see BulkProvisionFleet's doc comment (SOL-FLEET-02).
-  string status = 6;
+  // approval_status/group_id — CR-DS-006 Phase 2
+  // (docs/crs/v2/dev-server/CR-DS-006-dev-server-approval-and-grouping.md).
+  // Column named approval_status, not status: infra.dev_servers already has
+  // an unrelated status column (health/bootstrap state) from a separate
+  // migration — see migrations/0008_dev_server_approval_status_and_groups.up.sql's
+  // header comment.
+  string approval_status = 6; // pending_approval | approved | rejected
+  string group_id = 7;        // empty = ungrouped
+  // kind — CR-DS-009 §3.1. Every row registered before this field existed
+  // backfills to AGENT_KIND_DEV_SERVER (migrations/0011_dev_server_kind).
+  AgentKind kind = 8;
+  // health_status is domain.DevServerHealthStatus verbatim: pending|healthy|
+  // degraded|unhealthy — see BulkProvisionFleet's doc comment
+  // (SOL-FLEET-02) and
+  // docs/backlog/BACKLOG-007-dev-server-bootstrap-status-proto-field.md
+  // (option 2: reuse this coarse status for bootstrap.ts instead of adding
+  // a dedicated per-step bootstrap field). Distinct from approval_status
+  // above (admin approval, not connectivity/health) — see
+  // domain.DevServerHealthStatus's doc comment.
+  string health_status = 9;
   // platform/arch/node_version/agent_version are handshake-derived facts
   // (SOL-FLEET-04) — the same columns SOL-FLEET-02's BulkProvisionFleet
   // also persists into (domain.DevServer), see
   // usecase.DevServerRepository.UpdateProvisionResult.
-  string platform = 7;
-  string arch = 8;
-  string node_version = 9;
-  string agent_version = 10;
+  string platform = 10;
+  string arch = 11;
+  string node_version = 12;
+  string agent_version = 13;
   // tags is free-form, tenant-scoped (e.g. "gpu", "region:us-east"); also
   // BL-PRF-03's allowedServerTags match target and WF's ListDevServersByTag
   // dispatch-target key.
-  repeated string tags = 11;
+  repeated string tags = 14;
 }
 
 message RegisterDevServerRequest {
@@ -258,6 +455,9 @@ message RegisterDevServerRequest {
   // placeholder until agent/ gains a daemon (see TASK-FLEET-02-08).
   int32 relay_port = 5;
   repeated string tags = 6; // BL-PRF-03's allowedServerTags match target
+  // kind — CR-DS-009 §3.1. AGENT_KIND_UNSPECIFIED defaults to
+  // AGENT_KIND_DEV_SERVER server-side, see AgentKind's doc comment.
+  AgentKind kind = 7;
 }
 
 message RegisterDevServerResponse {
@@ -307,12 +507,28 @@ message ResolveConnectionResponse {
   // — empty when connected is false or the session predates this field.
   // Added for SOL-INT-03's preflight merge; not populated by any other RPC.
   string node_version = 6;
+  // hidden_target_id (TASK-BE-EVM-018, BE-SOL-EVM-004 §4/§6c) is set ONLY
+  // when this connection's worktree is attached to an ephemeral VM runtime
+  // whose connection_type is "ssh" (Hướng A, agent-outbound) — by
+  // convention, equal to that runtime's id. Empty for every other
+  // connection (the overwhelming majority) — an orthogonal routing
+  // attribute, NOT a new dev_server/host: dev_server above still points at
+  // the SAME, ALREADY-EXISTING Dev Server that ran vm.provision (decision
+  // 3 in BE-SOL-EVM-004's "Quyết định đã chốt"). git-gateway-service's
+  // RelayExecutor uses this to pick a "<method>ViaHiddenTarget" agent
+  // method instead of the normal one (TASK-BE-EVM-015).
+  string hidden_target_id = 7;
 }
 
 message ListDevServersRequest {
   // tenant_id is intentionally absent — pulled from request context (see
   // RegisterDevServerInput's doc comment for the same convention), never
   // trusted from the caller.
+  // kind — CR-DS-009 §3.1: AGENT_KIND_UNSPECIFIED (the zero value) returns
+  // every dev server regardless of kind, matching this RPC's behavior
+  // before this field existed — existing callers that never set it are
+  // unaffected.
+  AgentKind kind = 1;
 }
 
 message ListDevServersResponse {
@@ -326,6 +542,186 @@ message ListDevServersByTagRequest {
 
 message ListDevServersByTagResponse {
   repeated DevServer dev_servers = 1;
+}
+
+// ── CR-DS-006 Phase 2: admin approval + grouping ────────────────────────
+// docs/crs/v2/dev-server/CR-DS-006-dev-server-approval-and-grouping.md
+
+message DevServerGroup {
+  string id = 1;
+  string tenant_id = 2;
+  string name = 3;
+  string parent_group_id = 4; // empty = root of the tree
+}
+
+// ApproveDevServer/RejectDevServer/AssignDevServerGroup are admin-gated —
+// see usecase.requireAdmin (internal/usecase/authorization.go), which reads
+// the caller's role from common/tenant.Role(ctx). Fails closed
+// (PermissionDenied) if the role claim is absent, per that gap's own
+// documented "empty means unknown, never trust it" contract.
+message ApproveDevServerRequest {
+  string dev_server_id = 1;
+}
+message ApproveDevServerResponse {
+  DevServer dev_server = 1;
+}
+
+message RejectDevServerRequest {
+  string dev_server_id = 1;
+  string reason = 2;
+}
+message RejectDevServerResponse {
+  DevServer dev_server = 1;
+}
+
+message AssignDevServerGroupRequest {
+  string dev_server_id = 1;
+  string group_id = 2; // empty = unassign (ungroup)
+}
+message AssignDevServerGroupResponse {
+  DevServer dev_server = 1;
+}
+
+message CreateDevServerGroupRequest {
+  string name = 1;
+  string parent_group_id = 2;
+}
+message CreateDevServerGroupResponse {
+  DevServerGroup group = 1;
+}
+
+message ListDevServerGroupsRequest {
+  // tenant_id intentionally absent — pulled from context, same convention
+  // as ListDevServersRequest.
+}
+message ListDevServerGroupsResponse {
+  repeated DevServerGroup groups = 1;
+}
+
+// ── CR-DS-007: department/team ↔ group access grants ────────────────────
+// docs/crs/v2/dev-server/CR-DS-007-department-based-access-control.md
+//
+// Open decisions this proto encodes an answer to (recorded, not silently
+// assumed — see that CR's §3 and this pass's own solution docs for the
+// reasoning): ungrouped/unassigned dev servers are admin-only (never
+// returned by ListDevServersForUser); a group's grants are inherited by
+// every descendant group in its tree; department and team grants are OR'd
+// together (either one is sufficient).
+
+enum DevServerGroupGranteeKind {
+  DEV_SERVER_GROUP_GRANTEE_KIND_UNSPECIFIED = 0;
+  DEV_SERVER_GROUP_GRANTEE_KIND_DEPARTMENT = 1;
+  DEV_SERVER_GROUP_GRANTEE_KIND_TEAM = 2;
+}
+
+message DevServerGroupGrant {
+  string id = 1;
+  string tenant_id = 2;
+  string dev_server_group_id = 3;
+  DevServerGroupGranteeKind grantee_kind = 4;
+  string grantee_id = 5; // department_id or team_id — logical FK into tenant-service
+}
+
+// GrantDevServerGroupAccess/RevokeDevServerGroupAccess are admin-gated.
+message GrantDevServerGroupAccessRequest {
+  string dev_server_group_id = 1;
+  DevServerGroupGranteeKind grantee_kind = 2;
+  string grantee_id = 3;
+}
+message GrantDevServerGroupAccessResponse {
+  DevServerGroupGrant grant = 1;
+}
+
+message RevokeDevServerGroupAccessRequest {
+  string grant_id = 1;
+}
+message RevokeDevServerGroupAccessResponse {}
+
+message ListDevServerGroupGrantsRequest {
+  string dev_server_group_id = 1; // empty = every grant in the tenant
+}
+message ListDevServerGroupGrantsResponse {
+  repeated DevServerGroupGrant grants = 1;
+}
+
+// ListDevServersForUser is NOT admin-gated (every authenticated tenant user
+// calls this) — department_id/team_ids are supplied by the caller
+// (api-gateway, having already resolved them via
+// tenant-service.GetResolvedProfile), not looked up by infra-fleet-service
+// itself. Matches the "multi-service view assembled at api-gateway's edge,
+// not inside either owning service" pattern
+// worktree.detectedList/registerWorktreeChannels already established — see
+// that channel's doc comment. Keeps infra-fleet-service free of a new
+// cross-service dependency on tenant-service.
+message ListDevServersForUserRequest {
+  string department_id = 1; // "" if the user has none
+  repeated string team_ids = 2;
+  // kind — CR-DS-009 §3.1, same "unspecified = no filter" convention as
+  // ListDevServersRequest.kind.
+  AgentKind kind = 3;
+}
+message ListDevServersForUserResponse {
+  repeated DevServer dev_servers = 1;
+}
+
+// ── CR-DS-008: dev server access requests ───────────────────────────────
+// docs/crs/v2/dev-server/CR-DS-008-first-login-department-gate-and-access-request.md
+
+enum DevServerAccessRequestStatus {
+  DEV_SERVER_ACCESS_REQUEST_STATUS_UNSPECIFIED = 0;
+  DEV_SERVER_ACCESS_REQUEST_STATUS_PENDING = 1;
+  DEV_SERVER_ACCESS_REQUEST_STATUS_APPROVED = 2;
+  DEV_SERVER_ACCESS_REQUEST_STATUS_REJECTED = 3;
+}
+
+message DevServerAccessRequest {
+  string id = 1;
+  string tenant_id = 2;
+  string user_id = 3;
+  string dev_server_group_id = 4;
+  DevServerAccessRequestStatus status = 5;
+  string message = 6;
+  int64 created_at_unix_ms = 7;
+  // grantee_kind/grantee_id — captured at request-creation time (computed
+  // by api-gateway from the requester's tenant-service profile, same
+  // "resolve at the edge" reasoning as ListDevServersForUserRequest's
+  // department_id/team_ids), not re-derived at resolve time. When approved,
+  // ResolveAccessRequest grants exactly this (kind, id) pair — see that
+  // RPC's doc comment.
+  DevServerGroupGranteeKind grantee_kind = 8;
+  string grantee_id = 9;
+}
+
+// CreateAccessRequest is called by any authenticated tenant user — not
+// admin-gated (the whole point is a non-admin asking for access).
+// grantee_kind/grantee_id are supplied by the caller (api-gateway), same
+// reasoning as DevServerAccessRequest.grantee_kind's doc comment — this
+// service never looks up the requester's department/team itself.
+message CreateAccessRequestRequest {
+  string dev_server_group_id = 1;
+  string message = 2;
+  DevServerGroupGranteeKind grantee_kind = 3;
+  string grantee_id = 4;
+}
+message CreateAccessRequestResponse {
+  DevServerAccessRequest request = 1;
+}
+
+// ListPendingAccessRequests/ResolveAccessRequest are admin-gated.
+message ListPendingAccessRequestsRequest {}
+message ListPendingAccessRequestsResponse {
+  repeated DevServerAccessRequest requests = 1;
+}
+
+message ResolveAccessRequestRequest {
+  string request_id = 1;
+  bool approve = 2; // false = reject
+}
+message ResolveAccessRequestResponse {
+  DevServerAccessRequest request = 1;
+  // grant is populated only when approve=true — the GrantDevServerGroupAccess
+  // row this resolution created for the requester's department/team.
+  DevServerGroupGrant grant = 2;
 }
 
 message CreateConnectionRequest {
@@ -366,6 +762,48 @@ message RelayStreamFrame {
   // git-gateway-service's grpcclient adapter decodes this into a
   // domain.GitProgressLine, this RPC itself stays method-agnostic like Relay.
   string frame_json = 1;
+}
+
+message RelayByDevServerRequest {
+  string dev_server_id = 1;
+  string method = 2;
+  // params_json — same convention as RelayRequest.params_json.
+  string params_json = 3;
+}
+
+// StreamFileChangesRequest — exactly one of connection_id/dev_server_id is
+// set, same convention as Relay/RelayByDevServer's twin addressing. path is
+// an ABSOLUTE path on the target host (git-gateway-service resolves
+// worktree_id -> repoPath before calling this, the same resolution every
+// other files.* method already does — see RelayExecutor.relay's doc
+// comment).
+message StreamFileChangesRequest {
+  string connection_id = 1;
+  string dev_server_id = 2;
+  string path = 3;
+}
+
+// FileChangeEvent mirrors frontend's FsChangeEvent shape (frontend/src/shared/types.ts)
+// field-for-field so wscompat can forward it with no reshaping. Only kind
+// and absolute_path are ever populated today — old_absolute_path/
+// is_directory exist for shape parity but the agent's Node fs.watch-backed
+// primitive (agent/src/relay/fs-agent-extensions.ts's handleFsWatch) has no
+// rename-pair or directory-vs-file signal to fill them from; false/empty is
+// the honest default, never fabricated (same precedent as
+// InspectProcessResult.Known=false).
+message FileChangeEvent {
+  string kind = 1;              // "create" | "update" | "delete" | "rename" | "overflow"
+  string absolute_path = 2;
+  string old_absolute_path = 3; // always empty today, see doc comment above
+  bool is_directory = 4;        // always false today, see doc comment above
+}
+
+message IsDevServerConnectedRequest {
+  string dev_server_id = 1;
+}
+
+message IsDevServerConnectedResponse {
+  bool connected = 1;
 }
 
 message CreateSshTargetRequest {
@@ -493,15 +931,31 @@ message EstablishConnectionRequest {
   string ssh_target_id = 1;
 }
 
-message TeardownConnectionRequest {
-  string connection_id = 1;
-}
-
 message Connection {
   string id = 1;                 // the connectionId every other RPC keys on
   string dev_server_id = 2;
   string status = 3;             // "established" | "degraded" | "closed"
   int64 established_at_unix_ms = 4;
+}
+
+// GetFleetConnectivitySummaryRequest is deliberately empty — tenant/user
+// scoping comes from gRPC metadata (identity), matching every other "list
+// of mine" RPC in this service. See TASK-BE-STORAGE-006 /
+// BE-SOL-STORAGE-002 §3.
+message GetFleetConnectivitySummaryRequest {}
+
+// ConnectionHealthEntry mirrors one infra.connections row's health-relevant
+// fields — CR-STORAGE-007's frontend poll target.
+message ConnectionHealthEntry {
+  string connection_id = 1;
+  string dev_server_id = 2;
+  string status = 3;                                   // "establishing" | "established" | "degraded" | "closed" — mirrors connections.status
+  google.protobuf.Timestamp last_activity_at = 4;       // unset if never active
+  google.protobuf.Timestamp degraded_since = 5;         // unset unless status == "degraded"
+}
+
+message GetFleetConnectivitySummaryResponse {
+  repeated ConnectionHealthEntry connections = 1;
 }
 message SpawnTerminalSessionRequest {
   string connection_id = 1;  // empty = host-local; rejected in server-deployment mode, see usecase.SpawnTerminalSession
@@ -564,6 +1018,10 @@ message DeleteTerminalScrollbackSnapshotsRequest {
 }
 
 message ResizeTerminalSessionRequest { string pty_id = 1; int32 cols = 2; int32 rows = 3; }
+// TeardownConnectionRequest carries only connection_id — tenant scoping
+// comes from the authenticated context (BE-SOL-STORAGE-003 §5).
+message TeardownConnectionRequest { string connection_id = 1; }
+
 message KillTerminalSessionRequest   { string pty_id = 1; }
 message StopTerminalProcessRequest   { string pty_id = 1; } // sends an interrupt signal to the pty's foreground process
 message ListTerminalSessionsRequest  { string connection_id = 1; } // empty = all sessions for the caller's tenant
@@ -628,6 +1086,51 @@ message PtyServerFrame {
 }
 message PtyOutput { bytes data = 1; }
 message PtyExited { int32 exit_code = 1; }
+
+message ScreencastClientFrame {
+  oneof frame {
+    StartScreencast start = 1;  // first frame only: what/how to capture
+    StopScreencast  stop  = 2;
+  }
+}
+// Field bounds mirror the OLD TS backend's clamp bounds exactly
+// (orca-runtime-browser.ts's clampInteger/clampOptionalInteger/
+// clampOptionalNumber calls) — both api-gateway's wscompat handler and
+// the agent-side capture loop clamp to these same ranges, so behavior is
+// byte-identical to the pre-backend-go implementation.
+message StartScreencast {
+  string worktree_id = 1;
+  string page = 2;
+  string format = 3;                     // "jpeg" | "png"
+  int32 quality = 4;                     // clamp 10-100, default 70
+  int32 max_width = 5;                   // clamp 320-3840, default 1440
+  int32 max_height = 6;                  // clamp 240-2160, default 1200
+  optional int32 viewport_width = 7;     // clamp 320-3840
+  optional int32 viewport_height = 8;    // clamp 240-2160
+  optional double device_scale_factor = 9; // clamp 1-4
+  bool mobile = 10;
+  int32 every_nth_frame = 11;            // clamp 1-10, default 2
+  int32 min_frame_interval_ms = 12;      // clamp 0-1000, default 0
+}
+message StopScreencast {}
+
+message ScreencastServerFrame {
+  oneof frame {
+    ScreencastReady ready = 1;
+    ScreencastFrame frame_data = 2;
+    ScreencastEnded ended = 3;
+    ScreencastError error = 4;
+  }
+}
+message ScreencastReady {
+  string subscription_id = 1;
+  string browser_page_id = 2;
+  string format = 3;
+}
+message ScreencastFrame { bytes data = 1; } // opaque — see AttachScreencast's doc comment
+message ScreencastEnded {}
+message ScreencastError { string message = 1; }
+
 message BrowserProfile {
   string id = 1;
   string tenant_id = 2;

@@ -42,8 +42,12 @@ function hasUsageData(provider: ProviderRateLimits): boolean {
   )
 }
 
-function isProviderSnapshotPending(provider: ProviderRateLimits | null): boolean {
-  return provider === null || (provider.status === 'fetching' && !hasUsageData(provider))
+// `| undefined` beyond the declared `ProviderRateLimits | null` type: a
+// backend that omits a provider key entirely (rather than sending explicit
+// null) decodes to undefined, not null — treat it the same rather than
+// crash reading `.status` off it.
+function isProviderSnapshotPending(provider: ProviderRateLimits | null | undefined): boolean {
+  return !provider || (provider.status === 'fetching' && !hasUsageData(provider))
 }
 
 // Why: a provider that returns `unavailable` is explicitly not configured
@@ -53,9 +57,9 @@ function isProviderSnapshotPending(provider: ProviderRateLimits | null): boolean
 // — that's a *configured* provider failing transiently, and hiding it would
 // make the bar flap on every refresh hiccup.
 export function isProviderConfigured(
-  provider: ProviderRateLimits | null
+  provider: ProviderRateLimits | null | undefined
 ): provider is ProviderRateLimits {
-  if (provider === null || provider.status === 'unavailable') {
+  if (!provider || provider.status === 'unavailable') {
     return false
   }
   if (provider.status === 'fetching' && !hasUsageData(provider)) {

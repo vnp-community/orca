@@ -4,16 +4,23 @@
 # Flow this file implements (see scripts/build-local.sh + sync-to-server.sh):
 #   (1) build binary locally  →  (2) rsync to server  →  (3) mount into container
 #
-# Every backend-go service and the frontend run from PUBLIC, UNMODIFIED
-# images — gcr.io/distroless/static-debian12 (~2MB, no shell, CA certs +
-# tzdata only) for the 17 Go services, nginx:1.27-alpine for the frontend.
-# No Dockerfile is built for either: the compiled binary / built static
-# assets are bind-mounted read-only into the stock image at a fixed path,
-# per the explicit "mount into container, smallest possible image"
+# 16 of the 17 backend-go services, plus the frontend, run from PUBLIC,
+# UNMODIFIED images — gcr.io/distroless/static-debian12 (~2MB, no shell, CA
+# certs + tzdata only) for the Go services, nginx:1.27-alpine for the
+# frontend. No Dockerfile is built for either: the compiled binary / built
+# static assets are bind-mounted read-only into the stock image at a fixed
+# path, per the explicit "mount into container, smallest possible image"
 # requirement — there is no smaller image than "don't build a custom one at
 # all." See ../README.md for the full rationale and the production caveats
-# (Vault dev-mode, no mTLS/service-mesh here — this is the same
-# convenience-over-rigor tradeoff deploy/old made for the TS backend).
+# (no mTLS/service-mesh here — this is the same convenience-over-rigor
+# tradeoff deploy/old made for the TS backend). Vault is NOT run locally by
+# this file — see x-go-common-env's VAULT_ADDR/VAULT_TOKEN comment and
+# ../VAULT-SHARED-MIGRATION.md.
+#
+# git-gateway-service is the one exception — see its own service block
+# below and docker/git-gateway-runtime.Dockerfile for why it needs a real
+# `git` binary and a writable volume that the shared distroless image and
+# read_only:true convention can't provide.
 #
 # Service catalog / DB ownership: specs/backend-go/services/00-service-catalog.md
 # ============================================================
@@ -30,8 +37,12 @@ x-go-image: &go-image gcr.io/distroless/static-debian12:nonroot
 # the address here doesn't make the stub real, it just means "once that
 # service's client stops being a stub, it already has the right address").
 x-go-common-env: &go-common-env
-  VAULT_ADDR: http://vault:8200
-  VAULT_TOKEN: ${VAULT_TOKEN:-dev-root-token}
+  # Shared vnp-domain Vault (172.20.2.21) — see ../VAULT-SHARED-MIGRATION.md.
+  # No insecure default token here (unlike the old dev-mode Vault's
+  # ${VAULT_TOKEN:-dev-root-token}): an unset VAULT_TOKEN now fails loudly at
+  # `docker compose up` instead of silently degrading to a well-known value.
+  VAULT_ADDR: http://172.20.2.21:8200
+  VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN required — the orca-scoped token from the shared Vault, see VAULT-SHARED-MIGRATION.md}
   NATS_URL: nats://nats:4222
   OTLP_ENDPOINT: ${OTLP_ENDPOINT:-}
   AUTH_SERVICE_ADDR: auth-service:9090
@@ -74,6 +85,20 @@ x-go-defaults: &go-defaults
       max-file: "3"
   networks:
     - orca-go-net
+  # mem_limit/mem_reservation: NONE of this file had any memory cap before
+  # this pass — with 17 unconstrained Go services + Postgres + Vault + NATS
+  # + frontend on one small VM, a single leaking/spiking service could (and
+  # on 172.20.2.39, did) exhaust host RAM entirely and hang the box past
+  # SSH/HTTP reachability, not just crash its own process. mem_limit turns
+  # that into a contained, cgroup-level OOM-kill of the ONE offending
+  # container — restart: unless-stopped above brings it back automatically
+  # — instead of a host-wide freeze. 128m is generous for these: small,
+  # single-purpose gRPC services, no in-process caches of consequence.
+  # Bumped explicitly below for the two services with real reason to need
+  # more (git-gateway-service, api-gateway). Classic (non-swarm) compose
+  # keys — honored by plain `docker compose up -d`, no swarm mode needed.
+  mem_limit: 128m
+  mem_reservation: 64m
 
 x-migrate-defaults: &migrate-defaults
   image: migrate/migrate:v4.17.0
@@ -83,14 +108,18 @@ x-migrate-defaults: &migrate-defaults
   depends_on:
     postgres:
       condition: service_healthy
+  # Short-lived one-shot migration runners — minimal footprint, never
+  # accumulate load.
+  mem_limit: 64m
 
 services:
   # ------------------------------------------------------------
   # Infra: Postgres (database-per-service, one instance/many DBs for this
   # dev-server deploy — see specs/backend-go/architecture/05-data-architecture.md
-  # on when physical instance-per-service is warranted instead), Vault
-  # (dev mode — see README for why that's an accepted tradeoff here, not
-  # for a real production deploy), NATS JetStream.
+  # on when physical instance-per-service is warranted instead), NATS
+  # JetStream. Vault is external/shared (172.20.2.21) — see
+  # x-go-common-env above and ../VAULT-SHARED-MIGRATION.md, not a service
+  # defined in this file.
   # ------------------------------------------------------------
   postgres:
     image: postgres:16-alpine
@@ -116,65 +145,25 @@ services:
       options: { max-size: "20m", max-file: "3" }
     networks:
       - orca-go-net
+    # See x-go-defaults' doc comment above (root cause of the
+    # 172.20.2.39 host-wide hang this pass fixes) — Postgres is the one
+    # service here that genuinely needs real headroom (shared_buffers,
+    # per-connection work_mem across 17 services' pools), so it gets more
+    # than the Go services, still capped rather than unlimited.
+    mem_limit: 512m
+    mem_reservation: 256m
 
-  vault:
-    image: hashicorp/vault:1.17
-    container_name: orca-go-vault
-    restart: unless-stopped
-    cap_add:
-      - IPC_LOCK
-    environment:
-      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_TOKEN:-dev-root-token}
-      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8200/v1/sys/health?standbyok=true"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-      start_period: 5s
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: "json-file"
-      options: { max-size: "20m", max-file: "3" }
-    networks:
-      - orca-go-net
-
-  # Vault dev-mode auto-mounts secret/ (KV) only, never transit/ or any named
-  # KV v2 mount — nothing else in this deploy set enables either, so
-  # auth-service's TransitEnsureKey (common/secrets/vault.go) 404s on every
-  # boot without transit/, and credential-broker-service's WriteCredential
-  # fails CREDENTIAL_VAULT_WRITE_FAILED (confirmed by running TASK-220/043's
-  # real docker-compose E2E verification against this stack) without the
-  # `credential-secrets` KV v2 mount its own README documents as required
-  # setup (services/credential-broker-service/README.md, `internal/usecase/
-  # vault_paths.go`'s `kvMount`). Both checks are idempotent (read
-  # `vault secrets list` before enabling) so it's safe to re-run on every
-  # `docker compose up -d`, incl. against a live long-running vault.
-  vault-init:
-    image: hashicorp/vault:1.17
-    container_name: orca-go-vault-init
-    restart: "no"
-    entrypoint: ["sh", "-c"]
-    command:
-      - |
-        set -e
-        vault secrets list -address="$$VAULT_ADDR" | grep -q '^transit/' \
-          || vault secrets enable -address="$$VAULT_ADDR" -path=transit transit
-        vault secrets list -address="$$VAULT_ADDR" | grep -q '^credential-secrets/' \
-          || vault secrets enable -address="$$VAULT_ADDR" -path=credential-secrets -version=2 kv
-    environment:
-      VAULT_ADDR: http://vault:8200
-      VAULT_TOKEN: ${VAULT_TOKEN:-dev-root-token}
-    depends_on:
-      vault: { condition: service_healthy }
-    security_opt:
-      - no-new-privileges:true
-    logging:
-      driver: "json-file"
-      options: { max-size: "20m", max-file: "3" }
-    networks:
-      - orca-go-net
+  # Vault: NOT a local service in this file anymore (2026-09-07) — orca now
+  # points at the shared, persistent vnp-domain Vault (172.20.2.21) instead
+  # of running its own throwaway dev-mode instance. The dev-mode Vault this
+  # file used to define here lost all data on every host reboot (real
+  # incident, 2026-09-06 — auth-service/credential-broker-service crash-
+  # looped until manual `vault-init` recovery), which the shared Vault's
+  # real `file` storage backend doesn't have. See
+  # ../VAULT-SHARED-MIGRATION.md for the full migration record and
+  # ../orca-policy.hcl for exactly what's granted. VAULT_ADDR/VAULT_TOKEN
+  # below (x-go-common-env) now point at that shared instance directly —
+  # no local `vault`/`vault-init` service, no `depends_on: vault` needed.
 
   nats:
     image: nats:2.10-alpine
@@ -194,6 +183,7 @@ services:
       options: { max-size: "20m", max-file: "3" }
     networks:
       - orca-go-net
+    mem_limit: 128m
 
   # ------------------------------------------------------------
   # backend-go services — 15 own a database (bind-mount ./bin/<svc>/orca +
@@ -208,19 +198,52 @@ services:
     container_name: orca-go-auth
     volumes:
       - ./bin/auth-service/orca:/app/bin/orca:ro
+      # OPA bundle for requireAdminActor's embedded evaluator — see
+      # specs/backend-go/bugs/missing-v2/BUG-003/SOL-003/TASK-006. Mounted
+      # at the same absolute path config.go's OPABundlePath now defaults
+      # to, so no OPA_BUNDLE_PATH override is needed here.
+      #
+      # Source is relative ("./policy/..."), not "../../backend-go/policy/..."
+      # — the latter assumed a full monorepo checkout on the server, but
+      # sync-to-server.sh only ships this directory's own tree. That mismatch
+      # meant every admin-actor check failed closed for every caller
+      # regardless of role (Docker silently bind-mounts an empty directory
+      # for a missing host path instead of erroring) — live-verified
+      # 2026-08-29. build-local.sh now copies backend-go/policy/orca-authz/
+      # into deploy/dev/policy/ on every build so this path is always real.
+      - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/auth?sslmode=disable
       # First-boot admin bootstrap (internal/usecase/bootstrap.go) — no-op
       # once any user exists; leave BOOTSTRAP_ADMIN_PASSWORD unset to
       # auto-generate + log it once instead of setting it here.
-      BOOTSTRAP_TENANT_ID: ${BOOTSTRAP_TENANT_ID:-00000000-0000-0000-0000-000000000001}
+      # BOOTSTRAP_COMPANY_NAME (optional) replaces the old BOOTSTRAP_TENANT_ID
+      # — tenant-service now originates the tenant id itself via a
+      # CreateCompany call bootstrap.go makes at startup; see
+      # specs/backend-go/bugs/missing-v2/BUG-002/SOL-002/TASK-003. An
+      # operator-supplied BOOTSTRAP_TENANT_ID here would no longer do
+      # anything (the field was removed from BootstrapConfig).
+      BOOTSTRAP_COMPANY_NAME: ${BOOTSTRAP_COMPANY_NAME:-}
       BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL:-}
       BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD:-}
+      # CR-LOGIN-001 SSO (internal/adapter/oauth, internal/adapter/oauthstate)
+      # — see .env.example's "SSO" section. Every var here defaults to
+      # empty: an unset SSO_*_CLIENT_ID means that provider is simply
+      # absent from the SsoExchangerRegistry (StartSsoLogin surfaces
+      # AUTH_SSO_PROVIDER_UNSUPPORTED for it), so leaving this whole block
+      # unset is a no-op — local-password login is unaffected either way.
+      SSO_STATE_SECRET: ${SSO_STATE_SECRET:-}
+      SSO_GITHUB_CLIENT_ID: ${SSO_GITHUB_CLIENT_ID:-}
+      SSO_GITHUB_CLIENT_SECRET: ${SSO_GITHUB_CLIENT_SECRET:-}
+      SSO_GOOGLE_CLIENT_ID: ${SSO_GOOGLE_CLIENT_ID:-}
+      SSO_GOOGLE_CLIENT_SECRET: ${SSO_GOOGLE_CLIENT_SECRET:-}
+      SSO_OIDC_CLIENT_ID: ${SSO_OIDC_CLIENT_ID:-}
+      SSO_OIDC_CLIENT_SECRET: ${SSO_OIDC_CLIENT_SECRET:-}
+      SSO_OIDC_DISCOVERY_URL: ${SSO_OIDC_DISCOVERY_URL:-}
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
-      vault-init: { condition: service_completed_successfully }
+      tenant-service: { condition: service_started } # bootstrap.go now calls tenant-service.CreateCompany at startup
 
   tenant-service:
     <<: *go-defaults
@@ -232,19 +255,19 @@ services:
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/tenant?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
 
   project-service:
     <<: *go-defaults
     container_name: orca-go-project
     volumes:
       - ./bin/project-service/orca:/app/bin/orca:ro
+      # See auth-service's identical mount above — BUG-003/SOL-003/TASK-006.
+      - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/project?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
       workflow-service: { condition: service_started }
       task-service: { condition: service_started }
 
@@ -264,7 +287,6 @@ services:
       ORCA_AGENT_API_SECRET: ${ORCA_AGENT_API_SECRET:-}
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
 
   ai-provider-service:
     <<: *go-defaults
@@ -276,7 +298,6 @@ services:
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/aiprovider?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
       credential-broker-service: { condition: service_started }
 
   workflow-service:
@@ -289,7 +310,6 @@ services:
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/workflow?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
       infra-fleet-service: { condition: service_started }
 
   task-service:
@@ -297,12 +317,13 @@ services:
     container_name: orca-go-task
     volumes:
       - ./bin/task-service/orca:/app/bin/orca:ro
+      # See auth-service's identical mount above — BUG-003/SOL-003/TASK-006.
+      - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/task?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
       tenant-service: { condition: service_started }
 
   orchestration-service:
@@ -315,7 +336,6 @@ services:
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/orchestration?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
 
   automation-service:
     <<: *go-defaults
@@ -327,7 +347,6 @@ services:
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/automation?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
       workflow-service: { condition: service_started } # real gRPC client — see docs/execution-plan.md
 
   annotation-service:
@@ -335,12 +354,13 @@ services:
     container_name: orca-go-annotation
     volumes:
       - ./bin/annotation-service/orca:/app/bin/orca:ro
+      # See auth-service's identical mount above — BUG-003/SOL-003/TASK-006.
+      - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/annotation?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
 
   notification-service:
     <<: *go-defaults
@@ -369,7 +389,6 @@ services:
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/usage?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
       nats: { condition: service_healthy }
 
   credential-broker-service:
@@ -382,14 +401,43 @@ services:
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/credential?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
-      vault: { condition: service_healthy }
 
   # 2 services with no database:
+  #
+  # git-gateway-service is the one exception to every other service's
+  # "shared, unmodified distroless image, no writes anywhere" shape — its
+  # host-local dispatch path (internal/adapter/localgit) needs a real `git`
+  # binary AND somewhere writable to run it against (git-gateway-runtime.
+  # Dockerfile installs the former; the read_only override + repos volume
+  # below provide the latter). Per specs/backend-go/tdd/services/
+  # git-gateway-service.md §2, host-local exec is "retained for local/dev
+  # deployments" — this dev deploy IS that case, not a hypothetical.
+  #
+  # git-gateway-repos is where any repo NOT bound to a remote dev server
+  # (Project.dev_server_id empty — e.g. a repo added via the sidebar's bare
+  # "Add Project"/repo.add, which has no dev-server-selection step) actually
+  # lives on disk for git-gateway-service's local git/worktree operations
+  # to succeed against. This is a new convention, not one the codebase
+  # already had anywhere (checked: no existing volume/path convention for
+  # git-gateway-service's local storage) — /data/repos was picked as a
+  # clear, generic root; it is NOT retroactive for any repo whose url/path
+  # already points elsewhere (e.g. a stale /opt/repos/<name> row from
+  # before this volume existed), which still needs re-adding under this
+  # root (or its own dev-server binding) to actually work.
   git-gateway-service:
     <<: *go-defaults
+    image: orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}
     container_name: orca-go-git-gateway
+    read_only: false # see comment above — this service alone needs to write real git/worktree data
+    # Overrides go-defaults' 128m: real git clone/checkout/worktree-add
+    # operations on caller repos of unbounded size — the one Go service
+    # here with a genuine reason to need more than a stateless gRPC
+    # handler.
+    mem_limit: 384m
+    mem_reservation: 128m
     volumes:
       - ./bin/git-gateway-service/orca:/app/bin/orca:ro
+      - git-gateway-repos:/data/repos
     environment: *go-common-env
     depends_on:
       infra-fleet-service: { condition: service_started }
@@ -433,11 +481,36 @@ services:
     <<: *go-defaults
     container_name: orca-go-api-gateway
     read_only: false # writes nothing itself, but see README — kept false pending confirmation it needs no writable path; flip to true once verified
+    # Overrides go-defaults' 128m: fans out every browser session's
+    # WebSocket (wscompat) connections through this single process —
+    # more concurrent connection state than a typical backend service here.
+    mem_limit: 192m
+    mem_reservation: 96m
     volumes:
       - ./bin/api-gateway/orca:/app/bin/orca:ro
     environment:
       <<: *go-common-env
       PUBLIC_PORT: "8081"
+      # CR-LOGIN-001 SSO (internal/adapter/httpgateway/auth_routes.go) —
+      # see .env.example's "SSO" section. PUBLIC_BASE_URL is REQUIRED for
+      # SSO to work at all: GET /auth/sso/{provider} builds redirect_uri as
+      # exactly "${PUBLIC_BASE_URL}/auth/callback", deliberately never
+      # derived from the request's Host header (see that handler's doc
+      # comment on the Host-header-injection risk this avoids) — it must
+      # match, byte-for-byte, whatever redirect URI is registered with each
+      # configured IdP. Left empty, GET /auth/sso/{provider} degrades to a
+      # 501 (same as before this feature existed) and /auth/config never
+      # advertises any provider, regardless of AUTH_MODE or the client ids
+      # below — local-password login is unaffected.
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-}
+      AUTH_MODE: ${AUTH_MODE:-both}
+      # Client IDs only (never secrets — those stay auth-service-only, see
+      # SsoRouteConfig's doc comment) — gate which providers GET
+      # /auth/config advertises to the login page. Must match the
+      # SSO_*_CLIENT_ID values set on auth-service above.
+      SSO_GITHUB_CLIENT_ID: ${SSO_GITHUB_CLIENT_ID:-}
+      SSO_GOOGLE_CLIENT_ID: ${SSO_GOOGLE_CLIENT_ID:-}
+      SSO_OIDC_CLIENT_ID: ${SSO_OIDC_CLIENT_ID:-}
     ports:
       # SERVER_BIND_IP lets a specific deploy reuse a specific host port/IP
       # (e.g. to slot into an existing external gateway's hardcoded upstream
@@ -471,6 +544,7 @@ services:
       options: { max-size: "20m", max-file: "3" }
     networks:
       - orca-go-net
+    mem_limit: 64m # static assets only, no app logic
 
   # ------------------------------------------------------------
   # Migrations — one-shot per DB-owning service, `profiles: [migrate]` so
@@ -547,4 +621,6 @@ networks:
 
 volumes:
   orca-go-postgres-data:
+    driver: local
+  git-gateway-repos:
     driver: local

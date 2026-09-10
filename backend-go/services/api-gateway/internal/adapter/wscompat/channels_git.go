@@ -21,7 +21,9 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"io"
 
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
@@ -29,6 +31,15 @@ import (
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 )
+
+// cancelGenerateArgs mirrors cancelRuntimeGenerateCommitMessage/
+// cancelRuntimeGeneratePullRequestFields's exact wire shape
+// (runtime-git-client.ts: {worktree: toRuntimeWorktreeSelector(...)}) —
+// same field-name convention the generate calls' own genArgs/genPRFieldsArgs
+// already use.
+type cancelGenerateArgs struct {
+	WorktreeID string `json:"worktreeId"`
+}
 
 // registerGitDeepChannels wires every git.* channel this scope's tasks
 // (TASK-206/207/208/209/210/211/212/213) back with a real git-gateway-service
@@ -107,11 +118,33 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.GenerateCommitMessage(ctx, &gitgatewayv1.GenerateCommitMessageRequest{WorktreeId: in.WorktreeID})
+		// genCtx is independently cancellable via
+		// git.cancelGenerateCommitMessage (a second, independent WS
+		// request/goroutine) — see git_generate_cancellation.go (TASK-031).
+		// dispatchRPCTimeout (registry.go's 60s outer bound) still applies as
+		// the upper bound; this WithCancel narrows further via explicit
+		// cancel, it doesn't replace that deadline.
+		genCtx, cancel := context.WithCancel(ctx)
+		key := gitGenerateCancelKey{WorktreeID: in.WorktreeID, Kind: gitGenerateCancelKindCommitMessage}
+		cleanup := gitGenerateCancels.start(key, cancel)
+		defer cleanup()
+		defer cancel() // release resources if genCtx's parent finishes normally, not via explicit cancel
+
+		resp, err := client.GenerateCommitMessage(genCtx, &gitgatewayv1.GenerateCommitMessageRequest{WorktreeId: in.WorktreeID})
 		if err != nil {
 			return nil, err
 		}
 		return resp, nil
+	})
+
+	r.Register("git.cancelGenerateCommitMessage", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		in, err := decodeArg[cancelGenerateArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		key := gitGenerateCancelKey{WorktreeID: in.WorktreeID, Kind: gitGenerateCancelKindCommitMessage}
+		gitGenerateCancels.cancel(key) // return value ignored — "nothing in flight" is not an error, see cancel()'s doc comment
+		return nil, nil
 	})
 
 	// ── TASK-228: git.diff, corrected to thread filePath through — this
@@ -649,13 +682,29 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.GeneratePullRequestFields(ctx, &gitgatewayv1.GeneratePullRequestFieldsRequest{
+		genCtx, cancel := context.WithCancel(ctx)
+		key := gitGenerateCancelKey{WorktreeID: in.WorktreeID, Kind: gitGenerateCancelKindPullRequestFields}
+		cleanup := gitGenerateCancels.start(key, cancel)
+		defer cleanup()
+		defer cancel()
+
+		resp, err := client.GeneratePullRequestFields(genCtx, &gitgatewayv1.GeneratePullRequestFieldsRequest{
 			WorktreeId: in.WorktreeID, BaseBranch: in.BaseBranch,
 		})
 		if err != nil {
 			return nil, err
 		}
 		return resp, nil
+	})
+
+	r.Register("git.cancelGeneratePullRequestFields", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		in, err := decodeArg[cancelGenerateArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		key := gitGenerateCancelKey{WorktreeID: in.WorktreeID, Kind: gitGenerateCancelKindPullRequestFields}
+		gitGenerateCancels.cancel(key)
+		return nil, nil
 	})
 
 	// git.discoverCommitMessageModels reads from Identity (id.TenantID/
@@ -860,12 +909,20 @@ func pipeGitProgressStream(ctx context.Context, channelName string, stream gitPr
 
 // ── files.* (TASK-049..060) ─────────────────────────────────────────────
 //
-// files.commitUpload and files.unwatch are always-local renderer-side
-// bookkeeping in the old backend (no fs I/O) — registered as local no-op
-// acks below, not wired to git-gateway-service. Every other channel
-// dispatches through GitGatewayServiceClient's FileIO RPC group (SOL-009),
-// which itself resolves local-vs-relay per worktree — wscompat never makes
-// that decision; it only forwards worktreeId + params.
+// files.commitUpload is always-local renderer-side bookkeeping in the old
+// backend (no fs I/O) — registered as a local no-op ack below, not wired to
+// git-gateway-service. Every other channel dispatches through
+// GitGatewayServiceClient's FileIO RPC group (SOL-009), which itself
+// resolves local-vs-relay per worktree — wscompat never makes that
+// decision; it only forwards worktreeId + params.
+//
+// files.watch/files.unwatch (BACKLOG-003) are the one exception to "no fs
+// I/O here" — files.unwatch used to be documented above as always-local
+// bookkeeping too, which was true only because files.watch never existed to
+// have anything real to unwatch. Both now relay real fs.changed
+// notifications through git-gateway-service's WatchWorktree stream — see
+// registerFilesWatchChannel below, and file_watch_stream_registry.go for
+// the per-connection subscriptionId bookkeeping files.unwatch needs.
 
 // simpleFileOp wires a channel that decodes one JSON arg and issues one
 // gRPC call, returning the response verbatim — the shape most of files.*'s
@@ -1011,6 +1068,18 @@ func registerFilesChannels(r *Registry, client gitgatewayv1.GitGatewayServiceCli
 	simpleFileOp(r, "files.createDir", createDirHandler)
 	simpleFileOp(r, "files.createDirNoClobber", createDirHandler)
 
+	// files.createFile has no noClobber-equivalent param — the frontend's
+	// createRuntimePath (runtime-file-client.ts:395-414) never sends one for
+	// the file case, so creating an already-existing file is always an
+	// error (see CreateFileRequest's doc comment in gitgateway.proto).
+	simpleFileOp(r, "files.createFile", func(ctx context.Context, in readArgs) (any, error) {
+		resp, err := client.CreateFile(ctx, &gitgatewayv1.CreateFileRequest{WorktreeId: in.WorktreeID, Path: in.Path})
+		if err != nil {
+			return nil, err
+		}
+		return resp, nil
+	})
+
 	type deleteArgs struct {
 		WorktreeID string `json:"worktreeId"`
 		Path       string `json:"path"`
@@ -1096,8 +1165,166 @@ func registerFilesChannels(r *Registry, client gitgatewayv1.GitGatewayServiceCli
 	r.Register("files.commitUpload", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		return map[string]bool{"ok": true}, nil
 	})
-	r.Register("files.unwatch", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		return map[string]bool{"ok": true}, nil
+	registerFilesWatchChannel(r, client)
+	registerFilesUnwatchChannel(r)
+}
+
+// ── files.watch / files.unwatch (BACKLOG-003) ──────────────────────────────
+
+type filesWatchArgs struct {
+	// Worktree matches every other files.*/browser.* channel's "worktree"
+	// param name, always "id:"-prefixed — subscribeSharedFileWatch's real
+	// call site (runtime-file-client.ts) sends
+	// {worktree: toRuntimeWorktreeSelector(worktreeId)}.
+	Worktree string `json:"worktree"`
+}
+
+// filesWatchReadyView is this channel's ack — see
+// subscribeRuntimeStreamChannel's doc comment (runtime-rpc-client.ts): "the
+// subscription's very FIRST response is the ack", which is exactly what
+// frontend's RuntimeFileWatchEvent's {type:'ready', subscriptionId} case
+// expects as message #1, not a push event. subscriptionId is what a later
+// files.unwatch call must send back (unwatchSharedRuntimeFileWatch).
+type filesWatchReadyView struct {
+	Type           string `json:"type"`
+	SubscriptionID string `json:"subscriptionId"`
+}
+
+// registerFilesWatchChannel wires files.watch — mirrors
+// registerEphemeralVmProvisionChannel's spawn-then-open-stream-then-register
+// pattern (channels_ephemeral_vm.go), server-streaming only (no
+// client->server frames after the initial request, unlike AttachPty).
+func registerFilesWatchChannel(r *Registry, client gitgatewayv1.GitGatewayServiceClient) {
+	r.RegisterStreamChannel("files.watch", func(ctx context.Context, id Identity, args []json.RawMessage) (any, <-chan PushEvent, error) {
+		in, err := decodeArg[filesWatchArgs](args, 0)
+		if err != nil {
+			return nil, nil, err
+		}
+		worktreeID := stripWorktreeSelectorPrefix(in.Worktree)
+		if worktreeID == "" {
+			return nil, nil, fmt.Errorf("wscompat: files.watch requires a worktree selector")
+		}
+
+		watches := fileWatchStreamsFromContext(ctx)
+		if watches == nil {
+			return nil, nil, errNoFileWatchStreamRegistry
+		}
+
+		subscriptionID, err := newFileWatchID()
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// See attachContext's doc comment (channels_terminal.go): the stream
+		// MUST outlive this invoke's own rpcTimeout deadline — a file watch
+		// is meant to live for the rest of the pane's lifetime, not 25s.
+		streamCtx, cancel := attachContext(id)
+		stream, err := client.WatchWorktree(streamCtx, &gitgatewayv1.WatchWorktreeRequest{WorktreeId: worktreeID})
+		if err != nil {
+			cancel()
+			return nil, nil, err
+		}
+
+		entry := &fileWatchStreamEntry{cancel: cancel}
+		watches.put(subscriptionID, entry)
+
+		events := make(chan PushEvent)
+		go drainFileWatchOutput(streamCtx, subscriptionID, in.Worktree, stream, watches, events)
+
+		return filesWatchReadyView{Type: "ready", SubscriptionID: subscriptionID}, events, nil
+	})
+}
+
+// drainFileWatchOutput reads every FileChangeEvent git-gateway-service
+// pushes for one watch until the stream ends (files.unwatch's cancel(), the
+// underlying connection dropping, or a transport error), forwarding each as
+// a {type:'changed', worktree, events:[...]} push — mirrors
+// drainVmProvisionOutput exactly (channels_ephemeral_vm.go), plus one thing
+// that has no PTY/provision equivalent: an explicit terminal {type:'end'}
+// or {type:'error', message} push on stream end, since
+// RuntimeFileWatchEvent's contract (runtime-file-client.ts) gives callers a
+// real onError signal for 'error' that the transport's generic onClose
+// callback alone can't provide.
+func drainFileWatchOutput(
+	streamCtx context.Context,
+	subscriptionID string,
+	worktreeSelector string,
+	stream gitgatewayv1.GitGatewayService_WatchWorktreeClient,
+	watches *fileWatchStreamRegistry,
+	events chan<- PushEvent,
+) {
+	defer close(events)
+	defer watches.remove(subscriptionID)
+	for {
+		ev, err := stream.Recv()
+		if err != nil {
+			final := map[string]any{"type": "error", "message": err.Error()}
+			if errors.Is(err, io.EOF) {
+				final = map[string]any{"type": "end"}
+			}
+			select {
+			case events <- PushEvent{Channel: "files.watch", Args: []any{final}}:
+			case <-streamCtx.Done():
+			}
+			return
+		}
+		push := PushEvent{Channel: "files.watch", Args: []any{toFilesWatchChangedView(worktreeSelector, ev)}}
+		select {
+		case events <- push:
+		case <-streamCtx.Done():
+			return
+		}
+	}
+}
+
+// toFilesWatchChangedView maps 1 gitgatewayv1.FileChangeEvent onto
+// RuntimeFileWatchEvent's {type:'changed', worktree, events} shape —
+// `events` is always a single-element array since each gRPC message here
+// already carries exactly one change (no server-side batching), matching
+// FsChangedPayload's array shape for the consumer (handleSharedRuntimeFileWatchResponse
+// forwards event.events verbatim, batched or not). old_absolute_path/
+// is_directory are omitted rather than sent as empty/false — see
+// infrafleetv1.FileChangeEvent's doc comment for why those are never
+// populated today.
+func toFilesWatchChangedView(worktreeSelector string, ev *gitgatewayv1.FileChangeEvent) map[string]any {
+	changeEvent := map[string]any{"kind": ev.GetKind(), "absolutePath": ev.GetAbsolutePath()}
+	if ev.GetOldAbsolutePath() != "" {
+		changeEvent["oldAbsolutePath"] = ev.GetOldAbsolutePath()
+	}
+	if ev.GetIsDirectory() {
+		changeEvent["isDirectory"] = true
+	}
+	return map[string]any{"type": "changed", "worktree": worktreeSelector, "events": []any{changeEvent}}
+}
+
+type filesUnwatchArgs struct {
+	SubscriptionID string `json:"subscriptionId"`
+}
+
+type filesUnwatchResultView struct {
+	OK bool `json:"ok"`
+}
+
+// registerFilesUnwatchChannel wires files.unwatch — cancels THIS
+// connection's Go-side WatchWorktree subscription (entry.cancel(), which
+// unblocks entry.stream.Recv() in drainFileWatchOutput and tears down the
+// gRPC stream), mirroring registerEphemeralVmCancelProvisionChannel exactly.
+// An unknown/already-ended subscriptionId is NOT an error — files.unwatch
+// is frequently called during unmount races (the watch may have already
+// ended on its own) — {ok:true} either way, matching the OLD TS backend's
+// documented always-succeeds contract for this channel.
+func registerFilesUnwatchChannel(r *Registry) {
+	r.Register("files.unwatch", func(ctx context.Context, _ Identity, args []json.RawMessage) (any, error) {
+		in, err := decodeArg[filesUnwatchArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		if watches := fileWatchStreamsFromContext(ctx); watches != nil {
+			if entry, ok := watches.get(in.SubscriptionID); ok {
+				entry.cancel() // drainFileWatchOutput's own cleanup removes the registry entry once Recv observes the cancellation
+			}
+		}
+		return filesUnwatchResultView{OK: true}, nil
 	})
 }
 

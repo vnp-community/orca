@@ -7,6 +7,7 @@ import type {
   RepoHookSettings
 } from '../../../../shared/types'
 import { getRepoKindLabel, isFolderRepo } from '../../../../shared/repo-kind'
+import { getRepoExecutionHostId, LOCAL_EXECUTION_HOST_ID } from '../../../../shared/execution-host'
 import { Button } from '../ui/button'
 import { Label } from '../ui/label'
 import { Separator } from '../ui/separator'
@@ -25,6 +26,7 @@ import { getRepositoryIconSectionId } from './repository-settings-targets'
 import { RepositoryIconPicker } from './RepositoryIconPicker'
 import { getRepositoryPaneSearchEntries } from './repository-search'
 import { RepositoryHostSetupsSection } from './RepositoryHostSetupsSection'
+import { RepositoryGitInitSection } from './RepositoryGitInitSection'
 import { RepoSettingsDraftInput } from './RepositorySettingsDraftInput'
 import { RepositoryForkSyncSection } from './RepositoryForkSyncSection'
 import { translate } from '@/i18n/i18n'
@@ -119,11 +121,20 @@ export function RepositoryPane({
     setConfirmingRemove(repoId)
   }
 
-  const updateSelectedRepoHookSettings = (nextSettings: RepoHookSettings) => {
-    updateRepo(repo.id, {
-      hookSettings: nextSettings
-    })
-  }
+  // Why useCallback: an unmemoized function here got a new identity on
+  // every RepositoryPane render (e.g. live terminal/agent-status updates
+  // unrelated to this section) — RepositoryHooksSection.tsx passes this as
+  // an effect dependency, so an unstable identity re-ran that effect mid-
+  // typing and could resync the draft from a not-yet-updated store value,
+  // wiping text the user had just typed into the Setup Script textarea.
+  const updateSelectedRepoHookSettings = useCallback(
+    (nextSettings: RepoHookSettings) => {
+      updateRepo(repo.id, {
+        hookSettings: nextSettings
+      })
+    },
+    [repo.id, updateRepo]
+  )
 
   const handleCopyTemplate = async () => {
     // Why: the missing-`orca.yaml` state is a migration aid, so copying the shared-template
@@ -304,6 +315,13 @@ export function RepositoryPane({
 
         {!isFolder ? (
           <>
+            <RepositoryGitInitSection
+              repo={repo}
+              forceVisible={forceFullPaneForRepoMatch}
+              searchQuery={searchQuery}
+              searchEntries={[]}
+            />
+
             <RepositoryHostSetupsSection
               repo={repo}
               forceVisible={forceFullPaneForRepoMatch}
@@ -356,7 +374,18 @@ export function RepositoryPane({
     (forceFullPaneForRepoMatch || matchesSettingsSearch(searchQuery, symlinkEntries)) ? (
       <WorktreeSymlinksSection key="symlinks" repo={repo} updateRepo={updateRepo} />
     ) : null,
+    // Why getRepoExecutionHostId === local, not just !repo.connectionId:
+    // sparse-checkout presets only take effect on local worktree creation
+    // (useComposerState.ts's own "Sparse checkout is only supported for
+    // local repos right now" gate) — a dev-server-bound repo has no
+    // backend-go support for this yet (sparsePresets.list has no channel
+    // registered at all), so rendering this section here just fired a
+    // guaranteed-failing RPC on every Settings visit for such a repo.
+    // repo.connectionId alone (an SSH target id) misses repos bound via
+    // repo.devServerId instead — confirmed live: a devServerId-bound repo
+    // has connectionId === null, so that check never actually gated it.
     !isFolder &&
+    getRepoExecutionHostId(repo) === LOCAL_EXECUTION_HOST_ID &&
     (forceFullPaneForRepoMatch || matchesSettingsSearch(searchQuery, sparsePresetEntries)) ? (
       <SparsePresetSettingsSection key="sparse-presets" repoId={repo.id} />
     ) : null,

@@ -34,4 +34,8 @@ type Claims struct {
 	// issued a given request, for E2E-payload routing. Empty for every
 	// other token this system issues.
 	DeviceID string `json:"device_id,omitempty"`
+	// Role is the caller's global role ("admin"/"user") at token-issuance
+	// time — added so a bearer-JWT-authenticated caller propagates the same
+	// role claim the cookie/session path already does (BE-SOL-002).
+	Role string `json:"role,omitempty"`
 }

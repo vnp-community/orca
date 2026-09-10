@@ -102,6 +102,20 @@ type ScmProvider interface {
 	SetPullRequestAutoMerge(ctx context.Context, cred Credential, repo string, number int32, enabled bool, mergeMethod string) (domain.PullRequest, error)
 	UpdateIssue(ctx context.Context, cred Credential, repo string, number int32, patch IssuePatch) (domain.Issue, error)
 
+	// UpdatePullRequest — github.updatePRTitle (SOL-012). Plain (repo,
+	// number) address + a PullRequestPatch mirroring IssuePatch's
+	// nil-means-unchanged convention. GitHub implements it for real
+	// against PATCH /repos/{owner}/{repo}/pulls/{number}; every other
+	// adapter returns its own ErrCapabilityUnsupported, same convention as
+	// this block's other methods.
+	UpdatePullRequest(ctx context.Context, cred Credential, repo string, number int32, patch PullRequestPatch) (domain.PullRequest, error)
+
+	// StarRepository — github.starOrca (SOL-012). GitHub implements it for
+	// real against PUT /user/starred/{owner}/{repo}; every other adapter
+	// returns its own ErrCapabilityUnsupported, same convention as the
+	// block above.
+	StarRepository(ctx context.Context, cred Credential, repo string) (bool, error)
+
 	// GetPullRequestForBranch — provider-generic; backs github.prForBranch
 	// AND hostedReview.forBranch (SOL-014). found=false + zero-value
 	// PullRequest means "no open PR/MR for this branch", not an error.
@@ -151,6 +165,47 @@ type IssuePatch struct {
 	AddLabels    []string
 	RemoveLabels []string
 	Assignees    []string
+}
+
+// PullRequestPatch is UpdatePullRequest's partial-update shape — nil
+// pointer fields mean "leave unchanged", same convention as IssuePatch.
+// Title-only today (github.updatePRTitle's actual wire shape); additive
+// fields (Body, Base, State) can be added later without a breaking change,
+// mirroring how IssuePatch itself grew incrementally.
+type PullRequestPatch struct {
+	Title *string
+}
+
+// WorkItemFilter narrows a ListWorkItems call — a small, deliberately
+// partial subset of the legacy desktop backend's GitHub search-syntax
+// grammar (parseTaskQuery in backend/src/shared/task-query.ts): scope/
+// state/labels/assignee/author only. Explicitly NOT ported for v1 (see
+// docs/execution-plan.md's github.listWorkItems entry): "@me" (needs a
+// resolved current-user login — this service's CredentialResolver is
+// (tenantID, provider)->one shared token, not per-viewer identity),
+// review-requested:/reviewed-by:, free-text search (needs GitHub's Search
+// API, a different endpoint/response shape), and cursor pagination
+// (Before). Unrecognized/unsupported query tokens are silently ignored
+// rather than erroring, matching this codebase's established
+// documented-gap convention.
+type WorkItemFilter struct {
+	Scope    string // "all" | "issue" | "pr"
+	State    string // "open" | "closed" | "merged" | "all"
+	Labels   []string
+	Assignee string
+	Author   string
+	Limit    int
+}
+
+// WorkItemProvider is implemented only by adapters that support the
+// combined issue+PR "work items" listing feature — GitHub today. Kept as
+// its own interface (rather than a new ScmProvider method) so the other
+// four provider adapters (GitLab, Bitbucket, Azure DevOps, Gitea) don't
+// need a stub method just to keep compiling; ListWorkItems' usecase type-
+// asserts the resolved ScmProvider against this interface and returns
+// SCM_WORK_ITEMS_UNSUPPORTED for providers that don't implement it.
+type WorkItemProvider interface {
+	ListWorkItems(ctx context.Context, cred Credential, repo string, filter WorkItemFilter) ([]domain.WorkItem, error)
 }
 
 // ProviderRegistry resolves which concrete ScmProvider implementation to use

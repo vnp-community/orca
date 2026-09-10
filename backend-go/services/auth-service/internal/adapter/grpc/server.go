@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
 	"github.com/stablyai/orca-go/services/auth-service/internal/usecase"
 
@@ -31,13 +32,20 @@ type Server struct {
 	updateUserRole    *usecase.UpdateUserRole
 	revokeSession     *usecase.RevokeSession
 	queryAuditLog     *usecase.QueryAuditLog
+	appendAuditEntry  *usecase.AppendAuditEntry
 	issueServiceToken *usecase.IssueServiceToken
 	getJWKS           *usecase.GetJWKS
+
+	// CR-CLI-002 (headless CLI credential) — TASK-BE-CLI-005/006.
+	isServiceTokenRevoked *usecase.IsServiceTokenRevoked
+	listCliTokens         *usecase.ListCliTokens
+	revokeCliToken        *usecase.RevokeCliToken
 
 	deactivateUser                *usecase.DeactivateUser
 	reactivateUser                *usecase.ReactivateUser
 	listSessionsForUser           *usecase.ListSessionsForUser
 	forceRevokeAllSessionsForUser *usecase.ForceRevokeAllSessionsForUser
+	forceRevokeSession            *usecase.ForceRevokeSession
 	createAccessPolicy            *usecase.CreateAccessPolicy
 	getAccessPolicy               *usecase.GetAccessPolicy
 	listAccessPolicies            *usecase.ListAccessPolicies
@@ -53,6 +61,16 @@ type Server struct {
 	listPairedDevices         *usecase.ListPairedDevices
 	unpairDevice              *usecase.UnpairDevice
 	resolveDeviceSharedSecret *usecase.ResolveDeviceSharedSecret
+
+	listTenantMemberDirectory *usecase.ListTenantMemberDirectory
+
+	startSsoLogin    *usecase.StartSsoLogin
+	completeSsoLogin *usecase.CompleteSsoLogin
+
+	// CR-RBAC-003 (SSO group->role mapping, session refresh).
+	refreshSession        *usecase.RefreshSession
+	updateSsoGroupMapping *usecase.UpdateSsoGroupMapping
+	listSsoGroupMapping   *usecase.ListSsoGroupMapping
 }
 
 func New(
@@ -64,12 +82,17 @@ func New(
 	updateUserRole *usecase.UpdateUserRole,
 	revokeSession *usecase.RevokeSession,
 	queryAuditLog *usecase.QueryAuditLog,
+	appendAuditEntry *usecase.AppendAuditEntry,
 	issueServiceToken *usecase.IssueServiceToken,
 	getJWKS *usecase.GetJWKS,
+	isServiceTokenRevoked *usecase.IsServiceTokenRevoked,
+	listCliTokens *usecase.ListCliTokens,
+	revokeCliToken *usecase.RevokeCliToken,
 	deactivateUser *usecase.DeactivateUser,
 	reactivateUser *usecase.ReactivateUser,
 	listSessionsForUser *usecase.ListSessionsForUser,
 	forceRevokeAllSessionsForUser *usecase.ForceRevokeAllSessionsForUser,
+	forceRevokeSession *usecase.ForceRevokeSession,
 	createAccessPolicy *usecase.CreateAccessPolicy,
 	getAccessPolicy *usecase.GetAccessPolicy,
 	listAccessPolicies *usecase.ListAccessPolicies,
@@ -83,6 +106,12 @@ func New(
 	listPairedDevices *usecase.ListPairedDevices,
 	unpairDevice *usecase.UnpairDevice,
 	resolveDeviceSharedSecret *usecase.ResolveDeviceSharedSecret,
+	listTenantMemberDirectory *usecase.ListTenantMemberDirectory,
+	startSsoLogin *usecase.StartSsoLogin,
+	completeSsoLogin *usecase.CompleteSsoLogin,
+	refreshSession *usecase.RefreshSession,
+	updateSsoGroupMapping *usecase.UpdateSsoGroupMapping,
+	listSsoGroupMapping *usecase.ListSsoGroupMapping,
 ) *Server {
 	return &Server{
 		login:             login,
@@ -93,13 +122,19 @@ func New(
 		updateUserRole:    updateUserRole,
 		revokeSession:     revokeSession,
 		queryAuditLog:     queryAuditLog,
+		appendAuditEntry:  appendAuditEntry,
 		issueServiceToken: issueServiceToken,
 		getJWKS:           getJWKS,
+
+		isServiceTokenRevoked: isServiceTokenRevoked,
+		listCliTokens:         listCliTokens,
+		revokeCliToken:        revokeCliToken,
 
 		deactivateUser:                deactivateUser,
 		reactivateUser:                reactivateUser,
 		listSessionsForUser:           listSessionsForUser,
 		forceRevokeAllSessionsForUser: forceRevokeAllSessionsForUser,
+		forceRevokeSession:            forceRevokeSession,
 		createAccessPolicy:            createAccessPolicy,
 		getAccessPolicy:               getAccessPolicy,
 		listAccessPolicies:            listAccessPolicies,
@@ -115,6 +150,15 @@ func New(
 		listPairedDevices:         listPairedDevices,
 		unpairDevice:              unpairDevice,
 		resolveDeviceSharedSecret: resolveDeviceSharedSecret,
+
+		listTenantMemberDirectory: listTenantMemberDirectory,
+
+		startSsoLogin:    startSsoLogin,
+		completeSsoLogin: completeSsoLogin,
+
+		refreshSession:        refreshSession,
+		updateSsoGroupMapping: updateSsoGroupMapping,
+		listSsoGroupMapping:   listSsoGroupMapping,
 	}
 }
 
@@ -128,7 +172,7 @@ func (s *Server) Login(ctx context.Context, req *authv1.LoginRequest) (*authv1.L
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &authv1.LoginResponse{SessionToken: out.SessionToken, User: toProtoUser(out.User)}, nil
+	return &authv1.LoginResponse{SessionToken: out.SessionToken, RefreshToken: out.RefreshToken, User: toProtoUser(out.User)}, nil
 }
 
 func (s *Server) Logout(ctx context.Context, req *authv1.LogoutRequest) (*authv1.LogoutResponse, error) {
@@ -153,12 +197,23 @@ func (s *Server) ValidateSession(ctx context.Context, req *authv1.ValidateSessio
 // IssueServiceToken mints a real RS256 JWT, signed through Vault Transit
 // (internal/adapter/vault.TokenSigner) — the private key never materializes
 // in this service's process memory. See this service's README "Known gaps"
-// for what's still not covered (caller-authorization, the fuller
-// IssueToken/RefreshToken/RevokeToken surface).
+// for what's still not covered (the fuller IssueToken/RefreshToken/
+// RevokeToken surface — caller-authorization itself is now covered, see
+// usecase.IssueServiceTokenInput.CallerUserID's doc comment,
+// CR-CLI-002/TASK-BE-CLI-004).
+//
+// CallerUserID comes from tenant.UserID(ctx), NEVER from a request field —
+// populated by grpcmw.TenantExtractionInterceptor (wired in this service's
+// ChainUnary) from the x-orca-user-id metadata api-gateway's
+// gatewaygrpc.AttachIdentity sets on every outbound call. This is the same
+// existing propagation mechanism requireAdminActor (authorization.go) already
+// relies on for admin checks — reused here, not a new interceptor.
 func (s *Server) IssueServiceToken(ctx context.Context, req *authv1.IssueServiceTokenRequest) (*authv1.IssueServiceTokenResponse, error) {
+	callerUserID, _ := tenant.UserID(ctx)
 	out, err := s.issueServiceToken.Execute(ctx, usecase.IssueServiceTokenInput{
-		UserID:   req.GetUserId(),
-		Audience: req.GetAudience(),
+		UserID:       req.GetUserId(),
+		Audience:     req.GetAudience(),
+		CallerUserID: callerUserID,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -180,18 +235,73 @@ func (s *Server) GetJWKS(ctx context.Context, req *authv1.GetJWKSRequest) (*auth
 	return &authv1.GetJWKSResponse{JwksJson: out.JWKSJSON}, nil
 }
 
-func (s *Server) CreateUser(ctx context.Context, req *authv1.CreateUserRequest) (*authv1.CreateUserResponse, error) {
-	user, err := s.createUser.Execute(ctx, usecase.CreateUserInput{
-		Email:    req.GetEmail(),
-		Name:     req.GetName(),
-		TenantID: req.GetTenantId(),
-		Password: req.GetPassword(),
-		Role:     toDomainRole(req.GetRole()),
+// IsServiceTokenRevoked backs api-gateway's per-request revocation check —
+// see usecase.IsServiceTokenRevoked's doc comment for why this RPC has no
+// caller-identity gate.
+func (s *Server) IsServiceTokenRevoked(ctx context.Context, req *authv1.IsServiceTokenRevokedRequest) (*authv1.IsServiceTokenRevokedResponse, error) {
+	revoked, err := s.isServiceTokenRevoked.Execute(ctx, req.GetJti())
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.IsServiceTokenRevokedResponse{Revoked: revoked}, nil
+}
+
+// ListCliTokens/RevokeCliToken are self-service only — CallerUserID comes
+// from tenant.UserID(ctx), the same propagation mechanism IssueServiceToken
+// uses (see that handler's doc comment); UserID comes from the request
+// field api-gateway's route sets from identity.UserID, never a client-
+// controlled value, but the usecase re-verifies the two match rather than
+// trusting the request field alone (CR-CLI-002/TASK-BE-CLI-004's "never
+// trust identity from a request field" rule applied to these sibling RPCs).
+func (s *Server) ListCliTokens(ctx context.Context, req *authv1.ListCliTokensRequest) (*authv1.ListCliTokensResponse, error) {
+	callerUserID, _ := tenant.UserID(ctx)
+	tokens, err := s.listCliTokens.Execute(ctx, usecase.ListCliTokensInput{
+		UserID:       req.GetUserId(),
+		CallerUserID: callerUserID,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
-	return &authv1.CreateUserResponse{User: toProtoUser(user)}, nil
+	out := make([]*authv1.CliToken, 0, len(tokens))
+	for _, t := range tokens {
+		ct := &authv1.CliToken{
+			Jti:       t.JTI,
+			Audience:  t.Audience,
+			IssuedAt:  timestamppb.New(t.IssuedAt),
+			ExpiresAt: timestamppb.New(t.ExpiresAt),
+		}
+		if t.RevokedAt != nil {
+			ct.RevokedAt = timestamppb.New(*t.RevokedAt)
+		}
+		out = append(out, ct)
+	}
+	return &authv1.ListCliTokensResponse{Tokens: out}, nil
+}
+
+func (s *Server) RevokeCliToken(ctx context.Context, req *authv1.RevokeCliTokenRequest) (*emptypb.Empty, error) {
+	callerUserID, _ := tenant.UserID(ctx)
+	if err := s.revokeCliToken.Execute(ctx, usecase.RevokeCliTokenInput{
+		JTI:          req.GetJti(),
+		UserID:       req.GetUserId(),
+		CallerUserID: callerUserID,
+	}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
+}
+
+func (s *Server) CreateUser(ctx context.Context, req *authv1.CreateUserRequest) (*authv1.CreateUserResponse, error) {
+	out, err := s.createUser.Execute(ctx, usecase.CreateUserInput{
+		Email:    req.GetEmail(),
+		Name:     req.GetName(),
+		TenantID: req.GetTenantId(),
+		Role:     toDomainRole(req.GetRole()),
+		Password: req.GetPassword(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.CreateUserResponse{User: toProtoUser(out.User), GeneratedPassword: out.GeneratedPassword}, nil
 }
 
 func (s *Server) ListUsers(ctx context.Context, req *authv1.ListUsersRequest) (*authv1.ListUsersResponse, error) {
@@ -208,6 +318,18 @@ func (s *Server) ListUsers(ctx context.Context, req *authv1.ListUsersRequest) (*
 		users = append(users, toProtoUser(u))
 	}
 	return &authv1.ListUsersResponse{Users: users, NextPageToken: out.NextPageToken}, nil
+}
+
+func (s *Server) ListTenantMemberDirectory(ctx context.Context, _ *authv1.ListTenantMemberDirectoryRequest) (*authv1.ListTenantMemberDirectoryResponse, error) {
+	entries, err := s.listTenantMemberDirectory.Execute(ctx)
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	members := make([]*authv1.TenantMemberDirectoryEntry, 0, len(entries))
+	for _, e := range entries {
+		members = append(members, &authv1.TenantMemberDirectoryEntry{Id: e.ID, Name: e.Name, Email: e.Email})
+	}
+	return &authv1.ListTenantMemberDirectoryResponse{Members: members}, nil
 }
 
 func (s *Server) UpdateUserRole(ctx context.Context, req *authv1.UpdateUserRoleRequest) (*authv1.UpdateUserRoleResponse, error) {
@@ -268,11 +390,12 @@ func (s *Server) QueryAuditLog(ctx context.Context, req *authv1.QueryAuditLogReq
 	out, err := s.queryAuditLog.Execute(ctx, usecase.QueryAuditLogInput{
 		TenantID:  req.GetTenantId(),
 		Since:     toTime(req.GetSince()),
+		To:        toTime(req.GetTo()),
+		ActorID:   req.GetActorId(),
+		Action:    req.GetAction(),
+		Outcome:   domain.Outcome(req.GetOutcome()),
 		PageToken: req.GetPageToken(),
 		PageSize:  req.GetPageSize(),
-		To:        toTime(req.GetTo()),
-		Action:    req.GetAction(),
-		ActorID:   req.GetActorId(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -282,6 +405,23 @@ func (s *Server) QueryAuditLog(ctx context.Context, req *authv1.QueryAuditLogReq
 		entries = append(entries, toProtoAuditEntry(e))
 	}
 	return &authv1.QueryAuditLogResponse{Entries: entries, NextPageToken: out.NextPageToken}, nil
+}
+
+// AppendAuditEntry is the cross-service audit-ingress RPC (TASK-BE-017) —
+// deliberately no requireAdminActor-style gate, see
+// usecase.AppendAuditEntry's doc comment.
+func (s *Server) AppendAuditEntry(ctx context.Context, req *authv1.AppendAuditEntryRequest) (*emptypb.Empty, error) {
+	if err := s.appendAuditEntry.Execute(ctx, usecase.AppendAuditEntryInput{
+		TenantID:  req.GetTenantId(),
+		ActorID:   req.GetActorId(),
+		Action:    req.GetAction(),
+		Target:    req.GetTarget(),
+		Outcome:   req.GetOutcome(),
+		IPAddress: req.GetIpAddress(),
+	}); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) DeactivateUser(ctx context.Context, req *authv1.DeactivateUserRequest) (*authv1.DeactivateUserResponse, error) {
@@ -318,6 +458,13 @@ func (s *Server) ForceRevokeAllSessionsForUser(ctx context.Context, req *authv1.
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &authv1.ForceRevokeAllSessionsForUserResponse{RevokedCount: revoked}, nil
+}
+
+func (s *Server) ForceRevokeSession(ctx context.Context, req *authv1.ForceRevokeSessionRequest) (*emptypb.Empty, error) {
+	if err := s.forceRevokeSession.Execute(ctx, req.GetSessionId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func (s *Server) CreateAccessPolicy(ctx context.Context, req *authv1.CreateAccessPolicyRequest) (*authv1.AccessPolicy, error) {
@@ -441,6 +588,91 @@ func (s *Server) ResolveDeviceSharedSecret(ctx context.Context, req *authv1.Reso
 	return &authv1.ResolveDeviceSharedSecretResponse{SharedSecret: secret}, nil
 }
 
+// StartSsoLogin/CompleteSsoLogin are unauthenticated by necessity — like
+// Login, the caller has no session yet. api-gateway's GET /auth/sso/
+// {provider} and GET /auth/callback are the only callers (see
+// auth.proto's doc comment on the RPC).
+func (s *Server) StartSsoLogin(ctx context.Context, req *authv1.StartSsoLoginRequest) (*authv1.StartSsoLoginResponse, error) {
+	out, err := s.startSsoLogin.Execute(ctx, usecase.StartSsoLoginInput{
+		Provider:    domain.SsoProvider(req.GetProvider()),
+		RedirectURI: req.GetRedirectUri(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.StartSsoLoginResponse{AuthorizationUrl: out.AuthorizationURL, State: out.State}, nil
+}
+
+func (s *Server) CompleteSsoLogin(ctx context.Context, req *authv1.CompleteSsoLoginRequest) (*authv1.CompleteSsoLoginResponse, error) {
+	out, err := s.completeSsoLogin.Execute(ctx, usecase.CompleteSsoLoginInput{
+		Code:  req.GetCode(),
+		State: req.GetState(),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.CompleteSsoLoginResponse{SessionToken: out.SessionToken, RefreshToken: out.RefreshToken, User: toProtoUser(out.User)}, nil
+}
+
+// RefreshSession is unauthenticated by necessity — like Login, the caller
+// proves identity with a refresh token, not an existing valid session (see
+// auth.proto's doc comment on the RPC).
+func (s *Server) RefreshSession(ctx context.Context, req *authv1.RefreshSessionRequest) (*authv1.RefreshSessionResponse, error) {
+	out, err := s.refreshSession.Execute(ctx, usecase.RefreshSessionInput{RefreshToken: req.GetRefreshToken()})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.RefreshSessionResponse{
+		SessionToken: out.SessionToken,
+		ExpiresAt:    timestamppb.New(out.ExpiresAt),
+		// RefreshToken: the NEW rotated refresh token — TASK-BE-011 originally
+		// omitted this, making a second refresh impossible. See RefreshSessionResponse's
+		// proto doc comment (TASK-BE-012).
+		RefreshToken: out.RefreshToken,
+	}, nil
+}
+
+func (s *Server) UpdateSsoGroupMapping(ctx context.Context, req *authv1.UpdateSsoGroupMappingRequest) (*authv1.UpdateSsoGroupMappingResponse, error) {
+	mapping, err := s.updateSsoGroupMapping.Execute(ctx, usecase.UpdateSsoGroupMappingInput{
+		TenantID:  req.GetTenantId(),
+		Provider:  domain.SsoProvider(req.GetProvider()),
+		GroupName: req.GetGroupName(),
+		Role:      toDomainRole(req.GetRole()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &authv1.UpdateSsoGroupMappingResponse{Mapping: toProtoSsoGroupRoleMapping(mapping)}, nil
+}
+
+func (s *Server) ListSsoGroupMapping(ctx context.Context, req *authv1.ListSsoGroupMappingRequest) (*authv1.ListSsoGroupMappingResponse, error) {
+	out, err := s.listSsoGroupMapping.Execute(ctx, usecase.ListSsoGroupMappingInput{
+		TenantID: req.GetTenantId(),
+		Provider: domain.SsoProvider(req.GetProvider()),
+	})
+	if err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	mappings := make([]*authv1.SsoGroupRoleMapping, 0, len(out))
+	for _, m := range out {
+		mappings = append(mappings, toProtoSsoGroupRoleMapping(m))
+	}
+	return &authv1.ListSsoGroupMappingResponse{Mappings: mappings}, nil
+}
+
+func toProtoSsoGroupRoleMapping(m domain.SsoGroupRoleMapping) *authv1.SsoGroupRoleMapping {
+	out := &authv1.SsoGroupRoleMapping{
+		Id:        m.ID,
+		Provider:  string(m.Provider),
+		GroupName: m.GroupName,
+		Role:      toProtoRole(m.Role),
+	}
+	if !m.CreatedAt.IsZero() {
+		out.CreatedAt = timestamppb.New(m.CreatedAt)
+	}
+	return out
+}
+
 func toProtoSession(s domain.Session) *authv1.Session {
 	out := &authv1.Session{
 		Id:        s.TokenHash,
@@ -505,6 +737,12 @@ func toTime(ts *timestamppb.Timestamp) time.Time {
 }
 
 func toProtoUser(u domain.User) *authv1.User {
+	// "none" for a local-password-only account (u.SsoProvider's zero
+	// value) — see domain.User.SsoProvider's doc comment.
+	provider := "none"
+	if u.SsoProvider != "" {
+		provider = string(u.SsoProvider)
+	}
 	out := &authv1.User{
 		Id:       u.ID,
 		TenantId: u.TenantID,
@@ -512,6 +750,7 @@ func toProtoUser(u domain.User) *authv1.User {
 		Name:     u.Name,
 		Role:     toProtoRole(u.Role),
 		IsActive: u.IsActive,
+		Provider: provider,
 	}
 	if !u.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(u.CreatedAt)
@@ -533,9 +772,11 @@ func toProtoAuditEntry(e domain.AuditEntry) *authv1.AuditEntry {
 		TenantId:     e.TenantID,
 		ActorId:      e.ActorID,
 		Action:       e.Action,
+		Target:       e.Target,
 		TargetType:   e.TargetType,
 		TargetId:     e.TargetID,
 		MetadataJson: string(metadataJSON),
+		Outcome:      string(e.Outcome),
 		IpAddress:    e.IPAddress,
 	}
 	if !e.OccurredAt.IsZero() {

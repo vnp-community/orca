@@ -40,6 +40,7 @@ const (
 	GitGatewayService_RemoteCommitUrl_FullMethodName             = "/orca.gitgateway.v1.GitGatewayService/RemoteCommitUrl"
 	GitGatewayService_RemoteFileUrl_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/RemoteFileUrl"
 	GitGatewayService_Fetch_FullMethodName                       = "/orca.gitgateway.v1.GitGatewayService/Fetch"
+	GitGatewayService_GetRemoteUrl_FullMethodName                = "/orca.gitgateway.v1.GitGatewayService/GetRemoteUrl"
 	GitGatewayService_GeneratePullRequestFields_FullMethodName   = "/orca.gitgateway.v1.GitGatewayService/GeneratePullRequestFields"
 	GitGatewayService_DiscoverCommitMessageModels_FullMethodName = "/orca.gitgateway.v1.GitGatewayService/DiscoverCommitMessageModels"
 	GitGatewayService_ReadFile_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/ReadFile"
@@ -49,11 +50,13 @@ const (
 	GitGatewayService_WriteFile_FullMethodName                   = "/orca.gitgateway.v1.GitGatewayService/WriteFile"
 	GitGatewayService_WriteFileChunk_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/WriteFileChunk"
 	GitGatewayService_CreateDir_FullMethodName                   = "/orca.gitgateway.v1.GitGatewayService/CreateDir"
+	GitGatewayService_CreateFile_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/CreateFile"
 	GitGatewayService_DeleteFile_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/DeleteFile"
 	GitGatewayService_StatFile_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/StatFile"
 	GitGatewayService_SearchFiles_FullMethodName                 = "/orca.gitgateway.v1.GitGatewayService/SearchFiles"
 	GitGatewayService_ListAllFiles_FullMethodName                = "/orca.gitgateway.v1.GitGatewayService/ListAllFiles"
 	GitGatewayService_ListMarkdownDocuments_FullMethodName       = "/orca.gitgateway.v1.GitGatewayService/ListMarkdownDocuments"
+	GitGatewayService_WatchWorktree_FullMethodName               = "/orca.gitgateway.v1.GitGatewayService/WatchWorktree"
 	GitGatewayService_RenameFile_FullMethodName                  = "/orca.gitgateway.v1.GitGatewayService/RenameFile"
 	GitGatewayService_CopyFile_FullMethodName                    = "/orca.gitgateway.v1.GitGatewayService/CopyFile"
 	GitGatewayService_Clone_FullMethodName                       = "/orca.gitgateway.v1.GitGatewayService/Clone"
@@ -64,6 +67,7 @@ const (
 	GitGatewayService_ReadIssueCommand_FullMethodName            = "/orca.gitgateway.v1.GitGatewayService/ReadIssueCommand"
 	GitGatewayService_WriteIssueCommand_FullMethodName           = "/orca.gitgateway.v1.GitGatewayService/WriteIssueCommand"
 	GitGatewayService_ScanSetupScriptImports_FullMethodName      = "/orca.gitgateway.v1.GitGatewayService/ScanSetupScriptImports"
+	GitGatewayService_ReadEphemeralVmRecipes_FullMethodName      = "/orca.gitgateway.v1.GitGatewayService/ReadEphemeralVmRecipes"
 	GitGatewayService_CreateWorktree_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/CreateWorktree"
 	GitGatewayService_CreateWorktreeFromIssue_FullMethodName     = "/orca.gitgateway.v1.GitGatewayService/CreateWorktreeFromIssue"
 	GitGatewayService_RemoveWorktree_FullMethodName              = "/orca.gitgateway.v1.GitGatewayService/RemoveWorktree"
@@ -137,6 +141,15 @@ type GitGatewayServiceClient interface {
 	RemoteCommitUrl(ctx context.Context, in *RemoteCommitUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error)
 	RemoteFileUrl(ctx context.Context, in *RemoteFileUrlRequest, opts ...grpc.CallOption) (*RemoteUrlResponse, error)
 	Fetch(ctx context.Context, in *FetchRequest, opts ...grpc.CallOption) (*FetchResponse, error)
+	// GetRemoteUrl returns one configured remote's raw URL (not a web
+	// permalink like RemoteCommitUrl/RemoteFileUrl) — repo-scoped, same
+	// dispatchExecutorForRepo pattern as BaseRefDefault/PrefetchCreateBase.
+	// Added for github.listWorkItems: api-gateway resolves a repo_id's
+	// GitHub owner/repo by reading its configured remote (trying "upstream"
+	// then "origin"), since project.repos.url is not reliably a git remote
+	// URL (often an on-disk path — see project-service's SetupExistingFolder/
+	// ImportNested doc comments).
+	GetRemoteUrl(ctx context.Context, in *GetRemoteUrlRequest, opts ...grpc.CallOption) (*GetRemoteUrlResponse, error)
 	// ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
 	GeneratePullRequestFields(ctx context.Context, in *GeneratePullRequestFieldsRequest, opts ...grpc.CallOption) (*GeneratePullRequestFieldsResponse, error)
 	DiscoverCommitMessageModels(ctx context.Context, in *DiscoverCommitMessageModelsRequest, opts ...grpc.CallOption) (*DiscoverCommitMessageModelsResponse, error)
@@ -149,11 +162,22 @@ type GitGatewayServiceClient interface {
 	WriteFile(ctx context.Context, in *WriteFileRequest, opts ...grpc.CallOption) (*WriteFileResponse, error)
 	WriteFileChunk(ctx context.Context, in *WriteFileChunkRequest, opts ...grpc.CallOption) (*WriteFileChunkResponse, error)
 	CreateDir(ctx context.Context, in *CreateDirRequest, opts ...grpc.CallOption) (*CreateDirResponse, error)
+	CreateFile(ctx context.Context, in *CreateFileRequest, opts ...grpc.CallOption) (*CreateFileResponse, error)
 	DeleteFile(ctx context.Context, in *DeleteFileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	StatFile(ctx context.Context, in *StatFileRequest, opts ...grpc.CallOption) (*StatFileResponse, error)
 	SearchFiles(ctx context.Context, in *SearchFilesRequest, opts ...grpc.CallOption) (*SearchFilesResponse, error)
 	ListAllFiles(ctx context.Context, in *ListAllFilesRequest, opts ...grpc.CallOption) (*ListAllFilesResponse, error)
 	ListMarkdownDocuments(ctx context.Context, in *ListMarkdownDocumentsRequest, opts ...grpc.CallOption) (*ListMarkdownDocumentsResponse, error)
+	// WatchWorktree streams live fs.changed events for worktree_id's root
+	// (BACKLOG-003) — plain server-streaming, not unary: this is the one
+	// files.* RPC that pushes rather than answers once. Resolves worktree_id
+	// -> repoPath -> connection/dev server exactly like every RPC above, then
+	// opens infra-fleet-service's StreamFileChanges for that resolved path.
+	// The caller ends the subscription by canceling this call's context (see
+	// channels_files_watch.go's wscompat channel) — there is no separate
+	// Unwatch RPC; ending the stream is what tells the agent to fs.unwatch
+	// (see devserveragent.Client.StreamFileChanges's unsubscribe doc comment).
+	WatchWorktree(ctx context.Context, in *WatchWorktreeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FileChangeEvent], error)
 	// Known gaps carried forward from the old backend — both RPCs exist so
 	// the contract is honest, but return FAILED_PRECONDITION whenever
 	// dispatch resolves to a relay target, never a silent no-op.
@@ -170,6 +194,11 @@ type GitGatewayServiceClient interface {
 	ReadIssueCommand(ctx context.Context, in *ReadIssueCommandRequest, opts ...grpc.CallOption) (*ReadIssueCommandResponse, error)
 	WriteIssueCommand(ctx context.Context, in *WriteIssueCommandRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	ScanSetupScriptImports(ctx context.Context, in *ScanSetupScriptImportsRequest, opts ...grpc.CallOption) (*ScanSetupScriptImportsResponse, error)
+	// ReadEphemeralVmRecipes reads orca.yaml's environmentRecipes section off
+	// repoId's owning host (Group 1 of SOL-004 — no new agent capability,
+	// reuses the already-existing fs.readFile relay via GitExecutor.ReadFile).
+	// See specs/backend-go/bugs/missing-v3/solutions/SOL-004-ephemeralvm-channels.md.
+	ReadEphemeralVmRecipes(ctx context.Context, in *ReadEphemeralVmRecipesRequest, opts ...grpc.CallOption) (*ReadEphemeralVmRecipesResponse, error)
 	CreateWorktree(ctx context.Context, in *CreateWorktreeRequest, opts ...grpc.CallOption) (*CreateWorktreeResponse, error)
 	// CreateWorktreeFromIssue is the same saga as CreateWorktree with issue
 	// fetch/branch-derivation prepended and agent-spawn/status-sync-enqueue
@@ -443,6 +472,16 @@ func (c *gitGatewayServiceClient) Fetch(ctx context.Context, in *FetchRequest, o
 	return out, nil
 }
 
+func (c *gitGatewayServiceClient) GetRemoteUrl(ctx context.Context, in *GetRemoteUrlRequest, opts ...grpc.CallOption) (*GetRemoteUrlResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetRemoteUrlResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_GetRemoteUrl_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gitGatewayServiceClient) GeneratePullRequestFields(ctx context.Context, in *GeneratePullRequestFieldsRequest, opts ...grpc.CallOption) (*GeneratePullRequestFieldsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GeneratePullRequestFieldsResponse)
@@ -533,6 +572,16 @@ func (c *gitGatewayServiceClient) CreateDir(ctx context.Context, in *CreateDirRe
 	return out, nil
 }
 
+func (c *gitGatewayServiceClient) CreateFile(ctx context.Context, in *CreateFileRequest, opts ...grpc.CallOption) (*CreateFileResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateFileResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_CreateFile_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *gitGatewayServiceClient) DeleteFile(ctx context.Context, in *DeleteFileRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(emptypb.Empty)
@@ -582,6 +631,25 @@ func (c *gitGatewayServiceClient) ListMarkdownDocuments(ctx context.Context, in 
 	}
 	return out, nil
 }
+
+func (c *gitGatewayServiceClient) WatchWorktree(ctx context.Context, in *WatchWorktreeRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[FileChangeEvent], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &GitGatewayService_ServiceDesc.Streams[0], GitGatewayService_WatchWorktree_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[WatchWorktreeRequest, FileChangeEvent]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GitGatewayService_WatchWorktreeClient = grpc.ServerStreamingClient[FileChangeEvent]
 
 func (c *gitGatewayServiceClient) RenameFile(ctx context.Context, in *RenameFileRequest, opts ...grpc.CallOption) (*RenameFileResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -677,6 +745,16 @@ func (c *gitGatewayServiceClient) ScanSetupScriptImports(ctx context.Context, in
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ScanSetupScriptImportsResponse)
 	err := c.cc.Invoke(ctx, GitGatewayService_ScanSetupScriptImports_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *gitGatewayServiceClient) ReadEphemeralVmRecipes(ctx context.Context, in *ReadEphemeralVmRecipesRequest, opts ...grpc.CallOption) (*ReadEphemeralVmRecipesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReadEphemeralVmRecipesResponse)
+	err := c.cc.Invoke(ctx, GitGatewayService_ReadEphemeralVmRecipes_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -945,7 +1023,7 @@ func (c *gitGatewayServiceClient) DeleteBranch(ctx context.Context, in *DeleteBr
 
 func (c *gitGatewayServiceClient) PushStream(ctx context.Context, in *PushRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GitProgressEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &GitGatewayService_ServiceDesc.Streams[0], GitGatewayService_PushStream_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &GitGatewayService_ServiceDesc.Streams[1], GitGatewayService_PushStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -964,7 +1042,7 @@ type GitGatewayService_PushStreamClient = grpc.ServerStreamingClient[GitProgress
 
 func (c *gitGatewayServiceClient) PullStream(ctx context.Context, in *PullRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[GitProgressEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &GitGatewayService_ServiceDesc.Streams[1], GitGatewayService_PullStream_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &GitGatewayService_ServiceDesc.Streams[2], GitGatewayService_PullStream_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -1024,6 +1102,15 @@ type GitGatewayServiceServer interface {
 	RemoteCommitUrl(context.Context, *RemoteCommitUrlRequest) (*RemoteUrlResponse, error)
 	RemoteFileUrl(context.Context, *RemoteFileUrlRequest) (*RemoteUrlResponse, error)
 	Fetch(context.Context, *FetchRequest) (*FetchResponse, error)
+	// GetRemoteUrl returns one configured remote's raw URL (not a web
+	// permalink like RemoteCommitUrl/RemoteFileUrl) — repo-scoped, same
+	// dispatchExecutorForRepo pattern as BaseRefDefault/PrefetchCreateBase.
+	// Added for github.listWorkItems: api-gateway resolves a repo_id's
+	// GitHub owner/repo by reading its configured remote (trying "upstream"
+	// then "origin"), since project.repos.url is not reliably a git remote
+	// URL (often an on-disk path — see project-service's SetupExistingFolder/
+	// ImportNested doc comments).
+	GetRemoteUrl(context.Context, *GetRemoteUrlRequest) (*GetRemoteUrlResponse, error)
 	// ── Group E (TASK-211) — AI-assist. ─────────────────────────────────────
 	GeneratePullRequestFields(context.Context, *GeneratePullRequestFieldsRequest) (*GeneratePullRequestFieldsResponse, error)
 	DiscoverCommitMessageModels(context.Context, *DiscoverCommitMessageModelsRequest) (*DiscoverCommitMessageModelsResponse, error)
@@ -1036,11 +1123,22 @@ type GitGatewayServiceServer interface {
 	WriteFile(context.Context, *WriteFileRequest) (*WriteFileResponse, error)
 	WriteFileChunk(context.Context, *WriteFileChunkRequest) (*WriteFileChunkResponse, error)
 	CreateDir(context.Context, *CreateDirRequest) (*CreateDirResponse, error)
+	CreateFile(context.Context, *CreateFileRequest) (*CreateFileResponse, error)
 	DeleteFile(context.Context, *DeleteFileRequest) (*emptypb.Empty, error)
 	StatFile(context.Context, *StatFileRequest) (*StatFileResponse, error)
 	SearchFiles(context.Context, *SearchFilesRequest) (*SearchFilesResponse, error)
 	ListAllFiles(context.Context, *ListAllFilesRequest) (*ListAllFilesResponse, error)
 	ListMarkdownDocuments(context.Context, *ListMarkdownDocumentsRequest) (*ListMarkdownDocumentsResponse, error)
+	// WatchWorktree streams live fs.changed events for worktree_id's root
+	// (BACKLOG-003) — plain server-streaming, not unary: this is the one
+	// files.* RPC that pushes rather than answers once. Resolves worktree_id
+	// -> repoPath -> connection/dev server exactly like every RPC above, then
+	// opens infra-fleet-service's StreamFileChanges for that resolved path.
+	// The caller ends the subscription by canceling this call's context (see
+	// channels_files_watch.go's wscompat channel) — there is no separate
+	// Unwatch RPC; ending the stream is what tells the agent to fs.unwatch
+	// (see devserveragent.Client.StreamFileChanges's unsubscribe doc comment).
+	WatchWorktree(*WatchWorktreeRequest, grpc.ServerStreamingServer[FileChangeEvent]) error
 	// Known gaps carried forward from the old backend — both RPCs exist so
 	// the contract is honest, but return FAILED_PRECONDITION whenever
 	// dispatch resolves to a relay target, never a silent no-op.
@@ -1057,6 +1155,11 @@ type GitGatewayServiceServer interface {
 	ReadIssueCommand(context.Context, *ReadIssueCommandRequest) (*ReadIssueCommandResponse, error)
 	WriteIssueCommand(context.Context, *WriteIssueCommandRequest) (*emptypb.Empty, error)
 	ScanSetupScriptImports(context.Context, *ScanSetupScriptImportsRequest) (*ScanSetupScriptImportsResponse, error)
+	// ReadEphemeralVmRecipes reads orca.yaml's environmentRecipes section off
+	// repoId's owning host (Group 1 of SOL-004 — no new agent capability,
+	// reuses the already-existing fs.readFile relay via GitExecutor.ReadFile).
+	// See specs/backend-go/bugs/missing-v3/solutions/SOL-004-ephemeralvm-channels.md.
+	ReadEphemeralVmRecipes(context.Context, *ReadEphemeralVmRecipesRequest) (*ReadEphemeralVmRecipesResponse, error)
 	CreateWorktree(context.Context, *CreateWorktreeRequest) (*CreateWorktreeResponse, error)
 	// CreateWorktreeFromIssue is the same saga as CreateWorktree with issue
 	// fetch/branch-derivation prepended and agent-spawn/status-sync-enqueue
@@ -1190,6 +1293,9 @@ func (UnimplementedGitGatewayServiceServer) RemoteFileUrl(context.Context, *Remo
 func (UnimplementedGitGatewayServiceServer) Fetch(context.Context, *FetchRequest) (*FetchResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Fetch not implemented")
 }
+func (UnimplementedGitGatewayServiceServer) GetRemoteUrl(context.Context, *GetRemoteUrlRequest) (*GetRemoteUrlResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetRemoteUrl not implemented")
+}
 func (UnimplementedGitGatewayServiceServer) GeneratePullRequestFields(context.Context, *GeneratePullRequestFieldsRequest) (*GeneratePullRequestFieldsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GeneratePullRequestFields not implemented")
 }
@@ -1217,6 +1323,9 @@ func (UnimplementedGitGatewayServiceServer) WriteFileChunk(context.Context, *Wri
 func (UnimplementedGitGatewayServiceServer) CreateDir(context.Context, *CreateDirRequest) (*CreateDirResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateDir not implemented")
 }
+func (UnimplementedGitGatewayServiceServer) CreateFile(context.Context, *CreateFileRequest) (*CreateFileResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateFile not implemented")
+}
 func (UnimplementedGitGatewayServiceServer) DeleteFile(context.Context, *DeleteFileRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method DeleteFile not implemented")
 }
@@ -1231,6 +1340,9 @@ func (UnimplementedGitGatewayServiceServer) ListAllFiles(context.Context, *ListA
 }
 func (UnimplementedGitGatewayServiceServer) ListMarkdownDocuments(context.Context, *ListMarkdownDocumentsRequest) (*ListMarkdownDocumentsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMarkdownDocuments not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) WatchWorktree(*WatchWorktreeRequest, grpc.ServerStreamingServer[FileChangeEvent]) error {
+	return status.Error(codes.Unimplemented, "method WatchWorktree not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) RenameFile(context.Context, *RenameFileRequest) (*RenameFileResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RenameFile not implemented")
@@ -1261,6 +1373,9 @@ func (UnimplementedGitGatewayServiceServer) WriteIssueCommand(context.Context, *
 }
 func (UnimplementedGitGatewayServiceServer) ScanSetupScriptImports(context.Context, *ScanSetupScriptImportsRequest) (*ScanSetupScriptImportsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ScanSetupScriptImports not implemented")
+}
+func (UnimplementedGitGatewayServiceServer) ReadEphemeralVmRecipes(context.Context, *ReadEphemeralVmRecipesRequest) (*ReadEphemeralVmRecipesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReadEphemeralVmRecipes not implemented")
 }
 func (UnimplementedGitGatewayServiceServer) CreateWorktree(context.Context, *CreateWorktreeRequest) (*CreateWorktreeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateWorktree not implemented")
@@ -1727,6 +1842,24 @@ func _GitGatewayService_Fetch_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitGatewayService_GetRemoteUrl_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetRemoteUrlRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).GetRemoteUrl(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_GetRemoteUrl_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).GetRemoteUrl(ctx, req.(*GetRemoteUrlRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GitGatewayService_GeneratePullRequestFields_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GeneratePullRequestFieldsRequest)
 	if err := dec(in); err != nil {
@@ -1889,6 +2022,24 @@ func _GitGatewayService_CreateDir_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GitGatewayService_CreateFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateFileRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).CreateFile(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_CreateFile_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).CreateFile(ctx, req.(*CreateFileRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _GitGatewayService_DeleteFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(DeleteFileRequest)
 	if err := dec(in); err != nil {
@@ -1978,6 +2129,17 @@ func _GitGatewayService_ListMarkdownDocuments_Handler(srv interface{}, ctx conte
 	}
 	return interceptor(ctx, in, info, handler)
 }
+
+func _GitGatewayService_WatchWorktree_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(WatchWorktreeRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(GitGatewayServiceServer).WatchWorktree(m, &grpc.GenericServerStream[WatchWorktreeRequest, FileChangeEvent]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GitGatewayService_WatchWorktreeServer = grpc.ServerStreamingServer[FileChangeEvent]
 
 func _GitGatewayService_RenameFile_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RenameFileRequest)
@@ -2155,6 +2317,24 @@ func _GitGatewayService_ScanSetupScriptImports_Handler(srv interface{}, ctx cont
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(GitGatewayServiceServer).ScanSetupScriptImports(ctx, req.(*ScanSetupScriptImportsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _GitGatewayService_ReadEphemeralVmRecipes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadEphemeralVmRecipesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(GitGatewayServiceServer).ReadEphemeralVmRecipes(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: GitGatewayService_ReadEphemeralVmRecipes_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(GitGatewayServiceServer).ReadEphemeralVmRecipes(ctx, req.(*ReadEphemeralVmRecipesRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -2737,6 +2917,10 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _GitGatewayService_Fetch_Handler,
 		},
 		{
+			MethodName: "GetRemoteUrl",
+			Handler:    _GitGatewayService_GetRemoteUrl_Handler,
+		},
+		{
 			MethodName: "GeneratePullRequestFields",
 			Handler:    _GitGatewayService_GeneratePullRequestFields_Handler,
 		},
@@ -2771,6 +2955,10 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateDir",
 			Handler:    _GitGatewayService_CreateDir_Handler,
+		},
+		{
+			MethodName: "CreateFile",
+			Handler:    _GitGatewayService_CreateFile_Handler,
 		},
 		{
 			MethodName: "DeleteFile",
@@ -2831,6 +3019,10 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ScanSetupScriptImports",
 			Handler:    _GitGatewayService_ScanSetupScriptImports_Handler,
+		},
+		{
+			MethodName: "ReadEphemeralVmRecipes",
+			Handler:    _GitGatewayService_ReadEphemeralVmRecipes_Handler,
 		},
 		{
 			MethodName: "CreateWorktree",
@@ -2938,6 +3130,11 @@ var GitGatewayService_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "WatchWorktree",
+			Handler:       _GitGatewayService_WatchWorktree_Handler,
+			ServerStreams: true,
+		},
 		{
 			StreamName:    "PushStream",
 			Handler:       _GitGatewayService_PushStream_Handler,

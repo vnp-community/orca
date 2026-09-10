@@ -11,6 +11,7 @@ import {
   type RuntimeEnvironmentCallRequest
 } from '../../runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
+import { resetDefaultProjectCacheForTests } from './repos'
 
 const toastError = vi.hoisted(() => vi.fn())
 const toastInfo = vi.hoisted(() => vi.fn())
@@ -35,8 +36,34 @@ const remoteRepo: Repo = {
 const runtimeEnvironmentCall = vi.fn()
 const runtimeEnvironmentTransportCall = vi.fn()
 
+// Phase 4b: the runtime path's addRepoPath resolves an implicit default
+// OrcaProject (getOrCreateDefaultProject -> project.list) before repo.add
+// runs at all. Every mock below must answer 'project.list' with this fixed
+// project alongside whatever repo.add/folderWorkspace.getPathStatus behavior
+// the test is actually exercising.
+const DEFAULT_PROJECT_ID = 'default-project'
+function defaultProjectListResult() {
+  return {
+    id: 'rpc-project-list',
+    ok: true,
+    result: [
+      {
+        id: DEFAULT_PROJECT_ID,
+        name: 'My Repos',
+        defaultBranch: 'main',
+        devServerId: '',
+        visibility: 'private',
+        createdAt: 1,
+        updatedAt: 1
+      }
+    ],
+    _meta: { runtimeId: 'runtime-remote' }
+  }
+}
+
 beforeEach(() => {
   clearRuntimeCompatibilityCacheForTests()
+  resetDefaultProjectCacheForTests()
   runtimeEnvironmentCall.mockReset()
   runtimeEnvironmentTransportCall.mockReset()
   toastError.mockReset()
@@ -56,6 +83,9 @@ describe('repo slice runtime folder fallback', () => {
   it('blocks wrong-host runtime fallback', async () => {
     runtimeEnvironmentCall.mockImplementation((request: RuntimeEnvironmentCallRequest) => {
       const { method } = request
+      if (method === 'project.list') {
+        return defaultProjectListResult()
+      }
       if (method === 'repo.add') {
         return {
           id: 'rpc-add-git',
@@ -68,13 +98,7 @@ describe('repo slice runtime folder fallback', () => {
         return {
           id: 'rpc-path-status',
           ok: true,
-          result: {
-            status: {
-              path: '/Users/me/GitHub/travel-hub',
-              exists: false,
-              reason: 'missing'
-            }
-          },
+          result: { status: 'PATH_STATUS_INVALID' },
           _meta: { runtimeId: 'runtime-remote' }
         }
       }
@@ -91,7 +115,8 @@ describe('repo slice runtime folder fallback', () => {
     const store = createTestStore()
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
-      runtimeEnvironments: [{ id: 'env-1', name: 'Remote Mac' }] as never
+      runtimeEnvironments: [{ id: 'env-1', name: 'Remote Mac' }] as never,
+      activeDevServerId: null
     })
 
     await expect(
@@ -102,7 +127,7 @@ describe('repo slice runtime folder fallback', () => {
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'folderWorkspace.getPathStatus',
-      params: { scope: 'path', path: '/Users/me/GitHub/travel-hub' },
+      params: { devServerId: null, path: '/Users/me/GitHub/travel-hub' },
       timeoutMs: 15_000
     })
     expect(toastError).toHaveBeenCalledWith(
@@ -116,6 +141,9 @@ describe('repo slice runtime folder fallback', () => {
   it('treats runtime status RPC failures as host-scoped errors', async () => {
     runtimeEnvironmentCall.mockImplementation((request: RuntimeEnvironmentCallRequest) => {
       const { method } = request
+      if (method === 'project.list') {
+        return defaultProjectListResult()
+      }
       if (method === 'repo.add') {
         return {
           id: 'rpc-add-git',
@@ -169,6 +197,9 @@ describe('repo slice runtime folder fallback', () => {
     })
     runtimeEnvironmentCall.mockImplementation((request: RuntimeEnvironmentCallRequest) => {
       const { method } = request
+      if (method === 'project.list') {
+        return defaultProjectListResult()
+      }
       if (method === 'repo.add') {
         return {
           id: 'rpc-add-git',
@@ -209,25 +240,44 @@ describe('repo slice runtime folder fallback', () => {
       displayName: 'non-git',
       kind: 'folder'
     }
+    // Why a call counter, not a `kind` param branch: the fixed wire request
+    // (channels_repo_ssh_status_workspace.go's AddRepoRequest) never carries
+    // `kind` at all — repo.add only ever sees {projectId, url, displayName}.
+    // addRepoPath's own `kind` argument is a purely local annotation applied
+    // after the RPC response comes back. The test still needs the *first*
+    // repo.add (from the initial 'git' addRepoPath call below) to reject as
+    // non-git, and the *second* (from addNonGitFolder's own 'folder' retry)
+    // to succeed, so count calls instead.
+    let repoAddCalls = 0
     runtimeEnvironmentCall.mockImplementation((request) => {
-      const { selector, method, params } = request as {
+      const { selector, method } = request as {
         selector: string
         method: string
         params?: unknown
       }
-      if (method === 'repo.add' && (params as { kind?: string }).kind === 'git') {
-        return {
-          id: 'rpc-add-git',
-          ok: false,
-          error: { code: 'repo.invalid', message: 'Not a valid git repository' },
-          _meta: { runtimeId: 'runtime-remote' }
-        }
+      if (method === 'project.list') {
+        return defaultProjectListResult()
       }
-      if (method === 'repo.add' && (params as { kind?: string }).kind === 'folder') {
+      if (method === 'repo.add') {
+        repoAddCalls += 1
+        if (repoAddCalls === 1) {
+          return {
+            id: 'rpc-add-git',
+            ok: false,
+            error: { code: 'repo.invalid', message: 'Not a valid git repository' },
+            _meta: { runtimeId: 'runtime-remote' }
+          }
+        }
         return {
           id: 'rpc-add-folder',
           ok: true,
-          result: { repo: folderRepo },
+          result: {
+            id: folderRepo.id,
+            projectId: DEFAULT_PROJECT_ID,
+            url: folderRepo.path,
+            displayName: folderRepo.displayName,
+            position: 0
+          },
           _meta: { runtimeId: `runtime-${selector}` }
         }
       }
@@ -235,12 +285,7 @@ describe('repo slice runtime folder fallback', () => {
         return {
           id: 'rpc-path-status',
           ok: true,
-          result: {
-            status: {
-              path: '/srv/non-git',
-              exists: true
-            }
-          },
+          result: { status: 'PATH_STATUS_AVAILABLE' },
           _meta: { runtimeId: 'runtime-remote' }
         }
       }
@@ -249,7 +294,8 @@ describe('repo slice runtime folder fallback', () => {
     const store = createTestStore()
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'env-1' } as never,
-      fetchWorktrees: vi.fn().mockResolvedValue(undefined) as never
+      fetchWorktrees: vi.fn().mockResolvedValue(undefined) as never,
+      activeDevServerId: null
     })
 
     await expect(store.getState().addRepoPath('/srv/non-git', 'git')).resolves.toBeNull()
@@ -263,19 +309,28 @@ describe('repo slice runtime folder fallback', () => {
     store.setState({ settings: { activeRuntimeEnvironmentId: 'env-2' } as never })
     await expect(
       store.getState().addNonGitFolder('/srv/non-git', { runtimeEnvironmentId: 'env-1' })
-    ).resolves.toEqual({ ...folderRepo, executionHostId: 'runtime:env-1' })
+    ).resolves.toEqual({
+      id: folderRepo.id,
+      projectId: DEFAULT_PROJECT_ID,
+      path: folderRepo.path,
+      displayName: folderRepo.displayName,
+      badgeColor: '',
+      addedAt: expect.any(Number),
+      kind: 'folder',
+      executionHostId: 'runtime:env-1'
+    })
 
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
       method: 'repo.add',
-      params: { path: '/srv/non-git', kind: 'folder' },
+      params: { projectId: DEFAULT_PROJECT_ID, url: '/srv/non-git', displayName: 'non-git' },
       timeoutMs: 15_000
     })
     expect(runtimeEnvironmentCall).not.toHaveBeenCalledWith(
       expect.objectContaining({
         selector: 'env-2',
         method: 'repo.add',
-        params: { path: '/srv/non-git', kind: 'folder' }
+        params: { projectId: DEFAULT_PROJECT_ID, url: '/srv/non-git', displayName: 'non-git' }
       })
     )
   })

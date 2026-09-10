@@ -4,7 +4,7 @@
 **File:** `services/api-gateway/internal/adapter/wscompat/channels.go`
 **Severity:** Medium — admin-only feature (`TeamAdmin.tsx`); no channel is on the app bootstrap path
 **Symptom:** Every call the Team Admin screen makes (`team.list`, `team.listMembers`, `team.create`, `team.addMember`, `team.removeMember`) falls through to `notImplementedHandler` and times out client-side
-**Status: ❌ Open**
+**Status:** ✅ Resolved — see TASK-176–179 (4 task(s), all DONE) for implementation evidence.
 
 ---
 

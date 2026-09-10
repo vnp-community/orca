@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"strings"
 
@@ -18,6 +19,15 @@ type Identity struct {
 	// DeviceID is non-empty only for a mobile-paired-device JWT (SOL-MB-01)
 	// — read from the token's device_id claim, see jwtauth.Claims.DeviceID.
 	DeviceID string
+	// Role is the caller's global role ("admin"/"user") — added for
+	// CR-DS-006 Phase 2, and now populated on both auth paths: the
+	// cookie/session path (authclient.SessionValidator) and, since
+	// CR-RBAC-002 (BE-SOL-002/TASK-BE-004), AuthValidator.Validate's
+	// bearer-JWT path too (claims.Role, once jwtauth.Claims started
+	// carrying it). Empty for a JWT minted before that change (no "role"
+	// claim) — not an error, just an absent claim; see common/tenant.Role's
+	// doc comment for the fail-closed contract every caller must honor.
+	Role string
 }
 
 var (
@@ -38,6 +48,10 @@ var (
 	// ErrSignatureVerificationFailed means a signing key was found but the
 	// token's signature (or its exp/iat/iss) didn't validate against it.
 	ErrSignatureVerificationFailed = errors.New("authvalidator: signature verification failed")
+	// ErrTokenRevoked means the JWT verified fine but its jti has been
+	// revoked (CR-CLI-002/TASK-BE-CLI-005) — only reachable when Revocation
+	// is configured (see AuthValidator.Revocation's doc comment).
+	ErrTokenRevoked = errors.New("authvalidator: token has been revoked")
 )
 
 // SessionCookieName is the HTTP-only browser session cookie, SameSite=strict
@@ -56,6 +70,16 @@ const SessionCookieName = "orca_session"
 // fallback for callers that actually present a bearer JWT.
 type AuthValidator struct {
 	jwks JWKSClient
+	// Revocation checks a verified JWT's jti against auth-service's
+	// domain-revocation list (CR-CLI-002/TASK-BE-CLI-005) — nil-tolerant
+	// and set AFTER construction (see main.go), not a NewAuthValidator
+	// parameter: this field is optional (a deployment with no CLI-token
+	// revocation wired keeps today's exact behavior), and threading it
+	// through the constructor would force every one of NewAuthValidator's
+	// many existing call sites (main.go + every wsbridge/wscompat/
+	// httpgateway/usecase test double) to change for a feature most of
+	// them don't exercise.
+	Revocation RevocationChecker
 }
 
 // NewAuthValidator returns an AuthValidator that verifies bearer/cookie
@@ -97,7 +121,24 @@ func (v *AuthValidator) Validate(r *http.Request) (Identity, error) {
 	if claims.TenantID == "" || claims.Subject == "" {
 		return Identity{}, ErrMissingIdentityClaims
 	}
-	return Identity{TenantID: claims.TenantID, UserID: claims.Subject, DeviceID: claims.DeviceID}, nil
+
+	if v.Revocation != nil {
+		// Fail-closed: an error checking revocation is treated the same as
+		// "revoked" — a transient auth-service outage must never fall back
+		// to trusting an otherwise-valid JWT that could have been revoked
+		// moments ago (the whole point of this check). See
+		// RevocationChecker's doc comment for the caching that keeps this
+		// affordable per-request.
+		revoked, err := v.Revocation.IsRevoked(r.Context(), claims.ID)
+		if err != nil {
+			return Identity{}, fmt.Errorf("authvalidator: revocation check failed: %w", err)
+		}
+		if revoked {
+			return Identity{}, ErrTokenRevoked
+		}
+	}
+
+	return Identity{TenantID: claims.TenantID, UserID: claims.Subject, DeviceID: claims.DeviceID, Role: claims.Role}, nil
 }
 
 func bearerToken(r *http.Request) string {

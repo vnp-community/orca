@@ -4,12 +4,14 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc"
 
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/domain"
 	"github.com/stablyai/orca-go/services/git-gateway-service/internal/usecase"
 )
@@ -29,6 +31,18 @@ type fakeInfraFleetServiceClient struct {
 	relayResp *infrafleetv1.RelayResponse
 	relayErr  error
 	gotRelay  *infrafleetv1.RelayRequest
+
+	// relayRespByMethod/gotRelayRequests support multi-call sequences (e.g.
+	// CreateWorktree's git.worktree.add then git.exec follow-up) where a
+	// single fixed relayResp/gotRelay pair can't distinguish which call is
+	// which. When relayRespByMethod is non-nil, Relay looks up by
+	// in.Method instead of returning relayResp.
+	relayRespByMethod map[string]*infrafleetv1.RelayResponse
+	gotRelayRequests  []*infrafleetv1.RelayRequest
+
+	relayByDevServerResp *infrafleetv1.RelayResponse
+	relayByDevServerErr  error
+	gotRelayByDevServer  *infrafleetv1.RelayByDevServerRequest
 }
 
 func (f *fakeInfraFleetServiceClient) ResolveConnection(ctx context.Context, in *infrafleetv1.ResolveConnectionRequest, _ ...grpc.CallOption) (*infrafleetv1.ResolveConnectionResponse, error) {
@@ -41,10 +55,22 @@ func (f *fakeInfraFleetServiceClient) ResolveConnection(ctx context.Context, in 
 
 func (f *fakeInfraFleetServiceClient) Relay(ctx context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
 	f.gotRelay = in
+	f.gotRelayRequests = append(f.gotRelayRequests, in)
 	if f.relayErr != nil {
 		return nil, f.relayErr
 	}
+	if f.relayRespByMethod != nil {
+		return f.relayRespByMethod[in.GetMethod()], nil
+	}
 	return f.relayResp, nil
+}
+
+func (f *fakeInfraFleetServiceClient) RelayByDevServer(ctx context.Context, in *infrafleetv1.RelayByDevServerRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
+	f.gotRelayByDevServer = in
+	if f.relayByDevServerErr != nil {
+		return nil, f.relayByDevServerErr
+	}
+	return f.relayByDevServerResp, nil
 }
 
 func ctxWithTenant(t *testing.T) context.Context {
@@ -68,17 +94,42 @@ func TestConnectionResolver_ResolveConnection_NotConnected(t *testing.T) {
 	if conn.RepoPath != "wt-1" {
 		t.Errorf("expected RepoPath to fall back to worktreeID %q, got %q", "wt-1", conn.RepoPath)
 	}
-	if fake.gotResolveConnection.GetConnectionId() != "wt-1" {
-		t.Errorf("expected ConnectionId=wt-1 on the request, got %q", fake.gotResolveConnection.GetConnectionId())
+	if fake.gotResolveConnection.GetWorktreeId() != "wt-1" {
+		t.Errorf("expected WorktreeId=wt-1 on the request, got %q", fake.gotResolveConnection.GetWorktreeId())
+	}
+	if fake.gotResolveConnection.GetConnectionId() != "" {
+		t.Errorf("expected ConnectionId to stay unset (worktreeID is not a connections.id uuid), got %q", fake.gotResolveConnection.GetConnectionId())
+	}
+}
+
+// TestConnectionResolver_ResolveConnection_MapsHiddenTargetID is
+// TASK-BE-EVM-018's regression guard for the OTHER of the "2 proto" this
+// task's gap closed (TASK-BE-EVM-015's gap #1): infrafleetv1.ResolveConnectionResponse.hidden_target_id
+// is no longer silently dropped.
+func TestConnectionResolver_ResolveConnection_MapsHiddenTargetID(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{
+			Connected: true, RepoPath: "/remote/repo", ConnectionId: "conn-uuid-1", HiddenTargetId: "rt-1",
+		},
+	}
+	r := NewConnectionResolver(fake)
+
+	conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-2")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conn.HiddenTargetID != "rt-1" {
+		t.Errorf("expected HiddenTargetID=rt-1 from the response, got %q", conn.HiddenTargetID)
 	}
 }
 
 func TestConnectionResolver_ResolveConnection_Connected(t *testing.T) {
 	fake := &fakeInfraFleetServiceClient{
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{
-			Connected: true,
-			RepoPath:  "/remote/repo",
-			DevServer: &infrafleetv1.DevServer{Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_WEBSOCKET},
+			Connected:    true,
+			RepoPath:     "/remote/repo",
+			ConnectionId: "conn-uuid-1",
+			DevServer:    &infrafleetv1.DevServer{Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_WEBSOCKET},
 		},
 	}
 	r := NewConnectionResolver(fake)
@@ -90,8 +141,11 @@ func TestConnectionResolver_ResolveConnection_Connected(t *testing.T) {
 	if !conn.Connected {
 		t.Error("expected Connected=true")
 	}
-	if conn.ConnectionID != "wt-2" {
-		t.Errorf("expected ConnectionID=wt-2, got %q", conn.ConnectionID)
+	// ConnectionID must come from the response's real infra.connections.id,
+	// not be echoed back as worktreeID — RelayExecutor's Relay RPC requires
+	// that actual uuid (see relay_executor.go's Complete doc comment).
+	if conn.ConnectionID != "conn-uuid-1" {
+		t.Errorf("expected ConnectionID=conn-uuid-1 from the response, got %q", conn.ConnectionID)
 	}
 	if conn.RepoPath != "/remote/repo" {
 		t.Errorf("expected RepoPath from response, got %q", conn.RepoPath)
@@ -207,6 +261,37 @@ func TestReadDir_MapsAgentFileTreeNodeShape(t *testing.T) {
 	}
 	if fake.gotRelay.GetMethod() != "fs.readDir" {
 		t.Errorf("expected method=fs.readDir, got %q", fake.gotRelay.GetMethod())
+	}
+}
+
+// TestRelayExecutor_Stat_AgentErrorEnvelope_NumericCode guards against a bug
+// found live in the fix this test was added for: the agent's JSON-RPC error
+// code (AgentErrorCode, agent/src/shared/agent-wire-protocol.ts) is a JSON
+// number (e.g. -33003), not a string. relay()'s envelope-detection struct
+// originally typed Code as `string`, which made json.Unmarshal fail on any
+// real error response (number into a string field) — silently falling
+// through to "no error found" and treating the agent's rejection as success,
+// the exact bug this envelope check exists to close. Must use json.Number.
+func TestRelayExecutor_Stat_AgentErrorEnvelope_NumericCode(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"jsonrpc": "2.0",
+		"id":      1,
+		"error":   map[string]any{"code": -33003, "message": "Not found: /repo/missing.md"},
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{
+		relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)},
+	}
+	r := NewRelayExecutor(fake)
+
+	_, err = r.Stat(ctxWithTenant(t), "/repo", "missing.md")
+	if err == nil {
+		t.Fatal("expected an error for a JSON-RPC error envelope, got nil (agent rejection was silently swallowed as success)")
+	}
+	if !strings.Contains(err.Error(), "Not found: /repo/missing.md") {
+		t.Errorf("expected error to surface the agent's message, got: %v", err)
 	}
 }
 
@@ -1049,4 +1134,351 @@ func TestRelayExecutor_ImplementsFilesystemExecutorNotLocalOnly(t *testing.T) {
 	// runtime assertion available — confirmed manually per TASK-055's
 	// verify section.
 	var _ usecase.FilesystemExecutor = (*RelayExecutor)(nil)
+}
+
+// ── v5.0 dotted-method-name/contract fix: the real agent's
+// agent-rpc-dispatch.ts registers these under "git.worktree.list"/
+// "git.worktree.remove" (a "v5.0" update, per its own inline comments),
+// not the stale camelCase "git.worktreeList"/"git.worktreeRemove" this
+// package called before this fix — live-reproduced as WORKTREE_DETECT_FAILED
+// on b15.openledger.vn for a genuinely-reachable dev server. ──
+
+func TestRelayExecutor_ListWorktreePaths_SendsCwdAndParsesWorktreesShape(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"worktrees": []map[string]any{
+			{"path": "/repo", "head": "abc123", "branch": "main"},
+			{"path": "/repo/.worktrees/feature", "head": "def456", "branch": "feature"},
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	infos, err := r.ListWorktreePaths(ctxWithTenant(t), "/repo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.worktree.list" {
+		t.Errorf("expected method=git.worktree.list, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["cwd"] != "/repo" {
+		t.Errorf("expected cwd param (agent-git-handler.ts's handleGitWorktreeList reads params.cwd, not params.repoPath), got %+v", params)
+	}
+	if len(infos) != 2 {
+		t.Fatalf("want 2 worktrees, got %d", len(infos))
+	}
+	if infos[0].Path != "/repo" || infos[0].Head != "abc123" || infos[0].Branch != "main" {
+		t.Errorf("unexpected worktree[0]: %+v", infos[0])
+	}
+	if infos[1].Path != "/repo/.worktrees/feature" || infos[1].Head != "def456" || infos[1].Branch != "feature" {
+		t.Errorf("unexpected worktree[1]: %+v", infos[1])
+	}
+}
+
+// ── CreateWorktree fix: method name was "git.worktreeAdd" (typo — the agent
+// only registers the dotted "git.worktree.add"), and the param shape was
+// wrong (agent's handleGitWorktreeAdd wants params.path as the NEW
+// worktree's destination dir + params.cwd as the EXISTING repo root, not a
+// single "repoPath"). git.worktree.add's own reply has no path/HeadSHA, so
+// CreateWorktree computes the target path itself (mirrors localgit's
+// repoPath + "-" + sanitized-branch convention) and issues a git.exec
+// rev-parse HEAD follow-up for HeadSHA. ──
+
+func TestRelayExecutor_CreateWorktree_SendsCorrectMethodAndParams(t *testing.T) {
+	worktreeAddResp, err := json.Marshal(map[string]any{"stdout": "", "stderr": "", "exitCode": 0})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	revParseResp, err := json.Marshal(map[string]any{"stdout": "abc123\n", "stderr": "", "exitCode": 0})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayRespByMethod: map[string]*infrafleetv1.RelayResponse{
+		"git.worktree.add": {ResultJson: string(worktreeAddResp)},
+		"git.exec":         {ResultJson: string(revParseResp)},
+	}}
+	r := NewRelayExecutor(fake)
+
+	result, err := r.CreateWorktree(ctxWithTenant(t), "/repo", "feature/x", "origin/main", "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(fake.gotRelayRequests) != 2 {
+		t.Fatalf("want 2 relay calls (git.worktree.add + git.exec), got %d", len(fake.gotRelayRequests))
+	}
+
+	addReq := fake.gotRelayRequests[0]
+	if addReq.GetMethod() != "git.worktree.add" {
+		t.Errorf("expected method=git.worktree.add, got %q", addReq.GetMethod())
+	}
+	var addParams map[string]any
+	if err := json.Unmarshal([]byte(addReq.GetParamsJson()), &addParams); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	wantPath := "/repo-feature-x"
+	if addParams["path"] != wantPath {
+		t.Errorf("expected path=%q (agent-git-handler.ts's handleGitWorktreeAdd reads params.path as the new worktree's destination), got %+v", wantPath, addParams)
+	}
+	if addParams["branch"] != "feature/x" {
+		t.Errorf("expected branch=feature/x, got %+v", addParams)
+	}
+	if addParams["createBranch"] != true {
+		t.Errorf("expected createBranch=true (CreateWorktreeInput has no checkout-existing-branch signal), got %+v", addParams)
+	}
+	if addParams["cwd"] != "/repo" {
+		t.Errorf("expected cwd=/repo (the EXISTING repo root handleGitWorktreeAdd runs `git worktree add` from), got %+v", addParams)
+	}
+	if addParams["baseRef"] != "origin/main" {
+		t.Errorf("expected baseRef=origin/main, got %+v", addParams)
+	}
+
+	revParseReq := fake.gotRelayRequests[1]
+	if revParseReq.GetMethod() != "git.exec" {
+		t.Errorf("expected method=git.exec, got %q", revParseReq.GetMethod())
+	}
+	var revParseParams map[string]any
+	if err := json.Unmarshal([]byte(revParseReq.GetParamsJson()), &revParseParams); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if revParseParams["cwd"] != wantPath {
+		t.Errorf("expected rev-parse cwd=%q (the NEW worktree dir), got %+v", wantPath, revParseParams)
+	}
+
+	if result.Path != wantPath {
+		t.Errorf("expected result.Path=%q, got %q", wantPath, result.Path)
+	}
+	if result.HeadSHA != "abc123" {
+		t.Errorf("expected result.HeadSHA=abc123 (trimmed from git.exec's rev-parse HEAD stdout), got %q", result.HeadSHA)
+	}
+}
+
+func TestRelayExecutor_CreateWorktree_OmitsBaseRefWhenEmpty(t *testing.T) {
+	worktreeAddResp, _ := json.Marshal(map[string]any{"stdout": "", "stderr": "", "exitCode": 0})
+	revParseResp, _ := json.Marshal(map[string]any{"stdout": "def456\n", "stderr": "", "exitCode": 0})
+	fake := &fakeInfraFleetServiceClient{relayRespByMethod: map[string]*infrafleetv1.RelayResponse{
+		"git.worktree.add": {ResultJson: string(worktreeAddResp)},
+		"git.exec":         {ResultJson: string(revParseResp)},
+	}}
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.CreateWorktree(ctxWithTenant(t), "/repo", "plain", "", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	var addParams map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelayRequests[0].GetParamsJson()), &addParams); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if _, ok := addParams["baseRef"]; ok {
+		t.Errorf("expected baseRef omitted when empty, got %+v", addParams)
+	}
+}
+
+func TestRelayExecutor_RemoveWorktree_SendsPathAndForce(t *testing.T) {
+	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: "{}"}}
+	r := NewRelayExecutor(fake)
+
+	if err := r.RemoveWorktree(ctxWithTenant(t), "/repo/.worktrees/feature", true); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay.GetMethod() != "git.worktree.remove" {
+		t.Errorf("expected method=git.worktree.remove, got %q", fake.gotRelay.GetMethod())
+	}
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelay.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["path"] != "/repo/.worktrees/feature" || params["force"] != true {
+		t.Errorf("expected path+force params (agent-git-handler.ts's handleGitWorktreeRemove reads params.path, not params.worktreePath), got %+v", params)
+	}
+}
+
+// ── dispatchExecutorForRepo's ctx-carried DevServerID (usecase.WithDevServerID)
+// makes relay use RelayByDevServer instead of the connectionId-keyed Relay —
+// see relay's own doc comment for why: repoPath was never a valid
+// infra.connections.id, so Relay could never have resolved for any caller
+// reaching this package via dispatchExecutorForRepo. ──
+
+func TestRelayExecutor_ListWorktreePaths_WithDevServerIDInContext_UsesRelayByDevServer(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{
+		"worktrees": []map[string]any{{"path": "/repo", "head": "abc123", "branch": "main"}},
+	})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	ctx := usecase.WithDevServerID(ctxWithTenant(t), "ds-1")
+	infos, err := r.ListWorktreePaths(ctx, "/repo")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if fake.gotRelay != nil {
+		t.Error("expected the connectionId-keyed Relay RPC NOT to be called when a dev server id is in context")
+	}
+	if fake.gotRelayByDevServer == nil {
+		t.Fatal("expected RelayByDevServer to be called")
+	}
+	if fake.gotRelayByDevServer.GetDevServerId() != "ds-1" {
+		t.Errorf("expected devServerId=ds-1, got %q", fake.gotRelayByDevServer.GetDevServerId())
+	}
+	if fake.gotRelayByDevServer.GetMethod() != "git.worktree.list" {
+		t.Errorf("expected method=git.worktree.list, got %q", fake.gotRelayByDevServer.GetMethod())
+	}
+	if len(infos) != 1 || infos[0].Path != "/repo" {
+		t.Errorf("unexpected result: %+v", infos)
+	}
+}
+
+// ── TASK-BE-EVM-015: ctx-carried HiddenTargetID (usecase.WithHiddenTargetID)
+// makes relay() route via a "ViaHiddenTarget"-suffixed agent method name
+// with hiddenTargetId in params — same devServer/RelayByDevServer dispatch
+// as any other repo on that Dev Server, no new transport. ──
+
+func TestGitDispatch_HiddenTargetID_RoutesToAgentHiddenTargetMethod(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{"branch": "main", "clean": true})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	// Mirrors dispatchExecutorForRepo's real ordering: WithDevServerID first
+	// (so relay() picks RelayByDevServer at all), then WithHiddenTargetID on
+	// top of that same ctx — see that function's real body.
+	ctx := usecase.WithDevServerID(ctxWithTenant(t), "ds-1")
+	ctx = usecase.WithHiddenTargetID(ctx, "runtime-1")
+
+	if _, err := r.GetStatus(ctx, "/repo"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if fake.gotRelayByDevServer == nil {
+		t.Fatal("expected RelayByDevServer to be called")
+	}
+	if got := fake.gotRelayByDevServer.GetMethod(); got != "git.statusViaHiddenTarget" {
+		t.Errorf("expected method=git.statusViaHiddenTarget, got %q", got)
+	}
+
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelayByDevServer.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if params["hiddenTargetId"] != "runtime-1" {
+		t.Errorf("expected hiddenTargetId=runtime-1 in params, got %+v", params)
+	}
+	if params["worktreePath"] != "/repo" {
+		t.Errorf("expected worktreePath to still be sent unchanged, got %+v", params)
+	}
+}
+
+func TestGitDispatch_NoHiddenTargetID_UnchangedBehavior(t *testing.T) {
+	resultJSON, err := json.Marshal(map[string]any{"branch": "main", "clean": true})
+	if err != nil {
+		t.Fatalf("marshal fixture: %v", err)
+	}
+	fake := &fakeInfraFleetServiceClient{relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: string(resultJSON)}}
+	r := NewRelayExecutor(fake)
+
+	// No WithHiddenTargetID — regression guard: every ordinary repo (not
+	// backed by a ssh-type ephemeral VM's hidden target) must keep calling
+	// the plain method name with no hiddenTargetId param, exactly as before
+	// this task.
+	ctx := usecase.WithDevServerID(ctxWithTenant(t), "ds-1")
+
+	if _, err := r.GetStatus(ctx, "/repo"); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if fake.gotRelayByDevServer == nil {
+		t.Fatal("expected RelayByDevServer to be called")
+	}
+	if got := fake.gotRelayByDevServer.GetMethod(); got != "git.status" {
+		t.Errorf("expected unchanged method=git.status, got %q", got)
+	}
+
+	var params map[string]any
+	if err := json.Unmarshal([]byte(fake.gotRelayByDevServer.GetParamsJson()), &params); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if _, present := params["hiddenTargetId"]; present {
+		t.Errorf("expected no hiddenTargetId param for an ordinary repo, got %+v", params)
+	}
+}
+
+// ─── TASK-BE-EVM-018: project.proto's GetRepoResponse.hidden_target_id ────
+
+// fakeProjectServiceClient implements projectv1.ProjectServiceClient
+// directly (embed: panics on any unimplemented method) — mirrors
+// fakeInfraFleetServiceClient's exact convention above, scoped to just
+// GetRepo (the only RPC ProjectClient.GetRepo/this task's test needs).
+type fakeProjectServiceClient struct {
+	projectv1.ProjectServiceClient
+
+	getRepoResp *projectv1.GetRepoResponse
+	getRepoErr  error
+}
+
+func (f *fakeProjectServiceClient) GetRepo(ctx context.Context, in *projectv1.GetRepoRequest, _ ...grpc.CallOption) (*projectv1.GetRepoResponse, error) {
+	if f.getRepoErr != nil {
+		return nil, f.getRepoErr
+	}
+	return f.getRepoResp, nil
+}
+
+// TestGitGatewayRelay_PopulatesHiddenTargetIDFromRepoInfo is TASK-BE-EVM-018's
+// required test for Gap 3's project-service half: ProjectClient.GetRepo
+// maps project.proto's new GetRepoResponse.hidden_target_id field into
+// domain.RepoInfo.HiddenTargetID — closing TASK-BE-EVM-015's gap #2 at the
+// wire-mapping level (project-service's own GetRepo handler populating a
+// REAL value is a separate, still-open follow-up — see
+// domain.RepoInfo.HiddenTargetID's doc comment).
+func TestGitGatewayRelay_PopulatesHiddenTargetIDFromRepoInfo(t *testing.T) {
+	fake := &fakeProjectServiceClient{
+		getRepoResp: &projectv1.GetRepoResponse{
+			Repo:           &projectv1.Repo{Id: "repo-1", ProjectId: "proj-1", Url: "https://example.com/repo.git", DisplayName: "repo"},
+			DevServerId:    "ds-1",
+			HiddenTargetId: "rt-1",
+		},
+	}
+	client := NewProjectClient(fake)
+
+	info, err := client.GetRepo(ctxWithTenant(t), "repo-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.HiddenTargetID != "rt-1" {
+		t.Errorf("expected HiddenTargetID=rt-1 from the response, got %q", info.HiddenTargetID)
+	}
+	if info.DevServerID != "ds-1" {
+		t.Errorf("expected DevServerID to still map correctly alongside the new field, got %q", info.DevServerID)
+	}
+}
+
+// TestGitGatewayRelay_NoHiddenTargetID_UnchangedBehavior is the regression
+// guard: an ordinary repo (project-service not yet populating
+// hidden_target_id — today's universal case) still gets an empty
+// HiddenTargetID, not a zero-value panic or a spurious non-empty value.
+func TestGitGatewayRelay_NoHiddenTargetID_UnchangedBehavior(t *testing.T) {
+	fake := &fakeProjectServiceClient{
+		getRepoResp: &projectv1.GetRepoResponse{
+			Repo:        &projectv1.Repo{Id: "repo-1", ProjectId: "proj-1", Url: "https://example.com/repo.git"},
+			DevServerId: "ds-1",
+		},
+	}
+	client := NewProjectClient(fake)
+
+	info, err := client.GetRepo(ctxWithTenant(t), "repo-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if info.HiddenTargetID != "" {
+		t.Errorf("expected empty HiddenTargetID for an ordinary repo, got %q", info.HiddenTargetID)
+	}
 }

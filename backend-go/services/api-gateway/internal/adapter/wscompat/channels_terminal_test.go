@@ -180,7 +180,8 @@ func awaitPushEvent(t *testing.T, events <-chan PushEvent) PushEvent {
 // isolation guarantee production gets from ServeHTTP constructing a fresh
 // registry per accepted connection.
 func newTerminalTestCtx() context.Context {
-	return terminalStreamsContext(context.Background(), newTerminalStreamRegistry())
+	ctx := terminalStreamsContext(context.Background(), newTerminalStreamRegistry())
+	return terminalJSONSubscribeContext(ctx, newTerminalJSONSubscribeRegistry())
 }
 
 func TestTerminalCreateChannel_SpawnsAndOpensAttachPtyStream(t *testing.T) {
@@ -208,9 +209,16 @@ func TestTerminalCreateChannel_SpawnsAndOpensAttachPtyStream(t *testing.T) {
 	if events == nil {
 		t.Fatal("expected a non-nil push events channel")
 	}
-	view, ok := ack.(terminalSessionView)
-	if !ok || view.PtyID != "pty-1" || view.ConnectionID != "conn-1" {
+	view, ok := ack.(terminalCreateResultView)
+	if !ok || view.Terminal.PtyID != "pty-1" || view.Terminal.ConnectionID != "conn-1" {
 		t.Fatalf("unexpected ack: %+v", ack)
+	}
+	// Why: the frontend's remote runtime terminal transport reads
+	// created.terminal.handle as its opaque terminal identifier — a nil/
+	// missing handle here crashes the terminal pane the instant
+	// terminal.create resolves. Found live 2026-08-30.
+	if view.Terminal.Handle != "pty-1" {
+		t.Errorf("expected Terminal.Handle to echo the ptyId %q, got %q", "pty-1", view.Terminal.Handle)
 	}
 
 	if fake.lastStream == nil {
@@ -446,6 +454,34 @@ func TestTerminalSendChannel_RelaysInputOnTheStream(t *testing.T) {
 	}
 }
 
+// TestTerminalSendChannel_RecognizesTheRealFrontendWireKeys is the
+// regression test for the exact live bug: every other test in this file
+// builds its args via argsJSON(t, terminalSendArgs{...}), which is circular
+// — it always round-trips through this same struct's own tags, so it could
+// never catch those tags disagreeing with the real wire format. This test
+// hand-writes the JSON exactly as remote-runtime-pty-transport.ts's plain-RPC
+// fallback actually encodes it — keys "terminal"/"text", not "ptyId"/"data"
+// — the payload that silently no-op'd (found live 2026-08-30) before this fix.
+func TestTerminalSendChannel_RecognizesTheRealFrontendWireKeys(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+	ctx := newTerminalTestCtx()
+	createSession(t, ctx, r, fake, "pty-1")
+	awaitSentFrame(t, fake.lastStream) // drain the attach frame
+
+	rawArgs := []json.RawMessage{[]byte(`{"terminal":"pty-1","text":"echo hi\n","client":{"id":"c1","type":"desktop"}}`)}
+	_, err := r.Dispatch(ctx, Identity{TenantID: "tenant-1"}, "terminal.send", rawArgs)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	frame := awaitSentFrame(t, fake.lastStream)
+	input := frame.GetInput()
+	if input == nil || string(input.GetData()) != "echo hi\n" {
+		t.Errorf("expected an input frame carrying %q, got %+v", "echo hi\n", frame)
+	}
+}
+
 func TestTerminalSendChannel_UnknownPtyID_ReturnsError(t *testing.T) {
 	fake := &fakeTerminalInfraFleetClient{}
 	r := NewRegistry()
@@ -454,6 +490,99 @@ func TestTerminalSendChannel_UnknownPtyID_ReturnsError(t *testing.T) {
 	_, err := r.Dispatch(newTerminalTestCtx(), Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-unknown", Data: "x"}))
 	if err == nil {
 		t.Fatal("expected an error for a pty_id with no live stream")
+	}
+}
+
+// TestTerminalReattachSendChannel_RecoversAfterASimulatedReconnect is the
+// core regression guard: a silent WS reconnect mints a brand-new,
+// empty terminalStreamRegistry (newTerminalTestCtx's own doc comment
+// explains why two calls to it simulate two different WS connections) —
+// terminal.send for a pty created on the OLD connection must keep failing
+// there (nothing here should paper over that), but terminal.reattachSend on
+// the NEW connection must re-register the same still-alive pty so
+// terminal.send on the new connection works.
+func TestTerminalReattachSendChannel_RecoversAfterASimulatedReconnect(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+
+	oldConnCtx := newTerminalTestCtx()
+	createSession(t, oldConnCtx, r, fake, "pty-1")
+	awaitSentFrame(t, fake.lastStream) // drain the original attach frame
+
+	newConnCtx := newTerminalTestCtx()
+	if _, err := r.Dispatch(newConnCtx, Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "x"})); err == nil {
+		t.Fatal("expected terminal.send to still fail on the new connection before reattaching")
+	}
+
+	if _, err := r.Dispatch(newConnCtx, Identity{TenantID: "tenant-1"}, "terminal.reattachSend", argsJSON(t, terminalReattachSendArgs{PtyID: "pty-1"})); err != nil {
+		t.Fatalf("unexpected terminal.reattachSend error: %v", err)
+	}
+	reattachFrame := awaitSentFrame(t, fake.lastStream)
+	attach := reattachFrame.GetAttach()
+	if attach == nil || attach.GetPtyId() != "pty-1" {
+		t.Fatalf("expected the reattach stream's first frame to be an attach frame for pty-1, got %+v", reattachFrame)
+	}
+
+	_, err := r.Dispatch(newConnCtx, Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "echo hi\n"}))
+	if err != nil {
+		t.Fatalf("unexpected error sending after reattach: %v", err)
+	}
+	sentFrame := awaitSentFrame(t, fake.lastStream)
+	input := sentFrame.GetInput()
+	if input == nil || string(input.GetData()) != "echo hi\n" {
+		t.Errorf("expected an input frame carrying %q, got %+v", "echo hi\n", sentFrame)
+	}
+}
+
+// TestTerminalReattachSendChannel_MissingPtyID_ReturnsError guards the
+// fail-closed empty-ptyId check — an empty terminal wire key must never
+// silently reattach as an empty-string registry entry.
+func TestTerminalReattachSendChannel_MissingPtyID_ReturnsError(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+
+	_, err := r.Dispatch(newTerminalTestCtx(), Identity{TenantID: "tenant-1"}, "terminal.reattachSend", argsJSON(t, terminalReattachSendArgs{}))
+	if err == nil {
+		t.Fatal("expected an error when ptyId is empty")
+	}
+	if fake.lastStream != nil {
+		t.Error("expected no AttachPty call for an empty ptyId")
+	}
+}
+
+// TestTerminalReattachSendChannel_RemovesFromRegistryOnExit guards
+// drainReattachedPtyOutput's cleanup contract: once the reattached pty
+// exits, a subsequent terminal.send for it must fail again (the registry
+// entry must not outlive the actual pty).
+func TestTerminalReattachSendChannel_RemovesFromRegistryOnExit(t *testing.T) {
+	fake := &fakeTerminalInfraFleetClient{}
+	r := NewRegistry()
+	registerTerminalChannels(r, fake)
+	ctx := newTerminalTestCtx()
+
+	if _, err := r.Dispatch(ctx, Identity{TenantID: "tenant-1"}, "terminal.reattachSend", argsJSON(t, terminalReattachSendArgs{PtyID: "pty-1"})); err != nil {
+		t.Fatalf("unexpected terminal.reattachSend error: %v", err)
+	}
+	awaitSentFrame(t, fake.lastStream) // drain the attach frame
+	stream := fake.lastStream
+
+	stream.recv <- &infrafleetv1.PtyServerFrame{Frame: &infrafleetv1.PtyServerFrame_Exited{Exited: &infrafleetv1.PtyExited{ExitCode: 0}}}
+
+	// drainReattachedPtyOutput's streams.remove(ptyID) runs asynchronously
+	// right after it observes the exit frame — poll instead of asserting
+	// immediately.
+	deadline := time.Now().Add(2 * time.Second)
+	for {
+		_, err := r.Dispatch(ctx, Identity{TenantID: "tenant-1"}, "terminal.send", argsJSON(t, terminalSendArgs{PtyID: "pty-1", Data: "x"}))
+		if err != nil {
+			return
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("timed out waiting for the exited pty to be removed from the stream registry")
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
 }
 
@@ -816,8 +945,8 @@ func TestTerminalCreateChannel_EndToEndPushInterleavesWithConcurrentSend(t *test
 	if ack.Type != "result" || ack.ID != "create-1" {
 		t.Fatalf("first frame = %+v, want the terminal.create ack", ack)
 	}
-	var session terminalSessionView
-	if err := json.Unmarshal(ack.Result, &session); err != nil || session.PtyID != "pty-1" {
+	var session terminalCreateResultView
+	if err := json.Unmarshal(ack.Result, &session); err != nil || session.Terminal.PtyID != "pty-1" {
 		t.Fatalf("unexpected terminal.create ack result: %s (err=%v)", ack.Result, err)
 	}
 

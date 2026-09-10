@@ -47,9 +47,9 @@ func New(pool *pgxpool.Pool) *Repository {
 // a NULL text) into a uuid column.
 func (r *Repository) Register(ctx context.Context, ds domain.DevServer) (domain.DevServer, error) {
 	_, err := r.pool.Exec(ctx, `
-		INSERT INTO infra.dev_servers (id, tenant_id, host, connection_mode, ssh_target_id, tags)
-		VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid, COALESCE($6, '{}'::text[]))
-	`, ds.ID, ds.TenantID, ds.Host, string(ds.Mode), ds.SSHTargetID, ds.Tags)
+		INSERT INTO infra.dev_servers (id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind)
+		VALUES ($1, $2, $3, $4, NULLIF($5, '')::uuid, COALESCE($6, '{}'::text[]), $7, NULLIF($8, '')::uuid, $9)
+	`, ds.ID, ds.TenantID, ds.Host, string(ds.Mode), ds.SSHTargetID, ds.Tags, string(ds.Status), ds.GroupID, string(ds.Kind))
 	if err != nil {
 		return domain.DevServer{}, fmt.Errorf("postgres: insert dev server: %w", err)
 	}
@@ -61,15 +61,15 @@ func (r *Repository) Register(ctx context.Context, ds domain.DevServer) (domain.
 // specs/backend-go/services/infra-fleet-service.md §9.
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevServer, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind, status
 		FROM infra.dev_servers
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id)
 
 	var ds domain.DevServer
-	var mode string
-	var sshTargetID *string
-	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags)
+	var mode, status, kind, healthStatus string
+	var sshTargetID, groupID *string
+	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags, &status, &groupID, &kind, &healthStatus)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.DevServer{}, fmt.Errorf("postgres: dev server %q not found for tenant: %w", id, err)
 	}
@@ -77,8 +77,14 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevSe
 		return domain.DevServer{}, fmt.Errorf("postgres: query dev server: %w", err)
 	}
 	ds.Mode = domain.ConnectionMode(mode)
+	ds.Status = domain.DevServerStatus(status)
+	ds.Kind = domain.AgentKind(kind)
+	ds.HealthStatus = domain.DevServerHealthStatus(healthStatus)
 	if sshTargetID != nil {
 		ds.SSHTargetID = *sshTargetID
+	}
+	if groupID != nil {
+		ds.GroupID = *groupID
 	}
 	return ds, nil
 }
@@ -86,7 +92,7 @@ func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.DevSe
 // List returns every dev server registered for tenantID.
 func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevServer, error) {
 	rows, err := r.pool.Query(ctx, `
-		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, tags, approval_status, group_id, kind, status
 		FROM infra.dev_servers
 		WHERE tenant_id = $1
 		ORDER BY created_at DESC
@@ -99,14 +105,20 @@ func (r *Repository) List(ctx context.Context, tenantID string) ([]domain.DevSer
 	var out []domain.DevServer
 	for rows.Next() {
 		var ds domain.DevServer
-		var mode string
-		var sshTargetID *string
-		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags); err != nil {
+		var mode, status, kind, healthStatus string
+		var sshTargetID, groupID *string
+		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &ds.Tags, &status, &groupID, &kind, &healthStatus); err != nil {
 			return nil, fmt.Errorf("postgres: scan dev server row: %w", err)
 		}
 		ds.Mode = domain.ConnectionMode(mode)
+		ds.Status = domain.DevServerStatus(status)
+		ds.Kind = domain.AgentKind(kind)
+		ds.HealthStatus = domain.DevServerHealthStatus(healthStatus)
 		if sshTargetID != nil {
 			ds.SSHTargetID = *sshTargetID
+		}
+		if groupID != nil {
+			ds.GroupID = *groupID
 		}
 		out = append(out, ds)
 	}
@@ -174,7 +186,11 @@ func (r *Repository) ListAllForPolling(ctx context.Context) ([]domain.DevServer,
 			return nil, fmt.Errorf("postgres: scan dev server row for polling: %w", err)
 		}
 		ds.Mode = domain.ConnectionMode(mode)
-		ds.Status = domain.DevServerStatus(status)
+		// The dev_servers.status column is health/connectivity, NOT
+		// CR-DS-006 admin approval — see domain.DevServerHealthStatus's doc
+		// comment for why these are deliberately separate Go types even
+		// though this one predates the other and reused its own column.
+		ds.HealthStatus = domain.DevServerHealthStatus(status)
 		if sshTargetID != nil {
 			ds.SSHTargetID = *sshTargetID
 		}
@@ -184,6 +200,58 @@ func (r *Repository) ListAllForPolling(ctx context.Context) ([]domain.DevServer,
 		return nil, fmt.Errorf("postgres: iterate dev server rows for polling: %w", err)
 	}
 	return out, nil
+}
+
+// UpdateApprovalStatus sets a dev server's approval_status, scoped to
+// tenantID — CR-DS-006 Phase 2.
+func (r *Repository) UpdateApprovalStatus(ctx context.Context, tenantID, devServerID string, status domain.DevServerStatus) (domain.DevServer, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE infra.dev_servers
+		SET approval_status = $3
+		WHERE tenant_id = $1 AND id = $2
+		RETURNING id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind, status
+	`, tenantID, devServerID, string(status))
+	return scanDevServerRow(row)
+}
+
+// AssignGroup sets (or, when groupID == "", clears) a dev server's
+// group_id, scoped to tenantID — CR-DS-006 Phase 2. NULLIF(groupID, ”)
+// makes an empty string clear the FK to NULL, same pattern
+// Register/ssh_target_id already uses.
+func (r *Repository) AssignGroup(ctx context.Context, tenantID, devServerID, groupID string) (domain.DevServer, error) {
+	row := r.pool.QueryRow(ctx, `
+		UPDATE infra.dev_servers
+		SET group_id = NULLIF($3, '')::uuid
+		WHERE tenant_id = $1 AND id = $2
+		RETURNING id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind, status
+	`, tenantID, devServerID, groupID)
+	return scanDevServerRow(row)
+}
+
+// scanDevServerRow factors out the 9-column dev_servers row scan shared by
+// UpdateApprovalStatus/AssignGroup's RETURNING clauses.
+func scanDevServerRow(row pgx.Row) (domain.DevServer, error) {
+	var ds domain.DevServer
+	var mode, status, kind, healthStatus string
+	var sshTargetID, groupID *string
+	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &status, &groupID, &kind, &healthStatus)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.DevServer{}, fmt.Errorf("postgres: dev server not found for tenant: %w", err)
+	}
+	if err != nil {
+		return domain.DevServer{}, fmt.Errorf("postgres: update dev server: %w", err)
+	}
+	ds.Mode = domain.ConnectionMode(mode)
+	ds.Status = domain.DevServerStatus(status)
+	ds.Kind = domain.AgentKind(kind)
+	ds.HealthStatus = domain.DevServerHealthStatus(healthStatus)
+	if sshTargetID != nil {
+		ds.SSHTargetID = *sshTargetID
+	}
+	if groupID != nil {
+		ds.GroupID = *groupID
+	}
+	return ds, nil
 }
 
 // SshTargetStore implements usecase.SshTargetRepository and
@@ -478,61 +546,69 @@ func (r *Repository) GetActiveByDevServer(ctx context.Context, tenantID, devServ
 	return conn, true, nil
 }
 
-// UpdateStatus sets connectionID's status column — TeardownConnection's
-// "mark closed" step (BR-SSH-13).
-func (r *Repository) UpdateStatus(ctx context.Context, tenantID, connectionID, status string) error {
-	_, err := r.pool.Exec(ctx, `
+// UpdateStatus persists a connection's Status/DegradedSince after a domain
+// state machine transition (BE-SOL-STORAGE-003 §2, TASK-BE-STORAGE-009) —
+// scoped by tenant_id like every other mutation in this service.
+func (r *Repository) UpdateStatus(ctx context.Context, tenantID string, conn domain.Connection) error {
+	tag, err := r.pool.Exec(ctx, `
 		UPDATE infra.connections
-		SET status = $1
-		WHERE tenant_id = $2 AND id = $3
-	`, status, tenantID, connectionID)
+		SET status = $1, degraded_since = $2
+		WHERE id = $3 AND tenant_id = $4
+	`, conn.Status, conn.DegradedSince, conn.ID, tenantID)
 	if err != nil {
 		return fmt.Errorf("postgres: update connection status: %w", err)
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("postgres: update connection status: no connection %s for tenant %s", conn.ID, tenantID)
 	}
 	return nil
 }
 
-// GetDevServerByConnection resolves connectionID's owning DevServer —
-// mirrors ResolveConnection's join shape but returns only the DevServer
-// half, since TeardownConnection only needs devServer.ID for
-// CancelReconnect.
-func (r *Repository) GetDevServerByConnection(ctx context.Context, tenantID, connectionID string) (domain.DevServer, bool, error) {
-	row := r.pool.QueryRow(ctx, `
-		SELECT ds.id, ds.tenant_id, ds.host, ds.connection_mode, ds.ssh_target_id
+// ListConnectivitySummary returns every connection scoped to tenantID,
+// joined through dev_servers as defense-in-depth tenant scoping — backs
+// GetFleetConnectivitySummary (TASK-BE-STORAGE-006, CR-STORAGE-007).
+func (r *Repository) ListConnectivitySummary(ctx context.Context, tenantID string) ([]domain.Connection, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT c.id, c.tenant_id, c.dev_server_id, c.repo_path, c.worktree_id, c.status,
+		       c.last_activity_at, c.degraded_since, c.grace_period_seconds
 		FROM infra.connections c
-		JOIN infra.dev_servers ds ON ds.id = c.dev_server_id
-		WHERE c.tenant_id = $1 AND c.id = $2
-	`, tenantID, connectionID)
-
-	var devServer domain.DevServer
-	var mode string
-	var sshTargetID *string
-	err := row.Scan(&devServer.ID, &devServer.TenantID, &devServer.Host, &mode, &sshTargetID)
-	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.DevServer{}, false, nil
-	}
+		JOIN infra.dev_servers d ON d.id = c.dev_server_id AND d.tenant_id = c.tenant_id
+		WHERE c.tenant_id = $1
+		ORDER BY c.created_at DESC
+	`, tenantID)
 	if err != nil {
-		return domain.DevServer{}, false, fmt.Errorf("postgres: get dev server by connection: %w", err)
+		return nil, fmt.Errorf("postgres: list connectivity summary: %w", err)
 	}
-	devServer.Mode = domain.ConnectionMode(mode)
-	if sshTargetID != nil {
-		devServer.SSHTargetID = *sshTargetID
+	defer rows.Close()
+
+	var out []domain.Connection
+	for rows.Next() {
+		var conn domain.Connection
+		if err := rows.Scan(&conn.ID, &conn.TenantID, &conn.DevServerID, &conn.RepoPath, &conn.WorktreeID,
+			&conn.Status, &conn.LastActivityAt, &conn.DegradedSince, &conn.GracePeriodSeconds); err != nil {
+			return nil, fmt.Errorf("postgres: scan connectivity summary row: %w", err)
+		}
+		out = append(out, conn)
 	}
-	return devServer, true, nil
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate connectivity summary rows: %w", err)
+	}
+	return out, nil
 }
 
 // FindBySshTarget returns the DevServer bound to sshTargetID, if any.
 func (r *Repository) FindBySshTarget(ctx context.Context, tenantID, sshTargetID string) (domain.DevServer, bool, error) {
 	row := r.pool.QueryRow(ctx, `
-		SELECT id, tenant_id, host, connection_mode, ssh_target_id
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind
 		FROM infra.dev_servers
 		WHERE tenant_id = $1 AND ssh_target_id = $2
 		LIMIT 1
 	`, tenantID, sshTargetID)
 
 	var ds domain.DevServer
-	var mode string
-	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &ds.SSHTargetID)
+	var mode, status, kind string
+	var groupID *string
+	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &ds.SSHTargetID, &status, &groupID, &kind)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.DevServer{}, false, nil
 	}
@@ -540,12 +616,64 @@ func (r *Repository) FindBySshTarget(ctx context.Context, tenantID, sshTargetID 
 		return domain.DevServer{}, false, fmt.Errorf("postgres: find dev server by ssh target: %w", err)
 	}
 	ds.Mode = domain.ConnectionMode(mode)
+	ds.Status = domain.DevServerStatus(status)
+	ds.Kind = domain.AgentKind(kind)
+	if groupID != nil {
+		ds.GroupID = *groupID
+	}
+	return ds, true, nil
+}
+
+// FindByHostAndMode — live bug found investigating "why does every dev
+// server show disconnected despite a genuinely live, handshaked agent":
+// this scanned ssh_target_id directly into ds.SSHTargetID (a plain string
+// field), which pgx cannot do for a SQL NULL — and ssh_target_id IS NULL
+// for every direct-websocket dev server by design (that column only
+// applies to relay-ssh mode). So this call ALWAYS errored for the exact
+// mode ResolveDirectWebSocketDevServer resolves on every agent-token mint,
+// which made that resolver silently fall back to the raw external
+// devServerID string (e.g. "dev-01") as the Registry.Register slot key —
+// instead of the real domain.DevServer.ID (UUID) that
+// ListDevServers/IsDevServerConnected look sessions up by (see
+// resolveDirectWebSocketDevServer's fallback comment and
+// TokenIssuer.handlePost's same "must not break token issuance" comment).
+// AttachInboundSession then stored every live session under that raw
+// string key, forever invisible to any UUID-keyed lookup — the agent was
+// correctly connected and handshaked the entire time. Fixed by scanning
+// through a nullable local var, the same pattern Get/List already use.
+func (r *Repository) FindByHostAndMode(ctx context.Context, tenantID, host string, mode domain.ConnectionMode) (domain.DevServer, bool, error) {
+	row := r.pool.QueryRow(ctx, `
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind
+		FROM infra.dev_servers
+		WHERE tenant_id = $1 AND host = $2 AND connection_mode = $3
+		LIMIT 1
+	`, tenantID, host, string(mode))
+
+	var ds domain.DevServer
+	var modeStr, status, kind string
+	var sshTargetID, groupID *string
+	err := row.Scan(&ds.ID, &ds.TenantID, &ds.Host, &modeStr, &sshTargetID, &status, &groupID, &kind)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.DevServer{}, false, nil
+	}
+	if err != nil {
+		return domain.DevServer{}, false, fmt.Errorf("postgres: find dev server by host and mode: %w", err)
+	}
+	if sshTargetID != nil {
+		ds.SSHTargetID = *sshTargetID
+	}
+	ds.Mode = domain.ConnectionMode(modeStr)
+	ds.Status = domain.DevServerStatus(status)
+	ds.Kind = domain.AgentKind(kind)
+	if groupID != nil {
+		ds.GroupID = *groupID
+	}
 	return ds, true, nil
 }
 
 // UpdateProvisionResult persists the outcome of one provisioning attempt —
 // see usecase.DevServerRepository.UpdateProvisionResult's doc comment.
-func (r *Repository) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerStatus, info usecase.HandshakeInfo, provisionedAt time.Time) error {
+func (r *Repository) UpdateProvisionResult(ctx context.Context, tenantID, id string, status domain.DevServerHealthStatus, info usecase.HandshakeInfo, provisionedAt time.Time) error {
 	_, err := r.pool.Exec(ctx, `
 		UPDATE infra.dev_servers
 		SET status = $3, platform = $4, arch = $5, node_version = $6, agent_version = $7, last_provisioned_at = $8
@@ -589,10 +717,56 @@ func (r *Repository) GetFleetHealth(ctx context.Context, tenantID string) ([]dom
 	return out, nil
 }
 
+// ListAllDevServers returns every registered dev server across every
+// tenant — deliberately unscoped, unlike List/Get/GetFleetHealth. The one
+// caller (the fleet-health poller, usecase.PollFleetHealth) is an internal
+// background process with no request-scoped tenant to join through, and
+// polling reachability is not tenant-sensitive data exposure the way a
+// user-facing RPC's response would be.
+func (r *Repository) ListAllDevServers(ctx context.Context) ([]domain.DevServer, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, tenant_id, host, connection_mode, ssh_target_id, approval_status, group_id, kind
+		FROM infra.dev_servers
+	`)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: query all dev servers: %w", err)
+	}
+	defer rows.Close()
+
+	var out []domain.DevServer
+	for rows.Next() {
+		var ds domain.DevServer
+		var mode, status, kind string
+		var sshTargetID, groupID *string
+		if err := rows.Scan(&ds.ID, &ds.TenantID, &ds.Host, &mode, &sshTargetID, &status, &groupID, &kind); err != nil {
+			return nil, fmt.Errorf("postgres: scan dev server row: %w", err)
+		}
+		ds.Mode = domain.ConnectionMode(mode)
+		ds.Status = domain.DevServerStatus(status)
+		ds.Kind = domain.AgentKind(kind)
+		if sshTargetID != nil {
+			ds.SSHTargetID = *sshTargetID
+		}
+		if groupID != nil {
+			ds.GroupID = *groupID
+		}
+		out = append(out, ds)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("postgres: iterate all dev server rows: %w", err)
+	}
+	return out, nil
+}
+
 // UpsertFleetHealth implements usecase.FleetHealthWriter.UpsertFleetHealth —
 // dev_server_id is fleet_health's primary key (migrations/0001_init), so
 // this is a plain upsert-by-PK, one row per dev server, latest sample wins.
-func (r *Repository) UpsertFleetHealth(ctx context.Context, sample domain.DevServerHealth) error {
+// h.Status is persisted as-is — PollFleetHealth.pollOne already computes the
+// full healthy/degraded/unhealthy/unreachable classification (via
+// domain.ComputeHealthStatus, from real CPU/RAM/relay-reachability
+// measurements) before calling this, so this method must not re-derive a
+// cruder reachable-only status here and silently discard that work.
+func (r *Repository) UpsertFleetHealth(ctx context.Context, h domain.DevServerHealth) error {
 	const query = `
 		INSERT INTO infra.fleet_health (dev_server_id, reachable, cpu_percent, ram_percent, disk_percent, latency_ms, status, checked_at)
 		VALUES ($1, $2, $3, $4, $5, $6, $7, now())
@@ -600,7 +774,7 @@ func (r *Repository) UpsertFleetHealth(ctx context.Context, sample domain.DevSer
 		  reachable = EXCLUDED.reachable, cpu_percent = EXCLUDED.cpu_percent,
 		  ram_percent = EXCLUDED.ram_percent, disk_percent = EXCLUDED.disk_percent,
 		  latency_ms = EXCLUDED.latency_ms, status = EXCLUDED.status, checked_at = now()`
-	_, err := r.pool.Exec(ctx, query, sample.DevServerID, sample.Reachable, sample.CPUPercent, sample.RAMPercent, sample.DiskPercent, sample.LatencyMS, string(sample.Status))
+	_, err := r.pool.Exec(ctx, query, h.DevServerID, h.Reachable, h.CPUPercent, h.RAMPercent, h.DiskPercent, h.LatencyMS, string(h.Status))
 	if err != nil {
 		return fmt.Errorf("postgres: upsert fleet health: %w", err)
 	}
@@ -647,10 +821,12 @@ func (s *PortForwardStore) UpdateStatus(ctx context.Context, tenantID, id string
 	return nil
 }
 
-// GetPrevious implements usecase.FleetHealthWriter.GetPrevious — the
-// last-persisted sample for devServerID, which PollFleetHealth diffs
-// against to detect a status_change.
-func (r *Repository) GetPrevious(ctx context.Context, devServerID string) (domain.DevServerHealth, bool, error) {
+// GetDevServerHealth implements usecase.FleetHealthWriter.GetDevServerHealth
+// — devServerID's current (about-to-be-overwritten) sample, PollFleetHealth's
+// transition-detection read called BEFORE UpsertFleetHealth. found=false
+// (not an error) when no sample exists yet, e.g. this dev server's very
+// first poll.
+func (r *Repository) GetDevServerHealth(ctx context.Context, devServerID string) (domain.DevServerHealth, bool, error) {
 	const query = `SELECT dev_server_id, reachable, cpu_percent, ram_percent, disk_percent, latency_ms, status
 		FROM infra.fleet_health WHERE dev_server_id = $1`
 	var h domain.DevServerHealth
@@ -660,7 +836,7 @@ func (r *Repository) GetPrevious(ctx context.Context, devServerID string) (domai
 		return domain.DevServerHealth{}, false, nil
 	}
 	if err != nil {
-		return domain.DevServerHealth{}, false, fmt.Errorf("postgres: get previous fleet health: %w", err)
+		return domain.DevServerHealth{}, false, fmt.Errorf("postgres: get dev server health: %w", err)
 	}
 	h.Status = domain.HealthStatus(status)
 	return h, true, nil
@@ -727,4 +903,18 @@ func (s *PortForwardStore) ListActiveByConnection(ctx context.Context, tenantID,
 		return nil, fmt.Errorf("postgres: iterate port forward rows: %w", err)
 	}
 	return out, nil
+}
+
+// InsertOutboxEvent enqueues one row for common/outbox.Relay to publish —
+// implements usecase.OutboxWriter against infra.outbox_events
+// (migrations/0012_outbox_events).
+func (r *Repository) InsertOutboxEvent(ctx context.Context, event domain.OutboxEvent) error {
+	_, err := r.pool.Exec(ctx, `
+		INSERT INTO infra.outbox_events (id, tenant_id, subject, occurred_at, version, payload)
+		VALUES ($1, $2, $3, $4, 1, $5)
+	`, event.ID, event.TenantID, event.Subject, event.OccurredAt, event.PayloadJSON)
+	if err != nil {
+		return fmt.Errorf("postgres: insert outbox event: %w", err)
+	}
+	return nil
 }

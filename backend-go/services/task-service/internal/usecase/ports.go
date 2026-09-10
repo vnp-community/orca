@@ -229,7 +229,7 @@ type OPAClient interface {
 // comment for the full agent-rpc-catalog citation trail behind that
 // choice).
 type SimpleExecutor interface {
-	Execute(ctx context.Context, tenantID, taskID, requestID string) (executionRef string, err error)
+	Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (executionRef string, err error)
 }
 
 // ComplexExecutor relays Execute's complex-path dispatch to
