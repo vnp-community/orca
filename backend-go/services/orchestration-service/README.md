@@ -54,16 +54,25 @@ layout/conventions this service follows.
 - `internal/adapter/grpc/` — implements
   `orchestrationv1.UnimplementedOrchestrationServiceServer`'s 4 generated
   RPCs, pure wire<->usecase translation.
-- `migrations/0001_init.{up,down}.sql` — real DDL:
+- `migrations/postgres/0001_init.{up,down}.sql` (and 5 more) — real DDL:
   `orchestration.coordinator_runs`, `orchestration.orchestration_tasks`,
   `orchestration.dispatch_contexts`, `orchestration.decision_gates`,
   `orchestration.messages`, RLS policies on every table (`usage-service`
   pattern).
+- `internal/adapter/mysql/` — CR-DB-002/CR-DB-003 multi-database rollout
+  (batch 2): a MySQL/TiDB adapter implementing the same 4 repository ports
+  plus `common/outbox.Store`, against dialect-safe DDL in
+  `migrations/mysql/` (no RLS equivalent — tenant_id scoping is explicit in
+  every query, same posture as the Postgres adapter's queries already had).
+  See
+  [`specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-010-orchestration-service-mysql-tidb-adapter.md`](../../../specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-010-orchestration-service-mysql-tidb-adapter.md).
 - `cmd/server/main.go` — a real, working composition root: config load,
-  Postgres pool, the `KeyedSerializer` wired **once as a singleton** shared
-  by every usecase (a per-request instance would make the serialization
-  guarantee meaningless), gRPC server with the shared interceptor chain,
-  health/readiness HTTP server, graceful shutdown on SIGTERM.
+  `DATABASE_DSN`-scheme-driven dialect selection (Postgres or MySQL/TiDB,
+  via `common/dbcapability`), the `KeyedSerializer` wired **once as a
+  singleton** shared by every usecase (a per-request instance would make
+  the serialization guarantee meaningless), gRPC server with the shared
+  interceptor chain, health/readiness HTTP server, graceful shutdown on
+  SIGTERM.
 
 ## Known gaps / follow-ups (flagged honestly, not silently dropped)
 
@@ -123,15 +132,17 @@ itself:
   `coordinator_run_id` FK will fail against a real database unless a row
   was seeded out-of-band — a direct consequence of `StartCoordinatorRun`
   being outside the current proto surface, not a shortcut taken here.
-- **`common/secrets` (Vault) is not wired into `main.go`** — same posture
-  as usage-service; `DATABASE_DSN` is read directly from the environment.
+- **FIXED (CR-DB-002/CR-DB-003, batch 2 rollout): `common/secrets` (Vault)
+  is now wired into `main.go`** — `DATABASE_DSN` is resolved via
+  `secrets.DatabaseCredentialsFromFile`, matching every other rolled-out
+  service, instead of being read directly from the environment.
 - **`common/tracing` has no OTLP exporter configured** — spans are created
   but not shipped anywhere until a collector endpoint is wired in.
-- No transactional outbox / event publishing — the design doc §6 sketches
-  an `adapter/eventbus/` outbox (`orchestration.gate.resolved`,
-  `orchestration.run.completed`, ...); not implemented here since no
-  generated RPC's response depends on it and the core ask (KeyedSerializer +
-  atomic promotion) doesn't need it.
+- Transactional outbox / event publishing IS implemented (BE-SOL-003/
+  TASK-FT-003-01, ahead of this README section being updated) —
+  `orchestration.outbox_events` (Postgres) / `outbox_events` (MySQL), see
+  `internal/adapter/{postgres,mysql}/repository.go`'s
+  `FetchUnpublished`/`MarkPublished`.
 
 ## What IS fully real despite the above
 
@@ -150,13 +161,20 @@ gaps above.
 ```sh
 # from backend-go/
 docker compose up -d postgres   # see ../../docker-compose.yml
-migrate -path services/orchestration-service/migrations \
+migrate -path services/orchestration-service/migrations/postgres \
   -database "$DATABASE_DSN" up  # golang-migrate; see architecture/05
 
 cd services/orchestration-service
 DATABASE_DSN=postgres://orca:orca@localhost:5432/orchestration?sslmode=disable \
   go run ./cmd/server
 ```
+
+MySQL/TiDB (CR-DB-002/CR-DB-003 batch 2): run
+`migrate -path services/orchestration-service/migrations/mysql -database "$DATABASE_DSN" up`
+against a `mysql://`/`tidb://`-scheme DSN instead — `cmd/server/main.go`
+picks the adapter from the DSN's scheme automatically, no separate
+`DB_DIALECT` variable. See
+[BE-DB-SOL-010](../../../specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-010-orchestration-service-mysql-tidb-adapter.md).
 
 ## Testing
 
@@ -165,6 +183,7 @@ GOWORK=off go build ./...
 GOWORK=off go vet ./...
 GOWORK=off go test -race ./...                                # unit tests — no external deps
 GOWORK=off go test -tags=integration ./internal/adapter/postgres/...  # requires Docker (testcontainers-go)
+GOWORK=off go test -tags=integration ./internal/adapter/mysql/...     # requires Docker (testcontainers-go)
 ```
 
 This service is not listed in the workspace `go.work` (only

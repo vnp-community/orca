@@ -29,6 +29,15 @@ type Config struct {
 	// OPABundlePath, for identical override behavior in every service.
 	OPABundlePath             string
 	ScmIntegrationServiceAddr string
+	// DatabaseCredentialsFile is the path a Vault Agent sidecar renders
+	// dynamic database credentials to in production (see
+	// common/secrets.DatabaseCredentialsFromFile). Falls back to
+	// DATABASE_DSN (via Base) when the file doesn't exist, which is what
+	// local dev and this service's testcontainers path use instead. Added
+	// for CR-DB-002/CR-DB-003's multi-database rollout (BE-DB-SOL-011),
+	// replacing the direct cfg.DatabaseDSN read main.go used to do —
+	// mirrors usage-service's (the pilot) identical field 1:1.
+	DatabaseCredentialsFile string
 }
 
 func Load() (Config, error) {
@@ -41,5 +50,6 @@ func Load() (Config, error) {
 		NATSURL:                   commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		OPABundlePath:             commonconfig.StringEnv("OPA_BUNDLE_PATH", "../../policy/orca-authz"),
 		ScmIntegrationServiceAddr: commonconfig.StringEnv("SCM_INTEGRATION_SERVICE_ADDR", "scm-integration-service:9090"),
+		DatabaseCredentialsFile:   commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 	}, nil
 }

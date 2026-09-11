@@ -45,7 +45,7 @@ nào ở đây — thuộc phạm vi frontend/mobile/desktop repo khác.
 
 | Solution | CR | Service | Status |
 |---|---|---|---|
-| [BE-MOBILE-SOL-001](./BE-MOBILE-SOL-001-notification-service-push-delivery.md) | CR-MOBILE-001 | `notification-service`, `api-gateway` | 🔲 Designed — chưa implement |
+| [BE-MOBILE-SOL-001](./BE-MOBILE-SOL-001-notification-service-push-delivery.md) | CR-MOBILE-001 | `notification-service`, `api-gateway` | ✅ Implemented (2026-09-09), **regression vá lại 2026-09-11** — xem addendum ở [TASK-BE-MOBILE-003](../tasks/TASK-BE-MOBILE-003-subscription-repository-mark-expired.md) |
 | [BE-MOBILE-SOL-002](./BE-MOBILE-SOL-002-mobile-subscribe-auth-endpoint.md) | CR-MOBILE-002 | `api-gateway` | 🔲 Designed — chưa implement; chứa 1 quyết định kiến trúc CHƯA CHỐT (xem §1.2 của solution) |
 
 ## Thứ tự implement

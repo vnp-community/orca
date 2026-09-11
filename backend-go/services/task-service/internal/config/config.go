@@ -8,6 +8,16 @@ import (
 
 type Config struct {
 	commonconfig.Base
+	// DatabaseCredentialsFile is the path a Vault Agent sidecar renders
+	// dynamic database credentials to (see
+	// common/secrets.DatabaseCredentialsFromFile) — falls back to
+	// DATABASE_DSN itself when the file doesn't exist, the same posture
+	// usage-service/annotation-service's identical field uses. Added
+	// alongside CR-DB-002/CR-DB-003's dialect factory in cmd/server/main.go
+	// (BE-DB-SOL-015); closes this service's README's prior "common/secrets
+	// (Vault) is not wired into main.go" known gap as a side effect of that
+	// same wiring, same precedent as annotation-service's TASK-BE-DB-010.
+	DatabaseCredentialsFile string
 	// OPABundlePath points ResolvePermission's OPA client
 	// (internal/adapter/opaclient, via common/policy.Evaluator) at the
 	// orca-authz Rego bundle on disk. Defaults to the bundle's location
@@ -69,7 +79,8 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base: base,
+		Base:                    base,
+		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 		// Matches this service's deploy/Dockerfile `COPY --from=build
 		// /src/policy/orca-authz /policy/orca-authz` and dev
 		// docker-compose.yml's identical bind-mount — NOT a relative

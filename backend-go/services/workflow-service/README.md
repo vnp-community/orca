@@ -74,38 +74,50 @@ reference implementation.
   originally left deferred — see "Template inheritance" below). The design
   doc's fuller §3 sketch still has `StreamExecutionEvents`, which isn't in
   the generated proto and so isn't implemented here.
-- `migrations/0001_init.{up,down}.sql` — `workflow.templates` (id,
+- `migrations/postgres/0001_init.{up,down}.sql` — `workflow.templates` (id,
   tenant_id, name, dag_json, scope) and `workflow.executions` (id,
   template_id, tenant_id, status, root_trace_id, paused_at) with RLS
   policies, matching usage-service's pattern.
-- `migrations/0002_execution_project_id.{up,down}.sql` — adds
+- `migrations/postgres/0002_execution_project_id.{up,down}.sql` — adds
   `workflow.executions.project_id` plus the partial index
   `idx_workflow_executions_project_active`, backing `HasActiveExecutions`
   above.
-- `migrations/0003_template_parent_chain.{up,down}.sql` — adds
+- `migrations/postgres/0003_template_parent_chain.{up,down}.sql` — adds
   `workflow.templates.parent_template_id` plus
   `idx_workflow_templates_parent`, backing `ResolveTemplate` below.
-- `migrations/0004_step_executions.{up,down}.sql` — adds
+- `migrations/postgres/0004_step_executions.{up,down}.sql` — adds
   `workflow.step_executions` (id, execution_id, step_id, wave, status,
   dispatch_token, output, error_message), RLS'd via an `EXISTS` join back
   to `workflow.executions` (this table has no `tenant_id` column of its
   own), backing real wave-dispatch above.
-- `migrations/0005_execution_ad_hoc_template.{up,down}.sql` — drops
+- `migrations/postgres/0005_execution_ad_hoc_template.{up,down}.sql` — drops
   `workflow.executions.template_id`'s `NOT NULL` constraint and switches
   its FK to `ON DELETE SET NULL`, matching the fuller design doc (§5) —
   needed so `ExecuteAdHocStep`'s synthetic, templateless execution can be
   persisted at all.
-- `cmd/server/main.go` — composition root: config load, Postgres pool,
-  `StepExecutorRegistry` wired with all five step types (two real, three
-  stubs), gRPC server with the shared interceptor chain, health/readiness
-  HTTP server, graceful shutdown on SIGTERM.
+- **Multi-database (CR-DB-002/CR-DB-003, BE-DB-SOL-013):**
+  `migrations/postgres/` (unchanged content, moved) and `migrations/mysql/`
+  (dialect-safe: JSON instead of JSONB, no RLS, `tags` as a JSON array with
+  `JSON_CONTAINS`-per-tag filtering instead of `text[]` + GIN, a generated-
+  column unique index reproducing the one-pending-approval-per-template
+  partial unique index, `WITH RECURSIVE`/row-value subquery comparisons
+  both supported natively by MySQL 8/TiDB) both apply via golang-migrate;
+  `cmd/server/main.go` picks the adapter (`internal/adapter/postgres` or
+  `internal/adapter/mysql`) from `DATABASE_DSN`'s scheme at startup, same
+  `switch caps.Dialect` factory as usage-service (the pilot). See
+  `specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-013-workflow-service-mysql-tidb-adapter.md`.
+- `cmd/server/main.go` — composition root: config load, dialect-detected DB
+  connection (Postgres pool or MySQL/TiDB `*sql.DB`), `StepExecutorRegistry`
+  wired with all five step types (two real, three stubs), gRPC server with
+  the shared interceptor chain, health/readiness HTTP server, graceful
+  shutdown on SIGTERM.
 
 ## Running locally
 
 ```sh
 # from backend-go/
 docker compose up -d postgres   # see ../../docker-compose.yml
-migrate -path services/workflow-service/migrations \
+migrate -path services/workflow-service/migrations/postgres \
   -database "$DATABASE_DSN" up  # golang-migrate; see architecture/05
 
 cd services/workflow-service
@@ -114,11 +126,17 @@ WEBHOOK_ALLOWLIST_HOSTS=hooks.example.com \
   go run ./cmd/server
 ```
 
+MySQL/TiDB dialect: run `migrate -path services/workflow-service/migrations/mysql -database "$DATABASE_DSN" up`
+against a `mysql://user:pass@tcp(host:port)/workflow` DSN instead — the
+dialect is picked up automatically from `DATABASE_DSN`'s scheme, no
+separate `DB_DIALECT` env var.
+
 ## Testing
 
 ```sh
 go test ./...                 # unit tests (domain/, usecase/, adapter/stepexecutors/) — no external deps
 go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (testcontainers-go)
+go test -tags=integration ./internal/adapter/mysql/...      # requires Docker (testcontainers-go, MySQL 8)
 ```
 
 The `step_executions` table/repository and the ad hoc-execution nullable

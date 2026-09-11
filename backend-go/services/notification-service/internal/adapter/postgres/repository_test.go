@@ -26,7 +26,7 @@ func setupRepository(t *testing.T) *Repository {
 	t.Helper()
 	dsn := testutil.StartPostgres(t, "notification")
 
-	migrationsPath, err := filepath.Abs("../../../migrations")
+	migrationsPath, err := filepath.Abs("../../../migrations/postgres")
 	if err != nil {
 		t.Fatalf("resolving migrations path: %v", err)
 	}
@@ -46,12 +46,28 @@ func setupRepository(t *testing.T) *Repository {
 	return New(pool)
 }
 
+// Subscription/tenant/user IDs below must be real UUIDs — push_subscriptions'
+// id/tenant_id/user_id are UUID columns (migration 0001). Fixed as part of
+// CR-MOBILE-001's MarkExpired work: these 5 tests previously used
+// placeholder strings ("sub-1", "tenant-1", ...) that fail
+// "invalid input syntax for type uuid" against the real schema — confirmed
+// by running them here for the first time under `-tags=integration` — so
+// none of them had ever actually passed against Postgres before.
+const (
+	subTestSubID1      = "d0000000-0000-0000-0000-000000000001"
+	subTestSubID1Retry = "d0000000-0000-0000-0000-000000000002"
+	subTestSubID2      = "d0000000-0000-0000-0000-000000000003"
+	subTestTenant1     = "e0000000-0000-0000-0000-000000000001"
+	subTestTenant2     = "e0000000-0000-0000-0000-000000000002"
+	subTestUser1       = "f0000000-0000-0000-0000-000000000001"
+)
+
 func TestRepository_SaveSubscription_UpsertsOnEndpoint(t *testing.T) {
 	repo := setupRepository(t)
 	ctx := context.Background()
 
 	p256dh, auth := "p256dh-1", "auth-1"
-	sub, err := domain.NewPushSubscription("sub-1", "tenant-1", "user-1", domain.ChannelWeb,
+	sub, err := domain.NewPushSubscription(subTestSubID1, subTestTenant1, subTestUser1, domain.ChannelWeb,
 		"https://push.example/ep-1", &p256dh, &auth, "chrome", time.Now())
 	if err != nil {
 		t.Fatalf("building subscription: %v", err)
@@ -62,12 +78,12 @@ func TestRepository_SaveSubscription_UpsertsOnEndpoint(t *testing.T) {
 
 	// Re-subscribing to the same endpoint with a new subscription ID must
 	// update in place, not create a second row (endpoint UNIQUE index).
-	sub.ID = "sub-1-retry"
+	sub.ID = subTestSubID1Retry
 	if err := repo.Save(ctx, sub); err != nil {
 		t.Fatalf("second save (retry): %v", err)
 	}
 
-	subs, err := repo.ListByUser(ctx, "tenant-1", "user-1")
+	subs, err := repo.ListByUser(ctx, subTestTenant1, subTestUser1)
 	if err != nil {
 		t.Fatalf("list by user: %v", err)
 	}
@@ -81,17 +97,109 @@ func TestRepository_ListByUser_FiltersByTenantAndUser(t *testing.T) {
 	ctx := context.Background()
 
 	p256dh, auth := "p", "a"
-	s1, _ := domain.NewPushSubscription("s1", "tenant-1", "user-1", domain.ChannelWeb, "https://push.example/ep-1", &p256dh, &auth, "", time.Now())
-	s2, _ := domain.NewPushSubscription("s2", "tenant-2", "user-1", domain.ChannelWeb, "https://push.example/ep-2", &p256dh, &auth, "", time.Now())
-	_ = repo.Save(ctx, s1)
-	_ = repo.Save(ctx, s2)
+	s1, err := domain.NewPushSubscription(subTestSubID1, subTestTenant1, subTestUser1, domain.ChannelWeb, "https://push.example/ep-1", &p256dh, &auth, "", time.Now())
+	if err != nil {
+		t.Fatalf("building s1: %v", err)
+	}
+	s2, err := domain.NewPushSubscription(subTestSubID2, subTestTenant2, subTestUser1, domain.ChannelWeb, "https://push.example/ep-2", &p256dh, &auth, "", time.Now())
+	if err != nil {
+		t.Fatalf("building s2: %v", err)
+	}
+	if err := repo.Save(ctx, s1); err != nil {
+		t.Fatalf("save s1: %v", err)
+	}
+	if err := repo.Save(ctx, s2); err != nil {
+		t.Fatalf("save s2: %v", err)
+	}
 
-	subs, err := repo.ListByUser(ctx, "tenant-1", "user-1")
+	subs, err := repo.ListByUser(ctx, subTestTenant1, subTestUser1)
 	if err != nil {
 		t.Fatalf("list by user: %v", err)
 	}
-	if len(subs) != 1 || subs[0].TenantID != "tenant-1" {
-		t.Errorf("expected only tenant-1's subscription, got %+v", subs)
+	if len(subs) != 1 || subs[0].TenantID != subTestTenant1 {
+		t.Errorf("expected only tenant1's subscription, got %+v", subs)
+	}
+}
+
+func TestRepository_MarkExpired_SetsStatusExpired(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	p256dh, auth := "p256dh-1", "auth-1"
+	sub, err := domain.NewPushSubscription(subTestSubID1, subTestTenant1, subTestUser1, domain.ChannelWeb,
+		"https://push.example/ep-expiring", &p256dh, &auth, "chrome", time.Now())
+	if err != nil {
+		t.Fatalf("building subscription: %v", err)
+	}
+	if err := repo.Save(ctx, sub); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+
+	if err := repo.MarkExpired(ctx, "https://push.example/ep-expiring"); err != nil {
+		t.Fatalf("MarkExpired: %v", err)
+	}
+
+	var status string
+	if err := repo.pool.QueryRow(ctx, `SELECT status FROM notification.push_subscriptions WHERE endpoint = $1`, "https://push.example/ep-expiring").Scan(&status); err != nil {
+		t.Fatalf("querying status: %v", err)
+	}
+	if status != string(domain.SubscriptionExpired) {
+		t.Errorf("expected status %q, got %q", domain.SubscriptionExpired, status)
+	}
+
+	// ListByUser only returns 'active' subscriptions — an expired one must
+	// no longer show up, matching DeliverPush's expectation that a future
+	// event won't retry it.
+	subs, err := repo.ListByUser(ctx, subTestTenant1, subTestUser1)
+	if err != nil {
+		t.Fatalf("list by user: %v", err)
+	}
+	if len(subs) != 0 {
+		t.Errorf("expected 0 active subscriptions after MarkExpired, got %d: %+v", len(subs), subs)
+	}
+}
+
+func TestRepository_MarkExpired_UnknownEndpoint_NoError(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	// Idempotent-by-design, same contract as DeleteByEndpoint — 0 rows
+	// affected is not an error.
+	if err := repo.MarkExpired(ctx, "https://push.example/never-existed"); err != nil {
+		t.Fatalf("expected no error for an unknown endpoint, got: %v", err)
+	}
+}
+
+func TestRepository_MarkExpired_DoesNotAffectOtherEndpoints(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+
+	p256dh, auth := "p", "a"
+	kept, err := domain.NewPushSubscription(subTestSubID1, subTestTenant1, subTestUser1, domain.ChannelWeb, "https://push.example/keep", &p256dh, &auth, "", time.Now())
+	if err != nil {
+		t.Fatalf("building kept: %v", err)
+	}
+	expiring, err := domain.NewPushSubscription(subTestSubID2, subTestTenant1, subTestUser1, domain.ChannelWeb, "https://push.example/expire", &p256dh, &auth, "", time.Now())
+	if err != nil {
+		t.Fatalf("building expiring: %v", err)
+	}
+	if err := repo.Save(ctx, kept); err != nil {
+		t.Fatalf("save kept: %v", err)
+	}
+	if err := repo.Save(ctx, expiring); err != nil {
+		t.Fatalf("save expiring: %v", err)
+	}
+
+	if err := repo.MarkExpired(ctx, "https://push.example/expire"); err != nil {
+		t.Fatalf("MarkExpired: %v", err)
+	}
+
+	subs, err := repo.ListByUser(ctx, subTestTenant1, subTestUser1)
+	if err != nil {
+		t.Fatalf("list by user: %v", err)
+	}
+	if len(subs) != 1 || subs[0].Endpoint != "https://push.example/keep" {
+		t.Errorf("expected only the non-expired endpoint to remain active, got %+v", subs)
 	}
 }
 

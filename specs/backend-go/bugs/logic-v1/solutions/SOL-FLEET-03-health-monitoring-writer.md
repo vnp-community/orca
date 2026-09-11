@@ -13,7 +13,15 @@
 - `backend-go/services/infra-fleet-service/internal/adapter/metrics/fleet_collector.go` (new — Prometheus)
 - `backend-go/services/infra-fleet-service/cmd/server/main.go` (start the poller goroutine, mount `/health/metrics`)
 - `backend-go/proto/orca/infrafleet/v1/infrafleet.proto` (`DevServerHealth.status`)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — **Đính chính (2026-09-12)**: doc này ghi sai "Proposed" dù
+toàn bộ code thật đã tồn tại và hoạt động (xác nhận trực tiếp qua đọc code +
+chạy test thật, không phải suy đoán từ doc). Mọi file trong "Affected files"
+ở trên đã tồn tại đúng như liệt kê (trừ đường dẫn migration đổi số thứ tự do
+các CR khác chen vào), wire đầy đủ trong `cmd/server/main.go`
+(`webhookAlerterUC`, `fleetCollector`, `/health/metrics` qua `promhttp`,
+`pollFleetHealthUC` chạy nền), 25/25 unit test PASS thật
+(`poll_fleet_health_test.go`, `fleet_collector_test.go`, `alerter_test.go`).
+Xem [docs/roadmap/feature-completion-matrix.md](../../../../../docs/roadmap/feature-completion-matrix.md)'s dòng F27 cho đối chiếu đầy đủ.
 
 ---
 

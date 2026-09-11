@@ -5,17 +5,21 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/prometheus/client_golang/prometheus"
@@ -26,6 +30,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/stablyai/orca-go/common/auditclient"
+	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
@@ -44,6 +49,7 @@ import (
 	infragrpc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpc"
 	infragrpcclient "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/grpcclient"
 	inframetrics "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/metrics"
+	infrafleetmysql "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/mysql"
 	infraportalloc "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/portalloc"
 	infraportevents "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/portevents"
 	infrapostgres "github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/postgres"
@@ -108,26 +114,135 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	pool, err := pgxpool.New(ctx, dsn)
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("detecting database dialect: %w", err)
 	}
-	defer pool.Close()
 
-	// One Repository backs DevServerRepository, ConnectionRepository,
-	// ConnectionResolver, and FleetHealthPort; SshTargetStore is a separate
-	// value over the same pool for SshTargetRepository/SshTargetResolver —
-	// see internal/adapter/postgres's package doc comment for why they can't
-	// be the same Go value.
-	repo := infrapostgres.New(pool)
-	sshTargetStore := infrapostgres.NewSshTargetStore(pool)
-	terminalSessionStore := infrapostgres.NewTerminalSessionStore(pool)
-	browserProfileStore := infrapostgres.NewBrowserProfileStore(pool)
-	scrollbackStore := infrapostgres.NewTerminalScrollbackSnapshotStore(pool)
-	agentTokenStore := infrapostgres.NewAgentTokenStore(pool)
-	agentSessionStore := infrapostgres.NewAgentSessionStore(pool)
-	agentRateLimitedOutboxStore := infrapostgres.NewAgentRateLimitedOutboxStore(pool)
-	queuedPromptStore := infrapostgres.NewQueuedPromptStore(pool)
+	healthSrv := health.New()
+
+	// repo is bound to ONE concrete adapter (infrapostgres.Repository or
+	// infrafleetmysql.Repository) per caps.Dialect below and used at every
+	// call site throughout this file exactly the way the single-dialect
+	// `repo := infrapostgres.New(pool)` line used to be — repoAll's method
+	// set is the union of every DB-backed usecase port Repository
+	// implements (10 interfaces, per internal/adapter/mysql/shared.go's
+	// compile-time assertions), so a repoAll value satisfies any ONE of
+	// them implicitly wherever a narrower interface parameter is expected
+	// below, without touching those call sites individually — same
+	// technique as task-service's cmd/server/main.go, sized to this
+	// service's larger (15-repository) port surface. The other 14
+	// repositories are each used through exactly one usecase port, so they
+	// stay typed as that single interface instead. All 15 are constructed
+	// together here — rather than scattered at each one's original call
+	// site further down — so the postgres/mysql branch is written once per
+	// repository; SshTargetStore stays a separate Go value from Repository
+	// (SshTargetRepository/SshTargetResolver) — see
+	// internal/adapter/postgres's package doc comment for why they can't be
+	// the same value.
+	type repoAll interface {
+		usecase.DevServerRepository
+		usecase.ConnectionRepository
+		usecase.ConnectionResolver
+		usecase.FleetHealthPort
+		usecase.FleetHealthWriter
+		usecase.PollLockPort
+		usecase.FleetConnectivityRepository
+		usecase.FleetHealthPollerRepository
+		usecase.OutboxWriter
+		outbox.Store
+		infraeventbus.OutboxEnqueuer // EnqueueOutboxEvent — distinct, narrower interface than usecase.OutboxWriter's InsertOutboxEvent
+	}
+
+	// rateLimitedOutboxStore is outbox.Store (the transactional-outbox
+	// relay's port) plus Enqueue — the one extra method
+	// infraeventbus.New's local rateLimitedOutboxEnqueuer interface needs
+	// from AgentRateLimitedOutboxStore, distinct from outbox.Store's
+	// FetchUnpublished/MarkPublished.
+	type rateLimitedOutboxStore interface {
+		outbox.Store
+		Enqueue(ctx context.Context, rec outbox.Record) error
+	}
+
+	var (
+		repo                        repoAll
+		sshTargetStore              usecase.SshTargetRepository
+		terminalSessionStore        usecase.TerminalSessionRepository
+		browserProfileStore         usecase.BrowserProfileRepository
+		scrollbackStore             usecase.TerminalScrollbackSnapshotRepository
+		agentTokenStore             usecase.AgentTokenRepository
+		agentSessionStore           usecase.AgentSessionRepository
+		agentRateLimitedOutboxStore rateLimitedOutboxStore
+		queuedPromptStore           usecase.QueuedPromptRepository
+		ephemeralVmRuntimeStore     usecase.EphemeralVmRuntimeRepository
+		devServerGroupStore         usecase.DevServerGroupRepository
+		devServerGroupGrantStore    usecase.DevServerGroupGrantRepository
+		devServerAccessRequestStore usecase.DevServerAccessRequestRepository
+		portForwardStore            usecase.PortForwardRepository
+		ephemeralVmSshTargetStore   usecase.EphemeralVmSshTargetRepository
+	)
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		pgRepo := infrapostgres.New(pool)
+		repo = pgRepo
+		sshTargetStore = infrapostgres.NewSshTargetStore(pool)
+		terminalSessionStore = infrapostgres.NewTerminalSessionStore(pool)
+		browserProfileStore = infrapostgres.NewBrowserProfileStore(pool)
+		scrollbackStore = infrapostgres.NewTerminalScrollbackSnapshotStore(pool)
+		agentTokenStore = infrapostgres.NewAgentTokenStore(pool)
+		agentSessionStore = infrapostgres.NewAgentSessionStore(pool)
+		agentRateLimitedOutboxStore = infrapostgres.NewAgentRateLimitedOutboxStore(pool)
+		queuedPromptStore = infrapostgres.NewQueuedPromptStore(pool)
+		ephemeralVmRuntimeStore = infrapostgres.NewEphemeralVmRuntimeStore(pool)
+		devServerGroupStore = infrapostgres.NewDevServerGroupStore(pool)
+		devServerGroupGrantStore = infrapostgres.NewDevServerGroupGrantStore(pool)
+		devServerAccessRequestStore = infrapostgres.NewDevServerAccessRequestStore(pool)
+		portForwardStore = infrapostgres.NewPortForwardStore(pool)
+		ephemeralVmSshTargetStore = infrapostgres.NewEphemeralVmSshTargetStore(pool)
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		myRepo := infrafleetmysql.New(db)
+		repo = myRepo
+		sshTargetStore = infrafleetmysql.NewSshTargetStore(db)
+		terminalSessionStore = infrafleetmysql.NewTerminalSessionStore(db)
+		browserProfileStore = infrafleetmysql.NewBrowserProfileStore(db)
+		scrollbackStore = infrafleetmysql.NewTerminalScrollbackSnapshotStore(db)
+		agentTokenStore = infrafleetmysql.NewAgentTokenStore(db)
+		agentSessionStore = infrafleetmysql.NewAgentSessionStore(db)
+		agentRateLimitedOutboxStore = infrafleetmysql.NewAgentRateLimitedOutboxStore(db)
+		queuedPromptStore = infrafleetmysql.NewQueuedPromptStore(db)
+		ephemeralVmRuntimeStore = infrafleetmysql.NewEphemeralVmRuntimeStore(db)
+		devServerGroupStore = infrafleetmysql.NewDevServerGroupStore(db)
+		devServerGroupGrantStore = infrafleetmysql.NewDevServerGroupGrantStore(db)
+		devServerAccessRequestStore = infrafleetmysql.NewDevServerAccessRequestStore(db)
+		portForwardStore = infrafleetmysql.NewPortForwardStore(db)
+		ephemeralVmSshTargetStore = infrafleetmysql.NewEphemeralVmSshTargetStore(db)
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
 
 	// Transactional-outbox relay (Epic G, docs/execution-plan.md;
 	// TASK-AUTH-05-08): EstablishConnection durably enqueues an outbox row
@@ -223,13 +338,6 @@ func run() error {
 		bulkProvisioner = unavailableBulkProvisioner{}
 	}
 
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
-
 	// terminalLiveStates is the shared per-pod quiescence registry
 	// AttachPty writes and GetTerminalAgentStatus reads (TASK-MB-02-01/02) —
 	// constructed once here so both usecases share the exact same instance.
@@ -301,15 +409,9 @@ func run() error {
 	// --- Terminal/PTY (TASK-185) --- one ConnectionStreamLimiter shared by
 	// AttachPty across every stream this process serves.
 	ptyStreamLimiter := usecase.NewConnectionStreamLimiter(0)
-	// ephemeralVmRuntimeStore is constructed here (earlier than the rest of
-	// the "Ephemeral VM" wiring block below) because SpawnTerminalSession
-	// needs it too, for TASK-BE-EVM-007's environmentId resolution fallback
-	// — the block below still uses this same instance.
-	ephemeralVmRuntimeStore := infrapostgres.NewEphemeralVmRuntimeStore(pool)
 	// resolveConnectionUC (TASK-BE-EVM-018, BE-SOL-EVM-004 §6c) needs
-	// ephemeralVmRuntimeStore for its HiddenTargetID lookup — constructed
-	// here, after that store exists, rather than up with the rest of the
-	// "core dispatch" usecases above (which predate this dependency).
+	// ephemeralVmRuntimeStore (constructed in the dialect switch above) for
+	// its HiddenTargetID lookup.
 	resolveConnectionUC := usecase.NewResolveConnection(repo, ephemeralVmRuntimeStore)
 	resolveConnectionUC.Sessions = handshakeInfoProvider{client: agentClient} // TASK-INT-03-02: optional node_version enrichment
 	spawnTerminalSessionUC := usecase.NewSpawnTerminalSession(repo, repo, agentClient, terminalSessionStore, ephemeralVmRuntimeStore, cfg.ServerDeployment)
@@ -395,8 +497,8 @@ func run() error {
 	listAgentTokensUC := usecase.NewListAgentTokens(agentTokenStore)
 	revokeAgentTokenUC := usecase.NewRevokeAgentToken(agentTokenStore, agentClient)
 
-	// --- Auto port-forwarding (SOL-SSH-04) ---
-	portForwardStore := infrapostgres.NewPortForwardStore(pool)
+	// --- Auto port-forwarding (SOL-SSH-04) --- portForwardStore
+	// constructed in the dialect switch above.
 	portAllocator := infraportalloc.NewAllocator()
 	createPortForwardUC := usecase.NewCreatePortForward(portForwardStore, portAllocator)
 	listPortForwardsUC := usecase.NewListPortForwards(portForwardStore)
@@ -482,10 +584,9 @@ func run() error {
 	resumeAgentSessionUC := usecase.NewResumeAgentSession(agentSessionStore, repo, startAgentSessionUC)
 	switchAgentAccountUC := usecase.NewSwitchAgentAccount(agentSessionStore, killAgentSessionUC, aiProviderResolver, startAgentSessionUC, resumeAgentSessionUC)
 
-	// --- CR-DS-006 Phase 2 / CR-DS-007 / CR-DS-008 (dev server access control) ---
-	devServerGroupStore := infrapostgres.NewDevServerGroupStore(pool)
-	devServerGroupGrantStore := infrapostgres.NewDevServerGroupGrantStore(pool)
-	devServerAccessRequestStore := infrapostgres.NewDevServerAccessRequestStore(pool)
+	// --- CR-DS-006 Phase 2 / CR-DS-007 / CR-DS-008 (dev server access
+	// control) --- devServerGroupStore/devServerGroupGrantStore/
+	// devServerAccessRequestStore constructed in the dialect switch above.
 	approveDevServerUC := usecase.NewApproveDevServer(repo)
 	rejectDevServerUC := usecase.NewRejectDevServer(repo)
 	assignDevServerGroupUC := usecase.NewAssignDevServerGroup(repo)
@@ -499,16 +600,16 @@ func run() error {
 	listPendingAccessRequestsUC := usecase.NewListPendingAccessRequests(devServerAccessRequestStore)
 	resolveAccessRequestUC := usecase.NewResolveAccessRequest(devServerAccessRequestStore, devServerGroupGrantStore)
 
-	// --- Ephemeral VM (SOL-004 Group 1/2a, TASK-002/004) --- ephemeralVmRuntimeStore
-	// itself is constructed earlier, alongside spawnTerminalSessionUC (see
-	// that line's comment) — reused here.
+	// --- Ephemeral VM (SOL-004 Group 1/2a, TASK-002/004) ---
+	// ephemeralVmRuntimeStore constructed in the dialect switch above,
+	// reused here.
 	listEphemeralVmRuntimesUC := usecase.NewListEphemeralVmRuntimes(ephemeralVmRuntimeStore)
 	// --- Ephemeral VM ssh-type provisioner wiring (TASK-BE-EVM-012/014) ---
 	// Hướng A (agent-outbound) only — Hướng B (backend-relay-deploy,
 	// TASK-BE-EVM-013) wires its own usecase.WithSshProvisioner option
 	// separately; cfg.EphemeralVmSshMode's default
 	// ("backend-relay-deploy") stays inert here until that wiring lands.
-	ephemeralVmSshTargetStore := infrapostgres.NewEphemeralVmSshTargetStore(pool)
+	// ephemeralVmSshTargetStore constructed in the dialect switch above.
 	var ephemeralVmRelayOpts []usecase.EphemeralVmRelayOption
 	if cfg.EphemeralVmSshMode == "agent-outbound" {
 		// GAP 1/2 FIX (TASK-BE-EVM-016, BE-SOL-EVM-004 §6a/§6b): no Vault
@@ -822,4 +923,49 @@ func (p handshakeInfoProvider) NodeVersionFor(devServerID string) (string, bool)
 		return "", false
 	}
 	return info.NodeVersion, true
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — copied verbatim from
+// usage-service/cmd/server/main.go (see that file's doc comment for the
+// full two-input-shape/parseTime rationale); this is pure DSN-plumbing, not
+// service-specific, and there is no shared package for it yet — same
+// precedent every prior rollout service has followed.
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		sep := "?"
+		if strings.Contains(driverDSN, "?") {
+			sep = "&"
+		}
+		driverDSN += sep + "parseTime=true"
+	}
+	return driverDSN, nil
 }

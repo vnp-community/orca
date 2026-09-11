@@ -71,7 +71,10 @@ ops, port scans) reduces to the same call.
 ```sh
 # from backend-go/
 docker compose up -d postgres   # see ../../docker-compose.yml
-migrate -path services/infra-fleet-service/migrations \
+# CR-DB-002/CR-DB-003: migrations are split by dialect — use
+# migrations/postgres for Postgres, migrations/mysql for MySQL/TiDB (see
+# specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-017.md).
+migrate -path services/infra-fleet-service/migrations/postgres \
   -database "$DATABASE_DSN" up  # golang-migrate; see architecture/05
 
 cd services/infra-fleet-service

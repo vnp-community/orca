@@ -117,6 +117,49 @@ func formatFeedbackBlock(a *annotationv1.Annotation, codeLine string, context []
 	return b.String()
 }
 
+// ComposeReviewFeedbackPrompt runs the read-only half of SOL-CR-03
+// (collect unsent annotations, resolve ±2-line code context, format per
+// BR-CR-09) without delivering anything — extracted from
+// SendReviewFeedbackToAgent (TASK-BE-ANNOTATE-001) so a caller that wants
+// the composed text without also triggering PTY delivery (CR-ANNOTATE-002)
+// doesn't have to duplicate this logic or accept an unwanted side effect to
+// get it. annotationIDs is nil (not an empty non-nil slice) when there is
+// nothing to send, mirroring SendReviewFeedbackToAgent's existing
+// {"sent": 0} early-return contract.
+func ComposeReviewFeedbackPrompt(
+	ctx context.Context,
+	annotationClient annotationv1.AnnotationServiceClient,
+	gitClient gitgatewayv1.GitGatewayServiceClient,
+	worktreeID, worktreeName string,
+) (prompt string, annotationIDs []string, err error) {
+	// 1. Collect — worktree-scoped, unsent only. Empty result is not an
+	// error: nothing to send.
+	listResp, err := annotationClient.ListAnnotations(ctx, &annotationv1.ListAnnotationsRequest{
+		WorktreeId:  worktreeID,
+		SentToAgent: proto.Bool(false),
+		PageSize:    200, // review-buffer size is bounded by human review speed, one page is enough
+	})
+	if err != nil {
+		return "", nil, err
+	}
+	if len(listResp.GetAnnotations()) == 0 {
+		return "", nil, nil
+	}
+
+	// 2. Assemble ±2-line code context per BR-CR-11, best-effort per
+	// annotation.
+	blocks := make([]string, 0, len(listResp.GetAnnotations()))
+	annotationIDs = make([]string, 0, len(listResp.GetAnnotations()))
+	for _, a := range listResp.GetAnnotations() {
+		codeLine, context := resolveCodeContext(ctx, gitClient, worktreeID, a)
+		blocks = append(blocks, formatFeedbackBlock(a, codeLine, context))
+		annotationIDs = append(annotationIDs, a.GetId())
+	}
+
+	// 3. Format — BR-CR-09.
+	return formatReviewPrompt(worktreeName, blocks), annotationIDs, nil
+}
+
 // SendReviewFeedbackToAgent composes annotation-service's
 // ListAnnotations/MarkAnnotationsSent and git-gateway-service's ReadFile
 // into one review-feedback prompt, delivered via terminal.send's existing
@@ -143,30 +186,13 @@ func SendReviewFeedbackToAgent(
 	gitClient gitgatewayv1.GitGatewayServiceClient,
 	worktreeID, ptyID, worktreeName string,
 ) (map[string]any, error) {
-	// 1. Collect — worktree-scoped, unsent only. Empty result is not an
-	// error: nothing to send.
-	listResp, err := annotationClient.ListAnnotations(ctx, &annotationv1.ListAnnotationsRequest{
-		WorktreeId:  worktreeID,
-		SentToAgent: proto.Bool(false),
-		PageSize:    200, // review-buffer size is bounded by human review speed, one page is enough
-	})
+	prompt, ids, err := ComposeReviewFeedbackPrompt(ctx, annotationClient, gitClient, worktreeID, worktreeName)
 	if err != nil {
 		return nil, err
 	}
-	if len(listResp.GetAnnotations()) == 0 {
+	if len(ids) == 0 {
 		return map[string]any{"sent": 0}, nil
 	}
-
-	// 2. Assemble ±2-line code context per BR-CR-11, best-effort per
-	// annotation.
-	blocks := make([]string, 0, len(listResp.GetAnnotations()))
-	for _, a := range listResp.GetAnnotations() {
-		codeLine, context := resolveCodeContext(ctx, gitClient, worktreeID, a)
-		blocks = append(blocks, formatFeedbackBlock(a, codeLine, context))
-	}
-
-	// 3. Format — BR-CR-09.
-	prompt := formatReviewPrompt(worktreeName, blocks)
 
 	// 4. Deliver — reuse terminal.send's exact PTY-input frame shape, not a
 	// new delivery path. See this function's doc comment for the REST-
@@ -190,16 +216,15 @@ func SendReviewFeedbackToAgent(
 	// prompt was already delivered, so the correct failure mode is
 	// "delivered but badge didn't reset", surfaced to the client, not
 	// "silently re-deliver on retry".
-	ids := make([]string, len(listResp.GetAnnotations()))
-	for i, a := range listResp.GetAnnotations() {
-		ids[i] = a.GetId()
-	}
 	markResp, markErr := annotationClient.MarkAnnotationsSent(ctx, &annotationv1.MarkAnnotationsSentRequest{Ids: ids})
 	result := map[string]any{"sent": len(ids), "prompt": prompt}
 	if markErr != nil {
 		result["markSentError"] = markErr.Error()
 	} else {
-		result["annotations"] = markResp.GetAnnotations()
+		// TASK-BE-ANNOTATE-003: toAnnotationViews (channels.go) — raw proto
+		// here would ship snake_case + {seconds,nanos} timestamps, same bug
+		// class as annotation.create/list/update had before that task.
+		result["annotations"] = toAnnotationViews(markResp.GetAnnotations())
 	}
 	return result, nil
 }
@@ -223,5 +248,34 @@ func registerAnnotationSendChannel(
 			return nil, err
 		}
 		return SendReviewFeedbackToAgent(ctx, annotationClient, gitClient, in.WorktreeID, in.PtyID, in.WorktreeName)
+	})
+}
+
+type composeReviewPromptArgs struct {
+	WorktreeID   string `json:"worktreeId"`
+	WorktreeName string `json:"worktreeName"`
+}
+
+// registerAnnotationComposeChannel registers annotation.composeReviewPrompt
+// — the read-only half of SOL-CR-03 (see ComposeReviewFeedbackPrompt),
+// letting a client (CR-ANNOTATE-002's frontend delivery path) obtain the
+// code-context-enriched prompt without triggering this service's own PTY
+// delivery. Called from RegisterRealChannels (channels.go) — see
+// TASK-BE-ANNOTATE-002.
+func registerAnnotationComposeChannel(
+	r *Registry,
+	annotationClient annotationv1.AnnotationServiceClient,
+	gitClient gitgatewayv1.GitGatewayServiceClient,
+) {
+	r.Register("annotation.composeReviewPrompt", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		in, err := decodeArg[composeReviewPromptArgs](args, 0)
+		if err != nil {
+			return nil, err
+		}
+		prompt, ids, err := ComposeReviewFeedbackPrompt(ctx, annotationClient, gitClient, in.WorktreeID, in.WorktreeName)
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"prompt": prompt, "annotationIds": ids}, nil
 	})
 }

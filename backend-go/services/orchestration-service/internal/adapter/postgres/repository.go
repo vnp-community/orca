@@ -681,6 +681,7 @@ func (r *Repository) ResolveGate(ctx context.Context, tenantID, gateID, resoluti
 	var dispatchContextID *string
 	var fromHandle *string
 	var optionsJSON []byte
+	var existingResolution *string
 	var resolvedAt *time.Time
 	err = tx.QueryRow(ctx, `
 		SELECT g.id, g.tenant_id, g.orchestration_task_id, g.dispatch_context_id, g.question, g.options,
@@ -691,13 +692,19 @@ func (r *Repository) ResolveGate(ctx context.Context, tenantID, gateID, resoluti
 		FOR UPDATE OF g
 	`, gateID, tenantID).Scan(
 		&gate.ID, &gate.TenantID, &gate.OrchestrationTaskID, &dispatchContextID, &gate.Question, &optionsJSON,
-		&status, &gate.Resolution, &gate.CreatedAt, &resolvedAt, &fromHandle,
+		&status, &existingResolution, &gate.CreatedAt, &resolvedAt, &fromHandle,
 	)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.DecisionGate{}, nil, usecase.ErrGateNotFound
 	}
 	if err != nil {
 		return domain.DecisionGate{}, nil, fmt.Errorf("postgres: query decision gate: %w", err)
+	}
+	// resolution is NULL until a gate is resolved — a still-pending gate
+	// (the only state this function is ever called against, per its own
+	// name) would otherwise fail to scan into a non-pointer string.
+	if existingResolution != nil {
+		gate.Resolution = *existingResolution
 	}
 	if status != string(domain.GateStatusPending) {
 		return domain.DecisionGate{}, nil, usecase.ErrGateNotPending
@@ -1106,6 +1113,12 @@ func (r *Repository) CountNonTerminalByRun(ctx context.Context, tenantID, coordi
 // ---- DispatchContextRepository.RecordHeartbeat -------------------------
 
 func (r *Repository) RecordHeartbeat(ctx context.Context, tenantID, dispatchContextID string) (domain.DispatchContext, error) {
+	if _, err := uuid.Parse(dispatchContextID); err != nil {
+		// id is UUID-typed in the DB — a malformed id can never match a
+		// real row, so treat it the same as "not found" rather than
+		// leaking Postgres's raw invalid-input-syntax error to the caller.
+		return domain.DispatchContext{}, usecase.ErrDispatchContextNotFound
+	}
 	row := r.pool.QueryRow(ctx, `
 		UPDATE orchestration.dispatch_contexts
 		SET last_heartbeat_at = now()

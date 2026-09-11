@@ -1,0 +1,1 @@
+ALTER TABLE executions ADD COLUMN origin_task_id VARCHAR(255) NOT NULL DEFAULT '';

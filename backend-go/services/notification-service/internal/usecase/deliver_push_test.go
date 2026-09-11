@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -12,8 +13,10 @@ import (
 // --- fakes -------------------------------------------------------------
 
 type fakeDeliverPushSubscriptionRepository struct {
-	subs      []domain.PushSubscription
-	deviceIDs map[string]string // subscriptionID -> deviceID
+	subs             []domain.PushSubscription
+	deviceIDs        map[string]string // subscriptionID -> deviceID
+	expiredEndpoints []string
+	markExpiredErr   error
 }
 
 func (f *fakeDeliverPushSubscriptionRepository) Save(ctx context.Context, sub domain.PushSubscription) error {
@@ -36,6 +39,10 @@ func (f *fakeDeliverPushSubscriptionRepository) DeviceIDFor(ctx context.Context,
 		return "", nil
 	}
 	return f.deviceIDs[subscriptionID], nil
+}
+func (f *fakeDeliverPushSubscriptionRepository) MarkExpired(ctx context.Context, endpoint string) error {
+	f.expiredEndpoints = append(f.expiredEndpoints, endpoint)
+	return f.markExpiredErr
 }
 
 type fakeDeviceSecretResolver struct {
@@ -275,6 +282,99 @@ func TestDeliverPush_IOSAndAndroid_UseOwnCredential_NeverVAPID(t *testing.T) {
 	}
 	if signer.calls != 0 {
 		t.Errorf("expected vapidSigner.SignVapidPayload NEVER called for ios/android channels (VAPID/APNs conflation regression guard), got %d calls", signer.calls)
+	}
+}
+
+func TestDeliverPush_IOSDeadToken_MarksSubscriptionExpired(t *testing.T) {
+	sub := domain.PushSubscription{ID: "sub-ios", TenantID: "t1", UserID: "u1", Channel: domain.ChannelIOS, Endpoint: "dead-token"}
+	subs := &fakeDeliverPushSubscriptionRepository{subs: []domain.PushSubscription{sub}, deviceIDs: map[string]string{"sub-ios": "device-ios"}}
+	apns := &fakeAPNsClient{err: fmt.Errorf("apns: gateway returned 410: %w", ErrDeviceTokenInvalid)}
+	devices := &fakeDeviceSecretResolver{secret: make([]byte, 32)}
+	buffer := &fakeBufferedNotificationRepository{}
+
+	uc := NewDeliverPush(subs, devices, &fakeE2ESealer{}, &fakeVaultSigner{}, &fakeWebPushClient{}, buffer, &fakeNotificationPreferenceRepository{}, apns, &fakeFCMClient{}, nil)
+
+	if err := uc.Execute(context.Background(), testEvent("t1", "u1")); err != nil {
+		t.Fatalf("Execute itself must not return an error: %v", err)
+	}
+	if len(subs.expiredEndpoints) != 1 || subs.expiredEndpoints[0] != "dead-token" {
+		t.Errorf("expected MarkExpired called once with %q, got %v", "dead-token", subs.expiredEndpoints)
+	}
+	if len(buffer.enqueued) != 1 {
+		t.Errorf("expected the failed send to still be buffered like any other delivery failure, got %v", buffer.enqueued)
+	}
+}
+
+func TestDeliverPush_AndroidDeadToken_MarksSubscriptionExpired(t *testing.T) {
+	sub := domain.PushSubscription{ID: "sub-android", TenantID: "t1", UserID: "u1", Channel: domain.ChannelAndroid, Endpoint: "dead-token"}
+	subs := &fakeDeliverPushSubscriptionRepository{subs: []domain.PushSubscription{sub}, deviceIDs: map[string]string{"sub-android": "device-android"}}
+	fcm := &fakeFCMClient{err: fmt.Errorf("fcm: send returned 404: %w", ErrDeviceTokenInvalid)}
+	devices := &fakeDeviceSecretResolver{secret: make([]byte, 32)}
+
+	uc := NewDeliverPush(subs, devices, &fakeE2ESealer{}, &fakeVaultSigner{}, &fakeWebPushClient{}, &fakeBufferedNotificationRepository{}, &fakeNotificationPreferenceRepository{}, &fakeAPNsClient{}, fcm, nil)
+
+	if err := uc.Execute(context.Background(), testEvent("t1", "u1")); err != nil {
+		t.Fatalf("Execute itself must not return an error: %v", err)
+	}
+	if len(subs.expiredEndpoints) != 1 || subs.expiredEndpoints[0] != "dead-token" {
+		t.Errorf("expected MarkExpired called once with %q, got %v", "dead-token", subs.expiredEndpoints)
+	}
+}
+
+func TestDeliverPush_WebDeadToken_MarksSubscriptionExpired(t *testing.T) {
+	p256, auth := "p256dh-key", "auth-key"
+	sub := domain.PushSubscription{ID: "sub-1", TenantID: "t1", UserID: "u1", Channel: domain.ChannelWeb, Endpoint: "https://push.example/gone", P256dhKey: &p256, AuthKey: &auth}
+	subs := &fakeDeliverPushSubscriptionRepository{subs: []domain.PushSubscription{sub}}
+	webpush := &fakeWebPushClient{err: fmt.Errorf("webpush: endpoint returned 410: %w", ErrDeviceTokenInvalid)}
+
+	uc := NewDeliverPush(subs, &fakeDeviceSecretResolver{}, &fakeE2ESealer{}, &fakeVaultSigner{}, webpush, &fakeBufferedNotificationRepository{}, &fakeNotificationPreferenceRepository{}, nil, nil, nil)
+
+	if err := uc.Execute(context.Background(), testEvent("t1", "u1")); err != nil {
+		t.Fatalf("Execute itself must not return an error: %v", err)
+	}
+	if len(subs.expiredEndpoints) != 1 || subs.expiredEndpoints[0] != "https://push.example/gone" {
+		t.Errorf("expected MarkExpired called once with the dead endpoint, got %v", subs.expiredEndpoints)
+	}
+}
+
+func TestDeliverPush_TransientFailure_DoesNotMarkExpired(t *testing.T) {
+	p256, auth := "p256dh-key", "auth-key"
+	sub := domain.PushSubscription{ID: "sub-1", TenantID: "t1", UserID: "u1", Channel: domain.ChannelWeb, Endpoint: "https://push.example/1", P256dhKey: &p256, AuthKey: &auth}
+	subs := &fakeDeliverPushSubscriptionRepository{subs: []domain.PushSubscription{sub}}
+	webpush := &fakeWebPushClient{err: errors.New("endpoint unreachable")} // NOT wrapping ErrDeviceTokenInvalid
+
+	uc := NewDeliverPush(subs, &fakeDeviceSecretResolver{}, &fakeE2ESealer{}, &fakeVaultSigner{}, webpush, &fakeBufferedNotificationRepository{}, &fakeNotificationPreferenceRepository{}, nil, nil, nil)
+
+	if err := uc.Execute(context.Background(), testEvent("t1", "u1")); err != nil {
+		t.Fatalf("Execute itself must not return an error: %v", err)
+	}
+	if len(subs.expiredEndpoints) != 0 {
+		t.Errorf("expected a transient (non-ErrDeviceTokenInvalid) failure to NOT mark the subscription expired, got %v", subs.expiredEndpoints)
+	}
+}
+
+func TestDeliverPush_MarkExpiredFailure_DoesNotMaskSendError(t *testing.T) {
+	sub := domain.PushSubscription{ID: "sub-ios", TenantID: "t1", UserID: "u1", Channel: domain.ChannelIOS, Endpoint: "dead-token"}
+	subs := &fakeDeliverPushSubscriptionRepository{
+		subs:           []domain.PushSubscription{sub},
+		deviceIDs:      map[string]string{"sub-ios": "device-ios"},
+		markExpiredErr: errors.New("db unavailable"),
+	}
+	apns := &fakeAPNsClient{err: fmt.Errorf("apns: gateway returned 410: %w", ErrDeviceTokenInvalid)}
+	devices := &fakeDeviceSecretResolver{secret: make([]byte, 32)}
+	buffer := &fakeBufferedNotificationRepository{}
+
+	uc := NewDeliverPush(subs, devices, &fakeE2ESealer{}, &fakeVaultSigner{}, &fakeWebPushClient{}, buffer, &fakeNotificationPreferenceRepository{}, apns, &fakeFCMClient{}, nil)
+
+	// Execute itself never returns an error (see other tests); the
+	// assertion that matters here is that a MarkExpired failure still lets
+	// the original send failure buffer normally, rather than panicking or
+	// silently dropping the event.
+	if err := uc.Execute(context.Background(), testEvent("t1", "u1")); err != nil {
+		t.Fatalf("Execute itself must not return an error: %v", err)
+	}
+	if len(buffer.enqueued) != 1 {
+		t.Errorf("expected the send failure to still be buffered despite MarkExpired failing, got %v", buffer.enqueued)
 	}
 }
 

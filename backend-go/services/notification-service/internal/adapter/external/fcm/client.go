@@ -18,6 +18,8 @@ import (
 	"net/url"
 	"strings"
 	"time"
+
+	"github.com/stablyai/orca-go/services/notification-service/internal/usecase"
 )
 
 // fcmServiceAccountKeyName is the Vault Transit RSA key backing the FCM
@@ -98,13 +100,45 @@ func (c *Client) Send(ctx context.Context, registrationToken string, ciphertext,
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		// UNREGISTERED (404) means the token is permanently invalid vs.
-		// UNAVAILABLE/QUOTA_EXCEEDED (5xx/429) which is transient — see
-		// TASK-MB-02-08's error-classification note; DeliverPush's
-		// buffering handles the retry path uniformly either way.
+		// UNREGISTERED (404) means the token is permanently invalid — wrap
+		// usecase.ErrDeviceTokenInvalid so DeliverPush marks the
+		// subscription expired instead of buffering/retrying forever
+		// (TASK-MB-02-08's error-classification note, CR-MOBILE-001's
+		// acceptance criteria). UNAVAILABLE/QUOTA_EXCEEDED (5xx/429) is
+		// transient and left unwrapped, flowing through DeliverPush's
+		// normal buffer-and-retry path.
+		if isTokenInvalid(resp.StatusCode, respBody) {
+			return fmt.Errorf("fcm: send returned %d: %s: %w", resp.StatusCode, string(respBody), usecase.ErrDeviceTokenInvalid)
+		}
 		return fmt.Errorf("fcm: send returned %d: %s", resp.StatusCode, string(respBody))
 	}
 	return nil
+}
+
+// fcmErrorBody is FCM HTTP v1's documented error shape (google.rpc.Status):
+// {"error":{"code":404,"message":"...","status":"UNREGISTERED",...}}.
+type fcmErrorBody struct {
+	Error struct {
+		Status string `json:"status"`
+	} `json:"error"`
+}
+
+// isTokenInvalid reports whether an FCM HTTP v1 error response means the
+// registration token is permanently dead. HTTP 404 on this endpoint means
+// UNREGISTERED per FCM's docs even when the body doesn't parse (a
+// malformed/empty error body is not reason to treat a documented-404-only
+// condition as retriable), but a parseable body with a different status
+// (e.g. a future API revision reusing 404 for something else) is trusted
+// over the bare status code.
+func isTokenInvalid(statusCode int, body []byte) bool {
+	if statusCode != http.StatusNotFound {
+		return false
+	}
+	var parsed fcmErrorBody
+	if err := json.Unmarshal(body, &parsed); err != nil || parsed.Error.Status == "" {
+		return true
+	}
+	return parsed.Error.Status == "UNREGISTERED"
 }
 
 // oauthAccessToken builds a Transit-signed RS256 JWT assertion (RFC 7523)

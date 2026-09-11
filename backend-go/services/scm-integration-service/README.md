@@ -183,7 +183,9 @@ codebase's actual (not aspirational) contract today.
 
 ## Data model — `rate_limit_cache` real, `webhook_delivery_log` schema-only
 
-`migrations/0001_init.up.sql` adds both tables from
+`migrations/postgres/0001_init.up.sql` (mirrored dialect-safely by
+`migrations/mysql/0001_init.up.sql`, no RLS on MySQL — see "Running
+locally" above) adds both tables from
 `scm-integration-service.md` §5, in the `scm` schema, Row-Level-Security
 tenant-isolation policy included (matching every other service's Postgres
 migration in this codebase):
@@ -222,14 +224,30 @@ GITLAB_BASE_URL=https://gitlab.com/api/v4 \
   go run ./cmd/server
 ```
 
-A real Postgres connection is now required at startup (see "Data model"
-above) — run `migrate -path migrations -database "$DATABASE_DSN" up` first.
+A real database connection is now required at startup (see "Data model"
+above) — run `migrate -path migrations/postgres -database "$DATABASE_DSN" up`
+first.
+
+**MySQL/TiDB (CR-DB-002/CR-DB-003 multi-database rollout,
+[BE-DB-SOL-007](../../../specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-007-scm-integration-service-mysql-tidb-adapter.md)):**
+`cmd/server/main.go` picks the adapter at startup from `DATABASE_DSN`'s
+scheme (`postgres://`/`postgresql://` vs `mysql://`/`tidb://`, via
+`common/dbcapability.DetectDialectFromDSN`) — no separate `DB_DIALECT` env
+var, same pattern as `usage-service`'s pilot. Run
+`migrate -path migrations/mysql -database "$DATABASE_DSN" up` against a
+MySQL 8/TiDB database named `scm` first, e.g.:
+
+```sh
+DATABASE_DSN='mysql://root:orca@tcp(localhost:3307)/scm' \
+  go run ./cmd/server
+```
 
 ## Testing
 
 ```sh
-go test ./...                        # unit tests only — no external deps, no Docker required
-go test -tags=integration ./...      # + internal/adapter/postgres's real-Postgres tests (testcontainers-go, needs Docker + the `migrate` CLI)
+go test ./...                                          # unit tests only — no external deps, no Docker required
+go test -tags=integration ./internal/adapter/postgres/... # real-Postgres tests (testcontainers-go, needs Docker + the `migrate` CLI)
+go test -tags=integration ./internal/adapter/mysql/...    # real-MySQL tests (testcontainers-go, needs Docker + the `migrate` CLI)
 ```
 
 Every provider adapter's test uses `httptest.Server` to exercise the real

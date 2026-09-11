@@ -129,6 +129,24 @@ func (r *Repository) DeviceIDFor(ctx context.Context, subscriptionID string) (st
 	return *deviceID, nil
 }
 
+// MarkExpired transitions endpoint's subscription to 'expired'. Unlike
+// Save's upsert (which always forces status back to 'active' on conflict),
+// this only ever moves a row toward expired — a device token APNs/FCM
+// reports dead stays dead until Subscribe re-registers it. 0 rows affected
+// (unknown/already-expired endpoint) is not an error, same idempotent
+// contract as DeleteByEndpoint.
+func (r *Repository) MarkExpired(ctx context.Context, endpoint string) error {
+	_, err := r.pool.Exec(ctx, `
+		UPDATE notification.push_subscriptions
+		SET status = $2, updated_at = now()
+		WHERE endpoint = $1
+	`, endpoint, string(domain.SubscriptionExpired))
+	if err != nil {
+		return fmt.Errorf("postgres: mark push subscription expired: %w", err)
+	}
+	return nil
+}
+
 // GetPublicKey returns the tenant's active VAPID key metadata row.
 // Returns domain.ErrNoActiveVapidKey (not a raw pgx error) when none
 // exists, so usecase/ can map it to a NotFound status without depending

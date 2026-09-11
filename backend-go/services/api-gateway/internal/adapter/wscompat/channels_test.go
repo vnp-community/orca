@@ -1349,6 +1349,9 @@ func TestRegisterRealChannels_RegistersAnnotationSendToAgent(t *testing.T) {
 	if _, ok := r.handlers["annotation.markSent"]; !ok {
 		t.Error("want annotation.markSent registered by RegisterRealChannels")
 	}
+	if _, ok := r.handlers["annotation.composeReviewPrompt"]; !ok {
+		t.Error("want annotation.composeReviewPrompt registered by RegisterRealChannels (TASK-BE-ANNOTATE-002)")
+	}
 }
 
 // ── TASK-CR-02-07: annotation.delete/markSent tests ─────────────────────────
@@ -1405,8 +1408,15 @@ func TestAnnotationMarkSentChannel_Wired(t *testing.T) {
 	if len(gotReq.GetIds()) != 2 || gotReq.GetIds()[0] != "annot-1" || gotReq.GetIds()[1] != "annot-2" {
 		t.Errorf("unexpected request ids: %v", gotReq.GetIds())
 	}
-	resp, ok := result.(*annotationv1.MarkAnnotationsSentResponse)
-	if !ok || len(resp.GetAnnotations()) != 2 {
+	// TASK-BE-ANNOTATE-003: result must be JSON-safe camelCase (annotationView),
+	// not the raw proto response — see channels.go's toAnnotationViews doc
+	// comment for why returning proto directly here was a live bug.
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("unexpected result type: %T", result)
+	}
+	views, ok := resultMap["annotations"].([]annotationView)
+	if !ok || len(views) != 2 || views[0].ID != "annot-1" || views[1].ID != "annot-2" {
 		t.Errorf("unexpected result: %+v", result)
 	}
 }

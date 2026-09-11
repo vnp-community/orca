@@ -66,6 +66,26 @@ func (r *Repository) RunInTx(ctx context.Context, fn func(ctx context.Context, t
 	})
 }
 
+// subtreeColumnNames names subtree.go's recursive CTE's output columns to
+// match taskColumns' real field names, in the same order. Without this, the
+// CTE's columns take Postgres's auto-derived names for the COALESCE(...)
+// expressions in taskColumns/prefixedTaskColumns (e.g. "coalesce", not
+// "parent_id") — the outer `SELECT taskColumns FROM subtree` then fails
+// with "column ... does not exist" since it's reading raw base-table column
+// names against the CTE's own (differently named) output. Naming the CTE
+// explicitly makes taskColumns' bare references resolve against it too;
+// the resulting double COALESCE/cast is a harmless no-op (already
+// non-null/already-text from the base term).
+const subtreeColumnNames = `
+	id, tenant_id, title, status, parent_id, project_id,
+	description, task_type, priority, assignee_id, owner_id,
+	due_date, estimated_hours, actual_hours, prompt_template, ai_context,
+	ai_plan_json, visibility, worktree_id, agent_session_id,
+	progress_percent, active_execution_id, last_execution_output,
+	task_number, pr_url, workflow_template_id, active_execution_link_id,
+	labels, reporter_id, workflow_exec_id, done_subtasks, total_subtasks, share_token
+`
+
 // taskColumns is the widened column list every query in this file that
 // reads a full Task row must select, in the exact order scanTask expects —
 // keeps Create/Get/List/GetAncestors's scanning consistent as fields are
@@ -152,6 +172,13 @@ func prefixedTaskColumns(alias string) string {
 // total_subtasks/share_token are never set at creation (DB defaults/NULL),
 // so they're deliberately not INSERT columns here.
 func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
+	if task.Labels == nil {
+		// labels is NOT NULL (migration 0011); a nil slice binds as SQL
+		// NULL, not the column's DEFAULT '{}' (DEFAULT only applies when
+		// a column is omitted from the INSERT list, not when NULL is
+		// bound explicitly) — defends every caller, not just domain.NewTask.
+		task.Labels = []string{}
+	}
 	row := r.db.QueryRow(ctx, `
 		INSERT INTO task.tasks (
 			id, tenant_id, title, status, parent_id, project_id,

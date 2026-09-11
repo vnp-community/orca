@@ -61,10 +61,14 @@ publisher.
   `StreamNotifications`: a real, working server-streaming handler that
   registers the request as a broadcaster subscriber and loops sending
   frames until the client disconnects or the server shuts down.
-- `migrations/0001_init.{up,down}.sql` — real DDL:
-  `notification.push_subscriptions`, `notification.vapid_key_metadata`
-  (no `private_key` column, ever), RLS policies matching `usage-service`'s
-  pattern.
+- `migrations/postgres/` and `migrations/mysql/` — dialect-specific DDL for
+  `push_subscriptions`, `vapid_key_metadata` (no `private_key` column,
+  ever), `processed_events`, `buffered_notifications`,
+  `notification_preferences`, `notification_events`. RLS policies exist on
+  the Postgres side only — no equivalent exists in MySQL, see the mysql
+  migrations' own comments and `TASK-BE-DB-003`'s finding that this was
+  never an active backstop on Postgres either (CR-DB-002/CR-DB-003 rollout,
+  `BE-DB-SOL-008`).
 - `cmd/server/main.go` — composition root: config load, Postgres pool,
   NATS connection (degrades gracefully if unavailable, same as
   `usage-service`), the event-consumer loop started as a background
@@ -96,7 +100,7 @@ generic Transit passthrough.
 ```sh
 # from backend-go/
 docker compose up -d postgres nats   # see ../../docker-compose.yml
-migrate -path services/notification-service/migrations \
+migrate -path services/notification-service/migrations/postgres \
   -database "$DATABASE_DSN" up       # golang-migrate; see architecture/05
 
 cd services/notification-service
@@ -104,6 +108,14 @@ DATABASE_DSN=postgres://orca:orca@localhost:5432/notification?sslmode=disable \
 NATS_URL=nats://localhost:4222 \
   go run ./cmd/server
 ```
+
+MySQL/TiDB instead of Postgres: run `migrate -path
+services/notification-service/migrations/mysql -database "$DATABASE_DSN" up`
+against a database named `notification`, and set
+`DATABASE_DSN=mysql://root:orca@tcp(localhost:3306)/notification` (or
+`tidb://...`) before `go run ./cmd/server` — `cmd/server/main.go` picks the
+adapter from the DSN scheme, same factory pattern as `usage-service` (the
+pilot).
 
 ## Testing
 

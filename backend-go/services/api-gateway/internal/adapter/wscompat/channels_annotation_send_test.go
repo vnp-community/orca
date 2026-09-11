@@ -2,6 +2,7 @@ package wscompat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"strings"
 	"testing"
@@ -372,5 +373,199 @@ func TestAnnotationSendToAgentChannel_Registered(t *testing.T) {
 	registerAnnotationSendChannel(r, &fakeAnnotationClient{}, &fakeGitGatewayClient{})
 	if _, ok := r.handlers["annotation.sendToAgent"]; !ok {
 		t.Fatal("want annotation.sendToAgent registered")
+	}
+}
+
+// ── TASK-BE-ANNOTATE-001: ComposeReviewFeedbackPrompt (read-only half) ────
+
+func TestComposeReviewFeedbackPrompt_HappyPath(t *testing.T) {
+	annotations := []*annotationv1.Annotation{
+		{Id: "a1", Anchor: &annotationv1.Anchor{FilePath: "src/x.ts", Line: 1, Side: annotationv1.Side_SIDE_NEW}, Content: "fix 1"},
+		{Id: "a2", Anchor: &annotationv1.Anchor{FilePath: "src/y.ts", Line: 2, Side: annotationv1.Side_SIDE_NEW}, Content: "fix 2"},
+	}
+	annClient := &fakeAnnotationClient{
+		listAnnotationsFunc: func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error) {
+			return &annotationv1.ListAnnotationsResponse{Annotations: annotations}, nil
+		},
+	}
+	gitClient := &fakeGitGatewayClient{
+		readFileFunc: func(ctx context.Context, in *gitgatewayv1.ReadFileRequest) (*gitgatewayv1.ReadFileResponse, error) {
+			return &gitgatewayv1.ReadFileResponse{Content: []byte("line1\nline2\nline3")}, nil
+		},
+	}
+
+	prompt, ids, err := ComposeReviewFeedbackPrompt(context.Background(), annClient, gitClient, "wt-1", "my-worktree")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !strings.Contains(prompt, "src/x.ts") || !strings.Contains(prompt, "src/y.ts") {
+		t.Errorf("want both files in prompt, got: %s", prompt)
+	}
+	if len(ids) != 2 || ids[0] != "a1" || ids[1] != "a2" {
+		t.Errorf("want annotationIDs=[a1 a2], got %v", ids)
+	}
+}
+
+func TestComposeReviewFeedbackPrompt_EmptyList(t *testing.T) {
+	annClient := &fakeAnnotationClient{
+		listAnnotationsFunc: func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error) {
+			return &annotationv1.ListAnnotationsResponse{}, nil
+		},
+	}
+	prompt, ids, err := ComposeReviewFeedbackPrompt(context.Background(), annClient, &fakeGitGatewayClient{}, "wt-1", "wt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if prompt != "" || ids != nil {
+		t.Errorf("want empty prompt and nil ids for an empty annotation list, got prompt=%q ids=%v", prompt, ids)
+	}
+}
+
+func TestComposeReviewFeedbackPrompt_SideOldUsesOriginalCodeNeverReadsFile(t *testing.T) {
+	annotations := []*annotationv1.Annotation{
+		{Id: "a1", Anchor: &annotationv1.Anchor{FilePath: "src/x.ts", Line: 1, Side: annotationv1.Side_SIDE_OLD}, Content: "fix", OriginalCode: "old snapshot"},
+	}
+	annClient := &fakeAnnotationClient{
+		listAnnotationsFunc: func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error) {
+			return &annotationv1.ListAnnotationsResponse{Annotations: annotations}, nil
+		},
+	}
+	readFileCalled := false
+	gitClient := &fakeGitGatewayClient{
+		readFileFunc: func(ctx context.Context, in *gitgatewayv1.ReadFileRequest) (*gitgatewayv1.ReadFileResponse, error) {
+			readFileCalled = true
+			return &gitgatewayv1.ReadFileResponse{}, nil
+		},
+	}
+
+	prompt, ids, err := ComposeReviewFeedbackPrompt(context.Background(), annClient, gitClient, "wt-1", "wt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if readFileCalled {
+		t.Error("want ReadFile never called for side=SIDE_OLD")
+	}
+	if !strings.Contains(prompt, "old snapshot") {
+		t.Errorf("want OriginalCode used directly in prompt, got: %s", prompt)
+	}
+	if len(ids) != 1 || ids[0] != "a1" {
+		t.Errorf("want annotationIDs=[a1], got %v", ids)
+	}
+}
+
+func TestComposeReviewFeedbackPrompt_ListAnnotationsError(t *testing.T) {
+	wantErr := errors.New("annotation-service unavailable")
+	annClient := &fakeAnnotationClient{
+		listAnnotationsFunc: func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error) {
+			return nil, wantErr
+		},
+	}
+	_, _, err := ComposeReviewFeedbackPrompt(context.Background(), annClient, &fakeGitGatewayClient{}, "wt-1", "wt")
+	if !errors.Is(err, wantErr) {
+		t.Errorf("want wrapped/equal error %v, got %v", wantErr, err)
+	}
+}
+
+// ── TASK-BE-ANNOTATE-001: SendReviewFeedbackToAgent unchanged after refactor ──
+
+// TestSendReviewFeedbackToAgent_StillDeliversAfterComposeExtraction is a
+// regression guard specific to TASK-BE-ANNOTATE-001's refactor — every
+// TestAnnotationSendToAgent_* test above already covers
+// SendReviewFeedbackToAgent's full behavior unchanged; this test exists
+// only to name the refactor's own acceptance criterion explicitly.
+func TestSendReviewFeedbackToAgent_StillDeliversAfterComposeExtraction(t *testing.T) {
+	annotations := []*annotationv1.Annotation{
+		{Id: "a1", Anchor: &annotationv1.Anchor{FilePath: "src/x.ts", Line: 1, Side: annotationv1.Side_SIDE_NEW}, Content: "fix 1"},
+	}
+	annClient := &fakeAnnotationClient{
+		listAnnotationsFunc: func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error) {
+			return &annotationv1.ListAnnotationsResponse{Annotations: annotations}, nil
+		},
+		markAnnotationsSentFunc: func(ctx context.Context, in *annotationv1.MarkAnnotationsSentRequest) (*annotationv1.MarkAnnotationsSentResponse, error) {
+			return &annotationv1.MarkAnnotationsSentResponse{Annotations: annotations}, nil
+		},
+	}
+	gitClient := &fakeGitGatewayClient{
+		readFileFunc: func(ctx context.Context, in *gitgatewayv1.ReadFileRequest) (*gitgatewayv1.ReadFileResponse, error) {
+			return &gitgatewayv1.ReadFileResponse{Content: []byte("line1")}, nil
+		},
+	}
+	fakeStream := &fakeSendStream{}
+	ctx := newTestTerminalCtx(t, "pty-1", fakeStream)
+
+	result, err := SendReviewFeedbackToAgent(ctx, annClient, gitClient, "wt-1", "pty-1", "wt")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result["sent"] != 1 || len(fakeStream.sent) != 1 {
+		t.Fatalf("want delivery unchanged after extraction, got result=%v sent=%d", result, len(fakeStream.sent))
+	}
+}
+
+// ── TASK-BE-ANNOTATE-002: annotation.composeReviewPrompt ───────────────────
+
+func TestAnnotationComposeReviewPrompt_HappyPath(t *testing.T) {
+	annotations := []*annotationv1.Annotation{
+		{Id: "a1", Anchor: &annotationv1.Anchor{FilePath: "src/x.ts", Line: 1, Side: annotationv1.Side_SIDE_NEW}, Content: "fix 1"},
+	}
+	annClient := &fakeAnnotationClient{
+		listAnnotationsFunc: func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error) {
+			return &annotationv1.ListAnnotationsResponse{Annotations: annotations}, nil
+		},
+	}
+	gitClient := &fakeGitGatewayClient{
+		readFileFunc: func(ctx context.Context, in *gitgatewayv1.ReadFileRequest) (*gitgatewayv1.ReadFileResponse, error) {
+			return &gitgatewayv1.ReadFileResponse{Content: []byte("line1")}, nil
+		},
+	}
+	r := NewRegistry()
+	registerAnnotationComposeChannel(r, annClient, gitClient)
+
+	args := mustMarshalArg(t, composeReviewPromptArgs{WorktreeID: "wt-1", WorktreeName: "my-worktree"})
+	result, err := r.Dispatch(context.Background(), Identity{}, "annotation.composeReviewPrompt", []json.RawMessage{args})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	resultMap, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("want map[string]any result, got %T", result)
+	}
+	prompt, _ := resultMap["prompt"].(string)
+	if !strings.Contains(prompt, "src/x.ts") {
+		t.Errorf("want composed prompt containing the file, got: %s", prompt)
+	}
+	ids, _ := resultMap["annotationIds"].([]string)
+	if len(ids) != 1 || ids[0] != "a1" {
+		t.Errorf("want annotationIds=[a1], got %v", ids)
+	}
+}
+
+func TestAnnotationComposeReviewPrompt_DoesNotDeliverToPty(t *testing.T) {
+	// No terminalStreamsContext wrapping at all — if this handler tried to
+	// deliver via PTY like SendReviewFeedbackToAgent does, it would panic or
+	// error on a nil stream registry. It must not, by design (SOL-BE-ANNOTATE-002).
+	annotations := []*annotationv1.Annotation{
+		{Id: "a1", Anchor: &annotationv1.Anchor{FilePath: "src/x.ts", Line: 1, Side: annotationv1.Side_SIDE_OLD}, Content: "fix", OriginalCode: "x"},
+	}
+	annClient := &fakeAnnotationClient{
+		listAnnotationsFunc: func(ctx context.Context, in *annotationv1.ListAnnotationsRequest) (*annotationv1.ListAnnotationsResponse, error) {
+			return &annotationv1.ListAnnotationsResponse{Annotations: annotations}, nil
+		},
+	}
+	r := NewRegistry()
+	registerAnnotationComposeChannel(r, annClient, &fakeGitGatewayClient{})
+	args := mustMarshalArg(t, composeReviewPromptArgs{WorktreeID: "wt-1", WorktreeName: "wt"})
+
+	_, err := r.Dispatch(context.Background(), Identity{}, "annotation.composeReviewPrompt", []json.RawMessage{args})
+	if err != nil {
+		t.Fatalf("unexpected error (compose-only must not require a terminal stream registry): %v", err)
+	}
+}
+
+func TestAnnotationComposeReviewPromptChannel_Registered(t *testing.T) {
+	r := NewRegistry()
+	registerAnnotationComposeChannel(r, &fakeAnnotationClient{}, &fakeGitGatewayClient{})
+	if _, ok := r.handlers["annotation.composeReviewPrompt"]; !ok {
+		t.Fatal("want annotation.composeReviewPrompt registered")
 	}
 }

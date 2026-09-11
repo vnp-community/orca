@@ -2,7 +2,15 @@
 
 **Business Logic:** [BL-FLEET-03](../../../../docs/logic/fleet/BL-FLEET-03-health-monitoring.md) — Fleet Health Monitoring
 **Priority (per spec):** P1
-**Status:** PARTIAL
+**Status:** ✅ RESOLVED — **Đính chính (2026-09-12)**: đã sửa qua TASK-FLEET-03-01~08
+(tất cả 8 task đều "[x] DONE"), xác nhận lại bằng code thật + 25/25 unit
+test PASS thật. `infra.fleet_health` giờ có writer thật (`PollFleetHealth`),
+`/health/metrics` Prometheus endpoint thật, webhook alert thật — cả 3 bề mặt
+quan sát đều hoạt động end-to-end. Doc này (và SOL-FLEET-03) trước đó ghi
+sai trạng thái dù code đã triển khai xong từ trước — xem
+[SOL-FLEET-03](./solutions/SOL-FLEET-03-health-monitoring-writer.md) và
+[docs/roadmap/feature-completion-matrix.md](../../../../docs/roadmap/feature-completion-matrix.md)'s
+dòng F27 cho chi tiết đầy đủ.
 **Severity:** High
 **Symptom:** An Admin calling `fleet.health.checkAll` gets a `200`-shaped response with an empty/stale statuses list for every dev server, forever — because the table it reads from (`infra.fleet_health`) has no writer anywhere in backend-go. There is also no `/health/metrics` Prometheus endpoint and no webhook alerting on status change, so none of the spec's three observability surfaces (poller, metrics, alerts) function end-to-end.
 

@@ -45,28 +45,55 @@ service's schema logically references — this is the origin service.
   LRU cache with lazy per-entry TTL expiry, implementing `usecase.ProfileCache`.
 - `internal/adapter/grpc/` — implements the generated
   `tenantv1.TenantServiceServer`, pure wire<->usecase translation.
-- `migrations/0001_init.{up,down}.sql` — real DDL: `tenant.companies`,
+- `migrations/postgres/0001_init.{up,down}.sql` — real DDL: `tenant.companies`,
   `tenant.departments`, `tenant.user_profiles`, `tenant.teams`,
   `tenant.team_members`, RLS policies keyed on `company_id`. `companies` has
   no `tenant_id`/RLS of its own (it *is* the tenant root).
-- `cmd/server/main.go` — a real, working composition root: config load,
-  Postgres pool, the LRU-TTL cache wired as `GetResolvedProfile`'s decorator
-  and as the invalidation target for `SetUserDepartment`/`AddTeamMember`,
-  gRPC server with the shared interceptor chain, health/readiness HTTP
-  server, graceful shutdown on SIGTERM. No NATS/eventbus wiring —
-  tenant-service publishes no events and makes zero outbound synchronous
-  service calls (tenant-service.md §7).
+- `internal/adapter/mysql/` — MySQL/TiDB-backed repositories implementing the
+  same `internal/usecase` ports as `internal/adapter/postgres`, added for
+  CR-DB-002/CR-DB-003's multi-database rollout
+  (`specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-011-tenant-service-mysql-tidb-adapter.md`).
+  No RLS equivalent on this dialect — `company_id`/`companyID` filtering in
+  every query is the sole tenant-isolation enforcement, same posture the
+  Postgres adapter already has in practice (see that solution doc §1).
+- `migrations/mysql/` — dialect-safe DDL translated from `migrations/postgres/`
+  (`UUID`→`CHAR(36)`, `JSONB`→`JSON`, RLS dropped, `TEXT` primary/composite
+  key columns narrowed to `VARCHAR` — InnoDB requires an explicit key length
+  for `TEXT` in an index).
+- `cmd/server/main.go` — a real, working composition root: config load via
+  `common/secrets.DatabaseCredentialsFromFile` +
+  `common/dbcapability.DetectDialectFromDSN` (picks the Postgres or MySQL
+  adapter set from `DATABASE_DSN`'s scheme, no separate dialect env var —
+  same pattern as `usage-service`, the multi-dialect pilot), the LRU-TTL
+  cache wired as `GetResolvedProfile`'s decorator and as the invalidation
+  target for `SetUserDepartment`/`AddTeamMember`, gRPC server with the
+  shared interceptor chain, health/readiness HTTP server, graceful shutdown
+  on SIGTERM. No NATS/eventbus wiring for domain events — tenant-service
+  publishes no domain events itself and makes zero outbound synchronous
+  service calls beyond `scm-integration-service`'s star-check RPC
+  (tenant-service.md §7); NATS is still used for best-effort cross-replica
+  profile-cache invalidation.
 
 ## Running locally
 
 ```sh
-# from backend-go/
+# from backend-go/ — Postgres
 docker compose up -d postgres   # see ../../docker-compose.yml
-migrate -path services/tenant-service/migrations \
+migrate -path services/tenant-service/migrations/postgres \
   -database "$DATABASE_DSN" up  # golang-migrate; see architecture/05
 
 cd services/tenant-service
 DATABASE_DSN=postgres://orca:orca@localhost:5432/tenant?sslmode=disable \
+  go run ./cmd/server
+```
+
+```sh
+# from backend-go/ — MySQL/TiDB (CR-DB-002/CR-DB-003)
+migrate -path services/tenant-service/migrations/mysql \
+  -database "$DATABASE_DSN" up
+
+cd services/tenant-service
+DATABASE_DSN='mysql://root:orca@tcp(localhost:3306)/tenant' \
   go run ./cmd/server
 ```
 
@@ -75,6 +102,7 @@ DATABASE_DSN=postgres://orca:orca@localhost:5432/tenant?sslmode=disable \
 ```sh
 go test ./...                 # unit tests (domain/, usecase/, adapter/cache/) — no external deps
 go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (testcontainers-go)
+go test -tags=integration ./internal/adapter/mysql/...      # requires Docker (testcontainers-go)
 ```
 
 ## Known gaps / follow-ups (tracked, not silently skipped)

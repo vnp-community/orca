@@ -21,22 +21,36 @@ depth.
 - `internal/adapter/postgres/` — real `pgx`-backed repository, hand-written
   SQL (see `architecture/04-tech-stack.md` — `sqlc` codegen is the eventual
   target; this scaffold writes the equivalent queries directly).
+- `internal/adapter/mysql/` — MySQL/TiDB adapter via `database/sql` +
+  `go-sql-driver/mysql` (CR-DB-002/CR-DB-003 multi-database rollout, see
+  `specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-005.md`),
+  implementing the same `usecase.Repository` port as
+  `internal/adapter/postgres/` — `cmd/server/main.go` picks whichever one
+  at startup based on `DATABASE_DSN`'s scheme (`postgres://`/`postgresql://`
+  vs `mysql://`/`tidb://`), same factory pattern as `usage-service` (the
+  pilot).
 - `internal/adapter/grpc/` — implements the generated
   `annotationv1.AnnotationServiceServer`, pure wire<->usecase translation.
-- `migrations/0001_init.{up,down}.sql` — real DDL: `annotation.annotations`,
-  a `tenant_id` index, RLS policy.
+- `migrations/postgres/` and `migrations/mysql/` — dialect-specific DDL for
+  `annotations` (`annotation.annotations` schema-qualified on Postgres, a
+  plain `annotations` table inside a `annotation`-named MySQL database on
+  MySQL/TiDB): a `tenant_id` index, RLS policy (Postgres only — no
+  equivalent exists in MySQL, see the mysql migration's own comment and
+  `TASK-BE-DB-003`'s finding that this was never an active backstop on
+  Postgres either).
 - `cmd/server/main.go` — a real, working composition root: config load,
-  Postgres pool, gRPC server with the shared interceptor chain,
-  health/readiness HTTP server, graceful shutdown on SIGTERM. No
-  NATS/eventbus wiring — per the design doc, this service publishes no
-  events and has no `internal/adapter/eventbus/` package.
+  dialect-selected DB connection (Postgres pool or MySQL `*sql.DB`), gRPC
+  server with the shared interceptor chain, health/readiness HTTP server,
+  graceful shutdown on SIGTERM. No NATS/eventbus wiring — per the design
+  doc, this service publishes no events and has no
+  `internal/adapter/eventbus/` package.
 
 ## Running locally
 
 ```sh
 # from backend-go/
 docker compose up -d postgres   # see ../../docker-compose.yml
-migrate -path services/annotation-service/migrations \
+migrate -path services/annotation-service/migrations/postgres \
   -database "$DATABASE_DSN" up  # golang-migrate; see architecture/05
 
 cd services/annotation-service
@@ -44,21 +58,30 @@ DATABASE_DSN=postgres://orca:orca@localhost:5432/annotation?sslmode=disable \
   go run ./cmd/server
 ```
 
+MySQL/TiDB instead of Postgres: run `migrate -path
+services/annotation-service/migrations/mysql -database "$DATABASE_DSN" up`
+against a database named `annotation`, and set
+`DATABASE_DSN=mysql://root:orca@tcp(localhost:3306)/annotation` (or
+`tidb://...`, an explicit alias for the same MySQL wire protocol — see
+`common/dbcapability`).
+
 ## Testing
 
 ```sh
 go test ./...                 # unit tests (domain/, usecase/) — no external deps
 go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (testcontainers-go)
+go test -tags=integration ./internal/adapter/mysql/...      # requires Docker (testcontainers-go)
 ```
 
 ## Known gaps / follow-ups (tracked, not silently skipped)
 
 - **No `sqlc` codegen wired** — same rationale as `usage-service`: valid
   destination per the tech stack doc, just not the codegen-checked default.
-- **`common/secrets` (Vault) is not wired into `main.go`** —
-  `DATABASE_DSN` is read directly from the environment for local dev; wire
-  `secrets.DatabaseCredentialsFromFile` before this service is deployed
-  anywhere Vault is actually running.
+- ~~`common/secrets` (Vault) is not wired into `main.go`~~ — **closed**
+  (CR-DB-002/CR-DB-003, `BE-DB-SOL-005`): `main.go` now reads
+  `DATABASE_CREDENTIALS_FILE` via `secrets.DatabaseCredentialsFromFile`,
+  falling back to the raw `DATABASE_DSN` env var when the file doesn't
+  exist (local dev / testcontainers), same as `usage-service`.
 - ~~`common/tracing` has no OTLP exporter configured~~ — **closed**
   (`docs/execution-plan.md` §3 Phase 1, fixed in shared `common/tracing`):
   `Init` now batches spans to a real `otlptracegrpc` exporter whenever

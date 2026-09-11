@@ -20,7 +20,7 @@ func TestMigration0017_UniqueConstraintRejectsSameTenantHostDuplicate(t *testing
 	ctx := context.Background()
 	tenantID := uuid.NewString()
 
-	first, err := domain.NewSshTarget(uuid.NewString(), tenantID, "10.0.0.5", "orca", "ssh-role-dev")
+	first, err := domain.NewSshTarget(uuid.NewString(), tenantID, "10.0.0.5", 22, "orca", "ssh-role-dev", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
@@ -30,7 +30,7 @@ func TestMigration0017_UniqueConstraintRejectsSameTenantHostDuplicate(t *testing
 
 	// Same tenant, same host, different id — must violate the unique
 	// constraint added by 0017.
-	second, err := domain.NewSshTarget(uuid.NewString(), tenantID, "10.0.0.5", "orca", "ssh-role-dev")
+	second, err := domain.NewSshTarget(uuid.NewString(), tenantID, "10.0.0.5", 22, "orca", "ssh-role-dev", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
@@ -48,7 +48,7 @@ func TestMigration0017_AllowsSameHostDifferentTenant(t *testing.T) {
 	tenantA := uuid.NewString()
 	tenantB := uuid.NewString()
 
-	a, err := domain.NewSshTarget(uuid.NewString(), tenantA, "10.0.0.6", "orca", "ssh-role-dev")
+	a, err := domain.NewSshTarget(uuid.NewString(), tenantA, "10.0.0.6", 22, "orca", "ssh-role-dev", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
@@ -56,7 +56,7 @@ func TestMigration0017_AllowsSameHostDifferentTenant(t *testing.T) {
 		t.Fatalf("Create tenantA: %v", err)
 	}
 
-	b, err := domain.NewSshTarget(uuid.NewString(), tenantB, "10.0.0.6", "orca", "ssh-role-dev")
+	b, err := domain.NewSshTarget(uuid.NewString(), tenantB, "10.0.0.6", 22, "orca", "ssh-role-dev", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}

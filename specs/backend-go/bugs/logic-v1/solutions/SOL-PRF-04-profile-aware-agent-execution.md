@@ -15,7 +15,11 @@
 - `backend-go/services/task-service/internal/adapter/grpcclient/simple_executor.go` (edit: resolve profile + project context, build env)
 - `backend-go/services/task-service/internal/adapter/grpcclient/profile_resolver.go`, `project_context_resolver.go` (new)
 - `backend-go/services/task-service/internal/usecase/ports.go` (extend: `ProfileResolver`, `ProjectContextResolver`)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — **Đính chính (2026-09-12)**: doc ghi sai "Proposed"
+dù code thật đã xong (TASK-PRF-04-01~08 đều DONE). 1 gap sót
+(`initFile`/project-context preamble chưa đọc ở `agent/`) đã phát hiện +
+vá riêng — xem [BUG-PRF-04](../BUG-PRF-04-profile-aware-agent-execution-not-implemented.md)
+mục "Đính chính" cho chi tiết đầy đủ.
 
 ---
 

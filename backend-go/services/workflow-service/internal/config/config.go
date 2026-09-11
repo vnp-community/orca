@@ -59,6 +59,15 @@ type Config struct {
 	// TASK-PW-04-06/TASK-FT-003-03) publishes workflow.* domain events —
 	// same env var name/default as usage-service's identical field.
 	NATSURL string
+	// DatabaseCredentialsFile is the path a Vault Agent sidecar renders
+	// dynamic database credentials to in production (see
+	// common/secrets.DatabaseCredentialsFromFile). Falls back to
+	// DATABASE_DSN (via Base) when the file doesn't exist, which is what
+	// local dev and this service's testcontainers path use instead. Added
+	// for CR-DB-002/CR-DB-003's multi-database rollout (BE-DB-SOL-013),
+	// replacing the direct cfg.DatabaseDSN read main.go used to do —
+	// mirrors usage-service's (the pilot) identical field 1:1.
+	DatabaseCredentialsFile string
 }
 
 func Load() (Config, error) {
@@ -67,17 +76,18 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:                  base,
-		WebhookAllowlistHosts: splitCSV(commonconfig.StringEnv("WEBHOOK_ALLOWLIST_HOSTS", "")),
-		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
-		ProjectServiceAddr:    commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
-		GitGatewayServiceAddr: commonconfig.StringEnv("GIT_GATEWAY_SERVICE_ADDR", "git-gateway-service:9090"),
-		AutomationServiceAddr: commonconfig.StringEnv("AUTOMATION_SERVICE_ADDR", "automation-service:9090"),
-		TenantServiceAddr:     commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
-		AIProviderServiceAddr: commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
-		AuthServiceAddr:       commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
-		TaskServiceAddr:       commonconfig.StringEnv("TASK_SERVICE_ADDR", "task-service:9090"),
-		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		Base:                    base,
+		WebhookAllowlistHosts:   splitCSV(commonconfig.StringEnv("WEBHOOK_ALLOWLIST_HOSTS", "")),
+		InfraFleetServiceAddr:   commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		ProjectServiceAddr:      commonconfig.StringEnv("PROJECT_SERVICE_ADDR", "project-service:9090"),
+		GitGatewayServiceAddr:   commonconfig.StringEnv("GIT_GATEWAY_SERVICE_ADDR", "git-gateway-service:9090"),
+		AutomationServiceAddr:   commonconfig.StringEnv("AUTOMATION_SERVICE_ADDR", "automation-service:9090"),
+		TenantServiceAddr:       commonconfig.StringEnv("TENANT_SERVICE_ADDR", "tenant-service:9090"),
+		AIProviderServiceAddr:   commonconfig.StringEnv("AI_PROVIDER_SERVICE_ADDR", "ai-provider-service:9090"),
+		AuthServiceAddr:         commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
+		TaskServiceAddr:         commonconfig.StringEnv("TASK_SERVICE_ADDR", "task-service:9090"),
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 	}, nil
 }
 

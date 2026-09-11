@@ -1,0 +1,3 @@
+DROP INDEX idx_folder_workspaces_project_group ON folder_workspaces;
+ALTER TABLE folder_workspaces DROP FOREIGN KEY fk_folder_workspaces_project_group;
+ALTER TABLE folder_workspaces DROP COLUMN project_group_id;

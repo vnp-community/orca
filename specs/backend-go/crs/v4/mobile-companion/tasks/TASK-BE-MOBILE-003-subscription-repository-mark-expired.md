@@ -120,6 +120,49 @@ khi sửa interface — xác nhận đủ danh sách implementer
 (`postgres.Repository`) và mọi test double (`fakeSubscriptionRepository`)
 cần cập nhật, không bỏ sót file nào ngoài 4 file đã liệt kê ở trên.
 
+---
+
+## ⚠️ Regression + fix lại (2026-09-11)
+
+**Trạng thái "✅ DONE (2026-09-09)" ở trên KHÔNG còn đúng với code hiện tại
+tại thời điểm phát hiện.** Commit `41442c8e7` ("resolve unresolved merge
+conflict markers... reconcile duplicate CR implementations", 2026-09-10) —
+khi hợp nhất 2 nhánh cùng độc lập implement CR-MOBILE-001 — đã xoá mất
+`MarkExpired` khỏi cả `SubscriptionRepository` (`ports.go`) và
+`postgres/repository.go` (giữ nhánh có `DeviceIDFor` nhưng không mang theo
+`MarkExpired` từ nhánh kia). Xác nhận bằng `git log -S "MarkExpired"`: xuất
+hiện ở `f0cc07f1e` (task này), biến mất ở `41442c8e7`. Hệ quả thật: token
+APNs/FCM/Web Push chết (410/`BadDeviceToken`/`UNREGISTERED`) không bao giờ
+được đánh dấu hết hạn.
+
+**Đã fix lại (2026-09-11)**, phạm vi rộng hơn bản gốc của task này vì bản
+gốc chỉ thêm `MarkExpired` mà chưa có ai gọi nó từ đâu:
+
+- `MarkExpired` thêm lại vào `SubscriptionRepository` (`ports.go`) +
+  `postgres/repository.go` — đúng như thiết kế gốc của task này.
+- Thêm mới (không có trong task gốc): sentinel `usecase.ErrDeviceTokenInvalid`
+  + phân loại lỗi permanent-vs-transient **thật** ở cả 3 adapter
+  (`apns`, `fcm`, `webpush`) — parse `reason`/`status` JSON theo đúng tài
+  liệu Apple/FCM (không chỉ đoán theo status code) — và gọi `MarkExpired`
+  từ `deliver_push.go`'s `deliverOne` khi phát hiện token chết. Task gốc
+  chỉ thêm method vào repository, chưa có phần này — nếu không có,
+  `MarkExpired` sẽ tồn tại nhưng không ai gọi, tái tạo đúng bug đang sửa.
+- Sửa luôn 2 test tích hợp cũ trong `repository_test.go`
+  (`TestRepository_SaveSubscription_UpsertsOnEndpoint`,
+  `TestRepository_ListByUser_FiltersByTenantAndUser`) — phát hiện khi chạy
+  `-tags=integration` lần đầu thật: dùng ID không phải UUID hợp lệ
+  ("sub-1", "tenant-1"...) nên **chưa từng pass thật trước đó**, dù bị merge
+  báo cáo là đã verify. Cùng dạng bug đã ghi nhận ở usage-service
+  (CR-DB-002/003).
+- **Verify thật đã chạy** (không chỉ đọc code): `go build`/`go vet` sạch
+  cho toàn bộ 17 service backend-go; unit test `internal/usecase` + 3
+  adapter package (`apns`/`fcm`/`webpush`) PASS; **3 integration test
+  `TestRepository_MarkExpired_*` PASS trên Postgres thật** qua
+  testcontainers-go.
+- Chưa sửa (ngoài phạm vi CR-MOBILE): `TestRepository_GetPublicKey_NoActiveKeyReturnsDomainError`
+  cùng file cũng dùng ID không phải UUID — thuộc `VapidKeyRepository`
+  (F11/CR-NOTIF-001), không phải `SubscriptionRepository`.
+
 ## Blocking
 
 TASK-BE-MOBILE-007 (`DeliverPush` usecase) phụ thuộc cứng — cần

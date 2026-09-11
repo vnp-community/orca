@@ -5,17 +5,21 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
@@ -23,12 +27,14 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/stablyai/orca-go/common/auditclient"
+	"github.com/stablyai/orca-go/common/dbcapability"
 	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/policy"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/task-service/internal/config"
@@ -36,6 +42,7 @@ import (
 	taskeventbus "github.com/stablyai/orca-go/services/task-service/internal/adapter/eventbus"
 	taskgrpc "github.com/stablyai/orca-go/services/task-service/internal/adapter/grpc"
 	taskgrpcclient "github.com/stablyai/orca-go/services/task-service/internal/adapter/grpcclient"
+	taskmysql "github.com/stablyai/orca-go/services/task-service/internal/adapter/mysql"
 	taskopaclient "github.com/stablyai/orca-go/services/task-service/internal/adapter/opaclient"
 	taskpostgres "github.com/stablyai/orca-go/services/task-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/task-service/internal/usecase"
@@ -86,17 +93,91 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
-	}
-	pool, err := pgxpool.New(ctx, dsn)
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (common/secrets.DatabaseCredentialsFromFile's doc comment), falling
+	// back to DATABASE_DSN for local dev — same wiring as usage-service's
+	// pilot (CR-DB-002 BE-DB-SOL-001 §1) and this rollout's prior services.
+	// Closes this service's README's former "common/secrets (Vault) is not
+	// wired into main.go" gap as a side effect of adding the dialect
+	// factory below (same precedent as annotation-service's TASK-BE-DB-010).
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	defer pool.Close()
+	if dsn == "" {
+		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file)")
+	}
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
+	if err != nil {
+		return fmt.Errorf("detecting database dialect: %w", err)
+	}
 
-	repo := taskpostgres.New(pool)
+	healthSrv := health.New()
+
+	// repo is bound to ONE concrete adapter (taskpostgres.Repository or
+	// taskmysql.Repository) per caps.Dialect below and used at every call
+	// site throughout this file exactly the way the single-dialect
+	// `repo := taskpostgres.New(pool)` line used to be — repoAll's method
+	// set is the union of every DB-backed usecase port either adapter
+	// implements (~8 interfaces on one struct, per BE-DB-SOL-015's audit),
+	// so a repoAll value satisfies any ONE of them implicitly wherever a
+	// narrower interface parameter is expected below, without touching
+	// those call sites individually. Same dialect-switch shape as
+	// usage-service/issue-tracking-service's main.go, sized up for this
+	// service's larger port surface.
+	type repoAll interface {
+		usecase.TaskRepository
+		usecase.EdgeRepository
+		usecase.GrantRepository
+		usecase.CommentRepository
+		usecase.ExecutionLinkRepository
+		usecase.OutboxWriter
+		usecase.VelocityResolver
+		usecase.TxRunner
+		outbox.Store
+		taskeventbus.OutboxWriter // WriteOutboxEvent — distinct, narrower interface than usecase.OutboxWriter's InsertOutboxEvent
+	}
+
+	var (
+		repo           repoAll
+		shareLinkStore usecase.ShareLinkRepository
+	)
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		pgRepo := taskpostgres.New(pool)
+		repo = pgRepo
+		shareLinkStore = taskpostgres.NewShareLinkStore(pool)
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		myRepo := taskmysql.New(db)
+		repo = myRepo
+		shareLinkStore = taskmysql.NewShareLinkStore(db)
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
 
 	// Complex (orchestration-service) execution dispatch is real as of
 	// TASK-TG-04-04/BE-SOL-002: dials orchestration-service's
@@ -255,8 +336,8 @@ func run() error {
 	// ResolvePublicLink doc comment for why api-gateway is NOT wired to
 	// expose this yet. shareLinkStore is its own type (not repo) — see
 	// adapter/postgres/share_links.go's doc comment for the method-name
-	// collision that requires this.
-	shareLinkStore := taskpostgres.NewShareLinkStore(pool)
+	// collision that requires this. Already bound to the dialect-selected
+	// concrete adapter above (repoAll's dialect switch).
 	createPublicLinkUC := usecase.NewCreatePublicLink(shareLinkStore, resolvePermissionUC)
 	revokePublicLinkUC := usecase.NewRevokePublicLink(shareLinkStore, resolvePermissionUC, repo)
 	resolvePublicLinkUC := usecase.NewResolvePublicLink(shareLinkStore)
@@ -334,12 +415,9 @@ func run() error {
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
+	// healthSrv (constructed above, alongside the dialect switch that also
+	// registers the "postgres"/"mysql" DB-ping check) is already carrying
+	// that check by this point.
 	// outboxRelay (TASK-TG-03-07/SOL-PW-04/TASK-AG-FLOWTASK-003) is already
 	// running by this point — see its wiring above. Grant-audit events
 	// (Grant/RevokeGrant), task.* domain events (UpdateTask, SOL-PW-04), and
@@ -397,4 +475,51 @@ func run() error {
 	outboxRelayWG.Wait()
 
 	return nil
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — copied verbatim from
+// usage-service/cmd/server/main.go (see that file's doc comment for the
+// full two-input-shape/parseTime rationale); this is pure DSN-plumbing, not
+// task-service-specific, and there is no shared package for it yet — same
+// precedent every prior rollout service in this batch has followed
+// (issue-status-sync's TASK-BE-DB-008, issue-tracking-service's
+// BE-DB-SOL-004 §5, annotation-service's TASK-BE-DB-010 §5).
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		sep := "?"
+		if strings.Contains(driverDSN, "?") {
+			sep = "&"
+		}
+		driverDSN += sep + "parseTime=true"
+	}
+	return driverDSN, nil
 }

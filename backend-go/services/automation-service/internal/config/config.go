@@ -44,6 +44,16 @@ type Config struct {
 	// transactional-outbox relay) and to consume the 5 event-trigger
 	// subjects (TASK-AT-03-05).
 	NATSURL string
+	// DatabaseCredentialsFile is the path a Vault Agent sidecar renders
+	// dynamic database credentials to in production (see
+	// common/secrets.DatabaseCredentialsFromFile). Falls back to
+	// DATABASE_DSN (via Base) when the file doesn't exist, which is what
+	// local dev and this service's testcontainers path use instead. Added
+	// for CR-DB-002/CR-DB-003's multi-database rollout (BE-DB-SOL-012),
+	// replacing the direct cfg.DatabaseDSN read main.go used to do —
+	// mirrors usage-service's (the pilot) and annotation-service's
+	// identical field 1:1.
+	DatabaseCredentialsFile string
 }
 
 func Load() (Config, error) {
@@ -71,6 +81,7 @@ func Load() (Config, error) {
 		SchedulerInterval:         interval,
 		SchedulerBatchSize:        batchSize,
 		NATSURL:                   commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		DatabaseCredentialsFile:   commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 	}, nil
 }
 

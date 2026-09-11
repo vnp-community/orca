@@ -5,7 +5,10 @@
 **Affected files (proposed):**
 - `backend-go/services/tenant-service/internal/domain/profile_resolution.go` (edit: two new merge steps)
 - `backend-go/services/tenant-service/internal/domain/profile_resolution_test.go` (edit: new coverage)
-**Status:** 📋 Proposed — not yet implemented
+**Status:** ✅ Implemented — **Đính chính (2026-09-12)**: doc ghi sai
+"Proposed" dù cả 3 task đều DONE. Xem
+[BUG-PRF-02](../BUG-PRF-02-profile-inheritance-approvedmodels-servertags-missing.md)
+mục "Đính chính".
 
 ---
 

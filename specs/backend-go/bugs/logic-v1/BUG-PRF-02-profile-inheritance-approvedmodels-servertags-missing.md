@@ -2,7 +2,12 @@
 
 **Business Logic:** [BL-PRF-02](../../../../docs/logic/profile/BL-PRF-02-profile-inheritance.md) — Profile Inheritance Resolution (3-layer merge)
 **Priority (per spec):** P0
-**Status:** PARTIAL
+**Status:** ✅ RESOLVED — **Đính chính (2026-09-12)**: cả 3 task
+(TASK-PRF-02-01~03) đều "[x] DONE" — xác nhận qua đọc code thật:
+`applyApprovedModelsFallback` (`profile_resolution.go:290-321`) VÀ
+`mergeAllowedServerTags` (`profile_resolution.go:325+`) đều tồn tại, wire
+vào `ResolveProfile`, có test. Doc này + SOL-PRF-02 ghi sai trạng thái dù
+code đã xong.
 **Severity:** Medium
 **Symptom:** A user whose personal or department profile sets `agent.preferredModel` to a model the company has NOT approved gets that unapproved model back from `profile.getResolved` unchanged — no fallback to `company.approvedModels[0]`, no `_modelFallbackReason` explanation surfaced to the UI. Similarly, a developer whose profile is supposed to be restricted to a subset of `fleet.allowedServerTags` gets no enforcement of that subset at resolution time — nothing in the merge narrows the tag set.
 

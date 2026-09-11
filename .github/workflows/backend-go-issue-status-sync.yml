@@ -1,0 +1,48 @@
+name: backend-go / issue-status-sync
+
+# CR-DB-002/CR-DB-003 acceptance criteria: run issue-status-sync's
+# migrations + tests on BOTH dialects (Postgres, MySQL) on every PR that
+# touches it. Copied from backend-go-usage-service.yml's structure
+# (BE-DB-SOL-001/002's pilot) per
+# specs/backend-go/crs/v4/multi-database/tasks/TASK-BE-DB-008-issue-status-sync-mysql-rollout.md —
+# paths/service name updated, no other differences.
+on:
+  pull_request:
+    paths:
+      - "backend-go/common/**"
+      - "backend-go/services/issue-status-sync/**"
+      - "backend-go/go.work"
+      - ".github/workflows/backend-go-issue-status-sync.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        dialect: [postgres, mysql]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Install golang-migrate CLI (${{ matrix.dialect }} driver only)
+        run: |
+          go install -tags '${{ matrix.dialect }}' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
+      - name: go build
+        working-directory: backend-go/services/issue-status-sync
+        run: go build ./...
+      - name: go vet
+        working-directory: backend-go/services/issue-status-sync
+        run: go vet ./...
+      - name: Unit tests (no Docker)
+        working-directory: backend-go/services/issue-status-sync
+        run: go test ./...
+      - name: Integration tests (${{ matrix.dialect }}, testcontainers)
+        working-directory: backend-go/services/issue-status-sync
+        run: |
+          if [ "${{ matrix.dialect }}" = "postgres" ]; then
+            go test -tags=integration ./internal/adapter/postgres/... -v
+          else
+            go test -tags=integration ./internal/adapter/mysql/... -v
+          fi

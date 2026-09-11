@@ -164,9 +164,9 @@ for and RPC-wiring audits structurally can't see (e.g. a channel can be
 | ID | Title | Status | Report |
 |----|-------|--------|--------|
 | BL-PRF-01 | Profile CRUD (Company/Dept/User) | 🟡 Partial | [BUG-PRF-01](./BUG-PRF-01-profile-crud-validation-rbac-missing.md) |
-| BL-PRF-02 | Profile Inheritance Resolution (3-layer merge) | 🟡 Partial | [BUG-PRF-02](./BUG-PRF-02-profile-inheritance-approvedmodels-servertags-missing.md) |
+| BL-PRF-02 | Profile Inheritance Resolution (3-layer merge) | ✅ Resolved (2026-09-12) | [BUG-PRF-02](./BUG-PRF-02-profile-inheritance-approvedmodels-servertags-missing.md) |
 | BL-PRF-03 | Project-Dev Server Assignment | 🟡 Partial | [BUG-PRF-03](./BUG-PRF-03-project-devserver-assignment-partial.md) |
-| BL-PRF-04 | Profile-Aware Agent Execution Routing | ❌ Missing | [BUG-PRF-04](./BUG-PRF-04-profile-aware-agent-execution-not-implemented.md) |
+| BL-PRF-04 | Profile-Aware Agent Execution Routing | ✅ Resolved (2026-09-12) | [BUG-PRF-04](./BUG-PRF-04-profile-aware-agent-execution-not-implemented.md) |
 
 ### 16. AI Provider Management (`ai-providers/`)
 | ID | Title | Status | Report |

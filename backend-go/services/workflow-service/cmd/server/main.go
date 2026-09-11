@@ -5,26 +5,32 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/workflow-service/internal/config"
@@ -33,6 +39,7 @@ import (
 
 	workflowgrpc "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/infrafleetclient"
+	workflowmysql "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/mysql"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/opachecker"
 	workflowpostgres "github.com/stablyai/orca-go/services/workflow-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/workflow-service/internal/adapter/providerresolver"
@@ -81,18 +88,71 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
-	}
-	pool, err := pgxpool.New(ctx, dsn)
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (see common/secrets.DatabaseCredentialsFromFile's doc comment) —
+	// falls back to DATABASE_DSN itself when the file doesn't exist, which
+	// is what local dev / this service's testcontainers path still uses.
+	// Replaces the previous direct cfg.DatabaseDSN read (CR-DB-002/
+	// CR-DB-003, BE-DB-SOL-013 — closes this service's own former "Vault
+	// wiring not wired in" gap, same as every other rolled-out service).
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	defer pool.Close()
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
+	if err != nil {
+		return fmt.Errorf("detecting database dialect: %w", err)
+	}
 
-	repo := workflowpostgres.New(pool)
-	approvalStore := workflowpostgres.NewApprovalStore(pool)
+	healthSrv := health.New()
+
+	// workflowStore is the union of every port internal/adapter/postgres
+	// and internal/adapter/mysql's Repository types both implement — this
+	// composition root passes the SAME `repo` identifier to every
+	// TemplateRepository/ExecutionRepository/StepExecutionRepository/
+	// outbox.Store call site below (unchanged from before this dialect
+	// switch was introduced), so `repo`'s static type after the switch
+	// must satisfy all four at once.
+	var (
+		repo          workflowStore
+		approvalStore usecase.ApprovalRepository
+	)
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		pgRepo := workflowpostgres.New(pool)
+		repo = pgRepo
+		approvalStore = workflowpostgres.NewApprovalStore(pool)
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		myRepo := workflowmysql.New(db)
+		repo = myRepo
+		approvalStore = workflowmysql.NewApprovalStore(db)
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
 
 	infraFleetConn, err := infrafleetclient.Dial(cfg.InfraFleetServiceAddr)
 	if err != nil {
@@ -251,13 +311,6 @@ func run() error {
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
-
 	// Transactional-outbox relay (SOL-PW-04/TASK-PW-04-06, extended by
 	// BE-SOL-003/TASK-FT-003-03 for step-level events): Execute's
 	// runToCompletion/RecoverExecutions' finish (execution-level) and
@@ -346,4 +399,60 @@ func run() error {
 	relayWG.Wait()
 
 	return nil
+}
+
+// workflowStore is the union of every port internal/adapter/postgres.Repository
+// and internal/adapter/mysql.Repository both implement — see run's `repo`
+// declaration for why a single variable needs to satisfy all four
+// interfaces simultaneously (CR-DB-002/CR-DB-003, BE-DB-SOL-013).
+type workflowStore interface {
+	usecase.TemplateRepository
+	usecase.ExecutionRepository
+	usecase.StepExecutionRepository
+	outbox.Store
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — that driver does NOT accept
+// a URL directly (sql.Open("mysql", "mysql://...") fails outright).
+// Identical to usage-service's toMySQLDriverDSN (the multi-dialect pilot)
+// — this conversion is dialect-plumbing, not workflow-service-specific,
+// see that copy's doc comment for the two input shapes handled and why.
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		sep := "?"
+		if strings.Contains(driverDSN, "?") {
+			sep = "&"
+		}
+		driverDSN += sep + "parseTime=true"
+	}
+	return driverDSN, nil
 }

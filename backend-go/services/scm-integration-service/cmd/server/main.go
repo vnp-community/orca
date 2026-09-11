@@ -5,22 +5,27 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
@@ -39,6 +44,7 @@ import (
 	scmgithub "github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/github"
 	scmgitlab "github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/gitlab"
 	scmgrpc "github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/grpc"
+	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/mysql"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/oauth"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/oauthstate"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/adapter/postgres"
@@ -49,6 +55,17 @@ import (
 
 	scmintegrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/scmintegration/v1"
 )
+
+// outboxStore is the union of usecase.OutboxEnqueuer (CreatePullRequest/
+// MergePullRequest/ReceiveWebhook's enqueue path) and common/outbox.Store
+// (the relay's poll/publish/mark-published path) — both
+// postgres.OutboxRepository and mysql.OutboxRepository satisfy this,
+// letting outboxRepo below stay a single dialect-agnostic variable, same
+// shape as rateLimitCache/issueListCache/webhookDeliveries.
+type outboxStore interface {
+	usecase.OutboxEnqueuer
+	outbox.Store
+}
 
 // version is overridden at build time via -ldflags "-X main.version=...".
 var version = "dev"
@@ -78,28 +95,73 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	// scm.rate_limit_cache (migrations/0001_init.up.sql) as of Phase 3
-	// (docs/execution-plan.md §3) — this service's first real database
-	// connection. webhook_delivery_log lives in the same migration; its own
-	// repository (webhookDeliveries, below) was wired in TASK-PI-03-06.
+	// rate_limit_cache (migrations/{postgres,mysql}/0001_init.up.sql) — this
+	// service's first real database connection. webhook_delivery_log lives
+	// in the same migration; its own repository (webhookDeliveries, below)
+	// was wired in TASK-PI-03-06. CR-DB-002/CR-DB-003: DATABASE_DSN's
+	// scheme picks the adapter at startup, same dialect-factory pattern as
+	// usage-service's pilot (BE-DB-SOL-001) — no separate DB_DIALECT env
+	// var.
 	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
 	if err != nil {
 		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	pool, err := pgxpool.New(ctx, dsn)
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("detecting database dialect: %w", err)
 	}
-	defer pool.Close()
-	rateLimitCache := postgres.New(pool)
-	// issue_list_cache (migrations/0002) — BR-PI-01's 5-minute cache in
-	// front of ListIssues, sibling of rateLimitCache above.
-	issueListCache := postgres.NewIssueListCache(pool)
+
+	healthSrv := health.New()
+
+	var (
+		rateLimitCache    usecase.RateLimitCache
+		issueListCache    usecase.IssueListCache
+		outboxRepo        outboxStore
+		webhookDeliveries usecase.WebhookDeliveryStore
+	)
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		rateLimitCache = postgres.New(pool)
+		// issue_list_cache (migrations/0002) — BR-PI-01's 5-minute cache in
+		// front of ListIssues, sibling of rateLimitCache above.
+		issueListCache = postgres.NewIssueListCache(pool)
+		outboxRepo = postgres.NewOutboxRepository(pool)
+		// webhook_delivery_log (migrations/0001) — BUG-PI-03/TASK-PI-03-06's
+		// first writer for this table.
+		webhookDeliveries = postgres.NewWebhookDeliveryRepository(pool)
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		rateLimitCache = mysql.New(db)
+		issueListCache = mysql.NewIssueListCache(db)
+		outboxRepo = mysql.NewOutboxRepository(db)
+		webhookDeliveries = mysql.NewWebhookDeliveryRepository(db)
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
 	backoffExecutor := scmbackoff.New(3, 0, 0) // BR-PI-03: 3 attempts, default base/max delay
-	outboxRepo := postgres.NewOutboxRepository(pool)
-	// webhook_delivery_log (migrations/0001) — BUG-PI-03/TASK-PI-03-06's
-	// first writer for this table.
-	webhookDeliveries := postgres.NewWebhookDeliveryRepository(pool)
 	webhookVerifier := webhookverify.New(cfg.GitHubWebhookSecret, cfg.GitLabWebhookToken)
 
 	// githubProjectsAdapter/gitlabMRAdapter are the SAME instances registered
@@ -279,13 +341,6 @@ func run() error {
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
-
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
 		Handler: healthSrv.Handler(),
@@ -330,4 +385,49 @@ func run() error {
 	relayWG.Wait()
 
 	return nil
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — copied verbatim from
+// usage-service/cmd/server/main.go (BE-DB-SOL-002's pilot): pure
+// DSN-plumbing, not specific to any one service. See that copy's doc
+// comment for the two input shapes handled and why parseTime=true is
+// always appended.
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		sep := "?"
+		if strings.Contains(driverDSN, "?") {
+			sep = "&"
+		}
+		driverDSN += sep + "parseTime=true"
+	}
+	return driverDSN, nil
 }

@@ -19,7 +19,7 @@ func (r *Repository) GetSubtree(ctx context.Context, tenantID, rootID string, ma
 		maxDepth = domain.DefaultMaxAncestorDepth
 	}
 	rows, err := r.db.Query(ctx, `
-		WITH RECURSIVE subtree AS (
+		WITH RECURSIVE subtree(`+subtreeColumnNames+`, depth) AS (
 			SELECT `+taskColumns+`, 0 AS depth
 			FROM task.tasks
 			WHERE tenant_id = $1 AND id = $2
@@ -80,7 +80,7 @@ func (r *Repository) GetSubtree(ctx context.Context, tenantID, rootID string, ma
 // adapter-package type leaking across the boundary.
 func (r *Repository) GetSubtreeWithChildPercents(ctx context.Context, tenantID, rootID string) ([]usecase.SubtreeProgressNode, error) {
 	rows, err := r.db.Query(ctx, `
-		WITH RECURSIVE subtree AS (
+		WITH RECURSIVE subtree(`+subtreeColumnNames+`, depth) AS (
 			SELECT `+taskColumns+`, 0 AS depth
 			FROM task.tasks
 			WHERE tenant_id = $1 AND id = $2

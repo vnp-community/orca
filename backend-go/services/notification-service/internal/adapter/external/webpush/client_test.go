@@ -2,6 +2,7 @@ package webpush
 
 import (
 	"bytes"
+	"context"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/ecdh"
@@ -9,10 +10,15 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"io"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	"golang.org/x/crypto/hkdf"
+
+	"github.com/stablyai/orca-go/services/notification-service/internal/usecase"
 )
 
 // TestEncryptAES128GCM_RoundTrips independently re-derives the receiver
@@ -110,5 +116,59 @@ func TestFramePlaintext_RoundTripsNonceFlag(t *testing.T) {
 	noNonce := framePlaintext([]byte("cipher"), nil)
 	if noNonce[0] != 0x00 {
 		t.Fatalf("expected flag byte 0x00 when nonce absent, got %x", noNonce[0])
+	}
+}
+
+// testSubscriptionKeys generates a real ECDH P-256 keypair's public key and
+// a random auth secret, both base64url-encoded — the shape
+// encryptAES128GCM requires, matching how a real browser's
+// PushSubscription.toJSON() keys look (see TestEncryptAES128GCM_RoundTrips).
+// Send() encrypts before ever reaching the HTTP call, so a Send()-level
+// test needs real key material to exercise the HTTP status handling at all.
+func testSubscriptionKeys(t *testing.T) (p256dh, auth string) {
+	t.Helper()
+	priv, err := ecdh.P256().GenerateKey(rand.Reader)
+	if err != nil {
+		t.Fatalf("generating subscriber key: %v", err)
+	}
+	authSecret := make([]byte, 16)
+	if _, err := rand.Read(authSecret); err != nil {
+		t.Fatalf("generating auth secret: %v", err)
+	}
+	return base64.RawURLEncoding.EncodeToString(priv.PublicKey().Bytes()), base64.RawURLEncoding.EncodeToString(authSecret)
+}
+
+func TestSend_WrapsErrDeviceTokenInvalid_OnGoneAndNotFound(t *testing.T) {
+	p256dh, auth := testSubscriptionKeys(t)
+	for _, status := range []int{http.StatusGone, http.StatusNotFound} {
+		srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(status)
+		}))
+		c := New()
+		err := c.Send(context.Background(), srv.URL, p256dh, auth, []byte("cipher"), nil, "vapid-jwt")
+		srv.Close()
+		if err == nil {
+			t.Fatalf("status %d: expected an error", status)
+		}
+		if !errors.Is(err, usecase.ErrDeviceTokenInvalid) {
+			t.Errorf("status %d: expected errors.Is(err, usecase.ErrDeviceTokenInvalid), got: %v", status, err)
+		}
+	}
+}
+
+func TestSend_DoesNotWrapErrDeviceTokenInvalid_On5xx(t *testing.T) {
+	p256dh, auth := testSubscriptionKeys(t)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusServiceUnavailable)
+	}))
+	defer srv.Close()
+
+	c := New()
+	err := c.Send(context.Background(), srv.URL, p256dh, auth, []byte("cipher"), nil, "vapid-jwt")
+	if err == nil {
+		t.Fatal("expected an error for a 503 response")
+	}
+	if errors.Is(err, usecase.ErrDeviceTokenInvalid) {
+		t.Errorf("expected a transient 503 NOT to be classified as ErrDeviceTokenInvalid, got: %v", err)
 	}
 }

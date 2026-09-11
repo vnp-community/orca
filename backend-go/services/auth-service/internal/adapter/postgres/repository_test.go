@@ -26,7 +26,7 @@ func setupRepository(t *testing.T) *Repository {
 	t.Helper()
 	dsn := testutil.StartPostgres(t, "auth")
 
-	migrationsPath, err := filepath.Abs("../../../migrations")
+	migrationsPath, err := filepath.Abs("../../../migrations/postgres")
 	if err != nil {
 		t.Fatalf("resolving migrations path: %v", err)
 	}

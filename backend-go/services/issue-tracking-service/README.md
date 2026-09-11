@@ -68,9 +68,15 @@ this service implements exactly that subset.
   database), gRPC server with the shared interceptor chain,
   health/readiness HTTP server, graceful shutdown on SIGTERM (including the
   outbox relay goroutine).
-- `migrations/0001_outbox.{up,down}.sql` — real DDL: this service's only
-  table, `issuetracking.outbox_events`, RLS policy matching every other
-  service's tenant-isolation convention.
+- `migrations/postgres/0001_outbox.{up,down}.sql` — real DDL:
+  `issuetracking.outbox_events`, RLS policy matching every other service's
+  tenant-isolation convention. `migrations/postgres/0002_connections.{up,down}.sql`
+  adds `issuetracking.connections` (Connect/GetConnectionStatus/
+  SelectWorkspace's persistence). `migrations/mysql/` mirrors both,
+  dialect-safe (CR-DB-002/003 rollout, see
+  `specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-004-issue-tracking-service-mysql-tidb-adapter.md`)
+  — `cmd/server/main.go` picks the matching path by `DATABASE_DSN`'s scheme,
+  no separate env var.
 
 ## `credential-broker-service` is wired (Epic B, 2026-08-17)
 

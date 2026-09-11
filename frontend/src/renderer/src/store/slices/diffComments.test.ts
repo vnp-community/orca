@@ -7,6 +7,7 @@ import {
   type RuntimeEnvironmentCallRequest
 } from '../../runtime/runtime-compatibility-test-fixture'
 import { clearRuntimeCompatibilityCacheForTests } from '../../runtime/runtime-rpc-client'
+import { clearDiffCommentsPersistCacheForTests } from './diffComments'
 
 // Mock sonner (imported transitively by other slices)
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }))
@@ -18,13 +19,19 @@ vi.mock('@/lib/agent-status', async (importOriginal) => {
   }
 })
 
+// Shared envelope shape for runtimeEnvironmentCall mock resolutions — the
+// wrapping id/ok/_meta fields are never asserted on, only `result` varies.
+function rpcOk(result: unknown): {
+  id: string
+  ok: true
+  result: unknown
+  _meta: { runtimeId: string }
+} {
+  return { id: 'rpc-1', ok: true, result, _meta: { runtimeId: 'remote-runtime' } }
+}
+
 const updateMeta = vi.fn().mockResolvedValue({})
-const runtimeEnvironmentCall = vi.fn().mockResolvedValue({
-  id: 'rpc-1',
-  ok: true,
-  result: { ok: true },
-  _meta: { runtimeId: 'remote-runtime' }
-})
+const runtimeEnvironmentCall = vi.fn().mockResolvedValue(rpcOk({ ok: true }))
 const runtimeEnvironmentTransportCall = vi.fn()
 const mockApi = {
   ui: {
@@ -235,6 +242,15 @@ function seed(store: ReturnType<typeof createTestStore>, comments: DiffComment[]
   })
 }
 
+// Why (TASK-FE-ANNOTATE-001): persistRemote's lastPersistedByWorktree/
+// serverAnnotationIdByCommentId maps are module-level and long-lived by
+// design (they track this module's own annotation-service write history
+// for the real app session) — reset before every test in this file so one
+// test's remote-persist calls can't leak into the next.
+beforeEach(() => {
+  clearDiffCommentsPersistCacheForTests()
+})
+
 describe('addDiffComment', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -244,12 +260,7 @@ describe('addDiffComment', () => {
       return createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
     })
     updateMeta.mockResolvedValue({})
-    runtimeEnvironmentCall.mockResolvedValue({
-      id: 'rpc-1',
-      ok: true,
-      result: { ok: true },
-      _meta: { runtimeId: 'remote-runtime' }
-    })
+    runtimeEnvironmentCall.mockResolvedValue(rpcOk({ ok: true }))
   })
 
   it('persists source and startLine for ranged comments', async () => {
@@ -299,12 +310,7 @@ describe('updateDiffComment', () => {
       return createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
     })
     updateMeta.mockResolvedValue({})
-    runtimeEnvironmentCall.mockResolvedValue({
-      id: 'rpc-1',
-      ok: true,
-      result: { ok: true },
-      _meta: { runtimeId: 'remote-runtime' }
-    })
+    runtimeEnvironmentCall.mockResolvedValue(rpcOk({ ok: true }))
   })
 
   it('updates the body, trims it, and persists', async () => {
@@ -334,33 +340,42 @@ describe('updateDiffComment', () => {
     expect(updateMeta).toHaveBeenCalledTimes(1)
   })
 
-  it('persists through the selected runtime environment', async () => {
+  it('persists through the selected runtime environment (create then update, TASK-FE-ANNOTATE-001)', async () => {
     const store = createTestStore()
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'env-1' } as never
     })
-    seed(store, [
-      {
-        id: 'c1',
-        worktreeId: WT,
-        filePath: 'src/foo.ts',
-        lineNumber: 10,
-        body: 'old body',
-        createdAt: 1000,
-        side: 'modified'
-      }
-    ])
+    // Why: persistRemote only knows to call annotation.update for a comment
+    // it has already seen created via annotation.create in this session —
+    // seed()-ing state directly (bypassing addDiffComment) would make
+    // persistRemote treat the comment as brand-new on the next persist, per
+    // its own module-level create/update/delete diff. Going through
+    // addDiffComment first exercises the real flow, not an artificial one.
+    seed(store, [])
+    runtimeEnvironmentCall.mockResolvedValueOnce(rpcOk({ id: 'server-annotation-1' }))
+    const created = await store.getState().addDiffComment({
+      worktreeId: WT,
+      filePath: 'src/foo.ts',
+      lineNumber: 10,
+      body: 'old body',
+      side: 'modified'
+    })
+    expect(created).not.toBeNull()
+    const commentId = created!.id
+    runtimeEnvironmentCall.mockClear()
+    runtimeEnvironmentCall.mockResolvedValueOnce(rpcOk({ ok: true }))
 
-    const ok = await store.getState().updateDiffComment(WT, 'c1', 'remote body')
+    const ok = await store.getState().updateDiffComment(WT, commentId, 'remote body')
 
     expect(ok).toBe(true)
     expect(updateMeta).not.toHaveBeenCalled()
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
-      method: 'worktree.set',
+      method: 'annotation.update',
       params: {
-        worktree: `id:${WT}`,
-        diffComments: [expect.objectContaining({ id: 'c1', body: 'remote body' })]
+        id: 'server-annotation-1',
+        content: 'remote body',
+        resolved: false
       },
       timeoutMs: 15_000
     })
@@ -479,12 +494,7 @@ describe('markDiffCommentsSent', () => {
       return createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
     })
     updateMeta.mockResolvedValue({})
-    runtimeEnvironmentCall.mockResolvedValue({
-      id: 'rpc-1',
-      ok: true,
-      result: { ok: true },
-      _meta: { runtimeId: 'remote-runtime' }
-    })
+    runtimeEnvironmentCall.mockResolvedValue(rpcOk({ ok: true }))
   })
 
   it('marks selected notes as sent and persists once', async () => {
@@ -536,12 +546,7 @@ describe('clearDeliveredDiffComments', () => {
       return createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
     })
     updateMeta.mockResolvedValue({})
-    runtimeEnvironmentCall.mockResolvedValue({
-      id: 'rpc-1',
-      ok: true,
-      result: { ok: true },
-      _meta: { runtimeId: 'remote-runtime' }
-    })
+    runtimeEnvironmentCall.mockResolvedValue(rpcOk({ ok: true }))
   })
 
   it('clears delivered notes and persists the remaining pending notes', async () => {
@@ -602,12 +607,7 @@ describe('bulk clear diff comments', () => {
       return createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
     })
     updateMeta.mockResolvedValue({})
-    runtimeEnvironmentCall.mockResolvedValue({
-      id: 'rpc-1',
-      ok: true,
-      result: { ok: true },
-      _meta: { runtimeId: 'remote-runtime' }
-    })
+    runtimeEnvironmentCall.mockResolvedValue(rpcOk({ ok: true }))
   })
 
   it('clears all notes and persists once', async () => {
@@ -664,12 +664,27 @@ describe('bulk clear diff comments', () => {
     expect(updateMeta).not.toHaveBeenCalled()
   })
 
-  it('persists clear through the selected runtime environment', async () => {
+  it('persists clear through the selected runtime environment (create then delete, TASK-FE-ANNOTATE-001)', async () => {
     const store = createTestStore()
     store.setState({
       settings: { activeRuntimeEnvironmentId: 'env-1' } as never
     })
-    seed(store, [makeComment({ id: 'c1' })])
+    // Why: persistRemote only calls annotation.delete for a comment it has
+    // a tracked server id for, i.e. one this module itself created via
+    // annotation.create earlier in the session — see the sibling
+    // updateDiffComment test's identical rationale.
+    seed(store, [])
+    runtimeEnvironmentCall.mockResolvedValueOnce(rpcOk({ id: 'server-annotation-1' }))
+    const created = await store.getState().addDiffComment({
+      worktreeId: WT,
+      filePath: 'src/foo.ts',
+      lineNumber: 10,
+      body: 'body',
+      side: 'modified'
+    })
+    expect(created).not.toBeNull()
+    runtimeEnvironmentCall.mockClear()
+    runtimeEnvironmentCall.mockResolvedValueOnce(rpcOk({ ok: true }))
 
     const ok = await store.getState().clearDiffComments(WT)
 
@@ -677,10 +692,10 @@ describe('bulk clear diff comments', () => {
     expect(updateMeta).not.toHaveBeenCalled()
     expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
       selector: 'env-1',
-      method: 'worktree.set',
+      method: 'annotation.delete',
       params: {
-        worktree: `id:${WT}`,
-        diffComments: []
+        id: 'server-annotation-1',
+        confirmed: false
       },
       timeoutMs: 15_000
     })
@@ -724,5 +739,137 @@ describe('bulk clear diff comments', () => {
     expect(ok).toBe(false)
     expect(store.getState().getDiffComments(WT)).toBe(laterComments)
     errSpy.mockRestore()
+  })
+})
+
+// ── TASK-FE-ANNOTATE-002: ensureDiffCommentsHydrated ────────────────────────
+
+describe('ensureDiffCommentsHydrated', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    clearRuntimeCompatibilityCacheForTests()
+    runtimeEnvironmentTransportCall.mockReset()
+    runtimeEnvironmentTransportCall.mockImplementation((args: RuntimeEnvironmentCallRequest) => {
+      return createCompatibleRuntimeStatusResponseIfNeeded(args) ?? runtimeEnvironmentCall(args)
+    })
+    updateMeta.mockResolvedValue({})
+  })
+
+  function annotationResult(overrides: Record<string, unknown> = {}) {
+    return {
+      id: 'server-1',
+      anchor: { worktreeId: WT, filePath: 'src/foo.ts', line: 10, endLine: 0 },
+      content: 'server body',
+      createdAtUnixMs: 1000,
+      updatedAtUnixMs: 0,
+      originalCode: '',
+      sentToAgent: false,
+      sentAtUnixMs: 0,
+      ...overrides
+    }
+  }
+
+  it('loads comments from annotation.list for the remote target', async () => {
+    const store = createTestStore()
+    store.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
+    seed(store, [])
+    runtimeEnvironmentCall.mockResolvedValueOnce(rpcOk({ annotations: [annotationResult()] }))
+
+    await store.getState().ensureDiffCommentsHydrated(WT)
+
+    expect(runtimeEnvironmentCall).toHaveBeenCalledWith({
+      selector: 'env-1',
+      method: 'annotation.list',
+      params: { worktreeId: WT, sentToAgent: false },
+      timeoutMs: 15_000
+    })
+    const loaded = store.getState().getDiffComments(WT)
+    expect(loaded).toHaveLength(1)
+    expect(loaded[0]).toMatchObject({ id: 'server-1', filePath: 'src/foo.ts', body: 'server body' })
+  })
+
+  it('does not call annotation.list a second time for the same worktree in the same session', async () => {
+    const store = createTestStore()
+    store.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
+    seed(store, [])
+    runtimeEnvironmentCall.mockResolvedValueOnce(rpcOk({ annotations: [] }))
+
+    await store.getState().ensureDiffCommentsHydrated(WT)
+    runtimeEnvironmentCall.mockClear()
+    await store.getState().ensureDiffCommentsHydrated(WT)
+
+    expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
+  })
+
+  it('does not call annotation.list for the local/desktop target', async () => {
+    const store = createTestStore()
+    seed(store, [])
+
+    await store.getState().ensureDiffCommentsHydrated(WT)
+
+    expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
+  })
+
+  it('no-ops for an undefined worktreeId instead of hydrating with an empty string', async () => {
+    const store = createTestStore()
+    await store.getState().ensureDiffCommentsHydrated(undefined)
+    expect(runtimeEnvironmentCall).not.toHaveBeenCalled()
+  })
+
+  it('backfills a local-only comment that has no matching server row', async () => {
+    const store = createTestStore()
+    store.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
+    seed(store, [
+      makeComment({ id: 'local-1', filePath: 'src/bar.ts', lineNumber: 5, body: 'local only' })
+    ])
+    runtimeEnvironmentCall.mockResolvedValueOnce(rpcOk({ annotations: [] }))
+    runtimeEnvironmentCall.mockResolvedValueOnce(
+      rpcOk(
+        annotationResult({
+          id: 'server-backfilled-1',
+          anchor: { worktreeId: WT, filePath: 'src/bar.ts', line: 5, endLine: 0 },
+          content: 'local only'
+        })
+      )
+    )
+
+    await store.getState().ensureDiffCommentsHydrated(WT)
+
+    expect(runtimeEnvironmentCall).toHaveBeenNthCalledWith(2, {
+      selector: 'env-1',
+      method: 'annotation.create',
+      params: {
+        anchor: {
+          repoId: REPO,
+          worktreeId: WT,
+          filePath: 'src/bar.ts',
+          line: 5,
+          endLine: 0,
+          side: 2,
+          ref: ''
+        },
+        content: 'local only',
+        requestId: 'local-1',
+        originalCode: ''
+      },
+      timeoutMs: 15_000
+    })
+    const loaded = store.getState().getDiffComments(WT)
+    expect(loaded.map((c) => c.id)).toContain('server-backfilled-1')
+  })
+
+  it('does not backfill a local comment that already matches a server row by content', async () => {
+    const store = createTestStore()
+    store.setState({ settings: { activeRuntimeEnvironmentId: 'env-1' } as never })
+    seed(store, [
+      makeComment({ id: 'local-1', filePath: 'src/foo.ts', lineNumber: 10, body: 'server body' })
+    ])
+    runtimeEnvironmentCall.mockResolvedValueOnce(rpcOk({ annotations: [annotationResult()] }))
+
+    await store.getState().ensureDiffCommentsHydrated(WT)
+
+    expect(runtimeEnvironmentCall).toHaveBeenCalledTimes(1) // only annotation.list — no backfill create
+    const loaded = store.getState().getDiffComments(WT)
+    expect(loaded.map((c) => c.id)).toEqual(['server-1'])
   })
 })

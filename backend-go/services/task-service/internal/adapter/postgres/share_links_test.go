@@ -23,7 +23,7 @@ func setupShareLinkStore(t *testing.T) (*ShareLinkStore, *Repository) {
 	t.Helper()
 	dsn := testutil.StartPostgres(t, "task")
 
-	migrationsPath, err := filepath.Abs("../../../migrations")
+	migrationsPath, err := filepath.Abs("../../../migrations/postgres")
 	if err != nil {
 		t.Fatalf("resolving migrations path: %v", err)
 	}

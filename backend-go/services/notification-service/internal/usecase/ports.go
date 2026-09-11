@@ -6,9 +6,20 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/services/notification-service/internal/domain"
 )
+
+// ErrDeviceTokenInvalid is returned by APNsClient.Send/FCMClient.Send/
+// WebPushClient.Send (wrapped via %w) when the third-party push service
+// reports the endpoint/device token as permanently dead — APNs
+// `BadDeviceToken`/`Unregistered`, FCM `UNREGISTERED`, or a Web Push
+// endpoint returning 404/410 (RFC 8030). DeliverPush treats this as "call
+// SubscriptionRepository.MarkExpired", distinct from a transient failure
+// (5xx/429/network error), which is left for BufferedNotificationRepository
+// to retry instead (CR-MOBILE-001's acceptance criteria).
+var ErrDeviceTokenInvalid = errors.New("usecase: push device token/endpoint is permanently invalid")
 
 // SubscriptionRepository is the persistence port for push subscriptions.
 // Implemented by internal/adapter/postgres against this service's own
@@ -30,6 +41,15 @@ type SubscriptionRepository interface {
 	// subscription is associated with, or "" if none — a standard Web
 	// Push subscription with no mobile-companion pairing.
 	DeviceIDFor(ctx context.Context, subscriptionID string) (string, error)
+	// MarkExpired transitions the subscription at endpoint to
+	// domain.SubscriptionExpired — called by DeliverPush when a channel's
+	// Send returns ErrDeviceTokenInvalid, so a future event doesn't retry a
+	// dead endpoint. Unlike Save's upsert (which always forces status back
+	// to 'active' on conflict), this never resurrects a row — a device
+	// token APNs/FCM reports dead stays dead until the client re-subscribes
+	// via Subscribe. A missing endpoint affects 0 rows and is NOT an error,
+	// same idempotent-by-design contract as DeleteByEndpoint.
+	MarkExpired(ctx context.Context, endpoint string) error
 }
 
 // VapidKeyRepository is the persistence port for VAPID public-key

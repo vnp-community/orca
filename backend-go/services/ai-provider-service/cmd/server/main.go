@@ -5,16 +5,20 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
@@ -22,11 +26,13 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/ai-provider-service/internal/config"
@@ -34,6 +40,7 @@ import (
 	aiprovidereventbus "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/eventbus"
 	aiprovidergrpc "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/grpc"
 	aiprovidergrpcclient "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/grpcclient"
+	aiprovidermysql "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/mysql"
 	aiproviderpostgres "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/postgres"
 	aiproviderscheduler "github.com/stablyai/orca-go/services/ai-provider-service/internal/adapter/scheduler"
 	"github.com/stablyai/orca-go/services/ai-provider-service/internal/usecase"
@@ -69,22 +76,77 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
-	}
-	pool, err := pgxpool.New(ctx, dsn)
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (see common/secrets.DatabaseCredentialsFromFile's doc comment) —
+	// falls back to DATABASE_DSN itself when the file doesn't exist, which
+	// is what local dev / this scaffold's testcontainers path still uses.
+	// Added for CR-DB-002/003 multi-database rollout (TASK-BE-DB-014) —
+	// this also closes the README's previously-documented "common/secrets
+	// (Vault) is not wired into main.go" gap, as a reasonable side effect
+	// of wiring the dialect factory (same code needed touching either way),
+	// not a scope expansion.
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	defer pool.Close()
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
+	if err != nil {
+		return fmt.Errorf("detecting database dialect: %w", err)
+	}
 
 	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
+
+	// CR-DB-002/CR-DB-003 multi-database rollout (ai-provider-service,
+	// batch 2): DATABASE_DSN's scheme picks the adapter at startup, no
+	// separate DB_DIALECT env var — same factory pattern as usage-service's
+	// pilot implementation, see
+	// specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-001.md §3
+	// and BE-DB-SOL-009.md (this service's own solution doc). repo is typed
+	// as the combined port surface it's actually used as below (account
+	// repo, usage repo, health-check claimer, outbox enqueuer, AND
+	// outbox.Store for the relay) since both concrete Repository types
+	// implement all five — same shape credential-broker-service's batch-1
+	// rollout used (BE-DB-SOL-006 §6), except with 5 embedded interfaces
+	// instead of 3.
+	var repo interface {
+		usecase.ProviderAccountRepository
+		usecase.UsageRepository
+		usecase.DueHealthCheckClaimer
+		usecase.OutboxEnqueuer
+		outbox.Store
+	}
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		repo = aiproviderpostgres.New(pool)
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		repo = aiprovidermysql.New(db)
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
 
 	// Best-effort rate-limit event publish (SOL-MB-02,
 	// TASK-MB-02-04) — notification-service consumes
@@ -105,8 +167,6 @@ func run() error {
 			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
 		}
 	}
-
-	repo := aiproviderpostgres.New(pool)
 
 	// Real credential-broker-service connection — Epic B
 	// (docs/execution-plan.md §8). Insecure transport credentials here are
@@ -224,4 +284,63 @@ func run() error {
 	_ = httpServer.Shutdown(shutdownCtx)
 
 	return nil
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — that driver does NOT accept
+// a URL directly (sql.Open("mysql", "mysql://...") fails outright).
+// Identical to usage-service/cmd/server/main.go's helper of the same name
+// (see specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-001.md,
+// BE-DB-SOL-002.md §4) — duplicated here rather than shared because
+// cmd/server/main.go is each service's own composition root, not a
+// package other services import.
+//
+// Handles two input shapes:
+//  1. host already wrapped as "tcp(host:port)" — passed through as-is
+//     after stripping the scheme, since it's already valid driver syntax.
+//  2. a plain "mysql://user:pass@host:port/db" URL — parsed with net/url
+//     and re-wrapped. net/url.Parse cannot parse shape #1 itself (it
+//     rejects the literal parentheses in "tcp(host:port)" with "invalid
+//     port"), which is why shape #1 is handled by a plain scheme-prefix
+//     strip instead.
+//
+// parseTime=true is appended when absent, regardless of shape — required
+// for TIMESTAMP columns to scan into time.Time instead of []byte.
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		sep := "?"
+		if strings.Contains(driverDSN, "?") {
+			sep = "&"
+		}
+		driverDSN += sep + "parseTime=true"
+	}
+	return driverDSN, nil
 }

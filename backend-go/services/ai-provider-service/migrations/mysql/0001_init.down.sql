@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS `usage`;
+DROP TABLE IF EXISTS accounts;

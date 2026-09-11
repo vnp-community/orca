@@ -5,23 +5,28 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
@@ -36,6 +41,7 @@ import (
 	issuetrackinggrpc "github.com/stablyai/orca-go/services/issue-tracking-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/issue-tracking-service/internal/adapter/jira"
 	"github.com/stablyai/orca-go/services/issue-tracking-service/internal/adapter/linear"
+	issuetrackingmysql "github.com/stablyai/orca-go/services/issue-tracking-service/internal/adapter/mysql"
 	issuetrackingpostgres "github.com/stablyai/orca-go/services/issue-tracking-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/issue-tracking-service/internal/adapter/providerregistry"
 	"github.com/stablyai/orca-go/services/issue-tracking-service/internal/domain"
@@ -101,17 +107,58 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	pool, err := pgxpool.New(ctx, dsn)
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("detecting database dialect: %w", err)
 	}
-	defer pool.Close()
 
-	repo := issuetrackingpostgres.New(pool)
-	// connectionRepo is the same Repository value as repo — connections.go
-	// adds the usecase.ConnectionRepository methods to the one Repository
-	// type this service already has.
-	connectionRepo := repo
+	healthSrv := health.New()
+
+	// CR-DB-002/CR-DB-003 rollout (BE-DB-SOL-004): DATABASE_DSN's scheme
+	// picks the adapter at startup, no separate DB_DIALECT env var — same
+	// factory shape as usage-service's pilot (BE-DB-SOL-001 §3). repo/
+	// connectionRepo/outboxStore are typed as interfaces because they now
+	// vary by dialect; both concrete Repository types (postgres, mysql)
+	// implement all three ports on the one struct, same as the pilot.
+	var (
+		repo           usecase.OutboxEnqueuer
+		connectionRepo usecase.ConnectionRepository
+		outboxStore    outbox.Store
+	)
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		pgRepo := issuetrackingpostgres.New(pool)
+		repo, connectionRepo, outboxStore = pgRepo, pgRepo, pgRepo
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		myRepo := issuetrackingmysql.New(db)
+		repo, connectionRepo, outboxStore = myRepo, myRepo, myRepo
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
 
 	registry := providerregistry.New().
 		Register(domain.ProviderJira, jira.New(nil)).
@@ -129,13 +176,6 @@ func run() error {
 	defer func() { _ = brokerConn.Close() }()
 	credentialResolver := credential.New(brokerConn, connectionRepo)
 
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
-
 	// Transactional-outbox relay (Epic G, docs/execution-plan.md):
 	// LinkIssue durably enqueues an outbox row via repo.Enqueue — this
 	// relay is what actually gets those rows to NATS. If NATS is
@@ -151,7 +191,7 @@ func run() error {
 		if err := pub.EnsureStream(ctx, "ISSUETRACKING", []string{"orca.issuetracking.>"}); err != nil {
 			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
 		} else {
-			relay = outbox.NewRelay(repo, pub, outbox.DefaultConfig, logger)
+			relay = outbox.NewRelay(outboxStore, pub, outbox.DefaultConfig, logger)
 			healthSrv.Register("nats", func() error { return nil }) // presence-only: a real liveness probe would ping the connection
 		}
 	}
@@ -296,4 +336,56 @@ func run() error {
 	relayWG.Wait()
 
 	return nil
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — copied from
+// usage-service/cmd/server/main.go's identical helper (BE-DB-SOL-004
+// replicates the pilot pattern verbatim; no shared package exists for this
+// yet, matching every other multi-dialect service's own duplicate copy).
+// That driver does NOT accept a URL directly
+// (sql.Open("mysql", "mysql://...") fails outright). Handles two input
+// shapes: (1) host already wrapped as "tcp(host:port)" — passed through
+// as-is after stripping the scheme; (2) a plain
+// "mysql://user:pass@host:port/db" URL — parsed with net/url and
+// re-wrapped (net/url.Parse cannot parse shape #1's literal parentheses).
+// parseTime=true is appended when absent — required for TIMESTAMP columns
+// to scan into time.Time/sql.NullTime.
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		sep := "?"
+		if strings.Contains(driverDSN, "?") {
+			sep = "&"
+		}
+		driverDSN += sep + "parseTime=true"
+	}
+	return driverDSN, nil
 }

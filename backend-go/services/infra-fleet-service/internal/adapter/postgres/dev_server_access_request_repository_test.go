@@ -9,10 +9,10 @@ import (
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
-const (
-	testUser1      = "dddddddd-dddd-dddd-dddd-dddddddddddd"
-	testAccessReq1 = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
-)
+// testUser1 is defined in agent_session_repository_test.go — shared across
+// this package's integration test files, same convention as
+// testTenant1/testDevServer1 in repository_test.go.
+const testAccessReq1 = "eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee"
 
 func setupDevServerAccessRequestStore(t *testing.T) (*DevServerAccessRequestStore, *DevServerGroupStore) {
 	t.Helper()

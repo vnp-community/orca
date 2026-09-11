@@ -33,7 +33,7 @@ func setupRepository(t *testing.T) *RateLimitCacheRepository {
 	t.Helper()
 	dsn := testutil.StartPostgres(t, "scm")
 
-	migrationsPath, err := filepath.Abs("../../../migrations")
+	migrationsPath, err := filepath.Abs("../../../migrations/postgres")
 	if err != nil {
 		t.Fatalf("resolving migrations path: %v", err)
 	}

@@ -5,28 +5,34 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"go.opentelemetry.io/contrib/instrumentation/google.golang.org/grpc/otelgrpc"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/dbcapability"
 	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/automation-service/internal/config"
@@ -35,6 +41,7 @@ import (
 	automationgrpc "github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpc/interceptors"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/grpcclient"
+	automationmysql "github.com/stablyai/orca-go/services/automation-service/internal/adapter/mysql"
 	automationpostgres "github.com/stablyai/orca-go/services/automation-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/automation-service/internal/adapter/scheduler"
 	"github.com/stablyai/orca-go/services/automation-service/internal/usecase"
@@ -70,19 +77,79 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
-	}
-	pool, err := pgxpool.New(ctx, dsn)
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (see common/secrets.DatabaseCredentialsFromFile's doc comment) —
+	// falls back to DATABASE_DSN itself when the file doesn't exist, which
+	// is what local dev / this scaffold's testcontainers path still uses.
+	// Replaces the previous direct cfg.DatabaseDSN read (CR-DB-002/
+	// CR-DB-003, BE-DB-SOL-012 — closes this service's own "Vault (common/
+	// secrets) is not wired here" README gap, same as usage-service/
+	// annotation-service's identical rollout step).
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	defer pool.Close()
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
+	if err != nil {
+		return fmt.Errorf("detecting database dialect: %w", err)
+	}
 
-	automationRepo := automationpostgres.NewAutomationRepository(pool)
-	runCompletedPublisher := automationeventbus.NewRunCompletedPublisher()
-	runRepo := automationpostgres.NewAutomationRunRepository(pool, runCompletedPublisher)
+	healthSrv := health.New()
+
+	// CR-DB-003: DATABASE_DSN's scheme picks the adapter at startup, no
+	// separate DB_DIALECT env var — same factory pattern as usage-service
+	// (the multi-dialect pilot), see
+	// specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-001.md §1.
+	// automationRepo/claimer and runRepo/outboxStore are tracked as
+	// separate-but-same-value variable pairs (mirroring usage-service's
+	// repo/outboxStore split): the usecase.AutomationRepository/
+	// AutomationRunRepository interfaces don't themselves embed
+	// usecase.DueAutomationClaimer/common/outbox.Store, so scheduler.New and
+	// outbox.NewRelay below need their own narrower-typed handles onto the
+	// exact same concrete repository.
+	var (
+		automationRepo usecase.AutomationRepository
+		claimer        usecase.DueAutomationClaimer
+		runRepo        usecase.AutomationRunRepository
+		outboxStore    outbox.Store
+	)
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		pgAutomationRepo := automationpostgres.NewAutomationRepository(pool)
+		runCompletedPublisher := automationeventbus.NewRunCompletedPublisher()
+		pgRunRepo := automationpostgres.NewAutomationRunRepository(pool, runCompletedPublisher)
+		automationRepo, claimer, runRepo, outboxStore = pgAutomationRepo, pgAutomationRepo, pgRunRepo, pgRunRepo
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		myAutomationRepo := automationmysql.NewAutomationRepository(db)
+		myRunRepo := automationmysql.NewAutomationRunRepository(db)
+		automationRepo, claimer, runRepo, outboxStore = myAutomationRepo, myAutomationRepo, myRunRepo, myRunRepo
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
 
 	// Real gRPC connection to workflow-service — RunNow's whole reason for
 	// existing (see automation-service.md §2/§6). Insecure transport
@@ -138,12 +205,13 @@ func run() error {
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// In-process scheduler ticker — see automation-service.md §7. Every
-	// replica runs one; automationRepo (postgres.AutomationRepository) also
-	// implements usecase.DueAutomationClaimer's SKIP LOCKED claim query, so
-	// concurrent replicas' ticks never dispatch the same due occurrence
-	// twice. Started as a goroutine sharing the same top-level shutdown
-	// ctx every other goroutine here watches.
-	schedulerTicker := scheduler.New(automationRepo, runNowUC, cfg.SchedulerInterval, cfg.SchedulerBatchSize, logger)
+	// replica runs one; claimer (the same concrete repository as
+	// automationRepo, see the dialect switch above) implements
+	// usecase.DueAutomationClaimer's SKIP LOCKED claim query on both
+	// dialects, so concurrent replicas' ticks never dispatch the same due
+	// occurrence twice. Started as a goroutine sharing the same top-level
+	// shutdown ctx every other goroutine here watches.
+	schedulerTicker := scheduler.New(claimer, runNowUC, cfg.SchedulerInterval, cfg.SchedulerBatchSize, logger)
 	go schedulerTicker.Run(ctx)
 
 	// Transactional-outbox relay for orca.automation.run.completed
@@ -164,7 +232,7 @@ func run() error {
 		if err := pub.EnsureStream(ctx, "AUTOMATION", []string{"orca.automation.>"}); err != nil {
 			logger.WarnContext(ctx, "failed to ensure jetstream stream", slog.Any("error", err))
 		} else {
-			relay = outbox.NewRelay(runRepo, pub, outbox.DefaultConfig, logger)
+			relay = outbox.NewRelay(outboxStore, pub, outbox.DefaultConfig, logger)
 		}
 		eventConsumer := automationeventbus.NewConsumer(sub, handleEventTriggerUC)
 		go eventConsumer.Run(ctx, logger)
@@ -179,12 +247,9 @@ func run() error {
 		}()
 	}
 
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
+	// healthSrv itself (and its "postgres"/"mysql" dialect check) was
+	// created earlier, alongside the dialect switch — only the
+	// workflow-service dependency check is registered here.
 	healthSrv.Register("workflow-service", func() error {
 		state := workflowConn.GetState()
 		// Idle/Connecting are not failures — the connection is lazy and
@@ -243,4 +308,72 @@ func run() error {
 	_ = httpServer.Shutdown(shutdownCtx)
 
 	return nil
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — that driver does NOT accept
+// a URL directly (sql.Open("mysql", "mysql://...") fails outright). Same
+// two-input-shape handling as usage-service's (the pilot) toMySQLDriverDSN
+// — see that copy's doc comment for the full "tcp(host:port)" vs plain-URL
+// rationale — with one addition specific to this service:
+// clientFoundRows=true is always appended. automation-service's
+// AutomationRepository.Update and AutomationRunRepository.UpdateStatus both
+// decide "not found" from sql.Result.RowsAffected() == 0 (mirroring
+// internal/adapter/postgres 1:1) — go-sql-driver/mysql's DEFAULT
+// RowsAffected() semantics count only rows whose VALUES actually changed,
+// so a no-op retry (identical field values) would misreport "not found"
+// (the exact pitfall BE-DB-SOL-005 §3.1 documents for annotation-service's
+// UpdateAnnotation, which that adapter fixed with an extra SELECT per
+// call instead). clientFoundRows=true sets MySQL's CLIENT_FOUND_ROWS
+// connection flag, which restores Postgres's "matched rows" RowsAffected()
+// semantics for the WHOLE connection — a driver-level fix instead of a
+// per-method workaround, verified against real MySQL 8 in
+// TestAutomationRepository_Update_NoopRetryStillSucceeds
+// (internal/adapter/mysql/repository_test.go).
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		driverDSN += dsnParamSep(driverDSN) + "parseTime=true"
+	}
+	if !strings.Contains(driverDSN, "clientFoundRows=") {
+		driverDSN += dsnParamSep(driverDSN) + "clientFoundRows=true"
+	}
+	return driverDSN, nil
+}
+
+// dsnParamSep returns the correct separator ("?" for the first query param,
+// "&" for every subsequent one) for appending another key=value pair to
+// driverDSN.
+func dsnParamSep(driverDSN string) string {
+	if strings.Contains(driverDSN, "?") {
+		return "&"
+	}
+	return "?"
 }

@@ -13,9 +13,10 @@ import (
 // "test against fakes, not a real database" pattern from
 // specs/backend-go/standards/testing-strategy.md's unit-test section.
 type fakeSubscriptionRepository struct {
-	saved     []domain.PushSubscription
-	saveErr   error
-	deleteErr error
+	saved            []domain.PushSubscription
+	saveErr          error
+	deleteErr        error
+	expiredEndpoints []string
 }
 
 func (f *fakeSubscriptionRepository) Save(ctx context.Context, sub domain.PushSubscription) error {
@@ -57,6 +58,11 @@ func (f *fakeSubscriptionRepository) DeviceIDFor(ctx context.Context, subscripti
 		}
 	}
 	return "", nil
+}
+
+func (f *fakeSubscriptionRepository) MarkExpired(ctx context.Context, endpoint string) error {
+	f.expiredEndpoints = append(f.expiredEndpoints, endpoint)
+	return nil
 }
 
 func withTenant(ctx context.Context, tenantID string) context.Context {

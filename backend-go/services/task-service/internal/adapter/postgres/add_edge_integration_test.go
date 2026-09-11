@@ -94,7 +94,10 @@ func TestAddEdge_AutoBlock_PersistsAgainstRealDB(t *testing.T) {
 		t.Fatalf("AddEdge: %v", err)
 	}
 
-	got, err := repo.Get(ctx, tenantID, to.ID)
+	// "from depends on to" = "from must wait for to" (task_edge.go's
+	// TaskEdge doc comment) — from is the dependent task and is what gets
+	// auto-blocked, not to.
+	got, err := repo.Get(ctx, tenantID, from.ID)
 	if err != nil {
 		t.Fatalf("Get: %v", err)
 	}

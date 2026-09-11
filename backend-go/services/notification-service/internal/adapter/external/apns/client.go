@@ -26,6 +26,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/stablyai/orca-go/services/notification-service/internal/usecase"
 )
 
 // apnsSigningKeyName is the Vault Transit ES256 (ecdsa-p256) key backing
@@ -106,16 +108,45 @@ func (c *Client) Send(ctx context.Context, deviceToken string, ciphertext, nonce
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
-		// 410 Gone / BadDeviceToken means the token is permanently invalid
-		// (the subscription should eventually be pruned by a future
-		// cleanup pass) vs. a 5xx/429, which is transient and safe to let
-		// DeliverPush's buffering + StreamNotifications reconnect drain
-		// retry — see TASK-MB-02-08's error-classification note. Both are
-		// surfaced identically as an error here; callers distinguish by
-		// inspecting resp.StatusCode's text if they need to.
+		// 410 Gone (reason "Unregistered") / 400 (reason "BadDeviceToken")
+		// mean the token is permanently invalid — wrap usecase.ErrDeviceTokenInvalid
+		// so DeliverPush marks the subscription expired instead of letting it
+		// buffer/retry forever (TASK-MB-02-08's error-classification note,
+		// CR-MOBILE-001's acceptance criteria). A 5xx/429 is transient and
+		// left unwrapped, so it flows through DeliverPush's normal
+		// buffer-and-retry path.
+		if isTokenInvalid(resp.StatusCode, respBody) {
+			return fmt.Errorf("apns: gateway returned %d: %s: %w", resp.StatusCode, string(respBody), usecase.ErrDeviceTokenInvalid)
+		}
 		return fmt.Errorf("apns: gateway returned %d: %s", resp.StatusCode, string(respBody))
 	}
 	return nil
+}
+
+// apnsErrorBody is Apple's documented APNs HTTP/2 error response shape —
+// a single JSON object with a "reason" field (e.g. "BadDeviceToken",
+// "Unregistered", "TopicDisallowed") on any non-200 response.
+type apnsErrorBody struct {
+	Reason string `json:"reason"`
+}
+
+// isTokenInvalid reports whether an APNs error response means the device
+// token is permanently dead: HTTP 410 (always "Unregistered" per Apple's
+// docs) or HTTP 400 with reason "BadDeviceToken" specifically — a 400 can
+// also mean other, non-token problems (e.g. malformed payload), so only the
+// one reason that means "this token itself is bad" counts here.
+func isTokenInvalid(statusCode int, body []byte) bool {
+	if statusCode == http.StatusGone {
+		return true
+	}
+	if statusCode != http.StatusBadRequest {
+		return false
+	}
+	var parsed apnsErrorBody
+	if err := json.Unmarshal(body, &parsed); err != nil {
+		return false
+	}
+	return parsed.Reason == "BadDeviceToken"
 }
 
 // providerToken builds and Transit-signs an ES256 JWT per Apple's

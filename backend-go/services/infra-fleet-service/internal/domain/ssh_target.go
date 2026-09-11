@@ -54,6 +54,11 @@ func NewSshTarget(id, tenantID, host string, port int, userName, vaultSSHRole, k
 	if port == 0 {
 		port = 22
 	}
+	// tags is a NOT NULL TEXT[]/JSON column in both dialects — a nil caller
+	// value must never reach the adapter layer as SQL NULL.
+	if tags == nil {
+		tags = []string{}
+	}
 	return SshTarget{
 		ID:                    id,
 		TenantID:              tenantID,

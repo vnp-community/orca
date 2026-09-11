@@ -54,6 +54,9 @@ export default function DiffViewer({
   const updateDiffComment = useAppStore((s) => s.updateDiffComment)
   const scrollToDiffCommentId = useAppStore((s) => s.scrollToDiffCommentId)
   const setScrollToDiffCommentId = useAppStore((s) => s.setScrollToDiffCommentId)
+  useEffect(() => {
+    void useAppStore.getState().ensureDiffCommentsHydrated(worktreeId)
+  }, [worktreeId])
   // Why: subscribe to the raw comments array on the worktree so selector
   // identity only changes when diffComments actually changes on this worktree.
   // Filtering by relativePath happens in a memo below.

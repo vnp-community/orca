@@ -114,9 +114,11 @@ material actually differs from the old."
   isn't implemented; this scaffold has no event-publishing adapter at all
   yet (unlike usage-service's `internal/adapter/eventbus/`, included there
   because that service already had a defined event consumer).
-- **`common/secrets` (Vault) is not wired into this service's `main.go`** —
-  same known gap as usage-service: `DATABASE_DSN` is read directly from the
-  environment for local dev.
+- ~~**`common/secrets` (Vault) is not wired into this service's `main.go`**~~
+  — closed by TASK-BE-DB-014 (multi-database rollout): `main.go` now reads
+  `secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)`,
+  falling back to `DATABASE_DSN` only when that file doesn't exist (local
+  dev / testcontainers).
 - **`common/tracing` has no OTLP exporter configured** — spans are created
   but not shipped anywhere until a collector endpoint is wired in.
 - **No health-check reconciliation job** — the design doc's §8 "every 15
@@ -160,7 +162,7 @@ material actually differs from the old."
 ```sh
 # from backend-go/
 docker compose up -d postgres   # see ../../docker-compose.yml
-migrate -path services/ai-provider-service/migrations \
+migrate -path services/ai-provider-service/migrations/postgres \
   -database "$DATABASE_DSN" up  # golang-migrate; see architecture/05
 
 cd services/ai-provider-service
@@ -168,9 +170,19 @@ DATABASE_DSN=postgres://orca:orca@localhost:5432/ai_provider?sslmode=disable \
   go run ./cmd/server
 ```
 
+Multi-database (CR-DB-002/003, TASK-BE-DB-014): `migrations/` is split into
+`migrations/postgres/` and `migrations/mysql/` — pick the subfolder
+matching `DATABASE_DSN`'s scheme (`postgres://`/`postgresql://` vs.
+`mysql://`/`tidb://`). `DatabaseCredentialsFile`
+(`DATABASE_CREDENTIALS_FILE`, default `/vault/secrets/database-credentials`)
+takes precedence over `DATABASE_DSN` when a Vault-Agent-rendered file is
+present — see `internal/config/config.go` and
+`specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-009-ai-provider-service-mysql-tidb-adapter.md`.
+
 ## Testing
 
 ```sh
 go test ./...                 # unit tests (domain/, usecase/) — no external deps
 go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (testcontainers-go)
+go test -tags=integration ./internal/adapter/mysql/...      # requires Docker (testcontainers-go)
 ```

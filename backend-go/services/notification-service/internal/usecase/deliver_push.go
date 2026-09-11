@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 
 	"github.com/stablyai/orca-go/services/notification-service/internal/domain"
@@ -144,7 +145,8 @@ func (uc *DeliverPush) deliverOne(ctx context.Context, event domain.Notification
 		if err != nil {
 			return err
 		}
-		return uc.webpush.Send(ctx, sub.Endpoint, derefOrEmpty(sub.P256dhKey), derefOrEmpty(sub.AuthKey), plaintext, nil, jwt)
+		sendErr := uc.webpush.Send(ctx, sub.Endpoint, derefOrEmpty(sub.P256dhKey), derefOrEmpty(sub.AuthKey), plaintext, nil, jwt)
+		return uc.markExpiredOnDeadToken(ctx, sub.Endpoint, sendErr)
 	}
 
 	secret, err := uc.devices.ResolveSharedSecret(ctx, deviceID)
@@ -162,20 +164,44 @@ func (uc *DeliverPush) deliverOne(ctx context.Context, event domain.Notification
 		if err != nil {
 			return err
 		}
-		return uc.webpush.Send(ctx, sub.Endpoint, derefOrEmpty(sub.P256dhKey), derefOrEmpty(sub.AuthKey), ciphertext, nonce, jwt)
+		sendErr := uc.webpush.Send(ctx, sub.Endpoint, derefOrEmpty(sub.P256dhKey), derefOrEmpty(sub.AuthKey), ciphertext, nonce, jwt)
+		return uc.markExpiredOnDeadToken(ctx, sub.Endpoint, sendErr)
 	case domain.ChannelIOS:
 		if uc.apns == nil {
 			return errAPNsNotConfigured
 		}
-		return uc.apns.Send(ctx, sub.Endpoint, ciphertext, nonce) // own APNs credential — NOT vapidSigner
+		sendErr := uc.apns.Send(ctx, sub.Endpoint, ciphertext, nonce) // own APNs credential — NOT vapidSigner
+		return uc.markExpiredOnDeadToken(ctx, sub.Endpoint, sendErr)
 	case domain.ChannelAndroid:
 		if uc.fcm == nil {
 			return errFCMNotConfigured
 		}
-		return uc.fcm.Send(ctx, sub.Endpoint, ciphertext, nonce) // own FCM credential — NOT vapidSigner
+		sendErr := uc.fcm.Send(ctx, sub.Endpoint, ciphertext, nonce) // own FCM credential — NOT vapidSigner
+		return uc.markExpiredOnDeadToken(ctx, sub.Endpoint, sendErr)
 	default:
 		return domain.ErrUnsupportedChannel
 	}
+}
+
+// markExpiredOnDeadToken inspects sendErr for ErrDeviceTokenInvalid — a
+// third-party push service reporting the device token/endpoint as
+// permanently dead (APNs BadDeviceToken/Unregistered, FCM UNREGISTERED, Web
+// Push 404/410) — and, if found, marks the subscription expired
+// (CR-MOBILE-001) before returning sendErr unchanged so the caller still
+// sees (and buffers/logs) the original failure. A MarkExpired failure is
+// logged, not propagated: a repository hiccup here must not mask or replace
+// the real delivery error.
+func (uc *DeliverPush) markExpiredOnDeadToken(ctx context.Context, endpoint string, sendErr error) error {
+	if sendErr == nil {
+		return nil
+	}
+	if errors.Is(sendErr, ErrDeviceTokenInvalid) {
+		if err := uc.subscriptions.MarkExpired(ctx, endpoint); err != nil {
+			uc.logger.WarnContext(ctx, "deliver_push: failed to mark expired subscription",
+				slog.String("endpoint", endpoint), slog.Any("error", err))
+		}
+	}
+	return sendErr
 }
 
 func derefOrEmpty(s *string) string {

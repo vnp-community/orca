@@ -39,6 +39,15 @@ type Config struct {
 	// credentials are provisioned" posture as APNs above.
 	FCMProjectID           string
 	FCMServiceAccountEmail string
+	// DatabaseCredentialsFile is the path a Vault Agent sidecar renders
+	// dynamic database credentials to in production (see
+	// common/secrets.DatabaseCredentialsFromFile). Falls back to
+	// DATABASE_DSN (via Base) when the file doesn't exist, which is what
+	// local dev and this service's testcontainers path use instead. Added
+	// for CR-DB-002/CR-DB-003's multi-database rollout (BE-DB-SOL-008),
+	// replacing the direct cfg.DatabaseDSN read main.go used to do —
+	// mirrors usage-service's (the pilot) identical field 1:1.
+	DatabaseCredentialsFile string
 }
 
 func Load() (Config, error) {
@@ -47,15 +56,16 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:                   base,
-		NATSURL:                commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
-		CredentialBrokerAddr:   commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
-		AuthServiceAddr:        commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
-		APNsTeamID:             commonconfig.StringEnv("APNS_TEAM_ID", ""),
-		APNsKeyID:              commonconfig.StringEnv("APNS_KEY_ID", ""),
-		APNsTopic:              commonconfig.StringEnv("APNS_TOPIC", ""),
-		APNsEndpoint:           commonconfig.StringEnv("APNS_ENDPOINT", "https://api.push.apple.com"),
-		FCMProjectID:           commonconfig.StringEnv("FCM_PROJECT_ID", ""),
-		FCMServiceAccountEmail: commonconfig.StringEnv("FCM_SERVICE_ACCOUNT_EMAIL", ""),
+		Base:                    base,
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		CredentialBrokerAddr:    commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
+		AuthServiceAddr:         commonconfig.StringEnv("AUTH_SERVICE_ADDR", "auth-service:9090"),
+		APNsTeamID:              commonconfig.StringEnv("APNS_TEAM_ID", ""),
+		APNsKeyID:               commonconfig.StringEnv("APNS_KEY_ID", ""),
+		APNsTopic:               commonconfig.StringEnv("APNS_TOPIC", ""),
+		APNsEndpoint:            commonconfig.StringEnv("APNS_ENDPOINT", "https://api.push.apple.com"),
+		FCMProjectID:            commonconfig.StringEnv("FCM_PROJECT_ID", ""),
+		FCMServiceAccountEmail:  commonconfig.StringEnv("FCM_SERVICE_ACCOUNT_EMAIL", ""),
+		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 	}, nil
 }

@@ -8,7 +8,7 @@
 |---|---|---|
 | [TASK-BE-MOBILE-001](./TASK-BE-MOBILE-001-subscribe-channel-field.md) — proto `channel`/`device_label` + `Subscribe` usecase + gRPC handler | Không | ✅ DONE |
 | [TASK-BE-MOBILE-002](./TASK-BE-MOBILE-002-api-gateway-subscribe-passthrough.md) — `api-gateway`'s `handleSubscribe` passthrough | 001 | ✅ DONE |
-| [TASK-BE-MOBILE-003](./TASK-BE-MOBILE-003-subscription-repository-mark-expired.md) — `SubscriptionRepository.MarkExpired` | Không | ✅ DONE — đã có sẵn từ TASK-BE-NOTIF-009 (F11) |
+| [TASK-BE-MOBILE-003](./TASK-BE-MOBILE-003-subscription-repository-mark-expired.md) — `SubscriptionRepository.MarkExpired` | Không | ✅ DONE — **regression phát hiện + vá lại 2026-09-11**: bị merge `41442c8e7` xoá mất sau lần DONE gốc, nay đã thêm lại + wire thật vào `deliver_push.go` + 3 integration test PASS trên Postgres thật (xem addendum trong file task) |
 | [TASK-BE-MOBILE-004](./TASK-BE-MOBILE-004-push-credential-resolver.md) — `PushCredentialResolver` port + `credentialbroker` client | Không | ✅ DONE |
 | [TASK-BE-MOBILE-005](./TASK-BE-MOBILE-005-pushgateway-apns-sender.md) — `PushSender` port + `APNsSender` | 004 | ✅ DONE |
 | [TASK-BE-MOBILE-006](./TASK-BE-MOBILE-006-pushgateway-fcm-sender.md) — `FCMSender` | 004, 005 | ✅ DONE |

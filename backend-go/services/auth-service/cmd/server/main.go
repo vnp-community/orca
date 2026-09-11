@@ -5,13 +5,16 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -20,6 +23,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	_ "github.com/go-sql-driver/mysql"
+
+	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
@@ -33,6 +39,7 @@ import (
 	authbcrypt "github.com/stablyai/orca-go/services/auth-service/internal/adapter/bcrypt"
 	authgrpc "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpc"
 	authgrpcclient "github.com/stablyai/orca-go/services/auth-service/internal/adapter/grpcclient"
+	authmysql "github.com/stablyai/orca-go/services/auth-service/internal/adapter/mysql"
 	authnacl "github.com/stablyai/orca-go/services/auth-service/internal/adapter/nacl"
 	authnatsconsumer "github.com/stablyai/orca-go/services/auth-service/internal/adapter/natsconsumer"
 	authoauth "github.com/stablyai/orca-go/services/auth-service/internal/adapter/oauth"
@@ -84,13 +91,73 @@ func run() error {
 	if err != nil {
 		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	pool, err := pgxpool.New(ctx, dsn)
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("detecting database dialect: %w", err)
 	}
-	defer pool.Close()
 
-	repo := authpostgres.New(pool)
+	healthSrv := health.New()
+
+	// CR-DB-002/CR-DB-003: DATABASE_DSN's scheme picks the adapter at
+	// startup, no separate DB_DIALECT env var — same factory shape as
+	// usage-service's pilot (see
+	// specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-001.md §1).
+	// repo is declared against a local interface combining every SQL-backed
+	// port both concrete Repository types implement (UserRepository
+	// through SsoGroupRoleMappingRepository) — the ~30 usecase constructors
+	// below need different combinations of these, so a single shared
+	// variable (not one per port) matches how this file already passed
+	// `repo` everywhere before this dialect factory existed.
+	var (
+		repo interface {
+			usecase.UserRepository
+			usecase.SessionRepository
+			usecase.ServiceTokenRepository
+			usecase.AccessPolicyRepository
+			usecase.AuditRepository
+			usecase.SsoIdentityRepository
+			usecase.SsoGroupRoleMappingRepository
+		}
+		pairingSessions usecase.PairingSessionRepository
+		pairedDevices   usecase.PairedDeviceRepository
+	)
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		repo = authpostgres.New(pool)
+		pairingSessions = authpostgres.NewPairingSessionStore(pool)
+		pairedDevices = authpostgres.NewPairedDeviceStore(pool)
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		repo = authmysql.New(db)
+		pairingSessions = authmysql.NewPairingSessionStore(db)
+		pairedDevices = authmysql.NewPairedDeviceStore(db)
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
+
 	hasher := authbcrypt.New(cfg.BcryptCost)
 	clock := usecase.SystemClock{}
 
@@ -206,8 +273,6 @@ func run() error {
 		}()
 	}
 
-	pairingSessions := authpostgres.NewPairingSessionStore(pool)
-	pairedDevices := authpostgres.NewPairedDeviceStore(pool)
 	initiateDevicePairingUC := usecase.NewInitiateDevicePairing(pairingSessions, keyExchanger, sharedSecretSealer, clock, cfg.ServerAddress)
 	completeDevicePairingUC := usecase.NewCompleteDevicePairing(pairingSessions, pairedDevices, keyExchanger, sharedSecretSealer, tokenSigner, clock, cfg.DeviceAccessTokenTTL)
 	listPairedDevicesUC := usecase.NewListPairedDevices(pairedDevices)
@@ -355,12 +420,6 @@ func run() error {
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
 	// Vault reachability gates readiness — IssueServiceToken/GetJWKS can
 	// only serve real signatures/JWKS while Vault is reachable, so a pod
 	// that can't reach it should be pulled out of rotation. See
@@ -419,4 +478,49 @@ func run() error {
 	consumerWG.Wait()
 
 	return nil
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — copied verbatim from
+// usage-service/cmd/server/main.go's helper of the same name (pure
+// DSN-plumbing, not specific to any one service; see that file's doc
+// comment for the two input shapes it handles and why parseTime=true is
+// always appended).
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		sep := "?"
+		if strings.Contains(driverDSN, "?") {
+			sep = "&"
+		}
+		driverDSN += sep + "parseTime=true"
+	}
+	return driverDSN, nil
 }

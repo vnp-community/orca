@@ -47,6 +47,11 @@ export async function handleAgentExecPrompt(
   // taskId/projectId, when the caller sends one, avoids conflating the two.
   const taskId = typeof params.taskId === 'string' ? params.taskId : ''
   const projectId = typeof params.projectId === 'string' ? params.projectId : ''
+  // task-service/workflow-service's domain.BuildProjectContext — project +
+  // department/"Team" context prepended ahead of the real prompt (field
+  // name confirmed against this handler now, see TASK-PRF-04-06/08's own
+  // "field name UNVERIFIED" caveat — this closes that gap).
+  const initFile = typeof params.initFile === 'string' ? params.initFile : ''
   // 'default'/'standard'/'none' (StepExecutors.ts's and the old vocabulary's
   // non-'full' values) all mean "no extra flag" here — only 'full' is acted on.
   const trustPresetFull = params.trustPreset === 'full'
@@ -103,7 +108,7 @@ export async function handleAgentExecPrompt(
     }
   }
 
-  const args = ['--print', prompt]
+  const args = ['--print', initFile ? `${initFile}\n${prompt}` : prompt]
   if (trustPresetFull && YOLO_TUI_AGENT_ARGS.claude) {
     args.push(YOLO_TUI_AGENT_ARGS.claude)
   }
@@ -242,6 +247,8 @@ export async function handleAgentExecPromptStream(
   const trustPresetFull = params.trustPreset === 'full'
   const modelId = typeof params.model === 'string' && params.model ? params.model : 'claude'
   const accountId = typeof params.accountId === 'string' ? params.accountId : ''
+  // See handleAgentExecPrompt's identical field for the source/rationale.
+  const initFile = typeof params.initFile === 'string' ? params.initFile : ''
   const extraEnv =
     params.env && typeof params.env === 'object' && !Array.isArray(params.env)
       ? (params.env as Record<string, string>)
@@ -285,7 +292,7 @@ export async function handleAgentExecPromptStream(
     return
   }
 
-  const args = ['--print', prompt]
+  const args = ['--print', initFile ? `${initFile}\n${prompt}` : prompt]
   if (trustPresetFull && YOLO_TUI_AGENT_ARGS.claude) {
     args.push(YOLO_TUI_AGENT_ARGS.claude)
   }

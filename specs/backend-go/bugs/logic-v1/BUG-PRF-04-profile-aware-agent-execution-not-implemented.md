@@ -2,7 +2,24 @@
 
 **Business Logic:** [BL-PRF-04](../../../../docs/logic/profile/BL-PRF-04-profile-aware-agent-execution.md) — Profile-Aware Agent Execution Routing
 **Priority (per spec):** P0
-**Status:** NOT_IMPLEMENTED
+**Status:** ✅ RESOLVED — **Đính chính (2026-09-12)**: doc này ghi sai
+"NOT_IMPLEMENTED" dù toàn bộ 8 task (TASK-PRF-04-01~08) đã DONE từ trước
+(merge `243def87f`, 2026-09-10) — xác nhận qua đọc code thật:
+`tenant-service.GetResolvedProfile` (company→department→team→user 4-tầng,
+nhiều hơn 3-tầng doc gốc), `task-service`/`workflow-service` gọi nó rồi
+`domain.BuildAgentEnv` inject `shell.envVars`/`pathAdditions`/
+`agent.preferredModel` vào `agent.execPrompt`'s `env` param, `agent/`'s
+`buildAgentEnv()` merge `extraEnv` vào env tiến trình con thật — toàn bộ
+đường đi wire xong, có test. 1 gap thật còn sót phát hiện lúc audit lại
+(2026-09-12): `initFile` (preamble project-context, gồm dòng "Team:
+<department>") được xây ở `task-service`/`workflow-service` nhưng
+`agent/src/relay/agent-print-mode-exec.ts` chưa đọc field này —
+**đã vá** (đọc `params.initFile`, prepend vào prompt trước `--print`, cả 2
+handler `handleAgentExecPrompt`/`handleAgentExecPromptStream`, 3 test mới,
+22/22 test PASS). Xem
+[SOL-PRF-04](./solutions/SOL-PRF-04-profile-aware-agent-execution.md) và
+[docs/roadmap/feature-completion-matrix.md](../../../../docs/roadmap/feature-completion-matrix.md)'s
+dòng F33.
 **Severity:** Critical
 **Symptom:** When a workflow step spawns an agent through backend-go, the model and trust preset used come only from the workflow step's own static config (`AgentStepConfig.TrustPreset`) — never from the user's resolved profile (`tenant-service.GetResolvedProfile`). Nothing injects `shell.envVars`/`shell.pathAdditions` into the spawned process's environment, nothing sets `GH_CONFIG_DIR`/`GLAB_CONFIG_DIR` for per-user credential isolation, nothing sets `ORCA_PROJECT_ID`/`ORCA_PROJECT_NAME`/`ANTHROPIC_MODEL`, and no project-context preamble is built or passed to the agent. A user with a customized profile (preferred model, PATH additions, env vars) sees none of it take effect when an agent runs.
 

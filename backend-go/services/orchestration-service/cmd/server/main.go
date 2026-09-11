@@ -5,26 +5,32 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/outbox"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/orchestration-service/internal/config"
@@ -32,6 +38,7 @@ import (
 	orchgrpc "github.com/stablyai/orca-go/services/orchestration-service/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/orchestration-service/internal/adapter/grpcclient"
 	"github.com/stablyai/orca-go/services/orchestration-service/internal/adapter/infrafleetclient"
+	orchmysql "github.com/stablyai/orca-go/services/orchestration-service/internal/adapter/mysql"
 	orchpostgres "github.com/stablyai/orca-go/services/orchestration-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/orchestration-service/internal/adapter/taskserviceclient"
 	"github.com/stablyai/orca-go/services/orchestration-service/internal/usecase"
@@ -40,6 +47,23 @@ import (
 	orchestrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1"
 	taskv1 "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1"
 )
+
+// repository is the union of every port internal/adapter/postgres.Repository
+// and internal/adapter/mysql.Repository both implement — declared here
+// (not in usecase/ports.go) purely so run() can hold one variable across
+// the dialect switch below instead of one variable per port interface;
+// unlike usage-service's pilot (a single usecase.Repository interface),
+// orchestration-service's ports.go has 4 separate repository interfaces
+// (OrchestrationTaskRepository/DispatchContextRepository/GateRepository/
+// CoordinatorRunRepository), so this composition is main.go's own, not a
+// port usecase code depends on.
+type repository interface {
+	usecase.OrchestrationTaskRepository
+	usecase.DispatchContextRepository
+	usecase.GateRepository
+	usecase.CoordinatorRunRepository
+	outbox.Store
+}
 
 // version is overridden at build time via -ldflags "-X main.version=...".
 var version = "dev"
@@ -69,22 +93,62 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
-	}
-	pool, err := pgxpool.New(ctx, dsn)
+	// CR-DB-002/CR-DB-003 (batch 2): DATABASE_DSN's scheme picks the
+	// adapter at startup, no separate DB_DIALECT env var — same posture as
+	// usage-service's pilot (BE-DB-SOL-001 §1). Reads via
+	// secrets.DatabaseCredentialsFromFile now (previously read cfg.DatabaseDSN
+	// directly per the README's "Known gaps: common/secrets is not wired
+	// into main.go" — that gap is closed by this rollout, matching every
+	// other rolled-out service's wiring).
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	defer pool.Close()
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
+	if err != nil {
+		return fmt.Errorf("detecting database dialect: %w", err)
+	}
 
-	repo := orchpostgres.New(pool)
+	healthSrv := health.New()
+
+	var repo repository
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		repo = orchpostgres.New(pool)
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		repo = orchmysql.New(db)
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
 
 	// Transactional-outbox relay (BE-SOL-003/TASK-FT-003-01) — same shape
-	// as usage-service's cmd/server/main.go:100-121 wiring: usecases
-	// durably enqueue an outbox row in the SAME Postgres transaction as
-	// their domain write (internal/adapter/postgres.Repository), this
+	// as usage-service's cmd/server/main.go wiring: usecases durably
+	// enqueue an outbox row in the SAME database transaction as their
+	// domain write (internal/adapter/postgres|mysql.Repository), this
 	// relay is what actually gets those rows to NATS. If NATS is
 	// unreachable at startup, rows still get written durably, they just
 	// queue up unpublished until an operator restarts this process once
@@ -164,13 +228,6 @@ func run() error {
 	))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
-
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
 		Handler: healthSrv.Handler(),
@@ -249,4 +306,50 @@ func run() error {
 	relayWG.Wait()
 
 	return nil
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — copied verbatim from
+// usage-service's cmd/server/main.go (TASK-BE-DB-006) rather than shared
+// via a common package, same precedent issue-tracking-service's and
+// issue-status-sync's own rollouts already established. See that
+// function's doc comment for the full "why not net/url alone" rationale;
+// unchanged here.
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		sep := "?"
+		if strings.Contains(driverDSN, "?") {
+			sep = "&"
+		}
+		driverDSN += sep + "parseTime=true"
+	}
+	return driverDSN, nil
 }

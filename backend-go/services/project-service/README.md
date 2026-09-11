@@ -26,19 +26,33 @@ documented follow-up — see "Known gaps" below.
   against in-memory fakes (`fakes_test.go`), no real Postgres/gRPC needed.
 - `internal/adapter/postgres/` — real `pgx`-backed repositories:
   `Repository` (projects/members), `RepoRepository`, `WorktreeRepository`,
-  `ProjectGroupRepository` — one struct per entity, matching task-service's
-  postgres package layout.
+  `ProjectGroupRepository`, `SparsePresetRepository`,
+  `SourceProjectRepository`, `HostSetupRepository`,
+  `FolderWorkspaceRepository`, `OutboxRepository` — one struct per entity,
+  matching task-service's postgres package layout.
 - `internal/adapter/grpcclient/` — outbound client adapters toward
   workflow-service and task-service for the active-execution guard (real as
   of Epic C, 2026-08-17 — see "Known gaps" for a remaining task-service-side
   limitation).
 - `internal/adapter/grpc/` — implements the generated
   `projectv1.ProjectServiceServer`, pure wire<->usecase translation.
-- `migrations/` — `0001_init` (projects/project_members), `0002_project_extended_fields`
+- `migrations/postgres/` / `migrations/mysql/` — dialect-specific migrations
+  (F26/CR-DB-002/CR-DB-003 Multi-Database rollout, BE-DB-SOL-016): `0001_init`
+  (projects/project_members), `0002_project_extended_fields`
   (description/default_branch/visibility/created_by — visibility has a
-  `CHECK` constraint), `0003_repos`, `0004_worktrees`, `0005_project_groups`.
-- `cmd/server/main.go` — composition root: config load, Postgres pool, dials
-  to workflow-service/task-service, gRPC server with the shared interceptor
+  `CHECK` constraint), `0003_repos`, `0004_worktrees`, `0005_project_groups`,
+  and 19 more through `0030_source_projects` — see BE-DB-SOL-016 §5 for the
+  Postgres->MySQL translation notes (JSONB->JSON, TEXT[]->JSON array,
+  RLS dropped, partial indexes -> full indexes, `path`/`idempotency_key`
+  widened to bounded VARCHAR for MySQL's UNIQUE-index requirements).
+- `internal/adapter/mysql/` — the same 9 repositories re-implemented against
+  MySQL/TiDB via `database/sql` + `go-sql-driver/mysql`, selected at
+  startup by `cmd/server/main.go`'s `switch caps.Dialect`
+  (`common/dbcapability`, driven by `DATABASE_DSN`'s scheme — no separate
+  dialect env var).
+- `cmd/server/main.go` — composition root: config load, dialect-selected DB
+  pool (Postgres via `pgxpool`, or MySQL via `database/sql`), dials to
+  workflow-service/task-service, gRPC server with the shared interceptor
   chain, health/readiness HTTP server, graceful shutdown on SIGTERM.
 
 ### `RebindDevServer` — the guarded rebind saga
@@ -109,13 +123,25 @@ Two safety decisions were made explicitly for this RPC, not left implicit:
 ## Running locally
 
 ```sh
-# from backend-go/
+# from backend-go/ — Postgres
 docker compose up -d postgres   # see ../../docker-compose.yml
-migrate -path services/project-service/migrations \
+migrate -path services/project-service/migrations/postgres \
   -database "$DATABASE_DSN" up  # golang-migrate; see architecture/05
 
 cd services/project-service
 DATABASE_DSN=postgres://orca:orca@localhost:5432/project?sslmode=disable \
+WORKFLOW_SERVICE_ADDR=workflow-service:9090 \
+TASK_SERVICE_ADDR=task-service:9090 \
+  go run ./cmd/server
+```
+
+```sh
+# MySQL/TiDB — same binary, DATABASE_DSN's scheme picks the adapter
+# (common/dbcapability.DetectDialectFromDSN, no separate dialect env var)
+migrate -path services/project-service/migrations/mysql \
+  -database "mysql://orca:orca@tcp(localhost:3306)/project" up
+
+DATABASE_DSN=mysql://orca:orca@tcp(localhost:3306)/project \
 WORKFLOW_SERVICE_ADDR=workflow-service:9090 \
 TASK_SERVICE_ADDR=task-service:9090 \
   go run ./cmd/server
@@ -126,12 +152,15 @@ TASK_SERVICE_ADDR=task-service:9090 \
 ```sh
 go test ./...                 # unit tests (domain/, usecase/) — no external deps
 go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (testcontainers-go)
+go test -tags=integration ./internal/adapter/mysql/...      # requires Docker (testcontainers-go)
 ```
 
-112 unit tests (`domain`/`usecase`), 17 integration tests
-(`adapter/postgres`, real Postgres via testcontainers-go) — all pass as of
-this change. `policy/orca-authz/project_test.rego`'s 10 cases (23 total in
-the shared bundle) also pass via `make opa-test` / `opa test
+112 unit tests (`domain`/`usecase`), 17 Postgres integration tests
+(`adapter/postgres`, real Postgres via testcontainers-go) plus a new MySQL
+integration suite (`adapter/mysql`, real MySQL 8 via testcontainers-go,
+BE-DB-SOL-016) — see that solution doc's "Kết quả thực tế" for exact pass
+counts on both dialects. `policy/orca-authz/project_test.rego`'s 10 cases
+(23 total in the shared bundle) also pass via `make opa-test` / `opa test
 policy/orca-authz/ -v` from `backend-go/`.
 
 ## Known gaps / follow-ups (tracked, not silently skipped)
@@ -159,9 +188,11 @@ policy/orca-authz/ -v` from `backend-go/`.
 - **No `sqlc` codegen wired** — same rationale as `usage-service`'s README:
   hand-written SQL via `pgx` is a valid destination per the tech stack doc,
   not the codegen-checked default.
-- **`common/secrets` (Vault) is not wired into this service's `main.go`** —
-  same as `usage-service`; `DATABASE_DSN` is read directly from the
-  environment for local dev.
+- ~~**`common/secrets` (Vault) is not wired into this service's
+  `main.go`**~~ — **closed.** `main.go` reads `DATABASE_DSN` via
+  `secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)`
+  (Vault-Agent-rendered file, falling back to the raw env var for local
+  dev), same as every other Multi-Database-rollout service.
 - **`common/tracing` has no OTLP exporter configured** — spans are created
   but not shipped anywhere until a collector endpoint is wired in.
 - **OPA authorization is wired** (Epic E) via the shared embedded evaluator

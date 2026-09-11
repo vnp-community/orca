@@ -24,7 +24,7 @@ func setupPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 	dsn := testutil.StartPostgres(t, "tenant")
 
-	migrationsPath, err := filepath.Abs("../../../migrations")
+	migrationsPath, err := filepath.Abs("../../../migrations/postgres")
 	if err != nil {
 		t.Fatalf("resolving migrations path: %v", err)
 	}

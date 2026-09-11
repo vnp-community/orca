@@ -18,7 +18,7 @@ func TestRepository_Delete_RemovesRow(t *testing.T) {
 	ctx := context.Background()
 	tenantID := uuid.NewString()
 
-	target, err := domain.NewSshTarget(uuid.NewString(), tenantID, "10.0.0.1", "orca", "ssh-role-dev")
+	target, err := domain.NewSshTarget(uuid.NewString(), tenantID, "10.0.0.1", 22, "orca", "ssh-role-dev", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestRepository_Delete_ScopedByTenant(t *testing.T) {
 	tenantA := uuid.NewString()
 	tenantB := uuid.NewString()
 
-	target, err := domain.NewSshTarget(uuid.NewString(), tenantA, "10.0.0.2", "orca", "ssh-role-dev")
+	target, err := domain.NewSshTarget(uuid.NewString(), tenantA, "10.0.0.2", 22, "orca", "ssh-role-dev", "", "", "", nil)
 	if err != nil {
 		t.Fatalf("NewSshTarget: %v", err)
 	}

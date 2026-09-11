@@ -62,6 +62,19 @@ real generated types today.
   scheduler claim query, covered by real-Postgres integration tests
   (`-tags=integration`) for both the claim-and-advance path and the
   concurrent-claim SKIP LOCKED behavior.
+- `internal/adapter/mysql/` — MySQL/TiDB adapter via `database/sql` +
+  `go-sql-driver/mysql` (CR-DB-002/CR-DB-003 multi-database rollout, see
+  `specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-012.md`),
+  implementing the same `usecase.AutomationRepository`/
+  `AutomationRunRepository`/`DueAutomationClaimer` ports as
+  `internal/adapter/postgres/` — including `FOR UPDATE SKIP LOCKED` (InnoDB
+  supports it since MySQL 8.0) and a generated-column emulation of
+  Postgres's partial unique index for BR-AT-08's "at most one running run"
+  rule (`migrations/mysql/0004_one_running_run.up.sql` — MySQL has no
+  partial-index syntax at all). `cmd/server/main.go` picks whichever
+  adapter at startup based on the resolved `DATABASE_DSN`'s scheme
+  (`postgres://`/`postgresql://` vs `mysql://`/`tidb://`), same factory
+  pattern as `usage-service` (the pilot).
 - `internal/adapter/scheduler/` — the in-process ticker loop (§7): claims
   due automations, dispatches each through `usecase.RunNow`
   (`trigger=scheduled`), advances `next_run_at`. Unit-tested against fake
@@ -73,7 +86,21 @@ real generated types today.
   `automationv1.AutomationServiceServer` (including `HandleExternalTrigger`
   now), pure wire<->usecase translation, plus the `StepType` enum
   translation to/from `orca.workflow.v1.StepType`.
-- `migrations/0001_init.{up,down}.sql` — `automation.automations`,
+- `migrations/postgres/` and `migrations/mysql/` — dialect-specific DDL
+  (CR-DB-002/CR-DB-003, `BE-DB-SOL-012`), split from the single
+  `migrations/` directory this section used to describe (content below
+  still describes each migration's PURPOSE, which is identical across both
+  dialects — see `BE-DB-SOL-012.md` for the dialect-safe translation
+  details: `JSONB`→`JSON`, `gen_random_uuid()`/`BIGSERIAL` dropped — ids are
+  always generated in Go — no `RETURNING` anywhere in this repository, RLS
+  dropped for MySQL with an explanatory comment per migration, and 3 MySQL
+  indexes that lose partiality — `idx_automations_due`,
+  `idx_automations_trigger`, `idx_automation_outbox_events_unpublished` —
+  since MySQL has no partial-index syntax; `idx_automation_runs_one_running`
+  is the one exception that keeps its semantics exactly via a generated
+  column, since it's load-bearing for BR-AT-08, not just a performance
+  index).
+- `migrations/{postgres,mysql}/0001_init.{up,down}.sql` — `automation.automations`,
   `automation.automation_runs`, RLS policies, and the `(tenant_id,
   request_id)` unique index on `automation_runs` — the same idempotency
   pattern usage-service uses for `(tenant_id, request_id)` on `sessions`.
@@ -127,7 +154,7 @@ or not any particular Electron/Node process is up.
 ```sh
 # from backend-go/
 docker compose up -d postgres   # see ../../docker-compose.yml
-migrate -path services/automation-service/migrations \
+migrate -path services/automation-service/migrations/postgres \
   -database "$DATABASE_DSN" up  # golang-migrate; see architecture/05
 
 cd services/automation-service
@@ -138,6 +165,13 @@ SCHEDULER_BATCH_SIZE=50 \
   go run ./cmd/server
 ```
 
+MySQL/TiDB instead of Postgres: run `migrate -path
+services/automation-service/migrations/mysql -database "$DATABASE_DSN" up`
+against a database named `automation`, and set
+`DATABASE_DSN=mysql://root:orca@tcp(localhost:3306)/automation` (or
+`tidb://...`, an explicit alias for the same MySQL wire protocol — see
+`common/dbcapability`).
+
 `SCHEDULER_INTERVAL`/`SCHEDULER_BATCH_SIZE` are optional (default `1m`/`50`
 — see `internal/config/config.go`).
 
@@ -146,6 +180,7 @@ SCHEDULER_BATCH_SIZE=50 \
 ```sh
 go test ./...                 # unit tests (domain/, usecase/) — no external deps
 go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (testcontainers-go)
+go test -tags=integration ./internal/adapter/mysql/...      # requires Docker (testcontainers-go)
 ```
 
 ## Deviations from the design doc (and why)
@@ -263,5 +298,11 @@ silently matching the doc's aspirational shape:
 - **No `sqlc` codegen wired**, same as usage-service — hand-written `pgx`
   SQL is a valid destination per `architecture/04-tech-stack.md` but not
   yet the codegen-checked default path.
-- **`common/secrets` (Vault) and `common/tracing`'s OTLP exporter** are not
-  wired here either, matching usage-service's own noted gaps.
+- ~~`common/secrets` (Vault) is not wired into `main.go`~~ — **closed**
+  (CR-DB-002/CR-DB-003, `BE-DB-SOL-012`): `main.go` now reads
+  `DATABASE_CREDENTIALS_FILE` via `secrets.DatabaseCredentialsFromFile`,
+  falling back to the raw `DATABASE_DSN` env var when the file doesn't
+  exist (local dev / testcontainers), same as usage-service/
+  annotation-service.
+- **`common/tracing`'s OTLP exporter** is not wired here, matching
+  usage-service's own noted gap.

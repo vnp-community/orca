@@ -1,0 +1,11 @@
+-- Postgres's TEXT[] + GIN containment index has no MySQL/TiDB equivalent —
+-- stored as a JSON array of strings instead (same translation as
+-- migrations/mysql/0021_ssh_target_project_tags.up.sql's `tags` column).
+-- ListByTag's `$2 = ANY(tags)` containment check becomes
+-- JSON_CONTAINS(tags, JSON_QUOTE(?)) at the Go adapter layer
+-- (internal/adapter/mysql) — no functional-index equivalent to Postgres's
+-- GIN index is created here; a full JSON_CONTAINS scan is the accepted
+-- cost (this service's dev-server-tag cardinality per tenant is small, see
+-- ListByTag's doc comment), matching this rollout's "index selectivity may
+-- differ, correctness does not" convention (e.g. BE-DB-SOL-005 §5).
+ALTER TABLE dev_servers ADD COLUMN tags JSON NOT NULL DEFAULT (JSON_ARRAY());

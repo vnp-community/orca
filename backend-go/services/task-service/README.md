@@ -59,23 +59,33 @@ layout and conventions this service follows exactly.
   authoritative wire contract.
 - `internal/adapter/grpcclient/` — the three stubbed cross-service ports
   (see "Known gaps" below).
-- `migrations/0001_init.{up,down}.sql` — `task.tasks`, `task.task_edges`,
+- `migrations/postgres/` and `migrations/mysql/` — dialect-safe migrations
+  (CR-DB-002/CR-DB-003, BE-DB-SOL-015). Pick the directory matching
+  `DATABASE_DSN`'s scheme (`postgres://`/`postgresql://` vs
+  `mysql://`/`tidb://`) when running `migrate -path`. See
+  "Running locally (MySQL)" below and
+  `specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-015-task-service-mysql-tidb-adapter.md`.
+- `migrations/postgres/0001_init.{up,down}.sql` — `task.tasks`, `task.task_edges`,
   `task.task_grants`, `task.task_comments`, RLS policies matching
   usage-service's pattern.
-- `migrations/0002_task_project_execution_tracking.{up,down}.sql` — adds
-  `task.tasks.project_id` and a partial index on
+- `migrations/postgres/0002_task_project_execution_tracking.{up,down}.sql` —
+  adds `task.tasks.project_id` and a partial index on
   `(tenant_id, project_id, status) WHERE status = 'in_progress'` for Epic C
   (see "Epic C: `HasActiveExecutions`" below).
+- `internal/adapter/mysql/` — MySQL/TiDB adapter (CR-DB-002/CR-DB-003,
+  BE-DB-SOL-015), implementing every DB-backed port `internal/adapter/postgres`
+  does, against `migrations/mysql/`'s dialect-safe schema.
 - `cmd/server/main.go` — a real, working composition root: config load,
-  Postgres pool, gRPC server with the shared interceptor chain,
-  health/readiness HTTP server, graceful shutdown on SIGTERM.
+  a `caps.Dialect`-selected Postgres/MySQL pool + repository adapter, gRPC
+  server with the shared interceptor chain, health/readiness HTTP server,
+  graceful shutdown on SIGTERM.
 
 ## Running locally
 
 ```sh
 # from backend-go/
 docker compose up -d postgres   # see ../../docker-compose.yml
-migrate -path services/task-service/migrations \
+migrate -path services/task-service/migrations/postgres \
   -database "$DATABASE_DSN" up  # golang-migrate; see architecture/05
 
 cd services/task-service
@@ -83,11 +93,31 @@ DATABASE_DSN=postgres://orca:orca@localhost:5432/task?sslmode=disable \
   go run ./cmd/server
 ```
 
+## Running locally (MySQL/TiDB)
+
+```sh
+# from backend-go/
+docker run -d --name task-mysql -e MYSQL_ROOT_PASSWORD=orca -e MYSQL_DATABASE=task -p 3307:3306 mysql:8
+migrate -path services/task-service/migrations/mysql \
+  -database "mysql://root:orca@tcp(localhost:3307)/task" up
+
+cd services/task-service
+DATABASE_DSN=mysql://root:orca@tcp(localhost:3307)/task \
+  go run ./cmd/server
+```
+
+`DATABASE_DSN`'s scheme (`postgres://`/`postgresql://` vs
+`mysql://`/`tidb://`) picks the adapter at startup via
+`common/dbcapability.DetectDialectFromDSN` — no separate `DB_DIALECT` env
+var, same convention as usage-service (the CR-DB-002/CR-DB-003 pilot). See
+`specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-015-task-service-mysql-tidb-adapter.md`.
+
 ## Testing
 
 ```sh
 go test ./...                 # unit tests (domain/, usecase/) — no external deps
 go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (testcontainers-go)
+go test -tags=integration ./internal/adapter/mysql/...      # requires Docker (testcontainers-go)
 ```
 
 Build/lint standalone (this module has its own `go.mod`/`go.work`
@@ -243,8 +273,10 @@ later work — see "Known gaps" below.
   in the generated proto yet, and they'd need an `ai-provider-service`
   client plus the relay-to-Dev-Server-Agent `ai.complete` pattern used by
   `git-gateway-service`'s commit-message generation.
-- **`common/secrets` (Vault) is not wired into `main.go`** —
-  `DATABASE_DSN` is read directly from the environment for local dev, same
-  gap as usage-service's README documents.
+- ~~`common/secrets` (Vault) is not wired into `main.go`~~ — CLOSED
+  (BE-DB-SOL-015/TASK-BE-DB-020): `main.go` now reads `DATABASE_DSN` via
+  `secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)`,
+  falling back to the raw env var for local dev, as a side effect of adding
+  the CR-DB-002/CR-DB-003 dialect factory.
 - **`common/tracing` has no OTLP exporter configured** — spans are created
   but not shipped anywhere until a collector endpoint is wired in.

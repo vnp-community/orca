@@ -1,0 +1,1 @@
+ALTER TABLE templates ADD COLUMN version INT NOT NULL DEFAULT 1;

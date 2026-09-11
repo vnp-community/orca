@@ -5,22 +5,27 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
@@ -37,6 +42,7 @@ import (
 	notificationwebpush "github.com/stablyai/orca-go/services/notification-service/internal/adapter/external/webpush"
 	notificationgrpc "github.com/stablyai/orca-go/services/notification-service/internal/adapter/grpc"
 	notificationauthclient "github.com/stablyai/orca-go/services/notification-service/internal/adapter/grpcclient/authclient"
+	notificationmysql "github.com/stablyai/orca-go/services/notification-service/internal/adapter/mysql"
 	notificationnacl "github.com/stablyai/orca-go/services/notification-service/internal/adapter/nacl"
 	notificationpostgres "github.com/stablyai/orca-go/services/notification-service/internal/adapter/postgres"
 	notificationvaultsigner "github.com/stablyai/orca-go/services/notification-service/internal/adapter/vaultsigner"
@@ -73,17 +79,83 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
-	}
-	pool, err := pgxpool.New(ctx, dsn)
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (see common/secrets.DatabaseCredentialsFromFile's doc comment) —
+	// falls back to DATABASE_DSN itself when the file doesn't exist, which
+	// is what local dev / this service's testcontainers path still uses.
+	// Replaces the previous direct cfg.DatabaseDSN read (CR-DB-002/
+	// CR-DB-003, BE-DB-SOL-008 — closes this service's own README's
+	// "Known gaps" note that Vault wiring wasn't wired in yet).
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	defer pool.Close()
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
+	if err != nil {
+		return fmt.Errorf("detecting database dialect: %w", err)
+	}
 
-	repo := notificationpostgres.New(pool)
+	healthSrv := health.New()
+
+	// CR-DB-002/CR-DB-003 multi-database rollout (notification-service,
+	// batch 2): DATABASE_DSN's scheme picks the adapter at startup, no
+	// separate DB_DIALECT env var — same factory pattern as usage-service's
+	// pilot implementation, see
+	// specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-001.md §3
+	// and BE-DB-SOL-008.md (this service's own solution doc). repo is
+	// typed as the combined port surface it's actually used as below
+	// (SubscriptionRepository + VapidKeyRepository +
+	// ProcessedEventRepository + NotificationRepository — see this
+	// function's calls to usecase.New*) since both concrete Repository
+	// types implement all four; bufferStore/preferenceStore are separate
+	// per-table stores, same split as the Postgres package.
+	var (
+		repo interface {
+			usecase.SubscriptionRepository
+			usecase.VapidKeyRepository
+			usecase.ProcessedEventRepository
+			usecase.NotificationRepository
+		}
+		bufferStore     usecase.BufferedNotificationRepository
+		preferenceStore usecase.NotificationPreferenceRepository
+	)
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		repo = notificationpostgres.New(pool)
+		bufferStore = notificationpostgres.NewBufferedNotificationStore(pool)
+		preferenceStore = notificationpostgres.NewNotificationPreferenceStore(pool)
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		repo = notificationmysql.New(db)
+		bufferStore = notificationmysql.NewBufferedNotificationStore(db)
+		preferenceStore = notificationmysql.NewNotificationPreferenceStore(db)
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
+
 	broadcast := notificationbroadcaster.New()
 
 	// Real credential-broker-service connection — Epic B
@@ -106,9 +178,8 @@ func run() error {
 	// BL-MB-02 (SOL-MB-02): mobile push delivery pipeline — buffered
 	// notifications + per-event preferences (TASK-MB-02-06), device
 	// shared-secret resolution + E2E sealing (TASK-MB-02-07), APNs/FCM/Web
-	// Push transports (TASK-MB-02-07/08).
-	bufferStore := notificationpostgres.NewBufferedNotificationStore(pool)
-	preferenceStore := notificationpostgres.NewNotificationPreferenceStore(pool)
+	// Push transports (TASK-MB-02-07/08). bufferStore/preferenceStore were
+	// already constructed above in the dialect switch.
 	sealer := notificationnacl.New()
 	webpushClient := notificationwebpush.New()
 
@@ -184,12 +255,8 @@ func run() error {
 	notificationv1.RegisterNotificationServiceServer(grpcServer, notificationgrpc.New(subscribeUC, unregisterPushSubscriptionUC, getVapidPublicKeyUC, broadcast, signer, bufferStore, listNotificationsUC, markAsReadUC, markAllAsReadUC, getUnreadCountUC))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
+	// healthSrv was already constructed above (before the dialect switch)
+	// and had its "postgres"/"mysql" check registered inside that switch.
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
 		Handler: healthSrv.Handler(),
@@ -239,4 +306,49 @@ func run() error {
 	consumerWG.Wait()
 
 	return nil
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — copied verbatim from
+// usage-service's cmd/server/main.go (the multi-dialect pilot): pure
+// DSN-plumbing, not specific to any one service. See that file's doc
+// comment for the two input shapes handled and why net/url alone can't
+// parse shape #1 ("tcp(host:port)").
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		sep := "?"
+		if strings.Contains(driverDSN, "?") {
+			sep = "&"
+		}
+		driverDSN += sep + "parseTime=true"
+	}
+	return driverDSN, nil
 }

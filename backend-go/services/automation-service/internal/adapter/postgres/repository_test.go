@@ -29,7 +29,12 @@ func setupRepositories(t *testing.T) (*AutomationRepository, *AutomationRunRepos
 	t.Helper()
 	dsn := testutil.StartPostgres(t, "automation")
 
-	migrationsPath, err := filepath.Abs("../../../migrations")
+	// CR-DB-002/CR-DB-003 (BE-DB-SOL-012): migrations moved from
+	// migrations/ to migrations/postgres/ (content unchanged) to make room
+	// for the new migrations/mysql/ dialect variant — see
+	// internal/adapter/mysql/repository_test.go's own setupRepositories for
+	// that variant's equivalent.
+	migrationsPath, err := filepath.Abs("../../../migrations/postgres")
 	if err != nil {
 		t.Fatalf("resolving migrations path: %v", err)
 	}

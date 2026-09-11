@@ -1,0 +1,1 @@
+DROP INDEX idx_workflow_executions_tenant_project_created ON executions;

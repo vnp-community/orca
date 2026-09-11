@@ -23,6 +23,9 @@ implementation — see that README for the layout rationale.
 - `internal/adapter/postgres/` — real `pgx`-backed repository implementing
   all three repository ports, hand-written SQL (see `architecture/04-tech-stack.md`
   — `sqlc` codegen is the eventual target).
+- `internal/adapter/mysql/` — MySQL/TiDB adapter for the same ports via
+  `database/sql` + `go-sql-driver/mysql` (CR-DB-002/CR-DB-003 rollout —
+  see `specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-014-auth-service-mysql-tidb-adapter.md`).
 - `internal/adapter/bcrypt/` — `PasswordHasher` via `golang.org/x/crypto/bcrypt`,
   cost floored at 12 regardless of configuration (`auth-service.md` §9).
 - `internal/adapter/grpc/` — implements the generated
@@ -40,11 +43,27 @@ implementation — see that README for the layout rationale.
 ```sh
 # from backend-go/
 docker compose up -d postgres   # see ../../docker-compose.yml
-migrate -path services/auth-service/migrations \
+migrate -path services/auth-service/migrations/postgres \
   -database "$DATABASE_DSN" up  # golang-migrate; see architecture/05
 
 cd services/auth-service
 DATABASE_DSN=postgres://orca:orca@localhost:5432/auth?sslmode=disable \
+  go run ./cmd/server
+```
+
+### Running on MySQL/TiDB (CR-DB-002/CR-DB-003)
+
+`cmd/server/main.go` picks the adapter from `DATABASE_DSN`'s scheme at
+startup (`postgres://`/`postgresql://` -> Postgres, `mysql://`/`tidb://` ->
+MySQL/TiDB) — see `common/dbcapability` and
+`specs/backend-go/crs/v4/multi-database/solutions/BE-DB-SOL-014-auth-service-mysql-tidb-adapter.md`.
+
+```sh
+migrate -tags mysql -path services/auth-service/migrations/mysql \
+  -database "$DATABASE_DSN" up
+
+cd services/auth-service
+DATABASE_DSN='mysql://root:orca@tcp(localhost:3306)/auth' \
   go run ./cmd/server
 ```
 
@@ -53,6 +72,7 @@ DATABASE_DSN=postgres://orca:orca@localhost:5432/auth?sslmode=disable \
 ```sh
 go test ./...                 # unit tests (domain/, usecase/, adapter/bcrypt) — no external deps
 go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (testcontainers-go)
+go test -tags=integration ./internal/adapter/mysql/...      # requires Docker (testcontainers-go, mysql:8)
 ```
 
 ## Known gaps / follow-ups (tracked, not silently skipped)

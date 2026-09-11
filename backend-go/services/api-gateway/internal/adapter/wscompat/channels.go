@@ -128,7 +128,8 @@ func RegisterRealChannels(
 	eventBusConsumer *commoneventbus.Consumer,
 ) {
 	registerAnnotationChannels(r, annotationClient)
-	registerAnnotationSendChannel(r, annotationClient, gitClient) // NEW — SOL-CR-03
+	registerAnnotationSendChannel(r, annotationClient, gitClient)    // NEW — SOL-CR-03
+	registerAnnotationComposeChannel(r, annotationClient, gitClient) // NEW — TASK-BE-ANNOTATE-002
 	registerTaskChannels(r, taskClient)
 	registerGitChannels(r, gitClient)
 	registerAutomationChannels(r, automationClient)
@@ -206,6 +207,85 @@ type annotationAnchorArg struct {
 	Ref        string `json:"ref"`
 }
 
+// anchorView/annotationView — TASK-BE-ANNOTATE-003: same snake_case-JSON bug
+// as every other raw proto return this codebase's channels have already
+// found and fixed elsewhere (see channels_admin_users.go's userView,
+// channels_infra_fleet.go, channels_workflow.go, channels_tenant_project.go)
+// — annotationv1.Annotation/Anchor's generated `json:` struct tags are
+// snake_case (json:"file_path", json:"created_at", ...), but this envelope
+// serializes `Result any` via plain encoding/json, not protojson. Returning
+// resp.GetAnnotation()/resp directly here (as annotation.create/list/
+// update/markSent used to) silently shipped snake_case + {seconds,nanos}
+// timestamp objects to a frontend that only ever reads camelCase/UnixMs —
+// found while wiring TASK-FE-ANNOTATE-002's hydration read path, which
+// would have silently gotten undefined for every multi-word field.
+type anchorView struct {
+	RepoID     string `json:"repoId"`
+	WorktreeID string `json:"worktreeId"`
+	FilePath   string `json:"filePath"`
+	Line       int32  `json:"line"`
+	EndLine    int32  `json:"endLine"`
+	Side       int32  `json:"side"`
+	Ref        string `json:"ref"`
+}
+
+type annotationView struct {
+	ID              string     `json:"id"`
+	TenantID        string     `json:"tenantId"`
+	AuthorID        string     `json:"authorId"`
+	Anchor          anchorView `json:"anchor"`
+	Content         string     `json:"content"`
+	Resolved        bool       `json:"resolved"`
+	CreatedAtUnixMs int64      `json:"createdAtUnixMs"`
+	UpdatedAtUnixMs int64      `json:"updatedAtUnixMs"`
+	OriginalCode    string     `json:"originalCode"`
+	SentToAgent     bool       `json:"sentToAgent"`
+	SentAtUnixMs    int64      `json:"sentAtUnixMs"` // 0 means "not sent" — never sent a bare Go zero-Timestamp on the wire either way
+}
+
+func toAnnotationView(a *annotationv1.Annotation) annotationView {
+	var createdAtUnixMs, updatedAtUnixMs, sentAtUnixMs int64
+	if ts := a.GetCreatedAt(); ts != nil {
+		createdAtUnixMs = ts.AsTime().UnixMilli()
+	}
+	if ts := a.GetUpdatedAt(); ts != nil {
+		updatedAtUnixMs = ts.AsTime().UnixMilli()
+	}
+	if ts := a.GetSentAt(); ts != nil {
+		sentAtUnixMs = ts.AsTime().UnixMilli()
+	}
+	anchor := a.GetAnchor()
+	return annotationView{
+		ID:       a.GetId(),
+		TenantID: a.GetTenantId(),
+		AuthorID: a.GetAuthorId(),
+		Anchor: anchorView{
+			RepoID:     anchor.GetRepoId(),
+			WorktreeID: anchor.GetWorktreeId(),
+			FilePath:   anchor.GetFilePath(),
+			Line:       anchor.GetLine(),
+			EndLine:    anchor.GetEndLine(),
+			Side:       int32(anchor.GetSide()),
+			Ref:        anchor.GetRef(),
+		},
+		Content:         a.GetContent(),
+		Resolved:        a.GetResolved(),
+		CreatedAtUnixMs: createdAtUnixMs,
+		UpdatedAtUnixMs: updatedAtUnixMs,
+		OriginalCode:    a.GetOriginalCode(),
+		SentToAgent:     a.GetSentToAgent(),
+		SentAtUnixMs:    sentAtUnixMs,
+	}
+}
+
+func toAnnotationViews(as []*annotationv1.Annotation) []annotationView {
+	views := make([]annotationView, 0, len(as))
+	for _, a := range as {
+		views = append(views, toAnnotationView(a))
+	}
+	return views
+}
+
 func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServiceClient) {
 	r.Register("annotation.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
@@ -235,7 +315,7 @@ func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServi
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetAnnotation(), nil
+		return toAnnotationView(resp.GetAnnotation()), nil
 	})
 
 	r.Register("annotation.list", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -265,7 +345,10 @@ func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServi
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		return map[string]any{
+			"annotations":   toAnnotationViews(resp.GetAnnotations()),
+			"nextPageToken": resp.GetNextPageToken(),
+		}, nil
 	})
 
 	r.Register("annotation.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -284,7 +367,7 @@ func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServi
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetAnnotation(), nil
+		return toAnnotationView(resp.GetAnnotation()), nil
 	})
 
 	r.Register("annotation.delete", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -314,7 +397,7 @@ func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServi
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		return map[string]any{"annotations": toAnnotationViews(resp.GetAnnotations())}, nil
 	})
 }
 

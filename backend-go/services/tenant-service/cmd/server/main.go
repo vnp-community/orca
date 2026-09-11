@@ -5,26 +5,32 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	_ "github.com/go-sql-driver/mysql"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/policy"
+	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
 	svcconfig "github.com/stablyai/orca-go/services/tenant-service/internal/config"
@@ -32,6 +38,7 @@ import (
 	tenantcache "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/cache"
 	tenanteventbus "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/eventbus"
 	tenantgrpc "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/grpc"
+	tenantmysql "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/mysql"
 	tenantopaclient "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/opaclient"
 	tenantpostgres "github.com/stablyai/orca-go/services/tenant-service/internal/adapter/postgres"
 	"github.com/stablyai/orca-go/services/tenant-service/internal/adapter/scmstarcheck"
@@ -84,36 +91,100 @@ func run() error {
 	}
 	defer func() { _ = shutdownTracing(context.Background()) }()
 
-	dsn := cfg.DatabaseDSN
-	if dsn == "" {
-		return errors.New("DATABASE_DSN is required (or a Vault-Agent-rendered credentials file — not wired in this scaffold)")
-	}
-	pool, err := pgxpool.New(ctx, dsn)
+	// Prefer the Vault-Agent-rendered credentials file over the raw env var
+	// (see common/secrets.DatabaseCredentialsFromFile's doc comment) —
+	// falls back to DATABASE_DSN itself when the file doesn't exist, which
+	// is what local dev / this scaffold's testcontainers path still uses.
+	// CR-DB-002/CR-DB-003 (BE-DB-SOL-011): DATABASE_DSN's scheme picks the
+	// adapter at startup, no separate DB_DIALECT env var — same pattern as
+	// usage-service, the multi-dialect pilot (BE-DB-SOL-001 §1).
+	dsn, err := secrets.DatabaseCredentialsFromFile(cfg.DatabaseCredentialsFile)
 	if err != nil {
-		return fmt.Errorf("connecting to postgres: %w", err)
+		return fmt.Errorf("resolving database credentials: %w", err)
 	}
-	defer pool.Close()
+	caps, err := dbcapability.DetectDialectFromDSN(dsn)
+	if err != nil {
+		return fmt.Errorf("detecting database dialect: %w", err)
+	}
 
-	companies := tenantpostgres.NewCompanyRepository(pool)
-	departments := tenantpostgres.NewDepartmentRepository(pool)
-	profiles := tenantpostgres.NewUserProfileRepository(pool)
-	teams := tenantpostgres.NewTeamRepository(pool)
+	healthSrv := health.New()
+
+	// profileRepository combines usecase.UserProfileRepository and
+	// usecase.ClientStateRepository — every usecase constructor below needs
+	// one or the other from the SAME underlying repository (profiles
+	// doubles as both, see internal/adapter/postgres/mysql's
+	// UserProfileRepository doc comment), but a plain
+	// usecase.UserProfileRepository-typed variable can't be passed where
+	// usecase.ClientStateRepository is expected (Go interface-to-interface
+	// assignment requires the source interface's method set to already be a
+	// superset) — same anonymous-combined-interface pattern
+	// credential-broker-service's main.go (BE-DB-SOL-006) used for its own
+	// 3-port repository variable.
+	type profileRepository interface {
+		usecase.UserProfileRepository
+		usecase.ClientStateRepository
+	}
+
+	var (
+		companies           usecase.CompanyRepository
+		departments         usecase.DepartmentRepository
+		profiles            profileRepository
+		teams               usecase.TeamRepository
+		companyEmailDomains usecase.CompanyEmailDomainRepository
+		workspaceSessions   usecase.WorkspaceSessionRepository
+		starNagRepo         usecase.StarNagStateRepository
+	)
+	switch caps.Dialect {
+	case dbcapability.DialectPostgres:
+		pool, err := pgxpool.New(ctx, dsn)
+		if err != nil {
+			return fmt.Errorf("connecting to postgres: %w", err)
+		}
+		defer pool.Close()
+		companies = tenantpostgres.NewCompanyRepository(pool)
+		departments = tenantpostgres.NewDepartmentRepository(pool)
+		profiles = tenantpostgres.NewUserProfileRepository(pool)
+		teams = tenantpostgres.NewTeamRepository(pool)
+		companyEmailDomains = tenantpostgres.NewCompanyEmailDomainRepository(pool)
+		workspaceSessions = tenantpostgres.NewUserWorkspaceSessionRepository(pool)
+		starNagRepo = tenantpostgres.NewStarNagStateRepository(pool)
+		healthSrv.Register("postgres", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return pool.Ping(pingCtx)
+		})
+	case dbcapability.DialectMySQL:
+		driverDSN, err := toMySQLDriverDSN(dsn)
+		if err != nil {
+			return fmt.Errorf("converting mysql dsn: %w", err)
+		}
+		db, err := sql.Open("mysql", driverDSN)
+		if err != nil {
+			return fmt.Errorf("connecting to mysql: %w", err)
+		}
+		defer db.Close()
+		companies = tenantmysql.NewCompanyRepository(db)
+		departments = tenantmysql.NewDepartmentRepository(db)
+		profiles = tenantmysql.NewUserProfileRepository(db)
+		teams = tenantmysql.NewTeamRepository(db)
+		companyEmailDomains = tenantmysql.NewCompanyEmailDomainRepository(db)
+		workspaceSessions = tenantmysql.NewUserWorkspaceSessionRepository(db)
+		starNagRepo = tenantmysql.NewStarNagStateRepository(db)
+		healthSrv.Register("mysql", func() error {
+			pingCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+			return db.PingContext(pingCtx)
+		})
+	default:
+		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
+	}
+
 	opa := tenantopaclient.New(policy.NewEvaluator(cfg.OPABundlePath))
-	companyEmailDomains := tenantpostgres.NewCompanyEmailDomainRepository(pool)
-	workspaceSessions := tenantpostgres.NewUserWorkspaceSessionRepository(pool)
-	starNagRepo := tenantpostgres.NewStarNagStateRepository(pool)
 
 	// In-process LRU-with-TTL cache — a usecase-layer decorator, not
 	// baked into adapter/postgres. See tenant-service.md §6 for why this
 	// isn't a shared Redis read-through cache.
 	profileCache := tenantcache.NewLRUTTLCache(tenantcache.DefaultCapacity)
-
-	healthSrv := health.New()
-	healthSrv.Register("postgres", func() error {
-		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-		return pool.Ping(ctx)
-	})
 
 	// Best-effort cross-replica profile-cache invalidation broadcast (Epic F,
 	// docs/execution-plan.md). Unlike every other NATS-consuming service in
@@ -302,4 +373,50 @@ func run() error {
 	consumerWG.Wait()
 
 	return nil
+}
+
+// toMySQLDriverDSN converts a "mysql://"/"tidb://" DATABASE_DSN into
+// go-sql-driver/mysql's own DSN format
+// ("user:pass@tcp(host:port)/dbname?params") — copied verbatim from
+// usage-service's cmd/server/main.go (BE-DB-SOL-001/002's pilot), pure
+// DSN-plumbing with nothing usage-service-specific in it. See that
+// function's own doc comment for the two input shapes handled and why
+// net/url alone can't parse shape #1 ("tcp(host:port)" already-wrapped
+// form).
+func toMySQLDriverDSN(dsn string) (string, error) {
+	rest, ok := strings.CutPrefix(dsn, "mysql://")
+	if !ok {
+		rest, ok = strings.CutPrefix(dsn, "tidb://")
+	}
+	if !ok {
+		return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has neither mysql:// nor tidb:// scheme", dsn)
+	}
+
+	driverDSN := rest
+	if !strings.Contains(rest, "@tcp(") {
+		u, err := url.Parse(dsn)
+		if err != nil {
+			return "", fmt.Errorf("toMySQLDriverDSN: parsing dsn: %w", err)
+		}
+		if u.Host == "" {
+			return "", fmt.Errorf("toMySQLDriverDSN: dsn %q has no host", dsn)
+		}
+		userinfo := ""
+		if u.User != nil {
+			userinfo = u.User.String() + "@"
+		}
+		driverDSN = fmt.Sprintf("%stcp(%s)%s", userinfo, u.Host, u.Path)
+		if u.RawQuery != "" {
+			driverDSN += "?" + u.RawQuery
+		}
+	}
+
+	if !strings.Contains(driverDSN, "parseTime=") {
+		sep := "?"
+		if strings.Contains(driverDSN, "?") {
+			sep = "&"
+		}
+		driverDSN += sep + "parseTime=true"
+	}
+	return driverDSN, nil
 }

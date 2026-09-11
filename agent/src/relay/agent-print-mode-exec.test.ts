@@ -133,6 +133,48 @@ describe('handleAgentExecPrompt', () => {
     )
   })
 
+  it('prepends initFile to the prompt when the caller sends a project-context preamble', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+
+    const pending = handleAgentExecPrompt(
+      1,
+      {
+        prompt: 'fix the bug',
+        worktreePath: '/repo',
+        initFile: '# Orca Project Context\nProject: demo\nTeam: platform\n'
+      },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+    await waitForSpawn()
+    child.emit('close', 0)
+    await pending
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      'claude',
+      ['--print', '# Orca Project Context\nProject: demo\nTeam: platform\n\nfix the bug'],
+      expect.anything()
+    )
+  })
+
+  it('omits without a leading newline when no initFile is sent', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+
+    const pending = handleAgentExecPrompt(
+      1,
+      { prompt: 'fix the bug', worktreePath: '/repo' },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+    await waitForSpawn()
+    child.emit('close', 0)
+    await pending
+
+    expect(spawnMock).toHaveBeenCalledWith('claude', ['--print', 'fix the bug'], expect.anything())
+  })
+
   it("appends YOLO_TUI_AGENT_ARGS.claude when trustPreset is 'full'", async () => {
     const child = createFakeChild()
     spawnMock.mockReturnValue(child as never)
@@ -392,6 +434,31 @@ describe('handleAgentExecPromptStream', () => {
       result: { type: 'stream.chunk', line: 'warn 1', source: 'stderr' }
     })
     expect(frames[3]).toMatchObject({ id: 'req-1', result: { type: 'stream.end', exitCode: 0 } })
+  })
+
+  it('prepends initFile to the prompt, same as the non-streaming handler', async () => {
+    const child = createFakeChild()
+    spawnMock.mockReturnValue(child as never)
+    const ws = new MockWs()
+    const wireState = createWireState()
+
+    const pending = handleAgentExecPromptStream(
+      ws as unknown as never,
+      wireState,
+      'req-init',
+      { prompt: 'fix the bug', worktreePath: '/repo', initFile: 'Team: platform\n' },
+      MOCK_CONFIG,
+      MOCK_LOG
+    )
+    await waitForSpawn()
+    child.emit('close', 0)
+    await pending
+
+    expect(spawnMock).toHaveBeenCalledWith(
+      'claude',
+      ['--print', 'Team: platform\n\nfix the bug'],
+      expect.anything()
+    )
   })
 
   it('forwards raw data events verbatim without line-splitting (Open Question 1 resolution)', async () => {

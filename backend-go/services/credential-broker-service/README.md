@@ -115,7 +115,7 @@ an append-only audit trail, and nothing else.**
 ```sh
 # from backend-go/
 docker compose up -d postgres vault   # see ../../docker-compose.yml
-migrate -path services/credential-broker-service/migrations \
+migrate -path services/credential-broker-service/migrations/postgres \
   -database "$DATABASE_DSN" up        # golang-migrate; see architecture/05
 
 cd services/credential-broker-service

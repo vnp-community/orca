@@ -207,7 +207,12 @@ func NewTask(id, tenantID, title string, status Status, parentID, projectID stri
 	if parentID != "" && parentID == id {
 		return Task{}, ErrSelfParent
 	}
-	return Task{ID: id, TenantID: tenantID, Title: title, Status: status, ParentID: parentID, ProjectID: projectID}, nil
+	// Labels must be non-nil: the postgres adapter binds it directly into
+	// an INSERT against a NOT NULL column (migration 0011) — a nil slice
+	// serializes to SQL NULL and violates that constraint, bypassing the
+	// column's DEFAULT '{}' (which only applies when a column is omitted
+	// from the INSERT list entirely, not when NULL is bound explicitly).
+	return Task{ID: id, TenantID: tenantID, Title: title, Status: status, ParentID: parentID, ProjectID: projectID, Labels: []string{}}, nil
 }
 
 // SetStatus enforces the (small, currently permissive-by-design) set of

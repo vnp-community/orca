@@ -1,12 +1,24 @@
 // src/renderer/src/components/code-review/code-review-panel.tsx
 // BL-CR-01~05: Main code review panel — assembly of all code review sub-components
-// Layout: [FileTree 256px] [DiffViewer | AnnotationPanel]
+// Layout: [FileTree 256px] [DiffViewer]
+//
+// TASK-FE-ANNOTATE-003: this component (and everything under
+// components/code-review/) has zero real callers anywhere in the app —
+// confirmed via GitNexus context({name: "CodeReviewPanel"}) returning
+// incoming: {} and a repo-wide grep for JSX usage. It predates the real,
+// live diff-comments flow (components/diff-comments/,
+// useDiffCommentDecorator.tsx) and was superseded by it without being
+// retired. AnnotationPanel (formerly rendered below) was deleted here
+// because it called annotation.create/list with a field shape
+// (projectId/reviewId) that never matched backend-go's real
+// annotation-service contract (repo_id/worktree_id) — see
+// SOL-FE-ANNOTATE-001 §3. This file itself is left in place (out of this
+// task's scope) but is dead code — a candidate for its own cleanup CR.
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import { GitPullRequest } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ChangedFilesTree, type ChangedFile } from './changed-files-tree'
-import { AnnotationPanel } from './annotation-panel'
+import { ChangedFilesTree } from './changed-files-tree'
 import { CommitMessageGenerator } from './commit-message-generator'
 import { useCodeReview } from '../../hooks/use-code-review'
 
@@ -27,13 +39,11 @@ export function CodeReviewPanel({ reviewId }: CodeReviewPanelProps) {
     selectedFile,
     setSelectedFile,
     annotationLine,
-    handleLineClick,
-    closeAnnotation,
     isLoadingFiles,
     commitMessage,
     setCommitMessage,
     isCommitting,
-    handleCommit,
+    handleCommit
   } = useCodeReview({ reviewId })
 
   const { project } = useWorkspace()
@@ -84,34 +94,18 @@ export function CodeReviewPanel({ reviewId }: CodeReviewPanelProps) {
         {/* Diff viewer */}
         <div className={`flex-1 overflow-hidden ${annotationLine !== null ? 'border-r' : ''}`}>
           {selectedFile ? (
-            <DiffViewer
-              filePath={selectedFile}
-            />
+            <DiffViewer filePath={selectedFile} />
           ) : (
             <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
               Select a file to view diff
             </div>
           )}
         </div>
-
-        {/* Annotation panel — slides in when line is clicked */}
-        {annotationLine !== null && selectedFile && (
-          <AnnotationPanel
-            filePath={selectedFile}
-            lineNumber={annotationLine}
-            reviewId={reviewId}
-            onClose={closeAnnotation}
-          />
-        )}
       </div>
 
       {/* PR Create Dialog */}
       {project && (
-        <PrCreateDialog
-          open={showPrDialog}
-          onOpenChange={setShowPrDialog}
-          projectId={project.id}
-        />
+        <PrCreateDialog open={showPrDialog} onOpenChange={setShowPrDialog} projectId={project.id} />
       )}
     </div>
   )

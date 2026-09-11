@@ -65,7 +65,7 @@ func setupSshTargetStore(t *testing.T) (*Repository, *SshTargetStore) {
 	t.Helper()
 	dsn := testutil.StartPostgres(t, "infra")
 
-	migrationsPath, err := filepath.Abs("../../../migrations")
+	migrationsPath, err := filepath.Abs("../../../migrations/postgres")
 	if err != nil {
 		t.Fatalf("resolving migrations path: %v", err)
 	}
@@ -110,6 +110,10 @@ func TestFindByHostAndMode_DirectWebSocketWithNullSSHTargetID(t *testing.T) {
 		Host:     "dev-01",
 		Mode:     domain.ConnectionModeDirectWebSocket,
 		Status:   domain.DevServerStatusApproved,
+		// Kind must be set explicitly here (unlike domain.NewDevServer,
+		// this test builds the struct literal directly) — dev_servers_kind_check
+		// (migrations/0036) rejects an empty string.
+		Kind: domain.AgentKindDevServer,
 		// SSHTargetID intentionally empty — Register must persist this as
 		// SQL NULL for direct-websocket mode, matching production data.
 	})
@@ -322,7 +326,7 @@ func TestSshTargetStore_PersistsPortKnownHostsAndJumpHost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get bastion: %v", err)
 	}
-	if gotBastion != bastion {
+	if !reflect.DeepEqual(gotBastion, bastion) {
 		t.Errorf("expected bastion %+v, got %+v", bastion, gotBastion)
 	}
 	if gotBastion.JumpHostTargetID != "" {
@@ -333,7 +337,7 @@ func TestSshTargetStore_PersistsPortKnownHostsAndJumpHost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get target behind bastion: %v", err)
 	}
-	if gotBehind != behindBastion {
+	if !reflect.DeepEqual(gotBehind, behindBastion) {
 		t.Errorf("expected %+v, got %+v", behindBastion, gotBehind)
 	}
 	if gotBehind.Port != 2222 {

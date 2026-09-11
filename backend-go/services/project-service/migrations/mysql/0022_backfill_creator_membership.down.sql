@@ -1,0 +1,3 @@
+-- Intentional no-op — see the Postgres source's identical down migration
+-- for the full rationale (a backfilled row is indistinguishable from a
+-- real one, so there is nothing safe to delete on rollback).

@@ -21,6 +21,14 @@ type Config struct {
 	// (TASK-AIP-01-07) — and also the endpoint used to publish
 	// orca.aiprovider.account.rate_limited (TASK-MB-02-04, SOL-MB-02).
 	NATSURL string
+	// DatabaseCredentialsFile is the path a Vault Agent sidecar renders
+	// dynamic database credentials to in production (see
+	// common/secrets.DatabaseCredentialsFromFile) — added for CR-DB-002/003
+	// multi-database rollout (TASK-BE-DB-014), same field/default
+	// usage-service's config already has. Falls back to DATABASE_DSN (via
+	// Base) when the file doesn't exist, which is what local dev and this
+	// scaffold's testcontainers path use instead.
+	DatabaseCredentialsFile string
 }
 
 func Load() (Config, error) {
@@ -29,9 +37,10 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Base:                  base,
-		CredentialBrokerAddr:  commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
-		InfraFleetServiceAddr: commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
-		NATSURL:               commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		Base:                    base,
+		CredentialBrokerAddr:    commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),
+		InfraFleetServiceAddr:   commonconfig.StringEnv("INFRA_FLEET_SERVICE_ADDR", "infra-fleet-service:9090"),
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
 	}, nil
 }

@@ -66,7 +66,7 @@ func TestMigration0018_UniqueConstraintRejectsSameTenantNameDuplicate(t *testing
 func TestMigration0018_DownDropsTable(t *testing.T) {
 	repo := setupRepository(t) // already ran `up` through the latest migration
 
-	migrationsPath, err := filepath.Abs("../../../migrations")
+	migrationsPath, err := filepath.Abs("../../../migrations/postgres")
 	if err != nil {
 		t.Fatalf("resolving migrations path: %v", err)
 	}

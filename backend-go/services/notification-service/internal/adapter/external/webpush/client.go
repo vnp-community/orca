@@ -24,6 +24,8 @@ import (
 	"time"
 
 	"golang.org/x/crypto/hkdf"
+
+	"github.com/stablyai/orca-go/services/notification-service/internal/usecase"
 )
 
 // Client implements usecase.WebPushClient.
@@ -70,6 +72,15 @@ func (c *Client) Send(ctx context.Context, endpoint, p256dh, auth string, cipher
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
 		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		// RFC 8030 §7.3: 404/410 means the push service has permanently
+		// discarded this endpoint (browser unsubscribed, or the push
+		// service itself expired it) — wrap usecase.ErrDeviceTokenInvalid
+		// so DeliverPush marks the subscription expired instead of
+		// buffering/retrying forever. Any other non-2xx status is
+		// transient and left unwrapped.
+		if resp.StatusCode == http.StatusNotFound || resp.StatusCode == http.StatusGone {
+			return fmt.Errorf("webpush: endpoint returned %d: %s: %w", resp.StatusCode, string(respBody), usecase.ErrDeviceTokenInvalid)
+		}
 		return fmt.Errorf("webpush: endpoint returned %d: %s", resp.StatusCode, string(respBody))
 	}
 	return nil

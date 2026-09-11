@@ -1,0 +1,21 @@
+-- terminal_sessions.connection_id was FK'd to connections(id)
+-- only — but SpawnTerminalSession now falls back to storing a devServerId
+-- there when the caller has no connections row yet (a pre-project
+-- ephemeral terminal: CLI install, agent-skill setup — see
+-- spawn_terminal_session.go's fallback comment). A devServerId is never a
+-- row in connections, so every such spawn failed the FK constraint at
+-- INSERT time with INFRA_CREATE_TERMINAL_SESSION_FAILED, right after the
+-- agent had already spawned a real pty — found live 2026-08-30.
+--
+-- Dropping the FK (not repointing it at dev_servers instead) because
+-- this column now legitimately holds either kind of id, and neither
+-- Postgres nor MySQL has a single-column "FK to one of two tables"
+-- constraint. Referential integrity for the "real connection" case is
+-- preserved at the application layer: resolveTerminalSession/
+-- SpawnTerminalSession try ConnectionResolver first, which itself
+-- join-checks the row exists.
+--
+-- MySQL drops a named foreign key via DROP FOREIGN KEY, not Postgres's
+-- generic DROP CONSTRAINT — the constraint was named explicitly in
+-- migrations/mysql/0005_terminal_sessions.up.sql for exactly this drop.
+ALTER TABLE terminal_sessions DROP FOREIGN KEY terminal_sessions_connection_id_fkey;
