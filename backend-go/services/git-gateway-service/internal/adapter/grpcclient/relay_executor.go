@@ -334,10 +334,18 @@ func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, ba
 		targetPath = repoPath + "-" + sanitizeBranchForRelayPath(branch)
 	}
 
+	// createBranch: false when branch already exists locally — the agent's
+	// git.worktree.add handler passes -b unconditionally when createBranch
+	// is true, which git refuses ("a branch named '<branch>' already
+	// exists", exit 255) whenever the caller wants a worktree checking out
+	// an EXISTING branch (e.g. the frontend's branch-picker sending an
+	// already-known branch name) rather than creating a new one — see
+	// incident 2026-09-12 and localgit.Executor.CreateWorktree's identical
+	// fix.
 	params := map[string]any{
 		"path":         targetPath,
 		"branch":       branch,
-		"createBranch": true,
+		"createBranch": !r.branchExistsLocally(ctx, repoPath, branch),
 		"cwd":          repoPath,
 	}
 	if baseRef != "" {
@@ -361,6 +369,21 @@ func (r *RelayExecutor) CreateWorktree(ctx context.Context, repoPath, branch, ba
 		return domain.WorktreeCreateResult{}, err
 	}
 	return domain.WorktreeCreateResult{Path: targetPath, HeadSHA: strings.TrimSpace(execResult.Stdout)}, nil
+}
+
+// branchExistsLocally reports whether branch already exists as a local ref
+// (`git show-ref --verify --quiet refs/heads/<branch>`, exit 0 = exists).
+// Any error (missing ref, or an unexpected relay/git failure) is treated as
+// "does not exist" — CreateWorktree then falls back to its original
+// createBranch=true behavior, the same outcome as before this check
+// existed. show-ref is confirmed whitelisted on the relay's git.exec
+// surface — see ListLocalBranches' doc comment above.
+func (r *RelayExecutor) branchExistsLocally(ctx context.Context, repoPath, branch string) bool {
+	err := r.relay(ctx, repoPath, "git.exec", map[string]any{
+		"args": []string{"show-ref", "--verify", "--quiet", "refs/heads/" + branch},
+		"cwd":  repoPath,
+	}, nil)
+	return err == nil
 }
 
 // sanitizeBranchForRelayPath mirrors localgit.Executor's own

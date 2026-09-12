@@ -119,6 +119,23 @@ func (uc *CreateWorktree) Execute(ctx context.Context, in CreateWorktreeInput) (
 			fmt.Sprintf("path already exists; try %q", suggested), nil)
 	}
 
+	// [A1b] — branch-already-checked-out-elsewhere pre-check (incident
+	// 2026-09-12): git refuses `worktree add` for a branch that's already
+	// the HEAD of another worktree (including the main repo clone itself,
+	// per git-worktree(1)) with "fatal: '<branch>' is already used by
+	// worktree at '<path>'" — a real, common case for a branch the caller
+	// picked from an "existing branches" list (e.g. "main", almost always
+	// already checked out in repoPath itself) rather than a genuinely new
+	// branch name. Surfacing this clearly here (using the same onDisk data
+	// as [A1] above) avoids a confusing generic WORKTREE_CREATE_FAILED
+	// round-trip through the agent for a case we can already detect locally.
+	for _, w := range onDisk {
+		if w.Branch == "refs/heads/"+in.Branch {
+			return domain.WorktreeResult{}, apperrors.New(apperrors.KindFailedPrecondition, "WORKTREE_BRANCH_CHECKED_OUT_ELSEWHERE",
+				fmt.Sprintf("branch %q is already checked out at %q; pick a different branch or open that existing worktree instead", in.Branch, w.Path), nil)
+		}
+	}
+
 	result, err := executor.CreateWorktree(ctx, repoPath, in.Branch, in.BaseRef, targetPath)
 	if err != nil {
 		if isBaseRefNotFoundErr(err) { // [A2]

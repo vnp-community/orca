@@ -252,6 +252,36 @@ func TestCreateWorktree_PathAlreadyExists_ReturnsSuggestedName_NoGitCallAttempte
 	}
 }
 
+// TestCreateWorktree_BranchAlreadyCheckedOutElsewhere_RejectsBeforeGitCall is
+// the regression test for incident 2026-09-12: a real production
+// WORKTREE_CREATE_FAILED / INFRA_AGENT_EXEC_FAILED round-trip when the
+// caller wants a worktree for a branch that's already checked out in
+// another worktree (very commonly the main repo clone itself, e.g. "main")
+// — git's own "fatal: '<branch>' is already used by worktree at '<path>'"
+// is now caught locally via the already-fetched onDisk listing, before ever
+// calling the executor (and therefore before ever relaying to the agent).
+func TestCreateWorktree_BranchAlreadyCheckedOutElsewhere_RejectsBeforeGitCall(t *testing.T) {
+	reachability := &fakeDevServerReachability{}
+	local := &fakeGitExecutor{listWorktreePathsOut: []domain.WorktreeGitInfo{
+		{Path: "/repo", Branch: "refs/heads/main"},
+	}}
+	relay := &fakeGitExecutor{}
+	projects := &fakeProjectClient{getRepoResult: domain.RepoInfo{URL: "/repo"}}
+	uc := NewCreateWorktree(reachability, projects, local, relay)
+
+	_, err := uc.Execute(context.Background(), CreateWorktreeInput{ProjectID: "proj-1", RepoID: "repo-1", Branch: "main", BaseRef: "main"})
+	if err == nil {
+		t.Fatal("expected an error")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "WORKTREE_BRANCH_CHECKED_OUT_ELSEWHERE" {
+		t.Fatalf("expected WORKTREE_BRANCH_CHECKED_OUT_ELSEWHERE, got %v", err)
+	}
+	if local.calledCreateWorktree {
+		t.Error("expected CreateWorktree to never be called when the branch is already checked out elsewhere")
+	}
+}
+
 func TestCreateWorktree_LimitExceeded_RejectsBeforeGitCall(t *testing.T) {
 	reachability := &fakeDevServerReachability{}
 	local := &fakeGitExecutor{}

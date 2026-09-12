@@ -43,6 +43,12 @@ type fakeInfraFleetServiceClient struct {
 	relayByDevServerResp *infrafleetv1.RelayResponse
 	relayByDevServerErr  error
 	gotRelayByDevServer  *infrafleetv1.RelayByDevServerRequest
+
+	// relayRespFunc takes precedence over relayRespByMethod/relayResp when
+	// set — needed when two calls share the same Method (e.g. CreateWorktree's
+	// show-ref branch-existence precheck and its rev-parse HEAD follow-up are
+	// both "git.exec") and a test must distinguish them by ParamsJson content.
+	relayRespFunc func(*infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error)
 }
 
 func (f *fakeInfraFleetServiceClient) ResolveConnection(ctx context.Context, in *infrafleetv1.ResolveConnectionRequest, _ ...grpc.CallOption) (*infrafleetv1.ResolveConnectionResponse, error) {
@@ -58,6 +64,9 @@ func (f *fakeInfraFleetServiceClient) Relay(ctx context.Context, in *infrafleetv
 	f.gotRelayRequests = append(f.gotRelayRequests, in)
 	if f.relayErr != nil {
 		return nil, f.relayErr
+	}
+	if f.relayRespFunc != nil {
+		return f.relayRespFunc(in)
 	}
 	if f.relayRespByMethod != nil {
 		return f.relayRespByMethod[in.GetMethod()], nil
@@ -1190,30 +1199,47 @@ func TestRelayExecutor_ListWorktreePaths_SendsCwdAndParsesWorktreesShape(t *test
 // repoPath + "-" + sanitized-branch convention) and issues a git.exec
 // rev-parse HEAD follow-up for HeadSHA. ──
 
+// newCreateWorktreeFake builds a fake whose git.exec calls are distinguished
+// by their args (branchExistsLocally's "show-ref" precheck vs the HeadSHA
+// "rev-parse" follow-up), since both share the method name "git.exec" —
+// relayRespByMethod alone can't tell them apart. branchExists controls the
+// precheck's outcome: true = relay succeeds (branch found, createBranch
+// should end up false), false = relay errors (not found, createBranch
+// should end up true) — mirrors branchExistsLocally's err==nil-means-exists
+// contract.
+func newCreateWorktreeFake(branchExists bool, revParseStdout string) *fakeInfraFleetServiceClient {
+	worktreeAddResp, _ := json.Marshal(map[string]any{"stdout": "", "stderr": "", "exitCode": 0})
+	revParseResp, _ := json.Marshal(map[string]any{"stdout": revParseStdout, "stderr": "", "exitCode": 0})
+	fake := &fakeInfraFleetServiceClient{}
+	fake.relayRespFunc = func(in *infrafleetv1.RelayRequest) (*infrafleetv1.RelayResponse, error) {
+		switch {
+		case in.GetMethod() == "git.worktree.add":
+			return &infrafleetv1.RelayResponse{ResultJson: string(worktreeAddResp)}, nil
+		case strings.Contains(in.GetParamsJson(), "show-ref"):
+			if branchExists {
+				return &infrafleetv1.RelayResponse{ResultJson: "{}"}, nil
+			}
+			return nil, errors.New("git exit 1: ref not found")
+		default: // the rev-parse HEAD follow-up
+			return &infrafleetv1.RelayResponse{ResultJson: string(revParseResp)}, nil
+		}
+	}
+	return fake
+}
+
 func TestRelayExecutor_CreateWorktree_SendsCorrectMethodAndParams(t *testing.T) {
-	worktreeAddResp, err := json.Marshal(map[string]any{"stdout": "", "stderr": "", "exitCode": 0})
-	if err != nil {
-		t.Fatalf("marshal fixture: %v", err)
-	}
-	revParseResp, err := json.Marshal(map[string]any{"stdout": "abc123\n", "stderr": "", "exitCode": 0})
-	if err != nil {
-		t.Fatalf("marshal fixture: %v", err)
-	}
-	fake := &fakeInfraFleetServiceClient{relayRespByMethod: map[string]*infrafleetv1.RelayResponse{
-		"git.worktree.add": {ResultJson: string(worktreeAddResp)},
-		"git.exec":         {ResultJson: string(revParseResp)},
-	}}
+	fake := newCreateWorktreeFake(false, "abc123\n")
 	r := NewRelayExecutor(fake)
 
 	result, err := r.CreateWorktree(ctxWithTenant(t), "/repo", "feature/x", "origin/main", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(fake.gotRelayRequests) != 2 {
-		t.Fatalf("want 2 relay calls (git.worktree.add + git.exec), got %d", len(fake.gotRelayRequests))
+	if len(fake.gotRelayRequests) != 3 {
+		t.Fatalf("want 3 relay calls (show-ref precheck + git.worktree.add + git.exec rev-parse), got %d", len(fake.gotRelayRequests))
 	}
 
-	addReq := fake.gotRelayRequests[0]
+	addReq := fake.gotRelayRequests[1]
 	if addReq.GetMethod() != "git.worktree.add" {
 		t.Errorf("expected method=git.worktree.add, got %q", addReq.GetMethod())
 	}
@@ -1229,7 +1255,7 @@ func TestRelayExecutor_CreateWorktree_SendsCorrectMethodAndParams(t *testing.T) 
 		t.Errorf("expected branch=feature/x, got %+v", addParams)
 	}
 	if addParams["createBranch"] != true {
-		t.Errorf("expected createBranch=true (CreateWorktreeInput has no checkout-existing-branch signal), got %+v", addParams)
+		t.Errorf("expected createBranch=true (branch does not exist locally yet — genuinely new branch), got %+v", addParams)
 	}
 	if addParams["cwd"] != "/repo" {
 		t.Errorf("expected cwd=/repo (the EXISTING repo root handleGitWorktreeAdd runs `git worktree add` from), got %+v", addParams)
@@ -1238,7 +1264,7 @@ func TestRelayExecutor_CreateWorktree_SendsCorrectMethodAndParams(t *testing.T) 
 		t.Errorf("expected baseRef=origin/main, got %+v", addParams)
 	}
 
-	revParseReq := fake.gotRelayRequests[1]
+	revParseReq := fake.gotRelayRequests[2]
 	if revParseReq.GetMethod() != "git.exec" {
 		t.Errorf("expected method=git.exec, got %q", revParseReq.GetMethod())
 	}
@@ -1258,20 +1284,40 @@ func TestRelayExecutor_CreateWorktree_SendsCorrectMethodAndParams(t *testing.T) 
 	}
 }
 
+// TestRelayExecutor_CreateWorktree_ExistingBranch_OmitsCreateBranch is the
+// regression test for incident 2026-09-12: WORKTREE_CREATE_FAILED /
+// INFRA_AGENT_EXEC_FAILED when the caller wants a worktree checking out a
+// branch that already exists (e.g. the frontend's branch-picker sending an
+// already-known branch as both Branch and BaseRef) — createBranch must be
+// false so the agent doesn't pass -b, which git refuses with "a branch
+// named '<branch>' already exists" (exit 255) whenever it's already there.
+func TestRelayExecutor_CreateWorktree_ExistingBranch_OmitsCreateBranch(t *testing.T) {
+	fake := newCreateWorktreeFake(true, "abc123\n")
+	r := NewRelayExecutor(fake)
+
+	if _, err := r.CreateWorktree(ctxWithTenant(t), "/repo", "main", "main", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	addReq := fake.gotRelayRequests[1]
+	var addParams map[string]any
+	if err := json.Unmarshal([]byte(addReq.GetParamsJson()), &addParams); err != nil {
+		t.Fatalf("unmarshal params: %v", err)
+	}
+	if addParams["createBranch"] != false {
+		t.Errorf("expected createBranch=false (branch %q already exists locally), got %+v", "main", addParams)
+	}
+}
+
 func TestRelayExecutor_CreateWorktree_OmitsBaseRefWhenEmpty(t *testing.T) {
-	worktreeAddResp, _ := json.Marshal(map[string]any{"stdout": "", "stderr": "", "exitCode": 0})
-	revParseResp, _ := json.Marshal(map[string]any{"stdout": "def456\n", "stderr": "", "exitCode": 0})
-	fake := &fakeInfraFleetServiceClient{relayRespByMethod: map[string]*infrafleetv1.RelayResponse{
-		"git.worktree.add": {ResultJson: string(worktreeAddResp)},
-		"git.exec":         {ResultJson: string(revParseResp)},
-	}}
+	fake := newCreateWorktreeFake(false, "def456\n")
 	r := NewRelayExecutor(fake)
 
 	if _, err := r.CreateWorktree(ctxWithTenant(t), "/repo", "plain", "", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var addParams map[string]any
-	if err := json.Unmarshal([]byte(fake.gotRelayRequests[0].GetParamsJson()), &addParams); err != nil {
+	if err := json.Unmarshal([]byte(fake.gotRelayRequests[1].GetParamsJson()), &addParams); err != nil {
 		t.Fatalf("unmarshal params: %v", err)
 	}
 	if _, ok := addParams["baseRef"]; ok {

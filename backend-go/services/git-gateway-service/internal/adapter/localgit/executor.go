@@ -557,16 +557,26 @@ func (e *Executor) ScanSetupScriptImports(ctx context.Context, repoPath string) 
 // default worth revisiting once product specifies one.
 const minFreeSpaceBytes = 500 * 1024 * 1024
 
-// CreateWorktree runs `git worktree add <targetPath> -b <branch> <baseRef>`.
-// targetPath, if non-empty, overrides the default repoPath + "-" + branch
-// convention (mirrors the old TS backend's convention: worktree path =
-// repo root's parent dir / branch name, sanitized) — see SOL-WT-01's
-// custom name/path input support.
+// CreateWorktree runs `git worktree add <targetPath> -b <branch> <baseRef>`
+// when branch does not exist yet locally, or `git worktree add <targetPath>
+// <branch>` (no -b) when it already does — `-b` unconditionally would make
+// git refuse with "a branch named '<branch>' already exists" (exit 255)
+// whenever the caller wants a worktree checking out an EXISTING branch
+// (e.g. the frontend's branch-picker sending an already-known branch name
+// as both Branch and BaseRef) rather than creating a new one — see incident
+// 2026-09-12. targetPath, if non-empty, overrides the default repoPath +
+// "-" + branch convention (mirrors the old TS backend's convention:
+// worktree path = repo root's parent dir / branch name, sanitized) — see
+// SOL-WT-01's custom name/path input support.
 func (e *Executor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef, targetPath string) (domain.WorktreeCreateResult, error) {
 	if targetPath == "" {
 		targetPath = repoPath + "-" + sanitizeBranchForPath(branch)
 	}
-	if _, err := e.run(ctx, repoPath, "worktree", "add", targetPath, "-b", branch, baseRef); err != nil {
+	args := []string{"worktree", "add", targetPath, "-b", branch, baseRef}
+	if e.branchExistsLocally(ctx, repoPath, branch) {
+		args = []string{"worktree", "add", targetPath, branch}
+	}
+	if _, err := e.run(ctx, repoPath, args...); err != nil {
 		return domain.WorktreeCreateResult{}, err
 	}
 	sha, err := e.run(ctx, targetPath, "rev-parse", "HEAD")
@@ -574,6 +584,16 @@ func (e *Executor) CreateWorktree(ctx context.Context, repoPath, branch, baseRef
 		return domain.WorktreeCreateResult{}, err
 	}
 	return domain.WorktreeCreateResult{Path: targetPath, HeadSHA: strings.TrimSpace(sha)}, nil
+}
+
+// branchExistsLocally reports whether branch already exists as a local ref
+// (`git show-ref --verify --quiet refs/heads/<branch>`, exit 0 = exists).
+// Any error (missing ref, or an unexpected git failure) is treated as
+// "does not exist" — CreateWorktree's caller then falls back to its
+// original `-b` behavior, the same outcome as before this check existed.
+func (e *Executor) branchExistsLocally(ctx context.Context, repoPath, branch string) bool {
+	_, err := e.run(ctx, repoPath, "show-ref", "--verify", "--quiet", "refs/heads/"+branch)
+	return err == nil
 }
 
 // RemoveWorktree runs `git worktree remove [--force] <worktreePath>`. Run

@@ -1103,6 +1103,37 @@ func TestCreateWorktree_EmptyTargetPath_DerivesDefault(t *testing.T) {
 	}
 }
 
+// TestCreateWorktree_ExistingBranch_OmitsMinusB is the regression test for
+// incident 2026-09-12: WORKTREE_CREATE_FAILED when the caller wants a
+// worktree checking out a branch that already exists — passing -b
+// unconditionally makes git refuse with "a branch named '<branch>' already
+// exists" (exit 255). Uses a branch that exists but is NOT checked out
+// anywhere yet (unlike "main", which initRepo leaves checked out in dir
+// itself — checking that out into a second worktree hits a different,
+// unrelated git constraint: "already used by worktree at ...", which is
+// its own pre-check at the usecase layer, see create_worktree_test.go).
+func TestCreateWorktree_ExistingBranch_OmitsMinusB(t *testing.T) {
+	dir := initRepo(t)
+	e := New()
+
+	cmd := exec.Command("git", "branch", "existing-feature")
+	cmd.Dir = dir
+	if out, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("git branch existing-feature failed: %v\n%s", err, out)
+	}
+
+	result, err := e.CreateWorktree(context.Background(), dir, "existing-feature", "existing-feature", "")
+	if err != nil {
+		t.Fatalf("expected checking out the existing 'existing-feature' branch to succeed without -b, got: %v", err)
+	}
+	if _, err := os.Stat(filepath.Join(result.Path, "README.md")); err != nil {
+		t.Errorf("expected the worktree to actually exist on disk: %v", err)
+	}
+	if result.HeadSHA == "" {
+		t.Error("expected a non-empty HeadSHA")
+	}
+}
+
 // ── checkFreeSpace (SOL-WT-01 [A3]) ─────────────────────────────────────────
 
 func TestCheckFreeSpace(t *testing.T) {
