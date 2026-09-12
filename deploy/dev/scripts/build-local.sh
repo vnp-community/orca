@@ -89,8 +89,25 @@ for svc in "${TARGET_SERVICES[@]}"; do
   fi
   # Migrations travel alongside the binary — sync-to-server.sh rsyncs this
   # directory too, and the migrate-<service> one-shot compose service
-  # (docker-compose.yml) mounts it read-only.
-  if [ -d "${svc_dir}/migrations" ]; then
+  # (docker-compose.yml) mounts it read-only at /migrations and invokes
+  # golang-migrate with `-path /migrations`, which expects flat *.sql files
+  # directly under that path — NOT nested in a dialect subdirectory.
+  #
+  # Why the postgres/ check: the Multi-Database rollout (CR-DB-002/003)
+  # split every DB-owning service's migrations/ into migrations/postgres/ +
+  # migrations/mysql/ dialect-safe variants. This deploy is Postgres-only
+  # (docker-compose.yml's migrate-* commands hardcode postgresql:// DSNs),
+  # so flatten migrations/postgres/ into bin/<service>/migrations/ — copying
+  # the whole (now two-level) migrations/ dir verbatim, as this used to do,
+  # would leave *.sql one directory too deep for golang-migrate to see at
+  # all, exactly the failure this comment is here to prevent a regression
+  # of. Services not yet touched by that rollout (or that never adopted the
+  # postgres/mysql split) still have flat *.sql directly under migrations/
+  # and fall back to the old whole-directory copy.
+  if [ -d "${svc_dir}/migrations/postgres" ]; then
+    rm -rf "${BIN_DIR}/${svc}/migrations"
+    cp -r "${svc_dir}/migrations/postgres" "${BIN_DIR}/${svc}/migrations"
+  elif [ -d "${svc_dir}/migrations" ]; then
     rm -rf "${BIN_DIR}/${svc}/migrations"
     cp -r "${svc_dir}/migrations" "${BIN_DIR}/${svc}/migrations"
   fi
