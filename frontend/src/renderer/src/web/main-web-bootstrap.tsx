@@ -8,13 +8,16 @@ import { useTranslation } from 'react-i18next'
 import {
   clearPairingInputFromAddressBar,
   decideWebPairingStartup,
-  readPairingInputFromLocation
+  readPairingInputFromLocation,
+  type WebPairingStartupDecision
 } from './web-pairing'
 import {
+  clearStoredWebRuntimeEnvironment,
   createSessionWebRuntimeEnvironment,
   createStoredWebRuntimeEnvironment,
   readStoredWebRuntimeEnvironment,
-  saveStoredWebRuntimeEnvironment
+  saveStoredWebRuntimeEnvironment,
+  type StoredWebRuntimeEnvironment
 } from './web-runtime-environment'
 import { installWebPreloadApi } from './web-preload-api'
 import { I18nProvider } from '../i18n/I18nProvider'
@@ -184,6 +187,36 @@ type WebRootAuthContext = {
   availableProviders: SsoProvider[]
 }
 
+// Bug fix (incident 2026-09-12): a 'session-auth' environment is only valid
+// as long as its session cookie is. If sessionUser resolved to null
+// (WebRootBoundary's fetchCurrentUser found no/expired session) while this
+// stale environment is still in localStorage, treating hasEnvironment as
+// true here falls through to mounting <App/> with a WS connection doomed to
+// fail auth — installAuthFailedRedirect then does a full-page redirect back
+// to this exact same state, forever (infinite reload loop). Clear the stale
+// environment and fall back to LoginPage instead; a fresh login creates a
+// new one (WebRoot's sessionUser !== null branch, below).
+export function resolveHasEnvironment(
+  startupDecision: WebPairingStartupDecision,
+  sessionUser: AuthUser | null,
+  stored: StoredWebRuntimeEnvironment | null
+): boolean {
+  if (startupDecision.kind === 'auto-save-runtime-offer') {
+    saveStoredWebRuntimeEnvironment(
+      createStoredWebRuntimeEnvironment({ name: 'Orca Server', offer: startupDecision.offer })
+    )
+    return true
+  }
+  if (startupDecision.kind === 'use-stored-environment') {
+    if (sessionUser === null && stored?.id === 'session-auth') {
+      clearStoredWebRuntimeEnvironment()
+      return false
+    }
+    return true
+  }
+  return false
+}
+
 function WebRoot({
   client,
   sessionUser,
@@ -204,15 +237,9 @@ function WebRoot({
     return decision
   }, [initialPairingInput])
 
-  const [hasEnvironment] = useState(() => {
-    if (startupDecision.kind === 'auto-save-runtime-offer') {
-      saveStoredWebRuntimeEnvironment(
-        createStoredWebRuntimeEnvironment({ name: 'Orca Server', offer: startupDecision.offer })
-      )
-      return true
-    }
-    return startupDecision.kind === 'use-stored-environment'
-  })
+  const [hasEnvironment] = useState(() =>
+    resolveHasEnvironment(startupDecision, sessionUser, readStoredWebRuntimeEnvironment())
+  )
 
   // Why: `sessionUser` was resolved here (WebRootBoundary's fetchCurrentUser
   // call) and used ONLY to decide LoginPage vs App — it was never wired into

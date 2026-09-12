@@ -3,7 +3,12 @@
 // user-identity change on re-auth must still wipe it (FE-SOL-STORAGE-007 (a)).
 import { describe, expect, it, beforeEach } from 'vitest'
 import { saveStoredWebRuntimeEnvironment } from './web-runtime-environment'
-import { installAuthFailedRedirect, enforceWorkspaceOwnerOnReauth } from './main-web-bootstrap'
+import type { StoredWebRuntimeEnvironment } from './web-runtime-environment'
+import {
+  installAuthFailedRedirect,
+  enforceWorkspaceOwnerOnReauth,
+  resolveHasEnvironment
+} from './main-web-bootstrap'
 
 const WORKSPACE_SESSION_KEY = 'orca.web.workspaceSession.v1'
 
@@ -73,6 +78,78 @@ describe('installAuthFailedRedirect (FE-TASK-STORAGE-015)', () => {
     window.dispatchEvent(new Event('orca:auth-failed'))
 
     expect(window.location.href).toBe('')
+  })
+})
+
+function sessionAuthEnvironment(): StoredWebRuntimeEnvironment {
+  return {
+    id: 'session-auth',
+    name: 'Orca Session',
+    createdAt: 1,
+    updatedAt: 1,
+    lastUsedAt: null,
+    runtimeId: null,
+    preferredEndpointId: 'ws-session-auth',
+    endpoints: [
+      {
+        id: 'ws-session-auth',
+        kind: 'websocket',
+        label: 'Session WebSocket',
+        endpoint: 'wss://example.com/ws',
+        deviceToken: '',
+        publicKeyB64: ''
+      }
+    ]
+  }
+}
+
+describe('resolveHasEnvironment (incident 2026-09-12: login/logout reload loop)', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+  })
+
+  it('clears a stale session-auth environment and reports no environment when sessionUser is null', () => {
+    saveStoredWebRuntimeEnvironment(sessionAuthEnvironment())
+
+    const result = resolveHasEnvironment(
+      { kind: 'use-stored-environment' },
+      null,
+      sessionAuthEnvironment()
+    )
+
+    expect(result).toBe(false)
+    // The stale environment must actually be removed, or the next render
+    // (and the WS reconnect attempt it would trigger) sees it again.
+    expect(window.localStorage.getItem('orca.web.runtimeEnvironment.v1')).toBeNull()
+  })
+
+  it('keeps a session-auth environment when sessionUser is present (real authenticated session)', () => {
+    const result = resolveHasEnvironment(
+      { kind: 'use-stored-environment' },
+      { id: 'user-1', email: 'u@example.com', name: 'U', avatarUrl: null, role: 'member' },
+      sessionAuthEnvironment()
+    )
+
+    expect(result).toBe(true)
+  })
+
+  it('does not clear a non-session-auth (paired/E2EE) environment even when sessionUser is null', () => {
+    const paired: StoredWebRuntimeEnvironment = { ...sessionAuthEnvironment(), id: 'paired-abc' }
+    saveStoredWebRuntimeEnvironment(paired)
+
+    const result = resolveHasEnvironment({ kind: 'use-stored-environment' }, null, paired)
+
+    expect(result).toBe(true)
+    expect(window.localStorage.getItem('orca.web.runtimeEnvironment.v1')).not.toBeNull()
+  })
+
+  it('reports no environment for the show-connect decision', () => {
+    const result = resolveHasEnvironment(
+      { kind: 'show-connect', initialPairingInput: null },
+      null,
+      null
+    )
+    expect(result).toBe(false)
   })
 })
 
