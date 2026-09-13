@@ -164,7 +164,15 @@ function getSettingsSectionId(pane: SettingsNavTarget, repoId: string | null): s
   if (pane === 'repo' && repoId) {
     return `repo-${repoId}`
   }
-  return pane
+  // Defensive fallback: pane is typed as SettingsNavTarget, but this function's
+  // one caller casts an external `openSettingsTarget` payload into that type
+  // (`settingsNavigationTarget.pane as SettingsNavTarget`) — a caller passing a
+  // malformed target could hand this an actually-undefined pane at runtime.
+  // Returning it as-is used to poison neededSectionIds with a non-string
+  // entry, crashing the whole Settings page on `sectionId.startsWith(...)`
+  // (incident 2026-09-13, Dev Servers). 'general' is always a safe, always-
+  // mounted fallback section.
+  return pane || 'general'
 }
 
 function getFallbackVisibleSection(sections: SettingsNavSection[]): SettingsNavSection | undefined {
@@ -780,8 +788,8 @@ function Settings(): React.JSX.Element {
   )
   const runtimeTarget = useMemo(() => getActiveRuntimeTarget(settings), [settings])
   const hasActiveRuntimeEnvironment = Boolean(settings?.activeRuntimeEnvironmentId?.trim())
-  const needsRepoWindowsRuntimeCapabilities = [...neededSectionIds].some((sectionId) =>
-    sectionId.startsWith('repo-')
+  const needsRepoWindowsRuntimeCapabilities = [...neededSectionIds].some(
+    (sectionId) => typeof sectionId === 'string' && sectionId.startsWith('repo-')
   )
   const shouldLoadWindowsTerminalCapabilities =
     hasActiveRuntimeEnvironment ||
