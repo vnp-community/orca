@@ -14,8 +14,10 @@ export type PreflightIssue = {
 }
 
 export type LandingPreflightStatus = {
-  git: { installed: boolean }
-  gh: { installed: boolean; authenticated: boolean }
+  // Optional, same as PreflightStatus's own glab/bitbucket/... fields — a
+  // web/remote runtime session has no local git/gh CLI to report on.
+  git?: { installed: boolean }
+  gh?: { installed: boolean; authenticated: boolean }
 }
 
 export type LandingPreflightIssueOptions = {
@@ -33,7 +35,13 @@ export function getLandingPreflightIssues(
 ): PreflightIssue[] {
   const issues: PreflightIssue[] = []
 
-  if (!status.git.installed) {
+  // Optional chaining, not a required-field assumption: a web/remote
+  // runtime session has no local git/gh CLI to check at all (see
+  // web-preload-api.ts's createPreflightApi doc comment), so its
+  // preflight.check RPC can legitimately come back without these
+  // fields — found live 2026-09-13 as an uncaught TypeError crashing the
+  // landing page for every such session.
+  if (!status.git?.installed) {
     issues.push({
       id: 'git',
       title: translate('auto.components.Landing.e5b7296d9d', 'Git is not installed'),
@@ -52,7 +60,7 @@ export function getLandingPreflightIssues(
     return issues
   }
 
-  if (!status.gh.installed) {
+  if (!status.gh?.installed) {
     issues.push({
       id: 'gh',
       title: translate('auto.components.Landing.5beaef5f9e', 'GitHub CLI is not installed'),
@@ -64,7 +72,7 @@ export function getLandingPreflightIssues(
       fixUrl: 'https://cli.github.com',
       dismissible: true
     })
-  } else if (!status.gh.authenticated) {
+  } else if (!status.gh?.authenticated) {
     issues.push({
       id: 'gh-auth',
       title: translate('auto.components.Landing.9f96d018b7', 'GitHub CLI is not authenticated'),

@@ -61,6 +61,18 @@ describe('landing preflight issues', () => {
     expect(issues.map((issue) => issue.id)).toContain('gh-auth')
   })
 
+  // Regression test for a live incident (2026-09-13): a web/remote runtime
+  // session's preflight.check RPC can come back without git/gh at all (no
+  // local CLI to report on), which previously threw an uncaught TypeError
+  // ("Cannot read properties of undefined (reading 'installed')") and
+  // crashed the landing page.
+  it('does not throw when git and gh are both missing from the status', () => {
+    expect(() => getLandingPreflightIssues({}, { hasGitHubBackedProject: true })).not.toThrow()
+
+    const issues = getLandingPreflightIssues({}, { hasGitHubBackedProject: true })
+    expect(issues.map((issue) => issue.id)).toEqual(['git', 'gh'])
+  })
+
   it('treats GitLab-only registered projects as not GitHub-backed', () => {
     expect(
       hasGitHubBackedProject([

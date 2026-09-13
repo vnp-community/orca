@@ -2981,7 +2981,10 @@ function createPreflightApi(): NonNullable<Partial<PreloadApi>['preflight']> {
       if (!requireActiveEnvironmentOrNull()) {
         return fallbackStatus
       }
-      return callRuntimeResult<PreflightStatus>('preflight.check', args)
+      // Same defensive fallback as detectAgents/refreshAgents/... below —
+      // an RPC rejection here must not surface as an uncaught rejection to
+      // Landing.tsx's preflight polling.
+      return callRuntimeResult<PreflightStatus>('preflight.check', args).catch(() => fallbackStatus)
     },
     detectAgents: async () => {
       if (!requireActiveEnvironmentOrNull()) {
