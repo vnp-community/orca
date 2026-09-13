@@ -131,14 +131,33 @@ func (r *Repository) List(ctx context.Context, tenantID, userID, pageToken strin
 // usecase.ProjectRepository.ListForMember's doc comment for why List alone
 // is meaningless as ListProjects's visibility-filter input.
 func (r *Repository) ListForMember(ctx context.Context, tenantID, userID, pageToken string, pageSize int32) ([]domain.Project, string, error) {
-	rows, err := r.pool.Query(ctx, `
-		SELECT `+projectColumns+`
-		FROM project.projects p
-		JOIN project.project_members m ON m.project_id = p.id
-		WHERE p.tenant_id = $1 AND m.user_id = $2 AND p.id > $3
-		ORDER BY p.id
-		LIMIT $4
-	`, tenantID, userID, pageToken, pageSize)
+	var rows pgx.Rows
+	var err error
+	if pageToken == "" {
+		// Same BUG-004 fix as List above (id is UUID — binding "" into
+		// `id > $3` errors on every first-page call): no cursor comparison
+		// at all for the initial page. This method didn't exist yet when
+		// BUG-004 was originally fixed, so it never inherited the guard —
+		// found live 2026-09-13 (every project.list call failing with
+		// PROJECT_LIST_FAILED).
+		rows, err = r.pool.Query(ctx, `
+			SELECT `+projectColumns+`
+			FROM project.projects p
+			JOIN project.project_members m ON m.project_id = p.id
+			WHERE p.tenant_id = $1 AND m.user_id = $2
+			ORDER BY p.id
+			LIMIT $3
+		`, tenantID, userID, pageSize)
+	} else {
+		rows, err = r.pool.Query(ctx, `
+			SELECT `+projectColumns+`
+			FROM project.projects p
+			JOIN project.project_members m ON m.project_id = p.id
+			WHERE p.tenant_id = $1 AND m.user_id = $2 AND p.id > $3
+			ORDER BY p.id
+			LIMIT $4
+		`, tenantID, userID, pageToken, pageSize)
+	}
 	if err != nil {
 		return nil, "", fmt.Errorf("postgres: query member projects: %w", err)
 	}

@@ -177,6 +177,37 @@ func TestRepository_List_EmptyPageToken_ReturnsFirstPage(t *testing.T) {
 	}
 }
 
+// TestRepository_ListForMember_EmptyPageToken_ReturnsFirstPage is the
+// regression test for the same BUG-004 defect reappearing in ListForMember —
+// it never inherited List's empty-pageToken guard when it was added later as
+// List's membership-scoped counterpart, so every project.list call with no
+// cursor (i.e. every first page) failed with PROJECT_LIST_FAILED — found
+// live 2026-09-13.
+func TestRepository_ListForMember_EmptyPageToken_ReturnsFirstPage(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := "77777777-7777-7777-7777-777777777777"
+	userID := uuid.NewString()
+
+	for i := 0; i < 3; i++ {
+		p := newTestProject(uuid.NewString(), tenantID, fmt.Sprintf("project-%d", i))
+		if _, err := repo.Create(ctx, p); err != nil {
+			t.Fatalf("seeding project %d: %v", i, err)
+		}
+		if err := repo.AddMember(ctx, domain.ProjectMember{ProjectID: p.ID, UserID: userID, Role: domain.ProjectRoleOwner}); err != nil {
+			t.Fatalf("seeding membership for project %d: %v", i, err)
+		}
+	}
+
+	got, _, err := repo.ListForMember(ctx, tenantID, userID, "", 10)
+	if err != nil {
+		t.Fatalf("ListForMember with empty pageToken: %v", err)
+	}
+	if len(got) != 3 {
+		t.Errorf("expected 3 projects, got %d", len(got))
+	}
+}
+
 // TestRepository_List_ScopesToMembership is the direct regression test for
 // the "one private default project per user" pass: a bare tenant_id filter
 // previously leaked every tenant member's projects to every other member.
