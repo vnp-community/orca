@@ -34,13 +34,26 @@ function startSseClient(dispatch: TraceDispatch): () => void {
 
   const source = new EventSource(SSE_URL, {
     // Include cookies for session auth; also sends X-Orca-Trace-Client via URL param
-    withCredentials: true,
+    withCredentials: true
   })
   _sseSource = source
 
   source.onmessage = (e) => {
     try {
       const event = JSON.parse(e.data as string) as TraceEvent
+      // api-gateway's traceEventHandler forwards raw NATS payload bytes from
+      // any backend-go service's `orca.*.trace.span` publish verbatim
+      // (trace_broadcast.go), with no shape validation — a malformed/
+      // differently-shaped payload from any one service reaches every
+      // connected browser as-is. Every downstream consumer trusts `flow` to
+      // be a string (e.g. agent-ws-trace-status.ts's `.startsWith`), so
+      // reject anything missing it here rather than crashing every
+      // TracePanel/DevServerCard consumer on the next render (incident
+      // 2026-09-13, "Cannot read properties of undefined (reading
+      // 'startsWith')" — crashed the whole Settings > Dev Servers page).
+      if (typeof event.flow !== 'string') {
+        return
+      }
       dispatch(event)
     } catch {
       // malformed event — ignore
@@ -72,7 +85,9 @@ let _cleanup: (() => void) | null = null
  *   Typically: (e) => useAppStore.getState().addTraceEvent(e)
  */
 export function initBrowserTrace(dispatch: TraceDispatch): () => void {
-  if (_initialized) {return () => _cleanup?.()}
+  if (_initialized) {
+    return () => _cleanup?.()
+  }
   _initialized = true
 
   // 1. Override enabled predicate → check localStorage
@@ -103,15 +118,27 @@ export function initBrowserTrace(dispatch: TraceDispatch): () => void {
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 export function enableBrowserTrace(): void {
-  try { localStorage.setItem('ORCA_TRACE', '1') } catch { /* ignore */ }
+  try {
+    localStorage.setItem('ORCA_TRACE', '1')
+  } catch {
+    /* ignore */
+  }
 }
 
 export function disableBrowserTrace(): void {
-  try { localStorage.removeItem('ORCA_TRACE') } catch { /* ignore */ }
+  try {
+    localStorage.removeItem('ORCA_TRACE')
+  } catch {
+    /* ignore */
+  }
 }
 
 export function isBrowserTraceEnabled(): boolean {
-  try { return localStorage.getItem('ORCA_TRACE') === '1' } catch { return false }
+  try {
+    return localStorage.getItem('ORCA_TRACE') === '1'
+  } catch {
+    return false
+  }
 }
 
 /** True if the SSE stream to the backend is currently open */

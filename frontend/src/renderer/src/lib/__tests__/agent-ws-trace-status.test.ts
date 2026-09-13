@@ -8,7 +8,7 @@ function makeEvent(overrides: Partial<TraceEvent> & { flow: string }): TraceEven
     level: 'ok',
     fields: {},
     ts: 1000,
-    ...overrides,
+    ...overrides
   }
 }
 
@@ -16,7 +16,7 @@ describe('latestAgentWsStatusForDevServer', () => {
   it('returns null when no event matches any agentWs/agentToken flow prefix', () => {
     const events: TraceEvent[] = [
       makeEvent({ flow: 'devServer:browseDir', fields: { devServerId: 'ds-1' } }),
-      makeEvent({ flow: 'terminal:spawn', fields: { devServerId: 'ds-1' } }),
+      makeEvent({ flow: 'terminal:spawn', fields: { devServerId: 'ds-1' } })
     ]
 
     expect(latestAgentWsStatusForDevServer(events, 'ds-1')).toBeNull()
@@ -24,7 +24,7 @@ describe('latestAgentWsStatusForDevServer', () => {
 
   it('returns null when the matching flow belongs to a different devServerId', () => {
     const events: TraceEvent[] = [
-      makeEvent({ flow: 'agentWs:handshake', fields: { devServerId: 'ds-other' } }),
+      makeEvent({ flow: 'agentWs:handshake', fields: { devServerId: 'ds-other' } })
     ]
 
     expect(latestAgentWsStatusForDevServer(events, 'ds-1')).toBeNull()
@@ -32,8 +32,20 @@ describe('latestAgentWsStatusForDevServer', () => {
 
   it('returns the most recent matching event when multiple exist for the same devServerId', () => {
     const events: TraceEvent[] = [
-      makeEvent({ id: 'e1', flow: 'agentWs:handshake', level: 'start', ts: 1000, fields: { devServerId: 'ds-1' } }),
-      makeEvent({ id: 'e2', flow: 'agentWs:handshake', level: 'ok', ts: 2000, fields: { devServerId: 'ds-1' } }),
+      makeEvent({
+        id: 'e1',
+        flow: 'agentWs:handshake',
+        level: 'start',
+        ts: 1000,
+        fields: { devServerId: 'ds-1' }
+      }),
+      makeEvent({
+        id: 'e2',
+        flow: 'agentWs:handshake',
+        level: 'ok',
+        ts: 2000,
+        fields: { devServerId: 'ds-1' }
+      })
     ]
 
     const result = latestAgentWsStatusForDevServer(events, 'ds-1')
@@ -50,13 +62,29 @@ describe('latestAgentWsStatusForDevServer', () => {
     }
   })
 
+  // Regression test for a live incident (2026-09-13): api-gateway forwards
+  // raw NATS `orca.*.trace.span` payload bytes to every connected browser
+  // with no shape validation (trace_broadcast.go) — a malformed event
+  // missing `flow` crashed the whole Settings > Dev Servers page with
+  // "Cannot read properties of undefined (reading 'startsWith')".
+  it('does not throw and skips events with a missing/non-string flow', () => {
+    const malformed = { id: 'evt-bad', level: 'ok', fields: { devServerId: 'ds-1' }, ts: 500 }
+    const events = [
+      malformed,
+      makeEvent({ flow: 'devServer:browseDir', fields: { devServerId: 'ds-1' } })
+    ] as TraceEvent[]
+
+    expect(() => latestAgentWsStatusForDevServer(events, 'ds-1')).not.toThrow()
+    expect(latestAgentWsStatusForDevServer(events, 'ds-1')).toBeNull()
+  })
+
   it('surfaces the reason field when level is fail', () => {
     const events: TraceEvent[] = [
       makeEvent({
         flow: 'agentWs:handshake',
         level: 'fail',
-        fields: { devServerId: 'ds-1', reason: 'token expired' },
-      }),
+        fields: { devServerId: 'ds-1', reason: 'token expired' }
+      })
     ]
 
     const result = latestAgentWsStatusForDevServer(events, 'ds-1')
@@ -64,7 +92,7 @@ describe('latestAgentWsStatusForDevServer', () => {
       flow: 'agentWs:handshake',
       level: 'fail',
       ts: 1000,
-      reason: 'token expired',
+      reason: 'token expired'
     })
   })
 })
