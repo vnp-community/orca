@@ -29,6 +29,23 @@ let nonForcedPreflightRequest: { key: string; promise: Promise<void> } | null = 
 let forcedPreflightRequest: { key: string; promise: Promise<void> } | null = null
 let latestPreflightRequestId = 0
 
+// Root-cause fix (incident 2026-09-13): a web/remote session's
+// preflight.check RPC (the `runtimeTarget.kind === 'environment'` branch
+// below, which bypasses window.api.preflight.check's own fallback
+// entirely) can resolve with git/gh missing outright — there's no local
+// CLI on that host to report on. Every consumer of `preflightStatus`
+// across the app (Landing.tsx, FeatureWallSetupChecklist, ...) assumed
+// git/gh were always present, which crashed several unrelated screens.
+// Normalizing once here, at the single point this enters app state, is
+// safer than chasing down every read site as new crashes surface.
+function normalizePreflightStatus(status: PreflightStatus | null | undefined): PreflightStatus {
+  return {
+    ...status,
+    git: status?.git ?? { installed: false },
+    gh: status?.gh ?? { installed: false, authenticated: false }
+  }
+}
+
 function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'Failed to check integrations.'
 }
@@ -66,7 +83,7 @@ export const createPreflightSlice: StateCreator<AppState, [], [], PreflightSlice
       return {
         remotePreflightByServer: updated,
         activeRemotePreflightStatus:
-          devServerId === state.activeDevServerId ? status : state.activeRemotePreflightStatus,
+          devServerId === state.activeDevServerId ? status : state.activeRemotePreflightStatus
       }
     }),
 
@@ -113,7 +130,9 @@ export const createPreflightSlice: StateCreator<AppState, [], [], PreflightSlice
             // run locally on the Orca Server container (no tools there).
             const activeDevServerId = get().activeDevServerId
             const params: Record<string, unknown> = force ? { force } : {}
-            if (activeDevServerId) {params.devServerId = activeDevServerId}
+            if (activeDevServerId) {
+              params.devServerId = activeDevServerId
+            }
             // Why: traceId forwarded only over WS RPC so the Dev Server relay's
             // remoteIntegration:preflight span can resume this same trace id —
             // Electron IPC below is same-machine and has no downstream hop to resume.
@@ -129,7 +148,7 @@ export const createPreflightSlice: StateCreator<AppState, [], [], PreflightSlice
           return
         }
         set({
-          preflightStatus: status,
+          preflightStatus: normalizePreflightStatus(status),
           preflightStatusChecked: true,
           preflightStatusContextKey: contextKey,
           preflightStatusLoading: false,

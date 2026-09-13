@@ -22,7 +22,12 @@ vi.mock('@/runtime/runtime-rpc-client', () => ({
 // TASK-FE-014.1: mock spans expose id/step/ok/fail so tests can assert both
 // the RPC `traceId` forwarding AND the span lifecycle calls (start/step/ok/fail fields).
 const { preflightSpans, uiRemoteIntegrationPreflightFlowStart } = vi.hoisted(() => {
-  const preflightSpans: { id: string; step: ReturnType<typeof vi.fn>; ok: ReturnType<typeof vi.fn>; fail: ReturnType<typeof vi.fn> }[] = []
+  const preflightSpans: {
+    id: string
+    step: ReturnType<typeof vi.fn>
+    ok: ReturnType<typeof vi.fn>
+    fail: ReturnType<typeof vi.fn>
+  }[] = []
   const uiRemoteIntegrationPreflightFlowStart = vi.fn(() => {
     const span = {
       id: `preflight-span-${preflightSpans.length}`,
@@ -396,7 +401,10 @@ describe('createPreflightSlice', () => {
 
     await store.getState().refreshPreflightStatus()
 
-    expect(uiRemoteIntegrationPreflightFlowStart).toHaveBeenCalledWith({ force: false, mode: 'local' })
+    expect(uiRemoteIntegrationPreflightFlowStart).toHaveBeenCalledWith({
+      force: false,
+      mode: 'local'
+    })
     expect(uiRemoteIntegrationPreflightFlowStart.mock.invocationCallOrder[0]).toBeLessThan(
       preflightCheck.mock.invocationCallOrder[0]
     )
@@ -432,7 +440,9 @@ describe('createPreflightSlice', () => {
 
     const span = preflightSpans[0]
     expect(span.step).toHaveBeenCalledWith('relayDelegate', { devServerId: 'dev-server-1' })
-    expect(span.step.mock.invocationCallOrder[0]).toBeLessThan(callRuntimeRpc.mock.invocationCallOrder[0])
+    expect(span.step.mock.invocationCallOrder[0]).toBeLessThan(
+      callRuntimeRpc.mock.invocationCallOrder[0]
+    )
   })
 
   it('forwards traceId: span.id in callRuntimeRpc params only when runtimeTarget.kind is environment', async () => {
@@ -497,7 +507,10 @@ describe('createPreflightSlice', () => {
 
     await store.getState().refreshPreflightStatus()
 
-    expect(preflightSpans[0].ok).toHaveBeenCalledWith({ ghAuthenticated: true, glabAuthenticated: true })
+    expect(preflightSpans[0].ok).toHaveBeenCalledWith({
+      ghAuthenticated: true,
+      glabAuthenticated: true
+    })
   })
 
   it('marks the span ok({ stale: true }) and does not overwrite state for a superseded response', async () => {
@@ -528,5 +541,24 @@ describe('createPreflightSlice', () => {
     await store.getState().refreshPreflightStatus()
 
     expect(preflightSpans[0].fail).toHaveBeenCalledWith(error, { force: false, mode: 'local' })
+  })
+
+  // Regression test for a live incident (2026-09-13): a web/remote session's
+  // preflight.check RPC can resolve without git/gh at all (no local CLI on
+  // that host to report on) — every consumer across the app assumed they
+  // were always present, crashing the landing page and the setup-guide
+  // modal. Normalizing once here, at store ingestion, is the root fix.
+  it('normalizes a resolved status missing git/gh instead of storing it as-is', async () => {
+    resetPreflightMocks()
+    preflightCheck.mockResolvedValueOnce({} as PreflightStatus)
+    const store = createTestStore()
+
+    await store.getState().refreshPreflightStatus()
+
+    expect(store.getState().preflightStatus?.git).toEqual({ installed: false })
+    expect(store.getState().preflightStatus?.gh).toEqual({
+      installed: false,
+      authenticated: false
+    })
   })
 })

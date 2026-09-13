@@ -52,7 +52,7 @@ type TaskSourcesExitAction = TaskSourcesSnapshotProps['exit_action']
 function shouldSkipIntegrationsStep(
   status: ReturnType<typeof useAppStore.getState>['preflightStatus']
 ): boolean {
-  return status?.gh.installed === true
+  return status?.gh?.installed === true
 }
 
 function shouldSkipWindowsTerminalStep(isWindows: boolean): boolean {

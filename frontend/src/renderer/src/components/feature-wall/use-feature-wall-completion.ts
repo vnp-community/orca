@@ -48,8 +48,12 @@ export function useFeatureWallCompletion(
   const preflightStatus = useAppStore((s) => s.preflightStatus)
   const rateLimits = useAppStore((s) => s.rateLimits)
   const fetchRateLimits = useAppStore((s) => s.fetchRateLimits)
+  // Second-level optional chaining too: normalizePreflightStatus (preflight.ts)
+  // guarantees `gh` on freshly-fetched status, but this read shouldn't rely
+  // on that invariant holding forever — a half-guarded `?.gh.installed` still
+  // throws if `gh` itself is ever missing.
   const githubConfigured =
-    preflightStatus?.gh.installed === true && preflightStatus.gh.authenticated === true
+    preflightStatus?.gh?.installed === true && preflightStatus.gh?.authenticated === true
   const commitMessageAi = settings?.commitMessageAi
   const resolvedCommitMessageAgent =
     settings && commitMessageAi?.enabled === true
