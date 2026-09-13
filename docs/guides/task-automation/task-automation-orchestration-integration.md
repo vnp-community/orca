@@ -15,7 +15,7 @@ và chi tiết đầy đủ ở
 
 | | Nguồn | Trạng thái |
 |---|---|---|
-| **Task (Source)** | `TaskPage.tsx` (8278 dòng), `backend/src/shared/task-source-context.ts` | ✅ Thật, đang chạy — work item GitHub/GitLab/Linear/Jira |
+| **Task (Source)** | `TaskPage.tsx` (8278 dòng), `backend/src/shared/task-source-context.ts` | ✅ Thật, đang chạy — work item GitHub/GitLab/Linear/Jira (cách người dùng tự kết nối Jira: [jira-task-source-setup.md](./jira-task-source-setup.md)) |
 | **Task (Plan)** — `OrcaTask` | `backend/src/main/task/*` (5 file, 18 RPC method), `backend/src/shared/task-types.ts` | ✅ **Thật, đang chạy** (đính chính — trước nói sai là "chưa xây") |
 | **Task (Execute)** — `TaskRow` | `backend/src/main/runtime/orchestration/*` | ✅ Thật, đang chạy — sub-task tạm thời trong 1 phiên multi-agent |
 
