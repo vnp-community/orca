@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"flag"
 	"os"
+	"reflect"
 	"sort"
 	"strings"
 	"testing"
@@ -185,9 +186,23 @@ func TestToolsListGolden(t *testing.T) {
 	if err != nil {
 		t.Fatalf("missing golden (run with -update): %v", err)
 	}
-	if string(want) != string(b) {
+	// Why semantic: the repo's pre-commit formatter rewrites committed JSON, so a byte
+	// comparison would fail on a clean checkout even when nothing changed.
+	if !sameJSON(t, want, b) {
 		t.Error("tools list changed; review the diff and run `go test -run TestToolsListGolden -update`")
 	}
+}
+
+func sameJSON(t *testing.T, a, b []byte) bool {
+	t.Helper()
+	var av, bv any
+	if err := json.Unmarshal(a, &av); err != nil {
+		t.Fatalf("golden is not valid JSON: %v", err)
+	}
+	if err := json.Unmarshal(b, &bv); err != nil {
+		t.Fatalf("generated list is not valid JSON: %v", err)
+	}
+	return reflect.DeepEqual(av, bv)
 }
 
 func TestInventoryCountsByPack(t *testing.T) {
