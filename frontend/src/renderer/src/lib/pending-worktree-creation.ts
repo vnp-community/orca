@@ -1,5 +1,6 @@
 import type {
   CreateSparseCheckoutRequest,
+  CreateWorktreeArgs,
   GitPushTarget,
   SetupDecision,
   TuiAgent,
@@ -73,6 +74,8 @@ export type WorktreeCreationRequest = {
   linkedBitbucketPR?: number | null
   linkedAzureDevOpsPR?: number | null
   linkedGiteaPR?: number | null
+  /** Jira issue this workspace starts from — see CreateWorktreeArgs.linkedExternalIssue. */
+  linkedExternalIssue?: CreateWorktreeArgs['linkedExternalIssue']
   /** Backend-spawn startup payload (`createWorktree` arg). Present only when the
    *  agent launch is self-contained; otherwise the renderer drives startup via
    *  `startupPlan`. */

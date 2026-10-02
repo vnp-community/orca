@@ -2170,6 +2170,18 @@ export type CreateWorktreeArgs = {
   creationId?: string
   /** Authorizes the host to mint system-owned automation provenance. */
   automationProvenanceRequest?: AutomationWorkspaceProvenanceRequest
+  /** External issue (Jira/Linear/...) this workspace starts from. Recorded by the
+   *  backend so the issue is moved to In Progress asynchronously and a task started
+   *  from the same issue reuses this worktree. */
+  linkedExternalIssue?: {
+    provider: 'jira' | 'linear' | 'github' | 'gitlab'
+    ref: string
+    /** Display fields + owning project, used only to also create a task from the issue
+     *  when `experimentalJiraTaskLink` is on. */
+    title?: string
+    url?: string
+    taskProjectId?: string
+  }
 }
 
 export type CreateWorktreeResult = {
@@ -2998,6 +3010,10 @@ export type GlobalSettings = {
    *  and agent-completion events. Opt-in while the signal/noise balance is
    *  being tested. */
   experimentalTerminalAttention: boolean
+  /** Experimental: starting a workspace from a Jira issue also creates (or reuses) a task
+   *  for that issue, so running the task lands in the same worktree. Opt-in; remote
+   *  runtimes only. */
+  experimentalJiraTaskLink?: boolean
   /** Experimental: automatically sleep completed, resumable background agent terminals. */
   experimentalAgentHibernation?: boolean
   /** Milliseconds a completed agent must stay idle before hibernation can be considered. */

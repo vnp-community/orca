@@ -49,6 +49,22 @@ export function ExperimentalPane({
   const showNewWorktreeCardStyle = matchesSettingsSearch(searchQuery, [
     getExperimentalSearchEntry().newWorktreeCardStyle
   ])
+  const jiraTaskLinkTitle = translate(
+    'auto.components.settings.ExperimentalPane.jiraTaskLink.title',
+    'Jira task link'
+  )
+  const jiraTaskLinkDescription = translate(
+    'auto.components.settings.ExperimentalPane.jiraTaskLink.description',
+    'Starting a workspace from a Jira issue also creates a task for that issue, so running the task reuses the same worktree.'
+  )
+  const showJiraTaskLink = matchesSettingsSearch(searchQuery, [
+    {
+      title: jiraTaskLinkTitle,
+      description: jiraTaskLinkDescription,
+      keywords: ['experimental', 'jira', 'task', 'issue', 'worktree']
+    }
+  ])
+  const jiraTaskLinkEnabled = settings.experimentalJiraTaskLink === true
   const agentHibernationEnabled = settings.experimentalAgentHibernation === true
   const newWorktreeCardStyleEnabled = settings.experimentalNewWorktreeCardStyle === true
   // Why: the planner owns ms-based bounds/defaults; the UI edits minutes
@@ -199,6 +215,36 @@ export function ExperimentalPane({
                 }`}
               />
             </button>
+          </div>
+        </SearchableSetting>
+      ) : null}
+
+      {showJiraTaskLink ? (
+        <SearchableSetting
+          title={jiraTaskLinkTitle}
+          description={jiraTaskLinkDescription}
+          keywords={['experimental', 'jira', 'task', 'issue', 'worktree']}
+          className="space-y-3 py-2"
+          id="experimental-jira-task-link"
+        >
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0 shrink space-y-0.5">
+              <Label>{jiraTaskLinkTitle}</Label>
+              <p className="text-xs text-muted-foreground">
+                {translate(
+                  'auto.components.settings.ExperimentalPane.jiraTaskLink.copy',
+                  'Applies to workspaces started from Jira on a remote runtime. The task is created once per issue and project; if it already exists it is reused. The Jira issue moves to In Progress asynchronously when the project has issue status sync on.'
+                )}
+              </p>
+            </div>
+            <SettingsSwitch
+              checked={jiraTaskLinkEnabled}
+              ariaLabel={translate(
+                'auto.components.settings.ExperimentalPane.jiraTaskLink.toggleLabel',
+                'Toggle Jira task link'
+              )}
+              onChange={() => updateSettings({ experimentalJiraTaskLink: !jiraTaskLinkEnabled })}
+            />
           </div>
         </SearchableSetting>
       ) : null}

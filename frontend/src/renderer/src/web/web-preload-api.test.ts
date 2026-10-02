@@ -2545,6 +2545,7 @@ describe('web worktree preload API', () => {
       compareBaseRef: 'refs/remotes/origin/main',
       setupDecision: 'inherit',
       createdWithAgent: 'codex',
+      linkedExternalIssue: { provider: 'jira', ref: 'ENG-1' },
       startup: {
         command: "codex 'summarize repo'",
         env: { ORCA_AGENT_MODE: 'direct' },
@@ -2579,6 +2580,8 @@ describe('web worktree preload API', () => {
           baseBranch: TEST_COMMIT_OID,
           compareBaseRef: 'refs/remotes/origin/main',
           createdWithAgent: 'codex',
+          linkedIssueProvider: 'jira',
+          linkedIssueRef: 'ENG-1',
           startupCommand: "codex 'summarize repo'",
           startupEnv: { ORCA_AGENT_MODE: 'direct' },
           startupLaunchConfig: {

@@ -27,6 +27,7 @@ import {
   type WorktreeSlice
 } from './worktree-helpers'
 import { findRepoForHost } from './repo-host-identity'
+import { createTaskForExternalIssue } from '@/lib/external-issue-task'
 import { ensureHooksConfirmed } from '@/lib/ensure-hooks-confirmed'
 import { cleanupEphemeralVmRuntimesForDeleted } from '@/lib/ephemeral-vm-runtime-cleanup'
 import { tabHasLivePty } from '@/lib/tab-has-live-pty'
@@ -3027,6 +3028,7 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
     options
   ) => {
     const automationProvenanceRequest = options?.automationProvenanceRequest
+    const linkedExternalIssue = options?.linkedExternalIssue
     const retryableConflictPatterns = [
       /already exists locally/i,
       /already exists on a remote/i,
@@ -3098,7 +3100,8 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             ...(linkedGiteaPR !== undefined ? { linkedGiteaPR } : {}),
             ...(startup ? { startup } : {}),
             ...(creationId ? { creationId } : {}),
-            ...(automationProvenanceRequest ? { automationProvenanceRequest } : {})
+            ...(automationProvenanceRequest ? { automationProvenanceRequest } : {}),
+            ...(linkedExternalIssue ? { linkedExternalIssue } : {})
           }
           const target = getActiveRuntimeTarget(settingsForRepoOwner(get(), repoId))
           const result =
@@ -3142,6 +3145,12 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                     ...(linkedAzureDevOpsPR !== undefined ? { linkedAzureDevOpsPR } : {}),
                     ...(linkedGiteaPR !== undefined ? { linkedGiteaPR } : {}),
                     ...(automationProvenanceRequest ? { automationProvenanceRequest } : {}),
+                    ...(linkedExternalIssue
+                      ? {
+                          linkedIssueProvider: linkedExternalIssue.provider,
+                          linkedIssueRef: linkedExternalIssue.ref
+                        }
+                      : {}),
                     ...(startup
                       ? {
                           startupCommand: startup.command,
@@ -3213,6 +3222,18 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
             openSettingsTarget: get().openSettingsTarget
           })
           span.ok({ worktreeId: result.worktree.id, path: result.worktree.path, attempt })
+          // Why: opt-in and remote-only — task-service lives behind the runtime RPC, and
+          // creating a task for every Jira workspace would otherwise surprise existing users.
+          if (
+            linkedExternalIssue &&
+            target.kind !== 'local' &&
+            get().settings?.experimentalJiraTaskLink === true
+          ) {
+            void createTaskForExternalIssue(
+              (method, params) => callRuntimeRpc(target, method, params),
+              linkedExternalIssue
+            )
+          }
           return result
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error)

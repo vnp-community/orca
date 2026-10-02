@@ -12,6 +12,7 @@ import { TaskStatusBadge } from './TaskStatusBadge'
 import { TaskComments } from './TaskComments'
 import { TaskDispatchStatusPanel } from './TaskDispatchStatusPanel'
 import { ExecutionEngineBadge } from './ExecutionEngineBadge'
+import { TaskSourceBadge } from './TaskSourceBadge'
 import { AttachWorkflowTemplateAction } from './AttachWorkflowTemplateAction'
 import { TaskGrantModal } from './TaskGrantModal'
 import { Button } from '../ui/button'
@@ -205,6 +206,7 @@ export function TaskDetail() {
               {blockedBy.length > 0 ? (
                 <div className="text-muted-foreground flex gap-1">
                   <span>← Blocked by:</span>
+        <TaskSourceBadge taskId={task.id} />
                   <span>{blockedBy.map((d) => d.title).join(', ')}</span>
                 </div>
               ) : null}

@@ -16,6 +16,7 @@ import {
   parseGitHubIssueOrPRLink,
   normalizeGitHubLinkQuery
 } from '@/lib/github-links'
+import { getLinkedExternalIssue } from '@/lib/linked-external-issue'
 import { activateAndRevealWorktree, type AgentStartedTelemetry } from '@/lib/worktree-activation'
 import { runBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
 import type { WorktreeCreationRequest } from '@/lib/pending-worktree-creation'
@@ -3569,6 +3570,10 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
             : await ensureHooksConfirmed(useAppStore.getState(), repoId, 'issueCommand')
       }
 
+      const submitLinkedExternalIssue = getLinkedExternalIssue(
+        submitLinkedWorkItem,
+        selectedRepoProjectId
+      )
       const linkedLinearIssue =
         submitLinkedWorkItem && submitLinkedWorkItemProvider === 'linear'
           ? submitLinkedWorkItem.linearIdentifier
@@ -3677,7 +3682,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         undefined,
         undefined,
         undefined,
-        submitCompareBaseRef
+        submitCompareBaseRef,
+        submitLinkedExternalIssue ? { linkedExternalIssue: submitLinkedExternalIssue } : undefined
       )
       const worktree = result.worktree
 
@@ -3973,6 +3979,10 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
         const submitLinkedWorkItemProvider = submitLinkedWorkItem
           ? getLinkedWorkItemProvider(submitLinkedWorkItem)
           : null
+        const submitLinkedExternalIssue = getLinkedExternalIssue(
+          submitLinkedWorkItem,
+          selectedRepoProjectId
+        )
         const linkedLinearIssue =
           submitLinkedWorkItem && submitLinkedWorkItemProvider === 'linear'
             ? submitLinkedWorkItem.linearIdentifier
@@ -4161,6 +4171,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           ...(linkedLinearIssueOrganizationUrlKey !== undefined
             ? { linkedLinearIssueOrganizationUrlKey }
             : {}),
+          ...(submitLinkedExternalIssue ? { linkedExternalIssue: submitLinkedExternalIssue } : {}),
           ...(effectiveBranchNameOverride
             ? { branchNameOverride: effectiveBranchNameOverride }
             : {}),

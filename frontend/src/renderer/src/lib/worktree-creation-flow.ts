@@ -165,7 +165,10 @@ async function executeWorktreeCreation(
         preparedRequest.linkedBitbucketPR,
         preparedRequest.linkedAzureDevOpsPR,
         preparedRequest.linkedGiteaPR,
-        preparedRequest.compareBaseRef
+        preparedRequest.compareBaseRef,
+        preparedRequest.linkedExternalIssue
+          ? { linkedExternalIssue: preparedRequest.linkedExternalIssue }
+          : undefined
       )
   } catch (error) {
     // Why: a missing entry means the user cancelled mid-flight — abandon
