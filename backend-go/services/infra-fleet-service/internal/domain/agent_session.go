@@ -55,6 +55,9 @@ type AgentSession struct {
 	// (TASK-AG-03-05) — distinct from ID (this row's own primary key).
 	ResumeProviderSessionKey string // "session_id" | "conversation_id"; "" if never captured
 	ResumeProviderSessionID  string // the CLI's OWN session/conversation id — distinct from ID
+
+	// Origin is non-nil only for sessions an MCP client started (BE-MCP-SOL-009).
+	Origin *SessionOrigin
 }
 
 // UsesStreamJSON reports whether this session's spawn used

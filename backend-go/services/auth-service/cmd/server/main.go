@@ -29,6 +29,7 @@ import (
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
+	"github.com/stablyai/orca-go/common/internalcaller"
 	"github.com/stablyai/orca-go/common/logging"
 	"github.com/stablyai/orca-go/common/policy"
 	"github.com/stablyai/orca-go/common/secrets"
@@ -117,6 +118,8 @@ func run() error {
 			usecase.AuditRepository
 			usecase.SsoIdentityRepository
 			usecase.SsoGroupRoleMappingRepository
+			usecase.OAuthRepository
+			usecase.McpTokenRepository
 		}
 		pairingSessions usecase.PairingSessionRepository
 		pairedDevices   usecase.PairedDeviceRepository
@@ -262,6 +265,18 @@ func run() error {
 	} else {
 		defer func() { _ = closeBus() }()
 		auditIngestConsumer := authnatsconsumer.New(handleSSHConnectedEventUC, logger)
+		// Both SQL adapters implement IdempotentAuditAppender; the assertion
+		// keeps the anonymous repo interface above untouched.
+		if appender, ok := any(repo).(usecase.IdempotentAuditAppender); ok {
+			mcpAuditConsumer := authnatsconsumer.NewMcpAudit(usecase.NewHandleMcpAuditEvent(appender), logger)
+			consumerWG.Add(1)
+			go func() {
+				defer consumerWG.Done()
+				mcpAuditConsumer.Run(ctx, cons)
+			}()
+		} else {
+			logger.WarnContext(ctx, "audit repository cannot append idempotently: MCP audit events are not ingested")
+		}
 		consumerWG.Add(1)
 		go func() {
 			defer consumerWG.Done()
@@ -401,8 +416,16 @@ func run() error {
 	updateSsoGroupMappingUC := usecase.NewUpdateSsoGroupMapping(repo, repo, clock, opaClient)
 	listSsoGroupMappingUC := usecase.NewListSsoGroupMapping(repo, repo, opaClient)
 
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
-	authv1.RegisterAuthServiceServer(grpcServer, authgrpc.New(
+	oauthCfg, err := svcconfig.LoadOAuth()
+	if err != nil {
+		return err
+	}
+	// The mcp-service-only OAuth RPCs are guarded by a shared secret on top of
+	// the NetworkPolicy allow-list (no mesh peer identity exists yet). The
+	// guard option comes after ChainUnary so it runs inside recovery/logging.
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler(),
+		grpc.ChainUnaryInterceptor(internalcaller.Guard(oauthCfg.InternalCallerToken, authgrpc.OAuthInternalMethods...)))
+	baseServer := authgrpc.New(
 		loginUC, logoutUC, validateSessionUC,
 		createUserUC, listUsersUC, updateUserRoleUC, revokeSessionUC, queryAuditLogUC,
 		appendAuditEntryUC,
@@ -417,7 +440,36 @@ func run() error {
 		listTenantMemberDirectoryUC,
 		startSsoLoginUC, completeSsoLoginUC,
 		refreshSessionUC, updateSsoGroupMappingUC, listSsoGroupMappingUC,
-	))
+	)
+	var authServer authv1.AuthServiceServer = baseServer
+	if oauthCfg.Enabled {
+		ucCfg := usecase.OAuthConfig{
+			ResourceURL: oauthCfg.ResourceURL, AccessTokenTTL: oauthCfg.AccessTokenTTL, RefreshTokenTTL: oauthCfg.RefreshTokenTTL,
+			AuthCodeTTL: oauthCfg.AuthCodeTTL, DCREnabled: oauthCfg.DCREnabled, DCRMaxClients: oauthCfg.DCRMaxClients,
+		}
+		authServer = authgrpc.WithOAuth(baseServer, authgrpc.OAuthUsecases{
+			Register:  usecase.NewOAuthRegisterClient(repo, repo, clock, ucCfg),
+			Validate:  usecase.NewOAuthValidateAuthorizeRequest(repo, ucCfg),
+			IssueCode: usecase.NewOAuthIssueAuthCode(repo, repo, repo, clock, ucCfg),
+			Exchange:  usecase.NewOAuthExchangeToken(repo, repo, tokenSigner, repo, clock, ucCfg),
+			Revoke:    usecase.NewOAuthRevokeToken(repo, tokenSigner, repo, clock),
+			RevokeGr:  usecase.NewOAuthRevokeGrant(repo, repo, clock),
+			List:      usecase.NewOAuthListClientsForTenant(repo),
+			SetStatus: usecase.NewOAuthSetClientStatus(repo, repo, clock),
+			Ensure:    usecase.NewOAuthEnsureClientForTenant(repo, clock),
+		})
+		logger.Info("oauth authorization server enabled", slog.String("resource", oauthCfg.ResourceURL), slog.Bool("dcr", oauthCfg.DCREnabled))
+	}
+	if oauthCfg.Enabled {
+		// MCP PATs share the OAuth resource URL as their only audience.
+		authServer = authgrpc.WithMcp(authServer, authgrpc.McpUsecases{
+			Issue:   usecase.NewIssueMcpToken(repo, repo, repo, tokenSigner, clock, oauthCfg.ResourceURL),
+			List:    usecase.NewListMcpTokens(repo),
+			Revoke:  usecase.NewRevokeMcpToken(repo, repo, clock),
+			Resolve: usecase.NewResolveMcpPrincipal(repo, repo, repo, repo, clock),
+		})
+	}
+	authv1.RegisterAuthServiceServer(grpcServer, authServer)
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// Vault reachability gates readiness — IssueServiceToken/GetJWKS can

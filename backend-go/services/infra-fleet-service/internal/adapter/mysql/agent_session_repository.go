@@ -37,13 +37,19 @@ func (s *AgentSessionStore) Create(ctx context.Context, session domain.AgentSess
 	_, err := s.db.ExecContext(ctx, `
 		INSERT INTO agent_sessions
 			(id, tenant_id, pty_id, connection_id, worktree_id, dev_server_id, user_id, model_id, account_id,
-			 resume_of_session_id, agent_version, status, started_at, last_active_at)
+			 resume_of_session_id, agent_version, status, started_at, last_active_at,
+			 origin_type, origin_client_name, origin_mcp_session_id, origin_user_id)
 		VALUES (?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?, NULLIF(?, ''),
-		        NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?)
+		        NULLIF(?, ''), NULLIF(?, ''), ?, ?, ?,
+		        ?, ?, ?, ?)
 	`, session.ID, session.TenantID, session.PtyID, session.ConnectionID, session.WorktreeID, session.DevServerID,
 		session.UserID, session.ModelID, session.AccountID,
 		session.ResumeOfSessionID, session.AgentVersion, string(session.Status),
-		session.StartedAt, session.LastActiveAt)
+		session.StartedAt, session.LastActiveAt,
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.Type }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.ClientName }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.MCPSessionID }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.UserID }))
 	if err != nil {
 		var myErr *mysqldriver.MySQLError
 		if errors.As(err, &myErr) && myErr.Number == mysqlDuplicateEntry {
@@ -169,7 +175,8 @@ const agentSessionSelect = `
 	SELECT id, tenant_id, pty_id, COALESCE(connection_id, ''), worktree_id, dev_server_id, user_id, model_id,
 	       COALESCE(account_id, ''), COALESCE(resume_of_session_id, ''),
 	       COALESCE(agent_version, ''), status, started_at, last_active_at, stopped_at,
-	       COALESCE(resume_provider_session_key, ''), COALESCE(resume_provider_session_id, '')
+	       COALESCE(resume_provider_session_key, ''), COALESCE(resume_provider_session_id, ''),
+	       origin_type, origin_client_name, origin_mcp_session_id, origin_user_id
 	FROM agent_sessions
 `
 
@@ -177,11 +184,14 @@ func scanAgentSession(row rowScanner) (domain.AgentSession, error) {
 	var s domain.AgentSession
 	var status string
 	var stoppedAt sql.NullTime
+	var originType, originClient, originSession, originUser sql.NullString
 	if err := row.Scan(&s.ID, &s.TenantID, &s.PtyID, &s.ConnectionID, &s.WorktreeID, &s.DevServerID, &s.UserID,
 		&s.ModelID, &s.AccountID, &s.ResumeOfSessionID, &s.AgentVersion, &status,
-		&s.StartedAt, &s.LastActiveAt, &stoppedAt, &s.ResumeProviderSessionKey, &s.ResumeProviderSessionID); err != nil {
+		&s.StartedAt, &s.LastActiveAt, &stoppedAt, &s.ResumeProviderSessionKey, &s.ResumeProviderSessionID,
+		&originType, &originClient, &originSession, &originUser); err != nil {
 		return domain.AgentSession{}, err
 	}
+	s.Origin = buildSessionOrigin(originType, originClient, originSession, originUser)
 	s.Status = domain.AgentStatus(status)
 	if stoppedAt.Valid {
 		t := stoppedAt.Time

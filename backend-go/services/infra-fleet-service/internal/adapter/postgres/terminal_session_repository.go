@@ -32,9 +32,14 @@ func NewTerminalSessionStore(pool *pgxpool.Pool) *TerminalSessionStore {
 // ssh_target_id.
 func (s *TerminalSessionStore) Create(ctx context.Context, session domain.TerminalSession) (domain.TerminalSession, error) {
 	_, err := s.pool.Exec(ctx, `
-		INSERT INTO infra.terminal_sessions (pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, created_by_user_id)
-		VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5, $6, NULLIF($7, '')::uuid)
-	`, session.PtyID, session.TenantID, session.ConnectionID, session.Cwd, session.CreatedAt, session.LastActiveAt, session.CreatedByUserID)
+		INSERT INTO infra.terminal_sessions (pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, created_by_user_id,
+		                                     origin_type, origin_client_name, origin_mcp_session_id, origin_user_id)
+		VALUES ($1, $2, NULLIF($3, '')::uuid, $4, $5, $6, NULLIF($7, '')::uuid, $8, $9, $10, NULLIF($11, '')::uuid)
+	`, session.PtyID, session.TenantID, session.ConnectionID, session.Cwd, session.CreatedAt, session.LastActiveAt, session.CreatedByUserID,
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.Type }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.ClientName }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.MCPSessionID }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.UserID }))
 	if err != nil {
 		return domain.TerminalSession{}, fmt.Errorf("postgres: insert terminal session: %w", err)
 	}
@@ -45,7 +50,8 @@ func (s *TerminalSessionStore) Create(ctx context.Context, session domain.Termin
 // when no row matches, per usecase.TerminalSessionRepository's doc comment.
 func (s *TerminalSessionStore) Get(ctx context.Context, tenantID, ptyID string) (bool, domain.TerminalSession, error) {
 	row := s.pool.QueryRow(ctx, `
-		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at, created_by_user_id
+		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at, created_by_user_id,
+		       origin_type, origin_client_name, origin_mcp_session_id, origin_user_id::text
 		FROM infra.terminal_sessions
 		WHERE tenant_id = $1 AND pty_id = $2
 	`, tenantID, ptyID)
@@ -64,7 +70,8 @@ func (s *TerminalSessionStore) Get(ctx context.Context, tenantID, ptyID string) 
 // connectionID.
 func (s *TerminalSessionStore) List(ctx context.Context, tenantID, connectionID string) ([]domain.TerminalSession, error) {
 	rows, err := s.pool.Query(ctx, `
-		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at, created_by_user_id
+		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at, created_by_user_id,
+		       origin_type, origin_client_name, origin_mcp_session_id, origin_user_id::text
 		FROM infra.terminal_sessions
 		WHERE tenant_id = $1
 		  AND closed_at IS NULL
@@ -151,10 +158,13 @@ func scanTerminalSession(row rowScanner) (domain.TerminalSession, error) {
 	var connectionID *string
 	var closedAt *time.Time
 	var createdByUserID *string
-	err := row.Scan(&session.PtyID, &session.TenantID, &connectionID, &session.Cwd, &session.CreatedAt, &session.LastActiveAt, &closedAt, &createdByUserID)
+	var originType, originClient, originSession, originUser *string
+	err := row.Scan(&session.PtyID, &session.TenantID, &connectionID, &session.Cwd, &session.CreatedAt, &session.LastActiveAt, &closedAt, &createdByUserID,
+		&originType, &originClient, &originSession, &originUser)
 	if err != nil {
 		return domain.TerminalSession{}, err
 	}
+	session.Origin = buildSessionOrigin(originType, originClient, originSession, originUser)
 	if connectionID != nil {
 		session.ConnectionID = *connectionID
 	}

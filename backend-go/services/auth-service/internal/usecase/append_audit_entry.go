@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
 
@@ -18,6 +19,12 @@ type AppendAuditEntryInput struct {
 	Target    string
 	Outcome   string
 	IPAddress string
+
+	// Additive (BE-MCP-SOL-013). Empty ActorType means "user".
+	ActorType    string
+	TargetType   string
+	TargetID     string
+	MetadataJSON string
 }
 
 // AppendAuditEntry is the cross-service audit-ingress usecase (TASK-BE-017):
@@ -49,7 +56,18 @@ func (uc *AppendAuditEntry) Execute(ctx context.Context, in AppendAuditEntryInpu
 		return apperrors.New(apperrors.KindInvalidArgument, "AUTH_AUDIT_NO_ACTION", "action is required", nil)
 	}
 
-	entry, err := domain.NewAuditEntry(uuid.NewString(), in.TenantID, in.ActorID, in.Action, in.Target, "", "", nil, domain.Outcome(in.Outcome), in.IPAddress, uc.clock.Now())
+	actor := domain.ActorType(in.ActorType)
+	if actor != "" && !actor.Valid() {
+		return apperrors.New(apperrors.KindInvalidArgument, "AUTH_AUDIT_INVALID_ENTRY", domain.ErrInvalidActorType.Error(), domain.ErrInvalidActorType)
+	}
+	var metadata map[string]any
+	if in.MetadataJSON != "" {
+		if err := json.Unmarshal([]byte(in.MetadataJSON), &metadata); err != nil {
+			return apperrors.New(apperrors.KindInvalidArgument, "AUTH_AUDIT_INVALID_ENTRY", "metadata_json is not a JSON object", err)
+		}
+	}
+	entry, err := domain.NewAuditEntry(uuid.NewString(), in.TenantID, in.ActorID, in.Action, in.Target, in.TargetType, in.TargetID, metadata, domain.Outcome(in.Outcome), in.IPAddress, uc.clock.Now())
+	entry = entry.WithActorType(actor)
 	if err != nil {
 		return apperrors.New(apperrors.KindInvalidArgument, "AUTH_AUDIT_INVALID_ENTRY", err.Error(), err)
 	}

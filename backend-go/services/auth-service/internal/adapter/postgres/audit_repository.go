@@ -16,6 +16,15 @@ import (
 // comment) and, in production, at the database-permission level too (see
 // migrations/0001_init.up.sql's comment on auth.audit_log).
 func (r *Repository) Append(ctx context.Context, entry domain.AuditEntry) error {
+	return r.insertAudit(ctx, entry, false)
+}
+
+// AppendIdempotent is Append that ignores a duplicate id (event redelivery).
+func (r *Repository) AppendIdempotent(ctx context.Context, entry domain.AuditEntry) error {
+	return r.insertAudit(ctx, entry, true)
+}
+
+func (r *Repository) insertAudit(ctx context.Context, entry domain.AuditEntry, ignoreDuplicate bool) error {
 	metadataJSON, err := json.Marshal(entry.Metadata)
 	if err != nil {
 		return fmt.Errorf("postgres: marshal audit metadata: %w", err)
@@ -31,10 +40,14 @@ func (r *Repository) Append(ctx context.Context, entry domain.AuditEntry) error 
 	if outcome == "" {
 		outcome = domain.OutcomeAllowed // matches domain.NewAuditEntry's own backward-compatible default
 	}
+	onConflict := ""
+	if ignoreDuplicate {
+		onConflict = " ON CONFLICT (id) DO NOTHING"
+	}
 	_, err = r.pool.Exec(ctx, `
-		INSERT INTO auth.audit_log (id, tenant_id, actor_id, action, target, target_type, target_id, metadata, outcome, ip_address, occurred_at)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-	`, entry.ID, entry.TenantID, actorID, entry.Action, entry.Target, entry.TargetType, entry.TargetID, metadataJSON, string(outcome), ip, entry.OccurredAt)
+		INSERT INTO auth.audit_log (id, tenant_id, actor_id, action, target, target_type, target_id, metadata, outcome, ip_address, occurred_at, actor_type)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`+onConflict,
+		entry.ID, entry.TenantID, actorID, entry.Action, entry.Target, entry.TargetType, entry.TargetID, metadataJSON, string(outcome), ip, entry.OccurredAt, string(entry.EffectiveActorType()))
 	if err != nil {
 		return fmt.Errorf("postgres: insert audit entry: %w", err)
 	}
@@ -47,8 +60,39 @@ func (r *Repository) Append(ctx context.Context, entry domain.AuditEntry) error 
 // codebase's established convention — see e.g. ListAnnotations' filePath
 // parameter).
 func (r *Repository) Query(ctx context.Context, filter usecase.AuditQueryFilter, pageToken string, pageSize int32) ([]domain.AuditEntry, string, error) {
-	clauses := []string{"tenant_id = $1", "occurred_at >= $2", "id::text > $3"}
-	args := []any{filter.TenantID, filter.Since, pageToken}
+	clauses := []string{"tenant_id = $1", "occurred_at >= $2"}
+	args := []any{filter.TenantID, filter.Since}
+	if filter.NewestFirst {
+		if pageToken != "" {
+			at, id, err := domain.DecodeAuditKeyset(pageToken)
+			if err != nil {
+				return nil, "", err
+			}
+			args = append(args, at, id)
+			clauses = append(clauses, fmt.Sprintf("(occurred_at, id::text) < ($%d, $%d)", len(args)-1, len(args)))
+		}
+	} else {
+		args = append(args, pageToken)
+		clauses = append(clauses, "id::text > $"+strconv.Itoa(len(args)))
+	}
+	if filter.ActorType != "" {
+		args = append(args, string(filter.ActorType))
+		clauses = append(clauses, "actor_type = $"+strconv.Itoa(len(args)))
+	}
+	if filter.TargetID != "" {
+		args = append(args, filter.TargetID)
+		clauses = append(clauses, "target_id = $"+strconv.Itoa(len(args)))
+	}
+	// Keys come from a fixed allow-list (usecase.AllowedAuditMetadataKeys);
+	// even so, only the value is a parameter and the key must pass the check
+	// again here before it is placed in the SQL text.
+	for _, k := range domain.SortedKeys(filter.MetadataEquals) {
+		if !usecase.AllowedAuditMetadataKeys[k] {
+			return nil, "", fmt.Errorf("postgres: audit metadata key %q is not filterable", k)
+		}
+		args = append(args, filter.MetadataEquals[k])
+		clauses = append(clauses, "metadata->>'"+k+"' = $"+strconv.Itoa(len(args)))
+	}
 
 	if !filter.To.IsZero() {
 		args = append(args, filter.To)
@@ -75,12 +119,12 @@ func (r *Repository) Query(ctx context.Context, filter usecase.AuditQueryFilter,
 	query := fmt.Sprintf(`
 		SELECT id, tenant_id, COALESCE(actor_id::text, ''), action, target,
 		       COALESCE(target_type, ''), COALESCE(target_id, ''), metadata,
-		       outcome, COALESCE(host(ip_address), ''), occurred_at
+		       outcome, COALESCE(host(ip_address), ''), occurred_at, actor_type
 		FROM auth.audit_log
 		WHERE %s
-		ORDER BY id
+		ORDER BY %s
 		LIMIT $%d
-	`, strings.Join(clauses, " AND "), limitPos)
+	`, strings.Join(clauses, " AND "), domain.AuditOrderBy(filter.NewestFirst), limitPos)
 
 	rows, err := r.pool.Query(ctx, query, args...)
 	if err != nil {
@@ -92,15 +136,16 @@ func (r *Repository) Query(ctx context.Context, filter usecase.AuditQueryFilter,
 	for rows.Next() {
 		var e domain.AuditEntry
 		var metadataJSON []byte
-		var outcome string
+		var outcome, actorType string
 		if err := rows.Scan(&e.ID, &e.TenantID, &e.ActorID, &e.Action, &e.Target,
-			&e.TargetType, &e.TargetID, &metadataJSON, &outcome, &e.IPAddress, &e.OccurredAt); err != nil {
+			&e.TargetType, &e.TargetID, &metadataJSON, &outcome, &e.IPAddress, &e.OccurredAt, &actorType); err != nil {
 			return nil, "", fmt.Errorf("postgres: scan audit log row: %w", err)
 		}
 		if err := json.Unmarshal(metadataJSON, &e.Metadata); err != nil {
 			return nil, "", fmt.Errorf("postgres: unmarshal audit metadata: %w", err)
 		}
 		e.Outcome = domain.Outcome(outcome)
+		e.ActorType = domain.ActorType(actorType)
 		out = append(out, e)
 	}
 	if err := rows.Err(); err != nil {
@@ -110,6 +155,9 @@ func (r *Repository) Query(ctx context.Context, filter usecase.AuditQueryFilter,
 	next := ""
 	if int32(len(out)) == pageSize && len(out) > 0 {
 		next = out[len(out)-1].ID
+		if filter.NewestFirst {
+			next = domain.EncodeAuditKeyset(out[len(out)-1])
+		}
 	}
 	return out, next, nil
 }

@@ -49,6 +49,8 @@ type agentSessionView struct {
 	Status             string `json:"status"`
 	StartedAtUnixMs    int64  `json:"startedAtUnixMs"`
 	LastActiveAtUnixMs int64  `json:"lastActiveAtUnixMs"`
+	// Origin is present only for sessions an MCP client started (CONTRACT §5).
+	Origin *sessionOriginView `json:"origin,omitempty"`
 }
 
 func toAgentSessionView(s *infrafleetv1.AgentSession) agentSessionView {
@@ -56,6 +58,7 @@ func toAgentSessionView(s *infrafleetv1.AgentSession) agentSessionView {
 		ID: s.GetId(), PtyID: s.GetPtyId(), WorktreeID: s.GetWorktreeId(), DevServerID: s.GetDevServerId(),
 		UserID: s.GetUserId(), ModelID: s.GetModelId(), AccountID: s.GetAccountId(), Status: s.GetStatus(),
 		StartedAtUnixMs: s.GetStartedAtUnixMs(), LastActiveAtUnixMs: s.GetLastActiveAtUnixMs(),
+		Origin: originViewFromProto(s.GetOrigin()),
 	}
 }
 
@@ -124,6 +127,7 @@ func registerAgentStartChannel(r *Registry, client infrafleetv1.InfraFleetServic
 			TrustPreset:  in.TrustPreset,
 			Cols:         in.Cols,
 			Rows:         in.Rows,
+			Origin:       originProtoFromContext(ctx),
 		})
 		if err != nil {
 			return nil, nil, err

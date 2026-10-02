@@ -157,6 +157,8 @@ type terminalSessionView struct {
 	Cwd          string `json:"cwd"`
 	CreatedAt    int64  `json:"createdAt"`
 	LastActiveAt int64  `json:"lastActiveAt"`
+	// Origin is present only for sessions an MCP client created (CONTRACT §5).
+	Origin *sessionOriginView `json:"origin,omitempty"`
 }
 
 func toTerminalSessionView(s *infrafleetv1.TerminalSession) terminalSessionView {
@@ -166,6 +168,7 @@ func toTerminalSessionView(s *infrafleetv1.TerminalSession) terminalSessionView 
 		Cwd:          s.GetCwd(),
 		CreatedAt:    s.GetCreatedAtUnixMs(),
 		LastActiveAt: s.GetLastActiveAtUnixMs(),
+		Origin:       originViewFromProto(s.GetOrigin()),
 	}
 }
 
@@ -244,6 +247,7 @@ func registerTerminalCreateChannel(r *Registry, client infrafleetv1.InfraFleetSe
 			Cols:             in.Cols,
 			Rows:             in.Rows,
 			ShellIntegration: in.ShellIntegration,
+			Origin:           originProtoFromContext(ctx),
 		})
 		if err != nil {
 			return nil, nil, err

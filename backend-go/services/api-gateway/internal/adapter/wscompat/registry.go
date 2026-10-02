@@ -194,7 +194,8 @@ func (r *Registry) Dispatch(ctx context.Context, id Identity, channel string, ar
 	defer cancel()
 	result, err := h(ctx, id, args)
 	if err != nil {
-		return nil, err
+		// Channels with secret args (CONTRACT C11) must not echo them in errors.
+		return nil, scrubSensitiveChannelError(channel, args, err)
 	}
 	return normalizeNilSlices(result), nil
 }

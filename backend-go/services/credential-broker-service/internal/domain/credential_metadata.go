@@ -32,16 +32,34 @@ const (
 	// CategoryDevServerAgentToken mirrors
 	// CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN — see SOL-AWS-01.
 	CategoryDevServerAgentToken Category = "dev_server_agent_token"
+	// CategoryMcpExternalSecret holds env/header secrets of external MCP
+	// servers (BE-MCP-SOL-014); only mcp-service reads or writes it.
+	CategoryMcpExternalSecret Category = "mcp_external_secret"
 )
 
 // Valid reports whether c is one of the known category values.
 func (c Category) Valid() bool {
 	switch c {
-	case CategoryScmOAuth, CategoryIssueTrackerOAuth, CategoryAiProviderKey, CategorySsh, CategoryServiceSecret, CategoryDevServerAgentToken:
+	case CategoryScmOAuth, CategoryIssueTrackerOAuth, CategoryAiProviderKey, CategorySsh, CategoryServiceSecret, CategoryDevServerAgentToken, CategoryMcpExternalSecret:
 		return true
 	default:
 		return false
 	}
+}
+
+// McpServiceCaller is the only service identity allowed to touch
+// CategoryMcpExternalSecret material (BE-MCP-SOL-014).
+const McpServiceCaller = "mcp-service"
+
+// AllowsCaller is the category-to-caller allow-list. Categories with no
+// restriction accept any internal caller (existing behavior); the MCP
+// external-secret category accepts only mcp-service, fail-closed on an empty
+// identity.
+func (c Category) AllowsCaller(service string) bool {
+	if c == CategoryMcpExternalSecret {
+		return service == McpServiceCaller
+	}
+	return true
 }
 
 // VaultEngine identifies which Vault secrets engine a category's material is
@@ -108,6 +126,7 @@ var (
 	ErrCredentialNotFound     = errors.New("domain: credential not found")
 	ErrCredentialRevoked      = errors.New("domain: credential is revoked")
 	ErrCategoryEngineMismatch = errors.New("domain: category/vault engine mismatch")
+	ErrCallerNotAllowed       = errors.New("domain: caller is not allowed for this credential category")
 )
 
 // CredentialMetadata is a pointer to secret material that lives in Vault.

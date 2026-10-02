@@ -92,6 +92,24 @@ func (e *Evaluator) Decision(ctx context.Context, query string, input any) (bool
 	return allowed, nil
 }
 
+// Value returns the raw JSON-decoded result of query (undefined => nil, nil).
+// Decision only yields a bool; MCP needs an object ({decision, source,
+// reasons}). Same fail-closed contract: callers MUST treat (nil | error) as deny.
+func (e *Evaluator) Value(ctx context.Context, query string, input any) (any, error) {
+	pq, err := e.preparedQuery(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	rs, err := pq.Eval(ctx, rego.EvalInput(input))
+	if err != nil {
+		return nil, fmt.Errorf("policy: evaluating query %q: %w", query, err)
+	}
+	if len(rs) == 0 || len(rs[0].Expressions) == 0 {
+		return nil, nil
+	}
+	return rs[0].Expressions[0].Value, nil
+}
+
 // Warm eagerly compiles every named query — call once at service startup,
 // right after NewEvaluator, so a missing/unreadable/invalid bundle fails
 // loudly at boot instead of surfacing as an opaque per-request evaluation

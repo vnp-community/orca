@@ -24,6 +24,8 @@ import (
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
 	notificationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1"
+
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/originpolicy"
 )
 
 // StreamOpener opens a live StreamNotifications gRPC call for userID,
@@ -59,6 +61,15 @@ type Handler struct {
 	// Nil is tolerated (falls straight back to Auth for everything).
 	Cookie CookieValidator
 	Open   StreamOpener
+	// Origins rejects cross-site browser upgrades; nil/empty keeps the legacy
+	// permissive behavior (see originpolicy).
+	Origins *originpolicy.Policy
+}
+
+// WithOriginPolicy sets the Origin allow-list and returns h for chaining.
+func (h *Handler) WithOriginPolicy(p *originpolicy.Policy) *Handler {
+	h.Origins = p
+	return h
 }
 
 // New returns a Handler ready to mount at /v1/notifications/stream.
@@ -73,10 +84,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// InsecureSkipVerify: this scaffold has no CORS/origin allow-list
-	// wired yet (out of scope for this pass); production must set
-	// OriginPatterns to the real frontend/mobile origins before this
-	// serves real traffic — see README "Known gaps".
+	// Why checked here and not by the websocket library: auth is an ambient
+	// cookie, so a foreign page could otherwise open this stream as the user.
+	// With an empty allow-list the library check stays skipped (legacy).
+	if !h.Origins.Allow(r) {
+		h.Logger.WarnContext(r.Context(), "ws upgrade rejected, origin not allowed", slog.String("origin", r.Header.Get("Origin")))
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
+	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {
 		h.Logger.ErrorContext(r.Context(), "ws upgrade failed", slog.Any("error", err))

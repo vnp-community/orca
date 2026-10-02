@@ -5,7 +5,7 @@
 
 SERVICES := ai-provider-service annotation-service api-gateway auth-service \
             automation-service credential-broker-service git-gateway-service \
-            infra-fleet-service issue-tracking-service notification-service \
+            infra-fleet-service issue-tracking-service mcp-service notification-service \
             orchestration-service project-service scm-integration-service \
             task-service tenant-service usage-service workflow-service
 

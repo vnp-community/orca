@@ -231,3 +231,22 @@ func TestEvaluator_CheckPeriodZero_PreservesNeverInvalidateBehavior(t *testing.T
 		t.Fatal("expected checkPeriod:0 to never invalidate — the pre-edit rule must still be served")
 	}
 }
+
+func TestValue_ReturnsObjectAndUndefinedAsNil(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "v.rego"), []byte("package t.v\nimport rego.v1\nout := {\"a\": 1} if input.x == true\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	ev := policy.NewEvaluator(dir)
+	got, err := ev.Value(context.Background(), "data.t.v.out", map[string]any{"x": true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m, ok := got.(map[string]any); !ok || len(m) != 1 {
+		t.Fatalf("got %#v", got)
+	}
+	got, err = ev.Value(context.Background(), "data.t.v.out", map[string]any{"x": false})
+	if err != nil || got != nil {
+		t.Fatalf("undefined must be nil,nil; got %#v %v", got, err)
+	}
+}

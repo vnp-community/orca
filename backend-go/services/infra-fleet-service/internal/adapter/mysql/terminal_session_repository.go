@@ -27,9 +27,14 @@ func NewTerminalSessionStore(db *sql.DB) *TerminalSessionStore {
 // CHAR(36)/VARCHAR(255) already accept a plain string.
 func (s *TerminalSessionStore) Create(ctx context.Context, session domain.TerminalSession) (domain.TerminalSession, error) {
 	_, err := s.db.ExecContext(ctx, `
-		INSERT INTO terminal_sessions (pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, created_by_user_id)
-		VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''))
-	`, session.PtyID, session.TenantID, session.ConnectionID, session.Cwd, session.CreatedAt, session.LastActiveAt, session.CreatedByUserID)
+		INSERT INTO terminal_sessions (pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, created_by_user_id,
+		                               origin_type, origin_client_name, origin_mcp_session_id, origin_user_id)
+		VALUES (?, ?, NULLIF(?, ''), ?, ?, ?, NULLIF(?, ''), ?, ?, ?, ?)
+	`, session.PtyID, session.TenantID, session.ConnectionID, session.Cwd, session.CreatedAt, session.LastActiveAt, session.CreatedByUserID,
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.Type }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.ClientName }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.MCPSessionID }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.UserID }))
 	if err != nil {
 		return domain.TerminalSession{}, fmt.Errorf("mysql: insert terminal session: %w", err)
 	}
@@ -40,7 +45,8 @@ func (s *TerminalSessionStore) Create(ctx context.Context, session domain.Termin
 // when no row matches, per usecase.TerminalSessionRepository's doc comment.
 func (s *TerminalSessionStore) Get(ctx context.Context, tenantID, ptyID string) (bool, domain.TerminalSession, error) {
 	row := s.db.QueryRowContext(ctx, `
-		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at, created_by_user_id
+		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at, created_by_user_id,
+		       origin_type, origin_client_name, origin_mcp_session_id, origin_user_id
 		FROM terminal_sessions
 		WHERE tenant_id = ? AND pty_id = ?
 	`, tenantID, ptyID)
@@ -60,7 +66,8 @@ func (s *TerminalSessionStore) Get(ctx context.Context, tenantID, ptyID string) 
 // positional, unlike Postgres's $2 reused twice in one statement.
 func (s *TerminalSessionStore) List(ctx context.Context, tenantID, connectionID string) ([]domain.TerminalSession, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at, created_by_user_id
+		SELECT pty_id, tenant_id, connection_id, cwd, created_at, last_active_at, closed_at, created_by_user_id,
+		       origin_type, origin_client_name, origin_mcp_session_id, origin_user_id
 		FROM terminal_sessions
 		WHERE tenant_id = ?
 		  AND closed_at IS NULL
@@ -153,10 +160,13 @@ func scanTerminalSession(row rowScanner) (domain.TerminalSession, error) {
 	var connectionID sql.NullString
 	var closedAt sql.NullTime
 	var createdByUserID sql.NullString
-	err := row.Scan(&session.PtyID, &session.TenantID, &connectionID, &session.Cwd, &session.CreatedAt, &session.LastActiveAt, &closedAt, &createdByUserID)
+	var originType, originClient, originSession, originUser sql.NullString
+	err := row.Scan(&session.PtyID, &session.TenantID, &connectionID, &session.Cwd, &session.CreatedAt, &session.LastActiveAt, &closedAt, &createdByUserID,
+		&originType, &originClient, &originSession, &originUser)
 	if err != nil {
 		return domain.TerminalSession{}, err
 	}
+	session.Origin = buildSessionOrigin(originType, originClient, originSession, originUser)
 	if connectionID.Valid {
 		session.ConnectionID = connectionID.String
 	}

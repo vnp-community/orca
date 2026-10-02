@@ -3,7 +3,8 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."  # backend-go/
 
-for svc in auth-service task-service annotation-service project-service; do
+svcs=(auth-service task-service annotation-service project-service mcp-service)
+for svc in "${svcs[@]}"; do
   echo "Building $svc..."
   docker build -q -f "services/$svc/deploy/Dockerfile" -t "orca-go/$svc:ci-opa-check" .
 
@@ -19,4 +20,4 @@ for svc in auth-service task-service annotation-service project-service; do
   docker rm "$cid" >/dev/null
   echo "OK: $svc"
 done
-echo "All 4 images contain the OPA bundle."
+echo "All ${#svcs[@]} images contain the OPA bundle."

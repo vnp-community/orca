@@ -80,6 +80,13 @@ type AuthValidator struct {
 	// httpgateway/usecase test double) to change for a feature most of
 	// them don't exercise.
 	Revocation RevocationChecker
+	// RejectAudiences lists audiences Validate refuses (set after
+	// construction like Revocation): the MCP resource URL, so a token minted
+	// for /mcp is useless against REST/WS. Empty = no audience filtering.
+	RejectAudiences []string
+	// McpPrincipals backs ValidateMCP (live role + revocation). Set after
+	// construction for the same reason as Revocation.
+	McpPrincipals McpPrincipalResolver
 }
 
 // NewAuthValidator returns an AuthValidator that verifies bearer/cookie
@@ -120,6 +127,12 @@ func (v *AuthValidator) Validate(r *http.Request) (Identity, error) {
 
 	if claims.TenantID == "" || claims.Subject == "" {
 		return Identity{}, ErrMissingIdentityClaims
+	}
+
+	// MCP tokens (aud = MCP resource) are only valid on /mcp, so that a leaked
+	// or minted PAT/OAuth token cannot call REST/WS, e.g. mint more PATs.
+	if v.audienceRejected(claims.Audience, claims.TokenUse) {
+		return Identity{}, ErrAudienceNotAccepted
 	}
 
 	if v.Revocation != nil {

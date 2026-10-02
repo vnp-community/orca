@@ -124,7 +124,8 @@ func (s *Server) RevokeCredential(ctx context.Context, req *credentialbrokerv1.R
 
 func (s *Server) GetCredentialMetadata(ctx context.Context, req *credentialbrokerv1.GetCredentialMetadataRequest) (*credentialbrokerv1.GetCredentialMetadataResponse, error) {
 	metadata, err := s.getCredentialMetadata.Execute(ctx, usecase.GetCredentialMetadataInput{
-		CredentialID: req.GetCredentialId(),
+		CredentialID:      req.GetCredentialId(),
+		RequestingService: requestingService(ctx),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -164,9 +165,10 @@ func (s *Server) RevokeCredentialByOwner(ctx context.Context, req *credentialbro
 // `optional` proto declaration.
 func (s *Server) GetCredentialMetadataByOwner(ctx context.Context, req *credentialbrokerv1.GetCredentialMetadataByOwnerRequest) (*credentialbrokerv1.GetCredentialMetadataByOwnerResponse, error) {
 	result, err := s.getCredentialMetadataByOwner.Execute(ctx, usecase.GetCredentialMetadataByOwnerInput{
-		TenantID: req.GetTenantId(),
-		Category: toDomainCategory(req.GetCategory()),
-		OwnerID:  req.GetOwnerId(),
+		TenantID:          req.GetTenantId(),
+		Category:          toDomainCategory(req.GetCategory()),
+		OwnerID:           req.GetOwnerId(),
+		RequestingService: requestingService(ctx),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -179,8 +181,9 @@ func (s *Server) GetCredentialMetadataByOwner(ctx context.Context, req *credenti
 
 func (s *Server) ListCredentialsByCategory(ctx context.Context, req *credentialbrokerv1.ListCredentialsByCategoryRequest) (*credentialbrokerv1.ListCredentialsByCategoryResponse, error) {
 	rows, err := s.listCredentialsByCategory.Execute(ctx, usecase.ListCredentialsByCategoryInput{
-		TenantID: req.GetTenantId(),
-		Category: toDomainCategory(req.GetCategory()),
+		TenantID:          req.GetTenantId(),
+		Category:          toDomainCategory(req.GetCategory()),
+		RequestingService: requestingService(ctx),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -229,6 +232,8 @@ func toDomainCategory(c credentialbrokerv1.CredentialCategory) domain.Category {
 		return domain.CategoryServiceSecret
 	case credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN:
 		return domain.CategoryDevServerAgentToken
+	case credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_MCP_EXTERNAL_SECRET:
+		return domain.CategoryMcpExternalSecret
 	default:
 		return ""
 	}
@@ -248,6 +253,8 @@ func toProtoCategory(c domain.Category) credentialbrokerv1.CredentialCategory {
 		return credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_SERVICE_SECRET
 	case domain.CategoryDevServerAgentToken:
 		return credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN
+	case domain.CategoryMcpExternalSecret:
+		return credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_MCP_EXTERNAL_SECRET
 	default:
 		return credentialbrokerv1.CredentialCategory_CREDENTIAL_CATEGORY_UNSPECIFIED
 	}

@@ -37,13 +37,19 @@ func (s *AgentSessionStore) Create(ctx context.Context, session domain.AgentSess
 	_, err := s.pool.Exec(ctx, `
 		INSERT INTO infra.agent_sessions
 			(id, tenant_id, pty_id, connection_id, worktree_id, dev_server_id, user_id, model_id, account_id,
-			 resume_of_session_id, agent_version, status, started_at, last_active_at)
+			 resume_of_session_id, agent_version, status, started_at, last_active_at,
+			 origin_type, origin_client_name, origin_mcp_session_id, origin_user_id)
 		VALUES ($1, $2, $3, NULLIF($4, '')::uuid, $5, $6, $7, $8, NULLIF($9, '')::uuid,
-		        NULLIF($10, '')::uuid, NULLIF($11, ''), $12, $13, $14)
+		        NULLIF($10, '')::uuid, NULLIF($11, ''), $12, $13, $14,
+		        $15, $16, $17, NULLIF($18, '')::uuid)
 	`, session.ID, session.TenantID, session.PtyID, session.ConnectionID, session.WorktreeID, session.DevServerID,
 		session.UserID, session.ModelID, session.AccountID,
 		session.ResumeOfSessionID, session.AgentVersion, string(session.Status),
-		session.StartedAt, session.LastActiveAt)
+		session.StartedAt, session.LastActiveAt,
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.Type }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.ClientName }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.MCPSessionID }),
+		originColumn(session.Origin, func(o *domain.SessionOrigin) string { return o.UserID }))
 	if err != nil {
 		var pgErr *pgconn.PgError
 		if errors.As(err, &pgErr) && pgErr.Code == pgUniqueViolation {
@@ -166,7 +172,8 @@ const agentSessionSelect = `
 	SELECT id, tenant_id, pty_id, COALESCE(connection_id::text, ''), worktree_id, dev_server_id, user_id, model_id,
 	       COALESCE(account_id::text, ''), COALESCE(resume_of_session_id::text, ''),
 	       COALESCE(agent_version, ''), status, started_at, last_active_at, stopped_at,
-	       COALESCE(resume_provider_session_key, ''), COALESCE(resume_provider_session_id, '')
+	       COALESCE(resume_provider_session_key, ''), COALESCE(resume_provider_session_id, ''),
+	       origin_type, origin_client_name, origin_mcp_session_id, origin_user_id::text
 	FROM infra.agent_sessions
 `
 
@@ -174,11 +181,14 @@ func scanAgentSession(row pgx.Row) (domain.AgentSession, error) {
 	var s domain.AgentSession
 	var status string
 	var stoppedAt *time.Time
+	var originType, originClient, originSession, originUser *string
 	if err := row.Scan(&s.ID, &s.TenantID, &s.PtyID, &s.ConnectionID, &s.WorktreeID, &s.DevServerID, &s.UserID,
 		&s.ModelID, &s.AccountID, &s.ResumeOfSessionID, &s.AgentVersion, &status,
-		&s.StartedAt, &s.LastActiveAt, &stoppedAt, &s.ResumeProviderSessionKey, &s.ResumeProviderSessionID); err != nil {
+		&s.StartedAt, &s.LastActiveAt, &stoppedAt, &s.ResumeProviderSessionKey, &s.ResumeProviderSessionID,
+		&originType, &originClient, &originSession, &originUser); err != nil {
 		return domain.AgentSession{}, err
 	}
+	s.Origin = buildSessionOrigin(originType, originClient, originSession, originUser)
 	s.Status = domain.AgentStatus(status)
 	s.StoppedAt = stoppedAt
 	return s, nil

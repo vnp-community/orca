@@ -26,6 +26,8 @@ import (
 // only because Go requires every interface method to compile (mirrors
 // fakeAdminAuthServiceClient's convention, auth_admin_routes_test.go).
 type fakeCliTokenAuthServiceClient struct {
+	authv1.AuthServiceClient // embed: later-added RPCs panic if unexpectedly called; keeps the fake compiling
+
 	issueResp    *authv1.IssueServiceTokenResponse
 	issueErr     error
 	lastIssueReq *authv1.IssueServiceTokenRequest

@@ -80,6 +80,9 @@ type resolveDeps struct {
 // file's doc comment describes. See that doc comment for the ordering
 // requirement this function preserves.
 func resolveMetadata(ctx context.Context, deps resolveDeps, metadata domain.CredentialMetadata, requestingService string) ([]byte, error) {
+	if err := ensureCallerAllowed(metadata.Category, requestingService); err != nil {
+		return nil, err
+	}
 	now := deps.now()
 
 	if metadata.IsRevoked() {

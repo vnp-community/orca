@@ -137,6 +137,13 @@ var subjectRules = map[string]subjectRule{
 		Type: "automation_run_completed", Title: "Automation run finished", Body: "Your automation run has completed.",
 		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
 	},
+	// BE-MCP-SOL-013: an AI agent waits for the user's approval. Type follows
+	// CONTRACT section 4 ("mcp.approval"); the producer's body carries only
+	// client/tool/risk, never arguments, since notifications are stored.
+	"orca.mcp.approval.requested": {
+		Type: "mcp.approval", Title: "Approval needed", Body: "An AI agent is waiting for your approval.",
+		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
 	"orca.credential.credential.rotated": {
 		// "Always delivered regardless of preferences" per §2 — this
 		// scaffold has no preference filter at all yet, so "always" is

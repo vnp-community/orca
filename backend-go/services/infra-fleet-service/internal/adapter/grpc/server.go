@@ -1205,6 +1205,7 @@ func (s *Server) SpawnTerminalSession(ctx context.Context, req *infrafleetv1.Spa
 		ShellIntegration: req.GetShellIntegration(),
 		Command:          req.GetCommand(),
 		UserID:           req.GetUserId(),
+		Origin:           originFromProto(req.GetOrigin()),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -1628,6 +1629,7 @@ func (s *Server) toProtoTerminalSession(session domain.TerminalSession) *infrafl
 		CreatedAtUnixMs:    session.CreatedAt.UnixMilli(),
 		LastActiveAtUnixMs: session.LastActiveAt.UnixMilli(),
 		LastOutputPreview:  usecase.LastOutputPreview(s.liveStates, session.PtyID),
+		Origin:             originToProto(session.Origin),
 	}
 }
 
@@ -1656,6 +1658,7 @@ func (s *Server) StartAgentSession(ctx context.Context, req *infrafleetv1.StartA
 		TrustPreset:  req.GetTrustPreset(),
 		Cols:         req.GetCols(),
 		Rows:         req.GetRows(),
+		Origin:       originFromProto(req.GetOrigin()),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -1711,6 +1714,7 @@ func toProtoAgentSession(s domain.AgentSession) *infrafleetv1.AgentSession {
 		Id: s.ID, PtyId: s.PtyID, ConnectionId: s.ConnectionID, WorktreeId: s.WorktreeID, DevServerId: s.DevServerID,
 		UserId: s.UserID, ModelId: s.ModelID, AccountId: s.AccountID, Status: string(s.Status),
 		StartedAtUnixMs: s.StartedAt.UnixMilli(), LastActiveAtUnixMs: s.LastActiveAt.UnixMilli(),
+		Origin: originToProto(s.Origin),
 	}
 }
 

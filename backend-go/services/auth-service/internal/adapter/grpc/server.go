@@ -396,6 +396,11 @@ func (s *Server) QueryAuditLog(ctx context.Context, req *authv1.QueryAuditLogReq
 		Outcome:   domain.Outcome(req.GetOutcome()),
 		PageToken: req.GetPageToken(),
 		PageSize:  req.GetPageSize(),
+
+		ActorType:      domain.ActorType(req.GetActorType()),
+		TargetID:       req.GetTargetId(),
+		MetadataEquals: auditMetadataFilters(req.GetMetadataFilters()),
+		NewestFirst:    req.GetOrder() == authv1.AuditOrder_AUDIT_ORDER_TIME_DESC,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -418,6 +423,11 @@ func (s *Server) AppendAuditEntry(ctx context.Context, req *authv1.AppendAuditEn
 		Target:    req.GetTarget(),
 		Outcome:   req.GetOutcome(),
 		IPAddress: req.GetIpAddress(),
+
+		ActorType:    req.GetActorType(),
+		TargetType:   req.GetTargetType(),
+		TargetID:     req.GetTargetId(),
+		MetadataJSON: req.GetMetadataJson(),
 	}); err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
@@ -778,9 +788,23 @@ func toProtoAuditEntry(e domain.AuditEntry) *authv1.AuditEntry {
 		MetadataJson: string(metadataJSON),
 		Outcome:      string(e.Outcome),
 		IpAddress:    e.IPAddress,
+		ActorType:    string(e.EffectiveActorType()),
 	}
 	if !e.OccurredAt.IsZero() {
 		out.OccurredAt = timestamppb.New(e.OccurredAt)
+	}
+	return out
+}
+
+// auditMetadataFilters turns the repeated filter into a map; the usecase
+// rejects any key outside its allow-list.
+func auditMetadataFilters(fs []*authv1.AuditMetadataFilter) map[string]string {
+	if len(fs) == 0 {
+		return nil
+	}
+	out := make(map[string]string, len(fs))
+	for _, f := range fs {
+		out[f.GetKey()] = f.GetValue()
 	}
 	return out
 }

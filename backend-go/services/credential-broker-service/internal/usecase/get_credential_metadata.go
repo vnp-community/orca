@@ -11,6 +11,8 @@ import (
 // GetCredentialMetadataInput mirrors GetCredentialMetadataRequest 1:1.
 type GetCredentialMetadataInput struct {
 	CredentialID string
+	// RequestingService feeds the category allow-list (BE-MCP-SOL-014).
+	RequestingService string
 }
 
 // GetCredentialMetadata is a pure metadata read — no Vault call, no
@@ -40,6 +42,9 @@ func (uc *GetCredentialMetadata) Execute(ctx context.Context, in GetCredentialMe
 			return domain.CredentialMetadata{}, apperrors.New(apperrors.KindNotFound, "CREDENTIAL_NOT_FOUND", "credential not found", err)
 		}
 		return domain.CredentialMetadata{}, apperrors.New(apperrors.KindInternal, "CREDENTIAL_FETCH_FAILED", "failed to fetch credential metadata", err)
+	}
+	if err := ensureCallerAllowed(metadata.Category, in.RequestingService); err != nil {
+		return domain.CredentialMetadata{}, err
 	}
 	return metadata, nil
 }

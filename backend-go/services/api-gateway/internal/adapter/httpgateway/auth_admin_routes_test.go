@@ -26,6 +26,8 @@ import (
 // IssueServiceToken, GetJWKS) are thin unused pass-throughs, present only
 // because Go requires every interface method to compile.
 type fakeAdminAuthServiceClient struct {
+	authv1.AuthServiceClient // embed: later-added RPCs (OAuth*, Mcp*) panic if unexpectedly called; keeps the fake compiling
+
 	listUsersResp *authv1.ListUsersResponse
 	err           error
 

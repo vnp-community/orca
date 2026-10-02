@@ -128,6 +128,42 @@ service AuthService {
   // other admin-console RPC on this service.
   rpc UpdateSsoGroupMapping(UpdateSsoGroupMappingRequest) returns (UpdateSsoGroupMappingResponse);
   rpc ListSsoGroupMapping(ListSsoGroupMappingRequest) returns (ListSsoGroupMappingResponse);
+
+  // --- OAuth 2.1 Authorization Server (BE-MCP-SOL-005) ---
+  // Errors carry RFC 6749/7591/8707 semantics in apperrors Code (the
+  // "CODE: message" gRPC status message): OAUTH_INVALID_REQUEST,
+  // OAUTH_INVALID_CLIENT, OAUTH_INVALID_REDIRECT_URI, OAUTH_INVALID_GRANT,
+  // OAUTH_INVALID_SCOPE, OAUTH_INVALID_TARGET, OAUTH_UNAUTHORIZED_CLIENT,
+  // OAUTH_UNSUPPORTED_GRANT_TYPE, OAUTH_INVALID_CLIENT_METADATA,
+  // OAUTH_DCR_DISABLED, OAUTH_DCR_LIMIT_REACHED, OAUTH_CLIENT_NOT_FOUND.
+  //
+  // Public (no identity metadata; api-gateway calls them for anonymous HTTP):
+  // OAuthRegisterClient, OAuthValidateAuthorizeRequest, OAuthExchangeToken,
+  // OAuthRevokeToken.
+  // Internal-only (caller must be mcp-service; enforced by a shared-secret
+  // metadata guard, see auth-service internalcaller): OAuthIssueAuthCode,
+  // OAuthRevokeGrant, OAuthListClientsForTenant, OAuthSetClientStatus,
+  // OAuthEnsureClientForTenant. Those take tenant/user from gRPC metadata.
+  rpc OAuthRegisterClient(OAuthRegisterClientRequest) returns (OAuthRegisterClientResponse);
+  rpc OAuthValidateAuthorizeRequest(OAuthValidateAuthorizeRequestRequest) returns (OAuthAuthorizeRequestInfo);
+  rpc OAuthIssueAuthCode(OAuthIssueAuthCodeRequest) returns (OAuthIssueAuthCodeResponse);
+  rpc OAuthExchangeToken(OAuthExchangeTokenRequest) returns (OAuthTokenResponse);
+  rpc OAuthRevokeToken(OAuthRevokeTokenRequest) returns (google.protobuf.Empty);
+  rpc OAuthRevokeGrant(OAuthRevokeGrantRequest) returns (google.protobuf.Empty);
+  rpc OAuthListClientsForTenant(google.protobuf.Empty) returns (OAuthListClientsResponse);
+  rpc OAuthSetClientStatus(OAuthSetClientStatusRequest) returns (OAuthClientTenantView);
+  rpc OAuthEnsureClientForTenant(OAuthEnsureClientForTenantRequest) returns (OAuthClientTenantView);
+
+  // --- MCP personal access tokens + principal resolution (BE-MCP-SOL-006) ---
+  // user_id / tenant_id come ONLY from gRPC metadata. Errors: AUTH_MCP_TOKEN_TOO_LONG,
+  // AUTH_MCP_SCOPE_NOT_ALLOWED, AUTH_MCP_SCOPE_INVALID, AUTH_MCP_TOKEN_NOT_FOUND.
+  rpc IssueMcpToken(IssueMcpTokenRequest) returns (IssueMcpTokenResponse);
+  rpc ListMcpTokens(google.protobuf.Empty) returns (ListMcpTokensResponse);
+  rpc RevokeMcpToken(RevokeMcpTokenRequest) returns (google.protobuf.Empty);
+  // ResolveMcpPrincipal is called by api-gateway for every distinct MCP token
+  // (cached 30s there). It has a write side effect (first/last use) and is
+  // safe to repeat; it never returns a role the user does not hold right now.
+  rpc ResolveMcpPrincipal(ResolveMcpPrincipalRequest) returns (ResolveMcpPrincipalResponse);
 }
 
 enum Role {
@@ -317,6 +353,9 @@ message AuditEntry {
   string metadata_json = 9;  // JSON-serialized map[string]any
   string outcome = 10;       // "allowed" | "denied" (TASK-BE-016)
   string ip_address = 11;
+  // "user" | "agent" | "system" (BE-MCP-SOL-013); rows written before the
+  // column existed read as "user".
+  string actor_type = 12;
 }
 
 // AppendAuditEntryRequest carries an audit event another service wants
@@ -331,6 +370,11 @@ message AppendAuditEntryRequest {
   string target = 4;      // resource type + id, e.g. "project:proj-123"
   string outcome = 5;     // "allowed" | "denied"
   string ip_address = 6;
+  // Additive (BE-MCP-SOL-013). Empty actor_type means "user".
+  string actor_type = 7;
+  string target_type = 8;
+  string target_id = 9;
+  string metadata_json = 10;
 }
 
 message QueryAuditLogRequest {
@@ -344,6 +388,24 @@ message QueryAuditLogRequest {
   string actor_id = 6;
   string action = 7;
   string outcome = 8;
+  // Additive (BE-MCP-SOL-013). Empty actor_type = every actor type.
+  string actor_type = 9;
+  string target_id = 10;
+  // Only keys "decision" and "client_id" are accepted (fixed allow-list).
+  repeated AuditMetadataFilter metadata_filters = 11;
+  // ORDER_ID_ASC (default) keeps the legacy behavior; ORDER_TIME_DESC is
+  // newest-first with a keyset page token.
+  AuditOrder order = 12;
+}
+
+message AuditMetadataFilter {
+  string key = 1;
+  string value = 2;
+}
+
+enum AuditOrder {
+  AUDIT_ORDER_ID_ASC = 0;
+  AUDIT_ORDER_TIME_DESC = 1;
 }
 
 message QueryAuditLogResponse {
@@ -535,4 +597,165 @@ message ListSsoGroupMappingRequest {
 }
 message ListSsoGroupMappingResponse {
   repeated SsoGroupRoleMapping mappings = 1;
+}
+
+// ---------------------------------------------------------------------------
+// OAuth 2.1 Authorization Server (BE-MCP-SOL-005)
+// ---------------------------------------------------------------------------
+
+// RFC 7591 dynamic client registration. Public clients only.
+message OAuthRegisterClientRequest {
+  string client_name = 1;
+  string client_uri = 2;
+  repeated string redirect_uris = 3;
+  // Must be empty or "none".
+  string token_endpoint_auth_method = 4;
+  // Subset of {authorization_code, refresh_token}; empty = both.
+  repeated string grant_types = 5;
+  // Must be empty or ["code"].
+  repeated string response_types = 6;
+}
+message OAuthRegisterClientResponse {
+  string client_id = 1;
+  int64 client_id_issued_at = 2; // unix seconds
+  string client_name = 3;
+  string client_uri = 4;
+  repeated string redirect_uris = 5;
+  string token_endpoint_auth_method = 6; // always "none"
+  repeated string grant_types = 7;
+  repeated string response_types = 8;
+}
+
+message OAuthValidateAuthorizeRequestRequest {
+  string response_type = 1;
+  string client_id = 2;
+  string redirect_uri = 3;
+  string scope = 4; // space-delimited; empty = default orca:read
+  string code_challenge = 5;
+  string code_challenge_method = 6;
+  string resource = 7;
+}
+// Returned only when client and redirect_uri are valid and every other
+// parameter passed. OAUTH_INVALID_CLIENT / OAUTH_INVALID_REDIRECT_URI errors
+// must be shown to the user directly (never redirected, open-redirect guard);
+// every other OAUTH_* code may be sent back to the client via redirect.
+message OAuthAuthorizeRequestInfo {
+  string client_id = 1;
+  string client_name = 2;
+  string client_uri = 3;
+  repeated string scopes = 4;
+  string registered_via = 5; // "dcr" | "admin"
+  string redirect_uri = 6;
+  string resource = 7;
+}
+
+// tenant_id / user_id come from gRPC metadata (the consenting user).
+message OAuthIssueAuthCodeRequest {
+  string client_id = 1;
+  string redirect_uri = 2;
+  repeated string scopes = 3;
+  string code_challenge = 4;
+  string resource = 5;
+  string grant_id = 6;
+}
+message OAuthIssueAuthCodeResponse {
+  string code = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message OAuthExchangeTokenRequest {
+  string grant_type = 1; // authorization_code | refresh_token
+  string code = 2;
+  string redirect_uri = 3;
+  string code_verifier = 4;
+  string client_id = 5;
+  string refresh_token = 6;
+  string resource = 7;
+  string scope = 8;
+}
+message OAuthTokenResponse {
+  string access_token = 1;
+  int32 expires_in = 2;
+  string refresh_token = 3;
+  string scope = 4;
+}
+
+// RFC 7009. Always succeeds, even for unknown tokens.
+message OAuthRevokeTokenRequest {
+  string token = 1;
+  string token_type_hint = 2;
+  string client_id = 3;
+}
+
+// Idempotent. reason: "user_revoked" | "admin_revoked" (default user_revoked).
+message OAuthRevokeGrantRequest {
+  string grant_id = 1;
+  string reason = 2;
+}
+
+message OAuthClientTenantView {
+  string client_id = 1;
+  string client_name = 2;
+  string client_uri = 3;
+  repeated string redirect_uris = 4;
+  string registered_via = 5; // "dcr" | "admin"
+  string status = 6;         // "allowed" | "blocked" | "pending"
+  google.protobuf.Timestamp created_at = 7;
+  google.protobuf.Timestamp last_used_at = 8;
+  google.protobuf.Timestamp status_updated_at = 9;
+}
+message OAuthListClientsResponse {
+  repeated OAuthClientTenantView clients = 1;
+}
+message OAuthSetClientStatusRequest {
+  string client_id = 1;
+  string status = 2; // "allowed" | "blocked"
+}
+// Creates the per-tenant status row on first sight of a client:
+// allowed when the client was registered by an admin or dcr_enabled is true,
+// pending otherwise. An existing row is returned unchanged.
+message OAuthEnsureClientForTenantRequest {
+  string client_id = 1;
+  bool dcr_enabled = 2;
+}
+
+// ---------------------------------------------------------------------------
+// MCP personal access tokens (BE-MCP-SOL-006)
+// ---------------------------------------------------------------------------
+
+message McpTokenInfo {
+  string jti = 1;
+  string name = 2;
+  repeated string scopes = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp expires_at = 5;
+  google.protobuf.Timestamp last_used_at = 6;
+  google.protobuf.Timestamp revoked_at = 7;
+}
+message IssueMcpTokenRequest {
+  string name = 1;
+  repeated string scopes = 2;
+  int32 expires_in_days = 3; // 1..90
+}
+message IssueMcpTokenResponse {
+  McpTokenInfo token = 1;
+  string secret = 2; // "omp_<jwt>"; returned exactly once, never stored
+}
+message ListMcpTokensResponse { repeated McpTokenInfo tokens = 1; }
+message RevokeMcpTokenRequest { string jti = 1; }
+
+message ResolveMcpPrincipalRequest {
+  string jti = 1;
+  string user_id = 2;
+  string tenant_id = 3;
+  string token_use = 4; // "mcp_oauth" | "mcp_pat"
+  string family_id = 5; // oauth
+  string grant_id = 6;  // oauth
+  string client_id = 7; // oauth
+}
+message ResolveMcpPrincipalResponse {
+  bool active = 1;
+  // revoked|expired|user_inactive|client_blocked|grant_revoked|unknown_token
+  string inactive_reason = 2;
+  string role = 3; // "admin" | "user", read live from auth.users
 }

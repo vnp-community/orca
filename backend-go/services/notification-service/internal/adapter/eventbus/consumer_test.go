@@ -16,3 +16,12 @@ func TestSubjects_IncludesProjectDevServerChanged(t *testing.T) {
 	}
 	t.Errorf("expected %+v in Subjects, got %+v", want, Subjects)
 }
+
+func TestSubjects_IncludesMcpApprovalRequested(t *testing.T) {
+	for _, b := range Subjects {
+		if b.StreamName == "MCP" && b.Subject == "orca.mcp.approval.requested" {
+			return
+		}
+	}
+	t.Fatal("notification-service must consume orca.mcp.approval.requested from the MCP stream")
+}

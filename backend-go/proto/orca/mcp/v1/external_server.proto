@@ -1,0 +1,141 @@
+syntax = "proto3";
+
+package orca.mcp.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/mcp/v1;mcpv1";
+
+import "google/protobuf/timestamp.proto";
+
+// McpRegistryService is the external MCP server registry (BE-MCP-SOL-014,
+// CONTRACT-mcp-ui-api.md section 2.2). tenant_id, user_id and role travel in
+// gRPC metadata (common/tenant), never in bodies, EXCEPT ResolveAgentMcpConfig
+// whose user_id names the user the agent runs for (internal, service-to-service
+// caller). Errors are "CODE: message": MCP_NOT_ADMIN, MCP_NOT_FOUND,
+// MCP_INVALID_ARGUMENT, MCP_SERVER_INVALID, MCP_SERVER_SSRF_BLOCKED,
+// MCP_SERVER_STDIO_NOT_ALLOWED, MCP_SERVER_DIGEST_MISMATCH,
+// MCP_SERVER_NAME_CONFLICT, MCP_KILL_SWITCH_ACTIVE.
+// Kept in its own file and service so it never collides with other MCP RPC groups.
+service McpRegistryService {
+  // Admin: every server of the tenant (optionally filtered by scope).
+  // Non-admin: only scope=user servers owned by the caller.
+  rpc ListExternalServers(ListExternalServersRequest) returns (ListExternalServersResponse);
+  // Creates (empty id) or updates. status/digest/has_secret are server-computed.
+  rpc UpsertExternalServer(UpsertExternalServerRequest) returns (UpsertExternalServerResponse);
+  // value is PLAINTEXT sent once (D1). It is forwarded to credential-broker and
+  // never stored, logged or echoed.
+  rpc SetExternalServerSecret(SetExternalServerSecretRequest) returns (SetExternalServerSecretResponse);
+  // Admin, or the owner of a scope=user server.
+  rpc ProbeExternalServer(ProbeExternalServerRequest) returns (ProbeExternalServerResponse);
+  // Admin only.
+  rpc ReviewExternalServer(ReviewExternalServerRequest) returns (ReviewExternalServerResponse);
+  rpc DeleteExternalServer(DeleteExternalServerRequest) returns (DeleteExternalServerResponse);
+  // Internal (infra-fleet at agent spawn). Fail-closed per server, never errors
+  // because a single server is unusable (it becomes a warning).
+  rpc ResolveAgentMcpConfig(ResolveAgentMcpConfigRequest) returns (ResolveAgentMcpConfigResponse);
+}
+
+message ExternalSecretRef {
+  string name = 1;
+  bool has_secret = 2;
+}
+
+message ExternalServer {
+  string id = 1;
+  string scope = 2;     // tenant|team|user
+  string scope_id = 3;
+  string name = 4;
+  string transport = 5; // http|stdio
+  string url = 6;
+  string command = 7;
+  repeated string args = 8;
+  repeated ExternalSecretRef env_refs = 9;
+  repeated ExternalSecretRef header_refs = 10;
+  string status = 11;   // pending_review|approved|disabled
+  string tools_digest = 12;
+  bool tools_changed = 13;
+  bool has_health = 14;
+  bool health_ok = 15;
+  google.protobuf.Timestamp health_checked_at = 16;
+  string health_error = 17;
+  string created_by = 18;
+  string reviewed_by = 19;
+  google.protobuf.Timestamp updated_at = 20;
+}
+
+message UpsertExternalServerResponse { ExternalServer server = 1; }
+message ReviewExternalServerResponse { ExternalServer server = 1; }
+
+message ListExternalServersRequest { string scope = 1; }
+message ListExternalServersResponse { repeated ExternalServer servers = 1; }
+
+message UpsertExternalServerRequest {
+  string id = 1;                       // empty = create
+  string scope = 2;
+  string scope_id = 3;                 // ignored for scope=user (caller id is forced)
+  string name = 4;
+  string transport = 5;
+  string url = 6;
+  string command = 7;
+  repeated string args = 8;
+  repeated string env_ref_names = 9;
+  repeated string header_ref_names = 10;
+}
+
+message SetExternalServerSecretRequest {
+  string server_id = 1;
+  string kind = 2;   // env|header
+  string name = 3;
+  string value = 4;  // plaintext, never logged
+}
+message SetExternalServerSecretResponse { bool has_secret = 1; }
+
+message ExternalToolInfo {
+  string name = 1;
+  string description = 2; // untrusted text
+}
+message ProbeExternalServerRequest { string server_id = 1; }
+message ProbeExternalServerResponse {
+  string transport = 1;
+  repeated ExternalToolInfo tools = 2;
+  string digest = 3;
+  repeated ExternalToolInfo approved_tools = 4;
+  bool tools_changed = 5;
+}
+
+message ReviewExternalServerRequest {
+  string server_id = 1;
+  string decision = 2;     // approve|reject
+  string tools_digest = 3;
+}
+message DeleteExternalServerRequest { string server_id = 1; }
+message DeleteExternalServerResponse { bool ok = 1; }
+
+message ResolveAgentMcpConfigRequest {
+  string user_id = 1;
+  string project_id = 2;
+  string agent_kind = 3;        // claude|codex|gemini|opencode
+  string host_os = 4;           // posix|windows
+  string host_kind = 5;         // local|relay|ssh
+  int32 parent_mcp_depth = 6;
+  string parent_mcp_session_id = 7;
+}
+message AgentConfigFile {
+  string path = 1;    // relative, in a per-task temp dir chosen by the agent
+  string content = 2; // never contains secrets, only ${ORCA_MCP_*} placeholders
+  string mode = 3;    // e.g. 0600
+}
+message AgentEnvVar {
+  string name = 1;
+  string value = 2;   // may be a secret: child-process env only, never log
+}
+message AgentConfigWarning {
+  string server_name = 1;
+  string reason = 2;  // not_in_registry|pending_review|disabled|tools_changed|secret_unresolvable|ssrf_blocked|stdio_unsupported|agent_unsupported|config_format_unverified|depth_exceeded
+}
+message ResolveAgentMcpConfigResponse {
+  repeated AgentConfigFile files = 1;
+  repeated string extra_args = 2;
+  repeated AgentEnvVar env = 3;
+  repeated AgentConfigWarning warnings = 4;
+  int32 mcp_depth = 5;
+}

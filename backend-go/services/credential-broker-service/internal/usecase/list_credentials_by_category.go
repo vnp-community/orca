@@ -10,6 +10,8 @@ import (
 type ListCredentialsByCategoryInput struct {
 	TenantID string
 	Category domain.Category
+	// RequestingService feeds the category allow-list (BE-MCP-SOL-014).
+	RequestingService string
 }
 
 type ListCredentialsByCategory struct {
@@ -23,6 +25,9 @@ func NewListCredentialsByCategory(metadataRepo CredentialMetadataRepository) *Li
 func (uc *ListCredentialsByCategory) Execute(ctx context.Context, in ListCredentialsByCategoryInput) ([]domain.CredentialMetadata, error) {
 	if in.TenantID == "" {
 		return nil, apperrors.New(apperrors.KindInvalidArgument, "CREDENTIAL_MISSING_SCOPE", "tenant_id is required", nil)
+	}
+	if err := ensureCallerAllowed(in.Category, in.RequestingService); err != nil {
+		return nil, err
 	}
 	rows, err := uc.metadataRepo.ListByCategory(ctx, in.TenantID, in.Category)
 	if err != nil {

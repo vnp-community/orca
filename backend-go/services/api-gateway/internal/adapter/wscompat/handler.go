@@ -12,6 +12,8 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
+
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/originpolicy"
 )
 
 // SessionValidator resolves the caller's identity from the orca_session
@@ -59,6 +61,9 @@ type Handler struct {
 	Auth       SessionValidator
 	BearerAuth *usecase.AuthValidator // nil-tolerant, fallback khi Auth.ValidateCookie thất bại
 	Registry   *Registry
+	// Origins rejects cross-site browser upgrades; nil/empty keeps the legacy
+	// permissive behavior (see originpolicy).
+	Origins *originpolicy.Policy
 }
 
 func New(logger *slog.Logger, auth SessionValidator, bearerAuth *usecase.AuthValidator, registry *Registry) *Handler {
@@ -85,9 +90,21 @@ func (h *Handler) resolveIdentity(r *http.Request) (Identity, error) {
 	return Identity{TenantID: uid.TenantID, UserID: uid.UserID}, nil
 }
 
+// WithOriginPolicy sets the Origin allow-list and returns h for chaining.
+func (h *Handler) WithOriginPolicy(p *originpolicy.Policy) *Handler {
+	h.Origins = p
+	return h
+}
+
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// InsecureSkipVerify: see wsbridge.Handler's identical note — no
-	// CORS/origin allow-list wired yet in this scaffold pass.
+	// Why checked here and not by the websocket library: auth is an ambient
+	// cookie, so a foreign page could otherwise open this socket as the user.
+	// With an empty allow-list the library check stays skipped (legacy).
+	if !h.Origins.Allow(r) {
+		h.Logger.WarnContext(r.Context(), "wscompat: ws upgrade rejected, origin not allowed", slog.String("origin", r.Header.Get("Origin")))
+		http.Error(w, "origin not allowed", http.StatusForbidden)
+		return
+	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {
 		h.Logger.ErrorContext(r.Context(), "wscompat: ws upgrade failed", slog.Any("error", err))

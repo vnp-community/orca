@@ -107,3 +107,15 @@ func TestCredentialMetadata_Revoke(t *testing.T) {
 		t.Errorf("expected UpdatedAt=%v, got %v", later, revoked.UpdatedAt)
 	}
 }
+
+func TestCategoryMcpExternalSecret(t *testing.T) {
+	if !CategoryMcpExternalSecret.Valid() {
+		t.Fatal("mcp_external_secret must be valid")
+	}
+	if CategoryMcpExternalSecret.Engine() != VaultEngineKV2 {
+		t.Fatal("mcp_external_secret maps to KV2")
+	}
+	if !CategoryMcpExternalSecret.AllowsCaller("mcp-service") || CategoryMcpExternalSecret.AllowsCaller("api-gateway") || CategoryMcpExternalSecret.AllowsCaller("") {
+		t.Fatal("allow-list must admit only mcp-service")
+	}
+}

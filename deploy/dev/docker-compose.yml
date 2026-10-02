@@ -68,6 +68,7 @@ x-go-common-env: &go-common-env
   ANNOTATION_SERVICE_ADDR: annotation-service:9090
   NOTIFICATION_SERVICE_ADDR: notification-service:9090
   USAGE_SERVICE_ADDR: usage-service:9090
+  MCP_SERVICE_ADDR: mcp-service:9090
   CREDENTIAL_BROKER_SERVICE_ADDR: credential-broker-service:9090
   CREDENTIAL_BROKER_ADDR: credential-broker-service:9090 # ai-provider-service's own (slightly differently-named) var — see docs/execution-plan.md
 
@@ -391,6 +392,19 @@ services:
       postgres: { condition: service_healthy }
       nats: { condition: service_healthy }
 
+  mcp-service:
+    <<: *go-defaults
+    container_name: orca-go-mcp
+    volumes:
+      - ./bin/mcp-service/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/mcp?sslmode=disable
+      MCP_TENANT_DEFAULT_ENABLED: ${MCP_TENANT_DEFAULT_ENABLED:-true}
+    depends_on:
+      postgres: { condition: service_healthy }
+      nats: { condition: service_healthy }
+
   credential-broker-service:
     <<: *go-defaults
     container_name: orca-go-credential-broker
@@ -511,6 +525,17 @@ services:
       SSO_GITHUB_CLIENT_ID: ${SSO_GITHUB_CLIENT_ID:-}
       SSO_GOOGLE_CLIENT_ID: ${SSO_GOOGLE_CLIENT_ID:-}
       SSO_OIDC_CLIENT_ID: ${SSO_OIDC_CLIENT_ID:-}
+      # MCP endpoint (CR-MCP-002/003). Off by default: /mcp is not mounted
+      # and mcp.* WS channels answer MCP_DISABLED until the CR-015 gate.
+      # MCP_PUBLIC_BASE_URL/MCP_ISSUER_URL fall back to PUBLIC_BASE_URL and
+      # MCP_ALLOWED_ORIGINS to WS_ALLOWED_ORIGINS when left empty.
+      # MCP_SERVICE_ADDR comes from go-common-env. Bearer-token validation is
+      # fail-closed (every /mcp call is 401) until BE-MCP-SOL-005/006.
+      MCP_ENABLED: ${MCP_ENABLED:-false}
+      MCP_PUBLIC_BASE_URL: ${MCP_PUBLIC_BASE_URL:-}
+      MCP_ISSUER_URL: ${MCP_ISSUER_URL:-}
+      MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
+      MCP_CURSOR_KEY: ${MCP_CURSOR_KEY:-}
     ports:
       # SERVER_BIND_IP lets a specific deploy reuse a specific host port/IP
       # (e.g. to slot into an existing external gateway's hardcoded upstream
@@ -614,6 +639,10 @@ services:
     <<: *migrate-defaults
     volumes: ["./bin/scm-integration-service/migrations:/migrations:ro"]
     command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/scm?sslmode=disable", "up"]
+  migrate-mcp:
+    <<: *migrate-defaults
+    volumes: ["./bin/mcp-service/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/mcp?sslmode=disable", "up"]
 
 networks:
   orca-go-net:

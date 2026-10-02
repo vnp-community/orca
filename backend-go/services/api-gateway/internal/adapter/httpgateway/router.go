@@ -6,6 +6,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpserver"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/domain"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
@@ -89,6 +90,18 @@ type Deps struct {
 	// trace_routes.go's doc comment) — nil is valid (NewRouter falls back
 	// to an empty hub), matching every other optional Deps field's posture.
 	TraceBroadcast *TraceBroadcast
+	// MCP serves /mcp and the /.well-known/oauth-* documents (bearer-token
+	// auth inside the adapter, never the cookie authMiddleware). Nil when
+	// MCP_ENABLED=false: the routes are then not mounted and 404.
+	MCP *mcpserver.Handler
+	// OAuth serves the public /oauth/{register,authorize,token,revoke}
+	// endpoints. Nil when MCP is disabled. Mounted outside the authed group:
+	// token/register/revoke are anonymous by design and authorize reads only
+	// the session cookie itself.
+	OAuth *OAuthRoutes
+	// McpClient backs the authed REST /v1/auth/mcp-tokens routes (tenant
+	// policy lives behind it). Nil skips the routes.
+	McpTokens *McpTokenRoutes
 }
 
 // NewRouter builds api-gateway's chi router. Three route groups, in order:
@@ -129,6 +142,14 @@ func NewRouter(deps Deps) http.Handler {
 	if deps.WSCompatHandler != nil {
 		r.Get("/ws", deps.WSCompatHandler)
 	}
+	// /mcp authenticates with bearer tokens inside mcpserver and deliberately
+	// rejects the session cookie — mounted outside the authed group, never in it.
+	if deps.MCP != nil {
+		deps.MCP.Mount(r)
+	}
+	if deps.OAuth != nil {
+		deps.OAuth.mount(r)
+	}
 	// mountUnauthenticatedPairingRoutes is unauthenticated by design (see its
 	// doc comment) — mounted here, outside the authed group below, following
 	// mountPushRoutes's precedent immediately above. Never move inside r.Group.
@@ -156,6 +177,9 @@ func NewRouter(deps Deps) http.Handler {
 			mountAuthAdminRoutes(authed, deps.AuthClient)
 			mountAdminRoutes(authed, deps.AuthClient)
 			mountPairingRoutes(authed, deps.AuthClient)
+		}
+		if deps.McpTokens != nil {
+			deps.McpTokens.mount(authed)
 		}
 		if deps.AnnotationClient != nil {
 			mountAnnotationRoutes(authed, deps.AnnotationClient, deps.GitGatewayClient)

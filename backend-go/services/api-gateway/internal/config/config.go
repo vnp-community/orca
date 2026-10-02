@@ -62,6 +62,15 @@ type Config struct {
 	// crashing api-gateway.
 	NATSURL string
 
+	// WSAllowedOrigins is a comma-separated Origin allow-list for browser
+	// WebSocket upgrades (/ws, /v1/notifications/stream, later /mcp), e.g.
+	// "https://orca.example.com,https://*.example.com". Empty keeps the legacy
+	// permissive behavior so existing deployments do not break on upgrade.
+	WSAllowedOrigins string
+
+	// MCP holds the MCP endpoint settings (config_mcp.go); zero value = disabled.
+	MCP MCPConfig
+
 	// RateLimitRPS/RateLimitBurst configure the per-tenant in-memory
 	// token-bucket rate limiter (internal/usecase/rate_limit.go).
 	RateLimitRPS   float64
@@ -109,16 +118,25 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	wsAllowedOrigins := commonconfig.StringEnv("WS_ALLOWED_ORIGINS", "")
+	publicBaseURL := commonconfig.StringEnv("PUBLIC_BASE_URL", "")
+	mcpCfg, err := loadMCP(publicBaseURL, wsAllowedOrigins)
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		Base:                    base,
+		MCP:                     mcpCfg,
 		PublicPort:              publicPort,
 		UsageServiceAddr:        commonconfig.StringEnv("USAGE_SERVICE_ADDR", "localhost:9101"),
 		NotificationServiceAddr: commonconfig.StringEnv("NOTIFICATION_SERVICE_ADDR", "localhost:9102"),
 		InfraFleetHTTPAddr:      commonconfig.StringEnv("INFRA_FLEET_SERVICE_HTTP_ADDR", ""),
 		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
+		WSAllowedOrigins:        wsAllowedOrigins,
 		RateLimitRPS:            50,
 		RateLimitBurst:          100,
-		PublicBaseURL:           commonconfig.StringEnv("PUBLIC_BASE_URL", ""),
+		PublicBaseURL:           publicBaseURL,
 		AuthMode:                commonconfig.StringEnv("AUTH_MODE", "both"),
 		SsoGithubClientID:       commonconfig.StringEnv("SSO_GITHUB_CLIENT_ID", ""),
 		SsoGoogleClientID:       commonconfig.StringEnv("SSO_GOOGLE_CLIENT_ID", ""),

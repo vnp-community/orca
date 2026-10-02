@@ -58,6 +58,19 @@ const (
 	AuthService_RefreshSession_FullMethodName                = "/orca.auth.v1.AuthService/RefreshSession"
 	AuthService_UpdateSsoGroupMapping_FullMethodName         = "/orca.auth.v1.AuthService/UpdateSsoGroupMapping"
 	AuthService_ListSsoGroupMapping_FullMethodName           = "/orca.auth.v1.AuthService/ListSsoGroupMapping"
+	AuthService_OAuthRegisterClient_FullMethodName           = "/orca.auth.v1.AuthService/OAuthRegisterClient"
+	AuthService_OAuthValidateAuthorizeRequest_FullMethodName = "/orca.auth.v1.AuthService/OAuthValidateAuthorizeRequest"
+	AuthService_OAuthIssueAuthCode_FullMethodName            = "/orca.auth.v1.AuthService/OAuthIssueAuthCode"
+	AuthService_OAuthExchangeToken_FullMethodName            = "/orca.auth.v1.AuthService/OAuthExchangeToken"
+	AuthService_OAuthRevokeToken_FullMethodName              = "/orca.auth.v1.AuthService/OAuthRevokeToken"
+	AuthService_OAuthRevokeGrant_FullMethodName              = "/orca.auth.v1.AuthService/OAuthRevokeGrant"
+	AuthService_OAuthListClientsForTenant_FullMethodName     = "/orca.auth.v1.AuthService/OAuthListClientsForTenant"
+	AuthService_OAuthSetClientStatus_FullMethodName          = "/orca.auth.v1.AuthService/OAuthSetClientStatus"
+	AuthService_OAuthEnsureClientForTenant_FullMethodName    = "/orca.auth.v1.AuthService/OAuthEnsureClientForTenant"
+	AuthService_IssueMcpToken_FullMethodName                 = "/orca.auth.v1.AuthService/IssueMcpToken"
+	AuthService_ListMcpTokens_FullMethodName                 = "/orca.auth.v1.AuthService/ListMcpTokens"
+	AuthService_RevokeMcpToken_FullMethodName                = "/orca.auth.v1.AuthService/RevokeMcpToken"
+	AuthService_ResolveMcpPrincipal_FullMethodName           = "/orca.auth.v1.AuthService/ResolveMcpPrincipal"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -177,6 +190,40 @@ type AuthServiceClient interface {
 	// other admin-console RPC on this service.
 	UpdateSsoGroupMapping(ctx context.Context, in *UpdateSsoGroupMappingRequest, opts ...grpc.CallOption) (*UpdateSsoGroupMappingResponse, error)
 	ListSsoGroupMapping(ctx context.Context, in *ListSsoGroupMappingRequest, opts ...grpc.CallOption) (*ListSsoGroupMappingResponse, error)
+	// --- OAuth 2.1 Authorization Server (BE-MCP-SOL-005) ---
+	// Errors carry RFC 6749/7591/8707 semantics in apperrors Code (the
+	// "CODE: message" gRPC status message): OAUTH_INVALID_REQUEST,
+	// OAUTH_INVALID_CLIENT, OAUTH_INVALID_REDIRECT_URI, OAUTH_INVALID_GRANT,
+	// OAUTH_INVALID_SCOPE, OAUTH_INVALID_TARGET, OAUTH_UNAUTHORIZED_CLIENT,
+	// OAUTH_UNSUPPORTED_GRANT_TYPE, OAUTH_INVALID_CLIENT_METADATA,
+	// OAUTH_DCR_DISABLED, OAUTH_DCR_LIMIT_REACHED, OAUTH_CLIENT_NOT_FOUND.
+	//
+	// Public (no identity metadata; api-gateway calls them for anonymous HTTP):
+	// OAuthRegisterClient, OAuthValidateAuthorizeRequest, OAuthExchangeToken,
+	// OAuthRevokeToken.
+	// Internal-only (caller must be mcp-service; enforced by a shared-secret
+	// metadata guard, see auth-service internalcaller): OAuthIssueAuthCode,
+	// OAuthRevokeGrant, OAuthListClientsForTenant, OAuthSetClientStatus,
+	// OAuthEnsureClientForTenant. Those take tenant/user from gRPC metadata.
+	OAuthRegisterClient(ctx context.Context, in *OAuthRegisterClientRequest, opts ...grpc.CallOption) (*OAuthRegisterClientResponse, error)
+	OAuthValidateAuthorizeRequest(ctx context.Context, in *OAuthValidateAuthorizeRequestRequest, opts ...grpc.CallOption) (*OAuthAuthorizeRequestInfo, error)
+	OAuthIssueAuthCode(ctx context.Context, in *OAuthIssueAuthCodeRequest, opts ...grpc.CallOption) (*OAuthIssueAuthCodeResponse, error)
+	OAuthExchangeToken(ctx context.Context, in *OAuthExchangeTokenRequest, opts ...grpc.CallOption) (*OAuthTokenResponse, error)
+	OAuthRevokeToken(ctx context.Context, in *OAuthRevokeTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	OAuthRevokeGrant(ctx context.Context, in *OAuthRevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	OAuthListClientsForTenant(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*OAuthListClientsResponse, error)
+	OAuthSetClientStatus(ctx context.Context, in *OAuthSetClientStatusRequest, opts ...grpc.CallOption) (*OAuthClientTenantView, error)
+	OAuthEnsureClientForTenant(ctx context.Context, in *OAuthEnsureClientForTenantRequest, opts ...grpc.CallOption) (*OAuthClientTenantView, error)
+	// --- MCP personal access tokens + principal resolution (BE-MCP-SOL-006) ---
+	// user_id / tenant_id come ONLY from gRPC metadata. Errors: AUTH_MCP_TOKEN_TOO_LONG,
+	// AUTH_MCP_SCOPE_NOT_ALLOWED, AUTH_MCP_SCOPE_INVALID, AUTH_MCP_TOKEN_NOT_FOUND.
+	IssueMcpToken(ctx context.Context, in *IssueMcpTokenRequest, opts ...grpc.CallOption) (*IssueMcpTokenResponse, error)
+	ListMcpTokens(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListMcpTokensResponse, error)
+	RevokeMcpToken(ctx context.Context, in *RevokeMcpTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// ResolveMcpPrincipal is called by api-gateway for every distinct MCP token
+	// (cached 30s there). It has a write side effect (first/last use) and is
+	// safe to repeat; it never returns a role the user does not hold right now.
+	ResolveMcpPrincipal(ctx context.Context, in *ResolveMcpPrincipalRequest, opts ...grpc.CallOption) (*ResolveMcpPrincipalResponse, error)
 }
 
 type authServiceClient struct {
@@ -567,6 +614,136 @@ func (c *authServiceClient) ListSsoGroupMapping(ctx context.Context, in *ListSso
 	return out, nil
 }
 
+func (c *authServiceClient) OAuthRegisterClient(ctx context.Context, in *OAuthRegisterClientRequest, opts ...grpc.CallOption) (*OAuthRegisterClientResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OAuthRegisterClientResponse)
+	err := c.cc.Invoke(ctx, AuthService_OAuthRegisterClient_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) OAuthValidateAuthorizeRequest(ctx context.Context, in *OAuthValidateAuthorizeRequestRequest, opts ...grpc.CallOption) (*OAuthAuthorizeRequestInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OAuthAuthorizeRequestInfo)
+	err := c.cc.Invoke(ctx, AuthService_OAuthValidateAuthorizeRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) OAuthIssueAuthCode(ctx context.Context, in *OAuthIssueAuthCodeRequest, opts ...grpc.CallOption) (*OAuthIssueAuthCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OAuthIssueAuthCodeResponse)
+	err := c.cc.Invoke(ctx, AuthService_OAuthIssueAuthCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) OAuthExchangeToken(ctx context.Context, in *OAuthExchangeTokenRequest, opts ...grpc.CallOption) (*OAuthTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OAuthTokenResponse)
+	err := c.cc.Invoke(ctx, AuthService_OAuthExchangeToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) OAuthRevokeToken(ctx context.Context, in *OAuthRevokeTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AuthService_OAuthRevokeToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) OAuthRevokeGrant(ctx context.Context, in *OAuthRevokeGrantRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AuthService_OAuthRevokeGrant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) OAuthListClientsForTenant(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*OAuthListClientsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OAuthListClientsResponse)
+	err := c.cc.Invoke(ctx, AuthService_OAuthListClientsForTenant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) OAuthSetClientStatus(ctx context.Context, in *OAuthSetClientStatusRequest, opts ...grpc.CallOption) (*OAuthClientTenantView, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OAuthClientTenantView)
+	err := c.cc.Invoke(ctx, AuthService_OAuthSetClientStatus_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) OAuthEnsureClientForTenant(ctx context.Context, in *OAuthEnsureClientForTenantRequest, opts ...grpc.CallOption) (*OAuthClientTenantView, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(OAuthClientTenantView)
+	err := c.cc.Invoke(ctx, AuthService_OAuthEnsureClientForTenant_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) IssueMcpToken(ctx context.Context, in *IssueMcpTokenRequest, opts ...grpc.CallOption) (*IssueMcpTokenResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(IssueMcpTokenResponse)
+	err := c.cc.Invoke(ctx, AuthService_IssueMcpToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ListMcpTokens(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*ListMcpTokensResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMcpTokensResponse)
+	err := c.cc.Invoke(ctx, AuthService_ListMcpTokens_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) RevokeMcpToken(ctx context.Context, in *RevokeMcpTokenRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AuthService_RevokeMcpToken_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *authServiceClient) ResolveMcpPrincipal(ctx context.Context, in *ResolveMcpPrincipalRequest, opts ...grpc.CallOption) (*ResolveMcpPrincipalResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveMcpPrincipalResponse)
+	err := c.cc.Invoke(ctx, AuthService_ResolveMcpPrincipal_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -684,6 +861,40 @@ type AuthServiceServer interface {
 	// other admin-console RPC on this service.
 	UpdateSsoGroupMapping(context.Context, *UpdateSsoGroupMappingRequest) (*UpdateSsoGroupMappingResponse, error)
 	ListSsoGroupMapping(context.Context, *ListSsoGroupMappingRequest) (*ListSsoGroupMappingResponse, error)
+	// --- OAuth 2.1 Authorization Server (BE-MCP-SOL-005) ---
+	// Errors carry RFC 6749/7591/8707 semantics in apperrors Code (the
+	// "CODE: message" gRPC status message): OAUTH_INVALID_REQUEST,
+	// OAUTH_INVALID_CLIENT, OAUTH_INVALID_REDIRECT_URI, OAUTH_INVALID_GRANT,
+	// OAUTH_INVALID_SCOPE, OAUTH_INVALID_TARGET, OAUTH_UNAUTHORIZED_CLIENT,
+	// OAUTH_UNSUPPORTED_GRANT_TYPE, OAUTH_INVALID_CLIENT_METADATA,
+	// OAUTH_DCR_DISABLED, OAUTH_DCR_LIMIT_REACHED, OAUTH_CLIENT_NOT_FOUND.
+	//
+	// Public (no identity metadata; api-gateway calls them for anonymous HTTP):
+	// OAuthRegisterClient, OAuthValidateAuthorizeRequest, OAuthExchangeToken,
+	// OAuthRevokeToken.
+	// Internal-only (caller must be mcp-service; enforced by a shared-secret
+	// metadata guard, see auth-service internalcaller): OAuthIssueAuthCode,
+	// OAuthRevokeGrant, OAuthListClientsForTenant, OAuthSetClientStatus,
+	// OAuthEnsureClientForTenant. Those take tenant/user from gRPC metadata.
+	OAuthRegisterClient(context.Context, *OAuthRegisterClientRequest) (*OAuthRegisterClientResponse, error)
+	OAuthValidateAuthorizeRequest(context.Context, *OAuthValidateAuthorizeRequestRequest) (*OAuthAuthorizeRequestInfo, error)
+	OAuthIssueAuthCode(context.Context, *OAuthIssueAuthCodeRequest) (*OAuthIssueAuthCodeResponse, error)
+	OAuthExchangeToken(context.Context, *OAuthExchangeTokenRequest) (*OAuthTokenResponse, error)
+	OAuthRevokeToken(context.Context, *OAuthRevokeTokenRequest) (*emptypb.Empty, error)
+	OAuthRevokeGrant(context.Context, *OAuthRevokeGrantRequest) (*emptypb.Empty, error)
+	OAuthListClientsForTenant(context.Context, *emptypb.Empty) (*OAuthListClientsResponse, error)
+	OAuthSetClientStatus(context.Context, *OAuthSetClientStatusRequest) (*OAuthClientTenantView, error)
+	OAuthEnsureClientForTenant(context.Context, *OAuthEnsureClientForTenantRequest) (*OAuthClientTenantView, error)
+	// --- MCP personal access tokens + principal resolution (BE-MCP-SOL-006) ---
+	// user_id / tenant_id come ONLY from gRPC metadata. Errors: AUTH_MCP_TOKEN_TOO_LONG,
+	// AUTH_MCP_SCOPE_NOT_ALLOWED, AUTH_MCP_SCOPE_INVALID, AUTH_MCP_TOKEN_NOT_FOUND.
+	IssueMcpToken(context.Context, *IssueMcpTokenRequest) (*IssueMcpTokenResponse, error)
+	ListMcpTokens(context.Context, *emptypb.Empty) (*ListMcpTokensResponse, error)
+	RevokeMcpToken(context.Context, *RevokeMcpTokenRequest) (*emptypb.Empty, error)
+	// ResolveMcpPrincipal is called by api-gateway for every distinct MCP token
+	// (cached 30s there). It has a write side effect (first/last use) and is
+	// safe to repeat; it never returns a role the user does not hold right now.
+	ResolveMcpPrincipal(context.Context, *ResolveMcpPrincipalRequest) (*ResolveMcpPrincipalResponse, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -807,6 +1018,45 @@ func (UnimplementedAuthServiceServer) UpdateSsoGroupMapping(context.Context, *Up
 }
 func (UnimplementedAuthServiceServer) ListSsoGroupMapping(context.Context, *ListSsoGroupMappingRequest) (*ListSsoGroupMappingResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListSsoGroupMapping not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthRegisterClient(context.Context, *OAuthRegisterClientRequest) (*OAuthRegisterClientResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthRegisterClient not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthValidateAuthorizeRequest(context.Context, *OAuthValidateAuthorizeRequestRequest) (*OAuthAuthorizeRequestInfo, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthValidateAuthorizeRequest not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthIssueAuthCode(context.Context, *OAuthIssueAuthCodeRequest) (*OAuthIssueAuthCodeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthIssueAuthCode not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthExchangeToken(context.Context, *OAuthExchangeTokenRequest) (*OAuthTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthExchangeToken not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthRevokeToken(context.Context, *OAuthRevokeTokenRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthRevokeToken not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthRevokeGrant(context.Context, *OAuthRevokeGrantRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthRevokeGrant not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthListClientsForTenant(context.Context, *emptypb.Empty) (*OAuthListClientsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthListClientsForTenant not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthSetClientStatus(context.Context, *OAuthSetClientStatusRequest) (*OAuthClientTenantView, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthSetClientStatus not implemented")
+}
+func (UnimplementedAuthServiceServer) OAuthEnsureClientForTenant(context.Context, *OAuthEnsureClientForTenantRequest) (*OAuthClientTenantView, error) {
+	return nil, status.Error(codes.Unimplemented, "method OAuthEnsureClientForTenant not implemented")
+}
+func (UnimplementedAuthServiceServer) IssueMcpToken(context.Context, *IssueMcpTokenRequest) (*IssueMcpTokenResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method IssueMcpToken not implemented")
+}
+func (UnimplementedAuthServiceServer) ListMcpTokens(context.Context, *emptypb.Empty) (*ListMcpTokensResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMcpTokens not implemented")
+}
+func (UnimplementedAuthServiceServer) RevokeMcpToken(context.Context, *RevokeMcpTokenRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method RevokeMcpToken not implemented")
+}
+func (UnimplementedAuthServiceServer) ResolveMcpPrincipal(context.Context, *ResolveMcpPrincipalRequest) (*ResolveMcpPrincipalResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveMcpPrincipal not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -1513,6 +1763,240 @@ func _AuthService_ListSsoGroupMapping_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_OAuthRegisterClient_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OAuthRegisterClientRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthRegisterClient(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthRegisterClient_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthRegisterClient(ctx, req.(*OAuthRegisterClientRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_OAuthValidateAuthorizeRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OAuthValidateAuthorizeRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthValidateAuthorizeRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthValidateAuthorizeRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthValidateAuthorizeRequest(ctx, req.(*OAuthValidateAuthorizeRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_OAuthIssueAuthCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OAuthIssueAuthCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthIssueAuthCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthIssueAuthCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthIssueAuthCode(ctx, req.(*OAuthIssueAuthCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_OAuthExchangeToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OAuthExchangeTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthExchangeToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthExchangeToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthExchangeToken(ctx, req.(*OAuthExchangeTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_OAuthRevokeToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OAuthRevokeTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthRevokeToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthRevokeToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthRevokeToken(ctx, req.(*OAuthRevokeTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_OAuthRevokeGrant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OAuthRevokeGrantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthRevokeGrant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthRevokeGrant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthRevokeGrant(ctx, req.(*OAuthRevokeGrantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_OAuthListClientsForTenant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthListClientsForTenant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthListClientsForTenant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthListClientsForTenant(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_OAuthSetClientStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OAuthSetClientStatusRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthSetClientStatus(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthSetClientStatus_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthSetClientStatus(ctx, req.(*OAuthSetClientStatusRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_OAuthEnsureClientForTenant_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(OAuthEnsureClientForTenantRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).OAuthEnsureClientForTenant(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_OAuthEnsureClientForTenant_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).OAuthEnsureClientForTenant(ctx, req.(*OAuthEnsureClientForTenantRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_IssueMcpToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IssueMcpTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).IssueMcpToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_IssueMcpToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).IssueMcpToken(ctx, req.(*IssueMcpTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ListMcpTokens_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(emptypb.Empty)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ListMcpTokens(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ListMcpTokens_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ListMcpTokens(ctx, req.(*emptypb.Empty))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_RevokeMcpToken_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RevokeMcpTokenRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).RevokeMcpToken(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_RevokeMcpToken_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).RevokeMcpToken(ctx, req.(*RevokeMcpTokenRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AuthService_ResolveMcpPrincipal_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveMcpPrincipalRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).ResolveMcpPrincipal(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_ResolveMcpPrincipal_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).ResolveMcpPrincipal(ctx, req.(*ResolveMcpPrincipalRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -1671,6 +2155,58 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListSsoGroupMapping",
 			Handler:    _AuthService_ListSsoGroupMapping_Handler,
+		},
+		{
+			MethodName: "OAuthRegisterClient",
+			Handler:    _AuthService_OAuthRegisterClient_Handler,
+		},
+		{
+			MethodName: "OAuthValidateAuthorizeRequest",
+			Handler:    _AuthService_OAuthValidateAuthorizeRequest_Handler,
+		},
+		{
+			MethodName: "OAuthIssueAuthCode",
+			Handler:    _AuthService_OAuthIssueAuthCode_Handler,
+		},
+		{
+			MethodName: "OAuthExchangeToken",
+			Handler:    _AuthService_OAuthExchangeToken_Handler,
+		},
+		{
+			MethodName: "OAuthRevokeToken",
+			Handler:    _AuthService_OAuthRevokeToken_Handler,
+		},
+		{
+			MethodName: "OAuthRevokeGrant",
+			Handler:    _AuthService_OAuthRevokeGrant_Handler,
+		},
+		{
+			MethodName: "OAuthListClientsForTenant",
+			Handler:    _AuthService_OAuthListClientsForTenant_Handler,
+		},
+		{
+			MethodName: "OAuthSetClientStatus",
+			Handler:    _AuthService_OAuthSetClientStatus_Handler,
+		},
+		{
+			MethodName: "OAuthEnsureClientForTenant",
+			Handler:    _AuthService_OAuthEnsureClientForTenant_Handler,
+		},
+		{
+			MethodName: "IssueMcpToken",
+			Handler:    _AuthService_IssueMcpToken_Handler,
+		},
+		{
+			MethodName: "ListMcpTokens",
+			Handler:    _AuthService_ListMcpTokens_Handler,
+		},
+		{
+			MethodName: "RevokeMcpToken",
+			Handler:    _AuthService_RevokeMcpToken_Handler,
+		},
+		{
+			MethodName: "ResolveMcpPrincipal",
+			Handler:    _AuthService_ResolveMcpPrincipal_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

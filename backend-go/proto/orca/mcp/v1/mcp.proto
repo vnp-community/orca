@@ -1,0 +1,511 @@
+syntax = "proto3";
+
+package orca.mcp.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/mcp/v1;mcpv1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// McpService holds the state and decisions of the MCP layer (api-gateway
+// <-> mcp-service internal surface; NOT the MCP wire protocol). tenant_id,
+// user_id and role travel in gRPC metadata (common/tenant), never in
+// request bodies. RPC groups for sessions, grants, policies, approvals and
+// external servers are added by their owning solutions (BE-MCP-SOL-004..014);
+// only RPCs with a real implementation are declared here.
+// See specs/backend-go/crs/v5/mcp-service-foundation/solutions/BE-MCP-SOL-001-scaffold-mcp-service.md.
+service McpService {
+  // GetServerInfo returns the calling tenant's MCP settings (creating the
+  // default row lazily on first call) and the supported scope catalog.
+  rpc GetServerInfo(GetServerInfoRequest) returns (GetServerInfoResponse);
+
+  // --- OAuth consent & grants (BE-MCP-SOL-005 §D) ---
+  // Errors are apperrors "CODE: message": MCP_CONSENT_NOT_FOUND,
+  // MCP_CONSENT_EXPIRED, MCP_SCOPE_INVALID, MCP_SCOPE_NOT_ALLOWED,
+  // MCP_NOT_FOUND, MCP_NOT_ADMIN, MCP_CLIENT_NOT_ALLOWED (gateway turns this
+  // one into redirect error=access_denied), MCP_INVALID_ARGUMENT, plus the
+  // OAUTH_* codes of auth-service when authorize parameters are rejected.
+  // tenant_id / user_id / role always come from gRPC metadata.
+
+  // CreateConsentRequest is called by GET /oauth/authorize after the cookie
+  // session is valid. It re-validates the authorize parameters against
+  // auth-service (never trusts caller-supplied client data), then either
+  // auto-approves (redirect_url set) or stores a consent request (request_id set).
+  rpc CreateConsentRequest(CreateConsentRequestRequest) returns (CreateConsentRequestResponse);
+  // GetConsentRequest: only the requesting user of the same tenant sees it.
+  rpc GetConsentRequest(GetConsentRequestRequest) returns (ConsentRequestView);
+  rpc DecideConsent(DecideConsentRequest) returns (DecideConsentResponse);
+  // ListGrants with all_users=false returns the caller's own grants;
+  // all_users=true requires role admin (MCP_NOT_ADMIN) and may filter by user_id.
+  rpc ListGrants(ListGrantsRequest) returns (ListGrantsResponse);
+  // RevokeGrant with admin=false: caller's own grants only; admin=true requires role admin.
+  // A grant that is not visible to the caller yields MCP_NOT_FOUND.
+  rpc RevokeGrant(RevokeGrantRequest) returns (RevokeGrantResponse);
+  // Admin-only (role admin, else MCP_NOT_ADMIN).
+  rpc ListOAuthClients(google.protobuf.Empty) returns (ListOAuthClientsResponse);
+  rpc SetOAuthClientStatus(SetOAuthClientStatusRequest) returns (OAuthClient);
+
+  // --- Governance & safety (BE-MCP-SOL-012 / 013) ---
+  // tenant_id / user_id / role always come from gRPC metadata. Methods marked
+  // "gateway-only" are additionally guarded by common/internalcaller when
+  // MCP_INTERNAL_CALLER_TOKEN is configured. Errors are "CODE: message":
+  // MCP_NOT_ADMIN, MCP_NOT_FOUND, MCP_INVALID_ARGUMENT, MCP_POLICY_HARD_DENY,
+  // MCP_POLICY_VERSION_CONFLICT, MCP_APPROVAL_EXPIRED,
+  // MCP_APPROVAL_ALREADY_DECIDED, MCP_APPROVAL_HASH_MISMATCH,
+  // MCP_KILL_SWITCH_ACTIVE.
+
+  // EvaluateToolCall is the pure policy decision (no side effects). Gateway-only.
+  rpc EvaluateToolCall(EvaluateToolCallRequest) returns (PolicyDecision);
+  // FilterTools evaluates many tools against one snapshot (tools/list). Gateway-only.
+  rpc FilterTools(FilterToolsRequest) returns (FilterToolsResponse);
+  // ExplainPolicy: admin only; runs EvaluateToolCall with dry_run semantics.
+  rpc ExplainPolicy(ExplainPolicyRequest) returns (PolicyDecision);
+  rpc ListToolPolicies(google.protobuf.Empty) returns (ListToolPoliciesResponse);
+  rpc UpsertToolPolicy(UpsertToolPolicyRequest) returns (ToolPolicy);
+  rpc DeleteToolPolicy(DeleteToolPolicyRequest) returns (DeleteToolPolicyResponse);
+  rpc GetTenantSettings(google.protobuf.Empty) returns (TenantSettings);
+  rpc UpdateTenantSettings(UpdateTenantSettingsRequest) returns (TenantSettings);
+
+  // AuthorizeToolCall runs the full gate: kill state, policy, egress guard,
+  // paramsHash, approval create/consume, rate limit, journal. Gateway-only.
+  rpc AuthorizeToolCall(AuthorizeToolCallRequest) returns (AuthorizeToolCallResponse);
+  // CompleteToolCall finalizes the journal row, records taint, emits audit. Gateway-only.
+  rpc CompleteToolCall(CompleteToolCallRequest) returns (CompleteToolCallResponse);
+  // WaitApproval blocks until the approval leaves "pending" or max_wait_ms
+  // elapses. It never consumes the approval. Gateway-only.
+  rpc WaitApproval(WaitApprovalRequest) returns (WaitApprovalResponse);
+
+  rpc ListApprovals(ListApprovalsRequest) returns (ListApprovalsResponse);
+  // DecideApproval: only the approval's owner (metadata user_id) may decide;
+  // anything else is MCP_NOT_FOUND. Gateway-only (cookie-session channel).
+  rpc DecideApproval(DecideApprovalRequest) returns (Approval);
+
+  rpc SetKillSwitch(SetKillSwitchRequest) returns (google.protobuf.Empty);
+  rpc ListKillSwitches(google.protobuf.Empty) returns (ListKillSwitchesResponse);
+  // GetKillState answers whether a request in this scope is blocked. Gateway-only.
+  rpc GetKillState(GetKillStateRequest) returns (GetKillStateResponse);
+
+  // StreamEvents streams McpEvents visible to the metadata user (owner-only
+  // approval events; tenant-wide kill switch changes). Max 5 streams per user.
+  rpc StreamEvents(google.protobuf.Empty) returns (stream McpEvent);
+
+  // --- MCP sessions & SSE stream registry (BE-MCP-SOL-004) ---
+  // All gateway-only. tenant_id/user_id/role come from gRPC metadata. Errors:
+  // MCP_NOT_FOUND (unknown/closed/foreign), MCP_STREAM_LIMIT (FailedPrecondition).
+  // CreateSession stores only SHA-256(Mcp-Session-Id); the secret never reaches the DB.
+  rpc CreateSession(CreateSessionRequest) returns (McpSession);
+  // GetSessionBySecret returns closed sessions too (state=closed) so the gateway can answer 404.
+  rpc GetSessionBySecret(GetSessionBySecretRequest) returns (McpSession);
+  rpc TouchSession(TouchSessionRequest) returns (TouchSessionResponse);
+  // CloseSession by row id (user: own sessions only; admin: any in tenant) or by secret_hash.
+  rpc CloseSession(CloseSessionRequest) returns (CloseSessionResponse);
+  // ListSessions: the metadata user's open sessions. ListSessionsAdmin: whole tenant (admin).
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc ListSessionsAdmin(ListSessionsRequest) returns (ListSessionsResponse);
+  rpc OpenStream(OpenStreamRequest) returns (OpenStreamResponse);
+  rpc HeartbeatStream(HeartbeatStreamRequest) returns (HeartbeatStreamResponse);
+  rpc CloseStream(CloseStreamRequest) returns (CloseStreamResponse);
+
+  // --- Custom prompts (BE-MCP-SOL-011) ---
+  // Errors are "CODE: message": MCP_PROMPT_INVALID ("MCP_PROMPT_INVALID:
+  // <field>: <reason>"), MCP_PROMPT_NAME_CONFLICT, MCP_PROMPT_VERSION_CONFLICT,
+  // MCP_NOT_FOUND, MCP_NOT_ADMIN. tenant_id / user_id / role come from metadata.
+
+  // ListPrompts returns the caller's tenant prompts (any role: prompts/list on
+  // /mcp needs them; the admin-only gate is the gateway channel).
+  rpc ListPrompts(ListPromptsRequest) returns (ListPromptsResponse);
+  // UpsertPrompt is admin-only. Empty prompt.id creates; otherwise
+  // prompt.version must equal the stored version (optimistic concurrency).
+  rpc UpsertPrompt(UpsertPromptRequest) returns (CustomPrompt);
+  // DeletePrompt is admin-only and soft-deletes (the name becomes reusable).
+  rpc DeletePrompt(DeletePromptRequest) returns (google.protobuf.Empty);
+}
+
+message GetServerInfoRequest {}
+
+message GetServerInfoResponse {
+  // Tenant-level switch; the gateway ANDs it with its process-level MCP_ENABLED.
+  bool enabled = 1;
+  bool dcr_enabled = 2;
+  int32 max_token_days = 3;
+  int32 approval_ttl_seconds = 4;
+  KillSwitch kill_switch = 5;
+  repeated ScopeDescriptor scopes = 6;
+}
+
+message KillSwitch {
+  bool active = 1;
+  string reason = 2;
+  google.protobuf.Timestamp at = 3;
+}
+
+message ScopeDescriptor {
+  string id = 1;
+  string label = 2;
+  string description = 3;
+  // One of: read, write_reversible, exec, destructive, admin.
+  string risk = 4;
+}
+
+message CreateConsentRequestRequest {
+  string response_type = 1;
+  string client_id = 2;
+  string redirect_uri = 3;
+  string scope = 4; // space-delimited as received
+  string state = 5; // opaque client state, <= 512 chars, echoed verbatim
+  string code_challenge = 6;
+  string code_challenge_method = 7;
+  string resource = 8;
+}
+message CreateConsentRequestResponse {
+  // Exactly one of the two is set.
+  string request_id = 1;   // show the consent screen
+  string redirect_url = 2; // auto-approved: redirect_uri?code=..&state=..&iss=..
+}
+
+message GetConsentRequestRequest { string request_id = 1; }
+message ConsentRequestView {
+  string request_id = 1;
+  string client_id = 2;
+  string client_name = 3;
+  string client_uri = 4;
+  string redirect_host = 5; // host only, never the full redirect URI
+  repeated ScopeDescriptor scopes = 6; // scopes the client asked for
+  repeated string already_granted = 7;
+  string tenant_id = 8;     // gateway resolves the display name
+  bool is_new_client = 9;
+  bool registered_via_dcr = 10;
+  google.protobuf.Timestamp expires_at = 11;
+}
+
+message DecideConsentRequest {
+  string request_id = 1;
+  string decision = 2; // approve | deny
+  repeated string scopes = 3; // approve: the scopes the user chose
+}
+message DecideConsentResponse { string redirect_url = 1; }
+
+message Grant {
+  string id = 1;
+  string client_id = 2;
+  string client_name = 3;
+  string client_uri = 4;
+  repeated string scopes = 5;
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp last_used_at = 7;
+  string status = 8; // active | revoked
+  string user_id = 9;   // always set; the gateway only exposes it on admin channels
+  string user_name = 10; // best effort, admin listing only
+}
+message ListGrantsRequest {
+  bool all_users = 1;
+  string user_id = 2; // optional filter, all_users only
+}
+message ListGrantsResponse { repeated Grant grants = 1; }
+
+message RevokeGrantRequest {
+  string grant_id = 1;
+  bool admin = 2;
+}
+message RevokeGrantResponse {}
+
+message OAuthClient {
+  string client_id = 1;
+  string name = 2;
+  repeated string redirect_uris = 3;
+  string registered_via = 4; // dcr | admin
+  string status = 5;         // allowed | blocked | pending
+  google.protobuf.Timestamp created_at = 6;
+  google.protobuf.Timestamp last_used_at = 7;
+  int32 active_grants = 8;
+  string client_uri = 9;
+}
+message ListOAuthClientsResponse { repeated OAuthClient clients = 1; }
+message SetOAuthClientStatusRequest {
+  string client_id = 1;
+  string status = 2; // allowed | blocked
+}
+
+// ---------------- governance messages ----------------
+
+// ToolRef is built by the gateway from its catalog, never from the client.
+message ToolRef {
+  string name = 1;
+  string channel = 2;
+  string namespace = 3;
+  string risk = 4; // read | write_reversible | exec | destructive | admin
+  string required_scope = 5;
+  bool open_world = 6;
+  bool spawns_process = 7;
+  bool read_untrusted = 8;
+  string title = 9;
+}
+
+message CallContext {
+  string client_id = 1;
+  repeated string scopes = 2;
+  string token_kind = 3; // mcp_oauth | mcp_pat
+  string mcp_session_id = 4;
+  int32 depth = 5;
+  string client_name = 6;
+  string mcp_root = 7;
+  string token_id = 8;
+  string grant_id = 9;
+}
+
+message PolicyDecision {
+  string decision = 1; // allow | require_approval | deny
+  string source = 2;
+  repeated string reasons = 3;
+  int64 policy_epoch = 4;
+}
+
+message EvaluateToolCallRequest {
+  ToolRef tool = 1;
+  CallContext ctx = 2;
+  bool dry_run = 3;
+}
+message FilterToolsRequest {
+  repeated ToolRef tools = 1;
+  CallContext ctx = 2;
+}
+message ToolDecision {
+  string name = 1;
+  PolicyDecision decision = 2;
+}
+message FilterToolsResponse {
+  repeated ToolDecision decisions = 1;
+  int64 policy_epoch = 2;
+}
+message ExplainPolicyRequest {
+  string tool = 1;      // tool name
+  string user_id = 2;   // optional; role defaults to user
+  string client_id = 3; // optional
+  ToolRef tool_ref = 4; // resolved by the gateway from its catalog
+  string user_role = 5; // optional resolved role of user_id
+}
+
+message ToolPolicyMatch {
+  string tool = 1;
+  string namespace = 2;
+  string risk = 3;
+  string client_id = 4;
+  repeated string roles = 5;
+}
+message ToolPolicy {
+  string id = 1;
+  int32 version = 2;
+  ToolPolicyMatch match = 3;
+  string decision = 4;
+  string note = 5;
+  google.protobuf.Timestamp updated_at = 6;
+  string updated_by = 7;
+}
+message ListToolPoliciesResponse { repeated ToolPolicy policies = 1; }
+message UpsertToolPolicyRequest {
+  ToolPolicy policy = 1;               // empty id = create; else version must match
+  repeated ToolRef touched_tools = 2;  // gateway expands match over its catalog
+}
+message DeleteToolPolicyRequest { string policy_id = 1; }
+message DeleteToolPolicyResponse {}
+
+message TenantSettings {
+  bool enabled = 1;
+  bool dcr_enabled = 2;
+  int32 max_token_days = 3;
+  int32 approval_ttl_seconds = 4;
+  KillSwitch kill_switch = 5;
+}
+message UpdateTenantSettingsRequest {
+  optional bool enabled = 1;
+  optional bool dcr_enabled = 2;
+  optional int32 max_token_days = 3;
+  optional int32 approval_ttl_seconds = 4;
+}
+
+message AuthorizeToolCallRequest {
+  ToolRef tool = 1;
+  CallContext ctx = 2;
+  bytes arguments = 3; // raw JSON object exactly as the client sent it
+}
+message AuthorizeToolCallResponse {
+  string outcome = 1; // allow | require_approval | deny
+  string source = 2;
+  repeated string reasons = 3;
+  string approval_id = 4;
+  string call_id = 5; // set on allow; pass back to CompleteToolCall
+  string message = 6; // neutral, safe to show the agent
+  google.protobuf.Timestamp approval_expires_at = 7;
+  bool elicitation_eligible = 8;
+  string approval_prompt = 9; // server-built elicitation text (verbatim preview), only when eligible
+  string params_hash = 10;
+}
+message CompleteToolCallRequest {
+  string call_id = 1;
+  string result = 2; // ok | error
+  int64 duration_ms = 3;
+  string reason_code = 4;
+}
+message CompleteToolCallResponse {}
+message WaitApprovalRequest {
+  string approval_id = 1;
+  int32 max_wait_ms = 2;
+}
+message WaitApprovalResponse {
+  string status = 1; // pending | approved | denied | expired | cancelled
+}
+
+message Approval {
+  string id = 1;
+  google.protobuf.Timestamp created_at = 2;
+  google.protobuf.Timestamp expires_at = 3;
+  string status = 4;
+  string tool_name = 5;
+  string tool_title = 6;
+  string risk = 7;
+  string client_name = 8;
+  string session_id = 9;
+  string args_preview = 10;
+  bool args_redacted = 11;
+  string params_hash = 12;
+  google.protobuf.Timestamp decided_at = 13;
+  string decided_via = 14; // web | mobile | elicitation
+  repeated string reasons = 15;
+  string user_id = 16;
+}
+message ListApprovalsRequest {
+  string status = 1; // pending | all
+  string cursor = 2;
+  int32 limit = 3;
+}
+message ListApprovalsResponse {
+  repeated Approval approvals = 1;
+  string next_cursor = 2;
+}
+message DecideApprovalRequest {
+  string approval_id = 1;
+  string decision = 2; // approve | deny
+  string params_hash = 3;
+  string note = 4;
+  string via = 5; // web | mobile (derived by the gateway); elicitation is internal
+}
+
+message SetKillSwitchRequest {
+  string scope = 1; // tenant | client | grant | session
+  string target_id = 2;
+  bool active = 3;
+  string reason = 4;
+  bool revoke_tokens = 5; // reserved (R-3); PAT revocation is not performed in v1
+}
+message KillSwitchEntry {
+  string scope = 1;
+  string target_id = 2;
+  bool active = 3;
+  string reason = 4;
+  google.protobuf.Timestamp at = 5;
+  string set_by = 6;
+}
+message ListKillSwitchesResponse { repeated KillSwitchEntry entries = 1; }
+message GetKillStateRequest {
+  string client_id = 1;
+  string grant_id = 2;
+  string session_id = 3;
+}
+message GetKillStateResponse {
+  bool active = 1;
+  string scope = 2;
+  string reason = 3;
+}
+
+message McpEvent {
+  string type = 1; // approval.requested | approval.resolved | grant.revoked | session.closed | killswitch.changed
+  Approval approval = 2;       // approval.requested
+  string id = 3;               // approval.resolved
+  string status = 4;           // approval.resolved
+  string grant_id = 5;         // grant.revoked
+  string session_id = 6;       // session.closed
+  bool active = 7;             // killswitch.changed
+  string reason = 8;           // killswitch.changed
+}
+
+// ---------------- custom prompts (BE-MCP-SOL-011) ----------------
+
+message PromptArgument {
+  string name = 1;
+  string description = 2;
+  bool required = 3;
+}
+message CustomPrompt {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  repeated PromptArgument arguments = 4;
+  string template = 5; // {{name}} placeholders only
+  int32 version = 6;
+  google.protobuf.Timestamp updated_at = 7;
+  string updated_by = 8;
+}
+message ListPromptsRequest {}
+message ListPromptsResponse { repeated CustomPrompt prompts = 1; }
+message UpsertPromptRequest { CustomPrompt prompt = 1; }
+message DeletePromptRequest { string prompt_id = 1; }
+
+// ---------------- sessions (BE-MCP-SOL-004) ----------------
+
+message McpSession {
+  string id = 1; // row id (not secret); what the UI and kill switch use
+  string tenant_id = 2;
+  string user_id = 3;
+  string client_id = 4;
+  string client_name = 5;
+  string client_version = 6;
+  string grant_id = 7;
+  string token_id = 8;
+  string protocol_version = 9;
+  bytes capabilities_json = 10; // client capabilities from initialize
+  string log_level = 11;
+  string state = 12; // initializing | ready | closed
+  int64 tool_calls = 13;
+  google.protobuf.Timestamp created_at = 14;
+  google.protobuf.Timestamp last_seen_at = 15;
+  int32 active_streams = 16;
+  string close_reason = 17;
+}
+message CreateSessionRequest {
+  bytes secret_hash = 1; // SHA-256 of the Mcp-Session-Id
+  string client_id = 2;
+  string client_name = 3;
+  string client_version = 4;
+  string grant_id = 5;
+  string token_id = 6;
+  string protocol_version = 7;
+  bytes capabilities_json = 8;
+}
+message GetSessionBySecretRequest { bytes secret_hash = 1; }
+message TouchSessionRequest {
+  string session_id = 1; // row id
+  bool ready = 2;        // initializing -> ready
+  int64 tool_calls_delta = 3;
+  string log_level = 4;
+}
+message TouchSessionResponse { string state = 1; } // closed => gateway must drop the session
+message CloseSessionRequest {
+  string session_id = 1; // row id; or
+  bytes secret_hash = 2;
+  string reason = 3; // client_delete | user | admin | kill_switch | token_revoked
+}
+message CloseSessionResponse { string session_id = 1; }
+message ListSessionsRequest {}
+message ListSessionsResponse { repeated McpSession sessions = 1; }
+message OpenStreamRequest {
+  string session_id = 1;
+  string replica_id = 2;
+  string kind = 3; // get
+  int32 max_per_user = 4;   // 0 = unlimited
+  int32 max_per_tenant = 5; // 0 = unlimited
+}
+message OpenStreamResponse { string stream_id = 1; }
+message HeartbeatStreamRequest { string stream_id = 1; }
+message HeartbeatStreamResponse {}
+message CloseStreamRequest { string stream_id = 1; }
+message CloseStreamResponse {}

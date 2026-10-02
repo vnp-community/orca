@@ -220,6 +220,28 @@ type AuditQueryFilter struct {
 	Action   string         // "" = no filter
 	ActorID  string         // "" = no filter
 	Outcome  domain.Outcome // "" = no filter
+
+	// Additive (BE-MCP-SOL-013); zero values keep the legacy behavior.
+	ActorType domain.ActorType // "" = every actor type
+	TargetID  string           // "" = no filter
+	// MetadataEquals filters on metadata->>key = value. Keys outside
+	// AllowedAuditMetadataKeys are rejected by the usecase, never interpolated.
+	MetadataEquals map[string]string
+	// NewestFirst selects keyset paging on (occurred_at, id) descending with a
+	// "<rfc3339nano>|<id>" page token; false keeps ORDER BY id ascending.
+	NewestFirst bool
+}
+
+// AllowedAuditMetadataKeys is the fixed allow-list of filterable metadata keys.
+var AllowedAuditMetadataKeys = map[string]bool{"decision": true, "client_id": true}
+
+// IdempotentAuditAppender is implemented by both SQL adapters. A separate
+// interface (rather than a new AuditRepository method) keeps every existing
+// AuditRepository fake compiling.
+type IdempotentAuditAppender interface {
+	// AppendIdempotent inserts the entry unless a row with the same id exists,
+	// so redelivered events never fail or duplicate.
+	AppendIdempotent(ctx context.Context, entry domain.AuditEntry) error
 }
 
 // PasswordHasher hashes and verifies passwords. Implemented by

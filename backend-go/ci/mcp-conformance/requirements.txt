@@ -1,0 +1,5 @@
+# Pinned on 2026-10-02: 2.2.0 is the newest release on PyPI (`pip index versions mcp`).
+# The script was run against exactly this pair. httpx2 is the SDK's own HTTP
+# client in 2.x and is pinned because the script imports it directly.
+mcp==2.2.0
+httpx2==2.13.1

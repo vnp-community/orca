@@ -342,3 +342,34 @@ func (f *fakeEphemeralVmRuntimeRepositoryTenantSpy) FindDevServerByEnvironmentID
 func (f *fakeEphemeralVmRuntimeRepositoryTenantSpy) SetEnvironmentID(context.Context, string, string, string) (domain.EphemeralVmRuntime, error) {
 	return domain.EphemeralVmRuntime{}, domain.ErrEphemeralVmRuntimeNotFound
 }
+
+// TestSpawnTerminalSession_Origin_IsPersistedOnTheSession is BE-MCP-SOL-009's
+// guard: an MCP-created terminal records who created it, a UI one does not.
+func TestSpawnTerminalSession_Origin_IsPersistedOnTheSession(t *testing.T) {
+	ds, err := domain.NewDevServer("ds1", "tenant-1", "10.0.0.5", domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("building dev server: %v", err)
+	}
+	resolver := &fakeConnectionResolver{byConnectionID: map[string]domain.DevServer{"conn-1": ds}}
+	agent := &fakeDevServerAgentClient{spawnPtyResult: SpawnPtyResult{PtyID: "pty-abc"}}
+	sessions := &fakeTerminalSessionRepository{}
+	uc := NewSpawnTerminalSession(resolver, &fakeDevServerRepository{}, agent, sessions, &fakeEphemeralVmRuntimeRepository{}, false)
+	ctx := withTenant(context.Background(), "tenant-1")
+
+	origin := &domain.SessionOrigin{Type: "mcp", ClientName: "Claude Code", MCPSessionID: "sess-1", UserID: "user-1"}
+	if _, err := uc.Execute(ctx, SpawnTerminalSessionInput{ConnectionID: "conn-1", Origin: origin}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if _, err := uc.Execute(ctx, SpawnTerminalSessionInput{ConnectionID: "conn-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(sessions.createCalls) != 2 {
+		t.Fatalf("expected two Create calls, got %d", len(sessions.createCalls))
+	}
+	if got := sessions.createCalls[0].Origin; got == nil || *got != *origin {
+		t.Errorf("MCP-created session origin = %+v, want %+v", got, origin)
+	}
+	if sessions.createCalls[1].Origin != nil {
+		t.Errorf("UI-created session must have a nil origin, got %+v", sessions.createCalls[1].Origin)
+	}
+}

@@ -43,6 +43,10 @@ func (uc *ResolveCredentialByOwner) Execute(ctx context.Context, in ResolveCrede
 		return nil, apperrors.New(apperrors.KindInvalidArgument, "CREDENTIAL_INVALID_CATEGORY", "unknown credential category", nil)
 	}
 
+	if err := ensureCallerAllowed(in.Category, in.RequestingService); err != nil {
+		return nil, err
+	}
+
 	metadata, err := uc.metadataRepo.GetByOwner(ctx, in.TenantID, in.Category, in.OwnerID)
 	if err != nil {
 		if errors.Is(err, domain.ErrCredentialNotFound) {

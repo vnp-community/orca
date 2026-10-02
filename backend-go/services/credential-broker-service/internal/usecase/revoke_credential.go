@@ -45,6 +45,9 @@ func (uc *RevokeCredential) Execute(ctx context.Context, in RevokeCredentialInpu
 		}
 		return domain.CredentialMetadata{}, apperrors.New(apperrors.KindInternal, "CREDENTIAL_FETCH_FAILED", "failed to fetch credential metadata", err)
 	}
+	if err := ensureCallerAllowed(metadata.Category, in.RequestingService); err != nil {
+		return domain.CredentialMetadata{}, err
+	}
 	if metadata.IsRevoked() {
 		// Idempotent: revoking an already-revoked credential is a no-op
 		// success, not an error — matches the general idempotency posture

@@ -49,6 +49,9 @@ func (uc *RotateCredential) Execute(ctx context.Context, in RotateCredentialInpu
 		}
 		return domain.CredentialMetadata{}, apperrors.New(apperrors.KindInternal, "CREDENTIAL_FETCH_FAILED", "failed to fetch credential metadata", err)
 	}
+	if err := ensureCallerAllowed(metadata.Category, in.RequestingService); err != nil {
+		return domain.CredentialMetadata{}, err
+	}
 	if metadata.IsRevoked() {
 		return domain.CredentialMetadata{}, apperrors.New(apperrors.KindFailedPrecondition, "CREDENTIAL_REVOKED", "cannot rotate a revoked credential", domain.ErrCredentialRevoked)
 	}

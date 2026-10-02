@@ -29,6 +29,10 @@ integrate against for real; every other route is a documented `501`.
 | `GET /v1/usage/sessions` | **Real** | Calls `usagev1.UsageServiceClient.ListSessions` |
 | `GET /v1/notifications/stream` (WS) | **Real** | Bridges a WS connection to notification-service's `StreamNotifications` gRPC server-stream — see `internal/adapter/wsbridge/handler.go` |
 | Everything else (`/v1/tasks/*`, `/v1/projects/*`, `/v1/auth/*`, `/v1/tenants/*`, `/v1/infra/*`, `/v1/git/*`, `/v1/scm/*`, `/v1/issues/*`, `/v1/ai-providers/*`, `/v1/workflows/*`, `/v1/orchestration/*`, `/v1/automations/*`, `/v1/annotations/*`, `/v1/notifications/*` REST) | **501 stub** | Returns `{"error":{"code":"NOT_IMPLEMENTED","message":"this route will proxy to <service> once its gRPC contract stabilizes"}}` — see `internal/domain.NewDefaultServiceRegistry` for the full routing table and `internal/adapter/httpgateway/stub_routes.go` |
+| `POST/GET/DELETE /mcp` | **Real, off by default** (`MCP_ENABLED=false` -> not mounted, 404) | MCP Streamable HTTP built on the official Go SDK (`internal/adapter/mcpserver`): initialize/initialized lifecycle, `ping`, `logging/setLevel`, `tools/list` with HMAC-signed cursors, Origin check, body limit, cookie auth rejected. **Authentication is fail-closed**: the default `TokenVerifier` denies everything, so every call is `401` with `WWW-Authenticate: Bearer resource_metadata=...` until BE-MCP-SOL-005/006 plug in real token validation. `tools/list` is empty and `tools/call` answers unknown-tool until BE-MCP-SOL-007 supplies the `ToolCatalog`/`ToolExecutor`. Sessions are in-memory per replica (BE-MCP-SOL-004 makes them durable). No SSE resume (`Last-Event-ID`) yet |
+| `GET /.well-known/oauth-protected-resource[/mcp]` | **Real** (when MCP enabled) | RFC 9728 document built from config only (`MCP_PUBLIC_BASE_URL`, `MCP_ISSUER_URL`); no token logic |
+| `/.well-known/oauth-authorization-server`, `/oauth/*` | **Not mounted** | Owned by BE-MCP-SOL-005/006 (auth-service); nginx already proxies them |
+| WS channel `mcp.server.info` | **Real** | Process flag `MCP_ENABLED` + `mcp-service.GetServerInfo`; always answers (`{enabled:false}` when off). Other `mcp.*` channels are **not registered** yet (fall through to "not implemented"); the `mcpHandler`/`mcpChannelError` wrappers (`MCP_DISABLED`, `MCP_NOT_ADMIN`, `CODE: msg` errors) are ready for them |
 | Per-tenant rate limiting | **Real** | `internal/usecase/rate_limit.go` — an actual in-memory `golang.org/x/time/rate` token-bucket limiter, one bucket per tenant, applied ahead of every route |
 
 `credential-broker-service` has no route at all (real or stubbed): per the
@@ -138,3 +142,57 @@ unknown-kid/missing-claims cases, plus `JWKSClient`'s caching and
 stale-cache-survives-fetch-error behavior), `wsbridge.Handler`'s
 cookie-then-bearer-JWT auth ordering, the WS<->gRPC frame pump loop, and
 the router's 501-stub response shape and 401-unauthenticated behavior.
+
+## MCP tool catalog (BE-MCP-SOL-007/008)
+
+`internal/adapter/mcpserver/tools` turns `wscompat.Registry` channels into MCP
+tools: hand-declared `ToolSpec`s (input schema and `Args()` come from one
+field table), a catalog filtered by token scope and tenant policy, and an
+executor (validate, scope, `PolicyGate.Decide`, approval, dispatch,
+camelCase/redact/truncate, `PolicyGate.Complete`).
+
+- Schema library: `github.com/google/jsonschema-go` v0.4.3 (the library go-sdk uses).
+- Packs: `MCP_TOOL_PACKS_ENABLED` (default `1`; `1,2` adds reversible writes;
+  3 exec and 4 destructive/admin stay hidden unless listed). `MCP_TOOL_TIMEOUT` (default 55s).
+- **Fail-closed default:** until a governance `PolicyGate` is wired
+  (`buildMCPToolStack(reg, gate, ...)` in `cmd/server`), `mcpserver.FailClosedGate`
+  allows only tools with `risk=read` and denies everything else; approvals never resolve.
+- Every registered channel must have a ToolSpec or an entry in
+  `tools/excluded_channels.yaml` (with a reason): `go test ./internal/adapter/mcpserver/tools -run TestChannelInventory -v`
+  prints `MCP_CHANNEL_INVENTORY ...` and fails on uncovered channels.
+- `mcp.admin.tool.list` (admin) returns `McpToolView[]` including hard-denied channels.
+
+## MCP rollout, observability and conformance (BE-MCP-SOL-015)
+
+The service half of the runbook (flags, order, rollback, checklist, metrics
+list, known gaps) is in [`mcp-service/README.md`](../mcp-service/README.md#rollout-runbook-be-mcp-sol-015).
+Edge-specific points:
+
+- **Flag behaviour** (tests): `MCP_ENABLED=false` => `/mcp`, `/mcp/` and
+  `/.well-known/oauth-*` answer 404 (`cmd/server` `TestMCPDisabledRoutesAre404`)
+  and every registered `mcp.*` channel but `mcp.server.info` answers
+  `MCP_DISABLED` without calling mcp-service
+  (`wscompat` `TestEveryMcpChannelIsDisabledWhenProcessFlagIsOff`).
+  `MCP_TENANT_DEFAULT_ENABLED` is read by mcp-service only; the gateway holds
+  no policy, so "default-on never changes risk defaults" is proven in
+  mcp-service (`TestTenantDefaultEnabledTrue_DoesNotChangeRiskDefaults`), not here.
+- **Env of this process**: `MCP_ENABLED`, `MCP_PUBLIC_BASE_URL` (or `PUBLIC_BASE_URL`),
+  `MCP_ISSUER_URL`, `MCP_SERVICE_ADDR`, `MCP_INTERNAL_CALLER_TOKEN`,
+  `WS_ALLOWED_ORIGINS` / `MCP_ALLOWED_ORIGINS`, `MCP_CURSOR_KEY[_PREVIOUS|_FILE]`,
+  `MCP_MAX_REQUEST_BYTES`, `MCP_SESSION_IDLE_TTL`, `MCP_MAX_SSE_STREAMS_PER_USER|_TENANT`,
+  `MCP_SSE_BUFFER_MAX_BYTES`, `MCP_PAT_MAX_PER_USER`, `OAUTH_DCR_ENABLED`,
+  `MCP_TOOL_PACKS_ENABLED`, `MCP_TOOL_TIMEOUT`, `NATS_URL`. auth-service needs
+  `OAUTH_RESOURCE_URL` (= `<MCP_PUBLIC_BASE_URL>/mcp`) and `OAUTH_INTERNAL_CALLER_TOKEN`.
+- **Metrics**: `GET :HTTP_PORT/metrics` (the internal health port, never the
+  public edge) = health mux + `promhttp` over a private registry
+  (`internal/adapter/mcpmetrics`, wired in `cmd/server/mcp_metrics_wiring.go`).
+  It is served even with `MCP_ENABLED=false` (Go/process collectors only then).
+- **Tracing**: `mcp.request` -> `mcp.policy` -> `mcp.dispatch` spans under the
+  `otelhttp` root; the mcp-service connection carries the trace to mcp-service,
+  whose audit events include `trace_id`.
+- **Conformance tiers** (see `backend-go/ci/mcp-conformance/README.md`): tier 1 Go
+  in-process (`ci/mcp-conformance/run-go-conformance.sh`, blocking); tier 1b
+  Python reference client with the official `mcp` SDK (non-blocking until it has
+  run green against a real dev stack); tier 2 Inspector (not implemented).
+  `cmd/mcpconformance-devserver` is a test-only binary that serves the real
+  `/mcp` handler with a static token so the Python tier can run without the stack.

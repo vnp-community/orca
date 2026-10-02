@@ -1,0 +1,56 @@
+name: backend-go / mcp-conformance
+
+# BE-MCP-SOL-015. Tier 1 (Go, in-process) always runs and blocks. Tier 1b (Python
+# reference client with the official `mcp` SDK) runs against the test-only
+# cmd/mcpconformance-devserver and is non-blocking: it has not yet run against
+# the full compose dev stack. Tier 2 (Inspector CLI) is not implemented.
+on:
+  pull_request:
+    paths:
+      - "backend-go/common/**"
+      - "backend-go/proto/orca/mcp/**"
+      - "backend-go/services/api-gateway/**"
+      - "backend-go/services/mcp-service/**"
+      - "backend-go/services/auth-service/**"
+      - "backend-go/ci/mcp-conformance/**"
+      - "backend-go/ci/check-mcp-protocol-version-lock.sh"
+      - "backend-go/ci/check-nginx-mcp-routing.sh"
+      - "backend-go/deploy/alerts/mcp.rules.yaml"
+      - "backend-go/go.work"
+      - ".github/workflows/backend-go-mcp-conformance.yml"
+  workflow_dispatch:
+
+jobs:
+  go-conformance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - name: Static guards (protocol version lock, nginx routing)
+        working-directory: backend-go
+        run: |
+          bash ci/check-mcp-protocol-version-lock.sh
+          bash ci/check-nginx-mcp-routing.sh
+      - name: Tier 1 - Go in-process conformance
+        working-directory: backend-go
+        run: bash ci/mcp-conformance/run-go-conformance.sh
+        env:
+          FUZZTIME: 20s
+
+  python-reference-client:
+    # Non-blocking per BE-MCP-SOL-015 until it is green on a real dev stack.
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tier 1b - official MCP Python SDK against the dev server
+        working-directory: backend-go/ci/mcp-conformance
+        run: ./run-python-tier-local.sh

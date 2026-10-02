@@ -64,6 +64,10 @@ func (uc *WriteCredential) Execute(ctx context.Context, in WriteCredentialInput)
 		return domain.CredentialMetadata{}, apperrors.New(apperrors.KindInvalidArgument, "CREDENTIAL_INVALID_CATEGORY", "unknown credential category", nil)
 	}
 
+	if err := ensureCallerAllowed(in.Category, in.RequestingService); err != nil {
+		return domain.CredentialMetadata{}, err
+	}
+
 	id := uuid.NewString()
 	vaultPath := vaultPathFor(in.TenantID, id)
 

@@ -38,6 +38,32 @@ implementation — see that README for the layout rationale.
   publishing is wired — this scaffold doesn't need it for the RPCs
   implemented (see "Known gaps" for what a fuller build would add).
 
+## OAuth 2.1 authorization server (BE-MCP-SOL-005)
+
+Off unless `OAUTH_RESOURCE_URL` is set. Real: RFC 7591 public-client registration, authorize-request
+validation (PKCE S256 mandatory, RFC 8707 `resource`), single-use auth codes, code exchange, rotating
+refresh tokens with reuse detection (revokes the whole family), RFC 7009 revoke, grant revocation, per-tenant
+client allow/block. Tables: migrations `0011_oauth_authorization_server` (postgres and mysql).
+Access tokens are RS256 via the existing Transit signer, `aud` = the resource URL, `token_use=mcp_oauth`,
+no `role` claim. Code: `internal/usecase/oauth_*.go`, `internal/adapter/{postgres,mysql}/oauth_repository.go`,
+`internal/adapter/grpc/oauth_server.go`.
+
+| Env | Default | Meaning |
+|---|---|---|
+| `OAUTH_RESOURCE_URL` | - (OAuth off) | the only audience ever issued, e.g. `https://orca.example.com/mcp` |
+| `OAUTH_INTERNAL_CALLER_TOKEN` | - (required when on) | shared secret mcp-service presents on its internal-only RPCs |
+| `OAUTH_ACCESS_TOKEN_TTL` | `10m` (max `15m`) | |
+| `OAUTH_REFRESH_TOKEN_TTL` | `720h` | absolute, measured from the authorization |
+| `OAUTH_AUTH_CODE_TTL` | `60s` | |
+| `OAUTH_DCR_ENABLED` / `OAUTH_DCR_MAX_CLIENTS` | `true` / `1000` | |
+
+Internal-only RPCs (`OAuthIssueAuthCode`, `OAuthRevokeGrant`, `OAuthListClientsForTenant`,
+`OAuthSetClientStatus`, `OAuthEnsureClientForTenant`) are guarded by `common/internalcaller` (shared secret
+in gRPC metadata, fails closed). That is defense in depth; the NetworkPolicy allow-list `mcp-service ->
+auth-service` and, later, mesh peer identity are the real boundary. Not done here: a reaper for expired
+codes, `ResolveMcpPrincipal` (BE-MCP-SOL-006), redaction of `code`/`token` attributes in `common/logging`
+(no redaction hook exists; the OAuth code never logs these values and a test asserts it).
+
 ## Running locally
 
 ```sh

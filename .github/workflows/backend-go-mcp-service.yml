@@ -1,0 +1,49 @@
+name: backend-go / mcp-service
+
+# mcp-service is Postgres-only (D2), so unlike backend-go-usage-service.yml
+# there is no dialect matrix. Proto lint/breaking run for real (the Makefile's
+# proto-lint target ends in `|| true` and does not gate).
+on:
+  pull_request:
+    paths:
+      - "backend-go/common/**"
+      - "backend-go/proto/orca/mcp/**"
+      - "backend-go/proto/gen/go/orca/mcp/**"
+      - "backend-go/services/mcp-service/**"
+      - "backend-go/go.work"
+      - ".github/workflows/backend-go-mcp-service.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - uses: bufbuild/buf-setup-action@v1
+      - name: buf lint (mcp)
+        working-directory: backend-go/proto
+        run: buf lint --path orca/mcp
+      - name: buf breaking (mcp)
+        working-directory: backend-go/proto
+        # The first PR adds the package, so there is nothing on main to
+        # compare against yet; breaking only gates once mcp.proto exists there.
+        run: |
+          if git cat-file -e origin/main:backend-go/proto/orca/mcp/v1/mcp.proto 2>/dev/null; then
+            buf breaking --path orca/mcp --against '../../.git#branch=origin/main,subdir=backend-go/proto'
+          fi
+      - name: go build
+        working-directory: backend-go/services/mcp-service
+        run: go build ./...
+      - name: go vet
+        working-directory: backend-go/services/mcp-service
+        run: go vet ./...
+      - name: Unit tests (no Docker)
+        working-directory: backend-go/services/mcp-service
+        run: go test ./...
+      - name: Integration tests (Postgres, testcontainers)
+        working-directory: backend-go/services/mcp-service
+        run: go test -tags=integration ./internal/adapter/postgres/... -v

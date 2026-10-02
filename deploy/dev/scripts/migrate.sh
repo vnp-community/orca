@@ -7,7 +7,7 @@
 # inside the distroless service containers (which have no shell).
 #
 # Usage:
-#   ./deploy/dev/scripts/migrate.sh                 # all 14 services, local compose context
+#   ./deploy/dev/scripts/migrate.sh                 # all 16 services, local compose context
 #   ./deploy/dev/scripts/migrate.sh usage            # one service (name after "migrate-")
 #   ./deploy/dev/scripts/migrate.sh --remote         # run on the deploy server via SSH
 #   ./deploy/dev/scripts/migrate.sh --remote usage   # one service, on the server
@@ -18,7 +18,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 DEPLOY_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-SERVICES="auth tenant project infra aiprovider workflow task orchestration automation annotation notification usage credential scm"
+# "issuetracking" (issue-tracking-service, Jira/Linear integration) has a
+# real `migrate-issuetracking` compose service (docker-compose.yml) but was
+# never added here — its database was never created/migrated on any
+# deployment, causing ISSUETRACKING_GET_STATUS_FAILED: database
+# "issuetracking" does not exist for every issue-tracking RPC. See
+# specs/backend-go/bugs/missing-v2/BUG-014-issuetracking-database-never-migrated.md.
+SERVICES="auth tenant project infra aiprovider workflow task orchestration automation annotation notification usage credential issuetracking scm mcp"
 
 REMOTE=0
 TARGET=""

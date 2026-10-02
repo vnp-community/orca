@@ -37,6 +37,11 @@ const (
 	// Mapped to Vault KV v2 (static, versioned secret) — the closest existing
 	// category by shape, not something Vault signs fresh per connection.
 	CredentialCategory_CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN CredentialCategory = 6
+	// CREDENTIAL_CATEGORY_MCP_EXTERNAL_SECRET holds an env/header secret of an
+	// external MCP server (BE-MCP-SOL-014). Only mcp-service may use it
+	// (category-to-caller allow-list in the broker); owner_id is
+	// "mcp:<serverId>:<kind>:<name>".
+	CredentialCategory_CREDENTIAL_CATEGORY_MCP_EXTERNAL_SECRET CredentialCategory = 7
 )
 
 // Enum value maps for CredentialCategory.
@@ -49,6 +54,7 @@ var (
 		4: "CREDENTIAL_CATEGORY_SSH",
 		5: "CREDENTIAL_CATEGORY_SERVICE_SECRET",
 		6: "CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN",
+		7: "CREDENTIAL_CATEGORY_MCP_EXTERNAL_SECRET",
 	}
 	CredentialCategory_value = map[string]int32{
 		"CREDENTIAL_CATEGORY_UNSPECIFIED":            0,
@@ -58,6 +64,7 @@ var (
 		"CREDENTIAL_CATEGORY_SSH":                    4,
 		"CREDENTIAL_CATEGORY_SERVICE_SECRET":         5,
 		"CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN": 6,
+		"CREDENTIAL_CATEGORY_MCP_EXTERNAL_SECRET":    7,
 	}
 )
 
@@ -1231,7 +1238,7 @@ const file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc = "" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12H\n" +
 	"\bcategory\x18\x02 \x01(\x0e2,.orca.credentialbroker.v1.CredentialCategoryR\bcategory\"s\n" +
 	"!ListCredentialsByCategoryResponse\x12N\n" +
-	"\vcredentials\x18\x01 \x03(\v2,.orca.credentialbroker.v1.CredentialMetadataR\vcredentials*\xa7\x02\n" +
+	"\vcredentials\x18\x01 \x03(\v2,.orca.credentialbroker.v1.CredentialMetadataR\vcredentials*\xd4\x02\n" +
 	"\x12CredentialCategory\x12#\n" +
 	"\x1fCREDENTIAL_CATEGORY_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dCREDENTIAL_CATEGORY_SCM_OAUTH\x10\x01\x12+\n" +
@@ -1239,7 +1246,8 @@ const file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc = "" +
 	"#CREDENTIAL_CATEGORY_AI_PROVIDER_KEY\x10\x03\x12\x1b\n" +
 	"\x17CREDENTIAL_CATEGORY_SSH\x10\x04\x12&\n" +
 	"\"CREDENTIAL_CATEGORY_SERVICE_SECRET\x10\x05\x12.\n" +
-	"*CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN\x10\x062\xe7\n" +
+	"*CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN\x10\x06\x12+\n" +
+	"'CREDENTIAL_CATEGORY_MCP_EXTERNAL_SECRET\x10\a2\xe7\n" +
 	"\n" +
 	"\x17CredentialBrokerService\x12v\n" +
 	"\x0fWriteCredential\x120.orca.credentialbroker.v1.WriteCredentialRequest\x1a1.orca.credentialbroker.v1.WriteCredentialResponse\x12|\n" +

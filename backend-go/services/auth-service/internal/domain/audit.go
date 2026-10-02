@@ -35,6 +35,22 @@ func (o Outcome) Valid() bool {
 	}
 }
 
+// ActorType says who performed the audited action (BE-MCP-SOL-013).
+type ActorType string
+
+const (
+	ActorUser   ActorType = "user"
+	ActorAgent  ActorType = "agent"
+	ActorSystem ActorType = "system"
+)
+
+func (a ActorType) Valid() bool {
+	return a == ActorUser || a == ActorAgent || a == ActorSystem
+}
+
+// ErrInvalidActorType is returned for an actor type outside the closed enum.
+var ErrInvalidActorType = errors.New("domain: invalid actor type")
+
 // AuditEntry is one row of auth-service's append-only, system-wide
 // security-audit record (auth-service.md §4). ActorID may be empty for a
 // system-initiated event. TargetType/TargetID may also both be empty for a
@@ -63,6 +79,24 @@ type AuditEntry struct {
 	// common/tenant.ClientIP's doc comment (TASK-BE-023).
 	IPAddress  string
 	OccurredAt time.Time
+	// ActorType is empty for entries built by the pre-existing call sites and
+	// is stored as "user"; set it with WithActorType (NewAuditEntry's
+	// 11-parameter signature is deliberately unchanged).
+	ActorType ActorType
+}
+
+// WithActorType returns a copy with the actor type set.
+func (e AuditEntry) WithActorType(t ActorType) AuditEntry {
+	e.ActorType = t
+	return e
+}
+
+// EffectiveActorType is what gets persisted: unset means a human user.
+func (e AuditEntry) EffectiveActorType() ActorType {
+	if e.ActorType == "" {
+		return ActorUser
+	}
+	return e.ActorType
 }
 
 // NewAuditEntry constructs an AuditEntry, enforcing that every entry has an

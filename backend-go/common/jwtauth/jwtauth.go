@@ -38,4 +38,19 @@ type Claims struct {
 	// time — added so a bearer-JWT-authenticated caller propagates the same
 	// role claim the cookie/session path already does (BE-SOL-002).
 	Role string `json:"role,omitempty"`
+
+	// MCP-only claims (BE-MCP-SOL-005/006): absent on every pre-existing
+	// token, so verifiers of other audiences are unaffected. Role is never
+	// set on MCP tokens; it is read live at validation time.
+	Scope    string `json:"scope,omitempty"`     // space-delimited
+	ClientID string `json:"client_id,omitempty"` // OAuth access token only
+	GrantID  string `json:"grant_id,omitempty"`  // OAuth access token only (logical FK -> mcp.grants)
+	FamilyID string `json:"fid,omitempty"`       // OAuth access token only (refresh family)
+	TokenUse string `json:"token_use,omitempty"` // "mcp_oauth" | "mcp_pat"
+
+	// Recursion guard (BE-MCP-SOL-013 G): set only by auth-service on child
+	// tokens it mints for spawned agents; RS256 signing means a client can't
+	// set them. Absent = depth 0.
+	McpDepth int    `json:"mcp_depth,omitempty"`
+	McpRoot  string `json:"mcp_root,omitempty"` // root MCP session id
 }

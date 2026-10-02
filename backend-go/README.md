@@ -15,11 +15,11 @@ take this from scaffold to production.
 
 ```
 backend-go/
-├── go.work                  # ties all 19 modules together for local dev
+├── go.work                  # ties all 22 modules together for local dev (common, proto, cmd/orca-cli, 19 service dirs)
 ├── common/                  # orca-go-common — cross-cutting only, no business logic
 ├── proto/                   # buf module, orca.<service>.v1 packages, generated Go stubs in proto/gen/go/
 ├── services/<name>-service/ # one Go module per service, Clean Architecture layout (see any service's internal/ tree)
-├── docker-compose.yml       # local dev: postgres (17 DBs), vault (dev mode), nats
+├── docker-compose.yml       # local dev: postgres (one DB per service, created by deploy/postgres-init-databases.sh, incl. `mcp`), vault (dev mode), nats
 ├── Makefile                 # build/vet/test/lint/fmt/proto-gen/migrate — see `make help`
 └── docs/execution-plan.md   # the detailed task breakdown for finishing this
 ```
@@ -74,6 +74,15 @@ for how a real cutover would be sequenced.
   Webhook-step executor (with SSRF IP-range blocking) are real.
 - **`git-gateway-service`** — local git status/diff via `os/exec` against a
   real git binary is real.
+- **`mcp-service` + the `/mcp` adapter in `api-gateway`** (the 18th TDD service;
+  `services/issue-status-sync` is a worker module outside the TDD list) —
+  implemented with unit and integration tests: Streamable HTTP MCP server
+  (official Go SDK), OAuth/PAT, tool catalog, policy/approval/kill switch/audit,
+  sessions + SSE resume, resources/prompts, external MCP servers, `orca_mcp_*`
+  Prometheus metrics, conformance tiers (`ci/mcp-conformance/`). Off by default
+  (`MCP_ENABLED=false`). **Not** verified end-to-end against the full compose
+  stack; gaps and the rollout runbook are in
+  [`services/mcp-service/README.md`](./services/mcp-service/README.md).
 
 ## What's intentionally stubbed (and why that's honest, not incomplete work hidden)
 

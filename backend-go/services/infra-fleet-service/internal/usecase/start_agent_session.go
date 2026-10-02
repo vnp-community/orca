@@ -24,6 +24,8 @@ type StartAgentSessionInput struct {
 	TrustPreset  string
 	ResumeID     string // "" for a fresh start; set by ResumeAgentSession (TASK-AG-03-04)
 	Cols, Rows   int32
+	// Origin marks a session started for an MCP client (BE-MCP-SOL-009); nil for UI starts.
+	Origin *domain.SessionOrigin
 }
 
 // StartAgentSession spawns an AI-CLI agent via DevServerAgentClient.SpawnAgent
@@ -97,6 +99,7 @@ func (uc *StartAgentSession) Execute(ctx context.Context, in StartAgentSessionIn
 		DevServerID: devServer.ID, UserID: in.UserID, ModelID: in.ModelID, AccountID: in.AccountID,
 		AgentVersion: devServer.AgentVersion,
 		Status:       domain.AgentStatusSpawning, StartedAt: now, LastActiveAt: now,
+		Origin: in.Origin,
 	})
 	if err != nil {
 		if errors.Is(err, domain.ErrAgentAlreadyRunning) {

@@ -1171,6 +1171,10 @@ message SpawnTerminalSessionRequest {
   // pty-handler.ts:680-699. Always set from the caller's authenticated
   // identity server-side (wscompat), never trusted from client args.
   string user_id = 8;
+  // origin marks a session created on behalf of an MCP client (CONTRACT
+  // mcp-ui-api §5, BE-MCP-SOL-009). Set server-side by api-gateway from the
+  // verified MCP session, never from client args; absent for UI-created sessions.
+  SessionOrigin origin = 9;
 }
 message SpawnTerminalSessionResponse {
   TerminalSession session = 1;
@@ -1182,6 +1186,16 @@ message TerminalSession {
   int64  created_at_unix_ms = 4;
   int64  last_active_at_unix_ms = 5;
   string last_output_preview = 6; // BR-MB-15: truncated to 500 chars server-side, never a raw dump — see terminal_session.go's TruncatedForMobile
+  SessionOrigin origin = 7;       // unset for UI-created sessions
+}
+
+// SessionOrigin identifies the MCP client session that created a terminal or
+// agent session (additive; CONTRACT mcp-ui-api §5).
+message SessionOrigin {
+  string type            = 1; // "mcp"
+  string client_name     = 2;
+  string mcp_session_id  = 3; // non-secret mcp session row id
+  string user_id         = 4;
 }
 
 message SaveTerminalScrollbackSnapshotRequest {
@@ -1536,6 +1550,7 @@ message StartAgentSessionRequest {
   string trust_preset  = 7;     // "standard" | "full" | "none" — forwarded as-is, applied agent-side as CLI args
   int32  cols          = 8;
   int32  rows          = 9;
+  SessionOrigin origin = 10;    // set when an MCP client starts the agent; unset for UI starts
   // resolved_api_key is DELIBERATELY ABSENT — see TASK-AG-01-04 (credential
   // injection blocker). Adding it here would let a caller populate
   // agent.spawn's resolvedApiKey param, silently reintroducing Gap 2.
@@ -1553,6 +1568,7 @@ message AgentSession {
   string status          = 9;   // spawning|idle|running|waiting|completed|error|stopped — see TASK-AG-05-*
   int64  started_at_unix_ms      = 10;
   int64  last_active_at_unix_ms  = 11;
+  SessionOrigin origin           = 12;  // unset for UI-created sessions
 }
 
 message StopAgentSessionRequest { string session_id = 1; }

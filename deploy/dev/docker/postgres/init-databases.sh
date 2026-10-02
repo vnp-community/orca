@@ -3,7 +3,7 @@
 # specs/backend-go/architecture/05-data-architecture.md's database-per-service
 # rule. Run automatically by the postgres container's
 # docker-entrypoint-initdb.d hook on first startup (docker-compose.yml).
-# Only the 15 services that own a database are listed here — see
+# Only the 16 services that own a database are listed here — see
 # specs/backend-go/services/00-service-catalog.md for which 2 don't.
 # issuetracking joined this list in Epic G (docs/execution-plan.md):
 # issue-tracking-service's database hosts only its transactional-outbox
@@ -14,7 +14,7 @@
 # see that service's cmd/server/main.go doc comment.
 set -e
 
-DATABASES="auth tenant project infra aiprovider workflow task orchestration automation annotation notification usage credential issuetracking scm"
+DATABASES="auth tenant project infra aiprovider workflow task orchestration automation annotation notification usage credential issuetracking scm mcp"
 
 for db in $DATABASES; do
 	psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL

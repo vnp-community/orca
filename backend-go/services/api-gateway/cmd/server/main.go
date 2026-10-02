@@ -41,6 +41,11 @@ import (
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/fanout"
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/httpgateway"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpmetrics"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpserver"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpserver/resources"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcptokens"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/originpolicy"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/wsbridge"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/wscompat"
 
@@ -52,6 +57,7 @@ import (
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	issuetrackingv1 "github.com/stablyai/orca-go/proto/gen/go/orca/issuetracking/v1"
+	mcpv1 "github.com/stablyai/orca-go/proto/gen/go/orca/mcp/v1"
 	notificationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/notification/v1"
 	orchestrationv1 "github.com/stablyai/orca-go/proto/gen/go/orca/orchestration/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
@@ -268,6 +274,16 @@ func run() error {
 	// every bearer-JWT verify now also checks auth-service's real
 	// IsServiceTokenRevoked RPC, short-TTL cached (CR-CLI-002/TASK-BE-CLI-005).
 	authValidator.Revocation = authclient.NewRevocationClient(authClient)
+	// MCP tokens (aud = the MCP resource) are valid on /mcp only: REST/WS refuse
+	// them, and /mcp resolves the live role + revocation state through a 30s
+	// cache (the worst-case delay before a revocation/demotion takes effect).
+	mcpPrincipalResolver := authclient.NewMcpPrincipalResolver(authClient, authclient.DefaultMcpPrincipalTTL)
+	authValidator.McpPrincipals = mcpPrincipalResolver
+	mcpMetrics := newMCPMetrics()
+	mcpPrincipalResolver.OnResolve = mcpMetrics.ObservePrincipalResolve
+	if cfg.MCP.Enabled && cfg.MCP.ResourceURL() != "" {
+		authValidator.RejectAudiences = []string{cfg.MCP.ResourceURL()}
+	}
 	rateLimiter := usecase.NewRateLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
 	registry := domain.NewDefaultServiceRegistry()
 
@@ -294,7 +310,14 @@ func run() error {
 		streamCtx = gatewaygrpc.AttachIdentity(streamCtx, usecase.Identity{UserID: userID})
 		return notificationClient.StreamNotifications(streamCtx, &notificationv1.StreamNotificationsRequest{UserId: userID})
 	})
-	wsHandler := wsbridge.New(logger, authValidator, sessionValidator, notificationStreamOpener)
+	originPolicy, err := originpolicy.Parse(cfg.WSAllowedOrigins)
+	if err != nil {
+		return fmt.Errorf("WS_ALLOWED_ORIGINS: %w", err)
+	}
+	if !originPolicy.Enforced() {
+		logger.Warn("WS_ALLOWED_ORIGINS is empty: WebSocket upgrades accept any Origin (cross-site WebSocket hijacking is possible with cookie auth); set it to your frontend origins")
+	}
+	wsHandler := wsbridge.New(logger, authValidator, sessionValidator, notificationStreamOpener).WithOriginPolicy(originPolicy)
 
 	// fanOutUseCase composes SOL-WT-02's "create N worktrees, spawn N
 	// agents, inject N prompts" saga out of three already-real per-service
@@ -329,41 +352,109 @@ func run() error {
 	// non-browser callers (Orca CLI over ORCA_SERVER_URL) that present
 	// Authorization: Bearer <jwt> instead of a cookie.
 	wsCompatRegistry := wscompat.NewRegistry()
-	wscompat.RegisterRealChannels(
-		wsCompatRegistry, annotationClient, taskClient, gitClient, automationClient, infraFleetClient,
-		tenantClient, projectClient, issueTrackingClient, orchestrationClient, scmClient, workflowClient,
-		aiProviderClient,
-		credentialBrokerClient,
-		authClient,
-		rateLimiter,
-		fanOutUseCase,
-		eventBusConsumer,
-	)
-	// RegisterPushChannels wires the StreamHandler-backed (push-capable)
-	// channels — a separate registration mechanism from RegisterRealChannels'
-	// request/response ChannelHandlers, see channels_push.go's doc comment.
-	clientEventBus := wscompat.NewClientEventBus()
-	wscompat.RegisterPushChannels(wsCompatRegistry, wscompat.NotificationStreamOpener(notificationStreamOpener), clientEventBus, infraFleetClient)
-	// clientState.*/workspaceSession.* (CR-STORAGE-001/003/004a,b) — same
-	// "separate call, not folded into RegisterRealChannels" pattern as
-	// RegisterPushChannels above, so this addition doesn't collide with
-	// other parallel edits to RegisterRealChannels's own signature.
-	wscompat.RegisterClientStateChannels(wsCompatRegistry, tenantClient)
-
-	// task.activity (BE-SOL-003/TASK-FT-003-04) — subscribes the 4
-	// orchestration.* + 2 workflow.step.* subjects (published by
-	// orchestration-service/workflow-service's own outbox relays,
-	// TASK-FT-003-01/-02/-03) per connection, filtered by taskId. If NATS
-	// is unreachable at startup, the channel simply never registers —
-	// task.activity.subscribe then falls through to
-	// StreamHandlerFor's own "not found" handling, same degrade-not-panic
-	// shape as every other optional downstream in this composition root.
-	_, natsConsumer, closeNatsBus, err := eventbus.Connect(ctx, cfg.NATSURL)
-	if err != nil {
-		logger.WarnContext(ctx, "eventbus unavailable, task.activity channel disabled", slog.Any("error", err))
+	// task.activity (BE-SOL-003/TASK-FT-003-04) subscribes per connection; if
+	// NATS is unreachable the channel simply never registers.
+	_, natsConsumer, closeNatsBus, natsErr := eventbus.Connect(ctx, cfg.NATSURL)
+	if natsErr != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, task.activity channel disabled", slog.Any("error", natsErr))
 	} else {
 		defer func() { _ = closeNatsBus() }()
-		wscompat.RegisterTaskActivityStreamChannel(wsCompatRegistry, natsConsumer)
+	}
+	workspaceEventBus := wscompat.NewWorkspaceEventBus()
+	// One call registers every non-mcp channel (also used by the MCP parity
+	// test); clientState/push/mobile keep the order they had here.
+	wscompat.RegisterProductionChannels(wsCompatRegistry, wscompat.ChannelDeps{
+		Annotation: annotationClient, Task: taskClient, Git: gitClient, Automation: automationClient,
+		InfraFleet: infraFleetClient, Tenant: tenantClient, Project: projectClient,
+		IssueTracking: issueTrackingClient, Orchestration: orchestrationClient, Scm: scmClient,
+		Workflow: workflowClient, AIProvider: aiProviderClient, CredentialBroker: credentialBrokerClient,
+		Auth: authClient, RateLimits: rateLimiter, FanOut: fanOutUseCase, EventBus: eventBusConsumer,
+		NotificationStream:  wscompat.NotificationStreamOpener(notificationStreamOpener),
+		WorkspaceEvents:     workspaceEventBus,
+		DeviceSecrets:       authclient.NewDeviceSecretResolver(authClient),
+		TaskActivityEnabled: natsErr == nil, TaskActivityBus: natsConsumer,
+	})
+
+	// MCP (CR-MCP-002/003): process flag MCP_ENABLED gates /mcp and mcp.*
+	// channels. mcp-service is dialed lazily like every other downstream; an
+	// empty MCP_SERVICE_ADDR degrades (mcp.server.info -> MCP_UNAVAILABLE)
+	// instead of failing startup.
+	var mcpClient mcpv1.McpServiceClient
+	var mcpConn *grpc.ClientConn
+	if cfg.MCP.Enabled && cfg.MCP.ServiceAddr != "" {
+		mcpConn, err = dialMCPService(cfg.MCP.ServiceAddr)
+		if err != nil {
+			return fmt.Errorf("dialing mcp-service: %w", err)
+		}
+		defer func() { _ = mcpConn.Close() }()
+		mcpClient = mcpv1.NewMcpServiceClient(mcpConn)
+	} else if cfg.MCP.Enabled {
+		logger.Warn("MCP_ENABLED is true but MCP_SERVICE_ADDR is empty: mcp.server.info will answer MCP_UNAVAILABLE")
+	}
+	var mcpTokenService *mcptokens.Service
+	if mcpClient != nil {
+		mcpTokenService = &mcptokens.Service{
+			Auth: authClient, Policy: mcpClient, MaxActivePerUser: cfg.MCP.PATMaxPerUser,
+			OnRevoked: mcpPrincipalResolver.Invalidate,
+		}
+	}
+	// Governance (BE-MCP-SOL-012/013): the real policy gate and kill guard;
+	// both nil when mcp-service is not configured (fail-closed default gate).
+	mcpGate, mcpKillGuard, err := buildMCPGovernance(mcpClient, logger)
+	if err != nil {
+		return err
+	}
+	// Tool catalog/executor (BE-MCP-SOL-007/008). A nil gate is the fail-closed
+	// default; the governance adapter replaces it here.
+	var mcpToolOpts []func(*mcpserver.Deps)
+	var mcpToolCatalog wscompat.McpToolLister
+	var mcpResPrompts *mcpResourcePromptStack
+	if cfg.MCP.Enabled {
+		toolStack, err := buildMCPToolStack(wsCompatRegistry, mcpmetrics.InstrumentGate(mcpGate, mcpMetrics), logger)
+		if err != nil {
+			return err
+		}
+		withMCPGuards(toolStack, mcpGate, mcpKillGuard)
+		// Terminal/agent tools (BE-MCP-SOL-009): resolve worktree hosts like the
+		// UI, stop their PTYs when the MCP session ends (hook + durable reaper).
+		toolStack.setWorktreeTargets(wscompat.WorktreeTargetResolver{Project: projectClient, Infra: infraFleetClient})
+		defer toolStack.Executor.Close()
+		mcpToolOpts, mcpToolCatalog = append(mcpToolOpts, withMCPTools(toolStack), withMCPSessionClosed(toolStack)), toolStack.Catalog
+		if natsErr == nil {
+			go runMCPSessionReaper(ctx, toolStack, natsConsumer, logger)
+		}
+		var mcpBus resources.EphemeralSubscriber // stays a nil interface when NATS is down
+		if natsErr == nil {
+			mcpBus = natsConsumer
+		}
+		mcpResPrompts = buildMCPResourcePromptStack(wsCompatRegistry, mcpGate, mcpBus, mcpClient, logger)
+		mcpToolOpts = append(mcpToolOpts, withMCPResourcesPrompts(mcpResPrompts))
+	}
+	// Sessions, cross-replica signals and the resume buffer (BE-MCP-SOL-004).
+	mcpSessionCloser := &lateSessionCloser{}
+	if cfg.MCP.Enabled {
+		sessionOpts, closeSessions := buildMCPSessionStack(ctx, cfg.NATSURL, cfg.MCP.SSEBufferMaxBytes, mcpClient, mcpKillGuard, logger)
+		defer closeSessions()
+		mcpToolOpts = append(mcpToolOpts, sessionOpts...)
+		mcpToolOpts = append(mcpToolOpts, withMCPMetrics(mcpMetrics))
+	}
+	wscompat.RegisterMcpChannels(wsCompatRegistry, wscompat.McpChannelDeps{
+		Enabled: cfg.MCP.Enabled, Client: mcpClient, Registry: newMCPRegistryClient(mcpConn),
+		ResourceURL: cfg.MCP.ResourceURL(), AuthorizationServer: cfg.MCP.IssuerURL,
+		Tenant: tenantClient, Tokens: mcpTokenService, ToolCatalog: mcpToolCatalog, Audit: authClient,
+		SessionCloser: mcpSessionCloser,
+	})
+	mcpHandler, err := buildMCPHandlerWithVerifier(cfg.MCP, logger, rateLimiter,
+		withKillGuard(mcpserver.NewBearerTokenVerifier(authValidator, cfg.MCP.ResourceURL()), mcpKillGuard), mcpToolOpts...)
+	if err != nil {
+		return err
+	}
+	if mcpHandler != nil {
+		mcpSessionCloser.set(mcpHandler)
+		defer mcpHandler.Close()
+	}
+	if mcpHandler != nil && mcpResPrompts != nil && natsErr == nil {
+		go mcpResPrompts.watchPromptChanges(ctx, natsConsumer, mcpHandler, logger)
 	}
 
 	// workspace.subscribe (TASK-PW-04-07, SOL-PW-04): bridges task-service's
@@ -374,8 +465,6 @@ func run() error {
 	// this codebase (notification-service's own eventbus.Connect call):
 	// NATS unavailable at startup logs a warning, does not fail service
 	// startup.
-	workspaceEventBus := wscompat.NewWorkspaceEventBus()
-	wscompat.RegisterWorkspaceSubscribeChannel(wsCompatRegistry, workspaceEventBus)
 	var workspaceBridgeWG sync.WaitGroup
 	_, workspaceEventConsumer, closeWorkspaceEventBus, err := eventbus.Connect(ctx, cfg.NATSURL)
 	if err != nil {
@@ -389,13 +478,7 @@ func run() error {
 		}()
 	}
 
-	// mobile.* channels (SOL-MB-01/03/04) — deviceSecretResolver wraps
-	// auth-service's internal-only ResolveDeviceSharedSecret RPC, the same
-	// authClient every other real channel registration above shares.
-	deviceSecretResolver := authclient.NewDeviceSecretResolver(authClient)
-	wscompat.RegisterMobileChannels(wsCompatRegistry, infraFleetClient, projectClient, deviceSecretResolver)
-
-	wsCompatHandler := wscompat.New(logger, sessionValidator, authValidator, wsCompatRegistry)
+	wsCompatHandler := wscompat.New(logger, sessionValidator, authValidator, wsCompatRegistry).WithOriginPolicy(originPolicy)
 
 	// agentProxyHandler raw-proxies the Dev Server Agent's /agent (WS) and
 	// /api/agent-token (HTTP) traffic straight to infra-fleet-service — see
@@ -406,6 +489,16 @@ func run() error {
 	var agentProxyHandler http.Handler
 	if cfg.InfraFleetHTTPAddr != "" {
 		agentProxyHandler = httpgateway.NewAgentProxyHandler(cfg.InfraFleetHTTPAddr)
+	}
+
+	var oauthRoutes *httpgateway.OAuthRoutes
+	var mcpTokenRoutes *httpgateway.McpTokenRoutes
+	if cfg.MCP.Enabled && mcpClient != nil {
+		oauthRoutes = &httpgateway.OAuthRoutes{
+			Auth: authClient, Consent: mcpClient, CookieValidator: sessionValidator,
+			Issuer: cfg.MCP.IssuerURL, DCREnabled: cfg.MCP.DCREnabled,
+		}
+		mcpTokenRoutes = &httpgateway.McpTokenRoutes{Service: mcpTokenService}
 	}
 
 	router := httpgateway.NewRouter(httpgateway.Deps{
@@ -440,6 +533,9 @@ func run() error {
 		WSCompatHandler:     wsCompatHandler.ServeHTTP,
 		AgentProxyHandler:   agentProxyHandler,
 		TraceBroadcast:      traceBroadcast,
+		MCP:                 mcpHandler,
+		OAuth:               oauthRoutes,
+		McpTokens:           mcpTokenRoutes,
 	})
 
 	healthSrv := health.New()
@@ -458,19 +554,25 @@ func run() error {
 	healthSrv.Register("orchestration-service", grpcConnHealthCheck(orchestrationConn))
 	healthSrv.Register("scm-integration-service", grpcConnHealthCheck(scmConn))
 	healthSrv.Register("workflow-service", grpcConnHealthCheck(workflowConn))
+	if mcpConn != nil {
+		healthSrv.Register("mcp-service", grpcConnHealthCheck(mcpConn))
+	}
 
 	// otelhttp gives every /api/* request its trace's root span — health
 	// checks below stay unwrapped so they never depend on OTel exporter
 	// health (TASK-BE-FFT-004).
 	publicHandler := otelhttp.NewHandler(router, "api-gateway")
 
+	// ReadHeaderTimeout only: a Read/WriteTimeout would also cut WebSocket
+	// and SSE (/mcp GET) streams. /mcp sets a per-response write deadline.
 	publicServer := &http.Server{
-		Addr:    fmt.Sprintf(":%d", cfg.PublicPort),
-		Handler: publicHandler,
+		Addr:              fmt.Sprintf(":%d", cfg.PublicPort),
+		Handler:           publicHandler,
+		ReadHeaderTimeout: cfg.MCP.ReadHeaderTimeout,
 	}
 	healthServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
-		Handler: healthSrv.Handler(),
+		Handler: healthAndMetricsMux(healthSrv.Handler(), mcpMetrics),
 	}
 
 	errCh := make(chan error, 2)

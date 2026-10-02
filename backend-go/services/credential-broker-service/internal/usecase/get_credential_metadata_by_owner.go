@@ -12,6 +12,8 @@ type GetCredentialMetadataByOwnerInput struct {
 	TenantID string
 	Category domain.Category
 	OwnerID  string
+	// RequestingService feeds the category allow-list (BE-MCP-SOL-014).
+	RequestingService string
 }
 
 // GetCredentialMetadataByOwnerResult wraps the metadata plus a Found flag
@@ -39,6 +41,9 @@ func NewGetCredentialMetadataByOwner(metadataRepo CredentialMetadataRepository) 
 func (uc *GetCredentialMetadataByOwner) Execute(ctx context.Context, in GetCredentialMetadataByOwnerInput) (GetCredentialMetadataByOwnerResult, error) {
 	if in.TenantID == "" || in.OwnerID == "" {
 		return GetCredentialMetadataByOwnerResult{}, apperrors.New(apperrors.KindInvalidArgument, "CREDENTIAL_MISSING_SCOPE", "tenant_id and owner_id are required", nil)
+	}
+	if err := ensureCallerAllowed(in.Category, in.RequestingService); err != nil {
+		return GetCredentialMetadataByOwnerResult{}, err
 	}
 	metadata, err := uc.metadataRepo.GetByOwner(ctx, in.TenantID, in.Category, in.OwnerID)
 	if err != nil {

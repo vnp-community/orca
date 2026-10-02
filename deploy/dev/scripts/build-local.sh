@@ -40,7 +40,7 @@ ALL_SERVICES=(
   automation-service credential-broker-service git-gateway-service
   infra-fleet-service issue-tracking-service notification-service
   orchestration-service project-service scm-integration-service
-  task-service tenant-service usage-service workflow-service
+  task-service tenant-service usage-service workflow-service mcp-service
 )
 
 check_cmd() {

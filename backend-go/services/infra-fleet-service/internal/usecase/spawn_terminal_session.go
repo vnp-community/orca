@@ -26,6 +26,9 @@ type SpawnTerminalSessionInput struct {
 	// isolation for a gh/glab Command — always the caller's authenticated
 	// identity, set server-side by wscompat, never client-supplied.
 	UserID string
+	// Origin marks a session created for an MCP client (BE-MCP-SOL-009);
+	// nil for UI-created sessions.
+	Origin *domain.SessionOrigin
 }
 
 // SpawnTerminalSession creates a new PTY on the dev server ConnectionID
@@ -162,6 +165,7 @@ func (uc *SpawnTerminalSession) Execute(ctx context.Context, in SpawnTerminalSes
 		CreatedAt:       now,
 		LastActiveAt:    now,
 		CreatedByUserID: userID,
+		Origin:          in.Origin,
 	})
 	if err != nil {
 		return domain.TerminalSession{}, apperrors.New(apperrors.KindInternal, "INFRA_CREATE_TERMINAL_SESSION_FAILED", "failed to persist terminal session", err)

@@ -22,6 +22,9 @@ type TerminalSession struct {
 	// IsZero's check below: an old row legitimately has it empty without
 	// being an absent session.
 	CreatedByUserID string
+	// Origin is non-nil only for sessions an MCP client created
+	// (BE-MCP-SOL-009); UI-created sessions leave it nil.
+	Origin *SessionOrigin
 	// ClosedAt is nil while the session is open — set by
 	// usecase.KillTerminalSession, mirrors Connection/DevServer's convention
 	// of a real Go zero value (nil pointer) over a sentinel time, per

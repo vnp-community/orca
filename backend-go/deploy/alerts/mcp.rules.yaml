@@ -1,0 +1,46 @@
+# Prometheus alert rules for the MCP edge (BE-MCP-SOL-015 section C).
+# Not loaded by anything in this repository (no Prometheus/Helm wiring here);
+# an operator has to mount it. Only metrics that exist today are used:
+# there is no orca_mcp_killswitch_active gauge yet, so no kill-switch alert.
+groups:
+  - name: orca-mcp
+    rules:
+      - alert: McpDenyRateAnomaly
+        expr: |
+          sum(rate(orca_mcp_policy_denials_total[10m]))
+            / clamp_min(sum(rate(orca_mcp_tool_calls_total[10m])), 0.01) > 0.3
+        for: 30m
+        labels: {severity: warning}
+        annotations:
+          summary: "More than 30% of MCP tool calls are denied by policy"
+          description: "Look at orca_mcp_policy_denials_total by reason; a client may be looping on a denied tool or a policy change may be too strict."
+      - alert: McpExecSpike
+        expr: |
+          sum(rate(orca_mcp_tool_calls_total{decision="allow",tool=~".*(exec|run|terminal).*"}[5m]))
+            > 3 * (sum(rate(orca_mcp_tool_calls_total{decision="allow",tool=~".*(exec|run|terminal).*"}[1d])) + 0.01)
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Allowed exec-class MCP tool calls are 3x above the daily average"
+      - alert: McpAuthFailureBurst
+        expr: sum by (reason) (rate(orca_mcp_auth_failures_total[5m])) > 1
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "Sustained rejected /mcp authentications ({{ $labels.reason }})"
+      - alert: McpServerErrors
+        expr: |
+          sum(rate(orca_mcp_requests_total{result="http_5xx"}[5m]))
+            / clamp_min(sum(rate(orca_mcp_requests_total[5m])), 0.01) > 0.02
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: "More than 2% of /mcp requests fail with 5xx"
+      - alert: McpPrincipalResolveErrors
+        expr: |
+          sum(rate(orca_mcp_principal_resolve_total{result="error"}[5m]))
+            / clamp_min(sum(rate(orca_mcp_principal_resolve_total[5m])), 0.01) > 0.1
+        for: 10m
+        labels: {severity: warning}
+        annotations:
+          summary: "auth-service ResolveMcpPrincipal is failing; /mcp fails closed (503)"

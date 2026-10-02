@@ -1,0 +1,559 @@
+# Channels that are NOT MCP tools. Every registered channel needs either a
+# ToolSpec or a pattern here, with a reason (parity_test.go fails otherwise).
+# "*" matches any suffix. listedAsHardDenied shows the channel as locked in the
+# admin Tools tab; tools/list never lists excluded channels.
+
+- pattern: "credentials.*"
+  category: secret
+  reason: "Secrets, credentials and login flows: tenant secrets never leave the server and an agent must not mint or revoke logins."
+  listedAsHardDenied: true
+
+- pattern: "devServer.agentTokens.*"
+  category: secret
+  reason: "Secrets, credentials and login flows: tenant secrets never leave the server and an agent must not mint or revoke logins."
+  listedAsHardDenied: true
+
+- pattern: "aiProvider.create"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "aiProvider.update"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "aiProvider.delete"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "aiProvider.writeCredential"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "aiProvider.resolve"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "aiProvider.testConnection"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "github.startAuthLogin"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "github.revokeAuth"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "github.checkAuthStatus"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "gitlab.startAuthLogin"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "gitlab.revokeAuth"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "gitlab.checkAuthStatus"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "jira.connect"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "jira.disconnect"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "jira.selectSite"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "jira.testConnection"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "linear.connect"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "linear.disconnect"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "linear.selectWorkspace"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "linear.testConnection"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "github.checkOrcaStarred"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "github.starOrca"
+  category: secret
+  reason: "Provider credential and login management (write, resolve, revoke): secrets are handled only through the UI."
+
+- pattern: "admin.createUser"
+  category: privilege-escalation
+  reason: "Tenant administration that could escalate privileges or lock people out (users, roles, sessions, policies)."
+  listedAsHardDenied: true
+
+- pattern: "admin.deactivateUser"
+  category: privilege-escalation
+  reason: "Tenant administration that could escalate privileges or lock people out (users, roles, sessions, policies)."
+  listedAsHardDenied: true
+
+- pattern: "admin.reactivateUser"
+  category: privilege-escalation
+  reason: "Tenant administration that could escalate privileges or lock people out (users, roles, sessions, policies)."
+  listedAsHardDenied: true
+
+- pattern: "admin.updateUserRole"
+  category: privilege-escalation
+  reason: "Tenant administration that could escalate privileges or lock people out (users, roles, sessions, policies)."
+  listedAsHardDenied: true
+
+- pattern: "admin.forceRevokeSession"
+  category: privilege-escalation
+  reason: "Tenant administration that could escalate privileges or lock people out (users, roles, sessions, policies)."
+  listedAsHardDenied: true
+
+- pattern: "admin.forceRevokeAllSessions"
+  category: privilege-escalation
+  reason: "Tenant administration that could escalate privileges or lock people out (users, roles, sessions, policies)."
+  listedAsHardDenied: true
+
+- pattern: "admin.createPolicy"
+  category: privilege-escalation
+  reason: "Tenant administration that could escalate privileges or lock people out (users, roles, sessions, policies)."
+  listedAsHardDenied: true
+
+- pattern: "admin.updatePolicy"
+  category: privilege-escalation
+  reason: "Tenant administration that could escalate privileges or lock people out (users, roles, sessions, policies)."
+  listedAsHardDenied: true
+
+- pattern: "admin.deletePolicy"
+  category: privilege-escalation
+  reason: "Tenant administration that could escalate privileges or lock people out (users, roles, sessions, policies)."
+  listedAsHardDenied: true
+
+- pattern: "mcp.*"
+  category: mcp-self
+  reason: "MCP self-management channels (tokens, grants, consent, clients): an MCP client must not manage its own authorization."
+
+- pattern: "mobile.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "clientState.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "workspaceSession.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "starNag.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "onboarding.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "telemetry.track"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "crashReports.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "session.tabs.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "notifications.subscribe"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "runtime.clientEvents.subscribe"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "nativeChat.readSession"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "status.get"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "rateLimits.get"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "apiGateway.rateLimits.get"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "host.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "preflight.check"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "connection.teardown"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "ssh.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "sparsePresets.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "folderWorkspace.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "projectHostSetup.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "accounts.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "profile.*"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "workspace.refreshFileTree"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "devServer.browseDir"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "devServer.listSshTargets"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "git.discoverCommitMessageModels"
+  category: ui-only
+  reason: "Per-user UI, device or desktop state with no meaning for an agent."
+
+- pattern: "browser.*"
+  category: ui-automation
+  reason: "Browser and emulator remote control channels: they drive the user's interactive session, not workspace data."
+
+- pattern: "emulator.*"
+  category: ui-automation
+  reason: "Browser and emulator remote control channels: they drive the user's interactive session, not workspace data."
+
+- pattern: "terminal.focus"
+  category: ui-only
+  reason: "Terminal pane plumbing for the interactive UI (focus, resize, viewport, binary multiplex, reattach, scrollback snapshots); MCP terminals use terminal_start/send/read/stop instead."
+
+- pattern: "terminal.resize"
+  category: ui-only
+  reason: "Terminal pane plumbing for the interactive UI (focus, resize, viewport, binary multiplex, reattach, scrollback snapshots); MCP terminals use terminal_start/send/read/stop instead."
+
+- pattern: "terminal.updateViewport"
+  category: ui-only
+  reason: "Terminal pane plumbing for the interactive UI (focus, resize, viewport, binary multiplex, reattach, scrollback snapshots); MCP terminals use terminal_start/send/read/stop instead."
+
+- pattern: "terminal.multiplex"
+  category: ui-only
+  reason: "Terminal pane plumbing for the interactive UI (focus, resize, viewport, binary multiplex, reattach, scrollback snapshots); MCP terminals use terminal_start/send/read/stop instead."
+
+- pattern: "terminal.reattachSend"
+  category: ui-only
+  reason: "Terminal pane plumbing for the interactive UI (focus, resize, viewport, binary multiplex, reattach, scrollback snapshots); MCP terminals use terminal_start/send/read/stop instead."
+
+- pattern: "terminal.scrollback.save"
+  category: ui-only
+  reason: "Terminal pane plumbing for the interactive UI (focus, resize, viewport, binary multiplex, reattach, scrollback snapshots); MCP terminals use terminal_start/send/read/stop instead."
+
+- pattern: "terminal.scrollback.restore"
+  category: ui-only
+  reason: "Terminal pane plumbing for the interactive UI (focus, resize, viewport, binary multiplex, reattach, scrollback snapshots); MCP terminals use terminal_start/send/read/stop instead."
+
+- pattern: "terminal.subscribe"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; terminal_read (cursor ring buffer) and agent_status cover output and state."
+
+- pattern: "terminal.unsubscribe"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; terminal_read (cursor ring buffer) and agent_status cover output and state."
+
+- pattern: "terminal.inspectProcess"
+  category: not-needed
+  reason: "Process inspection of arbitrary terminals; agent_status and terminal_wait cover the MCP session's own terminals."
+
+- pattern: "terminal.isRunningAgent"
+  category: not-needed
+  reason: "Projection of terminal.agentStatus, which agent_status already uses for the MCP session's own agents."
+
+- pattern: "agent.subscribeStatus"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; terminal_read (cursor ring buffer) and agent_status cover output and state."
+
+- pattern: "agent.resume"
+  category: deferred-be009
+  reason: "Resuming an agent session is not part of the first terminal/agent tool set; agent_start covers new sessions."
+
+- pattern: "agent.switchAccount"
+  category: deferred-be009
+  reason: "Switching the provider account of a running agent is a UI account flow, not part of the first terminal/agent tool set."
+
+- pattern: "workflow.cancel"
+  category: deferred-be009
+  reason: "Terminal, agent and workflow-run tools are Composite tools delivered by BE-MCP-SOL-009; remove the pattern when they land."
+
+- pattern: "workflow.executeAdHocStep"
+  category: deferred-be009
+  reason: "Terminal, agent and workflow-run tools are Composite tools delivered by BE-MCP-SOL-009; remove the pattern when they land."
+
+- pattern: "workflow.pause"
+  category: deferred-be009
+  reason: "Terminal, agent and workflow-run tools are Composite tools delivered by BE-MCP-SOL-009; remove the pattern when they land."
+
+- pattern: "workflow.resume"
+  category: deferred-be009
+  reason: "Terminal, agent and workflow-run tools are Composite tools delivered by BE-MCP-SOL-009; remove the pattern when they land."
+
+- pattern: "ephemeralVm.provision"
+  category: deferred-be009
+  reason: "Terminal, agent and workflow-run tools are Composite tools delivered by BE-MCP-SOL-009; remove the pattern when they land."
+
+- pattern: "ephemeralVm.cancelProvision"
+  category: deferred-be009
+  reason: "Terminal, agent and workflow-run tools are Composite tools delivered by BE-MCP-SOL-009; remove the pattern when they land."
+
+- pattern: "onboarding.openGhAuthTerminal"
+  category: deferred-be009
+  reason: "Terminal, agent and workflow-run tools are Composite tools delivered by BE-MCP-SOL-009; remove the pattern when they land."
+
+- pattern: "workspace.subscribe"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; resources subscribe (BE-MCP-SOL-010) covers the useful ones."
+
+- pattern: "task.activity.subscribe"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; resources subscribe (BE-MCP-SOL-010) covers the useful ones."
+
+- pattern: "git.pull.progress"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; resources subscribe (BE-MCP-SOL-010) covers the useful ones."
+
+- pattern: "git.push.progress"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; resources subscribe (BE-MCP-SOL-010) covers the useful ones."
+
+- pattern: "workspacePorts.subscribe"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; resources subscribe (BE-MCP-SOL-010) covers the useful ones."
+
+- pattern: "files.watch"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; resources subscribe (BE-MCP-SOL-010) covers the useful ones."
+
+- pattern: "files.unwatch"
+  category: stream
+  reason: "Push-stream channels cannot answer tools/call; resources subscribe (BE-MCP-SOL-010) covers the useful ones."
+
+- pattern: "files.read"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.write"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.writeBase64"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.writeBase64Chunk"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.createFile"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.createDir"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.createDirNoClobber"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.rename"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.copy"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.delete"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.commitUpload"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "files.browseServerDir"
+  category: files-v1
+  reason: "Raw file read and file mutation are not exposed in v1: files_read uses the size-capped preview; the agent client has its own editing tools."
+
+- pattern: "automation.create"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "annotation.delete"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "github.project.deleteIssueCommentBySlug"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "github.project.resolveRef"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "orcaProjects.linkSourceProject"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "orcaProjects.unlinkSourceProject"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "orchestration.dispatchShow"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "task.grant"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "task.resolvePermission"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "worktree.resolveMrBase"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "worktree.resolvePrBase"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "projectGroup.delete"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "projectGroup.importNested"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "projectGroup.scanNested"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "project.rebindDevServer"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "repo.add"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "repo.assignToProject"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "repo.create"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "repo.hooksCheck"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "repo.issueCommandRead"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "repo.issueCommandWrite"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "repo.rebindDevServer"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "repo.reorder"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "repo.setupScriptImports"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "repo.update"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "devServer.add"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "devServer.listPendingAccessRequests"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "devServer.requestAccess"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "devServerGroup.*"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "ephemeralVm.doctor"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "ephemeralVm.getCleanupCommand"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "git.cancelGenerateCommitMessage"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "git.cancelGeneratePullRequestFields"
+  category: backlog
+  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."

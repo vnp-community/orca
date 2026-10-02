@@ -14,6 +14,7 @@ use (
 	./services/infra-fleet-service
 	./services/issue-status-sync
 	./services/issue-tracking-service
+	./services/mcp-service
 	./services/notification-service
 	./services/orchestration-service
 	./services/project-service

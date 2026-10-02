@@ -1,0 +1,2052 @@
+[
+  {
+    "name": "admin_getPolicy",
+    "channel": "admin.getPolicy",
+    "pack": 4,
+    "risk": "admin",
+    "scope": "orca:admin",
+    "required": ["policy_id"],
+    "props": ["policy_id"]
+  },
+  {
+    "name": "admin_listPolicies",
+    "channel": "admin.listPolicies",
+    "pack": 4,
+    "risk": "admin",
+    "scope": "orca:admin",
+    "props": ["page_size", "page_token"]
+  },
+  {
+    "name": "admin_listSessions",
+    "channel": "admin.listSessions",
+    "pack": 4,
+    "risk": "admin",
+    "scope": "orca:admin",
+    "required": ["target_user_id"],
+    "props": ["target_user_id"]
+  },
+  {
+    "name": "admin_listUsers",
+    "channel": "admin.listUsers",
+    "pack": 4,
+    "risk": "admin",
+    "scope": "orca:admin",
+    "props": ["page_size", "page_token"]
+  },
+  {
+    "name": "admin_queryAuditLog",
+    "channel": "admin.queryAuditLog",
+    "pack": 4,
+    "risk": "admin",
+    "scope": "orca:admin",
+    "props": ["action", "actor_id", "outcome", "page_size", "page_token", "since_unix_ms"]
+  },
+  {
+    "name": "agentSession_listActive",
+    "channel": "agentSession.listActive",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "agent_send",
+    "channel": "",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["prompt", "session_id"],
+    "props": ["prompt", "session_id"]
+  },
+  {
+    "name": "agent_start",
+    "channel": "",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["model_id", "worktree_id"],
+    "props": ["account_id", "cwd", "model_id", "trust_preset", "worktree_id"]
+  },
+  {
+    "name": "agent_status",
+    "channel": "",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["session_id"],
+    "props": ["session_id"]
+  },
+  {
+    "name": "agent_stop",
+    "channel": "",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["session_id"],
+    "props": ["force", "session_id"]
+  },
+  {
+    "name": "aiProvider_list",
+    "channel": "aiProvider.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "annotation_composeReviewPrompt",
+    "channel": "annotation.composeReviewPrompt",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["worktree_id", "worktree_name"]
+  },
+  {
+    "name": "annotation_create",
+    "channel": "annotation.create",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["content", "file_path", "line", "repo_id"],
+    "props": [
+      "content",
+      "end_line",
+      "file_path",
+      "line",
+      "original_code",
+      "ref",
+      "repo_id",
+      "request_id",
+      "side",
+      "worktree_id"
+    ]
+  },
+  {
+    "name": "annotation_list",
+    "channel": "annotation.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["file_path", "page_size", "page_token", "repo_id", "worktree_id"]
+  },
+  {
+    "name": "annotation_markSent",
+    "channel": "annotation.markSent",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["ids"],
+    "props": ["ids"]
+  },
+  {
+    "name": "annotation_sendToAgent",
+    "channel": "annotation.sendToAgent",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["worktree_id"],
+    "props": ["worktree_id", "worktree_name"]
+  },
+  {
+    "name": "annotation_update",
+    "channel": "annotation.update",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["content", "id", "resolved"],
+    "props": ["content", "id", "resolved"]
+  },
+  {
+    "name": "auth_listTenantMemberDirectory",
+    "channel": "auth.listTenantMemberDirectory",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "automation_delete",
+    "channel": "automation.delete",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["id"],
+    "props": ["id"]
+  },
+  {
+    "name": "automation_list",
+    "channel": "automation.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["page_size", "page_token"]
+  },
+  {
+    "name": "automation_runNow",
+    "channel": "automation.runNow",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["automation_id"],
+    "props": ["automation_id", "request_id"]
+  },
+  {
+    "name": "automation_runs",
+    "channel": "automation.runs",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["automation_id"],
+    "props": ["automation_id", "page_size", "page_token"]
+  },
+  {
+    "name": "automation_update",
+    "channel": "automation.update",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["id"],
+    "props": ["dtstart", "id", "name", "rrule", "step_config_json", "step_type", "timezone"]
+  },
+  {
+    "name": "connectivity_getSummary",
+    "channel": "connectivity.getSummary",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "devServer_approve",
+    "channel": "devServer.approve",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["dev_server_id"],
+    "props": ["dev_server_id"]
+  },
+  {
+    "name": "devServer_assignGroup",
+    "channel": "devServer.assignGroup",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["dev_server_id", "group_id"],
+    "props": ["dev_server_id", "group_id"]
+  },
+  {
+    "name": "devServer_list",
+    "channel": "devServer.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "devServer_listForUser",
+    "channel": "devServer.listForUser",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "devServer_reject",
+    "channel": "devServer.reject",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["dev_server_id"],
+    "props": ["dev_server_id", "reason"]
+  },
+  {
+    "name": "devServer_resolveAccessRequest",
+    "channel": "devServer.resolveAccessRequest",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["approve", "request_id"],
+    "props": ["approve", "request_id"]
+  },
+  {
+    "name": "ephemeralVm_attachWorkspace",
+    "channel": "ephemeralVm.attachWorkspace",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["runtime_id", "workspace_id"],
+    "props": ["runtime_id", "workspace_id"]
+  },
+  {
+    "name": "ephemeralVm_cleanup",
+    "channel": "ephemeralVm.cleanup",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["runtime_id"],
+    "props": ["runtime_id"]
+  },
+  {
+    "name": "ephemeralVm_listRecipeCatalog",
+    "channel": "ephemeralVm.listRecipeCatalog",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "ephemeralVm_listRecipes",
+    "channel": "ephemeralVm.listRecipes",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["repo_id"],
+    "props": ["repo_id"]
+  },
+  {
+    "name": "ephemeralVm_listRuntimes",
+    "channel": "ephemeralVm.listRuntimes",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "ephemeralVm_resumeWorkspace",
+    "channel": "ephemeralVm.resumeWorkspace",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["workspace_id"],
+    "props": ["workspace_id"]
+  },
+  {
+    "name": "ephemeralVm_suspendWorkspace",
+    "channel": "ephemeralVm.suspendWorkspace",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["workspace_id"],
+    "props": ["workspace_id"]
+  },
+  {
+    "name": "files_listAll",
+    "channel": "files.listAll",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["max_results", "path_glob", "worktree_id"]
+  },
+  {
+    "name": "files_listMarkdownDocuments",
+    "channel": "files.listMarkdownDocuments",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["max_results", "worktree_id"]
+  },
+  {
+    "name": "files_read",
+    "channel": "files.readPreview",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["path", "worktree_id"],
+    "props": ["max_bytes", "path", "worktree_id"]
+  },
+  {
+    "name": "files_readChunk",
+    "channel": "files.readChunk",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["path", "worktree_id"],
+    "props": ["length_bytes", "offset_bytes", "path", "worktree_id"]
+  },
+  {
+    "name": "files_readDir",
+    "channel": "files.readDir",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["path", "worktree_id"]
+  },
+  {
+    "name": "files_search",
+    "channel": "files.search",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["pattern", "worktree_id"],
+    "props": ["is_regex", "max_results", "path_glob", "pattern", "worktree_id"]
+  },
+  {
+    "name": "files_stat",
+    "channel": "files.stat",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["path", "worktree_id"],
+    "props": ["path", "worktree_id"]
+  },
+  {
+    "name": "fleet_health_checkAll",
+    "channel": "fleet.health.checkAll",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["server_ids"]
+  },
+  {
+    "name": "git_abortMerge",
+    "channel": "git.abortMerge",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "git_abortRebase",
+    "channel": "git.abortRebase",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "git_branchCompare",
+    "channel": "git.branchCompare",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["base_ref", "worktree_id"],
+    "props": ["base_ref", "worktree_id"]
+  },
+  {
+    "name": "git_branchDiff",
+    "channel": "git.branchDiff",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["base_ref", "file_path", "worktree_id"],
+    "props": ["base_ref", "file_path", "old_path", "worktree_id"]
+  },
+  {
+    "name": "git_branch_create",
+    "channel": "git.branch.create",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["branch", "worktree_id"],
+    "props": ["base_ref", "branch", "checkout", "worktree_id"]
+  },
+  {
+    "name": "git_branch_delete",
+    "channel": "git.branch.delete",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["branch", "worktree_id"],
+    "props": ["branch", "worktree_id"]
+  },
+  {
+    "name": "git_bulkDiscard",
+    "channel": "git.bulkDiscard",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["paths", "worktree_id"],
+    "props": ["paths", "worktree_id"]
+  },
+  {
+    "name": "git_bulkStage",
+    "channel": "git.bulkStage",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["paths", "worktree_id"],
+    "props": ["paths", "worktree_id"]
+  },
+  {
+    "name": "git_bulkUnstage",
+    "channel": "git.bulkUnstage",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["paths", "worktree_id"],
+    "props": ["paths", "worktree_id"]
+  },
+  {
+    "name": "git_checkIgnored",
+    "channel": "git.checkIgnored",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["paths", "worktree_id"],
+    "props": ["paths", "worktree_id"]
+  },
+  {
+    "name": "git_checkout",
+    "channel": "git.checkout",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["branch", "worktree_id"],
+    "props": ["branch", "worktree_id"]
+  },
+  {
+    "name": "git_commit",
+    "channel": "git.commit",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["message", "worktree_id"],
+    "props": ["message", "paths", "worktree_id"]
+  },
+  {
+    "name": "git_commitCompare",
+    "channel": "git.commitCompare",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["commit_id", "worktree_id"],
+    "props": ["commit_id", "worktree_id"]
+  },
+  {
+    "name": "git_commitDiff",
+    "channel": "git.commitDiff",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["commit_oid", "file_path", "worktree_id"],
+    "props": ["commit_oid", "file_path", "old_path", "parent_oid", "worktree_id"]
+  },
+  {
+    "name": "git_conflictOperation",
+    "channel": "git.conflictOperation",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "git_diff",
+    "channel": "git.diff",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["file_path", "staged", "worktree_id"]
+  },
+  {
+    "name": "git_discard",
+    "channel": "git.discard",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["path", "worktree_id"],
+    "props": ["path", "worktree_id"]
+  },
+  {
+    "name": "git_fastForward",
+    "channel": "git.fastForward",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "git_fetch",
+    "channel": "git.fetch",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "git_forkSync",
+    "channel": "git.forkSync",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["worktree_id"],
+    "props": ["expected_upstream", "worktree_id"]
+  },
+  {
+    "name": "git_generateCommitMessage",
+    "channel": "git.generateCommitMessage",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "git_generatePullRequestFields",
+    "channel": "git.generatePullRequestFields",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["worktree_id"],
+    "props": ["base_branch", "worktree_id"]
+  },
+  {
+    "name": "git_history",
+    "channel": "git.history",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["base_ref", "limit", "worktree_id"]
+  },
+  {
+    "name": "git_localBranches",
+    "channel": "git.localBranches",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "git_merge",
+    "channel": "git.merge",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["branch", "worktree_id"],
+    "props": ["branch", "no_ff", "worktree_id"]
+  },
+  {
+    "name": "git_pull",
+    "channel": "git.pull",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "git_push",
+    "channel": "git.push",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["worktree_id"],
+    "props": ["branch", "remote", "worktree_id"]
+  },
+  {
+    "name": "git_rebaseFromBase",
+    "channel": "git.rebaseFromBase",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["base_branch", "worktree_id"],
+    "props": ["base_branch", "worktree_id"]
+  },
+  {
+    "name": "git_remoteCommitUrl",
+    "channel": "git.remoteCommitUrl",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["sha", "worktree_id"],
+    "props": ["sha", "worktree_id"]
+  },
+  {
+    "name": "git_remoteFileUrl",
+    "channel": "git.remoteFileUrl",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["path", "worktree_id"],
+    "props": ["path", "ref", "worktree_id"]
+  },
+  {
+    "name": "git_resolveConflict",
+    "channel": "git.resolveConflict",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["operation", "path", "worktree_id"],
+    "props": ["operation", "path", "worktree_id"]
+  },
+  {
+    "name": "git_stage",
+    "channel": "git.stage",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["paths", "worktree_id"],
+    "props": ["paths", "worktree_id"]
+  },
+  {
+    "name": "git_stash_pop",
+    "channel": "git.stash.pop",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["stash_ref", "worktree_id"],
+    "props": ["stash_ref", "worktree_id"]
+  },
+  {
+    "name": "git_stash_push",
+    "channel": "git.stash.push",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["worktree_id"],
+    "props": ["include_untracked", "message", "worktree_id"]
+  },
+  {
+    "name": "git_status",
+    "channel": "git.status",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "git_submoduleStatus",
+    "channel": "git.submoduleStatus",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["submodule_path", "worktree_id"],
+    "props": ["area", "submodule_path", "worktree_id"]
+  },
+  {
+    "name": "git_unstage",
+    "channel": "git.unstage",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["paths", "worktree_id"],
+    "props": ["paths", "worktree_id"]
+  },
+  {
+    "name": "git_upstreamStatus",
+    "channel": "git.upstreamStatus",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "github_issueComments",
+    "channel": "github.issueComments",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["item_slug"],
+    "props": ["item_slug"]
+  },
+  {
+    "name": "github_issues",
+    "channel": "github.issues",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["repo"],
+    "props": ["assignee", "labels", "milestone", "repo", "state"]
+  },
+  {
+    "name": "github_listWorkItems",
+    "channel": "github.listWorkItems",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["repo"],
+    "props": ["before", "limit", "query", "repo"]
+  },
+  {
+    "name": "github_mergePR",
+    "channel": "github.mergePR",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["number", "repo"],
+    "props": ["commit_message", "commit_title", "merge_method", "number", "repo"]
+  },
+  {
+    "name": "github_prForBranch",
+    "channel": "github.prForBranch",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["head_branch", "repo"],
+    "props": ["head_branch", "repo"]
+  },
+  {
+    "name": "github_project_addIssueCommentBySlug",
+    "channel": "github.project.addIssueCommentBySlug",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["body", "item_slug"],
+    "props": ["body", "item_slug"]
+  },
+  {
+    "name": "github_project_clearItemField",
+    "channel": "github.project.clearItemField",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["field_id", "item_id", "project_slug"],
+    "props": ["field_id", "item_id", "project_slug"]
+  },
+  {
+    "name": "github_project_listAccessible",
+    "channel": "github.project.listAccessible",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "github_project_listAssignableUsersBySlug",
+    "channel": "github.project.listAssignableUsersBySlug",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["item_slug"],
+    "props": ["item_slug"]
+  },
+  {
+    "name": "github_project_listIssueTypesBySlug",
+    "channel": "github.project.listIssueTypesBySlug",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["item_slug"],
+    "props": ["item_slug"]
+  },
+  {
+    "name": "github_project_listLabelsBySlug",
+    "channel": "github.project.listLabelsBySlug",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["item_slug"],
+    "props": ["item_slug"]
+  },
+  {
+    "name": "github_project_listViews",
+    "channel": "github.project.listViews",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_slug"],
+    "props": ["project_slug"]
+  },
+  {
+    "name": "github_project_updateIssueBySlug",
+    "channel": "github.project.updateIssueBySlug",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["item_slug"],
+    "props": ["add_labels", "body", "item_slug", "remove_labels", "state", "title"]
+  },
+  {
+    "name": "github_project_updateIssueCommentBySlug",
+    "channel": "github.project.updateIssueCommentBySlug",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["body", "comment_id", "item_slug"],
+    "props": ["body", "comment_id", "item_slug"]
+  },
+  {
+    "name": "github_project_updateIssueTypeBySlug",
+    "channel": "github.project.updateIssueTypeBySlug",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["issue_type", "item_slug"],
+    "props": ["issue_type", "item_slug"]
+  },
+  {
+    "name": "github_project_updateItemField",
+    "channel": "github.project.updateItemField",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["field_id", "item_id", "kind", "project_slug", "value"],
+    "props": ["field_id", "item_id", "kind", "project_slug", "value"]
+  },
+  {
+    "name": "github_project_updatePullRequestBySlug",
+    "channel": "github.project.updatePullRequestBySlug",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["item_slug"],
+    "props": ["body", "item_slug", "state", "title"]
+  },
+  {
+    "name": "github_project_viewTable",
+    "channel": "github.project.viewTable",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_slug", "view_id"],
+    "props": ["page_size", "page_token", "project_slug", "view_id"]
+  },
+  {
+    "name": "github_project_workItemDetailsBySlug",
+    "channel": "github.project.workItemDetailsBySlug",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["item_slug"],
+    "props": ["item_slug"]
+  },
+  {
+    "name": "github_rateLimit",
+    "channel": "github.rateLimit",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "github_removePRReviewers",
+    "channel": "github.removePRReviewers",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["number", "repo", "reviewer_logins"],
+    "props": ["number", "repo", "reviewer_logins"]
+  },
+  {
+    "name": "github_repoSlug",
+    "channel": "github.repoSlug",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["candidate"],
+    "props": ["candidate"]
+  },
+  {
+    "name": "github_requestPRReviewers",
+    "channel": "github.requestPRReviewers",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["number", "repo"],
+    "props": ["number", "repo", "reviewer_logins", "team_slugs"]
+  },
+  {
+    "name": "github_setPRAutoMerge",
+    "channel": "github.setPRAutoMerge",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["enabled", "number", "repo"],
+    "props": ["enabled", "merge_method", "number", "repo"]
+  },
+  {
+    "name": "github_updateIssue",
+    "channel": "github.updateIssue",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["number", "repo"],
+    "props": [
+      "add_labels",
+      "assignees",
+      "body",
+      "number",
+      "remove_labels",
+      "repo",
+      "state",
+      "title"
+    ]
+  },
+  {
+    "name": "github_updatePRTitle",
+    "channel": "github.updatePRTitle",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["pr_number", "repo", "title"],
+    "props": ["pr_number", "repo", "title"]
+  },
+  {
+    "name": "gitlab_issues",
+    "channel": "gitlab.issues",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["repo"],
+    "props": ["assignee", "labels", "milestone", "repo", "state"]
+  },
+  {
+    "name": "gitlab_listMRs",
+    "channel": "gitlab.listMRs",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["repo"],
+    "props": ["repo", "source_branch", "state"]
+  },
+  {
+    "name": "gitlab_rateLimit",
+    "channel": "gitlab.rateLimit",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "gitlab_resolveMRDiscussion",
+    "channel": "gitlab.resolveMRDiscussion",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["discussion_id", "merge_request_iid", "repo", "resolved"],
+    "props": ["discussion_id", "merge_request_iid", "repo", "resolved"]
+  },
+  {
+    "name": "gitlab_workItemDetails",
+    "channel": "gitlab.workItemDetails",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["iid", "repo"],
+    "props": ["iid", "item_type", "repo"]
+  },
+  {
+    "name": "hostedReview_create",
+    "channel": "hostedReview.create",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["head_branch", "provider", "repo", "title"],
+    "props": [
+      "base_branch",
+      "body",
+      "draft",
+      "head_branch",
+      "linked_issue_number",
+      "provider",
+      "repo",
+      "request_id",
+      "title"
+    ]
+  },
+  {
+    "name": "hostedReview_forBranch",
+    "channel": "hostedReview.forBranch",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["head_branch", "provider", "repo"],
+    "props": ["head_branch", "provider", "repo"]
+  },
+  {
+    "name": "hostedReview_getCreationEligibility",
+    "channel": "hostedReview.getCreationEligibility",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["head_branch", "provider", "repo"],
+    "props": ["base_branch", "head_branch", "provider", "repo"]
+  },
+  {
+    "name": "hostedReview_submit",
+    "channel": "hostedReview.submit",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["pr_number", "provider", "repo_id", "review_type"],
+    "props": ["pr_number", "provider", "repo_id", "review_type", "summary"]
+  },
+  {
+    "name": "hostedReview_suggestReviewers",
+    "channel": "hostedReview.suggestReviewers",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["provider", "repo"],
+    "props": ["base_ref", "changed_files", "provider", "repo"]
+  },
+  {
+    "name": "jira_addIssueComment",
+    "channel": "jira.addIssueComment",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["body", "issue_id_or_key"],
+    "props": ["body", "issue_id_or_key", "site_id"]
+  },
+  {
+    "name": "jira_createIssue",
+    "channel": "jira.createIssue",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["issue_type", "project_key", "title"],
+    "props": [
+      "assignee_id",
+      "description",
+      "issue_type",
+      "label_ids",
+      "priority_id",
+      "project_key",
+      "site_id",
+      "title"
+    ]
+  },
+  {
+    "name": "jira_getIssue",
+    "channel": "jira.getIssue",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["issue_id_or_key"],
+    "props": ["issue_id_or_key", "site_id"]
+  },
+  {
+    "name": "jira_getProjectStatusOrder",
+    "channel": "jira.getProjectStatusOrder",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id_or_key"],
+    "props": ["project_id_or_key", "site_id"]
+  },
+  {
+    "name": "jira_issueComments",
+    "channel": "jira.issueComments",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["issue_id_or_key"],
+    "props": ["issue_id_or_key", "site_id"]
+  },
+  {
+    "name": "jira_listAssignableUsers",
+    "channel": "jira.listAssignableUsers",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["issue_id_or_key", "project_id_or_key", "site_id"]
+  },
+  {
+    "name": "jira_listCreateFields",
+    "channel": "jira.listCreateFields",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["issue_type_id", "project_id_or_key"],
+    "props": ["issue_type_id", "project_id_or_key", "site_id"]
+  },
+  {
+    "name": "jira_listIssueTypes",
+    "channel": "jira.listIssueTypes",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id_or_key"],
+    "props": ["project_id_or_key", "site_id"]
+  },
+  {
+    "name": "jira_listIssues",
+    "channel": "jira.listIssues",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_key"],
+    "props": ["limit", "project_key", "site_id"]
+  },
+  {
+    "name": "jira_listPriorities",
+    "channel": "jira.listPriorities",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["site_id"]
+  },
+  {
+    "name": "jira_listProjects",
+    "channel": "jira.listProjects",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["site_id"]
+  },
+  {
+    "name": "jira_listTransitions",
+    "channel": "jira.listTransitions",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["issue_id_or_key"],
+    "props": ["issue_id_or_key", "site_id"]
+  },
+  {
+    "name": "jira_searchIssues",
+    "channel": "jira.searchIssues",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["jql"],
+    "props": ["jql", "limit", "site_id"]
+  },
+  {
+    "name": "jira_status",
+    "channel": "jira.status",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "jira_updateIssue",
+    "channel": "jira.updateIssue",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["issue_id_or_key"],
+    "props": [
+      "assignee_id",
+      "description",
+      "issue_id_or_key",
+      "label_ids",
+      "priority_id",
+      "site_id",
+      "title",
+      "transition_id"
+    ]
+  },
+  {
+    "name": "linear_addIssueComment",
+    "channel": "linear.addIssueComment",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["body", "issue_id"],
+    "props": ["body", "issue_id", "workspace_id"]
+  },
+  {
+    "name": "linear_createIssue",
+    "channel": "linear.createIssue",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["team_id", "title"],
+    "props": [
+      "assignee_id",
+      "description",
+      "label_ids",
+      "parent_id",
+      "state_id",
+      "team_id",
+      "title",
+      "workspace_id"
+    ]
+  },
+  {
+    "name": "linear_createProject",
+    "channel": "linear.createProject",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["name", "team_id"],
+    "props": ["description", "name", "team_id", "workspace_id"]
+  },
+  {
+    "name": "linear_getCustomView",
+    "channel": "linear.getCustomView",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["view_id"],
+    "props": ["model", "view_id", "workspace_id"]
+  },
+  {
+    "name": "linear_getIssue",
+    "channel": "linear.getIssue",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["issue_id"],
+    "props": ["issue_id", "workspace_id"]
+  },
+  {
+    "name": "linear_getProject",
+    "channel": "linear.getProject",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id"],
+    "props": ["project_id", "workspace_id"]
+  },
+  {
+    "name": "linear_issueComments",
+    "channel": "linear.issueComments",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["issue_id"],
+    "props": ["issue_id", "workspace_id"]
+  },
+  {
+    "name": "linear_listIssues",
+    "channel": "linear.listIssues",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["team_key"],
+    "props": ["limit", "team_key", "workspace_id"]
+  },
+  {
+    "name": "linear_listTeams",
+    "channel": "linear.listTeams",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["workspace_id"]
+  },
+  {
+    "name": "linear_searchIssues",
+    "channel": "linear.searchIssues",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["query"],
+    "props": ["limit", "query", "workspace_id"]
+  },
+  {
+    "name": "linear_status",
+    "channel": "linear.status",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "linear_teamLabels",
+    "channel": "linear.teamLabels",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["team_id"],
+    "props": ["team_id", "workspace_id"]
+  },
+  {
+    "name": "linear_teamMembers",
+    "channel": "linear.teamMembers",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["team_id"],
+    "props": ["team_id", "workspace_id"]
+  },
+  {
+    "name": "linear_teamStates",
+    "channel": "linear.teamStates",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["team_id"],
+    "props": ["team_id", "workspace_id"]
+  },
+  {
+    "name": "linear_updateIssue",
+    "channel": "linear.updateIssue",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["issue_id"],
+    "props": [
+      "assignee_id",
+      "description",
+      "issue_id",
+      "label_ids",
+      "state_id",
+      "title",
+      "workspace_id"
+    ]
+  },
+  {
+    "name": "orcaProjects_getProjectData",
+    "channel": "orcaProjects.getProjectData",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["orca_project_id", "project_id"],
+    "props": ["orca_project_id", "project_id"]
+  },
+  {
+    "name": "orcaProjects_list",
+    "channel": "orcaProjects.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "projectGroup_create",
+    "channel": "projectGroup.create",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["name"],
+    "props": ["name", "parent_group_id"]
+  },
+  {
+    "name": "projectGroup_list",
+    "channel": "projectGroup.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "projectGroup_moveProject",
+    "channel": "projectGroup.moveProject",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["project_id", "target_parent_group_id"],
+    "props": ["project_id", "target_parent_group_id"]
+  },
+  {
+    "name": "projectGroup_update",
+    "channel": "projectGroup.update",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["group_id", "name"],
+    "props": ["group_id", "name"]
+  },
+  {
+    "name": "project_addMember",
+    "channel": "project.addMember",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["member_user_id", "project_id", "role"],
+    "props": ["member_user_id", "project_id", "role"]
+  },
+  {
+    "name": "project_create",
+    "channel": "project.create",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["name"],
+    "props": ["default_branch", "description", "dev_server_id", "name", "repo_path", "visibility"]
+  },
+  {
+    "name": "project_delete",
+    "channel": "project.delete",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["project_id"],
+    "props": ["project_id"]
+  },
+  {
+    "name": "project_get",
+    "channel": "project.get",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id"],
+    "props": ["project_id"]
+  },
+  {
+    "name": "project_getMembers",
+    "channel": "project.getMembers",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id"],
+    "props": ["project_id"]
+  },
+  {
+    "name": "project_list",
+    "channel": "project.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["page_size", "page_token"]
+  },
+  {
+    "name": "project_removeMember",
+    "channel": "project.removeMember",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["member_user_id", "project_id"],
+    "props": ["member_user_id", "project_id"]
+  },
+  {
+    "name": "project_update",
+    "channel": "project.update",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["id"],
+    "props": ["default_branch", "description", "id", "name", "visibility"]
+  },
+  {
+    "name": "project_updateMemberRole",
+    "channel": "project.updateMemberRole",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["member_user_id", "project_id", "role"],
+    "props": ["member_user_id", "project_id", "role"]
+  },
+  {
+    "name": "repo_addMember",
+    "channel": "repo.addMember",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["member_user_id", "repo_id", "role"],
+    "props": ["member_user_id", "repo_id", "role"]
+  },
+  {
+    "name": "repo_baseRefDefault",
+    "channel": "repo.baseRefDefault",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["repo_id"],
+    "props": ["repo_id"]
+  },
+  {
+    "name": "repo_clone",
+    "channel": "repo.clone",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["dest_path", "dev_server_id", "url"],
+    "props": ["dest_path", "dev_server_id", "url"]
+  },
+  {
+    "name": "repo_getMembers",
+    "channel": "repo.getMembers",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["repo_id"],
+    "props": ["repo_id"]
+  },
+  {
+    "name": "repo_list",
+    "channel": "repo.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id"],
+    "props": ["project_id"]
+  },
+  {
+    "name": "repo_removeMember",
+    "channel": "repo.removeMember",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["member_user_id", "repo_id"],
+    "props": ["member_user_id", "repo_id"]
+  },
+  {
+    "name": "repo_rm",
+    "channel": "repo.rm",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["repo_id"],
+    "props": ["repo_id"]
+  },
+  {
+    "name": "repo_searchRefs",
+    "channel": "repo.searchRefs",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["query", "repo_id"],
+    "props": ["query", "repo_id"]
+  },
+  {
+    "name": "repo_updateMemberRole",
+    "channel": "repo.updateMemberRole",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["member_user_id", "repo_id", "role"],
+    "props": ["member_user_id", "repo_id", "role"]
+  },
+  {
+    "name": "task_addComment",
+    "channel": "task.addComment",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["content", "task_id"],
+    "props": ["content", "task_id"]
+  },
+  {
+    "name": "task_addEdge",
+    "channel": "task.addEdge",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["from_task_id", "to_task_id", "type"],
+    "props": ["from_task_id", "to_task_id", "type"]
+  },
+  {
+    "name": "task_aiApply",
+    "channel": "task.aiApply",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "declared": true,
+    "required": ["task_id"],
+    "props": ["task_id"]
+  },
+  {
+    "name": "task_aiDecompose",
+    "channel": "task.aiDecompose",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["task_id"],
+    "props": ["task_id"]
+  },
+  {
+    "name": "task_create",
+    "channel": "task.create",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["title"],
+    "props": ["parent_id", "project_id", "title"]
+  },
+  {
+    "name": "task_createFromSource",
+    "channel": "task.createFromSource",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["provider", "ref", "title"],
+    "props": ["parent_id", "project_id", "provider", "ref", "title", "url"]
+  },
+  {
+    "name": "task_delete",
+    "channel": "task.delete",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["id"],
+    "props": ["id"]
+  },
+  {
+    "name": "task_execute",
+    "channel": "task.execute",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["task_id"],
+    "props": ["prompt", "request_id", "task_id"]
+  },
+  {
+    "name": "task_get",
+    "channel": "task.get",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["id"],
+    "props": ["id"]
+  },
+  {
+    "name": "task_getDependencies",
+    "channel": "task.getDependencies",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["task_id"],
+    "props": ["task_id"]
+  },
+  {
+    "name": "task_getSource",
+    "channel": "task.getSource",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["task_id"],
+    "props": ["task_id"]
+  },
+  {
+    "name": "task_getSubtree",
+    "channel": "task.getSubtree",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["root_id"],
+    "props": ["root_id"]
+  },
+  {
+    "name": "task_hasActiveExecutions",
+    "channel": "task.hasActiveExecutions",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id"],
+    "props": ["project_id"]
+  },
+  {
+    "name": "task_list",
+    "channel": "task.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["page_size", "page_token", "project_id"]
+  },
+  {
+    "name": "task_listComments",
+    "channel": "task.listComments",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["task_id"],
+    "props": ["page_size", "page_token", "task_id"]
+  },
+  {
+    "name": "task_recalculateProgress",
+    "channel": "task.recalculateProgress",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["root_id"],
+    "props": ["root_id"]
+  },
+  {
+    "name": "task_update",
+    "channel": "task.update",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["id"],
+    "props": ["id", "labels", "status", "title", "workflow_template_id"]
+  },
+  {
+    "name": "team_addMember",
+    "channel": "team.addMember",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["member_user_id", "team_id"],
+    "props": ["member_user_id", "role", "team_id"]
+  },
+  {
+    "name": "team_create",
+    "channel": "team.create",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["name"],
+    "props": ["name"]
+  },
+  {
+    "name": "team_list",
+    "channel": "team.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "team_listMembers",
+    "channel": "team.listMembers",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["team_id"],
+    "props": ["team_id"]
+  },
+  {
+    "name": "team_removeMember",
+    "channel": "team.removeMember",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["member_user_id", "team_id"],
+    "props": ["member_user_id", "team_id"]
+  },
+  {
+    "name": "terminal_list",
+    "channel": "terminal.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["connection_id"]
+  },
+  {
+    "name": "terminal_read",
+    "channel": "",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["terminal_id"],
+    "props": ["max_bytes", "since_seq", "terminal_id", "wait_ms"]
+  },
+  {
+    "name": "terminal_send",
+    "channel": "",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["terminal_id"],
+    "props": ["input", "submit", "terminal_id", "until_idle_ms", "wait_ms"]
+  },
+  {
+    "name": "terminal_start",
+    "channel": "",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "props": ["cols", "connection_id", "cwd", "rows", "shell", "worktree_id"]
+  },
+  {
+    "name": "terminal_stop",
+    "channel": "",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["terminal_id"],
+    "props": ["force", "terminal_id"]
+  },
+  {
+    "name": "terminal_wait",
+    "channel": "",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["terminal_id"],
+    "props": ["terminal_id", "timeout_ms"]
+  },
+  {
+    "name": "workflow_getExecution",
+    "channel": "workflow.getExecution",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["execution_id"],
+    "props": ["execution_id"]
+  },
+  {
+    "name": "workflow_hasActiveExecutions",
+    "channel": "workflow.hasActiveExecutions",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id"],
+    "props": ["project_id"]
+  },
+  {
+    "name": "workflow_listExecutions",
+    "channel": "workflow.listExecutions",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id"],
+    "props": ["cursor", "limit", "project_id"]
+  },
+  {
+    "name": "workflow_run",
+    "channel": "",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["template_id"],
+    "props": ["project_id", "request_id", "template_id"]
+  },
+  {
+    "name": "workflow_run_status",
+    "channel": "",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["execution_id"],
+    "props": ["execution_id"]
+  },
+  {
+    "name": "workflow_template_clone",
+    "channel": "workflow.template.clone",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["name", "source_template_id"],
+    "props": ["description", "name", "source_template_id", "tags"]
+  },
+  {
+    "name": "workflow_template_create",
+    "channel": "workflow.template.create",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["dag_json", "name"],
+    "props": ["dag_json", "name", "parent_template_id", "scope"]
+  },
+  {
+    "name": "workflow_template_list",
+    "channel": "workflow.template.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "props": ["page_size", "page_token", "scope"]
+  },
+  {
+    "name": "workflow_template_resolve",
+    "channel": "workflow.template.resolve",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["template_id"],
+    "props": ["template_id"]
+  },
+  {
+    "name": "workflow_template_update",
+    "channel": "workflow.template.update",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["expected_version", "id"],
+    "props": ["dag_json", "expected_version", "id", "name", "parent_template_id", "scope"]
+  },
+  {
+    "name": "workspacePorts_kill",
+    "channel": "workspacePorts.kill",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["pid", "port"],
+    "props": ["connection_id", "pid", "port", "repo_id", "worktree_id"]
+  },
+  {
+    "name": "workspacePorts_scan",
+    "channel": "workspacePorts.scan",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "props": ["connection_id", "repo_id", "worktree_id"]
+  },
+  {
+    "name": "worktree_checkDeleteSafety",
+    "channel": "worktree.checkDeleteSafety",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_id"],
+    "props": ["worktree_id"]
+  },
+  {
+    "name": "worktree_compare",
+    "channel": "worktree.compare",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["worktree_ids"],
+    "props": ["worktree_ids"]
+  },
+  {
+    "name": "worktree_create",
+    "channel": "worktree.create",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["name", "repo_id"],
+    "props": ["base_branch", "branch_name", "display_name", "name", "repo_id"]
+  },
+  {
+    "name": "worktree_createFromIssue",
+    "channel": "worktree.createFromIssue",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["project_id", "provider", "repo_id"],
+    "props": ["base_ref", "issue_ref", "number", "project_id", "provider", "repo", "repo_id"]
+  },
+  {
+    "name": "worktree_detectedList",
+    "channel": "worktree.detectedList",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id", "repo_id"],
+    "props": ["project_id", "repo_id"]
+  },
+  {
+    "name": "worktree_fanOut",
+    "channel": "worktree.fanOut",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["branch_prefix", "n", "project_id", "repo_id"],
+    "props": ["agent_type", "base_ref", "branch_prefix", "n", "project_id", "prompt", "repo_id"]
+  },
+  {
+    "name": "worktree_forceDeleteBranch",
+    "channel": "worktree.forceDeleteBranch",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["branch_name", "expected_head", "worktree_id"],
+    "props": ["branch_name", "expected_head", "worktree_id"]
+  },
+  {
+    "name": "worktree_lineageList",
+    "channel": "worktree.lineageList",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read"
+  },
+  {
+    "name": "worktree_list",
+    "channel": "worktree.list",
+    "pack": 1,
+    "risk": "read",
+    "scope": "orca:read",
+    "required": ["project_id"],
+    "props": ["project_id"]
+  },
+  {
+    "name": "worktree_merge",
+    "channel": "worktree.merge",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["base_branch", "worktree_id"],
+    "props": ["base_branch", "cleanup_worktree_ids", "commit_message", "strategy", "worktree_id"]
+  },
+  {
+    "name": "worktree_prefetchCreateBase",
+    "channel": "worktree.prefetchCreateBase",
+    "pack": 3,
+    "risk": "exec",
+    "scope": "orca:exec",
+    "required": ["repo_id"],
+    "props": ["base_ref", "repo_id"]
+  },
+  {
+    "name": "worktree_rm",
+    "channel": "worktree.rm",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["worktree_id"],
+    "props": ["allow_open_pr", "force", "stop_agents", "worktree_id"]
+  },
+  {
+    "name": "worktree_set",
+    "channel": "worktree.set",
+    "pack": 2,
+    "risk": "write_reversible",
+    "scope": "orca:write",
+    "required": ["worktree_id"],
+    "props": ["active", "no_parent", "parent_worktree_id", "worktree_id"]
+  }
+]

@@ -190,3 +190,28 @@ func TestDecodePayload(t *testing.T) {
 		}
 	})
 }
+
+func TestTranslateEvent_McpApproval(t *testing.T) {
+	payload := EventPayload{UserID: "owner-1", Title: "Approval needed", Body: "Claude Desktop wants to use Send terminal input (exec)",
+		DeepLink: "/?section=mcp&tab=approvals&approval=a-1"}
+	got, err := TranslateEvent("ne-1", "evt-1", "orca.mcp.approval.requested", "tenant-1", payload, time.Now())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Type != "mcp.approval" || got.Severity != SeverityWarning || got.DeepLink != "/?section=mcp&tab=approvals&approval=a-1" {
+		t.Fatalf("%+v", got)
+	}
+	if len(got.Channels) != 2 || got.Channels[0] != ChannelDeliveryWS || got.Channels[1] != ChannelDeliveryPush {
+		t.Fatalf("channels: %v", got.Channels)
+	}
+	if len(got.RecipientUserIDs) != 1 || got.RecipientUserIDs[0] != "owner-1" {
+		t.Fatalf("only the approval owner is notified: %v", got.RecipientUserIDs)
+	}
+	if got.Body != payload.Body {
+		t.Fatal("producer body is passed through unchanged")
+	}
+	// No owner in the payload: nobody is notified (never broadcast an approval).
+	if _, err := TranslateEvent("ne-2", "evt-2", "orca.mcp.approval.requested", "tenant-1", EventPayload{Title: "x"}, time.Now()); err == nil {
+		t.Fatal("an approval event without a recipient must not translate")
+	}
+}
