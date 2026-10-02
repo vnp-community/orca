@@ -37,6 +37,7 @@
 | [CR-TG-005](./CR-TG-005-task-agent-execution-permission-and-complex-executor.md) | `ExecuteTask` không precheck permission, không revert status khi fail; `ComplexExecutor` là stub cứng; context/env injection sai | Permission precheck, real `ComplexExecutor`, callback, context preamble, env injection đúng (theo SOL-TG-04) | Backend-go + Agent | P0 | 🔵 Proposed |
 | [CR-TG-006](./CR-TG-006-task-execute-streaming-relay.md) | 4 RPC agent gọi (`agent.execPrompt`/`exec`/`shell.exec`/`ai.complete`) đều buffer-toàn-bộ-rồi-trả-1-lần; Task Execute (Engine 2) dispatch không có kênh nhận output/exit | Streaming RPC mới ở `infra-fleet-service` (theo mẫu `AttachPty`) + `chunk` notification ở `agent/` | Backend-go + Agent | P1 | 🔵 Proposed |
 | [CR-TG-007](./CR-TG-007-frontend-task-crud-board-grant-ui.md) | Không có "New Task" UI, `TaskDAGView` luôn rỗng, không có Board view, không có Grant/Share UI, "Run with Agent" prompt bị bỏ qua | Task CRUD dialog, sửa DAG view dùng data thật, **Board/Kanban view mới**, **Grant/Share modal mới**, sửa Run-Agent UX, `useTaskActivity` | Frontend | P0 | 🔵 Proposed |
+| [CR-TG-008](./CR-TG-008-jira-source-link-and-durable-direct-agent.md) | "Start work" từ Jira không nối với OrcaTask/worktree của `task.execute`; Engine 1 chạy trong goroutine nên restart làm task kẹt `in_progress` | `task_sources` + `CreateTaskFromSource`, `linked_issue_*` trên `CreateWorktreeRequest`, dùng lại worktree theo issue; lease + heartbeat + recovery cho direct_agent | Backend-go + Frontend | P1 | 🟡 Đã code + test, chưa e2e |
 
 ## Thứ tự thực thi
 
