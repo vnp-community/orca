@@ -51,7 +51,7 @@ func NewTechStackDetector(git gitgatewayv1.GitGatewayServiceClient, resolver use
 
 func (d *TechStackDetector) Detect(ctx context.Context, tenantID, projectID string) (domain.TechStack, error) {
 	var stack domain.TechStack
-	_, _, worktreeID, connected, err := d.resolver.ResolveConnection(ctx, tenantID, projectID)
+	_, _, worktreeID, _, connected, err := d.resolver.ResolveConnection(ctx, tenantID, projectID)
 	if err != nil || !connected || worktreeID == "" {
 		return stack, nil // best-effort: no worktree to probe is not an error
 	}

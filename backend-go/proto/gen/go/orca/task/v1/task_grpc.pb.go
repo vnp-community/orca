@@ -21,6 +21,8 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	TaskService_CreateTask_FullMethodName                = "/orca.task.v1.TaskService/CreateTask"
+	TaskService_CreateTaskFromSource_FullMethodName      = "/orca.task.v1.TaskService/CreateTaskFromSource"
+	TaskService_GetTaskSource_FullMethodName             = "/orca.task.v1.TaskService/GetTaskSource"
 	TaskService_GetTask_FullMethodName                   = "/orca.task.v1.TaskService/GetTask"
 	TaskService_AddEdge_FullMethodName                   = "/orca.task.v1.TaskService/AddEdge"
 	TaskService_Grant_FullMethodName                     = "/orca.task.v1.TaskService/Grant"
@@ -58,6 +60,12 @@ const (
 // See specs/backend-go/services/task-service.md.
 type TaskServiceClient interface {
 	CreateTask(ctx context.Context, in *CreateTaskRequest, opts ...grpc.CallOption) (*CreateTaskResponse, error)
+	// CreateTaskFromSource starts a task from an external issue (Jira/Linear/
+	// GitHub/GitLab) idempotently — a repeat call for the same issue in the same
+	// project returns the existing task with created=false.
+	CreateTaskFromSource(ctx context.Context, in *CreateTaskFromSourceRequest, opts ...grpc.CallOption) (*CreateTaskFromSourceResponse, error)
+	// GetTaskSource returns the external issue a task was started from, if any.
+	GetTaskSource(ctx context.Context, in *GetTaskSourceRequest, opts ...grpc.CallOption) (*GetTaskSourceResponse, error)
 	GetTask(ctx context.Context, in *GetTaskRequest, opts ...grpc.CallOption) (*GetTaskResponse, error)
 	AddEdge(ctx context.Context, in *AddEdgeRequest, opts ...grpc.CallOption) (*AddEdgeResponse, error)
 	Grant(ctx context.Context, in *GrantRequest, opts ...grpc.CallOption) (*GrantResponse, error)
@@ -141,6 +149,26 @@ func (c *taskServiceClient) CreateTask(ctx context.Context, in *CreateTaskReques
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(CreateTaskResponse)
 	err := c.cc.Invoke(ctx, TaskService_CreateTask_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) CreateTaskFromSource(ctx context.Context, in *CreateTaskFromSourceRequest, opts ...grpc.CallOption) (*CreateTaskFromSourceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CreateTaskFromSourceResponse)
+	err := c.cc.Invoke(ctx, TaskService_CreateTaskFromSource_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *taskServiceClient) GetTaskSource(ctx context.Context, in *GetTaskSourceRequest, opts ...grpc.CallOption) (*GetTaskSourceResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetTaskSourceResponse)
+	err := c.cc.Invoke(ctx, TaskService_GetTaskSource_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -416,6 +444,12 @@ func (c *taskServiceClient) ReportTaskExecutionResult(ctx context.Context, in *R
 // See specs/backend-go/services/task-service.md.
 type TaskServiceServer interface {
 	CreateTask(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error)
+	// CreateTaskFromSource starts a task from an external issue (Jira/Linear/
+	// GitHub/GitLab) idempotently — a repeat call for the same issue in the same
+	// project returns the existing task with created=false.
+	CreateTaskFromSource(context.Context, *CreateTaskFromSourceRequest) (*CreateTaskFromSourceResponse, error)
+	// GetTaskSource returns the external issue a task was started from, if any.
+	GetTaskSource(context.Context, *GetTaskSourceRequest) (*GetTaskSourceResponse, error)
 	GetTask(context.Context, *GetTaskRequest) (*GetTaskResponse, error)
 	AddEdge(context.Context, *AddEdgeRequest) (*AddEdgeResponse, error)
 	Grant(context.Context, *GrantRequest) (*GrantResponse, error)
@@ -497,6 +531,12 @@ type UnimplementedTaskServiceServer struct{}
 
 func (UnimplementedTaskServiceServer) CreateTask(context.Context, *CreateTaskRequest) (*CreateTaskResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateTask not implemented")
+}
+func (UnimplementedTaskServiceServer) CreateTaskFromSource(context.Context, *CreateTaskFromSourceRequest) (*CreateTaskFromSourceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateTaskFromSource not implemented")
+}
+func (UnimplementedTaskServiceServer) GetTaskSource(context.Context, *GetTaskSourceRequest) (*GetTaskSourceResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetTaskSource not implemented")
 }
 func (UnimplementedTaskServiceServer) GetTask(context.Context, *GetTaskRequest) (*GetTaskResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetTask not implemented")
@@ -611,6 +651,42 @@ func _TaskService_CreateTask_Handler(srv interface{}, ctx context.Context, dec f
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(TaskServiceServer).CreateTask(ctx, req.(*CreateTaskRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_CreateTaskFromSource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateTaskFromSourceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).CreateTaskFromSource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_CreateTaskFromSource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).CreateTaskFromSource(ctx, req.(*CreateTaskFromSourceRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _TaskService_GetTaskSource_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetTaskSourceRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(TaskServiceServer).GetTaskSource(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: TaskService_GetTaskSource_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(TaskServiceServer).GetTaskSource(ctx, req.(*GetTaskSourceRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -1093,6 +1169,14 @@ var TaskService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "CreateTask",
 			Handler:    _TaskService_CreateTask_Handler,
+		},
+		{
+			MethodName: "CreateTaskFromSource",
+			Handler:    _TaskService_CreateTaskFromSource_Handler,
+		},
+		{
+			MethodName: "GetTaskSource",
+			Handler:    _TaskService_GetTaskSource_Handler,
 		},
 		{
 			MethodName: "GetTask",

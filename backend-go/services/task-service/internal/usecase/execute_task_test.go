@@ -44,12 +44,19 @@ func newExecutableExecuteTaskWithWorkflow(tasks *fakeTaskRepository, edges *fake
 	clock = newFakeClock(time.Unix(1000, 0), time.Hour)
 	links = &fakeExecutionLinkRepository{}
 	uc = NewExecuteTask(tasks, edges, simple, complex, workflow, resolvePermissionUC, worktrees, resolver, clock, links)
+	// Direct_agent's dispatch now runs via uc.runAsync (see
+	// dispatchDirectAgentAsync's doc comment) — production wiring spawns a
+	// goroutine, but tests substitute a synchronous version so assertions
+	// right after Execute returns can observe the dispatch's completed
+	// side effects deterministically, matching this usecase's OLD
+	// synchronous-for-direct_agent behavior from the test's point of view.
+	uc.runAsync = func(fn func()) { fn() }
 	return uc, worktrees, resolver, clock, links
 }
 
 func TestExecuteTask_RequiresTenantContext(t *testing.T) {
 	tasks := newFakeTaskRepository()
-	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, &fakeExecutor{}, &fakeExecutor{}, &fakeGrantRepository{})
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, &fakeSimpleExecutor{}, &fakeExecutor{}, &fakeGrantRepository{})
 	_, err := uc.Execute(context.Background(), ExecuteTaskInput{TaskID: "t1"})
 	if err == nil {
 		t.Fatal("expected an error when no tenant is in context")
@@ -57,7 +64,7 @@ func TestExecuteTask_RequiresTenantContext(t *testing.T) {
 }
 
 func TestExecuteTask_RequiresTaskID(t *testing.T) {
-	uc, _, _, _, _ := newExecutableExecuteTask(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeExecutor{}, &fakeExecutor{}, &fakeGrantRepository{})
+	uc, _, _, _, _ := newExecutableExecuteTask(newFakeTaskRepository(), &fakeEdgeRepository{}, &fakeSimpleExecutor{}, &fakeExecutor{}, &fakeGrantRepository{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{RequestID: "req-1"}); err == nil {
@@ -79,7 +86,7 @@ func TestExecuteTask_PermissionDenied_NeverWritesStatus(t *testing.T) {
 	tasks.tasks["task-1"] = task
 	grants := &fakeGrantRepository{} // no grants recorded anywhere — every action is denied
 	edges := &fakeEdgeRepository{}
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
 	uc, worktrees, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
@@ -111,7 +118,7 @@ func TestExecuteTask_SimplePath_NoSubtasksNoDependencies(t *testing.T) {
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
 	edges := &fakeEdgeRepository{}
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
 	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
@@ -120,11 +127,16 @@ func TestExecuteTask_SimplePath_NoSubtasksNoDependencies(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.ExecutionRef != "infra-fleet-ref-1" {
-		t.Errorf("expected the simple executor's ref, got %q", result.ExecutionRef)
+	// direct_agent now dispatches via dispatchDirectAgentAsync — the
+	// immediate response never carries the executor's ref (only known once
+	// the backgrounded dispatch finishes) and always reports Async: true,
+	// same shape as the orchestration/workflow engines now (see
+	// dispatchDirectAgentAsync's doc comment for why).
+	if result.ExecutionRef != "" {
+		t.Errorf("expected an empty ExecutionRef on the immediate async response, got %q", result.ExecutionRef)
 	}
-	if result.Async {
-		t.Error("expected the simple path to report Async: false")
+	if !result.Async {
+		t.Error("expected the direct_agent path to report Async: true")
 	}
 	if !simple.called {
 		t.Error("expected SimpleExecutor to be called")
@@ -151,7 +163,7 @@ func TestExecuteTask_ComplexPath_HasSubtasks(t *testing.T) {
 	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
 		{FromTaskID: "task-1", ToTaskID: "subtask-1", Kind: domain.EdgeKindParentChild},
 	}}
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
 	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
@@ -189,7 +201,7 @@ func TestExecuteTask_ComplexPath_HasDependencies(t *testing.T) {
 	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
 		{FromTaskID: "task-1", ToTaskID: "blocking-task", Kind: domain.EdgeKindDependsOn},
 	}}
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
 	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
@@ -215,7 +227,7 @@ func TestExecuteTask_IgnoresEdgesToTheTaskWhenDecidingComplexity(t *testing.T) {
 	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
 		{FromTaskID: "other-task", ToTaskID: "task-1", Kind: domain.EdgeKindDependsOn},
 	}}
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
 	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
@@ -228,13 +240,20 @@ func TestExecuteTask_IgnoresEdgesToTheTaskWhenDecidingComplexity(t *testing.T) {
 	}
 }
 
+// TestExecuteTask_ExecutorFailurePropagates covers the orchestration engine
+// (still dispatched synchronously — see dispatchDirectAgentAsync's doc
+// comment for why direct_agent no longer surfaces its own executor failure
+// this way; TestExecuteTask_DirectAgentFailure_RevertsStatusWithoutError
+// covers that path's equivalent).
 func TestExecuteTask_ExecutorFailurePropagates(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
-	edges := &fakeEdgeRepository{}
-	simple := &fakeExecutor{err: errors.New("infra-fleet-service unavailable")}
-	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, &fakeExecutor{}, grants)
+	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
+		{FromTaskID: "task-1", ToTaskID: "subtask-1", Kind: domain.EdgeKindParentChild},
+	}}
+	complex := &fakeExecutor{err: errors.New("orchestration-service unavailable")}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, &fakeSimpleExecutor{}, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
@@ -242,18 +261,60 @@ func TestExecuteTask_ExecutorFailurePropagates(t *testing.T) {
 	}
 }
 
-// TestExecuteTask_DispatchFailure_RevertsStatusToPrevious is TASK-TG-04-01's
-// core regression: a dispatch failure used to leave the task marked
-// in_progress PERMANENTLY (no RPC ever cleared it). Execute must now write
-// InProgress, then on failure revert back to the task's pre-dispatch
-// status, in that order.
-func TestExecuteTask_DispatchFailure_RevertsStatusToPrevious(t *testing.T) {
+// TestExecuteTask_DirectAgentFailure_RevertsStatusWithoutError is
+// dispatchDirectAgentAsync's core regression: unlike the orchestration/
+// workflow engines, a direct_agent executor failure must NOT propagate as
+// Execute's own error (the caller already got Async: true — the failure is
+// only discovered once the backgrounded dispatch runs), but the task's
+// status must still revert to its pre-dispatch value, same outcome as
+// before this redesign, just delivered asynchronously instead of inline.
+func TestExecuteTask_DirectAgentFailure_RevertsStatusWithoutError(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1") // starts StatusOpen
 	edges := &fakeEdgeRepository{}
-	simple := &fakeExecutor{err: errors.New("infra-fleet-service unavailable")}
-	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, simple, &fakeExecutor{}, grants)
+	simple := &fakeSimpleExecutor{err: errors.New("infra-fleet-service unavailable")}
+	uc, _, _, _, links := newExecutableExecuteTask(tasks, edges, simple, &fakeExecutor{}, grants)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	result, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v (direct_agent dispatch failures no longer propagate synchronously)", err)
+	}
+	if !result.Async {
+		t.Error("expected Async: true even though the backgrounded dispatch will fail")
+	}
+	if len(tasks.updateStatusCalls) != 2 {
+		t.Fatalf("expected exactly two UpdateStatus calls (in_progress then revert), got %d: %+v", len(tasks.updateStatusCalls), tasks.updateStatusCalls)
+	}
+	if tasks.updateStatusCalls[1].status != domain.StatusOpen {
+		t.Errorf("expected the second UpdateStatus call to revert to the pre-dispatch status (open), got %+v", tasks.updateStatusCalls[1])
+	}
+	if len(tasks.completeExecutionCalls) != 0 {
+		t.Errorf("expected no CompleteExecution call on a failed dispatch, got %+v", tasks.completeExecutionCalls)
+	}
+	if len(links.created) != 1 || links.created[0].StatusMirror != "failed" {
+		t.Errorf("expected the execution link to be marked failed, got %+v", links.created)
+	}
+}
+
+// TestExecuteTask_DispatchFailure_RevertsStatusToPrevious is TASK-TG-04-01's
+// core regression: a dispatch failure used to leave the task marked
+// in_progress PERMANENTLY (no RPC ever cleared it). Execute must now write
+// InProgress, then on failure revert back to the task's pre-dispatch
+// status, in that order. Uses the orchestration engine — still dispatched
+// (and its failure still propagated) synchronously; see
+// TestExecuteTask_DirectAgentFailure_RevertsStatusWithoutError for the
+// direct_agent engine's equivalent, now async.
+func TestExecuteTask_DispatchFailure_RevertsStatusToPrevious(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1") // starts StatusOpen
+	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
+		{FromTaskID: "task-1", ToTaskID: "subtask-1", Kind: domain.EdgeKindParentChild},
+	}}
+	complex := &fakeExecutor{err: errors.New("orchestration-service unavailable")}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, &fakeSimpleExecutor{}, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err == nil {
@@ -278,11 +339,153 @@ func TestExecuteTask_DispatchFailure_RevertsStatusToPrevious(t *testing.T) {
 	}
 }
 
+// blockingExecutor implements SimpleExecutor: Execute blocks on unblock
+// until closed, then returns ref/err — lets
+// TestExecuteTask_DirectAgentDispatch_ReturnsBeforeExecutorFinishes prove
+// Execute() itself doesn't wait for it, using the REAL (production)
+// goroutine-spawning runAsync rather than the test helper's synchronous one.
+type blockingExecutor struct {
+	unblock chan struct{}
+	ref     string
+	called  chan struct{}
+}
+
+func (f *blockingExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string) (string, error) {
+	close(f.called)
+	<-f.unblock
+	return f.ref, nil
+}
+
+// TestExecuteTask_DirectAgentDispatch_ReturnsBeforeExecutorFinishes is the
+// core regression for this redesign (explicit user ask after a live
+// timeout: "thiết kế lại đi. phải theo async" — redesign it, it must be
+// async): Execute must return to the caller BEFORE SimpleExecutor.Execute
+// finishes, using the real production runAsync (a genuine goroutine), not
+// the test helper's synchronous override. Without dispatchDirectAgentAsync,
+// this test would hang until blockingExecutor.unblock is closed.
+func TestExecuteTask_DirectAgentDispatch_ReturnsBeforeExecutorFinishes(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	simple := &blockingExecutor{unblock: make(chan struct{}), ref: "infra-fleet-ref-1", called: make(chan struct{})}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
+	uc.runAsync = func(fn func()) { go fn() } // undo the test helper's synchronous override — this test needs the real one
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	result, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !result.Async {
+		t.Error("expected Async: true")
+	}
+	select {
+	case <-simple.called:
+	case <-time.After(2 * time.Second):
+		t.Fatal("expected the backgrounded dispatch to have started SimpleExecutor.Execute by now")
+	}
+	// Read the task's status through the fake's own mutex-guarded Get
+	// (not the raw completeExecutionCalls/tasks fields directly, which the
+	// background goroutine also mutates — a direct field read here would be
+	// a genuine data race, unlike this codebase's other ExecuteTask tests,
+	// which all use the synchronous test runAsync and never have two
+	// goroutines touching the fake at once).
+	stillRunning, err := tasks.Get(ctx, "tenant-1", "task-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if stillRunning.Status != domain.StatusInProgress {
+		t.Errorf("expected status still in_progress while SimpleExecutor.Execute is blocked, got %q", stillRunning.Status)
+	}
+
+	close(simple.unblock)
+	// Poll (through the same mutex-guarded Get) for the async completion to
+	// land — the one place a real goroutine's completion is observed from
+	// this test, so a bounded poll (not a fixed sleep) is the right tool.
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		got, err := tasks.Get(ctx, "tenant-1", "task-1")
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.Status == domain.StatusReview {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("expected status to become review once the backgrounded dispatch finished")
+}
+
+// TestExecuteTask_DirectAgentDispatch_PassesRealWorktreePathOnReuse is
+// BUG-028's end-to-end regression: ExecuteTask.Execute must thread
+// WorktreeProvisioner.EnsureWorktree's own resolved path all the way to
+// SimpleExecutor.Execute, never leave the resolver's own (structurally
+// wrong, repo-root-level) path to win. The fake worktree provisioner and
+// fake resolver are deliberately configured with DIFFERENT paths here, so
+// this test only passes if the real, worktree-specific one actually flows
+// through.
+func TestExecuteTask_DirectAgentDispatch_PassesRealWorktreePathOnReuse(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
+	uc, worktrees, resolver, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
+	worktrees.path = "/opt/repos/proj-1-task-task-1"             // the real, isolated worktree path
+	resolver.worktreePath = "/opt/repos/proj-1-shared-repo-root" // the resolver's structurally-wrong repo-root guess (BUG-028)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if simple.gotWorktreePath != "/opt/repos/proj-1-task-task-1" {
+		t.Errorf("expected SimpleExecutor to receive the real worktree path, got %q", simple.gotWorktreePath)
+	}
+}
+
+// TestExecuteTask_AlreadyInProgress_RejectsReDispatch is the regression
+// guard for the concurrent-re-dispatch bug this async redesign exposed
+// live: once dispatchDirectAgentAsync made Execute return in milliseconds,
+// nothing stopped a second Execute call for the SAME task while the first
+// was still running in the background — each concurrent dispatch captured
+// its own (already in_progress) previousStatus snapshot, so a failure
+// "reverted" to in_progress (a no-op), leaving the task stuck forever.
+// Execute must now reject outright, before any pre-check work or status
+// write, when the task is already in_progress.
+func TestExecuteTask_AlreadyInProgress_RejectsReDispatch(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	task := tasks.tasks["task-1"]
+	task.Status = domain.StatusInProgress
+	tasks.tasks["task-1"] = task
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
+	uc, worktrees, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	_, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-2"})
+	if err == nil {
+		t.Fatal("expected an error when the task is already in_progress")
+	}
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Kind != apperrors.KindFailedPrecondition {
+		t.Fatalf("expected KindFailedPrecondition, got %v", err)
+	}
+	if len(tasks.updateStatusCalls) != 0 {
+		t.Errorf("expected NO UpdateStatus call for a rejected re-dispatch, got %+v", tasks.updateStatusCalls)
+	}
+	if worktrees.called {
+		t.Error("expected WorktreeProvisioner NOT to be called for a rejected re-dispatch")
+	}
+	if simple.called {
+		t.Error("expected SimpleExecutor NOT to be called for a rejected re-dispatch")
+	}
+}
+
 func TestExecuteTask_MarksTaskInProgressBeforeDispatching(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -309,7 +512,7 @@ func TestExecuteTask_StatusUpdateFailurePropagatesAndSkipsDispatch(t *testing.T)
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
 	tasks.updateStatusErr = errors.New("db unavailable")
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
 	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
@@ -329,7 +532,7 @@ func TestExecuteTask_NoConnection_FailsBeforeAnyStatusWrite(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	uc, worktrees, resolver, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
 	resolver.connected = false
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
@@ -360,7 +563,7 @@ func TestExecuteTask_WorktreeProvisionFailure_PropagatesBeforeStatusWrite(t *tes
 	tasks := newFakeTaskRepository()
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	uc, worktrees, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
 	worktrees.err = errors.New("git-gateway-service unavailable")
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
@@ -387,7 +590,7 @@ func TestExecuteTask_ReusesWorktree_DoesNotRewriteUnchangedWorktreeID(t *testing
 	task.WorktreeID = "wt-existing"
 	tasks.tasks["task-1"] = task
 
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	uc, worktrees, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
 	worktrees.worktreeID = "wt-existing" // EnsureWorktree's real reuse branch echoes the task's existing id back
 	worktrees.path = ""
@@ -414,7 +617,7 @@ func TestExecuteTask_CreatesWorktree_PersistsNewWorktreeID(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1") // no WorktreeID yet
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	uc, worktrees, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
 	worktrees.worktreeID = "wt-new"
 	worktrees.path = "/srv/worktrees/wt-new"
@@ -432,14 +635,17 @@ func TestExecuteTask_CreatesWorktree_PersistsNewWorktreeID(t *testing.T) {
 }
 
 // TestExecuteTask_SimplePath_CompletesInlineWithActualHours is
-// TASK-TG-04-03's core regression: SimpleExecutor.Execute already blocks
-// until completion, so Execute must persist StatusReview + a non-zero
-// actual_hours in the SAME call — no second RPC needed.
+// TASK-TG-04-03's core regression, updated for the async redesign
+// (dispatchDirectAgentAsync): SimpleExecutor.Execute's completion write
+// (StatusReview + actual_hours) now happens in the backgrounded dispatch,
+// not inline on Execute's own call — the test's synchronous uc.runAsync
+// (newExecutableExecuteTask) makes that dispatch finish before Execute
+// returns here too, so the same assertions still hold deterministically.
 func TestExecuteTask_SimplePath_CompletesInlineWithActualHours(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
@@ -447,8 +653,8 @@ func TestExecuteTask_SimplePath_CompletesInlineWithActualHours(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if result.Async {
-		t.Error("expected the simple path to report Async: false")
+	if !result.Async {
+		t.Error("expected the direct_agent path to report Async: true")
 	}
 	if len(tasks.completeExecutionCalls) != 1 {
 		t.Fatalf("expected exactly one CompleteExecution call, got %d: %+v", len(tasks.completeExecutionCalls), tasks.completeExecutionCalls)
@@ -474,7 +680,7 @@ func TestExecuteTask_ComplexPath_ReturnsAsyncAndLeavesStatusInProgress(t *testin
 		{FromTaskID: "task-1", ToTaskID: "subtask-1", Kind: domain.EdgeKindParentChild},
 	}}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
-	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, &fakeExecutor{}, complex, grants)
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, &fakeSimpleExecutor{}, complex, grants)
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
 
 	result, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "req-1"})
@@ -506,7 +712,7 @@ func TestExecuteTask_WorkflowTemplateID_TakesPriorityOverSubtasks(t *testing.T) 
 	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
 		{FromTaskID: "task-1", ToTaskID: "subtask-1", Kind: domain.EdgeKindParentChild},
 	}}
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
 	workflow := &fakeWorkflowExecutor{ref: "workflow-ref-1"}
 	uc, _, _, _, links := newExecutableExecuteTaskWithWorkflow(tasks, edges, simple, complex, workflow, grants)
@@ -535,7 +741,7 @@ func TestExecuteTask_WorkflowPath_DispatchesToWorkflowExecutor(t *testing.T) {
 	task := tasks.tasks["task-1"]
 	task.WorkflowTemplateID = "wf-tmpl-1"
 	tasks.tasks["task-1"] = task
-	simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+	simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 	complex := &fakeExecutor{ref: "orchestration-ref-1"}
 	workflow := &fakeWorkflowExecutor{ref: "workflow-exec-1"}
 	uc, _, _, _, _ := newExecutableExecuteTaskWithWorkflow(tasks, &fakeEdgeRepository{}, simple, complex, workflow, grants)
@@ -588,7 +794,7 @@ func TestExecuteTask_EveryEngineBranch_EnqueuesExactlyOneExecutionLink(t *testin
 				task.WorkflowTemplateID = tc.workflowTmplID
 				tasks.tasks["task-1"] = task
 			}
-			simple := &fakeExecutor{ref: "infra-fleet-ref-1"}
+			simple := &fakeSimpleExecutor{ref: "infra-fleet-ref-1"}
 			complex := &fakeExecutor{ref: "orchestration-ref-1"}
 			uc, _, _, _, links := newExecutableExecuteTask(tasks, &fakeEdgeRepository{edges: tc.edges}, simple, complex, grants)
 			ctx := withIdentity(context.Background(), "tenant-1", "user-1")

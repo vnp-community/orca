@@ -7,10 +7,13 @@ import (
 	"testing"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
+	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/tenant"
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
+	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 )
 
@@ -57,11 +60,32 @@ func ctxWithTenant(t *testing.T) context.Context {
 	return tenant.WithTenantID(context.Background(), "tenant-1")
 }
 
-func TestProjectExecutionResolver_NotConnected(t *testing.T) {
-	fake := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false}}
-	r := NewProjectExecutionResolver(fake)
+// fakeDevServerReachability implements usecase.DevServerReachability
+// directly — no embed-and-panic needed, the real interface is this
+// codebase's own single-method port, not a generated gRPC client.
+type fakeDevServerReachability struct {
+	reachable      bool
+	err            error
+	gotDevServerID string
+}
 
-	connID, worktreePath, _, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
+func (f *fakeDevServerReachability) IsReachable(ctx context.Context, devServerID string) (bool, error) {
+	f.gotDevServerID = devServerID
+	return f.reachable, f.err
+}
+
+// TestProjectExecutionResolver_NotConnected_NoFallbackAvailable is the
+// "genuinely nothing to fall back to" case — the project has no repos at
+// all, so resolveViaDefaultRepo also reports not connected. Distinct from
+// TestProjectExecutionResolver_NotConnected_FallsBackToReachableDefaultRepo
+// below, which is the actually-common case (BUG-025 follow-up).
+func TestProjectExecutionResolver_NotConnected_NoFallbackAvailable(t *testing.T) {
+	infra := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false}}
+	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{Repos: nil}}
+	reach := &fakeDevServerReachability{}
+	r := NewProjectExecutionResolver(infra, projects, reach)
+
+	connID, worktreePath, _, _, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -74,16 +98,131 @@ func TestProjectExecutionResolver_NotConnected(t *testing.T) {
 	if worktreePath != "" {
 		t.Errorf("expected empty worktreePath when not connected, got %q", worktreePath)
 	}
-	if fake.gotResolveConnection.GetConnectionId() != "p1" {
-		t.Errorf("expected project_id to pass through verbatim as connection_id, got %q", fake.gotResolveConnection.GetConnectionId())
+	if infra.gotResolveConnection.GetConnectionId() != "p1" {
+		t.Errorf("expected project_id to pass through verbatim as connection_id, got %q", infra.gotResolveConnection.GetConnectionId())
+	}
+	if projects.gotListRepos.GetProjectId() != "p1" {
+		t.Errorf("expected the fallback to list repos for the same project id, got %q", projects.gotListRepos.GetProjectId())
+	}
+}
+
+// TestProjectExecutionResolver_FallbackForwardsUserIDToListRepos is the
+// regression test for BUG-026's second bite: the fallback's ListRepos call
+// initially forwarded only tenant id (withTenantMetadata, deliberately
+// scoped to infra-fleet-service calls) — project-service's real ListRepos
+// is membership-gated and rejects a tenant-only call with PROJECT_NO_USER,
+// live-confirmed as the actual reason the fallback kept reporting
+// not-connected even with a real, reachable dev server bound.
+func TestProjectExecutionResolver_FallbackForwardsUserIDToListRepos(t *testing.T) {
+	infra := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false}}
+	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{
+		Repos: []*projectv1.Repo{{Id: "repo-1", DevServerId: "ds-1", Url: "/opt/repos/proj"}},
+	}}
+	reach := &fakeDevServerReachability{reachable: true}
+	r := NewProjectExecutionResolver(infra, projects, reach)
+
+	ctx := tenant.WithUserID(ctxWithTenant(t), "user-1")
+	if _, _, _, _, connected, err := r.ResolveConnection(ctx, "tenant-1", "p1"); err != nil || !connected {
+		t.Fatalf("expected connected=true, nil error, got connected=%v err=%v", connected, err)
+	}
+
+	md, ok := metadata.FromOutgoingContext(projects.gotListReposCtx)
+	if !ok {
+		t.Fatal("expected ListRepos to receive outgoing gRPC metadata")
+	}
+	if got := md.Get(grpcmw.MetadataTenantID); len(got) == 0 || got[0] != "tenant-1" {
+		t.Errorf("expected tenant id forwarded to ListRepos, got %v", got)
+	}
+	if got := md.Get(grpcmw.MetadataUserID); len(got) == 0 || got[0] != "user-1" {
+		t.Errorf("expected user id forwarded to ListRepos, got %v", got)
+	}
+}
+
+// TestProjectExecutionResolver_NotConnected_FallsBackToReachableDefaultRepo
+// is BUG-025 follow-up's regression test — the system-wide norm
+// (infra.connections has no row for any project id) must not fail Execute
+// outright when the project's default repo has a real, reachable dev
+// server bound to it.
+func TestProjectExecutionResolver_NotConnected_FallsBackToReachableDefaultRepo(t *testing.T) {
+	infra := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false}}
+	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{
+		Repos: []*projectv1.Repo{{Id: "repo-1", DevServerId: "ds-1", Url: "/opt/repos/proj"}},
+	}}
+	reach := &fakeDevServerReachability{reachable: true}
+	r := NewProjectExecutionResolver(infra, projects, reach)
+
+	_, worktreePath, _, devServerID, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !connected {
+		t.Error("expected connected=true via the default-repo reachability fallback")
+	}
+	if worktreePath != "/opt/repos/proj" {
+		t.Errorf("expected worktreePath to fall back to the default repo's own path, got %q", worktreePath)
+	}
+	if reach.gotDevServerID != "ds-1" {
+		t.Errorf("expected reachability to be checked against the default repo's dev server, got %q", reach.gotDevServerID)
+	}
+	// devServerID must be returned so callers (SimpleExecutor) can relay via
+	// RelayByDevServer instead of the connectionId-keyed Relay RPC — this
+	// fallback path has no real infra.connections row/connectionID for that
+	// RPC to key on. Live-confirmed as INFRA_RELAY_NO_CONNECTION
+	// ("connectionId is required") until this was returned (BUG-026 4th bite).
+	if devServerID != "ds-1" {
+		t.Errorf("expected devServerID to be returned for the fallback path, got %q", devServerID)
+	}
+}
+
+// TestProjectExecutionResolver_NotConnected_DefaultRepoUnreachable covers
+// the fallback's own negative case — a bound-but-unreachable dev server
+// must not be treated as connected.
+func TestProjectExecutionResolver_NotConnected_DefaultRepoUnreachable(t *testing.T) {
+	infra := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false}}
+	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{
+		Repos: []*projectv1.Repo{{Id: "repo-1", DevServerId: "ds-1", Url: "/opt/repos/proj"}},
+	}}
+	reach := &fakeDevServerReachability{reachable: false}
+	r := NewProjectExecutionResolver(infra, projects, reach)
+
+	_, _, _, _, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if connected {
+		t.Error("expected connected=false when the default repo's dev server is not reachable")
+	}
+}
+
+// TestProjectExecutionResolver_NotConnected_DefaultRepoHasNoDevServer
+// covers the fallback's other negative case — a repo that has never been
+// bound to any dev server (Repo.DevServerId == "") has nothing to check
+// reachability against.
+func TestProjectExecutionResolver_NotConnected_DefaultRepoHasNoDevServer(t *testing.T) {
+	infra := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false}}
+	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{
+		Repos: []*projectv1.Repo{{Id: "repo-1", DevServerId: ""}},
+	}}
+	reach := &fakeDevServerReachability{reachable: true}
+	r := NewProjectExecutionResolver(infra, projects, reach)
+
+	_, _, _, _, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if connected {
+		t.Error("expected connected=false when the default repo has no dev server bound")
+	}
+	if reach.gotDevServerID != "" {
+		t.Error("expected IsReachable never to be called with no dev server to check")
 	}
 }
 
 func TestProjectExecutionResolver_Connected(t *testing.T) {
-	fake := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: true, RepoPath: "/srv/worktrees/p1", WorktreeId: "wt-1"}}
-	r := NewProjectExecutionResolver(fake)
+	infra := &fakeInfraFleetServiceClient{resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: true, RepoPath: "/srv/worktrees/p1", WorktreeId: "wt-1"}}
+	r := NewProjectExecutionResolver(infra, &fakeProjectServiceClient{}, &fakeDevServerReachability{})
 
-	connID, worktreePath, worktreeID, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
+	connID, worktreePath, worktreeID, _, connected, err := r.ResolveConnection(ctxWithTenant(t), "tenant-1", "p1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -100,9 +239,9 @@ func TestProjectExecutionResolver_Connected(t *testing.T) {
 
 func TestProjectExecutionResolver_NoTenantInContext(t *testing.T) {
 	fake := &fakeInfraFleetServiceClient{}
-	r := NewProjectExecutionResolver(fake)
+	r := NewProjectExecutionResolver(fake, &fakeProjectServiceClient{}, &fakeDevServerReachability{})
 
-	if _, _, _, _, err := r.ResolveConnection(context.Background(), "", "p1"); !errors.Is(err, tenant.ErrNoTenant) {
+	if _, _, _, _, _, err := r.ResolveConnection(context.Background(), "", "p1"); !errors.Is(err, tenant.ErrNoTenant) {
 		t.Errorf("expected tenant.ErrNoTenant, got %v", err)
 	}
 	if fake.gotResolveConnection != nil {

@@ -44,7 +44,7 @@ func (uc *GenerateAgentPrompt) Execute(ctx context.Context, in GenerateAgentProm
 	if err != nil {
 		return "", apperrors.New(apperrors.KindInternal, "TASK_GENERATE_PROMPT_PROVIDER_RESOLVE_FAILED", "failed to resolve AI provider context", err)
 	}
-	connectionID, _, _, connected, err := uc.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
+	connectionID, _, _, _, connected, err := uc.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil || !connected {
 		return "", apperrors.New(apperrors.KindFailedPrecondition, "TASK_GENERATE_PROMPT_NO_CONNECTION", "task's project has no connected dev server for AI relay", err)
 	}

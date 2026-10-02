@@ -763,6 +763,13 @@ message CreateWorktreeRequest {
   optional string orchestration_run_id = 12;
   optional string coordinator_handle = 13;
   optional string created_by_terminal_handle = 14;
+  // External issue this worktree is started from. Both set or both unset.
+  // Persisted via project-service's RecordWorktreeCreated, which also emits the
+  // worktree.created outbox event that issue-status-sync consumes
+  // asynchronously (issue -> "In Progress"). Also lets task-service adopt this
+  // worktree for a task started from the same issue.
+  optional string linked_issue_provider = 15; // "jira" | "linear" | "github" | "gitlab"
+  optional string linked_issue_ref = 16;      // provider-native key, e.g. "ENG-123"
 }
 message CreateWorktreeResponse {
   string worktree_id = 1; // project-service's Worktree.id, from the saga's RecordWorktreeCreated step (TASK-193)

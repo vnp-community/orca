@@ -2,6 +2,7 @@ package wscompat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 
@@ -929,12 +930,58 @@ func TestWorktreeMerge_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	resp, ok := result.(*gitgatewayv1.MergeBranchResponse)
-	if !ok || resp.GetResultSha() != "sha-merged" {
-		t.Errorf("expected the raw MergeBranchResponse to be returned unmodified, got %+v (%T)", result, result)
+	// BUG-023-style fix (BL-TG-06): the raw proto response's Go struct tags
+	// are snake_case — this must come back translated to mergeResultView's
+	// camelCase wire shape instead of the raw *MergeBranchResponse.
+	view, ok := result.(mergeResultView)
+	if !ok || view.ResultSHA != "sha-merged" {
+		t.Errorf("expected a translated mergeResultView, got %+v (%T)", result, result)
 	}
 	if git.calledRemoveWorktree {
 		t.Error("expected RemoveWorktree NOT to be called when no cleanupWorktreeIds are given")
+	}
+}
+
+// TestWorktreeMerge_WireShapeIsCamelCase is the BUG-023-style regression:
+// MergeBranchResponse's generated Go struct has snake_case json tags
+// (result_sha/has_conflicts/conflicted_paths) — marshaling the raw proto
+// response (this channel's behavior before BL-TG-06) would ship those keys
+// verbatim on the wire, exactly the bug already found and fixed for
+// taskView. Asserts the actual marshaled JSON, not just the Go struct
+// type, since a Go-level assertion alone wouldn't have caught the original
+// taskView bug either.
+func TestWorktreeMerge_WireShapeIsCamelCase(t *testing.T) {
+	git := &fakeGitGatewayServiceClient{
+		mergeBranchFunc: func(_ context.Context, _ *gitgatewayv1.MergeBranchRequest) (*gitgatewayv1.MergeBranchResponse, error) {
+			return &gitgatewayv1.MergeBranchResponse{HasConflicts: true, ConflictedPaths: []string{"file.txt"}, ConflictDispatchKey: "repo:repo-1"}, nil
+		},
+	}
+	project := &fakeProjectServiceClient{}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, project, nil)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.merge",
+		argsJSON(t, map[string]any{"worktreeId": "wt-1", "baseBranch": "main", "strategy": "merge"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	raw, err := json.Marshal(result)
+	if err != nil {
+		t.Fatalf("marshal result: %v", err)
+	}
+	var decoded map[string]any
+	if err := json.Unmarshal(raw, &decoded); err != nil {
+		t.Fatalf("unmarshal result: %v", err)
+	}
+	for _, key := range []string{"hasConflicts", "conflictedPaths", "conflictDispatchKey"} {
+		if _, ok := decoded[key]; !ok {
+			t.Errorf("expected camelCase key %q in wire JSON, got keys %v", key, decoded)
+		}
+	}
+	for _, wrongKey := range []string{"has_conflicts", "conflicted_paths", "conflict_dispatch_key", "result_sha"} {
+		if _, ok := decoded[wrongKey]; ok {
+			t.Errorf("found snake_case key %q in wire JSON — the raw proto struct leaked through unmarshaled", wrongKey)
+		}
 	}
 }
 
@@ -956,9 +1003,9 @@ func TestWorktreeMerge_ConflictedMerge_NeverCallsRemoveWorktree_EvenWithCleanupI
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	resp, ok := result.(*gitgatewayv1.MergeBranchResponse)
-	if !ok || !resp.GetHasConflicts() {
-		t.Errorf("expected the raw conflicted MergeBranchResponse to be returned, got %+v", result)
+	view, ok := result.(mergeResultView)
+	if !ok || !view.HasConflicts {
+		t.Errorf("expected a translated, conflicted mergeResultView, got %+v", result)
 	}
 	if git.calledRemoveWorktree {
 		t.Error("expected RemoveWorktree to never be called on a conflicted merge, even with cleanupWorktreeIds set")
@@ -993,9 +1040,9 @@ func TestWorktreeMerge_CleanupOneFails_OthersStillRemoved_MergeResponseStillRetu
 	if !ok {
 		t.Fatalf("unexpected result type %T", result)
 	}
-	mergeResp, ok := m["merge"].(*gitgatewayv1.MergeBranchResponse)
-	if !ok || mergeResp.GetResultSha() != "sha-merged" {
-		t.Fatalf("expected merge key to carry the successful merge response, got %+v", m["merge"])
+	mergeResp, ok := m["merge"].(mergeResultView)
+	if !ok || mergeResp.ResultSHA != "sha-merged" {
+		t.Fatalf("expected merge key to carry the translated merge response, got %+v", m["merge"])
 	}
 	cleanup, ok := m["cleanup"].(map[string]string)
 	if !ok {
@@ -1110,5 +1157,48 @@ func TestWorktreeFanOut_NOutOfRange_ErrorSurfacesAsChannelError(t *testing.T) {
 	}
 	if result != nil {
 		t.Errorf("expected no partial result to leak through on error, got %+v", result)
+	}
+}
+
+// worktree.create must forward the external issue link so project-service
+// records it (and emits the worktree.created event issue-status-sync consumes
+// asynchronously); without it a Jira-started worktree never moves the issue.
+func TestWorktreeCreateChannel_ForwardsLinkedIssue(t *testing.T) {
+	var gotReq *gitgatewayv1.CreateWorktreeRequest
+	git := &fakeGitGatewayServiceClient{
+		createWorktreeFunc: func(_ context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "wt-1", Path: "/repo-eng-1"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, &fakeProjectServiceClient{}, nil)
+
+	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.create",
+		argsJSON(t, map[string]any{"repo": "repo-1", "name": "eng-1", "linkedIssueProvider": "jira", "linkedIssueRef": "ENG-1"})); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetLinkedIssueProvider() != "jira" || gotReq.GetLinkedIssueRef() != "ENG-1" {
+		t.Errorf("want linked issue forwarded, got provider=%q ref=%q", gotReq.GetLinkedIssueProvider(), gotReq.GetLinkedIssueRef())
+	}
+}
+
+func TestWorktreeCreateChannel_NoLinkedIssueMeansNilFields(t *testing.T) {
+	var gotReq *gitgatewayv1.CreateWorktreeRequest
+	git := &fakeGitGatewayServiceClient{
+		createWorktreeFunc: func(_ context.Context, in *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
+			gotReq = in
+			return &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "wt-1", Path: "/repo-x"}, nil
+		},
+	}
+	r := NewRegistry()
+	registerWorktreeChannels(r, git, &fakeProjectServiceClient{}, nil)
+
+	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.create",
+		argsJSON(t, map[string]any{"repo": "repo-1", "name": "x"})); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.LinkedIssueProvider != nil || gotReq.LinkedIssueRef != nil {
+		t.Errorf("existing callers must keep sending no link, got %v / %v", gotReq.LinkedIssueProvider, gotReq.LinkedIssueRef)
 	}
 }

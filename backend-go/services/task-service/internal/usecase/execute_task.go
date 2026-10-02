@@ -2,6 +2,8 @@ package usecase
 
 import (
 	"context"
+	"log/slog"
+	"time"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -64,6 +66,15 @@ type ExecuteResult struct {
 // return Async: true and leave status at InProgress; TASK-FT-002-04's
 // generalized ReportTaskExecutionResult is the eventual completion write for
 // both.
+// asyncTaskRunner runs fn — real wiring (NewExecuteTask) always spawns it as
+// a goroutine, so Execute can return before fn finishes (see
+// dispatchDirectAgentAsync's doc comment for why this exists at all). Tests
+// substitute a synchronous version (runs fn on the caller's own goroutine)
+// via newExecutableExecuteTask's test helper, so assertions right after
+// Execute returns observe fn's already-completed side effects
+// deterministically — no sleep/poll loop needed in any test.
+type asyncTaskRunner func(fn func())
+
 type ExecuteTask struct {
 	repo              TaskRepository
 	edges             EdgeRepository
@@ -78,13 +89,25 @@ type ExecuteTask struct {
 	// dispatch, across all three engines (BE-SOL-001/CR-FLOW-TASK-001) — see
 	// ExecutionLinkRepository's doc comment.
 	links ExecutionLinkRepository
+	// runAsync backs the direct_agent engine's async dispatch — see
+	// dispatchDirectAgentAsync's doc comment.
+	runAsync asyncTaskRunner
+
+	// leases, when set, makes direct_agent runs recoverable after a crash —
+	// see ExecutionLeaseRepository. nil keeps the previous behavior.
+	claimer        TaskExecutionClaimer
+	leases         ExecutionLeaseRepository
+	leaseOwner     string
+	leaseTTL       time.Duration
+	leaseHeartbeat time.Duration
 }
 
 func NewExecuteTask(repo TaskRepository, edges EdgeRepository, simple SimpleExecutor, complex ComplexExecutor, workflow WorkflowExecutor, resolvePermission *ResolvePermission, worktrees WorktreeProvisioner, resolver ProjectExecutionResolver, clock Clock, links ExecutionLinkRepository) *ExecuteTask {
 	return &ExecuteTask{
 		repo: repo, edges: edges, simple: simple, complex: complex, workflow: workflow,
 		resolvePermission: resolvePermission, worktrees: worktrees, resolver: resolver, clock: clock,
-		links: links,
+		links:    links,
+		runAsync: func(fn func()) { go fn() },
 	}
 }
 
@@ -109,6 +132,39 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	if err != nil {
 		return ExecuteResult{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
 	}
+
+	// Pre-check 0: reject a re-dispatch while one is already running.
+	//
+	// Why this exists: dispatchDirectAgentAsync (this bug's own async
+	// redesign) made Execute return in milliseconds instead of blocking for
+	// the whole agent run — which means NOTHING any longer naturally
+	// prevents a second click (or a third, or a tenth) from firing another
+	// concurrent Execute call for the SAME task while the first is still
+	// running in the background. Live-confirmed real consequence, not
+	// theoretical: a user repeatedly clicking "Run with Agent" (because the
+	// first click gave no visible feedback) fired several concurrent
+	// dispatches against the SAME dev server connection, which crashed it
+	// ("devserveragent: connection lost: EOF") — and worse, EACH concurrent
+	// dispatch captures its OWN `previousStatus` snapshot for its
+	// on-failure revert; the second dispatch's snapshot is already
+	// "in_progress" (set by the first dispatch moments earlier), so its
+	// failure "reverts" to in_progress — a no-op — leaving the task stuck
+	// at in_progress FOREVER once every concurrent attempt has failed, with
+	// no RPC able to clear it (the exact TASK-TG-04-01 failure mode this
+	// usecase already fixed once, reintroduced by concurrent re-entrancy).
+	//
+	// This check-then-write still has a narrow TOCTOU race (two Execute
+	// calls landing within microseconds of each other could both read a
+	// pre-dispatch status before either writes in_progress) — closing that
+	// fully would need a conditional/CAS-style UpdateStatus, a bigger
+	// interface change not justified here: this guard's real job is
+	// collapsing the "user clicks 10 times over several seconds because the
+	// first click gave no feedback" scenario (the one actually observed
+	// live) down from "guaranteed pile-up" to "not practically reachable",
+	// not achieving perfect mutual exclusion.
+	if task.Status == domain.StatusInProgress {
+		return ExecuteResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_ALREADY_IN_PROGRESS", "task already has a dispatch in progress", nil)
+	}
 	previousStatus := task.Status
 
 	engine, err := uc.selectEngine(ctx, tenantID, task) // computed BEFORE any status write, same as the old isComplex was
@@ -119,8 +175,16 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	// Pre-check 2: dev-server-online — resolved once here, BEFORE the
 	// in_progress write, so a disconnected project fails before any status
 	// mutation at all.
-	_, resolvedPath, _, connected, err := uc.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
+	_, resolvedPath, _, _, connected, err := uc.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil || !connected {
+		// BUG-026 diagnostic: apperrors.ToGRPCStatus only forwards
+		// Kind+Code+Message to the client, never the wrapped cause — logging
+		// it explicitly here is the only way to see WHY the resolver
+		// reported not-connected (a real RPC error inside the fallback vs.
+		// a genuine "no reachable dev server" result) without re-deriving
+		// it from scratch every time this fires.
+		slog.WarnContext(ctx, "task: execute blocked, project has no connected dev server",
+			slog.String("task_id", in.TaskID), slog.String("project_id", task.ProjectID), slog.Any("resolver_error", err))
 		return ExecuteResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_NO_CONNECTION", "task's project has no connected dev server", err)
 	}
 
@@ -128,19 +192,39 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	// existing worktree ELSE: create one").
 	worktreeID, worktreePath, err := uc.worktrees.EnsureWorktree(ctx, tenantID, task)
 	if err != nil {
+		// BUG-026-style diagnostic: same reasoning as the connection-check
+		// log above — apperrors.ToGRPCStatus never forwards this wrapped
+		// cause to the client, and the "rpc failed" log line only has the
+		// client-facing message, not this real error.
+		slog.WarnContext(ctx, "task: execute failed to provision worktree",
+			slog.String("task_id", in.TaskID), slog.String("project_id", task.ProjectID), slog.Any("worktree_error", err))
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_WORKTREE_FAILED", "failed to provision worktree", err)
 	}
 	if worktreePath == "" {
-		worktreePath = resolvedPath // reuse branch: EnsureWorktree returns "" for path on reuse — see WorktreeProvisioner's doc comment
+		// Defensive only, not the normal path since BUG-028: EnsureWorktree
+		// now resolves a real path on both the create AND reuse branches
+		// (failing closed on error instead of returning ""), so this only
+		// fires if EnsureWorktree somehow violates that contract — falling
+		// back to the project's repo-root path here is still better than
+		// crashing, but should never actually happen in practice.
+		worktreePath = resolvedPath
 	}
-	_ = worktreePath // resolved for parity with SOL-TG-04's design; SimpleExecutor/ComplexExecutor resolve their own worktree path today (TASK-TG-04-06 threads this through as a context preamble)
 	if worktreeID != task.WorktreeID {
 		if err := uc.repo.UpdateWorktreeID(ctx, tenantID, in.TaskID, worktreeID); err != nil {
 			return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_WORKTREE_PERSIST_FAILED", "failed to persist worktree id", err)
 		}
 	}
 
-	if err := uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, domain.StatusInProgress); err != nil {
+	if uc.claimer != nil {
+		// Atomic claim: only the Execute call that still sees previousStatus wins.
+		claimed, err := uc.claimer.ClaimForExecution(ctx, tenantID, in.TaskID, previousStatus)
+		if err != nil {
+			return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_STATUS_UPDATE_FAILED", "failed to mark task in_progress", err)
+		}
+		if !claimed {
+			return ExecuteResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_ALREADY_IN_PROGRESS", "task already has a dispatch in progress", nil)
+		}
+	} else if err := uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, domain.StatusInProgress); err != nil {
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_STATUS_UPDATE_FAILED", "failed to mark task in_progress", err)
 	}
 	dispatchStart := uc.clock.Now()
@@ -170,18 +254,42 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_ACTIVE_LINK_PERSIST_FAILED", "failed to record active execution link", err)
 	}
 
+	// Lease the run BEFORE dispatching, so a crash between here and the
+	// goroutine starting is still recoverable. Best-effort on purpose: if the
+	// lease cannot be written (e.g. migration 0013 not applied yet during a
+	// rolling deploy), degrade to the old un-recoverable behavior instead of
+	// failing every direct_agent run.
+	if uc.leases != nil && engine == domain.EngineDirectAgent {
+		if err := uc.leases.StartLease(ctx, tenantID, link.ID, uc.leaseOwner, string(previousStatus), uc.leaseTTL); err != nil {
+			slog.WarnContext(ctx, "task: could not lease execution, run will not be recoverable after a crash",
+				slog.String("task_id", in.TaskID), slog.String("link_id", link.ID), slog.Any("error", err))
+		}
+	}
+
 	// in.Prompt (docs/backlog/BACKLOG-016) overrides SimpleExecutor's own
 	// default prompt when non-empty; worktreeID threads the reuse-or-create
 	// result above into the complex path, same as before selectEngine
 	// generalized this switch (TASK-TG-04-04).
+	//
+	// EngineDirectAgent dispatches via dispatchDirectAgentAsync instead of
+	// inline below — see that method's doc comment for why (redesigned to
+	// async, explicit user ask after a live timeout: "thiết kế lại đi. phải
+	// theo async"). EngineOrchestration/EngineWorkflow are unchanged: their
+	// own .Execute() calls are already fast (they just kick off a request to
+	// another service and return a ref), so they keep reporting a synchronous
+	// dispatch error to the caller — only SimpleExecutor.Execute blocks for
+	// up to 15 minutes, so only its path needed to move off this RPC's own
+	// lifetime.
+	if engine == domain.EngineDirectAgent {
+		return uc.dispatchDirectAgentAsync(ctx, tenantID, userID, in, task, worktreePath, link.ID, previousStatus, dispatchStart)
+	}
+
 	var ref string
 	switch engine {
 	case domain.EngineOrchestration:
 		ref, err = uc.complex.Execute(ctx, tenantID, in.TaskID, in.RequestID, worktreeID)
 	case domain.EngineWorkflow:
 		ref, err = uc.workflow.Execute(ctx, tenantID, in.TaskID, in.RequestID, task.WorkflowTemplateID)
-	default: // domain.EngineDirectAgent
-		ref, err = uc.simple.Execute(ctx, tenantID, in.TaskID, in.RequestID, in.Prompt)
 	}
 
 	if err != nil {
@@ -190,31 +298,94 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 		// "running" state, since there is no other RPC to clear it.
 		_ = uc.links.Complete(ctx, tenantID, link.ID, "failed") // best-effort, same posture as this codebase's other non-critical bookkeeping writes
 		_ = uc.repo.UpdateStatus(ctx, tenantID, in.TaskID, previousStatus)
+		slog.WarnContext(ctx, "task: execute dispatch failed",
+			slog.String("task_id", in.TaskID), slog.String("project_id", task.ProjectID), slog.String("engine", string(engine)), slog.Any("dispatch_error", err))
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_FAILED", "execution dispatch failed", err)
 	}
 	if ref != "" {
 		_ = uc.links.SetExternalRef(ctx, tenantID, link.ID, ref) // best-effort: a failed backfill doesn't invalidate a dispatch that already succeeded
 	}
 
-	if engine != domain.EngineDirectAgent {
-		// No further status write here — StatusReview/Done arrives later via
-		// ReportTaskExecutionResult (TASK-TG-04-05). The link's "completed"
-		// mark is only task-service's own initial bookkeeping for the async
-		// engines — see ExecutionLinkRepository.Complete's doc comment.
-		_ = uc.links.Complete(ctx, tenantID, link.ID, "completed")
-		return ExecuteResult{ExecutionRef: ref, Async: true}, nil
-	}
-
-	// Simple path: SimpleExecutor.Execute blocks until the CLI process
-	// exits — the completion transition happens INLINE, same call, no
-	// separate completion RPC needed (see this usecase's doc comment).
-	actualHours := uc.clock.Now().Sub(dispatchStart).Hours()
-	if err := uc.repo.CompleteExecution(ctx, tenantID, in.TaskID, string(domain.StatusReview), actualHours); err != nil {
-		_ = uc.links.Complete(ctx, tenantID, link.ID, "failed")
-		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_COMPLETION_WRITE_FAILED", "failed to persist execution completion", err)
-	}
+	// No further status write here — StatusReview/Done arrives later via
+	// ReportTaskExecutionResult (TASK-TG-04-05). The link's "completed"
+	// mark is only task-service's own initial bookkeeping for the async
+	// engines — see ExecutionLinkRepository.Complete's doc comment.
 	_ = uc.links.Complete(ctx, tenantID, link.ID, "completed")
-	return ExecuteResult{ExecutionRef: ref, Async: false}, nil
+	return ExecuteResult{ExecutionRef: ref, Async: true}, nil
+}
+
+// dispatchDirectAgentAsync dispatches SimpleExecutor.Execute (and its
+// completion bookkeeping) via uc.runAsync instead of inline on Execute's own
+// call stack.
+//
+// Why: SimpleExecutor.Execute blocks synchronously on the spawned CLI
+// process for up to 15 minutes (agent-print-mode-exec.ts's MAX_TIMEOUT_MS).
+// Running that inline used to hold this Execute call's own client-facing
+// RPC open for the same duration — live-confirmed broken: the frontend's
+// own WS connection liveness watchdog (REMOTE_RUNTIME_SOCKET_LIVENESS_TIMEOUT_MS
+// / HEARTBEAT_IDLE_MS, 25s) tore the connection down mid-run, canceling this
+// call's ctx, which cascaded down through infra-fleet-service as "context
+// canceled" and surfaced to the user as a raw DeadlineExceeded RPC error.
+// Explicit user ask after hitting this live: "thiết kế lại đi. phải theo
+// async" (redesign it, it must be async).
+//
+// This mirrors the orchestration/workflow engines' own long-standing async
+// posture (dispatch, return immediately, completion arrives later) rather
+// than inventing a new mechanism — the difference is where "later" runs:
+// those two engines get a completion signal from a REAL later network call
+// (ReportTaskExecutionResult, TASK-TG-04-05, since orchestration-service/
+// workflow-service are separate processes); SimpleExecutor.Execute runs
+// in-process, so an in-process goroutine plays the same role, with no
+// external callback RPC needed.
+//
+// dispatchCtx is deliberately NOT ctx: ctx dies with this RPC (the very
+// problem being fixed here). dispatchCtx rebuilds only the identity values
+// SimpleExecutor.Execute and its downstream resolvers actually read from
+// context (tenant id, user id) onto a fresh context.Background() — no
+// deadline, no tie to the client connection, the same shape a real
+// completion callback's own fresh inbound request would carry.
+//
+// Known, flagged-not-fixed side effect: ExecuteBatch (execute_batch.go)
+// calls ExecuteTask.Execute per task and waits for each wave to finish
+// before starting the next, relying on Execute's OLD synchronous-completion
+// behavior for direct_agent tasks to gate dependency-respecting waves
+// correctly (TASK-TG-04-07's `{{outputs.taskId.*}}` interpolation needs the
+// dependency's LastExecutionOutput already persisted). ExecuteBatch is not
+// wired to any gRPC RPC or constructed anywhere outside its own tests
+// (confirmed: no caller of NewExecuteBatch exists in this service), so this
+// has no live production impact — flagged for whoever wires it up next,
+// not silently left undocumented.
+func (uc *ExecuteTask) dispatchDirectAgentAsync(ctx context.Context, tenantID, userID string, in ExecuteTaskInput, task domain.Task, worktreePath, linkID string, previousStatus domain.Status, dispatchStart time.Time) (ExecuteResult, error) {
+	dispatchCtx := tenant.WithTenantID(context.Background(), tenantID)
+	if userID != "" {
+		dispatchCtx = tenant.WithUserID(dispatchCtx, userID)
+	}
+	uc.runAsync(func() {
+		stopHeartbeat := uc.startHeartbeat(dispatchCtx, tenantID, linkID)
+		defer stopHeartbeat()
+		ref, err := uc.simple.Execute(dispatchCtx, tenantID, in.TaskID, in.RequestID, worktreePath, in.Prompt)
+		if err != nil {
+			// Same fix as the orchestration/workflow branch above: revert
+			// the in_progress write instead of leaving the task stuck.
+			_ = uc.links.Complete(dispatchCtx, tenantID, linkID, "failed")
+			_ = uc.repo.UpdateStatus(dispatchCtx, tenantID, in.TaskID, previousStatus)
+			slog.WarnContext(dispatchCtx, "task: execute dispatch failed",
+				slog.String("task_id", in.TaskID), slog.String("project_id", task.ProjectID), slog.String("engine", string(domain.EngineDirectAgent)), slog.Any("dispatch_error", err))
+			return
+		}
+		if ref != "" {
+			_ = uc.links.SetExternalRef(dispatchCtx, tenantID, linkID, ref)
+		}
+		actualHours := uc.clock.Now().Sub(dispatchStart).Hours()
+		if err := uc.repo.CompleteExecution(dispatchCtx, tenantID, in.TaskID, string(domain.StatusReview), actualHours); err != nil {
+			_ = uc.links.Complete(dispatchCtx, tenantID, linkID, "failed")
+			slog.WarnContext(dispatchCtx, "task: execute completion write failed",
+				slog.String("task_id", in.TaskID), slog.Any("completion_error", err))
+			return
+		}
+		_ = uc.links.Complete(dispatchCtx, tenantID, linkID, "completed")
+	})
+	return ExecuteResult{Async: true}, nil
 }
 
 // selectEngine implements task-service.md §3.1's three-way dispatch branch

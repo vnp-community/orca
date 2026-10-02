@@ -56,6 +56,11 @@ type Server struct {
 	// RPC doc comment for why).
 	generateShareLink   *usecase.GenerateShareLink
 	getTaskByShareToken *usecase.GetTaskByShareToken
+
+	// createTaskFromSource/taskSources back CreateTaskFromSource/GetTaskSource;
+	// wired through WithTaskSources so New's positional signature stays stable.
+	createTaskFromSource *usecase.CreateTaskFromSource
+	taskSources          usecase.TaskSourceRepository
 }
 
 func New(
@@ -328,6 +333,10 @@ func (s *Server) UpdateTask(ctx context.Context, req *taskv1.UpdateTaskRequest) 
 	if req.GetWorkflowTemplateId() != nil {
 		v := req.GetWorkflowTemplateId().GetValue()
 		in.WorkflowTemplateID = &v
+	}
+	if req.GetLabels() != nil {
+		v := req.GetLabels().GetValues()
+		in.Labels = &v
 	}
 	task, err := s.updateTask.Execute(ctx, in)
 	if err != nil {

@@ -131,6 +131,9 @@ func run() error {
 		usecase.GrantRepository
 		usecase.CommentRepository
 		usecase.ExecutionLinkRepository
+		usecase.ExecutionLeaseRepository
+		usecase.TaskExecutionClaimer
+		usecase.TaskSourceRepository
 		usecase.OutboxWriter
 		usecase.VelocityResolver
 		usecase.TxRunner
@@ -213,7 +216,6 @@ func run() error {
 	}
 	defer func() { _ = infraFleetConn.Close() }()
 	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
-	projectExecutionResolver := taskgrpcclient.NewProjectExecutionResolver(infraFleetClient)
 	// execOutputRelay/repo (as usecase.OutboxWriter) back
 	// TASK-AG-FLOWTASK-003's throttled mid-run republish — see
 	// SimpleExecutor's own doc comment.
@@ -225,7 +227,10 @@ func run() error {
 	// AND its GetProject/ListRepos calls (AIDecompose's context bundle,
 	// TASK-TG-02-04) — task-service never reads project-service's tables
 	// directly. Also WorktreeProvisioner's repo_id resolution
-	// (TASK-TG-04-02/SOL-TG-04). One dial, one client, reused by all three.
+	// (TASK-TG-04-02/SOL-TG-04), and now ProjectExecutionResolver's
+	// repo-dev-server-reachability fallback (BUG-025 follow-up) — moved
+	// above projectExecutionResolver's construction so it's available there.
+	// One dial, one client, reused by all four.
 	projectConn, err := taskgrpcclient.Dial(cfg.ProjectServiceAddr)
 	if err != nil {
 		return fmt.Errorf("dialing project-service: %w", err)
@@ -233,6 +238,13 @@ func run() error {
 	defer func() { _ = projectConn.Close() }()
 	projectClient := projectv1.NewProjectServiceClient(projectConn)
 	projectContextResolver := taskgrpcclient.NewProjectContextResolver(projectClient)
+
+	// devServerReachability backs ProjectExecutionResolver's fallback below
+	// — mirrors git-gateway-service's adapter/grpcclient/reachability.go
+	// exactly (same infra-fleet-service GetFleetHealth call), see that
+	// resolver's SOL-013/SOL-014 doc comments for why the fallback exists.
+	devServerReachability := taskgrpcclient.NewDevServerReachability(infraFleetClient)
+	projectExecutionResolver := taskgrpcclient.NewProjectExecutionResolver(infraFleetClient, projectClient, devServerReachability)
 
 	// profileResolver dials the same tenant-service connection as
 	// teamScopeResolver above — SimpleExecutor's profile-aware env
@@ -266,7 +278,7 @@ func run() error {
 	// worktreeProvisioner implements Execute's reuse-or-create worktree step
 	// (TASK-TG-04-02/03/SOL-TG-04) against git-gateway-service's existing
 	// CreateWorktree saga, resolving repo_id itself via project-service.
-	worktreeProvisioner := taskgrpcclient.NewWorktreeProvisioner(gitGatewayClient, projectClient)
+	worktreeProvisioner := taskgrpcclient.NewWorktreeProvisioner(gitGatewayClient, projectClient).WithTaskSources(repo)
 
 	// workflow-service dial — WorkflowExecutor's Engine 3 dispatch (TASK-FT-002-03).
 	workflowConn, err := taskgrpcclient.Dial(cfg.WorkflowServiceAddr)
@@ -311,7 +323,10 @@ func run() error {
 	// repo also implements usecase.ExecutionLinkRepository (adapter/postgres's
 	// execution_links.go) — one row per Execute dispatch, across all three
 	// engines (BE-SOL-001/CR-FLOW-TASK-001).
-	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor, workflowExecutor, resolvePermissionUC, worktreeProvisioner, projectExecutionResolver, SystemClock{}, repo)
+	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor, workflowExecutor, resolvePermissionUC, worktreeProvisioner, projectExecutionResolver, SystemClock{}, repo).
+		WithExecutionClaim(repo).
+		WithExecutionLeases(repo, executionLeaseOwner(), usecase.DefaultLeaseTTL, usecase.DefaultLeaseHeartbeat)
+	recoverInterruptedUC := usecase.NewRecoverInterruptedExecutions(repo, repo)
 	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
 	listTasksUC := usecase.NewListTasks(repo)
 	updateTaskUC := usecase.NewUpdateTask(repo, repo)
@@ -405,6 +420,16 @@ func run() error {
 		}()
 	}
 
+	// Reverts direct_agent runs whose owning process died (lease expired).
+	recoveryCtx, recoveryCancel := context.WithCancel(ctx)
+	defer recoveryCancel()
+	var recoveryWG sync.WaitGroup
+	recoveryWG.Add(1)
+	go func() {
+		defer recoveryWG.Done()
+		recoverInterruptedUC.RunRecoveryLoop(recoveryCtx, usecase.DefaultRecoveryInterval)
+	}()
+
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
 	taskv1.RegisterTaskServiceServer(grpcServer, taskgrpc.New(
 		createTaskUC, getTaskUC, repo, grantUC, resolvePermissionUC, executeTaskUC, hasActiveExecutionsUC,
@@ -412,7 +437,7 @@ func run() error {
 		revokeGrantUC, listGrantsUC, createPublicLinkUC, revokePublicLinkUC, resolvePublicLinkUC,
 		getSubtreeUC, recalculateProgressUC, addCommentUC, listCommentsUC, reportExecutionResultUC, findTaskByNumberUC,
 		generateShareLinkUC, getTaskByShareTokenUC,
-	))
+	).WithTaskSources(usecase.NewCreateTaskFromSource(repo, repo, createTaskUC), repo))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// healthSrv (constructed above, alongside the dialect switch that also
@@ -473,6 +498,8 @@ func run() error {
 	// server on shutdown — same pattern usage-service's/orchestration-service's
 	// main.go uses for their own outbox relay goroutines.
 	outboxRelayWG.Wait()
+	recoveryCancel() // explicit: an errCh-triggered shutdown leaves ctx uncancelled
+	recoveryWG.Wait()
 
 	return nil
 }
@@ -522,4 +549,14 @@ func toMySQLDriverDSN(dsn string) (string, error) {
 		driverDSN += sep + "parseTime=true"
 	}
 	return driverDSN, nil
+}
+
+// executionLeaseOwner identifies this process in execution_links.lease_owner;
+// hostname+pid is unique per running instance, which is all RenewLease needs.
+func executionLeaseOwner() string {
+	host, err := os.Hostname()
+	if err != nil || host == "" {
+		host = "task-service"
+	}
+	return fmt.Sprintf("%s:%d", host, os.Getpid())
 }

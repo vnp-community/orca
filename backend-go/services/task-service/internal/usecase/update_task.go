@@ -27,6 +27,11 @@ type UpdateTaskInput struct {
 	// string clears the attachment) — same wrapper-typed field-mask
 	// convention as Title/Status. See docs/backlog/BACKLOG-016.
 	WorkflowTemplateID *string
+	// Labels: nil = leave untouched, non-nil = replace the whole list
+	// (even with an empty one) — see BL-TG-05. Whole-list-replace, not a
+	// partial add/remove — the caller always has the task's current labels
+	// loaded already.
+	Labels *[]string
 }
 
 // UpdateTask is task-service's one client-facing status-edit RPC. It
@@ -91,6 +96,16 @@ func (uc *UpdateTask) Execute(ctx context.Context, in UpdateTaskInput) (domain.T
 	}
 	if in.WorkflowTemplateID != nil {
 		current.WorkflowTemplateID = *in.WorkflowTemplateID
+	}
+	if in.Labels != nil {
+		// A nil (vs. non-nil empty) slice violates the labels column's NOT
+		// NULL constraint at the postgres adapter — see domain.NewTask's doc
+		// comment. *in.Labels itself can be nil if the wire value was JSON
+		// `null` rather than `[]`; normalize either "unset intent" here.
+		current.Labels = *in.Labels
+		if current.Labels == nil {
+			current.Labels = []string{}
+		}
 	}
 
 	var events []domain.OutboxEvent

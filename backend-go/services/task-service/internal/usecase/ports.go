@@ -247,8 +247,17 @@ type OPAClient interface {
 // RPC, method "agent.execPrompt" (not "agent.exec" — see that file's doc
 // comment for the full agent-rpc-catalog citation trail behind that
 // choice).
+// worktreePath (BUG-028) is resolved by ExecuteTask's own worktree
+// reuse-or-create step and threaded through explicitly — mirrors
+// ComplexExecutor's already-established worktreeID parameter below, for
+// the same reason: SimpleExecutor must not re-derive worktree info on its
+// own via ProjectExecutionResolver, which only ever knows about a
+// project's REPO, never a specific worktree. Re-deriving it independently
+// is exactly the bug this parameter fixes — every task re-execution ran
+// the agent in the project's shared repo root instead of its own isolated
+// worktree.
 type SimpleExecutor interface {
-	Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (executionRef string, err error)
+	Execute(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string) (executionRef string, err error)
 }
 
 // AgentExecOutputChunk mirrors infrafleetv1.AgentExecOutputEvent — kept as
@@ -329,8 +338,31 @@ type TechStackDetector interface {
 	Detect(ctx context.Context, tenantID, projectID string) (domain.TechStack, error)
 }
 
+// devServerID (the 4th return value) is non-empty ONLY when ResolveConnection
+// resolved via its no-infra.connections-row fallback (resolveViaDefaultRepo)
+// rather than a real connectionID — see that method's doc comment. There is
+// no real infra.connections row backing that path, so connectionID is empty
+// and infra-fleet-service's connectionId-keyed Relay RPC has nothing to key
+// on; callers must use devServerID with the RelayByDevServer RPC instead
+// (mirrors git-gateway-service's RelayExecutor.relay's own
+// DevServerIDFromContext branch — same fallback shape, checked directly here
+// as a return value instead of threaded through ctx, since task-service has
+// exactly one caller of this resolver, not ~52 like git-gateway-service's
+// GitExecutor). Live-confirmed as INFRA_RELAY_NO_CONNECTION on every
+// task.execute dispatch until SimpleExecutor started branching on this.
 type ProjectExecutionResolver interface {
-	ResolveConnection(ctx context.Context, tenantID, projectID string) (connectionID, worktreePath, worktreeID string, connected bool, err error)
+	ResolveConnection(ctx context.Context, tenantID, projectID string) (connectionID, worktreePath, worktreeID, devServerID string, connected bool, err error)
+}
+
+// DevServerReachability backs ProjectExecutionResolver's real implementation
+// — see that type's doc comment (BUG-025 follow-up) for why a project with
+// no infra.connections row (the system-wide norm — nothing in this codebase
+// ever creates one keyed by project id) still needs a way to resolve
+// "connected" via its default repo's bound dev server. Mirrors
+// git-gateway-service's usecase.DevServerReachability exactly (same port
+// shape, same underlying GetFleetHealth RPC, second caller).
+type DevServerReachability interface {
+	IsReachable(ctx context.Context, devServerID string) (bool, error)
 }
 
 // WorktreeProvisioner implements Execute's "reuse or create" worktree step
@@ -340,10 +372,13 @@ type ProjectExecutionResolver interface {
 // CreateWorktree RPC, not a re-implementation of that saga.
 type WorktreeProvisioner interface {
 	// EnsureWorktree returns the worktree to execute task against. path is
-	// only populated on the create branch — see the create-branch/reuse split
-	// note on internal/adapter/grpcclient.WorktreeProvisioner.EnsureWorktree;
-	// callers resolve the reuse-branch path separately via
-	// ProjectExecutionResolver, same as today.
+	// populated on BOTH branches (BUG-028 fix: the reuse branch used to
+	// leave it empty, relying on callers to guess one via
+	// ProjectExecutionResolver — which only ever knows about a project's
+	// REPO, never a specific worktree, so every task re-execution ran in
+	// the shared repo root instead of its own isolated directory) — see
+	// internal/adapter/grpcclient.WorktreeProvisioner.EnsureWorktree's doc
+	// comment for the reuse branch's real resolution path.
 	EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (worktreeID, path string, err error)
 }
 

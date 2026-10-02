@@ -30,6 +30,13 @@ func NewAgentExecOutputRelay(relay infrafleetv1.InfraFleetServiceClient) *AgentE
 func (r *AgentExecOutputRelay) StreamExecOutput(ctx context.Context, connectionID, stepID string) <-chan usecase.AgentExecOutputChunk {
 	out := make(chan usecase.AgentExecOutputChunk, 64)
 
+	// ctx is expected to already carry tenant on its OUTGOING metadata —
+	// SimpleExecutor.Execute passes the same relayCtx it built via
+	// withTenantMetadata for its own Relay call (see that file's doc
+	// comment for why the plain incoming ctx alone isn't enough:
+	// infra-fleet-service rejects any call with no tenant in outgoing
+	// metadata). This adapter doesn't rebuild it itself since it has no
+	// tenantID parameter to build it from.
 	stream, err := r.relay.StreamExecOutput(ctx, &infrafleetv1.StreamExecOutputRequest{
 		ConnectionId: connectionID, StepId: stepID,
 	})

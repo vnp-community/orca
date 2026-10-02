@@ -112,8 +112,9 @@ func TestTaskChannels_AddComment(t *testing.T) {
 	if gotReq.GetTaskId() != "t1" || gotReq.GetContent() != "hello" {
 		t.Errorf("unexpected request: %+v", gotReq)
 	}
-	resp, ok := result.(*taskv1.AddCommentResponse)
-	if !ok || resp.GetId() != "c1" {
+	// BUG-023: the result is the camelCase commentView, never the raw proto.
+	view, ok := result.(commentView)
+	if !ok || view.ID != "c1" {
 		t.Errorf("unexpected result: %+v", result)
 	}
 }
@@ -136,8 +137,13 @@ func TestTaskChannels_ListComments(t *testing.T) {
 	if gotReq.GetTaskId() != "t1" || gotReq.GetPageToken() != "p" || gotReq.GetPageSize() != 10 {
 		t.Errorf("unexpected request: %+v", gotReq)
 	}
-	resp, ok := result.(*taskv1.ListCommentsResponse)
-	if !ok || len(resp.GetComments()) != 1 || resp.GetNextPageToken() != "next" {
+	// BUG-023: comments[] entries are camelCase commentView, never the raw proto.
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("result = %#v, want map[string]any", result)
+	}
+	comments, ok := m["comments"].([]commentView)
+	if !ok || len(comments) != 1 || comments[0].ID != "c1" || m["nextPageToken"] != "next" {
 		t.Errorf("unexpected result: %+v", result)
 	}
 }

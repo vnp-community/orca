@@ -370,8 +370,8 @@ type fakeProjectExecutionResolver struct {
 	connected    bool
 }
 
-func (f fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, string, bool, error) {
-	return f.connectionID, "", "", f.connected, nil
+func (f fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, string, string, bool, error) {
+	return f.connectionID, "", "", "", f.connected, nil
 }
 
 type fakeProjectContextResolver struct{}
@@ -433,7 +433,7 @@ func TestServer_ResolvePermission_ActionReachesOPA(t *testing.T) {
 	s := New(
 		usecase.NewCreateTask(tasks, tasks), usecase.NewGetTask(tasks), txRunner,
 		usecase.NewGrant(tasks, resolvePermissionUC, stubEvents{}), resolvePermissionUC,
-		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}, stubWorkflowExecutor{}, resolvePermissionUC, stubWorktreeProvisioner{}, fakeProjectExecutionResolver{}, stubClock{}, stubExecutionLinkRepository{}),
+		usecase.NewExecuteTask(tasks, edges, stubSimpleExecutor{}, stubExecutor{}, stubWorkflowExecutor{}, resolvePermissionUC, stubWorktreeProvisioner{}, fakeProjectExecutionResolver{}, stubClock{}, stubExecutionLinkRepository{}),
 		usecase.NewHasActiveExecutions(tasks),
 		usecase.NewListTasks(tasks), usecase.NewUpdateTask(tasks, edges), usecase.NewDeleteTask(tasks),
 		usecase.NewGetDependencies(tasks, edges),
@@ -513,7 +513,7 @@ func newTestServer(tasks *fakeTaskRepository, edges *fakeEdgeRepository) *Server
 		txRunner,
 		usecase.NewGrant(tasks, resolvePermissionUC, stubEvents{}),
 		resolvePermissionUC,
-		usecase.NewExecuteTask(tasks, edges, stubExecutor{}, stubExecutor{}, stubWorkflowExecutor{}, resolvePermissionUC, stubWorktreeProvisioner{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, stubClock{}, stubExecutionLinkRepository{}),
+		usecase.NewExecuteTask(tasks, edges, stubSimpleExecutor{}, stubExecutor{}, stubWorkflowExecutor{}, resolvePermissionUC, stubWorktreeProvisioner{}, fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}, stubClock{}, stubExecutionLinkRepository{}),
 		usecase.NewHasActiveExecutions(tasks),
 		usecase.NewListTasks(tasks),
 		usecase.NewUpdateTask(tasks, edges),
@@ -611,6 +611,16 @@ func (stubOPA) Decision(ctx context.Context, level domain.GrantLevel, action, te
 type stubExecutor struct{}
 
 func (stubExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
+	return "ref", nil
+}
+
+// stubSimpleExecutor is stubExecutor's SimpleExecutor-shaped twin — BUG-028
+// threaded an explicit worktreePath parameter through
+// usecase.SimpleExecutor.Execute, so it no longer shares stubExecutor's
+// signature (used for ComplexExecutor in this file's wiring).
+type stubSimpleExecutor struct{}
+
+func (stubSimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string) (string, error) {
 	return "ref", nil
 }
 

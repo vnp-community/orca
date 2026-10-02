@@ -407,7 +407,110 @@ func registerAnnotationChannels(r *Registry, client annotationv1.AnnotationServi
 // infra-fleet-service/orchestration-service, still stubs — see
 // task-service's own README) ─────────────────────────
 
+// taskView is the camelCase JSON shape task.create/task.get/task.update send
+// back — see BUG-023: returning *taskv1.Task directly ships snake_case keys
+// (plain encoding/json on protoc-gen-go struct tags), same bug class as
+// gitStatusResultView/providerAccountView. Only task.create/get/update are
+// mapped through this in this pass — task.list/getSubtree/getDependencies/
+// addEdge/grant/resolvePermission/aiDecompose/aiApply/execute still return
+// raw proto, tracked as a known related gap (BUG-023's "Related, not fixed
+// here").
+type taskView struct {
+	ID string `json:"id"`
+	// ProjectID/etc. below use omitempty — OrcaTask (frontend) types these
+	// as optional (`parentId?: string`). Fields the frontend types as
+	// required (title/type/status/priority/labels/visibility/
+	// progressPercent) keep no omitempty — those are never legitimately
+	// absent.
+	ProjectID string `json:"projectId,omitempty"`
+	// ParentID is a *string, not a plain string+omitempty — TaskTreeView's
+	// root-level render does `t.parentId === parentId` starting from a
+	// literal `null`, not `undefined`. omitempty (tried first, wrong) drops
+	// the key entirely for a root task, decoding as `undefined` in JS —
+	// `undefined === null` is false, so the task still never matched. Only
+	// an explicit `"parentId": null` on the wire (nil *string) satisfies
+	// the strict-equality check both loops rely on. A non-root task's
+	// ParentID still marshals as a plain string, matching a child's lookup
+	// by parent id.
+	ParentID           *string  `json:"parentId"`
+	Title              string   `json:"title"`
+	Description        string   `json:"description,omitempty"`
+	Type               string   `json:"type"`
+	Status             string   `json:"status"`
+	Priority           string   `json:"priority"`
+	Labels             []string `json:"labels"`
+	Visibility         string   `json:"visibility"`
+	ReporterID         string   `json:"reporterId,omitempty"`
+	AssigneeID         string   `json:"assigneeId,omitempty"`
+	OwnerID            string   `json:"ownerId,omitempty"`
+	EstimatedHours     *float64 `json:"estimatedHours,omitempty"`
+	ActualHours        *float64 `json:"actualHours,omitempty"`
+	ProgressPercent    int32    `json:"progressPercent"`
+	AIContext          string   `json:"aiContext,omitempty"`
+	PromptTemplate     string   `json:"promptTemplate,omitempty"`
+	AIPlanJSON         string   `json:"aiPlanJson,omitempty"`
+	WorkflowTemplateID string   `json:"workflowTemplateId,omitempty"`
+	WorktreeID         string   `json:"worktreeId,omitempty"`
+	AgentSessionID     string   `json:"agentSessionId,omitempty"`
+	TaskNumber         int64    `json:"taskNumber,omitempty"`
+	PRURL              string   `json:"prUrl,omitempty"`
+	WorkflowExecID     string   `json:"workflowExecId,omitempty"`
+	DoneSubtasks       int32    `json:"doneSubtasks"`
+	TotalSubtasks      int32    `json:"totalSubtasks"`
+	ShareToken         string   `json:"shareToken,omitempty"`
+	// dueDate is passed through as-is (RFC3339 string or "") — task.proto's
+	// due_date is a google.protobuf.Timestamp; converting it to a JS-Date-
+	// parseable string here is enough, no numeric-ms conversion needed.
+	DueDate string `json:"dueDate,omitempty"`
+}
+
+func toTaskView(t *taskv1.Task) taskView {
+	v := taskView{
+		ID: t.GetId(), ProjectID: t.GetProjectId(),
+		Title: t.GetTitle(), Description: t.GetDescription(), Type: t.GetTaskType(),
+		Status: t.GetStatus(), Priority: t.GetPriority(), Labels: t.GetLabels(),
+		Visibility: t.GetVisibility(), ReporterID: t.GetReporterId(), AssigneeID: t.GetAssigneeId(),
+		OwnerID: t.GetOwnerId(), ProgressPercent: t.GetProgressPercent(),
+		AIContext: t.GetAiContext(), PromptTemplate: t.GetPromptTemplate(), AIPlanJSON: t.GetAiPlanJson(),
+		WorkflowTemplateID: t.GetWorkflowTemplateId(), WorktreeID: t.GetWorktreeId(),
+		AgentSessionID: t.GetAgentSessionId(), TaskNumber: t.GetTaskNumber(), PRURL: t.GetPrUrl(),
+		WorkflowExecID: t.GetWorkflowExecId(), DoneSubtasks: t.GetDoneSubtasks(),
+		TotalSubtasks: t.GetTotalSubtasks(), ShareToken: t.GetShareToken(),
+	}
+	if t.GetLabels() == nil {
+		v.Labels = []string{}
+	}
+	if t.GetParentId() != "" {
+		v.ParentID = proto.String(t.GetParentId())
+	}
+	if t.GetEstimatedHours() != nil {
+		v.EstimatedHours = proto.Float64(t.GetEstimatedHours().GetValue())
+	}
+	if t.GetActualHours() != nil {
+		v.ActualHours = proto.Float64(t.GetActualHours().GetValue())
+	}
+	if t.GetDueDate() != nil {
+		v.DueDate = t.GetDueDate().AsTime().Format(time.RFC3339)
+	}
+	return v
+}
+
+// commentView is the camelCase JSON shape task.addComment/task.listComments
+// send back — taskv1.AddCommentResponse{id, author_id, content, created_at}
+// has the same BUG-023 snake_case issue.
+type commentView struct {
+	ID        string `json:"id"`
+	AuthorID  string `json:"authorId"`
+	Content   string `json:"content"`
+	CreatedAt string `json:"createdAt"`
+}
+
+func toCommentView(c *taskv1.AddCommentResponse) commentView {
+	return commentView{ID: c.GetId(), AuthorID: c.GetAuthorId(), Content: c.GetContent(), CreatedAt: c.GetCreatedAt()}
+}
+
 func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
+	registerTaskSourceChannels(r, client)
 	r.Register("task.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
 			Title     string `json:"title"`
@@ -424,7 +527,7 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetTask(), nil
+		return toTaskView(resp.GetTask()), nil
 	})
 
 	r.Register("task.get", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -439,7 +542,7 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetTask(), nil
+		return toTaskView(resp.GetTask()), nil
 	})
 
 	r.Register("task.getSubtree", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -473,7 +576,11 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 		if err != nil {
 			return nil, err
 		}
-		return client.AddComment(ctx, &taskv1.AddCommentRequest{TaskId: in.TaskID, Content: in.Content})
+		resp, err := client.AddComment(ctx, &taskv1.AddCommentRequest{TaskId: in.TaskID, Content: in.Content})
+		if err != nil {
+			return nil, err
+		}
+		return toCommentView(resp), nil
 	})
 
 	r.Register("task.listComments", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -486,7 +593,15 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 		if err != nil {
 			return nil, err
 		}
-		return client.ListComments(ctx, &taskv1.ListCommentsRequest{TaskId: in.TaskID, PageToken: in.PageToken, PageSize: in.PageSize})
+		resp, err := client.ListComments(ctx, &taskv1.ListCommentsRequest{TaskId: in.TaskID, PageToken: in.PageToken, PageSize: in.PageSize})
+		if err != nil {
+			return nil, err
+		}
+		comments := make([]commentView, 0, len(resp.GetComments()))
+		for _, c := range resp.GetComments() {
+			comments = append(comments, toCommentView(c))
+		}
+		return map[string]any{"comments": comments, "nextPageToken": resp.GetNextPageToken()}, nil
 	})
 
 	// BUG-034's WS-wiring gap for task.list/update/delete/getDependencies
@@ -518,6 +633,42 @@ func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 // implements for real against the local git binary; commit/push/pull relay
 // to the Dev Server Agent, still a stub) ────────────────────────────────
 
+// gitStatusEntryView/gitStatusResultView mirror the frontend's
+// GitStatusEntry/GitStatusResult (frontend/src/shared/git-status-types.ts) —
+// BUG-020: git.status used to return the raw gitgatewayv1.GetStatusResponse
+// proto (`files`/`state` field names, no `head`/`upstreamStatus` at all),
+// which crashed the whole Git tab (`useGit.ts`'s `for (const entry of
+// status.entries)` — `status.entries` was always undefined, since the wire
+// key was `files`) the moment GetStatus ever actually succeeded (it never
+// had, until SOL-013/014 fixed the dispatch/relay chain this session).
+//
+// area is hardcoded "unstaged" for every entry — git-gateway-service's
+// FileStatus has no staged/unstaged concept yet (BUG-020's "Phase 2", not
+// implemented here): parsePorcelainStatus (localgit/executor.go) already
+// extracts the full 2-char porcelain XY code but collapses it into a single
+// FileState, discarding the staged (X) vs unstaged (Y) distinction. This
+// stops the crash and reports accurate file lists/counts; the staged vs.
+// unstaged split in StagingArea.tsx is not yet accurate until Phase 2 lands.
+type gitStatusEntryView struct {
+	Path   string `json:"path"`
+	Status string `json:"status"`
+	Area   string `json:"area"`
+}
+
+type gitStatusResultView struct {
+	Branch  string               `json:"branch,omitempty"`
+	Entries []gitStatusEntryView `json:"entries"`
+}
+
+func toGitStatusResultView(resp *gitgatewayv1.GetStatusResponse) gitStatusResultView {
+	files := resp.GetFiles()
+	entries := make([]gitStatusEntryView, 0, len(files))
+	for _, f := range files {
+		entries = append(entries, gitStatusEntryView{Path: f.GetPath(), Status: f.GetState(), Area: "unstaged"})
+	}
+	return gitStatusResultView{Branch: resp.GetBranch(), Entries: entries}
+}
+
 func registerGitChannels(r *Registry, client gitgatewayv1.GitGatewayServiceClient) {
 	r.Register("git.status", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		// Every real caller (WorkspaceContext.tsx, useGit.ts, use-code-review.ts,
@@ -538,7 +689,7 @@ func registerGitChannels(r *Registry, client gitgatewayv1.GitGatewayServiceClien
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		return toGitStatusResultView(resp), nil
 	})
 
 	r.Register("git.diff", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {

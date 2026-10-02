@@ -4,6 +4,10 @@ import (
 	"context"
 	"fmt"
 
+	"google.golang.org/grpc/metadata"
+
+	"github.com/stablyai/orca-go/common/grpcmw"
+	"github.com/stablyai/orca-go/common/tenant"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
@@ -42,6 +46,9 @@ import (
 type WorktreeProvisioner struct {
 	git      gitgatewayv1.GitGatewayServiceClient
 	projects projectv1.ProjectServiceClient
+	// sources, when set, lets EnsureWorktree adopt a worktree already created
+	// for the task's external issue — see worktree_issue_reuse.go.
+	sources TaskSourceReader
 }
 
 func NewWorktreeProvisioner(git gitgatewayv1.GitGatewayServiceClient, projects projectv1.ProjectServiceClient) *WorktreeProvisioner {
@@ -50,7 +57,26 @@ func NewWorktreeProvisioner(git gitgatewayv1.GitGatewayServiceClient, projects p
 
 func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID string, task domain.Task) (worktreeID, path string, err error) {
 	if task.WorktreeID != "" {
-		return task.WorktreeID, "", nil // reuse — spec's "IF task.worktreeId exists: use existing worktree". Caller resolves the path separately via ProjectExecutionResolver, unchanged from today.
+		// reuse — spec's "IF task.worktreeId exists: use existing
+		// worktree". BUG-028: this used to return an empty path, relying
+		// on the caller (SimpleExecutor.Execute, via
+		// ProjectExecutionResolver) to guess one — but that resolver only
+		// ever knows about the project's REPO, never a specific worktree,
+		// so its guess was always the repo's shared root, not this task's
+		// own isolated directory. Live-confirmed: every task re-execution
+		// ran the agent in the shared repo checkout, on whatever branch
+		// happened to be checked out there (not the task's own branch).
+		// Resolve the real path here instead, at the one place that
+		// actually knows which worktree this is.
+		path, err := p.resolveWorktreePath(ctx, task.WorktreeID)
+		if err != nil {
+			return "", "", err // fail closed — a silent repo-root fallback here would just reintroduce BUG-028
+		}
+		return task.WorktreeID, path, nil
+	}
+
+	if id, wtPath, ok := p.findIssueWorktree(ctx, tenantID, task); ok {
+		return id, wtPath, nil
 	}
 
 	repoID, err := p.resolveRepoID(ctx, task.ProjectID)
@@ -58,16 +84,26 @@ func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID strin
 		return "", "", err
 	}
 
+	origCtx := ctx
 	ctx, err = withTenantMetadata(ctx)
 	if err != nil {
 		return "", "", err
 	}
-	resp, err := p.git.CreateWorktree(ctx, &gitgatewayv1.CreateWorktreeRequest{
+	req := &gitgatewayv1.CreateWorktreeRequest{
 		ProjectId: task.ProjectID,
 		RepoId:    repoID,
 		Branch:    fmt.Sprintf("task/%s", task.ID),
 		TaskId:    &task.ID,
-	})
+	}
+	// Record the issue on the worktree this task creates, so issue-status-sync
+	// moves it to In Progress and a later "Start work" on the same issue finds
+	// this worktree instead of forking another. Looked up on the original ctx:
+	// withTenantMetadata above only decorates the outgoing call.
+	if src, ok := p.sourceFor(origCtx, tenantID, task); ok {
+		provider, ref := string(src.Provider), src.Ref
+		req.LinkedIssueProvider, req.LinkedIssueRef = &provider, &ref
+	}
+	resp, err := p.git.CreateWorktree(ctx, req)
 	if err != nil {
 		return "", "", fmt.Errorf("worktree_provisioner: create worktree: %w", err)
 	}
@@ -81,11 +117,22 @@ func (p *WorktreeProvisioner) resolveRepoID(ctx context.Context, projectID strin
 	if projectID == "" {
 		return "", fmt.Errorf("worktree_provisioner: task has no project_id, cannot resolve a repo to create a worktree against")
 	}
-	ctx, err := withTenantMetadata(ctx)
+	// project-service's ListRepos is membership-gated (requireProjectAccess)
+	// and needs BOTH tenant AND acting-user identity forwarded as outbound
+	// metadata — withTenantMetadata alone is NOT enough (its own doc
+	// comment scopes it to infra-fleet-service calls only) — see
+	// ProjectContextResolver.GetProjectContext's doc comment and
+	// ProjectExecutionResolver.resolveViaDefaultRepo's identical fix
+	// (BUG-026) for the same requirement on sibling project-service calls.
+	// Found live: PROJECT_NO_USER, TASK_EXECUTE_WORKTREE_FAILED on every
+	// first-time task execution until this was added.
+	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
 		return "", err
 	}
-	resp, err := p.projects.ListRepos(ctx, &projectv1.ListReposRequest{ProjectId: projectID})
+	userID, _ := tenant.UserID(ctx) // absent -> project-service denies with PROJECT_NO_USER, a legitimate fail-closed outcome
+	projectCtx := metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataTenantID, tenantID, grpcmw.MetadataUserID, userID)
+	resp, err := p.projects.ListRepos(projectCtx, &projectv1.ListReposRequest{ProjectId: projectID})
 	if err != nil {
 		return "", fmt.Errorf("worktree_provisioner: list repos for project %q: %w", projectID, err)
 	}
@@ -94,4 +141,24 @@ func (p *WorktreeProvisioner) resolveRepoID(ctx context.Context, projectID strin
 		return "", fmt.Errorf("worktree_provisioner: project %q has no repos", projectID)
 	}
 	return repos[0].GetId(), nil
+}
+
+// resolveWorktreePath resolves an EXISTING worktree's real, isolated
+// filesystem path via project-service's GetWorktree — the same RPC
+// git-gateway-service's own ConnectionResolver.resolveLocal already calls
+// for the identical purpose. See EnsureWorktree's reuse-branch doc comment
+// (BUG-028) for why this must exist and why its error must propagate
+// rather than degrade to a guessed path.
+func (p *WorktreeProvisioner) resolveWorktreePath(ctx context.Context, worktreeID string) (string, error) {
+	tenantID, err := tenant.RequireTenantID(ctx)
+	if err != nil {
+		return "", err
+	}
+	userID, _ := tenant.UserID(ctx) // absent -> project-service denies with PROJECT_NO_USER, a legitimate fail-closed outcome — see resolveRepoID's identical comment
+	projectCtx := metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataTenantID, tenantID, grpcmw.MetadataUserID, userID)
+	resp, err := p.projects.GetWorktree(projectCtx, &projectv1.GetWorktreeRequest{WorktreeId: worktreeID})
+	if err != nil {
+		return "", fmt.Errorf("worktree_provisioner: get worktree %q: %w", worktreeID, err)
+	}
+	return resp.GetPath(), nil
 }

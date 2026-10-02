@@ -80,6 +80,12 @@ func registerWorktreeChannels(
 			OrchestrationRunID      string `json:"orchestrationRunId"`
 			CoordinatorHandle       string `json:"coordinatorHandle"`
 			CreatedByTerminalHandle string `json:"createdByTerminalHandle"`
+
+			// External issue this worktree starts from (Jira key, Linear key, ...).
+			// Recorded so issue-status-sync can move the issue asynchronously and
+			// task-service can adopt this worktree for the same issue.
+			LinkedIssueProvider string `json:"linkedIssueProvider"`
+			LinkedIssueRef      string `json:"linkedIssueRef"`
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
@@ -101,6 +107,8 @@ func registerWorktreeChannels(
 			OrchestrationRunId:      nonEmptyPtr(in.OrchestrationRunID),
 			CoordinatorHandle:       nonEmptyPtr(in.CoordinatorHandle),
 			CreatedByTerminalHandle: nonEmptyPtr(in.CreatedByTerminalHandle),
+			LinkedIssueProvider:     nonEmptyPtr(in.LinkedIssueProvider),
+			LinkedIssueRef:          nonEmptyPtr(in.LinkedIssueRef),
 		})
 		if err != nil {
 			return nil, err
@@ -257,8 +265,19 @@ func registerWorktreeChannels(
 		if err != nil {
 			return nil, err
 		}
+		// BUG-023-style fix (BL-TG-06): MergeBranchResponse's generated Go
+		// struct tags are snake_case (result_sha/has_conflicts/...) — returning
+		// resp raw would ship those keys verbatim on the wire, same footgun
+		// already found and fixed for taskView. Translated explicitly here
+		// since nothing called this channel before BL-TG-06 to catch it.
+		view := mergeResultView{
+			ResultSHA:           resp.GetResultSha(),
+			HasConflicts:        resp.GetHasConflicts(),
+			ConflictedPaths:     resp.GetConflictedPaths(),
+			ConflictDispatchKey: resp.GetConflictDispatchKey(),
+		}
 		if resp.GetHasConflicts() || len(in.CleanupWorktreeIDs) == 0 {
-			return resp, nil // never auto-cleanup on a conflicted merge
+			return view, nil // never auto-cleanup on a conflicted merge
 		}
 
 		// BR-WT-18 — optional, best-effort, per-item isolated the same way
@@ -272,7 +291,7 @@ func registerWorktreeChannels(
 				cleanupResults[wtID] = "removed"
 			}
 		}
-		return map[string]any{"merge": resp, "cleanup": cleanupResults}, nil
+		return map[string]any{"merge": view, "cleanup": cleanupResults}, nil
 	})
 
 	r.Register("worktree.forceDeleteBranch", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -629,6 +648,17 @@ func toWorktreeLineageView(e *projectv1.WorktreeLineageEntry) worktreeLineageVie
 // proto message both carry far fewer fields than the client type requires;
 // every field this backend has no data source for yet gets the same safe
 // default detectedWorktreeView below already established.
+// mergeResultView is worktree.merge's camelCase wire shape — see that
+// channel's own doc comment (BUG-023-style fix, BL-TG-06) for why this
+// exists: MergeBranchResponse's generated Go struct has snake_case json
+// tags, so returning it raw would ship those keys verbatim.
+type mergeResultView struct {
+	ResultSHA           string   `json:"resultSha,omitempty"`
+	HasConflicts        bool     `json:"hasConflicts"`
+	ConflictedPaths     []string `json:"conflictedPaths,omitempty"`
+	ConflictDispatchKey string   `json:"conflictDispatchKey,omitempty"`
+}
+
 type worktreeView struct {
 	ID                string  `json:"id"`
 	RepoID            string  `json:"repoId"`

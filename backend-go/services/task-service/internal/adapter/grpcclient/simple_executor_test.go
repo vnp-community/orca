@@ -10,8 +10,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/tenant"
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
@@ -32,11 +34,20 @@ type fakeInfraFleetServiceClient struct {
 	relayResp *infrafleetv1.RelayResponse
 	relayErr  error
 	gotRelay  *infrafleetv1.RelayRequest
+	// gotRelayCtx captures the outgoing context Relay was called with — the
+	// INFRA_NO_TENANT regression test reads its outgoing metadata to
+	// confirm tenant id was forwarded (real infra-fleet-service rejects a
+	// call with no tenant in its outgoing metadata).
+	gotRelayCtx context.Context
 	// relayBlock, if set, makes Relay wait for it to close before returning
 	// — lets throttle-behavior tests control exactly how long Execute's
 	// concurrent streaming goroutine (TASK-AG-FLOWTASK-003) runs before its
 	// owning Relay call completes.
 	relayBlock <-chan struct{}
+
+	relayByDevServerResp *infrafleetv1.RelayResponse
+	relayByDevServerErr  error
+	gotRelayByDevServer  *infrafleetv1.RelayByDevServerRequest
 }
 
 func (f *fakeInfraFleetServiceClient) ResolveConnection(ctx context.Context, in *infrafleetv1.ResolveConnectionRequest, _ ...grpc.CallOption) (*infrafleetv1.ResolveConnectionResponse, error) {
@@ -49,6 +60,7 @@ func (f *fakeInfraFleetServiceClient) ResolveConnection(ctx context.Context, in 
 
 func (f *fakeInfraFleetServiceClient) Relay(ctx context.Context, in *infrafleetv1.RelayRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
 	f.gotRelay = in
+	f.gotRelayCtx = ctx
 	if f.relayBlock != nil {
 		<-f.relayBlock
 	}
@@ -56,6 +68,14 @@ func (f *fakeInfraFleetServiceClient) Relay(ctx context.Context, in *infrafleetv
 		return nil, f.relayErr
 	}
 	return f.relayResp, nil
+}
+
+func (f *fakeInfraFleetServiceClient) RelayByDevServer(ctx context.Context, in *infrafleetv1.RelayByDevServerRequest, _ ...grpc.CallOption) (*infrafleetv1.RelayResponse, error) {
+	f.gotRelayByDevServer = in
+	if f.relayByDevServerErr != nil {
+		return nil, f.relayByDevServerErr
+	}
+	return f.relayByDevServerResp, nil
 }
 
 // fakeTaskRepository backs SimpleExecutor's tests without a database —
@@ -192,12 +212,13 @@ type fakeProjectExecutionResolver struct {
 	connectionID string
 	worktreePath string
 	worktreeID   string
+	devServerID  string
 	connected    bool
 	err          error
 }
 
-func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, string, bool, error) {
-	return f.connectionID, f.worktreePath, f.worktreeID, f.connected, f.err
+func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, string, string, bool, error) {
+	return f.connectionID, f.worktreePath, f.worktreeID, f.devServerID, f.connected, f.err
 }
 
 // fakeSimpleExecutorProfileResolver is an in-memory usecase.ProfileResolver.
@@ -295,7 +316,7 @@ func TestSimpleExecutor_Execute_RelaysAgentExecPrompt(t *testing.T) {
 	}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
 
-	ref, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "")
+	ref, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -320,6 +341,143 @@ func TestSimpleExecutor_Execute_RelaysAgentExecPrompt(t *testing.T) {
 	}
 }
 
+// TestSimpleExecutor_Execute_ForwardsTenantIDToRelay is the regression test
+// for the sibling bug found right after BUG-026's 3 project-service fixes:
+// SimpleExecutor.Execute's Relay('agent.execPrompt') call used the plain
+// incoming ctx directly — infra-fleet-service's real Relay RPC rejects a
+// call with no tenant in its OUTGOING metadata (INFRA_NO_TENANT), live-
+// confirmed as TASK_EXECUTE_FAILED on every task.execute dispatch even
+// after BUG-026's connection/worktree gates were fixed.
+func TestSimpleExecutor_Execute_ForwardsTenantIDToRelay(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`}}
+	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
+
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	md, ok := metadata.FromOutgoingContext(relay.gotRelayCtx)
+	if !ok {
+		t.Fatal("expected Relay to receive outgoing gRPC metadata")
+	}
+	if got := md.Get(grpcmw.MetadataTenantID); len(got) == 0 || got[0] != "tenant-1" {
+		t.Errorf("expected tenant id forwarded to Relay, got %v", got)
+	}
+}
+
+// TestSimpleExecutor_Execute_NoTenantInContext_FailsClosed locks in the
+// fail-closed posture of the fix above: if ctx carries no tenant value at
+// all (should never happen in production — ExecuteTask.Execute always
+// extracts tenantID from ctx before calling this far), Execute must return
+// an error rather than silently calling Relay with no tenant metadata.
+func TestSimpleExecutor_Execute_NoTenantInContext_FailsClosed(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`}}
+	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
+
+	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err == nil {
+		t.Fatal("expected an error when ctx carries no tenant value")
+	}
+	if relay.gotRelay != nil {
+		t.Error("expected Relay NOT to be called when tenant metadata can't be built")
+	}
+}
+
+// TestSimpleExecutor_Execute_DevServerIDSet_UsesRelayByDevServer is the
+// regression test for BUG-026's 5th bite: when ResolveConnection resolves
+// via its no-infra.connections-row fallback (a devServerID but no real
+// connectionID), Execute must dispatch via RelayByDevServer, not the
+// connectionId-keyed Relay RPC — the latter always failed with
+// INFRA_RELAY_NO_CONNECTION ("connectionId is required") against a project
+// resolved that way, live-confirmed as TASK_EXECUTE_FAILED on every
+// first-time task execution even after fixes #1-4.
+func TestSimpleExecutor_Execute_DevServerIDSet_UsesRelayByDevServer(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "", worktreePath: "/srv/worktrees/p1", devServerID: "ds-1", connected: true}
+	relay := &fakeInfraFleetServiceClient{relayByDevServerResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`}}
+	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
+
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if relay.gotRelay != nil {
+		t.Error("expected the connectionId-keyed Relay NOT to be called when devServerID is set")
+	}
+	if relay.gotRelayByDevServer == nil {
+		t.Fatal("expected RelayByDevServer to be called")
+	}
+	if relay.gotRelayByDevServer.GetDevServerId() != "ds-1" {
+		t.Errorf("expected devServerId=ds-1, got %q", relay.gotRelayByDevServer.GetDevServerId())
+	}
+	if relay.gotRelayByDevServer.GetMethod() != "agent.execPrompt" {
+		t.Errorf("expected method=agent.execPrompt, got %q", relay.gotRelayByDevServer.GetMethod())
+	}
+}
+
+// TestSimpleExecutor_Execute_SendsFullTrustPreset is the regression test
+// for the final root cause in this whole live-debugging chain: task.execute
+// is a one-shot, non-interactive dispatch — there is no human present to
+// answer the CLI's normal per-write/per-command approval prompts. Without
+// trustPreset="full", live-confirmed: the agent reports success (exit 0)
+// having made NO actual file changes, explicitly saying the write "needs
+// your permission" and to "approve it when it comes up again" — impossible
+// advice in a headless run. Confirmed via a direct grpcurl call bypassing
+// the frontend entirely (isolating this from every earlier bug in this
+// chain): task-service reported the dispatch "completed", but the task's
+// worktree had zero new commits and no spec file, matching the agent's own
+// stored last_execution_output explaining why.
+func TestSimpleExecutor_Execute_SendsFullTrustPreset(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/srv/worktrees/p1", connected: true}
+	relay := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`}}
+	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
+
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var sentParams agentExecPromptParams
+	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
+		t.Fatalf("params_json didn't decode: %v", err)
+	}
+	if sentParams.TrustPreset != "full" {
+		t.Errorf(`expected trustPreset="full" so a headless dispatch can actually write files, got %q`, sentParams.TrustPreset)
+	}
+}
+
+// TestSimpleExecutor_Execute_UsesPassedWorktreePath_NotResolverGuess is
+// BUG-028's core regression: SimpleExecutor.Execute must dispatch with the
+// EXPLICIT worktreePath parameter (resolved by ExecuteTask's own
+// WorktreeProvisioner.EnsureWorktree), never the resolver's own path guess
+// — ProjectExecutionResolver only ever knows about a project's REPO, never
+// a specific worktree, so its guess was always the shared repo root, not
+// the task's own isolated directory. The resolver here is deliberately
+// configured with a DIFFERENT (wrong-looking) path than the explicit
+// parameter, so this test only passes if the parameter genuinely wins.
+func TestSimpleExecutor_Execute_UsesPassedWorktreePath_NotResolverGuess(t *testing.T) {
+	tasks := &fakeTaskRepository{tasks: map[string]domain.Task{"t1": {ID: "t1", ProjectID: "p1"}}}
+	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", worktreePath: "/opt/repos/proj-1-shared-repo-root", connected: true}
+	relay := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: `{"stdout":"done","stderr":"","exitCode":0,"timedOut":false}`}}
+	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
+
+	explicitWorktreePath := "/opt/repos/proj-1-task-t1"
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", explicitWorktreePath, ""); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var sentParams agentExecPromptParams
+	if err := json.Unmarshal([]byte(relay.gotRelay.GetParamsJson()), &sentParams); err != nil {
+		t.Fatalf("params_json didn't decode: %v", err)
+	}
+	if sentParams.WorktreePath != explicitWorktreePath {
+		t.Errorf("expected the explicit worktreePath parameter (%q) to win over the resolver's own guess, got %q", explicitWorktreePath, sentParams.WorktreePath)
+	}
+}
+
 // TestSimpleExecutor_NotConnected_ReturnsTypedError locks in that the stub
 // behavior (a synthesized placeholder ref, no error) is actually gone.
 func TestSimpleExecutor_NotConnected_ReturnsTypedError(t *testing.T) {
@@ -327,7 +485,7 @@ func TestSimpleExecutor_NotConnected_ReturnsTypedError(t *testing.T) {
 	resolver := &fakeProjectExecutionResolver{connected: false}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, &fakeInfraFleetServiceClient{})
 
-	_, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "")
+	_, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", "")
 	if err == nil {
 		t.Fatal("expected a real error for a not-connected project, not a synthesized placeholder ref")
 	}
@@ -345,7 +503,7 @@ func TestSimpleExecutor_ConnectedButNoWorktreePath_ReturnsTypedError(t *testing.
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true, worktreePath: ""}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, &fakeInfraFleetServiceClient{})
 
-	_, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "")
+	_, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "", "")
 	if err == nil {
 		t.Fatal("expected a real error when connected but no worktreePath resolved")
 	}
@@ -357,7 +515,7 @@ func TestSimpleExecutor_ConnectedButNoWorktreePath_ReturnsTypedError(t *testing.
 
 func TestSimpleExecutor_TaskNotFound(t *testing.T) {
 	exec := newTestSimpleExecutor(&fakeTaskRepository{tasks: map[string]domain.Task{}}, &fakeEdgeRepository{}, &fakeProjectExecutionResolver{}, &fakeInfraFleetServiceClient{})
-	if _, err := exec.Execute(context.Background(), "tenant-1", "does-not-exist", "req-1", ""); err == nil {
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "does-not-exist", "req-1", "/srv/worktrees/p1", ""); err == nil {
 		t.Fatal("expected an error for a nonexistent task")
 	}
 }
@@ -368,7 +526,7 @@ func TestSimpleExecutor_RelayErrorPropagates(t *testing.T) {
 	relay := &fakeInfraFleetServiceClient{relayErr: errors.New("boom")}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err == nil {
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err == nil {
 		t.Fatal("expected an error when the relay call fails")
 	}
 }
@@ -386,7 +544,7 @@ func TestSimpleExecutor_NonZeroExitCode_ReturnsError(t *testing.T) {
 	}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err == nil {
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err == nil {
 		t.Fatal("expected an error for a non-zero agent.execPrompt exit code")
 	}
 }
@@ -401,7 +559,7 @@ func TestSimpleExecutor_TimedOut_ReturnsError(t *testing.T) {
 	}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err == nil {
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err == nil {
 		t.Fatal("expected an error for a timed-out agent.execPrompt run")
 	}
 }
@@ -491,8 +649,8 @@ func TestSimpleExecutor_MethodStaysAgentExecPrompt_NoRegression(t *testing.T) {
 	profiles := &fakeSimpleExecutorProfileResolver{settings: map[string]any{"agent": map[string]any{"preferredModel": "claude-opus-4-5"}}}
 	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{}, &fakeOutboxWriter{}, &fakeAgentExecOutputStreamer{})
 
-	ctx := tenant.WithUserID(context.Background(), "user-1")
-	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
+	ctx := tenant.WithUserID(ctxWithTenant(t), "user-1")
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if relay.gotRelay.GetMethod() != "agent.execPrompt" {
@@ -511,8 +669,8 @@ func TestSimpleExecutor_ResolvableUserID_PopulatesEnvAndModel(t *testing.T) {
 	profiles := &fakeSimpleExecutorProfileResolver{settings: map[string]any{"agent": map[string]any{"preferredModel": "claude-opus-4-5"}}}
 	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{}, &fakeOutboxWriter{}, &fakeAgentExecOutputStreamer{})
 
-	ctx := tenant.WithUserID(context.Background(), "user-1")
-	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
+	ctx := tenant.WithUserID(ctxWithTenant(t), "user-1")
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if len(profiles.calls) != 1 || profiles.calls[0] != "user-1" {
@@ -542,8 +700,8 @@ func TestSimpleExecutor_ProfileResolverError_DegradesToLegacyPassthrough(t *test
 	profiles := &fakeSimpleExecutorProfileResolver{err: errors.New("tenant-service unreachable")}
 	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, &fakeSimpleExecutorProjectContextResolver{}, &fakeOutboxWriter{}, &fakeAgentExecOutputStreamer{})
 
-	ctx := tenant.WithUserID(context.Background(), "user-1")
-	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
+	ctx := tenant.WithUserID(ctxWithTenant(t), "user-1")
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("expected profile-resolve failure to degrade to legacy passthrough, got error: %v", err)
 	}
 	var sentParams agentExecPromptParams
@@ -570,8 +728,8 @@ func TestSimpleExecutor_ProjectContextResolverError_SpawnStillProceeds(t *testin
 	projects := &fakeSimpleExecutorProjectContextResolver{err: errors.New("project-service unreachable")}
 	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, profiles, projects, &fakeOutboxWriter{}, &fakeAgentExecOutputStreamer{})
 
-	ctx := tenant.WithUserID(context.Background(), "user-1")
-	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", ""); err != nil {
+	ctx := tenant.WithUserID(ctxWithTenant(t), "user-1")
+	if _, err := exec.Execute(ctx, "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var sentParams agentExecPromptParams
@@ -595,7 +753,7 @@ func TestSimpleExecutor_Execute_EnvAlwaysContainsTaskAndProjectID(t *testing.T) 
 	}
 	exec := newTestSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay)
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err != nil {
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var sentParams agentExecPromptParams
@@ -628,7 +786,7 @@ func TestSimpleExecutor_Execute_CompletedDepsThreadIntoPrompt(t *testing.T) {
 	}
 	exec := newTestSimpleExecutor(tasks, edges, resolver, relay)
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err != nil {
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	var sentParams agentExecPromptParams
@@ -671,7 +829,7 @@ func TestSimpleExecutor_Execute_PublishesThrottledPartialOutputToOutbox(t *testi
 
 	resultCh := make(chan executeResult, 1)
 	go func() {
-		ref, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "")
+		ref, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", "")
 		resultCh <- executeResult{ref: ref, err: err}
 	}()
 
@@ -732,7 +890,7 @@ func TestSimpleExecutor_Execute_BatchesManyChunksIntoAtMostOneEvent(t *testing.T
 	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{}, outbox, &fakeAgentExecOutputStreamer{chunks: chunks})
 	exec.throttleInterval = time.Hour // no tick fires during this fast test — only the closed-channel final flush publishes
 
-	if _, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", ""); err != nil {
+	if _, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", ""); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
@@ -766,7 +924,7 @@ func TestSimpleExecutor_Execute_StreamingFailureDoesNotFailExecute(t *testing.T)
 	// never delivered anything.
 	exec := NewSimpleExecutor(tasks, &fakeEdgeRepository{}, resolver, relay, &fakeSimpleExecutorProfileResolver{}, &fakeSimpleExecutorProjectContextResolver{}, outbox, &fakeAgentExecOutputStreamer{})
 
-	ref, err := exec.Execute(context.Background(), "tenant-1", "t1", "req-1", "")
+	ref, err := exec.Execute(ctxWithTenant(t), "tenant-1", "t1", "req-1", "/srv/worktrees/p1", "")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

@@ -280,7 +280,7 @@ type agentExecPromptResult struct {
 	TimedOut bool   `json:"timedOut"`
 }
 
-func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
+func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string) (string, error) {
 	task, err := s.tasks.Get(ctx, tenantID, taskID)
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: load task: %w", err)
@@ -306,7 +306,15 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 		}
 	}
 
-	connectionID, worktreePath, _, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
+	// The resolver's own worktreePath return (2nd value) is deliberately
+	// discarded (`_`) — BUG-028: ResolveConnection only ever knows about
+	// the project's REPO, never a specific worktree, so its path guess is
+	// wrong for any task reusing an existing worktree. worktreePath is now
+	// an explicit parameter, resolved correctly by ExecuteTask's own
+	// WorktreeProvisioner.EnsureWorktree before this call. connectionID/
+	// devServerID/connected are still exactly what this call is for —
+	// unchanged from BUG-026's fix.
+	connectionID, _, _, devServerID, connected, err := s.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil {
 		return "", fmt.Errorf("simple_executor: resolve connection: %w", err)
 	}
@@ -343,6 +351,22 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 		WorktreePath: worktreePath,
 		StepID:       requestID,
 		Env:          map[string]string{"ORCA_TASK_ID": task.ID, "ORCA_PROJECT_ID": task.ProjectID},
+		// TrustPreset "full" (see this file's doc comment: "full" appends
+		// the YOLO flag, anything else is a no-op — agent-print-mode-exec.ts:44,97-99).
+		// task.execute is a one-shot, non-interactive dispatch — there is no
+		// human present in this call path to answer the CLI's normal
+		// per-write/per-command approval prompts. Without this, live-
+		// confirmed: the agent reports success (exit 0) having made NO
+		// actual file changes, e.g. "the save to specs/generated/
+		// TASK-1-spec.md was blocked because it needs your permission... approve
+		// the write when it comes up again" — impossible advice for a
+		// headless run, so every direct_agent dispatch that needs to write
+		// anything silently no-ops without this. Deliberate policy decision
+		// (not a default this port should invent quietly): every
+		// task.execute dispatch now runs with full, unattended write/git
+		// trust, confirmed with the user given the security-posture
+		// implication.
+		TrustPreset: "full",
 	}
 
 	// userID: task-service's domain.Task carries no per-task assignee field
@@ -378,6 +402,21 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 		return "", fmt.Errorf("simple_executor: marshal params: %w", err)
 	}
 
+	// relayCtx carries tenant id on the OUTGOING metadata for both
+	// infra-fleet-service calls below — infra-fleet-service's own RPCs
+	// reject a call with no tenant in context (INFRA_NO_TENANT), and the
+	// plain incoming ctx only carries tenant as an inbound-extracted Go
+	// value, never restamped onto an outbound gRPC call. Live-confirmed:
+	// every task.execute dispatch failed with TASK_EXECUTE_FAILED, and
+	// infra-fleet-service's own log showed the real cause,
+	// "INFRA_NO_TENANT: no tenant in request context", on the Relay RPC —
+	// this call was the one gap left un-fixed after BUG-026 (whose 3
+	// earlier fixes were all in project-service call sites, not this one).
+	relayCtx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return "", fmt.Errorf("simple_executor: tenant metadata: %w", err)
+	}
+
 	// TASK-AG-FLOWTASK-003: subscribe to this run's mid-run output
 	// CONCURRENTLY with the unary Relay('agent.execPrompt') call below —
 	// same stepId (requestID) both calls share, so infra-fleet-service's
@@ -386,7 +425,7 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	// goroutine drained via wg.Wait, in that order — see the two defers
 	// below) right after Relay returns, success or failure, so no
 	// subscription/goroutine outlives one Execute call.
-	streamCtx, cancelStream := context.WithCancel(ctx)
+	streamCtx, cancelStream := context.WithCancel(relayCtx)
 	var streamWG sync.WaitGroup
 	streamWG.Add(1)
 	go func() {
@@ -400,14 +439,37 @@ func (s *SimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestI
 	defer streamWG.Wait()
 	defer cancelStream()
 
-	resp, err := s.relay.Relay(ctx, &infrafleetv1.RelayRequest{
-		ConnectionId: connectionID, Method: "agent.execPrompt", ParamsJson: string(paramsJSON),
-	})
-	if err != nil {
-		return "", fmt.Errorf("simple_executor: relay agent.execPrompt: %w", err)
+	// devServerID is only set when ResolveConnection resolved via its
+	// no-infra.connections-row fallback (resolveViaDefaultRepo) — that path
+	// has no real connectionID for infra-fleet-service's connectionId-keyed
+	// Relay RPC to key on. Mirrors git-gateway-service's RelayExecutor.relay
+	// branching on DevServerIDFromContext(ctx) before falling through to
+	// plain Relay — same fallback shape, checked as a direct return value
+	// here instead of threaded through ctx (see
+	// usecase.ProjectExecutionResolver's doc comment for why). Live-
+	// confirmed as INFRA_RELAY_NO_CONNECTION ("connectionId is required")
+	// on every task.execute dispatch reaching this fallback until this
+	// branch was added.
+	var resultJSON string
+	if devServerID != "" {
+		resp, err := s.relay.RelayByDevServer(relayCtx, &infrafleetv1.RelayByDevServerRequest{
+			DevServerId: devServerID, Method: "agent.execPrompt", ParamsJson: string(paramsJSON),
+		})
+		if err != nil {
+			return "", fmt.Errorf("simple_executor: relayByDevServer agent.execPrompt: %w", err)
+		}
+		resultJSON = resp.GetResultJson()
+	} else {
+		resp, err := s.relay.Relay(relayCtx, &infrafleetv1.RelayRequest{
+			ConnectionId: connectionID, Method: "agent.execPrompt", ParamsJson: string(paramsJSON),
+		})
+		if err != nil {
+			return "", fmt.Errorf("simple_executor: relay agent.execPrompt: %w", err)
+		}
+		resultJSON = resp.GetResultJson()
 	}
 	var result agentExecPromptResult
-	if err := json.Unmarshal([]byte(resp.GetResultJson()), &result); err != nil {
+	if err := json.Unmarshal([]byte(resultJSON), &result); err != nil {
 		return "", fmt.Errorf("simple_executor: unmarshal agent.execPrompt result: %w", err)
 	}
 	if result.TimedOut {

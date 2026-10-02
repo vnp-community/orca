@@ -29,6 +29,15 @@ func newExecuteBatchForTest(t *testing.T, repo *fakeTaskRepository, edges *fakeE
 	resolver := &fakeProjectExecutionResolver{connectionID: "conn-1", connected: true}
 	clock := &fakeClock{now: time.Unix(1000, 0)}
 	executeTask := NewExecuteTask(repo, edges, simple, complex, &fakeWorkflowExecutor{}, resolvePermission, worktrees, resolver, clock, &fakeExecutionLinkRepository{})
+	// ExecuteBatch's wave-gating (waits for each task's Execute call to
+	// finish before starting the next wave) relies on ExecuteTask.Execute's
+	// direct_agent completion happening before it returns — true again with
+	// the synchronous test runAsync, same as it always was before
+	// dispatchDirectAgentAsync's redesign (see that method's doc comment:
+	// ExecuteBatch is dead/unwired code with no production caller, so this
+	// only needs to keep ExecuteBatch's OWN tests meaningful, not model real
+	// wiring).
+	executeTask.runAsync = func(fn func()) { fn() }
 	return NewExecuteBatch(edges, executeTask)
 }
 
@@ -74,7 +83,7 @@ func (s *sharedTracker) snapshot() []string {
 // exercised together.
 type orderTrackingSimpleExecutor struct{ tracker *sharedTracker }
 
-func (f *orderTrackingSimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
+func (f *orderTrackingSimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string) (string, error) {
 	f.tracker.record(taskID)
 	return "ref-" + taskID, nil
 }
@@ -94,7 +103,7 @@ type failingSimpleExecutor struct {
 	failFor string
 }
 
-func (f *failingSimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
+func (f *failingSimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string) (string, error) {
 	f.tracker.record(taskID)
 	if taskID == f.failFor {
 		return "", errors.New("boom")
@@ -128,7 +137,7 @@ type concurrencyTrackingExecutor struct {
 	wantOverlap int32
 }
 
-func (f *concurrencyTrackingExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, prompt string) (string, error) {
+func (f *concurrencyTrackingExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string) (string, error) {
 	atomic.AddInt32(&f.callCount, 1)
 	cur := atomic.AddInt32(&f.inFlight, 1)
 	for {
@@ -224,14 +233,20 @@ func TestExecuteBatch_BoundedConcurrency(t *testing.T) {
 
 // TestExecuteBatch_StopOnFailure_HaltsBeforeNextWave: a failure within a
 // wave must prevent the NEXT wave from ever dispatching when
-// StopOnFailure=true. B depends on A -> wave0=[A] (simple path, A has no
-// outgoing depends_on edge), wave1=[B] (complex path, B does).
+// StopOnFailure=true. B depends on A -> wave0=[A], wave1=[B] (both complex
+// path — A gets an extra outgoing parent_child edge so its dispatch still
+// goes through ComplexExecutor.Execute; dispatchDirectAgentAsync's redesign
+// means a direct_agent failure no longer propagates as Execute's own error,
+// see that method's doc comment, so this test (which needs a SYNCHRONOUSLY
+// observable failure to test StopOnFailure gating at all) uses the engine
+// that still has one).
 func TestExecuteBatch_StopOnFailure_HaltsBeforeNextWave(t *testing.T) {
 	repo := newFakeTaskRepository()
 	repo.tasks["A"] = domain.Task{ID: "A", TenantID: "tenant-1", OwnerID: "user-1", Status: domain.StatusOpen}
 	repo.tasks["B"] = domain.Task{ID: "B", TenantID: "tenant-1", OwnerID: "user-1", Status: domain.StatusOpen}
 	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
 		{FromTaskID: "B", ToTaskID: "A", Kind: domain.EdgeKindDependsOn},
+		{FromTaskID: "A", ToTaskID: "A-child", Kind: domain.EdgeKindParentChild},
 	}}
 	tracker := &sharedTracker{}
 	uc := newExecuteBatchForTest(t, repo, edges,
@@ -252,13 +267,16 @@ func TestExecuteBatch_StopOnFailure_HaltsBeforeNextWave(t *testing.T) {
 }
 
 // TestExecuteBatch_StopOnFailureFalse_ContinuesToNextWave is the mirror
-// case: StopOnFailure=false lets subsequent waves still run.
+// case: StopOnFailure=false lets subsequent waves still run. Same
+// complex-engine-for-A setup as TestExecuteBatch_StopOnFailure_HaltsBeforeNextWave
+// above, for the same reason (a synchronously observable failure).
 func TestExecuteBatch_StopOnFailureFalse_ContinuesToNextWave(t *testing.T) {
 	repo := newFakeTaskRepository()
 	repo.tasks["A"] = domain.Task{ID: "A", TenantID: "tenant-1", OwnerID: "user-1", Status: domain.StatusOpen}
 	repo.tasks["B"] = domain.Task{ID: "B", TenantID: "tenant-1", OwnerID: "user-1", Status: domain.StatusOpen}
 	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{
 		{FromTaskID: "B", ToTaskID: "A", Kind: domain.EdgeKindDependsOn},
+		{FromTaskID: "A", ToTaskID: "A-child", Kind: domain.EdgeKindParentChild},
 	}}
 	tracker := &sharedTracker{}
 	uc := newExecuteBatchForTest(t, repo, edges,

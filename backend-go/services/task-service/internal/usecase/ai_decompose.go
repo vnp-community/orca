@@ -75,7 +75,7 @@ func (uc *AIDecompose) Execute(ctx context.Context, in AIDecomposeInput) (AIDeco
 	// SimpleExecutor's agent.execPrompt call needs worktreePath (TASK-224
 	// Gap 1) and TechStackDetector needs worktreeID (its own resolve call
 	// below, not this one).
-	connectionID, _, _, connected, err := uc.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
+	connectionID, _, _, _, connected, err := uc.resolver.ResolveConnection(ctx, tenantID, task.ProjectID)
 	if err != nil || !connected {
 		// A not-connected project is a real error, never a silent empty
 		// proposal list — see TASK-226's regression test for this.

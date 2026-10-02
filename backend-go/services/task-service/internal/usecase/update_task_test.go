@@ -68,6 +68,54 @@ func TestUpdateTask_UpdatesTitleOnly(t *testing.T) {
 	}
 }
 
+func TestUpdateTask_ReplacesLabels(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Title: "t", Status: domain.StatusOpen, Labels: []string{"old"}}
+	uc := NewUpdateTask(repo, &fakeEdgeRepository{})
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	newLabels := []string{"phase:spec-approved"}
+	got, err := uc.Execute(ctx, UpdateTaskInput{ID: "t1", Labels: &newLabels})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got.Labels) != 1 || got.Labels[0] != "phase:spec-approved" {
+		t.Errorf("unexpected labels: %+v", got.Labels)
+	}
+}
+
+func TestUpdateTask_NilLabelsLeavesExistingUntouched(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Title: "t", Status: domain.StatusOpen, Labels: []string{"keep-me"}}
+	uc := NewUpdateTask(repo, &fakeEdgeRepository{})
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	newTitle := "renamed"
+	got, err := uc.Execute(ctx, UpdateTaskInput{ID: "t1", Title: &newTitle})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(got.Labels) != 1 || got.Labels[0] != "keep-me" {
+		t.Errorf("expected Labels untouched, got: %+v", got.Labels)
+	}
+}
+
+func TestUpdateTask_EmptyLabelsClearsList(t *testing.T) {
+	repo := newFakeTaskRepository()
+	repo.tasks["t1"] = domain.Task{ID: "t1", TenantID: "tenant-1", Title: "t", Status: domain.StatusOpen, Labels: []string{"old"}}
+	uc := NewUpdateTask(repo, &fakeEdgeRepository{})
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	emptyLabels := []string{}
+	got, err := uc.Execute(ctx, UpdateTaskInput{ID: "t1", Labels: &emptyLabels})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.Labels == nil || len(got.Labels) != 0 {
+		t.Errorf("expected Labels to be an empty (non-nil) slice, got: %#v", got.Labels)
+	}
+}
+
 func TestUpdateTask_NotFound(t *testing.T) {
 	uc := NewUpdateTask(newFakeTaskRepository(), &fakeEdgeRepository{})
 	ctx := withIdentity(context.Background(), "tenant-1", "user-1")

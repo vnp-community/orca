@@ -786,6 +786,31 @@ func (f *fakeExecutor) Execute(ctx context.Context, tenantID, taskID, requestID,
 	return f.ref, nil
 }
 
+// fakeSimpleExecutor is fakeExecutor's SimpleExecutor-shaped twin —
+// BUG-028 threaded an explicit worktreePath parameter through
+// usecase.SimpleExecutor.Execute, so it no longer has the same signature
+// as ComplexExecutor/WorkflowExecutor's Execute (which is why fakeExecutor
+// used to satisfy all three interchangeably). Kept as its own small type
+// rather than widening fakeExecutor, since ComplexExecutor/WorkflowExecutor
+// tests still rely on fakeExecutor's original, narrower shape.
+type fakeSimpleExecutor struct {
+	ref             string
+	err             error
+	called          bool
+	gotPrompt       string
+	gotWorktreePath string
+}
+
+func (f *fakeSimpleExecutor) Execute(ctx context.Context, tenantID, taskID, requestID, worktreePath, prompt string) (string, error) {
+	f.called = true
+	f.gotPrompt = prompt
+	f.gotWorktreePath = worktreePath
+	if f.err != nil {
+		return "", f.err
+	}
+	return f.ref, nil
+}
+
 // fakeComplexExecutor backs ExecuteTask's complex-path tests — a separate
 // type from fakeExecutor since usecase.ComplexExecutor's Execute takes an
 // extra worktreeID argument (TASK-TG-04-04) that usecase.SimpleExecutor's

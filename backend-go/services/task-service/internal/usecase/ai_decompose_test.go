@@ -27,8 +27,8 @@ type fakeProjectExecutionResolver struct {
 	err          error
 }
 
-func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, string, bool, error) {
-	return f.connectionID, f.worktreePath, f.worktreeID, f.connected, f.err
+func (f *fakeProjectExecutionResolver) ResolveConnection(ctx context.Context, tenantID, projectID string) (string, string, string, string, bool, error) {
+	return f.connectionID, f.worktreePath, f.worktreeID, "", f.connected, f.err
 }
 
 type fakeProjectInfoResolver struct {

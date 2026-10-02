@@ -13,6 +13,12 @@ option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/task/v1;taskv
 // See specs/backend-go/services/task-service.md.
 service TaskService {
   rpc CreateTask(CreateTaskRequest) returns (CreateTaskResponse);
+  // CreateTaskFromSource starts a task from an external issue (Jira/Linear/
+  // GitHub/GitLab) idempotently — a repeat call for the same issue in the same
+  // project returns the existing task with created=false.
+  rpc CreateTaskFromSource(CreateTaskFromSourceRequest) returns (CreateTaskFromSourceResponse);
+  // GetTaskSource returns the external issue a task was started from, if any.
+  rpc GetTaskSource(GetTaskSourceRequest) returns (GetTaskSourceResponse);
   rpc GetTask(GetTaskRequest) returns (GetTaskResponse);
   rpc AddEdge(AddEdgeRequest) returns (AddEdgeResponse);
   rpc Grant(GrantRequest) returns (GrantResponse);
@@ -194,6 +200,30 @@ message CreateTaskResponse {
   Task task = 1;
 }
 
+message CreateTaskFromSourceRequest {
+  // create carries the same fields as a plain CreateTask (title, project_id, ...).
+  CreateTaskRequest create = 1;
+  string provider = 2; // "jira" | "linear" | "github" | "gitlab"
+  string ref = 3;      // provider-native key, e.g. "ENG-123" or "owner/repo#12"
+  string url = 4;
+}
+
+message CreateTaskFromSourceResponse {
+  Task task = 1;
+  bool created = 2; // false when the issue already had a task
+}
+
+message GetTaskSourceRequest {
+  string task_id = 1;
+}
+
+message GetTaskSourceResponse {
+  bool found = 1;
+  string provider = 2;
+  string ref = 3;
+  string url = 4;
+}
+
 message GetTaskRequest {
   string id = 1;
 }
@@ -295,12 +325,16 @@ message TaskServiceExecuteRequest {
 }
 
 message TaskServiceExecuteResponse {
-  string execution_ref = 1; // opaque handle into infra-fleet-service or orchestration-service
-  // async is true for the complex path (orchestration-service dispatch is
-  // async — completion arrives later via ReportTaskExecutionResult,
-  // TASK-TG-04-05) and false for the simple path, which is already complete
-  // (status=review, actual_hours persisted) by the time this response is
-  // sent — see usecase.ExecuteTask's doc comment (SOL-TG-04).
+  string execution_ref = 1; // opaque handle into infra-fleet-service or orchestration-service; empty on the direct_agent path's immediate response (see async below)
+  // async is always true now (redesigned — see
+  // usecase.ExecuteTask.dispatchDirectAgentAsync's doc comment): the complex/
+  // workflow paths dispatch async as before (completion arrives later via
+  // ReportTaskExecutionResult, TASK-TG-04-05); the direct_agent path is ALSO
+  // async now — SimpleExecutor.Execute blocks on the CLI process for up to
+  // 15 minutes, which used to hold this very RPC open for that whole
+  // duration and got killed by the client's own WS liveness watchdog. Its
+  // completion (status=review, actual_hours) now happens in a backgrounded
+  // goroutine after this response is already sent, not before.
   bool async = 2;
 }
 
@@ -347,9 +381,24 @@ message UpdateTaskRequest {
   // wrapper-typed field-mask shape as title/status above. See
   // docs/backlog/BACKLOG-016.
   google.protobuf.StringValue workflow_template_id = 15;
+  // labels: unset (field absent) leaves Task.labels untouched; set (even to
+  // an empty list) replaces it wholesale — whole-list-replace, no partial
+  // add/remove, since the caller always has the task's current labels
+  // loaded already (BL-TG-05). Wrapped in a message, not a bare `repeated
+  // string`, so proto3 can distinguish "not sent" from "sent as empty" —
+  // same presence-tracking need the StringValue/DoubleValue fields above
+  // solve for scalars.
+  StringListValue labels = 16;
 }
 message UpdateTaskResponse {
   Task task = 1;
+}
+
+// StringListValue is an optional-repeated-string field-mask wrapper — see
+// UpdateTaskRequest.labels's doc comment for why a bare `repeated string`
+// can't express "unset" on its own.
+message StringListValue {
+  repeated string values = 1;
 }
 
 // FindTaskByNumber resolves a project-scoped "#TG-N" reference to a task

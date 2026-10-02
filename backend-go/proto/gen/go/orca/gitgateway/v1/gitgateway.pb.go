@@ -5499,8 +5499,15 @@ type CreateWorktreeRequest struct {
 	OrchestrationRunId      *string `protobuf:"bytes,12,opt,name=orchestration_run_id,json=orchestrationRunId,proto3,oneof" json:"orchestration_run_id,omitempty"`
 	CoordinatorHandle       *string `protobuf:"bytes,13,opt,name=coordinator_handle,json=coordinatorHandle,proto3,oneof" json:"coordinator_handle,omitempty"`
 	CreatedByTerminalHandle *string `protobuf:"bytes,14,opt,name=created_by_terminal_handle,json=createdByTerminalHandle,proto3,oneof" json:"created_by_terminal_handle,omitempty"`
-	unknownFields           protoimpl.UnknownFields
-	sizeCache               protoimpl.SizeCache
+	// External issue this worktree is started from. Both set or both unset.
+	// Persisted via project-service's RecordWorktreeCreated, which also emits the
+	// worktree.created outbox event that issue-status-sync consumes
+	// asynchronously (issue -> "In Progress"). Also lets task-service adopt this
+	// worktree for a task started from the same issue.
+	LinkedIssueProvider *string `protobuf:"bytes,15,opt,name=linked_issue_provider,json=linkedIssueProvider,proto3,oneof" json:"linked_issue_provider,omitempty"` // "jira" | "linear" | "github" | "gitlab"
+	LinkedIssueRef      *string `protobuf:"bytes,16,opt,name=linked_issue_ref,json=linkedIssueRef,proto3,oneof" json:"linked_issue_ref,omitempty"`                // provider-native key, e.g. "ENG-123"
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
 }
 
 func (x *CreateWorktreeRequest) Reset() {
@@ -5627,6 +5634,20 @@ func (x *CreateWorktreeRequest) GetCoordinatorHandle() string {
 func (x *CreateWorktreeRequest) GetCreatedByTerminalHandle() string {
 	if x != nil && x.CreatedByTerminalHandle != nil {
 		return *x.CreatedByTerminalHandle
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetLinkedIssueProvider() string {
+	if x != nil && x.LinkedIssueProvider != nil {
+		return *x.LinkedIssueProvider
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetLinkedIssueRef() string {
+	if x != nil && x.LinkedIssueRef != nil {
+		return *x.LinkedIssueRef
 	}
 	return ""
 }
@@ -9333,7 +9354,7 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"worktreeId\x12\x17\n" +
 	"\arepo_id\x18\x02 \x01(\tR\x06repoId\"G\n" +
 	"\x1eScanSetupScriptImportsResponse\x12%\n" +
-	"\x0eimported_paths\x18\x01 \x03(\tR\rimportedPaths\"\xdf\x05\n" +
+	"\x0eimported_paths\x18\x01 \x03(\tR\rimportedPaths\"\xf6\x06\n" +
 	"\x15CreateWorktreeRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x17\n" +
@@ -9350,7 +9371,10 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\atask_id\x18\v \x01(\tH\x06R\x06taskId\x88\x01\x01\x125\n" +
 	"\x14orchestration_run_id\x18\f \x01(\tH\aR\x12orchestrationRunId\x88\x01\x01\x122\n" +
 	"\x12coordinator_handle\x18\r \x01(\tH\bR\x11coordinatorHandle\x88\x01\x01\x12@\n" +
-	"\x1acreated_by_terminal_handle\x18\x0e \x01(\tH\tR\x17createdByTerminalHandle\x88\x01\x01B\x12\n" +
+	"\x1acreated_by_terminal_handle\x18\x0e \x01(\tH\tR\x17createdByTerminalHandle\x88\x01\x01\x127\n" +
+	"\x15linked_issue_provider\x18\x0f \x01(\tH\n" +
+	"R\x13linkedIssueProvider\x88\x01\x01\x12-\n" +
+	"\x10linked_issue_ref\x18\x10 \x01(\tH\vR\x0elinkedIssueRef\x88\x01\x01B\x12\n" +
 	"\x10_idempotency_keyB\a\n" +
 	"\x05_nameB\a\n" +
 	"\x05_pathB\x15\n" +
@@ -9361,7 +9385,9 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\b_task_idB\x17\n" +
 	"\x15_orchestration_run_idB\x15\n" +
 	"\x13_coordinator_handleB\x1d\n" +
-	"\x1b_created_by_terminal_handle\"\xa7\x01\n" +
+	"\x1b_created_by_terminal_handleB\x18\n" +
+	"\x16_linked_issue_providerB\x13\n" +
+	"\x11_linked_issue_ref\"\xa7\x01\n" +
 	"\x16CreateWorktreeResponse\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x12\n" +
