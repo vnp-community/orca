@@ -51,6 +51,9 @@ import { createTraceSlice } from './slices/trace'
 import { createRemoteAgentSessionSlice } from './slices/remote-agent-sessions'
 import { createPersistenceStatusSlice } from './slices/persistence-status'
 import { createConnectivitySlice } from './slices/connectivity-status'
+import { createMcpSlice } from './slices/mcp-slice'
+import { createMcpApprovalSlice } from './slices/mcp-approval-slice'
+import { createMcpTerminalOriginSlice } from './slices/mcp-terminal-origin'
 import { e2eConfig } from '@/lib/e2e-config'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
 import { registerClientStateSettingsAccessor } from '@/runtime/runtime-client-state-client'
@@ -115,7 +118,10 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createTraceSlice(...a),
   ...createRemoteAgentSessionSlice(...a),
   ...createPersistenceStatusSlice(...a),
-  ...createConnectivitySlice(...a)
+  ...createConnectivitySlice(...a),
+  ...createMcpSlice(...a),
+  ...createMcpApprovalSlice(...a),
+  ...createMcpTerminalOriginSlice(...a)
 }))
 
 registerHttpLinkStoreAccessor(() => useAppStore.getState())

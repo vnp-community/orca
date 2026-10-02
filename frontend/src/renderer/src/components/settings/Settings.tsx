@@ -106,11 +106,14 @@ import {
   getRuntimeTargetIdentity
 } from './settings-load-performance'
 import { translate } from '@/i18n/i18n'
+import { selectMcpSectionVisible } from '@/store/slices/mcp-slice'
+import { McpPaneSkeleton } from './mcp/McpPaneSkeleton'
 import { getProjectHostSetupProjectionFromState } from '../../store/selectors'
 
 const DevToolsPane = import.meta.env.DEV
   ? lazy(() => import('./DevToolsPane').then((module) => ({ default: module.DevToolsPane })))
   : null
+const McpPane = lazy(() => import('./mcp/McpPane').then((module) => ({ default: module.McpPane })))
 
 const SETTINGS_NAV_GROUPS = [
   {
@@ -281,6 +284,7 @@ function isEditableTarget(target: EventTarget | null): boolean {
 function Settings(): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const isAdmin = useAppStore((s) => s.currentUser?.role === 'admin')
+  const isMcpVisible = useAppStore(selectMcpSectionVisible)
   const keybindings = useAppStore((s) => s.keybindings)
   const updateSettings = useAppStore((s) => s.updateSettings)
   const switchRuntimeEnvironment = useAppStore((s) => s.switchRuntimeEnvironment)
@@ -1610,6 +1614,24 @@ function Settings(): React.JSX.Element {
                     searchEntries={getSectionSearchEntries('admin-org')}
                   >
                     {isSectionMounted('admin-org') ? <AdminOrgConsole /> : null}
+                  </SettingsSection>
+                ) : null}
+
+                {isMcpVisible ? (
+                  <SettingsSection
+                    id="mcp"
+                    title={translate('auto.mcp.nav.title', 'MCP')}
+                    description={translate(
+                      'auto.mcp.nav.description',
+                      'Let AI agents such as Claude Code, Claude Desktop, and Cursor work in Orca on your behalf.'
+                    )}
+                    searchEntries={getSectionSearchEntries('mcp')}
+                  >
+                    {isSectionMounted('mcp') ? (
+                      <Suspense fallback={<McpPaneSkeleton />}>
+                        <McpPane />
+                      </Suspense>
+                    ) : null}
                   </SettingsSection>
                 ) : null}
 

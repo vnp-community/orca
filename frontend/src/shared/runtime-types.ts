@@ -1,4 +1,5 @@
 /* eslint-disable max-lines -- Why: shared type definitions for all runtime RPC methods live in one file for discoverability and import simplicity. */
+import type { McpOrigin } from './mcp-entity-types'
 import type {
   AgentStatusEntry,
   AgentStatusOrchestrationContext,
@@ -380,6 +381,8 @@ export type RuntimeTerminalSummary = {
   writable: boolean
   lastOutputAt: number | null
   preview: string
+  /** Set only when an MCP client started this terminal; absent for UI-created ones. */
+  origin?: McpOrigin
 }
 
 export type RuntimeTerminalVisualTerminalNode = {

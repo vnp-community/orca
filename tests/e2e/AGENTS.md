@@ -32,3 +32,8 @@ Concretely:
 - Use the store to reach a state; use the DOM to prove the state is correct.
 - If a render-layer regression would leave the store clean but the UI broken, a store-only test will not catch it. Mount the affected subtree and assert on what the user sees.
 - Headless (`ORCA_E2E_HEADLESS=1`) does not exempt you from this rule — Playwright drives the real DOM via CDP regardless of window visibility. The rare cases that need focus or pointer capture use `ORCA_E2E_HEADFUL=1` via `project.metadata.orcaHeadful`.
+
+## `mcp-web/` Uses Its Own Playwright Config
+
+Specs in `tests/e2e/mcp-web/*.web.e2e.ts` are browser-only (no Electron) and run with
+`tests/playwright.web.config.ts` (`pnpm run test:e2e:mcp-web`). The `.web.e2e.ts` suffix keeps them out of the Electron project's `**/*.spec.ts`. They drive the web SPA against a mocked WebSocket backend (`support/mock-orca-ws.ts`, backed by the shared fake in `frontend/src/renderer/src/test-support/mcp-fake-backend.ts`); set `MCP_E2E_BASE_URL` to also run the `@dev-stack` cases against a real stack. If the cached Chromium build differs from Playwright's pinned one, set `MCP_E2E_CHROMIUM_PATH`.

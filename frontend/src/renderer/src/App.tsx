@@ -187,6 +187,7 @@ import {
 } from './components/terminal/background-terminal-worktree-mount'
 
 import { uiGet, uiSet } from '@/runtime/runtime-ui-client'
+import { mcpClient } from '@/runtime/runtime-mcp-client'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { installConnectivityPolling } from '@/store/slices/connectivity-status'
 // Why: agents alive during a hard kill (crash, forced update install) need a
@@ -364,6 +365,7 @@ const SshPassphraseDialog = lazy(() =>
     default: module.SshPassphraseDialog
   }))
 )
+const McpGlobalLayer = lazy(() => import('./components/mcp/McpGlobalLayer'))
 const UpdateCard = lazy(() =>
   import('./components/UpdateCard').then((module) => ({ default: module.UpdateCard }))
 )
@@ -685,6 +687,7 @@ function App(): React.JSX.Element {
   ) as React.CSSProperties | undefined
   const dictationState = useAppStore((s) => s.dictationState)
   const hasSshCredentialRequest = useAppStore((s) => s.sshCredentialQueue.length > 0)
+  const mcpSurface = mcpClient.isBridgeAvailable()
   const shouldMountDictationController =
     settings?.voice?.enabled === true || dictationState !== 'idle'
   const primarySelectionMiddleClickPaste = resolvePrimarySelectionMiddleClickPaste(
@@ -2822,6 +2825,18 @@ function App(): React.JSX.Element {
                   compact
                 >
                   <SshPassphraseDialog />
+                </RecoverableRenderErrorBoundary>
+              </Suspense>
+            ) : null}
+            {mcpSurface ? (
+              <Suspense fallback={null}>
+                <RecoverableRenderErrorBoundary
+                  boundaryId="modal.mcp-approval"
+                  surface="modal"
+                  resetKey={activeModal}
+                  compact
+                >
+                  <McpGlobalLayer />
                 </RecoverableRenderErrorBoundary>
               </Suspense>
             ) : null}

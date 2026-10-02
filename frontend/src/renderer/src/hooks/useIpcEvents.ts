@@ -139,6 +139,7 @@ import {
   subscribeToRemoteWorkspaceChanged
 } from '@/runtime/runtime-remote-workspace-client'
 import { useDevServersSync } from './useDevServersSync'
+import { useMcpSync } from './useMcpSync'
 import {
   getRuntimeSshState,
   listRuntimeSshDetectedPorts,
@@ -864,6 +865,7 @@ function getWorktreeRuntimeEnvironmentId(worktreeId: string | null | undefined):
 export function useIpcEvents(): void {
   // Dev server list + status sync (CR-OB-002)
   useDevServersSync()
+  useMcpSync()
 
   useEffect(() => {
     const unsubs: (() => void)[] = []

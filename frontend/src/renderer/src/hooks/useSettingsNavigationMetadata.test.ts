@@ -214,4 +214,19 @@ describe('settings navigation metadata', () => {
     expect(importLines).not.toMatch(/components\/settings\/[A-Z][A-Za-z]+Pane(?:'|")/)
     expect(importLines).not.toMatch(/components\/stats\/StatsPane(?:'|")/)
   })
+
+  it('adds the mcp section in capabilities only when enabled, with admin-only search entries', () => {
+    const base = { isMac: false, isWindows: false, isWebClient: true, isDev: false, repos: [repo] }
+    expect(buildSettingsNavigationMetadata(base).some((s) => s.id === 'mcp')).toBe(false)
+    const user = buildSettingsNavigationMetadata({ ...base, isMcpEnabled: true }).find(
+      (s) => s.id === 'mcp'
+    )
+    const admin = buildSettingsNavigationMetadata({
+      ...base,
+      isMcpEnabled: true,
+      isAdmin: true
+    }).find((s) => s.id === 'mcp')
+    expect(user?.group).toBe('capabilities')
+    expect(admin!.searchEntries.length).toBeGreaterThan(user!.searchEntries.length)
+  })
 })

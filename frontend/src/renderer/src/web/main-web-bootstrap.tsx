@@ -37,6 +37,10 @@ import { useAppStore } from '../store'
 
 const App = lazy(() => import('../App'))
 import { WorkspaceProvider } from '../context/WorkspaceContext'
+import { installPushDeepLinkHandling } from './web-push-deep-link'
+import { isOAuthConsentPath, loginUrlFor } from './oauth-return-to'
+import { useOAuthReturnForwarding } from './use-oauth-return-forwarding'
+import { OAuthConsentRoute } from './OAuthConsentRoute'
 const LoginPage = lazy(() => import('./login/LoginPage').then((m) => ({ default: m.LoginPage })))
 
 export type BootstrapOptions = {
@@ -109,7 +113,7 @@ export function installAuthFailedRedirect(): void {
       document.cookie = `${name}=; ${exp}; path=/; domain=${location.hostname}`
       document.cookie = `${name}=; ${exp}; path=/; domain=.${location.hostname}`
     })
-    window.location.href = '/login'
+    window.location.href = loginUrlFor(window.location)
   })
 }
 
@@ -268,9 +272,14 @@ function WebRoot({
     store.setAuthStatus('authenticated')
   }, [sessionUser])
 
+  const forwardTo = useOAuthReturnForwarding(sessionUser)
+
   // CR-LOGIN-001: if the user is already authenticated via session cookie,
   // skip the WebConnect / pairing flow entirely and render the App directly.
   if (sessionUser !== null) {
+    if (forwardTo) {
+      return <div className="min-h-dvh bg-background" />
+    }
     // Why: installWebPreloadApi reads activeEnvironment from localStorage via
     // readStoredWebRuntimeEnvironment(). Without a stored environment, all RPC
     // calls fail with "No active runtime environment" because requireActiveEnvironment()
@@ -282,6 +291,9 @@ function WebRoot({
       saveStoredWebRuntimeEnvironment(createSessionWebRuntimeEnvironment(window.location))
     }
     installWebPreloadApi()
+    if (isOAuthConsentPath(window.location)) {
+      return <OAuthConsentRoute />
+    }
     return (
       <ConnectionStatusProvider client={client}>
         <WebConnectionBannerWrapper />
@@ -448,6 +460,8 @@ export async function bootstrapWebApp(options: BootstrapOptions = {}): Promise<v
       </I18nProvider>
     </React.StrictMode>
   )
+
+  installPushDeepLinkHandling()
 
   // Register Service Worker for Web Push notifications (non-fatal — web mode only)
   if ('serviceWorker' in navigator) {

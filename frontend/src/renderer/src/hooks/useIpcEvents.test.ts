@@ -24,6 +24,11 @@ vi.mock('@/components/terminal/terminal-tab-actions', () => ({
   closeTerminalTab: closeTerminalTabMock
 }))
 
+// Why: these store-backed sync hooks call useAppStore(selector), but this file's store mocks only
+// expose getState/subscribe; they have their own tests and are not under test here.
+vi.mock('./useDevServersSync', () => ({ useDevServersSync: vi.fn() }))
+vi.mock('./useMcpSync', () => ({ useMcpSync: vi.fn() }))
+
 const FUTURE_LEAF_ID = '11111111-1111-4111-8111-111111111111'
 const STALE_LEAF_ID = '22222222-2222-4222-8222-222222222222'
 const ORPHAN_LEAF_ID = '33333333-3333-4333-8333-333333333333'

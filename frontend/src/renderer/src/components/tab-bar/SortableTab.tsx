@@ -22,6 +22,7 @@ import {
 } from './drop-indicator'
 import { preventMiddleButtonDefault } from './middle-button-default-guard'
 import { SortableTabContextMenu } from './SortableTabContextMenu'
+import { McpTabOriginBadge } from './McpTabOriginBadge'
 import { translate } from '@/i18n/i18n'
 import { TAB_CONTAINER_WIDTH_CLASSES, TAB_LABEL_WIDTH_CLASSES } from './tab-width-rules'
 import { useShortcutKeyDetails } from '@/hooks/useShortcutLabel'
@@ -328,6 +329,7 @@ export default function SortableTab({
           <ShellIcon shell={shellForIcon} size={12} />
         </span>
       )}
+      {!isEditing && <McpTabOriginBadge tabId={tab.id} />}
       {isPinned && !isEditing && (
         <Pin className="mr-1 size-3 shrink-0 text-muted-foreground" aria-hidden />
       )}

@@ -8,6 +8,7 @@ import type {
   HostedReviewInfo,
   HostedReviewProvider
 } from '../shared/hosted-review'
+import type { McpEvent, McpRpcArgs, McpRpcMethod, McpRpcResult } from '../shared/mcp-types'
 import type { NativeFileDropPayload } from '../shared/native-file-drop'
 import type {
   LocalLogTailChangedPayload,
@@ -924,7 +925,15 @@ export type AppApi = {
   pickFloatingWorkspaceDirectory: () => Promise<string | null>
 }
 
+export type McpBridgeApi = {
+  /** One params object (or none); errors are Error("<MCP_CODE>: ...") — parse via runtime-mcp-client. */
+  call: <M extends McpRpcMethod>(method: M, ...params: McpRpcArgs<M>) => Promise<McpRpcResult<M>>
+  /** Opens the mcp.events.subscribe stream; returns teardown. onClose fires when the socket closes. */
+  subscribeEvents: (onEvent: (event: McpEvent) => void, onClose?: () => void) => () => void
+}
+
 export type PreloadApi = {
+  mcp: McpBridgeApi
   app: AppApi
   orcaProfiles: {
     list: () => Promise<OrcaProfileListResult>

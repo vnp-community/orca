@@ -11,6 +11,7 @@ import type {
 } from '../../../preload/api-types'
 import type { CliInstallStatus } from '../../../shared/cli-install-types'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
+import { createMcpApi } from './web-mcp-api'
 import type { AiVaultListArgs, AiVaultListResult } from '../../../shared/ai-vault-types'
 import { buildNativeChatUnsubscribe } from '../../../shared/native-chat-stream-unsubscribe'
 import type {
@@ -793,6 +794,18 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     devServerGroup: createDevServerGroupApi(),
     tenantProfile: createTenantProfileApi(),
     admin: createAdminApi(),
+    mcp: createMcpApi({
+      callRuntimeResult,
+      openStream: (method, params, h) => {
+        const environment = requireActiveEnvironmentOrNull()
+        return environment
+          ? getClientForEnvironment(environment).subscribe(method, params, {
+              onResponse: h.onResponse,
+              onClose: h.onClose
+            })
+          : null
+      }
+    }),
     hooks: createHooksApi(),
     stats: {
       getSummary: async () =>

@@ -21,6 +21,7 @@ import { useAppStore } from '../../store'
 import { formatShortcutLabel, useOptionalShortcutLabel } from '@/hooks/useShortcutLabel'
 import { translate } from '@/i18n/i18n'
 import { TerminalTabSplitMenuSection } from './TerminalTabSplitMenuSection'
+import { McpOriginStopMenuItem } from './McpOriginStopMenuItem'
 
 const TAB_COLORS = [
   {
@@ -183,6 +184,7 @@ export function SortableTabContextMenu({
             </DropdownMenuItem>
           </>
         ) : null}
+        <McpOriginStopMenuItem tabId={tab.id} />
         <DropdownMenuSeparator />
         <DropdownMenuItem onSelect={onTogglePin}>
           {isPinned ? (

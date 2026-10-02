@@ -79,6 +79,18 @@ describe('installAuthFailedRedirect (FE-TASK-STORAGE-015)', () => {
 
     expect(window.location.href).toBe('')
   })
+
+  it('keeps an expired consent request via return_to', () => {
+    markSessionAuthEnvironment()
+    const id = '0b2f6c1e-1111-4222-8333-444455556666'
+    Object.assign(window.location, { pathname: '/oauth/consent', search: `?request_id=${id}` })
+    installAuthFailedRedirect()
+    window.dispatchEvent(new Event('orca:auth-failed'))
+
+    expect(window.location.href).toBe(
+      `/login?return_to=${encodeURIComponent(`/oauth/consent?request_id=${id}`)}`
+    )
+  })
 })
 
 function sessionAuthEnvironment(): StoredWebRuntimeEnvironment {

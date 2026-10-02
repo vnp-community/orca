@@ -20,6 +20,7 @@ import {
   Mic,
   MousePointerClick,
   Network,
+  Plug,
   Palette,
   PanelsTopLeft,
   Play,
@@ -71,6 +72,8 @@ import { getAdvancedPaneSearchEntries } from '@/components/settings/advanced-sea
 import { getShortcutsPaneSearchEntries } from '@/components/settings/shortcuts-search'
 import { getStatsPaneSearchEntries } from '@/components/stats/stats-search'
 import { getExperimentalPaneSearchEntries } from '@/components/settings/experimental-search'
+import { getMcpPaneSearchEntries } from '@/components/settings/mcp-search'
+import { selectMcpSectionVisible } from '@/store/slices/mcp-slice'
 import { getRepositoryPaneSearchEntries } from '@/components/settings/repository-search'
 import { isWebClientLocation } from '@/lib/web-client-location'
 import {
@@ -114,7 +117,8 @@ export function buildSettingsNavigationMetadata({
   isWebClient,
   isDev = import.meta.env.DEV,
   repos,
-  isAdmin = false
+  isAdmin = false,
+  isMcpEnabled = false
 }: {
   isMac: boolean
   isWindows: boolean
@@ -124,6 +128,8 @@ export function buildSettingsNavigationMetadata({
   repos: readonly Repo[]
   /** CR-DS-006/007/008: gates the Admin console nav section. */
   isAdmin?: boolean
+  /** True when MCP is enabled for the tenant, or an admin can turn it on. */
+  isMcpEnabled?: boolean
 }): SettingsNavSection[] {
   const showDesktopOnlySettings = !isWebClient
   const terminalPaneSearchEntries = getTerminalPaneSearchEntries({
@@ -584,6 +590,21 @@ export function buildSettingsNavigationMetadata({
       searchEntries: getExperimentalPaneSearchEntries(),
       group: 'experimental'
     },
+    ...(isMcpEnabled
+      ? [
+          {
+            id: 'mcp',
+            title: translate('auto.mcp.nav.title', 'MCP'),
+            description: translate(
+              'auto.mcp.nav.description',
+              'Let AI agents such as Claude Code, Claude Desktop, and Cursor work in Orca on your behalf.'
+            ),
+            icon: Plug,
+            searchEntries: getMcpPaneSearchEntries(isAdmin),
+            group: 'capabilities'
+          }
+        ]
+      : []),
     ...repos.map((repo) => ({
       id: `repo-${repo.id}`,
       title: repo.displayName,
@@ -607,6 +628,7 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
   const repos = useAppStore((state) => state.repos)
   const settings = useAppStore((state) => state.settings)
   const isAdmin = useAppStore((state) => state.currentUser?.role === 'admin')
+  const isMcpEnabled = useAppStore(selectMcpSectionVisible)
   const isMac = isMacUserAgent()
   const isWindows = isWindowsUserAgent()
   const isWebClient = isWebClientLocation()
@@ -634,9 +656,19 @@ export function useSettingsNavigationMetadata(): SettingsNavSection[] {
         isWebClient,
         isDev: import.meta.env.DEV,
         repos,
-        isAdmin
+        isAdmin,
+        isMcpEnabled
       }),
     // oxlint-disable-next-line react-hooks/exhaustive-deps -- activeLocale is read implicitly by the translate() calls inside buildSettingsNavigationMetadata; without it the memo keeps the previous language's sections.
-    [isMac, isWindows, isWindowsTerminalHost, isWebClient, repos, activeLocale, isAdmin]
+    [
+      isMac,
+      isWindows,
+      isWindowsTerminalHost,
+      isWebClient,
+      repos,
+      activeLocale,
+      isAdmin,
+      isMcpEnabled
+    ]
   )
 }

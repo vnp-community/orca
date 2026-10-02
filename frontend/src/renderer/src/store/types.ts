@@ -49,6 +49,9 @@ import type { TraceSlice } from './slices/trace'
 import type { RemoteAgentSessionSlice } from './slices/remote-agent-sessions'
 import type { PersistenceStatusSlice } from './slices/persistence-status'
 import type { ConnectivitySlice } from './slices/connectivity-status'
+import type { McpSlice } from './slices/mcp-slice'
+import type { McpApprovalSlice } from './slices/mcp-approval-slice'
+import type { McpTerminalOriginSlice } from './slices/mcp-terminal-origin'
 
 // ── Re-exports for cross-slice consumers (import from '@/store/types') ────────
 export type {
@@ -110,4 +113,7 @@ export type AppState = RepoSlice &
   TraceSlice &
   RemoteAgentSessionSlice &
   PersistenceStatusSlice &
-  ConnectivitySlice
+  ConnectivitySlice &
+  McpSlice &
+  McpApprovalSlice &
+  McpTerminalOriginSlice
