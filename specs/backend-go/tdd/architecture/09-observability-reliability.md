@@ -1,12 +1,18 @@
 # Observability & Reliability
 
-## The three pillars, uniformly across all 17 services
+## The three pillars, uniformly across all 18 services
 
 | Pillar | Tooling | Convention |
 |--------|---------|------------|
 | Logs | `slog` → OTLP → Loki (or equivalent) | Structured JSON only, never `fmt.Println`-style logs. Every log line carries `trace_id`, `tenant_id` (when applicable), `service`, `version` via the shared `orca-go-common` logging middleware |
 | Traces | OpenTelemetry SDK → OTLP → Jaeger/Tempo | Every inbound gRPC/HTTP request starts a span; every outbound gRPC call, DB query, Vault call, and NATS publish is a child span — a single request from `api-gateway` through 4 services and a DB call is one trace, not 5 disconnected logs |
 | Metrics | Prometheus client, `/metrics` endpoint per service | RED metrics (Rate, Errors, Duration) on every gRPC method by default via interceptor — no service hand-instruments this per-handler |
+
+### Naming prefixes and scrape path (T8)
+
+- Domain-specific Prometheus metrics use a per-domain prefix; MCP uses `orca_mcp_*`, and MCP env vars use `MCP_*` (loaded via `common/config`).
+- **Scrape path: `/metrics` = health mux + promhttp.** The service's HTTP health port (api-gateway `HTTP_PORT`, mcp-service's HTTP port) serves `/healthz`, `/readyz` and `/metrics` from one mux (`promhttp.HandlerFor` over a private registry, not the default registerer). In api-gateway `/metrics` is therefore NOT on the public edge listener. The ServiceMonitor/annotation that scrapes it belongs to the deployment chart.
+- MCP metric families (api-gateway `adapter/mcpmetrics` and mcp-service): `orca_mcp_requests_total`, `orca_mcp_tool_calls_total`, `orca_mcp_tool_duration_seconds`, `orca_mcp_sessions_active`, `orca_mcp_sessions_closed_total`, `orca_mcp_sessions_count_errors_total`, `orca_mcp_sse_streams_active`, `orca_mcp_sse_events_dropped_total`, `orca_mcp_resume_total`, `orca_mcp_approvals_total`, `orca_mcp_policy_denials_total`, `orca_mcp_auth_failures_total`, `orca_mcp_principal_resolve_total`, `orca_mcp_session_identity_mismatch_total`, `orca_mcp_rate_limited_total`, `orca_mcp_requests_cancelled_total`. OTel spans: `mcp.request`, `mcp.policy`, `mcp.dispatch` (no tool arguments, tokens, secrets or cookies as span attributes).
 
 ## SLOs
 

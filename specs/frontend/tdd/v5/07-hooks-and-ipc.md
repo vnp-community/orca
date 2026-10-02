@@ -444,10 +444,10 @@ export function useRemoteWindowsTerminalCapabilities(
 #### `useWebPushSubscription.ts`
 ```typescript
 export function useWebPushSubscription(): PushSubscriptionState & {
-  subscribe: () => Promise<void>   // GET /push/vapid-key → PushManager.subscribe()
-  unsubscribe: () => Promise<void> // DELETE /push/subscribe
+  subscribe: () => Promise<void>   // GET /api/vapid-public-key → PushManager.subscribe() → POST /api/push-subscribe
+  unsubscribe: () => Promise<void> // POST /api/push-unsubscribe { endpoint }
 }
-// Fetches VAPID key from server: GET /push/vapid-key
+// Fetches VAPID key from server: GET /api/vapid-public-key
 // Web Push API only — no IPC (direct HTTP)
 ```
 
@@ -496,6 +496,25 @@ useEffect(() => {
 ### Hook Rules (v3.0 additions)
 
 - **60s module cache**: `useRemoteAgentDetection`, `useRemoteWindowsTerminalCapabilities` — dùng module-level Map, không phải Zustand
-- **Web Push = direct HTTP**: Không qua IPC — dùng `fetch('/push/vapid-key')`, `fetch('/push/subscribe', { method: 'POST' })`
+- **Web Push = direct HTTP**: Không qua IPC — dùng `fetch('/api/vapid-public-key')`, `fetch('/api/push-subscribe', { method: 'POST' })`
 - **Service Worker registration** trong `bootstrapWebApp()` không phải hook — only once at startup
 - **Fleet polling** chỉ `autoStart = true` trong web mode (không áp dụng Electron — server-side fleet)
+
+
+---
+
+## Addendum v5.0 — hooks MCP (FE-MCP-SOL-001/002/006/009) — IMPLEMENTED
+
+| Hook | Vai trò |
+|---|---|
+| `useMcpSync` | được gọi trong `useIpcEvents`: nạp `mcp.server.info` (làm mới khi tab hiện lại và mỗi 5 phút), giữ **một** luồng sự kiện khi `authed && enabled`, xử lý deep link. Không đăng ký lại khi re-render; cleanup khi unmount. |
+| `useMcpEvent(type, cb)` | đăng ký vào `lib/mcp-event-bus.ts`, tự huỷ khi unmount |
+| `useMcpQuery(method, params, empty)` | loader danh sách cục bộ, phân loại lỗi -> `loading/ready/error/unavailable/forbidden`, bỏ phản hồi cũ |
+| `useMcpSessions`, `useMcpGrants`/`useMcpAllGrants`, `useMcpOAuthClients` | dữ liệu các tab |
+| `useMcpApprovalDeadline` | đếm ngược theo đồng hồ client |
+| `useMcpTerminalOrigins`, `useStopMcpTerminal` | nhãn "Tạo bởi agent" và dừng terminal do agent tạo |
+
+Quy tắc: mọi `subscribe`/`on*` phải trả hàm cleanup (nguyên tắc 12); không persist dữ liệu approval; không
+log/ghi storage secret hay `requestId`/`redirectUrl` consent.
+Test của `hooks/useIpcEvents.test.ts` mock `./useDevServersSync` và `./useMcpSync` vì các mock store của file
+đó chỉ có `getState/subscribe` (hai hook này gọi `useAppStore(selector)` và có test riêng).

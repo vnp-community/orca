@@ -482,3 +482,25 @@ shadcn/ui components (Radix UI + Tailwind):
 //     error    → error message (role="alert")
 //   Inject vào SshTargetRow — web mode only
 ```
+
+
+---
+
+## Addendum v5.0 — Settings > MCP và lớp toàn cục (FE-MCP-SOL-001..011) — IMPLEMENTED
+
+- **Section Settings `mcp`**: entry trong `hooks/useSettingsNavigationMetadata.ts` (hiện khi
+  `selectMcpSectionVisible`), `<SettingsSection id="mcp">` lazy trong `components/settings/Settings.tsx`,
+  chỉ mục tìm kiếm `components/settings/mcp-search.ts`. Khác `McpConfigSection` (cấu hình `.mcp.json` theo repo).
+- **`components/settings/mcp/McpPane.tsx`**: banner kill switch, trạng thái disabled/unavailable/error,
+  thẻ bật MCP cho admin (`McpAdminEnableCard`), tab lazy qua `mcp-tab-registry.ts`:
+  Connect, Connected apps, Access tokens, Approvals, External servers (mọi người) và OAuth clients,
+  All grants, Tools, Prompts, Policies, Audit log (admin).
+- **Lớp toàn cục `components/mcp/McpGlobalLayer.tsx`** (mount trong `App.tsx`): nhận `approval.requested/
+  resolved` từ event bus, resync khi stream nối lại / 30s / khi tab hiện lại, render `McpApprovalPrompt`
+  (không tự phê duyệt; khóa Approve theo rủi ro; chỉ click `isTrusted`; gửi `paramsHash` của server).
+- **Trang consent** `components/mcp/consent/McpConsentPage.tsx` (xem 06): độc lập, không tải shell.
+- Nhãn "Tạo bởi agent" trên terminal: `McpAgentTerminalsList`, `useMcpTerminalOrigins`, `useStopMcpTerminal`.
+- Gate admin: tab MCP admin dùng `adminOnly` trong registry (khác `AdminApp` — Admin SPA riêng — và
+  `AdminOrgConsole`, xem 00-index addendum). Primitive: dialog/sheet/table/tabs/badge/checkbox (không có `switch`/`alert`).
+- i18n: khoá `auto.mcp.*`, không gọi `translate` ở top-level. Nhãn giai đoạn rollout (`MCP_UI_STAGE`,
+  badge Beta) trong FE-MCP-SOL-012 **chưa được cài**.

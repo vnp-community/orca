@@ -413,3 +413,24 @@ function createMockClient(connected = true): IRpcClient {
   }
 }
 ```
+
+
+---
+
+## Addendum v5.0 — kênh `mcp.*` (FE-MCP-SOL-001) — IMPLEMENTED
+
+- Điểm vào duy nhất cho UI: `runtime/runtime-mcp-client.ts` (`mcpClient.call(method, params)`,
+  `subscribeEvents`, `isBridgeAvailable`); mọi lỗi được parse thành `McpRpcError { code, detail }` bởi
+  `runtime/runtime-mcp-error.ts` (chấp nhận cả `"MCP_X: msg"` và `rpc error: ... desc = MCP_X: msg`, mã
+  lạ -> `code = null` + thông điệp server). Kênh chưa cài ở gateway ("is not yet implemented") được coi
+  là "không khả dụng", không crash.
+- Cầu nối: namespace `window.api.mcp` (`McpBridgeApi` trong `preload/api-types.ts`) do
+  `web/web-mcp-api.ts` (`createMcpApi`) dựng trên `callRuntimeResult`/`openStream` của web client; khung stream:
+  ack `result:null` rồi các frame `McpEvent`, kết thúc `{type:'end'}`. Mỗi kênh nhận **một** object tham số (C10).
+- Kiểu dùng chung: `shared/mcp-types.ts` (+ `mcp-entity-types.ts`, `mcp-rpc-schema.ts`);
+  `MCP_RPC_METHODS`, `MCP_STREAM_METHODS`, `MCP_ERROR_CODES`, `MCP_EVENT_TYPES`. Test
+  `shared/mcp-contract-conformance.test.ts` parse bảng kênh/mã lỗi/union sự kiện trong CONTRACT và đối
+  chiếu với các hằng này **và** với mọi literal `mcp.*`/`MCP_*` trong mã production (lệch = CI đỏ).
+- 36 kênh RPC + 1 kênh stream (`mcp.events.subscribe`): nhóm người dùng (server/session/consent/grant/
+  token/approval), nhóm admin (`mcp.admin.*`: settings, killswitch, tool, policy, client, grant,
+  session, audit, prompt) và `mcp.externalServer.*`. Chi tiết tham số/kết quả: CONTRACT §2.

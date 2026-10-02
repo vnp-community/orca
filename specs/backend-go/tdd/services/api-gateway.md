@@ -12,7 +12,7 @@ per-user `fork()` model, `http-server.ts`, and the routing responsibility
 
 `api-gateway` is the only service with an external-facing listener. Every
 browser, mobile, and CLI client talks to it and nothing else; it talks to
-the other 16 services over internal gRPC (mTLS, mesh-only ingress), never
+the other 17 services over internal gRPC (mTLS, mesh-only ingress), never
 the reverse. Per
 [`08-inter-service-communication.md`](../architecture/08-inter-service-communication.md)'s
 "API Gateway responsibilities" section, which this doc expands on, it
@@ -26,9 +26,16 @@ others to cut-over Go services (§10).
 
 What it does not do: implement a business rule, own a row of business
 data, or run AI inference. An `if` deciding business behavior, rather than
-routing/auth/policy behavior, belongs downstream.
+routing/auth/policy behavior, belongs downstream. The one documented
+exception to "pure routing" is the set of **edge protocol adapters** (§6):
+the hand-written MCP endpoint is protocol translation, not business logic —
+consent, policy, approval and audit decisions stay in `mcp-service`.
 
 ## 2. Bounded context — pure edge, zero business logic
+
+("Zero business logic" holds for the edge protocol adapters too — `wsbridge`,
+`wscompat`, `mcpserver` (§6) translate a wire protocol into gRPC calls and
+enforce transport concerns; they decide nothing about domain behavior.)
 
 `api-gateway` sits outside every domain boundary in
 [`02-microservices-decomposition.md`](../architecture/02-microservices-decomposition.md):
@@ -51,7 +58,7 @@ every other user sharing it. Forking a process was the only isolation tool
 available at that cost.
 
 In the Go model the same safety property comes from elsewhere: business
-logic lives in the 16 backend services, each already isolated as a
+logic lives in the 17 backend services, each already isolated as a
 separate deployable with its own database, resource limits, and scaling
 (decomposition doc's principles 1–2). `api-gateway` runs no business
 logic, so no user-specific mutable state or computation ever lives in a
@@ -99,6 +106,23 @@ by gRPC server-streaming to the owning service (`04-tech-stack.md`'s
 Each WS endpoint maps to exactly one owning service; a connection is never
 fanned out to more than one. See §8 for the bridging mechanism.
 
+**MCP edge routes (T1).** Hand-written, not derived from a `.proto`, served by
+`adapter/mcpserver` and gated by `MCP_ENABLED` (route 404 when off):
+
+| Route | Purpose | Backing service |
+|---|---|---|
+| `/mcp` | MCP Streamable HTTP endpoint (official Go SDK `github.com/modelcontextprotocol/go-sdk`); bearer `aud`-bound token | `mcp-service` (policy/session/approval), `auth-service` (`ResolveMcpPrincipal`) |
+| `/oauth/register`, `/oauth/authorize`, `/oauth/token`, `/oauth/revoke` (plus the consent UI hand-off routes) | OAuth authorization-server front for MCP clients (PKCE) | `auth-service` `OAuth*` RPCs; consent in `mcp-service` |
+| `/.well-known/oauth-protected-resource`, `/.well-known/oauth-authorization-server` | OAuth discovery metadata | static from config |
+| `/v1/auth/mcp-tokens` | create/list/revoke MCP PATs (session-authenticated only; a PAT cannot mint PATs) | `auth-service` |
+
+The WS RPC surface (`wscompat`) gains `mcp.*` channels for the app UI:
+`mcp.server.info`, `mcp.consent.get`/`decide`, `mcp.grant.list`/`revoke`,
+`mcp.session.list`/`close`, `mcp.token.create`/`list`/`revoke`,
+`mcp.approval.list`/`decide`, `mcp.events.subscribe`, `mcp.admin.client.list`,
+and `mcp.externalServer.list`/`upsert`/`delete`/`probe`/`review`/`setSecret`.
+Each is a thin translation to `mcp-service` / `auth-service` gRPC.
+
 ## 4. Domain model
 
 Minimal — nothing here carries business invariants:
@@ -128,19 +152,32 @@ Ephemeral, in-memory, per-replica structures exist and are explicitly
 a given replica holds (not shared across replicas; a restart drops its
 connections and clients reconnect to any replica, no affinity to
 preserve, §2); a **JWKS cache** of `auth-service`'s public keys (short
-TTL, safe to lose and re-fetch); and **rate-limit counters**
+TTL, safe to lose and re-fetch); for MCP, the live SSE stream registry and a
+short-TTL (30 s) cache of resolved MCP principals; and **rate-limit counters**
 (per-tenant/per-user token-bucket state, §9), per-replica or backed by a
 shared fast store (Redis) as a build-time choice — either way disposable
-counters, not business data. If any of these ever needs to survive a
+counters, not business data.
+
+**MCP SSE resume buffer and cross-replica signals (T5).** So that a client
+can resume an SSE stream (`Last-Event-ID`) on any replica, the gateway
+appends stream events to a bounded JetStream stream `MCPSSE` (subjects
+`orca.sse.mcp.>`, memory storage, per-subject count/age/total-byte limits,
+oldest-dropped; a resume that needs dropped events gets 404). Cancel /
+session-closed / `list_changed` hints between replicas use core-NATS
+`eventbus.Ephemeral` (non-durable, best-effort). Both are disposable
+transport buffers, not owned business state; if NATS is unavailable the
+gateway degrades to an in-memory buffer that resumes on one replica only.
+See [`08-inter-service-communication.md`](../architecture/08-inter-service-communication.md)
+"Ephemeral subjects". If any of these ever needs to survive a
 restart or be visible cross-replica for a real product reason, that data
-belongs in one of the 16 services, not in added persistence here.
+belongs in one of the 17 services, not in added persistence here.
 
 ## 6. Package layout notes
 
 This service departs most from
 [`03-clean-architecture-guidelines.md`](../architecture/03-clean-architecture-guidelines.md)'s
 standard layout, intentionally. It is almost entirely **adapter**: inbound
-HTTP/WS on one side, outbound gRPC clients to all 16 other services on the
+HTTP/WS on one side, outbound gRPC clients to all 17 other services on the
 other, with a thin `usecase/` layer that exists only for cross-cutting
 request handling (auth validation, rate-limit decisioning, WS-bridge
 lifecycle) — not per-domain business use cases, because there are none.
@@ -158,12 +195,27 @@ api-gateway/
 │   └── adapter/
 │       ├── http/                  # chi router: generated grpc-gateway mux + context-extraction middleware
 │       ├── ws/                    # inbound: WS upgrade handling, frame read/write loops
-│       ├── grpcclients/           # outbound: one generated client per upstream service (all 16)
+│       ├── grpcclients/           # outbound: one generated client per upstream service (all 17)
 │       ├── authclient/            # outbound: auth-service JWKS fetch/cache
 │       └── config/                # ServiceRegistry static config, rate-limit thresholds
 ├── proto/                         # none owned — imports every other service's proto package for client codegen
 └── go.mod
 ```
+
+**Edge protocol adapters (T1, T2)** live under `internal/adapter/` next to
+`http/` and `ws/`: `wsbridge` and `wscompat` (WS RPC), and for MCP `mcpserver`
+(Streamable HTTP `/mcp` via the official Go SDK), `mcppolicy` (the
+`PolicyGate` that asks `mcp-service` for allow / deny / require-approval),
+`mcpsession` (gRPC-backed session store, SSE stream registry, `MCPSSE` resume
+store), `mcptokens` (token verification via `auth-service`) and `mcpmetrics`
+(Prometheus `orca_mcp_*` plus spans `mcp.request` / `mcp.policy` /
+`mcp.dispatch`), plus `originpolicy` (Origin allow-list, §9). `mcpserver` is
+an **edge protocol adapter with no business logic**: it translates protocol
+to gRPC; policy, audit, approval, consent and the kill switch live in
+`mcp-service`. `wscompat.Registry` is a translation layer to the services'
+gRPC clients (no domain logic); MCP `tools/call` reuses it through a
+`ToolExecutor` adapter, and the allow/deny/approval decision always comes
+back from `mcp-service` before any dispatch.
 
 No `adapter/postgres/`, `adapter/vault/`, or `adapter/eventbus/` — no owned
 state (§5) and no domain events of its own (routing a request is not a
@@ -184,9 +236,9 @@ no-business-logic service.
 ## 7. Dependencies
 
 `api-gateway` calls every other service — the one node in the
-decomposition doc's dependency graph with an edge to all 16 others (`gw
+decomposition doc's dependency graph with an edge to 16 of the other 17 (`gw
 --> auth`, `tenant`, `proj`, `infra`, `git`, `scm`, `issue`, `aiprov`,
-`wf`, `task`, `orch`, `auto`, `annot`, `notif`, `usage`;
+`wf`, `task`, `orch`, `auto`, `annot`, `notif`, `usage`, `mcp`;
 `credential-broker-service` is reached only indirectly via
 `infra-fleet-service`'s credential path).
 
@@ -209,7 +261,7 @@ milliseconds p50 on top of the routed-to service's own budget (e.g.
 this gateway must not erode it). **Horizontal scaling is trivial;
 downstream capacity is the real constraint** — stateless (§2, §5) means
 scaling out is just adding replicas, no pool-sizing ceiling, no affinity
-to preserve; adding gateway replicas past what the 16 backend services
+to preserve; adding gateway replicas past what the 17 backend services
 (and their DB pools, `04-tech-stack.md`) can absorb doesn't help, it moves
 the bottleneck one hop in, so capacity planning here is as much a
 downstream-capacity exercise as a replica-count one. **DDoS resilience**
@@ -302,11 +354,31 @@ endpoint" checks before routing, while fine-grained domain-specific checks
 (e.g. task-grant ancestor inheritance) stay in-process in each downstream
 service, not duplicated here; **rate limiting**, per-tenant and per-user,
 ahead of routing, the first line of defense against abusive clients and
-downstream overload (§8); **request size limits**, rejecting oversized
+downstream overload (§8) — for MCP (T6) the same limiter also guards `/mcp`
+per tenant, per-replica, with the inexactness across replicas accepted and
+documented (Redis-backed `RateLimitStore` remains the build-time option),
+while the per-(tenant, user, client, risk class) call limits and loop guards
+(`MCP_RATE_*`) are enforced in `mcp-service` against its database (so they
+hold across replicas), and concurrent SSE streams are capped per replica
+(`MCP_MAX_SSE_STREAMS_PER_USER`, default 5; `MCP_MAX_SSE_STREAMS_PER_TENANT`,
+default 200); **request size limits**, rejecting oversized
 bodies before forwarding; and **basic WAF-style input sanitization** — a
 coarse, edge-level structural rejection, not a substitute for the
 proto-level `protovalidate` each downstream service already applies per
 `07-security-architecture.md`'s "Input validation" section.
+
+**Origin allow-list (T11).** The `/ws` upgrade historically used
+`InsecureSkipVerify: true` (no Origin check) with cookie auth, which exposes
+state-changing channels (`mcp.consent.decide`, `mcp.approval.decide`) to
+cross-site WebSocket hijacking. `WS_ALLOWED_ORIGINS` (CSV of exact origins /
+host patterns) now applies to `wscompat.Handler` and `wsbridge.Handler`: when
+non-empty, `OriginPatterns` replaces `InsecureSkipVerify`; `/mcp` uses
+`MCP_ALLOWED_ORIGINS`, defaulting to `WS_ALLOWED_ORIGINS`. When empty, WS keeps
+the old behavior (any Origin) and `/mcp` rejects requests carrying an Origin,
+each with a loud startup WARN — set them in production. `/metrics` is served
+on the internal health HTTP port (`HTTP_PORT`, health mux + promhttp), not on
+the public edge. Tokens carrying an MCP `aud` are rejected by the REST/WS
+verifiers and accepted only on `/mcp` (`07-security-architecture.md`).
 
 **No secrets of its own** — beyond mTLS service identity and possibly a
 Redis connection for shared rate-limit state (§5), no

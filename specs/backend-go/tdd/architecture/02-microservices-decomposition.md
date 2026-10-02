@@ -68,8 +68,9 @@ mostly dispatch logic with little or no owned data (`git.*`, `github.*`,
 | 15 | `git-gateway-service` | `git.*` — resolves a worktree's owning host, executes locally or relays to the target's Dev Server Agent | `git.ts` RPC methods, dynamic dispatch pattern | Stateless dispatcher; calls `project-service`/`infra-fleet-service` to resolve `connectionId` |
 | 16 | `scm-integration-service` | GitHub/GitLab/Bitbucket/Azure DevOps/Gitea — issue/PR/MR CRUD, hosted review | `github/`, `gitlab/`, `bitbucket/`, `azure-devops/`, `gitea/`, `hosted-review/` | **Closes TS Gap 1**: direct per-tenant OAuth HTTP clients from day one, no shared-keychain CLI shell-out (see [`backend-agent-target-architecture.md`](../../backend/api/backend-agent-target-architecture.md)) |
 | 17 | `issue-tracking-service` | Jira/Linear | `jira/`, `linear/` | Already the correct shape in TS (direct API, per-user creds) — carried forward as-is, just in Go |
+| 18 | `mcp-service` | Owns MCP governance state and decisions: per-user consent/grants, sessions, per-tool policy, approvals, audit source, tenant kill switch, external MCP server registry (database `mcp`) | None (new capability, CRS v5) | Not a thin wrapper (principle 4, T7): it owns real state and makes the allow/deny/require-approval decision for every MCP tool call. The `/mcp` protocol endpoint itself is an edge adapter in `api-gateway`; secrets of external MCP servers live in `credential-broker-service` (`mcp_external_secret`), never in this DB. Postgres-only for now (see [`04-tech-stack.md`](./04-tech-stack.md)) |
 
-**Total: 17 services.** Every domain in `business-capabilities.md` maps to
+**Total: 18 services** (the original 17 plus `mcp-service`, #18). Every domain in `business-capabilities.md` maps to
 exactly one of these — see
 [`migration/domain-capability-service-mapping.md`](../migration/domain-capability-service-mapping.md)
 for the exhaustive mapping.
@@ -84,7 +85,7 @@ for the exhaustive mapping.
   contract the TS system uses today (see
   [`08-inter-service-communication.md`](./08-inter-service-communication.md)).
 - **A standalone "credential store" holding secret values** — Vault itself
-  is that store (an external system, not one of the 17). `credential-broker-service`
+  is that store (an external system, not one of the 18). `credential-broker-service`
   is a thin metadata/mediation layer in front of it, not a duplicate vault.
   Collapsing all secrets into one more application-tier service would
   recreate the single-point-of-compromise problem Vault is meant to solve.
@@ -128,6 +129,7 @@ flowchart TB
   notif[notification-service]
   usage[usage-service]
   cred[credential-broker-service]
+  mcp[mcp-service]
 
   gw --> auth
   gw --> tenant
@@ -144,6 +146,7 @@ flowchart TB
   gw --> annot
   gw --> notif
   gw --> usage
+  gw --> mcp
 
   proj --> tenant
   proj --> infra
@@ -160,6 +163,9 @@ flowchart TB
   issue --> cred
   infra --> cred
   orch --> task
+  mcp --> auth
+  mcp --> tenant
+  mcp --> cred
   notif -.events.-> task
   notif -.events.-> wf
   notif -.events.-> auto
@@ -172,3 +178,8 @@ identity/tenant resolution — per ADR-021 §"Phase 3" ordering, these are the
 **highest-risk, do-last** services if this is ever rolled out incrementally
 against a live system, since correctness of every other service depends on
 them.
+
+`mcp-service` calls `auth-service` (principal resolution), `tenant-service`
+and `credential-broker-service` (`mcp_external_secret`); `auth-service` does
+not depend on it (consent/grant data is owned by `mcp-service` precisely so
+the core login path never depends on MCP).

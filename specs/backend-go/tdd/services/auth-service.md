@@ -54,6 +54,9 @@ It owns:
   lives operationally (a dedicated policy repo + OCI bundle registry vs.
   folded into this service's deploy) is a platform decision outside this
   doc's scope — either way, the boundary "data here, logic there" holds.
+- **MCP consent, grants, sessions, tool policy, approvals** — `mcp-service`
+  (T3). This service owns only the OAuth protocol state (clients, codes,
+  refresh tokens, PATs).
 - **Secret material** — password hashes are the one exception this service
   stores directly (see §4); everything else (Vault tokens, OAuth client
   secrets for a future SSO integration, agent tokens) is `credential-broker-service`
@@ -125,6 +128,26 @@ further in this doc.
   a single-use operation, structurally disabled (not just UI-hidden) once
   any user row exists — see §9.
 
+**OAuth authorization server for MCP clients (T3)** (`api-gateway` exposes
+`/oauth/*` and the `/.well-known/*` metadata, translating to these RPCs)
+- Public (anonymous HTTP, no identity metadata): `OAuthRegisterClient`
+  (dynamic client registration), `OAuthValidateAuthorizeRequest`,
+  `OAuthExchangeToken` (authorization-code + PKCE and refresh grants),
+  `OAuthRevokeToken`.
+- Internal-only (caller must be `mcp-service`, enforced by a shared-secret
+  metadata guard; tenant/user come from gRPC metadata): `OAuthIssueAuthCode`
+  (called after the user's consent is recorded in `mcp-service`),
+  `OAuthRevokeGrant`, `OAuthListClientsForTenant`, `OAuthSetClientStatus`,
+  `OAuthEnsureClientForTenant`.
+
+**MCP personal access tokens and principal resolution (T4)**
+- `IssueMcpToken` (secret returned exactly once, never stored),
+  `ListMcpTokens`, `RevokeMcpToken` — user/tenant from gRPC metadata only.
+- `ResolveMcpPrincipal` — called by `api-gateway` for each distinct MCP token
+  (cached 30 s there); verifies the token and revocation state, records
+  first/last use, and returns the user's *current* role, never one embedded in
+  the token.
+
 ## 4. Domain model
 
 - **`User`** — `id`, `tenantID`, `email` (unique per tenant), `passwordHash`,
@@ -150,6 +173,15 @@ further in this doc.
   is a new version, not an in-place mutation — OPA bundle sync and audit
   both need a stable history of "what did the policy input look like at
   time T."
+- **`OAuthClient` / `OAuthAuthCode` / `OAuthRefreshToken`** (T3) — registered
+  MCP client, single-use short-lived authorization code (PKCE `S256` only),
+  and rotating refresh token belonging to a token family (with reuse
+  detection). A grant's consent record is *not*
+  here: it is `mcp-service` data, and this service only keeps a revocation
+  marker keyed by `(tenant_id, grant_id)`.
+- **`McpToken` (PAT)** (T4) — `jti`, `userID`, `name`, `scope`, `expiresAt`
+  (invariant: at most 90 days after creation, also a DB CHECK), `revokedAt`,
+  first/last-used timestamps. Only the SHA-256 of the secret is stored.
 - **`AuditEntry`** — `id`, `actorUserID` (nullable — some entries are
   system-initiated), `action`, `resourceType`, `resourceID`, `payload`
   (structured, redacted of secret material), `occurredAt`. Invariant:
@@ -171,6 +203,9 @@ there as recommended for a dedicated instance given blast radius.
 | `refresh_tokens` | `jti UUID PK`, `user_id UUID FK`, `family_id UUID`, `expires_at`, `revoked_at NULL` | `idx_refresh_tokens_user_id`; `idx_refresh_tokens_family_id` | new — TS had no mobile/CLI JWT refresh model |
 | `access_policies` | `id UUID PK`, `name TEXT`, `kind TEXT`, `document JSONB`, `version INT`, `updated_by UUID`, `updated_at` | unique `(name, version)` | new table — TS had no unified policy table (`resolveUserPermissions()`/`TaskGrantService` were code, not data) |
 | `audit_log` | `id BIGSERIAL PK`, `actor_user_id UUID NULL`, `action TEXT`, `resource_type TEXT`, `resource_id TEXT`, `payload JSONB`, `occurred_at` | `idx_audit_log_occurred_at` (BRIN, append-only + time-range queries); `idx_audit_log_actor` | `orca_audit_log` |
+| `oauth_clients` | client registration (redirect URIs, status) | per migration `0011_oauth_authorization_server` | new (T3) |
+| `oauth_client_tenant_status`, `oauth_token_families`, `oauth_auth_codes`, `oauth_refresh_tokens`, `oauth_grant_revocations` | tenant-scoped (RLS `tenant_isolation`); codes and refresh tokens stored as hashes; revocations keyed `(tenant_id, grant_id)` | per migration `0011` | new (T3) |
+| `mcp_tokens` | `jti TEXT PK`, `tenant_id`, `user_id FK→users`, `name`, `scope`, `token_sha256 UNIQUE`, `expires_at`, `first_used_at`, `last_used_at`, `revoked_at`; CHECK `expires_at <= created_at + 2160 hours` | `idx_mcp_tokens_user (tenant_id, user_id, created_at DESC)` | new (T4, migration `0012_mcp_tokens`) |
 | `outbox` | standard transactional-outbox shape (`id`, `event_type`, `payload`, `published_at NULL`) | `idx_outbox_unpublished` | new — required by the outbox pattern (§7) |
 
 `sessions.id` stores a hash of the token, not the token itself (same
@@ -255,7 +290,7 @@ request in the system — its SLOs are tighter than most:
   immediately break JWT validation elsewhere as long as the cached JWKS is
   still within its rotation-overlap window (§9).
 - **Availability**: this service's availability target is the *highest* of
-  the 17 — an `auth-service` outage takes down login and, once caches
+  the 18 — an `auth-service` outage takes down login and, once caches
   expire, effectively every other service's ability to authorize new
   requests. Horizontally scaled, stateless except for the DB (standard
   `pgxpool` + read-replica routing for `ValidateSession`/`GetUser` reads).
@@ -334,6 +369,19 @@ top.
   (a compliance requirement, not a debugging convenience). Retention period
   itself is a policy/compliance decision to set per deployment, not fixed
   in this doc.
+- **OAuth AS and MCP PAT (T3, T4).** This service is the OAuth
+  authorization server for MCP clients because it already holds the signing
+  key/JWKS and identities; the consent/grant data is deliberately owned by
+  `mcp-service` (reached only through the internal-only RPCs above), so the
+  core login path never depends on `mcp-service`. The MCP PAT is a
+  **documented exception** to "short-lived JWT only": lifetime <= 90 days,
+  SHA-256 hash stored (not the secret), has a `jti`, immediate revocation,
+  audit entry on create/revoke/first use, and a PAT cannot mint PATs. Token
+  audience is enforced on the verifier side: the MCP verifier requires
+  `aud == resourceUrl`; the REST/WS verifiers reject MCP-audience tokens.
+  MCP tokens carry no role claim — role is read live in
+  `ResolveMcpPrincipal`. The internal-only OAuth RPCs fail closed without the
+  `OAUTH_INTERNAL_CALLER_TOKEN` guard.
 - **SSO is a real gap, not a stub to carry forward.** The TS system's
   `GET /auth/sso/:provider` always returns `501` — it was never
   implemented. Porting that as another `501` in Go would just move the gap

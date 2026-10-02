@@ -2,7 +2,7 @@
 
 ## Database-per-service, physically
 
-Each of the 13 data-owning services (see
+Each of the 14 data-owning services (the 13 in the data-owning table plus `mcp-service`; see
 [`02-microservices-decomposition.md`](./02-microservices-decomposition.md))
 gets its **own PostgreSQL database** — not a schema in a shared instance.
 This is a deliberate departure from ADR-021's "schema-per-service in one
@@ -23,6 +23,12 @@ it goes straight to the end state:
   Vault-issued credentials per database, network policy) as well as by
   convention, matching ADR-021's principle 3 ("cô lập theo Postgres ROLE")
   taken to its logical conclusion.
+- **`mcp-service`'s** database `mcp` (Postgres-only for now, per D2/T10 — see
+  [`04-tech-stack.md`](./04-tech-stack.md)) holds MCP consent/grants, sessions,
+  tool policy, approvals, the audit source, kill-switch state and the external
+  MCP server registry. It holds no secret material: external-server secrets go
+  to `credential-broker-service` (category `mcp_external_secret`). Created by
+  `deploy/postgres-init-databases.sh` (and by hand on pre-existing dev volumes).
 - **`credential-broker-service`'s** database holds metadata only — no
   secret material, ever. See
   [`06-secrets-vault-architecture.md`](./06-secrets-vault-architecture.md).

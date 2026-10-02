@@ -522,3 +522,25 @@ npx vitest run \
   src/renderer/src/hooks/__tests__/useLogout.test.ts \
   src/renderer/src/hooks/__tests__/useSshUserAccount.test.ts
 ```
+
+
+---
+
+## Addendum v5.0 — OAuth consent, return_to, push deep link (FE-MCP-SOL-003/009) — IMPLEMENTED
+
+- **Route consent**: `web/main-web-bootstrap.tsx` -> khi đã có session và `isOAuthConsentPath(location)`
+  (`pathname === '/oauth/consent'`) chỉ render `web/OAuthConsentRoute.tsx` -> `McpConsentPage`, **không**
+  mount `App`/terminal/worktree. Luồng: `mcp.consent.get {requestId}` -> chọn scope ->
+  `mcp.consent.decide` -> `validateConsentRedirect` (chỉ https hoặc http loopback, không userinfo) ->
+  `window.location.assign`. Hạ tầng phải trả SPA cho `/oauth/consent` (không proxy), theo CONTRACT §3.
+- **return_to**: cookie phiên `SameSite=Strict` bị bỏ ở lần nhảy cross-site đầu, nên SPA tự giữ đích
+  (`web/oauth-return-to.ts`, sessionStorage, allow-list chỉ `/oauth/authorize?...` và
+  `/oauth/consent?request_id=...`, chặn open redirect, tối đa 2 lần để không lặp /login <-> /oauth/authorize) và
+  chuyển tiếp sau đăng nhập (`web/use-oauth-return-forwarding.ts`); `loginUrlFor` tạo `/login?return_to=`.
+- **Push deep link**: `public/service-worker.js` `notificationclick` -> focus client có sẵn và
+  `postMessage({type:'orca:navigate', url})` hoặc `openWindow(url)`; `web/web-push-deep-link.ts`
+  (`installPushDeepLinkHandling`, registry theo `section`) cùng `hooks/useMcpSync.ts` mở
+  Settings > MCP > tab theo `/?section=mcp&tab=approvals&approval=<id>` (cả khi khởi động nguội). Deep link bị
+  giữ lại tới khi biết MCP có hiển thị hay không (tenant tắt không lộ giao diện).
+- Endpoint đăng ký push thực tế: `/api/vapid-public-key`, `/api/push-subscribe`, `/api/push-unsubscribe`.
+  Push thật phụ thuộc CR-NOTIF-002 (`DeliverPush` chưa có ở backend).

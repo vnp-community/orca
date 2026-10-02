@@ -24,6 +24,9 @@ for the reasoning behind these boundaries.
 | [notification-service](./notification-service.md) | Supporting | Push subscriptions, VAPID metadata, WS fan-out | `WebPushManager`, `PgWebPushStore` | 1 |
 | [usage-service](./usage-service.md) | Supporting | AI-CLI usage/cost tracking | `ClaudeUsageStore`, `CodexUsageStore` | 1 (pilot) |
 | [credential-broker-service](./credential-broker-service.md) | Supporting | Secret metadata + Vault mediation | 5 fragmented mechanisms — see [`05-credential-secret-stores.md`](../../backend/models/05-credential-secret-stores.md) | 2 |
+| mcp-service (`backend-go/services/mcp-service`; no per-service TDD doc yet, see `crs/v5`) | Supporting | MCP consent/grants, sessions, tool policy, approvals, audit source, kill switch, external MCP server registry (own DB `mcp`) | None (new capability; the MCP protocol endpoint is an edge adapter in api-gateway) | new (post-migration, CRS v5) |
+
+Total: 18 services. `backend-go/services/issue-status-sync` is a worker module, not a TDD service, and is not counted.
 
 **Not services** (Vault, PostgreSQL, NATS JetStream, the Dev Server Agent)
 are external systems/infrastructure — see

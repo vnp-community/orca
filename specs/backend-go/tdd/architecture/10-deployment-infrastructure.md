@@ -19,7 +19,7 @@ requirements the operating org decides at implementation time):
   needs identically: Deployment, Service, ServiceAccount (for Vault K8s
   auth), HorizontalPodAutoscaler, PodDisruptionBudget, NetworkPolicy,
   ServiceMonitor (Prometheus scrape config). An umbrella chart composes all
-  17 for a full-system deploy; individual services can also be deployed/
+  18 for a full-system deploy; individual services can also be deployed/
   upgraded independently (the whole point of microservices — a
   `workflow-service` fix shouldn't require redeploying `auth-service`).
 - Each service: minimum 3 replicas in `production` (survives a single-node
@@ -29,7 +29,7 @@ requirements the operating org decides at implementation time):
   [`02-microservices-decomposition.md`](./02-microservices-decomposition.md)
   — a service can only reach the services it's declared to depend on.
 - Service mesh: **Linkerd** by default (lower operational complexity, mTLS
-  and basic traffic policy out of the box, sufficient for 17 services).
+  and basic traffic policy out of the box, sufficient for 18 services).
   **Istio** is the documented alternative if the deploying organization
   already standardizes on it or needs its more advanced traffic-shaping
   (canary via weighted routing, richer authorization policy) — the choice
@@ -59,7 +59,7 @@ main branch, per service
   (every production change is a reviewed PR with a diff).
 - Each service deploys independently — the CI pipeline is scoped per Go
   module (per service), so a change to `annotation-service` doesn't trigger
-  a rebuild/redeploy of the other 16.
+  a rebuild/redeploy of the other 17.
 
 ## Database & Vault infrastructure
 
@@ -78,10 +78,26 @@ main branch, per service
 ## Local development
 
 - `docker-compose.yml` at the repo root of this Go workspace, bringing up:
-  all 17 services, a local Postgres instance (one container, 17 databases —
+  all 18 services, a local Postgres instance (one container, 18 databases —
   local dev doesn't need physical instance separation, only
   staging/production do), a local Vault in `dev` mode (auto-unsealed, seeded
   with dev policies), a local NATS.
+- `mcp-service` is the 18th service and uses database `mcp`: it is listed in
+  `backend-go/deploy/postgres-init-databases.sh` (fresh volumes). On a
+  pre-existing dev volume create it by hand (`CREATE DATABASE mcp OWNER orca;`
+  then run its migrations; `deploy/dev/docker-compose.yml` has the `mcp-service`
+  and `migrate-mcp` entries). It exposes `/healthz`, `/readyz`, `/metrics` on its
+  HTTP port and needs `MCP_*` env plus the internal RPC addresses
+  `AUTH_SERVICE_ADDR`, `TENANT_SERVICE_ADDR`, `CREDENTIAL_BROKER_ADDR` and the
+  shared internal-caller secrets `OAUTH_INTERNAL_CALLER_TOKEN` (the same value
+  `auth-service` requires for its internal-only RPCs) and
+  `MCP_INTERNAL_CALLER_TOKEN` (the same value `api-gateway` presents on
+  mcp-service's gateway-only RPCs); `api-gateway` needs
+  `MCP_SERVICE_ADDR`, `MCP_ENABLED` and, in production, `WS_ALLOWED_ORIGINS` /
+  `MCP_ALLOWED_ORIGINS`.
+- NetworkPolicy additions for `mcp-service`: ingress from `api-gateway` (and `infra-fleet-service` for `ResolveAgentMcpConfig`) only;
+  egress to `auth-service`, `tenant-service`, `credential-broker-service`,
+  its Postgres and NATS (no direct Vault egress for tenant secrets).
 - `make dev-up` / `make dev-down` wrapping the compose lifecycle;
   `skaffold` (or an equivalent) for developers who prefer iterating directly
   against a local/dev Kubernetes cluster instead of compose.

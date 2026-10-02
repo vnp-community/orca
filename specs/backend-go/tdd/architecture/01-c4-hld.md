@@ -22,7 +22,7 @@ C4Context
   Person(mobile_user, "Mobile User", "Monitors + dispatches from a phone")
   Person(agentdev, "Custom Agent Developer", "Connects a self-written agent")
 
-  System(backend, "Orca Backend (Go)", "17 microservices behind api-gateway. Same coordination/control-plane role as the TS system.")
+  System(backend, "Orca Backend (Go)", "18 microservices behind api-gateway. Same coordination/control-plane role as the TS system.")
 
   System_Ext(frontend, "Orca Frontend (React SPA)", "Unchanged — same client, new backend API")
   System_Ext(devagent, "Dev Server Agent", "Unchanged execution plane (agent/)")
@@ -94,9 +94,10 @@ C4Container
     Container(notif, "notification-service", "Go", "WS fan-out + push")
     Container(usage, "usage-service", "Go", "AI-CLI usage/cost tracking")
     Container(cred, "credential-broker-service", "Go", "Secret metadata + Vault mediation")
+    Container(mcp, "mcp-service", "Go", "MCP consent/grants, sessions, tool policy, approvals, audit, external MCP server registry")
   }
 
-  ContainerDb(pg, "PostgreSQL (per-service DBs)", "17 logical databases")
+  ContainerDb(pg, "PostgreSQL (per-service DBs)", "18 logical databases")
   Container_Ext(vault_c, "HashiCorp Vault", "")
   Container_Ext(bus_c, "NATS JetStream", "")
   Container_Ext(devagent_c, "Dev Server Agent", "")
@@ -118,6 +119,7 @@ C4Container
   Rel(gw, annot, "gRPC", "")
   Rel(gw, notif, "gRPC + WS push", "")
   Rel(gw, usage, "gRPC", "")
+  Rel(gw, mcp, "gRPC (policy gate, sessions, MCP admin)", "")
 
   Rel(auth, pg, "", "")
   Rel(tenant, pg, "", "")
@@ -131,6 +133,7 @@ C4Container
   Rel(annot, pg, "", "")
   Rel(notif, pg, "", "")
   Rel(usage, pg, "", "")
+  Rel(mcp, pg, "", "")
   Rel(cred, pg, "Metadata only", "")
 
   Rel(cred, vault_c, "All secret reads/writes", "")
@@ -159,6 +162,6 @@ Component-level breakdowns live in each service's own doc under
 Architecture package diagram (domain/usecase/adapter layers) per the
 convention in
 [`03-clean-architecture-guidelines.md`](./03-clean-architecture-guidelines.md).
-This document doesn't duplicate 17 component diagrams; it stops at the
+This document doesn't duplicate 18 component diagrams; it stops at the
 container level, matching how `backend-hld-c4.md` scoped its own C3 section
 to the two richest containers rather than every one.

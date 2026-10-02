@@ -724,3 +724,20 @@ export function getRepoProviderConnectionKey(
 - `Repo['executionHostId']`'s type
 
 Trước session này, Dev Servers (`Repo.devServerId`) hoàn toàn tách biệt khỏi `ExecutionHostKind` — sidebar, Available Hosts panel, và mọi routing file/git/terminal chỉ biết `connectionId`/`executionHostId` (SSH). Giờ Dev Server là một host kind thật, đi qua cùng pipeline như local/ssh/runtime — xem TDD-FE-09 §11 và TDD-FE-04 §Connection Resolution.
+
+
+---
+
+## Addendum v5.0 — MCP slices (FE-MCP-SOL-001/009/006) — IMPLEMENTED
+
+Đăng ký ở `store/index.ts` + `store/types.ts` (`McpSlice & McpApprovalSlice & McpTerminalOriginSlice`).
+
+| Slice | File | State / hành động chính |
+|---|---|---|
+| `mcp` | `slices/mcp-slice.ts` | `mcpServerInfo`, `mcpServerInfoStatus`, `mcpAdminSetupAvailable`, `mcpEventsState`, `mcpResyncCounter`, `mcpNavigation`; `refreshMcpServerInfo`, `startMcpEvents` (ref-count, **một** luồng `mcp.events.subscribe` cho cả app, reconnect backoff trong `mcp-reconnect.ts`), `applyMcpEvent` (cập nhật kill switch rồi phát qua `lib/mcp-event-bus.ts`), `openMcpTab`, `resetMcp`. Selector: `selectMcpEnabled`, `selectMcpSectionVisible`, `selectMcpKillSwitchActive`. |
+| `mcp-approval` | `slices/mcp-approval-slice.ts` | `mcpApprovalQueue` (chỉ `pending`, cũ trước), `mcpApprovalLocalDeadline` (đồng hồ client, miễn nhiễm lệch giờ server), `mcpApprovalPromptOpen`, `mcpApprovalFocusId`; `enqueue/resolve/replace/focus...`. **Chỉ trong bộ nhớ** — chứa `argsPreview`/`paramsHash` nên không được thêm vào bất kỳ snapshot persist nào. |
+| `mcp-terminal-origin` | `slices/mcp-terminal-origin.ts` | map tab -> `McpOrigin` (nhãn "Tạo bởi agent" cho terminal do MCP client tạo, CONTRACT §5), poller ở `lib/mcp-terminal-origin-poller.ts`. |
+
+Bất biến: danh sách tab-riêng (tokens, grants, sessions...) nằm ở state cục bộ của hook
+(`hooks/useMcpQuery.ts`), **không** ở store; **secret của PAT không bao giờ vào store** (test
+`test-support/mcp-integration/mcp-token-flow.integration.test.tsx` duyệt toàn bộ store/storage).

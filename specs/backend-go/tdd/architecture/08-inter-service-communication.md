@@ -43,6 +43,30 @@
   the consuming service's own "processed events" table or a short-TTL
   cache) — JetStream's at-least-once delivery means every consumer *will*
   see duplicates eventually.
+- **Ephemeral subjects (T5).** Two non-outbox mechanisms exist in
+  `common/eventbus`, both used by the MCP edge (`api-gateway`
+  `adapter/mcpsession`, wired in `cmd/server/mcp_sessions_wiring.go`). They
+  must never carry domain events.
+  - `eventbus.Ephemeral` (`NewEphemeral`) is **core NATS** pub/sub on its own
+    connection: not durable, no replay. It carries self-healing cross-replica
+    control signals (cancel, session closed, `list_changed` hints), where
+    losing a message is acceptable. Each subscription has bounded pending
+    limits (1024 messages / 4 MiB); a slow handler drops messages rather than
+    growing memory.
+  - A bounded JetStream stream `MCPSSE` (subjects `orca.sse.mcp.>`, memory
+    storage, `Discard=old`, limits per subject of 256 messages and 10 minutes
+    plus a total byte cap, default 256 MiB) is the SSE **resume buffer**
+    (`Last-Event-ID`), so a client can resume on a different replica. Its
+    subject root deliberately avoids `orca.mcp.>` (JetStream forbids
+    overlapping stream subjects). When the buffer has dropped what a resume
+    needs, the resume is answered 404.
+  - Not to be confused with `Consumer.SubscribeEphemeral`, which is a
+    JetStream *ephemeral consumer* (one per replica, on a domain stream, with
+    replay semantics), not core NATS.
+  - Limits: signals are best-effort; the resume buffer is in-memory JetStream
+    (lost on a NATS restart). If NATS or JetStream is unavailable at startup
+    the gateway logs a warning and degrades (no cross-replica signals; a
+    bounded in-memory resume buffer that works on one replica only).
 
 ## API Gateway responsibilities
 
@@ -68,12 +92,24 @@
 6. Rate limiting (per-tenant and per-user), request size limits, and basic
    WAF-style input sanitization before anything reaches an internal
    service.
+7. Hosts the **edge protocol adapters** (T1): `wsbridge`/`wscompat` for the
+   WebSocket RPC surface and `mcpserver` for the MCP Streamable HTTP endpoint
+   (`/mcp`, plus `/oauth/*` and `/.well-known/*`). They only translate
+   protocol to gRPC and enforce transport concerns (Origin, rate limit, SSE
+   caps); they contain **no business rules**. Policy, consent, approvals,
+   audit and the kill switch are decided by `mcp-service` over gRPC (mTLS
+   like every other internal call).
+8. `wscompat.Registry` is a translation layer to the services' gRPC clients,
+   not a place for domain logic (T2). For MCP `tools/call`, the
+   `ToolExecutor` adapter dispatches through it only **after** `mcp-service`
+   has returned allow (or an approved approval); the allow/deny/approval
+   decision is never made in the gateway.
 
 ## Service discovery
 
 - Kubernetes-native: services address each other by
   `<service>.<namespace>.svc.cluster.local` DNS names — no separate
-  service-registry (Consul/etcd) needed at 17 services, consistent with
+  service-registry (Consul/etcd) needed at 18 services, consistent with
   ADR-021's own "chưa cần Consul/etcd ở quy mô hiện tại" judgment for the TS
   system, carried forward here since the scale argument still holds.
 - The service mesh (see

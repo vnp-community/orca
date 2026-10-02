@@ -22,6 +22,7 @@
 | 8 | [08-editor-and-files.md](./08-editor-and-files.md) | Editor slice, code editor, file explorer | v1.x |
 | 9 | [09-onboarding-devserver.md](./09-onboarding-devserver.md) | **[NEW]** Onboarding, Dev Server UI, Agent Detection, Web Push | ✅ v3.0 NEW |
 | 10 | [10-fleet-management.md](./10-fleet-management.md) | **[NEW]** Fleet Inventory, Health Monitoring, Bootstrap, RBAC | ✅ v3.0 NEW |
+| — | MCP (CR v5) | Settings > MCP, phê duyệt agent, consent OAuth, telemetry/test: xem [crs/v5 solutions](../../crs/v5/README.md), [FE-MCP-SOL-012](../../crs/v5/mcp-quality-rollout/solutions/FE-MCP-SOL-012-testing-telemetry-and-rollout.md), mục *Addendum v5.0 — MCP* trong 02/03/05/06/07 và [docs/guides/mcp](../../../../docs/guides/mcp/README.md) | ✅ FE-001..012 đã cài |
 
 ---
 
@@ -172,7 +173,7 @@ Key new files:
 - `src/renderer/src/hooks/useRemoteWindowsTerminalCapabilities.ts` — capsCache, 60s TTL
 - `src/renderer/src/hooks/useBrowserNotificationPermission.ts` — Web Push
 - `src/renderer/src/hooks/useWebPushSubscription.ts` — VAPID subscribe
-- `src/renderer/service-worker.js` — Push event handler
+- `src/renderer/public/service-worker.js` — Push event handler
 - `src/renderer/src/web/main-web-bootstrap.tsx` — MODIFY: SW registration
 
 Store extensions: `onboarding.ts` (agentDetectionByServer), `preflight.ts` (remotePreflightByServer).
@@ -534,3 +535,25 @@ main-web-bootstrap.tsx
                                   ├── TaskGraph
                                   └── WorkspaceTerminal
 ```
+
+
+---
+
+## Addendum v5.0 — MCP: kiểm thử web (Playwright tách khỏi Electron) và quy ước
+
+- Config riêng `tests/playwright.web.config.ts` (không có `globalSetup` Electron); spec ở
+  `tests/e2e/mcp-web/*.web.e2e.ts` (hậu tố không khớp `**/*.spec.ts` của project Electron). Chạy:
+  `pnpm run test:e2e:mcp-web` (backend WebSocket giả dựng bằng `page.routeWebSocket`, dùng lại
+  fake backend của vitest) hoặc đặt `MCP_E2E_BASE_URL` để chạy thêm các ca `@dev-stack`.
+- Tầng vitest: `renderer/src/test-support/mcp-fake-backend.ts` + `mcp-integration/*.integration.test.tsx`
+  (consent, PAT, approval, kill switch/trạng thái) và `shared/mcp-contract-conformance.test.ts`
+  (đối chiếu CONTRACT <-> `MCP_RPC_METHODS`/`MCP_ERROR_CODES` <-> chuỗi kênh trong mã nguồn).
+- Telemetry MCP: schema `.strict()` ở `shared/mcp-telemetry-events.ts`, gộp vào `eventSchemas`;
+  wrapper `renderer/src/lib/mcp-telemetry.ts`. Web build: `telemetryTrack` là no-op.
+- Đã xác minh và sửa trong v5/07 và v5/09: Web Push dùng `/api/vapid-public-key`,
+  `/api/push-subscribe`, `/api/push-unsubscribe` (không phải `/push/...`); nguồn service worker là
+  `src/renderer/public/service-worker.js` (không phải `src/renderer/service-worker.js`).
+- Làm rõ (không phải lỗi thời): `components/admin/AdminApp.tsx` vẫn tồn tại là gốc của Admin SPA riêng;
+  các tab quản trị *trong ứng dụng chính* nằm ở `components/settings/AdminOrgConsole.tsx`
+  (gate `currentUser.role === 'admin'`). Tab MCP admin đi theo `settings/mcp/mcp-tab-registry.ts`,
+  không qua `AdminApp`.

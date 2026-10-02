@@ -77,6 +77,7 @@ service block dùng chung `*go-image`/`*go-defaults` YAML anchor, cộng `migrat
 | 15 | `notification-service` | Supporting | Push subscriptions, VAPID metadata, WS fan-out | `WebPushManager`, `PgWebPushStore` |
 | 16 | `usage-service` | Supporting | AI-CLI usage/cost tracking | `ClaudeUsageStore`, `CodexUsageStore` |
 | 17 | `credential-broker-service` | Supporting | Secret **metadata only** — mediates mọi read/write secret thật qua Vault | 5 cơ chế rời rạc, xem §6 |
+| 18 | `mcp-service` *(thêm sau phiên rà soát 2026-09-06; có block trong `deploy/dev/docker-compose.yml`, DB `mcp`, Postgres-only)* | AI | Consent/grant OAuth cho MCP, session, tool policy, approval, kill switch, audit nguồn, registry MCP server ngoài — **không** phải wire protocol: endpoint `/mcp` là adapter `adapter/mcpserver` của `api-gateway` (ngoại lệ T1 "edge protocol adapter", không có nghiệp vụ). Metric `orca_mcp_*` ở cổng health `/metrics` | (mới, không thay thế phần TS nào) — xem `specs/backend-go/crs/v5/` |
 
 **Không phải service riêng** (external infra, chạy trong cùng `deploy/dev/docker-compose.yml` nhưng
 không phải 1 trong 17): `postgres` (1 instance, database-per-service — §6), `vault` + `vault-init`

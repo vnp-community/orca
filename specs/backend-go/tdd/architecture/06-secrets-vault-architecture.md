@@ -25,6 +25,7 @@ the fragmentation forward.
 | AI provider API keys (Anthropic/OpenAI/etc.) | Vault Transit engine for encrypt/decrypt-as-a-service, ciphertext reference stored in `ai-provider-service`'s Postgres, plaintext never touches application memory longer than the single call that needs it | Closes TS Gap 2 (`backend-agent-target-architecture.md`) by construction — no service ever holds a plaintext key at rest, and unlike the TS relay-based scheme, decrypt is always mediated by Vault policy, not implicit trust in whichever process holds a local `.enc` file |
 | SSH credentials for dev servers | Vault SSH secrets engine (signed short-lived SSH certificates) where the target supports certificate auth; static per-target key material otherwise, stored in KV v2 | Removes long-lived SSH private keys from `infra-fleet-service`'s filesystem/database entirely |
 | VAPID private key (Web Push signing) | Vault Transit engine, mediated by `credential-broker-service`'s `SignVapidPayload` RPC | Same reasoning as JWT signing above — the private key material never leaves Vault at all, not even into `notification-service`'s memory. **Updated 2026-08-17 (Epic B, `backend-go/docs/execution-plan.md` §8)**: this row previously read "`notification-service` asks Vault to sign push payloads" directly, which contradicted the "`credential-broker-service`'s role" section below and was in fact how the scaffold's first pass implemented it — a real, documented inconsistency, not a hypothetical one. `notification-service` now calls `credential-broker-service.SignVapidPayload` instead of touching Vault itself, closing the gap; see that RPC's doc comment in `credentialbroker.proto` for why it's a narrow, dedicated RPC rather than folded into `WriteCredential`/`ResolveCredential` |
+| Env/header secrets of external MCP servers (broker `CredentialCategory` `mcp_external_secret`, T9/D1) | Written through `credential-broker-service` `WriteCredential`; the broker Transit-encrypts with key `credential-broker-mcp_external_secret` (`credential-broker-<category>`). Only the `mcp-service` caller identity may read or write this category | `mcp-service` never talks to Vault for tenant secrets: it calls the broker (`WriteCredential` / `ResolveCredential`), and passes a resolved value only into the spawned child-process env. Needs the `mcp_external_secret` value in the broker's `category` CHECK (both `postgres/` and `mysql/` migrations) |
 | Webhook signing secrets, service-to-service shared secrets | Vault KV v2 | Consistent with everything else — no more "3 field-level `safeStorage` calls scattered across modules" |
 | Non-secret metadata (rotation timestamp, credential status, scope, which Vault path a credential lives at) | `credential-broker-service`'s Postgres | Never the secret value itself — a pointer + bookkeeping, matching ADR-021 §4's "metadata only" principle for the `credential` schema |
 
@@ -119,6 +120,14 @@ production.
   deploying a code/data change.
 
 ## What does NOT change at the edge
+
+**Exception — external MCP server secrets (D1, T9):** no client-side envelope.
+The UI sends the plaintext once over WS/TLS (`mcp.externalServer.setSecret`),
+the gateway forwards it to `mcp-service`, which calls the broker
+(`WriteCredential`, category `mcp_external_secret`); the broker treats the
+value as opaque bytes and Transit-encrypts it. The value is masked in logs and
+traces and never echoed in a response. The UI copy says "sent over TLS and
+encrypted at rest by the server", not end-to-end encryption.
 
 The user-facing credential-write flow (browser encrypts before sending,
 server never sees plaintext in transit) is preserved: the browser still

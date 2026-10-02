@@ -1795,7 +1795,7 @@ agent/src/
 Toàn bộ `case` thật trong `route()` (~40 method), theo `audit/agent/rpc-dispatch-lifecycle-vs-design-review.md` §2.2:
 
 ```
-tools/list, tools/call,                                              # MCP layer — không tài liệu hoá ở đâu khác
+tools/list, tools/call,                                              # relay nội bộ của agent (KHÔNG phải MCP server chuẩn) — xem ghi chú dưới
 git.exec, git.execStream, git.pr.create, git.worktree.list/add/remove,
 fs.readDir, fs.readFile, fs.grep, fs.stat, fs.glob, fs.writeFile, fs.mkdir, fs.rmdir, fs.watch, fs.unwatch,
 ai.provider.writeCredential, ai.provider.readCredential, ai.provider.healthCheck, ai.provider.deleteCredential,
@@ -1807,7 +1807,7 @@ ai.complete, shell.eval,
 pty.create, pty.attach, pty.write, pty.resize, pty.destroy, pty.scrollback, pty.sendSignal
 ```
 
-Khác biệt hệ thống so với mọi bảng RPC method trong §C4.5/§C4.9/§C4.11 phía trên: `git.exec`/`git.execStream` là **generic passthrough** (Orca gửi cả câu lệnh git, agent chỉ exec) thay vì method chi tiết theo từng operation; namespace credential là `ai.provider.*` (dot-separated), không phải `aiProvider.*` camelCase liền; **hoàn toàn không có `step.*`/`health.*`** (CR-DS-003 coi đây là nền tảng cho F36/F27 nhưng chưa từng implement); có sẵn lớp giao thức MCP (`tools/list`/`tools/call`) không được nhắc tới ở bất kỳ tài liệu HLD/ADR/CR nào khác.
+Khác biệt hệ thống so với mọi bảng RPC method trong §C4.5/§C4.9/§C4.11 phía trên: `git.exec`/`git.execStream` là **generic passthrough** (Orca gửi cả câu lệnh git, agent chỉ exec) thay vì method chi tiết theo từng operation; namespace credential là `ai.provider.*` (dot-separated), không phải `aiProvider.*` camelCase liền; **hoàn toàn không có `step.*`/`health.*`** (CR-DS-003 coi đây là nền tảng cho F36/F27 nhưng chưa từng implement); `tools/list`/`tools/call` ở đây là một **relay nội bộ** của Dev Server Agent (cùng khung JSON-RPC với các method còn lại), **không phải** MCP server theo chuẩn spec. MCP server chuẩn của hệ thống nằm ở `backend-go` (cập nhật 2026-10-02): endpoint Streamable HTTP `/mcp` của `api-gateway` (`services/api-gateway/internal/adapter/mcpserver`, MCP Go SDK chính thức, OAuth 2.1 + PAT) cùng `mcp-service` (`backend-go/services/mcp-service`: consent/grant, session, policy, approval, audit, registry server ngoài). Thiết kế: `specs/backend-go/crs/v5/` và CR `docs/crs/v5/`; vận hành: `backend-go/services/mcp-service/README.md`. Ghi chú: ADR riêng cho lựa chọn SDK/AS/transport (dự kiến `docs/adrs/v2/ADR-021..023`) **chưa được viết**.
 
 ---
 

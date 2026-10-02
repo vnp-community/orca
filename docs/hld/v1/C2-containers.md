@@ -409,3 +409,16 @@ C4Container
 | Workflow Engine | Dev Server (relay) | relay RPC | JSON-RPC |
 | Task Service | Dev Server (relay) | relay RPC | JSON-RPC |
 | All v5 Services | Server DB | SQL | IConnectionPool |
+
+---
+
+## Ghi chú: container MCP của `backend-go` (cập nhật 2026-10-02)
+
+Các sơ đồ ở trên mô tả Backend Node.js. Hệ `backend-go/` (xem `docs/hld/backend-go-architecture.md`) có thêm hai container liên quan tới MCP:
+
+| Container | Công nghệ | Trách nhiệm |
+|-----------|-----------|-------------|
+| `api-gateway` — adapter `mcpserver` | Go, MCP Go SDK chính thức, Streamable HTTP tại `/mcp` (+ `/.well-known/oauth-*`, `/oauth/*`) | Chỉ dịch giao thức MCP ↔ gRPC/`wscompat`; xác thực Bearer (OAuth 2.1 hoặc PAT, `aud` = tài nguyên MCP); không chứa quy tắc nghiệp vụ |
+| `mcp-service` | Go, gRPC, Postgres riêng (`mcp`, chỉ Postgres) | Consent/grant, session, tool policy (OPA in-process), approval, kill switch, audit nguồn, registry MCP server ngoài |
+
+Trạng thái: đã implement và có unit/integration test; **chưa** được kiểm chứng end-to-end trên stack dev đầy đủ — xem `backend-go/services/mcp-service/README.md` (mục Rollout runbook) để biết khoảng trống.

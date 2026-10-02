@@ -8,6 +8,11 @@
 | Mobile app | Short-lived JWT (RS256) + refresh token, obtained after the existing QR-pairing + TweetNaCl E2E handshake | `auth-service` issues; `api-gateway` validates against a JWKS endpoint `auth-service` publishes |
 | CLI / service-to-service (gateway → internal services) | Short-lived JWT, mTLS as a second factor at the network layer | `auth-service` issues user-context JWTs; mTLS identity comes from the service mesh, not from `auth-service` |
 | Dev Server Agent | Agent token (bearer), hashed at rest — same shape the TS system already uses correctly (SHA-256 hash, not plaintext) | `infra-fleet-service` |
+| MCP client (`/mcp`, Streamable HTTP) | `Authorization: Bearer` with an `aud`-bound token: either an OAuth access token (short-lived, issued by the `auth-service` OAuth AS with PKCE, tied to a consent grant) or an MCP PAT (documented exception, T4: lifetime <= 90 days, only the SHA-256 is stored, has a `jti`, revocable immediately, audited on create/revoke/first use). Cookie-only requests are rejected on `/mcp` | `auth-service` issues and revokes; `api-gateway` (`adapter/mcpserver`) verifies and calls `ResolveMcpPrincipal` (role and membership are read live, never taken from the token); consent/grants and the allow/deny/approval decision are owned by `mcp-service` |
+
+**MCP verifier rules (T4).** The MCP verifier requires `aud == resourceUrl` (the MCP resource). The REST and WS verifiers reject any token carrying an MCP audience, so an MCP token cannot be replayed against the REST/WS API (and a PAT cannot mint more PATs). MCP tokens never carry a role claim.
+
+**Origin checks (T11, D3).** The `/ws` upgrade previously used `InsecureSkipVerify: true` (no Origin check) while authenticating by cookie, which makes state-changing channels such as `mcp.consent.decide` and `mcp.approval.decide` cross-site WebSocket hijacking targets. When `WS_ALLOWED_ORIGINS` (CSV of exact origins / host patterns) is non-empty, `wscompat.Handler` and `wsbridge.Handler` use `OriginPatterns` instead of `InsecureSkipVerify`; `/mcp` uses `MCP_ALLOWED_ORIGINS`, which defaults to `WS_ALLOWED_ORIGINS`. When both are empty the previous behavior is kept (WS accepts any Origin; `/mcp` rejects requests that carry an Origin) with a loud startup WARN, so production must set them.
 
 ## Service-to-service transport security
 
