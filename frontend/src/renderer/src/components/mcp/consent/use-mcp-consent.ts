@@ -3,6 +3,7 @@ import type { McpConsentRequest, McpScopeId } from '../../../../../shared/mcp-ty
 import { mcpClient } from '@/runtime/runtime-mcp-client'
 import { McpRpcError } from '@/runtime/runtime-mcp-error'
 import { validateConsentRedirect } from '@/lib/mcp-redirect-validation'
+import { trackMcpConsentDecided } from '@/lib/mcp-telemetry'
 
 export type McpConsentErrorCode =
   | 'MCP_CONSENT_EXPIRED'
@@ -39,7 +40,7 @@ function toError(e: unknown): McpConsentState {
   }
 }
 
-// Why: no logging/telemetry/storage of requestId, scopes or redirectUrl anywhere in this hook.
+// Why: no logging/storage of requestId, scopes or redirectUrl; telemetry gets coarse buckets only.
 export function useMcpConsent(
   requestId: string | null,
   navigate: (url: string) => void = (u) => window.location.assign(u)
@@ -98,6 +99,13 @@ export function useMcpConsent(
             setState({ kind: 'error', code: 'UNKNOWN', message: '' })
             return
           }
+          trackMcpConsentDecided({
+            decision,
+            scopeCount: scopes.length,
+            newClient: req.isNewClient,
+            viaDcr: req.registeredViaDcr,
+            narrowed: decision === 'approve' && scopes.length < req.scopes.length
+          })
           setState({ kind: 'redirecting', url, clientName: req.clientName })
           navigateRef.current(url)
         },

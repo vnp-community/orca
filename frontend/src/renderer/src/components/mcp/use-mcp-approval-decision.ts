@@ -6,6 +6,7 @@ import { useAppStore } from '@/store'
 import { mcpClient } from '@/runtime/runtime-mcp-client'
 import { parseMcpError } from '@/runtime/runtime-mcp-error'
 import { syncMcpPendingApprovals } from '@/lib/mcp-approval-sync'
+import { trackMcpApprovalDecided } from '@/lib/mcp-telemetry'
 
 /**
  * Sends a decision. The caller is a user click; nothing here decides on its own.
@@ -31,6 +32,12 @@ export function useMcpApprovalDecision(approval: McpApproval | undefined) {
         paramsHash: approval.paramsHash
       })
       store.resolveMcpApproval(approval.id)
+      trackMcpApprovalDecided({
+        decision,
+        risk: approval.tool.risk,
+        via: 'dialog',
+        latencyMs: Math.max(0, Date.now() - Date.parse(approval.createdAt) || 0)
+      })
       toast.success(
         decision === 'approve'
           ? translate('auto.mcp.approval.approved', 'Approved')

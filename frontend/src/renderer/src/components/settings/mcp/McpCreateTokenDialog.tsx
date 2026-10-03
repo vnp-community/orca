@@ -24,6 +24,7 @@ import { isHighRisk } from '@/lib/mcp-risk'
 import { mcpScopeDescription, mcpScopeLabel } from '@/lib/mcp-labels'
 import { mcpClient } from '@/runtime/runtime-mcp-client'
 import { parseMcpError } from '@/runtime/runtime-mcp-error'
+import { trackMcpTokenCreated } from '@/lib/mcp-telemetry'
 import { McpInlineAlert } from './McpListStates'
 import { McpTokenSecretReveal } from './McpTokenSecretReveal'
 import {
@@ -58,7 +59,12 @@ export function McpCreateTokenDialog(props: Props): React.JSX.Element {
   const [name, setName] = useState('')
   const [selected, setSelected] = useState<McpScopeId[]>(['orca:read'])
   const [pickedDays, setDays] = useState<number | null>(null)
-  const days = pickedDays ?? (maxOk ? defaultExpiryDays(maxTokenDays) : 1)
+  // Why: a refreshed (lower) cap must also pull a previously picked lifetime back inside it.
+  const days = maxOk
+    ? Math.min(pickedDays ?? defaultExpiryDays(maxTokenDays), maxTokenDays)
+    : (pickedDays ?? 1)
+  // Why: the too-long text is derived at render so it shows the refreshed cap, not the stale one.
+  const [tooLong, setTooLong] = useState(false)
   const [errors, setErrors] = useState<TokenFormErrors>({})
   const [banner, setBanner] = useState<string | null>(null)
   const [blocked, setBlocked] = useState(false)
@@ -74,6 +80,7 @@ export function McpCreateTokenDialog(props: Props): React.JSX.Element {
     setName('')
     setSelected(['orca:read'])
     setErrors({})
+    setTooLong(false)
     setBanner(null)
     onOpenChange(false)
   }
@@ -84,6 +91,7 @@ export function McpCreateTokenDialog(props: Props): React.JSX.Element {
     }
     const errs = validateTokenForm({ name, scopes: selected, expiresInDays: days }, maxTokenDays)
     setErrors(errs)
+    setTooLong(false)
     if (hasFormErrors(errs)) {
       return
     }
@@ -96,12 +104,16 @@ export function McpCreateTokenDialog(props: Props): React.JSX.Element {
         scopes: selected,
         expiresInDays: days
       })
+      trackMcpTokenCreated({ lifetimeDays: days, scopeCount: selected.length })
       onCreated(res.token)
       setReveal({ token: res.token, secret: res.secret })
     } catch (e) {
       const err = parseMcpError(e)
       const effect = mapCreateError(err.code, err.detail, maxTokenDays)
-      if (effect.field) {
+      if (err.code === 'MCP_TOKEN_TOO_LONG') {
+        setErrors({})
+        setTooLong(true)
+      } else if (effect.field) {
         setErrors({ [effect.field]: effect.message })
       }
       if (effect.banner) {
@@ -122,6 +134,13 @@ export function McpCreateTokenDialog(props: Props): React.JSX.Element {
   const toggleScope = (id: McpScopeId, on: boolean): void =>
     setSelected((prev) => (on ? [...new Set([...prev, id])] : prev.filter((s) => s !== id)))
 
+  const expiryError =
+    errors.expiresInDays ??
+    (tooLong && maxOk
+      ? translate('auto.mcp.tokens.errTooLong', 'Maximum lifetime is {{days}} days.', {
+          days: maxTokenDays
+        })
+      : null)
   const revealing = reveal !== null
   return (
     <Dialog
@@ -225,7 +244,13 @@ export function McpCreateTokenDialog(props: Props): React.JSX.Element {
                 <Label htmlFor="mcp-token-expiry">
                   {translate('auto.mcp.tokens.expiresIn', 'Expires in')}
                 </Label>
-                <Select value={String(days)} onValueChange={(v) => setDays(Number(v))}>
+                <Select
+                  value={String(days)}
+                  onValueChange={(v) => {
+                    setDays(Number(v))
+                    setTooLong(false)
+                  }}
+                >
                   <SelectTrigger id="mcp-token-expiry" className="w-40">
                     <SelectValue />
                   </SelectTrigger>
@@ -248,9 +273,7 @@ export function McpCreateTokenDialog(props: Props): React.JSX.Element {
                     )}
                   </p>
                 ) : null}
-                {errors.expiresInDays ? (
-                  <p className="text-xs text-destructive">{errors.expiresInDays}</p>
-                ) : null}
+                {expiryError ? <p className="text-xs text-destructive">{expiryError}</p> : null}
               </div>
             </div>
             <DialogFooter>

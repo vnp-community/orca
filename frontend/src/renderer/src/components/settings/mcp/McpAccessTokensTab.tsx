@@ -17,6 +17,7 @@ import {
 import { useConfirmationDialog } from '@/components/confirmation-dialog'
 import { McpCreateTokenDialog } from './McpCreateTokenDialog'
 import { McpInlineAlert, McpListSkeleton, McpMutedNote } from './McpListStates'
+import { trackMcpTokenRevoked } from '@/lib/mcp-telemetry'
 import { McpScopeBadges } from './McpScopeBadges'
 import { McpTokenCliSnippet } from './McpTokenCliSnippet'
 import { useMcpTokens } from './use-mcp-tokens'
@@ -63,6 +64,7 @@ export function McpAccessTokensTab(): React.JSX.Element {
     }
     try {
       await revoke(t.id)
+      trackMcpTokenRevoked()
       toast.success(translate('auto.mcp.tokens.revokedToast', 'Token revoked'))
     } catch (e) {
       toast.error(e instanceof Error ? e.message : String(e))

@@ -1,9 +1,10 @@
 // ProviderForm.tsx — Add/Edit AI provider account dialog (TASK-V5-08)
-import { useState } from 'react'
+import { useCallback, useRef, useState } from 'react'
 import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
 import { useAppStore } from '../../store'
 import { Tracers } from '../../../../shared/trace/tracers'
-import { CredentialInput } from './CredentialInput'
+import { CredentialInput, type CredentialInputHandle } from './CredentialInput'
+import { credentialLengthBucket, toCredentialWirePayload } from '../../lib/credential-wire'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
@@ -38,10 +39,11 @@ export function ProviderForm({ account, onClose }: ProviderFormProps) {
   const [quota, setQuota] = useState(account?.quotaLimitDay ?? 0)
   const [isSaving, setIsSaving] = useState(false)
 
-  const [encryptedCred, setEncryptedCred] = useState<{ encryptedBlob: string; iv: string } | null>(
-    null
-  )
+  // Why a ref and a boolean: the API key stays inside CredentialInput's DOM node and is
+  // pulled once on save; it must never sit in this component's state.
+  const credentialRef = useRef<CredentialInputHandle>(null)
   const [hasNewCred, setHasNewCred] = useState(false)
+  const handleCredentialChange = useCallback((hasValue: boolean) => setHasNewCred(hasValue), [])
 
   const handleSave = async () => {
     setIsSaving(true)
@@ -73,19 +75,21 @@ export function ProviderForm({ account, onClose }: ProviderFormProps) {
       }
 
       // Write credential if new one provided — BL-AIP-01, băng qua relay tới Dev Server.
-      if (hasNewCred && encryptedCred) {
-        // SECURITY: span fields chỉ chứa accountId/provider/blobLength — KHÔNG bao giờ
-        // encryptedCred.encryptedBlob/iv.
+      const secret = hasNewCred ? (credentialRef.current?.take() ?? null) : null
+      if (secret) {
+        const wire = toCredentialWirePayload(secret)
+        // SECURITY: span fields chỉ chứa accountId/provider/blobLength (đã làm tròn) — KHÔNG bao giờ
+        // nội dung khoá, encryptedBlob hay iv.
         const span = Tracers.uiAiProviderWriteCredFlow.start({
           accountId,
           provider,
-          blobLength: encryptedCred.encryptedBlob.length
+          blobLength: credentialLengthBucket(wire)
         })
         try {
           await callRuntimeRpc(target, 'aiProvider.writeCredential', {
             accountId,
-            encryptedBlob: encryptedCred.encryptedBlob,
-            iv: encryptedCred.iv,
+            encryptedBlob: wire.encryptedBlob,
+            iv: wire.iv,
             traceId: span.id
           })
           span.ok({ accountId })
@@ -193,13 +197,10 @@ export function ProviderForm({ account, onClose }: ProviderFormProps) {
           </div>
 
           <CredentialInput
+            ref={credentialRef}
             provider={provider}
             hasExisting={!!account?.id}
-            onEncrypted={(blob, iv) => {
-              setEncryptedCred({ encryptedBlob: blob, iv })
-              setHasNewCred(true)
-            }}
-            onClear={() => setHasNewCred(false)}
+            onChange={handleCredentialChange}
           />
         </div>
 

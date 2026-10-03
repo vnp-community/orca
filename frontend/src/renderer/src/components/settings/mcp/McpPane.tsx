@@ -6,7 +6,10 @@ import {
   type McpTabId
 } from '@/store/slices/mcp-slice'
 import { translate } from '@/i18n/i18n'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { mcpUiStage } from '@/lib/mcp-labels'
+import { trackMcpSettingsOpened } from '@/lib/mcp-telemetry'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { McpPaneSkeleton } from './McpPaneSkeleton'
 import {
@@ -80,6 +83,14 @@ export function McpPane(): React.JSX.Element {
     clearNavigation()
   }, [navigation, clearNavigation])
 
+  // Why: coarse tab-view signal only (enum + role); fires on tab change, not on re-render.
+  const trackedRole = isAdmin ? 'admin' : 'user'
+  useEffect(() => {
+    if (activeTab) {
+      trackMcpSettingsOpened({ tab: activeTab, role: trackedRole })
+    }
+  }, [activeTab, trackedRole])
+
   if (!info && (status === 'idle' || status === 'loading')) {
     return <McpPaneSkeleton />
   }
@@ -93,6 +104,9 @@ export function McpPane(): React.JSX.Element {
 
   return (
     <div className="space-y-4">
+      {mcpUiStage() === 'beta' ? (
+        <Badge variant="secondary">{translate('auto.mcp.nav.badge', 'Beta')}</Badge>
+      ) : null}
       {killSwitchActive ? (
         <div
           role="status"

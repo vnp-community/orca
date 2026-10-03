@@ -76,6 +76,28 @@ test.describe('approvals (mocked WebSocket backend)', () => {
       page.locator('[role="tab"][data-state="active"]', { hasText: 'Approvals' })
     ).toBeAttached()
   })
+
+  test('cold-start deep link opens Settings > MCP > Approvals focused on that approval', async ({
+    page
+  }) => {
+    const backend = createFakeMcpBackend({ role: 'user' })
+    backend.requestToolCall(approval({ id: 'ap-cold' }))
+    // Why: a cold start races startup UI hydration, which only completes with the boot channels.
+    await mockOrcaApp(page, { backend, user: mockUser(), baseURL: SPA_URL, bootChannels: true })
+    await page.goto('/web-index.html?section=mcp&tab=approvals&approval=ap-cold')
+    // The global prompt is modal; deciding later exposes the inbox row that was focused.
+    await page.getByRole('button', { name: 'Decide later' }).click()
+    // Boot stubs close onboarding, so the first-run feature tip may sit on top; dismiss if shown.
+    await page
+      .getByRole('button', { name: 'Got it' })
+      .click({ timeout: 3000 })
+      .catch(() => {})
+    await expect(
+      page.locator('[role="tab"][data-state="active"]', { hasText: 'Approvals' })
+    ).toBeVisible()
+    await expect(page.getByRole('listitem').filter({ hasText: 'Run command' })).toBeVisible()
+    await expect.poll(() => new URL(page.url()).search).toBe('')
+  })
 })
 
 test.describe('@dev-stack approvals', () => {

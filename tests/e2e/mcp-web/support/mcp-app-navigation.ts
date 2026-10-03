@@ -14,9 +14,11 @@ export async function bootApp(page: Page, backend: FakeMcpBackend): Promise<void
 export async function openMcpTab(page: Page, tab: string): Promise<void> {
   const mcpNav = page.getByRole('button', { name: 'MCP', exact: true })
   const settings = page.getByRole('button', { name: 'Settings' }).first()
-  await expect(settings.or(mcpNav).first()).toBeVisible()
-  // Why: after a reload the app may restore straight into Settings.
-  if (!(await mcpNav.isVisible())) {
+  const settingsSearch = page.getByRole('textbox', { name: 'Search settings' })
+  await expect(settings.or(settingsSearch).first()).toBeVisible()
+  // Why: after a reload the app restores straight into Settings, where the MCP nav entry only
+  // appears once server.info has loaded, so "nav not visible yet" must not trigger a click.
+  if (!(await settingsSearch.isVisible())) {
     await settings.click()
   }
   await mcpNav.click()

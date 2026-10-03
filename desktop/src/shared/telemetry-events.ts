@@ -14,6 +14,7 @@
 // re-check string length.
 
 import { z } from 'zod'
+import { mcpEventSchemas } from './mcp-telemetry-events'
 import { FEATURE_WALL_MAX_DWELL_MS } from './feature-wall-telemetry'
 import { FEATURE_WALL_EXIT_ACTIONS, FEATURE_WALL_TOUR_DEPTH_STEPS } from './feature-wall-tour-depth'
 import {
@@ -1483,7 +1484,10 @@ export const eventSchemas = {
 
   smart_sort_class_distribution: smartSortClassDistributionSchema,
   smart_sort_class_1_promotion: smartSortClass1PromotionSchema,
-  smart_to_recent_switch: smartToRecentSwitchSchema
+  smart_to_recent_switch: smartToRecentSwitchSchema,
+
+  // MCP UI (additive; see mcp-telemetry-events.ts). Web build has no telemetry bridge.
+  ...mcpEventSchemas
 } as const
 
 export type EventMap = { [N in keyof typeof eventSchemas]: z.infer<(typeof eventSchemas)[N]> }

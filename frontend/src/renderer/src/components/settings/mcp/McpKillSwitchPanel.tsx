@@ -17,6 +17,7 @@ import { useAppStore } from '@/store'
 import { mcpClient } from '@/runtime/runtime-mcp-client'
 import { parseMcpError } from '@/runtime/runtime-mcp-error'
 import { formatMcpRelativeTime } from '@/lib/mcp-relative-time'
+import { trackMcpKillSwitchToggled } from '@/lib/mcp-telemetry'
 import { McpInlineAlert } from './McpListStates'
 import { McpKillSwitchConfirmDialog } from './McpKillSwitchConfirmDialog'
 import { McpKillSwitchTargetSelect } from './McpKillSwitchTargetSelect'
@@ -65,6 +66,7 @@ export function McpKillSwitchPanel(): React.JSX.Element {
         active,
         reason: why
       })
+      trackMcpKillSwitchToggled({ scope: s, active })
       void useAppStore.getState().refreshMcpServerInfo()
       list.reload()
       return true

@@ -1,108 +1,111 @@
-// CredentialInput.tsx — Secure API key input with in-browser AES-GCM encryption (TASK-V5-07)
-// SECURITY: rawValue is cleared from React state immediately after encryption
-import { useState } from 'react'
+// CredentialInput.tsx — write-only API key field for AI provider accounts.
+// SECURITY: the key lives only in the uncontrolled <input> DOM node. It is never held in
+// React state; the parent pulls it exactly once on save via the `take()` handle, which
+// also clears the field.
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
 import type { AIProviderType } from '../../types/ai-provider-types'
-import { encryptCredential } from '../../lib/credential-crypto'
-import { useAppStore } from '../../store'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
-import { Lock, Loader2 } from 'lucide-react'
+
+export type CredentialInputHandle = {
+  /** Returns the trimmed key and clears the field; null when nothing was entered. */
+  take: () => string | null
+}
 
 type CredentialInputProps = {
-  provider:    AIProviderType
+  provider: AIProviderType
   hasExisting: boolean
-  onEncrypted: (encryptedBlob: string, iv: string) => void
-  onClear:     () => void
+  /** Fires only when "has a value" flips, never with the value itself. */
+  onChange?: (hasValue: boolean) => void
 }
 
 const CREDENTIAL_LABELS: Record<AIProviderType, string | null> = {
   anthropic: 'Anthropic API Key (sk-ant-...)',
-  openai:    'OpenAI API Key (sk-...)',
-  gemini:    'Google API Key (AIza...)',
-  azure:     'Azure OpenAI API Key',
-  bedrock:   'AWS Credentials (JSON: accessKey + secret + region)',
-  vllm:      'vLLM API Key (optional)',
-  ollama:    null,   // no credential needed
+  openai: 'OpenAI API Key (sk-...)',
+  gemini: 'Google API Key (AIza...)',
+  azure: 'Azure OpenAI API Key',
+  bedrock: 'AWS Credentials (JSON: accessKey + secret + region)',
+  vllm: 'vLLM API Key (optional)',
+  ollama: null // no credential needed
 }
 
-export function CredentialInput({
-  provider, hasExisting, onEncrypted, onClear
-}: CredentialInputProps) {
-  const [rawValue, setRawValue]         = useState('')
-  const [isEncrypting, setIsEncrypting] = useState(false)
-  const [isEncrypted, setIsEncrypted]   = useState(false)
+export const CredentialInput = forwardRef<CredentialInputHandle, CredentialInputProps>(
+  function CredentialInput({ provider, hasExisting, onChange }, ref) {
+    const inputRef = useRef<HTMLInputElement>(null)
+    const [hasValue, setHasValue] = useState(false)
+    const label = CREDENTIAL_LABELS[provider]
 
-  // Ollama: no credential needed
-  const label = CREDENTIAL_LABELS[provider]
-  if (label === null) {return null}
-
-  // Get session token for key derivation
-  const sessionToken = useAppStore(
-    s => (s as any).auth?.sessionToken ?? 'fallback-dev-token'
-  ) as string
-
-  const handleChange = async (value: string) => {
-    // Reset state first
-    setRawValue(value)
-    setIsEncrypted(false)
-    onClear()
-
-    if (value.length >= 10) {
-      setIsEncrypting(true)
-      try {
-        const { encryptedBlob, iv } = await encryptCredential(value, sessionToken)
-        setIsEncrypted(true)
-        onEncrypted(encryptedBlob, iv)
-      } catch {
-        // SECURITY: Do not log error details — they may contain timing info
-        setIsEncrypted(false)
-      } finally {
-        setIsEncrypting(false)
-        // CRITICAL: clear plaintext from state after encryption
-        setRawValue('')
-      }
+    const update = (next: boolean): void => {
+      setHasValue(next)
+      onChange?.(next)
     }
-  }
 
-  return (
-    <div className="credential-input space-y-1">
-      <Label>{label}</Label>
-      {hasExisting && !isEncrypted && (
-        <p className="text-xs text-muted-foreground">
-          Leave blank to keep existing credential
-        </p>
-      )}
-      <div className="relative">
+    useImperativeHandle(ref, () => ({
+      take: () => {
+        const el = inputRef.current
+        const value = (el?.value ?? '').trim()
+        if (el) {
+          el.value = ''
+        }
+        setHasValue(false)
+        return value === '' ? null : value
+      }
+    }))
+
+    // Why: switching to a provider without a credential unmounts the field, so a typed
+    // value is gone — tell the parent instead of leaving it believing one is pending.
+    useEffect(() => {
+      if (label === null) {
+        setHasValue(false)
+        onChange?.(false)
+      }
+    }, [label, onChange])
+
+    useEffect(
+      () => () => {
+        if (inputRef.current) {
+          inputRef.current.value = ''
+        }
+      },
+      []
+    )
+
+    // Why after the hooks: returning before them changed the hook order when the provider
+    // switched to/from one with no credential field.
+    if (label === null) {
+      return null
+    }
+
+    return (
+      <div className="credential-input space-y-1">
+        <Label htmlFor="ai-provider-credential">{label}</Label>
+        {hasExisting && !hasValue && (
+          <p className="text-xs text-muted-foreground">Leave blank to keep existing credential</p>
+        )}
         <Input
+          id="ai-provider-credential"
+          ref={inputRef}
           type="password"
           placeholder="Enter API key..."
-          value={rawValue}
-          onChange={e => handleChange(e.target.value)}
+          defaultValue=""
+          onChange={(e) => {
+            const next = e.target.value.length > 0
+            if (next !== hasValue) {
+              update(next)
+            }
+          }}
           autoComplete="new-password"
           autoCorrect="off"
           autoCapitalize="off"
           spellCheck={false}
           data-testid="credential-input"
         />
-        {isEncrypting && (
-          <Loader2
-            className="absolute right-2 top-2.5 animate-spin text-muted-foreground"
-            size={16}
-          />
-        )}
-        {isEncrypted && (
-          <Lock
-            className="absolute right-2 top-2.5 text-green-500"
-            size={16}
-            data-testid="lock-icon"
-          />
+        {hasValue && (
+          <p className="text-xs text-muted-foreground" data-testid="credential-transport-note">
+            Sent over TLS when you save and encrypted at rest by the server.
+          </p>
         )}
       </div>
-      {isEncrypted && (
-        <p className="text-xs text-green-600">
-          ✓ Credential encrypted in browser — will be stored securely on dev server
-        </p>
-      )}
-    </div>
-  )
-}
+    )
+  }
+)

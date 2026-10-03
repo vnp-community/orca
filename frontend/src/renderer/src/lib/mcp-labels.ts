@@ -33,3 +33,10 @@ export function mcpScopeDescription(scope: McpScopeDescriptor): string {
 export function mcpRiskLabel(risk: McpRisk): string {
   return translate(`auto.mcp.risk.${risk}`, RISK_LABELS[risk] ?? risk)
 }
+
+export type McpUiStage = 'beta' | 'ga'
+
+/** Rollout stage (FE-MCP-SOL-012). Read per call so it stays env-driven; unset means GA (no badge). */
+export function mcpUiStage(): McpUiStage {
+  return import.meta.env.VITE_MCP_UI_STAGE === 'beta' ? 'beta' : 'ga'
+}

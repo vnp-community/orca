@@ -3,6 +3,7 @@ import {
   createFakeMcpBackend,
   type FakeMcpBackend
 } from '../../../../frontend/src/renderer/src/test-support/mcp-fake-backend'
+import { BOOT_CHANNEL_STUBS } from './mock-orca-boot-channels'
 
 export { createFakeMcpBackend, type FakeMcpBackend }
 
@@ -33,7 +34,13 @@ const json = (route: Route, body: unknown, status = 200): Promise<void> =>
  */
 export async function mockOrcaApp(
   page: Page,
-  opts: { backend: FakeMcpBackend; user: MockUser | null; baseURL: string }
+  opts: {
+    backend: FakeMcpBackend
+    user: MockUser | null
+    baseURL: string
+    /** Answer the SPA's boot channels so startup hydration completes (cold-start specs). */
+    bootChannels?: boolean
+  }
 ): Promise<{ wsMethods: string[] }> {
   const wsMethods: string[] = []
   await page.route('**/auth/me', (r) =>
@@ -64,6 +71,14 @@ export async function mockOrcaApp(
           opts.backend.bridge.subscribeEvents((event) =>
             send({ id: msg.id, ok: true, result: event, streaming: true, _meta: meta })
           )
+          continue
+        }
+        if (
+          opts.bootChannels &&
+          !msg.method.startsWith('mcp.') &&
+          msg.method in BOOT_CHANNEL_STUBS
+        ) {
+          send({ id: msg.id, ok: true, result: BOOT_CHANNEL_STUBS[msg.method], _meta: meta })
           continue
         }
         try {

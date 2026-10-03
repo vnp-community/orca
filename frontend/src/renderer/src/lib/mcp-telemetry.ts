@@ -1,9 +1,11 @@
 import type { McpRisk } from '../../../shared/mcp-types'
+import type { EventProps } from '../../../shared/telemetry-events'
 import { track } from './telemetry'
 
 // Components call these wrappers, never track() directly, so payloads stay coarse by construction.
 // Web build: telemetryTrack is a no-op, so these are inert there.
 
+export type McpTelemetryTab = EventProps<'mcp_settings_opened'>['tab']
 export type McpCountBucket = '1' | '2' | '3+'
 export type McpLifetimeBucket = '<=7d' | '<=30d' | '<=90d' | '>90d'
 export type McpLatencyBucket = '<10s' | '<60s' | '<10m' | '>=10m'
@@ -57,4 +59,15 @@ export function trackMcpApprovalDecided(a: {
     via: a.via,
     latency_bucket: bucketLatencyMs(a.latencyMs)
   })
+}
+
+export function trackMcpSettingsOpened(a: { tab: McpTelemetryTab; role: 'admin' | 'user' }): void {
+  track('mcp_settings_opened', { tab: a.tab, role: a.role })
+}
+
+export function trackMcpKillSwitchToggled(a: {
+  scope: 'tenant' | 'client' | 'grant' | 'session'
+  active: boolean
+}): void {
+  track('mcp_killswitch_toggled', { scope: a.scope, active: a.active })
 }

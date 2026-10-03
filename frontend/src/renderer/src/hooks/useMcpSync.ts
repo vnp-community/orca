@@ -17,6 +17,7 @@ export function useMcpSync(): void {
   const enabled = useAppStore(selectMcpEnabled)
   const visible = useAppStore(selectMcpSectionVisible)
   const infoStatus = useAppStore((s) => s.mcpServerInfoStatus)
+  const uiReady = useAppStore((s) => s.persistedUIReady)
   const pendingLink = useRef<McpDeepLinkTarget | null>(null)
   const [linkTick, setLinkTick] = useState(0)
 
@@ -65,7 +66,8 @@ export function useMcpSync(): void {
 
   useEffect(() => {
     const target = pendingLink.current
-    if (!target || !authed) {
+    // Why: startup UI hydration restores the persisted view and would undo a cold-start link.
+    if (!target || !authed || !uiReady) {
       return
     }
     if (visible) {
@@ -83,5 +85,5 @@ export function useMcpSync(): void {
         window.location.pathname === '/settings' ? '/' : window.location.pathname
       )
     }
-  }, [authed, visible, infoStatus, linkTick])
+  }, [authed, visible, infoStatus, linkTick, uiReady])
 }
