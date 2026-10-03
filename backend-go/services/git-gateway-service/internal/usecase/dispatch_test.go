@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/stablyai/orca-go/common/apperrors"
@@ -27,6 +28,9 @@ func (f *fakeConnectionResolver) ResolveConnection(ctx context.Context, worktree
 // called, so tests can assert *which* executor (local vs. relay) a usecase
 // dispatched to without either implementation doing real work.
 type fakeGitExecutor struct {
+	// mu guards BranchCompare: CompareWorktrees fans out one goroutine per
+	// worktree against the SAME executor, so its recording fields race otherwise.
+	mu   sync.Mutex
 	name string // "local" or "relay", for assertion messages
 
 	calledGetStatus              bool
@@ -283,6 +287,8 @@ func (f *fakeGitExecutor) CommitCompare(ctx context.Context, repoPath, commitID 
 }
 
 func (f *fakeGitExecutor) BranchCompare(ctx context.Context, repoPath, baseRef string) (domain.BranchCompareResult, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.calledBranchCompare = true
 	f.gotRepoPath = repoPath
 	f.gotBaseRef = baseRef
