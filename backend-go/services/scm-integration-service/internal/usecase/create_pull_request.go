@@ -19,12 +19,9 @@ import (
 // CreatePullRequestInput in ports.go, which is the narrower shape the
 // ScmProvider adapter itself receives.
 //
-// LinkedIssueProvider/LinkedIssueRef would come from parsing the PR body's
-// closing-keyword reference (e.g. "Fixes #123") — no such parser exists in
-// this codebase yet (TASK-PI-03-05's own scope note), so both are always
-// empty for now; orca.scm.pull_request.created is still published with an
-// empty linked_issue_ref, which issue-status-sync's consumer already
-// no-ops on.
+// LinkedIssueProvider/LinkedIssueRef are optional overrides; when empty the
+// event's linked issue is parsed from the head branch, title and body
+// (ParseLinkedJiraIssue). An empty result is still published and no-ops downstream.
 type CreatePullRequestParams struct {
 	TenantID          string
 	Provider          domain.ScmProvider
@@ -36,8 +33,7 @@ type CreatePullRequestParams struct {
 	Draft             bool  // NEW — BR-CR-20
 	LinkedIssueNumber int32 // NEW — BR-CR-19; 0 means "no linked issue"
 	// LinkedIssueProvider/LinkedIssueRef feed the orca.scm.pull_request.created
-	// outbox event payload (SOL-PI-03) — see this file's doc comment for why
-	// both are always empty today.
+	// outbox event payload (SOL-PI-03); parsed from the PR text when empty.
 	LinkedIssueProvider string
 	LinkedIssueRef      string
 }
@@ -129,10 +125,8 @@ func (uc *CreatePullRequest) Execute(ctx context.Context, in CreatePullRequestPa
 	}
 
 	if uc.outbox != nil {
-		payload, mErr := json.Marshal(prLifecycleEventPayload{
-			Provider: string(in.Provider), Repo: in.Repo, PrNumber: pr.Number,
-			LinkedIssueProvider: in.LinkedIssueProvider, LinkedIssueRef: in.LinkedIssueRef,
-		})
+		payload, mErr := json.Marshal(newPRLifecyclePayload(ctx, string(in.Provider), in.Repo, pr.Number,
+			in.LinkedIssueProvider, in.LinkedIssueRef, in.HeadBranch, in.Title, in.Body))
 		if mErr == nil {
 			event := domain.OutboxEvent{
 				ID: uuid.NewString(), Subject: subjectPullRequestCreated,

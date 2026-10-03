@@ -11,6 +11,7 @@ import (
 )
 
 type recordingTracker struct {
+	category         string
 	user, ref, state string
 	transitions      int
 }
@@ -21,7 +22,10 @@ func (r *recordingTracker) TransitionIssue(_ context.Context, _, userID, _, ref,
 	return nil
 }
 func (r *recordingTracker) IssueStatusCategory(context.Context, string, string, string, string) (string, error) {
-	return "todo", nil
+	if r.category == "" {
+		return "todo", nil
+	}
+	return r.category, nil
 }
 
 type noScm struct{}
@@ -97,5 +101,56 @@ func TestMalformedPayloadIsAcknowledged(t *testing.T) {
 	}
 	if tracker.transitions != 0 {
 		t.Error("nothing may be sent")
+	}
+}
+
+// The payloads below are exactly what scm-integration-service's
+// prLifecycleEventPayload marshals for a PR whose branch names an issue.
+func TestPullRequestCreatedPayloadFromScmServiceMovesJiraIssueToInReview(t *testing.T) {
+	sub, tracker := newContractSubscriber()
+	tracker.category = "in_progress"
+	payload := `{"provider":"github","repo":"o/r","pr_number":42,"linked_issue_provider":"jira","linked_issue_ref":"ENG-123","actor_user_id":"user-7"}`
+
+	if err := sub.handlePullRequestEvent(false)(context.Background(), event(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if tracker.transitions != 1 || tracker.ref != "ENG-123" || tracker.state != "In Review" || tracker.user != "user-7" {
+		t.Errorf("want In Review for ENG-123 as user-7, got %+v", tracker)
+	}
+}
+
+func TestPullRequestMergedPayloadFromScmServiceMovesJiraIssueToDone(t *testing.T) {
+	sub, tracker := newContractSubscriber()
+	tracker.category = "in_progress"
+	payload := `{"provider":"github","repo":"o/r","pr_number":42,"linked_issue_provider":"jira","linked_issue_ref":"ENG-123","actor_user_id":"user-7"}`
+
+	if err := sub.handlePullRequestEvent(true)(context.Background(), event(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if tracker.transitions != 1 || tracker.state != "Done" || tracker.user != "user-7" {
+		t.Errorf("want Done as user-7, got %+v", tracker)
+	}
+}
+
+func TestPullRequestPayloadsThatMustNotTransition(t *testing.T) {
+	cases := map[string]struct {
+		category, payload string
+	}{
+		"issue still todo":   {"todo", `{"provider":"github","repo":"o/r","pr_number":1,"linked_issue_provider":"jira","linked_issue_ref":"ENG-1","actor_user_id":"user-7"}`},
+		"issue already done": {"done", `{"provider":"github","repo":"o/r","pr_number":1,"linked_issue_provider":"jira","linked_issue_ref":"ENG-1","actor_user_id":"user-7"}`},
+		"no actor":           {"in_progress", `{"provider":"github","repo":"o/r","pr_number":1,"linked_issue_provider":"jira","linked_issue_ref":"ENG-1"}`},
+		"no linked issue":    {"in_progress", `{"provider":"github","repo":"o/r","pr_number":1,"actor_user_id":"user-7"}`},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			sub, tracker := newContractSubscriber()
+			tracker.category = tc.category
+			if err := sub.handlePullRequestEvent(true)(context.Background(), event(tc.payload)); err != nil {
+				t.Fatal(err)
+			}
+			if tracker.transitions != 0 {
+				t.Errorf("must not transition, got %+v", tracker)
+			}
+		})
 	}
 }

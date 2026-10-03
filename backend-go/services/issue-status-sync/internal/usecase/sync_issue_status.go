@@ -168,12 +168,14 @@ func mapWorktreeEventToStatus(ev domain.WorktreeLifecycleEvent) domain.TargetSta
 }
 
 // mapPullRequestEventToStatus implements BL-PI-03's mapping table:
-// pr.created -> In Review, pr.merged -> Done.
+// pr.created -> In Review, pr.merged -> Done. Both apply only to an issue
+// that is in progress: a todo issue was never started and a done one must
+// not be reopened or re-moved (a PR may also reference an issue loosely).
 func mapPullRequestEventToStatus(ev domain.PullRequestLifecycleEvent) domain.TargetState {
 	if ev.Merged {
-		return domain.TargetState{TrackerState: "Done", GitHubLabelPatch: "close"}
+		return domain.TargetState{TrackerState: "Done", GitHubLabelPatch: "close", OnlyFromCategory: "in_progress"}
 	}
-	return domain.TargetState{TrackerState: "In Review", GitHubLabelPatch: "add:in-review"}
+	return domain.TargetState{TrackerState: "In Review", GitHubLabelPatch: "add:in-review", OnlyFromCategory: "in_progress"}
 }
 
 // doWithRetry runs fn up to attempts times with a short fixed backoff

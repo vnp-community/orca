@@ -12,8 +12,8 @@ import (
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
 )
 
-// MergePullRequestParams — see CreatePullRequestParams' doc comment for why
-// LinkedIssueProvider/LinkedIssueRef are always empty for now.
+// MergePullRequestParams — LinkedIssueProvider/LinkedIssueRef override the
+// parse of the merged PR's head branch and title (a merge does not return the body).
 type MergePullRequestParams struct {
 	TenantID            string
 	Provider            domain.ScmProvider
@@ -80,10 +80,8 @@ func (uc *MergePullRequest) Execute(ctx context.Context, in MergePullRequestPara
 	}
 
 	if merged && uc.outbox != nil {
-		payload, mErr := json.Marshal(prLifecycleEventPayload{
-			Provider: string(in.Provider), Repo: in.Repo, PrNumber: pr.Number,
-			LinkedIssueProvider: in.LinkedIssueProvider, LinkedIssueRef: in.LinkedIssueRef,
-		})
+		payload, mErr := json.Marshal(newPRLifecyclePayload(ctx, string(in.Provider), in.Repo, pr.Number,
+			in.LinkedIssueProvider, in.LinkedIssueRef, pr.HeadBranch, pr.Title, ""))
 		if mErr == nil {
 			event := domain.OutboxEvent{
 				ID: uuid.NewString(), Subject: subjectPullRequestMerged,

@@ -284,8 +284,8 @@ func TestMappingTable(t *testing.T) {
 		ev   domain.PullRequestLifecycleEvent
 		want domain.TargetState
 	}{
-		{"pr.created -> In Review", domain.PullRequestLifecycleEvent{Merged: false}, domain.TargetState{TrackerState: "In Review", GitHubLabelPatch: "add:in-review"}},
-		{"pr.merged -> Done", domain.PullRequestLifecycleEvent{Merged: true}, domain.TargetState{TrackerState: "Done", GitHubLabelPatch: "close"}},
+		{"pr.created -> In Review", domain.PullRequestLifecycleEvent{Merged: false}, domain.TargetState{TrackerState: "In Review", GitHubLabelPatch: "add:in-review", OnlyFromCategory: "in_progress"}},
+		{"pr.merged -> Done", domain.PullRequestLifecycleEvent{Merged: true}, domain.TargetState{TrackerState: "Done", GitHubLabelPatch: "close", OnlyFromCategory: "in_progress"}},
 	}
 	for _, tc := range prCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -308,8 +308,8 @@ func TestHandlePullRequestLifecycle_DuplicateEventIsNoOp(t *testing.T) {
 	}
 }
 
-// scm-integration-service publishes no actor today, so PR events cannot be
-// synced yet; they must be skipped cleanly rather than fail three times each.
+// An event published without an actor (older producer, or a caller with no
+// user) cannot be synced; it must be skipped cleanly rather than fail three times each.
 func TestHandlePullRequestLifecycle_WithoutActorIsSkipped(t *testing.T) {
 	h := newHarness()
 
@@ -321,5 +321,46 @@ func TestHandlePullRequestLifecycle_WithoutActorIsSkipped(t *testing.T) {
 	}
 	if h.providerCalls() != 0 || !h.processed.seen["ev-1"] {
 		t.Errorf("want skipped and marked seen; calls=%d", h.providerCalls())
+	}
+}
+
+func TestHandlePullRequestLifecycle_GuardsByCurrentCategory(t *testing.T) {
+	cases := []struct {
+		name     string
+		merged   bool
+		category string
+		want     string // "" means no transition
+	}{
+		{"created from in_progress -> In Review", false, "in_progress", "In Review"},
+		{"created from todo is left alone", false, "todo", ""},
+		{"created from done is left alone", false, "done", ""},
+		{"merged from in_progress -> Done", true, "in_progress", "Done"},
+		{"merged from todo is left alone", true, "todo", ""},
+		{"merged from done is left alone", true, "done", ""},
+		{"merged from unknown category is left alone", true, "", ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			h := newHarness()
+			h.tracker.category = tc.category
+
+			err := h.uc.HandlePullRequestLifecycle(context.Background(), domain.PullRequestLifecycleEvent{
+				EventID: "ev-1", TenantID: "t1", LinkedIssueProvider: "jira", LinkedIssueRef: "ENG-1",
+				Merged: tc.merged, ActorUserID: "user-7",
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if tc.want == "" {
+				if h.tracker.calls != 0 {
+					t.Errorf("must not transition, got state %q", h.tracker.gotState)
+				}
+			} else if h.tracker.calls != 1 || h.tracker.gotState != tc.want || h.tracker.gotUser != "user-7" || h.tracker.gotRef != "ENG-1" {
+				t.Errorf("want one transition to %q as user-7, got calls=%d state=%q user=%q", tc.want, h.tracker.calls, h.tracker.gotState, h.tracker.gotUser)
+			}
+			if !h.processed.seen["ev-1"] {
+				t.Error("event must be marked seen")
+			}
+		})
 	}
 }
