@@ -57,7 +57,8 @@ Còn lại (chưa làm, có chủ đích):
 - **Dọn task kẹt `in_progress`** (vòng quét chung, mỗi lần trả task về đều là compare-and-set trên link đang active):
   - run direct_agent hết lease → trả về `previous_status` (không có thì `open`);
   - run direct_agent cũ không có lease (trước migration 0013), quá 30 phút (lớn hơn trần 15 phút của executor);
-  - task mồ côi: link đã kết thúc mà task vẫn `in_progress` — direct_agent `completed` → `review` (chỉ mất bước ghi hoàn tất), `failed` → `previous_status`. Với Engine 2/3 chỉ link `failed` mới tính là kết thúc, vì `Execute` đánh dấu link `completed` ngay sau khi dispatch (chỉ là ghi sổ, run vẫn đang chạy).
+  - task mồ côi: link đã kết thúc mà task vẫn `in_progress` — direct_agent `completed` → `review` (chỉ mất bước ghi hoàn tất), `failed` → `previous_status`. Với Engine 2/3 chỉ link `failed` mới tính là kết thúc, vì `Execute` đánh dấu link `completed` ngay sau khi dispatch (chỉ là ghi sổ, run vẫn đang chạy);
+  - task `in_progress` không có link nào (`active_execution_link_id IS NULL`, vd. từ trước khi có `execution_links`), `updated_at` quá 30 phút (`UnlinkedGrace`, đồng hồ DB) → `open` (không biết trạng thái trước). Một câu `UPDATE` compare-and-set (`status='in_progress' AND link IS NULL AND updated_at < now()-grace`); task healthy chỉ ở trạng thái này vài giây giữa claim và ghi link nên grace lớn không đụng tới. Task có link không bao giờ bị sweep này chạm vào.
 - **Engine 2/3 thất bại không còn kẹt `in_progress`:** `ReportTaskExecutionResult` trả task về `previous_status` (ghi trên link lúc dispatch, `open` nếu thiếu). Comment cũ "chưa có trạng thái blocked" đã lỗi thời — `blocked` có trong DB từ migration 0003.
 - **Chặn `prompt` override trên task không phải direct_agent** (`TASK_EXECUTE_PROMPT_UNSUPPORTED`): vòng spec/duyệt/code gửi prompt theo pha, nhưng coordinator bỏ qua nó và chạy phần implement, tức là âm thầm bỏ qua bước duyệt spec.
 - Rollout an toàn: link không có lease (trước migration) không bao giờ bị quét; nếu ghi lease lỗi (migration chưa chạy) thì chỉ log và chạy như cũ.
@@ -84,7 +85,6 @@ Còn lại (chưa làm, có chủ đích):
 - Tự tạo task cho mọi workspace Jira (hiện chỉ khi bật cờ).
 - Đã xoá `ExecuteBatch` (code chết, không có caller production; frontend tự điều phối batch qua `task.execute`) cùng test của nó — data race trong `fakeExecutionLinkRepository` biến mất, `go test -race` qua toàn bộ. `domain.TopologicalWaves` còn lại (có test riêng, chưa có caller).
 - `GenerateAgentPrompt` mới có kênh WS; chưa có nút trên UI (`TaskPromptEditor.tsx` đang có thay đổi chưa commit khác).
-- Task kẹt không có link nào (không đi qua `ExecuteTask`) vẫn không được tự dọn.
 
 ## Acceptance Criteria
 - [x] Hai lần "start work" trên cùng issue/project trả cùng một task (test usecase + test tích hợp Postgres/MySQL).

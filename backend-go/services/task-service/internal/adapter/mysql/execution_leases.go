@@ -175,3 +175,24 @@ func (r *Repository) ClaimForExecution(ctx context.Context, tenantID, taskID str
 	}
 	return n > 0, nil
 }
+
+// ReleaseUnlinkedInProgress is a single guarded UPDATE ... LIMIT. A concurrent
+// sweeper blocks on the row lock, then re-evaluates the WHERE against the
+// committed row (status already open), so nothing is released twice.
+func (r *Repository) ReleaseUnlinkedInProgress(ctx context.Context, grace time.Duration, limit int) (int, error) {
+	res, err := r.db.ExecContext(ctx, `
+		UPDATE tasks SET status = 'open', updated_at = NOW(6)
+		WHERE status = 'in_progress' AND active_execution_link_id IS NULL
+		  AND updated_at < DATE_SUB(NOW(6), INTERVAL ? MICROSECOND)
+		ORDER BY updated_at
+		LIMIT ?
+	`, grace.Microseconds(), limit)
+	if err != nil {
+		return 0, fmt.Errorf("mysql: release unlinked in_progress tasks: %w", err)
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return 0, fmt.Errorf("mysql: release unlinked in_progress tasks rows affected: %w", err)
+	}
+	return int(n), nil
+}

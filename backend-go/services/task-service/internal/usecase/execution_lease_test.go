@@ -30,6 +30,10 @@ type fakeLeaseRepository struct {
 	claimCalls  int
 	legacyAge   time.Duration
 	orphanGrace time.Duration
+
+	unlinkedErr   error
+	unlinkedGrace time.Duration
+	recentTasks   map[string]bool // task IDs whose updated_at is inside the grace window
 }
 
 type leaseStart struct {
@@ -96,6 +100,33 @@ func (f *fakeLeaseRepository) ListOrphanedRuns(_ context.Context, grace time.Dur
 		return nil, f.orphanErr
 	}
 	return f.orphaned, nil // not claimed: ReleaseExecution's compare-and-set makes repeats harmless
+}
+
+// ReleaseUnlinkedInProgress mimics the SQL: in_progress, no link, and an
+// updated_at older than grace (recentTasks marks the ones that are not).
+func (f *fakeLeaseRepository) ReleaseUnlinkedInProgress(_ context.Context, grace time.Duration, limit int) (int, error) {
+	f.mu.Lock()
+	f.unlinkedGrace = grace
+	err := f.unlinkedErr
+	f.mu.Unlock()
+	if err != nil {
+		return 0, err
+	}
+	f.tasks.mu.Lock()
+	defer f.tasks.mu.Unlock()
+	n := 0
+	for id, t := range f.tasks.tasks {
+		if n >= limit {
+			break
+		}
+		if t.Status != domain.StatusInProgress || t.ActiveExecutionLinkID != "" || f.recentTasks[id] {
+			continue
+		}
+		t.Status = domain.StatusOpen
+		f.tasks.tasks[id] = t
+		n++
+	}
+	return n, nil
 }
 
 func (f *fakeLeaseRepository) ReleaseExecution(_ context.Context, tenantID, taskID, linkID string, to domain.Status) (bool, error) {
@@ -236,6 +267,46 @@ func TestRecoverInterruptedExecutions_LaterSweepFailuresDoNotHideEarlierWork(t *
 	leases.expired = []domain.ExpiredRun{{TenantID: "tenant-1", LinkID: "link-1", TaskID: "t1"}}
 	leases.legacyErr = errors.New("legacy query failed")
 	leases.orphanErr = errors.New("orphan query failed")
+	leases.unlinkedErr = errors.New("unlinked query failed")
+
+	n, err := NewRecoverInterruptedExecutions(leases).Execute(context.Background())
+	if err != nil || n != 1 {
+		t.Fatalf("Execute = %d, %v; want 1, nil", n, err)
+	}
+}
+
+func TestRecoverInterruptedExecutions_UnlinkedInProgressSweep(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	inProgressTask(t, tasks, "old-unlinked", "")
+	inProgressTask(t, tasks, "recent-unlinked", "")
+	inProgressTask(t, tasks, "linked", "link-1")
+	leases := newLeases(tasks)
+	leases.recentTasks = map[string]bool{"recent-unlinked": true}
+
+	n, err := NewRecoverInterruptedExecutions(leases).Execute(context.Background())
+	if err != nil || n != 1 {
+		t.Fatalf("Execute = %d, %v; want 1, nil", n, err)
+	}
+	if got := tasks.tasks["old-unlinked"].Status; got != domain.StatusOpen {
+		t.Errorf("old unlinked task must go to open, got %s", got)
+	}
+	if got := tasks.tasks["recent-unlinked"].Status; got != domain.StatusInProgress {
+		t.Errorf("recent unlinked task is likely mid-dispatch and must stay, got %s", got)
+	}
+	if got := tasks.tasks["linked"].Status; got != domain.StatusInProgress {
+		t.Errorf("a task with a link is not this sweep's to touch, got %s", got)
+	}
+	if leases.unlinkedGrace < LegacyStuckAfter {
+		t.Errorf("unlinked grace %s must exceed the executor run cap", leases.unlinkedGrace)
+	}
+}
+
+func TestRecoverInterruptedExecutions_UnlinkedSweepFailureKeepsEarlierCount(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	inProgressTask(t, tasks, "t1", "link-1")
+	leases := newLeases(tasks)
+	leases.expired = []domain.ExpiredRun{{TenantID: "tenant-1", LinkID: "link-1", TaskID: "t1"}}
+	leases.unlinkedErr = errors.New("boom")
 
 	n, err := NewRecoverInterruptedExecutions(leases).Execute(context.Background())
 	if err != nil || n != 1 {

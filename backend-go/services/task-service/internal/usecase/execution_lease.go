@@ -34,6 +34,10 @@ type ExecutionLeaseRepository interface {
 	// ListOrphanedRuns lists tasks still in_progress although their active
 	// link ended more than grace ago.
 	ListOrphanedRuns(ctx context.Context, grace time.Duration, limit int) ([]domain.StuckTask, error)
+	// ReleaseUnlinkedInProgress moves up to limit tasks that are in_progress with
+	// no active execution link and whose updated_at is older than grace back to
+	// open, in one race-safe compare-and-set; it returns how many it moved.
+	ReleaseUnlinkedInProgress(ctx context.Context, grace time.Duration, limit int) (released int, err error)
 	TaskExecutionReleaser
 }
 
@@ -48,7 +52,10 @@ const (
 	LegacyStuckAfter = 30 * time.Minute
 	// OrphanGrace lets the normal completion writes land before a task whose
 	// link already ended is treated as abandoned.
-	OrphanGrace   = 2 * time.Minute
+	OrphanGrace = 2 * time.Minute
+	// UnlinkedGrace must dwarf the seconds ExecuteTask legitimately spends
+	// in_progress before it records the link, so a healthy dispatch is never swept.
+	UnlinkedGrace = 30 * time.Minute
 	recoveryBatch = 50
 )
 
@@ -121,7 +128,9 @@ func restoreStatus(previous string) domain.Status {
 //   - a direct_agent run whose lease expired (its process died),
 //   - a direct_agent run from before leases existed, long past the run cap,
 //   - a task whose active link already ended (failed, or a direct_agent run
-//     that completed without the task's completion write landing).
+//     that completed without the task's completion write landing),
+//   - a task in_progress with no link at all, long past any dispatch window
+//     (from before execution_links existed); previous status is unknown, so open.
 //
 // Safe to run on every instance concurrently: link claims hand each row to one
 // caller and every task change is a compare-and-set on the active link.
@@ -143,7 +152,7 @@ func (uc *RecoverInterruptedExecutions) Execute(ctx context.Context) (int, error
 	}
 	reverted += uc.releaseClaimed(ctx, expired, "lease expired")
 
-	// The two sweeps below are independent of the lease path: a failure there
+	// The sweeps below are independent of the lease path: a failure there
 	// is logged and must not hide what the first sweep already did.
 	legacy, err := uc.leases.ClaimLegacyStuck(ctx, LegacyStuckAfter, recoveryBatch)
 	if err != nil {
@@ -166,6 +175,14 @@ func (uc *RecoverInterruptedExecutions) Execute(ctx context.Context) (int, error
 				reverted++
 			}
 		}
+	}
+
+	unlinked, err := uc.leases.ReleaseUnlinkedInProgress(ctx, UnlinkedGrace, recoveryBatch)
+	if err != nil {
+		slog.ErrorContext(ctx, "task: unlinked in_progress sweep failed", slog.Any("error", err))
+	} else if unlinked > 0 {
+		slog.WarnContext(ctx, "task: released in_progress tasks with no execution link", slog.Int("count", unlinked))
+		reverted += unlinked
 	}
 	return reverted, nil
 }

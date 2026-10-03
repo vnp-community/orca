@@ -170,3 +170,25 @@ func (r *Repository) ReleaseExecution(ctx context.Context, tenantID, taskID, lin
 	}
 	return tag.RowsAffected() > 0, nil
 }
+
+// ReleaseUnlinkedInProgress is one guarded UPDATE; the SKIP LOCKED subquery
+// lets concurrent sweepers take disjoint rows and the repeated predicates
+// keep it a compare-and-set against a task that was just dispatched.
+func (r *Repository) ReleaseUnlinkedInProgress(ctx context.Context, grace time.Duration, limit int) (int, error) {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE task.tasks SET status = 'open', updated_at = now()
+		WHERE id IN (
+			SELECT id FROM task.tasks
+			WHERE status = 'in_progress' AND active_execution_link_id IS NULL
+			  AND updated_at < now() - make_interval(secs => $1)
+			ORDER BY updated_at
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)
+		AND status = 'in_progress' AND active_execution_link_id IS NULL
+	`, grace.Seconds(), limit)
+	if err != nil {
+		return 0, fmt.Errorf("postgres: release unlinked in_progress tasks: %w", err)
+	}
+	return int(tag.RowsAffected()), nil
+}

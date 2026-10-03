@@ -5,6 +5,7 @@ package postgres
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -359,5 +360,76 @@ func TestExecutionLeases_SetPreviousStatus_RoundTripsThroughGetExecutionLink(t *
 	l, err := repo.GetExecutionLink(ctx, tenantID, linkID)
 	if err != nil || l.PreviousStatus != "review" {
 		t.Fatalf("PreviousStatus = %q, %v; want review", l.PreviousStatus, err)
+	}
+}
+
+// newUnlinkedInProgress makes an in_progress task with no execution link at all.
+func newUnlinkedInProgress(t *testing.T, repo *Repository, tenantID string) string {
+	t.Helper()
+	task, err := domain.NewTask(uuid.NewString(), tenantID, "t", domain.StatusInProgress, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.Create(context.Background(), task); err != nil {
+		t.Fatal(err)
+	}
+	return task.ID
+}
+
+func TestExecutionLeases_ReleaseUnlinkedInProgress_OnlyOldTasksWithoutALink(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	oldUnlinked := newUnlinkedInProgress(t, repo, tenantID)
+	backdateTask(t, repo, oldUnlinked, time.Hour)
+	recentUnlinked := newUnlinkedInProgress(t, repo, tenantID) // may be mid-dispatch
+	oldLinked, _ := newActiveRun(t, repo, tenantID, domain.EngineDirectAgent)
+	backdateTask(t, repo, oldLinked, time.Hour)
+
+	n, err := repo.ReleaseUnlinkedInProgress(ctx, 30*time.Minute, 10)
+	if err != nil || n != 1 {
+		t.Fatalf("released = %d, %v; want 1, nil", n, err)
+	}
+	for id, want := range map[string]domain.Status{oldUnlinked: domain.StatusOpen, recentUnlinked: domain.StatusInProgress, oldLinked: domain.StatusInProgress} {
+		if got, _ := repo.Get(ctx, tenantID, id); got.Status != want {
+			t.Errorf("task %s: want %s, got %s", id, want, got.Status)
+		}
+	}
+	if again, _ := repo.ReleaseUnlinkedInProgress(ctx, 30*time.Minute, 10); again != 0 {
+		t.Errorf("a second sweep must be a no-op, released %d", again)
+	}
+}
+
+func TestExecutionLeases_ReleaseUnlinkedInProgress_ConcurrentSweepersNeverDoubleRelease(t *testing.T) {
+	repo := setupRepository(t)
+	tenantID := uuid.NewString()
+	const total = 24
+	for i := 0; i < total; i++ {
+		backdateTask(t, repo, newUnlinkedInProgress(t, repo, tenantID), time.Hour)
+	}
+
+	var released int64
+	var wg sync.WaitGroup
+	for w := 0; w < 6; w++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for {
+				n, err := repo.ReleaseUnlinkedInProgress(context.Background(), 30*time.Minute, 4)
+				if err != nil {
+					t.Errorf("ReleaseUnlinkedInProgress: %v", err)
+					return
+				}
+				if n == 0 {
+					return
+				}
+				atomic.AddInt64(&released, int64(n))
+			}
+		}()
+	}
+	wg.Wait()
+	if released != total {
+		t.Errorf("want exactly %d releases across sweepers, got %d", total, released)
 	}
 }
