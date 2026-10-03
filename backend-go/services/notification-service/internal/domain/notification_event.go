@@ -3,6 +3,7 @@ package domain
 import (
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -48,7 +49,27 @@ type EventPayload struct {
 	Title    string   `json:"title,omitempty"`
 	Body     string   `json:"body,omitempty"`
 	DeepLink string   `json:"deep_link,omitempty"`
+	// ClientName is the MCP client that opened a terminal; only read by rules
+	// that build their own text (see subjectRule.Locked).
+	ClientName string `json:"client_name,omitempty"`
+	// Reason and Origin are read only from infra-fleet's terminal.closed event.
+	Reason string              `json:"reason,omitempty"`
+	Origin *TerminalOriginInfo `json:"origin,omitempty"`
 }
+
+// TerminalOriginInfo is the origin block of orca.infrafleet.terminal.closed.
+type TerminalOriginInfo struct {
+	Type       string `json:"type"`
+	ClientName string `json:"client_name"`
+}
+
+// SubjectInfraTerminalClosed is infra-fleet's lossless (outbox) close event;
+// only idle closes of MCP-created terminals become a notification.
+const SubjectInfraTerminalClosed = "orca.infrafleet.terminal.closed"
+
+// ErrNotNotifiable means a well-formed event that intentionally produces no
+// notification (e.g. a user-initiated terminal close): acked, never retried.
+var ErrNotNotifiable = errors.New("domain: event does not produce a notification")
 
 // DecodePayload unmarshals a bus event's raw JSON payload into an
 // EventPayload. Kept in domain/ (encoding/json is stdlib, so this stays
@@ -105,6 +126,11 @@ type subjectRule struct {
 	Body     string
 	Severity Severity
 	Channels []DeliveryChannel
+	// DeepLink is the same-origin path used when the payload carries none.
+	DeepLink string
+	// Locked ignores payload title/body/deep_link: the text is built here from
+	// whitelisted fields only, since notifications are stored and may be pushed.
+	Locked bool
 }
 
 // subjectRules is illustrative, not exhaustive (§3) — a subject missing
@@ -143,6 +169,14 @@ var subjectRules = map[string]subjectRule{
 	"orca.mcp.approval.requested": {
 		Type: "mcp.approval", Title: "Approval needed", Body: "An AI agent is waiting for your approval.",
 		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
+	// A terminal an AI client opened was stopped for being idle. Locked: the
+	// body names the client at most, never command text or output.
+	"orca.mcp.terminal.idlestopped": {
+		Type: MCPTerminalIdleStoppedType, Title: "Terminal stopped",
+		Body:     "A terminal opened by an AI agent was stopped after being idle.",
+		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS},
+		DeepLink: "/?section=mcp&tab=connect", Locked: true,
 	},
 	"orca.credential.credential.rotated": {
 		// "Always delivered regardless of preferences" per §2 — this
@@ -192,6 +226,26 @@ var subjectRules = map[string]subjectRule{
 	},
 }
 
+// MCPTerminalIdleStoppedType is the NotificationEvent.Type of an idle-stop notice.
+const MCPTerminalIdleStoppedType = "mcp.terminal.idle_stopped"
+
+// idleStoppedBodyWithClient builds the body from a sanitized client name.
+func idleStoppedBodyWithClient(name string) string {
+	var b []rune
+	for _, r := range name {
+		if r < 0x20 || r == 0x7f {
+			continue
+		}
+		if b = append(b, r); len(b) == 64 {
+			break
+		}
+	}
+	if n := strings.TrimSpace(string(b)); n != "" {
+		return "A terminal opened by " + n + " was stopped after being idle."
+	}
+	return ""
+}
+
 // defaultRule is used for any subject not in subjectRules — WS-only,
 // informational, so an unrecognized publisher's event degrades safely
 // instead of being silently dropped.
@@ -207,12 +261,23 @@ var defaultRule = subjectRule{
 // uuid.NewString() in usecase/); sourceEventID/subject/tenantID/occurredAt
 // come from the consumed bus envelope (common/eventbus.Event).
 func TranslateEvent(id, sourceEventID, subject, tenantID string, payload EventPayload, occurredAt time.Time) (NotificationEvent, error) {
+	ruleSubject := subject
+	if subject == SubjectInfraTerminalClosed {
+		if payload.Reason != "idle" || payload.Origin == nil || payload.Origin.Type != "mcp" {
+			return NotificationEvent{}, ErrNotNotifiable
+		}
+		ruleSubject = "orca.mcp.terminal.idlestopped" // reuse the locked, sanitised idle-stop rule
+		if payload.ClientName == "" {
+			payload.ClientName = payload.Origin.ClientName
+		}
+	}
+
 	recipients := recipientsOf(payload)
 	if len(recipients) == 0 {
 		return NotificationEvent{}, ErrNoRecipients
 	}
 
-	rule, ok := subjectRules[subject]
+	rule, ok := subjectRules[ruleSubject]
 	if !ok {
 		rule = defaultRule
 	}
@@ -226,6 +291,16 @@ func TranslateEvent(id, sourceEventID, subject, tenantID string, payload EventPa
 		body = payload.Body
 	}
 
+	deepLink := payload.DeepLink
+	if rule.Locked {
+		title, body, deepLink = rule.Title, rule.Body, rule.DeepLink
+		if b := idleStoppedBodyWithClient(payload.ClientName); b != "" {
+			body = b
+		}
+	} else if deepLink == "" {
+		deepLink = rule.DeepLink
+	}
+
 	return NotificationEvent{
 		ID:               id,
 		TenantID:         tenantID,
@@ -235,7 +310,7 @@ func TranslateEvent(id, sourceEventID, subject, tenantID string, payload EventPa
 		Type:             rule.Type,
 		Title:            title,
 		Body:             body,
-		DeepLink:         payload.DeepLink,
+		DeepLink:         deepLink,
 		Severity:         rule.Severity,
 		Channels:         rule.Channels,
 		CreatedAt:        occurredAt,

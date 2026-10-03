@@ -44,7 +44,26 @@ publisher.
   `HandleIncomingEvent`. A subject whose stream doesn't exist yet (the
   publishing service hasn't started) logs a warning and only that one
   binding gives up — it doesn't fail service startup or the other
-  subjects.
+  subjects. A binding with `Durable` set (currently
+  `orca.infrafleet.terminal.closed` on stream `INFRAFLEET`, durable
+  `notification-service-infrafleet-terminal-closed`, and the legacy
+  `orca.mcp.terminal.idlestopped` on stream `MCP`, durable
+  `notification-service-mcp-terminal-idle-stopped`, kept only to drain in-flight
+  messages) uses a named
+  durable consumer instead of an ephemeral one, so an event published while the
+  service was down is delivered after it starts. That rule is `Locked`: title,
+  body and deep link come from the rule (+ a sanitized `client_name`), never from
+  the payload, WS-only, deep link `/?section=mcp&tab=connect`. Its event id must be
+  a UUID (`processed_events.event_id`). Shared durable cursor: only one replica
+  broadcasts live; the stored notification is visible to all.
+  The lossless source is infra-fleet-service: it writes
+  `orca.infrafleet.terminal.closed` to its outbox in the same transaction that
+  closes the terminal, so the event survives gateway crashes and NATS outages.
+  Only `reason=="idle"` with `origin.type=="mcp"` translates to
+  `mcp.terminal.idle_stopped` (same locked rule, `domain.ErrNotNotifiable` acks
+  every other close without a notification); `processed_events` makes redelivery
+  idempotent. Remaining gap: if the `INFRAFLEET` stream does not exist when this
+  service starts, that binding gives up until restart.
 - `internal/adapter/postgres/` — real `pgx`-backed repository implementing
   both `SubscriptionRepository` (upsert-on-endpoint) and
   `VapidKeyRepository`. Hand-written SQL, same rationale as
@@ -168,9 +187,20 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
   logged as host only. Metrics: `orca_notification_push_deliveries_total`,
   `orca_notification_push_delivery_seconds` on the HTTP port's `/metrics`.
   Env: `VAPID_SUBJECT` (required for web push; mailto:/https: contact).
-  Remaining gaps: the tenant's `vapid-signing-<tenant_id>` Transit key must be
-  provisioned as `ecdsa-p256` and its public half stored in `vapid_keys`
-  (ops, not code); failed non-410 sends are buffered (BR-MB-07) but there is
+  Per-tenant VAPID keys are provisioned automatically (`usecase.EnsureVapidKey`):
+  when `GetVapidPublicKey` or the VAPID authorizer used by `DeliverPush` finds no
+  active key row, it calls credential-broker-service `EnsureVapidSigningKey`
+  (creates the `ecdsa-p256` Transit key `vapid-signing-<tenant_id>`), then
+  `InsertActiveIfAbsent` (Postgres `ON CONFLICT DO NOTHING`, MySQL plain INSERT
+  ignoring duplicate-key on `idx_vapid_key_active`) and re-reads, so concurrent
+  callers share one in-process attempt and replicas converge on one row. A Vault
+  403 surfaces as `NOTIFICATION_NO_VAPID_KEY` with a message to apply
+  `deploy/dev/orca-policy.hcl`; other failures as
+  `NOTIFICATION_VAPID_KEY_FETCH_FAILED`. Failures are cached per tenant (30s for
+  a Vault 403, 5s otherwise) so a missing policy does not hammer Vault. Metric:
+  `orca_notification_vapid_provision_total{outcome=created|existing|forbidden|error}`.
+  `deploy/dev/scripts/provision-vapid-key.sh` remains as an optional pre-warm;
+  the Vault policy step is still required. Remaining gaps: failed non-410 sends are buffered (BR-MB-07) but there is
   no timed retry; no cross-event push dedup on restart (CR-NOTIF-001 item D).
 - ~~**No `processed_events` dedup table.**~~ — **closed**
   (docs/execution-plan.md §3 Phase 1): `migrations/0002_processed_events.{up,down}.sql`

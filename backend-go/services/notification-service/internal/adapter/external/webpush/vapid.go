@@ -13,6 +13,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/stablyai/orca-go/services/notification-service/internal/domain"
 	"github.com/stablyai/orca-go/services/notification-service/internal/usecase"
 )
 
@@ -32,6 +33,7 @@ type VapidAuthorizer struct {
 	signer  usecase.VaultSigner
 	keys    usecase.VapidKeyRepository
 	subject string
+	ensure  *usecase.EnsureVapidKey
 	now     func() time.Time
 
 	mu    sync.Mutex
@@ -46,6 +48,13 @@ type cachedVapid struct {
 // NewVapidAuthorizer: subject is the RFC 8292 "sub" claim (mailto: or https: URL).
 func NewVapidAuthorizer(signer usecase.VaultSigner, keys usecase.VapidKeyRepository, subject string) *VapidAuthorizer {
 	return &VapidAuthorizer{signer: signer, keys: keys, subject: subject, now: time.Now, cache: map[string]cachedVapid{}}
+}
+
+// WithKeyEnsurer provisions a tenant's VAPID key on first send instead of
+// failing when none exists yet.
+func (a *VapidAuthorizer) WithKeyEnsurer(ensure *usecase.EnsureVapidKey) *VapidAuthorizer {
+	a.ensure = ensure
+	return a
 }
 
 // Authorization returns "vapid t=<jwt>, k=<public key>" for endpoint's origin.
@@ -68,6 +77,9 @@ func (a *VapidAuthorizer) Authorization(ctx context.Context, tenantID, endpoint 
 	}
 
 	key, err := a.keys.GetPublicKey(ctx, tenantID)
+	if err != nil && errors.Is(err, domain.ErrNoActiveVapidKey) && a.ensure != nil {
+		key, err = a.ensure.Execute(ctx, tenantID)
+	}
 	if err != nil {
 		return "", fmt.Errorf("webpush: loading vapid public key: %w", err)
 	}

@@ -60,6 +60,33 @@ type VapidKeyRepository interface {
 	GetPublicKey(ctx context.Context, tenantID string) (domain.VapidKeyMetadata, error)
 }
 
+// VapidKeyStore adds idempotent insertion to VapidKeyRepository, used by
+// EnsureVapidKey.
+type VapidKeyStore interface {
+	VapidKeyRepository
+	// InsertActiveIfAbsent stores key as the tenant's active key unless one
+	// exists (atomic: ON CONFLICT DO NOTHING / duplicate-key ignore). It
+	// returns the row that is active afterwards and whether this call
+	// inserted it, so concurrent replicas converge on a single row.
+	InsertActiveIfAbsent(ctx context.Context, key domain.VapidKeyMetadata) (stored domain.VapidKeyMetadata, inserted bool, err error)
+}
+
+// ErrVapidProvisionForbidden means Vault (via the credential broker) denied
+// creating the tenant's signing key — an operator must apply the Vault policy.
+var ErrVapidProvisionForbidden = errors.New("usecase: vapid key provisioning forbidden by vault policy")
+
+// VapidKeyProvisioner asks credential-broker-service to ensure the tenant's
+// Transit signing key exists and returns its public key (base64url point).
+type VapidKeyProvisioner interface {
+	EnsureVapidSigningKey(ctx context.Context, tenantID string) (publicKey string, err error)
+}
+
+// VapidProvisionObserver counts provisioning outcomes
+// (created, existing, forbidden, error).
+type VapidProvisionObserver interface {
+	ObserveVapidProvision(outcome string)
+}
+
 // VaultSigner signs a VAPID push payload via Vault's Transit engine —
 // notification-service.md §9's headline property: "signing a push
 // payload's VAPID JWT is a Vault: sign call, not read secret, then sign

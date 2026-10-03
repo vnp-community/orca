@@ -233,6 +233,23 @@ production-ready deployment. What's left, explicitly:
   (2026-08-17): none of their new gRPC clients set this header either** —
   every access-audit-log row Epic B's new call paths generate will show an
   empty/`"unknown"` `accessor_service` until a client actually sets it.
+- **`EnsureVapidSigningKey` (automatic per-tenant VAPID key).** Additive RPC,
+  tenant taken from `x-orca-tenant-id` metadata, callable only by
+  `x-orca-service-id: notification-service` (else `CREDENTIAL_CALLER_NOT_ALLOWED`).
+  Reads `transit/keys/vapid-signing-<tenant>`; creates it as `ecdsa-p256` when
+  absent (Vault create is a no-op on an existing key, so concurrent callers are
+  safe), re-reads, and returns `{public_key, created}` where `public_key` is the
+  base64url (no padding, 87 chars) 65-byte uncompressed P-256 point derived in
+  Go from Vault's PEM. A key of another type is refused with
+  `CREDBROKER_VAPID_KEY_TYPE_MISMATCH` (FailedPrecondition) and never deleted or
+  modified. Vault 403 -> `CREDBROKER_VAULT_FORBIDDEN` (PermissionDenied; the
+  message tells the operator to apply `deploy/dev/orca-policy.hcl`); Vault
+  unreachable or 5xx -> `CREDBROKER_VAULT_UNAVAILABLE` (gRPC Unavailable). Needs
+  `create`+`read` on `transit/keys/vapid-signing-*` (already in the policy file,
+  still applied by a Vault admin). No new env vars. Integration test:
+  `go test -tags=integration ./internal/adapter/vault/` (starts a throwaway
+  `hashicorp/vault:1.17` dev container, verifies key type, signing, and that the
+  derived key verifies Vault's signature).
 - **`common/secrets.TransitEncrypt` stands in for a dedicated Transit
   "sign" operation in `SignVapidPayload` too.** `common/secrets` exposes
   `TransitEncrypt`/`TransitDecrypt` today, not Vault's asymmetric-key

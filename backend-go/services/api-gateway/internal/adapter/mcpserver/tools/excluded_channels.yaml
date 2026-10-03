@@ -476,6 +476,10 @@
   category: backlog
   reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
 
+- pattern: "task.generateAgentPrompt"
+  category: backlog
+  reason: "Added after the tool catalog was sized (task-service prompt generation, grant-checked). Valid agent use case whose arguments and output size are not reviewed yet; tracked for a later pack revision."
+
 - pattern: "task.grant"
   category: backlog
   reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."

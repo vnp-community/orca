@@ -455,7 +455,14 @@ func TestIdleTimeoutStopsAbandonedTerminals(t *testing.T) {
 	f := newPtyFixture(t, func(c *PtyToolsConfig) {
 		c.IdleTimeout = 60 * time.Millisecond
 		c.JanitorEvery = 10 * time.Millisecond
-		c.OnIdleStopped = func(_, _, sess, pty string) { mu.Lock(); told = append(told, sess+"/"+pty); mu.Unlock() }
+		c.OnIdleStopped = func(_, _, sess, pty, _ string, err error) {
+			if err != nil {
+				t.Errorf("idle close failed: %v", err)
+			}
+			mu.Lock()
+			told = append(told, sess+"/"+pty)
+			mu.Unlock()
+		}
 	}, nil)
 	id := startTerminal(t, f, "s1")
 	eventually(t, 3*time.Second, "idle stop", func() bool {
@@ -467,6 +474,33 @@ func TestIdleTimeoutStopsAbandonedTerminals(t *testing.T) {
 	defer mu.Unlock()
 	if len(told) != 1 || told[0] != "s1/"+id {
 		t.Fatalf("idle callback %v", told)
+	}
+	f.fleet.mu.Lock()
+	reason := f.fleet.killReason[id]
+	f.fleet.mu.Unlock()
+	if reason != "idle" {
+		t.Fatalf("janitor must close with reason idle (infra-fleet emits the lossless event), got %q", reason)
+	}
+	f.ex.Close()
+}
+
+func TestCloseReasons_PropagateToInfraFleet(t *testing.T) {
+	f := newPtyFixture(t, nil, nil)
+	forced := startTerminal(t, f, "s1")
+	f.mustCall("s1", "terminal_stop", `{"terminal_id":"`+forced+`","force":true}`)
+	reaped := startTerminal(t, f, "s2")
+	closedWithSession := startTerminal(t, f, "s3")
+	f.ex.CloseSession("s3", "kill_switch")
+	f.ex.sessions.CloseSession("s2", "x") // forget s2 locally so only the durable reaper can close it
+	if err := f.ex.ReapSession(context.Background(), "t1", "alice", "s2"); err != nil {
+		t.Fatal(err)
+	}
+	f.fleet.mu.Lock()
+	defer f.fleet.mu.Unlock()
+	for id, want := range map[string]string{forced: "user", closedWithSession: "session_closed", reaped: "session_closed"} {
+		if got := f.fleet.killReason[id]; got != want {
+			t.Errorf("terminal %s closed with reason %q, want %q", id, got, want)
+		}
 	}
 	f.ex.Close()
 }

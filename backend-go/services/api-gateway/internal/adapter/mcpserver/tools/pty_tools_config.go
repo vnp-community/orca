@@ -34,8 +34,11 @@ type PtyToolsConfig struct {
 	AgentGrace             time.Duration // polite agent.stop wait before agent.kill (3s)
 	QuotaCacheTTL          time.Duration // durable terminal.list count cache (5s)
 	Targets                WorktreeTargets
-	// OnIdleStopped is told when the janitor stopped a PTY for inactivity.
-	OnIdleStopped func(tenantID, userID, mcpSessionID, ptyID string)
+	// OnIdleStopped is told how the janitor's close of an idle PTY went
+	// (closeErr is the terminal.close failure, nil on success). The user
+	// notification is NOT sent from here: infra-fleet writes it in the close
+	// transaction (reason "idle").
+	OnIdleStopped func(tenantID, userID, mcpSessionID, ptyID, clientName string, closeErr error)
 	// OnOutputDropped is told how many output bytes a PTY ring overwrote before
 	// anyone read them (orca_mcp_terminal_dropped_bytes_total).
 	OnOutputDropped func(n uint64)

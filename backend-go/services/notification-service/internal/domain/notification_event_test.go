@@ -1,6 +1,8 @@
 package domain
 
 import (
+	"errors"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -213,5 +215,85 @@ func TestTranslateEvent_McpApproval(t *testing.T) {
 	// No owner in the payload: nobody is notified (never broadcast an approval).
 	if _, err := TranslateEvent("ne-2", "evt-2", "orca.mcp.approval.requested", "tenant-1", EventPayload{Title: "x"}, time.Now()); err == nil {
 		t.Fatal("an approval event without a recipient must not translate")
+	}
+}
+
+func TestTranslateEvent_McpTerminalIdleStoppedGolden(t *testing.T) {
+	at := time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)
+	// Hostile extras a producer might (wrongly) add must never reach the stored notification.
+	raw := `{"user_id":"u1","session_id":"s1","pty_id":"p1","reason":"idle","client_name":"Claude\nDesktop",
+		"title":"rm -rf /","body":"export TOKEN=sk-secret","deep_link":"https://evil.example/x","command":"curl -H secret"}`
+	p, err := DecodePayload([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := TranslateEvent("ne-1", "evt-1", "orca.mcp.terminal.idlestopped", "t1", p, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := NotificationEvent{
+		ID: "ne-1", TenantID: "t1", RecipientUserIDs: []string{"u1"}, SourceEventID: "evt-1",
+		SourceSubject: "orca.mcp.terminal.idlestopped", Type: "mcp.terminal.idle_stopped",
+		Title: "Terminal stopped", Body: "A terminal opened by ClaudeDesktop was stopped after being idle.",
+		DeepLink: "/?section=mcp&tab=connect", Severity: SeverityInfo,
+		Channels: []DeliveryChannel{ChannelDeliveryWS}, CreatedAt: at,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got  %+v\nwant %+v", got, want)
+	}
+}
+
+func TestTranslateEvent_McpTerminalIdleStoppedWithoutClientOrUser(t *testing.T) {
+	got, err := TranslateEvent("n", "e", "orca.mcp.terminal.idlestopped", "t", EventPayload{UserID: "u"}, time.Now())
+	if err != nil || got.Body != "A terminal opened by an AI agent was stopped after being idle." {
+		t.Fatalf("%+v %v", got, err)
+	}
+	if _, err := TranslateEvent("n", "e", "orca.mcp.terminal.idlestopped", "t", EventPayload{}, time.Now()); !errors.Is(err, ErrNoRecipients) {
+		t.Fatalf("no owner must be a no-op, got %v", err)
+	}
+}
+
+const infraTerminalClosedSubject = "orca.infrafleet.terminal.closed"
+
+func TestTranslateEvent_InfraTerminalClosedIdleMcpGolden(t *testing.T) {
+	at := time.Date(2026, 10, 3, 9, 0, 0, 0, time.UTC)
+	raw := `{"tenant_id":"t1","pty_id":"p1","user_id":"u1","reason":"idle","actor":"u9",
+		"origin":{"type":"mcp","client_name":"Claude\nDesktop","mcp_session_id":"s1"},
+		"title":"rm -rf /","body":"export TOKEN=sk-secret","deep_link":"https://evil.example/x"}`
+	p, err := DecodePayload([]byte(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	got, err := TranslateEvent("ne-1", "evt-1", infraTerminalClosedSubject, "t1", p, at)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := NotificationEvent{
+		ID: "ne-1", TenantID: "t1", RecipientUserIDs: []string{"u1"}, SourceEventID: "evt-1",
+		SourceSubject: infraTerminalClosedSubject, Type: "mcp.terminal.idle_stopped",
+		Title: "Terminal stopped", Body: "A terminal opened by ClaudeDesktop was stopped after being idle.",
+		DeepLink: "/?section=mcp&tab=connect", Severity: SeverityInfo,
+		Channels: []DeliveryChannel{ChannelDeliveryWS}, CreatedAt: at,
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("got  %+v\nwant %+v", got, want)
+	}
+}
+
+func TestTranslateEvent_InfraTerminalClosedOnlyIdleMcpNotifies(t *testing.T) {
+	for name, raw := range map[string]string{
+		"user close":      `{"user_id":"u1","reason":"user","origin":{"type":"mcp"}}`,
+		"session closed":  `{"user_id":"u1","reason":"session_closed","origin":{"type":"mcp"}}`,
+		"idle but ui":     `{"user_id":"u1","reason":"idle"}`,
+		"idle other kind": `{"user_id":"u1","reason":"idle","origin":{"type":"cli"}}`,
+	} {
+		p, _ := DecodePayload([]byte(raw))
+		if _, err := TranslateEvent("n", "e", infraTerminalClosedSubject, "t", p, time.Now()); !errors.Is(err, ErrNotNotifiable) {
+			t.Errorf("%s: want ErrNotNotifiable, got %v", name, err)
+		}
+	}
+	p, _ := DecodePayload([]byte(`{"reason":"idle","origin":{"type":"mcp"}}`))
+	if _, err := TranslateEvent("n", "e", infraTerminalClosedSubject, "t", p, time.Now()); !errors.Is(err, ErrNoRecipients) {
+		t.Fatalf("idle mcp close without owner must be a no-op, got %v", err)
 	}
 }

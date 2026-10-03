@@ -7,8 +7,11 @@ package grpc
 
 import (
 	"context"
+	"errors"
 
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/credential-broker-service/internal/domain"
@@ -45,6 +48,7 @@ type Server struct {
 	signVapidPayload             *usecase.SignVapidPayload
 	getCredentialMetadataByOwner *usecase.GetCredentialMetadataByOwner
 	listCredentialsByCategory    *usecase.ListCredentialsByCategory
+	ensureVapidSigningKey        *usecase.EnsureVapidSigningKey
 }
 
 func New(
@@ -71,6 +75,13 @@ func New(
 		getCredentialMetadataByOwner: getMetadataByOwner,
 		listCredentialsByCategory:    listByCategory,
 	}
+}
+
+// WithEnsureVapidSigningKey enables the EnsureVapidSigningKey RPC (left
+// unimplemented otherwise) without changing New's signature.
+func (s *Server) WithEnsureVapidSigningKey(uc *usecase.EnsureVapidSigningKey) *Server {
+	s.ensureVapidSigningKey = uc
+	return s
 }
 
 func (s *Server) WriteCredential(ctx context.Context, req *credentialbrokerv1.WriteCredentialRequest) (*credentialbrokerv1.WriteCredentialResponse, error) {
@@ -204,6 +215,21 @@ func (s *Server) SignVapidPayload(ctx context.Context, req *credentialbrokerv1.S
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &credentialbrokerv1.SignVapidPayloadResponse{Signature: signature}, nil
+}
+
+// EnsureVapidSigningKey provisions the caller's tenant VAPID key. A Vault
+// outage maps to Unavailable so clients may retry; the AppError mapping
+// covers everything else.
+func (s *Server) EnsureVapidSigningKey(ctx context.Context, _ *credentialbrokerv1.EnsureVapidSigningKeyRequest) (*credentialbrokerv1.EnsureVapidSigningKeyResponse, error) {
+	res, err := s.ensureVapidSigningKey.Execute(ctx, usecase.EnsureVapidSigningKeyInput{RequestingService: requestingService(ctx)})
+	if err != nil {
+		var ae *apperrors.AppError
+		if errors.As(err, &ae) && ae.Code == usecase.CodeVaultUnavailable {
+			return nil, status.Error(codes.Unavailable, ae.Code+": "+ae.Message)
+		}
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &credentialbrokerv1.EnsureVapidSigningKeyResponse{PublicKey: res.PublicKey, Created: res.Created}, nil
 }
 
 func requestingService(ctx context.Context) string {

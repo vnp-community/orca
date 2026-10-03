@@ -629,6 +629,23 @@ func TestTerminalCloseChannel_KillsAndRemovesStream(t *testing.T) {
 	}
 }
 
+func TestTerminalCloseChannel_PassesReasonToKillRPC(t *testing.T) {
+	for _, reason := range []string{"idle", "session_closed", ""} {
+		var killed *infrafleetv1.KillTerminalSessionRequest
+		fake := &fakeTerminalInfraFleetClient{
+			killFunc: func(in *infrafleetv1.KillTerminalSessionRequest) error { killed = in; return nil },
+		}
+		r := NewRegistry()
+		registerTerminalChannels(r, fake)
+		if _, err := r.Dispatch(newTerminalTestCtx(), Identity{TenantID: "tenant-1"}, "terminal.close", argsJSON(t, terminalCloseArg{PtyID: "pty-1", Reason: reason})); err != nil {
+			t.Fatal(err)
+		}
+		if killed == nil || killed.GetReason() != reason {
+			t.Errorf("reason %q: KillTerminalSession got %+v", reason, killed)
+		}
+	}
+}
+
 func TestTerminalStopChannel_CallsStopRPC(t *testing.T) {
 	var got *infrafleetv1.StopTerminalProcessRequest
 	fake := &fakeTerminalInfraFleetClient{

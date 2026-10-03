@@ -350,7 +350,7 @@ func composeTerminalStop(ctx context.Context, env *CompositeEnv, in json.RawMess
 		}
 		return map[string]any{"terminal_id": p.ptyID, "stopped": true, "forced": false}, nil
 	}
-	env.e.sessions.stopPty(ctx, ts, p)
+	_ = env.e.sessions.stopPty(ctx, ts, p, closeReasonUser)
 	return map[string]any{"terminal_id": p.ptyID, "stopped": true, "forced": true}, nil
 }
 

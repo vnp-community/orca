@@ -417,6 +417,10 @@ func run() error {
 	spawnTerminalSessionUC := usecase.NewSpawnTerminalSession(repo, repo, agentClient, terminalSessionStore, ephemeralVmRuntimeStore, cfg.ServerDeployment)
 	resizeTerminalSessionUC := usecase.NewResizeTerminalSession(terminalSessionStore, repo, repo, agentClient)
 	killTerminalSessionUC := usecase.NewKillTerminalSession(terminalSessionStore, repo, repo, agentClient)
+	// Both dialect stores enqueue orca.infrafleet.terminal.closed in the close transaction.
+	if closer, ok := terminalSessionStore.(usecase.TerminalSessionCloser); ok {
+		killTerminalSessionUC.WithClosedEvents(closer)
+	}
 	stopTerminalProcessUC := usecase.NewStopTerminalProcess(terminalSessionStore, repo, repo, agentClient)
 	listTerminalSessionsUC := usecase.NewListTerminalSessions(terminalSessionStore)
 	waitTerminalSessionUC := usecase.NewWaitTerminalSession(terminalSessionStore, repo, repo, agentClient)

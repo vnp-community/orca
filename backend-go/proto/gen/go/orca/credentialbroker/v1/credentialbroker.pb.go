@@ -1171,6 +1171,98 @@ func (x *ListCredentialsByCategoryResponse) GetCredentials() []*CredentialMetada
 	return nil
 }
 
+type EnsureVapidSigningKeyRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnsureVapidSigningKeyRequest) Reset() {
+	*x = EnsureVapidSigningKeyRequest{}
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnsureVapidSigningKeyRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnsureVapidSigningKeyRequest) ProtoMessage() {}
+
+func (x *EnsureVapidSigningKeyRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnsureVapidSigningKeyRequest.ProtoReflect.Descriptor instead.
+func (*EnsureVapidSigningKeyRequest) Descriptor() ([]byte, []int) {
+	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{21}
+}
+
+type EnsureVapidSigningKeyResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// public_key is base64url (no padding) of the 65-byte uncompressed P-256
+	// point (0x04||X||Y) — the "k=" value a browser passes as
+	// applicationServerKey.
+	PublicKey string `protobuf:"bytes,1,opt,name=public_key,json=publicKey,proto3" json:"public_key,omitempty"`
+	// created is true only when this call created the Transit key.
+	Created       bool `protobuf:"varint,2,opt,name=created,proto3" json:"created,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EnsureVapidSigningKeyResponse) Reset() {
+	*x = EnsureVapidSigningKeyResponse{}
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EnsureVapidSigningKeyResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EnsureVapidSigningKeyResponse) ProtoMessage() {}
+
+func (x *EnsureVapidSigningKeyResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EnsureVapidSigningKeyResponse.ProtoReflect.Descriptor instead.
+func (*EnsureVapidSigningKeyResponse) Descriptor() ([]byte, []int) {
+	return file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *EnsureVapidSigningKeyResponse) GetPublicKey() string {
+	if x != nil {
+		return x.PublicKey
+	}
+	return ""
+}
+
+func (x *EnsureVapidSigningKeyResponse) GetCreated() bool {
+	if x != nil {
+		return x.Created
+	}
+	return false
+}
+
 var File_orca_credentialbroker_v1_credentialbroker_proto protoreflect.FileDescriptor
 
 const file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc = "" +
@@ -1238,7 +1330,12 @@ const file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc = "" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12H\n" +
 	"\bcategory\x18\x02 \x01(\x0e2,.orca.credentialbroker.v1.CredentialCategoryR\bcategory\"s\n" +
 	"!ListCredentialsByCategoryResponse\x12N\n" +
-	"\vcredentials\x18\x01 \x03(\v2,.orca.credentialbroker.v1.CredentialMetadataR\vcredentials*\xd4\x02\n" +
+	"\vcredentials\x18\x01 \x03(\v2,.orca.credentialbroker.v1.CredentialMetadataR\vcredentials\"\x1e\n" +
+	"\x1cEnsureVapidSigningKeyRequest\"X\n" +
+	"\x1dEnsureVapidSigningKeyResponse\x12\x1d\n" +
+	"\n" +
+	"public_key\x18\x01 \x01(\tR\tpublicKey\x12\x18\n" +
+	"\acreated\x18\x02 \x01(\bR\acreated*\xd4\x02\n" +
 	"\x12CredentialCategory\x12#\n" +
 	"\x1fCREDENTIAL_CATEGORY_UNSPECIFIED\x10\x00\x12!\n" +
 	"\x1dCREDENTIAL_CATEGORY_SCM_OAUTH\x10\x01\x12+\n" +
@@ -1247,8 +1344,7 @@ const file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc = "" +
 	"\x17CREDENTIAL_CATEGORY_SSH\x10\x04\x12&\n" +
 	"\"CREDENTIAL_CATEGORY_SERVICE_SECRET\x10\x05\x12.\n" +
 	"*CREDENTIAL_CATEGORY_DEV_SERVER_AGENT_TOKEN\x10\x06\x12+\n" +
-	"'CREDENTIAL_CATEGORY_MCP_EXTERNAL_SECRET\x10\a2\xe7\n" +
-	"\n" +
+	"'CREDENTIAL_CATEGORY_MCP_EXTERNAL_SECRET\x10\a2\xf2\v\n" +
 	"\x17CredentialBrokerService\x12v\n" +
 	"\x0fWriteCredential\x120.orca.credentialbroker.v1.WriteCredentialRequest\x1a1.orca.credentialbroker.v1.WriteCredentialResponse\x12|\n" +
 	"\x11ResolveCredential\x122.orca.credentialbroker.v1.ResolveCredentialRequest\x1a3.orca.credentialbroker.v1.ResolveCredentialResponse\x12y\n" +
@@ -1259,7 +1355,8 @@ const file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc = "" +
 	"\x17RevokeCredentialByOwner\x128.orca.credentialbroker.v1.RevokeCredentialByOwnerRequest\x1a9.orca.credentialbroker.v1.RevokeCredentialByOwnerResponse\x12y\n" +
 	"\x10SignVapidPayload\x121.orca.credentialbroker.v1.SignVapidPayloadRequest\x1a2.orca.credentialbroker.v1.SignVapidPayloadResponse\x12\x9d\x01\n" +
 	"\x1cGetCredentialMetadataByOwner\x12=.orca.credentialbroker.v1.GetCredentialMetadataByOwnerRequest\x1a>.orca.credentialbroker.v1.GetCredentialMetadataByOwnerResponse\x12\x94\x01\n" +
-	"\x19ListCredentialsByCategory\x12:.orca.credentialbroker.v1.ListCredentialsByCategoryRequest\x1a;.orca.credentialbroker.v1.ListCredentialsByCategoryResponseBVZTgithub.com/stablyai/orca-go/proto/gen/go/orca/credentialbroker/v1;credentialbrokerv1b\x06proto3"
+	"\x19ListCredentialsByCategory\x12:.orca.credentialbroker.v1.ListCredentialsByCategoryRequest\x1a;.orca.credentialbroker.v1.ListCredentialsByCategoryResponse\x12\x88\x01\n" +
+	"\x15EnsureVapidSigningKey\x126.orca.credentialbroker.v1.EnsureVapidSigningKeyRequest\x1a7.orca.credentialbroker.v1.EnsureVapidSigningKeyResponseBVZTgithub.com/stablyai/orca-go/proto/gen/go/orca/credentialbroker/v1;credentialbrokerv1b\x06proto3"
 
 var (
 	file_orca_credentialbroker_v1_credentialbroker_proto_rawDescOnce sync.Once
@@ -1274,7 +1371,7 @@ func file_orca_credentialbroker_v1_credentialbroker_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_credentialbroker_v1_credentialbroker_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_orca_credentialbroker_v1_credentialbroker_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_orca_credentialbroker_v1_credentialbroker_proto_goTypes = []any{
 	(CredentialCategory)(0),                      // 0: orca.credentialbroker.v1.CredentialCategory
 	(*CredentialMetadata)(nil),                   // 1: orca.credentialbroker.v1.CredentialMetadata
@@ -1298,6 +1395,8 @@ var file_orca_credentialbroker_v1_credentialbroker_proto_goTypes = []any{
 	(*GetCredentialMetadataByOwnerResponse)(nil), // 19: orca.credentialbroker.v1.GetCredentialMetadataByOwnerResponse
 	(*ListCredentialsByCategoryRequest)(nil),     // 20: orca.credentialbroker.v1.ListCredentialsByCategoryRequest
 	(*ListCredentialsByCategoryResponse)(nil),    // 21: orca.credentialbroker.v1.ListCredentialsByCategoryResponse
+	(*EnsureVapidSigningKeyRequest)(nil),         // 22: orca.credentialbroker.v1.EnsureVapidSigningKeyRequest
+	(*EnsureVapidSigningKeyResponse)(nil),        // 23: orca.credentialbroker.v1.EnsureVapidSigningKeyResponse
 }
 var file_orca_credentialbroker_v1_credentialbroker_proto_depIdxs = []int32{
 	0,  // 0: orca.credentialbroker.v1.CredentialMetadata.category:type_name -> orca.credentialbroker.v1.CredentialCategory
@@ -1321,18 +1420,20 @@ var file_orca_credentialbroker_v1_credentialbroker_proto_depIdxs = []int32{
 	16, // 18: orca.credentialbroker.v1.CredentialBrokerService.SignVapidPayload:input_type -> orca.credentialbroker.v1.SignVapidPayloadRequest
 	18, // 19: orca.credentialbroker.v1.CredentialBrokerService.GetCredentialMetadataByOwner:input_type -> orca.credentialbroker.v1.GetCredentialMetadataByOwnerRequest
 	20, // 20: orca.credentialbroker.v1.CredentialBrokerService.ListCredentialsByCategory:input_type -> orca.credentialbroker.v1.ListCredentialsByCategoryRequest
-	3,  // 21: orca.credentialbroker.v1.CredentialBrokerService.WriteCredential:output_type -> orca.credentialbroker.v1.WriteCredentialResponse
-	5,  // 22: orca.credentialbroker.v1.CredentialBrokerService.ResolveCredential:output_type -> orca.credentialbroker.v1.ResolveCredentialResponse
-	7,  // 23: orca.credentialbroker.v1.CredentialBrokerService.RotateCredential:output_type -> orca.credentialbroker.v1.RotateCredentialResponse
-	9,  // 24: orca.credentialbroker.v1.CredentialBrokerService.RevokeCredential:output_type -> orca.credentialbroker.v1.RevokeCredentialResponse
-	11, // 25: orca.credentialbroker.v1.CredentialBrokerService.GetCredentialMetadata:output_type -> orca.credentialbroker.v1.GetCredentialMetadataResponse
-	13, // 26: orca.credentialbroker.v1.CredentialBrokerService.ResolveCredentialByOwner:output_type -> orca.credentialbroker.v1.ResolveCredentialByOwnerResponse
-	15, // 27: orca.credentialbroker.v1.CredentialBrokerService.RevokeCredentialByOwner:output_type -> orca.credentialbroker.v1.RevokeCredentialByOwnerResponse
-	17, // 28: orca.credentialbroker.v1.CredentialBrokerService.SignVapidPayload:output_type -> orca.credentialbroker.v1.SignVapidPayloadResponse
-	19, // 29: orca.credentialbroker.v1.CredentialBrokerService.GetCredentialMetadataByOwner:output_type -> orca.credentialbroker.v1.GetCredentialMetadataByOwnerResponse
-	21, // 30: orca.credentialbroker.v1.CredentialBrokerService.ListCredentialsByCategory:output_type -> orca.credentialbroker.v1.ListCredentialsByCategoryResponse
-	21, // [21:31] is the sub-list for method output_type
-	11, // [11:21] is the sub-list for method input_type
+	22, // 21: orca.credentialbroker.v1.CredentialBrokerService.EnsureVapidSigningKey:input_type -> orca.credentialbroker.v1.EnsureVapidSigningKeyRequest
+	3,  // 22: orca.credentialbroker.v1.CredentialBrokerService.WriteCredential:output_type -> orca.credentialbroker.v1.WriteCredentialResponse
+	5,  // 23: orca.credentialbroker.v1.CredentialBrokerService.ResolveCredential:output_type -> orca.credentialbroker.v1.ResolveCredentialResponse
+	7,  // 24: orca.credentialbroker.v1.CredentialBrokerService.RotateCredential:output_type -> orca.credentialbroker.v1.RotateCredentialResponse
+	9,  // 25: orca.credentialbroker.v1.CredentialBrokerService.RevokeCredential:output_type -> orca.credentialbroker.v1.RevokeCredentialResponse
+	11, // 26: orca.credentialbroker.v1.CredentialBrokerService.GetCredentialMetadata:output_type -> orca.credentialbroker.v1.GetCredentialMetadataResponse
+	13, // 27: orca.credentialbroker.v1.CredentialBrokerService.ResolveCredentialByOwner:output_type -> orca.credentialbroker.v1.ResolveCredentialByOwnerResponse
+	15, // 28: orca.credentialbroker.v1.CredentialBrokerService.RevokeCredentialByOwner:output_type -> orca.credentialbroker.v1.RevokeCredentialByOwnerResponse
+	17, // 29: orca.credentialbroker.v1.CredentialBrokerService.SignVapidPayload:output_type -> orca.credentialbroker.v1.SignVapidPayloadResponse
+	19, // 30: orca.credentialbroker.v1.CredentialBrokerService.GetCredentialMetadataByOwner:output_type -> orca.credentialbroker.v1.GetCredentialMetadataByOwnerResponse
+	21, // 31: orca.credentialbroker.v1.CredentialBrokerService.ListCredentialsByCategory:output_type -> orca.credentialbroker.v1.ListCredentialsByCategoryResponse
+	23, // 32: orca.credentialbroker.v1.CredentialBrokerService.EnsureVapidSigningKey:output_type -> orca.credentialbroker.v1.EnsureVapidSigningKeyResponse
+	22, // [22:33] is the sub-list for method output_type
+	11, // [11:22] is the sub-list for method input_type
 	11, // [11:11] is the sub-list for extension type_name
 	11, // [11:11] is the sub-list for extension extendee
 	0,  // [0:11] is the sub-list for field type_name
@@ -1350,7 +1451,7 @@ func file_orca_credentialbroker_v1_credentialbroker_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc), len(file_orca_credentialbroker_v1_credentialbroker_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   21,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

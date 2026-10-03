@@ -66,6 +66,22 @@ ops, port scans) reduces to the same call.
   devserveragent client in cleanly, real for relay-websocket-mode dev
   servers (see below).
 
+## Terminal closed event (outbox)
+
+`KillTerminalSession` (`terminal.close`) marks the session closed and, in the
+same DB transaction (`TerminalSessionStore.CloseWithEvent`, postgres + mysql),
+enqueues `orca.infrafleet.terminal.closed` in `outbox_events`; the existing
+`common/outbox.Relay` publishes it on stream `INFRAFLEET`. Only the real
+open->closed transition enqueues (a repeat close does not), the event id is
+UUIDv5(tenant+pty+"closed"), and the payload is
+`{tenant_id, pty_id, user_id, reason, actor?, origin:{type,client_name,mcp_session_id}}`
+- never cwd, command or output. `reason` comes from the additive
+`KillTerminalSessionRequest.reason` (`user` | `idle` | `session_closed`; anything
+else is `user`). notification-service turns `idle` + `origin.type=mcp` into the
+`mcp.terminal.idle_stopped` notification. Not covered: sessions closed in bulk by
+`CloseAllForConnection`/connection teardown do not emit the event; delivery is
+at-least-once (consumers dedupe on the event id).
+
 ## Running locally
 
 ```sh

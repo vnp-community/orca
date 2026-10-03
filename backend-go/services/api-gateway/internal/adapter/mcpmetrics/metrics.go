@@ -38,6 +38,7 @@ type Metrics struct {
 	cancelled        prometheus.Counter
 	sessionsClosed   *prometheus.CounterVec
 	terminalDropped  prometheus.Counter
+	idleStopEvents   *prometheus.CounterVec
 }
 
 // New registers all collectors on a fresh registry.
@@ -76,7 +77,9 @@ func New() *Metrics {
 		Name: "orca_mcp_sessions_closed_total", Help: "Sessions ended on this replica by reason."}, []string{"reason"})
 	m.terminalDropped = prometheus.NewCounter(prometheus.CounterOpts{
 		Name: "orca_mcp_terminal_dropped_bytes_total", Help: "PTY output bytes overwritten in the per-terminal ring before a reader consumed them."})
-	m.reg.MustRegister(m.terminalDropped, m.requests, m.toolCalls, m.toolDuration, m.sessionsActive, m.sseStreamsActive, m.resume,
+	m.idleStopEvents = prometheus.NewCounterVec(prometheus.CounterOpts{
+		Name: "orca_mcp_terminal_idle_stop_events_total", Help: "Idle terminal close RPCs by result (closed|failed). The notification event is written by infra-fleet in the close transaction; failed means the RPC errored (the close may or may not have committed) and the next stop path (session reaper) closes whatever is still open."}, []string{"result"})
+	m.reg.MustRegister(m.idleStopEvents, m.terminalDropped, m.requests, m.toolCalls, m.toolDuration, m.sessionsActive, m.sseStreamsActive, m.resume,
 		m.approvals, m.policyDenials, m.authFailures, m.principalResolve, m.identityMismatch, m.sseDropped,
 		m.rateLimited, m.cancelled, m.sessionsClosed)
 	return m
@@ -149,3 +152,8 @@ func (m *Metrics) ObservePrincipalResolve(result string) {
 
 // TerminalDropped is the tools.PtyToolsConfig.OnOutputDropped hook.
 func (m *Metrics) TerminalDropped(n uint64) { m.terminalDropped.Add(float64(n)) }
+
+// IdleStopClose counts one idle-janitor close RPC by result (closed|failed).
+func (m *Metrics) IdleStopClose(result string) {
+	m.idleStopEvents.WithLabelValues(pick(result, "other", "closed", "failed")).Inc()
+}

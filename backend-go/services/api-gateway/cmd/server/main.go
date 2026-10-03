@@ -419,11 +419,7 @@ func run() error {
 		// Terminal/agent tools (BE-MCP-SOL-009): resolve worktree hosts like the
 		// UI, stop their PTYs when the MCP session ends (hook + durable reaper).
 		toolStack.setWorktreeTargets(wscompat.WorktreeTargetResolver{Project: projectClient, Infra: infraFleetClient})
-		var terminalPub terminalEventPublisher // stays a nil interface when NATS is down
-		if pub != nil {
-			terminalPub = pub
-		}
-		toolStack.wireTerminalOperations(mcpMetrics, infraFleetClient, terminalPub, logger)
+		toolStack.wireTerminalOperations(mcpMetrics, infraFleetClient, logger)
 		defer toolStack.Executor.Close()
 		mcpToolOpts, mcpToolCatalog = append(mcpToolOpts, withMCPTools(toolStack), withMCPSessionClosed(toolStack)), toolStack.Catalog
 		if natsErr == nil {

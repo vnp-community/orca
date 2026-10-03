@@ -1221,7 +1221,11 @@ func (s *Server) ResizeTerminalSession(ctx context.Context, req *infrafleetv1.Re
 }
 
 func (s *Server) KillTerminalSession(ctx context.Context, req *infrafleetv1.KillTerminalSessionRequest) (*emptypb.Empty, error) {
-	if err := s.killTerminalSession.Execute(ctx, req.GetPtyId()); err != nil {
+	actor := req.GetActor()
+	if actor == "" {
+		actor, _ = tenant.UserID(ctx)
+	}
+	if err := s.killTerminalSession.ExecuteWithInput(ctx, usecase.KillTerminalSessionInput{PtyID: req.GetPtyId(), Reason: req.GetReason(), Actor: actor}); err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &emptypb.Empty{}, nil

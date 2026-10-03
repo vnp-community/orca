@@ -1235,7 +1235,11 @@ message ResizeTerminalSessionRequest { string pty_id = 1; int32 cols = 2; int32 
 // comes from the authenticated context (BE-SOL-STORAGE-003 §5).
 message TeardownConnectionRequest { string connection_id = 1; }
 
-message KillTerminalSessionRequest   { string pty_id = 1; }
+// reason/actor are additive and optional: reason is why the terminal was closed
+// ("user" | "idle" | "session_closed"; anything else, or empty, is recorded as
+// "user"); actor is the caller's user id when it differs from the session owner.
+// They only feed the orca.infrafleet.terminal.closed event, never a decision.
+message KillTerminalSessionRequest   { string pty_id = 1; string reason = 2; string actor = 3; }
 message StopTerminalProcessRequest   { string pty_id = 1; } // sends an interrupt signal to the pty's foreground process
 message ListTerminalSessionsRequest  { string connection_id = 1; } // empty = all sessions for the caller's tenant
 message ListTerminalSessionsResponse { repeated TerminalSession sessions = 1; }

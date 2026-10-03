@@ -33,7 +33,8 @@ type fakeFleet struct {
 	ptys       map[string]*fakePty
 	open       []*infrafleetv1.TerminalSession
 	killed     []string
-	stopped    []string // terminal.stop + agent.stop ids
+	killReason map[string]string // ptyID -> reason sent on KillTerminalSession
+	stopped    []string          // terminal.stop + agent.stop ids
 	agentStops []string
 	agentKills []string
 	spawnReqs  []*infrafleetv1.SpawnTerminalSessionRequest
@@ -102,6 +103,10 @@ func (f *fakeFleet) ListTerminalSessions(context.Context, *infrafleetv1.ListTerm
 func (f *fakeFleet) KillTerminalSession(_ context.Context, in *infrafleetv1.KillTerminalSessionRequest, _ ...grpc.CallOption) (*emptypb.Empty, error) {
 	f.mu.Lock()
 	f.killed = append(f.killed, in.GetPtyId())
+	if f.killReason == nil {
+		f.killReason = map[string]string{}
+	}
+	f.killReason[in.GetPtyId()] = in.GetReason()
 	for i, s := range f.open {
 		if s.GetPtyId() == in.GetPtyId() {
 			f.open = append(f.open[:i], f.open[i+1:]...)

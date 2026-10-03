@@ -6,6 +6,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/stablyai/orca-go/services/credential-broker-service/internal/domain"
@@ -85,7 +86,27 @@ type SecretStore interface {
 	// `DELETE <mount>/metadata/<path>` call — see that package's doc
 	// comment.
 	RevokeSecret(ctx context.Context, mount, path string) error
+	// TransitReadKey describes a Transit key, or (nil, nil) when it does not
+	// exist. Failures wrap ErrSecretStoreForbidden / ErrSecretStoreUnavailable
+	// when the cause is a Vault 403 / an unreachable or erroring Vault.
+	TransitReadKey(ctx context.Context, keyName string) (*TransitKeyInfo, error)
+	// TransitCreateKey creates a Transit key of keyType; creating an existing
+	// key is a no-op. Same error contract as TransitReadKey.
+	TransitCreateKey(ctx context.Context, keyName, keyType string) error
 }
+
+// TransitKeyInfo is the non-secret description of a Transit key.
+type TransitKeyInfo struct {
+	Type          string
+	LatestVersion int
+	PublicKeyPEM  string // latest version; empty for symmetric key types
+}
+
+// SecretStore failure classes the adapter maps Vault errors onto.
+var (
+	ErrSecretStoreForbidden   = errors.New("usecase: secret store denied the request")
+	ErrSecretStoreUnavailable = errors.New("usecase: secret store unavailable")
+)
 
 // TxRunner wraps a metadata mutation and its audit-log append in one
 // Postgres transaction — added to satisfy credential-broker-service.md

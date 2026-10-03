@@ -41,7 +41,7 @@ func (e *Executor) ReapSession(ctx context.Context, tenantID, userID, mcpSession
 		if r.Origin == nil || r.Origin.Type != "mcp" || r.Origin.McpSessionID != mcpSessionID {
 			continue
 		}
-		if _, err := e.disp.Dispatch(ctx, id, "terminal.close", mustArgs(map[string]any{"terminal": r.PtyID})); err != nil {
+		if _, err := e.disp.Dispatch(ctx, id, "terminal.close", mustArgs(map[string]any{"terminal": r.PtyID, "reason": closeReasonSessionClosed})); err != nil {
 			e.log.Warn("mcp reaper: terminal.close failed", slog.String("pty", r.PtyID), slog.Any("error", err))
 		}
 	}

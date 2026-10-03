@@ -167,7 +167,7 @@ func run() error {
 	credentialbrokerv1.RegisterCredentialBrokerServiceServer(grpcServer, credentialgrpc.New(
 		writeUC, resolveUC, rotateUC, revokeUC, getMetadataUC, resolveByOwnerUC, revokeByOwnerUC, signVapidUC,
 		getMetadataByOwnerUC, listByCategoryUC,
-	))
+	).WithEnsureVapidSigningKey(usecase.NewEnsureVapidSigningKey(store)))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// Vault reachability gates readiness — per credential-broker-service.md

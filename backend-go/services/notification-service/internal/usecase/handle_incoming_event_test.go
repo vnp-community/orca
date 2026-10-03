@@ -160,3 +160,42 @@ func TestHandleIncomingEvent_DifferentEventIDsBothProcess(t *testing.T) {
 		t.Fatalf("expected 2 broadcasts (one per distinct event ID), got %d", len(b.broadcast))
 	}
 }
+
+func TestHandleIncomingEvent_McpTerminalIdleStoppedIsIdempotent(t *testing.T) {
+	b := &fakeBroadcaster{}
+	uc := NewHandleIncomingEvent(b, &fakeProcessedEventRepository{}, nil, nil, nil)
+	in := HandleIncomingEventInput{
+		EventID: "0b6d7d5e-1f1c-5d0a-8a3b-111111111111", TenantID: "t1", Subject: "orca.mcp.terminal.idlestopped",
+		OccurredAt: time.Now(), Payload: []byte(`{"user_id":"u1","pty_id":"p1","reason":"idle","client_name":"Cursor"}`),
+	}
+	for i := 0; i < 3; i++ {
+		if err := uc.Execute(context.Background(), in); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(b.broadcast) != 1 || b.broadcast[0].Type != "mcp.terminal.idle_stopped" || b.broadcast[0].RecipientUserIDs[0] != "u1" {
+		t.Fatalf("broadcasts = %+v", b.broadcast)
+	}
+}
+
+func TestHandleIncomingEvent_InfraTerminalClosedIdleIsIdempotentAndOthersAreSkipped(t *testing.T) {
+	b := &fakeBroadcaster{}
+	uc := NewHandleIncomingEvent(b, &fakeProcessedEventRepository{}, nil, nil, nil)
+	idle := HandleIncomingEventInput{
+		EventID: "0b6d7d5e-1f1c-5d0a-8a3b-333333333333", TenantID: "t1", Subject: "orca.infrafleet.terminal.closed",
+		OccurredAt: time.Now(), Payload: []byte(`{"user_id":"u1","pty_id":"p1","reason":"idle","origin":{"type":"mcp","client_name":"Cursor"}}`),
+	}
+	user := idle
+	user.EventID = "0b6d7d5e-1f1c-5d0a-8a3b-444444444444"
+	user.Payload = []byte(`{"user_id":"u1","pty_id":"p2","reason":"user","origin":{"type":"mcp","client_name":"Cursor"}}`)
+	for i := 0; i < 3; i++ {
+		for _, in := range []HandleIncomingEventInput{idle, user} {
+			if err := uc.Execute(context.Background(), in); err != nil {
+				t.Fatal(err)
+			}
+		}
+	}
+	if len(b.broadcast) != 1 || b.broadcast[0].Type != "mcp.terminal.idle_stopped" || b.broadcast[0].SourceEventID != idle.EventID {
+		t.Fatalf("broadcasts = %+v", b.broadcast)
+	}
+}

@@ -7178,9 +7178,15 @@ func (x *TeardownConnectionRequest) GetConnectionId() string {
 	return ""
 }
 
+// reason/actor are additive and optional: reason is why the terminal was closed
+// ("user" | "idle" | "session_closed"; anything else, or empty, is recorded as
+// "user"); actor is the caller's user id when it differs from the session owner.
+// They only feed the orca.infrafleet.terminal.closed event, never a decision.
 type KillTerminalSessionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	PtyId         string                 `protobuf:"bytes,1,opt,name=pty_id,json=ptyId,proto3" json:"pty_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	Actor         string                 `protobuf:"bytes,3,opt,name=actor,proto3" json:"actor,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -7218,6 +7224,20 @@ func (*KillTerminalSessionRequest) Descriptor() ([]byte, []int) {
 func (x *KillTerminalSessionRequest) GetPtyId() string {
 	if x != nil {
 		return x.PtyId
+	}
+	return ""
+}
+
+func (x *KillTerminalSessionRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *KillTerminalSessionRequest) GetActor() string {
+	if x != nil {
+		return x.Actor
 	}
 	return ""
 }
@@ -12663,9 +12683,11 @@ const file_orca_infrafleet_v1_infrafleet_proto_rawDesc = "" +
 	"\x04cols\x18\x02 \x01(\x05R\x04cols\x12\x12\n" +
 	"\x04rows\x18\x03 \x01(\x05R\x04rows\"@\n" +
 	"\x19TeardownConnectionRequest\x12#\n" +
-	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\"3\n" +
+	"\rconnection_id\x18\x01 \x01(\tR\fconnectionId\"a\n" +
 	"\x1aKillTerminalSessionRequest\x12\x15\n" +
-	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"3\n" +
+	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x14\n" +
+	"\x05actor\x18\x03 \x01(\tR\x05actor\"3\n" +
 	"\x1aStopTerminalProcessRequest\x12\x15\n" +
 	"\x06pty_id\x18\x01 \x01(\tR\x05ptyId\"B\n" +
 	"\x1bListTerminalSessionsRequest\x12#\n" +

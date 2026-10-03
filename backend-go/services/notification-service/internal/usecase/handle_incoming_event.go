@@ -86,6 +86,9 @@ func (uc *HandleIncomingEvent) Execute(ctx context.Context, in HandleIncomingEve
 
 	event, err := domain.TranslateEvent(uuid.NewString(), in.EventID, in.Subject, in.TenantID, payload, in.OccurredAt)
 	if err != nil {
+		if errors.Is(err, domain.ErrNotNotifiable) {
+			return nil
+		}
 		if errors.Is(err, domain.ErrNoRecipients) {
 			uc.logger.InfoContext(ctx, "skipping event with no recipient",
 				slog.String("subject", in.Subject), slog.String("event_id", in.EventID))

@@ -29,6 +29,7 @@ const (
 	CredentialBrokerService_SignVapidPayload_FullMethodName             = "/orca.credentialbroker.v1.CredentialBrokerService/SignVapidPayload"
 	CredentialBrokerService_GetCredentialMetadataByOwner_FullMethodName = "/orca.credentialbroker.v1.CredentialBrokerService/GetCredentialMetadataByOwner"
 	CredentialBrokerService_ListCredentialsByCategory_FullMethodName    = "/orca.credentialbroker.v1.CredentialBrokerService/ListCredentialsByCategory"
+	CredentialBrokerService_EnsureVapidSigningKey_FullMethodName        = "/orca.credentialbroker.v1.CredentialBrokerService/EnsureVapidSigningKey"
 )
 
 // CredentialBrokerServiceClient is the client API for CredentialBrokerService service.
@@ -98,6 +99,13 @@ type CredentialBrokerServiceClient interface {
 	// ListCredentialsByCategory answers "which owner_ids have a credential in
 	// this category for this tenant" — backs credentials.list.
 	ListCredentialsByCategory(ctx context.Context, in *ListCredentialsByCategoryRequest, opts ...grpc.CallOption) (*ListCredentialsByCategoryResponse, error)
+	// EnsureVapidSigningKey idempotently provisions the calling tenant's Vault
+	// Transit key "vapid-signing-<tenant_id>" (type ecdsa-p256) and returns its
+	// Web Push public key. The tenant comes from request metadata
+	// (x-orca-tenant-id), not the message, so a caller cannot provision another
+	// tenant's key. Only notification-service (x-orca-service-id) may call it.
+	// An existing key of another type is refused, never deleted.
+	EnsureVapidSigningKey(ctx context.Context, in *EnsureVapidSigningKeyRequest, opts ...grpc.CallOption) (*EnsureVapidSigningKeyResponse, error)
 }
 
 type credentialBrokerServiceClient struct {
@@ -208,6 +216,16 @@ func (c *credentialBrokerServiceClient) ListCredentialsByCategory(ctx context.Co
 	return out, nil
 }
 
+func (c *credentialBrokerServiceClient) EnsureVapidSigningKey(ctx context.Context, in *EnsureVapidSigningKeyRequest, opts ...grpc.CallOption) (*EnsureVapidSigningKeyResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EnsureVapidSigningKeyResponse)
+	err := c.cc.Invoke(ctx, CredentialBrokerService_EnsureVapidSigningKey_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // CredentialBrokerServiceServer is the server API for CredentialBrokerService service.
 // All implementations must embed UnimplementedCredentialBrokerServiceServer
 // for forward compatibility.
@@ -275,6 +293,13 @@ type CredentialBrokerServiceServer interface {
 	// ListCredentialsByCategory answers "which owner_ids have a credential in
 	// this category for this tenant" — backs credentials.list.
 	ListCredentialsByCategory(context.Context, *ListCredentialsByCategoryRequest) (*ListCredentialsByCategoryResponse, error)
+	// EnsureVapidSigningKey idempotently provisions the calling tenant's Vault
+	// Transit key "vapid-signing-<tenant_id>" (type ecdsa-p256) and returns its
+	// Web Push public key. The tenant comes from request metadata
+	// (x-orca-tenant-id), not the message, so a caller cannot provision another
+	// tenant's key. Only notification-service (x-orca-service-id) may call it.
+	// An existing key of another type is refused, never deleted.
+	EnsureVapidSigningKey(context.Context, *EnsureVapidSigningKeyRequest) (*EnsureVapidSigningKeyResponse, error)
 	mustEmbedUnimplementedCredentialBrokerServiceServer()
 }
 
@@ -314,6 +339,9 @@ func (UnimplementedCredentialBrokerServiceServer) GetCredentialMetadataByOwner(c
 }
 func (UnimplementedCredentialBrokerServiceServer) ListCredentialsByCategory(context.Context, *ListCredentialsByCategoryRequest) (*ListCredentialsByCategoryResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListCredentialsByCategory not implemented")
+}
+func (UnimplementedCredentialBrokerServiceServer) EnsureVapidSigningKey(context.Context, *EnsureVapidSigningKeyRequest) (*EnsureVapidSigningKeyResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EnsureVapidSigningKey not implemented")
 }
 func (UnimplementedCredentialBrokerServiceServer) mustEmbedUnimplementedCredentialBrokerServiceServer() {
 }
@@ -517,6 +545,24 @@ func _CredentialBrokerService_ListCredentialsByCategory_Handler(srv interface{},
 	return interceptor(ctx, in, info, handler)
 }
 
+func _CredentialBrokerService_EnsureVapidSigningKey_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EnsureVapidSigningKeyRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(CredentialBrokerServiceServer).EnsureVapidSigningKey(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: CredentialBrokerService_EnsureVapidSigningKey_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(CredentialBrokerServiceServer).EnsureVapidSigningKey(ctx, req.(*EnsureVapidSigningKeyRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // CredentialBrokerService_ServiceDesc is the grpc.ServiceDesc for CredentialBrokerService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -563,6 +609,10 @@ var CredentialBrokerService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListCredentialsByCategory",
 			Handler:    _CredentialBrokerService_ListCredentialsByCategory_Handler,
+		},
+		{
+			MethodName: "EnsureVapidSigningKey",
+			Handler:    _CredentialBrokerService_EnsureVapidSigningKey_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

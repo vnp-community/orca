@@ -25,3 +25,30 @@ func TestSubjects_IncludesMcpApprovalRequested(t *testing.T) {
 	}
 	t.Fatal("notification-service must consume orca.mcp.approval.requested from the MCP stream")
 }
+
+func TestSubjects_McpTerminalIdleStoppedIsDurableOnTheMcpStream(t *testing.T) {
+	for _, b := range Subjects {
+		if b.Subject == "orca.mcp.terminal.idlestopped" {
+			if b.StreamName != "MCP" || b.Durable != "notification-service-mcp-terminal-idle-stopped" {
+				t.Fatalf("binding = %+v", b)
+			}
+			return
+		}
+	}
+	t.Fatal("idle-stop subject is not consumed")
+}
+
+func TestSubjects_InfraFleetTerminalClosedIsDurableAndLegacyBindingRemains(t *testing.T) {
+	var closed, legacy bool
+	for _, b := range Subjects {
+		switch b.Subject {
+		case "orca.infrafleet.terminal.closed":
+			closed = b.StreamName == "INFRAFLEET" && b.Durable == "notification-service-infrafleet-terminal-closed"
+		case "orca.mcp.terminal.idlestopped":
+			legacy = true
+		}
+	}
+	if !closed || !legacy {
+		t.Fatalf("closed binding ok=%v legacy binding present=%v", closed, legacy)
+	}
+}

@@ -42,6 +42,7 @@ import (
 	notificationwebpush "github.com/stablyai/orca-go/services/notification-service/internal/adapter/external/webpush"
 	notificationgrpc "github.com/stablyai/orca-go/services/notification-service/internal/adapter/grpc"
 	notificationauthclient "github.com/stablyai/orca-go/services/notification-service/internal/adapter/grpcclient/authclient"
+	notificationvapidprovisioner "github.com/stablyai/orca-go/services/notification-service/internal/adapter/grpcclient/vapidprovisioner"
 	notificationmetrics "github.com/stablyai/orca-go/services/notification-service/internal/adapter/metrics"
 	notificationmysql "github.com/stablyai/orca-go/services/notification-service/internal/adapter/mysql"
 	notificationnacl "github.com/stablyai/orca-go/services/notification-service/internal/adapter/nacl"
@@ -113,7 +114,7 @@ func run() error {
 	var (
 		repo interface {
 			usecase.SubscriptionRepository
-			usecase.VapidKeyRepository
+			usecase.VapidKeyStore
 			usecase.ProcessedEventRepository
 			usecase.NotificationRepository
 		}
@@ -228,14 +229,17 @@ func run() error {
 	if cfg.VAPIDSubject == "" {
 		logger.Warn("VAPID_SUBJECT not set — web push sends will fail until it is configured (mailto: or https: contact)")
 	}
-	vapidAuthorizer := notificationwebpush.NewVapidAuthorizer(signer, repo, cfg.VAPIDSubject)
 	pushMetrics := notificationmetrics.New()
+	// First use of a tenant provisions its Vault key + metadata row; the
+	// broker owns the Vault side.
+	ensureVapidKeyUC := usecase.NewEnsureVapidKey(repo, notificationvapidprovisioner.New(brokerConn), pushMetrics)
+	vapidAuthorizer := notificationwebpush.NewVapidAuthorizer(signer, repo, cfg.VAPIDSubject).WithKeyEnsurer(ensureVapidKeyUC)
 	deliverPushUC := usecase.NewDeliverPush(repo, deviceSecrets, sealer, vapidAuthorizer, webpushClient, bufferStore, preferenceStore, apnsClient, fcmClient, logger).
 		Configure(usecase.DeliverPushConfig{Concurrency: cfg.PushConcurrency, Timeout: cfg.PushTimeout, Observer: pushMetrics})
 
 	subscribeUC := usecase.NewSubscribe(repo)
 	unregisterPushSubscriptionUC := usecase.NewUnregisterPushSubscription(repo)
-	getVapidPublicKeyUC := usecase.NewGetVapidPublicKey(repo)
+	getVapidPublicKeyUC := usecase.NewGetVapidPublicKey(repo).WithEnsurer(ensureVapidKeyUC)
 	listNotificationsUC := usecase.NewListNotifications(repo)
 	markAsReadUC := usecase.NewMarkAsRead(repo, broadcast)
 	markAllAsReadUC := usecase.NewMarkAllAsRead(repo, broadcast)

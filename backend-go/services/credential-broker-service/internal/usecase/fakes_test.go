@@ -147,6 +147,12 @@ type fakeSecretStore struct {
 	revokeErr  error
 
 	revokeCalls []string // "mount/path" values RevokeSecret was called with
+
+	transitKeys    map[string]*TransitKeyInfo // key name -> existing key
+	readKeyErr     error
+	createKeyErr   error
+	createKeyCalls []string // "name:type"
+	createKeyPEM   string   // public key given to keys the fake creates
 }
 
 func newFakeSecretStore(r *callRecorder) *fakeSecretStore {
@@ -253,5 +259,32 @@ func (f *fakeTxRunner) RunInTx(ctx context.Context, fn func(ctx context.Context,
 		return err
 	}
 	f.recorder.record("tx.Commit")
+	return nil
+}
+
+func (f *fakeSecretStore) TransitReadKey(ctx context.Context, keyName string) (*TransitKeyInfo, error) {
+	f.recorder.record("store.TransitReadKey")
+	if f.readKeyErr != nil {
+		return nil, f.readKeyErr
+	}
+	if k, ok := f.transitKeys[keyName]; ok {
+		cp := *k
+		return &cp, nil
+	}
+	return nil, nil
+}
+
+func (f *fakeSecretStore) TransitCreateKey(ctx context.Context, keyName, keyType string) error {
+	f.recorder.record("store.TransitCreateKey")
+	f.createKeyCalls = append(f.createKeyCalls, keyName+":"+keyType)
+	if f.createKeyErr != nil {
+		return f.createKeyErr
+	}
+	if f.transitKeys == nil {
+		f.transitKeys = map[string]*TransitKeyInfo{}
+	}
+	if _, exists := f.transitKeys[keyName]; !exists {
+		f.transitKeys[keyName] = &TransitKeyInfo{Type: keyType, LatestVersion: 1, PublicKeyPEM: f.createKeyPEM}
+	}
 	return nil
 }

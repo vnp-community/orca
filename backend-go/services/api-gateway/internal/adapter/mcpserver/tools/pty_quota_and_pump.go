@@ -152,7 +152,7 @@ func (m *ToolSessions) register(ts *ToolSession, pt *managedPty, events <-chan w
 		st.mu.Unlock()
 		ctx, cancel := context.WithTimeout(context.Background(), m.cfg.CloseTimeout)
 		defer cancel()
-		m.stopPty(ctx, ts, pt)
+		_ = m.stopPty(ctx, ts, pt, closeReasonSessionClosed)
 		return &ToolError{"MCP_SESSION_CLOSED", "the MCP session was closed"}
 	}
 	st.ptys[pt.ptyID] = pt

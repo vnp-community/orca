@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
@@ -13,8 +12,8 @@ import (
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
 
-	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
+	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpmetrics"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/wscompat"
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
@@ -62,28 +61,33 @@ func TestInfraAgentLister_OldInfraFleetDegradesAndOtherErrorsSurface(t *testing.
 	}
 }
 
-type recordingPublisher struct {
-	subject string
-	ev      commoneventbus.Event
-	err     error
+func counterValue(t *testing.T, m *mcpmetrics.Metrics, result string) float64 {
+	t.Helper()
+	mfs, err := m.Registry().Gather()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, mf := range mfs {
+		if mf.GetName() != "orca_mcp_terminal_idle_stop_events_total" {
+			continue
+		}
+		for _, mm := range mf.GetMetric() {
+			if mm.GetLabel()[0].GetValue() == result {
+				return mm.GetCounter().GetValue()
+			}
+		}
+	}
+	return 0
 }
 
-func (r *recordingPublisher) Publish(_ context.Context, subject string, ev commoneventbus.Event) error {
-	r.subject, r.ev = subject, ev
-	return r.err
-}
-
-func TestIdleStoppedNotifier_PublishesTheMcpSubjectAndSurvivesFailures(t *testing.T) {
-	pub := &recordingPublisher{}
-	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	idleStoppedNotifier(pub, log)("t1", "u1", "sess-1", "pty-7")
-	if pub.subject != "orca.mcp.terminal.idlestopped" || pub.ev.TenantID != "t1" || pub.ev.ID != "idlestopped:pty-7" {
-		t.Fatalf("published %q %+v", pub.subject, pub.ev)
+func TestIdleCloseObserver_CountsCloseResultAndToleratesNilMetrics(t *testing.T) {
+	m := mcpmetrics.New()
+	obs := idleCloseObserver(m, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	obs("t1", "u1", "sess-1", "pty-1", "Cursor", nil)
+	obs("t1", "u1", "sess-1", "pty-2", "Cursor", errors.New("infra-fleet down"))
+	obs("t1", "u1", "sess-1", "pty-3", "Cursor", nil)
+	if counterValue(t, m, "closed") != 2 || counterValue(t, m, "failed") != 1 {
+		t.Fatalf("closed=%v failed=%v", counterValue(t, m, "closed"), counterValue(t, m, "failed"))
 	}
-	var p map[string]string
-	if err := json.Unmarshal(pub.ev.Payload, &p); err != nil || p["session_id"] != "sess-1" || p["pty_id"] != "pty-7" || p["user_id"] != "u1" || p["reason"] != "idle" {
-		t.Fatalf("payload = %v (%v)", p, err)
-	}
-	pub.err = errors.New("nats down")
-	idleStoppedNotifier(pub, log)("t1", "u1", "sess-1", "pty-8") // must not panic
+	idleCloseObserver(nil, slog.New(slog.NewTextHandler(io.Discard, nil)))("t", "u", "s", "p", "", errors.New("x"))
 }

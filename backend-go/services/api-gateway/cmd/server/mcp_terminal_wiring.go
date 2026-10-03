@@ -2,14 +2,11 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
-	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
-	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 	gatewaygrpc "github.com/stablyai/orca-go/services/api-gateway/internal/adapter/grpc"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpmetrics"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpserver/tools"
@@ -18,10 +15,6 @@ import (
 
 	infrafleetv1 "github.com/stablyai/orca-go/proto/gen/go/orca/infrafleet/v1"
 )
-
-// subjectTerminalIdleStopped is published when the janitor stops a PTY for
-// inactivity (notification-service may turn it into a notification).
-const subjectTerminalIdleStopped = "orca.mcp.terminal.idlestopped"
 
 // infraAgentLister finds the agents an MCP session started via infra-fleet's
 // ListAgentSessions. An infra-fleet that predates the RPC answers
@@ -48,37 +41,38 @@ func (l infraAgentLister) ListMcpAgentSessions(ctx context.Context, id wscompat.
 	return out, nil
 }
 
-type terminalEventPublisher interface {
-	Publish(ctx context.Context, subject string, event commoneventbus.Event) error
-}
-
-// idleStoppedNotifier publishes best effort: the PTY is already stopped, so a
-// lost event only costs the user a notification.
-func idleStoppedNotifier(pub terminalEventPublisher, logger *slog.Logger) func(tenantID, userID, mcpSessionID, ptyID string) {
-	return func(tenantID, userID, mcpSessionID, ptyID string) {
-		payload, _ := json.Marshal(map[string]string{"session_id": mcpSessionID, "user_id": userID, "pty_id": ptyID, "reason": "idle"})
-		ev := commoneventbus.Event{ID: "idlestopped:" + ptyID, TenantID: tenantID, OccurredAt: time.Now().UTC(), Version: 1, Payload: payload}
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		if err := pub.Publish(ctx, subjectTerminalIdleStopped, ev); err != nil {
-			logger.Warn("publishing mcp terminal idle-stop event failed", slog.Any("error", err))
-		}
-	}
-}
-
 // wireTerminalOperations connects the terminal/agent tools to metrics (ring
-// overflow), the durable agent reaper and the idle-stop event. pub may be nil
-// (NATS down). Call after setWorktreeTargets and before serving: it rebuilds the
-// session registry from s.PtyCfg.
-func (s *mcpToolStack) wireTerminalOperations(m *mcpmetrics.Metrics, fleet infrafleetv1.InfraFleetServiceClient, pub terminalEventPublisher, logger *slog.Logger) {
+// overflow) and the durable agent reaper. Call after setWorktreeTargets and
+// before serving: it rebuilds the session registry from s.PtyCfg.
+//
+// The idle-stop notification is NOT published here: the janitor closes the PTY
+// with reason "idle" and infra-fleet writes orca.infrafleet.terminal.closed to
+// its outbox in the same transaction as the close, so the gateway (which has no
+// database) cannot lose it. Crash safety: dying before the close RPC leaves the
+// terminal open for the next stop path (session reaper, reason session_closed);
+// dying after the RPC succeeded leaves the event already in the outbox.
+func (s *mcpToolStack) wireTerminalOperations(m *mcpmetrics.Metrics, fleet infrafleetv1.InfraFleetServiceClient, logger *slog.Logger) {
 	if m != nil {
 		s.PtyCfg.OnOutputDropped = m.TerminalDropped
 	}
 	if fleet != nil {
 		s.PtyCfg.AgentLister = infraAgentLister{c: fleet}
 	}
-	if pub != nil {
-		s.PtyCfg.OnIdleStopped = idleStoppedNotifier(pub, logger)
-	}
+	s.PtyCfg.OnIdleStopped = idleCloseObserver(m, logger)
 	s.Executor.WithPtyTools(s.PtyCfg)
+}
+
+// idleCloseObserver counts the janitor's close RPC by result (m may be nil).
+func idleCloseObserver(m *mcpmetrics.Metrics, logger *slog.Logger) func(tenantID, userID, mcpSessionID, ptyID, clientName string, closeErr error) {
+	return func(tenantID, _, mcpSessionID, ptyID, _ string, closeErr error) {
+		result := "closed"
+		if closeErr != nil {
+			result = "failed"
+			logger.Warn("mcp idle terminal close failed; the session reaper will retry", slog.String("tenant", tenantID),
+				slog.String("session", mcpSessionID), slog.String("pty", ptyID), slog.Any("error", closeErr))
+		}
+		if m != nil {
+			m.IdleStopClose(result)
+		}
+	}
 }

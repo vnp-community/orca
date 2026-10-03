@@ -10,8 +10,11 @@ package vault
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/stablyai/orca-go/common/secrets"
+	"github.com/stablyai/orca-go/services/credential-broker-service/internal/usecase"
 )
 
 // SecretStore wraps a *secrets.Client. Every method below delegates
@@ -81,4 +84,36 @@ func (s *SecretStore) RevokeSecret(ctx context.Context, mount, path string) erro
 // failure errors.
 func (s *SecretStore) Ping(ctx context.Context) error {
 	return s.client.Ping(ctx)
+}
+
+// TransitReadKey delegates to secrets.Client.TransitReadKey, mapping Vault
+// failure classes onto the usecase port's sentinels.
+func (s *SecretStore) TransitReadKey(ctx context.Context, keyName string) (*usecase.TransitKeyInfo, error) {
+	info, err := s.client.TransitReadKey(ctx, keyName)
+	if err != nil {
+		return nil, mapStoreError(err)
+	}
+	if info == nil {
+		return nil, nil
+	}
+	return &usecase.TransitKeyInfo{Type: info.Type, LatestVersion: info.LatestVersion, PublicKeyPEM: info.PublicKeyPEM}, nil
+}
+
+// TransitCreateKey delegates to secrets.Client.TransitCreateKey.
+func (s *SecretStore) TransitCreateKey(ctx context.Context, keyName, keyType string) error {
+	if err := s.client.TransitCreateKey(ctx, keyName, keyType); err != nil {
+		return mapStoreError(err)
+	}
+	return nil
+}
+
+func mapStoreError(err error) error {
+	switch {
+	case errors.Is(err, secrets.ErrVaultForbidden):
+		return fmt.Errorf("%w: %v", usecase.ErrSecretStoreForbidden, err)
+	case errors.Is(err, secrets.ErrVaultUnavailable):
+		return fmt.Errorf("%w: %v", usecase.ErrSecretStoreUnavailable, err)
+	default:
+		return err
+	}
 }

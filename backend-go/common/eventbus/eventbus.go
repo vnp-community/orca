@@ -89,6 +89,20 @@ func (p *Publisher) Publish(ctx context.Context, subject string, event Event) er
 	return nil
 }
 
+// PublishDedup is Publish with a Nats-Msg-Id header set to event.ID, so the
+// stream drops a retried publish of the same event inside its duplicate
+// window. For publishers outside a service's outbox (no DB to dedupe in).
+func (p *Publisher) PublishDedup(ctx context.Context, subject string, event Event) error {
+	b, err := json.Marshal(event)
+	if err != nil {
+		return fmt.Errorf("eventbus: marshaling event: %w", err)
+	}
+	if _, err := p.js.Publish(ctx, subject, b, jetstream.WithMsgID(event.ID)); err != nil {
+		return fmt.Errorf("eventbus: publishing to %s: %w", subject, err)
+	}
+	return nil
+}
+
 // Handler processes one delivered event; returning an error leaves the
 // message unacked for redelivery.
 type Handler func(ctx context.Context, event Event) error

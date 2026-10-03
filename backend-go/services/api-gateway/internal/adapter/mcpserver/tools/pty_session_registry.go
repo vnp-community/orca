@@ -181,7 +181,7 @@ func (m *ToolSessions) closeSession(ts *ToolSession, reason string) {
 			wg.Add(1)
 			go func() {
 				defer wg.Done()
-				m.stopPty(ctx, ts, p)
+				_ = m.stopPty(ctx, ts, p, closeReasonSessionClosed)
 			}()
 		}
 		wg.Wait()
@@ -198,13 +198,22 @@ func (m *ToolSessions) closeSession(ts *ToolSession, reason string) {
 	})
 }
 
+// Close reasons sent on terminal.close; infra-fleet records them on the
+// orca.infrafleet.terminal.closed event (only "idle" notifies the owner).
+const (
+	closeReasonUser          = "user"
+	closeReasonIdle          = "idle"
+	closeReasonSessionClosed = "session_closed"
+)
+
 // stopPty ends one PTY. Agents get a polite agent.stop and, after the grace
-// period agent.kill; terminals
-// are closed (KillTerminalSession). Idempotent and best effort.
-func (m *ToolSessions) stopPty(ctx context.Context, ts *ToolSession, p *managedPty) {
+// period agent.kill; terminals are closed (KillTerminalSession) with reason.
+// Idempotent and best effort; the returned error is the terminal.close failure.
+func (m *ToolSessions) stopPty(ctx context.Context, ts *ToolSession, p *managedPty, reason string) error {
 	if !p.stopping.CompareAndSwap(false, true) {
-		return
+		return nil
 	}
+	var closeErr error
 	sctx := ts.pty.streams.Context(ctx)
 	id := ts.pty.identity
 	if p.kind == kindAgent {
@@ -217,11 +226,13 @@ func (m *ToolSessions) stopPty(ctx context.Context, ts *ToolSession, p *managedP
 				m.log.Warn("mcp agent.kill failed", slog.Any("error", err))
 			}
 		}
-	} else if _, err := m.disp.Dispatch(sctx, id, "terminal.close", mustArgs(map[string]any{"terminal": p.ptyID})); err != nil {
+	} else if _, err := m.disp.Dispatch(sctx, id, "terminal.close", mustArgs(map[string]any{"terminal": p.ptyID, "reason": reason})); err != nil {
+		closeErr = err
 		m.log.Warn("mcp terminal.close failed", slog.Any("error", err))
 	}
 	ts.pty.streams.Detach(p.ptyID)
 	ts.pty.forget(p)
+	return closeErr
 }
 
 func (st *ptyState) forget(p *managedPty) {
@@ -290,10 +301,10 @@ func (m *ToolSessions) sweepIdle() {
 		for _, p := range idle {
 			p.idleStop.Store(true)
 			ctx, cancel := context.WithTimeout(context.Background(), m.cfg.CloseTimeout)
-			m.stopPty(ctx, ts, p)
+			err := m.stopPty(ctx, ts, p, closeReasonIdle)
 			cancel()
 			if m.cfg.OnIdleStopped != nil {
-				m.cfg.OnIdleStopped(ts.pty.tenantID, ts.pty.userID, ts.pty.id, p.ptyID)
+				m.cfg.OnIdleStopped(ts.pty.tenantID, ts.pty.userID, ts.pty.id, p.ptyID, ts.pty.clientName, err)
 			}
 		}
 	}

@@ -35,6 +35,11 @@ import (
 type SubjectBinding struct {
 	StreamName string
 	Subject    string
+	// Durable, when set, uses a named durable consumer (one shared cursor) so
+	// an event published while the service was down is delivered after it
+	// starts, even past the ephemeral consumer's inactivity expiry. Only for
+	// events whose loss matters; processed_events dedupes redeliveries.
+	Durable string
 }
 
 // Subjects is notification-service.md §3's subject table — illustrative,
@@ -52,6 +57,11 @@ var Subjects = []SubjectBinding{
 	{StreamName: "PROJECT", Subject: "orca.project.devserver.changed"}, // NEW
 	// BE-MCP-SOL-013: approval requests from mcp-service's outbox (stream "MCP").
 	{StreamName: "MCP", Subject: "orca.mcp.approval.requested"},
+	// Lossless idle-stop: infra-fleet enqueues terminal.closed in the close
+	// transaction; only reason=idle + origin=mcp becomes a notification.
+	{StreamName: "INFRAFLEET", Subject: "orca.infrafleet.terminal.closed", Durable: "notification-service-infrafleet-terminal-closed"},
+	// Legacy gateway-published idle-stop; kept so in-flight messages still drain.
+	{StreamName: "MCP", Subject: "orca.mcp.terminal.idlestopped", Durable: "notification-service-mcp-terminal-idle-stopped"},
 	// BL-MB-02 (SOL-MB-02): stream names must match infra-fleet-service's
 	// and ai-provider-service's own EnsureStream calls exactly ("INFRA",
 	// "AIPROVIDER" — see those services' cmd/server/main.go).
@@ -91,7 +101,7 @@ func (c *Consumer) Run(ctx context.Context, logger *slog.Logger) {
 		wg.Add(1)
 		go func(b SubjectBinding) {
 			defer wg.Done()
-			err := c.bus.SubscribeEphemeral(ctx, b.StreamName, b.Subject, func(ctx context.Context, event commoneventbus.Event) error {
+			handler := func(ctx context.Context, event commoneventbus.Event) error {
 				return c.handle.Execute(ctx, usecase.HandleIncomingEventInput{
 					EventID:    event.ID,
 					TenantID:   event.TenantID,
@@ -99,7 +109,13 @@ func (c *Consumer) Run(ctx context.Context, logger *slog.Logger) {
 					OccurredAt: event.OccurredAt,
 					Payload:    event.Payload,
 				})
-			})
+			}
+			var err error
+			if b.Durable != "" {
+				err = c.bus.Subscribe(ctx, b.StreamName, b.Durable, b.Subject, handler)
+			} else {
+				err = c.bus.SubscribeEphemeral(ctx, b.StreamName, b.Subject, handler)
+			}
 			if err != nil {
 				logger.WarnContext(ctx, "eventbus subject subscription ended",
 					slog.String("stream", b.StreamName), slog.String("subject", b.Subject), slog.Any("error", err))

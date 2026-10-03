@@ -480,14 +480,21 @@ type terminalPtyIDArg struct {
 	PtyID string `json:"terminal"`
 }
 
+// terminalCloseArg adds the optional close reason (MCP tools send "idle" or
+// "session_closed"; the UI sends none, which infra-fleet records as "user").
+type terminalCloseArg struct {
+	PtyID  string `json:"terminal"`
+	Reason string `json:"reason"`
+}
+
 func registerTerminalCloseChannel(r *Registry, client infrafleetv1.InfraFleetServiceClient) {
 	r.Register("terminal.close", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
-		in, err := decodeArg[terminalPtyIDArg](args, 0)
+		in, err := decodeArg[terminalCloseArg](args, 0)
 		if err != nil {
 			return nil, err
 		}
 		ctx = gatewaygrpc.AttachIdentity(ctx, usecase.Identity{TenantID: id.TenantID, UserID: id.UserID})
-		_, killErr := client.KillTerminalSession(ctx, &infrafleetv1.KillTerminalSessionRequest{PtyId: in.PtyID})
+		_, killErr := client.KillTerminalSession(ctx, &infrafleetv1.KillTerminalSessionRequest{PtyId: in.PtyID, Reason: in.Reason})
 
 		if streams := terminalStreamsFromContext(ctx); streams != nil {
 			if entry, ok := streams.remove(in.PtyID); ok {
