@@ -3399,8 +3399,11 @@ describe('web GitLab preload API', () => {
       ipcRenderer: { invoke: vi.fn() }
     }))
     const globals = installBrowserGlobals('Linux')
+    // Why desktop/: this package is the isolated web copy and has no Electron
+    // preload; the desktop package owns the preload this API must stay in
+    // parity with.
     const { glApi } = (await import(
-      new URL('../../../preload/gitlab.ts', import.meta.url).href
+      new URL('../../../../../desktop/src/preload/gitlab.ts', import.meta.url).href
     )) as {
       glApi: Record<string, unknown>
     }

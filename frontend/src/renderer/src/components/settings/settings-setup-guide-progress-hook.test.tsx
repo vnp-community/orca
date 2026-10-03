@@ -15,6 +15,7 @@ function makeProgress(): FeatureWallSetupProgress {
   return {
     ready: true,
     stepDone: {
+      'connect-dev-server': false,
       'default-agent': true,
       'add-two-repos': false,
       notifications: true,
@@ -25,7 +26,7 @@ function makeProgress(): FeatureWallSetupProgress {
       'setup-script': false
     },
     coreDoneCount: 4,
-    coreTotal: 8
+    coreTotal: 9
   }
 }
 
@@ -42,7 +43,7 @@ describe('useSettingsSetupGuideProgress', () => {
   it('uses the same setup progress path as the main sidebar', () => {
     mocks.useSetupGuideProgress.mockReturnValue(makeProgress())
 
-    expect(renderToStaticMarkup(<SettingsProgressProbe />)).toContain('4/8')
+    expect(renderToStaticMarkup(<SettingsProgressProbe />)).toContain('4/9')
     expect(mocks.useSetupGuideProgress).toHaveBeenCalledWith(true, false, false)
   })
 
@@ -50,6 +51,7 @@ describe('useSettingsSetupGuideProgress', () => {
     mocks.useSetupGuideProgress.mockReturnValue({
       ...makeProgress(),
       stepDone: {
+        'connect-dev-server': true,
         'default-agent': true,
         'add-two-repos': true,
         notifications: true,
@@ -59,16 +61,17 @@ describe('useSettingsSetupGuideProgress', () => {
         'agent-capabilities': true,
         'setup-script': true
       },
-      coreDoneCount: 8
+      coreDoneCount: 9
     })
 
-    expect(renderToStaticMarkup(<SettingsProgressProbe />)).toContain('8/8')
+    expect(renderToStaticMarkup(<SettingsProgressProbe />)).toContain('9/9')
   })
 
   it('shows browser incomplete after the browser migration has already run for fresh users', () => {
     mocks.useSetupGuideProgress.mockReturnValue({
       ...makeProgress(),
       stepDone: {
+        'connect-dev-server': true,
         'default-agent': true,
         'add-two-repos': true,
         notifications: true,
@@ -78,9 +81,9 @@ describe('useSettingsSetupGuideProgress', () => {
         'agent-capabilities': true,
         'setup-script': true
       },
-      coreDoneCount: 7
+      coreDoneCount: 8
     })
 
-    expect(renderToStaticMarkup(<SettingsProgressProbe />)).toContain('7/8')
+    expect(renderToStaticMarkup(<SettingsProgressProbe />)).toContain('8/9')
   })
 })
