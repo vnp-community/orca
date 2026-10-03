@@ -22,8 +22,9 @@ var nonJiraKeyPrefixes = map[string]struct{}{
 }
 
 // ParseLinkedJiraIssue finds the Jira issue a pull request refers to. Sources
-// are tried in priority order (head branch, title, body); in the body a key
-// after a closing keyword wins over a bare mention. Returns ("", "") if none.
+// are tried in priority order (head branch, title, body). A body only counts
+// when a closing keyword names the key: a bare "see ENG-5" is context, and
+// acting on it would move an unrelated issue. Returns ("", "") if none.
 func ParseLinkedJiraIssue(headBranch, title, body string) (provider, ref string) {
 	if key := firstJiraKey(headBranch); key != "" {
 		return linkedIssueProviderJira, key
@@ -35,9 +36,6 @@ func ParseLinkedJiraIssue(headBranch, title, body string) (provider, ref string)
 		if key := firstJiraKey(m[1]); key != "" {
 			return linkedIssueProviderJira, key
 		}
-	}
-	if key := firstJiraKey(body); key != "" {
-		return linkedIssueProviderJira, key
 	}
 	return "", ""
 }
