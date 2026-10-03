@@ -26,6 +26,9 @@ var gatewayOnlyMethods = []string{
 	"/orca.mcp.v1.McpService/GetKillState",
 }
 
+// gatewayOnlyStreamMethods are the streaming RPCs behind the same guard.
+var gatewayOnlyStreamMethods = []string{"/orca.mcp.v1.McpService/StreamEvents"}
+
 type governance struct {
 	usecases mcpgrpc.GovernanceUsecases
 	expire   *usecase.ExpireApprovals

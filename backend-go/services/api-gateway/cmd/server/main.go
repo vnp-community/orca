@@ -281,6 +281,7 @@ func run() error {
 	authValidator.McpPrincipals = mcpPrincipalResolver
 	mcpMetrics := newMCPMetrics()
 	mcpPrincipalResolver.OnResolve = mcpMetrics.ObservePrincipalResolve
+	mcpPrincipalResolver.InternalToken = os.Getenv("AUTH_MCP_PRINCIPAL_CALLER_TOKEN")
 	if cfg.MCP.Enabled && cfg.MCP.ResourceURL() != "" {
 		authValidator.RejectAudiences = []string{cfg.MCP.ResourceURL()}
 	}
@@ -418,10 +419,17 @@ func run() error {
 		// Terminal/agent tools (BE-MCP-SOL-009): resolve worktree hosts like the
 		// UI, stop their PTYs when the MCP session ends (hook + durable reaper).
 		toolStack.setWorktreeTargets(wscompat.WorktreeTargetResolver{Project: projectClient, Infra: infraFleetClient})
+		var terminalPub terminalEventPublisher // stays a nil interface when NATS is down
+		if pub != nil {
+			terminalPub = pub
+		}
+		toolStack.wireTerminalOperations(mcpMetrics, infraFleetClient, terminalPub, logger)
 		defer toolStack.Executor.Close()
 		mcpToolOpts, mcpToolCatalog = append(mcpToolOpts, withMCPTools(toolStack), withMCPSessionClosed(toolStack)), toolStack.Catalog
 		if natsErr == nil {
 			go runMCPSessionReaper(ctx, toolStack, natsConsumer, logger)
+			// tools/list_changed needs the event bus: advertise it only here.
+			mcpToolOpts = append(mcpToolOpts, withMCPToolsListChanged())
 		}
 		var mcpBus resources.EphemeralSubscriber // stays a nil interface when NATS is down
 		if natsErr == nil {
@@ -455,6 +463,10 @@ func run() error {
 	}
 	if mcpHandler != nil && mcpResPrompts != nil && natsErr == nil {
 		go mcpResPrompts.watchPromptChanges(ctx, natsConsumer, mcpHandler, logger)
+	}
+	if mcpHandler != nil && mcpToolCatalog != nil && natsErr == nil {
+		cache, _ := mcpToolCatalog.(toolCacheInvalidator)
+		go watchToolsChanged(ctx, natsConsumer, cache, mcpHandler, logger)
 	}
 
 	// workspace.subscribe (TASK-PW-04-07, SOL-PW-04): bridges task-service's

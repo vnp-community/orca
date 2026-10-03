@@ -27,3 +27,11 @@ type McpTokenRepository interface {
 	// TouchMcpTokenLastUsed sets last_used_at when it is NULL or older than staleBefore.
 	TouchMcpTokenLastUsed(ctx context.Context, tenantID, jti string, at, staleBefore time.Time) error
 }
+
+// McpPatSuspensionRepository holds the tenant-level "all PATs suspended" flag
+// set by the MCP kill switch. Suspending is reversible and leaves tokens intact.
+type McpPatSuspensionRepository interface {
+	// SetMcpPatSuspension is idempotent in both directions.
+	SetMcpPatSuspension(ctx context.Context, tenantID string, suspended bool, reason string, at time.Time) error
+	IsMcpPatSuspended(ctx context.Context, tenantID string) (bool, error)
+}

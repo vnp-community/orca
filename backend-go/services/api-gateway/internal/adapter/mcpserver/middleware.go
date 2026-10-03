@@ -115,7 +115,7 @@ func (h *Handler) authenticate(next http.Handler) http.Handler {
 			h.rec.AuthFailure("insufficient_scope")
 			h.challenge(w, http.StatusForbidden, "insufficient_scope")
 		default: // includes a "successful" verify with no tenant/user: fail closed
-			h.rec.AuthFailure("invalid_token")
+			h.rec.AuthFailure(invalidTokenReason(err))
 			h.challenge(w, http.StatusUnauthorized, "invalid_token")
 		}
 	})

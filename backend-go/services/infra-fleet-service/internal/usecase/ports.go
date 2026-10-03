@@ -1142,3 +1142,19 @@ type QueuedPromptRepository interface {
 type LifecycleEventPublisher interface {
 	PublishAgentLifecycle(ctx context.Context, tenantID, subject string, payload eventbus.AgentLifecyclePayload) error
 }
+
+// AgentSessionOriginFilter selects agent sessions by who created them. At
+// least one of OriginType / OriginSessionID must be set.
+type AgentSessionOriginFilter struct {
+	OriginType      string
+	OriginSessionID string
+	ActiveOnly      bool // spawning|running|idle|waiting only
+	Limit           int
+}
+
+// AgentSessionOriginLister lists a tenant's agent sessions by origin (the
+// durable MCP reaper's lookup). Separate from AgentSessionRepository so the
+// many fakes of that interface stay untouched.
+type AgentSessionOriginLister interface {
+	ListByOrigin(ctx context.Context, tenantID string, f AgentSessionOriginFilter) ([]domain.AgentSession, error)
+}

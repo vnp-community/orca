@@ -108,3 +108,31 @@ func (r *Repository) TouchMcpTokenLastUsed(ctx context.Context, tenantID, jti st
 }
 
 var _ usecase.McpTokenRepository = (*Repository)(nil)
+
+func (r *Repository) SetMcpPatSuspension(ctx context.Context, tenantID string, suspended bool, reason string, at time.Time) error {
+	var err error
+	if suspended {
+		_, err = r.db.ExecContext(ctx, `INSERT INTO mcp_pat_suspensions (tenant_id, suspended_at, reason) VALUES (?, ?, ?)
+			ON DUPLICATE KEY UPDATE suspended_at = VALUES(suspended_at), reason = VALUES(reason)`, tenantID, at, reason)
+	} else {
+		_, err = r.db.ExecContext(ctx, `DELETE FROM mcp_pat_suspensions WHERE tenant_id = ?`, tenantID)
+	}
+	if err != nil {
+		return fmt.Errorf("mysql: set mcp pat suspension: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) IsMcpPatSuspended(ctx context.Context, tenantID string) (bool, error) {
+	var one int
+	err := r.db.QueryRowContext(ctx, `SELECT 1 FROM mcp_pat_suspensions WHERE tenant_id = ?`, tenantID).Scan(&one)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("mysql: read mcp pat suspension: %w", err)
+	}
+	return true, nil
+}
+
+var _ usecase.McpPatSuspensionRepository = (*Repository)(nil)

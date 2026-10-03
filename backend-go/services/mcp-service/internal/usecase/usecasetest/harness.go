@@ -49,6 +49,28 @@ func (r *RecordingRevoker) RevokeGrantTokens(_ context.Context, grantID, _ strin
 	return nil
 }
 
+// RecordingPatSuspender mirrors auth-service's per-tenant PAT suspension flag.
+type RecordingPatSuspender struct {
+	mu        sync.Mutex
+	Suspended map[string]bool
+	Calls     int
+	Err       error
+}
+
+func (r *RecordingPatSuspender) SetPatSuspension(_ context.Context, tenantID string, suspended bool, _ string) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.Calls++
+	if r.Err != nil {
+		return r.Err
+	}
+	if r.Suspended == nil {
+		r.Suspended = map[string]bool{}
+	}
+	r.Suspended[tenantID] = suspended
+	return nil
+}
+
 // RecordingCanceller records cancelled call ids.
 type RecordingCanceller struct {
 	mu        sync.Mutex
@@ -70,6 +92,7 @@ type Harness struct {
 	Core      *usecase.GovernanceCore
 	Clients   *FakeClients
 	Revoker   *RecordingRevoker
+	Pats      *RecordingPatSuspender
 	Canceller *RecordingCanceller
 	Cfg       usecase.GovernanceConfig
 
@@ -105,7 +128,7 @@ func NewHarness(tenantDefaultEnabled bool) *Harness {
 
 func NewHarnessWithEngine(tenantDefaultEnabled bool, clock *Clock, engine usecase.PolicyEngine) *Harness {
 	h := &Harness{Clock: clock, Store: NewMemStore(clock), Engine: engine, Clients: &FakeClients{Statuses: map[string]string{"c1": "allowed"}},
-		Revoker: &RecordingRevoker{}, Canceller: &RecordingCanceller{}, Cfg: usecase.DefaultGovernanceConfig()}
+		Revoker: &RecordingRevoker{}, Pats: &RecordingPatSuspender{}, Canceller: &RecordingCanceller{}, Cfg: usecase.DefaultGovernanceConfig()}
 	defaults := usecase.Defaults{TenantEnabled: tenantDefaultEnabled, MaxTokenDays: 90}
 	log := slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: slog.LevelError}))
 	h.Cfg.PolicyCacheTTL = 0 // tests change state between calls; no cache
@@ -123,7 +146,7 @@ func NewHarnessWithEngine(tenantDefaultEnabled bool, clock *Clock, engine usecas
 	h.KillAdmin = usecase.NewKillSwitchAdmin(h.Store, h.Clients, h.Core, red, clock)
 	h.KillState = usecase.NewGetKillState(h.Core)
 	h.Expire = usecase.NewExpireApprovals(h.Store, clock)
-	h.Cleanup = usecase.NewKillSwitchCleanup(h.Store, h.Store, h.Store, h.Revoker, h.Canceller, clock, log)
+	h.Cleanup = usecase.NewKillSwitchCleanup(h.Store, h.Store, h.Store, h.Revoker, h.Canceller, clock, log).WithPatSuspender(h.Pats)
 	h.Maint = usecase.NewToolCallMaintenance(h.Store, h.Canceller, h.Cfg, 0, clock)
 	return h
 }

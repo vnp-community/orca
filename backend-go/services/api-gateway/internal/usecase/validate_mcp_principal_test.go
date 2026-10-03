@@ -174,3 +174,33 @@ func TestValidate_MCPTokenUseRejectedEvenWithoutConfiguredAudience(t *testing.T)
 		t.Fatalf("got %v", err)
 	}
 }
+
+func TestValidateMCP_RejectionReasons(t *testing.T) {
+	cases := []struct {
+		name   string
+		mutate func(*jwtauth.Claims)
+		res    McpResolveResult
+		want   string
+	}{
+		{"expired", func(c *jwtauth.Claims) {
+			c.IssuedAt = jwt.NewNumericDate(time.Now().Add(-2 * time.Hour))
+			c.Expiry = jwt.NewNumericDate(time.Now().Add(-time.Hour))
+		}, McpResolveResult{Active: true, Role: "user"}, McpReasonExpired},
+		{"audience", func(c *jwtauth.Claims) { c.Audience = nil }, McpResolveResult{Active: true, Role: "user"}, McpReasonAudience},
+		{"revoked", nil, McpResolveResult{InactiveReason: "revoked"}, McpReasonRevoked},
+		{"grant revoked", nil, McpResolveResult{InactiveReason: "grant_revoked"}, McpReasonRevoked},
+		{"suspended", nil, McpResolveResult{InactiveReason: "suspended"}, McpReasonKillSwitch},
+		{"user inactive", nil, McpResolveResult{InactiveReason: "user_inactive"}, ""},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			tok, jwks := mcpToken(t, c.mutate)
+			v := NewAuthValidator(jwks)
+			v.McpPrincipals = &fakeMcpResolver{res: c.res}
+			_, err := v.ValidateMCP(mcpRequest("Bearer "+tok), testMCPResource)
+			if err == nil || McpRejectionReason(err) != c.want {
+				t.Fatalf("err=%v reason=%q want %q", err, McpRejectionReason(err), c.want)
+			}
+		})
+	}
+}

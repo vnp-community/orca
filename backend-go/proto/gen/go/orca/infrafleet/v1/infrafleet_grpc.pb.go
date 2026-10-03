@@ -107,6 +107,7 @@ const (
 	InfraFleetService_KillAgentSession_FullMethodName                  = "/orca.infrafleet.v1.InfraFleetService/KillAgentSession"
 	InfraFleetService_ResumeAgentSession_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/ResumeAgentSession"
 	InfraFleetService_SwitchAgentAccount_FullMethodName                = "/orca.infrafleet.v1.InfraFleetService/SwitchAgentAccount"
+	InfraFleetService_ListAgentSessions_FullMethodName                 = "/orca.infrafleet.v1.InfraFleetService/ListAgentSessions"
 	InfraFleetService_ListEphemeralVmRuntimes_FullMethodName           = "/orca.infrafleet.v1.InfraFleetService/ListEphemeralVmRuntimes"
 	InfraFleetService_AttachEphemeralVmWorkspace_FullMethodName        = "/orca.infrafleet.v1.InfraFleetService/AttachEphemeralVmWorkspace"
 	InfraFleetService_SuspendEphemeralVmWorkspace_FullMethodName       = "/orca.infrafleet.v1.InfraFleetService/SuspendEphemeralVmWorkspace"
@@ -412,6 +413,11 @@ type InfraFleetServiceClient interface {
 	// resolve a replacement account excluding the one just switched away
 	// from, then resume/start with the new account.
 	SwitchAgentAccount(ctx context.Context, in *SwitchAgentAccountRequest, opts ...grpc.CallOption) (*AgentSession, error)
+	// ListAgentSessions lists the caller tenant's agent sessions by origin so
+	// api-gateway's durable MCP reaper can stop the agents of a closed MCP
+	// session even when the replica that started them is gone. At least one
+	// origin filter is required: this is not a general listing.
+	ListAgentSessions(ctx context.Context, in *ListAgentSessionsRequest, opts ...grpc.CallOption) (*ListAgentSessionsResponse, error)
 	// ListEphemeralVmRuntimes is a plain tenant-scoped Postgres read (no
 	// relay) of every non-destroyed ephemeral_vm_runtimes row — SOL-004
 	// Group 1's second read. Written to by EphemeralVmRelay (TASK-004).
@@ -1379,6 +1385,16 @@ func (c *infraFleetServiceClient) SwitchAgentAccount(ctx context.Context, in *Sw
 	return out, nil
 }
 
+func (c *infraFleetServiceClient) ListAgentSessions(ctx context.Context, in *ListAgentSessionsRequest, opts ...grpc.CallOption) (*ListAgentSessionsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAgentSessionsResponse)
+	err := c.cc.Invoke(ctx, InfraFleetService_ListAgentSessions_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *infraFleetServiceClient) ListEphemeralVmRuntimes(ctx context.Context, in *ListEphemeralVmRuntimesRequest, opts ...grpc.CallOption) (*ListEphemeralVmRuntimesResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(ListEphemeralVmRuntimesResponse)
@@ -1745,6 +1761,11 @@ type InfraFleetServiceServer interface {
 	// resolve a replacement account excluding the one just switched away
 	// from, then resume/start with the new account.
 	SwitchAgentAccount(context.Context, *SwitchAgentAccountRequest) (*AgentSession, error)
+	// ListAgentSessions lists the caller tenant's agent sessions by origin so
+	// api-gateway's durable MCP reaper can stop the agents of a closed MCP
+	// session even when the replica that started them is gone. At least one
+	// origin filter is required: this is not a general listing.
+	ListAgentSessions(context.Context, *ListAgentSessionsRequest) (*ListAgentSessionsResponse, error)
 	// ListEphemeralVmRuntimes is a plain tenant-scoped Postgres read (no
 	// relay) of every non-destroyed ephemeral_vm_runtimes row — SOL-004
 	// Group 1's second read. Written to by EphemeralVmRelay (TASK-004).
@@ -2042,6 +2063,9 @@ func (UnimplementedInfraFleetServiceServer) ResumeAgentSession(context.Context, 
 }
 func (UnimplementedInfraFleetServiceServer) SwitchAgentAccount(context.Context, *SwitchAgentAccountRequest) (*AgentSession, error) {
 	return nil, status.Error(codes.Unimplemented, "method SwitchAgentAccount not implemented")
+}
+func (UnimplementedInfraFleetServiceServer) ListAgentSessions(context.Context, *ListAgentSessionsRequest) (*ListAgentSessionsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAgentSessions not implemented")
 }
 func (UnimplementedInfraFleetServiceServer) ListEphemeralVmRuntimes(context.Context, *ListEphemeralVmRuntimesRequest) (*ListEphemeralVmRuntimesResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListEphemeralVmRuntimes not implemented")
@@ -3584,6 +3608,24 @@ func _InfraFleetService_SwitchAgentAccount_Handler(srv interface{}, ctx context.
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InfraFleetService_ListAgentSessions_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAgentSessionsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InfraFleetServiceServer).ListAgentSessions(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InfraFleetService_ListAgentSessions_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InfraFleetServiceServer).ListAgentSessions(ctx, req.(*ListAgentSessionsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _InfraFleetService_ListEphemeralVmRuntimes_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(ListEphemeralVmRuntimesRequest)
 	if err := dec(in); err != nil {
@@ -4007,6 +4049,10 @@ var InfraFleetService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SwitchAgentAccount",
 			Handler:    _InfraFleetService_SwitchAgentAccount_Handler,
+		},
+		{
+			MethodName: "ListAgentSessions",
+			Handler:    _InfraFleetService_ListAgentSessions_Handler,
 		},
 		{
 			MethodName: "ListEphemeralVmRuntimes",

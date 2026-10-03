@@ -11,6 +11,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
 // AgentSessionStore implements usecase.AgentSessionRepository against
@@ -193,3 +194,30 @@ func scanAgentSession(row pgx.Row) (domain.AgentSession, error) {
 	s.StoppedAt = stoppedAt
 	return s, nil
 }
+
+// ListByOrigin returns a tenant's agent sessions created by the given origin,
+// newest first. Served by idx_infra_agent_sessions_origin_mcp for MCP lookups.
+func (s *AgentSessionStore) ListByOrigin(ctx context.Context, tenantID string, f usecase.AgentSessionOriginFilter) ([]domain.AgentSession, error) {
+	rows, err := s.pool.Query(ctx, agentSessionSelect+`
+		WHERE tenant_id = $1
+		  AND ($2 = '' OR origin_type = $2)
+		  AND ($3 = '' OR origin_mcp_session_id = $3)
+		  AND (NOT $4::bool OR status IN ('spawning','running','idle','waiting'))
+		ORDER BY started_at DESC, id
+		LIMIT $5`, tenantID, f.OriginType, f.OriginSessionID, f.ActiveOnly, f.Limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list agent sessions by origin: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.AgentSession
+	for rows.Next() {
+		sess, err := scanAgentSession(rows)
+		if err != nil {
+			return nil, fmt.Errorf("postgres: scan agent session: %w", err)
+		}
+		out = append(out, sess)
+	}
+	return out, rows.Err()
+}
+
+var _ usecase.AgentSessionOriginLister = (*AgentSessionStore)(nil)

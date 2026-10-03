@@ -23,6 +23,9 @@ type OAuthConfig struct {
 	DCRMaxClients   int
 	// InternalCallerToken guards the mcp-service-only RPCs.
 	InternalCallerToken string
+	// McpPrincipalCallerToken (optional) guards ResolveMcpPrincipal, which only
+	// api-gateway calls. Empty keeps the RPC open (rollout-safe default).
+	McpPrincipalCallerToken string
 }
 
 const maxOAuthAccessTokenTTL = 15 * time.Minute
@@ -54,7 +57,8 @@ func LoadOAuth() (OAuthConfig, error) {
 	cfg := OAuthConfig{
 		Enabled: true, ResourceURL: resource, AccessTokenTTL: access, RefreshTokenTTL: refresh, AuthCodeTTL: code,
 		DCREnabled: boolEnv("OAUTH_DCR_ENABLED", true), DCRMaxClients: maxClients,
-		InternalCallerToken: commonconfig.StringEnv("OAUTH_INTERNAL_CALLER_TOKEN", ""),
+		InternalCallerToken:     commonconfig.StringEnv("OAUTH_INTERNAL_CALLER_TOKEN", ""),
+		McpPrincipalCallerToken: commonconfig.StringEnv("AUTH_MCP_PRINCIPAL_CALLER_TOKEN", ""),
 	}
 	return cfg, cfg.Validate()
 }

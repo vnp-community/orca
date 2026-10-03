@@ -5947,10 +5947,62 @@ func (x *ResolveMcpPrincipalRequest) GetClientId() string {
 	return ""
 }
 
+type SetMcpPatSuspensionRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Suspended     bool                   `protobuf:"varint,1,opt,name=suspended,proto3" json:"suspended,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"` // already redacted by the caller; stored for support only
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetMcpPatSuspensionRequest) Reset() {
+	*x = SetMcpPatSuspensionRequest{}
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[98]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetMcpPatSuspensionRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetMcpPatSuspensionRequest) ProtoMessage() {}
+
+func (x *SetMcpPatSuspensionRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[98]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetMcpPatSuspensionRequest.ProtoReflect.Descriptor instead.
+func (*SetMcpPatSuspensionRequest) Descriptor() ([]byte, []int) {
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{98}
+}
+
+func (x *SetMcpPatSuspensionRequest) GetSuspended() bool {
+	if x != nil {
+		return x.Suspended
+	}
+	return false
+}
+
+func (x *SetMcpPatSuspensionRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
 type ResolveMcpPrincipalResponse struct {
 	state  protoimpl.MessageState `protogen:"open.v1"`
 	Active bool                   `protobuf:"varint,1,opt,name=active,proto3" json:"active,omitempty"`
-	// revoked|expired|user_inactive|client_blocked|grant_revoked|unknown_token
+	// revoked|expired|user_inactive|client_blocked|grant_revoked|unknown_token|suspended
 	InactiveReason string `protobuf:"bytes,2,opt,name=inactive_reason,json=inactiveReason,proto3" json:"inactive_reason,omitempty"`
 	Role           string `protobuf:"bytes,3,opt,name=role,proto3" json:"role,omitempty"` // "admin" | "user", read live from auth.users
 	unknownFields  protoimpl.UnknownFields
@@ -5959,7 +6011,7 @@ type ResolveMcpPrincipalResponse struct {
 
 func (x *ResolveMcpPrincipalResponse) Reset() {
 	*x = ResolveMcpPrincipalResponse{}
-	mi := &file_orca_auth_v1_auth_proto_msgTypes[98]
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[99]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -5971,7 +6023,7 @@ func (x *ResolveMcpPrincipalResponse) String() string {
 func (*ResolveMcpPrincipalResponse) ProtoMessage() {}
 
 func (x *ResolveMcpPrincipalResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_orca_auth_v1_auth_proto_msgTypes[98]
+	mi := &file_orca_auth_v1_auth_proto_msgTypes[99]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -5984,7 +6036,7 @@ func (x *ResolveMcpPrincipalResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ResolveMcpPrincipalResponse.ProtoReflect.Descriptor instead.
 func (*ResolveMcpPrincipalResponse) Descriptor() ([]byte, []int) {
-	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{98}
+	return file_orca_auth_v1_auth_proto_rawDescGZIP(), []int{99}
 }
 
 func (x *ResolveMcpPrincipalResponse) GetActive() bool {
@@ -6442,7 +6494,10 @@ const file_orca_auth_v1_auth_proto_rawDesc = "" +
 	"\ttoken_use\x18\x04 \x01(\tR\btokenUse\x12\x1b\n" +
 	"\tfamily_id\x18\x05 \x01(\tR\bfamilyId\x12\x19\n" +
 	"\bgrant_id\x18\x06 \x01(\tR\agrantId\x12\x1b\n" +
-	"\tclient_id\x18\a \x01(\tR\bclientId\"r\n" +
+	"\tclient_id\x18\a \x01(\tR\bclientId\"R\n" +
+	"\x1aSetMcpPatSuspensionRequest\x12\x1c\n" +
+	"\tsuspended\x18\x01 \x01(\bR\tsuspended\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\"r\n" +
 	"\x1bResolveMcpPrincipalResponse\x12\x16\n" +
 	"\x06active\x18\x01 \x01(\bR\x06active\x12'\n" +
 	"\x0finactive_reason\x18\x02 \x01(\tR\x0einactiveReason\x12\x12\n" +
@@ -6455,7 +6510,7 @@ const file_orca_auth_v1_auth_proto_rawDesc = "" +
 	"\n" +
 	"AuditOrder\x12\x16\n" +
 	"\x12AUDIT_ORDER_ID_ASC\x10\x00\x12\x19\n" +
-	"\x15AUDIT_ORDER_TIME_DESC\x10\x012\x94&\n" +
+	"\x15AUDIT_ORDER_TIME_DESC\x10\x012\xed&\n" +
 	"\vAuthService\x12@\n" +
 	"\x05Login\x12\x1a.orca.auth.v1.LoginRequest\x1a\x1b.orca.auth.v1.LoginResponse\x12C\n" +
 	"\x06Logout\x12\x1b.orca.auth.v1.LogoutRequest\x1a\x1c.orca.auth.v1.LogoutResponse\x12^\n" +
@@ -6509,7 +6564,8 @@ const file_orca_auth_v1_auth_proto_rawDesc = "" +
 	"\rIssueMcpToken\x12\".orca.auth.v1.IssueMcpTokenRequest\x1a#.orca.auth.v1.IssueMcpTokenResponse\x12L\n" +
 	"\rListMcpTokens\x12\x16.google.protobuf.Empty\x1a#.orca.auth.v1.ListMcpTokensResponse\x12M\n" +
 	"\x0eRevokeMcpToken\x12#.orca.auth.v1.RevokeMcpTokenRequest\x1a\x16.google.protobuf.Empty\x12j\n" +
-	"\x13ResolveMcpPrincipal\x12(.orca.auth.v1.ResolveMcpPrincipalRequest\x1a).orca.auth.v1.ResolveMcpPrincipalResponseB>Z<github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1;authv1b\x06proto3"
+	"\x13ResolveMcpPrincipal\x12(.orca.auth.v1.ResolveMcpPrincipalRequest\x1a).orca.auth.v1.ResolveMcpPrincipalResponse\x12W\n" +
+	"\x13SetMcpPatSuspension\x12(.orca.auth.v1.SetMcpPatSuspensionRequest\x1a\x16.google.protobuf.EmptyB>Z<github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1;authv1b\x06proto3"
 
 var (
 	file_orca_auth_v1_auth_proto_rawDescOnce sync.Once
@@ -6524,7 +6580,7 @@ func file_orca_auth_v1_auth_proto_rawDescGZIP() []byte {
 }
 
 var file_orca_auth_v1_auth_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_orca_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 99)
+var file_orca_auth_v1_auth_proto_msgTypes = make([]protoimpl.MessageInfo, 100)
 var file_orca_auth_v1_auth_proto_goTypes = []any{
 	(Role)(0),                                     // 0: orca.auth.v1.Role
 	(AuditOrder)(0),                               // 1: orca.auth.v1.AuditOrder
@@ -6626,20 +6682,21 @@ var file_orca_auth_v1_auth_proto_goTypes = []any{
 	(*ListMcpTokensResponse)(nil),                 // 97: orca.auth.v1.ListMcpTokensResponse
 	(*RevokeMcpTokenRequest)(nil),                 // 98: orca.auth.v1.RevokeMcpTokenRequest
 	(*ResolveMcpPrincipalRequest)(nil),            // 99: orca.auth.v1.ResolveMcpPrincipalRequest
-	(*ResolveMcpPrincipalResponse)(nil),           // 100: orca.auth.v1.ResolveMcpPrincipalResponse
-	(*timestamppb.Timestamp)(nil),                 // 101: google.protobuf.Timestamp
-	(*wrapperspb.StringValue)(nil),                // 102: google.protobuf.StringValue
-	(*emptypb.Empty)(nil),                         // 103: google.protobuf.Empty
+	(*SetMcpPatSuspensionRequest)(nil),            // 100: orca.auth.v1.SetMcpPatSuspensionRequest
+	(*ResolveMcpPrincipalResponse)(nil),           // 101: orca.auth.v1.ResolveMcpPrincipalResponse
+	(*timestamppb.Timestamp)(nil),                 // 102: google.protobuf.Timestamp
+	(*wrapperspb.StringValue)(nil),                // 103: google.protobuf.StringValue
+	(*emptypb.Empty)(nil),                         // 104: google.protobuf.Empty
 }
 var file_orca_auth_v1_auth_proto_depIdxs = []int32{
 	0,   // 0: orca.auth.v1.User.role:type_name -> orca.auth.v1.Role
-	101, // 1: orca.auth.v1.User.created_at:type_name -> google.protobuf.Timestamp
+	102, // 1: orca.auth.v1.User.created_at:type_name -> google.protobuf.Timestamp
 	2,   // 2: orca.auth.v1.LoginResponse.user:type_name -> orca.auth.v1.User
 	2,   // 3: orca.auth.v1.ValidateSessionResponse.user:type_name -> orca.auth.v1.User
-	101, // 4: orca.auth.v1.IssueServiceTokenResponse.expires_at:type_name -> google.protobuf.Timestamp
-	101, // 5: orca.auth.v1.CliToken.issued_at:type_name -> google.protobuf.Timestamp
-	101, // 6: orca.auth.v1.CliToken.expires_at:type_name -> google.protobuf.Timestamp
-	101, // 7: orca.auth.v1.CliToken.revoked_at:type_name -> google.protobuf.Timestamp
+	102, // 4: orca.auth.v1.IssueServiceTokenResponse.expires_at:type_name -> google.protobuf.Timestamp
+	102, // 5: orca.auth.v1.CliToken.issued_at:type_name -> google.protobuf.Timestamp
+	102, // 6: orca.auth.v1.CliToken.expires_at:type_name -> google.protobuf.Timestamp
+	102, // 7: orca.auth.v1.CliToken.revoked_at:type_name -> google.protobuf.Timestamp
 	15,  // 8: orca.auth.v1.ListCliTokensResponse.tokens:type_name -> orca.auth.v1.CliToken
 	0,   // 9: orca.auth.v1.CreateUserRequest.role:type_name -> orca.auth.v1.Role
 	2,   // 10: orca.auth.v1.CreateUserResponse.user:type_name -> orca.auth.v1.User
@@ -6647,43 +6704,43 @@ var file_orca_auth_v1_auth_proto_depIdxs = []int32{
 	24,  // 12: orca.auth.v1.ListTenantMemberDirectoryResponse.members:type_name -> orca.auth.v1.TenantMemberDirectoryEntry
 	0,   // 13: orca.auth.v1.UpdateUserRoleRequest.role:type_name -> orca.auth.v1.Role
 	2,   // 14: orca.auth.v1.UpdateUserRoleResponse.user:type_name -> orca.auth.v1.User
-	101, // 15: orca.auth.v1.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
-	101, // 16: orca.auth.v1.QueryAuditLogRequest.since:type_name -> google.protobuf.Timestamp
-	101, // 17: orca.auth.v1.QueryAuditLogRequest.to:type_name -> google.protobuf.Timestamp
+	102, // 15: orca.auth.v1.AuditEntry.occurred_at:type_name -> google.protobuf.Timestamp
+	102, // 16: orca.auth.v1.QueryAuditLogRequest.since:type_name -> google.protobuf.Timestamp
+	102, // 17: orca.auth.v1.QueryAuditLogRequest.to:type_name -> google.protobuf.Timestamp
 	33,  // 18: orca.auth.v1.QueryAuditLogRequest.metadata_filters:type_name -> orca.auth.v1.AuditMetadataFilter
 	1,   // 19: orca.auth.v1.QueryAuditLogRequest.order:type_name -> orca.auth.v1.AuditOrder
 	30,  // 20: orca.auth.v1.QueryAuditLogResponse.entries:type_name -> orca.auth.v1.AuditEntry
 	2,   // 21: orca.auth.v1.DeactivateUserResponse.user:type_name -> orca.auth.v1.User
 	2,   // 22: orca.auth.v1.ReactivateUserResponse.user:type_name -> orca.auth.v1.User
 	41,  // 23: orca.auth.v1.ListSessionsForUserResponse.sessions:type_name -> orca.auth.v1.Session
-	101, // 24: orca.auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
-	101, // 25: orca.auth.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
-	101, // 26: orca.auth.v1.Session.last_seen_at:type_name -> google.protobuf.Timestamp
-	101, // 27: orca.auth.v1.AccessPolicy.updated_at:type_name -> google.protobuf.Timestamp
+	102, // 24: orca.auth.v1.Session.created_at:type_name -> google.protobuf.Timestamp
+	102, // 25: orca.auth.v1.Session.expires_at:type_name -> google.protobuf.Timestamp
+	102, // 26: orca.auth.v1.Session.last_seen_at:type_name -> google.protobuf.Timestamp
+	102, // 27: orca.auth.v1.AccessPolicy.updated_at:type_name -> google.protobuf.Timestamp
 	45,  // 28: orca.auth.v1.ListAccessPoliciesResponse.policies:type_name -> orca.auth.v1.AccessPolicy
 	56,  // 29: orca.auth.v1.ListSessionsResponse.sessions:type_name -> orca.auth.v1.SessionWithUser
 	41,  // 30: orca.auth.v1.SessionWithUser.session:type_name -> orca.auth.v1.Session
-	102, // 31: orca.auth.v1.UpdateUserRequest.email:type_name -> google.protobuf.StringValue
-	102, // 32: orca.auth.v1.UpdateUserRequest.name:type_name -> google.protobuf.StringValue
+	103, // 31: orca.auth.v1.UpdateUserRequest.email:type_name -> google.protobuf.StringValue
+	103, // 32: orca.auth.v1.UpdateUserRequest.name:type_name -> google.protobuf.StringValue
 	0,   // 33: orca.auth.v1.UpdateUserRequest.role:type_name -> orca.auth.v1.Role
 	2,   // 34: orca.auth.v1.UpdateUserResponse.user:type_name -> orca.auth.v1.User
 	65,  // 35: orca.auth.v1.ListPairedDevicesResponse.devices:type_name -> orca.auth.v1.PairedDevice
 	2,   // 36: orca.auth.v1.CompleteSsoLoginResponse.user:type_name -> orca.auth.v1.User
-	101, // 37: orca.auth.v1.RefreshSessionResponse.expires_at:type_name -> google.protobuf.Timestamp
+	102, // 37: orca.auth.v1.RefreshSessionResponse.expires_at:type_name -> google.protobuf.Timestamp
 	0,   // 38: orca.auth.v1.SsoGroupRoleMapping.role:type_name -> orca.auth.v1.Role
-	101, // 39: orca.auth.v1.SsoGroupRoleMapping.created_at:type_name -> google.protobuf.Timestamp
+	102, // 39: orca.auth.v1.SsoGroupRoleMapping.created_at:type_name -> google.protobuf.Timestamp
 	0,   // 40: orca.auth.v1.UpdateSsoGroupMappingRequest.role:type_name -> orca.auth.v1.Role
 	75,  // 41: orca.auth.v1.UpdateSsoGroupMappingResponse.mapping:type_name -> orca.auth.v1.SsoGroupRoleMapping
 	75,  // 42: orca.auth.v1.ListSsoGroupMappingResponse.mappings:type_name -> orca.auth.v1.SsoGroupRoleMapping
-	101, // 43: orca.auth.v1.OAuthIssueAuthCodeResponse.expires_at:type_name -> google.protobuf.Timestamp
-	101, // 44: orca.auth.v1.OAuthClientTenantView.created_at:type_name -> google.protobuf.Timestamp
-	101, // 45: orca.auth.v1.OAuthClientTenantView.last_used_at:type_name -> google.protobuf.Timestamp
-	101, // 46: orca.auth.v1.OAuthClientTenantView.status_updated_at:type_name -> google.protobuf.Timestamp
+	102, // 43: orca.auth.v1.OAuthIssueAuthCodeResponse.expires_at:type_name -> google.protobuf.Timestamp
+	102, // 44: orca.auth.v1.OAuthClientTenantView.created_at:type_name -> google.protobuf.Timestamp
+	102, // 45: orca.auth.v1.OAuthClientTenantView.last_used_at:type_name -> google.protobuf.Timestamp
+	102, // 46: orca.auth.v1.OAuthClientTenantView.status_updated_at:type_name -> google.protobuf.Timestamp
 	90,  // 47: orca.auth.v1.OAuthListClientsResponse.clients:type_name -> orca.auth.v1.OAuthClientTenantView
-	101, // 48: orca.auth.v1.McpTokenInfo.created_at:type_name -> google.protobuf.Timestamp
-	101, // 49: orca.auth.v1.McpTokenInfo.expires_at:type_name -> google.protobuf.Timestamp
-	101, // 50: orca.auth.v1.McpTokenInfo.last_used_at:type_name -> google.protobuf.Timestamp
-	101, // 51: orca.auth.v1.McpTokenInfo.revoked_at:type_name -> google.protobuf.Timestamp
+	102, // 48: orca.auth.v1.McpTokenInfo.created_at:type_name -> google.protobuf.Timestamp
+	102, // 49: orca.auth.v1.McpTokenInfo.expires_at:type_name -> google.protobuf.Timestamp
+	102, // 50: orca.auth.v1.McpTokenInfo.last_used_at:type_name -> google.protobuf.Timestamp
+	102, // 51: orca.auth.v1.McpTokenInfo.revoked_at:type_name -> google.protobuf.Timestamp
 	94,  // 52: orca.auth.v1.IssueMcpTokenResponse.token:type_name -> orca.auth.v1.McpTokenInfo
 	94,  // 53: orca.auth.v1.ListMcpTokensResponse.tokens:type_name -> orca.auth.v1.McpTokenInfo
 	3,   // 54: orca.auth.v1.AuthService.Login:input_type -> orca.auth.v1.LoginRequest
@@ -6730,66 +6787,68 @@ var file_orca_auth_v1_auth_proto_depIdxs = []int32{
 	86,  // 95: orca.auth.v1.AuthService.OAuthExchangeToken:input_type -> orca.auth.v1.OAuthExchangeTokenRequest
 	88,  // 96: orca.auth.v1.AuthService.OAuthRevokeToken:input_type -> orca.auth.v1.OAuthRevokeTokenRequest
 	89,  // 97: orca.auth.v1.AuthService.OAuthRevokeGrant:input_type -> orca.auth.v1.OAuthRevokeGrantRequest
-	103, // 98: orca.auth.v1.AuthService.OAuthListClientsForTenant:input_type -> google.protobuf.Empty
+	104, // 98: orca.auth.v1.AuthService.OAuthListClientsForTenant:input_type -> google.protobuf.Empty
 	92,  // 99: orca.auth.v1.AuthService.OAuthSetClientStatus:input_type -> orca.auth.v1.OAuthSetClientStatusRequest
 	93,  // 100: orca.auth.v1.AuthService.OAuthEnsureClientForTenant:input_type -> orca.auth.v1.OAuthEnsureClientForTenantRequest
 	95,  // 101: orca.auth.v1.AuthService.IssueMcpToken:input_type -> orca.auth.v1.IssueMcpTokenRequest
-	103, // 102: orca.auth.v1.AuthService.ListMcpTokens:input_type -> google.protobuf.Empty
+	104, // 102: orca.auth.v1.AuthService.ListMcpTokens:input_type -> google.protobuf.Empty
 	98,  // 103: orca.auth.v1.AuthService.RevokeMcpToken:input_type -> orca.auth.v1.RevokeMcpTokenRequest
 	99,  // 104: orca.auth.v1.AuthService.ResolveMcpPrincipal:input_type -> orca.auth.v1.ResolveMcpPrincipalRequest
-	4,   // 105: orca.auth.v1.AuthService.Login:output_type -> orca.auth.v1.LoginResponse
-	6,   // 106: orca.auth.v1.AuthService.Logout:output_type -> orca.auth.v1.LogoutResponse
-	8,   // 107: orca.auth.v1.AuthService.ValidateSession:output_type -> orca.auth.v1.ValidateSessionResponse
-	10,  // 108: orca.auth.v1.AuthService.IssueServiceToken:output_type -> orca.auth.v1.IssueServiceTokenResponse
-	12,  // 109: orca.auth.v1.AuthService.GetJWKS:output_type -> orca.auth.v1.GetJWKSResponse
-	14,  // 110: orca.auth.v1.AuthService.IsServiceTokenRevoked:output_type -> orca.auth.v1.IsServiceTokenRevokedResponse
-	17,  // 111: orca.auth.v1.AuthService.ListCliTokens:output_type -> orca.auth.v1.ListCliTokensResponse
-	103, // 112: orca.auth.v1.AuthService.RevokeCliToken:output_type -> google.protobuf.Empty
-	20,  // 113: orca.auth.v1.AuthService.CreateUser:output_type -> orca.auth.v1.CreateUserResponse
-	22,  // 114: orca.auth.v1.AuthService.ListUsers:output_type -> orca.auth.v1.ListUsersResponse
-	27,  // 115: orca.auth.v1.AuthService.UpdateUserRole:output_type -> orca.auth.v1.UpdateUserRoleResponse
-	55,  // 116: orca.auth.v1.AuthService.ListSessions:output_type -> orca.auth.v1.ListSessionsResponse
-	58,  // 117: orca.auth.v1.AuthService.UpdateUser:output_type -> orca.auth.v1.UpdateUserResponse
-	29,  // 118: orca.auth.v1.AuthService.RevokeSession:output_type -> orca.auth.v1.RevokeSessionResponse
-	34,  // 119: orca.auth.v1.AuthService.QueryAuditLog:output_type -> orca.auth.v1.QueryAuditLogResponse
-	103, // 120: orca.auth.v1.AuthService.AppendAuditEntry:output_type -> google.protobuf.Empty
-	36,  // 121: orca.auth.v1.AuthService.DeactivateUser:output_type -> orca.auth.v1.DeactivateUserResponse
-	38,  // 122: orca.auth.v1.AuthService.ReactivateUser:output_type -> orca.auth.v1.ReactivateUserResponse
-	40,  // 123: orca.auth.v1.AuthService.ListSessionsForUser:output_type -> orca.auth.v1.ListSessionsForUserResponse
-	43,  // 124: orca.auth.v1.AuthService.ForceRevokeAllSessionsForUser:output_type -> orca.auth.v1.ForceRevokeAllSessionsForUserResponse
-	103, // 125: orca.auth.v1.AuthService.ForceRevokeSession:output_type -> google.protobuf.Empty
-	45,  // 126: orca.auth.v1.AuthService.CreateAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
-	45,  // 127: orca.auth.v1.AuthService.GetAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
-	49,  // 128: orca.auth.v1.AuthService.ListAccessPolicies:output_type -> orca.auth.v1.ListAccessPoliciesResponse
-	45,  // 129: orca.auth.v1.AuthService.UpdateAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
-	103, // 130: orca.auth.v1.AuthService.DeleteAccessPolicy:output_type -> google.protobuf.Empty
-	53,  // 131: orca.auth.v1.AuthService.GetAdminStats:output_type -> orca.auth.v1.GetAdminStatsResponse
-	60,  // 132: orca.auth.v1.AuthService.InitiateDevicePairing:output_type -> orca.auth.v1.InitiateDevicePairingResponse
-	62,  // 133: orca.auth.v1.AuthService.CompleteDevicePairing:output_type -> orca.auth.v1.CompleteDevicePairingResponse
-	64,  // 134: orca.auth.v1.AuthService.ListPairedDevices:output_type -> orca.auth.v1.ListPairedDevicesResponse
-	103, // 135: orca.auth.v1.AuthService.UnpairDevice:output_type -> google.protobuf.Empty
-	68,  // 136: orca.auth.v1.AuthService.ResolveDeviceSharedSecret:output_type -> orca.auth.v1.ResolveDeviceSharedSecretResponse
-	25,  // 137: orca.auth.v1.AuthService.ListTenantMemberDirectory:output_type -> orca.auth.v1.ListTenantMemberDirectoryResponse
-	70,  // 138: orca.auth.v1.AuthService.StartSsoLogin:output_type -> orca.auth.v1.StartSsoLoginResponse
-	72,  // 139: orca.auth.v1.AuthService.CompleteSsoLogin:output_type -> orca.auth.v1.CompleteSsoLoginResponse
-	74,  // 140: orca.auth.v1.AuthService.RefreshSession:output_type -> orca.auth.v1.RefreshSessionResponse
-	77,  // 141: orca.auth.v1.AuthService.UpdateSsoGroupMapping:output_type -> orca.auth.v1.UpdateSsoGroupMappingResponse
-	79,  // 142: orca.auth.v1.AuthService.ListSsoGroupMapping:output_type -> orca.auth.v1.ListSsoGroupMappingResponse
-	81,  // 143: orca.auth.v1.AuthService.OAuthRegisterClient:output_type -> orca.auth.v1.OAuthRegisterClientResponse
-	83,  // 144: orca.auth.v1.AuthService.OAuthValidateAuthorizeRequest:output_type -> orca.auth.v1.OAuthAuthorizeRequestInfo
-	85,  // 145: orca.auth.v1.AuthService.OAuthIssueAuthCode:output_type -> orca.auth.v1.OAuthIssueAuthCodeResponse
-	87,  // 146: orca.auth.v1.AuthService.OAuthExchangeToken:output_type -> orca.auth.v1.OAuthTokenResponse
-	103, // 147: orca.auth.v1.AuthService.OAuthRevokeToken:output_type -> google.protobuf.Empty
-	103, // 148: orca.auth.v1.AuthService.OAuthRevokeGrant:output_type -> google.protobuf.Empty
-	91,  // 149: orca.auth.v1.AuthService.OAuthListClientsForTenant:output_type -> orca.auth.v1.OAuthListClientsResponse
-	90,  // 150: orca.auth.v1.AuthService.OAuthSetClientStatus:output_type -> orca.auth.v1.OAuthClientTenantView
-	90,  // 151: orca.auth.v1.AuthService.OAuthEnsureClientForTenant:output_type -> orca.auth.v1.OAuthClientTenantView
-	96,  // 152: orca.auth.v1.AuthService.IssueMcpToken:output_type -> orca.auth.v1.IssueMcpTokenResponse
-	97,  // 153: orca.auth.v1.AuthService.ListMcpTokens:output_type -> orca.auth.v1.ListMcpTokensResponse
-	103, // 154: orca.auth.v1.AuthService.RevokeMcpToken:output_type -> google.protobuf.Empty
-	100, // 155: orca.auth.v1.AuthService.ResolveMcpPrincipal:output_type -> orca.auth.v1.ResolveMcpPrincipalResponse
-	105, // [105:156] is the sub-list for method output_type
-	54,  // [54:105] is the sub-list for method input_type
+	100, // 105: orca.auth.v1.AuthService.SetMcpPatSuspension:input_type -> orca.auth.v1.SetMcpPatSuspensionRequest
+	4,   // 106: orca.auth.v1.AuthService.Login:output_type -> orca.auth.v1.LoginResponse
+	6,   // 107: orca.auth.v1.AuthService.Logout:output_type -> orca.auth.v1.LogoutResponse
+	8,   // 108: orca.auth.v1.AuthService.ValidateSession:output_type -> orca.auth.v1.ValidateSessionResponse
+	10,  // 109: orca.auth.v1.AuthService.IssueServiceToken:output_type -> orca.auth.v1.IssueServiceTokenResponse
+	12,  // 110: orca.auth.v1.AuthService.GetJWKS:output_type -> orca.auth.v1.GetJWKSResponse
+	14,  // 111: orca.auth.v1.AuthService.IsServiceTokenRevoked:output_type -> orca.auth.v1.IsServiceTokenRevokedResponse
+	17,  // 112: orca.auth.v1.AuthService.ListCliTokens:output_type -> orca.auth.v1.ListCliTokensResponse
+	104, // 113: orca.auth.v1.AuthService.RevokeCliToken:output_type -> google.protobuf.Empty
+	20,  // 114: orca.auth.v1.AuthService.CreateUser:output_type -> orca.auth.v1.CreateUserResponse
+	22,  // 115: orca.auth.v1.AuthService.ListUsers:output_type -> orca.auth.v1.ListUsersResponse
+	27,  // 116: orca.auth.v1.AuthService.UpdateUserRole:output_type -> orca.auth.v1.UpdateUserRoleResponse
+	55,  // 117: orca.auth.v1.AuthService.ListSessions:output_type -> orca.auth.v1.ListSessionsResponse
+	58,  // 118: orca.auth.v1.AuthService.UpdateUser:output_type -> orca.auth.v1.UpdateUserResponse
+	29,  // 119: orca.auth.v1.AuthService.RevokeSession:output_type -> orca.auth.v1.RevokeSessionResponse
+	34,  // 120: orca.auth.v1.AuthService.QueryAuditLog:output_type -> orca.auth.v1.QueryAuditLogResponse
+	104, // 121: orca.auth.v1.AuthService.AppendAuditEntry:output_type -> google.protobuf.Empty
+	36,  // 122: orca.auth.v1.AuthService.DeactivateUser:output_type -> orca.auth.v1.DeactivateUserResponse
+	38,  // 123: orca.auth.v1.AuthService.ReactivateUser:output_type -> orca.auth.v1.ReactivateUserResponse
+	40,  // 124: orca.auth.v1.AuthService.ListSessionsForUser:output_type -> orca.auth.v1.ListSessionsForUserResponse
+	43,  // 125: orca.auth.v1.AuthService.ForceRevokeAllSessionsForUser:output_type -> orca.auth.v1.ForceRevokeAllSessionsForUserResponse
+	104, // 126: orca.auth.v1.AuthService.ForceRevokeSession:output_type -> google.protobuf.Empty
+	45,  // 127: orca.auth.v1.AuthService.CreateAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
+	45,  // 128: orca.auth.v1.AuthService.GetAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
+	49,  // 129: orca.auth.v1.AuthService.ListAccessPolicies:output_type -> orca.auth.v1.ListAccessPoliciesResponse
+	45,  // 130: orca.auth.v1.AuthService.UpdateAccessPolicy:output_type -> orca.auth.v1.AccessPolicy
+	104, // 131: orca.auth.v1.AuthService.DeleteAccessPolicy:output_type -> google.protobuf.Empty
+	53,  // 132: orca.auth.v1.AuthService.GetAdminStats:output_type -> orca.auth.v1.GetAdminStatsResponse
+	60,  // 133: orca.auth.v1.AuthService.InitiateDevicePairing:output_type -> orca.auth.v1.InitiateDevicePairingResponse
+	62,  // 134: orca.auth.v1.AuthService.CompleteDevicePairing:output_type -> orca.auth.v1.CompleteDevicePairingResponse
+	64,  // 135: orca.auth.v1.AuthService.ListPairedDevices:output_type -> orca.auth.v1.ListPairedDevicesResponse
+	104, // 136: orca.auth.v1.AuthService.UnpairDevice:output_type -> google.protobuf.Empty
+	68,  // 137: orca.auth.v1.AuthService.ResolveDeviceSharedSecret:output_type -> orca.auth.v1.ResolveDeviceSharedSecretResponse
+	25,  // 138: orca.auth.v1.AuthService.ListTenantMemberDirectory:output_type -> orca.auth.v1.ListTenantMemberDirectoryResponse
+	70,  // 139: orca.auth.v1.AuthService.StartSsoLogin:output_type -> orca.auth.v1.StartSsoLoginResponse
+	72,  // 140: orca.auth.v1.AuthService.CompleteSsoLogin:output_type -> orca.auth.v1.CompleteSsoLoginResponse
+	74,  // 141: orca.auth.v1.AuthService.RefreshSession:output_type -> orca.auth.v1.RefreshSessionResponse
+	77,  // 142: orca.auth.v1.AuthService.UpdateSsoGroupMapping:output_type -> orca.auth.v1.UpdateSsoGroupMappingResponse
+	79,  // 143: orca.auth.v1.AuthService.ListSsoGroupMapping:output_type -> orca.auth.v1.ListSsoGroupMappingResponse
+	81,  // 144: orca.auth.v1.AuthService.OAuthRegisterClient:output_type -> orca.auth.v1.OAuthRegisterClientResponse
+	83,  // 145: orca.auth.v1.AuthService.OAuthValidateAuthorizeRequest:output_type -> orca.auth.v1.OAuthAuthorizeRequestInfo
+	85,  // 146: orca.auth.v1.AuthService.OAuthIssueAuthCode:output_type -> orca.auth.v1.OAuthIssueAuthCodeResponse
+	87,  // 147: orca.auth.v1.AuthService.OAuthExchangeToken:output_type -> orca.auth.v1.OAuthTokenResponse
+	104, // 148: orca.auth.v1.AuthService.OAuthRevokeToken:output_type -> google.protobuf.Empty
+	104, // 149: orca.auth.v1.AuthService.OAuthRevokeGrant:output_type -> google.protobuf.Empty
+	91,  // 150: orca.auth.v1.AuthService.OAuthListClientsForTenant:output_type -> orca.auth.v1.OAuthListClientsResponse
+	90,  // 151: orca.auth.v1.AuthService.OAuthSetClientStatus:output_type -> orca.auth.v1.OAuthClientTenantView
+	90,  // 152: orca.auth.v1.AuthService.OAuthEnsureClientForTenant:output_type -> orca.auth.v1.OAuthClientTenantView
+	96,  // 153: orca.auth.v1.AuthService.IssueMcpToken:output_type -> orca.auth.v1.IssueMcpTokenResponse
+	97,  // 154: orca.auth.v1.AuthService.ListMcpTokens:output_type -> orca.auth.v1.ListMcpTokensResponse
+	104, // 155: orca.auth.v1.AuthService.RevokeMcpToken:output_type -> google.protobuf.Empty
+	101, // 156: orca.auth.v1.AuthService.ResolveMcpPrincipal:output_type -> orca.auth.v1.ResolveMcpPrincipalResponse
+	104, // 157: orca.auth.v1.AuthService.SetMcpPatSuspension:output_type -> google.protobuf.Empty
+	106, // [106:158] is the sub-list for method output_type
+	54,  // [54:106] is the sub-list for method input_type
 	54,  // [54:54] is the sub-list for extension type_name
 	54,  // [54:54] is the sub-list for extension extendee
 	0,   // [0:54] is the sub-list for field type_name
@@ -6807,7 +6866,7 @@ func file_orca_auth_v1_auth_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_orca_auth_v1_auth_proto_rawDesc), len(file_orca_auth_v1_auth_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   99,
+			NumMessages:   100,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

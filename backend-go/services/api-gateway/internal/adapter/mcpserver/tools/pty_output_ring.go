@@ -29,6 +29,9 @@ type ptyOutputRing struct {
 	lastIOAt time.Time
 	dropped  uint64 // bytes overwritten before anyone could read them
 	notify   chan struct{}
+	// onDrop (optional, set before the ring is shared) is told how many bytes a
+	// write overwrote; metrics only, it never affects ring contents.
+	onDrop func(n uint64)
 }
 
 func newPtyOutputRing(capBytes int, now time.Time) *ptyOutputRing {
@@ -46,7 +49,14 @@ func (r *ptyOutputRing) Append(p []byte, now time.Time) {
 		return
 	}
 	r.mu.Lock()
-	defer r.mu.Unlock()
+	droppedBefore := r.dropped
+	defer func() {
+		d := r.dropped - droppedBefore
+		r.mu.Unlock()
+		if d > 0 && r.onDrop != nil {
+			r.onDrop(d)
+		}
+	}()
 	c := len(r.buf)
 	r.nextSeq += uint64(len(p))
 	if len(p) >= c { // only the tail can survive

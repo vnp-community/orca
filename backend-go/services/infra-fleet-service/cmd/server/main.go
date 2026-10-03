@@ -666,7 +666,7 @@ func run() error {
 	pickByTagUC := usecase.NewPickByTag(devServerGroupStore, repo, repo, agentClient)
 
 	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler())
-	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, infragrpc.New(
+	infraServer := infragrpc.New(
 		registerDevServerUC,
 		resolveConnectionUC,
 		createSshTargetUC,
@@ -743,7 +743,8 @@ func run() error {
 		getFleetConnectivitySummaryUC,
 		streamFileChangesUC,
 		pickByTagUC,
-	))
+	)
+	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, withAgentSessionList(infraServer, agentSessionStore))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// direct-websocket's inbound WS handler ("/agent") and token-issuance

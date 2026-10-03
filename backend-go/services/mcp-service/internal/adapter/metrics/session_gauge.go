@@ -19,13 +19,36 @@ type SessionCounter interface {
 	CountOpenSessions(ctx context.Context) (int64, error)
 }
 
+// KillSwitchCounter counts active kill switches across tenants, by scope.
+type KillSwitchCounter interface {
+	CountActiveKillSwitches(ctx context.Context) (map[string]int64, error)
+}
+
+// killScopes is the closed set of scopes (the gauge label); anything else is dropped.
+var killScopes = []string{"tenant", "client", "grant", "session"}
+
 // Set owns the registry served at /metrics.
 type Set struct {
 	reg            *prometheus.Registry
 	sessionsActive prometheus.Gauge
 	countErrors    prometheus.Counter
 	counter        SessionCounter
+	killActive     *prometheus.GaugeVec
+	kills          KillSwitchCounter
 	log            *slog.Logger
+}
+
+// WithKillSwitches adds orca_mcp_killswitch_active{scope}, sampled with the
+// session gauge. Call before Run.
+func (s *Set) WithKillSwitches(c KillSwitchCounter) *Set {
+	s.kills = c
+	s.killActive = prometheus.NewGaugeVec(prometheus.GaugeOpts{
+		Name: "orca_mcp_killswitch_active", Help: "Active MCP kill switches across all tenants, by scope (sampled from the database)."}, []string{"scope"})
+	for _, sc := range killScopes {
+		s.killActive.WithLabelValues(sc).Set(0)
+	}
+	s.reg.MustRegister(s.killActive)
+	return s
 }
 
 // New builds the registry (Go and process collectors included). counter may be
@@ -44,18 +67,28 @@ func New(counter SessionCounter, log *slog.Logger) *Set {
 // Handler serves the scrape endpoint.
 func (s *Set) Handler() http.Handler { return promhttp.HandlerFor(s.reg, promhttp.HandlerOpts{}) }
 
-// Refresh samples the session count once.
+// Refresh samples the session and kill-switch counts once.
 func (s *Set) Refresh(ctx context.Context) {
-	if s.counter == nil {
-		return
+	if s.counter != nil {
+		if n, err := s.counter.CountOpenSessions(ctx); err != nil {
+			s.countErrors.Inc()
+			s.log.WarnContext(ctx, "counting active mcp sessions failed", slog.Any("error", err))
+		} else {
+			s.sessionsActive.Set(float64(n))
+		}
 	}
-	n, err := s.counter.CountOpenSessions(ctx)
-	if err != nil {
-		s.countErrors.Inc()
-		s.log.WarnContext(ctx, "counting active mcp sessions failed", slog.Any("error", err))
-		return
+	if s.kills != nil {
+		// A failed sample keeps the last value, like the session gauge.
+		counts, err := s.kills.CountActiveKillSwitches(ctx)
+		if err != nil {
+			s.countErrors.Inc()
+			s.log.WarnContext(ctx, "counting active kill switches failed", slog.Any("error", err))
+			return
+		}
+		for _, sc := range killScopes {
+			s.killActive.WithLabelValues(sc).Set(float64(counts[sc]))
+		}
 	}
-	s.sessionsActive.Set(float64(n))
 }
 
 // Run refreshes every interval (30s in production) until ctx ends. A scrape

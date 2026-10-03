@@ -65,6 +65,13 @@ func pack4Admin() []*ToolSpec {
 		destructive("project.delete", "Delete a project.", Str("project_id", "projectId", "Project id", Req)),
 		destructive("automation.delete", "Delete an automation.", Str("id", "id", "Automation id", Req)),
 		destructive("task.delete", "Delete a task.", Str("id", "id", "Task id", Req)),
+		// confirmed is the handler's own safeguard: the agent must state it explicitly.
+		destructive("annotation.delete", "Delete a code review annotation.", Str("id", "id", "Annotation id", Req),
+			Bool("confirmed", "confirmed", "Must be true to delete", Req)),
+		destructive("projectGroup.delete", "Delete a project group.", Str("group_id", "groupId", "Project group id", Req)),
+		destructive("github.project.deleteIssueCommentBySlug", "Delete a comment of a GitHub issue or pull request.",
+			Str("item_slug", "itemSlug", "Item slug, as returned by github_project_* tools", Req),
+			Str("comment_id", "commentId", "Comment id", Req)).openWorld(),
 		destructive("github.mergePR", "Merge a GitHub pull request.", Str("repo", "repo", "Repository id", Req),
 			Int("number", "number", "Pull request number", Req, Range(1, 1<<30)), Str("merge_method", "mergeMethod", "merge, squash or rebase"),
 			Str("commit_title", "commitTitle", "Commit title"), Str("commit_message", "commitMessage", "Commit message")).openWorld(),
@@ -78,10 +85,6 @@ func pack4Admin() []*ToolSpec {
 		destructive("repo.addMember", "Add a user to a repository.", Str("repo_id", "repoId", "Repository id", Req), user, role),
 		destructive("repo.removeMember", "Remove a user from a repository.", Str("repo_id", "repoId", "Repository id", Req), user),
 		destructive("repo.updateMemberRole", "Change a repository member's role.", Str("repo_id", "repoId", "Repository id", Req), user, role),
-		destructive("team.create", "Create a team.", Str("name", "name", "Team name", Req, Len(200))),
-		destructive("team.addMember", "Add a user to a team.", Str("team_id", "teamId", "Team id", Req), user,
-			Str("role", "role", "Member role")),
-		destructive("team.removeMember", "Remove a user from a team.", Str("team_id", "teamId", "Team id", Req), user),
 		destructive("devServer.approve", "Approve a dev server.", Str("dev_server_id", "devServerId", "Dev server id", Req)),
 		destructive("devServer.reject", "Reject a dev server.", Str("dev_server_id", "devServerId", "Dev server id", Req),
 			Str("reason", "reason", "Reason")),
@@ -90,11 +93,9 @@ func pack4Admin() []*ToolSpec {
 		destructive("devServer.resolveAccessRequest", "Approve or reject a dev server access request.",
 			Str("request_id", "requestId", "Request id", Req), Bool("approve", "approve", "Approve the request", Req)),
 
-		adminRead("admin.listUsers", "List users of the tenant.", pageSize, pageTok),
-		adminRead("admin.listSessions", "List login sessions of a user.", Str("target_user_id", "userId", "Id of the user to inspect", Req)),
+		adminRead("admin.listUsers", "List users of the tenant.", pageSize, pageTok).pii(),
+		adminRead("admin.listSessions", "List login sessions of a user.", Str("target_user_id", "userId", "Id of the user to inspect", Req)).pii(),
 		adminRead("admin.queryAuditLog", "Query the audit log.", Int("since_unix_ms", "sinceUnixMs", "Only entries after this time", Range(0, 1<<53)),
 			Str("actor_id", "actorId", "Actor id"), Str("action", "action", "Action"), Str("outcome", "outcome", "Outcome"), pageSize, pageTok),
-		adminRead("admin.listPolicies", "List authorization policies.", pageSize, pageTok),
-		adminRead("admin.getPolicy", "Get one authorization policy.", Str("policy_id", "policyId", "Policy id", Req)),
 	}
 }

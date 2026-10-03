@@ -1,7 +1,6 @@
 # Prometheus alert rules for the MCP edge (BE-MCP-SOL-015 section C).
 # Not loaded by anything in this repository (no Prometheus/Helm wiring here);
-# an operator has to mount it. Only metrics that exist today are used:
-# there is no orca_mcp_killswitch_active gauge yet, so no kill-switch alert.
+# an operator has to mount it. Only metrics that exist today are used.
 groups:
   - name: orca-mcp
     rules:
@@ -44,3 +43,10 @@ groups:
         labels: {severity: warning}
         annotations:
           summary: "auth-service ResolveMcpPrincipal is failing; /mcp fails closed (503)"
+      - alert: McpKillSwitchActive
+        expr: max by (scope) (orca_mcp_killswitch_active) > 0
+        for: 1m
+        labels: {severity: warning}
+        annotations:
+          summary: "An MCP kill switch is active ({{ $labels.scope }})"
+          description: "An administrator stopped MCP access for a tenant, client, grant or session. Confirm it is intentional and clear it with mcp.admin.killswitch.set when the incident is over."

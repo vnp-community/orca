@@ -37,6 +37,10 @@ type engine struct {
 	server    *mcp.Server
 	subs      subscribedSessions
 	reqRec    RequestRecorder // optional; set by NewHandler from Deps.Recorder
+
+	// toolsListChanged advertises tools.listChanged; set only when something
+	// feeds Handler.NotifyToolsChanged (Config.ToolsListChanged).
+	toolsListChanged bool
 }
 
 func newSDKServer(e *engine, cfg Config, log *slog.Logger, getSessionID func() string) *mcp.Server {
@@ -47,7 +51,7 @@ func newSDKServer(e *engine, cfg Config, log *slog.Logger, getSessionID func() s
 			Logger:       log,
 			GetSessionID: getSessionID,
 			// Declare only what is truly implemented: tools/list + tools/call
-			// (no listChanged yet, BE-MCP-SOL-007) and logging/setLevel.
+			// (listChanged only when Config.ToolsListChanged is wired) and logging/setLevel.
 			Capabilities:              e.capabilities(),
 			SupportedProtocolVersions: sdkProtocolVersions(),
 			SubscribeHandler:          e.subscribeHandler(),

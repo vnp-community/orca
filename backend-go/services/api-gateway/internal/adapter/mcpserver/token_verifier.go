@@ -39,6 +39,32 @@ func (b *BearerTokenVerifier) Verify(_ context.Context, r *http.Request) (Princi
 	case errors.Is(err, usecase.ErrPrincipalLookupFailed):
 		return Principal{}, ErrVerifierUnavailable
 	default:
-		return Principal{}, ErrInvalidToken
+		switch reason := usecase.McpRejectionReason(err); reason {
+		case "":
+			return Principal{}, ErrInvalidToken
+		case usecase.McpReasonKillSwitch:
+			// PATs suspended by the tenant kill switch answer like the kill guard.
+			return Principal{}, ErrKillSwitchActive
+		default:
+			return Principal{}, invalidTokenError{reason: reason}
+		}
 	}
+}
+
+// invalidTokenError is ErrInvalidToken (same 401 answer) plus a bounded reason
+// for orca_mcp_auth_failures_total.
+type invalidTokenError struct{ reason string }
+
+func (invalidTokenError) Error() string               { return ErrInvalidToken.Error() }
+func (invalidTokenError) Is(target error) bool        { return target == ErrInvalidToken }
+func (e invalidTokenError) AuthFailureReason() string { return e.reason }
+
+// invalidTokenReason is the metric reason of a verifier error that is answered
+// as invalid_token.
+func invalidTokenReason(err error) string {
+	var r interface{ AuthFailureReason() string }
+	if errors.As(err, &r) {
+		return r.AuthFailureReason()
+	}
+	return "invalid_token"
 }

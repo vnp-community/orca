@@ -532,7 +532,7 @@ func (m *MemStore) UpsertKillSwitch(_ context.Context, e domain.KillSwitchEntry,
 			m.Settings[e.TenantID] = s
 		}
 	}
-	m.pendingCleanup[key] = e.Active
+	m.pendingCleanup[key] = e.Active || e.Scope == domain.KillScopeTenant // tenant off still owes the PAT restore
 	m.Epoch[e.TenantID]++
 	m.emit(e.TenantID, evs)
 	return e, nil

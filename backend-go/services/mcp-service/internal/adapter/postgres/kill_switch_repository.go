@@ -24,9 +24,9 @@ func (r *Repository) UpsertKillSwitch(ctx context.Context, e domain.KillSwitchEn
 	err := r.withTenantTx(ctx, e.TenantID, func(tx pgx.Tx) error {
 		got, err := scanKill(tx.QueryRow(ctx, `
 			INSERT INTO mcp.kill_switches (id, tenant_id, scope, target_id, active, reason, set_by, set_at, cleanup_pending)
-			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $5)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $5 OR $3 = 'tenant')
 			ON CONFLICT (tenant_id, scope, target_id) DO UPDATE SET active = EXCLUDED.active, reason = EXCLUDED.reason,
-				set_by = EXCLUDED.set_by, set_at = EXCLUDED.set_at, cleanup_pending = EXCLUDED.active
+				set_by = EXCLUDED.set_by, set_at = EXCLUDED.set_at, cleanup_pending = EXCLUDED.active OR EXCLUDED.scope = 'tenant'
 			RETURNING `+killColumns, e.ID, e.TenantID, e.Scope, e.TargetID, e.Active, e.Reason, e.SetBy, e.SetAt))
 		if err != nil {
 			return fmt.Errorf("postgres: upsert kill switch: %w", err)
@@ -148,3 +148,26 @@ func (r *Repository) GrantExists(ctx context.Context, tenantID, grantID string) 
 }
 
 var _ usecase.KillSwitchRepository = (*Repository)(nil)
+
+// CountActiveKillSwitches counts active switches across tenants by scope for
+// the orca_mcp_killswitch_active gauge (relay opt-in, read-only, no ids).
+func (r *Repository) CountActiveKillSwitches(ctx context.Context) (map[string]int64, error) {
+	out := map[string]int64{}
+	err := r.withRelayTx(ctx, func(tx pgx.Tx) error {
+		rows, err := tx.Query(ctx, `SELECT scope, count(*) FROM mcp.kill_switches WHERE active GROUP BY scope`)
+		if err != nil {
+			return fmt.Errorf("postgres: count active kill switches: %w", err)
+		}
+		defer rows.Close()
+		for rows.Next() {
+			var scope string
+			var n int64
+			if err := rows.Scan(&scope, &n); err != nil {
+				return err
+			}
+			out[scope] = n
+		}
+		return rows.Err()
+	})
+	return out, err
+}

@@ -103,6 +103,15 @@ go test -tags=integration ./internal/adapter/mysql/...      # requires Docker (t
 
 ## Known gaps / follow-ups (tracked, not silently skipped)
 
+- **MCP PATs and the kill switch (BE-MCP-SOL-013).** `SetMcpPatSuspension`
+  (mcp-service only, guarded by `OAUTH_INTERNAL_CALLER_TOKEN`) writes
+  `mcp_pat_suspensions` (migration `0014`, both dialects); while a tenant has a
+  row, `ResolveMcpPrincipal` answers `inactive_reason="suspended"` for all of
+  its PATs. Nothing is revoked, deleting the row restores them.
+  `ResolveMcpPrincipal` itself can be guarded with
+  `AUTH_MCP_PRINCIPAL_CALLER_TOKEN` (same value as api-gateway); unset keeps it
+  open and logs a warning (rollout-safe default).
+
 - **JWT signing via Vault Transit is now real, for `IssueServiceToken` +
   `GetJWKS` only (Epic D).** `internal/adapter/vault/token_signer.go` wraps
   `common/jwtauth.TransitSigner` over a `*secrets.Client`, backed by a

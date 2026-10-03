@@ -21,7 +21,16 @@ type McpUsecases struct {
 	List    *usecase.ListMcpTokens
 	Revoke  *usecase.RevokeMcpToken
 	Resolve *usecase.ResolveMcpPrincipal
+	Suspend *usecase.SetMcpPatSuspension
 }
+
+// McpPrincipalMethods / McpSuspensionMethods are guarded with separate shared
+// secrets (api-gateway holds the first, mcp-service the second) so neither can
+// call the other's RPC.
+var (
+	McpPrincipalMethods  = []string{authv1.AuthService_ResolveMcpPrincipal_FullMethodName}
+	McpSuspensionMethods = []string{authv1.AuthService_SetMcpPatSuspension_FullMethodName}
+)
 
 // McpServer layers the MCP RPCs over any AuthServiceServer (wrapper rather
 // than more fields on Server, same reason as OAuthServer).
@@ -78,6 +87,15 @@ func (s *McpServer) ResolveMcpPrincipal(ctx context.Context, req *authv1.Resolve
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	return &authv1.ResolveMcpPrincipalResponse{Active: out.Active, InactiveReason: out.InactiveReason, Role: out.Role}, nil
+}
+
+func (s *McpServer) SetMcpPatSuspension(ctx context.Context, req *authv1.SetMcpPatSuspensionRequest) (*emptypb.Empty, error) {
+	tenantID, _ := tenant.TenantID(ctx)
+	userID, _ := tenant.UserID(ctx)
+	if err := s.mcp.Suspend.Execute(ctx, tenantID, userID, req.GetSuspended(), req.GetReason()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
+	}
+	return &emptypb.Empty{}, nil
 }
 
 func toProtoMcpToken(t domain.McpToken) *authv1.McpTokenInfo {

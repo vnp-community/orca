@@ -29,6 +29,9 @@ type Config struct {
 	// ToolsListChanged enables forwarding tenant "tools_list_changed" signals as
 	// notifications/tools/list_changed (set together with the capability, BE-MCP-SOL-007).
 	ToolsListChanged bool
+	// ToolsListChangedDebounce batches bursts of policy changes into one
+	// notification per tenant (default 500ms).
+	ToolsListChangedDebounce time.Duration
 	// ScopesSupported feeds the RFC 9728 metadata document.
 	ScopesSupported []string
 	// ServerVersion is reported as serverInfo.version.
@@ -41,6 +44,9 @@ func (c Config) withDefaults() Config {
 	}
 	if c.SessionIdleTTL <= 0 {
 		c.SessionIdleTTL = 30 * time.Minute
+	}
+	if c.ToolsListChangedDebounce <= 0 {
+		c.ToolsListChangedDebounce = 500 * time.Millisecond
 	}
 	if c.PageSize <= 0 {
 		c.PageSize = 50

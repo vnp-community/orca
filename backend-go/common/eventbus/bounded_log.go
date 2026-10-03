@@ -32,6 +32,10 @@ type LogEntry struct {
 // ErrLogEmpty: no message is stored for the subject.
 var ErrLogEmpty = errors.New("eventbus: no stored message for subject")
 
+// ErrLogConflict: AppendAfter found a newer message on the subject than the
+// caller expected (another writer appended first).
+var ErrLogConflict = errors.New("eventbus: subject has a newer message than expected")
+
 // BoundedLog reads and writes a bounded stream. It keeps its own connection.
 type BoundedLog struct {
 	nc     *nats.Conn
@@ -87,6 +91,43 @@ func (l *BoundedLog) Append(ctx context.Context, subject string, header map[stri
 		return 0, fmt.Errorf("eventbus: appending to %s: %w", subject, err)
 	}
 	return ack.Sequence, nil
+}
+
+// AppendAfter stores one message only if the subject's newest message still
+// has stream sequence lastSeq (0 = the subject must be empty). It is the
+// compare-and-set that lets several replicas append to one subject while each
+// derives the next ordinal from what it read; on a lost race it returns
+// ErrLogConflict without storing anything.
+func (l *BoundedLog) AppendAfter(ctx context.Context, subject string, lastSeq uint64, header map[string]string, data []byte) (uint64, error) {
+	msg := &nats.Msg{Subject: subject, Data: data}
+	if len(header) > 0 {
+		msg.Header = nats.Header{}
+		for k, v := range header {
+			msg.Header.Set(k, v)
+		}
+	}
+	ack, err := l.js.PublishMsg(ctx, msg, jetstream.WithExpectLastSequencePerSubject(lastSeq))
+	if err != nil {
+		var apiErr *jetstream.APIError
+		if errors.As(err, &apiErr) && (apiErr.ErrorCode == jetstream.JSErrCodeStreamWrongLastSequence ||
+			apiErr.ErrorCode == jetstream.JSErrCodeStreamWrongLastSequenceConstant) {
+			return 0, ErrLogConflict
+		}
+		return 0, fmt.Errorf("eventbus: appending to %s: %w", subject, err)
+	}
+	return ack.Sequence, nil
+}
+
+// Last returns the newest stored message of subject (ErrLogEmpty if none).
+func (l *BoundedLog) Last(ctx context.Context, subject string) (LogEntry, error) {
+	raw, err := l.stream.GetLastMsgForSubject(ctx, subject)
+	if err != nil {
+		if errors.Is(err, jetstream.ErrMsgNotFound) {
+			return LogEntry{}, ErrLogEmpty
+		}
+		return LogEntry{}, fmt.Errorf("eventbus: reading %s: %w", subject, err)
+	}
+	return toEntry(raw.Subject, raw.Sequence, raw.Header, raw.Data), nil
 }
 
 func toEntry(subject string, seq uint64, h nats.Header, data []byte) LogEntry {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -13,6 +14,7 @@ import (
 // --- fakes -------------------------------------------------------------
 
 type fakeDeliverPushSubscriptionRepository struct {
+	mu               sync.Mutex
 	subs             []domain.PushSubscription
 	deviceIDs        map[string]string // subscriptionID -> deviceID
 	expiredEndpoints []string
@@ -41,18 +43,23 @@ func (f *fakeDeliverPushSubscriptionRepository) DeviceIDFor(ctx context.Context,
 	return f.deviceIDs[subscriptionID], nil
 }
 func (f *fakeDeliverPushSubscriptionRepository) MarkExpired(ctx context.Context, endpoint string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.expiredEndpoints = append(f.expiredEndpoints, endpoint)
 	return f.markExpiredErr
 }
 
 type fakeDeviceSecretResolver struct {
+	mu     sync.Mutex
 	secret []byte
 	err    error
 	calls  int
 }
 
 func (f *fakeDeviceSecretResolver) ResolveSharedSecret(ctx context.Context, deviceID string) ([]byte, error) {
+	f.mu.Lock()
 	f.calls++
+	f.mu.Unlock()
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -60,75 +67,103 @@ func (f *fakeDeviceSecretResolver) ResolveSharedSecret(ctx context.Context, devi
 }
 
 type fakeE2ESealer struct {
+	mu           sync.Mutex
 	calls        int
 	sealErr      error
 	lastSecretLn int
 }
 
 func (f *fakeE2ESealer) Seal(plaintext []byte, sharedSecret []byte) ([]byte, []byte, error) {
+	f.mu.Lock()
 	f.calls++
 	f.lastSecretLn = len(sharedSecret)
+	f.mu.Unlock()
 	if f.sealErr != nil {
 		return nil, nil, f.sealErr
 	}
 	return append([]byte("sealed:"), plaintext...), []byte("nonce-bytes-000000000000"), nil
 }
 
+// fakeVaultSigner is the VapidAuthorizer fake (name kept from when the
+// usecase called the signer directly).
 type fakeVaultSigner struct {
-	calls int
-	err   error
+	mu        sync.Mutex
+	calls     int
+	err       error
+	failFor   map[string]bool // endpoint -> fail
+	endpoints []string
 }
 
-func (f *fakeVaultSigner) SignVapidPayload(ctx context.Context, tenantID string, payload []byte) (string, error) {
+func (f *fakeVaultSigner) Authorization(ctx context.Context, tenantID, endpoint string) (string, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.calls++
-	if f.err != nil {
-		return "", f.err
+	f.endpoints = append(f.endpoints, endpoint)
+	if f.err != nil || f.failFor[endpoint] {
+		return "", errors.New("signer down")
 	}
-	return "signed-jwt", nil
+	return "vapid t=signed-jwt, k=pub", nil
 }
 
 type webpushCall struct {
 	endpoint          string
 	p256dh, auth      string
 	ciphertext, nonce []byte
-	vapidJWT          string
+	vapidAuth         string
+	opts              WebPushOptions
 }
 
 type fakeWebPushClient struct {
-	calls []webpushCall
-	err   error
+	mu     sync.Mutex
+	calls  []webpushCall
+	err    error
+	errFor map[string]error // endpoint -> error, overrides err
 }
 
-func (f *fakeWebPushClient) Send(ctx context.Context, endpoint, p256dh, auth string, ciphertext, nonce []byte, vapidJWT string) error {
-	f.calls = append(f.calls, webpushCall{endpoint, p256dh, auth, ciphertext, nonce, vapidJWT})
+func (f *fakeWebPushClient) Send(ctx context.Context, endpoint, p256dh, auth string, ciphertext, nonce []byte, vapidAuth string, opts WebPushOptions) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.calls = append(f.calls, webpushCall{endpoint, p256dh, auth, ciphertext, nonce, vapidAuth, opts})
+	if e, ok := f.errFor[endpoint]; ok {
+		return e
+	}
 	return f.err
 }
 
 type fakeAPNsClient struct {
+	mu    sync.Mutex
 	calls int
 	err   error
 }
 
 func (f *fakeAPNsClient) Send(ctx context.Context, deviceToken string, ciphertext, nonce []byte) error {
+	f.mu.Lock()
 	f.calls++
+	f.mu.Unlock()
 	return f.err
 }
 
 type fakeFCMClient struct {
+	mu    sync.Mutex
 	calls int
 	err   error
 }
 
 func (f *fakeFCMClient) Send(ctx context.Context, registrationToken string, ciphertext, nonce []byte) error {
+	f.mu.Lock()
 	f.calls++
+	f.mu.Unlock()
 	return f.err
 }
 
 type fakeBufferedNotificationRepository struct {
+	mu       sync.Mutex
 	enqueued []string // subscriptionIDs
 }
 
 func (f *fakeBufferedNotificationRepository) Enqueue(ctx context.Context, tenantID, userID, subscriptionID string, eventJSON []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.enqueued = append(f.enqueued, subscriptionID)
 	return nil
 }

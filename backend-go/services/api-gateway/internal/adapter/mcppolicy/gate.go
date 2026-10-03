@@ -157,39 +157,48 @@ func (g *Gate) authorize(ctx context.Context, p mcpserver.Principal, meta mcpser
 // second call lets the tool run. Anything else (pending, denied, expired, or a
 // lost consume race) is "not approved".
 func (g *Gate) AwaitApproval(ctx context.Context, p mcpserver.Principal, approvalID string) (bool, error) {
+	ok, _, err := g.AwaitApprovalStatus(ctx, p, approvalID)
+	return ok, err
+}
+
+// AwaitApprovalStatus is AwaitApproval plus mcp-service's terminal status
+// ("approved", "denied", "expired", "cancelled", or "pending" when the wait
+// timed out), so metrics can tell expiry from a denial. Status is "" when the
+// wait never reached mcp-service.
+func (g *Gate) AwaitApprovalStatus(ctx context.Context, p mcpserver.Principal, approvalID string) (bool, string, error) {
 	if g == nil || g.c == nil {
-		return false, errors.New("mcppolicy: mcp-service client not configured")
+		return false, "", errors.New("mcppolicy: mcp-service client not configured")
 	}
 	g.mu.Lock()
 	pend, ok := g.pending[approvalID]
 	g.mu.Unlock()
 	if !ok || pend.p.TenantID != p.TenantID || pend.p.UserID != p.UserID {
-		return false, nil
+		return false, "", nil
 	}
 	rctx, cancel := g.rpcCtx(ctx, p, g.cfg.ApprovalMaxWait+g.cfg.CallTimeout)
 	defer cancel()
 	w, err := g.c.WaitApproval(rctx, &mcpv1.WaitApprovalRequest{ApprovalId: approvalID, MaxWaitMs: int32(g.cfg.ApprovalMaxWait / time.Millisecond)})
 	if err != nil {
-		return false, fmt.Errorf("mcppolicy: wait approval: %w", err)
+		return false, "", fmt.Errorf("mcppolicy: wait approval: %w", err)
 	}
 	if w.GetStatus() == "pending" {
-		return false, nil // keep the pending entry: the client's retry may find it approved
+		return false, "pending", nil // keep the pending entry: the client's retry may find it approved
 	}
 	g.mu.Lock()
 	delete(g.pending, approvalID)
 	g.mu.Unlock()
 	if w.GetStatus() != "approved" {
-		return false, nil
+		return false, w.GetStatus(), nil
 	}
 	d, err := g.authorize(ctx, pend.p, pend.meta, pend.args)
 	if err != nil {
-		return false, err
+		return false, "", err
 	}
 	if d.Outcome != mcpserver.OutcomeAllow || d.CallId == "" {
-		return false, nil
+		return false, "denied", nil
 	}
 	g.pushCall(pend.p, pend.meta, d.CallId)
-	return true, nil
+	return true, "approved", nil
 }
 
 // DecideByElicitation records the in-band answer of the approval's owner.

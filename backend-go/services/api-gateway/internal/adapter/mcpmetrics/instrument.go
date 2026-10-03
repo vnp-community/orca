@@ -98,13 +98,28 @@ func (g *gate) Decide(ctx context.Context, p mcpserver.Principal, meta mcpserver
 	return d, err
 }
 
+// approvalStatusGate is the optional capability of a PolicyGate that reports
+// the approval's terminal status next to the verdict.
+type approvalStatusGate interface {
+	AwaitApprovalStatus(ctx context.Context, p mcpserver.Principal, approvalID string) (bool, string, error)
+}
+
 func (g *gate) AwaitApproval(ctx context.Context, p mcpserver.Principal, id string) (bool, error) {
-	ok, err := g.inner.AwaitApproval(ctx, p, id)
+	var ok bool
+	var status string
+	var err error
+	if sg, has := g.inner.(approvalStatusGate); has {
+		ok, status, err = sg.AwaitApprovalStatus(ctx, p, id)
+	} else {
+		ok, err = g.inner.AwaitApproval(ctx, p, id)
+	}
 	switch {
 	case err != nil || ctx.Err() != nil:
 		g.m.approvals.WithLabelValues("cancelled").Inc()
 	case ok:
 		g.m.approvals.WithLabelValues("approved").Inc()
+	case status == "expired":
+		g.m.approvals.WithLabelValues("expired").Inc()
 	default:
 		g.m.approvals.WithLabelValues("denied").Inc()
 	}

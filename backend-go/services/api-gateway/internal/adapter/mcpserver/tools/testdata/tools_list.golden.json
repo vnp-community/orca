@@ -1,22 +1,5 @@
 [
   {
-    "name": "admin_getPolicy",
-    "channel": "admin.getPolicy",
-    "pack": 4,
-    "risk": "admin",
-    "scope": "orca:admin",
-    "required": ["policy_id"],
-    "props": ["policy_id"]
-  },
-  {
-    "name": "admin_listPolicies",
-    "channel": "admin.listPolicies",
-    "pack": 4,
-    "risk": "admin",
-    "scope": "orca:admin",
-    "props": ["page_size", "page_token"]
-  },
-  {
     "name": "admin_listSessions",
     "channel": "admin.listSessions",
     "pack": 4,
@@ -121,6 +104,15 @@
     ]
   },
   {
+    "name": "annotation_delete",
+    "channel": "annotation.delete",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["confirmed", "id"],
+    "props": ["confirmed", "id"]
+  },
+  {
     "name": "annotation_list",
     "channel": "annotation.list",
     "pack": 1,
@@ -154,13 +146,6 @@
     "scope": "orca:write",
     "required": ["content", "id", "resolved"],
     "props": ["content", "id", "resolved"]
-  },
-  {
-    "name": "auth_listTenantMemberDirectory",
-    "channel": "auth.listTenantMemberDirectory",
-    "pack": 1,
-    "risk": "read",
-    "scope": "orca:read"
   },
   {
     "name": "automation_delete",
@@ -799,6 +784,15 @@
     "props": ["field_id", "item_id", "project_slug"]
   },
   {
+    "name": "github_project_deleteIssueCommentBySlug",
+    "channel": "github.project.deleteIssueCommentBySlug",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["comment_id", "item_slug"],
+    "props": ["comment_id", "item_slug"]
+  },
+  {
     "name": "github_project_listAccessible",
     "channel": "github.project.listAccessible",
     "pack": 1,
@@ -1395,6 +1389,15 @@
     "props": ["name", "parent_group_id"]
   },
   {
+    "name": "projectGroup_delete",
+    "channel": "projectGroup.delete",
+    "pack": 4,
+    "risk": "destructive",
+    "scope": "orca:admin",
+    "required": ["group_id"],
+    "props": ["group_id"]
+  },
+  {
     "name": "projectGroup_list",
     "channel": "projectGroup.list",
     "pack": 1,
@@ -1734,24 +1737,6 @@
     "props": ["id", "labels", "status", "title", "workflow_template_id"]
   },
   {
-    "name": "team_addMember",
-    "channel": "team.addMember",
-    "pack": 4,
-    "risk": "destructive",
-    "scope": "orca:admin",
-    "required": ["member_user_id", "team_id"],
-    "props": ["member_user_id", "role", "team_id"]
-  },
-  {
-    "name": "team_create",
-    "channel": "team.create",
-    "pack": 4,
-    "risk": "destructive",
-    "scope": "orca:admin",
-    "required": ["name"],
-    "props": ["name"]
-  },
-  {
     "name": "team_list",
     "channel": "team.list",
     "pack": 1,
@@ -1766,15 +1751,6 @@
     "scope": "orca:read",
     "required": ["team_id"],
     "props": ["team_id"]
-  },
-  {
-    "name": "team_removeMember",
-    "channel": "team.removeMember",
-    "pack": 4,
-    "risk": "destructive",
-    "scope": "orca:admin",
-    "required": ["member_user_id", "team_id"],
-    "props": ["member_user_id", "team_id"]
   },
   {
     "name": "terminal_list",

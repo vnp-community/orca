@@ -71,6 +71,7 @@ const (
 	AuthService_ListMcpTokens_FullMethodName                 = "/orca.auth.v1.AuthService/ListMcpTokens"
 	AuthService_RevokeMcpToken_FullMethodName                = "/orca.auth.v1.AuthService/RevokeMcpToken"
 	AuthService_ResolveMcpPrincipal_FullMethodName           = "/orca.auth.v1.AuthService/ResolveMcpPrincipal"
+	AuthService_SetMcpPatSuspension_FullMethodName           = "/orca.auth.v1.AuthService/SetMcpPatSuspension"
 )
 
 // AuthServiceClient is the client API for AuthService service.
@@ -224,6 +225,11 @@ type AuthServiceClient interface {
 	// (cached 30s there). It has a write side effect (first/last use) and is
 	// safe to repeat; it never returns a role the user does not hold right now.
 	ResolveMcpPrincipal(ctx context.Context, in *ResolveMcpPrincipalRequest, opts ...grpc.CallOption) (*ResolveMcpPrincipalResponse, error)
+	// SetMcpPatSuspension is called by mcp-service when a tenant kill switch
+	// flips. While suspended, every PAT of the tenant resolves inactive
+	// ("suspended"); nothing is revoked, so clearing it restores them. tenant_id
+	// comes ONLY from gRPC metadata. Idempotent. Internal-caller guarded.
+	SetMcpPatSuspension(ctx context.Context, in *SetMcpPatSuspensionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 }
 
 type authServiceClient struct {
@@ -744,6 +750,16 @@ func (c *authServiceClient) ResolveMcpPrincipal(ctx context.Context, in *Resolve
 	return out, nil
 }
 
+func (c *authServiceClient) SetMcpPatSuspension(ctx context.Context, in *SetMcpPatSuspensionRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, AuthService_SetMcpPatSuspension_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AuthServiceServer is the server API for AuthService service.
 // All implementations must embed UnimplementedAuthServiceServer
 // for forward compatibility.
@@ -895,6 +911,11 @@ type AuthServiceServer interface {
 	// (cached 30s there). It has a write side effect (first/last use) and is
 	// safe to repeat; it never returns a role the user does not hold right now.
 	ResolveMcpPrincipal(context.Context, *ResolveMcpPrincipalRequest) (*ResolveMcpPrincipalResponse, error)
+	// SetMcpPatSuspension is called by mcp-service when a tenant kill switch
+	// flips. While suspended, every PAT of the tenant resolves inactive
+	// ("suspended"); nothing is revoked, so clearing it restores them. tenant_id
+	// comes ONLY from gRPC metadata. Idempotent. Internal-caller guarded.
+	SetMcpPatSuspension(context.Context, *SetMcpPatSuspensionRequest) (*emptypb.Empty, error)
 	mustEmbedUnimplementedAuthServiceServer()
 }
 
@@ -1057,6 +1078,9 @@ func (UnimplementedAuthServiceServer) RevokeMcpToken(context.Context, *RevokeMcp
 }
 func (UnimplementedAuthServiceServer) ResolveMcpPrincipal(context.Context, *ResolveMcpPrincipalRequest) (*ResolveMcpPrincipalResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ResolveMcpPrincipal not implemented")
+}
+func (UnimplementedAuthServiceServer) SetMcpPatSuspension(context.Context, *SetMcpPatSuspensionRequest) (*emptypb.Empty, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetMcpPatSuspension not implemented")
 }
 func (UnimplementedAuthServiceServer) mustEmbedUnimplementedAuthServiceServer() {}
 func (UnimplementedAuthServiceServer) testEmbeddedByValue()                     {}
@@ -1997,6 +2021,24 @@ func _AuthService_ResolveMcpPrincipal_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AuthService_SetMcpPatSuspension_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetMcpPatSuspensionRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AuthServiceServer).SetMcpPatSuspension(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AuthService_SetMcpPatSuspension_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AuthServiceServer).SetMcpPatSuspension(ctx, req.(*SetMcpPatSuspensionRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AuthService_ServiceDesc is the grpc.ServiceDesc for AuthService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -2207,6 +2249,10 @@ var AuthService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ResolveMcpPrincipal",
 			Handler:    _AuthService_ResolveMcpPrincipal_Handler,
+		},
+		{
+			MethodName: "SetMcpPatSuspension",
+			Handler:    _AuthService_SetMcpPatSuspension_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

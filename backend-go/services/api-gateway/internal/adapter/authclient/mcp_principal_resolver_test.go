@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/metadata"
+
+	"github.com/stablyai/orca-go/common/internalcaller"
 
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
@@ -116,5 +119,29 @@ func TestMcpPrincipalResolver_SingleflightCollapsesConcurrentMisses(t *testing.T
 	wg.Wait()
 	if n := c.calls.Load(); n != 1 {
 		t.Fatalf("calls = %d, want 1", n)
+	}
+}
+
+type metadataCapturingClient struct {
+	authv1.AuthServiceClient
+	got []string
+}
+
+func (m *metadataCapturingClient) ResolveMcpPrincipal(ctx context.Context, _ *authv1.ResolveMcpPrincipalRequest, _ ...grpc.CallOption) (*authv1.ResolveMcpPrincipalResponse, error) {
+	md, _ := metadata.FromOutgoingContext(ctx)
+	m.got = md.Get(internalcaller.MetadataKey)
+	return &authv1.ResolveMcpPrincipalResponse{Active: true, Role: "user"}, nil
+}
+
+func TestMcpPrincipalResolver_PresentsInternalCallerToken(t *testing.T) {
+	c := &metadataCapturingClient{}
+	r := NewMcpPrincipalResolver(c, time.Minute)
+	if _, err := r.Resolve(context.Background(), in1); err != nil || len(c.got) != 0 {
+		t.Fatalf("no token configured: sent %v err %v", c.got, err)
+	}
+	r2 := NewMcpPrincipalResolver(c, time.Minute)
+	r2.InternalToken = "s3cret"
+	if _, err := r2.Resolve(context.Background(), in1); err != nil || len(c.got) != 1 || c.got[0] != "s3cret" {
+		t.Fatalf("token not presented: %v err %v", c.got, err)
 	}
 }

@@ -18,9 +18,12 @@ import (
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
+	"strconv"
 	"time"
 
 	"golang.org/x/crypto/hkdf"
@@ -33,23 +36,27 @@ type Client struct {
 	httpClient *http.Client
 }
 
-func New() *Client { return &Client{httpClient: &http.Client{Timeout: 10 * time.Second}} }
+// New returns a Client whose HTTP calls are bounded by a 5s deadline.
+func New() *Client { return &Client{httpClient: &http.Client{Timeout: 5 * time.Second}} }
 
-// defaultTTL is RFC 8030's TTL header (seconds) — 4 weeks, a typical Web
-// Push provider default.
-const defaultTTL = "2419200"
+// defaultTTLSeconds applies when the caller passes no TTL (RFC 8030 requires
+// the header).
+const defaultTTLSeconds = 86400
 
 // Send encrypts body (RFC 8291 aes128gcm, using the subscription's
 // p256dh/auth keys) and POSTs it to endpoint with a VAPID Authorization
 // header. ciphertext/nonce are whatever DeliverPush handed in — a
 // NaCl-sealed E2E payload for a paired mobile-companion subscription
-// (nonce non-nil), or a plaintext NotificationEvent JSON blob for a
-// standard (non-paired) Web Push subscription (nonce nil); either way,
+// (nonce non-nil, framed), or the browser JSON payload for a standard
+// (non-paired) Web Push subscription (nonce nil, sent unframed); either way,
 // THIS function is what actually encrypts it before it leaves the process
 // per RFC 8291, satisfying BR-MB-05 regardless of which case produced the
 // input bytes.
-func (c *Client) Send(ctx context.Context, endpoint, p256dh, auth string, ciphertext, nonce []byte, vapidJWT string) error {
-	plaintext := framePlaintext(ciphertext, nonce)
+func (c *Client) Send(ctx context.Context, endpoint, p256dh, auth string, ciphertext, nonce []byte, vapidAuth string, opts usecase.WebPushOptions) error {
+	plaintext := ciphertext // standard Web Push: the service worker parses this as JSON, so no frame byte
+	if len(nonce) > 0 {
+		plaintext = framePlaintext(ciphertext, nonce)
+	}
 
 	encoded, err := encryptAES128GCM(plaintext, p256dh, auth)
 	if err != nil {
@@ -62,16 +69,29 @@ func (c *Client) Send(ctx context.Context, endpoint, p256dh, auth string, cipher
 	}
 	req.Header.Set("content-encoding", "aes128gcm")
 	req.Header.Set("content-type", "application/octet-stream")
-	req.Header.Set("ttl", defaultTTL)
-	req.Header.Set("authorization", "vapid t="+vapidJWT)
+	ttl := opts.TTLSeconds
+	if ttl <= 0 {
+		ttl = defaultTTLSeconds
+	}
+	req.Header.Set("ttl", strconv.Itoa(ttl))
+	if opts.Urgency != "" {
+		req.Header.Set("urgency", opts.Urgency)
+	}
+	req.Header.Set("authorization", vapidAuth)
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
+		// *url.Error embeds the full endpoint URL, which is a bearer
+		// capability; keep only the underlying cause.
+		var uerr *url.Error
+		if errors.As(err, &uerr) {
+			err = uerr.Err
+		}
 		return fmt.Errorf("webpush: request failed: %w", err)
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusCreated && resp.StatusCode != http.StatusOK {
-		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 4096))
+		respBody, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
 		// RFC 8030 §7.3: 404/410 means the push service has permanently
 		// discarded this endpoint (browser unsubscribed, or the push
 		// service itself expired it) — wrap usecase.ErrDeviceTokenInvalid

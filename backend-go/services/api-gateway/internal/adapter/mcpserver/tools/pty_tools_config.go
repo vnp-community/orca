@@ -36,6 +36,12 @@ type PtyToolsConfig struct {
 	Targets                WorktreeTargets
 	// OnIdleStopped is told when the janitor stopped a PTY for inactivity.
 	OnIdleStopped func(tenantID, userID, mcpSessionID, ptyID string)
+	// OnOutputDropped is told how many output bytes a PTY ring overwrote before
+	// anyone read them (orca_mcp_terminal_dropped_bytes_total).
+	OnOutputDropped func(n uint64)
+	// AgentLister (optional) finds the agent sessions an MCP session started,
+	// in infra-fleet, so the durable reaper also stops agents whose replica died.
+	AgentLister AgentOriginLister
 }
 
 // DefaultPtyToolsConfig is the shipped default.

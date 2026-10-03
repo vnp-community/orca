@@ -7,6 +7,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/go-jose/go-jose/v4/jwt"
+
 	"github.com/stablyai/orca-go/common/jwtauth"
 	"github.com/stablyai/orca-go/common/mcpscope"
 )
@@ -22,6 +24,48 @@ var (
 	// ErrPrincipalLookupFailed: auth-service could not be asked (fail closed; /mcp answers 503).
 	ErrPrincipalLookupFailed = errors.New("authvalidator: mcp principal lookup failed")
 )
+
+// Bounded reasons for orca_mcp_auth_failures_total; the HTTP answer stays the
+// same (invalid_token) except McpReasonKillSwitch, which maps to the 403 of the
+// kill switch because the tenant, not the token, is what is stopped.
+const (
+	McpReasonExpired    = "expired"
+	McpReasonAudience   = "audience"
+	McpReasonRevoked    = "revoked"
+	McpReasonKillSwitch = "kill_switch"
+)
+
+// mcpRejection tags a ValidateMCP sentinel with a metric reason without
+// changing errors.Is on the sentinel.
+type mcpRejection struct {
+	cause  error
+	reason string
+}
+
+func (e mcpRejection) Error() string { return e.cause.Error() }
+func (e mcpRejection) Unwrap() error { return e.cause }
+
+// McpRejectionReason returns the bounded reason of a ValidateMCP error, or "".
+func McpRejectionReason(err error) string {
+	var r mcpRejection
+	if errors.As(err, &r) {
+		return r.reason
+	}
+	return ""
+}
+
+// inactiveReasonToMetric maps auth-service's inactive_reason to a bounded reason.
+func inactiveReasonToMetric(reason string) string {
+	switch reason {
+	case "suspended":
+		return McpReasonKillSwitch
+	case "expired":
+		return McpReasonExpired
+	case "revoked", "grant_revoked":
+		return McpReasonRevoked
+	}
+	return ""
+}
 
 const (
 	// McpTokenUseOAuth / McpTokenUsePAT are the token_use claim values.
@@ -84,10 +128,13 @@ func (v *AuthValidator) ValidateMCP(r *http.Request, resourceURL string) (McpPri
 	}
 	c, err := jwtauth.VerifyWithKey(key, raw)
 	if err != nil {
+		if errors.Is(err, jwt.ErrExpired) {
+			return McpPrincipal{}, mcpRejection{cause: ErrSignatureVerificationFailed, reason: McpReasonExpired}
+		}
 		return McpPrincipal{}, ErrSignatureVerificationFailed
 	}
 	if len(c.Audience) != 1 || strings.TrimRight(c.Audience[0], "/") != strings.TrimRight(resourceURL, "/") {
-		return McpPrincipal{}, ErrAudienceMismatch
+		return McpPrincipal{}, mcpRejection{cause: ErrAudienceMismatch, reason: McpReasonAudience}
 	}
 	if c.TenantID == "" || c.Subject == "" || c.ID == "" || (c.TokenUse != McpTokenUseOAuth && c.TokenUse != McpTokenUsePAT) {
 		return McpPrincipal{}, ErrMissingIdentityClaims
@@ -107,7 +154,7 @@ func (v *AuthValidator) ValidateMCP(r *http.Request, resourceURL string) (McpPri
 		return McpPrincipal{}, ErrPrincipalLookupFailed
 	}
 	if !res.Active || res.Role == "" {
-		return McpPrincipal{}, ErrPrincipalInactive
+		return McpPrincipal{}, mcpRejection{cause: ErrPrincipalInactive, reason: inactiveReasonToMetric(res.InactiveReason)}
 	}
 	p := McpPrincipal{
 		Identity: Identity{TenantID: c.TenantID, UserID: c.Subject, Role: res.Role},

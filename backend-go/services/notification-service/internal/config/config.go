@@ -4,6 +4,9 @@
 package config
 
 import (
+	"strconv"
+	"time"
+
 	commonconfig "github.com/stablyai/orca-go/common/config"
 )
 
@@ -48,6 +51,14 @@ type Config struct {
 	// replacing the direct cfg.DatabaseDSN read main.go used to do —
 	// mirrors usage-service's (the pilot) identical field 1:1.
 	DatabaseCredentialsFile string
+	// VAPIDSubject is the RFC 8292 "sub" claim (mailto: or https: contact);
+	// Web Push is refused at send time while it is empty, since push
+	// services (Apple's in particular) reject tokens without a valid one.
+	VAPIDSubject string
+	// PushConcurrency caps simultaneous push deliveries per event; PushTimeout
+	// is the deadline of each outbound push call.
+	PushConcurrency int
+	PushTimeout     time.Duration
 }
 
 func Load() (Config, error) {
@@ -55,7 +66,18 @@ func Load() (Config, error) {
 	if err != nil {
 		return Config{}, err
 	}
+	concurrency, err := strconv.Atoi(commonconfig.StringEnv("NOTIFICATION_PUSH_CONCURRENCY", "8"))
+	if err != nil || concurrency < 1 {
+		concurrency = 8
+	}
+	timeout, err := time.ParseDuration(commonconfig.StringEnv("NOTIFICATION_PUSH_TIMEOUT", "5s"))
+	if err != nil || timeout <= 0 {
+		timeout = 5 * time.Second
+	}
 	return Config{
+		VAPIDSubject:            commonconfig.StringEnv("VAPID_SUBJECT", ""),
+		PushConcurrency:         concurrency,
+		PushTimeout:             timeout,
 		Base:                    base,
 		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		CredentialBrokerAddr:    commonconfig.StringEnv("CREDENTIAL_BROKER_ADDR", "credential-broker-service:9090"),

@@ -303,3 +303,26 @@ func TestKillGuardCachesAndFallsBackBriefly(t *testing.T) {
 		t.Fatal("an old answer must not hide an outage: fail closed")
 	}
 }
+
+func TestAwaitApprovalStatusReportsTerminalStatus(t *testing.T) {
+	cases := map[string]string{"pending": "pending", "denied": "denied", "expired": "expired", "cancelled": "cancelled"}
+	for status, want := range cases {
+		f := &fakeClient{}
+		f.authorize = func(*mcpv1.AuthorizeToolCallRequest) (*mcpv1.AuthorizeToolCallResponse, error) {
+			return &mcpv1.AuthorizeToolCallResponse{Outcome: "require_approval", ApprovalId: "a1"}, nil
+		}
+		f.wait = func(*mcpv1.WaitApprovalRequest) (*mcpv1.WaitApprovalResponse, error) {
+			return &mcpv1.WaitApprovalResponse{Status: status}, nil
+		}
+		g := NewGate(f, Config{}, nil)
+		_, _ = g.Decide(context.Background(), principal, execMeta, args)
+		ok, got, err := g.AwaitApprovalStatus(context.Background(), principal, "a1")
+		if ok || err != nil || got != want {
+			t.Errorf("%s: ok=%v status=%q err=%v", status, ok, got, err)
+		}
+	}
+	// An unknown approval never reached mcp-service: no status.
+	if ok, st, _ := NewGate(&fakeClient{}, Config{}, nil).AwaitApprovalStatus(context.Background(), principal, "ghost"); ok || st != "" {
+		t.Fatalf("unknown id: ok=%v status=%q", ok, st)
+	}
+}

@@ -164,6 +164,11 @@ service AuthService {
   // (cached 30s there). It has a write side effect (first/last use) and is
   // safe to repeat; it never returns a role the user does not hold right now.
   rpc ResolveMcpPrincipal(ResolveMcpPrincipalRequest) returns (ResolveMcpPrincipalResponse);
+  // SetMcpPatSuspension is called by mcp-service when a tenant kill switch
+  // flips. While suspended, every PAT of the tenant resolves inactive
+  // ("suspended"); nothing is revoked, so clearing it restores them. tenant_id
+  // comes ONLY from gRPC metadata. Idempotent. Internal-caller guarded.
+  rpc SetMcpPatSuspension(SetMcpPatSuspensionRequest) returns (google.protobuf.Empty);
 }
 
 enum Role {
@@ -753,9 +758,13 @@ message ResolveMcpPrincipalRequest {
   string grant_id = 6;  // oauth
   string client_id = 7; // oauth
 }
+message SetMcpPatSuspensionRequest {
+  bool suspended = 1;
+  string reason = 2; // already redacted by the caller; stored for support only
+}
 message ResolveMcpPrincipalResponse {
   bool active = 1;
-  // revoked|expired|user_inactive|client_blocked|grant_revoked|unknown_token
+  // revoked|expired|user_inactive|client_blocked|grant_revoked|unknown_token|suspended
   string inactive_reason = 2;
   string role = 3; // "admin" | "user", read live from auth.users
 }

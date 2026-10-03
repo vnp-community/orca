@@ -118,7 +118,7 @@ func run() error {
 	var relayWG sync.WaitGroup
 	// /metrics on the health port: sessions_active is sampled from the DB every
 	// 30s so a scrape never queries it (BE-MCP-SOL-015 section C).
-	metricsSet := mcpmetrics.New(repo, logger)
+	metricsSet := mcpmetrics.New(repo, logger).WithKillSwitches(repo)
 	relayWG.Add(1)
 	go func() {
 		defer relayWG.Done()
@@ -150,6 +150,7 @@ func run() error {
 	// revocation; both stay nil (fail closed / skipped) when OAuth is off.
 	var clientStatuses usecase.ClientStatusReader
 	var tokenRevoker usecase.RefreshTokenRevoker
+	var patSuspender usecase.PatSuspender
 	if authzCfg.Enabled {
 		authConn, err := mcpauthclient.Dial(authzCfg.AuthServiceAddr, authzCfg.InternalToken)
 		if err != nil {
@@ -158,6 +159,7 @@ func run() error {
 		defer func() { _ = authConn.Close() }()
 		as := mcpauthclient.New(authv1.NewAuthServiceClient(authConn), authzCfg.AuthCallDeadline)
 		clientStatuses, tokenRevoker = mcpauthclient.NewClientStatuses(as), mcpauthclient.NewGrantTokenRevoker(as)
+		patSuspender = mcpauthclient.NewPatSuspender(as)
 		clock := usecase.SystemClock{}
 		consentCfg := usecase.ConsentConfig{ConsentTTL: authzCfg.ConsentTTL, Issuer: authzCfg.Issuer}
 		reconcileUC := usecase.NewReconcileGrantRevocations(repo, as, clock)
@@ -188,6 +190,9 @@ func run() error {
 		return fmt.Errorf("loading OPA bundle %q: %w", govCfg.BundlePath, err)
 	}
 	gov := buildGovernance(repo, engine, clientStatuses, tokenRevoker, defaults, govCfg, logger)
+	if patSuspender != nil {
+		gov.cleanup.WithPatSuspender(patSuspender)
+	}
 	mcpServer = mcpgrpc.WithGovernance(mcpServer, gov.usecases)
 	mcpServer = mcpgrpc.WithPrompts(mcpServer, usecase.NewPromptAdmin(repo, usecase.SystemClock{}))
 	sessCfg, err := svcconfig.LoadSessions()
@@ -217,8 +222,10 @@ func run() error {
 	serverOpts := []grpc.ServerOption{grpcmw.ChainUnary(logger), grpcmw.StatsHandler()}
 	if govCfg.InternalCallerToken != "" {
 		serverOpts = append(serverOpts, grpc.ChainUnaryInterceptor(internalcaller.Guard(govCfg.InternalCallerToken, append(append([]string{}, gatewayOnlyMethods...), registryInternalMethods...)...)))
+		// Unary interceptors never see streams, so StreamEvents needs its own.
+		serverOpts = append(serverOpts, grpc.ChainStreamInterceptor(internalcaller.StreamGuard(govCfg.InternalCallerToken, gatewayOnlyStreamMethods...)))
 	} else {
-		logger.Warn("MCP_INTERNAL_CALLER_TOKEN is empty: gateway-only governance RPCs rely on network policy alone")
+		logger.Warn("MCP_INTERNAL_CALLER_TOKEN is empty: gateway-only governance RPCs and StreamEvents rely on network policy alone")
 	}
 	grpcServer := grpc.NewServer(serverOpts...)
 	mcpv1.RegisterMcpServiceServer(grpcServer, mcpServer)

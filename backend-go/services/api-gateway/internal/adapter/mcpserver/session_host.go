@@ -788,7 +788,17 @@ func (s *sessionHost) onTenantSignal(subject string, data []byte) {
 	var sig struct {
 		T string `json:"t"`
 	}
-	if json.Unmarshal(data, &sig) != nil || sig.T != "tools_list_changed" || !s.cfg.ToolsListChanged {
+	if json.Unmarshal(data, &sig) != nil || sig.T != "tools_list_changed" {
+		return
+	}
+	s.notifyToolsListChanged(tenant)
+}
+
+// notifyToolsListChanged writes notifications/tools/list_changed to every
+// session of the tenant held by THIS replica. Sessions elsewhere are told by
+// their own replica (each one receives the triggering event).
+func (s *sessionHost) notifyToolsListChanged(tenant string) {
+	if !s.cfg.ToolsListChanged {
 		return
 	}
 	s.mu.Lock()

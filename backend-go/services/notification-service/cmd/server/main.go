@@ -42,6 +42,7 @@ import (
 	notificationwebpush "github.com/stablyai/orca-go/services/notification-service/internal/adapter/external/webpush"
 	notificationgrpc "github.com/stablyai/orca-go/services/notification-service/internal/adapter/grpc"
 	notificationauthclient "github.com/stablyai/orca-go/services/notification-service/internal/adapter/grpcclient/authclient"
+	notificationmetrics "github.com/stablyai/orca-go/services/notification-service/internal/adapter/metrics"
 	notificationmysql "github.com/stablyai/orca-go/services/notification-service/internal/adapter/mysql"
 	notificationnacl "github.com/stablyai/orca-go/services/notification-service/internal/adapter/nacl"
 	notificationpostgres "github.com/stablyai/orca-go/services/notification-service/internal/adapter/postgres"
@@ -222,7 +223,15 @@ func run() error {
 		}
 	}
 
-	deliverPushUC := usecase.NewDeliverPush(repo, deviceSecrets, sealer, signer, webpushClient, bufferStore, preferenceStore, apnsClient, fcmClient, logger)
+	// VAPID JWTs are signed in Vault via the credential broker (signer), never
+	// with a local key; repo supplies the public key for the "k=" parameter.
+	if cfg.VAPIDSubject == "" {
+		logger.Warn("VAPID_SUBJECT not set — web push sends will fail until it is configured (mailto: or https: contact)")
+	}
+	vapidAuthorizer := notificationwebpush.NewVapidAuthorizer(signer, repo, cfg.VAPIDSubject)
+	pushMetrics := notificationmetrics.New()
+	deliverPushUC := usecase.NewDeliverPush(repo, deviceSecrets, sealer, vapidAuthorizer, webpushClient, bufferStore, preferenceStore, apnsClient, fcmClient, logger).
+		Configure(usecase.DeliverPushConfig{Concurrency: cfg.PushConcurrency, Timeout: cfg.PushTimeout, Observer: pushMetrics})
 
 	subscribeUC := usecase.NewSubscribe(repo)
 	unregisterPushSubscriptionUC := usecase.NewUnregisterPushSubscription(repo)
@@ -259,7 +268,7 @@ func run() error {
 	// and had its "postgres"/"mysql" check registered inside that switch.
 	httpServer := &http.Server{
 		Addr:    fmt.Sprintf(":%d", cfg.HTTPPort),
-		Handler: healthSrv.Handler(),
+		Handler: healthAndMetricsMux(healthSrv.Handler(), pushMetrics.Handler()),
 	}
 
 	errCh := make(chan error, 2)
@@ -351,4 +360,12 @@ func toMySQLDriverDSN(dsn string) (string, error) {
 		driverDSN += sep + "parseTime=true"
 	}
 	return driverDSN, nil
+}
+
+// healthAndMetricsMux keeps /healthz and /readyz as they were and adds /metrics.
+func healthAndMetricsMux(health, metrics http.Handler) http.Handler {
+	mux := http.NewServeMux()
+	mux.Handle("/", health)
+	mux.Handle("/metrics", metrics)
+	return mux
 }

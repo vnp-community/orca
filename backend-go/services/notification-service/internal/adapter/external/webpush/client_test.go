@@ -145,7 +145,7 @@ func TestSend_WrapsErrDeviceTokenInvalid_OnGoneAndNotFound(t *testing.T) {
 			w.WriteHeader(status)
 		}))
 		c := New()
-		err := c.Send(context.Background(), srv.URL, p256dh, auth, []byte("cipher"), nil, "vapid-jwt")
+		err := c.Send(context.Background(), srv.URL, p256dh, auth, []byte("cipher"), nil, "vapid t=x", usecase.WebPushOptions{})
 		srv.Close()
 		if err == nil {
 			t.Fatalf("status %d: expected an error", status)
@@ -164,7 +164,7 @@ func TestSend_DoesNotWrapErrDeviceTokenInvalid_On5xx(t *testing.T) {
 	defer srv.Close()
 
 	c := New()
-	err := c.Send(context.Background(), srv.URL, p256dh, auth, []byte("cipher"), nil, "vapid-jwt")
+	err := c.Send(context.Background(), srv.URL, p256dh, auth, []byte("cipher"), nil, "vapid t=x", usecase.WebPushOptions{})
 	if err == nil {
 		t.Fatal("expected an error for a 503 response")
 	}

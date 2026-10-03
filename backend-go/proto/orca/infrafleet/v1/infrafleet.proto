@@ -323,6 +323,12 @@ service InfraFleetService {
   // from, then resume/start with the new account.
   rpc SwitchAgentAccount(SwitchAgentAccountRequest) returns (AgentSession);
 
+  // ListAgentSessions lists the caller tenant's agent sessions by origin so
+  // api-gateway's durable MCP reaper can stop the agents of a closed MCP
+  // session even when the replica that started them is gone. At least one
+  // origin filter is required: this is not a general listing.
+  rpc ListAgentSessions(ListAgentSessionsRequest) returns (ListAgentSessionsResponse);
+
   // ListEphemeralVmRuntimes is a plain tenant-scoped Postgres read (no
   // relay) of every non-destroyed ephemeral_vm_runtimes row — SOL-004
   // Group 1's second read. Written to by EphemeralVmRelay (TASK-004).
@@ -1570,6 +1576,14 @@ message AgentSession {
   int64  last_active_at_unix_ms  = 11;
   SessionOrigin origin           = 12;  // unset for UI-created sessions
 }
+
+message ListAgentSessionsRequest {
+  string origin_type       = 1; // e.g. "mcp"
+  string origin_session_id = 2; // SessionOrigin.mcp_session_id
+  bool   active_only       = 3; // only spawning|running|idle|waiting
+  int32  limit             = 4; // default 100, max 500
+}
+message ListAgentSessionsResponse { repeated AgentSession sessions = 1; }
 
 message StopAgentSessionRequest { string session_id = 1; }
 message KillAgentSessionRequest {

@@ -151,6 +151,12 @@ type RefreshTokenRevoker interface {
 	RevokeGrantTokens(ctx context.Context, grantID, reason string) error
 }
 
+// PatSuspender suspends (or restores) every personal access token of a tenant
+// at auth-service. Nothing is revoked, so restoring brings the tokens back.
+type PatSuspender interface {
+	SetPatSuspension(ctx context.Context, tenantID string, suspended bool, reason string) error
+}
+
 // ToolCanceller stops a running tool. The default is a no-op because running
 // tools live in the gateway, which also stops them itself when its kill-state
 // poll flips.

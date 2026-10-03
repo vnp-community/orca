@@ -52,10 +52,10 @@ publisher.
 - `internal/adapter/vaultsigner/` — implements the `VaultSigner` port
   against a real `credential-broker-service` connection's `SignVapidPayload`
   RPC (Epic B, 2026-08-17 — previously called `common/secrets.Client.TransitEncrypt`
-  directly; see "credential-broker-service is wired" below). **Not yet
-  called from any RPC path** — wired into the gRPC `Server` composition
-  (stored, ready for the future `DeliverPush` usecase) but no mobile-push
-  delivery usecase exists in this slice. See "Known gaps".
+  directly; see "credential-broker-service is wired" below). Called by
+  `external/webpush.VapidAuthorizer` (CR-NOTIF-002): only the JWT signing input
+  goes to the broker; the Vault signature (ASN.1 DER) is converted to raw
+  R||S locally. No VAPID private key ever enters this process.
 - `internal/adapter/grpc/` — implements the generated
   `notificationv1.NotificationServiceServer`, including
   `StreamNotifications`: a real, working server-streaming handler that
@@ -154,12 +154,24 @@ go test -tags=integration ./internal/adapter/postgres/...   # requires Docker (t
   Vault-side detail (`common/secrets.TransitEncrypt` standing in for a
   dedicated Transit "sign" operation is now that service's gap to track,
   not this one's).
-- **No `DeliverPush` usecase in this slice.** `VaultSigner` and the mobile
-  push path (`deliver_push.go`, APNs/FCM clients, Web Push protocol
-  framing per notification-service.md §6) aren't implemented — this slice
-  covers subscription CRUD, VAPID public-key distribution, event
-  consumption/translation, and WS fan-out only. `adapter/grpc.Server`
-  holds a `VaultSigner` field ready for that usecase to be wired in later.
+- ~~**No `DeliverPush` usecase.**~~ — **closed** (CR-NOTIF-002).
+  `usecase.DeliverPush` sends to every active subscription of an event's
+  recipients when `Channels` contains `push`, after `Broadcast` and without
+  failing the event. Web payload is exactly `{title, body, deepLink, tag}`
+  (`domain.ToPushMessage`); `mcp.approval` bodies are pinned to a fixed string
+  so tool arguments never reach a push service. RFC 8291 encryption and
+  RFC 8030 `TTL`/`Urgency` live in `adapter/external/webpush` (stdlib
+  `crypto/ecdh` + `x/crypto/hkdf`, no Web Push library: they sign VAPID with a
+  local key, which the Vault-only rule forbids). 404/410 -> `MarkExpired`.
+  Deliveries are bounded (`NOTIFICATION_PUSH_CONCURRENCY`, default 8) with a
+  per-call deadline (`NOTIFICATION_PUSH_TIMEOUT`, default 5s); endpoints are
+  logged as host only. Metrics: `orca_notification_push_deliveries_total`,
+  `orca_notification_push_delivery_seconds` on the HTTP port's `/metrics`.
+  Env: `VAPID_SUBJECT` (required for web push; mailto:/https: contact).
+  Remaining gaps: the tenant's `vapid-signing-<tenant_id>` Transit key must be
+  provisioned as `ecdsa-p256` and its public half stored in `vapid_keys`
+  (ops, not code); failed non-410 sends are buffered (BR-MB-07) but there is
+  no timed retry; no cross-event push dedup on restart (CR-NOTIF-001 item D).
 - ~~**No `processed_events` dedup table.**~~ — **closed**
   (docs/execution-plan.md §3 Phase 1): `migrations/0002_processed_events.{up,down}.sql`
   adds `notification.processed_events` exactly per notification-service.md

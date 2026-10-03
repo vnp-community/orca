@@ -86,6 +86,8 @@ type Handler struct {
 	streams  *streamLimiter
 	engine   *engine
 	host     *sessionHost
+
+	toolsDebounce *tenantDebouncer
 }
 
 // NewHandler builds the adapter and its SDK server.
@@ -109,7 +111,8 @@ func NewHandler(d Deps) *Handler {
 	}
 	codec := mustCursorCodec(d.CursorKeys, log)
 	srvOpts := &engine{catalog: catalog, executor: d.Executor, cursors: codec, pageSize: cfg.PageSize, log: log, ready: newReadySessions(cfg.SessionIdleTTL),
-		resources: d.Resources, prompts: d.Prompts}
+		resources: d.Resources, prompts: d.Prompts, toolsListChanged: cfg.ToolsListChanged}
+	h.toolsDebounce = newTenantDebouncer(cfg.ToolsListChangedDebounce)
 	server := newSDKServer(srvOpts, cfg, log, d.GetSessionID)
 	h.engine = srvOpts
 	srvOpts.reqRec, _ = h.rec.(RequestRecorder)
@@ -130,7 +133,10 @@ func NewHandler(d Deps) *Handler {
 
 // Close ends every session held by this replica (cancelling in-flight tools)
 // and stops background work. Call it on shutdown.
-func (h *Handler) Close() { h.host.Close() }
+func (h *Handler) Close() {
+	h.toolsDebounce.Stop()
+	h.host.Close()
+}
 
 // CloseSession ends a session by its row id on every replica (WS channel
 // mcp.session.close, admin actions).

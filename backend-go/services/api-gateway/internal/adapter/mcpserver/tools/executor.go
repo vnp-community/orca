@@ -44,6 +44,9 @@ type Executor struct {
 	cacheMu sync.Mutex
 	cache   map[string]cachedResult
 	now     func() time.Time
+
+	// scmLimit spends the per-tenant provider quota (github, gitlab, linear).
+	scmLimit *scmLimiter
 }
 
 // Guards are the governance hooks the composition root plugs in (BE-MCP-SOL-012/013).
@@ -92,6 +95,7 @@ func NewExecutor(c *Catalog, d Dispatcher, gate mcpserver.PolicyGate, s *ToolSes
 	}
 	e := &Executor{catalog: c, disp: d, gate: gate, session: s, cfg: cfg.withDefaults(), log: log,
 		cache: map[string]cachedResult{}, now: time.Now}
+	e.scmLimit = newSCMLimiter(e.cfg.SCMRatePerMin, e.nowFn)
 	e.sessions = newToolSessions(s, d, DefaultPtyToolsConfig(), log, e.nowFn, func() Guards { return e.guards })
 	return e
 }
@@ -278,6 +282,13 @@ func (e *Executor) runGuarded(ctx context.Context, p mcpserver.Principal, spec *
 			return obj, nil
 		}
 	}
+	if err := spec.guardInputPath(input, e.cfg.SensitivePathExtra); err != nil {
+		return nil, err
+	}
+	// After the cache check: a cached answer never touches the provider.
+	if ok, wait := e.scmLimit.allow(p.TenantID, rateGroup(spec.Namespace)); !ok {
+		return nil, &ToolError{"RATE_LIMITED", fmt.Sprintf("too many %s requests for this tenant; retry in %ds", spec.Namespace, int(wait.Seconds())+1)}
+	}
 	ctx, cancel := context.WithTimeout(ctx, e.cfg.ToolTimeout)
 	defer cancel()
 	stop := context.AfterFunc(e.session.Context(), cancel)
@@ -299,6 +310,10 @@ func (e *Executor) runGuarded(ctx context.Context, p mcpserver.Principal, spec *
 	obj, err := normalizeResult(res, spec)
 	if err != nil {
 		return nil, err
+	}
+	spec.filterSensitiveItems(obj, input, e.cfg.SensitivePathExtra)
+	if piiApplies(e.cfg.PIIMask, spec) {
+		obj = maskPII(obj).(map[string]any)
 	}
 	if key != "" {
 		e.cachePut(key, obj, time.Duration(spec.CacheTTL)*time.Second)

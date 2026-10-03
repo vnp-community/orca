@@ -120,6 +120,7 @@ func run() error {
 			usecase.SsoGroupRoleMappingRepository
 			usecase.OAuthRepository
 			usecase.McpTokenRepository
+			usecase.McpPatSuspensionRepository
 		}
 		pairingSessions usecase.PairingSessionRepository
 		pairedDevices   usecase.PairedDeviceRepository
@@ -423,8 +424,15 @@ func run() error {
 	// The mcp-service-only OAuth RPCs are guarded by a shared secret on top of
 	// the NetworkPolicy allow-list (no mesh peer identity exists yet). The
 	// guard option comes after ChainUnary so it runs inside recovery/logging.
-	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler(),
-		grpc.ChainUnaryInterceptor(internalcaller.Guard(oauthCfg.InternalCallerToken, authgrpc.OAuthInternalMethods...)))
+	guards := []grpc.UnaryServerInterceptor{
+		internalcaller.Guard(oauthCfg.InternalCallerToken, append(append([]string{}, authgrpc.OAuthInternalMethods...), authgrpc.McpSuspensionMethods...)...),
+	}
+	if oauthCfg.McpPrincipalCallerToken != "" {
+		guards = append(guards, internalcaller.Guard(oauthCfg.McpPrincipalCallerToken, authgrpc.McpPrincipalMethods...))
+	} else if oauthCfg.Enabled {
+		logger.Warn("AUTH_MCP_PRINCIPAL_CALLER_TOKEN is empty: ResolveMcpPrincipal relies on network policy alone")
+	}
+	grpcServer := grpc.NewServer(grpcmw.ChainUnary(logger), grpcmw.StatsHandler(), grpc.ChainUnaryInterceptor(guards...))
 	baseServer := authgrpc.New(
 		loginUC, logoutUC, validateSessionUC,
 		createUserUC, listUsersUC, updateUserRoleUC, revokeSessionUC, queryAuditLogUC,
@@ -466,7 +474,8 @@ func run() error {
 			Issue:   usecase.NewIssueMcpToken(repo, repo, repo, tokenSigner, clock, oauthCfg.ResourceURL),
 			List:    usecase.NewListMcpTokens(repo),
 			Revoke:  usecase.NewRevokeMcpToken(repo, repo, clock),
-			Resolve: usecase.NewResolveMcpPrincipal(repo, repo, repo, repo, clock),
+			Resolve: usecase.NewResolveMcpPrincipal(repo, repo, repo, repo, clock).WithPatSuspension(repo),
+			Suspend: usecase.NewSetMcpPatSuspension(repo, repo, clock),
 		})
 	}
 	authv1.RegisterAuthServiceServer(grpcServer, authServer)

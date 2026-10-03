@@ -25,7 +25,8 @@ func dialMCPService(addr string) (*grpc.ClientConn, error) {
 	// otelgrpc propagates the MCP request's trace to mcp-service (policy decision and audit share its trace_id).
 	opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials()), grpc.WithStatsHandler(otelgrpc.NewClientHandler())}
 	if tok := os.Getenv("MCP_INTERNAL_CALLER_TOKEN"); tok != "" {
-		opts = append(opts, grpc.WithChainUnaryInterceptor(internalcaller.ClientInterceptor(tok)))
+		opts = append(opts, grpc.WithChainUnaryInterceptor(internalcaller.ClientInterceptor(tok)),
+			grpc.WithChainStreamInterceptor(internalcaller.StreamClientInterceptor(tok)))
 	}
 	return grpc.NewClient(addr, opts...)
 }

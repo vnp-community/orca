@@ -20,6 +20,8 @@ const (
 	McpInactiveClientBlock  = "client_blocked"
 	McpInactiveGrantRevoked = "grant_revoked"
 	McpInactiveUnknown      = "unknown_token"
+	// McpInactiveSuspended: the tenant's kill switch suspends its PATs (reversible).
+	McpInactiveSuspended = "suspended"
 )
 
 type ResolveMcpPrincipalInput struct {
@@ -42,6 +44,14 @@ type ResolveMcpPrincipal struct {
 	oauth  OAuthRepository
 	audit  AuditRepository
 	clock  Clock
+	// suspended is optional; nil means PATs are never suspended.
+	suspended McpPatSuspensionRepository
+}
+
+// WithPatSuspension makes PAT resolution honour the tenant kill-switch flag.
+func (uc *ResolveMcpPrincipal) WithPatSuspension(r McpPatSuspensionRepository) *ResolveMcpPrincipal {
+	uc.suspended = r
+	return uc
 }
 
 func NewResolveMcpPrincipal(users UserRepository, tokens McpTokenRepository, oauth OAuthRepository, audit AuditRepository, clock Clock) *ResolveMcpPrincipal {
@@ -97,6 +107,16 @@ func (uc *ResolveMcpPrincipal) checkPAT(ctx context.Context, in ResolveMcpPrinci
 		return inactive(McpInactiveRevoked), nil
 	case !now.Before(t.ExpiresAt):
 		return inactive(McpInactiveExpired), nil
+	}
+	// Checked before usage bookkeeping so a suspended token leaves no trace of use.
+	if uc.suspended != nil {
+		sus, err := uc.suspended.IsMcpPatSuspended(ctx, in.TenantID)
+		if err != nil {
+			return ResolveMcpPrincipalOutput{}, apperrors.New(apperrors.KindInternal, "AUTH_MCP_RESOLVE_FAILED", "failed to check token suspension", err)
+		}
+		if sus {
+			return inactive(McpInactiveSuspended), nil
+		}
 	}
 	// Usage bookkeeping is best effort: it must never turn a valid token away.
 	if first, err := uc.tokens.MarkMcpTokenFirstUsed(ctx, t.TenantID, t.JTI, now); err == nil && first {

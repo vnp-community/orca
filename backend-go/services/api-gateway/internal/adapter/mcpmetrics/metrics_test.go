@@ -411,3 +411,41 @@ func (b bearer) RoundTrip(r *http.Request) (*http.Response, error) {
 	r.Header.Set("Authorization", "Bearer "+string(b))
 	return http.DefaultTransport.RoundTrip(r)
 }
+
+type statusGate struct {
+	*mcpservertest.FakeGate
+	status string
+}
+
+func (s statusGate) AwaitApprovalStatus(context.Context, mcpserver.Principal, string) (bool, string, error) {
+	return false, s.status, nil
+}
+
+func TestApprovalExpiredIsCountedAsExpiredNotDenied(t *testing.T) {
+	m := mcpmetrics.New()
+	p := mcpserver.Principal{TenantID: "t", UserID: "u"}
+	for _, st := range []string{"expired", "denied", "pending", "expired"} {
+		g := mcpmetrics.InstrumentGate(statusGate{FakeGate: &mcpservertest.FakeGate{}, status: st}, m)
+		_, _ = g.AwaitApproval(context.Background(), p, "a1")
+	}
+	for outcome, want := range map[string]float64{"expired": 2, "denied": 2} {
+		if got := counter(t, m, "orca_mcp_approvals_total", map[string]string{"outcome": outcome}); got != want {
+			t.Errorf("outcome %s = %v, want %v", outcome, got, want)
+		}
+	}
+	// A gate without the status capability keeps the old verdict-only behaviour.
+	g := mcpmetrics.InstrumentGate(&mcpservertest.FakeGate{}, m)
+	_, _ = g.AwaitApproval(context.Background(), p, "a1")
+	if got := counter(t, m, "orca_mcp_approvals_total", map[string]string{"outcome": "denied"}); got != 3 {
+		t.Errorf("verdict-only gate must count denied, got %v", got)
+	}
+}
+
+func TestTerminalDroppedBytesCounter(t *testing.T) {
+	m := mcpmetrics.New()
+	m.TerminalDropped(10)
+	m.TerminalDropped(5)
+	if got := counter(t, m, "orca_mcp_terminal_dropped_bytes_total", nil); got != 15 {
+		t.Fatalf("dropped = %v, want 15", got)
+	}
+}

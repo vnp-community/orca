@@ -97,3 +97,11 @@ func pageFields() []Field {
 	}
 }
 func with(base []Field, more ...Field) []Field { return append(append([]Field{}, base...), more...) }
+
+func (s *ToolSpec) pii() *ToolSpec { s.PII = true; return s }
+
+// guardPath marks a files tool whose input path and result paths are screened.
+func (s *ToolSpec) guardPath(arg string, optional bool, filter pathFilterKind) *ToolSpec {
+	s.PathArg, s.PathOptional, s.PathFilter = arg, optional, filter
+	return s
+}

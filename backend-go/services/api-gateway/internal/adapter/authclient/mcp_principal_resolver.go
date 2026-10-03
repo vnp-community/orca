@@ -7,7 +7,9 @@ import (
 	"time"
 
 	"golang.org/x/sync/singleflight"
+	"google.golang.org/grpc/metadata"
 
+	"github.com/stablyai/orca-go/common/internalcaller"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/usecase"
 
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
@@ -33,6 +35,10 @@ type McpPrincipalResolver struct {
 	// OnResolve, when set, is told how each Resolve ended (cache_hit, active,
 	// inactive, error) for orca_mcp_principal_resolve_total. Set before use.
 	OnResolve func(result string)
+
+	// InternalToken, when set, is presented as the internal-caller secret that
+	// auth-service requires on ResolveMcpPrincipal. Empty = rollout-safe no-op.
+	InternalToken string
 
 	mu    sync.Mutex
 	cache map[string]mcpCacheEntry
@@ -72,6 +78,9 @@ func (c *McpPrincipalResolver) Resolve(ctx context.Context, in usecase.McpResolv
 		// does not fail every request waiting on the same lookup.
 		rctx, cancel := context.WithTimeout(context.WithoutCancel(ctx), mcpResolveTimeout)
 		defer cancel()
+		if c.InternalToken != "" {
+			rctx = metadata.AppendToOutgoingContext(rctx, internalcaller.MetadataKey, c.InternalToken)
+		}
 		resp, err := c.client.ResolveMcpPrincipal(rctx, &authv1.ResolveMcpPrincipalRequest{
 			Jti: in.JTI, UserId: in.UserID, TenantId: in.TenantID, TokenUse: in.TokenUse,
 			FamilyId: in.FamilyID, GrantId: in.GrantID, ClientId: in.ClientID,

@@ -10,6 +10,7 @@ import (
 	mysqldriver "github.com/go-sql-driver/mysql"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/usecase"
 )
 
 // AgentSessionStore implements usecase.AgentSessionRepository against
@@ -199,3 +200,34 @@ func scanAgentSession(row rowScanner) (domain.AgentSession, error) {
 	}
 	return s, nil
 }
+
+// ListByOrigin returns a tenant's agent sessions created by the given origin,
+// newest first.
+func (s *AgentSessionStore) ListByOrigin(ctx context.Context, tenantID string, f usecase.AgentSessionOriginFilter) ([]domain.AgentSession, error) {
+	active := 0
+	if f.ActiveOnly {
+		active = 1
+	}
+	rows, err := s.db.QueryContext(ctx, agentSessionSelect+`
+		WHERE tenant_id = ?
+		  AND (? = '' OR origin_type = ?)
+		  AND (? = '' OR origin_mcp_session_id = ?)
+		  AND (? = 0 OR status IN ('spawning','running','idle','waiting'))
+		ORDER BY started_at DESC, id
+		LIMIT ?`, tenantID, f.OriginType, f.OriginType, f.OriginSessionID, f.OriginSessionID, active, f.Limit)
+	if err != nil {
+		return nil, fmt.Errorf("mysql: list agent sessions by origin: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.AgentSession
+	for rows.Next() {
+		sess, err := scanAgentSession(rows)
+		if err != nil {
+			return nil, fmt.Errorf("mysql: scan agent session: %w", err)
+		}
+		out = append(out, sess)
+	}
+	return out, rows.Err()
+}
+
+var _ usecase.AgentSessionOriginLister = (*AgentSessionStore)(nil)

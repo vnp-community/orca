@@ -92,3 +92,31 @@ func (r *Repository) TouchMcpTokenLastUsed(ctx context.Context, tenantID, jti st
 }
 
 var _ usecase.McpTokenRepository = (*Repository)(nil)
+
+func (r *Repository) SetMcpPatSuspension(ctx context.Context, tenantID string, suspended bool, reason string, at time.Time) error {
+	var err error
+	if suspended {
+		_, err = r.pool.Exec(ctx, `INSERT INTO auth.mcp_pat_suspensions (tenant_id, suspended_at, reason) VALUES ($1, $2, $3)
+			ON CONFLICT (tenant_id) DO UPDATE SET suspended_at = EXCLUDED.suspended_at, reason = EXCLUDED.reason`, tenantID, at, reason)
+	} else {
+		_, err = r.pool.Exec(ctx, `DELETE FROM auth.mcp_pat_suspensions WHERE tenant_id = $1`, tenantID)
+	}
+	if err != nil {
+		return fmt.Errorf("postgres: set mcp pat suspension: %w", err)
+	}
+	return nil
+}
+
+func (r *Repository) IsMcpPatSuspended(ctx context.Context, tenantID string) (bool, error) {
+	var one int
+	err := r.pool.QueryRow(ctx, `SELECT 1 FROM auth.mcp_pat_suspensions WHERE tenant_id = $1`, tenantID).Scan(&one)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, nil
+	}
+	if err != nil {
+		return false, fmt.Errorf("postgres: read mcp pat suspension: %w", err)
+	}
+	return true, nil
+}
+
+var _ usecase.McpPatSuspensionRepository = (*Repository)(nil)

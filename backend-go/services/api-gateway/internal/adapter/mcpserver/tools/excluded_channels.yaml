@@ -146,6 +146,36 @@
   reason: "Tenant administration that could escalate privileges or lock people out (users, roles, sessions, policies)."
   listedAsHardDenied: true
 
+- pattern: "admin.listPolicies"
+  category: privilege-escalation
+  reason: "Hard-denied by the Rego bundle (mcp.rego hard_deny_channels or prefixes): tenant administration, team membership and the identity directory are never reachable from an agent token."
+  listedAsHardDenied: true
+
+- pattern: "admin.getPolicy"
+  category: privilege-escalation
+  reason: "Hard-denied by the Rego bundle (mcp.rego hard_deny_channels or prefixes): tenant administration, team membership and the identity directory are never reachable from an agent token."
+  listedAsHardDenied: true
+
+- pattern: "team.create"
+  category: privilege-escalation
+  reason: "Hard-denied by the Rego bundle (mcp.rego hard_deny_channels or prefixes): tenant administration, team membership and the identity directory are never reachable from an agent token."
+  listedAsHardDenied: true
+
+- pattern: "team.addMember"
+  category: privilege-escalation
+  reason: "Hard-denied by the Rego bundle (mcp.rego hard_deny_channels or prefixes): tenant administration, team membership and the identity directory are never reachable from an agent token."
+  listedAsHardDenied: true
+
+- pattern: "team.removeMember"
+  category: privilege-escalation
+  reason: "Hard-denied by the Rego bundle (mcp.rego hard_deny_channels or prefixes): tenant administration, team membership and the identity directory are never reachable from an agent token."
+  listedAsHardDenied: true
+
+- pattern: "auth.listTenantMemberDirectory"
+  category: privilege-escalation
+  reason: "Hard-denied by the Rego bundle (mcp.rego hard_deny_channels or prefixes): tenant administration, team membership and the identity directory are never reachable from an agent token."
+  listedAsHardDenied: true
+
 - pattern: "mcp.*"
   category: mcp-self
   reason: "MCP self-management channels (tokens, grants, consent, clients): an MCP client must not manage its own authorization."
@@ -428,15 +458,7 @@
 
 - pattern: "automation.create"
   category: backlog
-  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
-
-- pattern: "annotation.delete"
-  category: backlog
-  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
-
-- pattern: "github.project.deleteIssueCommentBySlug"
-  category: backlog
-  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+  reason: "The channel has no enabled or draft argument, so an agent-created automation would start running on its schedule; needs a safe draft shape in automation-service first."
 
 - pattern: "github.project.resolveRef"
   category: backlog
@@ -467,10 +489,6 @@
   reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
 
 - pattern: "worktree.resolvePrBase"
-  category: backlog
-  reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
-
-- pattern: "projectGroup.delete"
   category: backlog
   reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
 

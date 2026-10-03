@@ -133,16 +133,25 @@ func (uc *GetKillState) Execute(ctx context.Context, clientID, grantID, sessionI
 
 // KillSwitchCleanup performs the idempotent side effects of an activated
 // switch (retried until all succeed): cancel approvals, stop running calls,
-// revoke OAuth refresh tokens. PATs are not revoked: the deny state already
-// blocks them and no auth RPC suspends a PAT.
+// revoke OAuth refresh tokens, and (tenant scope) suspend the tenant's PATs.
+// PATs are suspended, never revoked: switching the kill switch off restores
+// them, which is why a tenant-scope switch stays "pending" when it is turned off.
 type KillSwitchCleanup struct {
 	kills     KillSwitchRepository
 	approvals ApprovalRepository
 	calls     ToolCallRepository
 	revoker   RefreshTokenRevoker
 	canceller ToolCanceller
+	pats      PatSuspender
 	clock     Clock
 	log       *slog.Logger
+}
+
+// WithPatSuspender enables PAT suspension for tenant-scope switches (nil = off,
+// e.g. when OAuth/auth-service is not configured).
+func (uc *KillSwitchCleanup) WithPatSuspender(p PatSuspender) *KillSwitchCleanup {
+	uc.pats = p
+	return uc
 }
 
 func NewKillSwitchCleanup(kills KillSwitchRepository, approvals ApprovalRepository, calls ToolCallRepository, revoker RefreshTokenRevoker, canceller ToolCanceller, clock Clock, log *slog.Logger) *KillSwitchCleanup {
@@ -177,6 +186,15 @@ func (uc *KillSwitchCleanup) cleanOne(ctx context.Context, e domain.KillSwitchEn
 		ctx = tenant.WithUserID(ctx, e.SetBy)
 	}
 	now := uc.clock.Now()
+	if e.Scope == domain.KillScopeTenant && uc.pats != nil {
+		reason := e.Reason
+		if r, _ := (domain.SecretRedactor{}).Redact(reason); r != "" {
+			reason = r
+		}
+		if err := uc.pats.SetPatSuspension(ctx, e.TenantID, e.Active, reason); err != nil {
+			return err
+		}
+	}
 	if e.Active {
 		if _, err := uc.approvals.CancelApprovals(ctx, e.TenantID, e.Scope, e.TargetID, now); err != nil {
 			return err

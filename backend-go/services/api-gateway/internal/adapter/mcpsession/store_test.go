@@ -14,10 +14,12 @@ import (
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpserver"
 )
 
-// fakeLog is an in-memory eventbus.BoundedLog stand-in with a per-subject bound.
+// fakeLog is an in-memory eventbus.BoundedLog stand-in with a per-subject bound,
+// global stream sequences and the same compare-and-set rule as JetStream.
 type fakeLog struct {
 	mu      sync.Mutex
 	max     int
+	seq     uint64
 	subject map[string][]eventbus.LogEntry
 	subs    []subjectSub
 }
@@ -33,7 +35,12 @@ func newFakeLog(max int) *fakeLog {
 func (f *fakeLog) Append(_ context.Context, subj string, h map[string]string, d []byte) (uint64, error) {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	e := eventbus.LogEntry{Subject: subj, Header: h, Data: d}
+	return f.appendLocked(subj, h, d), nil
+}
+
+func (f *fakeLog) appendLocked(subj string, h map[string]string, d []byte) uint64 {
+	f.seq++
+	e := eventbus.LogEntry{Subject: subj, Seq: f.seq, Header: h, Data: d}
 	l := append(f.subject[subj], e)
 	if len(l) > f.max {
 		l = l[1:]
@@ -44,7 +51,29 @@ func (f *fakeLog) Append(_ context.Context, subj string, h map[string]string, d 
 			s.ch <- e
 		}
 	}
-	return 1, nil
+	return f.seq
+}
+
+func (f *fakeLog) AppendAfter(_ context.Context, subj string, lastSeq uint64, h map[string]string, d []byte) (uint64, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	var cur uint64
+	if l := f.subject[subj]; len(l) > 0 {
+		cur = l[len(l)-1].Seq
+	}
+	if cur != lastSeq {
+		return 0, eventbus.ErrLogConflict
+	}
+	return f.appendLocked(subj, h, d), nil
+}
+
+func (f *fakeLog) Last(_ context.Context, subj string) (eventbus.LogEntry, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if l := f.subject[subj]; len(l) > 0 {
+		return l[len(l)-1], nil
+	}
+	return eventbus.LogEntry{}, eventbus.ErrLogEmpty
 }
 func (f *fakeLog) First(_ context.Context, subj string) (eventbus.LogEntry, error) {
 	f.mu.Lock()

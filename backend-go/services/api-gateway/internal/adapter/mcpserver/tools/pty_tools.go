@@ -247,6 +247,7 @@ func composeTerminalStart(ctx context.Context, env *CompositeEnv, in json.RawMes
 	}
 	now := env.e.now()
 	pt := &managedPty{kind: kindTerminal, ptyID: ptyID, ring: newPtyOutputRing(env.e.sessions.cfg.RingBytes, now), created: now}
+	pt.ring.onDrop = env.e.sessions.cfg.OnOutputDropped
 	if err := env.e.sessions.register(ts, pt, events); err != nil {
 		return nil, err
 	}
@@ -422,6 +423,7 @@ func composeAgentStart(ctx context.Context, env *CompositeEnv, in json.RawMessag
 	}
 	now := env.e.now()
 	pt := &managedPty{kind: kindAgent, ptyID: ptyID, sessionID: sessionID, ring: newPtyOutputRing(env.e.sessions.cfg.RingBytes, now), created: now}
+	pt.ring.onDrop = env.e.sessions.cfg.OnOutputDropped
 	if err := env.e.sessions.register(ts, pt, events); err != nil {
 		return nil, err
 	}

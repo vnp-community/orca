@@ -37,6 +37,7 @@ type Metrics struct {
 	rateLimited      prometheus.Counter
 	cancelled        prometheus.Counter
 	sessionsClosed   *prometheus.CounterVec
+	terminalDropped  prometheus.Counter
 }
 
 // New registers all collectors on a fresh registry.
@@ -56,7 +57,7 @@ func New() *Metrics {
 	m.resume = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "orca_mcp_resume_total", Help: "SSE resume attempts by result (ok|gap|unsupported)."}, []string{"result"})
 	m.approvals = prometheus.NewCounterVec(prometheus.CounterOpts{
-		Name: "orca_mcp_approvals_total", Help: "Approval waits seen by the gateway (denied includes expiry and wait timeouts)."}, []string{"outcome"})
+		Name: "orca_mcp_approvals_total", Help: "Approval waits seen by the gateway (approved|denied|expired|cancelled; denied also includes wait timeouts)."}, []string{"outcome"})
 	m.policyDenials = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "orca_mcp_policy_denials_total", Help: "Tool calls denied by the policy gate."}, []string{"reason"})
 	m.authFailures = prometheus.NewCounterVec(prometheus.CounterOpts{
@@ -73,7 +74,9 @@ func New() *Metrics {
 		Name: "orca_mcp_requests_cancelled_total", Help: "In-flight requests cancelled by the client."})
 	m.sessionsClosed = prometheus.NewCounterVec(prometheus.CounterOpts{
 		Name: "orca_mcp_sessions_closed_total", Help: "Sessions ended on this replica by reason."}, []string{"reason"})
-	m.reg.MustRegister(m.requests, m.toolCalls, m.toolDuration, m.sessionsActive, m.sseStreamsActive, m.resume,
+	m.terminalDropped = prometheus.NewCounter(prometheus.CounterOpts{
+		Name: "orca_mcp_terminal_dropped_bytes_total", Help: "PTY output bytes overwritten in the per-terminal ring before a reader consumed them."})
+	m.reg.MustRegister(m.terminalDropped, m.requests, m.toolCalls, m.toolDuration, m.sessionsActive, m.sseStreamsActive, m.resume,
 		m.approvals, m.policyDenials, m.authFailures, m.principalResolve, m.identityMismatch, m.sseDropped,
 		m.rateLimited, m.cancelled, m.sessionsClosed)
 	return m
@@ -143,3 +146,6 @@ var knownMethods = []string{"initialize", "ping", "tools/list", "tools/call", "r
 func (m *Metrics) ObservePrincipalResolve(result string) {
 	m.principalResolve.WithLabelValues(pick(result, "other", "cache_hit", "active", "inactive", "error")).Inc()
 }
+
+// TerminalDropped is the tools.PtyToolsConfig.OnOutputDropped hook.
+func (m *Metrics) TerminalDropped(n uint64) { m.terminalDropped.Add(float64(n)) }

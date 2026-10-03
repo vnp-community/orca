@@ -77,6 +77,15 @@ type ToolSpec struct {
 	// KeepKeys leaves result keys exactly as the tool produced them (snake_case
 	// documented in the tool descriptions) instead of camelizing them.
 	KeepKeys bool
+	// PathArg names the input holding a worktree-relative path that must pass
+	// the sensitive-path rules (files tools); PathOptional allows it empty.
+	PathArg      string
+	PathOptional bool
+	// PathFilter drops sensitive paths from a list result.
+	PathFilter pathFilterKind
+	// PII marks results with personal data (emails, phones) masked under
+	// MCP_PII_MASK=directory (default) and all.
+	PII bool
 
 	input    *jsonschema.Schema
 	resolved *jsonschema.Resolved

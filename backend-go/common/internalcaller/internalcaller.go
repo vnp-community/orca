@@ -23,26 +23,60 @@ const MetadataKey = "x-orca-internal-token"
 // denies every guarded call (fail closed) so a missing secret can never
 // silently open an internal-only RPC. Other methods pass through untouched.
 func Guard(expectedToken string, fullMethods ...string) grpc.UnaryServerInterceptor {
-	guarded := make(map[string]bool, len(fullMethods))
-	for _, m := range fullMethods {
-		guarded[m] = true
-	}
+	guarded := methodSet(fullMethods)
 	return func(ctx context.Context, req any, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (any, error) {
 		if !guarded[info.FullMethod] {
 			return handler(ctx, req)
 		}
-		if expectedToken != "" {
-			if md, ok := metadata.FromIncomingContext(ctx); ok {
-				for _, got := range md.Get(MetadataKey) {
-					if subtle.ConstantTimeCompare([]byte(got), []byte(expectedToken)) == 1 {
-						return handler(ctx, req)
-					}
-				}
-			}
+		if !hasToken(ctx, expectedToken) {
+			return nil, errCallerRequired()
 		}
-		// Generic message: never reveal whether a token was present or close.
-		return nil, status.Error(codes.PermissionDenied, "INTERNAL_CALLER_REQUIRED: this method is restricted to internal services")
+		return handler(ctx, req)
 	}
+}
+
+// StreamGuard is Guard for server-streaming and bidi RPCs: a unary interceptor
+// never sees them, so a stream method listed only in Guard stays open.
+func StreamGuard(expectedToken string, fullMethods ...string) grpc.StreamServerInterceptor {
+	guarded := methodSet(fullMethods)
+	return func(srv any, ss grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
+		if !guarded[info.FullMethod] {
+			return handler(srv, ss)
+		}
+		if !hasToken(ss.Context(), expectedToken) {
+			return errCallerRequired()
+		}
+		return handler(srv, ss)
+	}
+}
+
+func methodSet(fullMethods []string) map[string]bool {
+	m := make(map[string]bool, len(fullMethods))
+	for _, f := range fullMethods {
+		m[f] = true
+	}
+	return m
+}
+
+func hasToken(ctx context.Context, expectedToken string) bool {
+	if expectedToken == "" {
+		return false
+	}
+	md, ok := metadata.FromIncomingContext(ctx)
+	if !ok {
+		return false
+	}
+	for _, got := range md.Get(MetadataKey) {
+		if subtle.ConstantTimeCompare([]byte(got), []byte(expectedToken)) == 1 {
+			return true
+		}
+	}
+	return false
+}
+
+// Generic message: never reveal whether a token was present or close.
+func errCallerRequired() error {
+	return status.Error(codes.PermissionDenied, "INTERNAL_CALLER_REQUIRED: this method is restricted to internal services")
 }
 
 // ClientInterceptor attaches the shared secret to every outgoing unary call.
@@ -53,5 +87,15 @@ func ClientInterceptor(token string) grpc.UnaryClientInterceptor {
 			ctx = metadata.AppendToOutgoingContext(ctx, MetadataKey, token)
 		}
 		return invoker(ctx, method, req, reply, cc, opts...)
+	}
+}
+
+// StreamClientInterceptor presents the shared secret on streaming RPCs.
+func StreamClientInterceptor(token string) grpc.StreamClientInterceptor {
+	return func(ctx context.Context, desc *grpc.StreamDesc, cc *grpc.ClientConn, method string, streamer grpc.Streamer, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+		if token != "" {
+			ctx = metadata.AppendToOutgoingContext(ctx, MetadataKey, token)
+		}
+		return streamer(ctx, desc, cc, method, opts...)
 	}
 }

@@ -26,7 +26,8 @@ type mcpToolStack struct {
 // buildMCPToolStack must run AFTER every non-mcp channel is registered (the
 // catalog expands hard-deny patterns against the inventory). gate nil =
 // fail-closed default (only risk=read tools run); governance supplies the
-// real gate. Env: MCP_TOOL_PACKS_ENABLED (default "1"), MCP_TOOL_TIMEOUT.
+// real gate. Env: MCP_TOOL_PACKS_ENABLED (default "1"), MCP_TOOL_TIMEOUT,
+// MCP_SCM_RATE_PER_MIN (30), MCP_PII_MASK (directory), MCP_SENSITIVE_PATH_EXTRA.
 func buildMCPToolStack(reg *wscompat.Registry, gate mcpserver.PolicyGate, logger *slog.Logger) (*mcpToolStack, error) {
 	cfg := tools.DefaultConfig()
 	packs, err := tools.ParsePacks(os.Getenv("MCP_TOOL_PACKS_ENABLED"))
@@ -34,6 +35,9 @@ func buildMCPToolStack(reg *wscompat.Registry, gate mcpserver.PolicyGate, logger
 		return nil, err
 	}
 	cfg.Packs = packs
+	if cfg, err = cfg.ApplyEnv(os.Getenv); err != nil {
+		return nil, err
+	}
 	if v := os.Getenv("MCP_TOOL_TIMEOUT"); v != "" {
 		d, err := time.ParseDuration(v)
 		if err != nil || d <= 0 {

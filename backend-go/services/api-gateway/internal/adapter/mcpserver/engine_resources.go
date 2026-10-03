@@ -15,7 +15,7 @@ import (
 // resources.listChanged is not emitted yet. Prompts: list/get + list_changed
 // (driven by Handler.NotifyPromptsChanged).
 func (e *engine) capabilities() *mcp.ServerCapabilities {
-	caps := &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{}, Logging: &mcp.LoggingCapabilities{}}
+	caps := &mcp.ServerCapabilities{Tools: &mcp.ToolCapabilities{ListChanged: e.toolsListChanged}, Logging: &mcp.LoggingCapabilities{}}
 	if e.resources != nil {
 		caps.Resources = &mcp.ResourceCapabilities{Subscribe: e.resources.Subscribable()}
 	}
