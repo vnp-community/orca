@@ -1,6 +1,6 @@
 # FE-MCP-SOL-003: Trang consent `/oauth/consent`, "Connected apps" và quản trị OAuth client
 
-> 🔲 Designed — chưa implement. Cần backend [BE-MCP-SOL-005](../../../../../backend-go/crs/v5/mcp-authorization/solutions/BE-MCP-SOL-005-oauth21-resource-server.md) (PR 4) mới chạy end-to-end; hợp đồng: [CONTRACT-mcp-ui-api.md](../../../../../backend-go/crs/v5/CONTRACT-mcp-ui-api.md).
+> ✅ Implemented (unit/integration tests) — see Gaps. Cần backend [BE-MCP-SOL-005](../../../../../backend-go/crs/v5/mcp-authorization/solutions/BE-MCP-SOL-005-oauth21-resource-server.md) (PR 4) mới chạy end-to-end; hợp đồng: [CONTRACT-mcp-ui-api.md](../../../../../backend-go/crs/v5/CONTRACT-mcp-ui-api.md).
 
 ## CR Reference
 

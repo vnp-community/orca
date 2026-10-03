@@ -24,7 +24,7 @@
 
 | Solution | CR | Area | Effort | Status |
 |---|---|---|---|---|
-| [FE-MCP-SOL-002](./FE-MCP-SOL-002-connect-panel-and-active-sessions.md) | CR-MCP-003/004 (phần FE) | `components/settings/mcp/McpConnectTab.tsx`, `hooks/useMcpSessions.ts`, `lib/mcp-connect-snippets.ts` | Small–Medium | 🔲 Designed — chưa implement |
+| [FE-MCP-SOL-002](./FE-MCP-SOL-002-connect-panel-and-active-sessions.md) | CR-MCP-003/004 (phần FE) | `components/settings/mcp/McpConnectTab.tsx`, `hooks/useMcpSessions.ts`, `lib/mcp-connect-snippets.ts` | Small–Medium | ✅ Implemented — see Gaps |
 
 ## Thứ tự thực thi & phụ thuộc
 

@@ -1,6 +1,6 @@
 # BE-MCP-SOL-002: Nối `/mcp` vào `api-gateway` — adapter `mcpserver`, cấu hình, chống tấn công transport, khung kênh `mcp.*`
 
-> **🔲 Designed — chưa implement.** Phụ thuộc [BE-MCP-SOL-001](./BE-MCP-SOL-001-scaffold-mcp-service.md) (client `mcpv1.McpServiceClient`).
+> **✅ Implemented (unit/integration tests) — see Gaps.** Phụ thuộc [BE-MCP-SOL-001](./BE-MCP-SOL-001-scaffold-mcp-service.md) (client `mcpv1.McpServiceClient`).
 
 **CR:** [CR-MCP-002](../../../../../../docs/crs/v5/mcp-service-foundation/CR-MCP-002-gateway-mcp-endpoint-wiring.md)
 **Service:** `api-gateway` (`internal/adapter/mcpserver`, `internal/adapter/wscompat`, `internal/adapter/httpgateway`, `internal/config`, `cmd/server`) · `deploy/dev` nginx · CI

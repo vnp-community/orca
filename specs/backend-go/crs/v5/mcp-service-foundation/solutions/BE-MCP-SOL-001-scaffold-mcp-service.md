@@ -1,6 +1,6 @@
 # BE-MCP-SOL-001: Dựng `mcp-service` — module Go, proto nội bộ, schema `mcp` có RLS thật
 
-> **🔲 Designed — chưa implement.** Điều kiện tiên quyết của mọi solution v5 còn lại. Không phụ thuộc solution nào.
+> **✅ Implemented (unit/integration tests) — see Gaps.** Điều kiện tiên quyết của mọi solution v5 còn lại. Không phụ thuộc solution nào.
 
 **CR:** [CR-MCP-001](../../../../../../docs/crs/v5/mcp-service-foundation/CR-MCP-001-scaffold-mcp-service.md)
 **Service:** `mcp-service` (mới) · `proto` · `go.work`/`Makefile`/`deploy/*` · `.github/workflows`

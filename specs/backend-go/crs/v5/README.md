@@ -2,7 +2,7 @@
 
 > **CR gốc:** [docs/crs/v5](../../../../docs/crs/v5/README.md) · **TDD áp dụng:** [specs/backend-go/tdd](../../tdd/README.md)
 > **Hợp đồng với frontend:** [CONTRACT-mcp-ui-api.md](./CONTRACT-mcp-ui-api.md) (bắt buộc) · **Phía frontend:** [specs/frontend/crs/v5](../../../frontend/crs/v5/README.md)
-> Trạng thái (cập nhật 2026-10-02): BE-MCP-SOL-001..007, 010..014 ✅ Implemented (unit/integration tests) — xem README từng service để biết khoảng trống; 008 🟡 pack 1-3 (pack 4 chưa); 009 🔲 đang được hiện thực riêng; 015 🟡 một phần (xem banner của nó). **Chưa có kiểm chứng end-to-end trên stack dev đầy đủ.**
+> Trạng thái (cập nhật 2026-10-03): BE-MCP-SOL-001..014 ✅ Implemented (unit/integration tests) — xem README từng service và mục Gaps của từng solution; 008 gồm pack 1–4 cho các channel hiện có; 015 🟡 một phần (xem banner của nó). Đã làm thêm: `DeliverPush` (CR-NOTIF-002), suspend PAT theo kill switch, `tools/list_changed`, ordinal SSE đa replica, reaper agent đa replica. **Chưa có kiểm chứng end-to-end trên stack dev đầy đủ.**
 
 ## 1. Cấu trúc
 

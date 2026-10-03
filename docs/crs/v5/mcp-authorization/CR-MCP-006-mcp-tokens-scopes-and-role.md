@@ -9,7 +9,7 @@
 | **Effort** | Medium (4–6 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát `wscompat/registry.go`, `auth_cli_token_routes.go` |
 | **Phụ thuộc** | [CR-MCP-005](./CR-MCP-005-oauth21-resource-server.md) (cùng nhau) |
 

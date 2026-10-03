@@ -1,6 +1,6 @@
 # FE-MCP-SOL-005: Tab "Tools" — danh mục tool MCP (admin, chỉ đọc)
 
-> 🔲 Designed — chưa implement. FE-MCP-SOL-001 (kiểu dùng chung, `window.api.mcp`, `mcp-slice`, section `mcp`, khung `McpSettingsPane`) được viết song song: solution này **chỉ dùng tên** do FE-001 chốt, không định nghĩa lại; chỗ phụ thuộc tên chưa chốt đánh dấu "(khớp FE-001 khi merge)". Tab chỉnh policy là FE-MCP-SOL-008; ở đây chỉ **liên kết** sang đó.
+> ✅ Implemented (unit/integration tests) — see Gaps. FE-MCP-SOL-001 (kiểu dùng chung, `window.api.mcp`, `mcp-slice`, section `mcp`, khung `McpSettingsPane`) được viết song song: solution này **chỉ dùng tên** do FE-001 chốt, không định nghĩa lại; chỗ phụ thuộc tên chưa chốt đánh dấu "(khớp FE-001 khi merge)". Tab chỉnh policy là FE-MCP-SOL-008; ở đây chỉ **liên kết** sang đó.
 
 ## CR Reference
 

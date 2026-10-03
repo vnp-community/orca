@@ -9,7 +9,7 @@
 | **Effort** | Large (7–9 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát `wscompat` (`terminal_stream_frame.go`, `registry.go:78`) |
 | **Phụ thuộc** | [CR-MCP-004](../mcp-protocol-server/CR-MCP-004-sessions-sse-resumability.md), [CR-MCP-008](./CR-MCP-008-domain-tool-packs.md) đợt 3 |
 

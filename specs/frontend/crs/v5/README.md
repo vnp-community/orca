@@ -2,7 +2,7 @@
 
 > **CR gốc:** [docs/crs/v5](../../../../docs/crs/v5/README.md) · **TDD áp dụng:** [specs/frontend/tdd/v5](../../tdd/v5/00-index.md) (+ [v4/03-admin-spa](../../tdd/v4/03-admin-spa.md), [v4/10-web-push-ui](../../tdd/v4/10-web-push-ui.md))
 > **Hợp đồng bắt buộc với backend-go:** [CONTRACT-mcp-ui-api.md](../../../backend-go/crs/v5/CONTRACT-mcp-ui-api.md) · **Phía backend:** [specs/backend-go/crs/v5](../../../backend-go/crs/v5/README.md)
-> Trạng thái: 🔲 Designed — chưa implement.
+> Trạng thái: ✅ Implemented — see Gaps.
 
 ## 1. Cấu trúc & ánh xạ
 
@@ -41,4 +41,4 @@ specs/frontend/crs/v5/<feature>/solutions/
 
 ## 3. Mẫu nội dung một FE solution (khuôn `crs/v4/team-rbac/solutions`)
 
-`# FE-MCP-SOL-NNN: …` → banner 🔲 → **CR Reference** (CR link, mức ưu tiên, phạm vi *chỉ phần FE*) → **Backend dependency** (bảng kênh CONTRACT + BE solution; nói rõ khi BE chưa có thì FE làm gì) → **Impact analysis (gitnexus)** (bảng Symbol/Direction/Risk — chỉ ghi lệnh cần chạy + rủi ro dự kiến, **không bịa số**) → **Bối cảnh (đã xác nhận lại)** kèm đường dẫn file thật → **Giải pháp** (`### Bước N` + `**File:** … (NEW|MODIFY)` + code TS/TSX) → **Trạng thái UI** (loading/empty/error/forbidden/disabled-by-flag) → **A11y & i18n & style** → **Files cần sửa** (bảng) → **Verification** (`cd frontend && npx vitest run …`, `npx tsc --noEmit -p tsconfig.json`, Playwright nếu có) → **Sửa TDD kèm theo** → **Không làm ở solution này**.
+`# FE-MCP-SOL-NNN: …` → banner trạng thái → **CR Reference** (CR link, mức ưu tiên, phạm vi *chỉ phần FE*) → **Backend dependency** (bảng kênh CONTRACT + BE solution; nói rõ khi BE chưa có thì FE làm gì) → **Impact analysis (gitnexus)** (bảng Symbol/Direction/Risk — chỉ ghi lệnh cần chạy + rủi ro dự kiến, **không bịa số**) → **Bối cảnh (đã xác nhận lại)** kèm đường dẫn file thật → **Giải pháp** (`### Bước N` + `**File:** … (NEW|MODIFY)` + code TS/TSX) → **Trạng thái UI** (loading/empty/error/forbidden/disabled-by-flag) → **A11y & i18n & style** → **Files cần sửa** (bảng) → **Verification** (`cd frontend && npx vitest run …`, `npx tsc --noEmit -p tsconfig.json`, Playwright nếu có) → **Sửa TDD kèm theo** → **Không làm ở solution này**.

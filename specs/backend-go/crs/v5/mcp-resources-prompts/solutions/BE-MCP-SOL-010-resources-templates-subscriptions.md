@@ -1,6 +1,6 @@
 # BE-MCP-SOL-010: Resources, resource templates, subscriptions
 
-> **🔲 Designed — chưa implement.** Phụ thuộc BE-MCP-SOL-007 (ToolExecutor/Catalog/redaction), BE-MCP-SOL-004 (phiên, notifier, resume), BE-MCP-SOL-012 (policy), BE-MCP-SOL-009 (ring terminal).
+> **✅ Implemented (unit/integration tests) — see Gaps.** Phụ thuộc BE-MCP-SOL-007 (ToolExecutor/Catalog/redaction), BE-MCP-SOL-004 (phiên, notifier, resume), BE-MCP-SOL-012 (policy), BE-MCP-SOL-009 (ring terminal).
 
 **CR:** [CR-MCP-010](../../../../../../docs/crs/v5/mcp-resources-prompts/CR-MCP-010-resources-templates-subscriptions.md)
 **Service:** `api-gateway` (`internal/adapter/mcpserver/resources/`), đề xuất sửa nhỏ `git-gateway-service` (symlink)

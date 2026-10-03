@@ -19,7 +19,7 @@
 | Trạng thái đã đọc/chưa đọc (`is_read`/`read_at`) | ❌ Không có field, không có RPC (`MarkAsRead`), không có REST endpoint | CR-NOTIF-001 |
 | `ListNotifications`/`GetUnreadCount` API | ❌ Không có trong proto lẫn implementation — RPC surface thật chỉ có `Subscribe`, `UnregisterPushSubscription`, `GetVapidPublicKey`, `StreamNotifications` | CR-NOTIF-001 |
 | Frontend tiêu thụ notification history/unread từ backend | ❌ Không — mọi unread-state ở `frontend/` (`isUnread` trên worktree, `unreadTerminalTabs`, `useActivityUnreadCount`) là state cục bộ tính từ agent/terminal status, không đọc từ `notification-service`; kênh `notifications.subscribe` tồn tại nhưng không handler nào tiêu thụ `notifications.event` | Ngoài phạm vi (frontend CR riêng) — ghi nhận ở CR-NOTIF-001 |
-| `DeliverPush` (Web Push/mobile push thật) | ❌ `NotificationEvent.Channels` gán `push` cho hầu hết subject nhưng 0 call site nào đọc field đó để gửi; `VaultSigner`/`SignVapidPayload` đã wire xong nhưng chưa từng được gọi | CR-NOTIF-002 |
+| `DeliverPush` (Web Push/mobile push thật) | ✅ Đã triển khai: `DeliverPush` gửi Web Push (RFC 8291 + VAPID ký qua Vault), `MarkExpired` khi 404/410 | CR-NOTIF-002 |
 | Per-user notification preference/mute | ❌ 0% — README's "Known gaps" tự ghi "explicitly out of scope" | Không có CR (chưa đủ evidence là yêu cầu thật, xem "Việc chưa làm" bên dưới) |
 | WS fan-out cross-replica | ✅ Đã đúng (Epic F, `SubscribeEphemeral`) — không cần CR | — |
 | Consumer-side dedup (JetStream redelivery) | ✅ Đã có (`processed_events`, Epic đã đóng) — không cần CR | — |
@@ -27,7 +27,7 @@
 | CR | Vấn đề | Priority | Effort | Status |
 |----|--------|----------|--------|--------|
 | [CR-NOTIF-001](./CR-NOTIF-001-unread-state-and-persistence.md) | Notification hoàn toàn ephemeral — không bảng, không unread state, không list/mark-as-read API | 🔴 P0 | Large | 🔲 Chưa triển khai |
-| [CR-NOTIF-002](./CR-NOTIF-002-deliver-push-usecase.md) | `Channels: push` là dead data — `DeliverPush` chưa từng được xây dù `VaultSigner` đã wire xong | 🟠 P1 | Medium | 🔲 Chưa triển khai |
+| [CR-NOTIF-002](./CR-NOTIF-002-deliver-push-usecase.md) | `Channels: push` là dead data — `DeliverPush` chưa từng được xây dù `VaultSigner` đã wire xong | 🟠 P1 | Medium | ✅ Đã triển khai (2026-10-03) |
 
 ## Thứ tự thực thi
 

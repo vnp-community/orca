@@ -1,6 +1,6 @@
 # BE-MCP-SOL-006: Token MCP — audience hai chiều, mô hình scope, PAT và `Role` hiện hành cho nhánh Bearer của MCP
 
-> **🔲 Designed — chưa implement.** Gồm 2 nhịp PR tách rời (nền tảng trước OAuth, PAT sau) — xem [README](./README.md) §3. Bám [CONTRACT-mcp-ui-api.md](../../CONTRACT-mcp-ui-api.md).
+> **✅ Implemented (unit/integration tests) — see Gaps.** Gồm 2 nhịp PR tách rời (nền tảng trước OAuth, PAT sau) — xem [README](./README.md) §3. Bám [CONTRACT-mcp-ui-api.md](../../CONTRACT-mcp-ui-api.md).
 
 **CR:** [CR-MCP-006](../../../../../../docs/crs/v5/mcp-authorization/CR-MCP-006-mcp-tokens-scopes-and-role.md)
 **Service:** `auth-service` (bảng `mcp_tokens`, RPC `IssueMcpToken/ListMcpTokens/RevokeMcpToken/ResolveMcpPrincipal`), `mcp-service` (policy PAT), `api-gateway` (`AuthValidator.ValidateMCP`, REST + 3 kênh WS), `common/` (`jwtauth.Claims`, package mới `mcpscope`)
@@ -229,3 +229,9 @@ UI PAT (FE-MCP-SOL-004); bảng scope × tool và scope mịn theo tool (BE-007/
 ## Liên quan
 
 `backend-go/common/jwtauth/jwtauth.go`, `backend-go/common/mcpscope/` (mới), `backend-go/services/api-gateway/internal/usecase/{validate_identity.go,validate_mcp_principal.go,ports.go}`, `backend-go/services/api-gateway/internal/adapter/{authclient/mcp_principal_resolver.go,httpgateway/auth_mcp_token_routes.go,wscompat/channels_mcp.go}`, `backend-go/services/auth-service/{internal/usecase,migrations/*/0012_mcp_tokens.*}`, `backend-go/services/api-gateway/cmd/server/main.go`. FE: [FE-MCP-SOL-004](../../../../../frontend/crs/v5/mcp-authorization/solutions/FE-MCP-SOL-004-access-tokens-pat-ui.md).
+
+## Ghi chú bổ sung (2026-10-03)
+
+- `inactive_reason` có thêm `suspended` (PAT của tenant đang bị kill switch tạm ngưng; xem BE-MCP-SOL-013). RPC cộng thêm `SetMcpPatSuspension` (chỉ mcp-service gọi; khoá bằng `OAUTH_INTERNAL_CALLER_TOKEN`).
+- `ResolveMcpPrincipal` nay có thể khoá bằng bí mật nội bộ riêng `AUTH_MCP_PRINCIPAL_CALLER_TOKEN` (đặt ở auth-service và api-gateway; trống = không khoá để rollout an toàn). Gateway gửi token qua metadata `x-orca-internal-token` chỉ trên lời gọi này.
+- Gateway phân biệt lý do từ chối ở metric (`expired|audience|revoked`) mà không đổi phản hồi HTTP.

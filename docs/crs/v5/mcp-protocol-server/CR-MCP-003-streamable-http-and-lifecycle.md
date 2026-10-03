@@ -9,7 +9,7 @@
 | **Effort** | Medium (5–7 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát `agent/src/relay/agent-rpc-dispatch-misc.ts`, `backend-go/` |
 | **Phụ thuộc** | [CR-MCP-002](../mcp-service-foundation/CR-MCP-002-gateway-mcp-endpoint-wiring.md) |
 

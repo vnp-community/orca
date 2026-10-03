@@ -9,7 +9,7 @@
 | **Effort** | Large (8–10 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát `wscompat/registry.go` |
 | **Phụ thuộc** | [CR-MCP-003](../mcp-protocol-server/CR-MCP-003-streamable-http-and-lifecycle.md) |
 

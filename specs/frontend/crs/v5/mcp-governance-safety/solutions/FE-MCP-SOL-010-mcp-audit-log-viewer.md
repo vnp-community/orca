@@ -1,6 +1,6 @@
 # FE-MCP-SOL-010: Tab "MCP audit" — nhật ký hành động của agent (lọc, phân trang con trỏ, chi tiết, xuất CSV)
 
-> 🔲 Designed — chưa implement.
+> ✅ Implemented (unit/integration tests) — see Gaps.
 
 ## CR Reference
 

@@ -9,7 +9,7 @@
 | **Effort** | XL — ước lượng 4–6 tuần cho 4 đợt; mỗi đợt là một PR/series riêng |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Thống kê `Register*("ns.method")` trong `wscompat/channels*.go` |
 | **Phụ thuộc** | [CR-MCP-007](./CR-MCP-007-registry-introspection-and-descriptors.md); đợt ghi/phá huỷ cần [CR-MCP-012](../mcp-governance-safety/CR-MCP-012-tool-policy-and-annotations.md) + [CR-MCP-013](../mcp-governance-safety/CR-MCP-013-approvals-audit-killswitch.md) |
 

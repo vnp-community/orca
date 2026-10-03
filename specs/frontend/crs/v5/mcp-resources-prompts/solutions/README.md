@@ -8,7 +8,7 @@
 | Solution | CR | Area | Effort | Status |
 |---|---|---|---|---|
 | — | CR-MCP-010 (resources) | **Không có solution FE — xem "Resources không có UI" bên dưới** | — | Không áp dụng |
-| [FE-MCP-SOL-007](./FE-MCP-SOL-007-custom-prompts-admin.md) | CR-MCP-011 (UI) | Tab "Prompts" trong `McpSettingsPane` (admin): danh sách built-in chỉ đọc + CRUD prompt tuỳ chỉnh, editor tham số, editor template với gợi ý `{{name}}`, hiển thị version, lỗi validation | Medium (≈3 ngày) | 🔲 Designed — chưa implement |
+| [FE-MCP-SOL-007](./FE-MCP-SOL-007-custom-prompts-admin.md) | CR-MCP-011 (UI) | Tab "Prompts" trong `McpSettingsPane` (admin): danh sách built-in chỉ đọc + CRUD prompt tuỳ chỉnh, editor tham số, editor template với gợi ý `{{name}}`, hiển thị version, lỗi validation | Medium (≈3 ngày) | ✅ Implemented — see Gaps |
 
 ## Resources (CR-MCP-010) không có UI — lý do
 

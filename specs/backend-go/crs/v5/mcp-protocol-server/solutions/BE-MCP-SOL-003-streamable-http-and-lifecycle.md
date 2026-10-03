@@ -1,6 +1,6 @@
 # BE-MCP-SOL-003: Streamable HTTP transport, vòng đời `initialize`, kênh `mcp.server.info`
 
-> **🔲 Designed — chưa implement.** Phụ thuộc [BE-MCP-SOL-002](../../mcp-service-foundation/solutions/BE-MCP-SOL-002-gateway-mcp-endpoint-wiring.md) (khung `/mcp`, `TokenVerifier`, `McpChannelDeps`). Session bền + SSE ở [BE-MCP-SOL-004](./BE-MCP-SOL-004-sessions-sse-resumability.md).
+> **✅ Implemented (unit/integration tests) — see Gaps.** Phụ thuộc [BE-MCP-SOL-002](../../mcp-service-foundation/solutions/BE-MCP-SOL-002-gateway-mcp-endpoint-wiring.md) (khung `/mcp`, `TokenVerifier`, `McpChannelDeps`). Session bền + SSE ở [BE-MCP-SOL-004](./BE-MCP-SOL-004-sessions-sse-resumability.md).
 
 **CR:** [CR-MCP-003](../../../../../../docs/crs/v5/mcp-protocol-server/CR-MCP-003-streamable-http-and-lifecycle.md)
 **Service:** `api-gateway` (`internal/adapter/mcpserver`, `internal/adapter/wscompat/channels_mcp_server_info.go`); gọi `mcp-service.GetServerInfo` (BE-001)

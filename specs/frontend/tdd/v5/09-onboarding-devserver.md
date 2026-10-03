@@ -10,7 +10,7 @@
 - `src/renderer/src/components/remote-browser/`
 - `src/renderer/src/hooks/` (useDevServers, useRemoteAgentDetection, ...)
 - `src/renderer/src/store/slices/dev-servers.ts`
-- `src/renderer/service-worker.js`
+- `src/renderer/public/service-worker.js`
 
 > **Status: ✅ IMPLEMENTED** — 4/4 solutions (Phase 1, 2, 3) | All components done
 
@@ -185,15 +185,15 @@ type PushSubscriptionState = {
 }
 
 export function useWebPushSubscription(): PushSubscriptionState & {
-  subscribe: () => Promise<void>    // POST /push/subscribe
-  unsubscribe: () => Promise<void>  // DELETE /push/subscribe
+  subscribe: () => Promise<void>    // POST /api/push-subscribe
+  unsubscribe: () => Promise<void>  // POST /api/push-unsubscribe
 }
 
-// Fetches VAPID public key: GET /push/vapid-key
+// Fetches VAPID public key: GET /api/vapid-public-key
 // Uses browser PushManager.subscribe({ userVisibleOnly: true, applicationServerKey })
 ```
 
-### 6.2 Service Worker (`src/renderer/service-worker.js`)
+### 6.2 Service Worker (`src/renderer/public/service-worker.js`)
 
 ```javascript
 // Registered in main-web-bootstrap.tsx:

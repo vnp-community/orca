@@ -1,6 +1,6 @@
 # FE-MCP-SOL-004: Tab "Access tokens" (PAT cho headless/CI) — tạo, hiển thị secret một lần, thu hồi
 
-> 🔲 Designed — chưa implement. Cần [BE-MCP-SOL-006](../../../../../backend-go/crs/v5/mcp-authorization/solutions/BE-MCP-SOL-006-mcp-tokens-scopes-and-role.md) (PR 5). Hợp đồng: [CONTRACT-mcp-ui-api.md](../../../../../backend-go/crs/v5/CONTRACT-mcp-ui-api.md).
+> ✅ Implemented (unit/integration tests) — see Gaps. Cần [BE-MCP-SOL-006](../../../../../backend-go/crs/v5/mcp-authorization/solutions/BE-MCP-SOL-006-mcp-tokens-scopes-and-role.md) (PR 5). Hợp đồng: [CONTRACT-mcp-ui-api.md](../../../../../backend-go/crs/v5/CONTRACT-mcp-ui-api.md).
 
 ## CR Reference
 

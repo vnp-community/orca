@@ -1,6 +1,6 @@
 # FE-MCP-SOL-001: Nền tảng frontend cho MCP — kiểu dùng chung, `window.api.mcp`, runtime client, slice, section Settings "MCP"
 
-> 🔲 Designed — chưa implement. **Đây là nền mà FE-MCP-SOL-002..012 xây lên**; tên file & symbol ở bảng "Bề mặt xuất" bên dưới là cam kết.
+> ✅ Implemented (unit/integration tests) — see Gaps. **Đây là nền mà FE-MCP-SOL-002..012 xây lên**; tên file & symbol ở bảng "Bề mặt xuất" bên dưới là cam kết.
 
 ## CR Reference
 

@@ -23,7 +23,7 @@
 
 | Solution | CR | Area | Effort | Status |
 |---|---|---|---|---|
-| [FE-MCP-SOL-012](./FE-MCP-SOL-012-testing-telemetry-and-rollout.md) | CR-MCP-015 (phần FE) | `tests/`, `frontend/src/**/*.test.ts(x)`, `shared/mcp-telemetry-events.ts`, `docs/guides/mcp/` | Medium (rải theo các FE solution) | 🔲 Designed — chưa implement |
+| [FE-MCP-SOL-012](./FE-MCP-SOL-012-testing-telemetry-and-rollout.md) | CR-MCP-015 (phần FE) | `tests/`, `frontend/src/**/*.test.ts(x)`, `shared/mcp-telemetry-events.ts`, `docs/guides/mcp/` | Medium (rải theo các FE solution) | ✅ Implemented — see Gaps |
 
 ## Thứ tự thực thi & phụ thuộc
 

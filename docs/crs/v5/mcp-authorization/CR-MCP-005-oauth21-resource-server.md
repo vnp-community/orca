@@ -9,7 +9,7 @@
 | **Effort** | Large (8–12 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát `api-gateway` authn, `auth-service` |
 | **Phụ thuộc** | [CR-MCP-003](../mcp-protocol-server/CR-MCP-003-streamable-http-and-lifecycle.md), [CR-MCP-001](../mcp-service-foundation/CR-MCP-001-scaffold-mcp-service.md) |
 

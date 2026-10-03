@@ -9,9 +9,9 @@
 
 | Solution | CR | Service / Area (FE) | Effort | Status |
 |---|---|---|---|---|
-| [FE-MCP-SOL-008](./FE-MCP-SOL-008-admin-policies-and-killswitch.md) | CR-MCP-012 (+013 §C) | Settings › MCP › tab "Tool policies" (match builder, explain, cài đặt tenant), panel Kill switch, banner | Medium | 🔲 Designed — chưa implement |
-| [FE-MCP-SOL-009](./FE-MCP-SOL-009-approval-dialog-and-inbox.md) | CR-MCP-013 §A | Lớp toàn cục `McpGlobalLayer` + hộp thoại phê duyệt (additive vào `App.tsx`), tab "Approvals", deep link | Large | 🔲 Designed — chưa implement |
-| [FE-MCP-SOL-010](./FE-MCP-SOL-010-mcp-audit-log-viewer.md) | CR-MCP-013 §B | Settings › MCP › tab "MCP audit" (lọc, con trỏ, chi tiết, CSV) | Medium | 🔲 Designed — chưa implement |
+| [FE-MCP-SOL-008](./FE-MCP-SOL-008-admin-policies-and-killswitch.md) | CR-MCP-012 (+013 §C) | Settings › MCP › tab "Tool policies" (match builder, explain, cài đặt tenant), panel Kill switch, banner | Medium | ✅ Implemented — see Gaps |
+| [FE-MCP-SOL-009](./FE-MCP-SOL-009-approval-dialog-and-inbox.md) | CR-MCP-013 §A | Lớp toàn cục `McpGlobalLayer` + hộp thoại phê duyệt (additive vào `App.tsx`), tab "Approvals", deep link | Large | ✅ Implemented — see Gaps |
+| [FE-MCP-SOL-010](./FE-MCP-SOL-010-mcp-audit-log-viewer.md) | CR-MCP-013 §B | Settings › MCP › tab "MCP audit" (lọc, con trỏ, chi tiết, CSV) | Medium | ✅ Implemented — see Gaps |
 
 ## Re-verify: khẳng định (CR / README FE v5 / CONTRACT) vs mã thật (2026-10-01)
 

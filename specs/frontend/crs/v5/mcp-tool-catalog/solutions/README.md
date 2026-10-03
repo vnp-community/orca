@@ -9,8 +9,8 @@ Feature này **có UI**: 1 tab admin chỉ đọc + nhãn/điều khiển trên 
 
 | Solution | CR | Area | Effort | Status |
 |---|---|---|---|---|
-| [FE-MCP-SOL-005](./FE-MCP-SOL-005-tool-catalog-admin-view.md) | CR-MCP-007/008 (UI) | Tab "Tools" trong `McpSettingsPane` (admin, chỉ đọc): bảng `McpToolView` nhóm theo namespace/pack/risk, lọc, badge rủi ro + quyết định hiệu lực + nguồn, khoá hard-deny, liên kết sang policy (FE-MCP-SOL-008) | Medium (≈2–3 ngày) | 🔲 Designed — chưa implement |
-| [FE-MCP-SOL-006](./FE-MCP-SOL-006-agent-origin-badge-in-terminal-ui.md) | CR-MCP-009 (UI) | Nhãn "Tạo bởi agent <clientName>" trên tab terminal + danh sách độc lập + nút dừng; types additive (`origin`) | Medium (≈2–3 ngày) | 🔲 Designed — chưa implement |
+| [FE-MCP-SOL-005](./FE-MCP-SOL-005-tool-catalog-admin-view.md) | CR-MCP-007/008 (UI) | Tab "Tools" trong `McpSettingsPane` (admin, chỉ đọc): bảng `McpToolView` nhóm theo namespace/pack/risk, lọc, badge rủi ro + quyết định hiệu lực + nguồn, khoá hard-deny, liên kết sang policy (FE-MCP-SOL-008) | Medium (≈2–3 ngày) | ✅ Implemented — see Gaps |
+| [FE-MCP-SOL-006](./FE-MCP-SOL-006-agent-origin-badge-in-terminal-ui.md) | CR-MCP-009 (UI) | Nhãn "Tạo bởi agent <clientName>" trên tab terminal + danh sách độc lập + nút dừng; types additive (`origin`) | Medium (≈2–3 ngày) | ✅ Implemented — see Gaps |
 
 Cả hai **không** định nghĩa lại phần nền của FE-MCP-SOL-001 (`shared/mcp-types.ts`, `window.api.mcp.*`, `store/slices/mcp-slice.ts`, section Settings `mcp`, `McpSettingsPane`); FE-005 chỉ thêm 1 tab + sub-namespace `window.api.mcp.admin.tool`, FE-006 thêm 1 slice nhỏ riêng và không đụng `McpSettingsPane` ngoài một khối danh sách.
 

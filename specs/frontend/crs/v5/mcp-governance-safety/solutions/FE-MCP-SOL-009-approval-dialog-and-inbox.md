@@ -1,6 +1,6 @@
 # FE-MCP-SOL-009: Hộp thoại phê duyệt toàn cục + tab "Approvals" (inbox/lịch sử) + deep link
 
-> 🔲 Designed — chưa implement. **Component bảo mật quan trọng nhất của UI MCP**: đây là chốt chặn con người duy nhất giữa agent và hành động `exec/destructive`.
+> ✅ Implemented (unit/integration tests) — see Gaps. **Component bảo mật quan trọng nhất của UI MCP**: đây là chốt chặn con người duy nhất giữa agent và hành động `exec/destructive`.
 
 ## CR Reference
 

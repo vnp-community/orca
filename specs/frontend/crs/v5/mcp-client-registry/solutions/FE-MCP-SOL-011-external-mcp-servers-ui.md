@@ -1,6 +1,6 @@
 # FE-MCP-SOL-011: Tab "External servers" — registry MCP server ngoài (Settings > MCP)
 
-> 🔲 Designed — chưa implement. FE-MCP-SOL-001 (kiểu dùng chung, `window.api.mcp`, `mcp-slice`, section `mcp`) đang được viết song song: solution này **chỉ dùng tên** do FE-001 chốt, không định nghĩa lại; chỗ nào phụ thuộc tên chưa chốt được đánh dấu "(khớp FE-001 khi merge)".
+> ✅ Implemented (unit/integration tests) — see Gaps. FE-MCP-SOL-001 (kiểu dùng chung, `window.api.mcp`, `mcp-slice`, section `mcp`) đang được viết song song: solution này **chỉ dùng tên** do FE-001 chốt, không định nghĩa lại; chỗ nào phụ thuộc tên chưa chốt được đánh dấu "(khớp FE-001 khi merge)".
 
 ## CR Reference
 

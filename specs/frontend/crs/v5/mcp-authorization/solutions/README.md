@@ -10,8 +10,8 @@ Feature này **có UI** (không thuộc nhóm "không UI"): 1 trang SPA web-only
 
 | Solution | CR | Area | Effort | Status |
 |---|---|---|---|---|
-| [FE-MCP-SOL-003](./FE-MCP-SOL-003-consent-page-connected-apps-and-clients.md) | CR-MCP-005 (UI) | Trang `/oauth/consent` + định tuyến/`return_to` tối thiểu ở `web/` + tab "Connected apps" + tab admin "OAuth clients" và "All grants" | Medium–Large (≈4–5 ngày) | 🔲 Designed — chưa implement |
-| [FE-MCP-SOL-004](./FE-MCP-SOL-004-access-tokens-pat-ui.md) | CR-MCP-006 (UI) | Tab "Access tokens": danh sách, tạo, reveal secret một lần, thu hồi, snippet CLI | Medium (≈2–3 ngày) | 🔲 Designed — chưa implement |
+| [FE-MCP-SOL-003](./FE-MCP-SOL-003-consent-page-connected-apps-and-clients.md) | CR-MCP-005 (UI) | Trang `/oauth/consent` + định tuyến/`return_to` tối thiểu ở `web/` + tab "Connected apps" + tab admin "OAuth clients" và "All grants" | Medium–Large (≈4–5 ngày) | ✅ Implemented — see Gaps |
+| [FE-MCP-SOL-004](./FE-MCP-SOL-004-access-tokens-pat-ui.md) | CR-MCP-006 (UI) | Tab "Access tokens": danh sách, tạo, reveal secret một lần, thu hồi, snippet CLI | Medium (≈2–3 ngày) | ✅ Implemented — see Gaps |
 
 Hai solution **không** định nghĩa lại phần nền của **FE-MCP-SOL-001** (`frontend/src/shared/mcp-types.ts`, `window.api.mcp.*`, `store/slices/mcp-slice.ts`, section Settings `mcp`, khung `McpSettingsPane`). Chúng chỉ thêm component tab và yêu cầu FE-001 mount.
 

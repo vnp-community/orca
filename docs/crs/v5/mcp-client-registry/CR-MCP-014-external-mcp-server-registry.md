@@ -9,7 +9,7 @@
 | **Effort** | Large (8–10 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát `tenant-service/internal/domain/profile_resolution.go:231-282`, `agent/src/shared/mcp-config.ts` |
 | **Phụ thuộc** | [CR-MCP-001](../mcp-service-foundation/CR-MCP-001-scaffold-mcp-service.md); khuyến nghị sau [CR-MCP-013](../mcp-governance-safety/CR-MCP-013-approvals-audit-killswitch.md) |
 

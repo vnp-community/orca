@@ -1,6 +1,6 @@
 # BE-MCP-SOL-012: Cổng chính sách tool — OPA `orca.authz.mcp`, `tool_policies` có version, hard-deny, lọc `tools/list` + enforce lúc gọi
 
-> **🔲 Designed — chưa implement.** Điều kiện cứng trước khi bật bất kỳ tool ghi/exec/phá huỷ nào (cùng BE-MCP-SOL-013). Rego trong tài liệu này đã được **chạy thử trong scratchpad** (không nằm trong repo): `opa test` 44/44 PASS, 98/98 khi gộp với bundle `policy/orca-authz` hiện có; đã nạp và eval thành công qua `github.com/open-policy-agent/opa/rego` (cùng đường `common/policy.Evaluator` dùng), kết quả trả về là `map[string]any`.
+> **✅ Implemented (unit/integration tests) — see Gaps.** Điều kiện cứng trước khi bật bất kỳ tool ghi/exec/phá huỷ nào (cùng BE-MCP-SOL-013). Rego trong tài liệu này đã được **chạy thử trong scratchpad** (không nằm trong repo): `opa test` 44/44 PASS, 98/98 khi gộp với bundle `policy/orca-authz` hiện có; đã nạp và eval thành công qua `github.com/open-policy-agent/opa/rego` (cùng đường `common/policy.Evaluator` dùng), kết quả trả về là `map[string]any`.
 
 **CR:** [CR-MCP-012](../../../../../../docs/crs/v5/mcp-governance-safety/CR-MCP-012-tool-policy-and-annotations.md)
 **Service:** `mcp-service` (quyết định + dữ liệu), `api-gateway` (`adapter/mcpserver` enforce, `adapter/wscompat/channels_mcp_policy.go`), `backend-go/policy/orca-authz` (Rego), `backend-go/common/policy` (additive)

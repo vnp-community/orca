@@ -6,7 +6,7 @@
 
 | Solution | CR | Area | Effort | Status |
 |---|---|---|---|---|
-| [FE-MCP-SOL-011](./FE-MCP-SOL-011-external-mcp-servers-ui.md) | CR-MCP-014 (phần UI) | Tab `external-servers` trong Settings > MCP (`components/settings/mcp/*`), sub-namespace `window.api.mcp.externalServer`, type bổ sung `shared/mcp-external-server-types.ts` | Medium (4–5 ngày) | 🔲 Designed — chưa implement |
+| [FE-MCP-SOL-011](./FE-MCP-SOL-011-external-mcp-servers-ui.md) | CR-MCP-014 (phần UI) | Tab `external-servers` trong Settings > MCP (`components/settings/mcp/*`), sub-namespace `window.api.mcp.externalServer`, type bổ sung `shared/mcp-external-server-types.ts` | Medium (4–5 ngày) | ✅ Implemented — see Gaps |
 
 ## Re-verify (CR/TDD vs mã frontend thật, 2026-10-01)
 

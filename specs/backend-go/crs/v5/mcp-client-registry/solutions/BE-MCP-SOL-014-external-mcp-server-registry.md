@@ -1,6 +1,6 @@
 # BE-MCP-SOL-014: Registry MCP server ngoài + cấp cấu hình MCP cho agent do Orca chạy
 
-> **🔲 Designed — chưa implement.** Phụ thuộc cứng: BE-MCP-SOL-001/002 (scaffold `mcp-service`, config, migration `0001`), BE-MCP-SOL-006 (mint token MCP ngắn hạn), BE-MCP-SOL-013 (kill switch/audit). Khuyến nghị làm sau BE-013 (theo CR).
+> **✅ Implemented (unit/integration tests) — see Gaps.** Phụ thuộc cứng: BE-MCP-SOL-001/002 (scaffold `mcp-service`, config, migration `0001`), BE-MCP-SOL-006 (mint token MCP ngắn hạn), BE-MCP-SOL-013 (kill switch/audit). Khuyến nghị làm sau BE-013 (theo CR).
 
 **CR:** [CR-MCP-014](../../../../../../docs/crs/v5/mcp-client-registry/CR-MCP-014-external-mcp-server-registry.md)
 **Service:** `mcp-service` (chính), `api-gateway` (kênh WS), `credential-broker-service` (category mới), `infra-fleet-service` (điểm hook spawn), `agent/` (**chỉ ghi phụ thuộc**, không sửa ở đây)

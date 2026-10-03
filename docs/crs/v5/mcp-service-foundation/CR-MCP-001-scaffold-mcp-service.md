@@ -9,7 +9,7 @@
 | **Effort** | Medium (4–6 ngày: scaffold, proto, migration, repo, wiring, CI) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát trực tiếp `backend-go/` theo yêu cầu hỗ trợ MCP |
 | **Phụ thuộc** | Không |
 | **Mở khoá** | Toàn bộ feature còn lại của v5 |

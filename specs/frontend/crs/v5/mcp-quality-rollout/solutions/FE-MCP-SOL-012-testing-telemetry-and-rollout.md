@@ -1,6 +1,6 @@
 # FE-MCP-SOL-012: Kiểm thử (vitest + Playwright), telemetry UI, tài liệu người dùng, hành vi rollout
 
-> 🔲 Designed — chưa implement. Chạy xuyên suốt cùng các FE-MCP-SOL-001..011; mỗi solution đó tự mang test của nó theo bảng §1, solution này định nghĩa khung chung, e2e, telemetry, tài liệu, rollout.
+> ✅ Implemented (unit/integration tests) — see Gaps. Chạy xuyên suốt cùng các FE-MCP-SOL-001..011; mỗi solution đó tự mang test của nó theo bảng §1, solution này định nghĩa khung chung, e2e, telemetry, tài liệu, rollout.
 
 ## CR Reference
 

@@ -9,8 +9,8 @@
 | Solution | CR | Service / khu vực | Effort | Status |
 |---|---|---|---|---|
 | [BE-MCP-SOL-007](./BE-MCP-SOL-007-registry-introspection-and-descriptors.md) | CR-MCP-007 | `api-gateway` (`wscompat` + `mcpserver/tools`) | Large | ✅ Implemented (unit/integration tests) — see service README for gaps |
-| [BE-MCP-SOL-008](./BE-MCP-SOL-008-domain-tool-packs.md) | CR-MCP-008 | `api-gateway` (`mcpserver/tools/pack*.go`) | XL (4 đợt) | 🟡 Packs 1-3 implemented (unit tests); pack 4 (destructive/admin tools) not implemented — see service README |
-| [BE-MCP-SOL-009](./BE-MCP-SOL-009-long-running-and-streaming-tools.md) | CR-MCP-009 | `api-gateway`, `infra-fleet-service` (cột `origin`) | Large | 🔲 Designed — chưa implement |
+| [BE-MCP-SOL-008](./BE-MCP-SOL-008-domain-tool-packs.md) | CR-MCP-008 | `api-gateway` (`mcpserver/tools/pack*.go`) | XL (4 đợt) | 🟡 Packs 1-4 implemented (108/58/27/29 tools; unit tests + real-Rego floor test); pack 4 off unless `MCP_TOOL_PACKS_ENABLED` has 4; PII mask, files sensitive-path guard, 30/min SCM limiter done — see solution doc |
+| [BE-MCP-SOL-009](./BE-MCP-SOL-009-long-running-and-streaming-tools.md) | CR-MCP-009 | `api-gateway`, `infra-fleet-service` (cột `origin`) | Large | ✅ Implemented — see Gaps |
 
 ## Re-verify: khẳng định của CR vs mã thật (2026-10-01)
 

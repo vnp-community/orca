@@ -9,7 +9,7 @@
 | **Effort** | Medium (5–7 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát `backend-go/policy/orca-authz`, `auth-service` (`opaclient`, `AccessPolicy`) |
 | **Phụ thuộc** | [CR-MCP-006](../mcp-authorization/CR-MCP-006-mcp-tokens-scopes-and-role.md), [CR-MCP-007](../mcp-tool-catalog/CR-MCP-007-registry-introspection-and-descriptors.md) |
 

@@ -1,6 +1,6 @@
 # FE-MCP-SOL-002: Tab "Connect" — địa chỉ MCP, snippet cho Claude Code / Claude Desktop / Cursor, bảng phiên đang hoạt động
 
-> 🔲 Designed — chưa implement. Xây trên [FE-MCP-SOL-001](../../mcp-service-foundation/solutions/FE-MCP-SOL-001-mcp-frontend-foundation.md) (kiểu, `mcpClient`, slice, `MCP_TABS`, `useMcpEvent`).
+> ✅ Implemented (unit/integration tests) — see Gaps. Xây trên [FE-MCP-SOL-001](../../mcp-service-foundation/solutions/FE-MCP-SOL-001-mcp-frontend-foundation.md) (kiểu, `mcpClient`, slice, `MCP_TABS`, `useMcpEvent`).
 
 ## CR Reference
 

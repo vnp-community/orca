@@ -1,6 +1,6 @@
 # BE-MCP-SOL-008: Domain tool packs 1–4 theo tên channel thật
 
-> **🔲 Designed — chưa implement.** Phụ thuộc BE-MCP-SOL-007 (ToolSpec/Executor/parity). Pack 2–4 **không bật ở production** trước BE-MCP-SOL-012/013 (policy + approval).
+> **🟡 Implemented (unit tests, real Rego bundle test) — chưa bật ở production mặc định.** Pack 1–4 có `ToolSpec` thật; mặc định `MCP_TOOL_PACKS_ENABLED=1`. Xem "Trạng thái triển khai" ở cuối tài liệu.
 
 **CR:** [CR-MCP-008](../../../../../../docs/crs/v5/mcp-tool-catalog/CR-MCP-008-domain-tool-packs.md)
 **Service:** `api-gateway` (`internal/adapter/mcpserver/tools/pack*.go`)
@@ -154,3 +154,27 @@ Cấu hình pack ở UI (FE-MCP-SOL-005 chỉ đọc; chỉnh policy ở FE-MCP-
 
 ## Liên quan
 `wscompat/channels*.go`; BE-MCP-SOL-007, 009, 010.
+
+
+## Trạng thái triển khai (2026-10-03, đo bằng `TestChannelInventory` / `TestInventoryCountsByPack`)
+
+Registry thật: 486 channel, 58 namespace. 222 channel có tool, 264 bị loại trừ, 0 chưa phân loại.
+
+| Pack | Tool chạy được | Declared (chưa chạy) | Ghi chú |
+|---|---|---|---|
+| 1 read | 108 | 0 | gồm `files_read`, `hostedReview_*` |
+| 2 write_reversible | 58 | 1 (`task_aiApply`) | `automation.create` KHÔNG phơi: channel không có `enabled`/`draft` ⇒ không ép được `enabled:false` |
+| 3 exec | 27 | 0 | gồm terminal/agent/workflow (BE-009) |
+| 4 destructive/admin | 29 | 0 | 26 destructive + 3 admin-read; scope `orca:admin`, `destructiveHint` |
+
+**Pack 4 (đã làm):** `worktree_rm/forceDeleteBranch/merge`, `git_branch_delete/discard/bulkDiscard`, `repo_rm`, `project_delete`, `automation_delete`, `task_delete`, `annotation_delete` (bắt buộc `confirmed:true`), `projectGroup_delete`, `github_mergePR`, `github_setPRAutoMerge`, `github_project_deleteIssueCommentBySlug`, `ephemeralVm_cleanup`, member project/repo (add/remove/updateRole), `devServer_approve/reject/assignGroup/resolveAccessRequest`, `admin_listUsers/listSessions/queryAuditLog`. Test `TestPack4NeverAllowedByDefaultRego` hỏi bundle Rego thật: không tool pack 4 nào cho ra `allow` với tenant settings mặc định (destructive ⇒ `require_approval`, admin ⇒ `deny`).
+
+**Lệch so với bảng pack 4 ở trên (Rego hard-deny thắng):** `team.create/addMember/removeMember`, `admin.listPolicies/getPolicy` và `auth.listTenantMemberDirectory` nằm trong `hard_deny_channels`/prefix `auth.` của `mcp.rego` ⇒ bỏ khỏi tool, đưa vào `excluded_channels.yaml` (`listedAsHardDenied`). Test `TestHardDeniedChannelsAreNotTools` giữ hai phía đồng bộ.
+
+**Không có channel nên không làm:** force-push/`git.reset`, `workflow.delete`, GitLab merge, `hostedReview` merge, `files.delete` (đang `files-v1`, mọi `files.write*/create*/rename/copy` vẫn loại trừ).
+
+**files:** đường dẫn đầu vào của `files_read/readChunk/stat/readDir` qua `CleanWorktreePath` + `IsSensitivePath` (lỗi trả `MCP_NOT_FOUND`, không gọi downstream); kết quả `readDir/search/listAll/listMarkdownDocuments` lọc đường dẫn nhạy cảm; nội dung chứa khoá PEM bị giữ lại (`withheld`). Mở rộng bằng `MCP_SENSITIVE_PATH_EXTRA`.
+
+**PII (`MCP_PII_MASK`):** `off` | `directory` (mặc định: chỉ tool gắn `PII`: team/member/admin.listUsers/listSessions) | `all`. Che email (`a***@host`), số điện thoại, số định danh dạng SSN/12 chữ số, và giá trị dưới khoá phone/ssn/passport. Cấu hình hiện theo process (env), chưa theo tenant.
+
+**Rate limit:** 30 yêu cầu/phút theo (tenant, nhóm github|gitlab|linear|hostedReview), in-process token bucket giới hạn 10 000 bucket; vượt ⇒ lỗi `RATE_LIMITED`, không gọi downstream; trúng cache 30s không tốn token. `MCP_SCM_RATE_PER_MIN` (0 = tắt). Không đồng bộ giữa replica.

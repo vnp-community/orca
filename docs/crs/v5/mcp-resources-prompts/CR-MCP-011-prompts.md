@@ -9,7 +9,7 @@
 | **Effort** | Small (2–3 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát nhu cầu từ các flow hiện có (hostedReview, task, workflow) |
 | **Phụ thuộc** | [CR-MCP-010](./CR-MCP-010-resources-templates-subscriptions.md) |
 

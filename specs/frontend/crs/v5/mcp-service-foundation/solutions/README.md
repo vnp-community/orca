@@ -27,7 +27,7 @@
 
 | Solution | CR | Area | Effort | Status |
 |---|---|---|---|---|
-| [FE-MCP-SOL-001](./FE-MCP-SOL-001-mcp-frontend-foundation.md) | CR-MCP-001/002 (phần FE) | `shared/`, `preload/api-types.ts`, `web/`, `runtime/`, `store/`, `hooks/`, `components/settings/` | Medium | 🔲 Designed — chưa implement |
+| [FE-MCP-SOL-001](./FE-MCP-SOL-001-mcp-frontend-foundation.md) | CR-MCP-001/002 (phần FE) | `shared/`, `preload/api-types.ts`, `web/`, `runtime/`, `store/`, `hooks/`, `components/settings/` | Medium | ✅ Implemented — see Gaps |
 
 ## Thứ tự thực thi & phụ thuộc
 

@@ -1,6 +1,6 @@
 # BE-MCP-SOL-011: Prompts — built-in template, prompt tuỳ chỉnh theo tenant, `list_changed`, locale
 
-> **🔲 Designed — chưa implement.** Phụ thuộc BE-MCP-SOL-010 (embedded resource), BE-MCP-SOL-002 (mcp-service nền + DB), BE-MCP-SOL-004 (notifier `list_changed`).
+> **✅ Implemented (unit/integration tests) — see Gaps.** Phụ thuộc BE-MCP-SOL-010 (embedded resource), BE-MCP-SOL-002 (mcp-service nền + DB), BE-MCP-SOL-004 (notifier `list_changed`).
 
 **CR:** [CR-MCP-011](../../../../../../docs/crs/v5/mcp-resources-prompts/CR-MCP-011-prompts.md)
 **Service:** `api-gateway` (`mcpserver/prompts/`, kênh `mcp.admin.prompt.*` trong `channels_mcp.go`), `mcp-service` (bảng + RPC prompt tuỳ chỉnh)

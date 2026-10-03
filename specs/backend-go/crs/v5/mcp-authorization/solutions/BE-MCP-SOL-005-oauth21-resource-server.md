@@ -1,6 +1,6 @@
 # BE-MCP-SOL-005: OAuth 2.1 — `auth-service` là Authorization Server, `mcp-service` giữ consent/grant, `api-gateway` là Resource Server edge
 
-> **🔲 Designed — chưa implement.** Thứ tự PR và phụ thuộc chéo với BE-MCP-SOL-006: xem [README](./README.md) §3. Mọi thay đổi bám [CONTRACT-mcp-ui-api.md](../../CONTRACT-mcp-ui-api.md).
+> **✅ Implemented (unit/integration tests) — see Gaps.** Thứ tự PR và phụ thuộc chéo với BE-MCP-SOL-006: xem [README](./README.md) §3. Mọi thay đổi bám [CONTRACT-mcp-ui-api.md](../../CONTRACT-mcp-ui-api.md).
 
 **CR:** [CR-MCP-005](../../../../../../docs/crs/v5/mcp-authorization/CR-MCP-005-oauth21-resource-server.md)
 **Service:** `auth-service` (nhóm RPC `OAuth*`, 6 bảng mới), `mcp-service` (consent/grant, gRPC), `api-gateway` (`/.well-known/*`, `/oauth/*`, `adapter/mcpauth`, 8 kênh WS)

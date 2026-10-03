@@ -9,7 +9,7 @@
 | **Effort** | Medium (4–6 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát `wscompat` (task/files/git), `notification-service` |
 | **Phụ thuộc** | [CR-MCP-007](../mcp-tool-catalog/CR-MCP-007-registry-introspection-and-descriptors.md), [CR-MCP-004](../mcp-protocol-server/CR-MCP-004-sessions-sse-resumability.md) |
 

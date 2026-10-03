@@ -1,6 +1,6 @@
 # FE-MCP-SOL-007: Tab "Prompts" — prompt MCP built-in (chỉ đọc) và prompt tuỳ chỉnh (CRUD, admin)
 
-> 🔲 Designed — chưa implement. FE-MCP-SOL-001 (kiểu dùng chung, `window.api.mcp`, `mcp-slice`, section `mcp`, `McpSettingsPane`) được viết song song: solution này **chỉ dùng tên** do FE-001 chốt, không định nghĩa lại; chỗ phụ thuộc tên chưa chốt đánh dấu "(khớp FE-001 khi merge)".
+> ✅ Implemented (unit/integration tests) — see Gaps. FE-MCP-SOL-001 (kiểu dùng chung, `window.api.mcp`, `mcp-slice`, section `mcp`, `McpSettingsPane`) được viết song song: solution này **chỉ dùng tên** do FE-001 chốt, không định nghĩa lại; chỗ phụ thuộc tên chưa chốt đánh dấu "(khớp FE-001 khi merge)".
 
 ## CR Reference
 

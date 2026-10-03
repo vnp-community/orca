@@ -9,7 +9,7 @@
 | **Effort** | Large (8–10 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát `auth-service` audit (`AppendAuditEntry`), `notification-service`, `rate_limit.go` |
 | **Phụ thuộc** | [CR-MCP-012](./CR-MCP-012-tool-policy-and-annotations.md), [CR-MCP-004](../mcp-protocol-server/CR-MCP-004-sessions-sse-resumability.md); đường Web Push khi app không focus: [CR-NOTIF-002](../../v4/notification/CR-NOTIF-002-deliver-push-usecase.md) (`DeliverPush`) |
 

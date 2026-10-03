@@ -9,7 +9,7 @@
 | **Effort** | Small (2–3 ngày) |
 | **Phiên bản** | v1.0 |
 | **Ngày tạo** | 2026-10-01 |
-| **Trạng thái** | 🔲 Chưa triển khai |
+| **Trạng thái** | ✅ Đã triển khai (unit/integration test) — xem solution và README service để biết khoảng trống |
 | **Tác giả** | Khảo sát `api-gateway/internal/adapter/httpgateway/router.go`, `wscompat` |
 | **Phụ thuộc** | [CR-MCP-001](./CR-MCP-001-scaffold-mcp-service.md) |
 

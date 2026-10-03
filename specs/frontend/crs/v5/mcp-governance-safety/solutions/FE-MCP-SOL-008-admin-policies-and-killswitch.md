@@ -1,6 +1,6 @@
 # FE-MCP-SOL-008: Tab "Policies" (policy tool, cài đặt tenant) + bảng Kill switch + banner
 
-> 🔲 Designed — chưa implement.
+> ✅ Implemented (unit/integration tests) — see Gaps.
 
 ## CR Reference
 

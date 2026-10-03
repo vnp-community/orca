@@ -1,6 +1,6 @@
 # BE-MCP-SOL-009: Tool dài hạn & streaming — terminal, agent, workflow
 
-> **🔲 Designed — chưa implement.** Phụ thuộc BE-MCP-SOL-007 (Composite/ToolSession), BE-MCP-SOL-008 (pack 3), BE-MCP-SOL-004 (phiên, notifier, sự kiện đóng phiên), BE-MCP-SOL-012/013 (approval theo lệnh).
+> **✅ Implemented (unit/integration tests) — see Gaps.** Phụ thuộc BE-MCP-SOL-007 (Composite/ToolSession), BE-MCP-SOL-008 (pack 3), BE-MCP-SOL-004 (phiên, notifier, sự kiện đóng phiên), BE-MCP-SOL-012/013 (approval theo lệnh).
 
 **CR:** [CR-MCP-009](../../../../../../docs/crs/v5/mcp-tool-catalog/CR-MCP-009-long-running-and-streaming-tools.md)
 **Service:** `api-gateway` (`mcpserver/tools/terminal_*.go`, `agent_*.go`, `wscompat` thêm `origin`), `infra-fleet-service` (thêm cột/trường `origin`)
@@ -140,3 +140,9 @@ UI hiển thị phiên agent (FE-MCP-SOL-006); đọc terminal của người d�
 
 ## Liên quan
 `wscompat/channels_terminal.go`, `channels_agent.go`, `channels_terminal_subscribe.go`, `httpgateway/infra_routes.go`, `infra-fleet-service/migrations`, BE-MCP-SOL-007/008.
+
+## Ghi chú bổ sung (2026-10-03)
+
+- **Reaper bền cho agent (đã làm).** infra-fleet có RPC cộng thêm `ListAgentSessions{origin_type, origin_session_id, active_only, limit}` (bắt buộc có ít nhất một bộ lọc origin; tenant từ metadata; postgres + mysql, dùng index `origin_mcp_session_id`). `Executor.ReapSession` (consumer `api-gateway-mcp-reaper`) nay liệt kê agent còn sống của phiên MCP vừa đóng qua `PtyToolsConfig.AgentLister` và `agent.stop` → (sau `AgentGrace`) `agent.kill`, nên agent của replica đã chết cũng được dừng. Infra-fleet cũ trả `Unimplemented` ⇒ chỉ dừng agent trong tiến trình (như trước). Lỗi liệt kê được trả về để sự kiện được giao lại, terminal vẫn được dọn.
+- **Sự kiện idle-stop.** Janitor dừng PTY nhàn rỗi nay phát (best effort, thẳng từ gateway, không outbox vì gateway không có DB) `orca.mcp.terminal.idlestopped` `{session_id, user_id, pty_id, reason:"idle"}`, id sự kiện `idlestopped:<ptyId>`. **Chưa có consumer**: luật thông báo ở notification-service chưa được thêm (việc của service đó).
+- **Chỉ số.** `orca_mcp_terminal_dropped_bytes_total` đếm byte ring PTY ghi đè (hook `OnOutputDropped`).

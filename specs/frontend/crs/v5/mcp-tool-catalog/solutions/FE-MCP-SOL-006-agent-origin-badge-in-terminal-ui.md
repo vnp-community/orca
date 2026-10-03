@@ -1,6 +1,6 @@
 # FE-MCP-SOL-006: Nhãn "Tạo bởi agent" + nút dừng cho terminal/agent do MCP tạo
 
-> 🔲 Designed — chưa implement. Dùng kiểu/`window.api.mcp`/`mcp-slice` của FE-MCP-SOL-001 chỉ để **đọc** (xem "Backend dependency"); không định nghĩa lại. Phần "tạo `origin`" là BE-MCP-SOL-009.
+> ✅ Implemented (unit/integration tests) — see Gaps. Dùng kiểu/`window.api.mcp`/`mcp-slice` của FE-MCP-SOL-001 chỉ để **đọc** (xem "Backend dependency"); không định nghĩa lại. Phần "tạo `origin`" là BE-MCP-SOL-009.
 
 ## CR Reference
 

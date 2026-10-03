@@ -1,6 +1,6 @@
 # BE-MCP-SOL-007: Introspection cho `wscompat.Registry`, `ToolSpec`, `ToolExecutor`, parity test
 
-> **🔲 Designed — chưa implement.** Nền tảng cho BE-MCP-SOL-008/009/010; phụ thuộc BE-MCP-SOL-003 (khung `/mcp`) và gọi vào `mcp-service` (BE-MCP-SOL-002/012/013) qua gRPC.
+> **✅ Implemented (unit/integration tests) — see Gaps.** Nền tảng cho BE-MCP-SOL-008/009/010; phụ thuộc BE-MCP-SOL-003 (khung `/mcp`) và gọi vào `mcp-service` (BE-MCP-SOL-002/012/013) qua gRPC.
 
 **CR:** [CR-MCP-007](../../../../../../docs/crs/v5/mcp-tool-catalog/CR-MCP-007-registry-introspection-and-descriptors.md)
 **Service:** `api-gateway` (adapter mới `mcpserver/tools`, thêm accessor vào `wscompat`)
@@ -166,6 +166,8 @@ Kết quả (2026-10-01, cây làm việc hiện tại): **449 channel duy nhấ
 ### G. `tools/list_changed`
 
 Gateway subscribe ephemeral (mỗi replica nhận đủ — cơ chế `Consumer.SubscribeEphemeral(ctx, stream, subject, fn)` có thật ở `common/eventbus`, tạo consumer JetStream không bền; **lưu ý T5 ghi "core-NATS" nhưng mã thật là JetStream ephemeral consumer**, `InactiveThreshold`) các subject do `mcp-service` publish qua outbox: `orca.mcp.policy.changed`, `orca.mcp.killswitch.changed`, `orca.mcp.settings.changed` (đổi `enabled`/rollout pack). Handler: xoá cache `ResolveEffective` của tenant, rồi gọi notifier phiên của BE-MCP-SOL-004 gửi `notifications/tools/list_changed` tới mọi phiên SSE của tenant (qua `orca.ephemeral.mcp.session.<id>`, T5, cho phiên nằm ở replica khác). Debounce 500ms để batch nhiều policy đổi liền nhau. Danh mục tool tĩnh (đổi theo release) không phát sự kiện — client gặp lại khi `initialize`.
+
+> **Đã hiện thực (2026-10-03):** `cmd/server/mcp_tools_changed_wiring.go` (`watchToolsChanged`) + `mcpserver.Handler.NotifyToolsChanged`; dùng consumer ephemeral mỗi replica trên `policy.changed`, `settings.changed`, `killswitch.changed` (mỗi replica chỉ thông báo các phiên nó đang giữ nên không cần phát lại qua `orca.ephemeral.mcp.session.<id>`); capability `tools.listChanged` chỉ quảng bá khi NATS sẵn sàng. Không có subject `orca.mcp.pack.changed` riêng: thay đổi pack/rollout đi qua `settings.changed`/`policy.changed`.
 
 ### H. Kênh `mcp.admin.tool.list` (CONTRACT §2.2)
 
