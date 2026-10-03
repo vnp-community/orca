@@ -39,14 +39,15 @@ Bản rà soát 2026-10-03 phát hiện luồng này **không cập nhật đư�
 | Có thể kéo lùi issue đã làm xong | `worktree.created → In Progress` chỉ áp dụng khi issue đang ở category `todo` (Jira `statusCategory` được chuẩn hoá `new/indeterminate/done → todo/in_progress/done` trong `GetIssue`). Đang `in_progress`, `done` hoặc không rõ → giữ nguyên. Không tra được category → thử lại rồi bỏ, **không** chuyển. |
 | Provider chưa kiểm chứng | Chỉ **Jira** được đồng bộ. Linear cần UUID state (service gửi tên), GitHub chưa có đường credential theo user; hai provider đó bị bỏ qua có log thay vì lỗi 3 lần mỗi sự kiện. |
 
+Đã làm thêm sau đợt rà soát:
+- **Sự kiện PR mang issue và người thực hiện.** `scm-integration-service` rút khoá Jira từ branch, rồi tiêu đề, rồi mô tả PR (trong mô tả chỉ nhận khoá đi sau `fixes`/`closes`/`resolves`; một lời nhắc trần như "xem ENG-5" bị bỏ qua; loại các token kiểu `CVE-2024-1234`, `SHA-256`, `ISO-8601`). Khi merge, API không trả mô tả PR nên chỉ rút từ branch và tiêu đề. Payload thêm `actor_user_id` (omitempty). PR tạo ra → "In Review" và PR merge → "Done", mỗi cái chỉ khi issue đang ở category `in_progress` (không kéo lùi issue `todo` hay đã `done`). Phụ thuộc workflow Jira: nếu không có status tên "In Review"/"Done" từ trạng thái hiện tại thì ghi log `ErrTransitionUnavailable` rồi bỏ.
+- **`issue-status-sync` đã nằm trong deploy dev** (`build-local.sh`, `migrate.sh`, `init-databases.sh`, `docker-compose.yml` kèm service `migrate-issuestatussync`). `migrate.sh` tự tạo database còn thiếu nên an toàn với server đang chạy: chạy `migrate.sh issuestatussync` **trước** `docker compose up -d issue-status-sync`. `sync-to-server.sh` đã gọi `migrate.sh --remote` cho toàn bộ danh sách. Chưa chạy `docker compose up`.
+- **Task `in_progress` không có link nào** được trả về `open` sau 30 phút (CAS trên `active_execution_link_id IS NULL`; trạng thái cũ không được ghi nên không khôi phục được `review`/`blocked`). Chỉ `ExecuteTask` mới đưa task vào `in_progress`.
+- **Nút "Generate with AI"** ở `TaskPromptEditor`: chỉ xem trước (`save=false`), hỏi xác nhận trước khi ghi đè nội dung đã gõ. Chuỗi mới chưa có trong các file locale (hiện rơi về tiếng Anh).
+
 Còn lại (chưa làm, có chủ đích):
-- Sự kiện PR không mang issue (`LinkedIssue*` luôn rỗng ở `CreatePullRequest/MergePullRequest`) và cũng không có actor, nên "In Review"/"Done" vẫn không kích hoạt. Cần parser closing-keyword hoặc tra issue từ worktree theo branch.
-- `issue-status-sync` **chưa nằm trong deploy dev**. `Makefile SERVICES` đã có nó (build/vet/test). Không bật tự động vì `init-databases.sh` chỉ chạy khi khởi tạo volume lần đầu (server đang chạy sẽ thiếu DB) và `migrate.sh all` sẽ lỗi trên DB chưa tồn tại. Để bật:
-  1. Tạo DB trên Postgres đang chạy (`CREATE DATABASE issuestatussync OWNER orca;`) rồi thêm `issuestatussync` vào `DATABASES` ở `deploy/dev/docker/postgres/init-databases.sh` cho môi trường mới.
-  2. Chạy migration của service (`backend-go/services/issue-status-sync/migrations/postgres`) với DSN tới DB đó; thêm vào `SERVICES` của `migrate.sh`.
-  3. Thêm `issue-status-sync` vào `ALL_SERVICES` của `build-local.sh` và một khối service trong `docker-compose.yml` theo mẫu `usage-service` (env: `DATABASE_DSN`, `NATS_URL`, `ISSUE_TRACKING_SERVICE_ADDR`, `SCM_INTEGRATION_SERVICE_ADDR`, `PROJECT_SERVICE_ADDR`; `depends_on` postgres, nats, issue-tracking-service, project-service).
-  4. Stream JetStream `PROJECT` phải tồn tại (project-service tạo khi relay khởi động).
-  Nên thử trên một project có Jira thật, đặt `IssueStatusSyncEnabled=false` ở các project còn lại cho tới khi yên tâm.
+- Đồng bộ **Linear/GitHub**: Linear cần UUID state (service gửi tên), GitHub chưa có đường credential theo user; hai provider đó bị bỏ qua có log.
+- **Bật thật trên server và thử với Jira thật**: chạy migration `0012`/`0013` của task-service, `migrate.sh issuestatussync`, deploy; đặt `IssueStatusSyncEnabled=false` ở các project chưa muốn đồng bộ.
 
 ### 2.4 Engine 1 bền (lease + heartbeat + recovery)
 - Migration `0013_execution_leases`: `execution_links.lease_expires_at / lease_owner / previous_status`.
@@ -81,10 +82,9 @@ Còn lại (chưa làm, có chủ đích):
 - Nếu `WithExecutionClaim` không được cấu hình (test/embedding khác), `Execute` quay về check-then-write như cũ.
 
 ## 5. Chưa làm / theo dõi
-- UI cho DecisionGate (`ListPendingDecisionGates`/`ResolveGate`) và nguồn tự mở gate — vẫn chưa có.
+- UI cho DecisionGate (`ListPendingDecisionGates`/`ResolveGate`) và nguồn tự mở gate — vẫn chưa có (cần chốt gate mở ở bước nào).
 - Tự tạo task cho mọi workspace Jira (hiện chỉ khi bật cờ).
 - Đã xoá `ExecuteBatch` (code chết, không có caller production; frontend tự điều phối batch qua `task.execute`) cùng test của nó — data race trong `fakeExecutionLinkRepository` biến mất, `go test -race` qua toàn bộ. `domain.TopologicalWaves` còn lại (có test riêng, chưa có caller).
-- `GenerateAgentPrompt` mới có kênh WS; chưa có nút trên UI (`TaskPromptEditor.tsx` đang có thay đổi chưa commit khác).
 
 ## Acceptance Criteria
 - [x] Hai lần "start work" trên cùng issue/project trả cùng một task (test usecase + test tích hợp Postgres/MySQL).
