@@ -3,8 +3,13 @@ import { useEffect, useState } from 'react'
 /** Remaining ms until `deadline` (client clock), ticking at 1 Hz; no network calls. */
 export function useMcpApprovalDeadline(deadline: number | undefined): number {
   const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
+  // Why: re-baseline the clock during render when the deadline changes, so no stale frame shows.
+  const [seenDeadline, setSeenDeadline] = useState(deadline)
+  if (seenDeadline !== deadline) {
+    setSeenDeadline(deadline)
     setNow(Date.now())
+  }
+  useEffect(() => {
     if (deadline === undefined) {
       return
     }

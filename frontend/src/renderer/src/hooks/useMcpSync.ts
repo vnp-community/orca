@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useAppStore } from '@/store'
 import { selectMcpEnabled, selectMcpSectionVisible } from '@/store/slices/mcp-slice'
 import { mcpClient } from '@/runtime/runtime-mcp-client'
@@ -18,7 +18,10 @@ export function useMcpSync(): void {
   const visible = useAppStore(selectMcpSectionVisible)
   const infoStatus = useAppStore((s) => s.mcpServerInfoStatus)
   const uiReady = useAppStore((s) => s.persistedUIReady)
-  const pendingLink = useRef<McpDeepLinkTarget | null>(null)
+  // Why: seeding the cold-start link at init lets the first consume effect see it without a re-render tick.
+  const [pendingLink] = useState<{ current: McpDeepLinkTarget | null }>(() => ({
+    current: parseMcpDeepLink(window.location)
+  }))
   const [linkTick, setLinkTick] = useState(0)
 
   useEffect(() => {
@@ -50,11 +53,6 @@ export function useMcpSync(): void {
   // Deep links (cold start, push click, orca:navigate) are parked until we know
   // whether MCP is visible, so a disabled tenant never learns the UI exists.
   useEffect(() => {
-    const cold = parseMcpDeepLink(window.location)
-    if (cold) {
-      pendingLink.current = cold
-      setLinkTick((n) => n + 1)
-    }
     return registerPushDeepLinkHandler('mcp', (link) => {
       const target = parseMcpDeepLinkParams(link.params)
       if (target) {
@@ -62,7 +60,7 @@ export function useMcpSync(): void {
         setLinkTick((n) => n + 1)
       }
     })
-  }, [])
+  }, [pendingLink])
 
   useEffect(() => {
     const target = pendingLink.current
@@ -85,5 +83,5 @@ export function useMcpSync(): void {
         window.location.pathname === '/settings' ? '/' : window.location.pathname
       )
     }
-  }, [authed, visible, infoStatus, linkTick, uiReady])
+  }, [authed, visible, infoStatus, linkTick, uiReady, pendingLink])
 }

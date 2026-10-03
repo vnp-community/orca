@@ -78,25 +78,31 @@ export function McpApprovalsTab(): React.JSX.Element {
   const rows = useRef(new Map<string, HTMLLIElement>())
 
   // Deep link: find the row in either list, scroll to it, then consume the id.
-  useEffect(() => {
-    if (!focusId || history.status === 'loading') {
-      return
-    }
+  // State is adjusted during render; the store write (not render-safe) is the effect below.
+  const focusReady = Boolean(focusId) && history.status !== 'loading'
+  if (focusReady) {
     const inPending = pending.some((a) => a.id === focusId)
     const inHistory = history.items.some((a) => a.id === focusId)
-    if (inPending) {
-      setMode('pending')
-    } else if (inHistory) {
-      setMode('history')
-    } else {
+    if (inPending || inHistory) {
+      const target: Mode = inPending ? 'pending' : 'history'
+      if (mode !== target) {
+        setMode(target)
+      }
+      if (missing) {
+        setMissing(false)
+      }
+      if (highlight !== focusId) {
+        setHighlight(focusId)
+      }
+    } else if (!missing) {
       setMissing(true)
-      useAppStore.getState().setMcpApprovalFocusId(null)
-      return
     }
-    setMissing(false)
-    setHighlight(focusId)
-    useAppStore.getState().setMcpApprovalFocusId(null)
-  }, [focusId, history.status, history.items, pending])
+  }
+  useEffect(() => {
+    if (focusReady) {
+      useAppStore.getState().setMcpApprovalFocusId(null)
+    }
+  }, [focusReady, focusId, history.items, pending])
 
   useEffect(() => {
     if (highlight) {
