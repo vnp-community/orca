@@ -1,7 +1,14 @@
-// Package jira implements usecase.IssueTrackerProvider against Jira Cloud's
-// REST API v3 — a plain HTTP client, no SDK gap to work around (design doc
-// §4: "Jira's adapter has no equivalent gap [to Linear]: a plain REST
-// client either way").
+// Package jira implements usecase.IssueTrackerProvider against Jira's REST
+// API — a plain HTTP client, no SDK gap to work around (design doc §4:
+// "Jira's adapter has no equivalent gap [to Linear]: a plain REST client
+// either way").
+//
+// CR-JIRA-001 (2026-09-15): originally Cloud-only (hardcoded /rest/api/3/ +
+// email/API-token Basic Auth). Confirmed live against a real self-hosted
+// site (jr.servicehub.vn) that this always failed — Server/Data Center has
+// no /rest/api/3/ at all (Cloud-only API version), so Whoami never reached
+// the site's real auth check. See specs/backend-go/bugs/missing-v2/
+// BUG-013-jira-adapter-cloud-only-rejects-self-hosted-jira.md.
 package jira
 
 import (
@@ -9,11 +16,13 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/stablyai/orca-go/services/issue-tracking-service/internal/domain"
@@ -29,9 +38,9 @@ import (
 // guards against.
 const defaultIssueType = "Task"
 
-// Client is a real Jira Cloud REST API v3 client — Basic Auth,
-// base64(email:apiToken), unchanged from the TS jira/client.ts scheme
-// (design doc §9).
+// Client is a real Jira REST API client — API version (v2 vs v3) and auth
+// scheme (Basic email:token vs Bearer PAT) are resolved per-site, see
+// resolveAPIVersion/authHeaderValue below (CR-JIRA-001).
 type Client struct {
 	httpClient *http.Client
 }
@@ -48,28 +57,108 @@ func New(httpClient *http.Client) *Client {
 
 var _ usecase.IssueTrackerProvider = (*Client)(nil)
 
+// ── API version resolution (CR-JIRA-001) ────────────────────────────────
+
+type apiVersionCacheEntry struct {
+	version   string
+	expiresAt time.Time
+}
+
+// apiVersionCache avoids re-probing serverInfo on every single API call —
+// keyed by baseURL, since deployment type never changes for a given site.
+var apiVersionCache sync.Map // map[string]apiVersionCacheEntry
+
+const apiVersionCacheTTL = 10 * time.Minute
+
+// resolveAPIVersion detects whether cred.BaseURL is Jira Cloud (API v3
+// available) or Server/Data Center (v3 doesn't exist — Cloud-only — must
+// use v2) by calling the v2 serverInfo endpoint, which exists on BOTH
+// deployment types, and reading its deploymentType field. Falls back to "3"
+// (the pre-CR-JIRA-001 Cloud-only default) on any probe failure — an
+// unreachable/unusual site degrades to the previous behavior rather than a
+// new failure mode, and a real Cloud site's own requests are unaffected
+// either way (this cache never returns an error itself, only a version
+// string every call site can use unconditionally).
+func (c *Client) resolveAPIVersion(ctx context.Context, cred usecase.Credential) string {
+	if cached, ok := apiVersionCache.Load(cred.BaseURL); ok {
+		if entry, ok := cached.(apiVersionCacheEntry); ok && time.Now().Before(entry.expiresAt) {
+			return entry.version
+		}
+	}
+	version := c.probeAPIVersion(ctx, cred)
+	apiVersionCache.Store(cred.BaseURL, apiVersionCacheEntry{version: version, expiresAt: time.Now().Add(apiVersionCacheTTL)})
+	return version
+}
+
+func (c *Client) probeAPIVersion(ctx context.Context, cred usecase.Credential) string {
+	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/2/serverInfo"
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	if err != nil {
+		return "3"
+	}
+	req.Header.Set("Authorization", authHeaderValue(cred))
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "3"
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusOK {
+		return "3"
+	}
+	var parsed struct {
+		DeploymentType string `json:"deploymentType"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+		return "3"
+	}
+	if parsed.DeploymentType == "Server" || parsed.DeploymentType == "Data Center" {
+		return "2"
+	}
+	return "3" // "Cloud", or empty/unrecognized — same safe default as before this CR.
+}
+
+// authHeaderValue picks Basic (Cloud's email:api-token convention) when an
+// email is present, else Bearer (Server/Data Center's Personal Access Token
+// convention — CR-JIRA-001) — a caller with only a token and no email is
+// assumed to be authenticating with a PAT against a self-hosted instance.
+// Does not change behavior for any existing Cloud caller (all of which
+// already send both email and token).
+func authHeaderValue(cred usecase.Credential) string {
+	if cred.Email == "" {
+		return "Bearer " + cred.Token
+	}
+	return "Basic " + basicAuth(cred.Email, cred.Token)
+}
+
+func apiURL(baseURL, apiVersion, path string) string {
+	return strings.TrimRight(baseURL, "/") + "/rest/api/" + apiVersion + path
+}
+
 // ── Whoami ───────────────────────────────────────────────────────────────
 
-// jiraMyselfResponse mirrors GET /rest/api/3/myself's JSON shape.
+// jiraMyselfResponse mirrors GET .../myself's JSON shape — identical on v2
+// and v3.
 type jiraMyselfResponse struct {
 	AccountID    string `json:"accountId"`
 	DisplayName  string `json:"displayName"`
 	EmailAddress string `json:"emailAddress"`
 }
 
-// Whoami calls Jira's /rest/api/3/myself to verify cred and identify the
+// Whoami calls Jira's .../myself to verify cred and identify the
 // authenticated account — the first call Connect makes, before anything is
 // persisted.
 func (c *Client) Whoami(ctx context.Context, cred usecase.Credential) (domain.Viewer, error) {
 	if cred.BaseURL == "" {
 		return domain.Viewer{}, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/myself"
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	u := apiURL(cred.BaseURL, apiVersion, "/myself")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return domain.Viewer{}, fmt.Errorf("jira: building whoami request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
@@ -89,29 +178,108 @@ func (c *Client) Whoami(ctx context.Context, cred usecase.Credential) (domain.Vi
 
 // ── SearchIssues / ListIssues / GetIssue ────────────────────────────────
 
-// jiraSearchResponse mirrors the subset of Jira Cloud's
-// GET /rest/api/3/search JSON response shape this adapter needs.
+// jiraSearchResponse mirrors the subset of Jira's GET .../search JSON
+// response shape this adapter needs — identical on v2 and v3.
 type jiraSearchResponse struct {
 	Issues []jiraIssue `json:"issues"`
 }
 
 type jiraIssue struct {
-	Key    string `json:"key"`
-	Fields struct {
-		Summary string `json:"summary"`
-		Status  struct {
-			Name string `json:"name"`
-		} `json:"status"`
-	} `json:"fields"`
+	Key    string          `json:"key"`
+	Fields jiraIssueFields `json:"fields"`
 }
 
-// toRichIssue maps a jiraIssue search-result row into the extended
+// jiraIssueFields is the subset of Jira's real `fields` object this adapter
+// reads — identical shape on v2 (Server/Data Center) and v3 (Cloud).
+//
+// BUG-016: this used to only declare Summary/Status — Project/IssueType/
+// Assignee/Reporter/Priority/Labels were silently dropped for every issue
+// SearchIssues/GetIssue ever returned, even though domain.Issue (and the
+// wire proto) has always had fields for all of them. Project/IssueType are
+// non-optional on the frontend's JiraIssue type — a live-confirmed crash
+// ("Cannot read properties of undefined (reading 'key')" on issue.project.key)
+// is what surfaced this, once CR-TSRC-001's capability fix let a real Jira
+// fetch reach the frontend for the first time.
+type jiraIssueFields struct {
+	Summary string `json:"summary"`
+	Status  struct {
+		Name           string `json:"name"`
+		StatusCategory struct {
+			Key string `json:"key"`
+		} `json:"statusCategory"`
+	} `json:"status"`
+	Project   jiraProjectField   `json:"project"`
+	IssueType jiraIssueTypeField `json:"issuetype"`
+	Assignee  *jiraUserField     `json:"assignee"`
+	Reporter  *jiraUserField     `json:"reporter"`
+	Priority  jiraPriorityField  `json:"priority"`
+	Labels    []string           `json:"labels"`
+}
+
+type jiraProjectField struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+type jiraIssueTypeField struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	Subtask bool   `json:"subtask"`
+}
+
+// jiraUserField covers both Jira Cloud's accountId-keyed user identity and
+// Jira Server/Data Center's name/key-keyed one (CR-JIRA-001 already
+// established this exact Cloud-vs-Server/DC duality for auth; the same
+// duality applies to user references inside issue payloads). Pointer in
+// jiraIssueFields (not a value) because Jira omits assignee/reporter
+// entirely — not an empty object — when unset (an unassigned issue), and a
+// nil *jiraUserField round-trips that distinction; toUserRef below then
+// maps nil to domain.UserRef{}'s zero value, same as any other unset ref.
+type jiraUserField struct {
+	AccountID    string `json:"accountId"`
+	Name         string `json:"name"`
+	Key          string `json:"key"`
+	DisplayName  string `json:"displayName"`
+	EmailAddress string `json:"emailAddress"`
+	AvatarUrls   struct {
+		Large string `json:"48x48"`
+	} `json:"avatarUrls"`
+}
+
+func (u *jiraUserField) toUserRef() domain.UserRef {
+	if u == nil {
+		return domain.UserRef{}
+	}
+	id := u.AccountID
+	if id == "" {
+		id = u.Key
+	}
+	if id == "" {
+		id = u.Name
+	}
+	return domain.UserRef{ID: id, DisplayName: u.DisplayName, Email: u.EmailAddress, AvatarURL: u.AvatarUrls.Large}
+}
+
+type jiraPriorityField struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+}
+
+// toRichIssue maps a jiraIssue search/get-result row into the extended
 // domain.Issue.
-func toRichIssue(baseURL string, key, summary, status string) domain.Issue {
+func toRichIssue(baseURL string, ji jiraIssue) domain.Issue {
 	return domain.Issue{
-		ID: key, ProviderIssueID: key, Key: key, Title: summary,
-		State: status, WorkflowState: domain.WorkflowState{Name: status},
-		URL: issueBrowseURL(baseURL, key),
+		ID: ji.Key, ProviderIssueID: ji.Key, Key: ji.Key, Title: ji.Fields.Summary,
+		State:         ji.Fields.Status.Name,
+		WorkflowState: domain.WorkflowState{Name: ji.Fields.Status.Name, Category: normalizeStatusCategory(ji.Fields.Status.StatusCategory.Key)},
+		URL:           issueBrowseURL(baseURL, ji.Key),
+		Project:       domain.ProjectRef{ID: ji.Fields.Project.ID, Key: ji.Fields.Project.Key, Name: ji.Fields.Project.Name},
+		IssueType:     domain.IssueTypeRef{ID: ji.Fields.IssueType.ID, Name: ji.Fields.IssueType.Name, Subtask: ji.Fields.IssueType.Subtask},
+		Assignee:      ji.Fields.Assignee.toUserRef(),
+		Reporter:      ji.Fields.Reporter.toUserRef(),
+		Priority:      domain.PriorityRef{ID: ji.Fields.Priority.ID, Name: ji.Fields.Priority.Name},
+		Labels:        ji.Fields.Labels,
 	}
 }
 
@@ -119,7 +287,8 @@ func (c *Client) SearchIssues(ctx context.Context, cred usecase.Credential, jql 
 	if cred.BaseURL == "" {
 		return nil, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	u, err := url.Parse(strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/search")
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	u, err := url.Parse(apiURL(cred.BaseURL, apiVersion, "/search"))
 	if err != nil {
 		return nil, fmt.Errorf("jira: invalid base url: %w", err)
 	}
@@ -135,7 +304,7 @@ func (c *Client) SearchIssues(ctx context.Context, cred usecase.Credential, jql 
 	if err != nil {
 		return nil, fmt.Errorf("jira: building search issues request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -151,17 +320,16 @@ func (c *Client) SearchIssues(ctx context.Context, cred usecase.Credential, jql 
 	}
 	issues := make([]domain.Issue, 0, len(parsed.Issues))
 	for _, ji := range parsed.Issues {
-		issues = append(issues, toRichIssue(cred.BaseURL, ji.Key, ji.Fields.Summary, ji.Fields.Status.Name))
+		issues = append(issues, toRichIssue(cred.BaseURL, ji))
 	}
 	return issues, nil
 }
 
-// ListIssues performs a real GET against Jira's /rest/api/3/search, JQL
-// filtered to projectKey when set. filterJSON (a JiraIssueFilter-shaped
-// object) is not translated to JQL here — a documented gap: a follow-up
-// can extend this to parse filterJSON's structured fields (status/
-// assignee/labels) into additional JQL clauses once a concrete
-// JiraIssueFilter shape is finalized.
+// ListIssues performs a real GET against Jira's .../search, JQL filtered to
+// projectKey when set. filterJSON (a JiraIssueFilter-shaped object) is not
+// translated to JQL here — a documented gap: a follow-up can extend this to
+// parse filterJSON's structured fields (status/assignee/labels) into
+// additional JQL clauses once a concrete JiraIssueFilter shape is finalized.
 func (c *Client) ListIssues(ctx context.Context, cred usecase.Credential, projectKey, filterJSON string, limit int) ([]domain.Issue, error) {
 	jql := ""
 	if projectKey != "" {
@@ -175,12 +343,13 @@ func (c *Client) GetIssue(ctx context.Context, cred usecase.Credential, issueID 
 	if cred.BaseURL == "" {
 		return domain.Issue{}, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/issue/" + url.PathEscape(issueID)
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	u := apiURL(cred.BaseURL, apiVersion, "/issue/"+url.PathEscape(issueID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return domain.Issue{}, fmt.Errorf("jira: building get issue request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -194,20 +363,23 @@ func (c *Client) GetIssue(ctx context.Context, cred usecase.Credential, issueID 
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
 		return domain.Issue{}, fmt.Errorf("jira: decoding get issue response: %w", err)
 	}
-	return toRichIssue(cred.BaseURL, parsed.Key, parsed.Fields.Summary, parsed.Fields.Status.Name), nil
+	return toRichIssue(cred.BaseURL, parsed), nil
 }
 
 // ── CreateIssue / UpdateIssue ────────────────────────────────────────────
 
-// jiraCreateIssueRequest mirrors POST /rest/api/3/issue's request body.
+// jiraCreateIssueRequest mirrors POST .../issue's request body.
 type jiraCreateIssueRequest struct {
 	Fields jiraCreateIssueFields `json:"fields"`
 }
 
 type jiraCreateIssueFields struct {
-	Project     jiraProjectRef   `json:"project"`
-	Summary     string           `json:"summary"`
-	Description *adfDoc          `json:"description,omitempty"`
+	Project jiraProjectRef `json:"project"`
+	Summary string         `json:"summary"`
+	// Description is `any`, not `*adfDoc`: API v3 (Cloud) requires ADF for
+	// rich text; API v2 (Server/Data Center) takes a plain string instead
+	// (CR-JIRA-001) — see CreateIssue's version branch below.
+	Description any              `json:"description,omitempty"`
 	IssueType   jiraIssueTypeRef `json:"issuetype"`
 }
 
@@ -223,13 +395,15 @@ type jiraCreateIssueResponse struct {
 	Key string `json:"key"`
 }
 
-// CreateIssue performs a real POST against Jira's /rest/api/3/issue.
-// Description is wrapped in a minimal Atlassian Document Format (ADF)
-// document — Jira Cloud REST API v3 requires ADF, not plain text, for rich
-// text fields. The issue type sent is resolved against the project's real
-// issue types (listIssueTypes) rather than blindly hardcoded, driven by
-// in.IssueTypeID (falling back to defaultIssueType/resolveIssueType when
-// unset) — see resolveIssueType and defaultIssueType's doc comment.
+// CreateIssue performs a real POST against Jira's .../issue. On API v3
+// (Cloud), Description is wrapped in a minimal Atlassian Document Format
+// (ADF) document, which v3 requires for rich text fields; on v2 (Server/
+// Data Center — CR-JIRA-001), Description is sent as a plain string, which
+// is what v2 expects instead. The issue type sent is resolved against the
+// project's real issue types (listIssueTypes) rather than blindly
+// hardcoded, driven by in.IssueTypeID (falling back to defaultIssueType/
+// resolveIssueType when unset) — see resolveIssueType and
+// defaultIssueType's doc comment.
 func (c *Client) CreateIssue(ctx context.Context, cred usecase.Credential, in domain.NewIssueInput) (domain.Issue, error) {
 	if cred.BaseURL == "" {
 		return domain.Issue{}, fmt.Errorf("jira: credential is missing a site base URL")
@@ -237,6 +411,7 @@ func (c *Client) CreateIssue(ctx context.Context, cred usecase.Credential, in do
 	if in.ProjectKey == "" {
 		return domain.Issue{}, fmt.Errorf("jira: project_key is required")
 	}
+	apiVersion := c.resolveAPIVersion(ctx, cred)
 
 	issueTypeName := in.IssueTypeID
 	if issueTypeName == "" {
@@ -256,19 +431,22 @@ func (c *Client) CreateIssue(ctx context.Context, cred usecase.Credential, in do
 		IssueType: jiraIssueTypeRef{Name: issueTypeName},
 	}
 	if in.Description != "" {
-		doc := plainTextADF(in.Description)
-		fields.Description = &doc
+		if apiVersion == "2" {
+			fields.Description = in.Description
+		} else {
+			fields.Description = plainTextADF(in.Description)
+		}
 	}
 	body, err := json.Marshal(jiraCreateIssueRequest{Fields: fields})
 	if err != nil {
 		return domain.Issue{}, fmt.Errorf("jira: marshal create issue request: %w", err)
 	}
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/issue"
+	u := apiURL(cred.BaseURL, apiVersion, "/issue")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
 	if err != nil {
 		return domain.Issue{}, fmt.Errorf("jira: building create issue request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.httpClient.Do(req)
@@ -283,31 +461,56 @@ func (c *Client) CreateIssue(ctx context.Context, cred usecase.Credential, in do
 	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
 		return domain.Issue{}, fmt.Errorf("jira: decoding create issue response: %w", err)
 	}
-	return toRichIssue(cred.BaseURL, parsed.Key, in.Title, ""), nil
+	// Jira's create response only carries {id, key, self} — no fields — so
+	// Project/IssueType are synthesized from what this call already knows
+	// (the values just sent), same as Title/Summary already was before
+	// BUG-016. Everything else (assignee, priority, labels...) legitimately
+	// has no value yet for a freshly created issue.
+	return toRichIssue(cred.BaseURL, jiraIssue{
+		Key: parsed.Key,
+		Fields: jiraIssueFields{
+			Summary:   in.Title,
+			Project:   jiraProjectField{Key: in.ProjectKey},
+			IssueType: jiraIssueTypeField{Name: issueTypeName},
+		},
+	}), nil
 }
 
 func (c *Client) UpdateIssue(ctx context.Context, cred usecase.Credential, in domain.IssueUpdate) (domain.Issue, error) {
 	if cred.BaseURL == "" {
 		return domain.Issue{}, fmt.Errorf("jira: credential is missing a site base URL")
 	}
+	apiVersion := c.resolveAPIVersion(ctx, cred)
 	fields := map[string]any{}
 	if in.Title != "" {
 		fields["summary"] = in.Title
 	}
 	if in.Description != "" {
-		doc := plainTextADF(in.Description)
-		fields["description"] = doc
+		// Same v2-plain-string / v3-ADF split as CreateIssue — see its doc comment.
+		if apiVersion == "2" {
+			fields["description"] = in.Description
+		} else {
+			fields["description"] = plainTextADF(in.Description)
+		}
+	}
+	if len(fields) == 0 && in.WorkflowStateID != "" {
+		// Status change only: nothing to PUT (an empty fields update is a no-op
+		// that would also report success).
+		if err := c.transitionIssue(ctx, cred, apiVersion, in.IssueID, in.WorkflowStateID); err != nil {
+			return domain.Issue{}, err
+		}
+		return c.GetIssue(ctx, cred, in.IssueID)
 	}
 	body, err := json.Marshal(map[string]any{"fields": fields})
 	if err != nil {
 		return domain.Issue{}, fmt.Errorf("jira: marshal update issue request: %w", err)
 	}
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/issue/" + url.PathEscape(in.IssueID)
+	u := apiURL(cred.BaseURL, apiVersion, "/issue/"+url.PathEscape(in.IssueID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodPut, u, bytes.NewReader(body))
 	if err != nil {
 		return domain.Issue{}, fmt.Errorf("jira: building update issue request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -316,6 +519,11 @@ func (c *Client) UpdateIssue(ctx context.Context, cred usecase.Credential, in do
 	defer func() { _ = resp.Body.Close() }()
 	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
 		return domain.Issue{}, jiraStatusError("update issue", resp)
+	}
+	if in.WorkflowStateID != "" {
+		if err := c.transitionIssue(ctx, cred, apiVersion, in.IssueID, in.WorkflowStateID); err != nil {
+			return domain.Issue{}, err
+		}
 	}
 	// Jira's PUT /issue/{id} returns 204 No Content — re-fetch to return the
 	// caller a current view, same convention GetIssue already uses.
@@ -328,17 +536,22 @@ func (c *Client) AddIssueComment(ctx context.Context, cred usecase.Credential, i
 	if cred.BaseURL == "" {
 		return domain.IssueComment{}, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	doc := plainTextADF(bodyMarkdown)
-	body, err := json.Marshal(map[string]any{"body": doc})
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	// Comment body: same v2-plain-string / v3-ADF split as CreateIssue.
+	var bodyField any = bodyMarkdown
+	if apiVersion != "2" {
+		bodyField = plainTextADF(bodyMarkdown)
+	}
+	body, err := json.Marshal(map[string]any{"body": bodyField})
 	if err != nil {
 		return domain.IssueComment{}, fmt.Errorf("jira: marshal add comment request: %w", err)
 	}
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/issue/" + url.PathEscape(issueID) + "/comment"
+	u := apiURL(cred.BaseURL, apiVersion, "/issue/"+url.PathEscape(issueID)+"/comment")
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
 	if err != nil {
 		return domain.IssueComment{}, fmt.Errorf("jira: building add comment request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := c.httpClient.Do(req)
@@ -362,12 +575,13 @@ func (c *Client) ListIssueComments(ctx context.Context, cred usecase.Credential,
 	if cred.BaseURL == "" {
 		return nil, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/issue/" + url.PathEscape(issueID) + "/comment"
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	u := apiURL(cred.BaseURL, apiVersion, "/issue/"+url.PathEscape(issueID)+"/comment")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("jira: building list comments request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -407,16 +621,42 @@ func (c *Client) ListIssueComments(ctx context.Context, cred usecase.Credential,
 // ListAssignableUsers / ListPriorities / ListTransitions /
 // GetProjectStatusOrder) ────────────────────────────────────────────────
 
+// jiraProjectListItem is the {id,key,name} shape shared by both of
+// ListProjects' endpoints — only the response envelope around it differs
+// (a flat array on v2 vs a paginated {values:[...]} object on v3).
+type jiraProjectListItem struct {
+	ID   string `json:"id"`
+	Key  string `json:"key"`
+	Name string `json:"name"`
+}
+
+// ListProjects. BUG-017: Jira Server/Data Center below version 8.4 has no
+// paginated GET /project/search endpoint at all — that path segment isn't
+// recognized as a distinct sub-resource, so Jira's router falls through to
+// the older single-project-lookup route (GET /project/{projectIdOrKey}),
+// treating the literal string "search" as a project key. Live-confirmed via
+// direct curl against jr.servicehub.vn: /project/search → 404 "No project
+// could be found with key 'search'"; /project → 200, a flat JSON array (not
+// {values:[...]}). v2 (Server/Data Center) must use the older /project
+// endpoint and parse its flat-array shape; v3 (Cloud) keeps using
+// /project/search's paginated {values:[...]} shape unchanged — same
+// Cloud-vs-Server/DC duality CR-JIRA-001 already established for this
+// adapter's auth/API-version handling, just not yet applied to this
+// specific endpoint.
 func (c *Client) ListProjects(ctx context.Context, cred usecase.Credential, workspaceID string) ([]domain.ProjectRef, error) {
 	if cred.BaseURL == "" {
 		return nil, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/project/search"
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	path := "/project/search"
+	if apiVersion == "2" {
+		path = "/project"
+	}
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, apiURL(cred.BaseURL, apiVersion, path), nil)
 	if err != nil {
 		return nil, fmt.Errorf("jira: building list projects request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -426,27 +666,33 @@ func (c *Client) ListProjects(ctx context.Context, cred usecase.Credential, work
 	if resp.StatusCode != http.StatusOK {
 		return nil, jiraStatusError("list projects", resp)
 	}
-	var parsed struct {
-		Values []struct {
-			ID   string `json:"id"`
-			Key  string `json:"key"`
-			Name string `json:"name"`
-		} `json:"values"`
+
+	var items []jiraProjectListItem
+	if apiVersion == "2" {
+		if err := json.NewDecoder(resp.Body).Decode(&items); err != nil {
+			return nil, fmt.Errorf("jira: decoding list projects response: %w", err)
+		}
+	} else {
+		var parsed struct {
+			Values []jiraProjectListItem `json:"values"`
+		}
+		if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
+			return nil, fmt.Errorf("jira: decoding list projects response: %w", err)
+		}
+		items = parsed.Values
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&parsed); err != nil {
-		return nil, fmt.Errorf("jira: decoding list projects response: %w", err)
-	}
-	out := make([]domain.ProjectRef, 0, len(parsed.Values))
-	for _, p := range parsed.Values {
+
+	out := make([]domain.ProjectRef, 0, len(items))
+	for _, p := range items {
 		out = append(out, domain.ProjectRef{ID: p.ID, Key: p.Key, Name: p.Name, WorkspaceID: workspaceID})
 	}
 	return out, nil
 }
 
-// jiraIssueTypeMeta mirrors one entry of Jira Cloud's
-// GET /rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes JSON
-// response — the current (non-deprecated) endpoint for discovering which
-// issue types are actually creatable on a project.
+// jiraIssueTypeMeta mirrors one entry of Jira's
+// GET .../issue/createmeta/{projectIdOrKey}/issuetypes JSON response — the
+// current (non-deprecated) endpoint for discovering which issue types are
+// actually creatable on a project, present on both v2 and v3.
 type jiraIssueTypeMeta struct {
 	ID      string `json:"id"`
 	Name    string `json:"name"`
@@ -455,29 +701,29 @@ type jiraIssueTypeMeta struct {
 
 // jiraIssueTypesResponse mirrors the paginated envelope
 // GET .../issuetypes returns. This adapter doesn't page through it — Jira
-// Cloud projects have a small, bounded number of issue types, well under a
+// projects have a small, bounded number of issue types, well under a
 // single page's maxResults.
 type jiraIssueTypesResponse struct {
 	Values []jiraIssueTypeMeta `json:"values"`
 }
 
 // listIssueTypes performs a real GET against Jira's
-// /rest/api/3/issue/createmeta/{projectIdOrKey}/issuetypes, returning the
-// issue types Jira actually allows creating on projectKey. CreateIssue
-// calls this internally; ListIssueTypes (below) is the exported wrapper
-// reachable from the gRPC surface.
+// .../issue/createmeta/{projectIdOrKey}/issuetypes, returning the issue
+// types Jira actually allows creating on projectKey. CreateIssue calls this
+// internally; ListIssueTypes (below) is the exported wrapper reachable from
+// the gRPC surface.
 func (c *Client) listIssueTypes(ctx context.Context, cred usecase.Credential, projectKey string) ([]jiraIssueTypeMeta, error) {
 	if cred.BaseURL == "" {
 		return nil, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/issue/createmeta/" + url.PathEscape(projectKey) + "/issuetypes"
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	u := apiURL(cred.BaseURL, apiVersion, "/issue/createmeta/"+url.PathEscape(projectKey)+"/issuetypes")
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("jira: building list issue types request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 
 	resp, err := c.httpClient.Do(req)
@@ -515,13 +761,13 @@ func (c *Client) ListCreateFields(ctx context.Context, cred usecase.Credential, 
 	if cred.BaseURL == "" {
 		return nil, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/issue/createmeta/" +
-		url.PathEscape(projectIDOrKey) + "/issuetypes/" + url.PathEscape(issueTypeID)
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	u := apiURL(cred.BaseURL, apiVersion, "/issue/createmeta/"+url.PathEscape(projectIDOrKey)+"/issuetypes/"+url.PathEscape(issueTypeID))
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("jira: building list create fields request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -569,7 +815,8 @@ func (c *Client) ListAssignableUsers(ctx context.Context, cred usecase.Credentia
 	if cred.BaseURL == "" {
 		return nil, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	u, err := url.Parse(strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/user/assignable/search")
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	u, err := url.Parse(apiURL(cred.BaseURL, apiVersion, "/user/assignable/search"))
 	if err != nil {
 		return nil, fmt.Errorf("jira: invalid base url: %w", err)
 	}
@@ -584,7 +831,7 @@ func (c *Client) ListAssignableUsers(ctx context.Context, cred usecase.Credentia
 	if err != nil {
 		return nil, fmt.Errorf("jira: building list assignable users request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -616,12 +863,13 @@ func (c *Client) ListPriorities(ctx context.Context, cred usecase.Credential) ([
 	if cred.BaseURL == "" {
 		return nil, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/priority"
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	u := apiURL(cred.BaseURL, apiVersion, "/priority")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("jira: building list priorities request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -649,12 +897,13 @@ func (c *Client) ListTransitions(ctx context.Context, cred usecase.Credential, i
 	if cred.BaseURL == "" {
 		return nil, fmt.Errorf("jira: credential is missing a site base URL")
 	}
-	u := strings.TrimRight(cred.BaseURL, "/") + "/rest/api/3/issue/" + url.PathEscape(issueID) + "/transitions"
+	apiVersion := c.resolveAPIVersion(ctx, cred)
+	u := apiURL(cred.BaseURL, apiVersion, "/issue/"+url.PathEscape(issueID)+"/transitions")
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u, nil)
 	if err != nil {
 		return nil, fmt.Errorf("jira: building list transitions request: %w", err)
 	}
-	req.Header.Set("Authorization", "Basic "+basicAuth(cred.Email, cred.Token))
+	req.Header.Set("Authorization", authHeaderValue(cred))
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -690,13 +939,13 @@ func (c *Client) ListTransitions(ctx context.Context, cred usecase.Credential, i
 	return out, nil
 }
 
-// GetProjectStatusOrder: Jira Cloud has no single "column order" REST
-// endpoint — this would need the project's board configuration via the
-// Agile API (/rest/agile/1.0/board?projectKeyOrId=... then
+// GetProjectStatusOrder: Jira has no single "column order" REST endpoint on
+// either API version — this would need the project's board configuration
+// via the Agile API (/rest/agile/1.0/board?projectKeyOrId=... then
 // /rest/agile/1.0/board/{id}/configuration's columnConfig.columns, each
 // column's statuses list giving one entry of StatusIdsByColumn). Left as a
-// documented gap rather than guessed at: no live Jira Cloud site is
-// available in this environment to confirm the exact response shape.
+// documented gap rather than guessed at: no live Jira site was available in
+// this environment to confirm the exact response shape.
 func (c *Client) GetProjectStatusOrder(ctx context.Context, cred usecase.Credential, projectIDOrKey string) (domain.ProjectStatusOrder, error) {
 	return domain.ProjectStatusOrder{}, fmt.Errorf("jira: GetProjectStatusOrder not yet implemented — see doc comment in this method")
 }
@@ -784,7 +1033,9 @@ func basicAuth(email, token string) string {
 }
 
 // adfDoc is a minimal Atlassian Document Format document — just enough to
-// carry a plain-text description, not the full ADF node-type surface.
+// carry a plain-text description, not the full ADF node-type surface. Only
+// used for API v3 (Cloud) — v2 (Server/Data Center, CR-JIRA-001) takes a
+// plain string instead.
 type adfDoc struct {
 	Type    string    `json:"type"`
 	Version int       `json:"version"`
@@ -805,5 +1056,93 @@ func plainTextADF(text string) adfDoc {
 			Type:    "paragraph",
 			Content: []adfNode{{Type: "text", Text: text}},
 		}},
+	}
+}
+
+// ErrTransitionUnavailable means the issue has no transition to the requested
+// status from where it is now. Returned instead of pretending success: a caller
+// asking to move an issue must be able to tell it did not move.
+var ErrTransitionUnavailable = errors.New("jira: transition unavailable")
+
+// transitionIssue moves the issue to the status named target (a status name, or
+// a transition id). Jira only offers the transitions its workflow allows from
+// the current status, so this never forces an illegal move: an issue already in
+// the target status is left alone, and one with no way there is an error.
+func (c *Client) transitionIssue(ctx context.Context, cred usecase.Credential, apiVersion, issueID, target string) error {
+	if current, err := c.GetIssue(ctx, cred, issueID); err == nil && strings.EqualFold(strings.TrimSpace(current.State), strings.TrimSpace(target)) {
+		return nil
+	}
+	transitions, err := c.ListTransitions(ctx, cred, issueID)
+	if err != nil {
+		return err
+	}
+	chosen, ok := pickTransition(transitions, target)
+	if !ok {
+		names := make([]string, 0, len(transitions))
+		for _, t := range transitions {
+			names = append(names, t.To.Name)
+		}
+		return fmt.Errorf("%w: %s has no transition to %q (available: %s)", ErrTransitionUnavailable, issueID, target, strings.Join(names, ", "))
+	}
+	body, err := json.Marshal(map[string]any{"transition": map[string]any{"id": chosen.ID}})
+	if err != nil {
+		return fmt.Errorf("jira: marshal transition request: %w", err)
+	}
+	u := apiURL(cred.BaseURL, apiVersion, "/issue/"+url.PathEscape(issueID)+"/transitions")
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, u, bytes.NewReader(body))
+	if err != nil {
+		return fmt.Errorf("jira: building transition request: %w", err)
+	}
+	req.Header.Set("Authorization", authHeaderValue(cred))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("jira: transition request: %w", err)
+	}
+	defer func() { _ = resp.Body.Close() }()
+	if resp.StatusCode != http.StatusNoContent && resp.StatusCode != http.StatusOK {
+		return jiraStatusError("transition issue", resp)
+	}
+	return nil
+}
+
+// pickTransition resolves target to one of the available transitions: an exact
+// transition id first, then the destination status name, then the transition's
+// own name — the order that keeps a caller-supplied id from being shadowed by a
+// status that happens to share its text.
+func pickTransition(transitions []domain.Transition, target string) (domain.Transition, bool) {
+	target = strings.TrimSpace(target)
+	for _, t := range transitions {
+		if t.ID == target {
+			return t, true
+		}
+	}
+	for _, t := range transitions {
+		if strings.EqualFold(strings.TrimSpace(t.To.Name), target) {
+			return t, true
+		}
+	}
+	for _, t := range transitions {
+		if strings.EqualFold(strings.TrimSpace(t.Name), target) {
+			return t, true
+		}
+	}
+	return domain.Transition{}, false
+}
+
+// normalizeStatusCategory maps Jira's statusCategory.key (new/indeterminate/
+// done) to the domain's todo/in_progress/done vocabulary (issuetracking.proto's
+// WorkflowState.category). Unknown keys stay empty so callers treat the
+// category as unknown rather than guessing.
+func normalizeStatusCategory(key string) string {
+	switch key {
+	case "new":
+		return "todo"
+	case "indeterminate":
+		return "in_progress"
+	case "done":
+		return "done"
+	default:
+		return ""
 	}
 }
