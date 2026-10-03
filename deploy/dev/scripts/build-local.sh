@@ -41,6 +41,7 @@ ALL_SERVICES=(
   infra-fleet-service issue-tracking-service notification-service
   orchestration-service project-service scm-integration-service
   task-service tenant-service usage-service workflow-service mcp-service
+  issue-status-sync
 )
 
 check_cmd() {

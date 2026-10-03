@@ -14,7 +14,7 @@
 # see that service's cmd/server/main.go doc comment.
 set -e
 
-DATABASES="auth tenant project infra aiprovider workflow task orchestration automation annotation notification usage credential issuetracking scm mcp"
+DATABASES="auth tenant project infra aiprovider workflow task orchestration automation annotation notification usage credential issuetracking scm mcp issuestatussync"
 
 for db in $DATABASES; do
 	psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL

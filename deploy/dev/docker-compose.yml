@@ -518,6 +518,20 @@ services:
       credential-broker-service: { condition: service_started }
       nats: { condition: service_healthy }
 
+  # NATS event consumer (no public gRPC API); acts on Jira via issue-tracking-service.
+  issue-status-sync:
+    <<: *go-defaults
+    container_name: orca-go-issue-status-sync
+    volumes:
+      - ./bin/issue-status-sync/orca:/app/bin/orca:ro
+    environment:
+      <<: *go-common-env
+      DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/issuestatussync?sslmode=disable
+    depends_on:
+      postgres: { condition: service_healthy }
+      issue-tracking-service: { condition: service_started }
+      nats: { condition: service_healthy }
+
   api-gateway:
     <<: *go-defaults
     container_name: orca-go-api-gateway
@@ -680,6 +694,10 @@ services:
     <<: *migrate-defaults
     volumes: ["./bin/mcp-service/migrations:/migrations:ro"]
     command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/mcp?sslmode=disable", "up"]
+  migrate-issuestatussync:
+    <<: *migrate-defaults
+    volumes: ["./bin/issue-status-sync/migrations:/migrations:ro"]
+    command: ["-path", "/migrations", "-database", "postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/issuestatussync?sslmode=disable", "up"]
 
 networks:
   orca-go-net:

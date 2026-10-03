@@ -156,6 +156,12 @@ Then Settings → MCP in the UI (needs an admin to create a first token / connec
 - VAPID keys are provisioned automatically: the first VAPID public-key request (or first push) of a tenant makes notification-service ask credential-broker-service to create `vapid-signing-<tenant_id>` (ecdsa-p256) and store its public key, so tenants created after a deploy need no script. `provision-vapid-key.sh` is an optional pre-warm. The Vault policy step above remains required.
 - `OAUTH_RESOURCE_URL` must equal `<MCP_PUBLIC_BASE_URL>/mcp` exactly; if you change `PUBLIC_BASE_URL`, clear `OAUTH_RESOURCE_URL` in the server `.env` and redeploy so it is re-derived.
 
+## issue-status-sync (Jira status sync)
+
+`issue-status-sync` is a NATS (JetStream) consumer with no public gRPC API: it reacts to worktree/SCM events and transitions the linked Jira issue through `issue-tracking-service`. It has its own database, `issuestatussync`.
+- `./scripts/migrate.sh issuestatussync` (or `--remote`) creates the database if missing, then migrates it; safe on an already-running server (`init-databases.sh` only covers fresh volumes). Then `docker compose up -d issue-status-sync`.
+- It only acts for projects with `IssueStatusSyncEnabled` set and for users who have connected Jira; otherwise events are ignored.
+
 ## Known limitations (read before treating this as production)
 
 - **Vault is the shared, persistent vnp-domain instance (172.20.2.21), not a
