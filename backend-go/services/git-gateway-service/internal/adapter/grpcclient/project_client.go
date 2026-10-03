@@ -64,7 +64,7 @@ func (p *ProjectClient) GetRepo(ctx context.Context, repoID string) (domain.Repo
 // parent-worktree/orchestration lineage fields) — these are independent
 // optional inputs, not competing shapes for the same field.
 func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, repoID, path, branch, baseRef string, lineage domain.WorktreeLineageCapture) (domain.WorktreeRecord, error) {
-	ctx, err := withTenantMetadata(ctx)
+	ctx, err := withIdentityMetadata(ctx)
 	if err != nil {
 		return domain.WorktreeRecord{}, err
 	}
@@ -94,7 +94,7 @@ func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, re
 }
 
 func (p *ProjectClient) RecordWorktreeRemoved(ctx context.Context, worktreeID string) error {
-	ctx, err := withTenantMetadata(ctx)
+	ctx, err := withIdentityMetadata(ctx)
 	if err != nil {
 		return err
 	}

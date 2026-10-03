@@ -28,3 +28,20 @@ func withTenantMetadata(ctx context.Context) (context.Context, error) {
 	}
 	return metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataTenantID, tenantID), nil
 }
+
+// withIdentityMetadata is withTenantMetadata plus the acting user, when the
+// inbound request carried one. Used only where the callee records WHO acted
+// (project-service's worktree lifecycle events, which issue-status-sync later
+// needs to pick that person's Jira credential). It is deliberately not folded
+// into withTenantMetadata: forwarding a user to every outbound call could
+// change authorization outcomes of calls that never had one.
+func withIdentityMetadata(ctx context.Context) (context.Context, error) {
+	ctx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if userID, ok := tenant.UserID(ctx); ok && userID != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataUserID, userID)
+	}
+	return ctx, nil
+}

@@ -13,8 +13,14 @@ import "context"
 // this service is an async event consumer, not an inbound gRPC handler —
 // there is no validated caller identity to forward, only the tenant_id
 // carried on the event itself (event.TenantID).
+//
+// userID is the person whose credential performs the call: the tracker
+// connection is stored per (tenant, user), and the event is all this service has.
 type IssueTrackerClient interface {
-	TransitionIssue(ctx context.Context, tenantID, provider, ref, state string) error
+	TransitionIssue(ctx context.Context, tenantID, userID, provider, ref, state string) error
+	// IssueStatusCategory returns the issue's current status category ("todo",
+	// "in_progress", "done"), or "" when the provider does not report one.
+	IssueStatusCategory(ctx context.Context, tenantID, userID, provider, ref string) (string, error)
 }
 
 // ScmClient wraps scm-integration-service for the GitHub half of

@@ -2,9 +2,13 @@ package grpcclient
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"log/slog"
 
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -69,10 +73,18 @@ func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID strin
 		// Resolve the real path here instead, at the one place that
 		// actually knows which worktree this is.
 		path, err := p.resolveWorktreePath(ctx, task.WorktreeID)
-		if err != nil {
+		if err == nil {
+			return task.WorktreeID, path, nil
+		}
+		if !isWorktreeGone(err) {
 			return "", "", err // fail closed — a silent repo-root fallback here would just reintroduce BUG-028
 		}
-		return task.WorktreeID, path, nil
+		// The worktree was removed (e.g. workspace cleanup) and the task still
+		// points at it. Falling back to the repo root would reintroduce BUG-028,
+		// but a worktree that no longer exists has nothing left to protect:
+		// provision a fresh one below; Execute persists the new id.
+		slog.WarnContext(ctx, "worktree_provisioner: task's worktree no longer exists, creating a new one",
+			slog.String("task_id", task.ID), slog.String("worktree_id", task.WorktreeID))
 	}
 
 	if id, wtPath, ok := p.findIssueWorktree(ctx, tenantID, task); ok {
@@ -88,6 +100,11 @@ func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID strin
 	ctx, err = withTenantMetadata(ctx)
 	if err != nil {
 		return "", "", err
+	}
+	// Who triggered the run, so project-service's worktree.created event can name
+	// the actor and issue-status-sync can act with that person's own credential.
+	if userID, ok := tenant.UserID(origCtx); ok && userID != "" {
+		ctx = metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataUserID, userID)
 	}
 	req := &gitgatewayv1.CreateWorktreeRequest{
 		ProjectId: task.ProjectID,
@@ -161,4 +178,15 @@ func (p *WorktreeProvisioner) resolveWorktreePath(ctx context.Context, worktreeI
 		return "", fmt.Errorf("worktree_provisioner: get worktree %q: %w", worktreeID, err)
 	}
 	return resp.GetPath(), nil
+}
+
+// isWorktreeGone reports whether err is project-service saying the worktree
+// does not exist (as opposed to being unreachable or forbidden, which must
+// still fail closed).
+func isWorktreeGone(err error) bool {
+	var st interface{ GRPCStatus() *status.Status }
+	if errors.As(err, &st) {
+		return st.GRPCStatus().Code() == codes.NotFound
+	}
+	return false
 }

@@ -19,3 +19,14 @@ import (
 func withTenantMetadata(ctx context.Context, tenantID string) context.Context {
 	return metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataTenantID, tenantID)
 }
+
+// withIdentityMetadata is withTenantMetadata plus the user the call is made on
+// behalf of. issue-tracking-service stores connections per (tenant, user) and
+// rejects a call with no user, so the event's actor must travel with it.
+func withIdentityMetadata(ctx context.Context, tenantID, userID string) context.Context {
+	ctx = withTenantMetadata(ctx, tenantID)
+	if userID == "" {
+		return ctx
+	}
+	return metadata.AppendToOutgoingContext(ctx, grpcmw.MetadataUserID, userID)
+}

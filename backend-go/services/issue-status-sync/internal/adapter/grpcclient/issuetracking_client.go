@@ -21,16 +21,27 @@ func NewIssueTrackingClient(client issuetrackingv1.IssueTrackingServiceClient) *
 	return &IssueTrackingClient{client: client}
 }
 
-// TransitionIssue calls UpdateIssue with workflow_state_id=state — that
-// field is documented as "== jira.updateIssue's transition target /
-// linear's stateId" (issuetracking.proto's UpdateIssueRequest doc
-// comment), matching BL-PI-03's TrackerState output exactly.
-func (c *IssueTrackingClient) TransitionIssue(ctx context.Context, tenantID, provider, ref, state string) error {
-	ctx = withTenantMetadata(ctx, tenantID)
+// TransitionIssue calls UpdateIssue with workflow_state_id=state, the target
+// status name — issue-tracking-service's Jira adapter resolves it to one of
+// the issue's currently available transitions and errors if there is none.
+func (c *IssueTrackingClient) TransitionIssue(ctx context.Context, tenantID, userID, provider, ref, state string) error {
+	ctx = withIdentityMetadata(ctx, tenantID, userID)
 	_, err := c.client.UpdateIssue(ctx, &issuetrackingv1.UpdateIssueRequest{
 		Provider: parseTrackerProvider(provider), IssueId: ref, WorkflowStateId: state,
 	})
 	return err
+}
+
+// IssueStatusCategory reads the issue's current status category through GetIssue.
+func (c *IssueTrackingClient) IssueStatusCategory(ctx context.Context, tenantID, userID, provider, ref string) (string, error) {
+	ctx = withIdentityMetadata(ctx, tenantID, userID)
+	issue, err := c.client.GetIssue(ctx, &issuetrackingv1.GetIssueRequest{
+		Provider: parseTrackerProvider(provider), IssueId: ref,
+	})
+	if err != nil {
+		return "", err
+	}
+	return issue.GetWorkflowState().GetCategory(), nil
 }
 
 func parseTrackerProvider(provider string) issuetrackingv1.IssueProvider {

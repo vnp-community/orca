@@ -6,7 +6,12 @@ import (
 	"testing"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/metadata"
+	"google.golang.org/grpc/status"
 
+	"github.com/stablyai/orca-go/common/grpcmw"
+	"github.com/stablyai/orca-go/common/tenant"
 	gitgatewayv1 "github.com/stablyai/orca-go/proto/gen/go/orca/gitgateway/v1"
 	projectv1 "github.com/stablyai/orca-go/proto/gen/go/orca/project/v1"
 	"github.com/stablyai/orca-go/services/task-service/internal/domain"
@@ -144,5 +149,90 @@ func TestWorktreeProvisioner_SourceLookupErrorStillCreatesWorktree(t *testing.T)
 	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
 	if err != nil || id != "wt-new" || git.gotCreateWorktree.LinkedIssueProvider != nil {
 		t.Fatalf("lookup failure must degrade to a plain create: id=%q err=%v", id, err)
+	}
+}
+
+func TestWorktreeProvisioner_RemovedWorktree_IsRecreatedNotFatal(t *testing.T) {
+	git := &fakeGitGatewayCreateWorktreeClient{createWorktreeResp: &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "wt-fresh", Path: "/srv/wt-fresh"}}
+	projects := &projectWithWorktrees{fakeProjectServiceClient: &fakeProjectServiceClient{
+		getWorktreeErr: status.Error(codes.NotFound, "worktree not found"),
+		listReposResp:  &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "repo-1", ProjectId: "proj-1"}}},
+	}}
+	p := NewWorktreeProvisioner(git, projects)
+
+	id, path, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-gone"})
+	if err != nil {
+		t.Fatalf("a task whose worktree was cleaned up must get a new one, got %v", err)
+	}
+	if id != "wt-fresh" || path != "/srv/wt-fresh" || !git.createWorktreeCalled {
+		t.Errorf("want a freshly created worktree, got id=%q path=%q created=%v", id, path, git.createWorktreeCalled)
+	}
+}
+
+// Only "does not exist" may recreate: an unreachable or forbidden project-service
+// says nothing about the worktree, and guessing would reintroduce BUG-028.
+func TestWorktreeProvisioner_OtherLookupErrors_StillFailClosed(t *testing.T) {
+	for name, lookupErr := range map[string]error{
+		"unavailable":       status.Error(codes.Unavailable, "project-service down"),
+		"permission denied": status.Error(codes.PermissionDenied, "no access"),
+		"plain error":       errors.New("boom"),
+	} {
+		t.Run(name, func(t *testing.T) {
+			git := &fakeGitGatewayCreateWorktreeClient{}
+			projects := &projectWithWorktrees{fakeProjectServiceClient: &fakeProjectServiceClient{getWorktreeErr: lookupErr}}
+			p := NewWorktreeProvisioner(git, projects)
+
+			if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1", WorktreeID: "wt-1"}); err == nil {
+				t.Fatal("expected an error")
+			}
+			if git.createWorktreeCalled {
+				t.Error("must not create a worktree when the lookup failed for any reason other than not found")
+			}
+		})
+	}
+}
+
+// ctxCapturingGit records the context CreateWorktree was called with.
+type ctxCapturingGit struct {
+	*fakeGitGatewayCreateWorktreeClient
+	gotCtx context.Context
+}
+
+func (g *ctxCapturingGit) CreateWorktree(ctx context.Context, in *gitgatewayv1.CreateWorktreeRequest, opts ...grpc.CallOption) (*gitgatewayv1.CreateWorktreeResponse, error) {
+	g.gotCtx = ctx
+	return g.fakeGitGatewayCreateWorktreeClient.CreateWorktree(ctx, in, opts...)
+}
+
+func TestWorktreeProvisioner_CreateForwardsTheActingUser(t *testing.T) {
+	git := &ctxCapturingGit{fakeGitGatewayCreateWorktreeClient: &fakeGitGatewayCreateWorktreeClient{
+		createWorktreeResp: &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "wt-new", Path: "/srv/wt-new"}}}
+	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "repo-1", ProjectId: "proj-1"}}}}
+	p := NewWorktreeProvisioner(git, projects)
+
+	ctx := tenant.WithUserID(ctxWithTenant(t), "user-7")
+	if _, _, err := p.EnsureWorktree(ctx, "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err != nil {
+		t.Fatal(err)
+	}
+	md, _ := metadata.FromOutgoingContext(git.gotCtx)
+	if got := md.Get(grpcmw.MetadataUserID); len(got) != 1 || got[0] != "user-7" {
+		t.Errorf("the creating user must reach git-gateway, got %v", got)
+	}
+	if got := md.Get(grpcmw.MetadataTenantID); len(got) != 1 {
+		t.Errorf("tenant must still be forwarded, got %v", got)
+	}
+}
+
+func TestWorktreeProvisioner_CreateWithoutUserSendsNoUserHeader(t *testing.T) {
+	git := &ctxCapturingGit{fakeGitGatewayCreateWorktreeClient: &fakeGitGatewayCreateWorktreeClient{
+		createWorktreeResp: &gitgatewayv1.CreateWorktreeResponse{WorktreeId: "wt-new", Path: "/srv/wt-new"}}}
+	projects := &fakeProjectServiceClient{listReposResp: &projectv1.ListReposResponse{Repos: []*projectv1.Repo{{Id: "repo-1", ProjectId: "proj-1"}}}}
+	p := NewWorktreeProvisioner(git, projects)
+
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err != nil {
+		t.Fatal(err)
+	}
+	md, _ := metadata.FromOutgoingContext(git.gotCtx)
+	if got := md.Get(grpcmw.MetadataUserID); len(got) != 0 {
+		t.Errorf("no user in context must not invent one, got %v", got)
 	}
 }

@@ -19,6 +19,12 @@ var errUnknownProvider = errors.New("issue-status-sync: unknown or unsupported i
 // 3 total attempts, not 3 retries after the first (4 total).
 const retryAttempts = 3
 
+// syncableProviders are the trackers this service can drive correctly end to
+// end. Jira only: Linear's workflow_state_id must be a state UUID (this service
+// sends a name), and GitHub's label write has no per-user credential path yet.
+// Other providers are skipped quietly instead of failing three times each.
+var syncableProviders = map[string]bool{"jira": true}
+
 type SyncIssueStatus struct {
 	tracker         IssueTrackerClient
 	scm             ScmClient
@@ -55,13 +61,15 @@ func (uc *SyncIssueStatus) HandleWorktreeLifecycle(ctx context.Context, ev domai
 
 	target := mapWorktreeEventToStatus(ev) // BL-PI-03's mapping table
 	if target == (domain.TargetState{}) {
-		// worktree.deleted && had_open_pr: no mapping-table row — the PR
-		// lifecycle events own In Review/Done for this case, not this one.
+		// worktree.deleted: no mapping — see mapWorktreeEventToStatus.
+		return uc.processedEvents.MarkSeen(ctx, ev.EventID)
+	}
+	if !uc.canSync(ctx, ev.EventID, ev.LinkedIssueProvider, ev.ActorUserID) {
 		return uc.processedEvents.MarkSeen(ctx, ev.EventID)
 	}
 
 	err := doWithRetry(ctx, retryAttempts, func(ctx context.Context) error { // BR-PI-08
-		return uc.updateIssueStatus(ctx, ev.TenantID, ev.LinkedIssueProvider, ev.LinkedIssueRef, target)
+		return uc.updateIssueStatus(ctx, ev.TenantID, ev.ActorUserID, ev.LinkedIssueProvider, ev.LinkedIssueRef, target)
 	})
 	if err != nil {
 		uc.logger.ErrorContext(ctx, "gave up syncing issue status after retries", "issue", ev.LinkedIssueRef, "error", err)
@@ -69,6 +77,23 @@ func (uc *SyncIssueStatus) HandleWorktreeLifecycle(ctx context.Context, ev domai
 		// own redelivery window is the safety net.
 	}
 	return uc.processedEvents.MarkSeen(ctx, ev.EventID) // mark seen regardless of sync outcome
+}
+
+// canSync reports whether an event can be acted on at all, logging why not.
+// A skipped event is deliberate and quiet, never an error: an unsupported
+// provider or a missing actor will not become syncable by retrying.
+func (uc *SyncIssueStatus) canSync(ctx context.Context, eventID, provider, actorUserID string) bool {
+	if !syncableProviders[provider] {
+		uc.logger.InfoContext(ctx, "issue status sync skipped: provider not supported", "event", eventID, "provider", provider)
+		return false
+	}
+	if actorUserID == "" {
+		// The tracker connection belongs to a user; guessing one would act on
+		// someone else's account (or fail on every retry).
+		uc.logger.WarnContext(ctx, "issue status sync skipped: event carries no acting user", "event", eventID)
+		return false
+	}
+	return true
 }
 
 // HandlePullRequestLifecycle mirrors HandleWorktreeLifecycle's shape for
@@ -89,9 +114,12 @@ func (uc *SyncIssueStatus) HandlePullRequestLifecycle(ctx context.Context, ev do
 	// project_id through CreatePullRequest/MergePullRequest's outbox payload.
 
 	target := mapPullRequestEventToStatus(ev)
+	if !uc.canSync(ctx, ev.EventID, ev.LinkedIssueProvider, ev.ActorUserID) {
+		return uc.processedEvents.MarkSeen(ctx, ev.EventID)
+	}
 
 	err := doWithRetry(ctx, retryAttempts, func(ctx context.Context) error {
-		return uc.updateIssueStatus(ctx, ev.TenantID, ev.LinkedIssueProvider, ev.LinkedIssueRef, target)
+		return uc.updateIssueStatus(ctx, ev.TenantID, ev.ActorUserID, ev.LinkedIssueProvider, ev.LinkedIssueRef, target)
 	})
 	if err != nil {
 		uc.logger.ErrorContext(ctx, "gave up syncing issue status after retries", "issue", ev.LinkedIssueRef, "error", err)
@@ -99,10 +127,23 @@ func (uc *SyncIssueStatus) HandlePullRequestLifecycle(ctx context.Context, ev do
 	return uc.processedEvents.MarkSeen(ctx, ev.EventID)
 }
 
-func (uc *SyncIssueStatus) updateIssueStatus(ctx context.Context, tenantID, provider, ref string, state domain.TargetState) error {
+func (uc *SyncIssueStatus) updateIssueStatus(ctx context.Context, tenantID, userID, provider, ref string, state domain.TargetState) error {
 	switch provider {
 	case "linear", "jira":
-		return uc.tracker.TransitionIssue(ctx, tenantID, provider, ref, state.TrackerState)
+		if state.OnlyFromCategory != "" {
+			category, err := uc.tracker.IssueStatusCategory(ctx, tenantID, userID, provider, ref)
+			if err != nil {
+				return err
+			}
+			if category != state.OnlyFromCategory {
+				// Already started, finished or of unknown kind: leave it. Moving an
+				// issue backwards is worse than not moving it.
+				uc.logger.InfoContext(ctx, "issue status sync skipped: issue not in the expected category",
+					"issue", ref, "category", category, "expected", state.OnlyFromCategory)
+				return nil
+			}
+		}
+		return uc.tracker.TransitionIssue(ctx, tenantID, userID, provider, ref, state.TrackerState)
 	case "github":
 		return uc.scm.UpdateIssue(ctx, tenantID, provider, ref, state.GitHubLabelPatch)
 	default:
@@ -110,20 +151,20 @@ func (uc *SyncIssueStatus) updateIssueStatus(ctx context.Context, tenantID, prov
 	}
 }
 
-// mapWorktreeEventToStatus implements BL-PI-03's mapping table:
-// worktree.created -> In Progress, worktree.deleted && !had_open_pr ->
-// Cancelled. worktree.deleted && had_open_pr is left unmapped (empty
-// TargetState — the PR lifecycle events own "Done"/"In Review" instead;
-// a worktree removed while its PR is still open shouldn't itself close
-// the issue).
+// mapWorktreeEventToStatus implements BL-PI-03's mapping table, narrowed:
+// worktree.created -> In Progress, but only for an issue still in "todo".
+//
+// worktree.deleted deliberately maps to NOTHING. BL-PI-03 used to map it to
+// Cancelled/close when there was no open PR, but a worktree is deleted for
+// routine reasons (cleanup after the PR merged, a fresh checkout, disk space),
+// and the event's had_open_pr is always false. Acting on it would cancel or
+// close issues whose work is finished — data loss in the tracker — so removal
+// is never treated as a signal about the issue.
 func mapWorktreeEventToStatus(ev domain.WorktreeLifecycleEvent) domain.TargetState {
-	if !ev.Deleted {
-		return domain.TargetState{TrackerState: "In Progress", GitHubLabelPatch: "add:in-progress"}
+	if ev.Deleted {
+		return domain.TargetState{}
 	}
-	if !ev.HadOpenPR {
-		return domain.TargetState{TrackerState: "Cancelled", GitHubLabelPatch: "close"}
-	}
-	return domain.TargetState{}
+	return domain.TargetState{TrackerState: "In Progress", GitHubLabelPatch: "add:in-progress", OnlyFromCategory: "todo"}
 }
 
 // mapPullRequestEventToStatus implements BL-PI-03's mapping table:

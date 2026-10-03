@@ -29,8 +29,24 @@
 - `WorktreeProvisioner.EnsureWorktree` tìm worktree `active` đã gắn issue của task (và chưa thuộc task khác) trước khi tạo mới. Lỗi tra cứu → quay về tạo mới.
 - Chiều ngược lại: khi `task.execute` tự tạo worktree cho task có nguồn, request mang luôn `linked_issue_*` — nhờ đó issue cũng chuyển "In Progress" cho luồng bắt đầu từ task, và hai đường dùng chung một worktree.
 
-### 2.3 Đồng bộ trạng thái về Jira
-- Không viết mới: `issue-status-sync` đã nhận `worktree.created` qua JetStream (retry 3 lần, idempotent, kiểm tra cờ theo project). Việc ghi liên kết ở 2.2 là đủ để issue chuyển "In Progress" bất đồng bộ.
+### 2.3 Đồng bộ trạng thái về Jira (đã sửa 2026-10-03; chưa bật trên server)
+Bản rà soát 2026-10-03 phát hiện luồng này **không cập nhật được Jira** (5 lỗi độc lập). Đã sửa:
+| Lỗi | Sửa |
+|---|---|
+| Consumer chỉ gửi `tenant`, `UpdateIssue` đòi user và credential Jira lưu theo `(tenant, user)` | Sự kiện `worktree.created/deleted` mang thêm `actor_user_id` (project-service lấy từ ngữ cảnh; git-gateway và task-service chuyển user cho `RecordWorktree*`/`CreateWorktree`). Consumer gọi tracker bằng chính người đó. Sự kiện không có actor (cũ, hoặc tạo từ nơi không có user) bị **bỏ qua có log**, không thử lại vô ích. Field là `omitempty` nên tương thích ngược. |
+| Adapter Jira bỏ qua `workflow_state_id` nhưng báo thành công | `jira.Client.UpdateIssue` giờ chọn transition khả dụng (id, rồi tên status đích, rồi tên transition) và `POST /issue/{id}/transitions`. Đã ở đúng status thì không làm gì. Không có đường tới status đó → `ErrTransitionUnavailable`; Jira từ chối → trả lỗi. Không còn "thành công giả". Chỉ cập nhật trạng thái thì không `PUT` fields rỗng. |
+| `had_open_pr` luôn `false`, xoá worktree sẽ "Cancelled" | **Bỏ hẳn mapping `worktree.deleted → Cancelled/close`.** Xoá worktree là việc dọn dẹp thường ngày (kể cả sau khi PR đã merge) và không nói gì về issue; tự huỷ/đóng issue ở đây là mất dữ liệu trên tracker. |
+| Có thể kéo lùi issue đã làm xong | `worktree.created → In Progress` chỉ áp dụng khi issue đang ở category `todo` (Jira `statusCategory` được chuẩn hoá `new/indeterminate/done → todo/in_progress/done` trong `GetIssue`). Đang `in_progress`, `done` hoặc không rõ → giữ nguyên. Không tra được category → thử lại rồi bỏ, **không** chuyển. |
+| Provider chưa kiểm chứng | Chỉ **Jira** được đồng bộ. Linear cần UUID state (service gửi tên), GitHub chưa có đường credential theo user; hai provider đó bị bỏ qua có log thay vì lỗi 3 lần mỗi sự kiện. |
+
+Còn lại (chưa làm, có chủ đích):
+- Sự kiện PR không mang issue (`LinkedIssue*` luôn rỗng ở `CreatePullRequest/MergePullRequest`) và cũng không có actor, nên "In Review"/"Done" vẫn không kích hoạt. Cần parser closing-keyword hoặc tra issue từ worktree theo branch.
+- `issue-status-sync` **chưa nằm trong deploy dev**. `Makefile SERVICES` đã có nó (build/vet/test). Không bật tự động vì `init-databases.sh` chỉ chạy khi khởi tạo volume lần đầu (server đang chạy sẽ thiếu DB) và `migrate.sh all` sẽ lỗi trên DB chưa tồn tại. Để bật:
+  1. Tạo DB trên Postgres đang chạy (`CREATE DATABASE issuestatussync OWNER orca;`) rồi thêm `issuestatussync` vào `DATABASES` ở `deploy/dev/docker/postgres/init-databases.sh` cho môi trường mới.
+  2. Chạy migration của service (`backend-go/services/issue-status-sync/migrations/postgres`) với DSN tới DB đó; thêm vào `SERVICES` của `migrate.sh`.
+  3. Thêm `issue-status-sync` vào `ALL_SERVICES` của `build-local.sh` và một khối service trong `docker-compose.yml` theo mẫu `usage-service` (env: `DATABASE_DSN`, `NATS_URL`, `ISSUE_TRACKING_SERVICE_ADDR`, `SCM_INTEGRATION_SERVICE_ADDR`, `PROJECT_SERVICE_ADDR`; `depends_on` postgres, nats, issue-tracking-service, project-service).
+  4. Stream JetStream `PROJECT` phải tồn tại (project-service tạo khi relay khởi động).
+  Nên thử trên một project có Jira thật, đặt `IssueStatusSyncEnabled=false` ở các project còn lại cho tới khi yên tâm.
 
 ### 2.4 Engine 1 bền (lease + heartbeat + recovery)
 - Migration `0013_execution_leases`: `execution_links.lease_expires_at / lease_owner / previous_status`.
@@ -55,10 +71,11 @@
 1. Chạy migration `0012` rồi `0013` cho task-service (Postgres và MySQL).
 2. Deploy task-service, git-gateway-service, api-gateway; sau đó frontend.
 3. Bật cờ Experimental cho nhóm thử nghiệm.
-4. `issue-status-sync` phải đang chạy thì issue mới đổi trạng thái (repo chỉ có workflow CI cho service này, chưa thấy manifest deploy).
+4. Cập nhật trạng thái Jira: code đã sửa (2.3) nhưng service chưa được triển khai; làm theo 4 bước ở 2.3 để bật.
 
 ## 4. Hành vi cần biết
-- Cờ đồng bộ ở project mặc định **bật** (`IssueStatusSyncEnabled: true`): mọi workspace Jira tạo trên web sẽ đẩy issue sang "In Progress" trừ khi project tắt.
+- Cờ `IssueStatusSyncEnabled` mặc định bật; khi `issue-status-sync` được triển khai, mọi worktree tạo từ issue Jira (có actor) sẽ đẩy issue đang `todo` sang "In Progress". Xoá worktree **không** đổi gì trên Jira.
+- Dọn worktree không báo cho task-service nên `task.worktree_id` giữ id cũ. `EnsureWorktree` giờ coi `NotFound` từ project-service là "đã bị xoá" và tạo worktree mới (lưu id mới); các lỗi khác (không kết nối, từ chối quyền) vẫn dừng, không đoán.
 - Recovery **không chạy lại** agent; nó chỉ trả task về trạng thái trước. Tiến trình agent trên dev server có thể vẫn chạy tới khi bị dọn; nếu hoàn tất muộn nó vẫn ghi `review`.
 - Nếu `WithExecutionClaim` không được cấu hình (test/embedding khác), `Execute` quay về check-then-write như cũ.
 
@@ -82,4 +99,8 @@
 - [x] Task kẹt từ trước migration (không lease, quá 30 phút) và task mồ côi được trả về trạng thái hợp lệ; link `completed` của Engine 2/3 không bị coi là đã xong (test tích hợp Postgres + MySQL).
 - [x] Engine 2/3 báo thất bại → task về trạng thái trước, không kẹt.
 - [x] Người không có grant không đọc được task/nguồn của người khác và không gọi được `GenerateAgentPrompt`.
+- [x] Xoá worktree không còn nằm trong mapping: không bao giờ Cancelled/close issue (test).
+- [x] Adapter Jira chuyển trạng thái thật, không thành công giả, không kéo lùi issue (test với Jira giả).
+- [x] Task có `worktree_id` đã bị dọn vẫn chạy được: tạo worktree mới; lỗi khác vẫn fail closed.
+- [ ] Bật `issue-status-sync` và chạy thử trên Jira thật (chưa).
 - [ ] Chạy end-to-end với tiến trình task-service thật bị kill giữa lúc agent chạy (hiện mới mô phỏng ở mức DB + use case).

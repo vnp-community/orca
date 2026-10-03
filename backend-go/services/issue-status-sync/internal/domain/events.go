@@ -25,6 +25,9 @@ type WorktreeLifecycleEvent struct {
 	LinkedIssueRef      string
 	HadOpenPR           bool
 	Deleted             bool
+	// ActorUserID is who created/removed the worktree. The tracker call runs with
+	// that person's own credential, so an event without one cannot be synced.
+	ActorUserID string
 }
 
 // PullRequestLifecycleEvent mirrors scmintegrationv1.PullRequestLifecycleEvent's
@@ -42,6 +45,7 @@ type PullRequestLifecycleEvent struct {
 	LinkedIssueProvider string
 	LinkedIssueRef      string
 	Merged              bool
+	ActorUserID         string // empty today: scm-integration-service does not publish one
 }
 
 // TargetState is BL-PI-03's mapping-table output: what to write to the
@@ -50,4 +54,8 @@ type PullRequestLifecycleEvent struct {
 type TargetState struct {
 	TrackerState     string // Jira/Linear transition name
 	GitHubLabelPatch string // add/remove label, or "close" for Done
+	// OnlyFromCategory, when set, applies the change only while the issue is in
+	// that status category ("todo", "in_progress", "done"). It keeps a sync from
+	// dragging an issue backwards, e.g. In Progress over an already Done issue.
+	OnlyFromCategory string
 }

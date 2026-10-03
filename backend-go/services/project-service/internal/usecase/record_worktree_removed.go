@@ -45,11 +45,13 @@ func (uc *RecordWorktreeRemoved) Execute(ctx context.Context, in RecordWorktreeR
 		return apperrors.New(apperrors.KindInvalidArgument, "PROJECT_WORKTREE_ID_REQUIRED", "worktree_id is required", nil)
 	}
 
+	actorID, _ := tenant.UserID(ctx)
 	buildEvent := func(removed domain.Worktree) domain.OutboxEvent {
 		payload, _ := json.Marshal(worktreeLifecycleEventPayload{
 			WorktreeID: removed.ID, ProjectID: removed.ProjectID,
 			LinkedIssueProvider: removed.LinkedIssueProvider, LinkedIssueRef: removed.LinkedIssueRef,
-			HadOpenPr: false, // always false — see this type's doc comment
+			HadOpenPr:   false, // always false — see this type's doc comment
+			ActorUserID: actorID,
 		})
 		return domain.OutboxEvent{
 			ID: uuid.NewString(), TenantID: tenantID,

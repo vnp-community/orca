@@ -43,6 +43,7 @@ type worktreeLifecycleWirePayload struct {
 	LinkedIssueProvider string `json:"linked_issue_provider"`
 	LinkedIssueRef      string `json:"linked_issue_ref"`
 	HadOpenPr           bool   `json:"had_open_pr"`
+	ActorUserID         string `json:"actor_user_id"` // absent on events published before it existed
 }
 
 // prLifecycleWirePayload mirrors scm-integration-service's
@@ -53,6 +54,7 @@ type prLifecycleWirePayload struct {
 	PrNumber            int32  `json:"pr_number"`
 	LinkedIssueProvider string `json:"linked_issue_provider"`
 	LinkedIssueRef      string `json:"linked_issue_ref"`
+	ActorUserID         string `json:"actor_user_id"`
 }
 
 // Subscriber wires common/eventbus.Consumer to usecase.SyncIssueStatus.
@@ -111,7 +113,7 @@ func (s *Subscriber) handleWorktreeEvent(deleted bool) eventbus.Handler {
 			OccurredAt: event.OccurredAt.Format("2006-01-02T15:04:05Z07:00"),
 			WorktreeID: wire.WorktreeID, ProjectID: wire.ProjectID,
 			LinkedIssueProvider: wire.LinkedIssueProvider, LinkedIssueRef: wire.LinkedIssueRef,
-			HadOpenPR: wire.HadOpenPr, Deleted: deleted,
+			HadOpenPR: wire.HadOpenPr, Deleted: deleted, ActorUserID: wire.ActorUserID,
 		}
 		return s.sync.HandleWorktreeLifecycle(ctx, ev)
 	}
@@ -129,7 +131,7 @@ func (s *Subscriber) handlePullRequestEvent(merged bool) eventbus.Handler {
 			OccurredAt: event.OccurredAt.Format("2006-01-02T15:04:05Z07:00"),
 			Provider:   wire.Provider, Repo: wire.Repo, PRNumber: wire.PrNumber,
 			LinkedIssueProvider: wire.LinkedIssueProvider, LinkedIssueRef: wire.LinkedIssueRef,
-			Merged: merged,
+			Merged: merged, ActorUserID: wire.ActorUserID,
 		}
 		return s.sync.HandlePullRequestLifecycle(ctx, ev)
 	}

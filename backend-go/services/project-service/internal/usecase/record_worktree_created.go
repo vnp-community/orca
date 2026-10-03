@@ -57,9 +57,11 @@ func (uc *RecordWorktreeCreated) Execute(ctx context.Context, in RecordWorktreeC
 	wt.LinkedIssueProvider = in.LinkedIssueProvider
 	wt.LinkedIssueRef = in.LinkedIssueRef
 
+	actorID, _ := tenant.UserID(ctx)
 	payload, _ := json.Marshal(worktreeLifecycleEventPayload{
 		WorktreeID: wt.ID, ProjectID: in.ProjectID,
 		LinkedIssueProvider: in.LinkedIssueProvider, LinkedIssueRef: in.LinkedIssueRef,
+		ActorUserID: actorID,
 	})
 	event := domain.OutboxEvent{
 		ID: uuid.NewString(), TenantID: tenantID,
