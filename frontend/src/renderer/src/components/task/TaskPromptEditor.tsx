@@ -4,6 +4,7 @@ import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rp
 import { useAppStore } from '../../store'
 import { Button } from '../ui/button'
 import { Loader2 } from 'lucide-react'
+import { GenerateAgentPromptButton } from './GenerateAgentPromptButton'
 import { Tracers } from '../../../../shared/trace/tracers'
 import type { OrcaTask } from '../../../../shared/task-types'
 
@@ -50,16 +51,23 @@ export function TaskPromptEditor({ task }: { task: OrcaTask }) {
         placeholder="Describe what the agent should do for this task..."
         rows={4}
       />
-      <Button onClick={runWithAgent} disabled={isRunning} data-testid="run-agent-btn">
-        {isRunning ? (
-          <>
-            <Loader2 size={12} className="animate-spin mr-1" />
-            Running...
-          </>
-        ) : (
-          '▶ Run with Agent'
-        )}
-      </Button>
+      <div className="flex items-center gap-2">
+        <GenerateAgentPromptButton
+          taskId={task.id}
+          currentPrompt={prompt}
+          onGenerated={setPrompt}
+        />
+        <Button onClick={runWithAgent} disabled={isRunning} data-testid="run-agent-btn">
+          {isRunning ? (
+            <>
+              <Loader2 size={12} className="animate-spin mr-1" />
+              Running...
+            </>
+          ) : (
+            '▶ Run with Agent'
+          )}
+        </Button>
+      </div>
     </div>
   )
 }
