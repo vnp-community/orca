@@ -42,11 +42,11 @@ func (r *Repository) GetExecutionLink(ctx context.Context, tenantID, id string) 
 	var link domain.ExecutionLink
 	var engine string
 	err := r.db.QueryRowContext(ctx, `
-		SELECT id, tenant_id, task_id, engine, external_ref_id, status_mirror, started_at, completed_at
+		SELECT id, tenant_id, task_id, engine, external_ref_id, status_mirror, started_at, completed_at, previous_status
 		FROM execution_links
 		WHERE tenant_id = ? AND id = ?
 	`, tenantID, id).Scan(
-		&link.ID, &link.TenantID, &link.TaskID, &engine, &link.ExternalRefID, &link.StatusMirror, &link.StartedAt, &link.CompletedAt,
+		&link.ID, &link.TenantID, &link.TaskID, &engine, &link.ExternalRefID, &link.StatusMirror, &link.StartedAt, &link.CompletedAt, &link.PreviousStatus,
 	)
 	if err != nil {
 		return domain.ExecutionLink{}, fmt.Errorf("mysql: query execution link %s: %w", id, err)

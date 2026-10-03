@@ -9,3 +9,13 @@ type ExpiredRun struct {
 	TaskID         string
 	PreviousStatus string
 }
+
+// StuckTask is a task left at in_progress although the execution it points at
+// (its active link) already ended. LinkStatus is that link's status_mirror.
+type StuckTask struct {
+	TenantID       string
+	TaskID         string
+	LinkID         string
+	LinkStatus     string
+	PreviousStatus string
+}

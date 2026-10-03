@@ -906,11 +906,14 @@ func (f *fakeWorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID s
 // fakeExecutionLinkRepository backs execute_task_test.go's execution_links
 // assertions (BE-SOL-001/CR-FLOW-TASK-001) without a real postgres adapter.
 type fakeExecutionLinkRepository struct {
+	mu      sync.Mutex // guards the fields below; Execute's dispatch runs concurrently with test assertions
 	created []domain.ExecutionLink
 	nextID  int
 }
 
 func (f *fakeExecutionLinkRepository) CreateExecutionLink(ctx context.Context, tenantID, taskID string, engine domain.ExecutionEngine, externalRefID string) (domain.ExecutionLink, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.nextID++
 	link := domain.ExecutionLink{ID: fmt.Sprintf("link-%d", f.nextID), TenantID: tenantID, TaskID: taskID, Engine: engine, ExternalRefID: externalRefID, StatusMirror: "in_progress"}
 	f.created = append(f.created, link)
@@ -918,6 +921,8 @@ func (f *fakeExecutionLinkRepository) CreateExecutionLink(ctx context.Context, t
 }
 
 func (f *fakeExecutionLinkRepository) SetExternalRef(ctx context.Context, tenantID, linkID, externalRefID string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	for i := range f.created {
 		if f.created[i].ID == linkID {
 			f.created[i].ExternalRefID = externalRefID
@@ -930,6 +935,8 @@ func (f *fakeExecutionLinkRepository) SetExternalRef(ctx context.Context, tenant
 // assertions (TASK-FT-002-04) — a not-found lookup returns errNotFound,
 // mirroring the real repository's not-found behavior.
 func (f *fakeExecutionLinkRepository) GetExecutionLink(ctx context.Context, tenantID, id string) (domain.ExecutionLink, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	for _, l := range f.created {
 		if l.ID == id && l.TenantID == tenantID {
 			return l, nil
@@ -939,6 +946,8 @@ func (f *fakeExecutionLinkRepository) GetExecutionLink(ctx context.Context, tena
 }
 
 func (f *fakeExecutionLinkRepository) Complete(ctx context.Context, tenantID, linkID, statusMirror string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	for i := range f.created {
 		if f.created[i].ID == linkID {
 			f.created[i].StatusMirror = statusMirror
@@ -951,6 +960,8 @@ func (f *fakeExecutionLinkRepository) Complete(ctx context.Context, tenantID, li
 // (BE-SOL-003/TASK-FT-003-05) — a no-op (not an error) when no row matches
 // externalRefID, mirroring the real repository's idempotence contract.
 func (f *fakeExecutionLinkRepository) UpdateStatusMirror(ctx context.Context, tenantID, externalRefID, newStatus string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	for i := range f.created {
 		if f.created[i].ExternalRefID == externalRefID && f.created[i].TenantID == tenantID {
 			f.created[i].StatusMirror = newStatus

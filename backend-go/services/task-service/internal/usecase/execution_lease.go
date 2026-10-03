@@ -25,6 +25,16 @@ type ExecutionLeaseRepository interface {
 	// ClaimExpired atomically marks up to limit expired direct_agent links
 	// failed and returns them; concurrent callers never receive the same row.
 	ClaimExpired(ctx context.Context, limit int) ([]domain.ExpiredRun, error)
+	// SetPreviousStatus records the pre-dispatch status on a link that has no
+	// lease (Engines 2/3), so a failure report can restore it.
+	SetPreviousStatus(ctx context.Context, tenantID, linkID, status string) error
+	// ClaimLegacyStuck claims direct_agent links with no lease that started
+	// more than olderThan ago — runs from before leases existed.
+	ClaimLegacyStuck(ctx context.Context, olderThan time.Duration, limit int) ([]domain.ExpiredRun, error)
+	// ListOrphanedRuns lists tasks still in_progress although their active
+	// link ended more than grace ago.
+	ListOrphanedRuns(ctx context.Context, grace time.Duration, limit int) ([]domain.StuckTask, error)
+	TaskExecutionReleaser
 }
 
 // Defaults chosen so a healthy run renews ~3 times per TTL: one missed
@@ -33,7 +43,13 @@ const (
 	DefaultLeaseTTL         = 90 * time.Second
 	DefaultLeaseHeartbeat   = 30 * time.Second
 	DefaultRecoveryInterval = 30 * time.Second
-	recoveryBatch           = 50
+	// LegacyStuckAfter must exceed the executor's hard run cap (15 minutes) so a
+	// still-alive run from a not-yet-upgraded instance is never swept.
+	LegacyStuckAfter = 30 * time.Minute
+	// OrphanGrace lets the normal completion writes land before a task whose
+	// link already ended is treated as abandoned.
+	OrphanGrace   = 2 * time.Minute
+	recoveryBatch = 50
 )
 
 // WithExecutionLeases enables lease + heartbeat for direct_agent dispatches.
@@ -84,49 +100,98 @@ func (uc *ExecuteTask) startHeartbeat(ctx context.Context, tenantID, linkID stri
 	}
 }
 
-// RecoverInterruptedExecutions reverts tasks whose direct_agent run was
-// abandoned (its lease expired). Safe to run on every instance concurrently:
-// ClaimExpired hands each expired row to exactly one caller.
+// TaskExecutionReleaser moves an in_progress task back out of in_progress, but
+// only while the given link is still its active one (compare-and-set), so a
+// slow sweeper or a late failure report can never undo a newer dispatch.
+type TaskExecutionReleaser interface {
+	ReleaseExecution(ctx context.Context, tenantID, taskID, linkID string, to domain.Status) (released bool, err error)
+}
+
+// restoreStatus picks where a task goes after an abandoned/failed run: the
+// status it had before the dispatch, or open when that was never recorded.
+func restoreStatus(previous string) domain.Status {
+	s := domain.Status(previous)
+	if s == "" || s == domain.StatusInProgress {
+		return domain.StatusOpen
+	}
+	return s
+}
+
+// RecoverInterruptedExecutions reverts tasks stuck at in_progress:
+//   - a direct_agent run whose lease expired (its process died),
+//   - a direct_agent run from before leases existed, long past the run cap,
+//   - a task whose active link already ended (failed, or a direct_agent run
+//     that completed without the task's completion write landing).
+//
+// Safe to run on every instance concurrently: link claims hand each row to one
+// caller and every task change is a compare-and-set on the active link.
 type RecoverInterruptedExecutions struct {
 	leases ExecutionLeaseRepository
-	repo   TaskRepository
 }
 
-func NewRecoverInterruptedExecutions(leases ExecutionLeaseRepository, repo TaskRepository) *RecoverInterruptedExecutions {
-	return &RecoverInterruptedExecutions{leases: leases, repo: repo}
+func NewRecoverInterruptedExecutions(leases ExecutionLeaseRepository) *RecoverInterruptedExecutions {
+	return &RecoverInterruptedExecutions{leases: leases}
 }
 
-// Execute returns how many tasks were reverted.
+// Execute returns how many tasks were put back.
 func (uc *RecoverInterruptedExecutions) Execute(ctx context.Context) (int, error) {
+	reverted := 0
+
 	expired, err := uc.leases.ClaimExpired(ctx, recoveryBatch)
 	if err != nil {
 		return 0, err
 	}
-	reverted := 0
-	for _, run := range expired {
-		task, err := uc.repo.Get(ctx, run.TenantID, run.TaskID)
-		if err != nil {
-			slog.WarnContext(ctx, "task: recovery could not load task", slog.String("task_id", run.TaskID), slog.Any("error", err))
-			continue
+	reverted += uc.releaseClaimed(ctx, expired, "lease expired")
+
+	// The two sweeps below are independent of the lease path: a failure there
+	// is logged and must not hide what the first sweep already did.
+	legacy, err := uc.leases.ClaimLegacyStuck(ctx, LegacyStuckAfter, recoveryBatch)
+	if err != nil {
+		slog.ErrorContext(ctx, "task: legacy stuck sweep failed", slog.Any("error", err))
+	} else {
+		reverted += uc.releaseClaimed(ctx, legacy, "pre-lease run past the run cap")
+	}
+
+	orphaned, err := uc.leases.ListOrphanedRuns(ctx, OrphanGrace, recoveryBatch)
+	if err != nil {
+		slog.ErrorContext(ctx, "task: orphaned run sweep failed", slog.Any("error", err))
+	} else {
+		for _, o := range orphaned {
+			to := restoreStatus(o.PreviousStatus)
+			if o.LinkStatus == "completed" {
+				// The run finished; only the task's completion write was lost.
+				to = domain.StatusReview
+			}
+			if uc.release(ctx, o.TenantID, o.TaskID, o.LinkID, to, "active link already "+o.LinkStatus) {
+				reverted++
+			}
 		}
-		// Only undo our own dispatch: if the task moved on (finished, or a
-		// newer dispatch took over the active link), leave it alone.
-		if task.Status != domain.StatusInProgress || task.ActiveExecutionLinkID != run.LinkID {
-			continue
-		}
-		restore := domain.Status(run.PreviousStatus)
-		if restore == "" || restore == domain.StatusInProgress {
-			restore = domain.StatusOpen
-		}
-		if err := uc.repo.UpdateStatus(ctx, run.TenantID, run.TaskID, restore); err != nil {
-			slog.WarnContext(ctx, "task: recovery could not revert task", slog.String("task_id", run.TaskID), slog.Any("error", err))
-			continue
-		}
-		slog.WarnContext(ctx, "task: reverted interrupted direct_agent run",
-			slog.String("task_id", run.TaskID), slog.String("link_id", run.LinkID), slog.String("status", string(restore)))
-		reverted++
 	}
 	return reverted, nil
+}
+
+func (uc *RecoverInterruptedExecutions) releaseClaimed(ctx context.Context, runs []domain.ExpiredRun, reason string) int {
+	n := 0
+	for _, run := range runs {
+		if uc.release(ctx, run.TenantID, run.TaskID, run.LinkID, restoreStatus(run.PreviousStatus), reason) {
+			n++
+		}
+	}
+	return n
+}
+
+func (uc *RecoverInterruptedExecutions) release(ctx context.Context, tenantID, taskID, linkID string, to domain.Status, reason string) bool {
+	released, err := uc.leases.ReleaseExecution(ctx, tenantID, taskID, linkID, to)
+	if err != nil {
+		slog.WarnContext(ctx, "task: recovery could not release task", slog.String("task_id", taskID), slog.Any("error", err))
+		return false
+	}
+	if !released {
+		return false // finished, or a newer dispatch owns it now
+	}
+	slog.WarnContext(ctx, "task: released stuck in_progress task",
+		slog.String("task_id", taskID), slog.String("link_id", linkID), slog.String("status", string(to)), slog.String("reason", reason))
+	return true
 }
 
 // RunRecoveryLoop sweeps on a fixed interval until ctx is cancelled. A failed

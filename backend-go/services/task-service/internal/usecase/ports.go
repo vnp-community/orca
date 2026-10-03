@@ -87,9 +87,9 @@ type TaskRepository interface {
 	UpdateActiveExecutionID(ctx context.Context, tenantID, id, activeExecutionID string) error
 	// UpdateLastExecutionOutput persists a task's most recent successful
 	// run's stdout (TASK-TG-04-07), truncated to 8KB by the caller before
-	// this is invoked — read back by a LATER ExecuteBatch wave's
+	// this is invoked — read back by a LATER run's
 	// buildExecutePrompt to resolve `{{outputs.<taskId>.*}}` interpolation
-	// against an EARLIER wave's completed dependency.
+	// against an EARLIER, completed dependency.
 	UpdateLastExecutionOutput(ctx context.Context, tenantID, id, output string) error
 	// UpdatePromptTemplate persists the "Generate Agent Prompt" output — see
 	// SOL-TG-02.

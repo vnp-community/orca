@@ -217,7 +217,7 @@ func TestExecutionLeases_RecoveryRevertsAbandonedRun_EndToEnd(t *testing.T) {
 	}
 	time.Sleep(30 * time.Millisecond)
 
-	n, err := usecase.NewRecoverInterruptedExecutions(repo, repo).Execute(ctx)
+	n, err := usecase.NewRecoverInterruptedExecutions(repo).Execute(ctx)
 	if err != nil || n != 1 {
 		t.Fatalf("recovery = %d, %v; want 1, nil", n, err)
 	}
@@ -229,7 +229,135 @@ func TestExecutionLeases_RecoveryRevertsAbandonedRun_EndToEnd(t *testing.T) {
 	if l.StatusMirror != "failed" || l.CompletedAt == nil {
 		t.Errorf("link must be failed and completed, got %+v", l)
 	}
-	if again, _ := usecase.NewRecoverInterruptedExecutions(repo, repo).Execute(ctx); again != 0 {
+	if again, _ := usecase.NewRecoverInterruptedExecutions(repo).Execute(ctx); again != 0 {
 		t.Errorf("a second sweep must be a no-op, reverted %d", again)
+	}
+}
+
+// newActiveRun makes an in_progress task whose active link is a fresh one on `engine`.
+func newActiveRun(t *testing.T, repo *Repository, tenantID string, engine domain.ExecutionEngine) (taskID, linkID string) {
+	t.Helper()
+	ctx := context.Background()
+	task, err := domain.NewTask(uuid.NewString(), tenantID, "t", domain.StatusInProgress, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := repo.Create(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+	link, err := repo.CreateExecutionLink(ctx, tenantID, task.ID, engine, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := repo.SetActiveExecutionLink(ctx, tenantID, task.ID, link.ID); err != nil {
+		t.Fatal(err)
+	}
+	return task.ID, link.ID
+}
+
+func TestExecutionLeases_ClaimLegacyStuck_OnlyOldUnleasedDirectAgentRuns(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	_, oldLegacy := newActiveRun(t, repo, tenantID, domain.EngineDirectAgent)
+	backdateLink(t, repo, oldLegacy, time.Hour)
+	_, freshLegacy := newActiveRun(t, repo, tenantID, domain.EngineDirectAgent) // maybe still alive
+	_, oldLeased := newActiveRun(t, repo, tenantID, domain.EngineDirectAgent)
+	if err := repo.StartLease(ctx, tenantID, oldLeased, "owner", "open", time.Hour); err != nil {
+		t.Fatal(err)
+	}
+	backdateLink(t, repo, oldLeased, time.Hour)
+	_, oldOrchestration := newActiveRun(t, repo, tenantID, domain.EngineOrchestration)
+	backdateLink(t, repo, oldOrchestration, time.Hour) // long-running coordinator run, legitimately in progress
+
+	got, err := repo.ClaimLegacyStuck(ctx, 30*time.Minute, 10)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 || got[0].LinkID != oldLegacy {
+		t.Fatalf("want only the old unleased direct_agent link %s, got %+v", oldLegacy, got)
+	}
+	if again, _ := repo.ClaimLegacyStuck(ctx, 30*time.Minute, 10); len(again) != 0 {
+		t.Errorf("an already-claimed link must not come back, got %+v", again)
+	}
+	for _, id := range []string{freshLegacy, oldLeased, oldOrchestration} {
+		l, _ := repo.GetExecutionLink(ctx, tenantID, id)
+		if l.StatusMirror != "in_progress" {
+			t.Errorf("link %s must be left alone, got %s", id, l.StatusMirror)
+		}
+	}
+}
+
+func TestExecutionLeases_ListOrphanedRuns_EngineAwareStatusRules(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+
+	finish := func(engine domain.ExecutionEngine, status string, ago time.Duration) (string, string) {
+		taskID, linkID := newActiveRun(t, repo, tenantID, engine)
+		if err := repo.Complete(ctx, tenantID, linkID, status); err != nil {
+			t.Fatal(err)
+		}
+		backdateLink(t, repo, linkID, ago)
+		return taskID, linkID
+	}
+	wantTask, _ := finish(domain.EngineDirectAgent, "completed", 10*time.Minute) // completion write lost
+	wantFailedWf, _ := finish(domain.EngineWorkflow, "failed", 10*time.Minute)
+	notRunning, _ := finish(domain.EngineOrchestration, "completed", 10*time.Minute) // Execute marks this right after dispatch; run still going
+	recent, _ := finish(domain.EngineDirectAgent, "failed", 0)                       // inside the grace window
+
+	got, err := repo.ListOrphanedRuns(ctx, 2*time.Minute, 20)
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := map[string]domain.StuckTask{}
+	for _, s := range got {
+		found[s.TaskID] = s
+	}
+	if len(found) != 2 || found[wantTask].LinkStatus != "completed" || found[wantFailedWf].LinkStatus != "failed" {
+		t.Fatalf("want the lost-write direct_agent and the failed workflow run, got %+v", got)
+	}
+	if _, bad := found[notRunning]; bad {
+		t.Error("an orchestration link marked completed at dispatch must never be treated as finished")
+	}
+	if _, bad := found[recent]; bad {
+		t.Error("a link that ended inside the grace window must not be listed yet")
+	}
+}
+
+func TestExecutionLeases_ReleaseExecution_IsCompareAndSetOnActiveLink(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+	taskID, linkID := newActiveRun(t, repo, tenantID, domain.EngineOrchestration)
+
+	if ok, err := repo.ReleaseExecution(ctx, tenantID, taskID, uuid.NewString(), domain.StatusOpen); err != nil || ok {
+		t.Fatalf("a different link must not release the task: ok=%v err=%v", ok, err)
+	}
+	if ok, err := repo.ReleaseExecution(ctx, tenantID, taskID, linkID, domain.StatusReview); err != nil || !ok {
+		t.Fatalf("the active link must release: ok=%v err=%v", ok, err)
+	}
+	got, _ := repo.Get(ctx, tenantID, taskID)
+	if got.Status != domain.StatusReview {
+		t.Errorf("want review, got %s", got.Status)
+	}
+	if ok, _ := repo.ReleaseExecution(ctx, tenantID, taskID, linkID, domain.StatusOpen); ok {
+		t.Error("a task no longer in_progress must not be released again")
+	}
+}
+
+func TestExecutionLeases_SetPreviousStatus_RoundTripsThroughGetExecutionLink(t *testing.T) {
+	repo := setupRepository(t)
+	ctx := context.Background()
+	tenantID := uuid.NewString()
+	_, linkID := newActiveRun(t, repo, tenantID, domain.EngineWorkflow)
+
+	if err := repo.SetPreviousStatus(ctx, tenantID, linkID, "review"); err != nil {
+		t.Fatal(err)
+	}
+	l, err := repo.GetExecutionLink(ctx, tenantID, linkID)
+	if err != nil || l.PreviousStatus != "review" {
+		t.Fatalf("PreviousStatus = %q, %v; want review", l.PreviousStatus, err)
 	}
 }

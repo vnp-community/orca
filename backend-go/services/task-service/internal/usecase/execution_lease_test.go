@@ -12,15 +12,24 @@ import (
 )
 
 type fakeLeaseRepository struct {
-	mu         sync.Mutex
-	started    []leaseStart
-	renewals   int
-	startErr   error
-	renewHeld  bool
-	renewErr   error
-	expired    []domain.ExpiredRun
-	claimErr   error
-	claimCalls int
+	mu        sync.Mutex
+	tasks     *fakeTaskRepository // ReleaseExecution mutates it with real compare-and-set semantics
+	started   []leaseStart
+	prevSet   map[string]string // linkID -> status recorded via SetPreviousStatus
+	renewals  int
+	startErr  error
+	renewHeld bool
+	renewErr  error
+
+	expired     []domain.ExpiredRun
+	legacy      []domain.ExpiredRun
+	orphaned    []domain.StuckTask
+	claimErr    error
+	legacyErr   error
+	orphanErr   error
+	claimCalls  int
+	legacyAge   time.Duration
+	orphanGrace time.Duration
 }
 
 type leaseStart struct {
@@ -35,6 +44,16 @@ func (f *fakeLeaseRepository) StartLease(_ context.Context, _, linkID, owner, pr
 		return f.startErr
 	}
 	f.started = append(f.started, leaseStart{linkID, owner, previousStatus, ttl})
+	return nil
+}
+
+func (f *fakeLeaseRepository) SetPreviousStatus(_ context.Context, _, linkID, status string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.prevSet == nil {
+		f.prevSet = map[string]string{}
+	}
+	f.prevSet[linkID] = status
 	return nil
 }
 
@@ -57,10 +76,48 @@ func (f *fakeLeaseRepository) ClaimExpired(_ context.Context, _ int) ([]domain.E
 	return out, nil
 }
 
+func (f *fakeLeaseRepository) ClaimLegacyStuck(_ context.Context, olderThan time.Duration, _ int) ([]domain.ExpiredRun, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.legacyAge = olderThan
+	if f.legacyErr != nil {
+		return nil, f.legacyErr
+	}
+	out := f.legacy
+	f.legacy = nil
+	return out, nil
+}
+
+func (f *fakeLeaseRepository) ListOrphanedRuns(_ context.Context, grace time.Duration, _ int) ([]domain.StuckTask, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	f.orphanGrace = grace
+	if f.orphanErr != nil {
+		return nil, f.orphanErr
+	}
+	return f.orphaned, nil // not claimed: ReleaseExecution's compare-and-set makes repeats harmless
+}
+
+func (f *fakeLeaseRepository) ReleaseExecution(_ context.Context, tenantID, taskID, linkID string, to domain.Status) (bool, error) {
+	f.tasks.mu.Lock()
+	defer f.tasks.mu.Unlock()
+	t, ok := f.tasks.tasks[taskID]
+	if !ok || t.TenantID != tenantID || t.Status != domain.StatusInProgress || t.ActiveExecutionLinkID != linkID {
+		return false, nil
+	}
+	t.Status = to
+	f.tasks.tasks[taskID] = t
+	return true, nil
+}
+
 func (f *fakeLeaseRepository) renewalCount() int {
 	f.mu.Lock()
 	defer f.mu.Unlock()
 	return f.renewals
+}
+
+func newLeases(tasks *fakeTaskRepository) *fakeLeaseRepository {
+	return &fakeLeaseRepository{tasks: tasks}
 }
 
 func inProgressTask(t *testing.T, tasks *fakeTaskRepository, id, activeLink string) {
@@ -73,12 +130,13 @@ func inProgressTask(t *testing.T, tasks *fakeTaskRepository, id, activeLink stri
 	tasks.tasks[id] = task
 }
 
-func TestRecoverInterruptedExecutions_RevertsToPreviousStatus(t *testing.T) {
+func TestRecoverInterruptedExecutions_ExpiredLeaseRestoresPreviousStatus(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	inProgressTask(t, tasks, "t1", "link-1")
-	leases := &fakeLeaseRepository{expired: []domain.ExpiredRun{{TenantID: "tenant-1", LinkID: "link-1", TaskID: "t1", PreviousStatus: string(domain.StatusReview)}}}
+	leases := newLeases(tasks)
+	leases.expired = []domain.ExpiredRun{{TenantID: "tenant-1", LinkID: "link-1", TaskID: "t1", PreviousStatus: string(domain.StatusReview)}}
 
-	n, err := NewRecoverInterruptedExecutions(leases, tasks).Execute(context.Background())
+	n, err := NewRecoverInterruptedExecutions(leases).Execute(context.Background())
 	if err != nil || n != 1 {
 		t.Fatalf("Execute = %d, %v; want 1, nil", n, err)
 	}
@@ -90,9 +148,10 @@ func TestRecoverInterruptedExecutions_RevertsToPreviousStatus(t *testing.T) {
 func TestRecoverInterruptedExecutions_UnknownPreviousFallsBackToOpen(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	inProgressTask(t, tasks, "t1", "link-1")
-	leases := &fakeLeaseRepository{expired: []domain.ExpiredRun{{TenantID: "tenant-1", LinkID: "link-1", TaskID: "t1"}}}
+	leases := newLeases(tasks)
+	leases.expired = []domain.ExpiredRun{{TenantID: "tenant-1", LinkID: "link-1", TaskID: "t1"}}
 
-	if _, err := NewRecoverInterruptedExecutions(leases, tasks).Execute(context.Background()); err != nil {
+	if _, err := NewRecoverInterruptedExecutions(leases).Execute(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 	if got := tasks.tasks["t1"].Status; got != domain.StatusOpen {
@@ -106,12 +165,13 @@ func TestRecoverInterruptedExecutions_LeavesTaskThatMovedOn(t *testing.T) {
 	done.ActiveExecutionLinkID = "link-1"
 	tasks.tasks["finished"] = done
 	inProgressTask(t, tasks, "redispatched", "link-NEW") // a newer dispatch owns it now
-	leases := &fakeLeaseRepository{expired: []domain.ExpiredRun{
+	leases := newLeases(tasks)
+	leases.expired = []domain.ExpiredRun{
 		{TenantID: "tenant-1", LinkID: "link-1", TaskID: "finished", PreviousStatus: "open"},
 		{TenantID: "tenant-1", LinkID: "link-OLD", TaskID: "redispatched", PreviousStatus: "open"},
-	}}
+	}
 
-	n, err := NewRecoverInterruptedExecutions(leases, tasks).Execute(context.Background())
+	n, err := NewRecoverInterruptedExecutions(leases).Execute(context.Background())
 	if err != nil || n != 0 {
 		t.Fatalf("Execute = %d, %v; want 0, nil", n, err)
 	}
@@ -120,29 +180,80 @@ func TestRecoverInterruptedExecutions_LeavesTaskThatMovedOn(t *testing.T) {
 	}
 }
 
-func TestRecoverInterruptedExecutions_ClaimedOnceAcrossSweeps(t *testing.T) {
+func TestRecoverInterruptedExecutions_LegacyStuckRunIsReleasedWithRunCapMargin(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	inProgressTask(t, tasks, "old", "link-old")
+	leases := newLeases(tasks)
+	leases.legacy = []domain.ExpiredRun{{TenantID: "tenant-1", LinkID: "link-old", TaskID: "old"}}
+
+	n, err := NewRecoverInterruptedExecutions(leases).Execute(context.Background())
+	if err != nil || n != 1 {
+		t.Fatalf("Execute = %d, %v; want 1, nil", n, err)
+	}
+	if tasks.tasks["old"].Status != domain.StatusOpen {
+		t.Errorf("want open, got %s", tasks.tasks["old"].Status)
+	}
+	if leases.legacyAge < 15*time.Minute {
+		t.Errorf("legacy threshold %s must exceed the 15-minute run cap or a live run could be swept", leases.legacyAge)
+	}
+}
+
+func TestRecoverInterruptedExecutions_OrphanedTasks(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	inProgressTask(t, tasks, "write-lost", "link-a")     // run finished, completion write lost
+	inProgressTask(t, tasks, "failed-engine2", "link-b") // coordinator run failed earlier
+	inProgressTask(t, tasks, "failed-no-prev", "link-c")
+	leases := newLeases(tasks)
+	leases.orphaned = []domain.StuckTask{
+		{TenantID: "tenant-1", TaskID: "write-lost", LinkID: "link-a", LinkStatus: "completed"},
+		{TenantID: "tenant-1", TaskID: "failed-engine2", LinkID: "link-b", LinkStatus: "failed", PreviousStatus: "review"},
+		{TenantID: "tenant-1", TaskID: "failed-no-prev", LinkID: "link-c", LinkStatus: "failed"},
+	}
+
+	n, err := NewRecoverInterruptedExecutions(leases).Execute(context.Background())
+	if err != nil || n != 3 {
+		t.Fatalf("Execute = %d, %v; want 3, nil", n, err)
+	}
+	want := map[string]domain.Status{"write-lost": domain.StatusReview, "failed-engine2": domain.StatusReview, "failed-no-prev": domain.StatusOpen}
+	for id, st := range want {
+		if got := tasks.tasks[id].Status; got != st {
+			t.Errorf("%s: want %s, got %s", id, st, got)
+		}
+	}
+	if leases.orphanGrace < time.Minute {
+		t.Errorf("orphan grace %s is too short — normal completion writes need time to land", leases.orphanGrace)
+	}
+	// A second sweep sees the same list but the compare-and-set makes it a no-op.
+	if again, _ := NewRecoverInterruptedExecutions(leases).Execute(context.Background()); again != 0 {
+		t.Errorf("second sweep must release nothing, released %d", again)
+	}
+}
+
+func TestRecoverInterruptedExecutions_LaterSweepFailuresDoNotHideEarlierWork(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	inProgressTask(t, tasks, "t1", "link-1")
-	leases := &fakeLeaseRepository{expired: []domain.ExpiredRun{{TenantID: "tenant-1", LinkID: "link-1", TaskID: "t1", PreviousStatus: "open"}}}
-	uc := NewRecoverInterruptedExecutions(leases, tasks)
+	leases := newLeases(tasks)
+	leases.expired = []domain.ExpiredRun{{TenantID: "tenant-1", LinkID: "link-1", TaskID: "t1"}}
+	leases.legacyErr = errors.New("legacy query failed")
+	leases.orphanErr = errors.New("orphan query failed")
 
-	first, _ := uc.Execute(context.Background())
-	second, _ := uc.Execute(context.Background())
-	if first != 1 || second != 0 {
-		t.Errorf("want 1 then 0, got %d then %d", first, second)
+	n, err := NewRecoverInterruptedExecutions(leases).Execute(context.Background())
+	if err != nil || n != 1 {
+		t.Fatalf("Execute = %d, %v; want 1, nil", n, err)
 	}
 }
 
 func TestRecoverInterruptedExecutions_ClaimErrorPropagates(t *testing.T) {
-	leases := &fakeLeaseRepository{claimErr: errors.New("db down")}
-	if _, err := NewRecoverInterruptedExecutions(leases, newFakeTaskRepository()).Execute(context.Background()); err == nil {
+	leases := newLeases(newFakeTaskRepository())
+	leases.claimErr = errors.New("db down")
+	if _, err := NewRecoverInterruptedExecutions(leases).Execute(context.Background()); err == nil {
 		t.Fatal("want error")
 	}
 }
 
 func TestRecoverInterruptedExecutions_LoopSweepsAndStops(t *testing.T) {
-	leases := &fakeLeaseRepository{}
-	uc := NewRecoverInterruptedExecutions(leases, newFakeTaskRepository())
+	leases := newLeases(newFakeTaskRepository())
+	uc := NewRecoverInterruptedExecutions(leases)
 	ctx, cancel := context.WithCancel(context.Background())
 	done := make(chan struct{})
 	go func() { uc.RunRecoveryLoop(ctx, 5*time.Millisecond); close(done) }()
@@ -173,7 +284,7 @@ func TestExecuteTask_DirectAgent_LeasesWithPreviousStatus(t *testing.T) {
 	tasks := newFakeTaskRepository()
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
-	leases := &fakeLeaseRepository{renewHeld: true}
+	leases := &fakeLeaseRepository{tasks: tasks, renewHeld: true}
 	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, &fakeSimpleExecutor{ref: "ref"}, &fakeExecutor{}, grants)
 	uc.WithExecutionLeases(leases, "host:1", time.Minute, 20*time.Second)
 
@@ -195,7 +306,7 @@ func TestExecuteTask_DirectAgent_LeaseFailureDoesNotBlockRun(t *testing.T) {
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
 	simple := &fakeSimpleExecutor{ref: "ref"}
 	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
-	uc.WithExecutionLeases(&fakeLeaseRepository{startErr: errors.New("no such column")}, "host:1", time.Minute, 0)
+	uc.WithExecutionLeases(&fakeLeaseRepository{tasks: tasks, startErr: errors.New("no such column")}, "host:1", time.Minute, 0)
 
 	if _, err := uc.Execute(withIdentity(context.Background(), "tenant-1", "user-1"), ExecuteTaskInput{TaskID: "task-1", RequestID: "r"}); err != nil {
 		t.Fatalf("a lease failure (e.g. migration not applied) must not fail the run: %v", err)
@@ -217,7 +328,7 @@ func TestExecuteTask_DirectAgent_HeartbeatRenewsWhileRunningThenStops(t *testing
 	tasks := newFakeTaskRepository()
 	grants := &fakeGrantRepository{}
 	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
-	leases := &fakeLeaseRepository{renewHeld: true}
+	leases := &fakeLeaseRepository{tasks: tasks, renewHeld: true}
 	simple := &blockingSimpleExecutor{release: make(chan struct{})}
 	uc, _, _, _, _ := newExecutableExecuteTask(tasks, &fakeEdgeRepository{}, simple, &fakeExecutor{}, grants)
 	uc.WithExecutionLeases(leases, "host:1", 300*time.Millisecond, 10*time.Millisecond)
@@ -292,5 +403,108 @@ func TestExecuteTask_AtomicClaim_WinnerDispatches(t *testing.T) {
 	}
 	if !simple.called {
 		t.Error("the claim winner must dispatch")
+	}
+}
+
+func failedReportSetup(t *testing.T, previous string) (*ReportTaskExecutionResult, *fakeTaskRepository, *fakeExecutionLinkRepository) {
+	t.Helper()
+	tasks := newFakeTaskRepository()
+	task, err := domain.NewTask("task-1", "tenant-1", "Task", domain.StatusInProgress, "", "proj-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks.tasks["task-1"] = task
+	links := &fakeExecutionLinkRepository{}
+	seedTaskWithActiveLink(tasks, links, "task-1", domain.EngineOrchestration, "run-1")
+	links.created[0].PreviousStatus = previous
+	uc := NewReportTaskExecutionResult(tasks, links).WithExecutionRelease(newLeases(tasks))
+	return uc, tasks, links
+}
+
+func TestReportTaskExecutionResult_FailureRestoresPreviousStatus(t *testing.T) {
+	uc, tasks, links := failedReportSetup(t, string(domain.StatusReview))
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "task-1", ExecutionRef: "run-1", Engine: "orchestration", Success: false, ErrorMessage: "boom"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := tasks.tasks["task-1"].Status; got != domain.StatusReview {
+		t.Errorf("a failed Engine 2/3 run must not leave the task in_progress; want review, got %s", got)
+	}
+	if links.created[0].StatusMirror != "failed" {
+		t.Errorf("link must be marked failed, got %q", links.created[0].StatusMirror)
+	}
+}
+
+func TestReportTaskExecutionResult_FailureWithoutRecordedPreviousRestoresToOpen(t *testing.T) {
+	uc, tasks, _ := failedReportSetup(t, "")
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	if err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "task-1", ExecutionRef: "run-1", Engine: "orchestration"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := tasks.tasks["task-1"].Status; got != domain.StatusOpen {
+		t.Errorf("want open, got %s", got)
+	}
+}
+
+func TestReportTaskExecutionResult_StaleFailureDoesNotTouchTask(t *testing.T) {
+	uc, tasks, links := failedReportSetup(t, "open")
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	// A callback for a different run than the task's active one.
+	if err := uc.Execute(ctx, ReportTaskExecutionResultInput{TaskID: "task-1", ExecutionRef: "some-older-run", Engine: "orchestration"}); err != nil {
+		t.Fatal(err)
+	}
+	if tasks.tasks["task-1"].Status != domain.StatusInProgress || links.created[0].StatusMirror != "in_progress" {
+		t.Error("a stale failure callback must change nothing")
+	}
+}
+
+func TestExecuteTask_ComplexPath_RecordsPreviousStatusForFailureRestore(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{{FromTaskID: "task-1", ToTaskID: "sub", Kind: domain.EdgeKindParentChild}}}
+	uc, _, _, _, _ := newExecutableExecuteTask(tasks, edges, &fakeSimpleExecutor{}, &fakeExecutor{ref: "run-1"}, grants)
+	leases := newLeases(tasks)
+	uc.WithExecutionLeases(leases, "host:1", time.Minute, 0)
+
+	if _, err := uc.Execute(withIdentity(context.Background(), "tenant-1", "user-1"), ExecuteTaskInput{TaskID: "task-1", RequestID: "r"}); err != nil {
+		t.Fatal(err)
+	}
+	if got := leases.prevSet["link-1"]; got != string(domain.StatusOpen) {
+		t.Errorf("complex dispatch must record the pre-dispatch status for a failure report, got %q", got)
+	}
+	if len(leases.started) != 0 {
+		t.Error("Engines 2/3 report back; they must not get a lease that the sweeper would expire")
+	}
+}
+
+func TestExecuteTask_PromptOverrideRefusedOnComplexTask(t *testing.T) {
+	tasks := newFakeTaskRepository()
+	grants := &fakeGrantRepository{}
+	seedExecutableTask(t, tasks, grants, "task-1", "proj-1")
+	edges := &fakeEdgeRepository{edges: []domain.TaskEdge{{FromTaskID: "task-1", ToTaskID: "sub", Kind: domain.EdgeKindParentChild}}}
+	complex := &fakeExecutor{ref: "run-1"}
+	uc, _, _, _, links := newExecutableExecuteTask(tasks, edges, &fakeSimpleExecutor{}, complex, grants)
+	ctx := withIdentity(context.Background(), "tenant-1", "user-1")
+
+	_, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "r", Prompt: "Write a spec only"})
+	var ae *apperrors.AppError
+	if !errors.As(err, &ae) || ae.Code != "TASK_EXECUTE_PROMPT_UNSUPPORTED" {
+		t.Fatalf("want TASK_EXECUTE_PROMPT_UNSUPPORTED, got %v", err)
+	}
+	if complex.called || len(links.created) != 0 || len(tasks.updateStatusCalls) != 0 {
+		t.Error("a refused request must not dispatch, write a link, or touch the status")
+	}
+
+	// Without a prompt the same task still runs on the coordinator.
+	if _, err := uc.Execute(ctx, ExecuteTaskInput{TaskID: "task-1", RequestID: "r2"}); err != nil {
+		t.Fatalf("plain run of a complex task must still work: %v", err)
+	}
+	if !complex.called {
+		t.Error("expected the complex executor to run")
 	}
 }

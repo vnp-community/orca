@@ -172,6 +172,15 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 		return ExecuteResult{}, apperrors.New(apperrors.KindInternal, "TASK_EXECUTE_EDGE_LOOKUP_FAILED", "failed to determine execution engine", err)
 	}
 
+	// Only the direct_agent engine can honor a prompt override. The spec ->
+	// approve -> code loop (BL-TG-05) sends one per phase; on a task with
+	// subtasks the coordinator would ignore it and run the implementation,
+	// silently skipping the approval step. Refuse instead of doing that.
+	if in.Prompt != "" && engine != domain.EngineDirectAgent {
+		return ExecuteResult{}, apperrors.New(apperrors.KindFailedPrecondition, "TASK_EXECUTE_PROMPT_UNSUPPORTED",
+			"a prompt override is only supported for tasks without subtasks, dependencies or an attached workflow", nil)
+	}
+
 	// Pre-check 2: dev-server-online — resolved once here, BEFORE the
 	// in_progress write, so a disconnected project fails before any status
 	// mutation at all.
@@ -259,9 +268,16 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 	// lease cannot be written (e.g. migration 0013 not applied yet during a
 	// rolling deploy), degrade to the old un-recoverable behavior instead of
 	// failing every direct_agent run.
-	if uc.leases != nil && engine == domain.EngineDirectAgent {
-		if err := uc.leases.StartLease(ctx, tenantID, link.ID, uc.leaseOwner, string(previousStatus), uc.leaseTTL); err != nil {
-			slog.WarnContext(ctx, "task: could not lease execution, run will not be recoverable after a crash",
+	if uc.leases != nil {
+		if engine == domain.EngineDirectAgent {
+			if err := uc.leases.StartLease(ctx, tenantID, link.ID, uc.leaseOwner, string(previousStatus), uc.leaseTTL); err != nil {
+				slog.WarnContext(ctx, "task: could not lease execution, run will not be recoverable after a crash",
+					slog.String("task_id", in.TaskID), slog.String("link_id", link.ID), slog.Any("error", err))
+			}
+		} else if err := uc.leases.SetPreviousStatus(ctx, tenantID, link.ID, string(previousStatus)); err != nil {
+			// Engines 2/3 have no lease (they report back); this only lets a
+			// failure report restore the task. Best-effort for the same reason.
+			slog.WarnContext(ctx, "task: could not record previous status, a failed run will restore to open",
 				slog.String("task_id", in.TaskID), slog.String("link_id", link.ID), slog.Any("error", err))
 		}
 	}
@@ -344,17 +360,6 @@ func (uc *ExecuteTask) Execute(ctx context.Context, in ExecuteTaskInput) (Execut
 // context (tenant id, user id) onto a fresh context.Background() — no
 // deadline, no tie to the client connection, the same shape a real
 // completion callback's own fresh inbound request would carry.
-//
-// Known, flagged-not-fixed side effect: ExecuteBatch (execute_batch.go)
-// calls ExecuteTask.Execute per task and waits for each wave to finish
-// before starting the next, relying on Execute's OLD synchronous-completion
-// behavior for direct_agent tasks to gate dependency-respecting waves
-// correctly (TASK-TG-04-07's `{{outputs.taskId.*}}` interpolation needs the
-// dependency's LastExecutionOutput already persisted). ExecuteBatch is not
-// wired to any gRPC RPC or constructed anywhere outside its own tests
-// (confirmed: no caller of NewExecuteBatch exists in this service), so this
-// has no live production impact — flagged for whoever wires it up next,
-// not silently left undocumented.
 func (uc *ExecuteTask) dispatchDirectAgentAsync(ctx context.Context, tenantID, userID string, in ExecuteTaskInput, task domain.Task, worktreePath, linkID string, previousStatus domain.Status, dispatchStart time.Time) (ExecuteResult, error) {
 	dispatchCtx := tenant.WithTenantID(context.Background(), tenantID)
 	if userID != "" {

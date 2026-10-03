@@ -16,4 +16,7 @@ type ExecutionLink struct {
 	StatusMirror  string
 	StartedAt     time.Time
 	CompletedAt   *time.Time
+	// PreviousStatus is the task's status before this dispatch, recorded so a
+	// failed run can put it back. Empty for links written before migration 0013.
+	PreviousStatus string
 }

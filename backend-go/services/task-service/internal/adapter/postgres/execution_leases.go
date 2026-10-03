@@ -84,3 +84,89 @@ func (r *Repository) ClaimForExecution(ctx context.Context, tenantID, taskID str
 	}
 	return tag.RowsAffected() > 0, nil
 }
+
+func (r *Repository) SetPreviousStatus(ctx context.Context, tenantID, linkID, status string) error {
+	_, err := r.db.Exec(ctx, `UPDATE task.execution_links SET previous_status = $1 WHERE id = $2 AND tenant_id = $3`, status, linkID, tenantID)
+	if err != nil {
+		return fmt.Errorf("postgres: set execution link previous status: %w", err)
+	}
+	return nil
+}
+
+// ClaimLegacyStuck sweeps direct_agent runs written before leases existed
+// (lease_expires_at IS NULL). Such a run cannot be alive past the executor's
+// own hard cap, so olderThan must exceed that cap with margin.
+func (r *Repository) ClaimLegacyStuck(ctx context.Context, olderThan time.Duration, limit int) ([]domain.ExpiredRun, error) {
+	rows, err := r.pool.Query(ctx, `
+		UPDATE task.execution_links
+		SET status_mirror = 'failed', completed_at = now()
+		WHERE id IN (
+			SELECT id FROM task.execution_links
+			WHERE engine = 'direct_agent' AND status_mirror = 'in_progress'
+			  AND lease_expires_at IS NULL AND started_at < now() - make_interval(secs => $1)
+			ORDER BY started_at
+			LIMIT $2
+			FOR UPDATE SKIP LOCKED
+		)
+		RETURNING id::text, tenant_id::text, task_id::text, previous_status
+	`, olderThan.Seconds(), limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: claim legacy stuck execution links: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.ExpiredRun
+	for rows.Next() {
+		var run domain.ExpiredRun
+		if err := rows.Scan(&run.LinkID, &run.TenantID, &run.TaskID, &run.PreviousStatus); err != nil {
+			return nil, fmt.Errorf("postgres: scan legacy stuck link: %w", err)
+		}
+		out = append(out, run)
+	}
+	return out, rows.Err()
+}
+
+// ListOrphanedRuns finds tasks still in_progress whose active link already
+// ended. Engines 2/3 mark the link 'completed' right after dispatch (task-service
+// bookkeeping while the run is still going), so only 'failed' is a real end for
+// them; direct_agent is synchronous in-process, so 'completed' is a real end too.
+// Not claimed here — ReleaseExecution is a compare-and-set, so concurrent
+// sweepers are safe.
+func (r *Repository) ListOrphanedRuns(ctx context.Context, grace time.Duration, limit int) ([]domain.StuckTask, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT t.tenant_id::text, t.id::text, l.id::text, l.status_mirror, l.previous_status
+		FROM task.tasks t
+		JOIN task.execution_links l ON l.id = t.active_execution_link_id
+		WHERE t.status = 'in_progress'
+		  AND l.completed_at IS NOT NULL AND l.completed_at < now() - make_interval(secs => $1)
+		  AND ((l.engine = 'direct_agent' AND l.status_mirror IN ('failed','completed'))
+		    OR (l.engine IN ('orchestration','workflow') AND l.status_mirror = 'failed'))
+		ORDER BY l.completed_at
+		LIMIT $2
+	`, grace.Seconds(), limit)
+	if err != nil {
+		return nil, fmt.Errorf("postgres: list orphaned runs: %w", err)
+	}
+	defer rows.Close()
+	var out []domain.StuckTask
+	for rows.Next() {
+		var s domain.StuckTask
+		if err := rows.Scan(&s.TenantID, &s.TaskID, &s.LinkID, &s.LinkStatus, &s.PreviousStatus); err != nil {
+			return nil, fmt.Errorf("postgres: scan orphaned run: %w", err)
+		}
+		out = append(out, s)
+	}
+	return out, rows.Err()
+}
+
+// ReleaseExecution moves an in_progress task to `to`, but only while the given
+// link is still its active one — so it can never undo a newer dispatch.
+func (r *Repository) ReleaseExecution(ctx context.Context, tenantID, taskID, linkID string, to domain.Status) (bool, error) {
+	tag, err := r.db.Exec(ctx, `
+		UPDATE task.tasks SET status = $4, updated_at = now()
+		WHERE tenant_id = $1 AND id = $2 AND status = 'in_progress' AND active_execution_link_id = $3
+	`, tenantID, taskID, linkID, string(to))
+	if err != nil {
+		return false, fmt.Errorf("postgres: release task execution: %w", err)
+	}
+	return tag.RowsAffected() > 0, nil
+}

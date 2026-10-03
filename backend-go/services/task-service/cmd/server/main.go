@@ -326,7 +326,7 @@ func run() error {
 	executeTaskUC := usecase.NewExecuteTask(repo, repo, simpleExecutor, complexExecutor, workflowExecutor, resolvePermissionUC, worktreeProvisioner, projectExecutionResolver, SystemClock{}, repo).
 		WithExecutionClaim(repo).
 		WithExecutionLeases(repo, executionLeaseOwner(), usecase.DefaultLeaseTTL, usecase.DefaultLeaseHeartbeat)
-	recoverInterruptedUC := usecase.NewRecoverInterruptedExecutions(repo, repo)
+	recoverInterruptedUC := usecase.NewRecoverInterruptedExecutions(repo)
 	hasActiveExecutionsUC := usecase.NewHasActiveExecutions(repo)
 	listTasksUC := usecase.NewListTasks(repo)
 	updateTaskUC := usecase.NewUpdateTask(repo, repo)
@@ -346,7 +346,7 @@ func run() error {
 	// (as txRunner) rather than a pre-built *usecase.AddEdge, since AddEdge
 	// must be constructed fresh per call, scoped to that call's transaction.
 	aiApplyUC := usecase.NewAIApply(repo)
-	generateAgentPromptUC := usecase.NewGenerateAgentPrompt(repo, aiProviderContextResolver, projectExecutionResolver, aiCompleter)
+	generateAgentPromptUC := usecase.NewGenerateAgentPrompt(repo, aiProviderContextResolver, projectExecutionResolver, aiCompleter).WithPermissionCheck(resolvePermissionUC)
 	// TASK-TG-03-08's public/anonymous share-link flow. See server.go's
 	// ResolvePublicLink doc comment for why api-gateway is NOT wired to
 	// expose this yet. shareLinkStore is its own type (not repo) — see
@@ -370,7 +370,7 @@ func run() error {
 	// workflow-service only — see server.go's ReportTaskExecutionResult doc
 	// comment for the flagged (unresolved) service-identity check this
 	// handler is missing.
-	reportExecutionResultUC := usecase.NewReportTaskExecutionResult(repo, repo)
+	reportExecutionResultUC := usecase.NewReportTaskExecutionResult(repo, repo).WithExecutionRelease(repo)
 	findTaskByNumberUC := usecase.NewFindTaskByNumber(repo)
 	// TASK-TG-003-05's second, independently-built share-link mechanism —
 	// see task.proto's GenerateShareLink/GetTaskByShareToken doc comment

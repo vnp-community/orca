@@ -23,6 +23,16 @@ type GenerateAgentPrompt struct {
 	aiProvider AIProviderContextResolver
 	resolver   ProjectExecutionResolver
 	relay      AICompleter
+	// permission, when set, requires read access to preview and write access
+	// to save. Set in production wiring; left nil only by tests that exercise
+	// prompt building on its own.
+	permission *ResolvePermission
+}
+
+// WithPermissionCheck makes Execute enforce the caller's grant on the task.
+func (uc *GenerateAgentPrompt) WithPermissionCheck(p *ResolvePermission) *GenerateAgentPrompt {
+	uc.permission = p
+	return uc
 }
 
 func NewGenerateAgentPrompt(tasks TaskRepository, aiProvider AIProviderContextResolver, resolver ProjectExecutionResolver, relay AICompleter) *GenerateAgentPrompt {
@@ -35,6 +45,18 @@ func (uc *GenerateAgentPrompt) Execute(ctx context.Context, in GenerateAgentProm
 		return "", apperrors.New(apperrors.KindUnauthenticated, "TASK_NO_TENANT", "no tenant in request context", err)
 	}
 	userID, _ := tenant.UserID(ctx)
+
+	// Before any lookup: a caller without access must not learn whether the
+	// task exists, and Save writes PromptTemplate, which the agent later runs.
+	if uc.permission != nil {
+		action := "read"
+		if in.Save {
+			action = "write"
+		}
+		if _, err := uc.permission.Execute(ctx, ResolvePermissionInput{TaskID: in.TaskID, UserID: userID, Action: action}); err != nil {
+			return "", err
+		}
+	}
 
 	task, err := uc.tasks.Get(ctx, tenantID, in.TaskID)
 	if err != nil {

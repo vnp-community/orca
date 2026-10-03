@@ -34,11 +34,11 @@ func (r *Repository) CreateExecutionLink(ctx context.Context, tenantID, taskID s
 func (r *Repository) GetExecutionLink(ctx context.Context, tenantID, id string) (domain.ExecutionLink, error) {
 	var link domain.ExecutionLink
 	err := r.db.QueryRow(ctx, `
-		SELECT id, tenant_id, task_id, engine, external_ref_id, status_mirror, started_at, completed_at
+		SELECT id, tenant_id, task_id, engine, external_ref_id, status_mirror, started_at, completed_at, previous_status
 		FROM task.execution_links
 		WHERE tenant_id = $1 AND id = $2
 	`, tenantID, id).Scan(
-		&link.ID, &link.TenantID, &link.TaskID, (*string)(&link.Engine), &link.ExternalRefID, &link.StatusMirror, &link.StartedAt, &link.CompletedAt,
+		&link.ID, &link.TenantID, &link.TaskID, (*string)(&link.Engine), &link.ExternalRefID, &link.StatusMirror, &link.StartedAt, &link.CompletedAt, &link.PreviousStatus,
 	)
 	if err != nil {
 		return domain.ExecutionLink{}, fmt.Errorf("postgres: query execution link %s: %w", id, err)

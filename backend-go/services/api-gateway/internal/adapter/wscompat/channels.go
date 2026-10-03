@@ -511,6 +511,7 @@ func toCommentView(c *taskv1.AddCommentResponse) commentView {
 
 func registerTaskChannels(r *Registry, client taskv1.TaskServiceClient) {
 	registerTaskSourceChannels(r, client)
+	registerTaskPromptChannels(r, client)
 	r.Register("task.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createArgs struct {
 			Title     string `json:"title"`

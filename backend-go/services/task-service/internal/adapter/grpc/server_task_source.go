@@ -38,9 +38,10 @@ func (s *Server) CreateTaskFromSource(ctx context.Context, req *taskv1.CreateTas
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	if !res.Created {
-		// An existing task may belong to a teammate and be private: returning
-		// it to anyone who knows the issue key would bypass task grants.
-		if _, err := s.getTask.Execute(ctx, res.Task.ID); err != nil {
+		// An existing task may belong to a teammate: returning it to anyone who
+		// knows the issue key would bypass task grants. (GetTask itself only
+		// checks the tenant, so the grant check has to be explicit here.)
+		if err := s.requireTaskRead(ctx, res.Task.ID); err != nil {
 			return nil, apperrors.ToGRPCStatus(err)
 		}
 	}
@@ -51,13 +52,12 @@ func (s *Server) GetTaskSource(ctx context.Context, req *taskv1.GetTaskSourceReq
 	if s.taskSources == nil {
 		return s.UnimplementedTaskServiceServer.GetTaskSource(ctx, req)
 	}
-	// Reading the task enforces the caller's read permission first.
-	if _, err := s.getTask.Execute(ctx, req.GetTaskId()); err != nil {
-		return nil, apperrors.ToGRPCStatus(err)
-	}
 	tenantID, err := tenant.RequireTenantID(ctx)
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(apperrors.New(apperrors.KindUnauthenticated, "TASK_NO_TENANT", "no tenant in request context", err))
+	}
+	if err := s.requireTaskRead(ctx, req.GetTaskId()); err != nil {
+		return nil, apperrors.ToGRPCStatus(err)
 	}
 	src, ok, err := s.taskSources.GetSource(ctx, tenantID, req.GetTaskId())
 	if err != nil {
@@ -67,4 +67,12 @@ func (s *Server) GetTaskSource(ctx context.Context, req *taskv1.GetTaskSourceReq
 		return &taskv1.GetTaskSourceResponse{}, nil
 	}
 	return &taskv1.GetTaskSourceResponse{Found: true, Provider: string(src.Provider), Ref: src.Ref, Url: src.URL}, nil
+}
+
+// requireTaskRead checks the caller's grant on the task. It returns the
+// permission error unwrapped so apperrors.ToGRPCStatus maps it (PermissionDenied).
+func (s *Server) requireTaskRead(ctx context.Context, taskID string) error {
+	userID, _ := tenant.UserID(ctx)
+	_, err := s.resolvePermission.Execute(ctx, usecase.ResolvePermissionInput{TaskID: taskID, UserID: userID, Action: "read"})
+	return err
 }

@@ -30,6 +30,15 @@ type ReportTaskExecutionResultInput struct {
 type ReportTaskExecutionResult struct {
 	tasks TaskRepository
 	links ExecutionLinkRepository
+	// releaser, when set, puts a failed run's task back to its pre-dispatch
+	// status. nil keeps the old behavior of leaving it at in_progress.
+	releaser TaskExecutionReleaser
+}
+
+// WithExecutionRelease enables restoring the task when an async run fails.
+func (uc *ReportTaskExecutionResult) WithExecutionRelease(r TaskExecutionReleaser) *ReportTaskExecutionResult {
+	uc.releaser = r
+	return uc
 }
 
 func NewReportTaskExecutionResult(tasks TaskRepository, links ExecutionLinkRepository) *ReportTaskExecutionResult {
@@ -76,18 +85,25 @@ func (uc *ReportTaskExecutionResult) Execute(ctx context.Context, in ReportTaskE
 		return uc.tasks.CompleteExecution(ctx, tenantID, in.TaskID, string(domain.StatusReview), in.ActualHours)
 	}
 
-	// Failed complex/workflow execution. domain.StatusBlocked does not
-	// exist yet in this codebase (BUG-TASKV1-001's scope, not this task's —
-	// see TASK-FT-002-04's Context note) and the tasks_status_check
-	// constraint (migrations/0003) admits no "failed"-shaped status, so this
-	// deliberately does NOT call CompleteExecution: the task is left at
-	// StatusInProgress rather than forced into a status that doesn't
-	// honestly describe "async dispatch failed." Flagged as a temporary gap
-	// until a real blocked/failed task status lands.
+	// Failed complex/workflow execution. Mark the link failed first so a retried
+	// callback is recognized, then put the task back to what it was before the
+	// dispatch (open when unknown) instead of leaving it at in_progress forever.
 	if err := uc.links.Complete(ctx, tenantID, link.ID, "failed"); err != nil {
 		return apperrors.New(apperrors.KindInternal, "TASK_EXECUTION_LINK_COMPLETE_FAILED", "failed to complete execution link", err)
 	}
-	slog.WarnContext(ctx, "task: async execution failed; leaving task in_progress (no blocked/failed task status exists yet, BUG-TASKV1-001)",
-		slog.String("task_id", in.TaskID), slog.String("engine", in.Engine), slog.String("execution_ref", in.ExecutionRef), slog.String("error_message", in.ErrorMessage))
+	if uc.releaser == nil {
+		slog.WarnContext(ctx, "task: async execution failed; leaving task in_progress (no releaser configured)",
+			slog.String("task_id", in.TaskID), slog.String("engine", in.Engine), slog.String("execution_ref", in.ExecutionRef), slog.String("error_message", in.ErrorMessage))
+		return nil
+	}
+	to := restoreStatus(link.PreviousStatus)
+	if _, err := uc.releaser.ReleaseExecution(ctx, tenantID, in.TaskID, link.ID, to); err != nil {
+		// The periodic recovery sweep picks this task up (failed link + in_progress).
+		slog.WarnContext(ctx, "task: could not restore task after failed run, recovery sweep will retry",
+			slog.String("task_id", in.TaskID), slog.Any("error", err))
+		return nil
+	}
+	slog.WarnContext(ctx, "task: async execution failed; task restored",
+		slog.String("task_id", in.TaskID), slog.String("engine", in.Engine), slog.String("status", string(to)), slog.String("error_message", in.ErrorMessage))
 	return nil
 }
