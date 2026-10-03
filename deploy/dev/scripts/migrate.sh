@@ -39,8 +39,15 @@ if [ -n "${TARGET}" ]; then
   SERVICES="${TARGET}"
 fi
 
+# docker/postgres/init-databases.sh only runs when the Postgres volume is created, so a
+# database added later (e.g. "mcp") would never exist on a long-lived server and its
+# migrate-* one-shot would fail. Idempotent: creates only what is missing.
+ENSURE_DB_SQL='SELECT format($f$CREATE DATABASE %I OWNER orca$f$, d) FROM unnest(string_to_array(:'"'"'dbs'"'"', '"'"' '"'"')) AS d WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = d)\gexec'
+
 run_local() {
   cd "${DEPLOY_DIR}"
+  echo "==> ensure databases exist: ${SERVICES}"
+  printf '%s\n' "${ENSURE_DB_SQL}" | docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U orca -d postgres -v dbs="${SERVICES}"
   for svc in ${SERVICES}; do
     echo "==> migrate-${svc}"
     docker compose run --rm "migrate-${svc}"
@@ -58,6 +65,9 @@ run_remote() {
   SERVER_DEPLOY="${SERVER_DEPLOY:-~/orca-go-deploy}"
   SSH_OPTS="-i ${SERVER_KEY} -p ${SERVER_PORT} -o StrictHostKeyChecking=accept-new -o ConnectTimeout=10"
 
+  echo "==> ensure databases exist: ${SERVICES}"
+  printf '%s\n' "${ENSURE_DB_SQL}" | ssh ${SSH_OPTS} "${SERVER_USER}@${SERVER_HOST}" \
+    "cd ${SERVER_DEPLOY} && docker compose exec -T postgres psql -v ON_ERROR_STOP=1 -U orca -d postgres -v dbs='${SERVICES}'"
   for svc in ${SERVICES}; do
     echo "==> migrate-${svc} (remote)"
     ssh ${SSH_OPTS} "${SERVER_USER}@${SERVER_HOST}" \

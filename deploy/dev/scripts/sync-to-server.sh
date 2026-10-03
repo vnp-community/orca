@@ -106,6 +106,12 @@ else
     echo "  (server already has .env — leaving it untouched)"
 fi
 
+# MCP secrets: the server's .env is never overwritten, so variables added after
+# it was first created never arrive on their own. Fill in ONLY what is missing
+# (random internal-caller tokens, cursor key, OAUTH_RESOURCE_URL) — on the
+# server, so no secret leaves it — and never touch a value that is already set.
+bash "${SCRIPT_DIR}/ensure-mcp-env.sh" --remote
+
 echo "✅ Synced"
 echo ""
 
@@ -148,6 +154,16 @@ echo "[6/6] Starting/recreating the full stack..."
 # (orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}) must resolve to the
 # exact tag step 3 just `docker load`-ed on this same run.
 ssh_cmd "cd ${SERVER_DEPLOY} && ORCA_GO_VERSION=${ORCA_GO_VERSION} docker compose up -d --force-recreate --remove-orphans"
+echo ""
+# Web Push needs one ecdsa-p256 Vault Transit key + public-key row per tenant
+# (idempotent). Not fatal: it needs the Vault policy in orca-policy.hcl applied
+# by a Vault admin, and tenants may not exist yet on a first deploy — re-run
+# `scripts/provision-vapid-key.sh --remote --all` after fixing either.
+# Optional pre-warm: keys are also created automatically on a tenant's first Web
+# Push use (credential-broker EnsureVapidSigningKey); the Vault policy is still required.
+echo "Provisioning Web Push (VAPID) keys..."
+bash "${SCRIPT_DIR}/provision-vapid-key.sh" --remote --all || \
+    echo "⚠️  VAPID key provisioning incomplete — Web Push stays off for affected tenants (see README 'MCP rollout')."
 echo ""
 
 echo "Health check (waiting 15s for startup)..."

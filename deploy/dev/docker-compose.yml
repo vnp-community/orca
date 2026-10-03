@@ -242,6 +242,15 @@ services:
       SSO_OIDC_CLIENT_ID: ${SSO_OIDC_CLIENT_ID:-}
       SSO_OIDC_CLIENT_SECRET: ${SSO_OIDC_CLIENT_SECRET:-}
       SSO_OIDC_DISCOVERY_URL: ${SSO_OIDC_DISCOVERY_URL:-}
+      # MCP OAuth 2.1 authorization server + personal access tokens. The OAuth
+      # server only starts when OAUTH_RESOURCE_URL is set (= <PUBLIC_BASE_URL>/mcp;
+      # scripts/ensure-mcp-env.sh derives it). The three tokens guard internal-only
+      # RPCs on the flat docker network — scripts/ensure-mcp-env.sh generates them
+      # on the server; a guard stays off (with a startup warning) while its token is empty.
+      OAUTH_RESOURCE_URL: ${OAUTH_RESOURCE_URL:-}
+      OAUTH_INTERNAL_CALLER_TOKEN: ${OAUTH_INTERNAL_CALLER_TOKEN:-}
+      AUTH_MCP_PRINCIPAL_CALLER_TOKEN: ${AUTH_MCP_PRINCIPAL_CALLER_TOKEN:-}
+      OAUTH_DCR_ENABLED: ${OAUTH_DCR_ENABLED:-true}
     depends_on:
       postgres: { condition: service_healthy }
       tenant-service: { condition: service_started } # bootstrap.go now calls tenant-service.CreateCompany at startup
@@ -371,6 +380,10 @@ services:
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/notification?sslmode=disable
+      # Web Push (VAPID): the subject must be a mailto: or https: URL — defaults to
+      # the public URL. Without it web pushes fail with a clear error. The per-tenant
+      # Transit key + public key row come from scripts/provision-vapid-key.sh.
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-${PUBLIC_BASE_URL:-}}
     depends_on:
       postgres: { condition: service_healthy }
       # VAPID Transit signing now goes through credential-broker-service's
@@ -397,13 +410,27 @@ services:
     container_name: orca-go-mcp
     volumes:
       - ./bin/mcp-service/orca:/app/bin/orca:ro
+      # OPA bundle for the tool-policy engine. mcp-service refuses to start on a
+      # missing/broken bundle (fail-closed), and the distroless image has no
+      # Dockerfile ENV to point at one — so mount it and set OPA_BUNDLE_PATH
+      # (same pattern as auth-service; build-local.sh copies the bundle here).
+      - ./policy/orca-authz:/policy/orca-authz:ro
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/mcp?sslmode=disable
       MCP_TENANT_DEFAULT_ENABLED: ${MCP_TENANT_DEFAULT_ENABLED:-true}
+      OPA_BUNDLE_PATH: /policy/orca-authz
+      # Consent redirects and OAuth metadata are built from this; falls back to the public URL.
+      MCP_PUBLIC_BASE_URL: ${MCP_PUBLIC_BASE_URL:-${PUBLIC_BASE_URL:-}}
+      MCP_INTERNAL_CALLER_TOKEN: ${MCP_INTERNAL_CALLER_TOKEN:-}
+      OAUTH_INTERNAL_CALLER_TOKEN: ${OAUTH_INTERNAL_CALLER_TOKEN:-}
+      MCP_EXTERNAL_STDIO_ENABLED: ${MCP_EXTERNAL_STDIO_ENABLED:-false}
     depends_on:
       postgres: { condition: service_healthy }
       nats: { condition: service_healthy }
+      auth-service: { condition: service_started }
+      tenant-service: { condition: service_started }
+      credential-broker-service: { condition: service_started }
 
   credential-broker-service:
     <<: *go-defaults
@@ -536,6 +563,15 @@ services:
       MCP_ISSUER_URL: ${MCP_ISSUER_URL:-}
       MCP_ALLOWED_ORIGINS: ${MCP_ALLOWED_ORIGINS:-}
       MCP_CURSOR_KEY: ${MCP_CURSOR_KEY:-}
+      # Browser WebSocket Origin allow-list (/ws, notification stream, /mcp).
+      # Defaults to the public URL so cross-site WebSocket hijacking is blocked
+      # out of the box; add more comma-separated origins in .env if users reach
+      # the UI by another address. Empty => any Origin is accepted (warns at startup).
+      WS_ALLOWED_ORIGINS: ${WS_ALLOWED_ORIGINS:-${PUBLIC_BASE_URL:-}}
+      MCP_INTERNAL_CALLER_TOKEN: ${MCP_INTERNAL_CALLER_TOKEN:-}
+      AUTH_MCP_PRINCIPAL_CALLER_TOKEN: ${AUTH_MCP_PRINCIPAL_CALLER_TOKEN:-}
+      OAUTH_DCR_ENABLED: ${OAUTH_DCR_ENABLED:-true}
+      MCP_TOOL_PACKS_ENABLED: ${MCP_TOOL_PACKS_ENABLED:-1}
     ports:
       # SERVER_BIND_IP lets a specific deploy reuse a specific host port/IP
       # (e.g. to slot into an existing external gateway's hardcoded upstream
@@ -546,6 +582,7 @@ services:
       usage-service: { condition: service_started }
       notification-service: { condition: service_started }
       auth-service: { condition: service_started }
+      mcp-service: { condition: service_started }
 
   # ------------------------------------------------------------
   # Frontend — stock nginx:alpine, built static assets bind-mounted

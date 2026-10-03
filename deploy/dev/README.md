@@ -55,7 +55,9 @@ deploy/dev/
 └── scripts/
     ├── build-local.sh           # [LOCAL] cross-compile all 17 Go binaries + vite-build frontend
     ├── sync-to-server.sh        # [LOCAL] build, rsync, pull images, migrate, up -d — the whole flow in one command
-    └── migrate.sh               # [LOCAL or --remote] run golang-migrate for one/all services
+    ├── migrate.sh               # [LOCAL or --remote] create missing databases, then run golang-migrate for one/all services
+    ├── ensure-mcp-env.sh        # [LOCAL or --remote] fill in missing MCP secrets in .env (never overwrites a set value)
+    └── provision-vapid-key.sh   # [on server, or --remote] per-tenant Vault ecdsa-p256 key + public-key row for Web Push
 ```
 
 ## Quick start
@@ -110,6 +112,49 @@ being true at some point (build time becomes a real bottleneck),
   layering `deploy/old/gateway/` used). Add it there, or put a TLS-terminating
   proxy in this compose file, once this deploy needs to be reachable outside
   a trusted network.
+
+## MCP rollout (AI agents operating Orca)
+
+`sync-to-server.sh` now does most of this for you. **MCP stays off until you set `MCP_ENABLED=true`** in the
+server's `.env` — everything below can be deployed first and switched on later.
+
+### What the deploy does automatically
+| Step | Where | Effect |
+|------|-------|--------|
+| `ensure-mcp-env.sh --remote` | server `.env` | generates `MCP_INTERNAL_CALLER_TOKEN`, `OAUTH_INTERNAL_CALLER_TOKEN`, `AUTH_MCP_PRINCIPAL_CALLER_TOKEN`, `MCP_CURSOR_KEY` (random, created **on the server**, never printed) and derives `OAUTH_RESOURCE_URL=<PUBLIC_BASE_URL>/mcp`. Only fills missing/empty keys. |
+| `migrate.sh --remote` | Postgres | creates any missing database (e.g. `mcp` — `init-databases.sh` only runs on a brand-new volume), then migrates. |
+| `provision-vapid-key.sh --remote --all` | Vault + `notification` DB | optional pre-warm: creates `vapid-signing-<tenant_id>` (ecdsa-p256) and stores its public key for existing tenants. Keys are also created automatically on first use (see below). Non-fatal if it can't. |
+| compose defaults | containers | `WS_ALLOWED_ORIGINS` and `VAPID_SUBJECT` default to `PUBLIC_BASE_URL`; `mcp-service` gets the OPA bundle mounted at `/policy/orca-authz`. |
+
+### Decisions baked in (and why)
+- **`WS_ALLOWED_ORIGINS` = `PUBLIC_BASE_URL`.** Browsers authenticate with a cookie, so without an Origin check any web page a user visits could drive `/ws`. nginx forwards `Host $http_host` for the two WebSocket locations so a direct `http://<ip>:<port>` visit still counts as same-origin; any *other* address must be added to `WS_ALLOWED_ORIGINS` (comma-separated).
+- **Internal tokens are generated, not defaulted.** There is no mTLS/mesh here (see "Known limitations"), so these shared secrets are the only check on internal-only RPCs. A guard stays off — with a startup warning — while its token is empty.
+- **`VAPID_SUBJECT` = `PUBLIC_BASE_URL`** (must be `mailto:` or `https:`).
+
+### Manual steps (one-time; need rights this deploy does not have)
+1. **Apply the Vault policy** on the shared Vault (172.20.2.21) so the orca token can create VAPID signing keys:
+   `vault policy write <policy attached to the orca token> deploy/dev/orca-policy.hcl` — find the name with `vault token lookup` (field `policies`); the migration record names the token (`orca-backend-go`) but not the policy. The change only adds `create` on `transit/keys/vapid-signing-*`.
+   Without it, automatic provisioning and `provision-vapid-key.sh` both hit a Vault 403 (the broker reports `CREDBROKER_VAULT_FORBIDDEN`; the VAPID public-key request fails with `NOTIFICATION_NO_VAPID_KEY`, retried at most every 30s per tenant) and Web Push stays off; everything else works.
+   The credential-broker key for external-server secrets (`credential-broker-mcp_external_secret`) needs **no** action — it auto-creates on first use under the existing `transit/encrypt/*` `create` grant.
+2. **TLS front proxy** (the host-level gateway that terminates `PUBLIC_BASE_URL`; not in this repo) must forward, to the `frontend` port, these paths **unbuffered with a long read timeout** (SSE) and preserving `Host`, `X-Forwarded-Proto`, `Authorization`, `Mcp-Session-Id`, `MCP-Protocol-Version`, `Last-Event-ID`:
+   `/mcp`, `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`, `/oauth/*` (except `/oauth/consent`, which is an SPA page and must NOT be proxied to the API).
+3. Set `MCP_ENABLED=true` in the server's `.env`, then `docker compose up -d api-gateway`.
+
+### Verify
+```bash
+curl -si "$PUBLIC_BASE_URL/mcp" | head -3                                   # 401 + WWW-Authenticate (not 404) once enabled
+curl -s  "$PUBLIC_BASE_URL/.well-known/oauth-protected-resource"            # resource = $PUBLIC_BASE_URL/mcp
+curl -s  "$PUBLIC_BASE_URL/.well-known/oauth-authorization-server" | head -c 300
+docker compose logs api-gateway mcp-service | grep -iE "warn|WS_ALLOWED_ORIGINS|internal.?caller"   # no "token empty" warnings
+```
+Then Settings → MCP in the UI (needs an admin to create a first token / connect a client).
+
+### Rollback
+`MCP_ENABLED=false` + `docker compose up -d api-gateway` turns the whole surface off (`/mcp` → 404, channels → `MCP_DISABLED`). A tenant-wide emergency stop that keeps the rest of MCP up: Settings → MCP → Kill switch.
+
+### Known limits
+- VAPID keys are provisioned automatically: the first VAPID public-key request (or first push) of a tenant makes notification-service ask credential-broker-service to create `vapid-signing-<tenant_id>` (ecdsa-p256) and store its public key, so tenants created after a deploy need no script. `provision-vapid-key.sh` is an optional pre-warm. The Vault policy step above remains required.
+- `OAUTH_RESOURCE_URL` must equal `<MCP_PUBLIC_BASE_URL>/mcp` exactly; if you change `PUBLIC_BASE_URL`, clear `OAUTH_RESOURCE_URL` in the server `.env` and redeploy so it is re-derived.
 
 ## Known limitations (read before treating this as production)
 

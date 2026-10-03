@@ -44,6 +44,23 @@ path "transit/keys/*" {
   capabilities = ["read", "update"]
 }
 
+# notification-service's per-tenant Web Push (VAPID) signing key. Unlike the
+# encrypt keys above it can NOT auto-vivify: signing needs an ecdsa-p256 key,
+# whereas a Transit key created implicitly by an encrypt call is aes256-gcm96.
+# scripts/provision-vapid-key.sh creates "vapid-signing-<tenant_id>" explicitly,
+# which needs "create" on exactly this prefix and nothing broader. Since the
+# broker's EnsureVapidSigningKey RPC, credential-broker-service creates the key
+# itself on a tenant's first Web Push use (needs create+read here); the script
+# is only an optional pre-warm. This policy step stays required. (The
+# credential-broker "mcp_external_secret" key needs no entry: it is aes256-gcm96
+# and auto-vivifies under transit/encrypt/* above.) Apply with:
+#   vault policy write <policy attached to the orca token> deploy/dev/orca-policy.hcl
+# (find the name with `vault token lookup` -> policies; the token itself is
+# called orca-backend-go, but VAULT-SHARED-MIGRATION.md never records the policy's name)
+path "transit/keys/vapid-signing-*" {
+  capabilities = ["create", "read", "update"]
+}
+
 # credential-broker-service: KV v2 read/write for ciphertext storage
 # (WriteCredential/ResolveCredential), and destroy-metadata for permanent
 # revocation (RevokeSecret → KVDestroyMetadata, see secret_store.go's doc
