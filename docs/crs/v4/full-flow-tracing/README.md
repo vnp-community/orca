@@ -27,7 +27,7 @@
 CR-FFT-001 (OTel span thật qua gRPC/HTTP interceptor)
         │  span tồn tại, nhưng chưa ai đọc được từ process khác
         ▼
-CR-FFT-002 (Span → NATS JetStream, subject orca.<service>.trace.span)
+CR-FFT-002 (Span → NATS JetStream, subject orca.trace.<service>.span)
         │  event đã ra NATS, nhưng api-gateway chưa consume
         ▼
 CR-FFT-003 (api-gateway subscribe NATS → fan-out SSE /api/trace-stream)

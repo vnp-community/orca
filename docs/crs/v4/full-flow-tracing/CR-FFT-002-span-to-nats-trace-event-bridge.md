@@ -3,7 +3,7 @@
 | Trường | Giá trị |
 |--------|---------|
 | **CR ID** | CR-FFT-002 |
-| **Tên** | Custom `SpanProcessor` publish span thành `TraceEvent` lên NATS JetStream (`orca.<service>.trace.span`) |
+| **Tên** | Custom `SpanProcessor` publish span thành `TraceEvent` lên NATS JetStream (`orca.trace.<service>.span`) |
 | **Loại** | Feature / Observability |
 | **Priority** | 🔴 P0 (điều kiện tiên quyết của CR-FFT-003) |
 | **Effort** | Medium |
@@ -108,9 +108,9 @@ Vì `Init`'s option là opt-in/nil-safe, CR này chỉ bật `WithTraceEventPubl
 
 | File | Thay đổi |
 |------|---------|
-| `backend-go/common/tracing/trace_event_processor.go` (mới) | `TraceEventSpanProcessor` implement `sdktrace.SpanProcessor`, publish JSON `TraceEvent` lên subject `orca.<service>.trace.span` |
+| `backend-go/common/tracing/trace_event_processor.go` (mới) | `TraceEventSpanProcessor` implement `sdktrace.SpanProcessor`, publish JSON `TraceEvent` lên subject `orca.trace.<service>.span` |
 | `backend-go/common/tracing/tracing.go` | `Init` nhận thêm `opts ...Option` (additive); đăng ký `TraceEventSpanProcessor` khi có `WithTraceEventPublisher` |
-| `backend-go/common/eventbus` | Không đổi API — chỉ cần `EnsureStream` cho stream mới (vd. tên `TRACE`, subjects `["orca.*.trace.span"]`) gọi 1 lần ở mỗi service publish |
+| `backend-go/common/eventbus` | Không đổi API — chỉ cần `EnsureStream` cho stream mới (vd. tên `TRACE`, subjects `["orca.trace.*.span"]`) gọi 1 lần ở mỗi service publish |
 | `backend-go/services/api-gateway/internal/config/config.go` | Thêm field `NATSURL string` (chưa tồn tại — service này chưa kết nối NATS bao giờ), theo đúng convention `commonconfig.StringEnv("NATS_URL", "nats://localhost:4222")` 5 service kia đã dùng |
 | `backend-go/services/api-gateway/cmd/server/main.go` | Gọi `eventbus.Connect(ctx, cfg.NATSURL)` lần đầu tiên cho service này; truyền `pub` vào `tracing.Init(..., tracing.WithTraceEventPublisher(pub))`; giữ `cons` cho CR-FFT-003 |
 | `backend-go/services/{usage,issue-tracking,notification,tenant,infra-fleet}-service/cmd/server/main.go` | Thêm `tracing.WithTraceEventPublisher(pub)` vào `Init(...)` call đã có (1 dòng/service, `pub` đã tồn tại sẵn từ `eventbus.Connect`) |
@@ -123,7 +123,7 @@ Vì `Init`'s option là opt-in/nil-safe, CR này chỉ bật `WithTraceEventPubl
 
 ## Tiêu chí chấp nhận
 
-- [ ] Gọi 1 gRPC method bất kỳ trên `api-gateway` với `NATSURL` cấu hình → xuất hiện đúng 1 message trên subject `orca.api-gateway.trace.span`, JSON parse được thành `TraceEvent` hợp lệ (field name khớp chính xác frontend's `TraceEvent` type).
+- [ ] Gọi 1 gRPC method bất kỳ trên `api-gateway` với `NATSURL` cấu hình → xuất hiện đúng 1 message trên subject `orca.trace.api-gateway.span`, JSON parse được thành `TraceEvent` hợp lệ (field name khớp chính xác frontend's `TraceEvent` type).
 - [ ] Khi `NATSURL` rỗng/không cấu hình (local dev không có NATS) → `Init` không lỗi, không panic, hành vi giống hệt trước CR này (giữ đúng tiền lệ "always-sample, exporter-less" fallback).
 - [ ] `EnsureStream` idempotent — khởi động lại service nhiều lần không lỗi "stream already exists".
 - [ ] Span lỗi (`span.Status().Code == codes.Error`) publish `level: "fail"` — không im lặng biến mất giống F40's "fail luôn phải thấy" acceptance criteria gốc.

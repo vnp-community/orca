@@ -81,7 +81,7 @@ func run() error {
 		logger.WarnContext(ctx, "eventbus unavailable, outbox events will queue until a future restart", slog.Any("error", err))
 	} else {
 		defer func() { _ = closeBus() }()
-		if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.*.trace.span"}); err != nil {
+		if err := pub.EnsureStream(ctx, tracing.TraceStreamName, []string{tracing.TraceStreamSubjects}); err != nil {
 			logger.WarnContext(ctx, "failed to ensure TRACE jetstream stream", slog.Any("error", err))
 		}
 	}

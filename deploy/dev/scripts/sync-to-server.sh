@@ -138,7 +138,7 @@ echo "[4/6] Pulling public images on server (cached after first run)..."
 # to succeed at least once. No local vault image here (2026-09-07) — Vault
 # is the shared vnp-domain instance now, see docker-compose.yml's
 # x-go-common-env comment and ../VAULT-SHARED-MIGRATION.md.
-ssh_cmd "cd ${SERVER_DEPLOY} && docker compose pull postgres nats frontend" || \
+ssh_cmd "cd ${SERVER_DEPLOY} && docker compose pull postgres nats frontend vault-token-renewer" || \
     echo "⚠️  Image pull failed (registry hiccup?) — continuing with whatever's already cached on the server."
 echo ""
 

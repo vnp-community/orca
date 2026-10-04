@@ -58,7 +58,7 @@ if err != nil {
 }
 defer func() { _ = shutdownTracing(context.Background()) }()
 
-if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.*.trace.span"}); err != nil {
+if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.trace.*.span"}); err != nil {
     return fmt.Errorf("ensuring TRACE stream: %w", err)
 }
 ```
@@ -94,7 +94,7 @@ if err != nil {
     return fmt.Errorf("connecting to nats: %w", err)
 }
 defer func() { _ = closeBus() }()
-if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.*.trace.span"}); err != nil {
+if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.trace.*.span"}); err != nil {
     return fmt.Errorf("ensuring TRACE stream: %w", err)
 }
 
@@ -149,7 +149,7 @@ thuộc CỨNG vào Phần B của task này (`cons` phải tồn tại trong
   doc) — cả 5 service đều có `tracing.Init` chạy TRƯỚC `eventbus.Connect`
   ở code hiện tại, đúng như task doc cảnh báo. Đảo thứ tự: di chuyển
   `eventbus.Connect` lên trước, gọi `pub.EnsureStream(ctx, "TRACE",
-  []string{"orca.*.trace.span"})`, rồi truyền
+  []string{"orca.trace.*.span"})`, rồi truyền
   `tracing.WithTraceEventPublisher(pub)` vào `Init`. Giữ nguyên tên biến
   cục bộ khác nhau giữa các service (`cons` giữ lại ở `notification-service`/
   `tenant-service` vì đã dùng cho event consumer riêng của chúng; `_`

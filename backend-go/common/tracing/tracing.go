@@ -34,7 +34,7 @@ type initConfig struct {
 }
 
 // WithTraceEventPublisher additionally publishes every finished span onto
-// pub, at subject "orca.<serviceName>.trace.span" (CR-FFT-002/
+// pub, at subject "orca.trace.<serviceName>.span" (CR-FFT-002/
 // TASK-BE-FFT-008) — a real-time sink for api-gateway's TracePanel SSE
 // bridge (see httpgateway.TraceBroadcast), separate from and in addition to
 // the batched OTLP export above. pub may be nil (e.g. eventbus

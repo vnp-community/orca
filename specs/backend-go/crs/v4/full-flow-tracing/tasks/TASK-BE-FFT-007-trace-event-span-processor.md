@@ -10,7 +10,7 @@
 ## Mục tiêu
 
 Publish mỗi span (start/end) thành `TraceEvent` JSON lên NATS JetStream
-(`orca.<service>.trace.span`), qua 1 `sdktrace.SpanProcessor` mới đăng ký
+(`orca.trace.<service>.span`), qua 1 `sdktrace.SpanProcessor` mới đăng ký
 có điều kiện trong `Init`.
 
 ## gitnexus — BẮT BUỘC trước khi sửa (chạm lại `Init`, symbol CRITICAL)
@@ -102,7 +102,7 @@ func (p *TraceEventSpanProcessor) publish(traceID, spanName, level string, attrs
     if err != nil {
         return // malformed attrs shouldn't crash the tracer callback path
     }
-    subject := "orca." + p.serviceName + ".trace.span"
+    subject := "orca.trace." + p.serviceName + ".span"
     // Best-effort, fire-and-forget — a trace span callback must never
     // block request handling on NATS availability.
     go func() {
@@ -174,7 +174,7 @@ compile nguyên trạng vì Go cho phép biến-tham-số rỗng.
 - `TestInit_WithTraceEventPublisher_RegistersSpanProcessor` — gọi `Init`
   với `WithTraceEventPublisher(pub)`, tạo 1 span thật, xác nhận
   `pub`/NATS nhận được đúng 1 message trên subject
-  `orca.<serviceName>.trace.span` (dùng NATS test server nếu repo đã có
+  `orca.trace.<serviceName>.span` (dùng NATS test server nếu repo đã có
   tiền lệ, hoặc fake `*eventbus.Publisher`-compatible test double nếu
   `Publisher` cho phép inject `jetstream.JetStream` giả).
 - `TestInit_WithoutOption_NoPublisherNoPanic` — **regression bắt buộc**:

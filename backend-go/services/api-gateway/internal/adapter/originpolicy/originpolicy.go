@@ -27,7 +27,8 @@ type pattern struct {
 // "not enforced": every origin is accepted, preserving behavior for
 // deployments that have not configured an allow-list yet.
 type Policy struct {
-	patterns []pattern
+	patterns   []pattern
+	reportOnly bool
 }
 
 // Parse builds a Policy from a comma-separated list of origins such as
@@ -65,6 +66,21 @@ func Parse(csv string) (*Policy, error) {
 // permissive behavior.
 func (p *Policy) Enforced() bool {
 	return p != nil && len(p.patterns) > 0
+}
+
+// WithReportOnly makes the verdict advisory: callers log what would be rejected but
+// let the request through. It exists to roll an allow-list out safely when some
+// clients' Origin is unknown (for example Electron renderers send file://).
+func (p *Policy) WithReportOnly(v bool) *Policy {
+	if p != nil {
+		p.reportOnly = v
+	}
+	return p
+}
+
+// ReportOnly reports whether rejections are advisory.
+func (p *Policy) ReportOnly() bool {
+	return p != nil && p.reportOnly
 }
 
 // Allow reports whether r may proceed. Requests with no Origin header are

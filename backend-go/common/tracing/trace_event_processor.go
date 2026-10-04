@@ -81,7 +81,7 @@ func (p *TraceEventSpanProcessor) publish(traceID, spanName, level string, attrs
 	if err != nil {
 		return // malformed attrs shouldn't crash the tracer callback path
 	}
-	subject := "orca." + p.serviceName + ".trace.span"
+	subject := TraceSubject(p.serviceName)
 	// Best-effort, fire-and-forget — a trace span callback must never
 	// block request handling on NATS availability. Publish order across
 	// concurrent spans is not guaranteed; TracePanel orders by TS, not

@@ -64,7 +64,7 @@ regression hành vi hiện tại của 17 service khi thêm OTel interceptor —
 BE-FFT-SOL-001 (OTel span thật)
         │  span tồn tại, nhưng chưa ai đọc được từ process khác
         ▼
-BE-FFT-SOL-002 (Span → NATS JetStream, orca.<service>.trace.span)
+BE-FFT-SOL-002 (Span → NATS JetStream, orca.trace.<service>.span)
         │  event đã ra NATS, nhưng api-gateway chưa consume
         ▼
 BE-FFT-SOL-003 (api-gateway subscribe NATS → fan-out SSE)

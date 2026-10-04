@@ -62,8 +62,8 @@ func TestInit_WithTraceEventPublisher_RegistersSpanProcessor(t *testing.T) {
 	span.End()
 
 	call := fake.awaitOne(t)
-	if call.subject != "orca.svc-under-test.trace.span" {
-		t.Errorf("subject: got %q, want orca.svc-under-test.trace.span", call.subject)
+	if call.subject != "orca.trace.svc-under-test.span" {
+		t.Errorf("subject: got %q, want orca.trace.svc-under-test.span", call.subject)
 	}
 	var ev TraceEvent
 	if err := json.Unmarshal(call.event.Payload, &ev); err != nil {

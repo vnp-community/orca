@@ -104,7 +104,7 @@ func run() error {
 		logger.WarnContext(ctx, "eventbus unavailable, trace events will not be published", slog.Any("error", err))
 	} else {
 		defer func() { _ = closeBus() }()
-		if err := pub.EnsureStream(ctx, "TRACE", []string{"orca.*.trace.span"}); err != nil {
+		if err := pub.EnsureStream(ctx, tracing.TraceStreamName, []string{tracing.TraceStreamSubjects}); err != nil {
 			logger.WarnContext(ctx, "failed to ensure TRACE jetstream stream", slog.Any("error", err))
 		}
 	}
@@ -130,7 +130,7 @@ func run() error {
 			// trace events" rather than crashing api-gateway — trace data is
 			// diagnostic, not a startup-critical dependency (CR-FFT-002's
 			// outbox rationale).
-			if err := cons.SubscribeEphemeral(ctx, "TRACE", "orca.*.trace.span", traceEventHandler(traceBroadcast)); err != nil {
+			if err := cons.SubscribeEphemeral(ctx, tracing.TraceStreamName, tracing.TraceSubscribeSubject, traceEventHandler(traceBroadcast)); err != nil {
 				logger.ErrorContext(ctx, "trace event subscription ended", slog.Any("error", err))
 			}
 		}()
@@ -314,6 +314,10 @@ func run() error {
 	originPolicy, err := originpolicy.Parse(cfg.WSAllowedOrigins)
 	if err != nil {
 		return fmt.Errorf("WS_ALLOWED_ORIGINS: %w", err)
+	}
+	originPolicy.WithReportOnly(cfg.WSOriginMode == "report")
+	if originPolicy.Enforced() && originPolicy.ReportOnly() {
+		logger.Warn("WS_ORIGIN_MODE=report: Origins outside WS_ALLOWED_ORIGINS are only logged, not rejected; switch to enforce once the log is clean")
 	}
 	if !originPolicy.Enforced() {
 		logger.Warn("WS_ALLOWED_ORIGINS is empty: WebSocket upgrades accept any Origin (cross-site WebSocket hijacking is possible with cookie auth); set it to your frontend origins")

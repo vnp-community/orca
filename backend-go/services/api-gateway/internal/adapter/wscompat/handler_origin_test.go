@@ -30,3 +30,26 @@ func TestServeHTTPRejectsDisallowedOriginBeforeUpgrade(t *testing.T) {
 		t.Fatalf("status=%d want 403", rec.Code)
 	}
 }
+
+func TestServeHTTPReportOnlyDoesNotReject(t *testing.T) {
+	policy, err := originpolicy.Parse("https://orca.example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h := New(logger, fakeSessionValidator{identity: Identity{TenantID: "t", UserID: "u"}}, nil, NewRegistry()).
+		WithOriginPolicy(policy.WithReportOnly(true))
+
+	req := httptest.NewRequest(http.MethodGet, "/ws", nil)
+	req.Header.Set("Origin", "https://evil.example")
+	req.Header.Set("Connection", "Upgrade")
+	req.Header.Set("Upgrade", "websocket")
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+
+	// Not 403: the request got past the origin check (the bare recorder then fails the
+	// real upgrade handshake, which is irrelevant here).
+	if rec.Code == http.StatusForbidden {
+		t.Fatalf("report-only mode must not reject, got %d", rec.Code)
+	}
+}

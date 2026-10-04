@@ -83,3 +83,21 @@ func TestParseRejectsBadEntries(t *testing.T) {
 		}
 	}
 }
+
+func TestReportOnlyFlag(t *testing.T) {
+	p, _ := Parse("https://orca.example.com")
+	if p.ReportOnly() {
+		t.Fatal("default must be enforce")
+	}
+	if !p.WithReportOnly(true).ReportOnly() {
+		t.Fatal("WithReportOnly(true) must set the flag")
+	}
+	// The verdict itself is unchanged; handlers decide what to do with it.
+	if p.Allow(req("https://evil.example", "gw.internal")) {
+		t.Fatal("report-only must not change Allow's verdict")
+	}
+	var nilPolicy *Policy
+	if nilPolicy.WithReportOnly(true) != nil || nilPolicy.ReportOnly() {
+		t.Fatal("nil policy stays nil and not report-only")
+	}
+}

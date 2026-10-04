@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 
 	commonconfig "github.com/stablyai/orca-go/common/config"
 )
@@ -67,6 +68,9 @@ type Config struct {
 	// "https://orca.example.com,https://*.example.com". Empty keeps the legacy
 	// permissive behavior so existing deployments do not break on upgrade.
 	WSAllowedOrigins string
+	// WSOriginMode is "enforce" (default: reject Origins outside the list) or "report"
+	// (log what would be rejected but allow it) — for rolling the list out safely.
+	WSOriginMode string
 
 	// MCP holds the MCP endpoint settings (config_mcp.go); zero value = disabled.
 	MCP MCPConfig
@@ -119,6 +123,10 @@ func Load() (Config, error) {
 	}
 
 	wsAllowedOrigins := commonconfig.StringEnv("WS_ALLOWED_ORIGINS", "")
+	wsOriginMode := strings.ToLower(strings.TrimSpace(commonconfig.StringEnv("WS_ORIGIN_MODE", "enforce")))
+	if wsOriginMode != "enforce" && wsOriginMode != "report" {
+		return Config{}, fmt.Errorf("WS_ORIGIN_MODE must be \"enforce\" or \"report\", got %q", wsOriginMode)
+	}
 	publicBaseURL := commonconfig.StringEnv("PUBLIC_BASE_URL", "")
 	mcpCfg, err := loadMCP(publicBaseURL, wsAllowedOrigins)
 	if err != nil {
@@ -134,6 +142,7 @@ func Load() (Config, error) {
 		InfraFleetHTTPAddr:      commonconfig.StringEnv("INFRA_FLEET_SERVICE_HTTP_ADDR", ""),
 		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 		WSAllowedOrigins:        wsAllowedOrigins,
+		WSOriginMode:            wsOriginMode,
 		RateLimitRPS:            50,
 		RateLimitBurst:          100,
 		PublicBaseURL:           publicBaseURL,

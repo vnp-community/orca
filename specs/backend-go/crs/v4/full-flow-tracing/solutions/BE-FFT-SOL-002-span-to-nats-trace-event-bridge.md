@@ -131,7 +131,7 @@ func (p *TraceEventSpanProcessor) publish(ctx context.Context, s interface {
         return
     }
     // ... build TraceEvent{ID: traceID, Flow: serviceName+":"+s.Name(), Level: level, Fields: flattenAttrs(...), TS: time.Now().UnixMilli()}
-    // marshal, publish to "orca." + serviceName + ".trace.span" via p.pub.Publish
+    // marshal, publish to "orca.trace." + serviceName + ".span" via p.pub.Publish
 }
 ```
 
@@ -187,7 +187,7 @@ rỗng.
 
 | Service | Trạng thái NATS | Việc cần làm |
 |---|---|---|
-| `api-gateway` | Chưa kết nối bao giờ | Thêm `NATSURL` vào `Config`, gọi `eventbus.Connect` lần đầu, `EnsureStream("TRACE", []string{"orca.*.trace.span"})`, truyền `pub` vào `tracing.Init(..., tracing.WithTraceEventPublisher(pub))`, giữ `cons` cho BE-FFT-SOL-003 |
+| `api-gateway` | Chưa kết nối bao giờ | Thêm `NATSURL` vào `Config`, gọi `eventbus.Connect` lần đầu, `EnsureStream("TRACE", []string{"orca.trace.*.span"})`, truyền `pub` vào `tracing.Init(..., tracing.WithTraceEventPublisher(pub))`, giữ `cons` cho BE-FFT-SOL-003 |
 | `usage-service`, `issue-tracking-service`, `notification-service`, `tenant-service`, `infra-fleet-service` | Đã có `*eventbus.Publisher` (xác nhận 3/5 qua grep `eventbus.Connect`) | Chỉ thêm `tracing.WithTraceEventPublisher(pub)` vào lệnh `tracing.Init(...)` đã có — 1 dòng/service |
 | 11 service còn lại | Chưa nối NATS | **Ngoài phạm vi** — xem "Không thuộc phạm vi" |
 

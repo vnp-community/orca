@@ -127,14 +127,25 @@ server's `.env` — everything below can be deployed first and switched on later
 | compose defaults | containers | `WS_ALLOWED_ORIGINS` and `VAPID_SUBJECT` default to `PUBLIC_BASE_URL`; `mcp-service` gets the OPA bundle mounted at `/policy/orca-authz`. |
 
 ### Decisions baked in (and why)
-- **`WS_ALLOWED_ORIGINS` = `PUBLIC_BASE_URL`.** Browsers authenticate with a cookie, so without an Origin check any web page a user visits could drive `/ws`. nginx forwards `Host $http_host` for the two WebSocket locations so a direct `http://<ip>:<port>` visit still counts as same-origin; any *other* address must be added to `WS_ALLOWED_ORIGINS` (comma-separated).
+- **`WS_ALLOWED_ORIGINS` = `PUBLIC_BASE_URL`, rolled out in `WS_ORIGIN_MODE=report` first.** Browsers authenticate with a cookie, so without an Origin check any web page a user visits could drive `/ws`. Report mode logs what *would* be rejected (`grep "would be rejected"` in the api-gateway log) without blocking anyone, because some clients' Origin is unknown (an Electron renderer may send `file://`). Once the log shows only things you want blocked, set `WS_ORIGIN_MODE=enforce`. nginx forwards `Host $http_host` for the two WebSocket locations so a direct `http://<ip>:<port>` visit still counts as same-origin; any *other* address must be added to `WS_ALLOWED_ORIGINS` (comma-separated).
 - **Internal tokens are generated, not defaulted.** There is no mTLS/mesh here (see "Known limitations"), so these shared secrets are the only check on internal-only RPCs. A guard stays off — with a startup warning — while its token is empty.
 - **`VAPID_SUBJECT` = `PUBLIC_BASE_URL`** (must be `mailto:` or `https:`).
 
 ### Manual steps (one-time; need rights this deploy does not have)
-1. **Apply the Vault policy** on the shared Vault (172.20.2.21) so the orca token can create VAPID signing keys:
-   `vault policy write <policy attached to the orca token> deploy/dev/orca-policy.hcl` — find the name with `vault token lookup` (field `policies`); the migration record names the token (`orca-backend-go`) but not the policy. The change only adds `create` on `transit/keys/vapid-signing-*`.
-   Without it, automatic provisioning and `provision-vapid-key.sh` both hit a Vault 403 (the broker reports `CREDBROKER_VAULT_FORBIDDEN`; the VAPID public-key request fails with `NOTIFICATION_NO_VAPID_KEY`, retried at most every 30s per tenant) and Web Push stays off; everything else works.
+1. **Apply the Vault policy** on the shared Vault (172.20.2.21) so the orca token can create VAPID signing keys. The
+   live policy is named **`orca`** (verified with `lookup-self` on the `.env` token: policies `[default, orca]`) and today it
+   lacks `create` on `transit/keys/vapid-signing-*` (verified: `read, update`). Writing a policy needs an **admin** token —
+   the orca token is denied `sys/policies/acl/*`, and the root token was revoked after the migration (a temporary one comes
+   from `vault operator generate-root`, 3 of 5 unseal-key holders). Then:
+   ```bash
+   read -rs VAULT_ADMIN_TOKEN && export VAULT_ADMIN_TOKEN       # not echoed, not in shell history
+   deploy/dev/scripts/apply-vault-policy.sh                      # dry run: shows backup + exactly what would change
+   deploy/dev/scripts/apply-vault-policy.sh --apply              # writes it, then verifies with the orca token
+   vault token revoke -self                                      # if the admin token was a temporary root token
+   ```
+   `vault policy write` replaces the whole policy, so the script **refuses** (exit 3) when the live policy has rules the repo
+   file lacks, backs the live policy up (mode 600) first, and only needs `curl` + `python3`. Without this step
+   `provision-vapid-key.sh` reports a 403 and Web Push stays off; everything else works.
    The credential-broker key for external-server secrets (`credential-broker-mcp_external_secret`) needs **no** action — it auto-creates on first use under the existing `transit/encrypt/*` `create` grant.
 2. **TLS front proxy** (the host-level gateway that terminates `PUBLIC_BASE_URL`; not in this repo) must forward, to the `frontend` port, these paths **unbuffered with a long read timeout** (SSE) and preserving `Host`, `X-Forwarded-Proto`, `Authorization`, `Mcp-Session-Id`, `MCP-Protocol-Version`, `Last-Event-ID`:
    `/mcp`, `/.well-known/oauth-authorization-server`, `/.well-known/oauth-protected-resource`, `/oauth/*` (except `/oauth/consent`, which is an SPA page and must NOT be proxied to the API).

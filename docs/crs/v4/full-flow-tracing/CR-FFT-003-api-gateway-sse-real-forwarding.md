@@ -100,7 +100,7 @@ Heartbeat **giữ nguyên** (không xoá) — vẫn cần để giữ kết nố
 // main.go, sau khi eventbus.Connect (CR-FFT-002 đã thêm)
 broadcast := &traceBroadcast{subs: make(map[chan []byte]struct{})}
 go func() {
-	_ = cons.SubscribeEphemeral(ctx, "TRACE", "orca.*.trace.span", func(ctx context.Context, event eventbus.Event) error {
+	_ = cons.SubscribeEphemeral(ctx, "TRACE", "orca.trace.*.span", func(ctx context.Context, event eventbus.Event) error {
 		broadcast.publish(event.Payload) // event.Payload already the F40 TraceEvent JSON — see CR-FFT-002
 		return nil
 	})

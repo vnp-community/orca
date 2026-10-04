@@ -54,9 +54,8 @@ path "transit/keys/*" {
 # is only an optional pre-warm. This policy step stays required. (The
 # credential-broker "mcp_external_secret" key needs no entry: it is aes256-gcm96
 # and auto-vivifies under transit/encrypt/* above.) Apply with:
-#   vault policy write <policy attached to the orca token> deploy/dev/orca-policy.hcl
-# (find the name with `vault token lookup` -> policies; the token itself is
-# called orca-backend-go, but VAULT-SHARED-MIGRATION.md never records the policy's name)
+#   deploy/dev/scripts/apply-vault-policy.sh --apply     (live policy name: orca; needs an ADMIN token)
+# It refuses to overwrite rules that exist live but not in this file.
 path "transit/keys/vapid-signing-*" {
   capabilities = ["create", "read", "update"]
 }

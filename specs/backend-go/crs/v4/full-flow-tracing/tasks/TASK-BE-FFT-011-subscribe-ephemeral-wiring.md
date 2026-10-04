@@ -42,7 +42,7 @@ go func() {
     // here (e.g. TRACE stream missing) degrades to "no live trace events"
     // rather than crashing api-gateway — trace data is diagnostic, not a
     // startup-critical dependency (see CR-FFT-002's outbox rationale).
-    if err := cons.SubscribeEphemeral(ctx, "TRACE", "orca.*.trace.span", func(_ context.Context, event eventbus.Event) error {
+    if err := cons.SubscribeEphemeral(ctx, "TRACE", "orca.trace.*.span", func(_ context.Context, event eventbus.Event) error {
         broadcast.Publish(event.Payload) // event.Payload đã là F40 TraceEvent JSON (TASK-BE-FFT-007)
         return nil
     }); err != nil {
@@ -63,7 +63,7 @@ deps.TraceBroadcast)` ngay trong thân hàm, theo TASK-BE-FFT-010).
 - `TestRun_SubscribeEphemeralFeedsTraceBroadcast` — test tích hợp (cần
   NATS thật hoặc harness giả lập nếu repo đã có tiền lệ cho
   `notification-service`'s tương tự): publish 1 message lên
-  `orca.<any-service>.trace.span`, xác nhận `broadcast` nhận được đúng
+  `orca.trace.<any-service>.span`, xác nhận `broadcast` nhận được đúng
   payload trong khoảng thời gian hợp lý (vài trăm ms).
 - **Regression bắt buộc** — `TestRun_NATSSubscribeFailureDoesNotCrashStartup`:
   giả lập `SubscribeEphemeral` lỗi (vd. NATS down), xác nhận `api-gateway`
@@ -114,7 +114,7 @@ này").
   chưa đổi kể từ TASK-BE-FFT-008/010.
 - Wire đúng theo khuôn task doc: `broadcast := httpgateway.NewTraceBroadcast()`
   tạo TRƯỚC `httpgateway.NewRouter(deps)`, gán vào `deps.TraceBroadcast`;
-  goroutine `cons.SubscribeEphemeral(ctx, "TRACE", "orca.*.trace.span",
+  goroutine `cons.SubscribeEphemeral(ctx, "TRACE", "orca.trace.*.span",
   ...)` chỉ khởi động khi `cons != nil` (NATS connect thành công) — giữ
   đúng nguyên tắc "trace là diagnostic, không phải startup-critical
   dependency" đã thống nhất từ TASK-BE-FFT-008.

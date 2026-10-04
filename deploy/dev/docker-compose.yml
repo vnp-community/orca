@@ -582,6 +582,11 @@ services:
       # out of the box; add more comma-separated origins in .env if users reach
       # the UI by another address. Empty => any Origin is accepted (warns at startup).
       WS_ALLOWED_ORIGINS: ${WS_ALLOWED_ORIGINS:-${PUBLIC_BASE_URL:-}}
+      # "report" = log Origins that would be rejected but let them through; "enforce" = reject
+      # them with HTTP 403. Starts in report because some clients' Origin is unknown (an
+      # Electron renderer may send file://). Check `docker compose logs api-gateway | grep
+      # "would be rejected"`, add legitimate origins to WS_ALLOWED_ORIGINS, then set enforce.
+      WS_ORIGIN_MODE: ${WS_ORIGIN_MODE:-report}
       MCP_INTERNAL_CALLER_TOKEN: ${MCP_INTERNAL_CALLER_TOKEN:-}
       AUTH_MCP_PRINCIPAL_CALLER_TOKEN: ${AUTH_MCP_PRINCIPAL_CALLER_TOKEN:-}
       OAUTH_DCR_ENABLED: ${OAUTH_DCR_ENABLED:-true}
@@ -597,6 +602,48 @@ services:
       notification-service: { condition: service_started }
       auth-service: { condition: service_started }
       mcp-service: { condition: service_started }
+
+  # ------------------------------------------------------------
+  # Vault token renewer. The orca service token is a periodic token whose lease
+  # is only 30 days (renew-self resets it to 30d, not to its 1y period), so
+  # without renewal every service that talks to Vault (auth-service JWT signing,
+  # credential-broker) loses access when it lapses. This renews it every 12h and
+  # logs the new lease. Stock curl image, no custom build; it only ever calls
+  # auth/token/renew-self with the token it was given.
+  # ------------------------------------------------------------
+  vault-token-renewer:
+    image: curlimages/curl:8.10.1
+    container_name: orca-go-vault-renewer
+    restart: unless-stopped
+    read_only: true
+    user: "65534:65534"
+    security_opt:
+      - no-new-privileges:true
+    mem_limit: 32m
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "5m"
+        max-file: "2"
+    networks:
+      - orca-go-net
+    environment:
+      VAULT_ADDR: http://172.20.2.21:8200
+      VAULT_TOKEN: ${VAULT_TOKEN:?VAULT_TOKEN required}
+      VAULT_RENEW_INTERVAL_SECONDS: ${VAULT_RENEW_INTERVAL_SECONDS:-43200}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        while true; do
+          r="$$(curl -sS -m 15 -X POST -H "X-Vault-Token: $$VAULT_TOKEN" "$$VAULT_ADDR/v1/auth/token/renew-self" 2>&1)"
+          d="$$(printf '%s' "$$r" | sed -n 's/.*"lease_duration":\([0-9]*\).*/\1/p')"
+          if [ -n "$$d" ]; then
+            echo "$$(date -u +%FT%TZ) vault token renewed, lease $${d}s (~$$((d / 86400)) days)"
+          else
+            echo "$$(date -u +%FT%TZ) VAULT TOKEN RENEWAL FAILED: $$(printf '%s' "$$r" | head -c 300)"
+          fi
+          sleep "$$VAULT_RENEW_INTERVAL_SECONDS"
+        done
 
   # ------------------------------------------------------------
   # Frontend — stock nginx:alpine, built static assets bind-mounted

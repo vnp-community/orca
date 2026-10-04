@@ -101,9 +101,14 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// cookie, so a foreign page could otherwise open this socket as the user.
 	// With an empty allow-list the library check stays skipped (legacy).
 	if !h.Origins.Allow(r) {
-		h.Logger.WarnContext(r.Context(), "wscompat: ws upgrade rejected, origin not allowed", slog.String("origin", r.Header.Get("Origin")))
-		http.Error(w, "origin not allowed", http.StatusForbidden)
-		return
+		if h.Origins.ReportOnly() {
+			// Why: staged rollout — record who would be blocked without breaking them.
+			h.Logger.WarnContext(r.Context(), "wscompat: ws upgrade would be rejected: origin not in WS_ALLOWED_ORIGINS (report-only mode)", slog.String("origin", r.Header.Get("Origin")))
+		} else {
+			h.Logger.WarnContext(r.Context(), "wscompat: ws upgrade rejected, origin not allowed", slog.String("origin", r.Header.Get("Origin")))
+			http.Error(w, "origin not allowed", http.StatusForbidden)
+			return
+		}
 	}
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{InsecureSkipVerify: true})
 	if err != nil {

@@ -43,7 +43,7 @@ type eventPublishingProcessor struct {
 }
 
 func newEventPublishingProcessor(pub *eventbus.Publisher, serviceName string) *eventPublishingProcessor {
-	return &eventPublishingProcessor{pub: pub, serviceName: serviceName, subject: "orca." + serviceName + ".trace.span"}
+	return &eventPublishingProcessor{pub: pub, serviceName: serviceName, subject: TraceSubject(serviceName)}
 }
 
 func (p *eventPublishingProcessor) OnStart(parent context.Context, s sdktrace.ReadWriteSpan) {}

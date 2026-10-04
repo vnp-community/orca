@@ -159,7 +159,7 @@ deps.TraceBroadcast)` (hoặc tham số tương đương truyền qua `Deps`).
 // api-gateway/cmd/server/main.go, sau khi có cons từ BE-FFT-SOL-002's eventbus.Connect
 broadcast := httpgateway.NewTraceBroadcast() // hoặc constructor export tương đương
 go func() {
-    _ = cons.SubscribeEphemeral(ctx, "TRACE", "orca.*.trace.span", func(ctx context.Context, event eventbus.Event) error {
+    _ = cons.SubscribeEphemeral(ctx, "TRACE", "orca.trace.*.span", func(ctx context.Context, event eventbus.Event) error {
         broadcast.Publish(event.Payload) // event.Payload đã là F40 TraceEvent JSON (BE-FFT-SOL-002)
         return nil
     })
