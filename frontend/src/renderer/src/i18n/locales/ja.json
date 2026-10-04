@@ -705,6 +705,13 @@
       },
       "useLargeTextControlPaste": {
         "pasteTooLarge": "貼り付け内容が大きすぎます。"
+      },
+      "useGenerateAgentPrompt": {
+        "permissionDenied": "すでに生成中です。",
+        "noDevServer": "エージェントのプロンプトを生成できませんでした。",
+        "unsupported": "プロンプトを生成するには、このプロジェクトの開発サーバーを接続してください。",
+        "failed": "このタスクのプロンプトを生成する権限がありません。",
+        "busy": "接続中のランタイムはプロンプト生成をサポートしていません。"
       }
     },
     "components": {
@@ -5331,6 +5338,12 @@
             "defaultViewLabel": "デフォルトのネイティブ チャット ビュー",
             "defaultViewTerminal": "Terminal チャット",
             "defaultViewNative": "ネイティブチャット"
+          },
+          "jiraTaskLink": {
+            "title": "Jira タスク連携",
+            "description": "Jira の Issue からワークスペースを開始すると、その Issue 用のタスクも作成され、タスクの実行時に同じワークツリーが再利用されます。",
+            "copy": "リモートランタイムで Jira から開始したワークスペースに適用されます。タスクは Issue とプロジェクトごとに 1 回だけ作成され、すでに存在する場合は再利用されます。プロジェクトで Issue ステータスの同期が有効な場合、Jira の Issue は非同期で「進行中」に移行します。",
+            "toggleLabel": "Jira タスク連携を切り替える"
           }
         },
         "FloatingWorkspacePane": {
@@ -12739,6 +12752,10 @@
               "chooseSource": "タスクソースを選択"
             }
           }
+        },
+        "GenerateAgentPromptButton": {
+          "confirmReplace": "現在のプロンプトを生成されたものに置き換えますか?",
+          "label": "AI で生成"
         }
       },
       "taskPageEmptyState": {

@@ -705,6 +705,13 @@
       },
       "useLargeTextControlPaste": {
         "pasteTooLarge": "粘贴内容过大。"
+      },
+      "useGenerateAgentPrompt": {
+        "permissionDenied": "正在生成中。",
+        "noDevServer": "无法生成智能体提示词。",
+        "unsupported": "请先为该项目连接开发服务器，再生成提示词。",
+        "failed": "你没有为此任务生成提示词的权限。",
+        "busy": "当前连接的运行时不支持生成提示词。"
       }
     },
     "components": {
@@ -5331,6 +5338,12 @@
             "defaultViewLabel": "默认原生聊天视图",
             "defaultViewTerminal": "终端聊天",
             "defaultViewNative": "原生聊天"
+          },
+          "jiraTaskLink": {
+            "title": "Jira 任务关联",
+            "description": "从 Jira 议题启动工作区时，也会为该议题创建任务，运行该任务时会复用同一个工作树。",
+            "copy": "适用于在远程运行时中从 Jira 启动的工作区。每个议题和项目只创建一次任务；若已存在则直接复用。当项目开启议题状态同步时，Jira 议题会异步变为“进行中”。",
+            "toggleLabel": "切换 Jira 任务关联"
           }
         },
         "FloatingWorkspacePane": {
@@ -12739,6 +12752,10 @@
               "chooseSource": "选择任务来源"
             }
           }
+        },
+        "GenerateAgentPromptButton": {
+          "confirmReplace": "要用生成的提示词替换当前提示词吗？",
+          "label": "使用 AI 生成"
         }
       },
       "taskPageEmptyState": {

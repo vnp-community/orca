@@ -23,7 +23,14 @@ import { callRuntimeRpc } from '../../../runtime/runtime-rpc-client'
 import { toast } from 'sonner'
 const mockRpc = vi.mocked(callRuntimeRpc)
 
-const task = { id: 't1', title: 'T', promptTemplate: '' } as OrcaTask
+// labels/status: the editor derives the spec/approve phase from them.
+const task = {
+  id: 't1',
+  title: 'T',
+  promptTemplate: '',
+  labels: [],
+  status: 'open'
+} as unknown as OrcaTask
 const taskWithPrompt = { ...task, promptTemplate: 'my text' } as OrcaTask
 // happy-dom has no window.confirm to spy on, so install a stub.
 function mockConfirm(answer: boolean) {

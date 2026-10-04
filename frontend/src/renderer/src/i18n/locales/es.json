@@ -705,6 +705,13 @@
       },
       "useLargeTextControlPaste": {
         "pasteTooLarge": "El contenido pegado es demasiado grande."
+      },
+      "useGenerateAgentPrompt": {
+        "permissionDenied": "Ya se está generando.",
+        "noDevServer": "No se pudo generar el prompt del agente.",
+        "unsupported": "Conecta un servidor de desarrollo para este proyecto para generar un prompt.",
+        "failed": "No tienes permiso para generar un prompt para esta tarea.",
+        "busy": "El host conectado no admite la generación de prompts."
       }
     },
     "components": {
@@ -5346,6 +5353,12 @@
             "defaultViewLabel": "Vista predeterminada de chat nativo",
             "defaultViewTerminal": "Chat en terminal",
             "defaultViewNative": "Chat nativo"
+          },
+          "jiraTaskLink": {
+            "title": "Vínculo de tarea de Jira",
+            "description": "Al iniciar un espacio de trabajo desde un issue de Jira, también se crea una tarea para ese issue, de modo que al ejecutar la tarea se reutiliza el mismo worktree.",
+            "copy": "Se aplica a los espacios de trabajo iniciados desde Jira en un host remoto. La tarea se crea una sola vez por issue y proyecto; si ya existe, se reutiliza. El issue de Jira pasa a En curso de forma asíncrona cuando el proyecto tiene activada la sincronización del estado de los issues.",
+            "toggleLabel": "Alternar vínculo de tarea de Jira"
           }
         },
         "FloatingWorkspacePane": {
@@ -12739,6 +12752,10 @@
               "chooseSource": "Elige el origen de tareas"
             }
           }
+        },
+        "GenerateAgentPromptButton": {
+          "confirmReplace": "¿Reemplazar el prompt actual por el generado?",
+          "label": "Generar con IA"
         }
       },
       "taskPageEmptyState": {

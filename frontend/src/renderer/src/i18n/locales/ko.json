@@ -705,6 +705,13 @@
       },
       "useLargeTextControlPaste": {
         "pasteTooLarge": "붙여넣기 내용이 너무 큽니다."
+      },
+      "useGenerateAgentPrompt": {
+        "permissionDenied": "이미 생성 중입니다.",
+        "noDevServer": "에이전트 프롬프트를 생성하지 못했습니다.",
+        "unsupported": "프롬프트를 생성하려면 이 프로젝트에 개발 서버를 연결하세요.",
+        "failed": "이 작업에 대한 프롬프트를 생성할 권한이 없습니다.",
+        "busy": "연결된 런타임이 프롬프트 생성을 지원하지 않습니다."
       }
     },
     "components": {
@@ -5331,6 +5338,12 @@
             "defaultViewLabel": "기본 기본 채팅 보기",
             "defaultViewTerminal": "Terminal 채팅",
             "defaultViewNative": "네이티브 채팅"
+          },
+          "jiraTaskLink": {
+            "title": "Jira 작업 연결",
+            "description": "Jira 이슈에서 워크스페이스를 시작하면 해당 이슈의 작업도 함께 생성되어, 작업을 실행할 때 같은 워크트리를 재사용합니다.",
+            "copy": "원격 런타임에서 Jira로 시작한 워크스페이스에 적용됩니다. 작업은 이슈와 프로젝트마다 한 번만 생성되며, 이미 있으면 재사용합니다. 프로젝트에서 이슈 상태 동기화가 켜져 있으면 Jira 이슈가 비동기로 '진행중'으로 이동합니다.",
+            "toggleLabel": "Jira 작업 연결 전환"
           }
         },
         "FloatingWorkspacePane": {
@@ -12739,6 +12752,10 @@
               "chooseSource": "작업 소스 선택"
             }
           }
+        },
+        "GenerateAgentPromptButton": {
+          "confirmReplace": "현재 프롬프트를 생성된 프롬프트로 바꾸시겠습니까?",
+          "label": "AI로 생성"
         }
       },
       "taskPageEmptyState": {

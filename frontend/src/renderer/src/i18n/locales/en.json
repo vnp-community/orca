@@ -705,6 +705,13 @@
       },
       "useLargeTextControlPaste": {
         "pasteTooLarge": "Paste is too large."
+      },
+      "useGenerateAgentPrompt": {
+        "permissionDenied": "You do not have permission to generate a prompt for this task.",
+        "noDevServer": "Connect a dev server for this project to generate a prompt.",
+        "unsupported": "Prompt generation is not supported by the connected runtime.",
+        "failed": "Failed to generate the agent prompt.",
+        "busy": "Already generating."
       }
     },
     "components": {
@@ -5346,6 +5353,12 @@
             "defaultViewLabel": "Default native chat view",
             "defaultViewTerminal": "Terminal chat",
             "defaultViewNative": "Native chat"
+          },
+          "jiraTaskLink": {
+            "title": "Jira task link",
+            "description": "Starting a workspace from a Jira issue also creates a task for that issue, so running the task reuses the same worktree.",
+            "copy": "Applies to workspaces started from Jira on a remote runtime. The task is created once per issue and project; if it already exists it is reused. The Jira issue moves to In Progress asynchronously when the project has issue status sync on.",
+            "toggleLabel": "Toggle Jira task link"
           }
         },
         "FloatingWorkspacePane": {
@@ -12739,6 +12752,10 @@
               "chooseSource": "Choose task source"
             }
           }
+        },
+        "GenerateAgentPromptButton": {
+          "confirmReplace": "Replace the current prompt with the generated one?",
+          "label": "Generate with AI"
         }
       },
       "taskPageEmptyState": {
