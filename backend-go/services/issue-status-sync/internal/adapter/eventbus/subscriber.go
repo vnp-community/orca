@@ -10,6 +10,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
+	"strings"
 
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/services/issue-status-sync/internal/domain"
@@ -88,7 +89,7 @@ func (s *Subscriber) Run(ctx context.Context) error {
 	for _, sub := range subs {
 		stream, subject, handle := sub.stream, sub.subject, sub.handle
 		go func() {
-			if err := s.consumer.Subscribe(ctx, stream, consumerName+"-"+subject, subject, handle); err != nil {
+			if err := s.consumer.Subscribe(ctx, stream, durableName(subject), subject, handle); err != nil {
 				errCh <- fmt.Errorf("subscribing to %s: %w", subject, err)
 			}
 		}()
@@ -135,4 +136,10 @@ func (s *Subscriber) handlePullRequestEvent(merged bool) eventbus.Handler {
 		}
 		return s.sync.HandlePullRequestLifecycle(ctx, ev)
 	}
+}
+
+// durableName derives a JetStream-legal durable name: NATS rejects '.', '*', '>'
+// and whitespace in consumer names, and subjects are dotted.
+func durableName(subject string) string {
+	return consumerName + "-" + strings.ReplaceAll(subject, ".", "-")
 }
