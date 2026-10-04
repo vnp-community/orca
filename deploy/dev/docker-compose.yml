@@ -442,6 +442,7 @@ services:
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/credential?sslmode=disable
     depends_on:
       postgres: { condition: service_healthy }
+      nats: { condition: service_healthy } # outbox relay connects once at startup
 
   # 2 services with no database:
   #

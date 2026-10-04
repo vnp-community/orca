@@ -69,7 +69,13 @@ func (uc *RotateCredential) Execute(ctx context.Context, in RotateCredentialInpu
 		if err := metadataRepo.UpdateStatus(ctx, metadata.ID, domain.StatusActive, now); err != nil {
 			return apperrors.New(apperrors.KindInternal, "CREDENTIAL_UPDATE_FAILED", "failed to update credential status after rotation", err)
 		}
-		return appendAudit(ctx, auditRepo, metadata.ID, in.RequestingService, domain.ActionRotate, now)
+		if err := appendAudit(ctx, auditRepo, metadata.ID, in.RequestingService, domain.ActionRotate, now); err != nil {
+			return err
+		}
+		if err := enqueueCredentialRotated(ctx, auditRepo, metadata, now); err != nil {
+			return apperrors.New(apperrors.KindInternal, "CREDENTIAL_EVENT_ENQUEUE_FAILED", "failed to enqueue credential rotated event", err)
+		}
+		return nil
 	}); err != nil {
 		return domain.CredentialMetadata{}, err
 	}

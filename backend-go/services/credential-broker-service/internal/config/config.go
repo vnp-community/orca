@@ -22,6 +22,8 @@ type Config struct {
 	// doesn't exist, which is what local dev and this scaffold's
 	// testcontainers path use instead.
 	DatabaseCredentialsFile string
+	// NATSURL targets the outbox relay (credential.rotated events).
+	NATSURL string
 }
 
 func Load() (Config, error) {
@@ -32,5 +34,6 @@ func Load() (Config, error) {
 	return Config{
 		Base:                    base,
 		DatabaseCredentialsFile: commonconfig.StringEnv("DATABASE_CREDENTIALS_FILE", "/vault/secrets/database-credentials"),
+		NATSURL:                 commonconfig.StringEnv("NATS_URL", "nats://localhost:4222"),
 	}, nil
 }

@@ -20,6 +20,7 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -29,9 +30,11 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/stablyai/orca-go/common/dbcapability"
+	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
+	"github.com/stablyai/orca-go/common/outbox"
 	"github.com/stablyai/orca-go/common/secrets"
 	"github.com/stablyai/orca-go/common/tracing"
 
@@ -68,7 +71,18 @@ func run() error {
 	logger := logging.New(cfg.ServiceName, version)
 	slog.SetDefault(logger)
 
-	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
+	// NATS is optional: credential events queue in the outbox until it is reachable at a later start.
+	pub, _, closeBus, err := eventbus.Connect(ctx, cfg.NATSURL)
+	if err != nil {
+		logger.WarnContext(ctx, "eventbus unavailable, credential events will queue in the outbox", slog.Any("error", err))
+	} else {
+		defer func() { _ = closeBus() }()
+		if err := pub.EnsureStream(ctx, tracing.TraceStreamName, []string{tracing.TraceStreamSubjects}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure TRACE jetstream stream", slog.Any("error", err))
+		}
+	}
+
+	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint, tracing.WithTraceEventPublisher(pub))
 	if err != nil {
 		return fmt.Errorf("initializing tracing: %w", err)
 	}
@@ -103,6 +117,7 @@ func run() error {
 		usecase.CredentialMetadataRepository
 		usecase.AuditRepository
 		usecase.TxRunner
+		outbox.Store
 	}
 	switch caps.Dialect {
 	case dbcapability.DialectPostgres:
@@ -136,6 +151,22 @@ func run() error {
 	default:
 		return fmt.Errorf("unsupported database dialect: %s", caps.Dialect)
 	}
+
+	// Relay for the transactional outbox (credential.rotated -> notification-service).
+	var relayWG sync.WaitGroup
+	if pub != nil {
+		if err := pub.EnsureStream(ctx, "CREDENTIAL", []string{"orca.credential.>"}); err != nil {
+			logger.WarnContext(ctx, "failed to ensure CREDENTIAL jetstream stream", slog.Any("error", err))
+		} else {
+			relay := outbox.NewRelay(repo, pub, outbox.DefaultConfig, logger)
+			relayWG.Add(1)
+			go func() {
+				defer relayWG.Done()
+				relay.Run(ctx)
+			}()
+		}
+	}
+	defer relayWG.Wait()
 
 	// Real Vault wiring — see this file's package doc comment and
 	// internal/adapter/vault's doc comment. secrets.NewClient() reads
