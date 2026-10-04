@@ -10,7 +10,9 @@ package eventbus
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/nats-io/nats.go"
@@ -124,7 +126,7 @@ type Handler func(ctx context.Context, event Event) error
 // fan-out to replica-local in-process state) — use SubscribeEphemeral for
 // that case instead.
 func (c *Consumer) Subscribe(ctx context.Context, streamName, consumerName, subject string, fn Handler) error {
-	stream, err := c.js.Stream(ctx, streamName)
+	stream, err := c.awaitStream(ctx, streamName)
 	if err != nil {
 		return fmt.Errorf("eventbus: looking up stream %s: %w", streamName, err)
 	}
@@ -137,6 +139,35 @@ func (c *Consumer) Subscribe(ctx context.Context, streamName, consumerName, subj
 		return fmt.Errorf("eventbus: creating consumer %s: %w", consumerName, err)
 	}
 	return consumeUntilDone(ctx, cons, fn)
+}
+
+// Streams are created by their publisher at its own startup, so a consumer that
+// boots first (or whose publisher is deployed later) finds no stream. Waiting
+// beats giving up: a one-shot lookup left the subscription dead until restart.
+var (
+	streamWaitInitial = 2 * time.Second
+	streamWaitMax     = 30 * time.Second
+)
+
+// awaitStream returns the stream, retrying with capped backoff while it does not
+// exist yet. Any other error, or ctx ending, is returned as is.
+func (c *Consumer) awaitStream(ctx context.Context, name string) (jetstream.Stream, error) {
+	wait := streamWaitInitial
+	for attempt := 0; ; attempt++ {
+		stream, err := c.js.Stream(ctx, name)
+		if err == nil || !errors.Is(err, jetstream.ErrStreamNotFound) {
+			return stream, err
+		}
+		if attempt == 0 {
+			slog.Warn("eventbus: stream not found yet, waiting for its publisher to create it", "stream", name)
+		}
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-time.After(wait):
+		}
+		wait = min(wait*2, streamWaitMax)
+	}
 }
 
 // ephemeralInactiveThreshold bounds how long an ephemeral consumer with no
@@ -163,7 +194,7 @@ const ephemeralInactiveThreshold = 5 * time.Minute
 // for signals that are naturally self-healing or non-critical if missed
 // (never for a domain-of-record event, which must use Subscribe).
 func (c *Consumer) SubscribeEphemeral(ctx context.Context, streamName, subject string, fn Handler) error {
-	stream, err := c.js.Stream(ctx, streamName)
+	stream, err := c.awaitStream(ctx, streamName)
 	if err != nil {
 		return fmt.Errorf("eventbus: looking up stream %s: %w", streamName, err)
 	}

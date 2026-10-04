@@ -26,15 +26,17 @@ type SubjectBinding struct {
 }
 
 // Subjects maps BL-AT-03's 5 event names to real (or planned) subjects.
-// worktree:created, pr:merged, and issue:assigned have no publisher yet —
-// see SOL-AT-03's "Cross-service work needed" section; subscribing here is
-// safe regardless (no events arrive until those publishers exist).
+// worktree:created and issue:assigned have no publisher yet — see SOL-AT-03's
+// "Cross-service work needed" section; subscribing here is safe regardless (no
+// events arrive until those publishers exist). scm-integration-service publishes
+// to stream "SCM" as orca.scm.* (not "SCMINTEGRATION"/orca.scmintegration.*,
+// which never existed and left these two subscriptions dead).
 var Subjects = []SubjectBinding{
 	{StreamName: "TASK", Subject: "orca.task.task.completed"},
 	{StreamName: "TASK", Subject: "orca.task.task.failed"},
 	{StreamName: "PROJECT", Subject: "orca.project.worktree.created"},
-	{StreamName: "SCMINTEGRATION", Subject: "orca.scmintegration.pull_request.merged"},
-	{StreamName: "SCMINTEGRATION", Subject: "orca.scmintegration.issue.assigned"},
+	{StreamName: "SCM", Subject: "orca.scm.pull_request.merged"},
+	{StreamName: "SCM", Subject: "orca.scm.issue.assigned"},
 }
 
 // subjectToEventName maps a subject exhaustively over the 5 documented
@@ -49,9 +51,9 @@ func subjectToEventName(subject string) domain.EventName {
 		return domain.EventAgentError
 	case "orca.project.worktree.created":
 		return domain.EventWorktreeCreated
-	case "orca.scmintegration.pull_request.merged":
+	case "orca.scm.pull_request.merged":
 		return domain.EventPRMerged
-	case "orca.scmintegration.issue.assigned":
+	case "orca.scm.issue.assigned":
 		return domain.EventIssueAssigned
 	default:
 		panic("eventbus: unmapped subject " + subject)
