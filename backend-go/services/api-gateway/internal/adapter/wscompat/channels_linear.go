@@ -83,6 +83,11 @@ func toLinearIssueView(i *issuetrackingv1.Issue) linearIssueView {
 		Description: i.GetDescriptionMarkdown(), URL: i.GetUrl(),
 		Labels: i.GetLabels(), State: linearStateView{Name: i.GetState()},
 	}
+	// BUG-018: same nil-slice-encodes-as-null fix as toJiraIssueView — see
+	// that function's comment.
+	if v.Labels == nil {
+		v.Labels = []string{}
+	}
 	if p := i.GetProject(); p != nil {
 		v.Team = &linearTeamRefView{ID: p.GetId(), Key: p.GetKey(), Name: p.GetName()}
 	}

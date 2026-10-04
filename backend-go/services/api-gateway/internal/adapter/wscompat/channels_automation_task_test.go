@@ -381,6 +381,8 @@ type fakeTaskServiceClient struct {
 	addEdgeFunc             func(ctx context.Context, in *taskv1.AddEdgeRequest) (*taskv1.AddEdgeResponse, error)
 	grantFunc               func(ctx context.Context, in *taskv1.GrantRequest) (*taskv1.GrantResponse, error)
 	resolvePermissionFunc   func(ctx context.Context, in *taskv1.ResolvePermissionRequest) (*taskv1.ResolvePermissionResponse, error)
+	addCommentFunc          func(ctx context.Context, in *taskv1.AddCommentRequest) (*taskv1.AddCommentResponse, error)
+	listCommentsFunc        func(ctx context.Context, in *taskv1.ListCommentsRequest) (*taskv1.ListCommentsResponse, error)
 
 	lastHasActiveExecutionsRequest *taskv1.HasActiveExecutionsRequest
 }
@@ -441,6 +443,14 @@ func (f *fakeTaskServiceClient) ResolvePermission(ctx context.Context, in *taskv
 	return f.resolvePermissionFunc(ctx, in)
 }
 
+func (f *fakeTaskServiceClient) AddComment(ctx context.Context, in *taskv1.AddCommentRequest, _ ...grpc.CallOption) (*taskv1.AddCommentResponse, error) {
+	return f.addCommentFunc(ctx, in)
+}
+
+func (f *fakeTaskServiceClient) ListComments(ctx context.Context, in *taskv1.ListCommentsRequest, _ ...grpc.CallOption) (*taskv1.ListCommentsResponse, error) {
+	return f.listCommentsFunc(ctx, in)
+}
+
 // TestTaskCreateGetChannels_StillRegistered guards the "keep, don't
 // remove" decision (TASK-222) against a future contributor treating
 // BUG-034's dead-code finding as license to delete these two channels —
@@ -462,6 +472,216 @@ func TestTaskCreateGetChannels_StillRegistered(t *testing.T) {
 	}
 	if _, err := r.Dispatch(context.Background(), Identity{}, "task.get", argsJSON(t, map[string]any{"id": "t1"})); err != nil {
 		t.Errorf("expected task.get to remain registered: %v", err)
+	}
+}
+
+// TestTaskGetChannel_MapsToCamelCaseView is BUG-023's regression test —
+// returning *taskv1.Task directly ships snake_case keys (promptTemplate,
+// aiContext, taskNumber, prUrl, workflowTemplateId all lost).
+func TestTaskGetChannel_MapsToCamelCaseView(t *testing.T) {
+	r := NewRegistry()
+	registerTaskChannels(r, &fakeTaskServiceClient{
+		getTaskFunc: func(ctx context.Context, in *taskv1.GetTaskRequest) (*taskv1.GetTaskResponse, error) {
+			return &taskv1.GetTaskResponse{Task: &taskv1.Task{
+				Id: "t1", PromptTemplate: "do the thing", AiContext: "ctx",
+				TaskNumber: 42, PrUrl: "https://example.com/pr/1",
+				WorkflowTemplateId: "wf-1", Labels: []string{"phase:spec-review"},
+			}}, nil
+		},
+	})
+	result, err := r.Dispatch(context.Background(), Identity{}, "task.get", argsJSON(t, map[string]any{"id": "t1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	view, ok := result.(taskView)
+	if !ok {
+		t.Fatalf("result = %#v (%T), want taskView", result, result)
+	}
+	if view.PromptTemplate != "do the thing" || view.AIContext != "ctx" || view.TaskNumber != 42 ||
+		view.PRURL != "https://example.com/pr/1" || view.WorkflowTemplateID != "wf-1" ||
+		len(view.Labels) != 1 || view.Labels[0] != "phase:spec-review" {
+		t.Errorf("unexpected taskView: %+v", view)
+	}
+	b, err := json.Marshal(view)
+	if err != nil {
+		t.Fatalf("marshal view: %v", err)
+	}
+	var wire map[string]any
+	if err := json.Unmarshal(b, &wire); err != nil {
+		t.Fatalf("unmarshal wire: %v", err)
+	}
+	if _, hasSnake := wire["prompt_template"]; hasSnake {
+		t.Errorf("wire JSON still has snake_case prompt_template: %s", b)
+	}
+	if wire["promptTemplate"] != "do the thing" {
+		t.Errorf("wire JSON missing camelCase promptTemplate: %s", b)
+	}
+}
+
+// TestTaskGetChannel_RootTaskParentIDIsExplicitNull is the regression test
+// for a live bug found while testing BL-TG-05, in 2 stages:
+//  1. A root task (empty ParentId) first marshaled to `"parentId": ""`, but
+//     TaskTreeView.tsx's `t.parentId === parentId` root-level filter starts
+//     from a literal `null` — "" !== null hid every newly created root task
+//     from the Tree view (confirmed live: visible in DAG view, which
+//     doesn't filter by parent, invisible in the default Tree view).
+//  2. Fixing that by adding `omitempty` (dropping the key so it decodes as
+//     `undefined`) was ALSO wrong: `undefined === null` is false too — the
+//     task stayed invisible. Only an explicit `"parentId": null` (a nil
+//     *string, no omitempty) satisfies the strict-equality check.
+func TestTaskGetChannel_RootTaskParentIDIsExplicitNull(t *testing.T) {
+	r := NewRegistry()
+	registerTaskChannels(r, &fakeTaskServiceClient{
+		getTaskFunc: func(ctx context.Context, in *taskv1.GetTaskRequest) (*taskv1.GetTaskResponse, error) {
+			return &taskv1.GetTaskResponse{Task: &taskv1.Task{Id: "t1", ParentId: ""}}, nil
+		},
+	})
+	result, err := r.Dispatch(context.Background(), Identity{}, "task.get", argsJSON(t, map[string]any{"id": "t1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	view, ok := result.(taskView)
+	if !ok {
+		t.Fatalf("result = %#v (%T), want taskView", result, result)
+	}
+	if view.ParentID != nil {
+		t.Errorf("expected a root task's ParentID to be a nil pointer, got %v", *view.ParentID)
+	}
+	b, err := json.Marshal(view)
+	if err != nil {
+		t.Fatalf("marshal view: %v", err)
+	}
+	var wire map[string]any
+	if err := json.Unmarshal(b, &wire); err != nil {
+		t.Fatalf("unmarshal wire: %v", err)
+	}
+	parentID, present := wire["parentId"]
+	if !present {
+		t.Fatalf("root task's parentId must be PRESENT on the wire (as null), got: %s", b)
+	}
+	if parentID != nil {
+		t.Errorf("root task's parentId must be JSON null, got %#v: %s", parentID, b)
+	}
+}
+
+// TestTaskGetChannel_ChildTaskParentIDIsAString covers the non-root side of
+// the same fix — a task WITH a parent must still marshal ParentID as a
+// plain string (not wrapped oddly), so a child lookup by parent id
+// (`t.parentId === task.id`) still matches.
+func TestTaskGetChannel_ChildTaskParentIDIsAString(t *testing.T) {
+	r := NewRegistry()
+	registerTaskChannels(r, &fakeTaskServiceClient{
+		getTaskFunc: func(ctx context.Context, in *taskv1.GetTaskRequest) (*taskv1.GetTaskResponse, error) {
+			return &taskv1.GetTaskResponse{Task: &taskv1.Task{Id: "t2", ParentId: "t1"}}, nil
+		},
+	})
+	result, err := r.Dispatch(context.Background(), Identity{}, "task.get", argsJSON(t, map[string]any{"id": "t2"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	view, ok := result.(taskView)
+	if !ok || view.ParentID == nil || *view.ParentID != "t1" {
+		t.Fatalf("expected ParentID=%q, got %#v", "t1", result)
+	}
+}
+
+// TestTaskUpdateChannel_ThreadsLabels covers BL-TG-05's new labels
+// field-mask: nil (key absent) leaves Task.Labels untouched server-side (not
+// exercisable from this layer directly, but the request must carry no
+// Labels field at all); a present array, even empty, must reach
+// UpdateTaskRequest.Labels as a StringListValue.
+func TestTaskUpdateChannel_ThreadsLabels(t *testing.T) {
+	var gotReq *taskv1.UpdateTaskRequest
+	fake := &fakeTaskServiceClient{
+		updateTaskFunc: func(ctx context.Context, in *taskv1.UpdateTaskRequest) (*taskv1.UpdateTaskResponse, error) {
+			gotReq = in
+			return &taskv1.UpdateTaskResponse{Task: &taskv1.Task{Id: in.GetId(), Labels: in.GetLabels().GetValues()}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerTaskCRUDChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{}, "task.update", argsJSON(t, map[string]any{
+		"id": "t1", "labels": []string{"phase:spec-approved"},
+	}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetLabels() == nil || len(gotReq.GetLabels().GetValues()) != 1 || gotReq.GetLabels().GetValues()[0] != "phase:spec-approved" {
+		t.Errorf("Labels not threaded through: %+v", gotReq.GetLabels())
+	}
+	view, ok := result.(taskView)
+	if !ok || len(view.Labels) != 1 || view.Labels[0] != "phase:spec-approved" {
+		t.Errorf("unexpected result: %#v", result)
+	}
+}
+
+// TestTaskUpdateChannel_OmittedLabelsStaysNil is the field-mask-absence
+// counterpart to the above — no "labels" key sent at all must not
+// construct a StringListValue (which would otherwise read as "replace with
+// empty list" server-side, per UpdateTaskRequest.labels's doc comment).
+func TestTaskUpdateChannel_OmittedLabelsStaysNil(t *testing.T) {
+	var gotReq *taskv1.UpdateTaskRequest
+	fake := &fakeTaskServiceClient{
+		updateTaskFunc: func(ctx context.Context, in *taskv1.UpdateTaskRequest) (*taskv1.UpdateTaskResponse, error) {
+			gotReq = in
+			return &taskv1.UpdateTaskResponse{Task: &taskv1.Task{Id: in.GetId()}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerTaskCRUDChannels(r, fake)
+
+	if _, err := r.Dispatch(context.Background(), Identity{}, "task.update", argsJSON(t, map[string]any{"id": "t1", "status": "review"})); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if gotReq.GetLabels() != nil {
+		t.Errorf("expected Labels to remain nil when omitted, got %v", gotReq.GetLabels())
+	}
+}
+
+// TestTaskAddCommentChannel_MapsToCamelCaseView / TestTaskListCommentsChannel_MapsToCamelCaseView
+// are BUG-023's regression tests for the Comment side (authorId/createdAt).
+func TestTaskAddCommentChannel_MapsToCamelCaseView(t *testing.T) {
+	r := NewRegistry()
+	registerTaskChannels(r, &fakeTaskServiceClient{
+		addCommentFunc: func(ctx context.Context, in *taskv1.AddCommentRequest) (*taskv1.AddCommentResponse, error) {
+			return &taskv1.AddCommentResponse{Id: "c1", AuthorId: "u1", Content: in.GetContent(), CreatedAt: "2026-09-15T00:00:00Z"}, nil
+		},
+	})
+	result, err := r.Dispatch(context.Background(), Identity{}, "task.addComment", argsJSON(t, map[string]any{"taskId": "t1", "content": "looks good"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	view, ok := result.(commentView)
+	if !ok || view.AuthorID != "u1" || view.Content != "looks good" || view.CreatedAt != "2026-09-15T00:00:00Z" {
+		t.Fatalf("unexpected result: %#v", result)
+	}
+}
+
+func TestTaskListCommentsChannel_MapsToCamelCaseView(t *testing.T) {
+	r := NewRegistry()
+	registerTaskChannels(r, &fakeTaskServiceClient{
+		listCommentsFunc: func(ctx context.Context, in *taskv1.ListCommentsRequest) (*taskv1.ListCommentsResponse, error) {
+			return &taskv1.ListCommentsResponse{
+				Comments:      []*taskv1.AddCommentResponse{{Id: "c1", AuthorId: "u1", Content: "hi", CreatedAt: "2026-09-15T00:00:00Z"}},
+				NextPageToken: "tok",
+			}, nil
+		},
+	})
+	result, err := r.Dispatch(context.Background(), Identity{}, "task.listComments", argsJSON(t, map[string]any{"taskId": "t1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("result = %#v, want map[string]any", result)
+	}
+	comments, ok := m["comments"].([]commentView)
+	if !ok || len(comments) != 1 || comments[0].AuthorID != "u1" {
+		t.Fatalf("unexpected comments: %#v", m["comments"])
+	}
+	if m["nextPageToken"] != "tok" {
+		t.Errorf("unexpected nextPageToken: %#v", m["nextPageToken"])
 	}
 }
 
@@ -617,10 +837,18 @@ func TestTaskResolvePermissionChannel_ReturnsLowercaseLevel(t *testing.T) {
 	}
 }
 
+// TestTaskListChannel_Success is BUG-023's regression test for task.list —
+// returning *taskv1.ListTasksResponse directly ships snake_case Task
+// fields (projectId lost as project_id), which silently empties
+// useTasks.ts's `t.projectId === projectId` filter — found live: a freshly
+// created task disappeared from the Tree/Board view.
 func TestTaskListChannel_Success(t *testing.T) {
 	fake := &fakeTaskServiceClient{
 		listTasksFunc: func(ctx context.Context, in *taskv1.ListTasksRequest) (*taskv1.ListTasksResponse, error) {
-			return &taskv1.ListTasksResponse{Tasks: []*taskv1.Task{{Id: "t1"}, {Id: "t2"}}}, nil
+			return &taskv1.ListTasksResponse{
+				Tasks:         []*taskv1.Task{{Id: "t1", ProjectId: "proj-1"}, {Id: "t2", ProjectId: "proj-1"}},
+				NextPageToken: "next",
+			}, nil
 		},
 	}
 	r := NewRegistry()
@@ -630,9 +858,16 @@ func TestTaskListChannel_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	resp, ok := result.(*taskv1.ListTasksResponse)
-	if !ok || len(resp.GetTasks()) != 2 {
-		t.Errorf("unexpected result: %+v", result)
+	m, ok := result.(map[string]any)
+	if !ok {
+		t.Fatalf("result = %#v, want map[string]any", result)
+	}
+	tasks, ok := m["tasks"].([]taskView)
+	if !ok || len(tasks) != 2 || tasks[0].ProjectID != "proj-1" {
+		t.Fatalf("unexpected tasks: %#v", m["tasks"])
+	}
+	if m["nextPageToken"] != "next" {
+		t.Errorf("unexpected nextPageToken: %#v", m["nextPageToken"])
 	}
 }
 

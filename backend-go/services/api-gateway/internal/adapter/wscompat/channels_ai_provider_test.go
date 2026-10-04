@@ -365,7 +365,12 @@ func TestAiProviderResolveChannel_Success(t *testing.T) {
 		resolveProviderFunc: func(ctx context.Context, in *aiproviderv1.ResolveProviderRequest) (*aiproviderv1.ResolveProviderResponse, error) {
 			gotCtx, gotReq = ctx, in
 			return &aiproviderv1.ResolveProviderResponse{
-				Account: &aiproviderv1.ProviderAccount{Id: "acct-9", TenantId: "t1"},
+				Account: &aiproviderv1.ProviderAccount{
+					Id: "acct-9", TenantId: "t1",
+					Type:        aiproviderv1.ProviderType_PROVIDER_TYPE_ANTHROPIC,
+					DevServerId: "ds-1", ModelHint: "claude-opus-4",
+					Models: []string{"claude-opus-4"},
+				},
 			}, nil
 		},
 	}
@@ -380,9 +385,29 @@ func TestAiProviderResolveChannel_Success(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	account, ok := result.(*aiproviderv1.ProviderAccount)
-	if !ok || account.GetId() != "acct-9" {
-		t.Fatalf("result = %#v, want ProviderAccount{Id: acct-9}", result)
+	// BUG-022: must be the camelCase view, never the raw proto (which
+	// serializes snake_case field names and a bare numeric `type`).
+	view, ok := result.(providerAccountView)
+	if !ok {
+		t.Fatalf("result = %#v (%T), want providerAccountView", result, result)
+	}
+	if view.ID != "acct-9" || view.DevServerID != "ds-1" || view.ModelHint != "claude-opus-4" ||
+		view.Type != "anthropic" || len(view.Models) != 1 || view.Models[0] != "claude-opus-4" {
+		t.Errorf("unexpected providerAccountView: %+v", view)
+	}
+	b, err := json.Marshal(view)
+	if err != nil {
+		t.Fatalf("marshal view: %v", err)
+	}
+	var wire map[string]any
+	if err := json.Unmarshal(b, &wire); err != nil {
+		t.Fatalf("unmarshal wire: %v", err)
+	}
+	if _, hasSnake := wire["dev_server_id"]; hasSnake {
+		t.Errorf("wire JSON still has snake_case dev_server_id: %s", b)
+	}
+	if wire["devServerId"] != "ds-1" {
+		t.Errorf("wire JSON missing camelCase devServerId: %s", b)
 	}
 	if gotReq.GetTenantId() != "t1" || gotReq.GetUserId() != "u1" || gotReq.GetProjectId() != "proj-1" ||
 		gotReq.GetDevServerId() != "ds-1" || gotReq.GetModelHint() != "claude-opus" ||

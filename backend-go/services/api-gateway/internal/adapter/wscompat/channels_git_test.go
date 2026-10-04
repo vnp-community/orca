@@ -289,7 +289,7 @@ func TestGitDiffChannel_ThreadsFilePathThrough(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.diff",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "filePath": "a.txt", "staged": true}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "filePath": "a.txt", "staged": true}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestGitCommitChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.commit",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "message": "fix"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "message": "fix"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -334,7 +334,7 @@ func TestGitCheckoutChannel_NoCreateField(t *testing.T) {
 	// Sending a "create" field (the stale TASK-212 sketch's shape) must be
 	// harmlessly ignored — the redesigned args struct has no such field.
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.checkout",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature", "create": true}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "branch": "feature", "create": true}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -355,7 +355,7 @@ func TestGitLocalBranchesChannel_ReturnsUnwrappedBranches(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.localBranches",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -378,7 +378,7 @@ func TestGitFastForwardChannel_ThreadsStructuredPushTarget(t *testing.T) {
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.fastForward",
 		argsJSON(t, map[string]any{
-			"worktreeId": "wt-1",
+			"worktree": "wt-1",
 			"pushTarget": map[string]any{"remoteName": "origin", "branchName": "main"},
 		}))
 	if err != nil {
@@ -401,7 +401,7 @@ func TestGitFastForwardChannel_NilPushTarget_Allowed(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.fastForward",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -423,7 +423,7 @@ func TestGitRebaseFromBaseChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.rebaseFromBase",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "baseBranch": "main"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "baseBranch": "main"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -443,7 +443,7 @@ func TestGitAbortRebaseAndAbortMergeChannels_Success(t *testing.T) {
 
 	for _, channel := range []string{"git.abortRebase", "git.abortMerge"} {
 		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, channel,
-			argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+			argsJSON(t, map[string]any{"worktree": "wt-1"}))
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", channel, err)
 		}
@@ -464,7 +464,7 @@ func TestGitConflictOperationChannel_IsDetectorOnly(t *testing.T) {
 	// Sending path/operation (the stale TASK-212 sketch's shape) must be
 	// harmlessly ignored — the redesigned args struct has no such fields.
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.conflictOperation",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "a.txt", "operation": "ours"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "path": "a.txt", "operation": "ours"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -489,7 +489,7 @@ func TestGitResolveConflictChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.resolveConflict",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "a.txt", "operation": "ours"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "path": "a.txt", "operation": "ours"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -509,7 +509,7 @@ func TestGitResolveConflictChannel_UnsupportedOverRelay_ErrorPassesThrough(t *te
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.resolveConflict",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "a.txt", "operation": "ours"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "path": "a.txt", "operation": "ours"}))
 	if !errors.Is(err, wantErr) {
 		t.Fatalf("expected the FAILED_PRECONDITION error to pass through, got %v", err)
 	}
@@ -528,11 +528,11 @@ func TestGitDiscardAndBulkDiscardChannels_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.discard",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "a.txt"})); err != nil {
+		argsJSON(t, map[string]any{"worktree": "wt-1", "path": "a.txt"})); err != nil {
 		t.Fatalf("git.discard: unexpected error: %v", err)
 	}
 	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.bulkDiscard",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "paths": []string{"a.txt", "b.txt"}})); err != nil {
+		argsJSON(t, map[string]any{"worktree": "wt-1", "paths": []string{"a.txt", "b.txt"}})); err != nil {
 		t.Fatalf("git.bulkDiscard: unexpected error: %v", err)
 	}
 }
@@ -550,7 +550,7 @@ func TestGitStageAndBulkStageChannels_ShareOneHandler(t *testing.T) {
 
 	for _, channel := range []string{"git.stage", "git.bulkStage"} {
 		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, channel,
-			argsJSON(t, map[string]any{"worktreeId": "wt-1", "paths": []string{"a.txt"}}))
+			argsJSON(t, map[string]any{"worktree": "wt-1", "paths": []string{"a.txt"}}))
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", channel, err)
 		}
@@ -573,7 +573,7 @@ func TestGitHistoryChannel_CorrectedShape(t *testing.T) {
 
 	// baseRef (not "ref"), no cursor — matches TASK-209's corrected shape.
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.history",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "baseRef": "main", "limit": 5}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "baseRef": "main", "limit": 5}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -614,12 +614,45 @@ func TestGitPushChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.push",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "remote": "origin", "branch": "main"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "remote": "origin", "branch": "main"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if got.GetRemote() != "origin" || got.GetBranch() != "main" {
 		t.Errorf("unexpected request: %+v", got)
+	}
+}
+
+// TestGitPushChannel_MapsPushTargetShape is BUG-021's regression guard for
+// the reported symptom: the real caller (useGit.ts's push()) sends
+// pushTarget: {remoteName, branchName}, not flat remote/branch — the old
+// handler only decoded flat fields (never populated by any real caller) AND
+// decoded "worktreeId" instead of "worktree" (WorktreeId always empty,
+// tripping GITGATEWAY_MISSING_WORKTREE_ID on every real Sync click).
+func TestGitPushChannel_MapsPushTargetShape(t *testing.T) {
+	var got *gitgatewayv1.PushRequest
+	fake := &fakeGitGatewayClient{
+		pushFunc: func(ctx context.Context, in *gitgatewayv1.PushRequest) (*gitgatewayv1.PushResponse, error) {
+			got = in
+			return &gitgatewayv1.PushResponse{Success: true}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitDeepChannels(r, fake)
+
+	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.push",
+		argsJSON(t, map[string]any{
+			"worktree":   "id:wt-1",
+			"pushTarget": map[string]any{"remoteName": "origin", "branchName": "main"},
+		}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.GetWorktreeId() != "wt-1" {
+		t.Errorf("expected WorktreeId=wt-1 (id: prefix stripped), got %q", got.GetWorktreeId())
+	}
+	if got.GetRemote() != "origin" || got.GetBranch() != "main" {
+		t.Errorf("expected pushTarget mapped to Remote/Branch, got %+v", got)
 	}
 }
 
@@ -635,7 +668,7 @@ func TestGitPullChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.pull",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -654,7 +687,7 @@ func TestGitGenerateCommitMessageChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.generateCommitMessage",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -677,7 +710,7 @@ func TestGitUnstageAndBulkUnstageChannels_ShareOneHandler(t *testing.T) {
 
 	for _, channel := range []string{"git.unstage", "git.bulkUnstage"} {
 		_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, channel,
-			argsJSON(t, map[string]any{"worktreeId": "wt-1", "paths": []string{"a.txt"}}))
+			argsJSON(t, map[string]any{"worktree": "wt-1", "paths": []string{"a.txt"}}))
 		if err != nil {
 			t.Fatalf("%s: unexpected error: %v", channel, err)
 		}
@@ -700,7 +733,7 @@ func TestGitCheckIgnoredChannel_ReturnsUnwrappedIgnoredPaths(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.checkIgnored",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "paths": []string{"node_modules", "README.md"}}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "paths": []string{"node_modules", "README.md"}}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -722,7 +755,7 @@ func TestGitForkSyncChannel_SendsExpectedUpstream(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.forkSync",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "expectedUpstream": "origin/main"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "expectedUpstream": "origin/main"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -744,7 +777,7 @@ func TestGitUpstreamStatusChannel_SendsStructuredPushTarget(t *testing.T) {
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.upstreamStatus",
 		argsJSON(t, map[string]any{
-			"worktreeId": "wt-1",
+			"worktree": "wt-1",
 			"pushTarget": map[string]any{"remoteName": "origin", "branchName": "main"},
 		}))
 	if err != nil {
@@ -767,7 +800,7 @@ func TestGitUpstreamStatusChannel_NilPushTargetOmitsField(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.upstreamStatus",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -788,7 +821,7 @@ func TestGitRemoteCommitUrlChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.remoteCommitUrl",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "sha": "abc"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "sha": "abc"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -813,7 +846,7 @@ func TestGitRemoteFileUrlChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.remoteFileUrl",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "path": "a.txt", "ref": "main"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "path": "a.txt", "ref": "main"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -834,7 +867,7 @@ func TestGitCommitCompareChannel_SendsCommitID(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.commitCompare",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "commitId": "deadbeef"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "commitId": "deadbeef"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -859,7 +892,7 @@ func TestGitBranchCompareChannel_SendsBaseRef(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branchCompare",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "baseRef": "main"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "baseRef": "main"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -882,7 +915,7 @@ func TestGitCommitDiffChannel_SendsRequiredFilePathAndOptionalParentOid(t *testi
 	parentOID := "parent1"
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.commitDiff",
 		argsJSON(t, map[string]any{
-			"worktreeId": "wt-1", "commitOid": "commit1", "parentOid": parentOID, "filePath": "a.txt",
+			"worktree": "wt-1", "commitOid": "commit1", "parentOid": parentOID, "filePath": "a.txt",
 		}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -908,7 +941,7 @@ func TestGitCommitDiffChannel_OmitsParentOidWhenNil(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.commitDiff",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "commitOid": "root-commit", "filePath": "a.txt"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "commitOid": "root-commit", "filePath": "a.txt"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -929,7 +962,7 @@ func TestGitBranchDiffChannel_SendsBaseRefAndRequiredFilePath(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branchDiff",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "baseRef": "main", "filePath": "a.txt"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "baseRef": "main", "filePath": "a.txt"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -950,7 +983,7 @@ func TestGitSubmoduleStatusChannel_SendsSubmodulePathAndArea(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.submoduleStatus",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "submodulePath": "vendor/lib", "area": "staged"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "submodulePath": "vendor/lib", "area": "staged"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -976,7 +1009,7 @@ func TestGitFetchChannel_SendsOptionalPushTarget(t *testing.T) {
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.fetch",
 		argsJSON(t, map[string]any{
-			"worktreeId": "wt-1",
+			"worktree": "wt-1",
 			"pushTarget": map[string]any{"remoteName": "origin"},
 		}))
 	if err != nil {
@@ -999,7 +1032,7 @@ func TestGitFetchChannel_NilPushTargetOmitsField(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.fetch",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1020,7 +1053,7 @@ func TestGitGeneratePullRequestFieldsChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.generatePullRequestFields",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "baseBranch": "main"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "baseBranch": "main"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1509,7 +1542,8 @@ func TestFilesCopyChannel_KnownGapErrorPassesThrough(t *testing.T) {
 // never "worktreeId". The old handler decoded "worktreeId", so WorktreeId
 // was always empty and every real call tripped git-gateway-service's
 // GITGATEWAY_MISSING_WORKTREE_ID guard (confirmed live, repeating in
-// git-gateway-service's logs).
+// git-gateway-service's logs). BUG-021 later found ~40 other git.* handlers
+// shared this exact same bug — see that bug's file for the full audit.
 func TestGitStatusChannel_DecodesWorktreeSelector(t *testing.T) {
 	var gotReq *gitgatewayv1.GetStatusRequest
 	fake := &fakeGitGatewayClient{
@@ -1531,6 +1565,50 @@ func TestGitStatusChannel_DecodesWorktreeSelector(t *testing.T) {
 	}
 }
 
+// TestGitStatusChannel_MapsToFrontendShape is BUG-020's regression guard:
+// the handler used to return the raw gitgatewayv1.GetStatusResponse proto
+// (field names "files"/"state", no "entries" at all) — useGit.ts's
+// `for (const entry of status.entries)` crashed the whole Git tab with
+// "entries is not iterable" the moment GetStatus ever actually succeeded
+// (SOL-013/014 fixed the underlying dispatch bug that had masked this one).
+func TestGitStatusChannel_MapsToFrontendShape(t *testing.T) {
+	fake := &fakeGitGatewayClient{
+		getStatusFunc: func(_ context.Context, in *gitgatewayv1.GetStatusRequest) (*gitgatewayv1.GetStatusResponse, error) {
+			return &gitgatewayv1.GetStatusResponse{
+				Branch: "main",
+				Files: []*gitgatewayv1.FileStatus{
+					{Path: "a.txt", State: "modified"},
+					{Path: "b.txt", State: "untracked"},
+				},
+			}, nil
+		},
+	}
+	r := NewRegistry()
+	registerGitChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.status",
+		argsJSON(t, map[string]any{"worktree": "id:wt-1"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	view, ok := result.(gitStatusResultView)
+	if !ok {
+		t.Fatalf("expected a gitStatusResultView (frontend-shaped), got %T", result)
+	}
+	if view.Branch != "main" {
+		t.Errorf("expected Branch=main, got %q", view.Branch)
+	}
+	if len(view.Entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d: %+v", len(view.Entries), view.Entries)
+	}
+	if view.Entries[0].Path != "a.txt" || view.Entries[0].Status != "modified" || view.Entries[0].Area != "unstaged" {
+		t.Errorf("unexpected first entry: %+v", view.Entries[0])
+	}
+	if view.Entries[1].Path != "b.txt" || view.Entries[1].Status != "untracked" {
+		t.Errorf("unexpected second entry: %+v", view.Entries[1])
+	}
+}
+
 // ── TASK-032: git.cancelGenerateCommitMessage / cancelGeneratePullRequestFields ──
 
 func TestGitCancelGenerateCommitMessage_CancelsInFlightCall(t *testing.T) {
@@ -1547,12 +1625,12 @@ func TestGitCancelGenerateCommitMessage_CancelsInFlightCall(t *testing.T) {
 
 	errCh := make(chan error, 1)
 	go func() {
-		_, err := r.Dispatch(context.Background(), Identity{}, "git.generateCommitMessage", argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		_, err := r.Dispatch(context.Background(), Identity{}, "git.generateCommitMessage", argsJSON(t, map[string]any{"worktree": "wt-1"}))
 		errCh <- err
 	}()
 	<-started
 
-	_, err := r.Dispatch(context.Background(), Identity{}, "git.cancelGenerateCommitMessage", argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	_, err := r.Dispatch(context.Background(), Identity{}, "git.cancelGenerateCommitMessage", argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	if err != nil {
 		t.Fatalf("unexpected error from cancel: %v", err)
 	}
@@ -1562,7 +1640,7 @@ func TestGitCancelGenerateCommitMessage_CancelsInFlightCall(t *testing.T) {
 	}
 
 	// A second cancel for the same, now-finished worktree must be a clean no-op.
-	_, err = r.Dispatch(context.Background(), Identity{}, "git.cancelGenerateCommitMessage", argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	_, err = r.Dispatch(context.Background(), Identity{}, "git.cancelGenerateCommitMessage", argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	if err != nil {
 		t.Fatalf("second cancel: unexpected error: %v", err)
 	}
@@ -1572,7 +1650,7 @@ func TestGitCancelGenerateCommitMessage_NoInFlightCallIsCleanNoOp(t *testing.T) 
 	r := NewRegistry()
 	registerGitDeepChannels(r, &fakeGitGatewayClient{})
 
-	_, err := r.Dispatch(context.Background(), Identity{}, "git.cancelGenerateCommitMessage", argsJSON(t, map[string]any{"worktreeId": "no-such-worktree"}))
+	_, err := r.Dispatch(context.Background(), Identity{}, "git.cancelGenerateCommitMessage", argsJSON(t, map[string]any{"worktree": "no-such-worktree"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1592,12 +1670,12 @@ func TestGitCancelGeneratePullRequestFields_DoesNotCancelCommitMessage(t *testin
 	r := NewRegistry()
 	registerGitDeepChannels(r, fake)
 
-	go r.Dispatch(context.Background(), Identity{}, "git.generateCommitMessage", argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	go r.Dispatch(context.Background(), Identity{}, "git.generateCommitMessage", argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	<-commitStarted
 
 	// Cancelling pullRequestFields for the SAME worktree must not touch the
 	// independent commitMessage in-flight call.
-	_, _ = r.Dispatch(context.Background(), Identity{}, "git.cancelGeneratePullRequestFields", argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	_, _ = r.Dispatch(context.Background(), Identity{}, "git.cancelGeneratePullRequestFields", argsJSON(t, map[string]any{"worktree": "wt-1"}))
 
 	select {
 	case ctx := <-commitCtx:
@@ -1624,7 +1702,7 @@ func TestGitMergeChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.merge",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature", "noFf": true}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "branch": "feature", "noFf": true}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1648,7 +1726,7 @@ func TestGitMergeChannel_FailedPreconditionSurfacesUnmodified(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.merge",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "branch": "feature"}))
 	st, ok := status.FromError(err)
 	if !ok || st.Code() != codes.FailedPrecondition {
 		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
@@ -1667,7 +1745,7 @@ func TestGitStashPushChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.stash.push",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "message": "wip", "includeUntracked": true}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "message": "wip", "includeUntracked": true}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1691,7 +1769,7 @@ func TestGitStashPushChannel_FailedPreconditionSurfacesUnmodified(t *testing.T) 
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.stash.push",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	st, ok := status.FromError(err)
 	if !ok || st.Code() != codes.FailedPrecondition {
 		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
@@ -1710,7 +1788,7 @@ func TestGitStashPopChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.stash.pop",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "stashRef": "stash@{0}"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "stashRef": "stash@{0}"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1734,7 +1812,7 @@ func TestGitStashPopChannel_FailedPreconditionSurfacesUnmodified(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.stash.pop",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	st, ok := status.FromError(err)
 	if !ok || st.Code() != codes.FailedPrecondition {
 		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
@@ -1753,7 +1831,7 @@ func TestGitBranchCreateChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branch.create",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature", "baseRef": "main", "checkout": true}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "branch": "feature", "baseRef": "main", "checkout": true}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1777,7 +1855,7 @@ func TestGitBranchCreateChannel_FailedPreconditionSurfacesUnmodified(t *testing.
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branch.create",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "branch": "feature"}))
 	st, ok := status.FromError(err)
 	if !ok || st.Code() != codes.FailedPrecondition {
 		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
@@ -1796,7 +1874,7 @@ func TestGitBranchDeleteChannel_Success(t *testing.T) {
 	registerGitDeepChannels(r, fake)
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branch.delete",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "branch": "feature"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1820,7 +1898,7 @@ func TestGitBranchDeleteChannel_FailedPreconditionSurfacesUnmodified(t *testing.
 	registerGitDeepChannels(r, fake)
 
 	_, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "git.branch.delete",
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "branch": "feature"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "branch": "feature"}))
 	st, ok := status.FromError(err)
 	if !ok || st.Code() != codes.FailedPrecondition {
 		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
@@ -1849,7 +1927,7 @@ func TestGitPushProgressChannel_DeliversFramesAndFinalOutcome(t *testing.T) {
 		t.Fatal("expected git.push.progress to be registered")
 	}
 	events, err := sh(context.Background(), Identity{TenantID: "t1"},
-		argsJSON(t, map[string]any{"worktreeId": "wt-1", "remote": "origin", "branch": "main"}))
+		argsJSON(t, map[string]any{"worktree": "wt-1", "remote": "origin", "branch": "main"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -1900,7 +1978,7 @@ func TestGitPushProgressChannel_OpenErrorSurfacesUnmodified(t *testing.T) {
 	if !ok {
 		t.Fatal("expected git.push.progress to be registered")
 	}
-	_, err := sh(context.Background(), Identity{TenantID: "t1"}, argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	_, err := sh(context.Background(), Identity{TenantID: "t1"}, argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	st, ok := status.FromError(err)
 	if !ok || st.Code() != codes.FailedPrecondition {
 		t.Fatalf("want an unmodified codes.FailedPrecondition status, got %v", err)
@@ -1926,7 +2004,7 @@ func TestGitPullProgressChannel_DeliversFramesAndFinalOutcome(t *testing.T) {
 	if !ok {
 		t.Fatal("expected git.pull.progress to be registered")
 	}
-	events, err := sh(context.Background(), Identity{TenantID: "t1"}, argsJSON(t, map[string]any{"worktreeId": "wt-1"}))
+	events, err := sh(context.Background(), Identity{TenantID: "t1"}, argsJSON(t, map[string]any{"worktree": "wt-1"}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

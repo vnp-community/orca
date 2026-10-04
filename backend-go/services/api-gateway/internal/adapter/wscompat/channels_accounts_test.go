@@ -84,6 +84,50 @@ func TestAccountsChannels_RelaySuccess(t *testing.T) {
 	}
 }
 
+// TestAccountsChannels_NullAccountId_RelaysAsJSONNull is the regression test
+// for BUG-009's confirmed root cause: selecting "System default" sends
+// accountId: null from the frontend (see selectClaudeProviderAccount's
+// `selection.accountId`, ProviderAccountSelection's null case) — the agent's
+// own parseSelectAccountId (agent/src/relay/accounts-handler.ts) explicitly
+// treats JSON null as valid ("deselect"), but rejects "" as
+// AgentErrorCode.InvalidParams "accountId is required". Before AccountID was
+// *string, this handler silently collapsed null into the Go zero value ""
+// and relayed that, corrupting a valid deselect into an always-rejected
+// request — live-confirmed via SOL-009's cause-logging fix.
+func TestAccountsChannels_NullAccountId_RelaysAsJSONNull(t *testing.T) {
+	cases := []string{"accounts.selectClaude", "accounts.selectCodex"}
+	for _, channel := range cases {
+		t.Run(channel, func(t *testing.T) {
+			var gotReq *infrafleetv1.RelayByDevServerRequest
+			fake := &fakeAccountsRelayClient{
+				relayByDevServerFunc: func(_ context.Context, in *infrafleetv1.RelayByDevServerRequest) (*infrafleetv1.RelayResponse, error) {
+					gotReq = in
+					return &infrafleetv1.RelayResponse{ResultJson: `{"ok":true}`}, nil
+				},
+			}
+			r := NewRegistry()
+			registerAccountsChannels(r, fake)
+
+			args := argsJSON(t, map[string]any{"accountId": nil, "connectionId": "ds-1"})
+			if _, err := r.Dispatch(context.Background(), Identity{TenantID: "t1", UserID: "u1"}, channel, args); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			var params map[string]any
+			if err := json.Unmarshal([]byte(gotReq.GetParamsJson()), &params); err != nil {
+				t.Fatalf("params_json not valid JSON: %v", err)
+			}
+			accountID, present := params["accountId"]
+			if !present {
+				t.Fatal("expected params to have an \"accountId\" key at all (agent's parseSelectAccountId treats a missing key as invalid, distinct from null)")
+			}
+			if accountID != nil {
+				t.Errorf(`relayed accountId = %#v, want JSON null (got the "" zero-value collapse this test guards against)`, accountID)
+			}
+		})
+	}
+}
+
 func TestAccountsChannels_MissingConnectionID_FailsFastWithoutCallingRelay(t *testing.T) {
 	called := false
 	fake := &fakeAccountsRelayClient{

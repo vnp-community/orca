@@ -38,7 +38,7 @@ import (
 // same field-name convention the generate calls' own genArgs/genPRFieldsArgs
 // already use.
 type cancelGenerateArgs struct {
-	WorktreeID string `json:"worktreeId"`
+	WorktreeID string `json:"worktree"`
 }
 
 // registerGitDeepChannels wires every git.* channel this scope's tasks
@@ -59,7 +59,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.commit", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type commitArgs struct {
-			WorktreeID string   `json:"worktreeId"`
+			WorktreeID string   `json:"worktree"`
 			Message    string   `json:"message"`
 			Paths      []string `json:"paths"`
 		}
@@ -68,7 +68,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.Commit(ctx, &gitgatewayv1.CommitRequest{
-			WorktreeId: in.WorktreeID, Message: in.Message, Paths: in.Paths,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Message: in.Message, Paths: in.Paths,
 		})
 		if err != nil {
 			return nil, err
@@ -77,17 +77,33 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 	})
 
 	r.Register("git.push", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
+		// BUG-021: the real caller (useGit.ts's push()) sends
+		// pushTarget: {remoteName, branchName}, not flat remote/branch —
+		// PushRequest has no pushTarget concept, so map it here. Flat
+		// remote/branch still decoded too, for any other caller that might
+		// send them directly. publish/forceWithLease are NOT honored —
+		// pre-existing, already-documented gap (relay_executor.go's Push
+		// doc comment, SOL-032 §0 open question #1), unrelated to this fix.
+		type pushTargetArgs struct {
+			RemoteName string `json:"remoteName"`
+			BranchName string `json:"branchName"`
+		}
 		type pushArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			Remote     string `json:"remote"`
-			Branch     string `json:"branch"`
+			WorktreeID string          `json:"worktree"`
+			Remote     string          `json:"remote"`
+			Branch     string          `json:"branch"`
+			PushTarget *pushTargetArgs `json:"pushTarget"`
 		}
 		in, err := decodeArg[pushArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
+		remote, branch := in.Remote, in.Branch
+		if in.PushTarget != nil {
+			remote, branch = in.PushTarget.RemoteName, in.PushTarget.BranchName
+		}
 		resp, err := client.Push(ctx, &gitgatewayv1.PushRequest{
-			WorktreeId: in.WorktreeID, Remote: in.Remote, Branch: in.Branch,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Remote: remote, Branch: branch,
 		})
 		if err != nil {
 			return nil, err
@@ -97,13 +113,13 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.pull", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type pullArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 		}
 		in, err := decodeArg[pullArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.Pull(ctx, &gitgatewayv1.PullRequest{WorktreeId: in.WorktreeID})
+		resp, err := client.Pull(ctx, &gitgatewayv1.PullRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID)})
 		if err != nil {
 			return nil, err
 		}
@@ -112,7 +128,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.generateCommitMessage", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type genArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 		}
 		in, err := decodeArg[genArgs](args, 0)
 		if err != nil {
@@ -125,12 +141,12 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		// the upper bound; this WithCancel narrows further via explicit
 		// cancel, it doesn't replace that deadline.
 		genCtx, cancel := context.WithCancel(ctx)
-		key := gitGenerateCancelKey{WorktreeID: in.WorktreeID, Kind: gitGenerateCancelKindCommitMessage}
+		key := gitGenerateCancelKey{WorktreeID: stripWorktreeSelectorPrefix(in.WorktreeID), Kind: gitGenerateCancelKindCommitMessage}
 		cleanup := gitGenerateCancels.start(key, cancel)
 		defer cleanup()
 		defer cancel() // release resources if genCtx's parent finishes normally, not via explicit cancel
 
-		resp, err := client.GenerateCommitMessage(genCtx, &gitgatewayv1.GenerateCommitMessageRequest{WorktreeId: in.WorktreeID})
+		resp, err := client.GenerateCommitMessage(genCtx, &gitgatewayv1.GenerateCommitMessageRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID)})
 		if err != nil {
 			return nil, err
 		}
@@ -142,7 +158,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		if err != nil {
 			return nil, err
 		}
-		key := gitGenerateCancelKey{WorktreeID: in.WorktreeID, Kind: gitGenerateCancelKindCommitMessage}
+		key := gitGenerateCancelKey{WorktreeID: stripWorktreeSelectorPrefix(in.WorktreeID), Kind: gitGenerateCancelKindCommitMessage}
 		gitGenerateCancels.cancel(key) // return value ignored — "nothing in flight" is not an error, see cancel()'s doc comment
 		return nil, nil
 	})
@@ -153,7 +169,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 	// doc comment. ─────────────────────────────────────────────────────
 	r.Register("git.diff", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type diffArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			FilePath   string `json:"filePath"`
 			Staged     bool   `json:"staged"`
 		}
@@ -162,7 +178,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.GetDiff(ctx, &gitgatewayv1.GetDiffRequest{
-			WorktreeId: in.WorktreeID, FilePath: in.FilePath, Staged: in.Staged,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), FilePath: in.FilePath, Staged: in.Staged,
 		})
 		if err != nil {
 			return nil, err
@@ -183,14 +199,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.checkout", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type checkoutArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			Branch     string `json:"branch"`
 		}
 		in, err := decodeArg[checkoutArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.Checkout(ctx, &gitgatewayv1.CheckoutRequest{WorktreeId: in.WorktreeID, Branch: in.Branch})
+		resp, err := client.Checkout(ctx, &gitgatewayv1.CheckoutRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Branch: in.Branch})
 		if err != nil {
 			return nil, err
 		}
@@ -199,13 +215,13 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.localBranches", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type localBranchesArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 		}
 		in, err := decodeArg[localBranchesArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.ListLocalBranches(ctx, &gitgatewayv1.ListLocalBranchesRequest{WorktreeId: in.WorktreeID})
+		resp, err := client.ListLocalBranches(ctx, &gitgatewayv1.ListLocalBranchesRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID)})
 		if err != nil {
 			return nil, err
 		}
@@ -220,14 +236,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			RemoteCreated bool   `json:"remoteCreated"`
 		}
 		type fastForwardArgs struct {
-			WorktreeID string          `json:"worktreeId"`
+			WorktreeID string          `json:"worktree"`
 			PushTarget *pushTargetArgs `json:"pushTarget"`
 		}
 		in, err := decodeArg[fastForwardArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		req := &gitgatewayv1.FastForwardRequest{WorktreeId: in.WorktreeID}
+		req := &gitgatewayv1.FastForwardRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID)}
 		if in.PushTarget != nil {
 			req.PushTarget = &gitgatewayv1.PushTargetInput{
 				RemoteName: in.PushTarget.RemoteName, BranchName: in.PushTarget.BranchName,
@@ -243,14 +259,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.rebaseFromBase", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type rebaseArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			BaseBranch string `json:"baseBranch"`
 		}
 		in, err := decodeArg[rebaseArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.RebaseFromBase(ctx, &gitgatewayv1.RebaseFromBaseRequest{WorktreeId: in.WorktreeID, BaseBranch: in.BaseBranch})
+		resp, err := client.RebaseFromBase(ctx, &gitgatewayv1.RebaseFromBaseRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), BaseBranch: in.BaseBranch})
 		if err != nil {
 			return nil, err
 		}
@@ -259,13 +275,13 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.abortRebase", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type abortRebaseArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 		}
 		in, err := decodeArg[abortRebaseArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.AbortRebase(ctx, &gitgatewayv1.AbortRebaseRequest{WorktreeId: in.WorktreeID})
+		resp, err := client.AbortRebase(ctx, &gitgatewayv1.AbortRebaseRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID)})
 		if err != nil {
 			return nil, err
 		}
@@ -274,13 +290,13 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.abortMerge", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type abortMergeArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 		}
 		in, err := decodeArg[abortMergeArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.AbortMerge(ctx, &gitgatewayv1.AbortMergeRequest{WorktreeId: in.WorktreeID})
+		resp, err := client.AbortMerge(ctx, &gitgatewayv1.AbortMergeRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID)})
 		if err != nil {
 			return nil, err
 		}
@@ -295,13 +311,13 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 	// confirmed live caller was found in today's frontend for that op.
 	r.Register("git.conflictOperation", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type conflictOpArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 		}
 		in, err := decodeArg[conflictOpArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.ConflictOperation(ctx, &gitgatewayv1.ConflictOperationRequest{WorktreeId: in.WorktreeID})
+		resp, err := client.ConflictOperation(ctx, &gitgatewayv1.ConflictOperationRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID)})
 		if err != nil {
 			return nil, err
 		}
@@ -310,7 +326,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.resolveConflict", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type resolveConflictArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			Path       string `json:"path"`
 			Operation  string `json:"operation"`
 		}
@@ -319,7 +335,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.ResolveConflict(ctx, &gitgatewayv1.ResolveConflictRequest{
-			WorktreeId: in.WorktreeID, Path: in.Path, Operation: in.Operation,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Path: in.Path, Operation: in.Operation,
 		})
 		if err != nil {
 			return nil, err // FAILED_PRECONDITION over relay surfaces as-is (domain.ErrConflictResolveUnsupportedOverRelay)
@@ -329,14 +345,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.discard", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type discardArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			Path       string `json:"path"`
 		}
 		in, err := decodeArg[discardArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.Discard(ctx, &gitgatewayv1.DiscardRequest{WorktreeId: in.WorktreeID, Path: in.Path})
+		resp, err := client.Discard(ctx, &gitgatewayv1.DiscardRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Path: in.Path})
 		if err != nil {
 			return nil, err
 		}
@@ -345,14 +361,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.bulkDiscard", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type bulkDiscardArgs struct {
-			WorktreeID string   `json:"worktreeId"`
+			WorktreeID string   `json:"worktree"`
 			Paths      []string `json:"paths"`
 		}
 		in, err := decodeArg[bulkDiscardArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.BulkDiscard(ctx, &gitgatewayv1.BulkDiscardRequest{WorktreeId: in.WorktreeID, Paths: in.Paths})
+		resp, err := client.BulkDiscard(ctx, &gitgatewayv1.BulkDiscardRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Paths: in.Paths})
 		if err != nil {
 			return nil, err
 		}
@@ -365,14 +381,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	stageHandler := func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type stageArgs struct {
-			WorktreeID string   `json:"worktreeId"`
+			WorktreeID string   `json:"worktree"`
 			Paths      []string `json:"paths"`
 		}
 		in, err := decodeArg[stageArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.Stage(ctx, &gitgatewayv1.StageRequest{WorktreeId: in.WorktreeID, Paths: in.Paths})
+		resp, err := client.Stage(ctx, &gitgatewayv1.StageRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Paths: in.Paths})
 		if err != nil {
 			return nil, err
 		}
@@ -383,14 +399,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	unstageHandler := func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type unstageArgs struct {
-			WorktreeID string   `json:"worktreeId"`
+			WorktreeID string   `json:"worktree"`
 			Paths      []string `json:"paths"`
 		}
 		in, err := decodeArg[unstageArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.Unstage(ctx, &gitgatewayv1.UnstageRequest{WorktreeId: in.WorktreeID, Paths: in.Paths})
+		resp, err := client.Unstage(ctx, &gitgatewayv1.UnstageRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Paths: in.Paths})
 		if err != nil {
 			return nil, err
 		}
@@ -410,7 +426,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.history", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type historyArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			BaseRef    string `json:"baseRef"`
 			Limit      int32  `json:"limit"`
 		}
@@ -419,7 +435,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.History(ctx, &gitgatewayv1.HistoryRequest{
-			WorktreeId: in.WorktreeID, BaseRef: in.BaseRef, Limit: in.Limit,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), BaseRef: in.BaseRef, Limit: in.Limit,
 		})
 		if err != nil {
 			return nil, err
@@ -429,14 +445,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.checkIgnored", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type checkIgnoredArgs struct {
-			WorktreeID string   `json:"worktreeId"`
+			WorktreeID string   `json:"worktree"`
 			Paths      []string `json:"paths"`
 		}
 		in, err := decodeArg[checkIgnoredArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.CheckIgnored(ctx, &gitgatewayv1.CheckIgnoredRequest{WorktreeId: in.WorktreeID, Paths: in.Paths})
+		resp, err := client.CheckIgnored(ctx, &gitgatewayv1.CheckIgnoredRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Paths: in.Paths})
 		if err != nil {
 			return nil, err
 		}
@@ -445,7 +461,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.forkSync", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type forkSyncArgs struct {
-			WorktreeID       string `json:"worktreeId"`
+			WorktreeID       string `json:"worktree"`
 			ExpectedUpstream string `json:"expectedUpstream"`
 		}
 		in, err := decodeArg[forkSyncArgs](args, 0)
@@ -453,7 +469,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.ForkSync(ctx, &gitgatewayv1.ForkSyncRequest{
-			WorktreeId: in.WorktreeID, ExpectedUpstream: in.ExpectedUpstream,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), ExpectedUpstream: in.ExpectedUpstream,
 		})
 		if err != nil {
 			return nil, err
@@ -473,14 +489,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			RemoteCreated bool   `json:"remoteCreated"`
 		}
 		type upstreamStatusArgs struct {
-			WorktreeID string          `json:"worktreeId"`
+			WorktreeID string          `json:"worktree"`
 			PushTarget *pushTargetArgs `json:"pushTarget"`
 		}
 		in, err := decodeArg[upstreamStatusArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		req := &gitgatewayv1.UpstreamStatusRequest{WorktreeId: in.WorktreeID}
+		req := &gitgatewayv1.UpstreamStatusRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID)}
 		if in.PushTarget != nil {
 			req.PushTarget = &gitgatewayv1.PushTargetInput{
 				RemoteName: in.PushTarget.RemoteName, BranchName: in.PushTarget.BranchName,
@@ -501,7 +517,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.commitCompare", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type commitCompareArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			CommitID   string `json:"commitId"`
 		}
 		in, err := decodeArg[commitCompareArgs](args, 0)
@@ -509,7 +525,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.CommitCompare(ctx, &gitgatewayv1.CommitCompareRequest{
-			WorktreeId: in.WorktreeID, CommitId: in.CommitID,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), CommitId: in.CommitID,
 		})
 		if err != nil {
 			return nil, err
@@ -519,7 +535,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.branchCompare", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type branchCompareArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			BaseRef    string `json:"baseRef"`
 		}
 		in, err := decodeArg[branchCompareArgs](args, 0)
@@ -527,7 +543,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.BranchCompare(ctx, &gitgatewayv1.BranchCompareRequest{
-			WorktreeId: in.WorktreeID, BaseRef: in.BaseRef,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), BaseRef: in.BaseRef,
 		})
 		if err != nil {
 			return nil, err
@@ -540,7 +556,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 	// two-sided shapes TASK-213's original sketch had.
 	r.Register("git.commitDiff", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type commitDiffArgs struct {
-			WorktreeID string  `json:"worktreeId"`
+			WorktreeID string  `json:"worktree"`
 			CommitOID  string  `json:"commitOid"`
 			ParentOID  *string `json:"parentOid"`
 			FilePath   string  `json:"filePath"`
@@ -551,7 +567,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		req := &gitgatewayv1.CommitDiffRequest{
-			WorktreeId: in.WorktreeID, CommitOid: in.CommitOID, FilePath: in.FilePath, OldPath: in.OldPath,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), CommitOid: in.CommitOID, FilePath: in.FilePath, OldPath: in.OldPath,
 		}
 		if in.ParentOID != nil {
 			req.ParentOid = *in.ParentOID
@@ -565,7 +581,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.branchDiff", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type branchDiffArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			BaseRef    string `json:"baseRef"`
 			FilePath   string `json:"filePath"`
 			OldPath    string `json:"oldPath"`
@@ -575,7 +591,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.BranchDiff(ctx, &gitgatewayv1.BranchDiffRequest{
-			WorktreeId: in.WorktreeID, BaseRef: in.BaseRef, FilePath: in.FilePath, OldPath: in.OldPath,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), BaseRef: in.BaseRef, FilePath: in.FilePath, OldPath: in.OldPath,
 		})
 		if err != nil {
 			return nil, err
@@ -589,7 +605,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 	// response, so there is no "list every submodule" call to support here.
 	r.Register("git.submoduleStatus", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type submoduleStatusArgs struct {
-			WorktreeID    string `json:"worktreeId"`
+			WorktreeID    string `json:"worktree"`
 			SubmodulePath string `json:"submodulePath"`
 			Area          string `json:"area"`
 		}
@@ -598,7 +614,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.SubmoduleStatus(ctx, &gitgatewayv1.SubmoduleStatusRequest{
-			WorktreeId: in.WorktreeID, SubmodulePath: in.SubmodulePath, Area: in.Area,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), SubmodulePath: in.SubmodulePath, Area: in.Area,
 		})
 		if err != nil {
 			return nil, err
@@ -617,14 +633,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			RemoteCreated bool   `json:"remoteCreated"`
 		}
 		type fetchArgs struct {
-			WorktreeID string          `json:"worktreeId"`
+			WorktreeID string          `json:"worktree"`
 			PushTarget *pushTargetArgs `json:"pushTarget"`
 		}
 		in, err := decodeArg[fetchArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		req := &gitgatewayv1.FetchRequest{WorktreeId: in.WorktreeID}
+		req := &gitgatewayv1.FetchRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID)}
 		if in.PushTarget != nil {
 			req.PushTarget = &gitgatewayv1.PushTargetInput{
 				RemoteName: in.PushTarget.RemoteName, BranchName: in.PushTarget.BranchName,
@@ -640,14 +656,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.remoteCommitUrl", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type remoteCommitURLArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			SHA        string `json:"sha"`
 		}
 		in, err := decodeArg[remoteCommitURLArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.RemoteCommitUrl(ctx, &gitgatewayv1.RemoteCommitUrlRequest{WorktreeId: in.WorktreeID, Sha: in.SHA})
+		resp, err := client.RemoteCommitUrl(ctx, &gitgatewayv1.RemoteCommitUrlRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Sha: in.SHA})
 		if err != nil {
 			return nil, err
 		}
@@ -656,7 +672,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.remoteFileUrl", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type remoteFileURLArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			Path       string `json:"path"`
 			Ref        string `json:"ref"`
 		}
@@ -664,7 +680,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.RemoteFileUrl(ctx, &gitgatewayv1.RemoteFileUrlRequest{WorktreeId: in.WorktreeID, Path: in.Path, Ref: in.Ref})
+		resp, err := client.RemoteFileUrl(ctx, &gitgatewayv1.RemoteFileUrlRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Path: in.Path, Ref: in.Ref})
 		if err != nil {
 			return nil, err
 		}
@@ -675,7 +691,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.generatePullRequestFields", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type genPRFieldsArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			BaseBranch string `json:"baseBranch"`
 		}
 		in, err := decodeArg[genPRFieldsArgs](args, 0)
@@ -683,13 +699,13 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		genCtx, cancel := context.WithCancel(ctx)
-		key := gitGenerateCancelKey{WorktreeID: in.WorktreeID, Kind: gitGenerateCancelKindPullRequestFields}
+		key := gitGenerateCancelKey{WorktreeID: stripWorktreeSelectorPrefix(in.WorktreeID), Kind: gitGenerateCancelKindPullRequestFields}
 		cleanup := gitGenerateCancels.start(key, cancel)
 		defer cleanup()
 		defer cancel()
 
 		resp, err := client.GeneratePullRequestFields(genCtx, &gitgatewayv1.GeneratePullRequestFieldsRequest{
-			WorktreeId: in.WorktreeID, BaseBranch: in.BaseBranch,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), BaseBranch: in.BaseBranch,
 		})
 		if err != nil {
 			return nil, err
@@ -702,7 +718,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		if err != nil {
 			return nil, err
 		}
-		key := gitGenerateCancelKey{WorktreeID: in.WorktreeID, Kind: gitGenerateCancelKindPullRequestFields}
+		key := gitGenerateCancelKey{WorktreeID: stripWorktreeSelectorPrefix(in.WorktreeID), Kind: gitGenerateCancelKindPullRequestFields}
 		gitGenerateCancels.cancel(key)
 		return nil, nil
 	})
@@ -728,7 +744,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.merge", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type mergeArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			Branch     string `json:"branch"`
 			NoFF       bool   `json:"noFf"`
 		}
@@ -736,7 +752,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.MergeIntoBranch(ctx, &gitgatewayv1.MergeIntoBranchRequest{WorktreeId: in.WorktreeID, Branch: in.Branch, NoFf: in.NoFF})
+		resp, err := client.MergeIntoBranch(ctx, &gitgatewayv1.MergeIntoBranchRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Branch: in.Branch, NoFf: in.NoFF})
 		if err != nil {
 			return nil, err // FAILED_PRECONDITION over relay-ssh surfaces as-is
 		}
@@ -745,7 +761,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.stash.push", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type stashPushArgs struct {
-			WorktreeID       string `json:"worktreeId"`
+			WorktreeID       string `json:"worktree"`
 			Message          string `json:"message"`
 			IncludeUntracked bool   `json:"includeUntracked"`
 		}
@@ -754,7 +770,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.StashPush(ctx, &gitgatewayv1.StashPushRequest{
-			WorktreeId: in.WorktreeID, Message: in.Message, IncludeUntracked: in.IncludeUntracked,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Message: in.Message, IncludeUntracked: in.IncludeUntracked,
 		})
 		if err != nil {
 			return nil, err
@@ -764,14 +780,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.stash.pop", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type stashPopArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			StashRef   string `json:"stashRef"`
 		}
 		in, err := decodeArg[stashPopArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.StashPop(ctx, &gitgatewayv1.StashPopRequest{WorktreeId: in.WorktreeID, StashRef: in.StashRef})
+		resp, err := client.StashPop(ctx, &gitgatewayv1.StashPopRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), StashRef: in.StashRef})
 		if err != nil {
 			return nil, err
 		}
@@ -780,7 +796,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.branch.create", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type createBranchArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			Branch     string `json:"branch"`
 			BaseRef    string `json:"baseRef"`
 			Checkout   bool   `json:"checkout"`
@@ -790,7 +806,7 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 			return nil, err
 		}
 		resp, err := client.CreateBranch(ctx, &gitgatewayv1.CreateBranchRequest{
-			WorktreeId: in.WorktreeID, Branch: in.Branch, BaseRef: in.BaseRef, Checkout: in.Checkout,
+			WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Branch: in.Branch, BaseRef: in.BaseRef, Checkout: in.Checkout,
 		})
 		if err != nil {
 			return nil, err
@@ -800,14 +816,14 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.Register("git.branch.delete", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
 		type deleteBranchArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 			Branch     string `json:"branch"`
 		}
 		in, err := decodeArg[deleteBranchArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		resp, err := client.DeleteBranch(ctx, &gitgatewayv1.DeleteBranchRequest{WorktreeId: in.WorktreeID, Branch: in.Branch})
+		resp, err := client.DeleteBranch(ctx, &gitgatewayv1.DeleteBranchRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Branch: in.Branch})
 		if err != nil {
 			return nil, err
 		}
@@ -824,16 +840,28 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 	// success/exitCode, the unary-Push/PullResponse-equivalent outcome. ──
 
 	r.RegisterStream("git.push.progress", func(ctx context.Context, id Identity, args []json.RawMessage) (<-chan PushEvent, error) {
+		// No confirmed frontend caller today (grep: 0 hits) — mirrors the
+		// unary git.push's pushTarget mapping (BUG-021) anyway, so this
+		// doesn't reintroduce the same bug the moment it IS wired up.
+		type pushTargetArgs struct {
+			RemoteName string `json:"remoteName"`
+			BranchName string `json:"branchName"`
+		}
 		type pushStreamArgs struct {
-			WorktreeID string `json:"worktreeId"`
-			Remote     string `json:"remote"`
-			Branch     string `json:"branch"`
+			WorktreeID string          `json:"worktree"`
+			Remote     string          `json:"remote"`
+			Branch     string          `json:"branch"`
+			PushTarget *pushTargetArgs `json:"pushTarget"`
 		}
 		in, err := decodeArg[pushStreamArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		stream, err := client.PushStream(ctx, &gitgatewayv1.PushRequest{WorktreeId: in.WorktreeID, Remote: in.Remote, Branch: in.Branch})
+		remote, branch := in.Remote, in.Branch
+		if in.PushTarget != nil {
+			remote, branch = in.PushTarget.RemoteName, in.PushTarget.BranchName
+		}
+		stream, err := client.PushStream(ctx, &gitgatewayv1.PushRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID), Remote: remote, Branch: branch})
 		if err != nil {
 			return nil, err // FAILED_PRECONDITION (relay-ssh) surfaces as-is — frontend retries against the unary git.push RPC
 		}
@@ -842,13 +870,13 @@ func registerGitDeepChannels(r *Registry, client gitgatewayv1.GitGatewayServiceC
 
 	r.RegisterStream("git.pull.progress", func(ctx context.Context, id Identity, args []json.RawMessage) (<-chan PushEvent, error) {
 		type pullStreamArgs struct {
-			WorktreeID string `json:"worktreeId"`
+			WorktreeID string `json:"worktree"`
 		}
 		in, err := decodeArg[pullStreamArgs](args, 0)
 		if err != nil {
 			return nil, err
 		}
-		stream, err := client.PullStream(ctx, &gitgatewayv1.PullRequest{WorktreeId: in.WorktreeID})
+		stream, err := client.PullStream(ctx, &gitgatewayv1.PullRequest{WorktreeId: stripWorktreeSelectorPrefix(in.WorktreeID)})
 		if err != nil {
 			return nil, err
 		}

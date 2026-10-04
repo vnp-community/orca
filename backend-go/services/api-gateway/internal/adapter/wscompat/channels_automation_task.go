@@ -356,7 +356,16 @@ func registerTaskCRUDChannels(r *Registry, client taskv1.TaskServiceClient) {
 		if err != nil {
 			return nil, err
 		}
-		return resp, nil
+		// BUG-023: returning resp raw ships snake_case Task fields — every
+		// listed task's projectId/taskNumber/... comes back undefined,
+		// which silently empties useTasks.ts's `t.projectId === projectId`
+		// filter (found live: a freshly created task disappears from the
+		// Tree/Board view the moment task.list's own fetch effect re-runs).
+		tasks := make([]taskView, 0, len(resp.GetTasks()))
+		for _, t := range resp.GetTasks() {
+			tasks = append(tasks, toTaskView(t))
+		}
+		return map[string]any{"tasks": tasks, "nextPageToken": resp.GetNextPageToken()}, nil
 	})
 
 	r.Register("task.update", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {
@@ -365,6 +374,9 @@ func registerTaskCRUDChannels(r *Registry, client taskv1.TaskServiceClient) {
 			Title              *string `json:"title"`
 			Status             *string `json:"status"`
 			WorkflowTemplateID *string `json:"workflowTemplateId"`
+			// Labels: nil = unchanged, non-nil (even []) = replace the whole
+			// list — see BL-TG-05, UpdateTaskRequest.labels's doc comment.
+			Labels *[]string `json:"labels"`
 		}
 		in, err := decodeArg[updateArgs](args, 0)
 		if err != nil {
@@ -380,11 +392,14 @@ func registerTaskCRUDChannels(r *Registry, client taskv1.TaskServiceClient) {
 		if in.WorkflowTemplateID != nil {
 			req.WorkflowTemplateId = wrapperspb.String(*in.WorkflowTemplateID)
 		}
+		if in.Labels != nil {
+			req.Labels = &taskv1.StringListValue{Values: *in.Labels}
+		}
 		resp, err := client.UpdateTask(ctx, req)
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetTask(), nil
+		return toTaskView(resp.GetTask()), nil
 	})
 
 	r.Register("task.delete", func(ctx context.Context, id Identity, args []json.RawMessage) (any, error) {

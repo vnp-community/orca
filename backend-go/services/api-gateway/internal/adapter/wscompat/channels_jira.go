@@ -101,6 +101,14 @@ func toJiraIssueView(i *issuetrackingv1.Issue) jiraIssueView {
 		Description: i.GetDescriptionMarkdown(), URL: i.GetUrl(),
 		Labels: i.GetLabels(), Status: jiraStatusView{Name: i.GetState()},
 	}
+	// BUG-018: a nil slice (the common case — most issues have no labels)
+	// encodes as JSON null, not [] — TaskPage.tsx's issue.labels.slice(...)
+	// (no null-guard, labels is a required field on the wire) crashes the
+	// whole page render on it. Same fix already applied to channels_scm.go's
+	// Labels handling; just never ported here.
+	if v.Labels == nil {
+		v.Labels = []string{}
+	}
 	if p := i.GetProject(); p != nil {
 		v.Project = &jiraProjectView{ID: p.GetId(), Key: p.GetKey(), Name: p.GetName()}
 	}

@@ -2,7 +2,9 @@ package wscompat
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"strings"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -589,6 +591,41 @@ func TestJiraSearchIssuesChannel_MapsFields(t *testing.T) {
 	}
 	if gotReq.GetProvider() != issuetrackingv1.IssueProvider_ISSUE_PROVIDER_JIRA {
 		t.Errorf("expected jira provider, got %v", gotReq.GetProvider())
+	}
+}
+
+// TestJiraSearchIssuesChannel_NilLabels_MapsToEmptyArrayNotNull is BUG-018's
+// regression guard: an issue with no labels (the common case — Jira omits
+// the labels field entirely rather than an empty array) must not encode as
+// JSON null. TaskPage.tsx's issue.labels.slice(...) has no null-guard
+// (labels is a required field on the wire) and crashed the whole page
+// render on it, live, immediately after BUG-016/BUG-017 let real Jira data
+// reach the frontend for the first time.
+func TestJiraSearchIssuesChannel_NilLabels_MapsToEmptyArrayNotNull(t *testing.T) {
+	fake := &fakeIssueTrackingClient{
+		searchIssuesFunc: func(ctx context.Context, in *issuetrackingv1.SearchIssuesRequest) (*issuetrackingv1.SearchIssuesResponse, error) {
+			// Labels deliberately left unset (nil), matching the real proto
+			// getter's behavior for an issue with no labels.
+			return &issuetrackingv1.SearchIssuesResponse{Issues: []*issuetrackingv1.Issue{{Id: "1", Key: "PROJ-1", Title: "Bug"}}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerJiraChannels(r, fake)
+
+	result, err := r.Dispatch(context.Background(), Identity{TenantID: "t1"}, "jira.searchIssues", argsJSON(t, map[string]any{"jql": "project = PROJ", "limit": 10}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	views := result.([]jiraIssueView)
+	if views[0].Labels == nil {
+		t.Fatal("expected Labels to be an empty slice, not nil (encodes as JSON null, crashing issue.labels.slice(...) on the frontend)")
+	}
+	encoded, err := json.Marshal(views[0])
+	if err != nil {
+		t.Fatalf("unexpected marshal error: %v", err)
+	}
+	if strings.Contains(string(encoded), `"labels":null`) {
+		t.Errorf("expected labels to encode as [], got null in: %s", encoded)
 	}
 }
 

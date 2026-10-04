@@ -748,7 +748,18 @@ func registerStatusChannels(r *Registry) {
 			"liveLeafCount":                     0,
 			"runtimeProtocolVersion":            currentRuntimeProtocolVersion,
 			"minCompatibleRuntimeClientVersion": minCompatibleRuntimeClientVersion,
-			"capabilities":                      []string{"browser.screencast.v1"},
+			// task-source-context.v1 (BUG-FE-TASKV1-009/CR-TSRC-001): the
+			// Jira/Linear "account-backed" task source and Automations'
+			// equivalent gate (TaskPage.tsx/AutomationsPage.tsx) both check
+			// this before ever showing those sources as available —
+			// independent of whether Jira/Linear is actually connected
+			// (issue-tracking-service's own Jira adapter already works,
+			// verified live with a real credential; this flag was the only
+			// thing blocking the UI from ever calling it). Only this one
+			// capability is added here — the other 13 entries in
+			// frontend/src/shared/protocol-version.ts's RUNTIME_CAPABILITIES
+			// are a separate, broader gap not investigated/fixed in this pass.
+			"capabilities": []string{"browser.screencast.v1", "task-source-context.v1"},
 			"hostPlatform":                      hostPlatformString(), // the one field windows-terminal-capability-read.ts actually reads
 		}, nil
 	})

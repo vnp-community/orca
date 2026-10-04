@@ -111,9 +111,23 @@ func registerAccountsResolveDevServerConnectionChannel(r *Registry, client infra
 // accountsRelayArgs is shared by all 4 channels — accountId plus the
 // devServerId (still named connectionId on the wire, see this file's
 // package doc comment) accounts.resolveDevServerConnection resolved.
+//
+// AccountID is *string, not string: the dev server agent's own
+// accounts.selectClaude/selectCodex handlers (agent/src/relay/
+// accounts-handler.ts's parseSelectAccountId) explicitly treat a JSON
+// `null` accountId as valid — it means "System default" / deselect, a
+// distinct case from an empty string, which the agent correctly rejects
+// as invalid. A plain Go `string` field collapses JSON `null`, `""`, and
+// an omitted field into the same zero value "" before this handler ever
+// re-marshals `{"accountId": in.AccountID}` to relay to the agent — so
+// selecting "System default" on a Remote Dev Server always relayed `""`,
+// which the agent always rejected with "accountId is required", surfacing
+// as the generic INFRA_AGENT_EXEC_FAILED (BUG-009, confirmed live via
+// SOL-009's cause-logging fix). *string round-trips `null` correctly
+// through json.Marshal below.
 type accountsRelayArgs struct {
-	AccountID    string `json:"accountId"`
-	ConnectionID string `json:"connectionId"`
+	AccountID    *string `json:"accountId"`
+	ConnectionID string  `json:"connectionId"`
 }
 
 // registerAccountsRelay is the single representative implementation shared

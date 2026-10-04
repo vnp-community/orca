@@ -10,6 +10,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"strings"
 
 	aiproviderv1 "github.com/stablyai/orca-go/proto/gen/go/orca/aiprovider/v1"
 
@@ -28,6 +29,47 @@ func registerAiProviderChannels(r *Registry, client aiproviderv1.AiProviderServi
 	r.Register("aiProvider.writeCredential", handleAiProviderWriteCredential(client))
 	r.Register("aiProvider.testConnection", handleAiProviderTestConnection(client))
 	r.Register("aiProvider.resolve", handleAiProviderResolve(client))
+}
+
+// providerAccountView is the camelCase JSON shape aiProvider.resolve sends
+// back — see BUG-022: returning *aiproviderv1.ProviderAccount directly ships
+// snake_case keys (plain encoding/json on protoc-gen-go struct tags) and a
+// bare numeric `type`, neither of which any frontend caller can consume.
+type providerAccountView struct {
+	ID                string   `json:"id"`
+	TenantID          string   `json:"tenantId"`
+	Type              string   `json:"type"`
+	Status            string   `json:"status"`
+	CredentialRef     string   `json:"credentialRef"`
+	DevServerID       string   `json:"devServerId"`
+	Label             string   `json:"label"`
+	ModelHint         string   `json:"modelHint"`
+	BaseURL           string   `json:"baseUrl"`
+	QuotaLimitDay     int32    `json:"quotaLimitDay"`
+	Models            []string `json:"models"`
+	IsDefault         bool     `json:"isDefault"`
+	LastHealthCheckAt string   `json:"lastHealthCheckAt"`
+	CreatedBy         string   `json:"createdBy"`
+}
+
+// providerTypeJSONName maps a ProviderType enum to the lowercase string this
+// view sends, e.g. PROVIDER_TYPE_ANTHROPIC -> "anthropic". Falls back to the
+// raw enum name (lowercased) for any value missing the PROVIDER_TYPE_ prefix
+// rather than silently dropping it.
+func providerTypeJSONName(t aiproviderv1.ProviderType) string {
+	name := aiproviderv1.ProviderType_name[int32(t)]
+	name = strings.TrimPrefix(name, "PROVIDER_TYPE_")
+	return strings.ToLower(name)
+}
+
+func toProviderAccountView(a *aiproviderv1.ProviderAccount) providerAccountView {
+	return providerAccountView{
+		ID: a.GetId(), TenantID: a.GetTenantId(), Type: providerTypeJSONName(a.GetType()),
+		Status: a.GetStatus(), CredentialRef: a.GetCredentialRef(), DevServerID: a.GetDevServerId(),
+		Label: a.GetLabel(), ModelHint: a.GetModelHint(), BaseURL: a.GetBaseUrl(),
+		QuotaLimitDay: a.GetQuotaLimitDay(), Models: a.GetModels(), IsDefault: a.GetIsDefault(),
+		LastHealthCheckAt: a.GetLastHealthCheckAt(), CreatedBy: a.GetCreatedBy(),
+	}
 }
 
 // attachAiProviderIdentity is shared by every handler below.
@@ -217,6 +259,6 @@ func handleAiProviderResolve(client aiproviderv1.AiProviderServiceClient) Channe
 		if err != nil {
 			return nil, err
 		}
-		return resp.GetAccount(), nil
+		return toProviderAccountView(resp.GetAccount()), nil
 	}
 }

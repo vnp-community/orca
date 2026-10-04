@@ -815,6 +815,38 @@ func TestStatusGet_ReturnsHostPlatformAndHonestZeroValues(t *testing.T) {
 	}
 }
 
+// TestStatusGet_AdvertisesTaskSourceContextCapability is BUG-FE-TASKV1-009's
+// regression guard: TaskPage.tsx/AutomationsPage.tsx gate the Jira/Linear
+// "account-backed" task source entirely on "task-source-context.v1" being
+// present in status.get's capabilities — independent of whether Jira/Linear
+// is actually connected. Confirmed live: user saw "Jira source unavailable:
+// ... server update needed for task sources" (task-source-context-summary.ts's
+// label for the missing-capability reason) even after a real Jira connection
+// was verified working.
+func TestStatusGet_AdvertisesTaskSourceContextCapability(t *testing.T) {
+	r := NewRegistry()
+	registerStatusChannels(r)
+	result, err := r.Dispatch(context.Background(), Identity{}, "status.get", nil)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	m := result.(map[string]any)
+	capabilities, ok := m["capabilities"].([]string)
+	if !ok {
+		t.Fatalf("expected capabilities to be a []string, got %T", m["capabilities"])
+	}
+	found := false
+	for _, c := range capabilities {
+		if c == "task-source-context.v1" {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Errorf("expected capabilities to include task-source-context.v1, got %v", capabilities)
+	}
+}
+
 // ── workspacePorts.* ─────────────────────────────────────────────────────
 
 func TestRegisterWorkspacePortsChannels(t *testing.T) {
