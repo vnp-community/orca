@@ -960,4 +960,88 @@ describe('activateAndRevealWorktree', () => {
     expect(result).toEqual({ primaryTabId: 'tab-1' })
     expect(queueTabInitialCwd).toHaveBeenCalledWith('tab-1', '/repo/packages/web')
   })
+
+  // CR-PW-012: a plain worktree re-select while already on the Project
+  // Workspace (Beta) page must not yank the user back to the classic
+  // Terminal view — Workspace reuses the sidebar as its own picker and
+  // expects the click to just update currentWorktree in place.
+  function setupWorktreeStoreForViewGuardTests(activeView: string) {
+    const setActiveView = vi.fn()
+    useAppStore.setState({
+      activeRepoId: 'repo-1',
+      activeWorktreeId: null,
+      activeView: activeView as never,
+      filterRepoIds: [],
+      isNavigatingHistory: false,
+      repos: [{ id: 'repo-1', connectionId: null }],
+      worktreesByRepo: {
+        'repo-1': [
+          {
+            id: 'wt-1',
+            repoId: 'repo-1',
+            path: '/repo',
+            displayName: 'main',
+            branch: 'main',
+            head: 'abc',
+            isBare: false,
+            isMainWorktree: true
+          }
+        ]
+      },
+      getKnownWorktreeById: (worktreeId: string) =>
+        worktreeId === 'wt-1'
+          ? ({
+              id: 'wt-1',
+              repoId: 'repo-1',
+              path: '/repo',
+              displayName: 'main',
+              branch: 'main',
+              head: 'abc',
+              isBare: false,
+              isMainWorktree: true
+            } as never)
+          : null,
+      setActiveRepo: vi.fn(),
+      setActiveView,
+      setActiveWorktree: vi.fn(),
+      markWorktreeVisited: vi.fn(),
+      recordWorktreeVisit: vi.fn(),
+      reconcileWorktreeTabModel: vi.fn(() => ({ renderableTabCount: 0 })),
+      createTab: vi.fn(() => ({ id: 'tab-1' })),
+      setActiveTab: vi.fn(),
+      setTabCustomTitle: vi.fn(),
+      setTabColor: vi.fn(),
+      markDefaultTerminalTabsApplied: vi.fn(),
+      queueTabStartupCommand: vi.fn(),
+      queueTabInitialCwd: vi.fn(),
+      queueTabSetupSplit: vi.fn(),
+      queueTabIssueCommandSplit: vi.fn(),
+      revealWorktreeInSidebar: vi.fn()
+    } as never)
+    return setActiveView
+  }
+
+  it('does not force activeView to terminal on a plain reselect while on Project Workspace (Beta)', () => {
+    const setActiveView = setupWorktreeStoreForViewGuardTests('workspace')
+
+    activateAndRevealWorktree('wt-1', { revealInSidebar: false })
+
+    expect(setActiveView).not.toHaveBeenCalled()
+  })
+
+  it('still forces activeView to terminal from Project Workspace (Beta) when there is real activation work', () => {
+    const setActiveView = setupWorktreeStoreForViewGuardTests('workspace')
+
+    activateAndRevealWorktree('wt-1', { startup: { command: 'echo hi' } })
+
+    expect(setActiveView).toHaveBeenCalledWith('terminal')
+  })
+
+  it('still forces activeView to terminal from any other non-terminal view (e.g. settings)', () => {
+    const setActiveView = setupWorktreeStoreForViewGuardTests('settings')
+
+    activateAndRevealWorktree('wt-1', { revealInSidebar: false })
+
+    expect(setActiveView).toHaveBeenCalledWith('terminal')
+  })
 })

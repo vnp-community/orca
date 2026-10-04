@@ -131,7 +131,14 @@ export function ProjectSettings({ projectId, open, onClose, onDeleted }: Project
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl" data-testid="project-settings-dialog">
+      {/* max-h + overflow-y-auto: General tab stacks Filter + Dev Server picker +
+          Mobile Emulator + Danger zone, which can exceed viewport height — the
+          base DialogContent has no height cap, so without this the lower
+          sections render off-screen with no way to scroll to them. */}
+      <DialogContent
+        className="max-w-2xl max-h-[85vh] overflow-y-auto"
+        data-testid="project-settings-dialog"
+      >
         <DialogHeader>
           <DialogTitle>Project Settings — {project?.name ?? projectId}</DialogTitle>
         </DialogHeader>

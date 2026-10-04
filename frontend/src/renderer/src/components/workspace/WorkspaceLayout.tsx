@@ -2,6 +2,7 @@
 // TASK-FE-003: Upgraded with ResizablePanelGroup + status bar + terminal toggle
 import { lazy, Suspense, useState } from 'react'
 import { GitBranch } from 'lucide-react'
+import { useAppStore } from '../../store'
 import { useWorkspace } from '../../context/WorkspaceContext'
 import { WorkspaceTabBar } from './WorkspaceTabBar'
 import { OfflineBanner } from './OfflineBanner'
@@ -18,6 +19,7 @@ const GitPanel = lazy(() => import('./git/GitPanel').then((m) => ({ default: m.G
 const TaskGraphPanel = lazy(() =>
   import('../task/TaskGraphPanel').then((m) => ({ default: m.TaskGraphPanel }))
 )
+const TaskDetail = lazy(() => import('../task/TaskDetail').then((m) => ({ default: m.TaskDetail })))
 const WorkflowMonitor = lazy(() =>
   import('../workflow/WorkflowMonitor').then((m) => ({ default: m.WorkflowMonitor }))
 )
@@ -33,8 +35,6 @@ const AgentPanel = lazy(() => import('./AgentPanel').then((m) => ({ default: m.A
 const SshStatusSegment = lazy(() =>
   import('../status-bar/SshStatusSegment').then((m) => ({ default: m.SshStatusSegment }))
 )
-
-type WorkspaceTab = 'git' | 'tasks' | 'workflows' | 'agent'
 
 // Why: mirrors NoProjectSelected's style for the tab's own empty state —
 // Agent/terminal need a worktree, which Workspace doesn't have yet until the
@@ -54,7 +54,11 @@ function NoWorktreeSelected() {
 
 export function WorkspaceLayout() {
   const { project, isOffline, isInitializing, switchProject, currentWorktree } = useWorkspace()
-  const [activeTab, setActiveTab] = useState<WorkspaceTab>('git')
+  const activeTaskId = useAppStore((s) => s.activeTaskId)
+  // Store field (not local state) — TaskDetail, several layers away in the
+  // right panel, needs to switch this tab from its "Open in Git" action.
+  const activeTab = useAppStore((s) => s.activeWorkspaceTab)
+  const setActiveTab = useAppStore((s) => s.setActiveWorkspaceTab)
   const [rightPanelVisible, setRightPanel] = useState(true)
   const [terminalVisible, setTerminalVisible] = useState(false)
   // FE-TASK-001/002 (workflow v4): WorkflowBuilder/WorkflowLibrary were built (or, for
@@ -139,9 +143,16 @@ export function WorkspaceLayout() {
           <>
             <ResizableHandle />
             <ResizablePanel defaultSize="30" minSize="20" data-testid="panel-right">
-              <div className="workspace-right h-full border-l bg-muted/30 overflow-y-auto p-3 text-xs text-muted-foreground">
-                {activeTab === 'git' && <span>Git details</span>}
-                {activeTab === 'tasks' && <span>Task detail</span>}
+              <div className="workspace-right h-full border-l bg-muted/30 overflow-y-auto text-xs text-muted-foreground">
+                {activeTab === 'git' && <span className="p-3 block">Git details</span>}
+                {activeTab === 'tasks' &&
+                  (activeTaskId ? (
+                    <Suspense fallback={<div className="p-3">Loading...</div>}>
+                      <TaskDetail />
+                    </Suspense>
+                  ) : (
+                    <span className="p-3 block">Select a task to see its details</span>
+                  ))}
               </div>
             </ResizablePanel>
           </>
@@ -156,7 +167,10 @@ export function WorkspaceLayout() {
           data-testid="terminal-panel"
         >
           {currentWorktree ? (
-            <WorkspaceTerminalPanel worktreeId={currentWorktree.id} />
+            <WorkspaceTerminalPanel
+              worktreeId={currentWorktree.id}
+              worktreePath={currentWorktree.path}
+            />
           ) : (
             <div className="flex h-full items-center justify-center text-xs text-muted-foreground">
               Select a worktree to open a terminal

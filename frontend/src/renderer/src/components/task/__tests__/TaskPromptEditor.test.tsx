@@ -19,6 +19,8 @@ vi.mock('../../../context/WorkspaceContext', () => ({
   })
 }))
 
+import { useWorkspace } from '../../../context/WorkspaceContext'
+
 // Mock RPC
 vi.mock('../../../runtime/runtime-rpc-client', () => ({
   callRuntimeRpc: vi.fn(),
@@ -26,6 +28,16 @@ vi.mock('../../../runtime/runtime-rpc-client', () => ({
 }))
 import { callRuntimeRpc } from '../../../runtime/runtime-rpc-client'
 const mockRpc = vi.mocked(callRuntimeRpc)
+
+const mockUpdateTask = vi.fn()
+vi.mock('../../../hooks/useTask', () => ({
+  useTask: () => ({ updateTask: mockUpdateTask })
+}))
+
+const mockAddComment = vi.fn()
+vi.mock('../../../hooks/useTaskComments', () => ({
+  useTaskComments: () => ({ comments: [], addComment: mockAddComment, isSupported: true })
+}))
 
 function captureTraceEvents(): { events: TraceEvent[]; stop: () => void } {
   const events: TraceEvent[] = []
@@ -39,6 +51,7 @@ const task: OrcaTask = {
   status: 'todo',
   priority: 'high',
   projectId: 'proj-1',
+  labels: [] as string[],
   promptTemplate: 'do the thing'
 } as OrcaTask
 
@@ -65,7 +78,7 @@ describe('TaskPromptEditor.runWithAgent() tracing', () => {
     expect(startEvent?.fields.promptLength).toBe('do the thing'.length)
   })
 
-  it('task.execute RPC receives taskId/projectId/worktreePath/prompt + traceId === span.id (BACKLOG-016)', async () => {
+  it('task.execute RPC receives taskId/projectId/prompt + traceId === span.id (BACKLOG-016), never worktreePath (dead param, crashed with no worktree selected)', async () => {
     const { events, stop } = captureTraceEvents()
     render(<TaskPromptEditor task={task} />)
     fireEvent.click(screen.getByTestId('run-agent-btn'))
@@ -77,11 +90,11 @@ describe('TaskPromptEditor.runWithAgent() tracing', () => {
         expect.objectContaining({
           taskId: 't1',
           projectId: 'proj-1',
-          worktreePath: '/repo/proj-1',
           prompt: 'do the thing'
         })
       )
     })
+    expect(mockRpc.mock.calls[0]?.[2]).not.toHaveProperty('worktreePath')
     stop()
 
     const startEvent = events.find((e) => e.flow === 'ui:taskGraph.execute' && e.level === 'start')
@@ -176,5 +189,147 @@ describe('TaskPromptEditor.runWithAgent() tracing', () => {
         expect.objectContaining({ prompt: undefined })
       )
     })
+  })
+})
+
+describe('BL-TG-05 spec/build loop', () => {
+  const specTask: OrcaTask = { ...task, taskNumber: 42, description: 'do the extra thing' }
+
+  beforeEach(() => {
+    cleanup()
+    vi.clearAllMocks()
+    mockRpc.mockResolvedValue(undefined)
+    mockUpdateTask.mockResolvedValue(undefined)
+    mockAddComment.mockResolvedValue(undefined)
+  })
+
+  it('Generate Spec fills the textarea with the spec prompt referencing the deterministic file path', () => {
+    render(<TaskPromptEditor task={specTask} />)
+    fireEvent.click(screen.getByTestId('generate-spec-btn'))
+
+    const textarea = screen.getByPlaceholderText(
+      'Describe what the agent should do for this task...'
+    ) as HTMLTextAreaElement
+    expect(textarea.value).toContain('specs/generated/TASK-42-spec.md')
+    expect(textarea.value).toContain('Do NOT write implementation code yet')
+  })
+
+  it('Implement Spec is disabled until the spec is approved', () => {
+    render(<TaskPromptEditor task={specTask} />)
+    expect(screen.getByTestId('implement-spec-btn')).toBeDisabled()
+    cleanup()
+
+    render(<TaskPromptEditor task={{ ...specTask, labels: ['phase:spec-approved'] }} />)
+    expect(screen.getByTestId('implement-spec-btn')).not.toBeDisabled()
+  })
+
+  it('clicking Generate Spec then Run with Agent sets phase:spec-pending BEFORE task.execute', async () => {
+    render(<TaskPromptEditor task={specTask} />)
+    fireEvent.click(screen.getByTestId('generate-spec-btn'))
+    fireEvent.click(screen.getByTestId('run-agent-btn'))
+
+    await waitFor(() => expect(mockRpc).toHaveBeenCalled())
+    expect(mockUpdateTask).toHaveBeenCalledWith({ labels: ['phase:spec-pending'] })
+    const updateOrder = mockUpdateTask.mock.invocationCallOrder[0]
+    const executeOrder = mockRpc.mock.invocationCallOrder[0]
+    expect(updateOrder).toBeLessThan(executeOrder)
+  })
+
+  it('a plain custom-prompt run (no preset clicked) never touches labels', async () => {
+    render(<TaskPromptEditor task={specTask} />)
+    fireEvent.click(screen.getByTestId('run-agent-btn'))
+
+    await waitFor(() => expect(mockRpc).toHaveBeenCalled())
+    expect(mockUpdateTask).not.toHaveBeenCalled()
+  })
+
+  it('shows the spec review panel only when phase is spec-pending AND status is review', () => {
+    render(<TaskPromptEditor task={{ ...specTask, labels: ['phase:spec-pending'] }} />)
+    expect(screen.queryByTestId('spec-review-panel')).not.toBeInTheDocument()
+    cleanup()
+
+    render(
+      <TaskPromptEditor task={{ ...specTask, status: 'review', labels: ['phase:spec-pending'] }} />
+    )
+    expect(screen.getByTestId('spec-review-panel')).toBeInTheDocument()
+  })
+
+  it('Approve Spec replaces phase:spec-pending with phase:spec-approved', async () => {
+    render(
+      <TaskPromptEditor task={{ ...specTask, status: 'review', labels: ['phase:spec-pending'] }} />
+    )
+    fireEvent.click(screen.getByTestId('approve-spec-btn'))
+
+    await waitFor(() =>
+      expect(mockUpdateTask).toHaveBeenCalledWith({ labels: ['phase:spec-approved'] })
+    )
+  })
+
+  it('Request Changes posts a comment and does not change status/labels', async () => {
+    render(
+      <TaskPromptEditor task={{ ...specTask, status: 'review', labels: ['phase:spec-pending'] }} />
+    )
+    const textarea = screen.getByPlaceholderText('What needs to change?')
+    fireEvent.change(textarea, { target: { value: 'please add error handling' } })
+    fireEvent.click(screen.getByTestId('request-changes-btn'))
+
+    await waitFor(() => expect(mockAddComment).toHaveBeenCalledWith('please add error handling'))
+    expect(mockUpdateTask).not.toHaveBeenCalled()
+  })
+
+  it('shows the code review panel when phase is code-pending AND status is review', () => {
+    render(
+      <TaskPromptEditor task={{ ...specTask, status: 'review', labels: ['phase:code-pending'] }} />
+    )
+    expect(screen.getByTestId('code-review-panel')).toBeInTheDocument()
+  })
+
+  it('Approve & Mark Done sets status done and clears the phase label', async () => {
+    render(
+      <TaskPromptEditor task={{ ...specTask, status: 'review', labels: ['phase:code-pending'] }} />
+    )
+    fireEvent.click(screen.getByTestId('approve-code-btn'))
+
+    await waitFor(() => expect(mockUpdateTask).toHaveBeenCalledWith({ status: 'done', labels: [] }))
+  })
+
+  it('runWithAgent does not crash when no worktree is selected in the sidebar (found live: TypeError reading .path on null)', async () => {
+    vi.mocked(useWorkspace).mockReturnValueOnce({
+      project: { id: 'proj-1' },
+      currentWorktree: null
+    } as unknown as ReturnType<typeof useWorkspace>)
+    render(<TaskPromptEditor task={specTask} />)
+    fireEvent.click(screen.getByTestId('run-agent-btn'))
+
+    await waitFor(() => expect(mockRpc).toHaveBeenCalled())
+    expect(mockRpc.mock.calls[0]?.[2]).not.toHaveProperty('worktreePath')
+  })
+
+  it('withPhase never drops a non-phase label the user set independently', async () => {
+    render(
+      <TaskPromptEditor
+        task={{ ...specTask, status: 'review', labels: ['priority:urgent', 'phase:spec-pending'] }}
+      />
+    )
+    fireEvent.click(screen.getByTestId('approve-spec-btn'))
+
+    await waitFor(() =>
+      expect(mockUpdateTask).toHaveBeenCalledWith({
+        labels: ['priority:urgent', 'phase:spec-approved']
+      })
+    )
+  })
+
+  // BUG-027 follow-up: task.execute now dispatches async (returns before the
+  // agent finishes) — local `isRunning` alone resets right after that
+  // now-fast RPC resolves, no longer reflecting whether the agent is still
+  // actually working. The caller (TaskDetail) is expected to pass its
+  // freshest known task (polled, once available), so task.status ===
+  // 'in_progress' must independently keep every dispatch button disabled.
+  it('BUG-027: task.status === in_progress disables Run/Generate Spec/Implement Spec regardless of local isRunning', () => {
+    render(<TaskPromptEditor task={{ ...task, status: 'in_progress' }} />)
+    expect(screen.getByTestId('run-agent-btn')).toBeDisabled()
+    expect(screen.getByTestId('run-agent-btn')).toHaveTextContent('Running...')
+    expect(screen.getByTestId('generate-spec-btn')).toBeDisabled()
   })
 })

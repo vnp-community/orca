@@ -46,6 +46,7 @@ import { createProfileSlice } from './slices/profile-slice'
 import { createAIProviderSlice } from './slices/ai-provider-slice'
 import { createGitPanelSlice } from './slices/git-panel'
 import { createTaskSlice } from './slices/task'
+import { createWorkspaceTabSlice } from './slices/workspace-tab'
 import { createWorkflowSlice } from './slices/workflow'
 import { createTraceSlice } from './slices/trace'
 import { createRemoteAgentSessionSlice } from './slices/remote-agent-sessions'
@@ -114,6 +115,7 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createAIProviderSlice(...a),
   ...createGitPanelSlice(...a),
   ...createTaskSlice(...a),
+  ...createWorkspaceTabSlice(...a),
   ...createWorkflowSlice(...a),
   ...createTraceSlice(...a),
   ...createRemoteAgentSessionSlice(...a),

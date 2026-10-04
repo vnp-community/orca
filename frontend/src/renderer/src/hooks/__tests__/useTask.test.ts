@@ -19,7 +19,7 @@ vi.mock('../../runtime/runtime-rpc-client', () => ({
   getActiveRuntimeTarget: vi.fn().mockReturnValue('mock-target')
 }))
 
-const mockStore: any = {
+const mockStore = {
   tasks: [{ id: 'task-1', title: 'Task 1', projectId: 'proj-1' }],
   updateTask: vi.fn(),
   removeTask: vi.fn(),
@@ -28,9 +28,12 @@ const mockStore: any = {
 }
 
 vi.mock('../../store', () => ({
-  useAppStore: Object.assign((fn?: any) => (fn ? fn(mockStore) : mockStore), {
-    getState: () => mockStore
-  })
+  useAppStore: Object.assign(
+    (fn?: (state: typeof mockStore) => unknown) => (fn ? fn(mockStore) : mockStore),
+    {
+      getState: () => mockStore
+    }
+  )
 }))
 
 const mockRpc = vi.mocked(callRuntimeRpc)
@@ -64,8 +67,8 @@ describe('useTask().aiDecompose() tracing', () => {
 
     const callArgs = mockRpc.mock.calls[0]
     expect(callArgs?.[1]).toBe('task.aiDecompose')
-    expect((callArgs?.[2] as { projectId?: string }).projectId).toBe('proj-1')
-    expect((callArgs?.[2] as { traceId?: string }).traceId).toBe(startEvent?.id)
+    expect((callArgs?.[2] as { projectId?: string } | undefined)?.projectId).toBe('proj-1')
+    expect((callArgs?.[2] as { traceId?: string } | undefined)?.traceId).toBe(startEvent?.id)
   })
 
   it('without instruction → start({hasInstruction:false, promptLength:0})', async () => {
@@ -136,5 +139,23 @@ describe('useTask().aiDecompose() tracing', () => {
     stop()
 
     expect(events.filter((e) => e.flow === 'ui:taskGraph.aiPlan')).toHaveLength(0)
+  })
+
+  it('updateTask sends the flat {id, ...} shape the real task.update handler decodes (BUG-024)', async () => {
+    mockRpc.mockResolvedValueOnce(undefined)
+    const { useTask } = await import('../useTask')
+    const { result } = renderHook(() => useTask('task-1'))
+
+    await act(async () => {
+      await result.current.updateTask({ status: 'review', labels: ['phase:spec-review'] })
+    })
+
+    const callArgs = mockRpc.mock.calls[0]
+    expect(callArgs?.[1]).toBe('task.update')
+    expect(callArgs?.[2]).toEqual({
+      id: 'task-1',
+      status: 'review',
+      labels: ['phase:spec-review']
+    })
   })
 })

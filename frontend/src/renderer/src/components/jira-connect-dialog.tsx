@@ -52,11 +52,14 @@ export function JiraConnectDialog({
   const [connectState, setConnectState] = useState<ConnectState>('idle')
   const [connectError, setConnectError] = useState<string | null>(null)
 
+  // Why Email isn't required (CR-JIRA-001/BUG-013): Cloud uses Basic auth
+  // (email:token), but a self-hosted Server/Data Center site's Personal
+  // Access Token needs Bearer auth instead — authHeaderValue on the backend
+  // picks Bearer specifically when Email is blank. Requiring Email here
+  // made it impossible to ever submit the Bearer-PAT case; confirmed live
+  // against a real self-hosted site that only Bearer (blank Email) works.
   const canSubmit =
-    Boolean(siteUrl.trim()) &&
-    Boolean(email.trim()) &&
-    Boolean(apiToken.trim()) &&
-    connectState !== 'connecting'
+    Boolean(siteUrl.trim()) && Boolean(apiToken.trim()) && connectState !== 'connecting'
   const credentialStorageCopy = hasRemoteProviderRuntime(settings)
     ? 'Your token is sent to the selected remote runtime and stored there with runtime-supported encryption.'
     : 'Your token is stored locally and encrypted when local runtime storage supports it.'
@@ -78,7 +81,7 @@ export function JiraConnectDialog({
     const trimmedSite = siteUrl.trim()
     const trimmedEmail = email.trim()
     const trimmedToken = apiToken.trim()
-    if (!trimmedSite || !trimmedEmail || !trimmedToken || connectState === 'connecting') {
+    if (!trimmedSite || !trimmedToken || connectState === 'connecting') {
       return
     }
     setConnectState('connecting')
@@ -157,14 +160,17 @@ export function JiraConnectDialog({
             </div>
             <div className="space-y-2">
               <Label htmlFor={emailId} className="text-xs">
-                {translate('auto.components.jira.connect.dialog.2849ddb295', 'Atlassian email')}
+                {translate(
+                  'auto.components.jira.connect.dialog.2849ddb295',
+                  'Atlassian email (optional — leave blank for a Server/Data Center Personal Access Token)'
+                )}
               </Label>
               <Input
                 id={emailId}
                 type="email"
                 placeholder={translate(
                   'auto.components.jira.connect.dialog.e91b9a4073',
-                  'you@example.com'
+                  'you@example.com (Cloud only)'
                 )}
                 value={email}
                 onChange={(event) => {

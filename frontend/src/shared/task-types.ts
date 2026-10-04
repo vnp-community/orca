@@ -10,8 +10,17 @@
 /** Task classification */
 export type TaskType = 'epic' | 'story' | 'task' | 'subtask' | 'bug' | 'spike'
 
-/** Task lifecycle status */
+/** Task lifecycle status
+ * BUG-023 follow-up: 'open' added — task-service's domain.Status default
+ * (StatusOpen) is a real, first-class backend value (domain/task.go's own
+ * doc comment: "kept as a first-class value... existing rows/tests use
+ * it"), but this frontend enum never had it. Every task-service task
+ * created without an explicit status starts at 'open', not 'todo' — found
+ * live: a freshly created task disappeared from TaskBoardView (no matching
+ * column) and showed the wrong status badge everywhere else, since nothing
+ * here recognized the value. */
 export type TaskStatus =
+  | 'open'
   | 'backlog'
   | 'todo'
   | 'in_progress'
@@ -60,6 +69,16 @@ export type OrcaTask = {
    * lưu/trả field này (CR-FLOW-TASK-002 chưa triển khai) — luôn `undefined` sau
    * khi load lại task cho tới khi backend field tồn tại. */
   workflowTemplateId?: string
+  /** Per-project sequential number (e.g. "#TG-42") — immutable, assigned at create. */
+  taskNumber?: number
+  /** The git worktree this task's agent runs execute against (BUG-028) —
+   * empty until the task's first Execute call provisions one. Backend
+   * already sends this on the wire (channels.go's taskView.WorktreeID,
+   * json:"worktreeId,omitempty") — was missing from this type entirely
+   * until BL-TG-06's Merge Worktree action needed it. */
+  worktreeId?: string
+  /** Set by the PR-creation write-back saga; empty until a PR referencing this task exists. */
+  prUrl?: string
   dueDate?: Date
   createdAt: Date
   updatedAt: Date
@@ -128,6 +147,7 @@ export const TASK_PERMISSION_ORDER: Readonly<Record<TaskPermission, number>> = {
 
 /** Progress weights by status (leaf node calculation) */
 export const TASK_STATUS_PROGRESS: Readonly<Record<TaskStatus, number>> = {
+  open: 0,
   backlog: 0,
   todo: 0,
   in_progress: 40,

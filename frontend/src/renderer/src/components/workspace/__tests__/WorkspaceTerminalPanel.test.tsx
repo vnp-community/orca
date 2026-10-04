@@ -13,7 +13,11 @@ vi.mock('../../../store', () => ({
 const createNewTerminalTab = vi.fn()
 const closeTerminalTab = vi.fn()
 vi.mock('../../terminal/terminal-tab-actions', () => ({
-  createNewTerminalTab: (worktreeId: string) => createNewTerminalTab(worktreeId),
+  createNewTerminalTab: (
+    worktreeId: string,
+    shellOverride?: string,
+    options?: { startupCwd?: string }
+  ) => createNewTerminalTab(worktreeId, shellOverride, options),
   closeTerminalTab: (tabId: string) => closeTerminalTab(tabId)
 }))
 
@@ -31,7 +35,12 @@ vi.mock('../../terminal-pane/TerminalPane', () => ({
     onPtyExit: () => void
     onCloseTab: () => void
   }) => (
-    <div data-testid="terminal-pane" data-tab-id={tabId} data-worktree-id={worktreeId} data-active={String(isActive)}>
+    <div
+      data-testid="terminal-pane"
+      data-tab-id={tabId}
+      data-worktree-id={worktreeId}
+      data-active={String(isActive)}
+    >
       <button data-testid="pty-exit" onClick={onPtyExit} />
       <button data-testid="close-tab" onClick={onCloseTab} />
     </div>
@@ -49,15 +58,23 @@ describe('WorkspaceTerminalPanel', () => {
   })
 
   it('creates a terminal tab (reusing createNewTerminalTab) when the worktree has none yet', () => {
-    render(<WorkspaceTerminalPanel worktreeId="wt-1" />)
+    render(<WorkspaceTerminalPanel worktreeId="wt-1" worktreePath="/opt/repos/wt-1" />)
     expect(screen.getByText(/Starting terminal/)).toBeInTheDocument()
-    expect(createNewTerminalTab).toHaveBeenCalledWith('wt-1')
     expect(screen.queryByTestId('terminal-pane')).not.toBeInTheDocument()
   })
 
-  it('renders the real TerminalPane for the worktree\'s first tab once one exists', () => {
+  // Regression test for BUG-FE-PW-004: without startupCwd, a terminal opened
+  // from Project Workspace didn't land in the worktree's own directory.
+  it('passes the worktree path as startupCwd so the new tab opens there', () => {
+    render(<WorkspaceTerminalPanel worktreeId="wt-1" worktreePath="/opt/repos/wt-1" />)
+    expect(createNewTerminalTab).toHaveBeenCalledWith('wt-1', undefined, {
+      startupCwd: '/opt/repos/wt-1'
+    })
+  })
+
+  it("renders the real TerminalPane for the worktree's first tab once one exists", () => {
     mockTabsByWorktree = { 'wt-1': [{ id: 'tab-1' }, { id: 'tab-2' }] }
-    render(<WorkspaceTerminalPanel worktreeId="wt-1" />)
+    render(<WorkspaceTerminalPanel worktreeId="wt-1" worktreePath="/opt/repos/wt-1" />)
 
     const pane = screen.getByTestId('terminal-pane')
     expect(pane).toHaveAttribute('data-tab-id', 'tab-1')
@@ -68,7 +85,7 @@ describe('WorkspaceTerminalPanel', () => {
 
   it('reuses closeTerminalTab for both onPtyExit and onCloseTab', () => {
     mockTabsByWorktree = { 'wt-1': [{ id: 'tab-1' }] }
-    render(<WorkspaceTerminalPanel worktreeId="wt-1" />)
+    render(<WorkspaceTerminalPanel worktreeId="wt-1" worktreePath="/opt/repos/wt-1" />)
 
     screen.getByTestId('pty-exit').click()
     expect(closeTerminalTab).toHaveBeenCalledWith('tab-1')

@@ -318,8 +318,21 @@ export function activateAndRevealWorktree(
     state.setActiveRepo(wt.repoId)
   }
 
-  // 2. Switch any non-terminal view back to terminal
-  if (state.activeView !== 'terminal') {
+  // 2. Switch any non-terminal view back to terminal — EXCEPT Project
+  // Workspace (Beta, activeView === 'workspace'), which reuses the sidebar
+  // as its own worktree picker (see WorktreeList.tsx/GitPanel.tsx's own
+  // "Workspace has no picker of its own" comments) and expects a plain
+  // re-select to just update currentWorktree in place, not navigate away
+  // (CR-PW-012 — a worktree click while already in Workspace view was
+  // unconditionally yanking the user back to the classic Terminal view,
+  // defeating the whole point of clicking a worktree to see its Git tab).
+  // Still forces 'terminal' when there's real activation work (a startup
+  // script, setup split, issue-command split, or default-tabs launch) —
+  // those need a real terminal surface to show, even from Workspace view.
+  if (
+    state.activeView !== 'terminal' &&
+    !(state.activeView === 'workspace' && !hasActivationWork)
+  ) {
     state.setActiveView('terminal')
   }
 

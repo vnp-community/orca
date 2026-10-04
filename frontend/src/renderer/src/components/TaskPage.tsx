@@ -3559,9 +3559,12 @@ export default function TaskPage(): React.JSX.Element {
 
   const handleJiraConnect = useCallback(async (): Promise<void> => {
     const siteUrl = jiraSiteUrlDraft.trim()
+    // Email is optional (CR-JIRA-001/BUG-013) — see jira-connect-dialog.tsx's
+    // canSubmit doc comment for why: a self-hosted Server/Data Center PAT
+    // needs Bearer auth, which the backend only picks when Email is blank.
     const email = jiraEmailDraft.trim()
     const apiToken = jiraApiTokenDraft.trim()
-    if (!siteUrl || !email || !apiToken) {
+    if (!siteUrl || !apiToken) {
       return
     }
     setJiraConnectState('connecting')
@@ -8153,7 +8156,6 @@ export default function TaskPage(): React.JSX.Element {
             if (
               e.key === 'Enter' &&
               jiraSiteUrlDraft.trim() &&
-              jiraEmailDraft.trim() &&
               jiraApiTokenDraft.trim() &&
               jiraConnectState !== 'connecting'
             ) {
@@ -8192,7 +8194,10 @@ export default function TaskPage(): React.JSX.Element {
             />
             <Input
               type="email"
-              placeholder={translate('auto.components.TaskPage.68df347677', 'you@example.com')}
+              placeholder={translate(
+                'auto.components.TaskPage.68df347677',
+                'you@example.com (optional — leave blank for a Server/Data Center PAT)'
+              )}
               value={jiraEmailDraft}
               onChange={(e) => {
                 setJiraEmailDraft(e.target.value)
@@ -8251,7 +8256,6 @@ export default function TaskPage(): React.JSX.Element {
               onClick={() => void handleJiraConnect()}
               disabled={
                 !jiraSiteUrlDraft.trim() ||
-                !jiraEmailDraft.trim() ||
                 !jiraApiTokenDraft.trim() ||
                 jiraConnectState === 'connecting'
               }

@@ -11,17 +11,59 @@ import {
   SelectContent,
   SelectItem,
   SelectTrigger,
-  SelectValue,
+  SelectValue
 } from '@/components/ui/select'
 import { toast } from 'sonner'
 import { useAppStore } from '../../store'
 import { useShallow } from 'zustand/react/shallow'
-import type { RemoteAgentSession } from '../../store/slices/remote-agent-sessions'
+import type {
+  RemoteAgentSession,
+  RemoteAgentStatus
+} from '../../store/slices/remote-agent-sessions'
 import { Tracers } from '../../../../shared/trace/tracers'
 import {
   registerOpenAgentOrchSpan,
   takeOpenAgentOrchSpan
 } from '@/lib/agent-orchestration-active-spans'
+import { useWorkspace } from '../../context/WorkspaceContext'
+import { useAuthUser } from '../../hooks/useAuthSession'
+import { getActiveRuntimeTarget } from '../../runtime/runtime-rpc-client'
+import { getConnectionId } from '../../lib/connection-context'
+import { findWorktreeById } from '../../store/slices/worktree-helpers'
+import {
+  resolveRuntimeAgentProvider,
+  startRuntimeAgentSession,
+  resumeRuntimeAgentSession,
+  stopRuntimeAgentSession,
+  subscribeRuntimeAgentStatus,
+  type RuntimeAgentSessionStatus
+} from '../../runtime/runtime-agent-orchestration-client'
+
+// Backend AgentSession.status carries more detail (infrafleet.proto's
+// documented spawning|idle|running|waiting|completed|error|stopped) than
+// this panel's 4-value badge vocabulary — collapse it here rather than
+// growing AgentStatusBadge's config for states the UI doesn't act on
+// differently yet.
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
+function toRemoteAgentStatus(status: RuntimeAgentSessionStatus): RemoteAgentStatus {
+  switch (status) {
+    case 'spawning':
+      return 'starting'
+    case 'idle':
+    case 'running':
+    case 'waiting':
+      return 'running'
+    case 'error':
+      return 'error'
+    case 'completed':
+    case 'stopped':
+    default:
+      return 'stopped'
+  }
+}
 
 type AgentPanelProps = {
   worktreeId: string
@@ -34,13 +76,23 @@ type TrustPreset = 'standard' | 'permissive' | 'strict'
 
 function AgentStatusBadge({ status }: { status: RemoteAgentSession['status'] | undefined }) {
   if (!status || status === 'stopped') {
-    return <Badge variant="secondary" className="text-[10px]">Idle</Badge>
+    return (
+      <Badge variant="secondary" className="text-[10px]">
+        Idle
+      </Badge>
+    )
   }
   const configs: Record<string, { label: string; className: string }> = {
-    starting:  { label: 'Starting…', className: 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30' },
-    running:   { label: 'Running',   className: 'bg-green-500/20  text-green-600  border-green-500/30'  },
-    stopped:   { label: 'Idle',      className: ''                                                        },
-    error:     { label: 'Error',     className: 'bg-red-500/20    text-red-600    border-red-500/30'     },
+    starting: {
+      label: 'Starting…',
+      className: 'bg-yellow-500/20 text-yellow-600 border-yellow-500/30'
+    },
+    running: {
+      label: 'Running',
+      className: 'bg-green-500/20  text-green-600  border-green-500/30'
+    },
+    stopped: { label: 'Idle', className: '' },
+    error: { label: 'Error', className: 'bg-red-500/20    text-red-600    border-red-500/30' }
   }
   const cfg = configs[status] ?? configs.stopped
   return (
@@ -58,25 +110,66 @@ export function AgentPanel({ worktreeId }: AgentPanelProps) {
   const [trustPreset, setTrustPreset] = useState<TrustPreset>('standard')
   const [isActing, setIsActing] = useState(false)
 
+  const { project } = useWorkspace()
+  const currentUser = useAuthUser()
+
   const { session, setRemoteAgentSession, updateAgentStatus } = useAppStore(
-    useShallow(s => ({
+    useShallow((s) => ({
       session: s.remoteAgentSessions[worktreeId] as RemoteAgentSession | undefined,
       setRemoteAgentSession: s.setRemoteAgentSession,
-      updateAgentStatus:     s.updateAgentStatus,
+      updateAgentStatus: s.updateAgentStatus
     }))
   )
 
-  // Subscribe to status change events
+  // Subscribe to status change events. agent.subscribeStatus is tenant-wide
+  // (no worktreeId filter server-side, see channels_agent.go), so this reads
+  // the latest session id from the store on every push rather than closing
+  // over a stale value from mount time.
   useEffect(() => {
-    const unsubscribe = window.api.agentOrchestration.onStatusChanged(event => {
-      if (event.worktreeId === worktreeId) {
-        updateAgentStatus(event)
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    let cancelled = false
+    let unsubscribe: (() => void) | null = null
+    subscribeRuntimeAgentStatus(target, (event) => {
+      const current = useAppStore.getState().remoteAgentSessions[worktreeId]
+      if (current?.sessionId && current.sessionId === event.session_id) {
+        updateAgentStatus({
+          worktreeId,
+          sessionId: event.session_id,
+          status: toRemoteAgentStatus(event.status)
+        })
       }
     })
-    return unsubscribe
+      .then((handle) => {
+        if (cancelled) {
+          handle.unsubscribe()
+          return
+        }
+        unsubscribe = handle.unsubscribe
+      })
+      .catch(() => {
+        // Why no toast here: a status-subscribe failure (e.g. no runtime
+        // environment connected yet) shouldn't itself surface as an error —
+        // startAgent/resumeAgent's own error handling covers the user-facing
+        // signal when the same target is unusable.
+      })
+    return () => {
+      cancelled = true
+      unsubscribe?.()
+    }
   }, [worktreeId, updateAgentStatus])
 
   const startAgent = useCallback(async () => {
+    if (!currentUser) {
+      toast.error('Sign in before starting an agent')
+      return
+    }
+    const worktree = findWorktreeById(useAppStore.getState().worktreesByRepo, worktreeId)
+    if (!worktree) {
+      toast.error('Worktree not found')
+      return
+    }
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    const connectionId = getConnectionId(worktreeId) ?? ''
     setIsActing(true)
     // Optimistic update
     updateAgentStatus({ worktreeId, status: 'starting' })
@@ -85,97 +178,149 @@ export function AgentPanel({ worktreeId }: AgentPanelProps) {
     const span = Tracers.uiAgentOrchSpawnFlow.start({ worktreeId, agentType, trustPreset })
     registerOpenAgentOrchSpan(worktreeId, span)
     try {
-      const result = await window.api.agentOrchestration.start({
-        worktreeId,
-        agentType,
-        trustPreset,
-        traceId: span.id,
+      // TASK-AG-01-07: StartAgentSession never resolves its own account/model
+      // — the caller must call aiProvider.resolve first.
+      const { accountId, modelId } = await resolveRuntimeAgentProvider(target, {
+        userId: currentUser.id,
+        projectId: project?.id ?? '',
+        devServerId: project?.devServerId ?? '',
+        agentType
       })
-      span.step('ipc-invoke-resolved', { sessionId: result.sessionId, status: result.status })
+      const { ack: startedSession } = await startRuntimeAgentSession(
+        target,
+        {
+          connectionId,
+          worktreeId,
+          userId: currentUser.id,
+          cwd: worktree.path,
+          modelId,
+          accountId,
+          trustPreset
+        },
+        () => {
+          // Pty output isn't surfaced by this panel yet — see SOL-FE-PW-004
+          // "Not done in this spec".
+        }
+      )
+      span.step('rpc-resolved', { sessionId: startedSession.id, status: startedSession.status })
       setRemoteAgentSession(worktreeId, {
-        sessionId: result.sessionId,
+        sessionId: startedSession.id,
         worktreeId,
         agentType,
         trustPreset,
-        status: result.status === 'already-running' ? 'running' : 'starting',
-        startedAt: Date.now(),
+        status: toRemoteAgentStatus(startedSession.status),
+        startedAt: Date.now()
       })
-      if (result.status === 'already-running') {
-        toast.info('Agent is already running')
-        // Why: 'already-running' is a terminal outcome — no statusChanged event
-        // will ever arrive to close this span, so ok() it right here.
-        takeOpenAgentOrchSpan(worktreeId)
-        span.ok({ sessionId: result.sessionId, status: result.status })
-      }
-      // If result.status === 'started': span stays open, waiting for
-      // statusChanged 'running'|'error' to close it (TASK-FE-002.3).
-    } catch (err: any) {
+      // Span stays open, waiting for agent.subscribeStatus's 'running'|'error'
+      // to close it (TASK-FE-002.3) — resolveRuntimeAgentProvider/
+      // startRuntimeAgentSession's ack alone doesn't confirm the agent
+      // actually came up.
+    } catch (err: unknown) {
       takeOpenAgentOrchSpan(worktreeId)
       span.fail(err, { worktreeId, agentType })
-      updateAgentStatus({ worktreeId, status: 'error', errorMessage: err.message })
-      toast.error(`Failed to start agent: ${err.message}`)
+      updateAgentStatus({ worktreeId, status: 'error', errorMessage: errorText(err) })
+      toast.error(`Failed to start agent: ${errorText(err)}`)
     } finally {
       setIsActing(false)
     }
-  }, [worktreeId, agentType, trustPreset, updateAgentStatus, setRemoteAgentSession])
+  }, [
+    worktreeId,
+    agentType,
+    trustPreset,
+    updateAgentStatus,
+    setRemoteAgentSession,
+    currentUser,
+    project
+  ])
 
   const stopAgent = useCallback(async () => {
-    if (!session?.sessionId) {return}
+    if (!session?.sessionId) {
+      return
+    }
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
     setIsActing(true)
     // Why: stop() is a simple request/response — unlike spawn/resume, 'starting'
     // is never an intermediate status here, so the span closes immediately.
     const span = Tracers.uiAgentOrchStopFlow.start({ worktreeId, sessionId: session.sessionId })
     try {
-      await window.api.agentOrchestration.stop({ sessionId: session.sessionId, traceId: span.id })
+      await stopRuntimeAgentSession(target, session.sessionId)
       updateAgentStatus({ worktreeId, status: 'stopped' })
       span.ok({ worktreeId, sessionId: session.sessionId })
-    } catch (err: any) {
+    } catch (err: unknown) {
       span.fail(err, { worktreeId, sessionId: session.sessionId })
-      toast.error(`Failed to stop agent: ${err.message}`)
+      toast.error(`Failed to stop agent: ${errorText(err)}`)
     } finally {
       setIsActing(false)
     }
   }, [session, worktreeId, updateAgentStatus])
 
   const resumeAgent = useCallback(async () => {
-    if (!session?.sessionId) {return}
+    if (!session?.sessionId || !currentUser) {
+      return
+    }
+    const worktree = findWorktreeById(useAppStore.getState().worktreesByRepo, worktreeId)
+    if (!worktree) {
+      toast.error('Worktree not found')
+      return
+    }
+    const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+    const connectionId = getConnectionId(worktreeId) ?? ''
     setIsActing(true)
     updateAgentStatus({ worktreeId, status: 'starting' })
     const span = Tracers.uiAgentOrchResumeFlow.start({ worktreeId, sessionId: session.sessionId })
     registerOpenAgentOrchSpan(worktreeId, span)
     try {
-      const result = await window.api.agentOrchestration.resume({
-        sessionId: session.sessionId,
-        traceId: span.id,
-      })
-      if (!result.resumed) {
-        takeOpenAgentOrchSpan(worktreeId)
-        span.fail(new Error('resume returned resumed:false'), {
+      // ResumeAgentSessionRequest resumes by worktree, not by the old
+      // sessionId (infra-fleet finds the worktree's most recent session) —
+      // see SOL-FE-PW-004's contract-mismatch #2.
+      const { ack: resumed } = await resumeRuntimeAgentSession(
+        target,
+        {
+          connectionId,
           worktreeId,
-          sessionId: session.sessionId,
-        })
-        toast.error('Could not resume agent session')
-        updateAgentStatus({ worktreeId, status: 'stopped' })
-        return
-      }
-      span.step('ipc-invoke-resolved', { sessionId: session.sessionId })
-      // Span stays open — statusChanged 'running' will close it (TASK-FE-002.3).
-    } catch (err: any) {
+          userId: currentUser.id,
+          cwd: worktree.path
+        },
+        () => {
+          // Pty output isn't surfaced by this panel yet — see SOL-FE-PW-004
+          // "Not done in this spec".
+        }
+      )
+      setRemoteAgentSession(worktreeId, {
+        sessionId: resumed.id,
+        worktreeId,
+        agentType,
+        trustPreset,
+        status: toRemoteAgentStatus(resumed.status),
+        startedAt: session.startedAt
+      })
+      span.step('rpc-resolved', { sessionId: resumed.id })
+      // Span stays open — agent.subscribeStatus's 'running' will close it
+      // (TASK-FE-002.3).
+    } catch (err: unknown) {
       takeOpenAgentOrchSpan(worktreeId)
       span.fail(err, { worktreeId, sessionId: session.sessionId })
-      updateAgentStatus({ worktreeId, status: 'error', errorMessage: err.message })
-      toast.error(`Failed to resume agent: ${err.message}`)
+      updateAgentStatus({ worktreeId, status: 'error', errorMessage: errorText(err) })
+      toast.error(`Failed to resume agent: ${errorText(err)}`)
     } finally {
       setIsActing(false)
     }
-  }, [session, worktreeId, updateAgentStatus])
+  }, [
+    session,
+    worktreeId,
+    updateAgentStatus,
+    setRemoteAgentSession,
+    currentUser,
+    agentType,
+    trustPreset
+  ])
 
   const status = session?.status
-  const isRunning   = status === 'running'
-  const isStopped   = !status || status === 'stopped'
-  const isStarting  = status === 'starting'
-  const canResume   = status === 'stopped' && !!session?.sessionId
-  const isDisabled  = isActing || isStarting
+  const isRunning = status === 'running'
+  const isStopped = !status || status === 'stopped'
+  const isStarting = status === 'starting'
+  const canResume = status === 'stopped' && !!session?.sessionId
+  const isDisabled = isActing || isStarting
 
   return (
     <div className="agent-panel flex flex-col gap-3 p-3 border rounded-lg bg-card">
@@ -200,7 +345,7 @@ export function AgentPanel({ worktreeId }: AgentPanelProps) {
         <div className="grid grid-cols-2 gap-2">
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Agent type</label>
-            <Select value={agentType} onValueChange={v => setAgentType(v as AgentType)}>
+            <Select value={agentType} onValueChange={(v) => setAgentType(v as AgentType)}>
               <SelectTrigger className="h-7 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -214,7 +359,7 @@ export function AgentPanel({ worktreeId }: AgentPanelProps) {
 
           <div className="space-y-1">
             <label className="text-xs text-muted-foreground">Trust level</label>
-            <Select value={trustPreset} onValueChange={v => setTrustPreset(v as TrustPreset)}>
+            <Select value={trustPreset} onValueChange={(v) => setTrustPreset(v as TrustPreset)}>
               <SelectTrigger className="h-7 text-xs">
                 <SelectValue />
               </SelectTrigger>
@@ -274,10 +419,7 @@ export function AgentPanel({ worktreeId }: AgentPanelProps) {
             onClick={stopAgent}
             disabled={isDisabled}
           >
-            {isActing
-              ? <Loader2 size={12} className="animate-spin" />
-              : <Square size={12} />
-            }
+            {isActing ? <Loader2 size={12} className="animate-spin" /> : <Square size={12} />}
             Stop
           </Button>
         )}

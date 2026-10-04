@@ -44,6 +44,7 @@ import type { ProfileSlice } from './slices/profile-slice'
 import type { AIProviderSlice } from './slices/ai-provider-slice'
 import type { GitPanelSlice } from './slices/git-panel'
 import type { TaskSlice } from './slices/task'
+import type { WorkspaceTabSlice } from './slices/workspace-tab'
 import type { WorkflowSlice } from './slices/workflow'
 import type { TraceSlice } from './slices/trace'
 import type { RemoteAgentSessionSlice } from './slices/remote-agent-sessions'
@@ -109,6 +110,7 @@ export type AppState = RepoSlice &
   AIProviderSlice &
   GitPanelSlice &
   TaskSlice &
+  WorkspaceTabSlice &
   WorkflowSlice &
   TraceSlice &
   RemoteAgentSessionSlice &

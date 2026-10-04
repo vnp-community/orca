@@ -5,6 +5,7 @@ import type { TaskStatus, TaskPriority } from '../../../../shared/task-types'
 // FE-TASK-003 (task-graph v4): previously covered only 4 of 7 TaskStatus values and fell
 // back to "Todo" for backlog/review/blocked — fixed below to cover all 7.
 const STATUS_CONFIG = {
+  open: { label: 'Open', icon: '🆕', className: 'text-slate-500' },
   backlog: { label: 'Backlog', icon: '📋', className: 'text-slate-400' },
   todo: { label: 'Todo', icon: '⏳', className: 'text-gray-500' },
   in_progress: { label: 'In Progress', icon: '🔄', className: 'text-blue-600' },

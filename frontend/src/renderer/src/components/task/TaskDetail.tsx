@@ -27,6 +27,7 @@ import type { OrcaTask, TaskPriority, TaskStatus } from '../../../../shared/task
 // Tabs: Details | Subtasks | AI Agent | Comments | Access
 
 const TASK_STATUSES: OrcaTask['status'][] = [
+  'open',
   'backlog',
   'todo',
   'in_progress',
@@ -36,10 +37,14 @@ const TASK_STATUSES: OrcaTask['status'][] = [
   'cancelled'
 ]
 
+type WorktreeListItem = { id: string; path: string; branch: string }
+
 export function TaskDetail() {
   const activeTaskId = useAppStore((s) => s.activeTaskId)
   const { task, updateTask } = useTask(activeTaskId!)
-  const { project, currentWorktree } = useWorkspace()
+  const { project, setCurrentWorktree } = useWorkspace()
+  const setActiveWorkspaceTab = useAppStore((s) => s.setActiveWorkspaceTab)
+  const [openingInGit, setOpeningInGit] = useState(false)
   const [localTitle, setLocalTitle] = useState(task?.title ?? '')
   const [activeTab, setActiveTab] = useState<'details' | 'subtasks' | 'ai' | 'comments' | 'access'>(
     'details'
@@ -48,6 +53,17 @@ export function TaskDetail() {
   // useTaskActivity.ts's header comment. `polledTask` reflects status changes (e.g.
   // 'in_progress' → 'done') without the user needing to F5.
   const { task: polledTask } = useTaskActivity(task?.id ?? null)
+  // isDispatching covers the gap between clicking "Execute with Agent" and
+  // the next poll tick actually reporting in_progress (BUG-027 follow-up —
+  // see handleRunAgent's doc comment). Reset once polling confirms the task
+  // is no longer running, whether it finished or the backgrounded dispatch
+  // reverted the status on failure.
+  const [isDispatching, setIsDispatching] = useState(false)
+  useEffect(() => {
+    if (polledTask && polledTask.status !== 'in_progress') {
+      setIsDispatching(false)
+    }
+  }, [polledTask])
 
   // task.getDependencies returns a flat Task[] (NOT { task, edgeType }[] — no edgeType field
   // exists at all, see task.proto:169-177 + channels_automation_task.go:296-308), always the
@@ -89,7 +105,25 @@ export function TaskDetail() {
     return <div className="p-4 text-sm text-muted-foreground">Select a task</div>
   }
 
+  // BUG-027 follow-up: task.execute now dispatches async (returns in
+  // milliseconds instead of blocking for the whole agent run), so nothing
+  // server-side stops a second click from firing another concurrent
+  // dispatch for the SAME task while the first is still running — found
+  // live: a user repeatedly clicking (because the first click gave no
+  // visible feedback) fired several concurrent dispatches against the same
+  // dev server connection and crashed it. task-service now rejects a
+  // re-dispatch while already in_progress (TASK_EXECUTE_ALREADY_IN_PROGRESS),
+  // but that's a safety net, not a substitute for the button reflecting
+  // reality — isDispatching covers the gap between click and the next
+  // poll tick (useTaskActivity polls every 4s) actually reporting
+  // in_progress; effectiveStatus (falls back to task.status when the poll
+  // hasn't landed yet, e.g. right after navigating to a task) covers the
+  // rest.
+  const effectiveStatus = polledTask?.status ?? task.status
+  const isRunning = isDispatching || effectiveStatus === 'in_progress'
+
   const handleRunAgent = async () => {
+    setIsDispatching(true)
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
     // field `entryPoint: 'task-detail'` phân biệt với TaskPromptEditor (TASK-FE-018.3) —
     // 2 nút UI khác nhau cùng dẫn vào 1 tracer chung (BL-TG-04).
@@ -98,10 +132,16 @@ export function TaskDetail() {
       entryPoint: 'task-detail'
     })
     try {
+      // Why no worktreePath: task.execute's real handler (channels_automation_task.go)
+      // never reads it — SimpleExecutor resolves the task's own worktree
+      // server-side (task.projectId → ProjectExecutionResolver), independent
+      // of whichever worktree happens to be selected in the sidebar. Sending
+      // `currentWorktree!.path` here crashed with no worktree selected (a
+      // real, common state on the Tasks tab, which has no worktree
+      // requirement of its own) — found live.
       await callRuntimeRpc(target, 'task.execute', {
         taskId: task.id,
         projectId: project!.id,
-        worktreePath: currentWorktree!.path,
         traceId: span.id
       })
       span.ok({ taskId: task.id })
@@ -111,6 +151,44 @@ export function TaskDetail() {
     } catch (err) {
       span.fail(err, { taskId: task.id })
       toast.error(`Failed to start agent: ${err instanceof Error ? err.message : String(err)}`)
+      setIsDispatching(false) // dispatch itself failed synchronously — safe to let the user retry right away
+    }
+  }
+
+  // Jumps straight to this task's own worktree in the Git tab — before this,
+  // seeing an agent's changes meant manually finding the right worktree in
+  // the sidebar, which (unlike the Tasks tab) has no relation to which task
+  // it came from. worktree.list is the only RPC that resolves task.worktreeId
+  // (a plain UUID, same as project.worktrees.id) to a path/branch — there is
+  // no single-worktree-by-id fetch.
+  const handleOpenInGit = async () => {
+    if (!task.worktreeId || !project) {
+      return
+    }
+    setOpeningInGit(true)
+    try {
+      const target = getActiveRuntimeTarget(useAppStore.getState().settings)
+      const { worktrees } = await callRuntimeRpc<{ worktrees: WorktreeListItem[] }>(
+        target,
+        'worktree.list',
+        { projectId: project.id }
+      )
+      const worktree = worktrees.find((w) => w.id === task.worktreeId)
+      if (!worktree) {
+        toast.error("This task's worktree no longer exists")
+        return
+      }
+      setCurrentWorktree({
+        id: worktree.id,
+        path: worktree.path,
+        branch: worktree.branch,
+        isMain: false
+      })
+      setActiveWorkspaceTab('git')
+    } catch (err) {
+      toast.error(`Failed to open worktree: ${err instanceof Error ? err.message : String(err)}`)
+    } finally {
+      setOpeningInGit(false)
     }
   }
 
@@ -128,10 +206,26 @@ export function TaskDetail() {
       {/* Action Buttons */}
       <div className="flex gap-2 mt-2 items-center">
         <ExecutionEngineBadge task={task} />
+        <TaskSourceBadge taskId={task.id} />
         <AttachWorkflowTemplateAction task={task} />
         {canExecute && (
-          <Button variant="default" onClick={handleRunAgent} data-testid="run-agent-btn">
-            ▶ Execute with Agent
+          <Button
+            variant="default"
+            onClick={handleRunAgent}
+            disabled={isRunning}
+            data-testid="run-agent-btn"
+          >
+            {isRunning ? '⏳ Agent running…' : '▶ Execute with Agent'}
+          </Button>
+        )}
+        {task.worktreeId && (
+          <Button
+            variant="outline"
+            onClick={handleOpenInGit}
+            disabled={openingInGit}
+            data-testid="open-in-git-btn"
+          >
+            {openingInGit ? 'Opening…' : '🔀 Open in Git'}
           </Button>
         )}
       </div>
@@ -206,7 +300,6 @@ export function TaskDetail() {
               {blockedBy.length > 0 ? (
                 <div className="text-muted-foreground flex gap-1">
                   <span>← Blocked by:</span>
-        <TaskSourceBadge taskId={task.id} />
                   <span>{blockedBy.map((d) => d.title).join(', ')}</span>
                 </div>
               ) : null}
@@ -227,7 +320,11 @@ export function TaskDetail() {
           <TaskAIDecompose parentTask={task} />
         </TabsContent>
         <TabsContent value="ai">
-          <TaskPromptEditor task={task} />
+          {/* polledTask ?? task: TaskPromptEditor's own run-button guard
+              (BUG-027 follow-up) needs the freshest known status to detect
+              "already in_progress" once polling catches up, not the
+              possibly-stale store copy. */}
+          <TaskPromptEditor task={polledTask ?? task} />
         </TabsContent>
         <TabsContent value="comments">
           <TaskComments taskId={task.id} />

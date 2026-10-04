@@ -8,8 +8,25 @@ export function useTask(taskId: string) {
 
   const updateTask = async (patch: Partial<OrcaTask>) => {
     const target = getActiveRuntimeTarget(useAppStore.getState().settings)
-    // task.update expects the patch nested under `patch`, not spread at the top level.
-    await callRuntimeRpc(target, 'task.update', { taskId, patch })
+    // BUG-024: task.update's real handler (channels_automation_task.go)
+    // decodes flat {id, title, status, workflowTemplateId, labels} — no
+    // `patch` wrapper, and the id key is `id`, not `taskId`. Only send keys
+    // actually present in `patch` (an omitted key must leave that field
+    // untouched server-side, per UpdateTaskRequest's field-mask convention).
+    const args: Record<string, unknown> = { id: taskId }
+    if ('title' in patch) {
+      args.title = patch.title
+    }
+    if ('status' in patch) {
+      args.status = patch.status
+    }
+    if ('workflowTemplateId' in patch) {
+      args.workflowTemplateId = patch.workflowTemplateId
+    }
+    if ('labels' in patch) {
+      args.labels = patch.labels
+    }
+    await callRuntimeRpc(target, 'task.update', args)
     useAppStore.getState().updateTask(taskId, patch)
   }
 

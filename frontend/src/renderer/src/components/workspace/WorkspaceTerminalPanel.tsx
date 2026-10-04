@@ -10,9 +10,14 @@ import { createNewTerminalTab, closeTerminalTab } from '../terminal/terminal-tab
 
 type WorkspaceTerminalPanelProps = {
   worktreeId: string
+  /** BUG-FE-PW-004: the worktree's filesystem path, passed as the new tab's
+   *  startupCwd — without it, createNewTerminalTab falls back to whatever
+   *  default cwd the runtime picks (not necessarily this worktree), so a
+   *  terminal opened here didn't land in the worktree's own directory. */
+  worktreePath: string
 }
 
-export function WorkspaceTerminalPanel({ worktreeId }: WorkspaceTerminalPanelProps) {
+export function WorkspaceTerminalPanel({ worktreeId, worktreePath }: WorkspaceTerminalPanelProps) {
   const tabIds = useAppStore(
     useShallow((s) => (s.tabsByWorktree[worktreeId] ?? []).map((tab) => tab.id))
   )
@@ -23,9 +28,9 @@ export function WorkspaceTerminalPanel({ worktreeId }: WorkspaceTerminalPanelPro
   // the sidebar uses (createNewTerminalTab), not a new PTY spawn path.
   useEffect(() => {
     if (tabIds.length === 0) {
-      createNewTerminalTab(worktreeId)
+      createNewTerminalTab(worktreeId, undefined, { startupCwd: worktreePath })
     }
-  }, [worktreeId, tabIds.length])
+  }, [worktreeId, worktreePath, tabIds.length])
 
   if (!tabId) {
     return (

@@ -7,6 +7,10 @@ import { useTask } from '../../../hooks/useTask'
 import { registerTraceSink, type TraceEvent } from '../../../../../shared/trace'
 
 // Mock useAppStore for activeTaskId and settings
+const { mockSetActiveWorkspaceTab, mockSetCurrentWorktree } = vi.hoisted(() => ({
+  mockSetActiveWorkspaceTab: vi.fn(),
+  mockSetCurrentWorktree: vi.fn()
+}))
 vi.mock('../../../store', () => ({
   useAppStore: Object.assign(
     vi.fn((selector) =>
@@ -15,7 +19,8 @@ vi.mock('../../../store', () => ({
         settings: {},
         tasks: [],
         templates: [],
-        currentUser: { id: 'u1' }
+        currentUser: { id: 'u1' },
+        setActiveWorkspaceTab: mockSetActiveWorkspaceTab
       })
     ),
     { getState: () => ({ settings: {}, updateTask: vi.fn() }) }
@@ -31,9 +36,11 @@ vi.mock('../../../hooks/useTask', () => ({
 vi.mock('../../../context/WorkspaceContext', () => ({
   useWorkspace: vi.fn().mockReturnValue({
     project: { id: 'p1' },
-    currentWorktree: { id: 'wt-1', path: '/repo/p1', branch: 'main', isMain: true }
+    currentWorktree: { id: 'wt-1', path: '/repo/p1', branch: 'main', isMain: true },
+    setCurrentWorktree: mockSetCurrentWorktree
   })
 }))
+import { useWorkspace } from '../../../context/WorkspaceContext'
 
 // Mock RPC
 vi.mock('../../../runtime/runtime-rpc-client', () => ({
@@ -102,7 +109,7 @@ describe('TaskDetail', () => {
     expect(screen.getByTestId('task-title-input')).toHaveValue('My Task')
   })
 
-  it('Execute with Agent button calls task.execute with taskId/projectId/worktreePath + traceId', async () => {
+  it('Execute with Agent button calls task.execute with taskId/projectId + traceId, never worktreePath (dead param, crashed with no worktree selected)', async () => {
     render(<TaskDetail />)
     fireEvent.click(screen.getByTestId('run-agent-btn'))
     await waitFor(() => {
@@ -112,10 +119,23 @@ describe('TaskDetail', () => {
         expect.objectContaining({
           taskId: 't1',
           projectId: 'p1',
-          worktreePath: '/repo/p1',
           traceId: expect.any(String)
         })
       )
+    })
+    const executeCall = mockRpc.mock.calls.find((c) => c[1] === 'task.execute')
+    expect(executeCall?.[2]).not.toHaveProperty('worktreePath')
+  })
+
+  it('Execute with Agent does not crash when no worktree is selected in the sidebar (found live: TypeError reading .path on null)', async () => {
+    vi.mocked(useWorkspace).mockReturnValueOnce({
+      project: { id: 'p1' },
+      currentWorktree: null
+    } as unknown as ReturnType<typeof useWorkspace>)
+    render(<TaskDetail />)
+    fireEvent.click(screen.getByTestId('run-agent-btn'))
+    await waitFor(() => {
+      expect(mockRpc).toHaveBeenCalledWith('mock-target', 'task.execute', expect.any(Object))
     })
   })
 
@@ -243,6 +263,34 @@ describe('TaskDetail', () => {
     })
   })
 
+  // BUG-027 follow-up: task.execute now dispatches async (returns before the
+  // agent finishes) — nothing else stops a second click from firing another
+  // concurrent dispatch for the same task while the first is still running,
+  // which live-crashed a dev server connection. The button must disable
+  // once polling reports in_progress.
+  it('BUG-027: polled in_progress status disables the run-agent button', async () => {
+    mockRpcByMethod({
+      'task.get': () => Promise.resolve({ id: 't1', status: 'in_progress' })
+    })
+    render(<TaskDetail />)
+    await waitFor(() => {
+      expect(screen.getByTestId('run-agent-btn')).toBeDisabled()
+      expect(screen.getByTestId('run-agent-btn')).toHaveTextContent('Agent running')
+    })
+  })
+
+  it('BUG-027: clicking run-agent-btn disables it immediately, before any poll lands', async () => {
+    mockRpcByMethod({
+      'task.execute': () => new Promise(() => {}), // never resolves — simulates the async dispatch still in flight
+      'task.get': () => new Promise(() => {}) // never resolves — isolates this test from polling's own effect
+    })
+    render(<TaskDetail />)
+    fireEvent.click(screen.getByTestId('run-agent-btn'))
+    await waitFor(() => {
+      expect(screen.getByTestId('run-agent-btn')).toBeDisabled()
+    })
+  })
+
   // TASK-FE-TASKV1-10: dispatch status panel sits under the Execute button.
   it('renders TaskDispatchStatusPanel, calling orchestration.dispatchShow for this task', async () => {
     mockRpcByMethod({
@@ -314,6 +362,87 @@ describe('TaskDetail', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Access' }))
     await waitFor(() => {
       expect(screen.getByTestId('task-grant-modal')).toBeInTheDocument()
+    })
+  })
+
+  // "Open in Git": before this, seeing a task's agent-created files meant
+  // manually finding the right worktree in the sidebar — nothing connected
+  // Task Detail to which worktree the task's own execution actually used.
+  describe('Open in Git', () => {
+    it('task has no worktreeId → button is not rendered', () => {
+      render(<TaskDetail />)
+      expect(screen.queryByTestId('open-in-git-btn')).not.toBeInTheDocument()
+    })
+
+    it('task has worktreeId → clicking resolves it via worktree.list, then switches worktree + tab', async () => {
+      vi.mocked(useTask).mockReturnValue({
+        task: {
+          id: 't1',
+          title: 'My Task',
+          status: 'done',
+          priority: 'high',
+          projectId: 'p1',
+          worktreeId: 'wt-task-1'
+        },
+        updateTask
+      } as unknown as ReturnType<typeof useTask>)
+      mockRpcByMethod({
+        'worktree.list': () =>
+          Promise.resolve({
+            worktrees: [
+              { id: 'wt-other', path: '/repo/other', branch: 'main' },
+              { id: 'wt-task-1', path: '/repo/task-1', branch: 'task/t1' }
+            ]
+          })
+      })
+      render(<TaskDetail />)
+      fireEvent.click(screen.getByTestId('open-in-git-btn'))
+
+      await waitFor(() => {
+        expect(mockSetCurrentWorktree).toHaveBeenCalledWith({
+          id: 'wt-task-1',
+          path: '/repo/task-1',
+          branch: 'task/t1',
+          isMain: false
+        })
+      })
+      expect(mockSetActiveWorkspaceTab).toHaveBeenCalledWith('git')
+    })
+
+    it('worktree.list has no matching entry → toast.error, never switches worktree/tab', async () => {
+      vi.mocked(useTask).mockReturnValue({
+        task: {
+          id: 't1',
+          title: 'My Task',
+          status: 'done',
+          projectId: 'p1',
+          worktreeId: 'wt-gone'
+        },
+        updateTask
+      } as unknown as ReturnType<typeof useTask>)
+      mockRpcByMethod({ 'worktree.list': () => Promise.resolve({ worktrees: [] }) })
+      render(<TaskDetail />)
+      fireEvent.click(screen.getByTestId('open-in-git-btn'))
+
+      await waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith("This task's worktree no longer exists")
+      })
+      expect(mockSetCurrentWorktree).not.toHaveBeenCalled()
+      expect(mockSetActiveWorkspaceTab).not.toHaveBeenCalled()
+    })
+
+    it('worktree.list RPC fails → toast.error with the failure message', async () => {
+      vi.mocked(useTask).mockReturnValue({
+        task: { id: 't1', title: 'My Task', status: 'done', projectId: 'p1', worktreeId: 'wt-1' },
+        updateTask
+      } as unknown as ReturnType<typeof useTask>)
+      mockRpcByMethod({ 'worktree.list': () => Promise.reject(new Error('boom')) })
+      render(<TaskDetail />)
+      fireEvent.click(screen.getByTestId('open-in-git-btn'))
+
+      await waitFor(() => {
+        expect(mockToast.error).toHaveBeenCalledWith('Failed to open worktree: boom')
+      })
     })
   })
 })

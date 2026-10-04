@@ -2,12 +2,46 @@
 import '@testing-library/jest-dom/vitest'
 import { render, screen, fireEvent, cleanup, waitFor } from '@testing-library/react'
 import { describe, expect, it, vi, beforeEach, afterEach } from 'vitest'
-import type { ReactNode } from 'react'
+import { useSyncExternalStore, type ReactNode } from 'react'
 import { WorkspaceLayout } from '../WorkspaceLayout'
 import { useWorkspace } from '../../../context/WorkspaceContext'
 
 vi.mock('../../../context/WorkspaceContext', () => ({
   useWorkspace: vi.fn()
+}))
+
+let mockActiveTaskId: string | null = null
+// activeWorkspaceTab needs real reactivity (unlike activeTaskId, which tests
+// only ever set before render): WorkspaceLayout reads it via multiple
+// separate useAppStore(selector) calls that must all observe the same
+// value, and clicking a tab must re-render the component — a plain
+// selector(state) call (activeTaskId's pattern) can't do either.
+let mockActiveWorkspaceTab = 'git'
+const workspaceTabListeners = new Set<() => void>()
+function mockSetActiveWorkspaceTab(tab: string): void {
+  mockActiveWorkspaceTab = tab
+  workspaceTabListeners.forEach((l) => l())
+}
+vi.mock('../../../store', () => ({
+  useAppStore: (
+    selector: (s: {
+      activeTaskId: string | null
+      activeWorkspaceTab: string
+      setActiveWorkspaceTab: (tab: string) => void
+    }) => unknown
+  ) =>
+    useSyncExternalStore(
+      (listener) => {
+        workspaceTabListeners.add(listener)
+        return () => workspaceTabListeners.delete(listener)
+      },
+      () =>
+        selector({
+          activeTaskId: mockActiveTaskId,
+          activeWorkspaceTab: mockActiveWorkspaceTab,
+          setActiveWorkspaceTab: mockSetActiveWorkspaceTab
+        })
+    )
 }))
 
 vi.mock('../WorkspaceTabBar', () => ({
@@ -58,6 +92,9 @@ vi.mock('../ExplorerPanel', () => ({ ExplorerPanel: () => <div data-testid="expl
 vi.mock('../git/GitPanel', () => ({ GitPanel: () => <div data-testid="git-panel" /> }))
 vi.mock('../../task/TaskGraphPanel', () => ({
   TaskGraphPanel: () => <div data-testid="task-graph-panel" />
+}))
+vi.mock('../../task/TaskDetail', () => ({
+  TaskDetail: () => <div data-testid="task-detail" />
 }))
 vi.mock('../../workflow/WorkflowMonitor', () => ({
   WorkflowMonitor: ({
@@ -112,6 +149,8 @@ vi.mock('../../status-bar/SshStatusSegment', () => ({
 describe('WorkspaceLayout', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockActiveTaskId = null
+    mockActiveWorkspaceTab = 'git'
     vi.mocked(useWorkspace).mockReturnValue({
       project: { id: 'p1' },
       isOffline: false,
@@ -183,6 +222,27 @@ describe('WorkspaceLayout', () => {
     fireEvent.click(screen.getByTestId('tab-tasks'))
     await waitFor(() => {
       expect(screen.getByTestId('task-graph-panel')).toBeInTheDocument()
+    })
+  })
+
+  // BL-TG-05 / TaskDetail was built but never mounted anywhere — the right
+  // panel only ever showed a hardcoded "Task detail" placeholder string.
+  it('"tasks" tab with no task selected → right panel shows a hint, not TaskDetail', async () => {
+    render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByTestId('tab-tasks'))
+    await waitFor(() => {
+      expect(screen.getByTestId('task-graph-panel')).toBeInTheDocument()
+    })
+    expect(screen.queryByTestId('task-detail')).not.toBeInTheDocument()
+    expect(screen.getByText('Select a task to see its details')).toBeInTheDocument()
+  })
+
+  it('"tasks" tab with a task selected (activeTaskId set) → renders TaskDetail in the right panel', async () => {
+    mockActiveTaskId = 't1'
+    render(<WorkspaceLayout />)
+    fireEvent.click(screen.getByTestId('tab-tasks'))
+    await waitFor(() => {
+      expect(screen.getByTestId('task-detail')).toBeInTheDocument()
     })
   })
 

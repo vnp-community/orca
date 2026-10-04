@@ -137,7 +137,12 @@ export function DepartmentGate(): React.JSX.Element | null {
               )}
             />
           </SelectTrigger>
-          <SelectContent>
+          {/* Why z-[210]: SelectContent portals to document.body (see
+              ui/select.tsx) at its own z-[70] — this gate's overlay sits at
+              z-[200] (above OnboardingFlow's z-100, see this file's header
+              comment), so without an override the dropdown's options render
+              behind the overlay and are unclickable. */}
+          <SelectContent className="z-[210]">
             {departments.map((dept) => (
               <SelectItem key={dept.id} value={dept.id}>
                 {dept.name}

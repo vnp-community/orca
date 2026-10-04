@@ -7,6 +7,7 @@ import { callRuntimeRpc, getActiveRuntimeTarget } from '../../runtime/runtime-rp
 import { toast } from 'sonner'
 
 const STATUS_ORDER: TaskStatus[] = [
+  'open',
   'backlog',
   'todo',
   'in_progress',
@@ -18,10 +19,20 @@ const STATUS_ORDER: TaskStatus[] = [
 
 export function TaskBoardView({
   tasks,
-  onSelect
+  onSelect,
+  selectMode = false,
+  selectedIds,
+  onToggleSelect
 }: {
   tasks: OrcaTask[]
   onSelect: (id: string) => void
+  // BL-TG-06: same selectMode/selectedIds/onToggleSelect shape
+  // TaskTreeView/TaskGraph (DAG) already accept — Board was the one view
+  // missing it, confirmed by reading this file before BL-TG-06 (only
+  // `onSelect` existed here).
+  selectMode?: boolean
+  selectedIds?: Set<string>
+  onToggleSelect?: (id: string) => void
 }) {
   // Optimistic move + rollback kept local to this view — useTask.ts's updateTask()
   // has no revert path when the backend rejects (e.g. permission denied), so a
@@ -93,6 +104,9 @@ export function TaskBoardView({
                     isExpanded={false}
                     onToggle={() => {}}
                     onSelect={onSelect}
+                    selectMode={selectMode}
+                    isSelected={selectedIds?.has(task.id)}
+                    onToggleSelect={onToggleSelect}
                   />
                 </div>
               ))}

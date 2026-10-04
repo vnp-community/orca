@@ -177,4 +177,36 @@ describe('TaskBoardView', () => {
     fireEvent.click(screen.getByText('Task'))
     expect(onSelect).toHaveBeenCalledWith('t1')
   })
+
+  // BL-TG-06: TaskBoardView was the one view (Tree/DAG already had it)
+  // missing selectMode/selectedIds/onToggleSelect passthrough to TaskCard —
+  // confirmed by reading this file's props before this change.
+  it('selectMode renders a checkbox per card, checked per selectedIds, and onToggleSelect fires without triggering onSelect', () => {
+    const onToggleSelect = vi.fn()
+    const tasks = [makeTask({ id: 't1', status: 'todo' }), makeTask({ id: 't2', status: 'todo' })]
+    render(
+      <TaskBoardView
+        tasks={tasks}
+        onSelect={onSelect}
+        selectMode
+        selectedIds={new Set(['t2'])}
+        onToggleSelect={onToggleSelect}
+      />
+    )
+
+    const cb1 = screen.getByTestId('task-select-t1') as HTMLInputElement
+    const cb2 = screen.getByTestId('task-select-t2') as HTMLInputElement
+    expect(cb1.checked).toBe(false)
+    expect(cb2.checked).toBe(true)
+
+    fireEvent.click(cb1)
+    expect(onToggleSelect).toHaveBeenCalledWith('t1')
+    expect(onSelect).not.toHaveBeenCalled()
+  })
+
+  it('selectMode omitted → no checkboxes rendered (default behavior unchanged)', () => {
+    const tasks = [makeTask({ id: 't1', status: 'todo' })]
+    render(<TaskBoardView tasks={tasks} onSelect={onSelect} />)
+    expect(screen.queryByTestId('task-select-t1')).not.toBeInTheDocument()
+  })
 })
