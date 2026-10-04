@@ -20,8 +20,8 @@ type fakeConnectionResolver struct {
 	err  error
 }
 
-func (f *fakeConnectionResolver) ResolveConnection(ctx context.Context, worktreeID string) (ResolvedConnection, error) {
-	return f.conn, f.err
+func (f *fakeConnectionResolver) ResolveConnection(ctx context.Context, worktreeID string) (context.Context, ResolvedConnection, error) {
+	return ctx, f.conn, f.err
 }
 
 // fakeGitExecutor is a GitExecutor that records which of its methods was
@@ -126,6 +126,7 @@ type fakeGitExecutor struct {
 
 	gotRepoPath string
 	gotFilePath string
+	gotCtx      context.Context // SOL-014: records the ctx GetStatus was called with, to assert dispatchExecutor threads it through
 
 	statusErr                 error
 	statusResult              domain.GitStatus
@@ -186,6 +187,7 @@ type fakeGitExecutor struct {
 func (f *fakeGitExecutor) GetStatus(ctx context.Context, repoPath string) (domain.GitStatus, error) {
 	f.calledGetStatus = true
 	f.gotRepoPath = repoPath
+	f.gotCtx = ctx
 	if f.statusErr != nil {
 		return domain.GitStatus{}, f.statusErr
 	}
@@ -699,6 +701,48 @@ func TestGetStatus_Connected_RoutesToRelayExecutor(t *testing.T) {
 	if local.calledGetStatus {
 		t.Error("expected local executor NOT to be called when Connected=true")
 	}
+}
+
+// TestGetStatus_ConnectionResolverEnrichesCtx_ThreadsThroughToExecutor is
+// SOL-014's regression guard at the dispatchExecutor level (BUG-015/
+// CR-PW-011): when ConnectionResolver.ResolveConnection returns a ctx
+// enriched with WithDevServerID (its relay-via-reachability decision),
+// dispatchExecutor must pass THAT ctx to the executor call, not the
+// original one — otherwise RelayExecutor.relay()'s DevServerIDFromContext
+// check would never see it, silently dropping the routing decision.
+func TestGetStatus_ConnectionResolverEnrichesCtx_ThreadsThroughToExecutor(t *testing.T) {
+	enrichedCtx := WithDevServerID(context.Background(), "ds-1")
+	resolver := &fakeConnectionResolverReturnsCtx{
+		ctx:  enrichedCtx,
+		conn: ResolvedConnection{Connected: true, RepoPath: "/repo/wt1"},
+	}
+	relay := &fakeGitExecutor{name: "relay"}
+	uc := NewGetStatus(resolver, &fakeGitExecutor{name: "local"}, relay)
+
+	_, err := uc.Execute(context.Background(), GetStatusInput{WorktreeID: "wt1"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !relay.calledGetStatus {
+		t.Fatal("expected relay executor to be called")
+	}
+	if devServerID, ok := DevServerIDFromContext(relay.gotCtx); !ok || devServerID != "ds-1" {
+		t.Errorf("expected the executor to receive the ConnectionResolver-enriched ctx (DevServerID=ds-1), got ok=%v devServerID=%q", ok, devServerID)
+	}
+}
+
+// fakeConnectionResolverReturnsCtx is a ConnectionResolver fake that returns
+// a caller-supplied ctx instead of echoing back the input one — needed
+// because fakeConnectionResolver (above) always echoes its input ctx
+// unchanged, which can't exercise dispatchExecutor's ctx-threading at all.
+type fakeConnectionResolverReturnsCtx struct {
+	ctx  context.Context
+	conn ResolvedConnection
+	err  error
+}
+
+func (f *fakeConnectionResolverReturnsCtx) ResolveConnection(ctx context.Context, worktreeID string) (context.Context, ResolvedConnection, error) {
+	return f.ctx, f.conn, f.err
 }
 
 func TestGetStatus_MissingWorktreeID_ReturnsError(t *testing.T) {

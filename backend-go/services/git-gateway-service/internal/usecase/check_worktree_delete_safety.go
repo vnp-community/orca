@@ -27,7 +27,7 @@ func NewCheckWorktreeDeleteSafety(resolver ConnectionResolver, local, relay GitE
 }
 
 func (uc *CheckWorktreeDeleteSafety) Execute(ctx context.Context, worktreeID string) (domain.DeleteSafetyReport, error) {
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return domain.DeleteSafetyReport{}, apperrors.New(apperrors.KindInternal, "WORKTREE_RESOLVE_FAILED", "failed to resolve host", err)
 	}
@@ -45,7 +45,7 @@ func (uc *CheckWorktreeDeleteSafety) Execute(ctx context.Context, worktreeID str
 		}
 	}
 
-	conn, err := uc.resolver.ResolveConnection(ctx, worktreeID)
+	ctx, conn, err := uc.resolver.ResolveConnection(ctx, worktreeID)
 	if err == nil && conn.Connected {
 		if sessions, listErr := uc.terminals.ListSessions(ctx, conn.ConnectionID); listErr == nil {
 			for _, s := range sessions {

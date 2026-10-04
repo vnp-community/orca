@@ -24,6 +24,7 @@ import (
 	"google.golang.org/grpc/connectivity"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/grpcmw"
 	"github.com/stablyai/orca-go/common/health"
 	"github.com/stablyai/orca-go/common/logging"
@@ -68,6 +69,12 @@ func run() error {
 
 	logger := logging.New(cfg.ServiceName, version)
 	slog.SetDefault(logger)
+	// SOL-012: without this, an AppError's wrapped cause (e.g.
+	// GITGATEWAY_STATUS_FAILED's real underlying error) is discarded before
+	// ToGRPCStatus ever logs it — see BUG-012. Additive only, matches
+	// infra-fleet-service's SOL-009 wiring exactly; client-visible status is
+	// unchanged.
+	apperrors.SetLogger(logger)
 
 	shutdownTracing, err := tracing.Init(ctx, cfg.ServiceName, cfg.OTLPEndpoint)
 	if err != nil {
@@ -87,7 +94,6 @@ func run() error {
 	defer func() { _ = infraFleetConn.Close() }()
 
 	infraFleetClient := infrafleetv1.NewInfraFleetServiceClient(infraFleetConn)
-	resolver := grpcclient.NewConnectionResolver(infraFleetClient)
 	relay := grpcclient.NewRelayExecutor(infraFleetClient)
 	local := localgit.New()
 	localFS := localfs.New()
@@ -116,6 +122,12 @@ func run() error {
 	defer func() { _ = projectConn.Close() }()
 	projectServiceClient := projectv1.NewProjectServiceClient(projectConn)
 	projectClient := grpcclient.NewProjectClient(projectServiceClient)
+	// resolver needs projectClient to resolve a real filesystem path when
+	// infra-fleet-service reports no connection for a worktree (SOL-013),
+	// and devServerReachability to relay via the repo's own dev server in
+	// that same case when one is bound and reachable (SOL-014) — constructed
+	// here, after projectClient, rather than alongside relay above.
+	resolver := grpcclient.NewConnectionResolver(infraFleetClient, projectClient, devServerReachability)
 
 	scmConn, err := grpcclient.Dial(cfg.SCMIntegrationServiceAddr)
 	if err != nil {

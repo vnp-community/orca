@@ -157,7 +157,9 @@ func (p *ProjectClient) ListWorktrees(ctx context.Context, projectID string) ([]
 
 // GetWorktree wraps project-service's GetWorktree RPC (SOL-WT-04) —
 // CompareWorktrees uses it to look up each compared worktree's
-// repo_id/branch/base_ref.
+// repo_id/branch/base_ref; ConnectionResolver.ResolveConnection (SOL-013)
+// also uses it, for Path, to resolve a real filesystem path when there's no
+// infra.connections row for the worktree.
 func (p *ProjectClient) GetWorktree(ctx context.Context, worktreeID string) (domain.WorktreeInfo, error) {
 	ctx, err := withTenantMetadata(ctx)
 	if err != nil {
@@ -167,7 +169,7 @@ func (p *ProjectClient) GetWorktree(ctx context.Context, worktreeID string) (dom
 	if err != nil {
 		return domain.WorktreeInfo{}, err
 	}
-	return domain.WorktreeInfo{ID: wt.GetId(), RepoID: wt.GetRepoId(), Branch: wt.GetBranch(), BaseRef: wt.GetBaseRef()}, nil
+	return domain.WorktreeInfo{ID: wt.GetId(), RepoID: wt.GetRepoId(), Path: wt.GetPath(), Branch: wt.GetBranch(), BaseRef: wt.GetBaseRef()}, nil
 }
 
 // nonEmptyPtr returns nil for an empty string, otherwise a pointer to s —

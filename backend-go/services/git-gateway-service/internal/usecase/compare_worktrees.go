@@ -61,7 +61,7 @@ func (uc *CompareWorktrees) Execute(ctx context.Context, worktreeIDs []string) (
 	g, gctx := errgroup.WithContext(ctx)
 	for i, wt := range metas {
 		g.Go(func() error {
-			executor, repoPath, err := dispatchExecutor(gctx, uc.resolver, uc.local, uc.relay, wt.ID)
+			gctx, executor, repoPath, err := dispatchExecutor(gctx, uc.resolver, uc.local, uc.relay, wt.ID)
 			if err != nil {
 				return err
 			}

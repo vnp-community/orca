@@ -17,7 +17,7 @@ func NewSearchFilesUseCase(resolver ConnectionResolver, local, relay FilesystemE
 }
 
 func (uc *SearchFilesUseCase) Execute(ctx context.Context, worktreeID string, opts domain.SearchOptions) ([]domain.SearchMatch, error) {
-	exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return nil, err
 	}

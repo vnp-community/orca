@@ -17,7 +17,7 @@ func NewReadDirUseCase(resolver ConnectionResolver, local, relay FilesystemExecu
 }
 
 func (uc *ReadDirUseCase) Execute(ctx context.Context, worktreeID, path string) ([]domain.DirEntry, error) {
-	exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return nil, err
 	}

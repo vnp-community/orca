@@ -31,7 +31,7 @@ func (uc *CheckIgnored) Execute(ctx context.Context, in CheckIgnoredInput) ([]st
 	if len(in.Paths) == 0 {
 		return nil, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_PATHS", "paths is required", nil)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	ctx, executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
 	if err != nil {
 		return nil, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
 	}

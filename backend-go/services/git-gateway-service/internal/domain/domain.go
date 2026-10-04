@@ -350,9 +350,16 @@ type WorktreeRecord struct {
 // WorktreeInfo is project-service's GetWorktree answer — the richer shape
 // CompareWorktrees needs (RepoID + Branch + BaseRef), vs. WorktreeRecord's
 // narrower ID/Path/Branch used by CreateWorktree's own bookkeeping call.
+//
+// Path was added by SOL-013 (BUG-012/CR-PW-010): project.proto's Worktree
+// message already carries it (field 4), but this struct didn't map it
+// because CompareWorktrees never needed it — ConnectionResolver.ResolveConnection
+// now does, to resolve a real filesystem path for a worktree with no
+// infra.connections row instead of echoing back the worktree id.
 type WorktreeInfo struct {
 	ID      string
 	RepoID  string
+	Path    string
 	Branch  string
 	BaseRef string // empty = never backfilled (worktree created before base_ref was added)
 }

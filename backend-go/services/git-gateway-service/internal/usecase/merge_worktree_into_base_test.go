@@ -198,10 +198,10 @@ type fakeConnectionResolverRecordsCalls struct {
 	gotIDs []string
 }
 
-func (f *fakeConnectionResolverRecordsCalls) ResolveConnection(ctx context.Context, worktreeID string) (ResolvedConnection, error) {
+func (f *fakeConnectionResolverRecordsCalls) ResolveConnection(ctx context.Context, worktreeID string) (context.Context, ResolvedConnection, error) {
 	f.gotIDs = append(f.gotIDs, worktreeID)
 	if f.err != nil {
-		return ResolvedConnection{}, f.err
+		return ctx, ResolvedConnection{}, f.err
 	}
-	return f.conn, nil
+	return ctx, f.conn, nil
 }

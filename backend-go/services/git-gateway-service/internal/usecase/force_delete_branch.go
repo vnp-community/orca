@@ -24,7 +24,7 @@ func NewForceDeleteBranch(resolver ConnectionResolver, local, relay GitExecutor)
 }
 
 func (uc *ForceDeleteBranch) Execute(ctx context.Context, worktreeID, branch string) error {
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return apperrors.New(apperrors.KindInternal, "WORKTREE_RESOLVE_FAILED", "failed to resolve host", err)
 	}

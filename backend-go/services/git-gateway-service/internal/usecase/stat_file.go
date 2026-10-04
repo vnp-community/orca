@@ -17,7 +17,7 @@ func NewStatFileUseCase(resolver ConnectionResolver, local, relay FilesystemExec
 }
 
 func (uc *StatFileUseCase) Execute(ctx context.Context, worktreeID, path string) (domain.FileStat, error) {
-	exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return domain.FileStat{}, err
 	}

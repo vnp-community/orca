@@ -30,7 +30,7 @@ func (uc *PullStream) Execute(ctx context.Context, in PullInputStream, sink func
 	if in.WorktreeID == "" {
 		return apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_WORKTREE_ID", "worktree_id is required", nil)
 	}
-	conn, err := uc.resolver.ResolveConnection(ctx, in.WorktreeID)
+	ctx, conn, err := uc.resolver.ResolveConnection(ctx, in.WorktreeID)
 	if err != nil {
 		return apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
 	}

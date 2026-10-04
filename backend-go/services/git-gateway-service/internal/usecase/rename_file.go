@@ -24,7 +24,7 @@ func NewRenameFileUseCase(resolver ConnectionResolver, local LocalOnlyFilesystem
 }
 
 func (uc *RenameFileUseCase) Execute(ctx context.Context, worktreeID, from, to string) error {
-	conn, err := uc.resolver.ResolveConnection(ctx, worktreeID)
+	ctx, conn, err := uc.resolver.ResolveConnection(ctx, worktreeID)
 	if err != nil {
 		return err
 	}

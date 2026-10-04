@@ -61,7 +61,7 @@ type RemoveWorktreeInput struct {
 // AllowOpenPR=false, per workflow-service.CleanupWorktreesStepExecutor's
 // doc comment: an automated bulk delete must never bypass either rule).
 func (uc *RemoveWorktree) Execute(ctx context.Context, in RemoveWorktreeInput) (domain.RemoveWorktreeResult, error) {
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	ctx, executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
 	if err != nil {
 		return domain.RemoveWorktreeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_RESOLVE_FAILED", "failed to resolve host", err)
 	}
@@ -98,7 +98,11 @@ func (uc *RemoveWorktree) Execute(ctx context.Context, in RemoveWorktreeInput) (
 
 	// BR-WT-10 — same re-check for active agent sessions.
 	var stoppedPtyIDs []string
-	if conn, cErr := uc.resolver.ResolveConnection(ctx, in.WorktreeID); cErr == nil && conn.Connected {
+	// ctx discarded here (SOL-014): this check only reads conn.Connected/
+	// conn.ConnectionID for the TerminalSessionLister call below, which is
+	// unrelated to git dispatch — the outer ctx (already possibly enriched
+	// by the dispatchExecutor call above) is used for that, not this one.
+	if _, conn, cErr := uc.resolver.ResolveConnection(ctx, in.WorktreeID); cErr == nil && conn.Connected {
 		if sessions, lErr := uc.terminals.ListSessions(ctx, conn.ConnectionID); lErr == nil {
 			var active []string
 			for _, s := range sessions {

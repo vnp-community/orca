@@ -87,27 +87,297 @@ func ctxWithTenant(t *testing.T) context.Context {
 	return tenant.WithTenantID(context.Background(), "tenant-1")
 }
 
-func TestConnectionResolver_ResolveConnection_NotConnected(t *testing.T) {
-	fake := &fakeInfraFleetServiceClient{
+// fakeDevServerReachability implements usecase.DevServerReachability — used
+// by ConnectionResolver's SOL-014 relay-via-reachability branch. Tests that
+// don't exercise that branch (DevServerID always "" from their
+// fakeProjectClient response) can pass a zero-value one; it's never called.
+type fakeDevServerReachability struct {
+	reachable       bool
+	err             error
+	gotDevServerIDs []string
+}
+
+func (f *fakeDevServerReachability) IsReachable(ctx context.Context, devServerID string) (bool, error) {
+	f.gotDevServerIDs = append(f.gotDevServerIDs, devServerID)
+	if f.err != nil {
+		return false, f.err
+	}
+	return f.reachable, nil
+}
+
+// fakeProjectClient implements usecase.ProjectClient directly (embed:
+// panics on any unimplemented method, matching fakeInfraFleetServiceClient's
+// convention) — scoped to GetWorktree/GetRepo, the two methods
+// ConnectionResolver.resolveLocal (SOL-013/SOL-014) calls.
+type fakeProjectClient struct {
+	usecase.ProjectClient
+
+	getWorktreeResp  domain.WorktreeInfo
+	getWorktreeErr   error
+	gotGetWorktreeID string
+
+	getRepoResp  domain.RepoInfo
+	getRepoErr   error
+	gotGetRepoID string
+}
+
+func (f *fakeProjectClient) GetWorktree(ctx context.Context, worktreeID string) (domain.WorktreeInfo, error) {
+	f.gotGetWorktreeID = worktreeID
+	if f.getWorktreeErr != nil {
+		return domain.WorktreeInfo{}, f.getWorktreeErr
+	}
+	return f.getWorktreeResp, nil
+}
+
+func (f *fakeProjectClient) GetRepo(ctx context.Context, repoID string) (domain.RepoInfo, error) {
+	f.gotGetRepoID = repoID
+	if f.getRepoErr != nil {
+		return domain.RepoInfo{}, f.getRepoErr
+	}
+	return f.getRepoResp, nil
+}
+
+// TestConnectionResolver_ResolveConnection_NotConnected_ResolvesRealWorktreePath
+// is SOL-013's core regression guard (BUG-012/CR-PW-010): the !Connected
+// branch used to echo worktreeID itself back as RepoPath, which every one
+// of dispatchExecutor's ~34 callers then handed straight to git as a cwd.
+// It must now resolve a real path via project-service's GetWorktree.
+func TestConnectionResolver_ResolveConnection_NotConnected_ResolvesRealWorktreePath(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
-	r := NewConnectionResolver(fake)
+	projects := &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", Path: "/opt/repos/aiops-v3"}}
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{})
 
-	conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
+	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if conn.Connected {
 		t.Error("expected Connected=false")
 	}
-	if conn.RepoPath != "wt-1" {
-		t.Errorf("expected RepoPath to fall back to worktreeID %q, got %q", "wt-1", conn.RepoPath)
+	if conn.RepoPath != "/opt/repos/aiops-v3" {
+		t.Errorf("expected RepoPath resolved via project-service's GetWorktree, got %q", conn.RepoPath)
 	}
-	if fake.gotResolveConnection.GetWorktreeId() != "wt-1" {
-		t.Errorf("expected WorktreeId=wt-1 on the request, got %q", fake.gotResolveConnection.GetWorktreeId())
+	if projects.gotGetWorktreeID != "wt-1" {
+		t.Errorf("expected GetWorktree called with wt-1, got %q", projects.gotGetWorktreeID)
 	}
-	if fake.gotResolveConnection.GetConnectionId() != "" {
-		t.Errorf("expected ConnectionId to stay unset (worktreeID is not a connections.id uuid), got %q", fake.gotResolveConnection.GetConnectionId())
+	if infraFleet.gotResolveConnection.GetWorktreeId() != "wt-1" {
+		t.Errorf("expected WorktreeId=wt-1 on the request, got %q", infraFleet.gotResolveConnection.GetWorktreeId())
+	}
+	if infraFleet.gotResolveConnection.GetConnectionId() != "" {
+		t.Errorf("expected ConnectionId to stay unset (worktreeID is not a connections.id uuid), got %q", infraFleet.gotResolveConnection.GetConnectionId())
+	}
+}
+
+// TestConnectionResolver_ResolveConnection_NotConnected_ExternalWorktree_UsesEmbeddedPath
+// covers dispatchID's second shape (SOL-013): api-gateway's
+// mergeDetectedWorktrees synthesizes "repoId::path" ids for worktrees Orca
+// never bookkept (a manual `git worktree add`) — there is no
+// project.worktrees row to look up, so the path must be read straight out
+// of the id instead of calling GetWorktree (which would 404).
+func TestConnectionResolver_ResolveConnection_NotConnected_ExternalWorktree_UsesEmbeddedPath(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+	}
+	projects := &fakeProjectClient{getWorktreeErr: errors.New("should not be called for an external worktree id")}
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{})
+
+	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "45f573e8-be1a-4b1a-894b-a7c261fb7331::/opt/repos/aiops-v3")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conn.RepoPath != "/opt/repos/aiops-v3" {
+		t.Errorf("expected RepoPath read from the composite id's embedded path, got %q", conn.RepoPath)
+	}
+	if projects.gotGetWorktreeID != "" {
+		t.Error("expected GetWorktree not to be called for an external worktree's composite id")
+	}
+}
+
+// TestConnectionResolver_ResolveConnection_NotConnected_RepoScoped_UsesGetRepo
+// covers dispatchID's third shape (SOL-013): MergeWorktreeIntoBase's
+// "repo:"-prefixed dispatch key (dispatchKeyForRepo) names a repo, not a
+// worktree — resolved via GetRepo, whose Repo.URL doubles as an absolute
+// filesystem path for these repos (see domain.RepoInfo's doc comment).
+func TestConnectionResolver_ResolveConnection_NotConnected_RepoScoped_UsesGetRepo(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+	}
+	projects := &fakeProjectClient{getRepoResp: domain.RepoInfo{ID: "repo-1", URL: "/opt/repos/repo-1"}}
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{})
+
+	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "repo:repo-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conn.RepoPath != "/opt/repos/repo-1" {
+		t.Errorf("expected RepoPath from GetRepo's Repo.URL, got %q", conn.RepoPath)
+	}
+	if projects.gotGetRepoID != "repo-1" {
+		t.Errorf("expected GetRepo called with the repo id (prefix stripped), got %q", projects.gotGetRepoID)
+	}
+	// The infra-fleet-service request must still carry the stripped repo id,
+	// matching ResolveConnection's existing prefix-stripping behavior.
+	if infraFleet.gotResolveConnection.GetWorktreeId() != "repo-1" {
+		t.Errorf("expected WorktreeId=repo-1 (prefix stripped) on the request, got %q", infraFleet.gotResolveConnection.GetWorktreeId())
+	}
+}
+
+// TestConnectionResolver_ResolveConnection_NotConnected_ProjectServiceLookupFails
+// is the error-propagation guard: a real project-service failure (not
+// "not found" masquerading as success) must surface as an error, not a
+// silently-wrong path.
+func TestConnectionResolver_ResolveConnection_NotConnected_ProjectServiceLookupFails(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+	}
+	projects := &fakeProjectClient{getWorktreeErr: errors.New("project-service unavailable")}
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{})
+
+	if _, _, err := r.ResolveConnection(ctxWithTenant(t), "wt-1"); err == nil {
+		t.Error("expected an error when project-service's GetWorktree lookup fails")
+	}
+}
+
+// TestConnectionResolver_ResolveConnection_NotConnected_ReachableDevServer_RelaysViaDevServerID
+// is SOL-014's core regression guard (BUG-015/CR-PW-011): a worktree with no
+// infra.connections row but whose repo IS bound to a reachable dev server
+// must relay to it (Connected=true, ctx carrying WithDevServerID), not
+// silently fall back to local dispatch.
+func TestConnectionResolver_ResolveConnection_NotConnected_ReachableDevServer_RelaysViaDevServerID(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+	}
+	projects := &fakeProjectClient{
+		getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/opt/repos/aiops-v3-golang-production-ready"},
+		getRepoResp:     domain.RepoInfo{ID: "repo-1", DevServerID: "ds-1", HiddenTargetID: "rt-1"},
+	}
+	reachability := &fakeDevServerReachability{reachable: true}
+	r := NewConnectionResolver(infraFleet, projects, reachability)
+
+	ctx, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if !conn.Connected {
+		t.Error("expected Connected=true when the repo's dev server is reachable")
+	}
+	if conn.RepoPath != "/opt/repos/aiops-v3-golang-production-ready" {
+		t.Errorf("expected the real resolved path, got %q", conn.RepoPath)
+	}
+	if conn.ConnectionID != "" {
+		t.Errorf("expected ConnectionID to stay empty (no real infra.connections row exists), got %q", conn.ConnectionID)
+	}
+	if devServerID, ok := usecase.DevServerIDFromContext(ctx); !ok || devServerID != "ds-1" {
+		t.Errorf("expected returned ctx to carry DevServerID=ds-1, got %q (ok=%v)", devServerID, ok)
+	}
+	if hiddenTargetID, ok := usecase.HiddenTargetIDFromContext(ctx); !ok || hiddenTargetID != "rt-1" {
+		t.Errorf("expected returned ctx to carry HiddenTargetID=rt-1, got %q (ok=%v)", hiddenTargetID, ok)
+	}
+	if projects.gotGetRepoID != "repo-1" {
+		t.Errorf("expected GetRepo called with the worktree's repo id, got %q", projects.gotGetRepoID)
+	}
+	if len(reachability.gotDevServerIDs) != 1 || reachability.gotDevServerIDs[0] != "ds-1" {
+		t.Errorf("expected IsReachable called with ds-1, got %v", reachability.gotDevServerIDs)
+	}
+}
+
+// TestConnectionResolver_ResolveConnection_NotConnected_UnreachableDevServer_FallsBackToLocal
+// covers the fallback: a bound but unreachable dev server must not relay —
+// same SOL-013 local-path behavior as if no dev server were bound at all.
+func TestConnectionResolver_ResolveConnection_NotConnected_UnreachableDevServer_FallsBackToLocal(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+	}
+	projects := &fakeProjectClient{
+		getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/opt/repos/aiops-v3"},
+		getRepoResp:     domain.RepoInfo{ID: "repo-1", DevServerID: "ds-1"},
+	}
+	reachability := &fakeDevServerReachability{reachable: false}
+	r := NewConnectionResolver(infraFleet, projects, reachability)
+
+	ctx, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conn.Connected {
+		t.Error("expected Connected=false when the dev server is unreachable")
+	}
+	if conn.RepoPath != "/opt/repos/aiops-v3" {
+		t.Errorf("expected the real resolved path even on the local fallback, got %q", conn.RepoPath)
+	}
+	if _, ok := usecase.DevServerIDFromContext(ctx); ok {
+		t.Error("expected returned ctx NOT to carry DevServerID when the dev server is unreachable")
+	}
+}
+
+// TestConnectionResolver_ResolveConnection_NotConnected_NoDevServerBound_UnchangedSOL013Behavior
+// is the regression guard for SOL-013's own existing behavior: a repo with
+// no dev server bound at all must never call IsReachable.
+func TestConnectionResolver_ResolveConnection_NotConnected_NoDevServerBound_UnchangedSOL013Behavior(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+	}
+	projects := &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/opt/repos/local-only"}}
+	reachability := &fakeDevServerReachability{reachable: true} // would relay if ever consulted
+	r := NewConnectionResolver(infraFleet, projects, reachability)
+
+	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-1")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if conn.Connected {
+		t.Error("expected Connected=false when the repo has no dev server bound")
+	}
+	if len(reachability.gotDevServerIDs) != 0 {
+		t.Errorf("expected IsReachable NOT to be called when DevServerID is empty, got %v", reachability.gotDevServerIDs)
+	}
+}
+
+// TestConnectionResolver_ResolveConnection_NotConnected_ReachabilityCheckFails_Propagates
+// is the error-propagation guard: a real reachability-check failure must
+// surface as an error, not be silently treated as unreachable.
+func TestConnectionResolver_ResolveConnection_NotConnected_ReachabilityCheckFails_Propagates(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+	}
+	projects := &fakeProjectClient{
+		getWorktreeResp: domain.WorktreeInfo{ID: "wt-1", RepoID: "repo-1", Path: "/opt/repos/aiops-v3"},
+		getRepoResp:     domain.RepoInfo{ID: "repo-1", DevServerID: "ds-1"},
+	}
+	reachability := &fakeDevServerReachability{err: errors.New("infra-fleet-service unreachable")}
+	r := NewConnectionResolver(infraFleet, projects, reachability)
+
+	if _, _, err := r.ResolveConnection(ctxWithTenant(t), "wt-1"); err == nil {
+		t.Error("expected an error when the reachability check itself fails")
+	}
+}
+
+// TestConnectionResolver_ResolveConnection_NotConnected_ExternalWorktree_DevServerLookupFails_DegradesToPathOnly
+// covers the composite-id case's degrade-gracefully posture (SOL-014): a
+// GetRepo failure for the embedded repo id must not invalidate the
+// already-known path (SOL-013's guarantee) — it should just skip the
+// dev-server enrichment.
+func TestConnectionResolver_ResolveConnection_NotConnected_ExternalWorktree_DevServerLookupFails_DegradesToPathOnly(t *testing.T) {
+	infraFleet := &fakeInfraFleetServiceClient{
+		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
+	}
+	projects := &fakeProjectClient{getRepoErr: errors.New("repo not found")}
+	r := NewConnectionResolver(infraFleet, projects, &fakeDevServerReachability{reachable: true})
+
+	ctx, conn, err := r.ResolveConnection(ctxWithTenant(t), "45f573e8-be1a-4b1a-894b-a7c261fb7331::/opt/repos/aiops-v3")
+	if err != nil {
+		t.Fatalf("expected the GetRepo failure to degrade gracefully, not propagate: %v", err)
+	}
+	if conn.RepoPath != "/opt/repos/aiops-v3" {
+		t.Errorf("expected the embedded path to still resolve, got %q", conn.RepoPath)
+	}
+	if conn.Connected {
+		t.Error("expected Connected=false — DevServerID unknown, so no relay decision can be made")
+	}
+	if _, ok := usecase.DevServerIDFromContext(ctx); ok {
+		t.Error("expected no DevServerID in ctx when the enrichment lookup failed")
 	}
 }
 
@@ -121,9 +391,9 @@ func TestConnectionResolver_ResolveConnection_MapsHiddenTargetID(t *testing.T) {
 			Connected: true, RepoPath: "/remote/repo", ConnectionId: "conn-uuid-1", HiddenTargetId: "rt-1",
 		},
 	}
-	r := NewConnectionResolver(fake)
+	r := NewConnectionResolver(fake, &fakeProjectClient{}, &fakeDevServerReachability{})
 
-	conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-2")
+	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-2")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -141,9 +411,9 @@ func TestConnectionResolver_ResolveConnection_Connected(t *testing.T) {
 			DevServer:    &infrafleetv1.DevServer{Mode: infrafleetv1.ConnectionMode_CONNECTION_MODE_RELAY_WEBSOCKET},
 		},
 	}
-	r := NewConnectionResolver(fake)
+	r := NewConnectionResolver(fake, &fakeProjectClient{}, &fakeDevServerReachability{})
 
-	conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-2")
+	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-2")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -168,9 +438,9 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ModeLeftAtZeroValue(t
 	fake := &fakeInfraFleetServiceClient{
 		resolveConnectionResp: &infrafleetv1.ResolveConnectionResponse{Connected: false},
 	}
-	r := NewConnectionResolver(fake)
+	r := NewConnectionResolver(fake, &fakeProjectClient{getWorktreeResp: domain.WorktreeInfo{Path: "/opt/repos/wt-3"}}, &fakeDevServerReachability{})
 
-	conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-3")
+	_, conn, err := r.ResolveConnection(ctxWithTenant(t), "wt-3")
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -184,9 +454,9 @@ func TestConnectionResolver_ResolveConnection_NotConnected_ModeLeftAtZeroValue(t
 
 func TestConnectionResolver_ResolveConnection_NoTenantInContext(t *testing.T) {
 	fake := &fakeInfraFleetServiceClient{}
-	r := NewConnectionResolver(fake)
+	r := NewConnectionResolver(fake, &fakeProjectClient{}, &fakeDevServerReachability{})
 
-	if _, err := r.ResolveConnection(context.Background(), "wt-1"); !errors.Is(err, tenant.ErrNoTenant) {
+	if _, _, err := r.ResolveConnection(context.Background(), "wt-1"); !errors.Is(err, tenant.ErrNoTenant) {
 		t.Errorf("expected tenant.ErrNoTenant, got %v", err)
 	}
 	if fake.gotResolveConnection != nil {
@@ -1325,6 +1595,13 @@ func TestRelayExecutor_CreateWorktree_OmitsBaseRefWhenEmpty(t *testing.T) {
 	}
 }
 
+// TestRelayExecutor_RemoveWorktree_SendsPathAndForce is BUG-019's regression
+// guard: cwd added alongside path/force — handleGitExec (the agent's shared
+// git-exec chokepoint) falls back to its own config.workDir when cwd is
+// missing, which doesn't exist on real dev servers (confirmed live via a
+// direct repro on a real dev server) — worktreePath (already resolved to a
+// real, existing directory by dispatchExecutor before this call) must be
+// sent as cwd too, not just path.
 func TestRelayExecutor_RemoveWorktree_SendsPathAndForce(t *testing.T) {
 	fake := &fakeInfraFleetServiceClient{relayResp: &infrafleetv1.RelayResponse{ResultJson: "{}"}}
 	r := NewRelayExecutor(fake)
@@ -1341,6 +1618,9 @@ func TestRelayExecutor_RemoveWorktree_SendsPathAndForce(t *testing.T) {
 	}
 	if params["path"] != "/repo/.worktrees/feature" || params["force"] != true {
 		t.Errorf("expected path+force params (agent-git-handler.ts's handleGitWorktreeRemove reads params.path, not params.worktreePath), got %+v", params)
+	}
+	if params["cwd"] != "/repo/.worktrees/feature" {
+		t.Errorf("expected cwd=worktreePath (BUG-019 — without it, handleGitExec falls back to a cwd that doesn't exist on real dev servers), got %+v", params)
 	}
 }
 

@@ -31,7 +31,7 @@ func (uc *RemoteFileURL) Execute(ctx context.Context, in RemoteFileURLInput) (st
 	if in.Path == "" {
 		return "", apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_PATH", "path is required", nil)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	ctx, executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
 	if err != nil {
 		return "", apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
 	}

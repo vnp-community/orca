@@ -19,7 +19,7 @@ func NewCreateFileUseCase(resolver ConnectionResolver, local, relay FilesystemEx
 // is always an error, matching desktop's local 'wx'-flag semantics
 // (desktop/src/main/ipc/filesystem-mutations.ts).
 func (uc *CreateFileUseCase) Execute(ctx context.Context, worktreeID, path string) error {
-	exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return err
 	}

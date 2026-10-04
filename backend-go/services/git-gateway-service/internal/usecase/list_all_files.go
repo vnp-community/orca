@@ -13,7 +13,7 @@ func NewListAllFilesUseCase(resolver ConnectionResolver, local, relay Filesystem
 }
 
 func (uc *ListAllFilesUseCase) Execute(ctx context.Context, worktreeID, pathGlob string, maxResults int) ([]string, error) {
-	exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return nil, err
 	}

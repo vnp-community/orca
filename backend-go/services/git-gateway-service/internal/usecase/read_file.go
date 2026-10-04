@@ -13,7 +13,7 @@ func NewReadFileUseCase(resolver ConnectionResolver, local, relay FilesystemExec
 }
 
 func (uc *ReadFileUseCase) Execute(ctx context.Context, worktreeID, path string) ([]byte, error) {
-	exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return nil, err
 	}

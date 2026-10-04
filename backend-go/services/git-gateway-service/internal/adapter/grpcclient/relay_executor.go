@@ -773,9 +773,22 @@ func (r *RelayExecutor) ScanSetupScriptImports(ctx context.Context, repoPath str
 // computed (the agent's git.worktree.add wants an explicit "path", which
 // this call site never derives today) — left as a separate, still-open gap,
 // not fixed in this pass.
+//
+// cwd added (BUG-019) — this call never sent it, so the agent's shared
+// handleGitExec (agent-git-handler.ts) fell back to its own config.workDir
+// (the AGENT_WORK_DIR env var the agent was started with), which is a
+// generic default that doesn't exist on real dev servers (repos live at
+// whatever path project-service/SOL-013/014 actually resolved, e.g.
+// /opt/repos/..., not AGENT_WORK_DIR) — Node's spawn() then fails with
+// "spawn git ENOENT", attributing the error to the command when it's really
+// the cwd that's missing (a well-known Node gotcha). worktreePath is
+// already a real, existing directory (the worktree being removed itself,
+// resolved by dispatchExecutor before this call) — confirmed live via a
+// direct repro on a real dev server that `git worktree remove <path>` with
+// cwd set to that same path succeeds normally.
 func (r *RelayExecutor) RemoveWorktree(ctx context.Context, worktreePath string, force bool) error {
 	return r.relay(ctx, worktreePath, "git.worktree.remove", map[string]any{
-		"path": worktreePath, "force": force,
+		"path": worktreePath, "cwd": worktreePath, "force": force,
 	}, nil)
 }
 

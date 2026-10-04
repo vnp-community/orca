@@ -32,7 +32,7 @@ func (uc *CommitCompare) Execute(ctx context.Context, in CommitCompareInput) (do
 	if in.CommitID == "" {
 		return domain.CommitCompareResult{}, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_COMMIT_ID", "commit_id is required", nil)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	ctx, executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
 	if err != nil {
 		return domain.CommitCompareResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
 	}

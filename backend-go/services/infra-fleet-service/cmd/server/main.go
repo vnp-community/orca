@@ -29,6 +29,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/auditclient"
 	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
@@ -85,6 +86,12 @@ func run() error {
 
 	logger := logging.New(cfg.ServiceName, version)
 	slog.SetDefault(logger)
+	// BUG-009 (specs/backend-go/bugs/missing-v2/): wire apperrors' optional
+	// logger so ToGRPCStatus's discarded-from-the-client wrapped cause is at
+	// least visible in this service's own structured logs — see that
+	// function's doc comment for why this was previously undiagnosable even
+	// with live log access.
+	apperrors.SetLogger(logger)
 
 	// NATS connect moved ahead of tracing.Init (TASK-BE-FFT-008) so pub
 	// exists in time to pass to tracing.WithTraceEventPublisher. Same

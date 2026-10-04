@@ -8,6 +8,7 @@ package apperrors
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -64,9 +65,35 @@ func New(kind Kind, code, message string, cause error) *AppError {
 	return &AppError{Kind: kind, Code: code, Message: message, Err: cause}
 }
 
+// logger is an optional package-level sink for the wrapped cause
+// ToGRPCStatus otherwise discards — nil until a service's main.go calls
+// SetLogger, in which case every call site is a no-op (same
+// wire-once-from-main-nil-safe-until-then convention as
+// project-service/internal/usecase/authorization.go's auditClient).
+var logger *slog.Logger
+
+// SetLogger wires an optional logger for ToGRPCStatus to record an
+// AppError's wrapped cause to before it's discarded (see ToGRPCStatus's doc
+// comment for why that cause never reaches the client). Call once, from
+// main.go, before serving traffic. Never required — omitting this call
+// keeps ToGRPCStatus's return value identical to before this existed.
+func SetLogger(l *slog.Logger) { logger = l }
+
 // ToGRPCStatus maps an AppError to a gRPC status — the single mapping table
 // standards/api-design-guidelines.md requires, imported by every service's
 // adapter/grpc/ layer instead of each reimplementing this switch.
+//
+// BUG-009 (specs/backend-go/bugs/missing-v2/): ae.Err (the real underlying
+// cause — e.g. a devserveragent transport failure) is deliberately never
+// included in the returned status (ae.Code+": "+ae.Message only) — clients
+// must key behavior off the stable Code, never off wrapped internal detail,
+// per this function's own doc comment above. But that same omission also
+// meant the cause never reached even this service's OWN structured logs
+// (common/grpcmw.LoggingInterceptor logs the error THIS function returns,
+// after the cause is already gone) — undiagnosable from live logs alone, as
+// confirmed investigating BUG-009 live against b15.openledger.vn. Logging it
+// here, gated behind the nil-by-default logger above, fixes that without
+// changing what any of this function's 463 existing call sites return.
 func ToGRPCStatus(err error) error {
 	if err == nil {
 		return nil
@@ -74,6 +101,12 @@ func ToGRPCStatus(err error) error {
 	var ae *AppError
 	if !errors.As(err, &ae) {
 		return status.Error(codes.Internal, "internal error")
+	}
+	if ae.Err != nil && logger != nil {
+		logger.Error("apperrors: internal cause (not sent to client)",
+			"code", ae.Code,
+			"cause", ae.Err.Error(),
+		)
 	}
 	code := codes.Unknown
 	switch ae.Kind {

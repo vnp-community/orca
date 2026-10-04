@@ -34,7 +34,15 @@ type resolvedFleetSection struct {
 }
 
 func (r *TenantProfileResolver) GetResolvedProfile(ctx context.Context, tenantID, userID string) (usecase.ResolvedProfileView, error) {
-	resp, err := r.tenant.GetResolvedProfile(ctx, &tenantv1.GetResolvedProfileRequest{UserId: userID})
+	// tenant-service's GetResolvedProfile usecase calls tenant.RequireTenantID
+	// against its own inbound-interceptor-populated context — forward the
+	// caller's tenant as outbound metadata, same as every other call this
+	// package makes (see tenant_forwarding.go's doc comment).
+	outCtx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return usecase.ResolvedProfileView{}, fmt.Errorf("grpcclient: profile resolver: %w", err)
+	}
+	resp, err := r.tenant.GetResolvedProfile(outCtx, &tenantv1.GetResolvedProfileRequest{UserId: userID})
 	if err != nil {
 		return usecase.ResolvedProfileView{}, fmt.Errorf("grpcclient: tenant-service GetResolvedProfile: %w", err)
 	}

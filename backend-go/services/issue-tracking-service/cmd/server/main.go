@@ -26,6 +26,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/dbcapability"
 	"github.com/stablyai/orca-go/common/eventbus"
 	"github.com/stablyai/orca-go/common/grpcmw"
@@ -71,6 +72,10 @@ func run() error {
 
 	logger := logging.New(cfg.ServiceName, version)
 	slog.SetDefault(logger)
+	// SOL-009/SOL-012 pattern, 4th service — without this, ISSUETRACKING_AUTH_FAILED's
+	// wrapped cause (the real HTTP status/body from Jira's Whoami call) is
+	// discarded before ever being logged. Additive only.
+	apperrors.SetLogger(logger)
 
 	// NATS connect moved ahead of tracing.Init (TASK-BE-FFT-008) so pub
 	// exists in time to pass to tracing.WithTraceEventPublisher. Same

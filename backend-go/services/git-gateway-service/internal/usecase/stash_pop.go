@@ -29,7 +29,7 @@ func (uc *StashPop) Execute(ctx context.Context, in StashPopInput) (domain.Merge
 	if in.WorktreeID == "" {
 		return domain.MergeOutcome{}, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_WORKTREE_ID", "worktree_id is required", nil)
 	}
-	conn, err := uc.resolver.ResolveConnection(ctx, in.WorktreeID)
+	ctx, conn, err := uc.resolver.ResolveConnection(ctx, in.WorktreeID)
 	if err != nil {
 		return domain.MergeOutcome{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
 	}

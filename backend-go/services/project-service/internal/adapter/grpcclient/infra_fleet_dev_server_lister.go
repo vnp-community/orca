@@ -39,7 +39,11 @@ func (c *InfraFleetDevServerLister) Close() error {
 // port's signature to match usecase.DevServerLister's contract even though
 // it isn't threaded into the request message itself.
 func (c *InfraFleetDevServerLister) Exists(ctx context.Context, tenantID, devServerID string) (bool, error) {
-	resp, err := c.client.ListDevServers(ctx, &infrafleetv1.ListDevServersRequest{})
+	outCtx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return false, fmt.Errorf("grpcclient: dev server lister: %w", err)
+	}
+	resp, err := c.client.ListDevServers(outCtx, &infrafleetv1.ListDevServersRequest{})
 	if err != nil {
 		return false, fmt.Errorf("grpcclient: infra-fleet-service ListDevServers: %w", err)
 	}

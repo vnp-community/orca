@@ -13,7 +13,7 @@ func NewDeleteFileUseCase(resolver ConnectionResolver, local, relay FilesystemEx
 }
 
 func (uc *DeleteFileUseCase) Execute(ctx context.Context, worktreeID, path string, recursive bool) error {
-	exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return err
 	}

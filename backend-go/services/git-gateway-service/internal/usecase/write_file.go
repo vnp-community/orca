@@ -13,7 +13,7 @@ func NewWriteFileUseCase(resolver ConnectionResolver, local, relay FilesystemExe
 }
 
 func (uc *WriteFileUseCase) Execute(ctx context.Context, worktreeID, path string, content []byte, createParents bool) (bytesWritten int64, err error) {
-	exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return 0, err
 	}

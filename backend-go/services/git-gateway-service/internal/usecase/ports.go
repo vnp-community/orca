@@ -56,11 +56,21 @@ type ResolvedConnection struct {
 
 // ConnectionResolver resolves which host owns a worktree, by calling
 // infra-fleet-service's ResolveConnection RPC (git-gateway-service.md §2
-// step 2, §7). Implemented by internal/adapter/grpcclient in this scaffold
-// as a stub that always answers Connected=false — see that package's doc
-// comment for what real wiring needs.
+// step 2, §7). Implemented by internal/adapter/grpcclient.
+//
+// Returns context.Context alongside its answer (SOL-014, CR-PW-011): when
+// the resolved dispatch is via a repo's dev server reachability rather than
+// a real infra.connections row, the implementation threads
+// WithDevServerID/WithHiddenTargetID into a NEW context it hands back here
+// — Go contexts are immutable, so there is no other way for the answer to
+// reach RelayExecutor.relay()'s shared DevServerIDFromContext(ctx) check
+// (relay_executor.go) without widening every GitExecutor method's own
+// signature. Every caller MUST use the returned ctx for any subsequent
+// call keyed by this resolution (executor calls, AICompleter.Complete,
+// etc.) — using the original ctx instead silently loses the routing
+// decision. See dispatchExecutor below for the reference pattern.
 type ConnectionResolver interface {
-	ResolveConnection(ctx context.Context, worktreeID string) (ResolvedConnection, error)
+	ResolveConnection(ctx context.Context, worktreeID string) (context.Context, ResolvedConnection, error)
 }
 
 // GitExecutor performs the actual git operation against a resolved worktree
@@ -418,15 +428,19 @@ type LocalOnlyFilesystemExecutor interface {
 // the resolved repo path and the raw ResolvedConnection (needed by
 // ReadFileChunkUseCase/RenameFileUseCase/CopyFileUseCase to reject
 // relay-only-unsupported operations before calling the executor at all).
-func dispatchFilesystemExecutor(ctx context.Context, resolver ConnectionResolver, local, relay FilesystemExecutor, worktreeID string) (FilesystemExecutor, ResolvedConnection, error) {
-	conn, err := resolver.ResolveConnection(ctx, worktreeID)
+//
+// Also widened to return ctx (SOL-014, CR-PW-011) — see dispatchExecutor's
+// doc comment for why. Every one of this function's 12 callers was updated
+// to use the returned ctx for its subsequent exec.* call.
+func dispatchFilesystemExecutor(ctx context.Context, resolver ConnectionResolver, local, relay FilesystemExecutor, worktreeID string) (context.Context, FilesystemExecutor, ResolvedConnection, error) {
+	ctx, conn, err := resolver.ResolveConnection(ctx, worktreeID)
 	if err != nil {
-		return nil, ResolvedConnection{}, err
+		return ctx, nil, ResolvedConnection{}, err
 	}
 	if conn.Connected {
-		return relay, conn, nil
+		return ctx, relay, conn, nil
 	}
-	return local, conn, nil
+	return ctx, local, conn, nil
 }
 
 // ProjectClient wraps project-service's worktree-bookkeeping RPCs — a new
@@ -601,28 +615,31 @@ func HiddenTargetIDFromContext(ctx context.Context) (string, bool) {
 	return v, v != ""
 }
 
-// dispatchExecutor deliberately does NOT thread ResolvedConnection.HiddenTargetID
-// into ctx the way dispatchExecutorForRepo does below — its 3-value return
-// (executor, repoPath, err) is depended on by all ~33 worktree-keyed
-// usecases in this package. TASK-BE-EVM-018 (BE-SOL-EVM-004 §6c) closed
-// the proto gap this comment used to describe (infrafleetv1.ResolveConnectionResponse
-// now carries hidden_target_id, and grpcclient.ConnectionResolver.ResolveConnection
-// maps it into conn.HiddenTargetID for real) — conn.HiddenTargetID CAN be
-// non-empty from this path now. Widening this function's signature to
-// thread it into ctx anyway is still deliberately out of scope here: it
-// would churn all 33 call sites for a routing case
-// (worktree-keyed dispatch of a repo backed by an ssh-type ephemeral VM)
-// dispatchExecutorForRepo below already covers via the repo-scoped path —
-// revisit only if a real worktree-keyed (not repo-scoped) caller needs it.
-func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, relay GitExecutor, worktreeID string) (GitExecutor, string, error) {
-	conn, err := resolver.ResolveConnection(ctx, worktreeID)
+// dispatchExecutor now DOES thread ctx through (SOL-014, CR-PW-011) —
+// widened from a 3-value (executor, repoPath, err) to a 4-value
+// (ctx, executor, repoPath, err) return, mirroring dispatchExecutorForRepo
+// below exactly. This closes BUG-015: previously, a worktree with no
+// infra.connections row ALWAYS dispatched to local, even when its repo had
+// a real, reachable dev server (infra.connections has zero rows
+// system-wide — confirmed live — so this was every worktree, not an edge
+// case). ConnectionResolver.ResolveConnection (grpcclient package) now
+// independently checks DevServerReachability for that case too (same
+// mechanism dispatchExecutorForRepo already used), and returns a ctx
+// carrying WithDevServerID/WithHiddenTargetID when it decides to relay via
+// reachability rather than a real connection row. All ~33 callers of this
+// function were updated to use the returned ctx for their subsequent
+// executor call — using the original ctx instead would silently drop the
+// routing decision (RelayExecutor.relay() reads DevServerID from ctx, not
+// from any return value here).
+func dispatchExecutor(ctx context.Context, resolver ConnectionResolver, local, relay GitExecutor, worktreeID string) (context.Context, GitExecutor, string, error) {
+	ctx, conn, err := resolver.ResolveConnection(ctx, worktreeID)
 	if err != nil {
-		return nil, "", err
+		return ctx, nil, "", err
 	}
 	if conn.Connected {
-		return relay, conn.RepoPath, nil
+		return ctx, relay, conn.RepoPath, nil
 	}
-	return local, conn.RepoPath, nil
+	return ctx, local, conn.RepoPath, nil
 }
 
 // dispatchExecutorForRepo is dispatchExecutor's repo-scoped counterpart,

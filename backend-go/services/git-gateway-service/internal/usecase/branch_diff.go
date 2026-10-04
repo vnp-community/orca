@@ -38,7 +38,7 @@ func (uc *BranchDiff) Execute(ctx context.Context, in BranchDiffInput) (domain.F
 	if in.FilePath == "" {
 		return domain.FileDiffResult{}, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_FILE_PATH", "file_path is required", nil)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	ctx, executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
 	if err != nil {
 		return domain.FileDiffResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
 	}

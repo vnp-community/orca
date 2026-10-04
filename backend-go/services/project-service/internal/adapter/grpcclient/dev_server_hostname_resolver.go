@@ -21,7 +21,11 @@ func NewInfraFleetHostnameResolver(client infrafleetv1.InfraFleetServiceClient) 
 }
 
 func (c *InfraFleetHostnameResolver) Hostname(ctx context.Context, tenantID, devServerID string) (string, error) {
-	resp, err := c.client.ListDevServers(ctx, &infrafleetv1.ListDevServersRequest{})
+	outCtx, err := withTenantMetadata(ctx)
+	if err != nil {
+		return "", fmt.Errorf("grpcclient: hostname resolver: %w", err)
+	}
+	resp, err := c.client.ListDevServers(outCtx, &infrafleetv1.ListDevServersRequest{})
 	if err != nil {
 		return "", fmt.Errorf("grpcclient: infra-fleet-service ListDevServers: %w", err)
 	}

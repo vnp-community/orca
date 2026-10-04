@@ -40,7 +40,7 @@ func (uc *MergeWorktreeIntoBase) Execute(ctx context.Context, in MergeWorktreeIn
 	}
 
 	// BR-WT-16 — must commit all changes before merging.
-	wtExecutor, wtPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	ctx, wtExecutor, wtPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
 	if err != nil {
 		return domain.MergeResult{}, apperrors.New(apperrors.KindInternal, "WORKTREE_RESOLVE_FAILED", "failed to resolve host", err)
 	}
@@ -58,7 +58,7 @@ func (uc *MergeWorktreeIntoBase) Execute(ctx context.Context, in MergeWorktreeIn
 	// primary clone. dispatchExecutor's worktreeID param is reused,
 	// unmodified, as the dispatch key here (ports.go's doc comment) — the
 	// same pattern CreateWorktree.Execute already uses for repo.ID.
-	mainExecutor, mainRepoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, repo.ID)
+	ctx, mainExecutor, mainRepoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, repo.ID)
 	if err != nil {
 		return domain.MergeResult{}, apperrors.New(apperrors.KindInternal, "REPO_RESOLVE_FAILED", "failed to resolve host", err)
 	}

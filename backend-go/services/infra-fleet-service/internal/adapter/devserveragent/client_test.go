@@ -57,6 +57,12 @@ type fakeAgent struct {
 	// precedent). Takes precedence over the generic single-result `results`
 	// map for method=="vm.provision".
 	vmProvisionFrames []map[string]any
+
+	// responseDelay, keyed by method, sleeps before writing that method's
+	// response frame — lets a test simulate a slow agent method (e.g.
+	// TestClientExec_AgentExecPromptSurvivesLongerThanRequestTimeout, BUG-027
+	// 3rd bite) without a real 15-minute wait.
+	responseDelay map[string]time.Duration
 }
 
 // lastParams returns the raw params this fake agent most recently received
@@ -199,6 +205,9 @@ func (f *fakeAgent) handler(w http.ResponseWriter, r *http.Request) {
 			_ = conn.Write(ctx, websocket.MessageBinary, frame)
 			continue
 		}
+		if delay, ok := f.responseDelay[req.Method]; ok {
+			time.Sleep(delay)
+		}
 		encodedResult, _ := json.Marshal(result)
 		resp := JSONRPCResponse{JSONRPC: "2.0", ID: req.ID, Result: encodedResult}
 		frame, _ := EncodeJSONRPCFrame(resp, 2, decoded.ID)
@@ -280,6 +289,49 @@ func TestClientExecSucceedsAgainstFakeAgent(t *testing.T) {
 	git, ok := result["git"].(map[string]any)
 	if !ok || git["installed"] != true {
 		t.Errorf("result = %+v, want git.installed=true", result)
+	}
+}
+
+// TestClientExec_AgentExecPromptSurvivesLongerThanRequestTimeout is the
+// regression test for BUG-027's 3rd bite: Exec used to route every method
+// through cfg.RequestTimeout's flat cap (session.call), so
+// "agent.execPrompt" — the one method documented to legitimately block for
+// up to 15 minutes while the Dev Server Agent's spawned CLI runs — was
+// killed after cfg.RequestTimeout regardless of how long the real call
+// needed. Live-confirmed: "devserveragent: request \"agent.execPrompt\"
+// timed out: context deadline exceeded" at almost exactly cfg.RequestTimeout
+// (30s in production), on every task.execute dispatch that reached this
+// far — the actual reason a dispatched agent run never produced a result.
+//
+// cfg.RequestTimeout is set well below the fake agent's simulated delay
+// here; an ordinary method (preflight.check, unaffected by this fix) would
+// time out under the same delay — this test only passes because
+// execTimeoutForMethod routes "agent.execPrompt" around that cap.
+func TestClientExec_AgentExecPromptSurvivesLongerThanRequestTimeout(t *testing.T) {
+	agent := &fakeAgent{
+		t:             t,
+		requireToken:  fakeAgentToken,
+		results:       map[string]any{"agent.execPrompt": map[string]any{"stdout": "done", "exitCode": 0}},
+		responseDelay: map[string]time.Duration{"agent.execPrompt": 300 * time.Millisecond},
+	}
+	host, port := startFakeAgent(t, agent)
+
+	cfg := testConfig(port)
+	cfg.RequestTimeout = 100 * time.Millisecond // shorter than the fake agent's simulated delay above
+	client := New(cfg, slog.Default(), WithAgentTokens(fakeStaticTokenSource{token: fakeAgentToken}))
+	t.Cleanup(client.Close)
+
+	devServer, err := domain.NewDevServer("ds-1", "tenant-1", host, domain.ConnectionModeRelayWebSocket, "", nil)
+	if err != nil {
+		t.Fatalf("NewDevServer: %v", err)
+	}
+
+	result, err := client.Exec(context.Background(), devServer, "agent.execPrompt", map[string]any{"prompt": "do the thing", "worktreePath": "/repo"})
+	if err != nil {
+		t.Fatalf("Exec: %v (agent.execPrompt should not be capped by cfg.RequestTimeout)", err)
+	}
+	if result["stdout"] != "done" {
+		t.Errorf("result = %+v, want stdout=done", result)
 	}
 }
 

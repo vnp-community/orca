@@ -1137,8 +1137,30 @@ func (s *session) cancelReconnect() {
 }
 
 // call sends a JSON-RPC request over the live transport and waits for its
-// response, honoring ctx and cfg.RequestTimeout (whichever is shorter).
+// response, honoring ctx and cfg.RequestTimeout (whichever is shorter) —
+// the right default for short calls (ports.scan, preflight.check, ...).
+// See callWithTimeout for methods that need a longer cap.
 func (s *session) call(ctx context.Context, method string, params any) (json.RawMessage, error) {
+	return s.callWithTimeout(ctx, method, params, s.cfg.RequestTimeout)
+}
+
+// callWithTimeout is call() with an explicit per-call cap instead of
+// cfg.RequestTimeout — added because Client.Exec is a generic "run any
+// method" dispatch (Relay/RelayByDevServer's shared path) that used to
+// force EVERY method through cfg.RequestTimeout's flat 30s, including
+// "agent.execPrompt", which legitimately blocks until the spawned CLI
+// process exits (up to 15 minutes — agent-print-mode-exec.ts's
+// MAX_TIMEOUT_MS). Live-confirmed: every task.execute dispatch that
+// reached this far died with "devserveragent: request \"agent.execPrompt\"
+// timed out: context deadline exceeded" at almost exactly 30.000s, well
+// before the CLI could ever produce a result — the actual reason a
+// dispatched agent run never showed any output. timeout<=0 falls back to
+// cfg.RequestTimeout (call()'s own behavior, unchanged for every other
+// method).
+func (s *session) callWithTimeout(ctx context.Context, method string, params any, timeout time.Duration) (json.RawMessage, error) {
+	if timeout <= 0 {
+		timeout = s.cfg.RequestTimeout
+	}
 	s.mu.Lock()
 	if s.transport == nil || !s.handshaked {
 		s.mu.Unlock()
@@ -1170,7 +1192,7 @@ func (s *session) call(ctx context.Context, method string, params any) (json.Raw
 		return nil, err
 	}
 
-	callCtx, cancel := context.WithTimeout(ctx, s.cfg.RequestTimeout)
+	callCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
 	if err := t.WriteFrame(callCtx, frame); err != nil {

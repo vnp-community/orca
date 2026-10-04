@@ -396,6 +396,26 @@ func (c *Client) CancelReconnect(devServerID string) {
 	sess.cancelReconnect()
 }
 
+// execPromptTimeout matches agent-print-mode-exec.ts's own MAX_TIMEOUT_MS
+// (15 minutes) — see execTimeoutForMethod's doc comment for why Exec needs
+// this override at all.
+const execPromptTimeout = 15 * time.Minute
+
+// execTimeoutForMethod special-cases the one method known, by this
+// codebase's own documentation, to legitimately run far longer than
+// cfg.RequestTimeout's flat 30s default: "agent.execPrompt" blocks until
+// the Dev Server Agent's spawned CLI process exits. Every other method
+// Exec dispatches (ports.scan, preflight.check, shell.exec, ...) keeps
+// cfg.RequestTimeout's default (timeout<=0 signals callWithTimeout to fall
+// back to it) — not guessed at here, since nothing else in this codebase
+// documents a similarly long real duration.
+func execTimeoutForMethod(method string) time.Duration {
+	if method == "agent.execPrompt" {
+		return execPromptTimeout
+	}
+	return 0
+}
+
 // Exec dispatches one JSON-RPC method call (e.g. "ports.scan",
 // "preflight.check", "shell.exec") to the Dev Server Agent over devServer's
 // resolved transport and decodes its JSON-RPC result into a map — the
@@ -406,7 +426,7 @@ func (c *Client) Exec(ctx context.Context, devServer domain.DevServer, method st
 	if err != nil {
 		return nil, err
 	}
-	result, err := sess.call(ctx, method, params)
+	result, err := sess.callWithTimeout(ctx, method, params, execTimeoutForMethod(method))
 	if err != nil {
 		// JSON-RPC standard "method not found" (-32601): the agent answered,
 		// it just doesn't implement method on this build — a permanent,

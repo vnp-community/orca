@@ -21,8 +21,8 @@ import (
 // three ports since they're all selected by the same dispatch shape.
 type fakeResolver struct{ conn usecase.ResolvedConnection }
 
-func (f *fakeResolver) ResolveConnection(context.Context, string) (usecase.ResolvedConnection, error) {
-	return f.conn, nil
+func (f *fakeResolver) ResolveConnection(ctx context.Context, _ string) (context.Context, usecase.ResolvedConnection, error) {
+	return ctx, f.conn, nil
 }
 
 type fakeExecutor struct{}

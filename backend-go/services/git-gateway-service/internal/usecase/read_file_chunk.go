@@ -25,7 +25,7 @@ func NewReadFileChunkUseCase(resolver ConnectionResolver, local FilesystemExecut
 }
 
 func (uc *ReadFileChunkUseCase) Execute(ctx context.Context, worktreeID, path string, offsetBytes, lengthBytes int64) ([]byte, error) {
-	conn, err := uc.resolver.ResolveConnection(ctx, worktreeID)
+	ctx, conn, err := uc.resolver.ResolveConnection(ctx, worktreeID)
 	if err != nil {
 		return nil, err
 	}

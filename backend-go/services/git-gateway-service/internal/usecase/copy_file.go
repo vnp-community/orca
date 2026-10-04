@@ -12,7 +12,7 @@ func NewCopyFileUseCase(resolver ConnectionResolver, local LocalOnlyFilesystemEx
 }
 
 func (uc *CopyFileUseCase) Execute(ctx context.Context, worktreeID, from, to string) error {
-	conn, err := uc.resolver.ResolveConnection(ctx, worktreeID)
+	ctx, conn, err := uc.resolver.ResolveConnection(ctx, worktreeID)
 	if err != nil {
 		return err
 	}

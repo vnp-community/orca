@@ -31,7 +31,7 @@ func (uc *ForkSync) Execute(ctx context.Context, in ForkSyncInput) (domain.ForkS
 	if in.ExpectedUpstream == "" {
 		return domain.ForkSyncStatus{}, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_EXPECTED_UPSTREAM", "expected_upstream is required", nil)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	ctx, executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
 	if err != nil {
 		return domain.ForkSyncStatus{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
 	}

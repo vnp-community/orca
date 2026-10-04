@@ -29,7 +29,7 @@ func (uc *RebaseFromBase) Execute(ctx context.Context, in RebaseFromBaseInput) (
 	if in.BaseRef == "" {
 		return domain.RebaseResult{}, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_BASE_REF", "base_ref is required", nil)
 	}
-	executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
+	ctx, executor, repoPath, err := dispatchExecutor(ctx, uc.resolver, uc.local, uc.relay, in.WorktreeID)
 	if err != nil {
 		return domain.RebaseResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
 	}

@@ -19,7 +19,7 @@ func NewListMarkdownDocumentsUseCase(resolver ConnectionResolver, local, relay F
 }
 
 func (uc *ListMarkdownDocumentsUseCase) Execute(ctx context.Context, worktreeID string, maxResults int) ([]string, error) {
-	exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
+	ctx, exec, conn, err := dispatchFilesystemExecutor(ctx, uc.resolver, uc.local, uc.relay, worktreeID)
 	if err != nil {
 		return nil, err
 	}

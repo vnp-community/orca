@@ -31,7 +31,7 @@ func (uc *DeleteBranch) Execute(ctx context.Context, in DeleteBranchInput) (doma
 	if in.WorktreeID == "" || in.Branch == "" {
 		return domain.SimpleResult{}, apperrors.New(apperrors.KindInvalidArgument, "GITGATEWAY_MISSING_ARGS", "worktree_id and branch are required", nil)
 	}
-	conn, err := uc.resolver.ResolveConnection(ctx, in.WorktreeID)
+	ctx, conn, err := uc.resolver.ResolveConnection(ctx, in.WorktreeID)
 	if err != nil {
 		return domain.SimpleResult{}, apperrors.New(apperrors.KindInternal, "GITGATEWAY_RESOLVE_FAILED", "failed to resolve worktree's owning host", err)
 	}
