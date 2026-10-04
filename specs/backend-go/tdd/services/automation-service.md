@@ -251,8 +251,8 @@ caller. Every replica runs a ticker (~1 minute interval) that queries
 each due row calls the same `usecase.RunAutomation` interactor `RunNow`
 uses, with `trigger=scheduled` and a deterministic `request_id` derived
 from `(automation_id, next_run_at)`. Simplest option at this system's
-scale (17 services total; automation volume nowhere near justifying a
-dedicated scheduler tier) and avoids an 18th service whose only job is
+scale (18 services total; automation volume nowhere near justifying a
+dedicated scheduler tier) and avoids an extra service whose only job is
 "call `RunNow` on a timer." Running on every replica requires a claim step
 (`SELECT ... FOR UPDATE SKIP LOCKED`, or an advisory lock keyed by
 `automation_id`) so two replicas ticking in the same window don't both

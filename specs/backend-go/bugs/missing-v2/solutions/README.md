@@ -13,15 +13,29 @@ which the `tdd/README.md` doc-map treats as part of the same corpus). Each
 its fix follows, not just "seemed reasonable" — per this bug-report
 family's own established discipline of citing real sources over guessing.
 
-> **Status: 🟡 Proposed — none of these are implemented yet.** Every root
-> cause was confirmed by reading the actual `backend-go` source (not
-> guessed), several during the process of designing the fix itself (see
-> "Root causes found while designing," below) — but no code has been
-> changed. This differs from `../../api-v1/solutions/` and
-> `../../missing-v1/solutions/`, both of which document fixes that were
-> actually applied and verified; treat those as the pattern for what
-> "done" looks like for these once implemented, not as evidence these
-> already match that state.
+> **Status: 🟡 Proposed for SOL-001–007 — none of those 7 are implemented
+> yet.** Every root cause was confirmed by reading the actual `backend-go`
+> source (not guessed), several during the process of designing the fix
+> itself (see "Root causes found while designing," below) — but no code
+> has been changed for these 7. This differs from `../../api-v1/solutions/`
+> and `../../missing-v1/solutions/`, both of which document fixes that were
+> actually applied and verified; treat those as the pattern for what "done"
+> looks like for these once implemented, not as evidence these already
+> match that state.
+>
+> **SOL-008, SOL-009, and SOL-010 are the exceptions: ✅ IMPLEMENTED**
+> (2026-09-14, TASK-016/017, TASK-018/019, and TASK-020/021 respectively) —
+> all three filed and fixed in the same pass, following this directory's
+> established BUG→SOL→TASK structure end to end rather than stopping at the
+> proposal stage. SOL-009 fixed only an observability gap found while
+> investigating BUG-009 live; that same logging fix then exposed BUG-009's
+> REAL root cause (a `null`→`""` data-corruption bug, unrelated to SOL-009's
+> original race-condition theory), which SOL-010 fixes. **SOL-008 and
+> SOL-009 were both deployed together** (`sync-to-server.sh` rebuilds all 17
+> `backend-go` services at once, so `project-service`'s SOL-008 fix rode
+> along with `infra-fleet-service`'s SOL-009 fix). **SOL-010 (`api-gateway`)
+> was written afterward and is NOT yet deployed** — needs its own
+> rebuild/redeploy pass.
 
 ## Solution Index
 
@@ -34,6 +48,15 @@ family's own established discipline of citing real sources over guessing.
 | [SOL-005](./SOL-005-normalize-nil-slices-before-json-encode.md) | BUG-005 | Normalize `nil` slices to `[]` once, in `Registry.Dispatch`'s return path, covering every channel not just the 4 confirmed | Medium | `api-gateway` |
 | [SOL-006](./SOL-006-session-dialect-always-populate-args.md) | BUG-006 | `normalizeInboundMessage` always populates `Args[0]` for the session-client dialect, even with no `params` | Medium | `api-gateway` |
 | [SOL-007](./SOL-007-nginx-admin-api-location-block.md) | BUG-007 | Add the missing `/admin/api/` nginx `location` block, proxying to `api-gateway` like `/v1/` already does | High | deploy config |
+| [SOL-008](./SOL-008-profile-resolver-forward-tenant-metadata.md) ✅ | BUG-008 | `TenantProfileResolver.GetResolvedProfile` calls this package's own `withTenantMetadata(ctx)` before the outbound RPC, matching its two sibling call sites | High | `project-service` |
+| [SOL-009](./SOL-009-apperrors-optional-cause-logging.md) ✅ deployed | BUG-009 | `apperrors.ToGRPCStatus` logs an `AppError`'s wrapped cause to an optional, nil-by-default logger (server-side only, client-visible status unchanged) — fixed the observability gap that then exposed BUG-009's real cause (see SOL-010) | Low | `common/apperrors` (CRITICAL blast radius, 463 callers — additive only), wired in `infra-fleet-service` |
+| [SOL-010](./SOL-010-accounts-relay-preserve-null-accountid.md) ✅ deployed | BUG-009 (real root cause) | `accountsRelayArgs.AccountID` becomes `*string` so a client's `accountId:null` ("System default") round-trips correctly instead of collapsing to `""`, which the dev server agent always rejected | High | `api-gateway` |
+| [SOL-011](./SOL-011-dev-server-lister-forward-tenant-metadata.md) ✅ deployed | BUG-010 | `InfraFleetDevServerLister.Exists`/`InfraFleetHostnameResolver.Hostname` call `withTenantMetadata(ctx)` before their outbound `ListDevServers` RPC — same pattern as SOL-008, one layer down | High | `project-service` |
+| [SOL-012](./SOL-012-git-gateway-service-cause-logging.md) ✅ deployed | BUG-012 | Wire `apperrors.SetLogger` into `git-gateway-service/cmd/server/main.go` — extends SOL-009's pattern to a third service | Medium | `git-gateway-service` |
+| [SOL-013](./SOL-013-connection-resolver-worktree-path-fallback.md) ✅ deployed & live-verified | BUG-012 / CR-PW-010 | Fix `ConnectionResolver.ResolveConnection`'s `!Connected` branch to resolve a real path via project-service instead of echoing the worktree ID — closes the bug for all 34 `dispatchExecutor` callers at once | 🔴 CRITICAL blast radius (34 direct callers, gitnexus-confirmed) | `git-gateway-service` |
+| [SOL-014](./SOL-014-connection-resolver-relay-via-dev-server-reachability.md) ✅ deployed & live-verified | BUG-015 / CR-PW-011 | Same chokepoint, one layer deeper: `ResolveConnection`'s `!Connected` branch now ALSO checks `DevServerReachability` and relays via `RelayByDevServer` (ctx-threaded `WithDevServerID`) instead of always falling back to `local` — closes BUG-012→BUG-015 chain end-to-end | 🔴 Even larger blast radius than SOL-013 once the sibling `dispatchFilesystemExecutor` family (12 more callers) was found mid-implementation — ~58 call sites total, all mechanical | `git-gateway-service` |
+
+(BUG-011 has no SOL yet — fix direction sketched in the bug file itself, needs its own impact analysis first before a full solution doc.)
 
 ## Suggested implementation order
 

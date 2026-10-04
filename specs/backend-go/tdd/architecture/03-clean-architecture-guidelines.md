@@ -1,6 +1,6 @@
 # Clean Architecture Guidelines
 
-Every one of the 17 services (see
+Every one of the 18 services (see
 [`02-microservices-decomposition.md`](./02-microservices-decomposition.md))
 follows the same internal layering. This is not optional per-service — a
 production-readiness gate in

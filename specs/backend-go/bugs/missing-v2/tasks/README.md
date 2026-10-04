@@ -1,7 +1,12 @@
 # Missing-v2 Tasks — Executable Breakdown of the Solutions
 
-15 task files (`TASK-001`–`TASK-015`), one execution unit each, derived
-from the 7 proposals in [`../solutions/`](../solutions/). Each follows the
+23 task files (`TASK-001`–`TASK-023`), one execution unit each, derived
+from the 11 proposals in [`../solutions/`](../solutions/). TASK-001–015 are
+still `[ ]` TODO (unimplemented proposals); **TASK-016/017 (SOL-008),
+TASK-018/019 (SOL-009), TASK-020/021 (SOL-010), and TASK-022/023 (SOL-011)
+are all `[x]` DONE and deployed** (2026-09-14/15 — see BUG-009/BUG-010's
+"Deploy status"). **SOL-012 (BUG-012) has no task breakdown yet — not
+implemented.** Each follows the
 format established in [`../../missing-v1/tasks/`](../../missing-v1/tasks/)
 (itself following [`../../api-v1/tasks/`](../../api-v1/tasks/)):
 **From Solution** / **Priority** / **Service** / **File** / **Depends
@@ -112,6 +117,11 @@ per-task below), and a "Verify" section with exact commands.
 | SOL-005 | BUG-005 (empty lists → `null`) | [TASK-010](./TASK-010-normalize-nil-slices-in-dispatch.md)–[011](./TASK-011-test-nil-slice-normalization.md) | 2 | Also edits `Dispatch` — depends on TASK-001 |
 | SOL-006 | BUG-006 (session dialect drops `params`) | [TASK-012](./TASK-012-session-dialect-populate-empty-args.md)–[013](./TASK-013-test-session-dialect-empty-params.md) | 2 | Same file family as TASK-001/010, different function |
 | SOL-007 | BUG-007 (nginx `/admin/api/*` unrouted) | [TASK-014](./TASK-014-nginx-admin-api-location-block.md)–[015](./TASK-015-test-nginx-admin-api-routing.md) | 2 | Deploy config only, no Go code |
+| SOL-008 | BUG-008 (`project.list` `PROJECT_PROFILE_RESOLVE_FAILED`) | [TASK-016](./TASK-016-profile-resolver-forward-tenant-metadata.md)–[017](./TASK-017-test-profile-resolver-tenant-metadata.md) | 2 | ✅ **DONE** (2026-09-14) |
+| SOL-009 | BUG-009 (`INFRA_AGENT_EXEC_FAILED` observability gap) | [TASK-018](./TASK-018-apperrors-optional-cause-logger.md)–[019](./TASK-019-test-apperrors-cause-logging.md) | 2 | ✅ **DONE + DEPLOYED** (2026-09-14) — fixed the observability gap, which then exposed BUG-009's real cause (see SOL-010) |
+| SOL-010 | BUG-009 (real root cause: `null`→`""` accountId corruption) | [TASK-020](./TASK-020-accounts-relay-nullable-accountid.md)–[021](./TASK-021-test-accounts-relay-nullable-accountid.md) | 2 | ✅ **DONE + DEPLOYED** (2026-09-14) |
+| SOL-011 | BUG-010 (`PROJECT_DEV_SERVER_LOOKUP_FAILED` missing tenant metadata) | [TASK-022](./TASK-022-dev-server-lister-forward-tenant-metadata.md)–[023](./TASK-023-test-dev-server-lister-tenant-metadata.md) | 2 | ✅ **DONE + DEPLOYED** (2026-09-15) |
+| SOL-012 | BUG-012 (`GITGATEWAY_STATUS_FAILED` opaque, needs cause-logging) | — no tasks yet | 0 | 🔴 Not implemented |
 
 ## Dependency graph
 
@@ -126,6 +136,9 @@ TASK-006 (Dockerfiles + config) ─┴─→ TASK-007 (test: unit + CI image che
 TASK-008 (project.list fix)    ─→ TASK-009 (test)
 TASK-012 (session dialect fix) ─→ TASK-013 (test)
 TASK-014 (nginx location block) ─→ TASK-015 (test: CI routing check)
+TASK-016 (profile resolver tenant metadata) ─→ TASK-017 (test) — [x] DONE
+TASK-018 (apperrors optional cause logger) ─→ TASK-019 (test) — [x] DONE, deployed
+TASK-020 (accounts relay nullable accountId) ─→ TASK-021 (test) — [x] DONE, not deployed
 ```
 
 Only **TASK-001 → TASK-010** is a true same-function edit dependency
@@ -168,5 +181,8 @@ corrected here, not silently carried forward:
 
 Sequential, no gaps — unlike `missing-v1/tasks/`'s reserved-range scheme
 (that directory's scale, 35 solutions/226 tasks, needed parallel
-research-pass ranges; this one's 7 solutions/15 tasks were sized and
-numbered in one pass).
+research-pass ranges). TASK-001–015 (7 solutions) were sized and numbered
+in one pass; TASK-016–017 (SOL-008), TASK-018–019 (SOL-009), and
+TASK-020–021 (SOL-010) were each
+appended later, 2026-09-14, when BUG-008 and BUG-009 were filed — same
+sequential convention, just later passes the same day.

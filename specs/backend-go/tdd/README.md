@@ -55,7 +55,7 @@ as binding inputs, not just references:
 | [09-observability-reliability.md](./architecture/09-observability-reliability.md) | Logging, tracing, metrics, SLOs, resilience patterns |
 | [10-deployment-infrastructure.md](./architecture/10-deployment-infrastructure.md) | Kubernetes, Helm, CI/CD, environments |
 | **Services** | |
-| [services/00-service-catalog.md](./services/00-service-catalog.md) | One-page index of all 17 services — owns-what, talks-to-whom, replaces-what |
+| [services/00-service-catalog.md](./services/00-service-catalog.md) | One-page index of all 18 services — owns-what, talks-to-whom, replaces-what |
 | `services/<name>-service.md` × 16 | Per-service deep dive: responsibilities, API surface, domain model, DB schema, dependencies, NFRs, migration notes |
 | **Migration** | |
 | [migration/domain-capability-service-mapping.md](./migration/domain-capability-service-mapping.md) | Every TS RPC namespace / business capability → target Go service |

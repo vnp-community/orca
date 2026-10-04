@@ -118,6 +118,12 @@ type TaskActivityEvent =
 
 ## Multi-task Agent Session (Batch Execution)
 
+> ⚠️ **Deprecated — xem [BL-TG-06](./BL-TG-06-centralized-spec-code-merge.md).** Mục này là
+> thiết kế gốc, viết trước khi có code thật, và không khớp với implementation/ràng buộc thật đã
+> tìm ra sau này (dispatch async, không có dev-server-grouping, không có concurrency limit ở bất
+> kỳ tầng nào, `ExecuteBatch` — thứ lẽ ra làm việc "topological order" này — là dead code không
+> RPC nào gọi tới). BL-TG-06 thay thế mục này bằng thiết kế đã đối chiếu với code thật.
+
 ```
 Lead → select multiple tasks (Ctrl+click) → [Run All with Agent]
     │
