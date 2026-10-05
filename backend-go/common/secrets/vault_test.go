@@ -20,6 +20,8 @@ import (
 type fakeVault struct {
 	keyExists   atomic.Bool
 	createCalls atomic.Int32
+	// lastSignBody is the JSON body of the latest transit/sign request.
+	lastSignBody atomic.Value
 }
 
 func newFakeVaultServer(t *testing.T, fv *fakeVault) *httptest.Server {
@@ -52,6 +54,9 @@ func newFakeVaultServer(t *testing.T, fv *fakeVault) *httptest.Server {
 		}
 	})
 	mux.HandleFunc("/v1/transit/sign/jwt-signing", func(w http.ResponseWriter, r *http.Request) {
+		var body map[string]any
+		_ = json.NewDecoder(r.Body).Decode(&body)
+		fv.lastSignBody.Store(body)
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"data": map[string]any{
 				"signature":   "vault:v1:c2lnbmF0dXJlLWJ5dGVz", // base64("signature-bytes")
@@ -162,6 +167,36 @@ func TestTransitSign_ParsesSignatureField(t *testing.T) {
 	}
 	if sig != "vault:v1:c2lnbmF0dXJlLWJ5dGVz" {
 		t.Fatalf("unexpected signature wire value: %q", sig)
+	}
+}
+
+func TestTransitSignRS256_RequestsPKCS1v15(t *testing.T) {
+	fv := &fakeVault{}
+	fv.keyExists.Store(true)
+	server := newFakeVaultServer(t, fv)
+	defer server.Close()
+	t.Setenv("VAULT_ADDR", server.URL)
+	t.Setenv("VAULT_TOKEN", "test-token")
+	client, err := secrets.NewClient()
+	if err != nil {
+		t.Fatalf("NewClient: %v", err)
+	}
+
+	if _, err := client.TransitSignRS256(context.Background(), "jwt-signing", []byte("payload")); err != nil {
+		t.Fatalf("TransitSignRS256: %v", err)
+	}
+	body, _ := fv.lastSignBody.Load().(map[string]any)
+	if body["signature_algorithm"] != "pkcs1v15" || body["hash_algorithm"] != "sha2-256" {
+		t.Fatalf("RS256 signing must ask Vault for pkcs1v15 + sha2-256, got %v", body)
+	}
+
+	// Plain TransitSign keeps Vault's default so non-JWT callers (APNs/FCM) are unaffected.
+	if _, err := client.TransitSign(context.Background(), "jwt-signing", []byte("payload")); err != nil {
+		t.Fatalf("TransitSign: %v", err)
+	}
+	body, _ = fv.lastSignBody.Load().(map[string]any)
+	if _, set := body["signature_algorithm"]; set {
+		t.Fatalf("TransitSign must not set signature_algorithm, got %v", body)
 	}
 }
 

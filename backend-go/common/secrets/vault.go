@@ -151,10 +151,25 @@ func (c *Client) TransitEnsureKey(ctx context.Context, keyName, keyType string) 
 // callers that need the raw signature bytes (e.g. to embed in a JWT) must
 // strip the "vault:v<N>:" prefix themselves.
 func (c *Client) TransitSign(ctx context.Context, keyName string, input []byte) (string, error) {
-	secret, err := c.api.Logical().WriteWithContext(ctx, "transit/sign/"+keyName, map[string]any{
+	return c.transitSign(ctx, keyName, input, nil)
+}
+
+// TransitSignRS256 is TransitSign with RSASSA-PKCS1-v1_5, the padding JWT RS256
+// requires. Vault's RSA default is PSS, which no RS256 verifier accepts, so a JWT
+// signed with plain TransitSign never verifies against its own JWKS.
+func (c *Client) TransitSignRS256(ctx context.Context, keyName string, input []byte) (string, error) {
+	return c.transitSign(ctx, keyName, input, map[string]any{"signature_algorithm": "pkcs1v15"})
+}
+
+func (c *Client) transitSign(ctx context.Context, keyName string, input []byte, extra map[string]any) (string, error) {
+	body := map[string]any{
 		"input":          base64.StdEncoding.EncodeToString(input),
 		"hash_algorithm": "sha2-256",
-	})
+	}
+	for k, v := range extra {
+		body[k] = v
+	}
+	secret, err := c.api.Logical().WriteWithContext(ctx, "transit/sign/"+keyName, body)
 	if err != nil {
 		return "", fmt.Errorf("secrets: transit sign: %w", err)
 	}

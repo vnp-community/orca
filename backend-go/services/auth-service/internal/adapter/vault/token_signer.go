@@ -38,7 +38,7 @@ type TokenSigner struct {
 func New(client *secrets.Client) *TokenSigner {
 	return &TokenSigner{
 		client: client,
-		signer: jwtauth.NewTransitSigner(keyName, client.TransitSign, client.TransitPublicKeyVersions),
+		signer: jwtauth.NewTransitSigner(keyName, client.TransitSignRS256, client.TransitPublicKeyVersions),
 	}
 }
 
