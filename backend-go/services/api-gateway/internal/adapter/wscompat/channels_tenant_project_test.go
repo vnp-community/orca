@@ -750,6 +750,45 @@ func TestProjectUpdateChannel_Success(t *testing.T) {
 	}
 }
 
+func TestProjectUpdateChannel_JiraMappingPresenceSemantics(t *testing.T) {
+	var got *projectv1.UpdateProjectRequest
+	fake := &fakeProjectServiceClient2{
+		updateProjectFunc: func(ctx context.Context, in *projectv1.UpdateProjectRequest) (*projectv1.UpdateProjectResponse, error) {
+			got = in
+			return &projectv1.UpdateProjectResponse{Project: &projectv1.Project{Id: "p1", JiraProjectKey: "ABC", JiraSiteId: "https://a.atlassian.net"}}, nil
+		},
+	}
+	r := NewRegistry()
+	registerProjectChannels(r, fake)
+	id := Identity{TenantID: "tenant-1"}
+
+	result, err := r.Dispatch(context.Background(), id, "project.update",
+		argsJSON(t, map[string]any{"id": "p1", "jiraProjectKey": "abc", "jiraSiteId": "https://a.atlassian.net"}))
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.JiraProjectKey == nil || *got.JiraProjectKey != "abc" || got.JiraSiteId == nil || *got.JiraSiteId != "https://a.atlassian.net" {
+		t.Errorf("want jira fields forwarded, got %v / %v", got.JiraProjectKey, got.JiraSiteId)
+	}
+	if proj, ok := result.(projectView); !ok || proj.JiraProjectKey != "ABC" || proj.JiraSiteID != "https://a.atlassian.net" {
+		t.Errorf("want jira fields in projectView, got %+v", result)
+	}
+
+	if _, err := r.Dispatch(context.Background(), id, "project.update", argsJSON(t, map[string]any{"id": "p1", "name": "x"})); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.JiraProjectKey != nil || got.JiraSiteId != nil {
+		t.Errorf("absent fields must stay unset, got %v / %v", got.JiraProjectKey, got.JiraSiteId)
+	}
+
+	if _, err := r.Dispatch(context.Background(), id, "project.update", argsJSON(t, map[string]any{"id": "p1", "jiraProjectKey": "", "jiraSiteId": ""})); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got.JiraProjectKey == nil || *got.JiraProjectKey != "" || got.JiraSiteId == nil || *got.JiraSiteId != "" {
+		t.Errorf("empty string must be sent as present-and-empty to clear, got %v / %v", got.JiraProjectKey, got.JiraSiteId)
+	}
+}
+
 func TestProjectGetMembersChannel_Success(t *testing.T) {
 	var called bool
 	fake := &fakeProjectServiceClient2{

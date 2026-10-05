@@ -86,6 +86,8 @@ func registerWorktreeChannels(
 			// task-service can adopt this worktree for the same issue.
 			LinkedIssueProvider string `json:"linkedIssueProvider"`
 			LinkedIssueRef      string `json:"linkedIssueRef"`
+			// Jira site the ref belongs to; keeps the key unambiguous across sites.
+			LinkedIssueSite string `json:"linkedIssueSite"`
 		}
 		in, err := decodeArg[createArgs](args, 0)
 		if err != nil {
@@ -109,6 +111,7 @@ func registerWorktreeChannels(
 			CreatedByTerminalHandle: nonEmptyPtr(in.CreatedByTerminalHandle),
 			LinkedIssueProvider:     nonEmptyPtr(in.LinkedIssueProvider),
 			LinkedIssueRef:          nonEmptyPtr(in.LinkedIssueRef),
+			LinkedIssueSite:         nonEmptyPtr(in.LinkedIssueSite),
 		})
 		if err != nil {
 			return nil, err

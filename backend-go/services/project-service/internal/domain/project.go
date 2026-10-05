@@ -6,6 +6,8 @@ package domain
 
 import (
 	"errors"
+	"regexp"
+	"strings"
 	"time"
 )
 
@@ -25,6 +27,9 @@ var (
 	// bad value surfaces as apperrors.KindInvalidArgument, not a raw SQL
 	// constraint-violation error.
 	ErrInvalidVisibility = errors.New("domain: visibility must be one of private, team, department, company")
+	// ErrInvalidJiraProjectKey is returned when a non-empty Jira project key
+	// doesn't match Jira's own key shape.
+	ErrInvalidJiraProjectKey = errors.New("domain: jira_project_key must match ^[A-Z][A-Z0-9_]{1,19}$")
 	// ErrProjectNotFound is the sentinel a Repository implementation returns
 	// (wrapped, per errors.Is convention) when a project doesn't exist for
 	// the given tenant — usecase/ maps this to apperrors.KindNotFound.
@@ -98,6 +103,22 @@ type Project struct {
 	// defaults to true in NewProject (sync is on unless a project
 	// explicitly turns it off via UpdateProject).
 	IssueStatusSyncEnabled bool
+	// JiraProjectKey/JiraSiteID pin the Jira project this Orca project maps
+	// to; the site keeps identical keys on different Jira sites unambiguous.
+	JiraProjectKey string
+	JiraSiteID     string
+}
+
+var jiraProjectKeyPattern = regexp.MustCompile(`^[A-Z][A-Z0-9_]{1,19}$`)
+
+// NormalizeJiraProjectKey trims and uppercases key, then validates it; empty
+// is valid and clears the mapping.
+func NormalizeJiraProjectKey(key string) (string, error) {
+	key = strings.ToUpper(strings.TrimSpace(key))
+	if key != "" && !jiraProjectKeyPattern.MatchString(key) {
+		return "", ErrInvalidJiraProjectKey
+	}
+	return key, nil
 }
 
 // ProjectUpdatePatch carries UpdateProject's field-mask semantics: an empty
@@ -119,6 +140,10 @@ type ProjectUpdatePatch struct {
 	// MobileEmulatorAgentID is empty-string-means-no-change, like the other
 	// string fields — CR-DS-009 §3.2.
 	MobileEmulatorAgentID string
+	// JiraProjectKey/JiraSiteID are presence-based (nil = no change, ""
+	// clears) so a mapping can be removed, unlike the string fields above.
+	JiraProjectKey *string
+	JiraSiteID     *string
 }
 
 // NewProject constructs a Project, enforcing the invariants a record must

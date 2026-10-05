@@ -32,7 +32,7 @@ func TestRecordWorktreeRemoved_AlwaysPublishesHadOpenPrFalse(t *testing.T) {
 	repo := newFakeWorktreeRepository()
 	repo.worktrees["w1"] = domain.Worktree{
 		ID: "w1", ProjectID: "p1", RepoID: "r1", Path: "/srv/w1", Branch: "main", Active: true,
-		LinkedIssueProvider: "github", LinkedIssueRef: "owner/repo#42",
+		LinkedIssueProvider: "github", LinkedIssueRef: "owner/repo#42", LinkedIssueSite: "https://a.atlassian.net",
 	}
 	uc := NewRecordWorktreeRemoved(repo)
 
@@ -56,6 +56,9 @@ func TestRecordWorktreeRemoved_AlwaysPublishesHadOpenPrFalse(t *testing.T) {
 	}
 	if payload.LinkedIssueRef != "owner/repo#42" {
 		t.Errorf("expected linked_issue_ref to carry the removed worktree's link, got %q", payload.LinkedIssueRef)
+	}
+	if payload.LinkedIssueSite != "https://a.atlassian.net" {
+		t.Errorf("expected linked_issue_site on deleted event, got %q", payload.LinkedIssueSite)
 	}
 }
 

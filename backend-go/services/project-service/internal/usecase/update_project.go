@@ -3,6 +3,7 @@ package usecase
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/common/tenant"
@@ -27,6 +28,9 @@ type UpdateProjectInput struct {
 	// domain.Project.MobileEmulatorAgentID's doc comment for why this field
 	// (unlike DevServerID) goes through the ordinary UpdateProject path.
 	MobileEmulatorAgentID string
+	// JiraProjectKey/JiraSiteID are presence-based (nil = no change, "" clears).
+	JiraProjectKey *string
+	JiraSiteID     *string
 }
 
 type UpdateProject struct {
@@ -55,6 +59,20 @@ func (uc *UpdateProject) Execute(ctx context.Context, in UpdateProjectInput) (do
 		return domain.Project{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_INVALID_VISIBILITY", domain.ErrInvalidVisibility.Error(), domain.ErrInvalidVisibility)
 	}
 
+	jiraKey := in.JiraProjectKey
+	if jiraKey != nil {
+		normalized, err := domain.NormalizeJiraProjectKey(*jiraKey)
+		if err != nil {
+			return domain.Project{}, apperrors.New(apperrors.KindInvalidArgument, "PROJECT_INVALID_JIRA_PROJECT_KEY", err.Error(), err)
+		}
+		jiraKey = &normalized
+	}
+	jiraSite := in.JiraSiteID
+	if jiraSite != nil {
+		trimmed := strings.TrimSpace(*jiraSite)
+		jiraSite = &trimmed
+	}
+
 	patch := domain.ProjectUpdatePatch{
 		Name:                   in.Name,
 		Description:            in.Description,
@@ -62,6 +80,8 @@ func (uc *UpdateProject) Execute(ctx context.Context, in UpdateProjectInput) (do
 		Visibility:             in.Visibility,
 		IssueStatusSyncEnabled: in.IssueStatusSyncEnabled,
 		MobileEmulatorAgentID:  in.MobileEmulatorAgentID,
+		JiraProjectKey:         jiraKey,
+		JiraSiteID:             jiraSite,
 	}
 
 	updated, err := uc.repo.UpdateProject(ctx, tenantID, in.ProjectID, patch)

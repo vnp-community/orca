@@ -467,6 +467,8 @@ type WorktreeLineageCapture struct {
 	CreatedByTerminalHandle string
 	LinkedIssueProvider     string
 	LinkedIssueRef          string
+	// LinkedIssueSite disambiguates LinkedIssueRef across Jira sites; empty = unknown.
+	LinkedIssueSite string
 }
 
 // ResolvedBase is PrefetchCreateBase/ResolvePrBase/ResolveMrBase's answer:

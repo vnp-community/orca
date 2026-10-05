@@ -69,7 +69,7 @@ func (uc *SyncIssueStatus) HandleWorktreeLifecycle(ctx context.Context, ev domai
 	}
 
 	err := doWithRetry(ctx, retryAttempts, func(ctx context.Context) error { // BR-PI-08
-		return uc.updateIssueStatus(ctx, ev.TenantID, ev.ActorUserID, ev.LinkedIssueProvider, ev.LinkedIssueRef, target)
+		return uc.updateIssueStatus(ctx, ev.TenantID, ev.ActorUserID, ev.LinkedIssueProvider, ev.LinkedIssueRef, ev.LinkedIssueSite, target)
 	})
 	if err != nil {
 		uc.logger.ErrorContext(ctx, "gave up syncing issue status after retries", "issue", ev.LinkedIssueRef, "error", err)
@@ -119,7 +119,7 @@ func (uc *SyncIssueStatus) HandlePullRequestLifecycle(ctx context.Context, ev do
 	}
 
 	err := doWithRetry(ctx, retryAttempts, func(ctx context.Context) error {
-		return uc.updateIssueStatus(ctx, ev.TenantID, ev.ActorUserID, ev.LinkedIssueProvider, ev.LinkedIssueRef, target)
+		return uc.updateIssueStatus(ctx, ev.TenantID, ev.ActorUserID, ev.LinkedIssueProvider, ev.LinkedIssueRef, ev.LinkedIssueSite, target)
 	})
 	if err != nil {
 		uc.logger.ErrorContext(ctx, "gave up syncing issue status after retries", "issue", ev.LinkedIssueRef, "error", err)
@@ -127,11 +127,11 @@ func (uc *SyncIssueStatus) HandlePullRequestLifecycle(ctx context.Context, ev do
 	return uc.processedEvents.MarkSeen(ctx, ev.EventID)
 }
 
-func (uc *SyncIssueStatus) updateIssueStatus(ctx context.Context, tenantID, userID, provider, ref string, state domain.TargetState) error {
+func (uc *SyncIssueStatus) updateIssueStatus(ctx context.Context, tenantID, userID, provider, ref, site string, state domain.TargetState) error {
 	switch provider {
 	case "linear", "jira":
 		if state.OnlyFromCategory != "" {
-			category, err := uc.tracker.IssueStatusCategory(ctx, tenantID, userID, provider, ref)
+			category, err := uc.tracker.IssueStatusCategory(ctx, tenantID, userID, provider, ref, site)
 			if err != nil {
 				return err
 			}
@@ -143,7 +143,7 @@ func (uc *SyncIssueStatus) updateIssueStatus(ctx context.Context, tenantID, user
 				return nil
 			}
 		}
-		return uc.tracker.TransitionIssue(ctx, tenantID, userID, provider, ref, state.TrackerState)
+		return uc.tracker.TransitionIssue(ctx, tenantID, userID, provider, ref, site, state.TrackerState)
 	case "github":
 		return uc.scm.UpdateIssue(ctx, tenantID, provider, ref, state.GitHubLabelPatch)
 	default:

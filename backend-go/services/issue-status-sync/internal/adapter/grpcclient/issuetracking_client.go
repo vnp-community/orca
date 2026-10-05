@@ -24,19 +24,19 @@ func NewIssueTrackingClient(client issuetrackingv1.IssueTrackingServiceClient) *
 // TransitionIssue calls UpdateIssue with workflow_state_id=state, the target
 // status name — issue-tracking-service's Jira adapter resolves it to one of
 // the issue's currently available transitions and errors if there is none.
-func (c *IssueTrackingClient) TransitionIssue(ctx context.Context, tenantID, userID, provider, ref, state string) error {
+func (c *IssueTrackingClient) TransitionIssue(ctx context.Context, tenantID, userID, provider, ref, site, state string) error {
 	ctx = withIdentityMetadata(ctx, tenantID, userID)
 	_, err := c.client.UpdateIssue(ctx, &issuetrackingv1.UpdateIssueRequest{
-		Provider: parseTrackerProvider(provider), IssueId: ref, WorkflowStateId: state,
+		Provider: parseTrackerProvider(provider), IssueId: ref, WorkflowStateId: state, WorkspaceId: site,
 	})
 	return err
 }
 
 // IssueStatusCategory reads the issue's current status category through GetIssue.
-func (c *IssueTrackingClient) IssueStatusCategory(ctx context.Context, tenantID, userID, provider, ref string) (string, error) {
+func (c *IssueTrackingClient) IssueStatusCategory(ctx context.Context, tenantID, userID, provider, ref, site string) (string, error) {
 	ctx = withIdentityMetadata(ctx, tenantID, userID)
 	issue, err := c.client.GetIssue(ctx, &issuetrackingv1.GetIssueRequest{
-		Provider: parseTrackerProvider(provider), IssueId: ref,
+		Provider: parseTrackerProvider(provider), IssueId: ref, WorkspaceId: site,
 	})
 	if err != nil {
 		return "", err

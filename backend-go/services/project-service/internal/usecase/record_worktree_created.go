@@ -24,7 +24,9 @@ type RecordWorktreeCreatedInput struct {
 	// CreateWorktree call.
 	LinkedIssueProvider string
 	LinkedIssueRef      string
-	Lineage             domain.WorktreeLineageCapture
+	// LinkedIssueSite is the Jira site the ref lives on (empty = unknown).
+	LinkedIssueSite string
+	Lineage         domain.WorktreeLineageCapture
 }
 
 // RecordWorktreeCreated is called by git-gateway-service AFTER the real
@@ -56,12 +58,14 @@ func (uc *RecordWorktreeCreated) Execute(ctx context.Context, in RecordWorktreeC
 	}
 	wt.LinkedIssueProvider = in.LinkedIssueProvider
 	wt.LinkedIssueRef = in.LinkedIssueRef
+	wt.LinkedIssueSite = in.LinkedIssueSite
 
 	actorID, _ := tenant.UserID(ctx)
 	payload, _ := json.Marshal(worktreeLifecycleEventPayload{
 		WorktreeID: wt.ID, ProjectID: in.ProjectID,
 		LinkedIssueProvider: in.LinkedIssueProvider, LinkedIssueRef: in.LinkedIssueRef,
-		ActorUserID: actorID,
+		LinkedIssueSite: in.LinkedIssueSite,
+		ActorUserID:     actorID,
 	})
 	event := domain.OutboxEvent{
 		ID: uuid.NewString(), TenantID: tenantID,

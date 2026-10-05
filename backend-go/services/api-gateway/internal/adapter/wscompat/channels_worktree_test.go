@@ -1175,11 +1175,14 @@ func TestWorktreeCreateChannel_ForwardsLinkedIssue(t *testing.T) {
 	registerWorktreeChannels(r, git, &fakeProjectServiceClient{}, nil)
 
 	if _, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "user-1"}, "worktree.create",
-		argsJSON(t, map[string]any{"repo": "repo-1", "name": "eng-1", "linkedIssueProvider": "jira", "linkedIssueRef": "ENG-1"})); err != nil {
+		argsJSON(t, map[string]any{"repo": "repo-1", "name": "eng-1", "linkedIssueProvider": "jira", "linkedIssueRef": "ENG-1", "linkedIssueSite": "https://a.atlassian.net"})); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	if gotReq.GetLinkedIssueProvider() != "jira" || gotReq.GetLinkedIssueRef() != "ENG-1" {
 		t.Errorf("want linked issue forwarded, got provider=%q ref=%q", gotReq.GetLinkedIssueProvider(), gotReq.GetLinkedIssueRef())
+	}
+	if gotReq.GetLinkedIssueSite() != "https://a.atlassian.net" {
+		t.Errorf("want linked issue site forwarded, got %q", gotReq.GetLinkedIssueSite())
 	}
 }
 
@@ -1198,7 +1201,7 @@ func TestWorktreeCreateChannel_NoLinkedIssueMeansNilFields(t *testing.T) {
 		argsJSON(t, map[string]any{"repo": "repo-1", "name": "x"})); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if gotReq.LinkedIssueProvider != nil || gotReq.LinkedIssueRef != nil {
-		t.Errorf("existing callers must keep sending no link, got %v / %v", gotReq.LinkedIssueProvider, gotReq.LinkedIssueRef)
+	if gotReq.LinkedIssueProvider != nil || gotReq.LinkedIssueRef != nil || gotReq.LinkedIssueSite != nil {
+		t.Errorf("existing callers must keep sending no link, got %v / %v / %v", gotReq.LinkedIssueProvider, gotReq.LinkedIssueRef, gotReq.LinkedIssueSite)
 	}
 }

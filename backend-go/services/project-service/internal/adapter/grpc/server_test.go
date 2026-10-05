@@ -91,3 +91,17 @@ func TestServer_GetWorktree_NotFound_ReturnsNotFound(t *testing.T) {
 		t.Errorf("expected NotFound, got %v", err)
 	}
 }
+
+func TestToProto_JiraMapping(t *testing.T) {
+	proj := toProtoProject(domain.Project{ID: "p1", JiraProjectKey: "ABC", JiraSiteID: "https://a.atlassian.net"})
+	if proj.JiraProjectKey != "ABC" || proj.JiraSiteId != "https://a.atlassian.net" {
+		t.Errorf("project jira mapping not exposed: %+v", proj)
+	}
+	wt := toProtoWorktree(domain.Worktree{ID: "w1", LinkedIssueProvider: "jira", LinkedIssueRef: "ABC-1", LinkedIssueSite: "https://a.atlassian.net"})
+	if wt.LinkedIssueSite == nil || *wt.LinkedIssueSite != "https://a.atlassian.net" {
+		t.Errorf("worktree linked_issue_site not exposed: %v", wt.LinkedIssueSite)
+	}
+	if got := toProtoWorktree(domain.Worktree{ID: "w2"}); got.LinkedIssueSite != nil {
+		t.Errorf("expected nil site when unset, got %v", *got.LinkedIssueSite)
+	}
+}

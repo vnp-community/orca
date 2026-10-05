@@ -36,7 +36,7 @@ func TestRecordWorktreeCreated_EnqueuesLifecycleEvent(t *testing.T) {
 	ctx := withTenant(context.Background(), "tenant-1")
 	got, err := uc.Execute(ctx, RecordWorktreeCreatedInput{
 		ProjectID: "p1", RepoID: "r1", Path: "/srv/worktrees/w1", Branch: "feature/x",
-		LinkedIssueProvider: "github", LinkedIssueRef: "owner/repo#42",
+		LinkedIssueProvider: "github", LinkedIssueRef: "owner/repo#42", LinkedIssueSite: "https://a.atlassian.net",
 	})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -57,6 +57,9 @@ func TestRecordWorktreeCreated_EnqueuesLifecycleEvent(t *testing.T) {
 	}
 	if payload.LinkedIssueRef != "owner/repo#42" {
 		t.Errorf("expected linked_issue_ref=owner/repo#42, got %q", payload.LinkedIssueRef)
+	}
+	if payload.LinkedIssueSite != "https://a.atlassian.net" || got.LinkedIssueSite != "https://a.atlassian.net" {
+		t.Errorf("expected linked_issue_site persisted and in payload, got row=%q payload=%q", got.LinkedIssueSite, payload.LinkedIssueSite)
 	}
 }
 

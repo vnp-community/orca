@@ -373,6 +373,10 @@ type projectView struct {
 	// kind=AGENT_KIND_MOBILE_EMULATOR this project's Mobile Emulator pane
 	// routes emulator.* control to). Empty = not bound yet.
 	MobileEmulatorAgentID string `json:"mobileEmulatorAgentId"`
+	// JiraProjectKey/JiraSiteID map this project to a Jira project; the site
+	// keeps identical keys on different Jira sites unambiguous.
+	JiraProjectKey string `json:"jiraProjectKey"`
+	JiraSiteID     string `json:"jiraSiteId"`
 }
 
 func toProjectView(p *projectv1.Project) projectView {
@@ -382,6 +386,8 @@ func toProjectView(p *projectv1.Project) projectView {
 		Visibility: p.GetVisibility(), CreatedBy: p.GetCreatedBy(),
 		CreatedAt: protoTimeMillis(p.GetCreatedAt()), UpdatedAt: protoTimeMillis(p.GetUpdatedAt()),
 		MobileEmulatorAgentID: p.GetMobileEmulatorAgentId(),
+		JiraProjectKey:        p.GetJiraProjectKey(),
+		JiraSiteID:            p.GetJiraSiteId(),
 	}
 }
 
@@ -546,6 +552,9 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 			DefaultBranch         string `json:"defaultBranch"`
 			Visibility            string `json:"visibility"`
 			MobileEmulatorAgentID string `json:"mobileEmulatorAgentId"`
+			// Pointers: absent = no change, "" = clear the mapping.
+			JiraProjectKey *string `json:"jiraProjectKey"`
+			JiraSiteID     *string `json:"jiraSiteId"`
 		}
 		in, err := decodeArg[updateArgs](args, 0)
 		if err != nil {
@@ -558,6 +567,8 @@ func registerProjectChannels(r *Registry, client projectv1.ProjectServiceClient)
 			ProjectId: in.ID, Name: in.Name, Description: in.Description,
 			DefaultBranch: in.DefaultBranch, Visibility: in.Visibility,
 			MobileEmulatorAgentId: in.MobileEmulatorAgentID,
+			JiraProjectKey:        in.JiraProjectKey,
+			JiraSiteId:            in.JiraSiteID,
 		})
 		if err != nil {
 			return nil, err

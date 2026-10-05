@@ -350,6 +350,8 @@ func (s *Server) UpdateProject(ctx context.Context, req *projectv1.UpdateProject
 		Visibility:             req.GetVisibility(),
 		IssueStatusSyncEnabled: req.IssueStatusSyncEnabled,
 		MobileEmulatorAgentID:  req.GetMobileEmulatorAgentId(),
+		JiraProjectKey:         req.JiraProjectKey,
+		JiraSiteID:             req.JiraSiteId,
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -519,6 +521,7 @@ func (s *Server) RecordWorktreeCreated(ctx context.Context, req *projectv1.Recor
 		BaseRef:             req.GetBaseRef(),
 		LinkedIssueProvider: req.GetLinkedIssueProvider(),
 		LinkedIssueRef:      req.GetLinkedIssueRef(),
+		LinkedIssueSite:     req.GetLinkedIssueSite(),
 		Lineage: domain.WorktreeLineageCapture{
 			ParentWorktreeID:        req.GetParentWorktreeId(),
 			Origin:                  req.GetOrigin(),
@@ -905,6 +908,8 @@ func toProtoProject(p domain.Project) *projectv1.Project {
 		CreatedBy:              p.CreatedBy,
 		IssueStatusSyncEnabled: p.IssueStatusSyncEnabled,
 		MobileEmulatorAgentId:  p.MobileEmulatorAgentID,
+		JiraProjectKey:         p.JiraProjectKey,
+		JiraSiteId:             p.JiraSiteID,
 	}
 	if !p.CreatedAt.IsZero() {
 		out.CreatedAt = timestamppb.New(p.CreatedAt)
@@ -997,6 +1002,9 @@ func toProtoWorktree(wt domain.Worktree) *projectv1.Worktree {
 	}
 	if wt.LinkedIssueRef != "" {
 		out.LinkedIssueRef = &wt.LinkedIssueRef
+	}
+	if wt.LinkedIssueSite != "" {
+		out.LinkedIssueSite = &wt.LinkedIssueSite
 	}
 	return out
 }

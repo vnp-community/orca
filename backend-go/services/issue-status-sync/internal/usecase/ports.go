@@ -17,10 +17,11 @@ import "context"
 // userID is the person whose credential performs the call: the tracker
 // connection is stored per (tenant, user), and the event is all this service has.
 type IssueTrackerClient interface {
-	TransitionIssue(ctx context.Context, tenantID, userID, provider, ref, state string) error
+	// site is the tracker workspace (Jira site) the ref belongs to; "" means the connection default.
+	TransitionIssue(ctx context.Context, tenantID, userID, provider, ref, site, state string) error
 	// IssueStatusCategory returns the issue's current status category ("todo",
 	// "in_progress", "done"), or "" when the provider does not report one.
-	IssueStatusCategory(ctx context.Context, tenantID, userID, provider, ref string) (string, error)
+	IssueStatusCategory(ctx context.Context, tenantID, userID, provider, ref, site string) (string, error)
 }
 
 // ScmClient wraps scm-integration-service for the GitHub half of

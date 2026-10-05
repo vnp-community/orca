@@ -17,7 +17,8 @@ import (
 const worktreeColumns = `id, project_id, repo_id, path, branch, active, created_at,
 	idempotency_key, COALESCE(linked_issue_provider, ''), COALESCE(linked_issue_ref, ''), status, base_ref,
 	parent_worktree_id, origin, capture_source, capture_confidence, task_id,
-	orchestration_run_id, coordinator_handle, created_by_terminal_handle, metadata`
+	orchestration_run_id, coordinator_handle, created_by_terminal_handle, metadata,
+	COALESCE(linked_issue_site, '')`
 
 // WorktreeRepository implements usecase.WorktreeRepository against
 // project.worktrees.
@@ -218,7 +219,7 @@ func scanWorktree(row rowScanner) (domain.Worktree, error) {
 		&wt.ID, &wt.ProjectID, &wt.RepoID, &wt.Path, &wt.Branch, &wt.Active, &wt.CreatedAt,
 		&wt.IdempotencyKey, &wt.LinkedIssueProvider, &wt.LinkedIssueRef, &status, &wt.BaseRef,
 		&wt.ParentWorktreeID, &wt.Origin, &wt.CaptureSource, &wt.CaptureConfidence, &wt.TaskID,
-		&wt.OrchestrationRunID, &wt.CoordinatorHandle, &wt.CreatedByTerminalHandle, &wt.Metadata,
+		&wt.OrchestrationRunID, &wt.CoordinatorHandle, &wt.CreatedByTerminalHandle, &wt.Metadata, &wt.LinkedIssueSite,
 	); err != nil {
 		return domain.Worktree{}, err
 	}
@@ -246,13 +247,13 @@ func (r *WorktreeRepository) CreateWorktreeWithEvent(ctx context.Context, wt dom
 		INSERT INTO project.worktrees (
 			id, project_id, repo_id, path, branch, active, idempotency_key, linked_issue_provider, linked_issue_ref, status, base_ref,
 			parent_worktree_id, origin, capture_source, capture_confidence, task_id,
-			orchestration_run_id, coordinator_handle, created_by_terminal_handle
+			orchestration_run_id, coordinator_handle, created_by_terminal_handle, linked_issue_site
 		)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), NULLIF($9, ''), $10, $11, $12, $13, $14, $15, $16, $17, $18, $19)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, NULLIF($8, ''), NULLIF($9, ''), $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, NULLIF($20, ''))
 		RETURNING `+worktreeColumns,
 		wt.ID, wt.ProjectID, wt.RepoID, wt.Path, wt.Branch, wt.Active, wt.IdempotencyKey, wt.LinkedIssueProvider, wt.LinkedIssueRef, string(status), wt.BaseRef,
 		wt.ParentWorktreeID, wt.Origin, wt.CaptureSource, wt.CaptureConfidence, wt.TaskID,
-		wt.OrchestrationRunID, wt.CoordinatorHandle, wt.CreatedByTerminalHandle,
+		wt.OrchestrationRunID, wt.CoordinatorHandle, wt.CreatedByTerminalHandle, wt.LinkedIssueSite,
 	)
 	out, err := scanWorktree(row)
 	if err != nil {

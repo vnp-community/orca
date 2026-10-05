@@ -10,7 +10,9 @@ type worktreeLifecycleEventPayload struct {
 	ProjectID           string `json:"project_id"`
 	LinkedIssueProvider string `json:"linked_issue_provider,omitempty"`
 	LinkedIssueRef      string `json:"linked_issue_ref,omitempty"`
-	HadOpenPr           bool   `json:"had_open_pr"`
+	// LinkedIssueSite lets issue-status-sync address the right Jira site.
+	LinkedIssueSite string `json:"linked_issue_site,omitempty"`
+	HadOpenPr       bool   `json:"had_open_pr"`
 	// ActorUserID is who created/removed the worktree, when the caller carried a
 	// user. issue-status-sync needs it to act with that person's own Jira
 	// credential; without it the sync is skipped rather than guessed.

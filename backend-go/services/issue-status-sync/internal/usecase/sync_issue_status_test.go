@@ -19,20 +19,23 @@ type fakeTracker struct {
 	gotUser     string
 	gotState    string
 	gotRef      string
+	gotSite     string
+	catSite     string
 	catCalls    int
 }
 
-func (f *fakeTracker) TransitionIssue(_ context.Context, _, userID, _, ref, state string) error {
+func (f *fakeTracker) TransitionIssue(_ context.Context, _, userID, _, ref, site, state string) error {
 	f.calls++
-	f.gotUser, f.gotState, f.gotRef = userID, state, ref
+	f.gotUser, f.gotState, f.gotRef, f.gotSite = userID, state, ref, site
 	if f.calls <= f.failN {
 		return errors.New("transient failure")
 	}
 	return nil
 }
 
-func (f *fakeTracker) IssueStatusCategory(_ context.Context, _, _, _, _ string) (string, error) {
+func (f *fakeTracker) IssueStatusCategory(_ context.Context, _, _, _, _, site string) (string, error) {
 	f.catCalls++
+	f.catSite = site
 	return f.category, f.categoryErr
 }
 
@@ -362,5 +365,28 @@ func TestHandlePullRequestLifecycle_GuardsByCurrentCategory(t *testing.T) {
 				t.Error("event must be marked seen")
 			}
 		})
+	}
+}
+
+func TestHandleWorktreeLifecycle_PassesLinkedIssueSiteToTracker(t *testing.T) {
+	h := newHarness()
+	ev := jiraCreated("ev-1")
+	ev.LinkedIssueSite = "https://a.atlassian.net"
+
+	if err := h.uc.HandleWorktreeLifecycle(context.Background(), ev); err != nil {
+		t.Fatal(err)
+	}
+	if h.tracker.catSite != "https://a.atlassian.net" || h.tracker.gotSite != "https://a.atlassian.net" {
+		t.Errorf("site must reach both GetIssue and UpdateIssue calls, got cat=%q transition=%q", h.tracker.catSite, h.tracker.gotSite)
+	}
+}
+
+func TestHandleWorktreeLifecycle_EmptySiteKeepsDefaultBehaviour(t *testing.T) {
+	h := newHarness()
+	if err := h.uc.HandleWorktreeLifecycle(context.Background(), jiraCreated("ev-1")); err != nil {
+		t.Fatal(err)
+	}
+	if h.tracker.calls != 1 || h.tracker.gotSite != "" {
+		t.Errorf("want one transition with empty site, got calls=%d site=%q", h.tracker.calls, h.tracker.gotSite)
 	}
 }

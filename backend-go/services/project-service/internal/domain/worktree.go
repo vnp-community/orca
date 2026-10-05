@@ -64,6 +64,8 @@ type Worktree struct {
 	// events (SOL-PI-03) — empty means "no linked issue".
 	LinkedIssueProvider string
 	LinkedIssueRef      string
+	// LinkedIssueSite is the Jira site the ref belongs to; empty when unknown.
+	LinkedIssueSite string
 
 	// Status is orthogonal to Active — see WorktreeStatus's doc comment.
 	Status WorktreeStatus

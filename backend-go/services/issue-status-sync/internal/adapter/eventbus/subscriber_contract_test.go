@@ -11,17 +11,17 @@ import (
 )
 
 type recordingTracker struct {
-	category         string
-	user, ref, state string
-	transitions      int
+	category               string
+	user, ref, site, state string
+	transitions            int
 }
 
-func (r *recordingTracker) TransitionIssue(_ context.Context, _, userID, _, ref, state string) error {
+func (r *recordingTracker) TransitionIssue(_ context.Context, _, userID, _, ref, site, state string) error {
 	r.transitions++
-	r.user, r.ref, r.state = userID, ref, state
+	r.user, r.ref, r.site, r.state = userID, ref, site, state
 	return nil
 }
-func (r *recordingTracker) IssueStatusCategory(context.Context, string, string, string, string) (string, error) {
+func (r *recordingTracker) IssueStatusCategory(context.Context, string, string, string, string, string) (string, error) {
 	if r.category == "" {
 		return "todo", nil
 	}
@@ -67,6 +67,18 @@ func TestWorktreeCreatedPayloadFromProjectServiceDrivesAJiraTransition(t *testin
 	}
 	if tracker.transitions != 1 || tracker.ref != "ENG-1" || tracker.state != "In Progress" || tracker.user != "user-7" {
 		t.Errorf("want In Progress for ENG-1 as user-7, got %+v", tracker)
+	}
+}
+
+func TestWorktreeCreatedPayloadCarriesJiraSiteToTheTransition(t *testing.T) {
+	sub, tracker := newContractSubscriber()
+	payload := `{"worktree_id":"w1","project_id":"p1","linked_issue_provider":"jira","linked_issue_ref":"ENG-1","linked_issue_site":"https://a.atlassian.net","had_open_pr":false,"actor_user_id":"user-7"}`
+
+	if err := sub.handleWorktreeEvent(false)(context.Background(), event(payload)); err != nil {
+		t.Fatal(err)
+	}
+	if tracker.transitions != 1 || tracker.site != "https://a.atlassian.net" {
+		t.Errorf("want transition on site https://a.atlassian.net, got %+v", tracker)
 	}
 }
 

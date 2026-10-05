@@ -50,8 +50,9 @@ func (uc *RecordWorktreeRemoved) Execute(ctx context.Context, in RecordWorktreeR
 		payload, _ := json.Marshal(worktreeLifecycleEventPayload{
 			WorktreeID: removed.ID, ProjectID: removed.ProjectID,
 			LinkedIssueProvider: removed.LinkedIssueProvider, LinkedIssueRef: removed.LinkedIssueRef,
-			HadOpenPr:   false, // always false — see this type's doc comment
-			ActorUserID: actorID,
+			LinkedIssueSite: removed.LinkedIssueSite,
+			HadOpenPr:       false, // always false — see this type's doc comment
+			ActorUserID:     actorID,
 		})
 		return domain.OutboxEvent{
 			ID: uuid.NewString(), TenantID: tenantID,

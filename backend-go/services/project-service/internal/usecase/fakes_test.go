@@ -151,6 +151,12 @@ func (f *fakeProjectRepository) UpdateProject(ctx context.Context, tenantID, pro
 	if patch.MobileEmulatorAgentID != "" {
 		p.MobileEmulatorAgentID = patch.MobileEmulatorAgentID
 	}
+	if patch.JiraProjectKey != nil {
+		p.JiraProjectKey = *patch.JiraProjectKey
+	}
+	if patch.JiraSiteID != nil {
+		p.JiraSiteID = *patch.JiraSiteID
+	}
 	f.projects[projectID] = p
 	return p, nil
 }

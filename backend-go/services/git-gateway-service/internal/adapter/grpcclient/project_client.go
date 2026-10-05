@@ -77,6 +77,7 @@ func (p *ProjectClient) RecordWorktreeCreated(ctx context.Context, projectID, re
 	// rather than an empty-but-present string.
 	req.LinkedIssueProvider = nonEmptyPtr(lineage.LinkedIssueProvider)
 	req.LinkedIssueRef = nonEmptyPtr(lineage.LinkedIssueRef)
+	req.LinkedIssueSite = nonEmptyPtr(lineage.LinkedIssueSite)
 	req.ParentWorktreeId = nonEmptyPtr(lineage.ParentWorktreeID)
 	req.Origin = nonEmptyPtr(lineage.Origin)
 	req.CaptureSource = nonEmptyPtr(lineage.CaptureSource)

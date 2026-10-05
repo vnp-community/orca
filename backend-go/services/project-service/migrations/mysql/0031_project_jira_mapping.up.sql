@@ -1,0 +1,2 @@
+ALTER TABLE projects ADD COLUMN jira_project_key VARCHAR(64) NOT NULL DEFAULT '', ADD COLUMN jira_site_id VARCHAR(512) NOT NULL DEFAULT '';
+ALTER TABLE worktrees ADD COLUMN linked_issue_site VARCHAR(512) NULL;

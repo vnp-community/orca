@@ -43,6 +43,7 @@ type worktreeLifecycleWirePayload struct {
 	ProjectID           string `json:"project_id"`
 	LinkedIssueProvider string `json:"linked_issue_provider"`
 	LinkedIssueRef      string `json:"linked_issue_ref"`
+	LinkedIssueSite     string `json:"linked_issue_site"` // absent on events published before it existed
 	HadOpenPr           bool   `json:"had_open_pr"`
 	ActorUserID         string `json:"actor_user_id"` // absent on events published before it existed
 }
@@ -113,7 +114,7 @@ func (s *Subscriber) handleWorktreeEvent(deleted bool) eventbus.Handler {
 			EventID: event.ID, TenantID: event.TenantID, SchemaVersion: int32(event.Version),
 			OccurredAt: event.OccurredAt.Format("2006-01-02T15:04:05Z07:00"),
 			WorktreeID: wire.WorktreeID, ProjectID: wire.ProjectID,
-			LinkedIssueProvider: wire.LinkedIssueProvider, LinkedIssueRef: wire.LinkedIssueRef,
+			LinkedIssueProvider: wire.LinkedIssueProvider, LinkedIssueRef: wire.LinkedIssueRef, LinkedIssueSite: wire.LinkedIssueSite,
 			HadOpenPR: wire.HadOpenPr, Deleted: deleted, ActorUserID: wire.ActorUserID,
 		}
 		return s.sync.HandleWorktreeLifecycle(ctx, ev)

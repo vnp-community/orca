@@ -132,3 +132,51 @@ func TestUpdateProject_FailsClosedOnPolicyEvalError(t *testing.T) {
 		t.Errorf("expected project to remain unchanged, got %+v", repo.projects["p1"])
 	}
 }
+
+func TestUpdateProject_JiraMapping(t *testing.T) {
+	str := func(v string) *string { return &v }
+	setup := func() (*UpdateProject, context.Context) {
+		repo := newFakeProjectRepository()
+		repo.projects["p1"] = domain.Project{ID: "p1", TenantID: "tenant-1", Name: "proj", JiraProjectKey: "OLD", JiraSiteID: "https://a.atlassian.net"}
+		repo.members = append(repo.members, domain.ProjectMember{ProjectID: "p1", UserID: "u1", Role: domain.ProjectRoleOwner})
+		return NewUpdateProject(repo, allowAllOPA()), withTenantAndUser(context.Background(), "tenant-1", "u1")
+	}
+
+	t.Run("normalizes key and trims site", func(t *testing.T) {
+		uc, ctx := setup()
+		got, err := uc.Execute(ctx, UpdateProjectInput{ProjectID: "p1", JiraProjectKey: str(" abc_1 "), JiraSiteID: str(" https://b.atlassian.net ")})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.JiraProjectKey != "ABC_1" || got.JiraSiteID != "https://b.atlassian.net" {
+			t.Errorf("got key=%q site=%q", got.JiraProjectKey, got.JiraSiteID)
+		}
+	})
+	t.Run("absent leaves unchanged", func(t *testing.T) {
+		uc, ctx := setup()
+		got, err := uc.Execute(ctx, UpdateProjectInput{ProjectID: "p1", Name: "x"})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.JiraProjectKey != "OLD" || got.JiraSiteID != "https://a.atlassian.net" {
+			t.Errorf("mapping changed: key=%q site=%q", got.JiraProjectKey, got.JiraSiteID)
+		}
+	})
+	t.Run("empty clears", func(t *testing.T) {
+		uc, ctx := setup()
+		got, err := uc.Execute(ctx, UpdateProjectInput{ProjectID: "p1", JiraProjectKey: str(""), JiraSiteID: str("")})
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got.JiraProjectKey != "" || got.JiraSiteID != "" {
+			t.Errorf("expected cleared, got key=%q site=%q", got.JiraProjectKey, got.JiraSiteID)
+		}
+	})
+	t.Run("rejects invalid key", func(t *testing.T) {
+		for _, bad := range []string{"A", "1ABC", "AB-C", "ABCDEFGHIJKLMNOPQRSTU"} {
+			uc, ctx := setup()
+			_, err := uc.Execute(ctx, UpdateProjectInput{ProjectID: "p1", JiraProjectKey: str(bad)})
+			assertAppError(t, err, apperrors.KindInvalidArgument, "PROJECT_INVALID_JIRA_PROJECT_KEY")
+		}
+	})
+}

@@ -832,7 +832,8 @@ func (s *Server) ScanSetupScriptImports(ctx context.Context, req *gitgatewayv1.S
 // ── worktree.* (SOL-031, TASK-192/193/194) ─────────────────────────────────
 
 func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWorktreeRequest) (*gitgatewayv1.CreateWorktreeResponse, error) {
-	if err := validateLinkedIssue(req.GetLinkedIssueProvider(), req.GetLinkedIssueRef()); err != nil {
+	linkedIssueSite, err := validateLinkedIssue(req.GetLinkedIssueProvider(), req.GetLinkedIssueRef(), req.GetLinkedIssueSite())
+	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 	result, err := s.createWorktree.Execute(ctx, usecase.CreateWorktreeInput{
@@ -849,6 +850,7 @@ func (s *Server) CreateWorktree(ctx context.Context, req *gitgatewayv1.CreateWor
 			CreatedByTerminalHandle: req.GetCreatedByTerminalHandle(),
 			LinkedIssueProvider:     req.GetLinkedIssueProvider(),
 			LinkedIssueRef:          req.GetLinkedIssueRef(),
+			LinkedIssueSite:         linkedIssueSite,
 		},
 	})
 	if err != nil {

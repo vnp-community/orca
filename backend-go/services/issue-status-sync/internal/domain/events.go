@@ -23,8 +23,10 @@ type WorktreeLifecycleEvent struct {
 	ProjectID           string
 	LinkedIssueProvider string
 	LinkedIssueRef      string
-	HadOpenPR           bool
-	Deleted             bool
+	// LinkedIssueSite is the Jira site the ref lives on; empty keeps the tracker's default site.
+	LinkedIssueSite string
+	HadOpenPR       bool
+	Deleted         bool
 	// ActorUserID is who created/removed the worktree. The tracker call runs with
 	// that person's own credential, so an event without one cannot be synced.
 	ActorUserID string
@@ -44,6 +46,7 @@ type PullRequestLifecycleEvent struct {
 	PRNumber            int32
 	LinkedIssueProvider string
 	LinkedIssueRef      string
+	LinkedIssueSite     string // empty today: scm-integration-service does not publish one
 	Merged              bool
 	ActorUserID         string // empty today: scm-integration-service does not publish one
 }

@@ -25,7 +25,7 @@ import (
 // projects — kept as one constant so Create/Get/List/UpdateDevServerID/
 // UpdateProject/scanProject can't drift out of sync, mirroring
 // internal/adapter/postgres/repository.go's identical convention.
-const projectColumns = `id, tenant_id, name, dev_server_id, description, default_branch, visibility, created_by, created_at, updated_at, issue_status_sync_enabled, mobile_emulator_agent_id`
+const projectColumns = `id, tenant_id, name, dev_server_id, description, default_branch, visibility, created_by, created_at, updated_at, issue_status_sync_enabled, mobile_emulator_agent_id, jira_project_key, jira_site_id`
 
 // Repository implements usecase.ProjectRepository against MySQL via
 // database/sql + github.com/go-sql-driver/mysql.
@@ -40,9 +40,9 @@ func New(db *sql.DB) *Repository {
 func (r *Repository) Create(ctx context.Context, p domain.Project) (domain.Project, error) {
 	now := time.Now().UTC()
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO projects (id, tenant_id, name, dev_server_id, description, default_branch, visibility, created_by, issue_status_sync_enabled, created_at, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, p.ID, p.TenantID, p.Name, nullableString(p.DevServerID), p.Description, p.DefaultBranch, p.Visibility, nullableString(p.CreatedBy), p.IssueStatusSyncEnabled, now, now)
+		INSERT INTO projects (id, tenant_id, name, dev_server_id, description, default_branch, visibility, created_by, issue_status_sync_enabled, jira_project_key, jira_site_id, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+	`, p.ID, p.TenantID, p.Name, nullableString(p.DevServerID), p.Description, p.DefaultBranch, p.Visibility, nullableString(p.CreatedBy), p.IssueStatusSyncEnabled, p.JiraProjectKey, p.JiraSiteID, now, now)
 	if err != nil {
 		return domain.Project{}, fmt.Errorf("mysql: insert project: %w", err)
 	}
@@ -200,9 +200,11 @@ func (r *Repository) UpdateProject(ctx context.Context, tenantID, projectID stri
 		    visibility                 = COALESCE(NULLIF(?, ''), visibility),
 		    issue_status_sync_enabled  = COALESCE(?, issue_status_sync_enabled),
 		    mobile_emulator_agent_id   = COALESCE(NULLIF(?, ''), mobile_emulator_agent_id),
+		    jira_project_key           = COALESCE(?, jira_project_key),
+		    jira_site_id               = COALESCE(?, jira_site_id),
 		    updated_at                 = ?
 		WHERE tenant_id = ? AND id = ?
-	`, patch.Name, patch.Description, patch.DefaultBranch, patch.Visibility, patch.IssueStatusSyncEnabled, patch.MobileEmulatorAgentID, time.Now().UTC(), tenantID, projectID); err != nil {
+	`, patch.Name, patch.Description, patch.DefaultBranch, patch.Visibility, patch.IssueStatusSyncEnabled, patch.MobileEmulatorAgentID, patch.JiraProjectKey, patch.JiraSiteID, time.Now().UTC(), tenantID, projectID); err != nil {
 		return domain.Project{}, fmt.Errorf("mysql: update project: %w", err)
 	}
 	return r.Get(ctx, tenantID, projectID)
@@ -327,7 +329,7 @@ func scanProject(row rowScanner) (domain.Project, error) {
 	var devServerID, createdBy, mobileEmulatorAgentID sql.NullString
 	if err := row.Scan(
 		&p.ID, &p.TenantID, &p.Name, &devServerID, &p.Description, &p.DefaultBranch, &p.Visibility, &createdBy,
-		&p.CreatedAt, &p.UpdatedAt, &p.IssueStatusSyncEnabled, &mobileEmulatorAgentID,
+		&p.CreatedAt, &p.UpdatedAt, &p.IssueStatusSyncEnabled, &mobileEmulatorAgentID, &p.JiraProjectKey, &p.JiraSiteID,
 	); err != nil {
 		return domain.Project{}, err
 	}

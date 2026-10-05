@@ -16,7 +16,8 @@ import (
 const worktreeColumns = `id, project_id, repo_id, path, branch, active, created_at,
 	idempotency_key, linked_issue_provider, linked_issue_ref, status, base_ref,
 	parent_worktree_id, origin, capture_source, capture_confidence, task_id,
-	orchestration_run_id, coordinator_handle, created_by_terminal_handle, metadata`
+	orchestration_run_id, coordinator_handle, created_by_terminal_handle, metadata,
+	linked_issue_site`
 
 // WorktreeRepository implements usecase.WorktreeRepository against
 // `worktrees` — mirrors postgres.WorktreeRepository.
@@ -190,11 +191,12 @@ func scanWorktree(row rowScanner) (domain.Worktree, error) {
 	var idempotencyKey, linkedIssueProvider, linkedIssueRef, baseRef sql.NullString
 	var parentWorktreeID, origin, captureSource, captureConfidence, taskID, orchestrationRunID, coordinatorHandle, createdByTerminalHandle sql.NullString
 	var metadata []byte
+	var linkedIssueSite sql.NullString
 	if err := row.Scan(
 		&wt.ID, &wt.ProjectID, &wt.RepoID, &wt.Path, &wt.Branch, &wt.Active, &wt.CreatedAt,
 		&idempotencyKey, &linkedIssueProvider, &linkedIssueRef, &status, &baseRef,
 		&parentWorktreeID, &origin, &captureSource, &captureConfidence, &taskID,
-		&orchestrationRunID, &coordinatorHandle, &createdByTerminalHandle, &metadata,
+		&orchestrationRunID, &coordinatorHandle, &createdByTerminalHandle, &metadata, &linkedIssueSite,
 	); err != nil {
 		return domain.Worktree{}, err
 	}
@@ -202,6 +204,7 @@ func scanWorktree(row rowScanner) (domain.Worktree, error) {
 	wt.IdempotencyKey = nullStringPtr(idempotencyKey)
 	wt.LinkedIssueProvider = linkedIssueProvider.String
 	wt.LinkedIssueRef = linkedIssueRef.String
+	wt.LinkedIssueSite = linkedIssueSite.String
 	wt.BaseRef = nullStringPtr(baseRef)
 	wt.ParentWorktreeID = nullStringPtr(parentWorktreeID)
 	wt.Origin = nullStringPtr(origin)
@@ -238,12 +241,12 @@ func (r *WorktreeRepository) CreateWorktreeWithEvent(ctx context.Context, wt dom
 		INSERT INTO worktrees (
 			id, project_id, repo_id, path, branch, active, created_at, idempotency_key, linked_issue_provider, linked_issue_ref, status, base_ref,
 			parent_worktree_id, origin, capture_source, capture_confidence, task_id,
-			orchestration_run_id, coordinator_handle, created_by_terminal_handle
+			orchestration_run_id, coordinator_handle, created_by_terminal_handle, linked_issue_site
 		)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`, wt.ID, wt.ProjectID, wt.RepoID, wt.Path, wt.Branch, wt.Active, time.Now().UTC(), ptrToAny(wt.IdempotencyKey), nullableString(wt.LinkedIssueProvider), nullableString(wt.LinkedIssueRef), string(status), ptrToAny(wt.BaseRef),
 		ptrToAny(wt.ParentWorktreeID), ptrToAny(wt.Origin), ptrToAny(wt.CaptureSource), ptrToAny(wt.CaptureConfidence), ptrToAny(wt.TaskID),
-		ptrToAny(wt.OrchestrationRunID), ptrToAny(wt.CoordinatorHandle), ptrToAny(wt.CreatedByTerminalHandle),
+		ptrToAny(wt.OrchestrationRunID), ptrToAny(wt.CoordinatorHandle), ptrToAny(wt.CreatedByTerminalHandle), nullableString(wt.LinkedIssueSite),
 	); err != nil {
 		return domain.Worktree{}, fmt.Errorf("mysql: insert worktree: %w", err)
 	}
