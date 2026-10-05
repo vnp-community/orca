@@ -1,6 +1,6 @@
 # MCP trong Orca — hướng dẫn người dùng và quản trị
 
-**Cập nhật:** 2026-10-02 · Đối chiếu với: `frontend/src/renderer/src/components/settings/mcp/*`,
+**Cập nhật:** 2026-10-05 · Đối chiếu với: `frontend/src/renderer/src/components/settings/mcp/*`,
 `frontend/src/renderer/src/components/mcp/*`, `backend-go/services/mcp-service/README.md`,
 [CONTRACT-mcp-ui-api.md](../../../specs/backend-go/crs/v5/CONTRACT-mcp-ui-api.md).
 
@@ -17,6 +17,7 @@ bạn** và **trong phạm vi quyền bạn cho phép**. Toàn bộ phần quả
 | Người dùng được hỏi "agent xin quyền chạy lệnh" | [Phê duyệt hành động của agent](./approving-agent-actions.md) |
 | Quản trị viên (admin) | [Hướng dẫn quản trị](./admin-guide.md) |
 | Quản trị viên muốn nối MCP server bên ngoài | [MCP server bên ngoài và secret](./external-servers-and-secrets.md) |
+| Người dùng/agent muốn giao việc cho task và worktree qua MCP | [Task và worktree qua MCP](./task-worktree-tools.md) |
 
 ## Luồng kết nối (tóm tắt)
 

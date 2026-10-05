@@ -57,6 +57,7 @@ Tab **Prompts**: quản lý prompt MCP của tổ chức (prompt dựng sẵn l�
 
 ## 7. Giai đoạn rollout hiện hành
 
-Backend: `MCP_ENABLED=false` mặc định tới khi qua cổng chất lượng CR-MCP-015. Trên UI, nhãn giai
-đoạn (Beta/GA) trên mục Settings **chưa được cài đặt** (không có hằng `MCP_UI_STAGE` trong mã) —
-đừng hứa với người dùng là có.
+Backend: `MCP_ENABLED=false` mặc định tới khi qua cổng chất lượng CR-MCP-015 (bật mà thiếu
+`MCP_PUBLIC_BASE_URL`/`PUBLIC_BASE_URL` thì gateway từ chối khởi động). Trên UI, biến build
+`VITE_MCP_UI_STAGE=beta` hiện nhãn **Beta** ở mục MCP; để trống thì coi là GA và không có nhãn
+(`frontend/src/renderer/src/lib/mcp-labels.ts`).
