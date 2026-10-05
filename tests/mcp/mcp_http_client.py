@@ -51,9 +51,14 @@ class RpcReply:
         return r.get("structuredContent") if isinstance(r, dict) else None
 
 
+def _utf8(resp: requests.Response) -> str:
+    return resp.content.decode("utf-8", errors="replace") if resp.content else ""
+
+
 def _parse_body(resp: requests.Response, rid: Any) -> dict[str, Any] | None:
     ctype = resp.headers.get("Content-Type", "")
-    text = resp.text or ""
+    # SSE không khai báo charset nên requests đoán latin-1 và làm hỏng tiếng Việt; JSON-RPC luôn là UTF-8.
+    text = resp.content.decode("utf-8", errors="replace") if resp.content else ""
     candidates: list[Any] = []
     if "text/event-stream" in ctype:
         for line in text.splitlines():
@@ -124,14 +129,14 @@ class McpClient:
         sid = resp.headers.get("Mcp-Session-Id")
         if sid and method == "initialize":
             self.session_id = sid
-        return RpcReply(resp.status_code, dict(resp.headers), _parse_body(resp, rid), resp.text or "")
+        return RpcReply(resp.status_code, dict(resp.headers), _parse_body(resp, rid), _utf8(resp))
 
     def notify(self, method: str, params: dict | None = None) -> RpcReply:
         payload: dict[str, Any] = {"jsonrpc": "2.0", "method": method}
         if params is not None:
             payload["params"] = params
         resp = self._send("POST", data=json.dumps(payload), headers=self._headers())
-        return RpcReply(resp.status_code, dict(resp.headers), None, resp.text or "")
+        return RpcReply(resp.status_code, dict(resp.headers), None, _utf8(resp))
 
     def initialize(self, version: str = PROTOCOL_VERSION) -> RpcReply:
         reply = self.rpc("initialize", {

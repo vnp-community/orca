@@ -130,7 +130,7 @@ class Context:
     # ---- ghi nhận ------------------------------------------------------
     def _record(self, name: str, status: str, detail: str = "") -> bool:
         self.results.append(Outcome(self.suite, name, status, detail))
-        mark = {"PASS": "  ok ", "FAIL": " FAIL", "SKIP": " skip"}[status]
+        mark = {"PASS": "  ok ", "FAIL": " FAIL", "SKIP": " skip", "XFAIL": "xfail"}[status]
         print(f"[{mark}] {self.suite}: {name}" + (f"  -> {detail}" if detail and status != "PASS" else ""))
         return status == "PASS"
 
@@ -139,6 +139,11 @@ class Context:
 
     def skip(self, name: str, reason: str) -> None:
         self._record(name, "SKIP", reason)
+
+    def known_defect(self, name: str, ok: bool, detail: str = "") -> bool:
+        """Kiểm tra hành vi ĐÚNG mà hệ thống hiện chưa đạt: ok=True là PASS (đã sửa), ok=False là XFAIL
+        (lỗi đã biết — hiện rõ trong báo cáo nhưng không làm lần chạy thất bại)."""
+        return self._record(name, "PASS" if ok else "XFAIL", "" if ok else detail)
 
     def cleanup(self, label: str, fn: Callable[[], None]) -> None:
         self.cleanups.append((label, fn))
@@ -268,14 +273,17 @@ def run_suite(ctx: Context, name: str, fn: Callable[[Context], None]) -> None:
 
 
 def summarize(ctx: Context) -> int:
-    counts = {"PASS": 0, "FAIL": 0, "SKIP": 0}
+    counts = {"PASS": 0, "FAIL": 0, "SKIP": 0, "XFAIL": 0}
     for r in ctx.results:
         counts[r.status] += 1
     print("\n" + "=" * 70)
-    print(f"PASS={counts['PASS']}  FAIL={counts['FAIL']}  SKIP={counts['SKIP']}  (mcp={ctx.cfg.mcp_url})")
+    print(f"PASS={counts['PASS']}  FAIL={counts['FAIL']}  SKIP={counts['SKIP']}  XFAIL={counts['XFAIL']}  (mcp={ctx.cfg.mcp_url})")
     for r in ctx.results:
         if r.status == "FAIL":
             print(f"  FAIL {r.suite}: {r.name}\n       {r.detail}")
+    for r in ctx.results:
+        if r.status == "XFAIL":
+            print(f"  XFAIL(lỗi đã biết) {r.suite}: {r.name}\n       {r.detail[:200]}")
     return 1 if counts["FAIL"] else 0
 
 

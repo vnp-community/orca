@@ -18,7 +18,14 @@ python run_all.py --list
 
 python get_mcp_token.py         # tạo PAT bằng tài khoản admin, ghi ORCA_MCP_TOKEN vào .env
 python get_mcp_token.py --list  # liệt kê PAT;  --revoke <id> để thu hồi
+
+python3 mcp_list_projects.py                      # project mà token thấy (qua project_list)
+python3 mcp_list_tasks.py --project <tên|uuid>    # task của một project (task_list)
+python3 mcp_create_task.py --project <tên|uuid> --title "..." [--parent-id ..] [--labels a,b] [--dry-run]
 ```
+
+`mcp_create_task.py` gọi `task_create` (cần scope `orca:write` và gateway bật pack 2 — `MCP_TOOL_PACKS_ENABLED=1,2`).
+Qua MCP task chỉ nhận `title` (bắt buộc, ≤500 ký tự), `project_id` và `parent_id`; `labels` đặt được sau bằng `task_update`.
 
 Mọi cấu hình đọc từ `tests/mcp/.env` (biến môi trường shell ghi đè). Thiếu `ORCA_ADMIN_*` thì dùng
 `BOOTSTRAP_ADMIN_*` trong `deploy/dev/.env` (chỉ đọc các khóa `BOOTSTRAP_ADMIN_*`, `MCP_PUBLIC_BASE_URL`,
