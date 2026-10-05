@@ -770,6 +770,7 @@ message CreateWorktreeRequest {
   // worktree for a task started from the same issue.
   optional string linked_issue_provider = 15; // "jira" | "linear" | "github" | "gitlab"
   optional string linked_issue_ref = 16;      // provider-native key, e.g. "ENG-123"
+  optional string linked_issue_site = 17;     // connection workspace id (Jira: site base URL); disambiguates the key across sites
 }
 message CreateWorktreeResponse {
   string worktree_id = 1; // project-service's Worktree.id, from the saga's RecordWorktreeCreated step (TASK-193)

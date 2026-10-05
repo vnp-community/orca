@@ -206,6 +206,7 @@ message CreateTaskFromSourceRequest {
   string provider = 2; // "jira" | "linear" | "github" | "gitlab"
   string ref = 3;      // provider-native key, e.g. "ENG-123" or "owner/repo#12"
   string url = 4;
+  string site = 5; // connection workspace id (Jira: site base URL); empty = unknown
 }
 
 message CreateTaskFromSourceResponse {
@@ -222,6 +223,7 @@ message GetTaskSourceResponse {
   string provider = 2;
   string ref = 3;
   string url = 4;
+  string site = 5;
 }
 
 message GetTaskRequest {

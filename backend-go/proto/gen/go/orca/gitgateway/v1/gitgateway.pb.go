@@ -5506,6 +5506,7 @@ type CreateWorktreeRequest struct {
 	// worktree for a task started from the same issue.
 	LinkedIssueProvider *string `protobuf:"bytes,15,opt,name=linked_issue_provider,json=linkedIssueProvider,proto3,oneof" json:"linked_issue_provider,omitempty"` // "jira" | "linear" | "github" | "gitlab"
 	LinkedIssueRef      *string `protobuf:"bytes,16,opt,name=linked_issue_ref,json=linkedIssueRef,proto3,oneof" json:"linked_issue_ref,omitempty"`                // provider-native key, e.g. "ENG-123"
+	LinkedIssueSite     *string `protobuf:"bytes,17,opt,name=linked_issue_site,json=linkedIssueSite,proto3,oneof" json:"linked_issue_site,omitempty"`             // connection workspace id (Jira: site base URL); disambiguates the key across sites
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -5648,6 +5649,13 @@ func (x *CreateWorktreeRequest) GetLinkedIssueProvider() string {
 func (x *CreateWorktreeRequest) GetLinkedIssueRef() string {
 	if x != nil && x.LinkedIssueRef != nil {
 		return *x.LinkedIssueRef
+	}
+	return ""
+}
+
+func (x *CreateWorktreeRequest) GetLinkedIssueSite() string {
+	if x != nil && x.LinkedIssueSite != nil {
+		return *x.LinkedIssueSite
 	}
 	return ""
 }
@@ -9354,7 +9362,7 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"worktreeId\x12\x17\n" +
 	"\arepo_id\x18\x02 \x01(\tR\x06repoId\"G\n" +
 	"\x1eScanSetupScriptImportsResponse\x12%\n" +
-	"\x0eimported_paths\x18\x01 \x03(\tR\rimportedPaths\"\xf6\x06\n" +
+	"\x0eimported_paths\x18\x01 \x03(\tR\rimportedPaths\"\xbd\a\n" +
 	"\x15CreateWorktreeRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x17\n" +
@@ -9374,7 +9382,8 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\x1acreated_by_terminal_handle\x18\x0e \x01(\tH\tR\x17createdByTerminalHandle\x88\x01\x01\x127\n" +
 	"\x15linked_issue_provider\x18\x0f \x01(\tH\n" +
 	"R\x13linkedIssueProvider\x88\x01\x01\x12-\n" +
-	"\x10linked_issue_ref\x18\x10 \x01(\tH\vR\x0elinkedIssueRef\x88\x01\x01B\x12\n" +
+	"\x10linked_issue_ref\x18\x10 \x01(\tH\vR\x0elinkedIssueRef\x88\x01\x01\x12/\n" +
+	"\x11linked_issue_site\x18\x11 \x01(\tH\fR\x0flinkedIssueSite\x88\x01\x01B\x12\n" +
 	"\x10_idempotency_keyB\a\n" +
 	"\x05_nameB\a\n" +
 	"\x05_pathB\x15\n" +
@@ -9387,7 +9396,8 @@ const file_orca_gitgateway_v1_gitgateway_proto_rawDesc = "" +
 	"\x13_coordinator_handleB\x1d\n" +
 	"\x1b_created_by_terminal_handleB\x18\n" +
 	"\x16_linked_issue_providerB\x13\n" +
-	"\x11_linked_issue_ref\"\xa7\x01\n" +
+	"\x11_linked_issue_refB\x14\n" +
+	"\x12_linked_issue_site\"\xa7\x01\n" +
 	"\x16CreateWorktreeResponse\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\x12\x12\n" +

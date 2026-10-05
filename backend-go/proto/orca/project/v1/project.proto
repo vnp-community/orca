@@ -192,6 +192,12 @@ message Project {
   // there is no active-execution concern tied to swapping which machine
   // drives the emulator, the two bindings are deliberately independent.
   string mobile_emulator_agent_id = 12;
+  // Jira mapping: which Jira project (key prefix, e.g. "ENG") and which connected
+  // Jira site (the connection's workspace id = the site base URL) this Orca project
+  // tracks. Lets the workspace composer pick this project for an issue like ENG-123.
+  // Empty = not mapped.
+  string jira_project_key = 13;
+  string jira_site_id = 14;
 }
 
 message CreateProjectRequest {
@@ -308,6 +314,9 @@ message UpdateProjectRequest {
   // above) since "" can't mean no-change for a bool — unset = no change.
   optional bool issue_status_sync_enabled = 6;
   string mobile_emulator_agent_id = 7; // empty = no change, see Project.mobile_emulator_agent_id
+  // Presence-based like issue_status_sync_enabled: unset = no change, set to "" = clear the mapping.
+  optional string jira_project_key = 8;
+  optional string jira_site_id = 9;
 }
 
 message UpdateProjectResponse {
@@ -541,6 +550,10 @@ message Worktree {
   // comment. Unset (nil) when a worktree has never had UpdateWorktreeMeta
   // called for it (e.g. every worktree created before this field existed).
   google.protobuf.Struct metadata = 21;
+
+  // Site (connection workspace id) of linked_issue_ref, so a key like ENG-123 is not
+  // ambiguous across Jira sites. Unset for links recorded before sites were tracked.
+  optional string linked_issue_site = 22;
 }
 
 // NEW (SOL-WT-04) — single-worktree lookup by id.
@@ -568,6 +581,7 @@ message RecordWorktreeCreatedRequest {
   optional string orchestration_run_id = 13;
   optional string coordinator_handle = 14;
   optional string created_by_terminal_handle = 15;
+  optional string linked_issue_site = 16; // see Worktree.linked_issue_site
 }
 
 message RecordWorktreeCreatedResponse {
@@ -593,6 +607,7 @@ message WorktreeLifecycleEvent {
   string project_id = 6;
   string linked_issue_provider = 7;  // empty = no linked issue, consumer no-ops
   string linked_issue_ref = 8;
+  string linked_issue_site = 10;     // see Worktree.linked_issue_site; empty = unknown
   bool had_open_pr = 9;              // worktree.deleted only; publisher always sends false — see record_worktree_removed.go's doc comment
 }
 

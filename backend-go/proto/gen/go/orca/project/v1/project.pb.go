@@ -147,8 +147,14 @@ type Project struct {
 	// there is no active-execution concern tied to swapping which machine
 	// drives the emulator, the two bindings are deliberately independent.
 	MobileEmulatorAgentId string `protobuf:"bytes,12,opt,name=mobile_emulator_agent_id,json=mobileEmulatorAgentId,proto3" json:"mobile_emulator_agent_id,omitempty"`
-	unknownFields         protoimpl.UnknownFields
-	sizeCache             protoimpl.SizeCache
+	// Jira mapping: which Jira project (key prefix, e.g. "ENG") and which connected
+	// Jira site (the connection's workspace id = the site base URL) this Orca project
+	// tracks. Lets the workspace composer pick this project for an issue like ENG-123.
+	// Empty = not mapped.
+	JiraProjectKey string `protobuf:"bytes,13,opt,name=jira_project_key,json=jiraProjectKey,proto3" json:"jira_project_key,omitempty"`
+	JiraSiteId     string `protobuf:"bytes,14,opt,name=jira_site_id,json=jiraSiteId,proto3" json:"jira_site_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *Project) Reset() {
@@ -261,6 +267,20 @@ func (x *Project) GetIssueStatusSyncEnabled() bool {
 func (x *Project) GetMobileEmulatorAgentId() string {
 	if x != nil {
 		return x.MobileEmulatorAgentId
+	}
+	return ""
+}
+
+func (x *Project) GetJiraProjectKey() string {
+	if x != nil {
+		return x.JiraProjectKey
+	}
+	return ""
+}
+
+func (x *Project) GetJiraSiteId() string {
+	if x != nil {
+		return x.JiraSiteId
 	}
 	return ""
 }
@@ -1241,8 +1261,11 @@ type UpdateProjectRequest struct {
 	// above) since "" can't mean no-change for a bool — unset = no change.
 	IssueStatusSyncEnabled *bool  `protobuf:"varint,6,opt,name=issue_status_sync_enabled,json=issueStatusSyncEnabled,proto3,oneof" json:"issue_status_sync_enabled,omitempty"`
 	MobileEmulatorAgentId  string `protobuf:"bytes,7,opt,name=mobile_emulator_agent_id,json=mobileEmulatorAgentId,proto3" json:"mobile_emulator_agent_id,omitempty"` // empty = no change, see Project.mobile_emulator_agent_id
-	unknownFields          protoimpl.UnknownFields
-	sizeCache              protoimpl.SizeCache
+	// Presence-based like issue_status_sync_enabled: unset = no change, set to "" = clear the mapping.
+	JiraProjectKey *string `protobuf:"bytes,8,opt,name=jira_project_key,json=jiraProjectKey,proto3,oneof" json:"jira_project_key,omitempty"`
+	JiraSiteId     *string `protobuf:"bytes,9,opt,name=jira_site_id,json=jiraSiteId,proto3,oneof" json:"jira_site_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
 }
 
 func (x *UpdateProjectRequest) Reset() {
@@ -1320,6 +1343,20 @@ func (x *UpdateProjectRequest) GetIssueStatusSyncEnabled() bool {
 func (x *UpdateProjectRequest) GetMobileEmulatorAgentId() string {
 	if x != nil {
 		return x.MobileEmulatorAgentId
+	}
+	return ""
+}
+
+func (x *UpdateProjectRequest) GetJiraProjectKey() string {
+	if x != nil && x.JiraProjectKey != nil {
+		return *x.JiraProjectKey
+	}
+	return ""
+}
+
+func (x *UpdateProjectRequest) GetJiraSiteId() string {
+	if x != nil && x.JiraSiteId != nil {
+		return *x.JiraSiteId
 	}
 	return ""
 }
@@ -3100,9 +3137,12 @@ type Worktree struct {
 	// Opaque UI-authored metadata blob — see UpdateWorktreeMetaRequest's doc
 	// comment. Unset (nil) when a worktree has never had UpdateWorktreeMeta
 	// called for it (e.g. every worktree created before this field existed).
-	Metadata      *structpb.Struct `protobuf:"bytes,21,opt,name=metadata,proto3" json:"metadata,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	Metadata *structpb.Struct `protobuf:"bytes,21,opt,name=metadata,proto3" json:"metadata,omitempty"`
+	// Site (connection workspace id) of linked_issue_ref, so a key like ENG-123 is not
+	// ambiguous across Jira sites. Unset for links recorded before sites were tracked.
+	LinkedIssueSite *string `protobuf:"bytes,22,opt,name=linked_issue_site,json=linkedIssueSite,proto3,oneof" json:"linked_issue_site,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
 }
 
 func (x *Worktree) Reset() {
@@ -3282,6 +3322,13 @@ func (x *Worktree) GetMetadata() *structpb.Struct {
 	return nil
 }
 
+func (x *Worktree) GetLinkedIssueSite() string {
+	if x != nil && x.LinkedIssueSite != nil {
+		return *x.LinkedIssueSite
+	}
+	return ""
+}
+
 // NEW (SOL-WT-04) — single-worktree lookup by id.
 type GetWorktreeRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -3349,6 +3396,7 @@ type RecordWorktreeCreatedRequest struct {
 	OrchestrationRunId      *string `protobuf:"bytes,13,opt,name=orchestration_run_id,json=orchestrationRunId,proto3,oneof" json:"orchestration_run_id,omitempty"`
 	CoordinatorHandle       *string `protobuf:"bytes,14,opt,name=coordinator_handle,json=coordinatorHandle,proto3,oneof" json:"coordinator_handle,omitempty"`
 	CreatedByTerminalHandle *string `protobuf:"bytes,15,opt,name=created_by_terminal_handle,json=createdByTerminalHandle,proto3,oneof" json:"created_by_terminal_handle,omitempty"`
+	LinkedIssueSite         *string `protobuf:"bytes,16,opt,name=linked_issue_site,json=linkedIssueSite,proto3,oneof" json:"linked_issue_site,omitempty"` // see Worktree.linked_issue_site
 	unknownFields           protoimpl.UnknownFields
 	sizeCache               protoimpl.SizeCache
 }
@@ -3484,6 +3532,13 @@ func (x *RecordWorktreeCreatedRequest) GetCoordinatorHandle() string {
 func (x *RecordWorktreeCreatedRequest) GetCreatedByTerminalHandle() string {
 	if x != nil && x.CreatedByTerminalHandle != nil {
 		return *x.CreatedByTerminalHandle
+	}
+	return ""
+}
+
+func (x *RecordWorktreeCreatedRequest) GetLinkedIssueSite() string {
+	if x != nil && x.LinkedIssueSite != nil {
+		return *x.LinkedIssueSite
 	}
 	return ""
 }
@@ -3626,7 +3681,8 @@ type WorktreeLifecycleEvent struct {
 	ProjectId           string                 `protobuf:"bytes,6,opt,name=project_id,json=projectId,proto3" json:"project_id,omitempty"`
 	LinkedIssueProvider string                 `protobuf:"bytes,7,opt,name=linked_issue_provider,json=linkedIssueProvider,proto3" json:"linked_issue_provider,omitempty"` // empty = no linked issue, consumer no-ops
 	LinkedIssueRef      string                 `protobuf:"bytes,8,opt,name=linked_issue_ref,json=linkedIssueRef,proto3" json:"linked_issue_ref,omitempty"`
-	HadOpenPr           bool                   `protobuf:"varint,9,opt,name=had_open_pr,json=hadOpenPr,proto3" json:"had_open_pr,omitempty"` // worktree.deleted only; publisher always sends false — see record_worktree_removed.go's doc comment
+	LinkedIssueSite     string                 `protobuf:"bytes,10,opt,name=linked_issue_site,json=linkedIssueSite,proto3" json:"linked_issue_site,omitempty"` // see Worktree.linked_issue_site; empty = unknown
+	HadOpenPr           bool                   `protobuf:"varint,9,opt,name=had_open_pr,json=hadOpenPr,proto3" json:"had_open_pr,omitempty"`                   // worktree.deleted only; publisher always sends false — see record_worktree_removed.go's doc comment
 	unknownFields       protoimpl.UnknownFields
 	sizeCache           protoimpl.SizeCache
 }
@@ -3713,6 +3769,13 @@ func (x *WorktreeLifecycleEvent) GetLinkedIssueProvider() string {
 func (x *WorktreeLifecycleEvent) GetLinkedIssueRef() string {
 	if x != nil {
 		return x.LinkedIssueRef
+	}
+	return ""
+}
+
+func (x *WorktreeLifecycleEvent) GetLinkedIssueSite() string {
+	if x != nil {
+		return x.LinkedIssueSite
 	}
 	return ""
 }
@@ -7233,7 +7296,7 @@ var File_orca_project_v1_project_proto protoreflect.FileDescriptor
 
 const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\n" +
-	"\x1dorca/project/v1/project.proto\x12\x0forca.project.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xe0\x03\n" +
+	"\x1dorca/project/v1/project.proto\x12\x0forca.project.v1\x1a\x1cgoogle/protobuf/struct.proto\x1a\x1fgoogle/protobuf/timestamp.proto\"\xac\x04\n" +
 	"\aProject\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x12\n" +
@@ -7252,7 +7315,10 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"updated_at\x18\n" +
 	" \x01(\v2\x1a.google.protobuf.TimestampR\tupdatedAt\x129\n" +
 	"\x19issue_status_sync_enabled\x18\v \x01(\bR\x16issueStatusSyncEnabled\x127\n" +
-	"\x18mobile_emulator_agent_id\x18\f \x01(\tR\x15mobileEmulatorAgentId\"\xf1\x01\n" +
+	"\x18mobile_emulator_agent_id\x18\f \x01(\tR\x15mobileEmulatorAgentId\x12(\n" +
+	"\x10jira_project_key\x18\r \x01(\tR\x0ejiraProjectKey\x12 \n" +
+	"\fjira_site_id\x18\x0e \x01(\tR\n" +
+	"jiraSiteId\"\xf1\x01\n" +
 	"\x14CreateProjectRequest\x12\x1b\n" +
 	"\ttenant_id\x18\x01 \x01(\tR\btenantId\x12\x12\n" +
 	"\x04name\x18\x02 \x01(\tR\x04name\x12 \n" +
@@ -7313,7 +7379,7 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12)\n" +
 	"\x11new_dev_server_id\x18\x02 \x01(\tR\x0enewDevServerId\"H\n" +
 	"\x1bRebindRepoDevServerResponse\x12)\n" +
-	"\x04repo\x18\x01 \x01(\v2\x15.orca.project.v1.RepoR\x04repo\"\xc9\x02\n" +
+	"\x04repo\x18\x01 \x01(\v2\x15.orca.project.v1.RepoR\x04repo\"\xc5\x03\n" +
 	"\x14UpdateProjectRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x12\n" +
@@ -7324,8 +7390,13 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"visibility\x18\x05 \x01(\tR\n" +
 	"visibility\x12>\n" +
 	"\x19issue_status_sync_enabled\x18\x06 \x01(\bH\x00R\x16issueStatusSyncEnabled\x88\x01\x01\x127\n" +
-	"\x18mobile_emulator_agent_id\x18\a \x01(\tR\x15mobileEmulatorAgentIdB\x1c\n" +
-	"\x1a_issue_status_sync_enabled\"K\n" +
+	"\x18mobile_emulator_agent_id\x18\a \x01(\tR\x15mobileEmulatorAgentId\x12-\n" +
+	"\x10jira_project_key\x18\b \x01(\tH\x01R\x0ejiraProjectKey\x88\x01\x01\x12%\n" +
+	"\fjira_site_id\x18\t \x01(\tH\x02R\n" +
+	"jiraSiteId\x88\x01\x01B\x1c\n" +
+	"\x1a_issue_status_sync_enabledB\x13\n" +
+	"\x11_jira_project_keyB\x0f\n" +
+	"\r_jira_site_id\"K\n" +
 	"\x15UpdateProjectResponse\x122\n" +
 	"\aproject\x18\x01 \x01(\v2\x18.orca.project.v1.ProjectR\aproject\"5\n" +
 	"\x14DeleteProjectRequest\x12\x1d\n" +
@@ -7429,7 +7500,7 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\x19RemoveSparsePresetRequest\x12\x17\n" +
 	"\arepo_id\x18\x01 \x01(\tR\x06repoId\x12\x1b\n" +
 	"\tpreset_id\x18\x02 \x01(\tR\bpresetId\"\x1c\n" +
-	"\x1aRemoveSparsePresetResponse\"\xb8\b\n" +
+	"\x1aRemoveSparsePresetResponse\"\xff\b\n" +
 	"\bWorktree\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
 	"\n" +
@@ -7454,7 +7525,8 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"R\x11coordinatorHandle\x88\x01\x01\x12@\n" +
 	"\x1acreated_by_terminal_handle\x18\x13 \x01(\tH\vR\x17createdByTerminalHandle\x88\x01\x01\x12+\n" +
 	"\x12created_at_unix_ms\x18\x14 \x01(\x03R\x0fcreatedAtUnixMs\x123\n" +
-	"\bmetadata\x18\x15 \x01(\v2\x17.google.protobuf.StructR\bmetadataB\x12\n" +
+	"\bmetadata\x18\x15 \x01(\v2\x17.google.protobuf.StructR\bmetadata\x12/\n" +
+	"\x11linked_issue_site\x18\x16 \x01(\tH\fR\x0flinkedIssueSite\x88\x01\x01B\x12\n" +
 	"\x10_idempotency_keyB\x18\n" +
 	"\x16_linked_issue_providerB\x13\n" +
 	"\x11_linked_issue_refB\v\n" +
@@ -7467,10 +7539,11 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\b_task_idB\x17\n" +
 	"\x15_orchestration_run_idB\x15\n" +
 	"\x13_coordinator_handleB\x1d\n" +
-	"\x1b_created_by_terminal_handle\"5\n" +
+	"\x1b_created_by_terminal_handleB\x14\n" +
+	"\x12_linked_issue_site\"5\n" +
 	"\x12GetWorktreeRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
-	"worktreeId\"\xdf\x06\n" +
+	"worktreeId\"\xa6\a\n" +
 	"\x1cRecordWorktreeCreatedRequest\x12\x1d\n" +
 	"\n" +
 	"project_id\x18\x01 \x01(\tR\tprojectId\x12\x17\n" +
@@ -7489,7 +7562,8 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\x14orchestration_run_id\x18\r \x01(\tH\bR\x12orchestrationRunId\x88\x01\x01\x122\n" +
 	"\x12coordinator_handle\x18\x0e \x01(\tH\tR\x11coordinatorHandle\x88\x01\x01\x12@\n" +
 	"\x1acreated_by_terminal_handle\x18\x0f \x01(\tH\n" +
-	"R\x17createdByTerminalHandle\x88\x01\x01B\x12\n" +
+	"R\x17createdByTerminalHandle\x88\x01\x01\x12/\n" +
+	"\x11linked_issue_site\x18\x10 \x01(\tH\vR\x0flinkedIssueSite\x88\x01\x01B\x12\n" +
 	"\x10_idempotency_keyB\x18\n" +
 	"\x16_linked_issue_providerB\x13\n" +
 	"\x11_linked_issue_refB\v\n" +
@@ -7501,13 +7575,14 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\b_task_idB\x17\n" +
 	"\x15_orchestration_run_idB\x15\n" +
 	"\x13_coordinator_handleB\x1d\n" +
-	"\x1b_created_by_terminal_handle\"V\n" +
+	"\x1b_created_by_terminal_handleB\x14\n" +
+	"\x12_linked_issue_site\"V\n" +
 	"\x1dRecordWorktreeCreatedResponse\x125\n" +
 	"\bworktree\x18\x01 \x01(\v2\x19.orca.project.v1.WorktreeR\bworktree\"?\n" +
 	"\x1cRecordWorktreeRemovedRequest\x12\x1f\n" +
 	"\vworktree_id\x18\x01 \x01(\tR\n" +
 	"worktreeId\"\x1f\n" +
-	"\x1dRecordWorktreeRemovedResponse\"\xd6\x02\n" +
+	"\x1dRecordWorktreeRemovedResponse\"\x82\x03\n" +
 	"\x16WorktreeLifecycleEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12\x1b\n" +
 	"\ttenant_id\x18\x02 \x01(\tR\btenantId\x12\x1f\n" +
@@ -7519,7 +7594,9 @@ const file_orca_project_v1_project_proto_rawDesc = "" +
 	"\n" +
 	"project_id\x18\x06 \x01(\tR\tprojectId\x122\n" +
 	"\x15linked_issue_provider\x18\a \x01(\tR\x13linkedIssueProvider\x12(\n" +
-	"\x10linked_issue_ref\x18\b \x01(\tR\x0elinkedIssueRef\x12\x1e\n" +
+	"\x10linked_issue_ref\x18\b \x01(\tR\x0elinkedIssueRef\x12*\n" +
+	"\x11linked_issue_site\x18\n" +
+	" \x01(\tR\x0flinkedIssueSite\x12\x1e\n" +
 	"\vhad_open_pr\x18\t \x01(\bR\thadOpenPr\"\x8d\x01\n" +
 	"\x14ListWorktreesRequest\x12\x1d\n" +
 	"\n" +

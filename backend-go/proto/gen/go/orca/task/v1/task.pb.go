@@ -884,6 +884,7 @@ type CreateTaskFromSourceRequest struct {
 	Provider      string             `protobuf:"bytes,2,opt,name=provider,proto3" json:"provider,omitempty"` // "jira" | "linear" | "github" | "gitlab"
 	Ref           string             `protobuf:"bytes,3,opt,name=ref,proto3" json:"ref,omitempty"`           // provider-native key, e.g. "ENG-123" or "owner/repo#12"
 	Url           string             `protobuf:"bytes,4,opt,name=url,proto3" json:"url,omitempty"`
+	Site          string             `protobuf:"bytes,5,opt,name=site,proto3" json:"site,omitempty"` // connection workspace id (Jira: site base URL); empty = unknown
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -942,6 +943,13 @@ func (x *CreateTaskFromSourceRequest) GetRef() string {
 func (x *CreateTaskFromSourceRequest) GetUrl() string {
 	if x != nil {
 		return x.Url
+	}
+	return ""
+}
+
+func (x *CreateTaskFromSourceRequest) GetSite() string {
+	if x != nil {
+		return x.Site
 	}
 	return ""
 }
@@ -1048,6 +1056,7 @@ type GetTaskSourceResponse struct {
 	Provider      string                 `protobuf:"bytes,2,opt,name=provider,proto3" json:"provider,omitempty"`
 	Ref           string                 `protobuf:"bytes,3,opt,name=ref,proto3" json:"ref,omitempty"`
 	Url           string                 `protobuf:"bytes,4,opt,name=url,proto3" json:"url,omitempty"`
+	Site          string                 `protobuf:"bytes,5,opt,name=site,proto3" json:"site,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1106,6 +1115,13 @@ func (x *GetTaskSourceResponse) GetRef() string {
 func (x *GetTaskSourceResponse) GetUrl() string {
 	if x != nil {
 		return x.Url
+	}
+	return ""
+}
+
+func (x *GetTaskSourceResponse) GetSite() string {
+	if x != nil {
+		return x.Site
 	}
 	return ""
 }
@@ -3806,22 +3822,24 @@ const file_orca_task_v1_task_proto_rawDesc = "" +
 	"\n" +
 	"creator_id\x18\x0e \x01(\tR\tcreatorId\"<\n" +
 	"\x12CreateTaskResponse\x12&\n" +
-	"\x04task\x18\x01 \x01(\v2\x12.orca.task.v1.TaskR\x04task\"\x96\x01\n" +
+	"\x04task\x18\x01 \x01(\v2\x12.orca.task.v1.TaskR\x04task\"\xaa\x01\n" +
 	"\x1bCreateTaskFromSourceRequest\x127\n" +
 	"\x06create\x18\x01 \x01(\v2\x1f.orca.task.v1.CreateTaskRequestR\x06create\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12\x10\n" +
 	"\x03ref\x18\x03 \x01(\tR\x03ref\x12\x10\n" +
-	"\x03url\x18\x04 \x01(\tR\x03url\"`\n" +
+	"\x03url\x18\x04 \x01(\tR\x03url\x12\x12\n" +
+	"\x04site\x18\x05 \x01(\tR\x04site\"`\n" +
 	"\x1cCreateTaskFromSourceResponse\x12&\n" +
 	"\x04task\x18\x01 \x01(\v2\x12.orca.task.v1.TaskR\x04task\x12\x18\n" +
 	"\acreated\x18\x02 \x01(\bR\acreated\"/\n" +
 	"\x14GetTaskSourceRequest\x12\x17\n" +
-	"\atask_id\x18\x01 \x01(\tR\x06taskId\"m\n" +
+	"\atask_id\x18\x01 \x01(\tR\x06taskId\"\x81\x01\n" +
 	"\x15GetTaskSourceResponse\x12\x14\n" +
 	"\x05found\x18\x01 \x01(\bR\x05found\x12\x1a\n" +
 	"\bprovider\x18\x02 \x01(\tR\bprovider\x12\x10\n" +
 	"\x03ref\x18\x03 \x01(\tR\x03ref\x12\x10\n" +
-	"\x03url\x18\x04 \x01(\tR\x03url\" \n" +
+	"\x03url\x18\x04 \x01(\tR\x03url\x12\x12\n" +
+	"\x04site\x18\x05 \x01(\tR\x04site\" \n" +
 	"\x0eGetTaskRequest\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\"9\n" +
 	"\x0fGetTaskResponse\x12&\n" +
