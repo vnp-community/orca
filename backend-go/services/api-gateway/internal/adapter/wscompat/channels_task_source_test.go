@@ -24,7 +24,7 @@ func (f *fakeTaskSourceClient) GetTaskSource(_ context.Context, _ *taskv1.GetTas
 	if !f.found {
 		return &taskv1.GetTaskSourceResponse{}, nil
 	}
-	return &taskv1.GetTaskSourceResponse{Found: true, Provider: "jira", Ref: "ENG-1", Url: "https://x/browse/ENG-1"}, nil
+	return &taskv1.GetTaskSourceResponse{Found: true, Provider: "jira", Ref: "ENG-1", Url: "https://x/browse/ENG-1", Site: "https://a.atlassian.net"}, nil
 }
 
 func TestTaskCreateFromSourceChannel_ForwardsFieldsAndReturnsCamelCase(t *testing.T) {
@@ -34,11 +34,12 @@ func TestTaskCreateFromSourceChannel_ForwardsFieldsAndReturnsCamelCase(t *testin
 
 	result, err := r.Dispatch(context.Background(), Identity{TenantID: "tenant-1", UserID: "u1"}, "task.createFromSource", argsJSON(t, map[string]any{
 		"title": "ENG-1 fix", "projectId": "proj-1", "provider": "jira", "ref": "ENG-1", "url": "https://x/browse/ENG-1",
+		"site": "https://a.atlassian.net",
 	}))
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if fake.gotCreate.GetProvider() != "jira" || fake.gotCreate.GetRef() != "ENG-1" || fake.gotCreate.GetCreate().GetProjectId() != "proj-1" {
+	if fake.gotCreate.GetProvider() != "jira" || fake.gotCreate.GetRef() != "ENG-1" || fake.gotCreate.GetCreate().GetProjectId() != "proj-1" || fake.gotCreate.GetSite() != "https://a.atlassian.net" {
 		t.Errorf("fields not forwarded: %+v", fake.gotCreate)
 	}
 	if fake.gotCreate.GetCreate().GetCreatorId() != "u1" {
@@ -73,7 +74,7 @@ func TestTaskGetSourceChannel(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 	view, ok := got.(taskSourceView)
-	if !ok || view.Provider != "jira" || view.Ref != "ENG-1" {
+	if !ok || view.Provider != "jira" || view.Ref != "ENG-1" || view.Site != "https://a.atlassian.net" {
 		t.Fatalf("unexpected view: %#v", got)
 	}
 }

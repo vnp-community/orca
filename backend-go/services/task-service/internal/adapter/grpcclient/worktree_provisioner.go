@@ -119,6 +119,9 @@ func (p *WorktreeProvisioner) EnsureWorktree(ctx context.Context, tenantID strin
 	if src, ok := p.sourceFor(origCtx, tenantID, task); ok {
 		provider, ref := string(src.Provider), src.Ref
 		req.LinkedIssueProvider, req.LinkedIssueRef = &provider, &ref
+		if src.Site != "" {
+			req.LinkedIssueSite = &src.Site
+		}
 	}
 	resp, err := p.git.CreateWorktree(ctx, req)
 	if err != nil {

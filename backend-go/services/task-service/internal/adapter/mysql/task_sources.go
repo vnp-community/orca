@@ -16,9 +16,9 @@ const mysqlDuplicateEntry = 1062
 
 func (r *Repository) LinkSource(ctx context.Context, src domain.TaskSource) error {
 	_, err := r.db.ExecContext(ctx, `
-		INSERT INTO task_sources (task_id, tenant_id, project_id, provider, ref, url)
-		VALUES (?, ?, ?, ?, ?, ?)
-	`, src.TaskID, src.TenantID, nullableUUID(src.ProjectID), string(src.Provider), src.Ref, src.URL)
+		INSERT INTO task_sources (task_id, tenant_id, project_id, provider, ref, url, site_id)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, src.TaskID, src.TenantID, nullableUUID(src.ProjectID), string(src.Provider), src.Ref, src.URL, src.Site)
 	if err != nil {
 		var myErr *drivermysql.MySQLError
 		if errors.As(err, &myErr) && myErr.Number == mysqlDuplicateEntry {
@@ -29,12 +29,13 @@ func (r *Repository) LinkSource(ctx context.Context, src domain.TaskSource) erro
 	return nil
 }
 
-func (r *Repository) FindTaskIDBySource(ctx context.Context, tenantID, projectID string, provider domain.SourceProvider, ref string) (string, bool, error) {
+func (r *Repository) FindTaskIDBySource(ctx context.Context, tenantID, projectID string, provider domain.SourceProvider, site, ref string) (string, bool, error) {
 	var taskID string
 	err := r.db.QueryRowContext(ctx, `
 		SELECT task_id FROM task_sources
-		WHERE tenant_id = ? AND project_key = ? AND provider = ? AND ref = ?
-	`, tenantID, projectID, string(provider), ref).Scan(&taskID)
+		WHERE tenant_id = ? AND project_key = ? AND provider = ? AND ref = ? AND site_id IN (?, '')
+		ORDER BY (site_id = ?) DESC LIMIT 1
+	`, tenantID, projectID, string(provider), ref, site, site).Scan(&taskID)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
 	}
@@ -49,8 +50,8 @@ func (r *Repository) GetSource(ctx context.Context, tenantID, taskID string) (do
 	var provider string
 	var projectID sql.NullString
 	err := r.db.QueryRowContext(ctx, `
-		SELECT project_id, provider, ref, url FROM task_sources WHERE tenant_id = ? AND task_id = ?
-	`, tenantID, taskID).Scan(&projectID, &provider, &src.Ref, &src.URL)
+		SELECT project_id, provider, ref, url, site_id FROM task_sources WHERE tenant_id = ? AND task_id = ?
+	`, tenantID, taskID).Scan(&projectID, &provider, &src.Ref, &src.URL, &src.Site)
 	if errors.Is(err, sql.ErrNoRows) {
 		return domain.TaskSource{}, false, nil
 	}

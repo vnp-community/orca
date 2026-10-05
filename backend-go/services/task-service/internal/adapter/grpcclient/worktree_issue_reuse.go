@@ -48,7 +48,7 @@ func (p *WorktreeProvisioner) findIssueWorktree(ctx context.Context, tenantID st
 		return "", "", false
 	}
 	for _, wt := range resp.GetWorktrees() {
-		if wt.GetLinkedIssueProvider() != string(src.Provider) || wt.GetLinkedIssueRef() != src.Ref {
+		if wt.GetLinkedIssueProvider() != string(src.Provider) || wt.GetLinkedIssueRef() != src.Ref || !sitesCompatible(wt.GetLinkedIssueSite(), src.Site) {
 			continue
 		}
 		if wt.GetStatus() != "" && wt.GetStatus() != "active" {
@@ -78,4 +78,10 @@ func (p *WorktreeProvisioner) sourceFor(ctx context.Context, tenantID string, ta
 		return domain.TaskSource{}, false
 	}
 	return src, found
+}
+
+// sitesCompatible treats an empty site on either side as a wildcard: legacy
+// worktrees and pre-site sources carry none, and must stay reusable.
+func sitesCompatible(a, b string) bool {
+	return a == "" || b == "" || a == b
 }

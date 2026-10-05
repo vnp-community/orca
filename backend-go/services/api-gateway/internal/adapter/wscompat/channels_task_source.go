@@ -12,6 +12,7 @@ type taskSourceView struct {
 	Provider string `json:"provider"`
 	Ref      string `json:"ref"`
 	URL      string `json:"url,omitempty"`
+	Site     string `json:"site,omitempty"`
 }
 
 // registerTaskSourceChannels exposes the Jira/Linear/GitHub/GitLab → task link:
@@ -26,6 +27,7 @@ func registerTaskSourceChannels(r *Registry, client taskv1.TaskServiceClient) {
 			Provider  string `json:"provider"`
 			Ref       string `json:"ref"`
 			URL       string `json:"url"`
+			Site      string `json:"site"`
 		}
 		in, err := decodeArg[createFromSourceArgs](args, 0)
 		if err != nil {
@@ -38,7 +40,7 @@ func registerTaskSourceChannels(r *Registry, client taskv1.TaskServiceClient) {
 				// short-circuit expects (TASK-TG-003-02).
 				CreatorId: id.UserID,
 			},
-			Provider: in.Provider, Ref: in.Ref, Url: in.URL,
+			Provider: in.Provider, Ref: in.Ref, Url: in.URL, Site: in.Site,
 		})
 		if err != nil {
 			return nil, err
@@ -64,6 +66,6 @@ func registerTaskSourceChannels(r *Registry, client taskv1.TaskServiceClient) {
 		if !resp.GetFound() {
 			return nil, nil
 		}
-		return taskSourceView{Provider: resp.GetProvider(), Ref: resp.GetRef(), URL: resp.GetUrl()}, nil
+		return taskSourceView{Provider: resp.GetProvider(), Ref: resp.GetRef(), URL: resp.GetUrl(), Site: resp.GetSite()}, nil
 	})
 }

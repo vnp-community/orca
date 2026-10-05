@@ -30,10 +30,13 @@ type TaskSource struct {
 	Provider  SourceProvider
 	Ref       string
 	URL       string
+	// Site is the connection workspace id (Jira: site base URL) that makes Ref
+	// unambiguous across sites; "" means unknown (pre-site rows, other providers).
+	Site string
 }
 
 // NewTaskSource validates and normalizes a source link.
-func NewTaskSource(tenantID, projectID string, provider SourceProvider, ref, url string) (TaskSource, error) {
+func NewTaskSource(tenantID, projectID string, provider SourceProvider, ref, url, site string) (TaskSource, error) {
 	switch provider {
 	case SourceProviderJira, SourceProviderLinear, SourceProviderGitHub, SourceProviderGitLab:
 	default:
@@ -46,10 +49,10 @@ func NewTaskSource(tenantID, projectID string, provider SourceProvider, ref, url
 	if tenantID == "" {
 		return TaskSource{}, ErrEmptyTenant
 	}
-	return TaskSource{TenantID: tenantID, ProjectID: projectID, Provider: provider, Ref: ref, URL: strings.TrimSpace(url)}, nil
+	return TaskSource{TenantID: tenantID, ProjectID: projectID, Provider: provider, Ref: ref, URL: strings.TrimSpace(url), Site: strings.TrimSpace(site)}, nil
 }
 
 // ErrSourceAlreadyLinked is returned by a repository when a different task
-// already holds the same (tenant, project, provider, ref) — the caller
+// already holds the same (tenant, project, provider, site, ref) — the caller
 // resolves the race by re-reading the winner instead of failing the user.
 var ErrSourceAlreadyLinked = errors.New("task source: already linked to another task")

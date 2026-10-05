@@ -236,3 +236,45 @@ func TestWorktreeProvisioner_CreateWithoutUserSendsNoUserHeader(t *testing.T) {
 		t.Errorf("no user in context must not invent one, got %v", got)
 	}
 }
+
+func jiraSiteSource(ref, site string) fakeTaskSourceReader {
+	return fakeTaskSourceReader{ok: true, src: domain.TaskSource{Provider: domain.SourceProviderJira, Ref: ref, Site: site}}
+}
+
+func TestWorktreeProvisioner_IssueReuse_MatchesOnSiteWithEmptyAsWildcard(t *testing.T) {
+	wts := []*projectv1.Worktree{
+		{Id: "wt-b", Path: "/p/b", LinkedIssueProvider: strp("jira"), LinkedIssueRef: strp("ENG-1"), LinkedIssueSite: strp("https://b.atlassian.net"), Status: "active"},
+		{Id: "wt-legacy", Path: "/p/legacy", LinkedIssueProvider: strp("jira"), LinkedIssueRef: strp("ENG-1"), Status: "active"},
+	}
+	// Site a must skip the site-b worktree and fall to the legacy (site-less) one.
+	p, _, _ := newIssueReuseProvisioner(jiraSiteSource("ENG-1", "https://a.atlassian.net"), wts, nil)
+	id, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
+	if err != nil || id != "wt-legacy" {
+		t.Fatalf("want legacy worktree, got id=%q err=%v", id, err)
+	}
+	// A site-less source matches any worktree: first in list wins.
+	p, _, _ = newIssueReuseProvisioner(jiraSiteSource("ENG-1", ""), wts, nil)
+	if id, _, _ = p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); id != "wt-b" {
+		t.Errorf("site-less source must wildcard-match, got %q", id)
+	}
+	// Different site and no legacy candidate: create a new worktree.
+	p, git, _ := newIssueReuseProvisioner(jiraSiteSource("ENG-1", "https://a.atlassian.net"), wts[:1], nil)
+	if id, _, _ = p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); id != "wt-new" || !git.createWorktreeCalled {
+		t.Errorf("other-site worktree must not be adopted, got %q", id)
+	}
+}
+
+func TestWorktreeProvisioner_CreateCarriesIssueSite(t *testing.T) {
+	p, git, _ := newIssueReuseProvisioner(jiraSiteSource("ENG-1", "https://a.atlassian.net"), nil, nil)
+	if _, _, err := p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"}); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if got := git.gotCreateWorktree.GetLinkedIssueSite(); got != "https://a.atlassian.net" {
+		t.Errorf("linked_issue_site = %q", got)
+	}
+	p, git, _ = newIssueReuseProvisioner(jiraSource("ENG-1"), nil, nil)
+	_, _, _ = p.EnsureWorktree(ctxWithTenant(t), "tenant-1", domain.Task{ID: "task-1", ProjectID: "proj-1"})
+	if git.gotCreateWorktree.LinkedIssueSite != nil {
+		t.Error("empty site must not be sent")
+	}
+}

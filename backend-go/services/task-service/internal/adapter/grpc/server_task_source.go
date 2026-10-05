@@ -33,6 +33,7 @@ func (s *Server) CreateTaskFromSource(ctx context.Context, req *taskv1.CreateTas
 		Provider: req.GetProvider(),
 		Ref:      req.GetRef(),
 		URL:      req.GetUrl(),
+		Site:     req.GetSite(),
 	})
 	if err != nil {
 		return nil, apperrors.ToGRPCStatus(err)
@@ -66,7 +67,7 @@ func (s *Server) GetTaskSource(ctx context.Context, req *taskv1.GetTaskSourceReq
 	if !ok {
 		return &taskv1.GetTaskSourceResponse{}, nil
 	}
-	return &taskv1.GetTaskSourceResponse{Found: true, Provider: string(src.Provider), Ref: src.Ref, Url: src.URL}, nil
+	return &taskv1.GetTaskSourceResponse{Found: true, Provider: string(src.Provider), Ref: src.Ref, Url: src.URL, Site: src.Site}, nil
 }
 
 // requireTaskRead checks the caller's grant on the task. It returns the
