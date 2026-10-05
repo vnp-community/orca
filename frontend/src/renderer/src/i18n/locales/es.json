@@ -12973,6 +12973,21 @@
         "searchLabels": "Filtrar etiquetas…",
         "searchAssignee": "Filtrar asignatario…",
         "back": "Atrás"
+      },
+      "project": {
+        "ProjectJiraMappingSection": {
+          "title": "Asignación de Jira",
+          "description": "Asocia este proyecto con una clave de proyecto de Jira para que, al iniciar trabajo desde una incidencia de Jira, se seleccione automáticamente.",
+          "keyLabel": "Clave de proyecto de Jira",
+          "keyInvalid": "Usa de 2 a 20 caracteres: mayúsculas, dígitos o guiones bajos, empezando por una letra.",
+          "siteLabel": "Sitio de Jira",
+          "siteNone": "Sin sitio",
+          "noSites": "No hay sitios de Jira conectados. Conecta Jira primero desde la página de Tareas.",
+          "save": "Guardar",
+          "saving": "Guardando…",
+          "saved": "Asignación de Jira actualizada",
+          "saveFailed": "No se pudo actualizar la asignación de Jira."
+        }
       }
     },
     "i18n": {

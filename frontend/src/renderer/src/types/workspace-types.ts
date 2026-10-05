@@ -14,6 +14,10 @@ export type OrcaProject = {
   // DevServer registered with kind 'mobile-emulator'. Empty/absent means
   // "no Mobile Emulator Agent bound yet" (optional, unlike devServerId).
   mobileEmulatorAgentId?: string
+  // Jira project key (e.g. "ABC") and Jira site id this project maps to, used
+  // to pre-select the project from an issue key. "" / absent = unmapped.
+  jiraProjectKey?: string
+  jiraSiteId?: string
   visibility: 'private' | 'team' | 'department' | 'company'
   createdAt: number
   updatedAt: number

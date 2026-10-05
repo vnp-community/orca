@@ -360,6 +360,8 @@ export type FolderWorkspaceLinkedTask = {
   url: string
   linearIdentifier?: string
   jiraIdentifier?: string
+  /** Jira site the issue belongs to; forwarded as linkedExternalIssue.site. */
+  jiraSiteId?: string
   repoId?: string
 }
 
@@ -2181,6 +2183,8 @@ export type CreateWorktreeArgs = {
     title?: string
     url?: string
     taskProjectId?: string
+    /** Jira site id the issue lives on (multi-site Jira connections). */
+    site?: string
   }
 }
 

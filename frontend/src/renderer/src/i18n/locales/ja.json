@@ -12973,6 +12973,21 @@
         "searchLabels": "ラベルをフィルター…",
         "searchAssignee": "担当者をフィルター…",
         "back": "戻る"
+      },
+      "project": {
+        "ProjectJiraMappingSection": {
+          "title": "Jira マッピング",
+          "description": "このプロジェクトを Jira プロジェクトキーに対応付けると、Jira 課題から作業を開始したときに自動的に選択されます。",
+          "keyLabel": "Jira プロジェクトキー",
+          "keyInvalid": "先頭は英字で、大文字・数字・アンダースコアの 2〜20 文字にしてください。",
+          "siteLabel": "Jira サイト",
+          "siteNone": "サイトなし",
+          "noSites": "接続済みの Jira サイトがありません。先にタスクページから Jira を接続してください。",
+          "save": "保存",
+          "saving": "保存中…",
+          "saved": "Jira マッピングを更新しました",
+          "saveFailed": "Jira マッピングの更新に失敗しました。"
+        }
       }
     },
     "i18n": {

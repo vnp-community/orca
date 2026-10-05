@@ -44,4 +44,28 @@ describe('getLinkedExternalIssue', () => {
     ).toBeUndefined()
     expect(getLinkedExternalIssue(null)).toBeUndefined()
   })
+
+  it('carries the backend project id and the Jira site id', () => {
+    expect(
+      getLinkedExternalIssue(
+        {
+          type: 'issue',
+          provider: 'jira',
+          number: 0,
+          title: 'ENG-1 fix',
+          url: 'https://x.atlassian.net/browse/ENG-1',
+          jiraIdentifier: 'ENG-1',
+          jiraSiteId: 'site-1'
+        },
+        'proj-backend'
+      )
+    ).toEqual({
+      provider: 'jira',
+      ref: 'ENG-1',
+      title: 'ENG-1 fix',
+      url: 'https://x.atlassian.net/browse/ENG-1',
+      taskProjectId: 'proj-backend',
+      site: 'site-1'
+    })
+  })
 })

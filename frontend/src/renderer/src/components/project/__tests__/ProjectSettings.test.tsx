@@ -56,6 +56,10 @@ vi.mock('../ProjectDevServerSection', () => ({
   )
 }))
 
+vi.mock('../ProjectJiraMappingSection', () => ({
+  ProjectJiraMappingSection: () => <div data-testid="project-jira-mapping-section" />
+}))
+
 vi.mock('../ProjectDevServerFilterSection', () => ({
   ProjectDevServerFilterSection: () => <div data-testid="project-dev-server-filter-section" />
 }))

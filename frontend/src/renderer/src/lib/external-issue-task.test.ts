@@ -21,6 +21,20 @@ describe('createTaskForExternalIssue', () => {
     })
   })
 
+  it('forwards the Jira site to task.createFromSource', async () => {
+    const call = vi.fn().mockResolvedValue({})
+    await createTaskForExternalIssue(call, {
+      provider: 'jira',
+      ref: 'ENG-1',
+      taskProjectId: 'p',
+      site: 'site-1'
+    })
+    expect(call).toHaveBeenCalledWith(
+      'task.createFromSource',
+      expect.objectContaining({ site: 'site-1' })
+    )
+  })
+
   it('falls back to the key as title and skips without a project', async () => {
     const call = vi.fn().mockResolvedValue({})
     expect(await createTaskForExternalIssue(call, { provider: 'jira', ref: 'ENG-2' })).toBe(false)

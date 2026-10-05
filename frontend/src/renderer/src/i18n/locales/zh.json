@@ -12973,6 +12973,21 @@
         "searchLabels": "筛选标签…",
         "searchAssignee": "筛选负责人…",
         "back": "返回"
+      },
+      "project": {
+        "ProjectJiraMappingSection": {
+          "title": "Jira 映射",
+          "description": "将此项目映射到 Jira 项目键后，从 Jira 工单开始工作时会自动选中它。",
+          "keyLabel": "Jira 项目键",
+          "keyInvalid": "请使用 2-20 个字符：大写字母、数字或下划线，且以字母开头。",
+          "siteLabel": "Jira 站点",
+          "siteNone": "无站点",
+          "noSites": "没有已连接的 Jira 站点。请先在任务页面连接 Jira。",
+          "save": "保存",
+          "saving": "保存中…",
+          "saved": "Jira 映射已更新",
+          "saveFailed": "更新 Jira 映射失败。"
+        }
       }
     },
     "i18n": {

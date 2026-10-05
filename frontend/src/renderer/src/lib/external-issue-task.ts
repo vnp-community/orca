@@ -19,7 +19,8 @@ export async function createTaskForExternalIssue(
       projectId: issue.taskProjectId,
       provider: issue.provider,
       ref: issue.ref,
-      url: issue.url ?? ''
+      url: issue.url ?? '',
+      ...(issue.site ? { site: issue.site } : {})
     })
     return true
   } catch (error) {

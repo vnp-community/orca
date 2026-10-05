@@ -22,6 +22,7 @@ export function getLinkedExternalIssue(
     ref,
     title: item.title,
     url: item.url,
-    ...(taskProjectId ? { taskProjectId } : {})
+    ...(taskProjectId ? { taskProjectId } : {}),
+    ...(item.jiraSiteId ? { site: item.jiraSiteId } : {})
   }
 }
