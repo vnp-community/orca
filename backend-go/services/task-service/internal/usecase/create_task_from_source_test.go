@@ -20,15 +20,15 @@ func newFakeTaskSourceRepository() *fakeTaskSourceRepository {
 	return &fakeTaskSourceRepository{byKey: map[string]string{}, bySource: map[string]domain.TaskSource{}}
 }
 
-func sourceKey(tenantID, projectID string, p domain.SourceProvider, ref string) string {
-	return tenantID + "|" + projectID + "|" + string(p) + "|" + ref
+func sourceKey(tenantID, projectID string, p domain.SourceProvider, site, ref string) string {
+	return tenantID + "|" + projectID + "|" + string(p) + "|" + site + "|" + ref
 }
 
 func (f *fakeTaskSourceRepository) LinkSource(_ context.Context, src domain.TaskSource) error {
 	if f.linkErr != nil {
 		return f.linkErr
 	}
-	k := sourceKey(src.TenantID, src.ProjectID, src.Provider, src.Ref)
+	k := sourceKey(src.TenantID, src.ProjectID, src.Provider, src.Site, src.Ref)
 	if f.raceTaskID != "" {
 		f.byKey[k] = f.raceTaskID
 		return domain.ErrSourceAlreadyLinked
@@ -41,8 +41,12 @@ func (f *fakeTaskSourceRepository) LinkSource(_ context.Context, src domain.Task
 	return nil
 }
 
-func (f *fakeTaskSourceRepository) FindTaskIDBySource(_ context.Context, tenantID, projectID string, p domain.SourceProvider, ref string) (string, bool, error) {
-	id, ok := f.byKey[sourceKey(tenantID, projectID, p, ref)]
+func (f *fakeTaskSourceRepository) FindTaskIDBySource(_ context.Context, tenantID, projectID string, p domain.SourceProvider, site, ref string) (string, bool, error) {
+	if id, ok := f.byKey[sourceKey(tenantID, projectID, p, site, ref)]; ok {
+		return id, true, nil
+	}
+	// Legacy rows stored with site "" match any site.
+	id, ok := f.byKey[sourceKey(tenantID, projectID, p, "", ref)]
 	return id, ok, nil
 }
 
@@ -143,5 +147,49 @@ func TestCreateTaskFromSource_RejectsBadInput(t *testing.T) {
 	bad = sourceInput("  ")
 	if _, err := uc.Execute(ctx, bad); err == nil {
 		t.Fatal("want error for empty ref")
+	}
+}
+
+func TestCreateTaskFromSource_SameKeyDifferentSites_AreDistinctTasks(t *testing.T) {
+	uc, _, sources := newCreateFromSourceUC()
+	ctx := tenant.WithTenantID(context.Background(), "t1")
+
+	a := sourceInput("ENG-1")
+	a.Site = " https://a.atlassian.net "
+	b := sourceInput("ENG-1")
+	b.Site = "https://b.atlassian.net"
+	ra, err := uc.Execute(ctx, a)
+	if err != nil || !ra.Created {
+		t.Fatalf("site a: created=%v err=%v", ra.Created, err)
+	}
+	rb, err := uc.Execute(ctx, b)
+	if err != nil || !rb.Created || rb.Task.ID == ra.Task.ID {
+		t.Fatalf("site b must create its own task: %+v err=%v", rb, err)
+	}
+	if got := sources.bySource[ra.Task.ID].Site; got != "https://a.atlassian.net" {
+		t.Errorf("stored site = %q, want trimmed", got)
+	}
+	again, err := uc.Execute(ctx, a)
+	if err != nil || again.Created || again.Task.ID != ra.Task.ID {
+		t.Errorf("repeat on site a must reuse: %+v err=%v", again, err)
+	}
+}
+
+func TestCreateTaskFromSource_LegacySiteLessRow_IsReusedNotDuplicated(t *testing.T) {
+	uc, _, sources := newCreateFromSourceUC()
+	ctx := tenant.WithTenantID(context.Background(), "t1")
+
+	legacy, err := uc.Execute(ctx, sourceInput("ENG-1"))
+	if err != nil || !legacy.Created {
+		t.Fatalf("legacy create: %v", err)
+	}
+	in := sourceInput("ENG-1")
+	in.Site = "https://a.atlassian.net"
+	res, err := uc.Execute(ctx, in)
+	if err != nil || res.Created || res.Task.ID != legacy.Task.ID {
+		t.Fatalf("site-carrying request must reuse legacy row: %+v err=%v", res, err)
+	}
+	if len(sources.bySource) != 1 {
+		t.Errorf("sources = %d, want 1", len(sources.bySource))
 	}
 }

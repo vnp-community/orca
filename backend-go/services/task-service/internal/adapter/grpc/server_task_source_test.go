@@ -22,12 +22,12 @@ func newMemTaskSources() *memTaskSources {
 	return &memTaskSources{byKey: map[string]string{}, bySrc: map[string]domain.TaskSource{}}
 }
 
-func (m *memTaskSources) key(tenantID, projectID string, p domain.SourceProvider, ref string) string {
-	return tenantID + "|" + projectID + "|" + string(p) + "|" + ref
+func (m *memTaskSources) key(tenantID, projectID string, p domain.SourceProvider, site, ref string) string {
+	return tenantID + "|" + projectID + "|" + string(p) + "|" + site + "|" + ref
 }
 
 func (m *memTaskSources) LinkSource(_ context.Context, s domain.TaskSource) error {
-	k := m.key(s.TenantID, s.ProjectID, s.Provider, s.Ref)
+	k := m.key(s.TenantID, s.ProjectID, s.Provider, s.Site, s.Ref)
 	if _, taken := m.byKey[k]; taken {
 		return domain.ErrSourceAlreadyLinked
 	}
@@ -36,8 +36,11 @@ func (m *memTaskSources) LinkSource(_ context.Context, s domain.TaskSource) erro
 	return nil
 }
 
-func (m *memTaskSources) FindTaskIDBySource(_ context.Context, tenantID, projectID string, p domain.SourceProvider, ref string) (string, bool, error) {
-	id, ok := m.byKey[m.key(tenantID, projectID, p, ref)]
+func (m *memTaskSources) FindTaskIDBySource(_ context.Context, tenantID, projectID string, p domain.SourceProvider, site, ref string) (string, bool, error) {
+	if id, ok := m.byKey[m.key(tenantID, projectID, p, site, ref)]; ok {
+		return id, true, nil
+	}
+	id, ok := m.byKey[m.key(tenantID, projectID, p, "", ref)]
 	return id, ok, nil
 }
 
@@ -117,5 +120,21 @@ func TestServer_TaskSourceRPCs_UnimplementedUntilConfigured(t *testing.T) {
 	}
 	if _, err := s.GetTaskSource(ctx, &taskv1.GetTaskSourceRequest{TaskId: "t"}); status.Code(err) != codes.Unimplemented {
 		t.Errorf("GetTaskSource: want Unimplemented, got %v", err)
+	}
+}
+
+func TestServer_CreateTaskFromSource_SitePersistedAndReturnedByGetTaskSource(t *testing.T) {
+	s, _ := sourceServer(t)
+	ctx := ctxWithTenantAndUser(t, "user-1")
+
+	req := startFromJira("proj-1")
+	req.Site = "https://a.atlassian.net"
+	res, err := s.CreateTaskFromSource(ctx, req)
+	if err != nil || !res.GetCreated() {
+		t.Fatalf("create: created=%v err=%v", res.GetCreated(), err)
+	}
+	got, err := s.GetTaskSource(ctx, &taskv1.GetTaskSourceRequest{TaskId: res.GetTask().GetId()})
+	if err != nil || !got.GetFound() || got.GetSite() != "https://a.atlassian.net" {
+		t.Fatalf("GetTaskSource = %+v, err=%v; want site echoed", got, err)
 	}
 }

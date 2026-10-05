@@ -17,6 +17,7 @@ type CreateTaskFromSourceInput struct {
 	Provider string
 	Ref      string
 	URL      string
+	Site     string
 }
 
 // CreateTaskFromSourceResult.Created is false when an earlier "start work" on
@@ -27,7 +28,7 @@ type CreateTaskFromSourceResult struct {
 }
 
 // CreateTaskFromSource makes "start work on this issue" idempotent: one task
-// per (tenant, project, provider, ref). Without it, a double click or a second
+// per (tenant, project, provider, site, ref). Without it, a double click or a second
 // teammate starting the same Jira issue would fork a duplicate task and a
 // duplicate worktree.
 type CreateTaskFromSource struct {
@@ -45,7 +46,7 @@ func (uc *CreateTaskFromSource) Execute(ctx context.Context, in CreateTaskFromSo
 	if err != nil {
 		return CreateTaskFromSourceResult{}, apperrors.New(apperrors.KindUnauthenticated, "TASK_NO_TENANT", "no tenant in request context", err)
 	}
-	src, err := domain.NewTaskSource(tenantID, in.ProjectID, domain.SourceProvider(in.Provider), in.Ref, in.URL)
+	src, err := domain.NewTaskSource(tenantID, in.ProjectID, domain.SourceProvider(in.Provider), in.Ref, in.URL, in.Site)
 	if err != nil {
 		return CreateTaskFromSourceResult{}, apperrors.New(apperrors.KindInvalidArgument, "TASK_SOURCE_INVALID", err.Error(), err)
 	}
@@ -83,7 +84,7 @@ func (uc *CreateTaskFromSource) Execute(ctx context.Context, in CreateTaskFromSo
 }
 
 func (uc *CreateTaskFromSource) existing(ctx context.Context, tenantID string, src domain.TaskSource) (domain.Task, bool, error) {
-	taskID, ok, err := uc.sources.FindTaskIDBySource(ctx, tenantID, src.ProjectID, src.Provider, src.Ref)
+	taskID, ok, err := uc.sources.FindTaskIDBySource(ctx, tenantID, src.ProjectID, src.Provider, src.Site, src.Ref)
 	if err != nil {
 		return domain.Task{}, false, apperrors.New(apperrors.KindInternal, "TASK_SOURCE_LOOKUP_FAILED", "failed to look up task by source", err)
 	}
