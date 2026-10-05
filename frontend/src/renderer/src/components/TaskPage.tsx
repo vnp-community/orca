@@ -3537,7 +3537,8 @@ export default function TaskPage(): React.JSX.Element {
         number: 0,
         title: `${issue.key} ${issue.title}`,
         url: issue.url,
-        jiraIdentifier: issue.key
+        jiraIdentifier: issue.key,
+        ...(issue.siteId ? { jiraSiteId: issue.siteId } : {})
       }
       openModal('new-workspace-composer', {
         linkedWorkItem,

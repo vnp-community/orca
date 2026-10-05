@@ -12973,6 +12973,21 @@
         "searchLabels": "Filter labels…",
         "searchAssignee": "Filter assignee…",
         "back": "Back"
+      },
+      "project": {
+        "ProjectJiraMappingSection": {
+          "title": "Jira mapping",
+          "description": "Map this project to a Jira project key so starting work from a Jira issue selects it automatically.",
+          "keyLabel": "Jira project key",
+          "keyInvalid": "Use 2-20 characters: capital letters, digits or underscores, starting with a letter.",
+          "siteLabel": "Jira site",
+          "siteNone": "No site",
+          "noSites": "No connected Jira sites. Connect Jira from the Tasks page first.",
+          "save": "Save",
+          "saving": "Saving…",
+          "saved": "Jira mapping updated",
+          "saveFailed": "Failed to update the Jira mapping."
+        }
       }
     },
     "i18n": {

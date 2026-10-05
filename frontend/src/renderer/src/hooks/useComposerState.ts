@@ -17,6 +17,7 @@ import {
   normalizeGitHubLinkQuery
 } from '@/lib/github-links'
 import { getLinkedExternalIssue } from '@/lib/linked-external-issue'
+import { useJiraProjectPreselect } from './useJiraProjectPreselect'
 import { activateAndRevealWorktree, type AgentStartedTelemetry } from '@/lib/worktree-activation'
 import { runBackgroundWorktreeCreation } from '@/lib/worktree-creation-flow'
 import type { WorktreeCreationRequest } from '@/lib/pending-worktree-creation'
@@ -940,6 +941,13 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
     },
     [onRepoIdOverrideChange]
   )
+
+  useJiraProjectPreselect({
+    linkedWorkItem: initialLinkedWorkItem,
+    skip: Boolean(initialRepoId || draftRepoId),
+    eligibleRepos,
+    setRepoId
+  })
 
   const [name, setName] = useState<string>(
     persistDraft ? (newWorkspaceDraft?.name ?? initialName) : initialName
@@ -3572,7 +3580,8 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
 
       const submitLinkedExternalIssue = getLinkedExternalIssue(
         submitLinkedWorkItem,
-        selectedRepoProjectId
+        // Why: the backend project id, not the frontend `repo:<id>` target id.
+        selectedRepo?.projectId
       )
       const linkedLinearIssue =
         submitLinkedWorkItem && submitLinkedWorkItemProvider === 'linear'
@@ -3981,7 +3990,7 @@ export function useComposerState(options: UseComposerStateOptions): UseComposerS
           : null
         const submitLinkedExternalIssue = getLinkedExternalIssue(
           submitLinkedWorkItem,
-          selectedRepoProjectId
+          selectedRepo?.projectId
         )
         const linkedLinearIssue =
           submitLinkedWorkItem && submitLinkedWorkItemProvider === 'linear'

@@ -3148,7 +3148,10 @@ export const createWorktreeSlice: StateCreator<AppState, [], [], WorktreeSlice> 
                     ...(linkedExternalIssue
                       ? {
                           linkedIssueProvider: linkedExternalIssue.provider,
-                          linkedIssueRef: linkedExternalIssue.ref
+                          linkedIssueRef: linkedExternalIssue.ref,
+                          ...(linkedExternalIssue.site
+                            ? { linkedIssueSite: linkedExternalIssue.site }
+                            : {})
                         }
                       : {}),
                     ...(startup

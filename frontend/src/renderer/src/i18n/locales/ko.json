@@ -12973,6 +12973,21 @@
         "searchLabels": "레이블 필터…",
         "searchAssignee": "담당자 필터…",
         "back": "뒤로"
+      },
+      "project": {
+        "ProjectJiraMappingSection": {
+          "title": "Jira 매핑",
+          "description": "이 프로젝트를 Jira 프로젝트 키에 연결하면 Jira 이슈에서 작업을 시작할 때 자동으로 선택됩니다.",
+          "keyLabel": "Jira 프로젝트 키",
+          "keyInvalid": "대문자, 숫자, 밑줄로 이루어진 2~20자여야 하며 문자로 시작해야 합니다.",
+          "siteLabel": "Jira 사이트",
+          "siteNone": "사이트 없음",
+          "noSites": "연결된 Jira 사이트가 없습니다. 먼저 작업 페이지에서 Jira를 연결하세요.",
+          "save": "저장",
+          "saving": "저장 중…",
+          "saved": "Jira 매핑이 업데이트되었습니다",
+          "saveFailed": "Jira 매핑을 업데이트하지 못했습니다."
+        }
       }
     },
     "i18n": {
