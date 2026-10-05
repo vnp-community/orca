@@ -21,8 +21,6 @@ from mcp_check_framework import Context
 from mcp_http_client import McpClient, RpcReply
 from mcp_list_projects import fetch_projects
 
-DEFAULT_PROJECT = "Vnp-asm"
-
 # mcp-service chặn lời gọi giống hệt lặp lại: >=5 trong 60s -> "slow down", >=20 trong 5 phút -> chặn vài phút
 # (governance_ports.go: LoopSlowDown/LoopBlock). Bộ thử nghiệm tự giãn nhịp để không bị chặn nhầm.
 _WINDOW_SHORT, _LIMIT_SHORT = 60.0, 4
@@ -70,27 +68,40 @@ class TaskBed:
 
     # ---- dựng bed -----------------------------------------------------------
     @staticmethod
-    def open(ctx: Context) -> "TaskBed | None":
+    def open(ctx: Context, scopes: list[str] | None = None, auto_purge: bool = True) -> "TaskBed | None":
+        """Mở phiên MCP + resolve project thử nghiệm theo cấu hình .env (task_settings).
+
+        scopes mặc định read+write; auto_purge=False để CLI giữ lại task (tự gọi purge khi cần).
+        """
+        from task_settings import load_task_settings
+
+        settings = load_task_settings()
+        scopes = scopes or ["orca:read", "orca:write"]
         if not ctx.need_mcp():
             return None
-        if not ctx.cfg.allow_writes:
+        if "orca:write" in scopes and not ctx.cfg.allow_writes:
             ctx.skip("tạo task qua MCP", "ORCA_ALLOW_WRITES=false")
             return None
-        client = ctx.session_client(["orca:read", "orca:write"])
+        client = ctx.session_client(scopes)
         if client is None:
             return None
-        if "task_create" not in {t.get("name") for t in client.list_tools()}:
+        if "orca:write" in scopes and "task_create" not in {t.get("name") for t in client.list_tools()}:
             ctx.skip("tạo task qua MCP", "gateway chưa công bố task_create (MCP_TOOL_PACKS_ENABLED cần có pack 2)")
             return None
-        wanted = os.environ.get("ORCA_MCP_TASK_PROJECT") or ctx_env(ctx, "ORCA_MCP_TASK_PROJECT") or DEFAULT_PROJECT
         projects, err = fetch_projects(client)
+        wanted = settings.project_ref
         hits = [p for p in projects if str(p.get("name", "")).lower() == wanted.lower() or p.get("id") == wanted]
-        if err or len(hits) != 1:
+        if len(hits) == 1:
+            bed = TaskBed(ctx, client, str(hits[0]["id"]), str(hits[0].get("name")))
+        elif not hits and settings.project_id:
+            # project không nằm trong project_list của token (không phải thành viên): dùng thẳng uuid trong .env
+            bed = TaskBed(ctx, client, settings.project_id, "(không có trong project_list của token)")
+        else:
             ctx.check(f"tìm project '{wanted}' trong project_list", False,
-                      err or f"{len(hits)} kết quả (đặt ORCA_MCP_TASK_PROJECT = uuid nếu trùng tên/không thấy)")
+                      err or f"{len(hits)} kết quả (đặt ORCA_MCP_TASK_PROJECT_ID = uuid nếu trùng tên/không thấy)")
             return None
-        bed = TaskBed(ctx, client, str(hits[0]["id"]), str(hits[0].get("name")))
-        ctx.cleanup("xoá task thử nghiệm", bed.purge)
+        if auto_purge:
+            ctx.cleanup("xoá task thử nghiệm", bed.purge)
         return bed
 
     # ---- tạo / đọc ------------------------------------------------------------

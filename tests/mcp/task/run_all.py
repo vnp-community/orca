@@ -21,6 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from mcp_check_framework import build_context, run_suite, summarize  # noqa: E402
 
 SUITES = [
+    ("lifecycle", "check_task_lifecycle"),
     ("fields", "check_task_create_fields"),
     ("hierarchy", "check_task_create_hierarchy"),
     ("update", "check_task_create_update"),

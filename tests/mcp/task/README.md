@@ -17,9 +17,40 @@ cd task
 `orca:read`+`orca:write`), và `websocket-client` để dọn dẹp. Thiếu `websocket-client` thì test báo FAIL kèm danh sách
 id cần xoá tay.
 
+## Tạo task, kiểm tra tồn tại và đã thực thi chưa (CLI)
+Tất cả qua MCP server; project và tuỳ chọn đọc từ `tests/mcp/.env`:
+
+| Khoá `.env` | Ý nghĩa |
+|---|---|
+| `ORCA_MCP_TASK_PROJECT` | tên project thử nghiệm (mặc định `Vnp-asm`) |
+| `ORCA_MCP_TASK_PROJECT_ID` | uuid project; ưu tiên hơn tên, dùng khi project không có trong `project_list` của token |
+| `ORCA_MCP_TASK_TITLE` / `_PROMPT` | tiêu đề mặc định / prompt gửi kèm `task_execute` |
+| `ORCA_MCP_TASK_EXECUTE` | `true` mới thực sự gọi `task_execute` |
+| `ORCA_MCP_TASK_WAIT_S` / `_POLL_S` | thời gian chờ tối đa / chu kỳ kiểm tra khi chờ kết quả |
+| `ORCA_MCP_TASK_KEEP` | `true`: suite `lifecycle` không xoá task sau khi chạy |
+
+```bash
+cd tests/mcp/task
+../.venv/bin/python mcp_task_lifecycle.py create  --title "..."          # tạo + xác minh task tồn tại
+../.venv/bin/python mcp_task_lifecycle.py status  --id <uuid>            # hoặc --number N: tồn tại? đã thực thi chưa?
+../.venv/bin/python mcp_task_lifecycle.py execute --id <uuid>            # task_execute rồi chờ kết quả
+../.venv/bin/python mcp_task_lifecycle.py run --execute                  # tạo -> xác minh -> thực thi -> báo cáo
+```
+CLI **giữ lại** task để bạn xem trên giao diện; thêm `--cleanup` để xoá.
+
+"Đã thực thi ở Orca chưa" được kết luận chỉ từ công cụ đọc của MCP:
+- `status = in_progress` → đang chạy; `task_hasActiveExecutions(project)` và `agentSession_listActive` xác nhận thêm.
+- `actualHours > 0` → `ExecuteTask` đã ghi thời gian chạy khi kết thúc. Đây là bằng chứng chắc chắn nhất.
+- `status = review/done` mà `actualHours = 0` **không** tính là đã chạy, vì `task_update` đặt tay được các trạng thái đó.
+
+`task_execute` cần pack exec (`MCP_TOOL_PACKS_ENABLED=1,2,3`), project có dev server kết nối và người duyệt trong
+Settings → MCP → Approvals (công cụ `exec` mặc định cần phê duyệt). Khi pack chưa bật, lệnh `execute` và phần thực thi
+của suite `lifecycle` báo rõ lý do (SKIP), không lỗi.
+
 ## Suite
 | Suite | File | Kiểm tra |
 |---|---|---|
+| lifecycle | `check_task_lifecycle.py` | tạo → tồn tại (get/list/theo số) → "chưa thực thi" → (tuỳ chọn) thực thi → "đã thực thi" |
 | fields | `check_task_create_fields.py` | title/project_id, biên 1/500/501 ký tự, rỗng, sai kiểu, tham số ngoài hợp đồng, Việt/emoji/HTML, đọc lại, `taskNumber` tăng |
 | hierarchy | `check_task_create_hierarchy.py` | `parent_id` (con, cháu), cha không tồn tại/sai định dạng, `depends_on` (vòng, tự phụ thuộc, loại sai) |
 | update | `check_task_create_update.py` | labels, title, máy trạng thái (blocked/open/review/done, `in_progress` bị chặn, `done` là cuối), bình luận |
