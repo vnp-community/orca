@@ -193,7 +193,7 @@ Thứ tự thực hiện, trong cùng PR với phần kiểu:
 4. Cần trường quyền theo người xem (ví dụ `viewerCan: {confirmType, decide, cancel}`) hay UI chỉ dựa lỗi `forbidden`?
 5. Có dọn lệch `TaskType` (`story|subtask|spike` ở frontend, `feature` ở backend) trong series này không? Đề xuất để CR riêng.
 6. `TaskStatus` frontend còn `todo` mà backend không có; README không nhắc.
-7. Liên kết `[STYLEGUIDE.md](../../STYLEGUIDE.md)` trong README v6 và AGENTS.md trỏ `docs/STYLEGUIDE.md` không tồn tại; file thật là `guides/STYLEGUIDE.md`.
+7. Liên kết `[STYLEGUIDE.md](../../../../guides/STYLEGUIDE.md)` trong README v6 và AGENTS.md trỏ `docs/STYLEGUIDE.md` không tồn tại; file thật là `guides/STYLEGUIDE.md`.
 
 ## 8. Tham chiếu
 

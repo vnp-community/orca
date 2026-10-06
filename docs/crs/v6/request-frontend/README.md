@@ -1,6 +1,6 @@
 # Feature: request-frontend — Giao diện Request, Solution, Plan, Approval, Backlog
 
-> Thuộc series [Change Requests v6](../README.md). Trạng thái: 📝 Đề xuất, chưa triển khai. Viết từ khảo sát code ngày 2026-10-05; chưa chạy test hay ứng dụng.
+> Thuộc series [Change Requests v6](../README.md). Trạng thái: 📝 Đề xuất, chưa triển khai. Viết từ khảo sát code ngày 2026-10-05 (CR-REQ-032 và 036 bổ sung ngày 2026-10-06, xem [ADDENDUM-2026-10-06.md](./ADDENDUM-2026-10-06.md)); chưa chạy test hay ứng dụng.
 
 Phạm vi: `frontend/src/renderer/src` và `frontend/src/shared`. Backend thuộc CR-REQ-001 đến 017, chỉ tham chiếu bằng mã CR. Nguyên tắc "UI sau cùng": bắt đầu khi RPC của CR-REQ-016 chạy được.
 
@@ -14,6 +14,8 @@ Phạm vi: `frontend/src/renderer/src` và `frontend/src/shared`. Backend thuộ
 | [CR-REQ-021](./CR-REQ-021-plan-phase-tree-and-approval-ui.md) | Cây Plan → Phase → Task, duyệt Plan và Phase, tiến độ, lọc khỏi Board | 🔴 P0 | Large | 018 đến 020 |
 | [CR-REQ-022](./CR-REQ-022-approval-inbox.md) | Hộp duyệt gom mọi Approval `pending` | 🟠 P1 | Medium | 018, 020, 021 |
 | [CR-REQ-023](./CR-REQ-023-backlog-screens.md) | Màn Backlog ba phân đoạn | 🟠 P1 | Medium | 018, 019, 021 |
+| [CR-REQ-032](./CR-REQ-032-graph-canvas-and-lenses.md) | Canvas đồ thị và các lens (Luồng, Kiến trúc, Hợp đồng, Dữ liệu, Phạm vi ảnh hưởng, Kế hoạch, Thực thi) | 🟠 P1 | Large | 018, CR-REQ-030 |
+| [CR-REQ-036](./CR-REQ-036-clarification-decision-readiness-impact-ui.md) | Giao diện hỏi lại, quyết định, sẵn sàng, tác động rủi ro, kết quả thực thi | 🟠 P1 | Large | 018 đến 021, CR-REQ-028, 029, 030 |
 
 ## Thứ tự thực thi
 

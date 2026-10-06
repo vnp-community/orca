@@ -165,6 +165,17 @@ Thuộc tính phụ: `size` ∈ {`S`,`M`,`L`}; `urgency` ∈ {`normal`,`urgent`}
 | | CR-REQ-023 | Màn hình Backlog (ba view) | 🟠 P1 | Medium |
 | [`request-quality-rollout`](./request-quality-rollout/README.md) | CR-REQ-024 | Đồng bộ trạng thái Jira theo Request, audit, observability | 🟠 P1 | Medium |
 | | CR-REQ-025 | Kiểm thử đầu cuối, feature flag, rollout, tài liệu | 🔴 P0 | Medium |
+| [`solution-engines`](./solution-engines/README.md) | CR-REQ-026 | OpenSpec solution engine sau giao diện `SolutionEngine` | 🟡 P2 | Large |
+| [`request-artifact-model`](./request-artifact-model/README.md) | CR-REQ-027 | Lược đồ và ontology có phiên bản, bản chiếu Markdown/YAML, bảng phủ yêu cầu | 🔴 P0 | Large |
+| | CR-REQ-028 | Clarification, Decision, trạng thái `awaiting_information` | 🔴 P0 | Large |
+| [`execution-contract`](./execution-contract/README.md) | CR-REQ-029 | TaskSpec, ExecutionPacket, ReadinessGate, ExecutionResult, phân loại lỗi | 🔴 P0 | Large |
+| [`impact-risk`](./impact-risk/README.md) | CR-REQ-030 | Đánh giá tác động và chấm điểm rủi ro | 🟠 P1 | Large |
+| [`context-sources`](./context-sources/README.md) | CR-REQ-031 | Source Registry và Context Pack Builder, MCP ngoài | 🟠 P1 | Large |
+| [`request-frontend`](./request-frontend/README.md) | CR-REQ-032 | Canvas đồ thị và các lens | 🟠 P1 | Large |
+| [`agent-capabilities`](./agent-capabilities/README.md) | CR-REQ-033 | Agent: chế độ chỉ đọc, `workspaceKind`, khối kết quả, báo cáo năng lực (**duy nhất chạm `agent/`**) | 🔴 P0 | Large |
+| [`ai-governance`](./ai-governance/README.md) | CR-REQ-034 | Ngân sách AI, chọn model, phiên bản prompt, eval | 🟠 P1 | Large |
+| [`security-compliance`](./security-compliance/README.md) | CR-REQ-035 | Quyền mức Request, RLS thật, secretscan, audit, lưu giữ | 🔴 P0 | Large |
+| [`request-frontend`](./request-frontend/README.md) | CR-REQ-036 | Giao diện hỏi lại, quyết định, sẵn sàng, tác động | 🟠 P1 | Large |
 
 ## 5. Thứ tự thực thi
 
@@ -242,3 +253,18 @@ Các CR được soạn song song và phát hiện chỗ README này thiếu ho�
 | 15 | Đường dẫn đúng: `guides/STYLEGUIDE.md` và `guides/reference/git-compatibility.md` (AGENTS.md và các README cũ trỏ `docs/...` không tồn tại) | tất cả |
 
 Điểm chưa ai chốt: Request chưa có `Grant` nên chưa rõ ai có quyền ghi ở mức Request (CR-003 hoặc CR-010 chốt); bật cờ chỉ theo tenant, chưa theo loại (CR-025).
+
+
+## 9. Bộ solution và task thực thi
+
+Mỗi CR có solution và task ở từng khu vực mà nó chạm tới, theo thư mục feature trùng tên:
+
+| Khu vực | Vị trí | Solution | Task |
+|---|---|---|---|
+| Backend | [`specs/backend-go/crs/v6/`](../../../specs/backend-go/crs/v6/README.md) | 28 | 199 |
+| Frontend | [`specs/frontend/crs/v6/`](../../../specs/frontend/crs/v6/README.md) | 8 | 54 |
+| Agent | [`specs/agent/crs/v6/`](../../../specs/agent/crs/v6/README.md) | 3 | 13 |
+
+Mỗi README ở các nơi trên có danh sách "điểm cần chốt" riêng. Các điểm chéo khu vực quan trọng nhất: số migration của `request-service` chồng nhau, timeout WebSocket 25 giây so với lời gọi AI đồng bộ, RLS thật ở `request-service`, token màu rủi ro ở frontend, và chế độ chỉ đọc của agent chưa kiểm chứng với `claude` thật.
+
+CR-REQ-027 đến 036 được soạn sau mục 3 của README này; nếu mâu thuẫn với mục 3 hoặc mục 8, theo CR (xem mục "Tác động tới CR hiện có" của từng CR để biết CR cũ nào cần sửa gì).

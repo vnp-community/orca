@@ -142,7 +142,7 @@ task-service (giữ nguyên vai trò) — Plan, Phase, Task đều là bản ghi
 | **Sơ đồ tiến trình Request** | Request đang ở trạng thái nào, ai chặn |
 | **Trang Tasks hiện có** | Thêm "Tạo Request" từ issue Jira/GitHub thay cho chỉ "Start work" |
 
-Tuân thủ [STYLEGUIDE](../../STYLEGUIDE.md) và dùng shadcn primitives. Cần hỗ trợ cả chế độ SSH và remote theo AGENTS.md.
+Tuân thủ [STYLEGUIDE](../../../guides/STYLEGUIDE.md) và dùng shadcn primitives. Cần hỗ trợ cả chế độ SSH và remote theo AGENTS.md.
 
 ### 4.4 Nguồn Request
 
