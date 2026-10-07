@@ -1,0 +1,14 @@
+[
+  {
+    "RuleID": "aws-access-token",
+    "Description": "AWS Access Key",
+    "StartLine": 12,
+    "EndLine": 12,
+    "StartColumn": 5,
+    "EndColumn": 25,
+    "File": "src/config.ts",
+    "Secret": "REDACTED",
+    "Match": "REDACTED",
+    "Entropy": 0
+  }
+]

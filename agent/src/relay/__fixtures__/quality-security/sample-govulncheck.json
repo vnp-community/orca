@@ -1,0 +1,20 @@
+{
+  "config": {
+    "protocolVersion": "v1"
+  },
+  "osv": {
+    "id": "GO-2023-1234",
+    "details": "Vulnerability in sample go module"
+  },
+  "finding": {
+    "osv": "GO-2023-1234",
+    "fixedVersion": "v1.2.3",
+    "trace": [
+      {
+        "module": "example.com/mod",
+        "version": "v1.0.0",
+        "function": "VulnerableFunc"
+      }
+    ]
+  }
+}

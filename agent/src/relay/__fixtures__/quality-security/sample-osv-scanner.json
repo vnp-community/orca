@@ -1,0 +1,31 @@
+{
+  "results": [
+    {
+      "source": {
+        "path": "pnpm-lock.yaml",
+        "type": "lockfile"
+      },
+      "packages": [
+        {
+          "package": {
+            "name": "sample-pkg",
+            "version": "1.0.0",
+            "ecosystem": "npm"
+          },
+          "vulnerabilities": [
+            {
+              "id": "GHSA-xxxx-yyyy-zzzz",
+              "database_specific": {
+                "severity": "HIGH",
+                "cvss": {
+                  "score": 7.5
+                }
+              },
+              "summary": "Sample vulnerability"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

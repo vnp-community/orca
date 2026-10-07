@@ -1,0 +1,31 @@
+{
+  "capturedAt": "2026-10-07T11:55:16.893Z",
+  "tools": {
+    "govulncheck": {
+      "status": "BLOCKED",
+      "reason": "tool_not_installed_pending_approval"
+    },
+    "osv-scanner": {
+      "status": "BLOCKED",
+      "reason": "tool_not_installed_pending_approval"
+    },
+    "gitleaks": {
+      "status": "BLOCKED",
+      "reason": "tool_not_installed_pending_approval"
+    }
+  },
+  "fixtures": {
+    "sample-govulncheck.json": {
+      "sha256": "e52646aabfdee170aefeba15904ae4a4dd344ef9f917dc5ebfdda3fa3f5d34a7",
+      "sizeBytes": 359
+    },
+    "sample-osv-scanner.json": {
+      "sha256": "81fba5784604fe84d72a0be77abf22518ee1a9bd4129f07ca849c32a7d5a888a",
+      "sizeBytes": 630
+    },
+    "sample-gitleaks.json": {
+      "sha256": "9bb1079e7f7343f1ddcaedba8dbc8ac06cee9bd4f7aa4aedad9bb043d62c73ab",
+      "sizeBytes": 262
+    }
+  }
+}
