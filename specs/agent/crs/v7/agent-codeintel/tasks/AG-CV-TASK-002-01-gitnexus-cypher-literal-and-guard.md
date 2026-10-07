@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/gitnexus-cypher-literal.ts`, `gitnexus-cypher-guard.ts` (mới) và `gitnexus-cypher-literal.test.ts`, `gitnexus-cypher-guard.test.ts` (mới)
 **Depends on:** [AG-CV-TASK-001-01](./AG-CV-TASK-001-01-codeintel-errors-and-strict-params.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 CLI `gitnexus cypher` không có tham số ràng buộc (CR-002 1.1; `OR 1=1` chạy khi ghép chuỗi thô). Contract §2.4: chỉ bốn bộ mã hoá, guard một câu bắt đầu `MATCH `, cấm từ khoá ghi/`CALL`/`LOAD`/... GitNexus tự chặn ghi nhưng không chặn `CALL|LOAD|INSTALL|ATTACH|EXPORT`.
@@ -19,8 +19,8 @@ Bảng ca độc hại: `x' OR 1=1 --`, `\\'`, xuống dòng, NUL, `'; MATCH (a)
 Lệnh: `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/gitnexus-cypher-literal.test.ts src/relay/gitnexus-cypher-guard.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Không ca độc hại nào qua guard; `deleteFile` trong chuỗi qua.
-- [ ] Không có đường ghép chuỗi người dùng ngoài bốn bộ mã hoá.
+- [x] Không ca độc hại nào qua guard; `deleteFile` trong chuỗi qua.
+- [x] Không có đường ghép chuỗi người dùng ngoài bốn bộ mã hoá.
 
 ## Rủi ro
 - Quy tắc thoát `\'` được CR ghi "đã parse đúng" nhưng chưa chạy lại; task 04 xác nhận bằng ca có dấu nháy.

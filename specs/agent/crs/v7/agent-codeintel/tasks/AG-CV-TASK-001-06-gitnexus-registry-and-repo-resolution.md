@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/gitnexus-registry-reader.ts` (mới), `agent/src/relay/codeintel-git-exec.ts` (mới), `agent/src/relay/codeintel-repo-resolution.ts` (mới), và test cùng tên (`gitnexus-registry-reader.test.ts`, `codeintel-repo-resolution.test.ts`)
 **Depends on:** [01](./AG-CV-TASK-001-01-codeintel-errors-and-strict-params.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -30,10 +30,10 @@ Lệnh: `pnpm exec vitest run src/relay/gitnexus-registry-reader.test.ts src/rel
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi nhánh lỗi không spawn công cụ; không lộ `ENOENT`/stack.
-- [ ] Khớp registry chỉ theo đường dẫn chính xác sau `realpath`.
-- [ ] Chỉ dùng lệnh Git <= 2.25 (kèm dự phòng `--path-format`).
-- [ ] Worktree liên kết cho `worktreeMismatch:true`.
+- [x] Mọi nhánh lỗi không spawn công cụ; không lộ `ENOENT`/stack.
+- [x] Khớp registry chỉ theo đường dẫn chính xác sau `realpath`.
+- [x] Chỉ dùng lệnh Git <= 2.25 (kèm dự phòng `--path-format`).
+- [x] Worktree liên kết cho `worktreeMismatch:true`.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-command-whitelist.ts` (mới), `agent/src/relay/codeintel-child-env.ts` (mới), `agent/src/relay/codeintel-command-whitelist.test.ts` (mới), `agent/src/relay/codeintel-child-env.test.ts` (mới)
 **Depends on:** [01](./AG-CV-TASK-001-01-codeintel-errors-and-strict-params.md) (dùng `assertSafeClientString`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -30,9 +30,9 @@ Lệnh: `pnpm exec vitest run src/relay/codeintel-command-whitelist.test.ts src/
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không có đường nào sinh argv ngoài hai hàm `build*Argv`.
-- [ ] `-r`/`-p` luôn cuối; giá trị bắt đầu `-` bị từ chối.
-- [ ] Env con không chứa biến khớp mẫu bí mật; `config.toolEnv` không bị sửa.
+- [x] Không có đường nào sinh argv ngoài hai hàm `build*Argv`.
+- [x] `-r`/`-p` luôn cuối; giá trị bắt đầu `-` bị từ chối.
+- [x] Env con không chứa biến khớp mẫu bí mật; `config.toolEnv` không bị sửa.
 
 ## Rủi ro và lưu ý
 

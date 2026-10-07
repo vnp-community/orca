@@ -5,7 +5,7 @@
 **Area:** `agent/` (kiểm chứng; chỉ lệnh đọc)
 **File:** `agent/src/relay/codeintel/__fixtures__/gitnexus-1.6.9/*.json` (mới), cập nhật cột `verifiedByCr` ở `gitnexus-cypher-templates.ts`
 **Depends on:** [003](./AG-CV-TASK-002-03-gitnexus-cypher-templates-and-runner.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Điều kiện tiên quyết merge (CR-002 2.1; contract O-3). Chưa mẫu nào được chạy lại khi soạn solution. Quy trình chụp fixture chính thức thuộc AG-CV-SOL-070 (`agent/scripts/capture-codeintel-fixtures.mjs`); task này làm thủ công lần đầu.
@@ -21,7 +21,7 @@ Test runner (task 03) chạy lại trên fixture. Không có lệnh ghi nào: ch
 Lệnh: `pnpm exec vitest run src/relay/gitnexus-cypher-runner.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Bảng "chạy" trong solution đã cập nhật; mọi mẫu có fixture; thời gian ghi trong PR.
+- [x] Bảng "chạy" trong solution đã cập nhật; mọi mẫu có fixture; thời gian ghi trong PR.
 
 ## Rủi ro
 - Nếu `IN` trên `MATCH (n)` lỗi, SOL-005 phải đổi `FILE_SYMBOLS_BATCH`; báo ngay.

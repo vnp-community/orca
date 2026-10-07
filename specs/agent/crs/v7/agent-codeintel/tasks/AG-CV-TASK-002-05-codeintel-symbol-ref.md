@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-symbol-ref.ts`, `codeintel-symbol-ref.test.ts` (mới)
 **Depends on:** không (SOL-001 chỉ cho kiểu `warnings`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Contract §2.6, PQ-20: agent chuẩn hoá (`key`, dòng 1-based, `qualifiedName` `::`→`.`, NFC, bỏ `#n` lưu `ordinal`, `lineBase 1`). GitNexus 0-based (`runToolCommand` thật 72-113, GitNexus báo 71-112). File tạo ở đây với bảng kind đầy đủ cả CodeGraph (CR-003 chỉ thêm hàm).
@@ -21,7 +21,7 @@ Contract §2.6, PQ-20: agent chuẩn hoá (`key`, dòng 1-based, `qualifiedName`
 Lệnh: `pnpm exec vitest run src/relay/codeintel-symbol-ref.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Mọi nhãn ánh xạ; không cộng dòng hai lần.
+- [x] Mọi nhãn ánh xạ; không cộng dòng hai lần.
 
 ## Rủi ro
 - `arity` chưa có nguồn (solution mục 8); chỉ `#L<startLine>` nếu không tính được.

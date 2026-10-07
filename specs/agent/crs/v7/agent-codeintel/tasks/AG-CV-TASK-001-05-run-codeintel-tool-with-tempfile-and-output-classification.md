@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-tool-runner.ts` (mới), `agent/src/relay/codeintel-tool-output-classification.ts` (mới), `agent/src/relay/codeintel-secret-redaction.ts` (mới), và ba file `*.test.ts` cùng tên
 **Depends on:** [01](./AG-CV-TASK-001-01-codeintel-errors-and-strict-params.md), [02](./AG-CV-TASK-001-02-codeintel-limits-and-concurrency-gate.md), [03](./AG-CV-TASK-001-03-codeintel-command-whitelist-and-child-env.md), [04](./AG-CV-TASK-001-04-run-tool-command-options-and-legacy-tool-guard.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -37,11 +37,11 @@ Re-verify thủ công, một lần (chỉ lệnh đọc), ghi kết quả vào P
 
 ## Tiêu chí hoàn thành
 
-- [ ] GitNexus 3 000 hàng (> 256 KB) không cụt; `row_count` khớp (đo ở task SOL-002-04).
-- [ ] Tệp tạm xoá ở mọi nhánh; thư mục `0700`, tệp `0600`.
-- [ ] `{"error"}` exit 0 và text ANSI của CodeGraph được quy đúng mã.
-- [ ] `stderrTail` đã che; không có `$HOME`/bí mật canary.
-- [ ] `TestSpawnNeverUsesShell`: không `shell:true`, không `exec(`, mọi spawn đi qua `runToolCommand`.
+- [x] GitNexus 3 000 hàng (> 256 KB) không cụt; `row_count` khớp (đo ở task SOL-002-04).
+- [x] Tệp tạm xoá ở mọi nhánh; thư mục `0700`, tệp `0600`.
+- [x] `{"error"}` exit 0 và text ANSI của CodeGraph được quy đúng mã.
+- [x] `stderrTail` đã che; không có `$HOME`/bí mật canary.
+- [x] `TestSpawnNeverUsesShell`: không `shell:true`, không `exec(`, mọi spawn đi qua `runToolCommand`.
 
 ## Rủi ro và lưu ý
 

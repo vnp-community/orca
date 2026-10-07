@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codegraph-affected-tests.ts`, `codegraph-affected-tests.test.ts` (mới)
 **Depends on:** [001](./AG-CV-TASK-003-01-codegraph-cli-output-parsing.md), [AG-CV-TASK-001-04](./AG-CV-TASK-001-04-run-tool-command-options-and-legacy-tool-guard.md) (`stdinText`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 CR-003 2.6: `codegraph affected --stdin -p <root> -j -d 5` với tệp qua stdin; ≤ 500 tệp/lần, ≤ 200 test (`truncated`). Nếu `stdinText` chưa có: đối số, nhóm 50, mỗi giá trị không bắt đầu `-`.

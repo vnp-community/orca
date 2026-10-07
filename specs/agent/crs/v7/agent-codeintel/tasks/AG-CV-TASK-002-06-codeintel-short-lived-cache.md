@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-short-lived-cache.ts`, `codeintel-short-lived-cache.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Contract §2.3: TTL 60 s, ≤ 64 mục, ≤ 32 MiB (LRU), singleflight; khoá `(registryPath, indexedAt|lastCommit, method, hash(paramsChuẩnHoá))`; không cache lỗi và `symbol` có `source`. Không thay cache bền (CR-022).
@@ -21,7 +21,7 @@ Contract §2.3: TTL 60 s, ≤ 64 mục, ≤ 32 MiB (LRU), singleflight; khoá `(
 Lệnh: `pnpm exec vitest run src/relay/codeintel-short-lived-cache.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Spawn một lần trong 60 s cho cùng khoá.
+- [x] Spawn một lần trong 60 s cho cùng khoá.
 
 ## Rủi ro
 - Tỷ lệ trúng chưa đo; 60 s là giả định.

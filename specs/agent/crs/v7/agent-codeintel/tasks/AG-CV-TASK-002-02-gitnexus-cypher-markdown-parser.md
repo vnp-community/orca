@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/gitnexus-cypher-markdown-parser.ts`, `gitnexus-cypher-markdown-parser.test.ts` (mới)
 **Depends on:** [AG-CV-TASK-001-05](./AG-CV-TASK-001-05-run-codeintel-tool-with-tempfile-and-output-classification.md) (phân loại `{"error"}`) 
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 CR-002 1.4–1.5: ba dạng đầu ra (`{markdown,row_count}`, `[]`, `{error}`); markdown không thoát ` | `, xuống dòng bị gộp, ô rỗng gồm cả `null`, mảng là chuỗi JSON có nháy đơn thừa (`["'comm_7339'"]`). Chưa chạy lại; dùng chuỗi thật từ CR làm fixture.
@@ -19,7 +19,7 @@ Tiêu đề+phân cách; ô `["'comm_7339'","'comm_7395'"]`; id `Section:CLAUDE.
 Lệnh: `pnpm exec vitest run src/relay/gitnexus-cypher-markdown-parser.test.ts` (trong `/opt/repos/orca/agent`)
 
 ## Tiêu chí hoàn thành
-- [ ] Mọi ca trên xanh; không bao giờ đoán cột.
+- [x] Mọi ca trên xanh; không bao giờ đoán cột.
 
 ## Rủi ro
 - Định dạng nội bộ GitNexus 1.6.9, có thể đổi: fixture vàng (AG-CV-SOL-070).

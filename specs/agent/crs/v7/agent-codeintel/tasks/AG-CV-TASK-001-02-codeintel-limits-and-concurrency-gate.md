@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-limits.ts` (mới), `agent/src/relay/codeintel-concurrency-gate.ts` (mới), `agent/src/relay/codeintel-limits.test.ts` (mới), `agent/src/relay/codeintel-concurrency-gate.test.ts` (mới)
 **Depends on:** không (dùng `CodeIntelError` của [01](./AG-CV-TASK-001-01-codeintel-errors-and-strict-params.md) khi tích hợp; có thể làm song song và nối ở task 05)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -26,9 +26,9 @@ Lệnh: `pnpm exec vitest run src/relay/codeintel-limits.test.ts src/relay/codei
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng mặc định khớp contract §2.3 từng dòng (test so khớp).
-- [ ] Không bao giờ có > 3 tiến trình đang giữ chỗ; `gitnexus` <= 2.
-- [ ] Hết hạn chờ trả `CODEINTEL_TIMEOUT` với `data.reason === 'queue_wait'`.
+- [x] Bảng mặc định khớp contract §2.3 từng dòng (test so khớp).
+- [x] Không bao giờ có > 3 tiến trình đang giữ chỗ; `gitnexus` <= 2.
+- [x] Hết hạn chờ trả `CODEINTEL_TIMEOUT` với `data.reason === 'queue_wait'`.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-tool-detection.ts` (mới), `agent/src/relay/codeintel-tool-detection.test.ts` (mới), `agent/src/relay/agent-session-capabilities.ts` (sửa), `agent/src/relay/agent-session-capabilities-codeintel.test.ts` (mới), `agent/src/shared/agent-wire-protocol.ts` (sửa)
 **Depends on:** [01](./AG-CV-TASK-001-01-codeintel-errors-and-strict-params.md) (mã lỗi `unsupported_*`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -27,9 +27,9 @@ Lệnh: `pnpm exec vitest run src/relay/codeintel-tool-detection.test.ts src/rel
 
 ## Tiêu chí hoàn thành
 
-- [ ] `agent.handshake` có `codeintel*` khi binary tồn tại và không khi vắng.
-- [ ] Không có `--version` nào chạy trong đường handshake.
-- [ ] Test handshake hiện có (`agent-session.test.ts`) xanh không sửa.
+- [x] `agent.handshake` có `codeintel*` khi binary tồn tại và không khi vắng.
+- [x] Không có `--version` nào chạy trong đường handshake.
+- [x] Test handshake hiện có (`agent-session.test.ts`) xanh không sửa.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codegraph-index-probe.ts`, `codegraph-index-probe.test.ts` (mới)
 **Depends on:** [001](./AG-CV-TASK-003-01-codegraph-cli-output-parsing.md), [AG-CV-TASK-001-09](./AG-CV-TASK-001-09-codeintel-status-method-table-and-dispatcher.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Contract §4.1: `state, indexedAt, stats, pendingChanges, backend, journalMode, dbSizeBytes, extractionVersion, reindexRecommended, rootMismatch`. `status` nhận đối số vị trí; không commit (`sources[].commit=null`); `lastIndexed` không đổi khi daemon tự đồng bộ (không là tín hiệu).

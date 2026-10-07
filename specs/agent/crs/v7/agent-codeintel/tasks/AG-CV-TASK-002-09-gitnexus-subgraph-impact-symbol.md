@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-gitnexus-subgraph.ts`, `-impact.ts`, `-symbol.ts`, `codeintel-symbol-source-reader.ts` (mới), `codeintel-method-table.ts` (sửa), `codeintel-symbol-source-reader.test.ts`, `codeintel-gitnexus-methods.test.ts` (sửa)
 **Depends on:** [008](./AG-CV-TASK-002-08-gitnexus-overview-processes-process-routes.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Contract §4.4–4.6. `impact`: `ambiguous` -> `AMBIGUOUS_SYMBOL` kèm `candidates` (+1 dòng), không tự chọn; `ImpactGraph` không có cạnh; `affectedModules` (PQ-19); `testsCovering` lọc theo mẫu tên khi `includeTests`, ngược lại `[]` + `tests_excluded`. `symbol`: không `--content`; mã nguồn tự đọc: `realpath` trong `workspaceRoot`, `git check-ignore -q -- <path>` (mã 0 -> `gitignored`), NUL trong 8 KiB đầu -> `binary`, ≤ 200 KiB cắt theo dòng, `source_may_not_match_index` khi stale; không cache khi có `source`.
@@ -21,7 +21,7 @@ Fixture + repo tạm: ambiguous 2 ứng viên; uid -> 1 nút depth 1; `limit 300
 Lệnh: `pnpm exec vitest run src/relay/codeintel-gitnexus-methods.test.ts src/relay/codeintel-symbol-source-reader.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Các tiêu chí `subgraph/impact/symbol` ở solution mục 5.
+- [x] Các tiêu chí `subgraph/impact/symbol` ở solution mục 5.
 
 ## Rủi ro
 - Chặn `.env*`/`*.pem` ở agent chưa chốt (mục 8 câu 2); backend che.

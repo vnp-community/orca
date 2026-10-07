@@ -5,7 +5,7 @@
 **Area:** `agent/` (kiểm chứng; chỉ lệnh đọc)
 **File:** `agent/src/relay/codeintel/__fixtures__/codegraph-1.4.1/*.json` (mới)
 **Depends on:** [007](./AG-CV-TASK-003-07-codegraph-enrichment-of-symbol-subgraph-impact.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Chưa chạy lại: hình dạng `-j`, `files` phẳng, `affected --stdin`, `EXPLAIN QUERY PLAN`, `node:sqlite` trên Node đích, `codegraph telemetry status`, `ExperimentalWarning`.

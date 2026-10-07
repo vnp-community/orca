@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-codegraph-search.ts`, `codeintel-codegraph-files.ts`, `codeintel-method-table.ts` (sửa), `codeintel-codegraph-methods.test.ts` (mới)
 **Depends on:** [001](./AG-CV-TASK-003-01-codegraph-cli-output-parsing.md), [003](./AG-CV-TASK-003-03-codeintel-symbol-ref-codegraph.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Contract §4.14. Backend phải chịu `-32601` (phát hành đợt 4).

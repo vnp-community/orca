@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-codegraph-enrichment.ts` (mới), sửa nhẹ `codeintel-gitnexus-symbol.ts`, `-subgraph.ts`, `-impact.ts`; test `codeintel-codegraph-methods.test.ts` (sửa)
 **Depends on:** [003](./AG-CV-TASK-003-03-codeintel-symbol-ref-codegraph.md), [004](./AG-CV-TASK-003-04-codegraph-sqlite-readonly-reader.md), [005](./AG-CV-TASK-003-05-codegraph-search-and-files-methods.md), [006](./AG-CV-TASK-003-06-codegraph-affected-tests.md), [AG-CV-TASK-002-09](./AG-CV-TASK-002-09-gitnexus-subgraph-impact-symbol.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Contract §4.4–4.6: `symbol` thêm `codegraphId`, `signature`, `docstring`, `isExported`; `subgraph source:'codegraph'|'auto'` chỉ tầng `calls` khi SQLite khả dụng; `impact.testsCovering` từ `affected` khi `includeTests`; `symbol.includeTrail` thử nghiệm (`experimental:true`, text từ `codegraph node`, parse tối thiểu, lỗi bỏ im lặng + cảnh báo).

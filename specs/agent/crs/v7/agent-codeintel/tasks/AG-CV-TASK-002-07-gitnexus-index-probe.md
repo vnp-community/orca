@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/gitnexus-index-probe.ts`, `gitnexus-index-probe.test.ts` (mới)
 **Depends on:** [AG-CV-TASK-001-06](./AG-CV-TASK-001-06-gitnexus-registry-and-repo-resolution.md), [AG-CV-TASK-001-09](./AG-CV-TASK-001-09-codeintel-status-method-table-and-dispatcher.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Contract §4.1 khối `indexes.gitnexus`: `state, indexedCommit, indexedAt, branch, stats, schemaVersion, storagePath, indicators`. Đã thấy `.gitnexus/meta.json` (cấp gốc có `lastCommit`, `indexedAt`; 2,8 MB do `fileHashes`) và bốn tệp `lbug.wal.missing-shadow.*`. Marker hỗ trợ `schemaVersion ∈ {5}`.
@@ -20,7 +20,7 @@ Thư mục tạm với `.gitnexus/lbug`, `meta.json` nhỏ, 4 tệp shadow: `rea
 Lệnh: `pnpm exec vitest run src/relay/gitnexus-index-probe.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Không gọi CLI/Cypher; `wal_missing_shadow_files:4` xuất hiện.
+- [x] Không gọi CLI/Cypher; `wal_missing_shadow_files:4` xuất hiện.
 
 ## Rủi ro
 - Chi phí parse `meta.json` chưa đo.

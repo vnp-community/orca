@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-result-envelope.ts` (mới), `agent/src/relay/codeintel-head-commit.ts` (mới), và `codeintel-result-envelope.test.ts`, `codeintel-head-commit.test.ts` (mới)
 **Depends on:** [06](./AG-CV-TASK-001-06-gitnexus-registry-and-repo-resolution.md) (`runGit`, binding)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -27,9 +27,9 @@ Lệnh: `pnpm exec vitest run src/relay/codeintel-result-envelope.test.ts src/re
 
 ## Tiêu chí hoàn thành
 
-- [ ] Kết quả luôn là object; `perf` thay `toolTimingsMs`.
-- [ ] `stale` đúng công thức hợp đồng cho mọi tổ hợp.
-- [ ] Cắt 8 MiB không làm vỡ JSON (test dùng ngưỡng nhỏ).
+- [x] Kết quả luôn là object; `perf` thay `toolTimingsMs`.
+- [x] `stale` đúng công thức hợp đồng cho mọi tổ hợp.
+- [x] Cắt 8 MiB không làm vỡ JSON (test dùng ngưỡng nhỏ).
 
 ## Rủi ro và lưu ý
 

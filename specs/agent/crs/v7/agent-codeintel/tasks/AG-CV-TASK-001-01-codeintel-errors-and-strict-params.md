@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel-errors.ts` (mới), `agent/src/relay/codeintel-params-validation.ts` (mới), `agent/src/relay/codeintel-errors.test.ts` (mới), `agent/src/relay/codeintel-params-validation.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -29,10 +29,10 @@ Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeinte
 
 ## Tiêu chí hoàn thành
 
-- [ ] 16 mã khai đủ; số `error.code` đúng bảng; không thêm số mới vào `AgentErrorCode`.
-- [ ] Module lỗi không import `agent-rpc-dispatch`, `ws`, `orca-dev-agent-transport` (test quét import).
-- [ ] Mọi giá trị chuỗi bắt đầu `-` (kể cả U+FF0D, U+2212 sau NFKC) bị từ chối.
-- [ ] Khoá lạ trả `INVALID_PARAMS` với `data.field` đúng tên khoá.
+- [x] 16 mã khai đủ; số `error.code` đúng bảng; không thêm số mới vào `AgentErrorCode`.
+- [x] Module lỗi không import `agent-rpc-dispatch`, `ws`, `orca-dev-agent-transport` (test quét import).
+- [x] Mọi giá trị chuỗi bắt đầu `-` (kể cả U+FF0D, U+2212 sau NFKC) bị từ chối.
+- [x] Khoá lạ trả `INVALID_PARAMS` với `data.field` đúng tên khoá.
 
 ## Rủi ro và lưu ý
 

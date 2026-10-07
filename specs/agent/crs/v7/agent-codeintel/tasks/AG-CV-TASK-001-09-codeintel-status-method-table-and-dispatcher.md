@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-status.ts` (mới), `agent/src/relay/codeintel-method-table.ts` (mới), `agent/src/relay/agent-rpc-dispatch-codeintel.ts` (mới), `agent/src/relay/agent-rpc-dispatch.ts` (sửa), và test: `codeintel-status.test.ts`, `agent-rpc-dispatch-codeintel.test.ts` (mới), `agent-rpc-dispatch.test.ts` (sửa, nếu cần, ở `agent/src/relay/__tests__/`)
 **Depends on:** [05](./AG-CV-TASK-001-05-run-codeintel-tool-with-tempfile-and-output-classification.md), [07](./AG-CV-TASK-001-07-codeintel-tool-detection-and-capabilities.md), [08](./AG-CV-TASK-001-08-result-envelope-and-head-commit.md) (và 01, 02, 06 gián tiếp)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -33,10 +33,10 @@ Lệnh: `pnpm exec vitest run src/relay/codeintel-status.test.ts src/relay/agent
 
 ## Tiêu chí hoàn thành
 
-- [ ] `codeintel.status` đúng hình dạng §4.1 phần nền; luôn thành công khi binding phân giải được hoặc thiếu công cụ.
-- [ ] Trace chỉ có `workspaceRoot`.
-- [ ] `route()` các method khác không đổi (test hồi quy xanh).
-- [ ] Không file nào tên `helpers/utils/common/misc`; không `max-lines` disable mới.
+- [x] `codeintel.status` đúng hình dạng §4.1 phần nền; luôn thành công khi binding phân giải được hoặc thiếu công cụ.
+- [x] Trace chỉ có `workspaceRoot`.
+- [x] `route()` các method khác không đổi (test hồi quy xanh).
+- [x] Không file nào tên `helpers/utils/common/misc`; không `max-lines` disable mới.
 
 ## Rủi ro và lưu ý
 

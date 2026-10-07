@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codegraph-cli-output.ts`, `codegraph-cli-output.test.ts` (mới)
 **Depends on:** [AG-CV-TASK-001-05](./AG-CV-TASK-001-05-run-codeintel-tool-with-tempfile-and-output-classification.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 CR-003 1.2–1.3: `status/query/callers/callees/impact/files/affected` có `-j`; lỗi là text ANSI exit 0 (`ℹ Symbol "X" not found`, `✗ CodeGraph not initialized in /tmp`); `files -j` luôn mảng phẳng `{path,language,nodeCount,size}`; `affected -j` -> `{changedFiles, affectedTests[]}`.

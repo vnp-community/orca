@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/agent-tool-registry.ts` (sửa), `agent/src/relay/__tests__/agent-tool-registry.test.ts` (sửa)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -34,9 +34,9 @@ Lệnh: `pnpm exec vitest run src/relay/__tests__/agent-tool-registry.test.ts`; 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Gọi `runToolCommand` với tham số cũ cho kết quả y hệt (test hiện có xanh không sửa).
-- [ ] Cả cây tiến trình bị diệt sau `killGraceMs`; không rò listener/fd.
-- [ ] `tools/call gitnexus analyze` bị từ chối (nếu chốt); tool khác không đổi.
+- [x] Gọi `runToolCommand` với tham số cũ cho kết quả y hệt (test hiện có xanh không sửa).
+- [x] Cả cây tiến trình bị diệt sau `killGraceMs`; không rò listener/fd.
+- [x] `tools/call gitnexus analyze` bị từ chối (nếu chốt); tool khác không đổi.
 
 ## Rủi ro và lưu ý
 
