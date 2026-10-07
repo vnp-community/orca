@@ -12,6 +12,7 @@
 ::error::New max-lines bypass not allowed: inline agent/src/relay/git-handler.ts
 ::error::New max-lines bypass not allowed: inline agent/src/relay/pty-handler.test.ts
 ::error::New max-lines bypass not allowed: inline agent/src/relay/pty-handler.ts
+::error::New max-lines bypass not allowed: inline agent/src/relay/quality-rule-pack-orca.ts
 ::error::New max-lines bypass not allowed: inline agent/src/relay/relay.ts
 ::error::New max-lines bypass not allowed: inline agent/src/relay/workspace-space-scan.ts
 ::error::New max-lines bypass not allowed: inline agent/src/shared/agent-hook-listener.test.ts
@@ -220,5 +221,4 @@
 ::error::New max-lines bypass not allowed: inline desktop/src/main/ipc/browser.ts
 ::error::New max-lines bypass not allowed: inline desktop/src/main/ipc/crash-reporting.ts
 ::error::New max-lines bypass not allowed: inline desktop/src/main/ipc/filesystem-auth.ts
-::error::New max-lines bypass not allowed: inline desktop/src/main/ipc/filesystem-mutations.ts
-::error::New max-lines bypass not allowed: inline desktop/src/...[TRUNCATED]
+::error::New max-lines bypass not allowed: inline desktop/src/mai...[TRUNCATED]
