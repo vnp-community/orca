@@ -1,0 +1,75 @@
+name: CodeIntel Contract Checks
+
+on:
+  pull_request:
+    paths:
+      - 'agent/**'
+      - 'backend-go/services/code-intel-service/testdata/**'
+      - '.github/workflows/code-intel-contract.yml'
+  workflow_dispatch:
+  schedule:
+    - cron: '0 3 * * *'
+
+jobs:
+  code-intel-contract:
+    name: CodeIntel Contract Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter orca-agent...
+
+      - name: Verify required contract test coverage
+        run: |
+          cd agent
+          LIST_OUTPUT=$(pnpm exec vitest list --config vitest.code-intel-contract.config.ts)
+          echo "$LIST_OUTPUT" | grep -q "agent-result-golden" || { echo "Missing agent-result-golden test"; exit 1; }
+          echo "$LIST_OUTPUT" | grep -q "fixture-manifest" || { echo "Missing fixture-manifest test"; exit 1; }
+          echo "$LIST_OUTPUT" | grep -q "tool-compatibility" || { echo "Missing tool-compatibility test"; exit 1; }
+
+      - name: Run CodeIntel Contract Tests
+        run: |
+          cd agent
+          pnpm exec vitest run --config vitest.code-intel-contract.config.ts
+
+  code-intel-live-contract:
+    name: CodeIntel Live Tools Test (Nightly / Manual)
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter orca-agent...
+
+      - name: Install GitNexus globally
+        run: npm install -g gitnexus
+
+      - name: Run fixture verification against live tools
+        run: |
+          cd agent
+          pnpm exec vitest run src/relay/codeintel/fixture-manifest.test.ts
