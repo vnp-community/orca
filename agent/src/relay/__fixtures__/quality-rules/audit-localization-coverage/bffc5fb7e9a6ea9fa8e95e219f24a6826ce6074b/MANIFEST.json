@@ -1,0 +1,11 @@
+{
+  "script": "desktop/config/scripts/audit-localization-coverage.mjs",
+  "args": [
+    "--check"
+  ],
+  "cwd": "<repo>",
+  "exitCode": 1,
+  "durationMs": 246,
+  "scriptSha": "bffc5fb7e9a6ea9fa8e95e219f24a6826ce6074b",
+  "env": {}
+}

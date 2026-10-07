@@ -1,0 +1,17 @@
+node:internal/fs/promises:953
+  const result = await PromisePrototypeThen(
+                 ^
+
+Error: ENOENT: no such file or directory, scandir '<repo>/src/renderer/src'
+    at async Object.readdir (node:internal/fs/promises:953:18)
+    at async collectSourceFiles (file://<repo>/desktop/config/scripts/check-styled-scrollbars.mjs:28:19)
+    at async collectUnstyledScrollbarReports (file://<repo>/desktop/config/scripts/check-styled-scrollbars.mjs:51:17)
+    at async main (file://<repo>/desktop/config/scripts/check-styled-scrollbars.mjs:72:19)
+    at async file://<repo>/desktop/config/scripts/check-styled-scrollbars.mjs:86:16 {
+  errno: -2,
+  code: 'ENOENT',
+  syscall: 'scandir',
+  path: '<repo>/src/renderer/src'
+}
+
+Node.js v24.13.1

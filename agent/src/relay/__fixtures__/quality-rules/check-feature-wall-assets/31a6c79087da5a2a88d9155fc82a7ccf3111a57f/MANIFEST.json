@@ -1,0 +1,9 @@
+{
+  "script": "desktop/config/scripts/check-feature-wall-assets.mjs",
+  "args": [],
+  "cwd": "<repo>",
+  "exitCode": 0,
+  "durationMs": 33,
+  "scriptSha": "31a6c79087da5a2a88d9155fc82a7ccf3111a57f",
+  "env": {}
+}

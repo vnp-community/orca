@@ -1,0 +1,9 @@
+{
+  "script": "desktop/config/scripts/verify-localization-catalog.mjs",
+  "args": [],
+  "cwd": "<repo>",
+  "exitCode": 1,
+  "durationMs": 244,
+  "scriptSha": "223dd32d08002687c43299be5f4f67cf1b3a6168",
+  "env": {}
+}

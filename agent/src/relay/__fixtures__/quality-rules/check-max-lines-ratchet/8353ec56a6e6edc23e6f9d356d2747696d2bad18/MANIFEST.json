@@ -1,0 +1,9 @@
+{
+  "script": "desktop/config/scripts/check-max-lines-ratchet.mjs",
+  "args": [],
+  "cwd": "<repo>",
+  "exitCode": 1,
+  "durationMs": 2091,
+  "scriptSha": "8353ec56a6e6edc23e6f9d356d2747696d2bad18",
+  "env": {}
+}

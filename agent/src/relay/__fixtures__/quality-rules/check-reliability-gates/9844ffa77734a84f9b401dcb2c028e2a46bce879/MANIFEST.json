@@ -1,0 +1,9 @@
+{
+  "script": "desktop/config/scripts/check-reliability-gates.mjs",
+  "args": [],
+  "cwd": "<repo>",
+  "exitCode": 1,
+  "durationMs": 36,
+  "scriptSha": "9844ffa77734a84f9b401dcb2c028e2a46bce879",
+  "env": {}
+}
