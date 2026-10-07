@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/__fixtures__/quality-security/` (mới), `agent/scripts/capture-security-fixtures.mjs` (mới), `agent/src/relay/quality-security-fixture-contract.test.ts`
 **Depends on:** duyệt O12/O-9; AG-CV-TASK-082-01 (khung MANIFEST)
-**Status:** [ ] TODO
+**Status:** [ ] BLOCKED (tools not installed)
 
 ## Context
 
