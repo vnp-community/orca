@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / domain thuần, không I/O
 **File:** `internal/domain/task_spec_v2.go` (mới), `internal/domain/spec_violation.go` (mới), `internal/domain/scope_matcher.go` (mới), `internal/domain/execution_packet.go` (mới), `internal/domain/execution_packet_template.go` (mới), `internal/domain/testdata/{task_spec_v2_valid.json,packet_ep1.golden.txt}` (mới), và các `_test.go`
 **Depends on:** TASK-REQ-001-01 (module); TASK-REQ-027-03 (`CanonicalJSON`, `Digest` ở `internal/domain/canonical_json_digest.go`, mẫu vàng), TASK-REQ-027-02 (`SchemaVersion >= 1` nhận v2, bảng `task_specs`); CR-REQ-027 (schema v1, `AC-n`, `exempt_from_coverage`); không phụ thuộc DB hay proto
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -60,12 +60,12 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi dòng bảng 2.1 của CR có test âm và dương; mọi mã `REQUEST_SPEC_*` xuất hiện trong test.
-- [ ] `RenderExecutionPacket` cùng đầu vào cho cùng `Digest` qua 1000 lần; đổi một ký tự template làm test guard đỏ.
-- [ ] Nội dung độc hại (`</untrusted-...>`, `ORCA_RESULT_BEGIN`) trong Request không phá khối và không tạo khối kết quả hợp lệ.
-- [ ] Không có giá trị biến môi trường hay `credential_ref` trong packet (test quét).
-- [ ] Domain không import `common`, adapter hay `os`/`time.Now`.
-- [ ] `DigestOfRawSpec` trùng `task_specs.digest` của `task-service` trên mẫu vàng chung (không còn bản canonical thứ ba).
+- [x] Mỗi dòng bảng 2.1 của CR có test âm và dương; mọi mã `REQUEST_SPEC_*` xuất hiện trong test.
+- [x] `RenderExecutionPacket` cùng đầu vào cho cùng `Digest` qua 1000 lần; đổi một ký tự template làm test guard đỏ.
+- [x] Nội dung độc hại (`</untrusted-...>`, `ORCA_RESULT_BEGIN`) trong Request không phá khối và không tạo khối kết quả hợp lệ.
+- [x] Không có giá trị biến môi trường hay `credential_ref` trong packet (test quét).
+- [x] Domain không import `common`, adapter hay `os`/`time.Now`.
+- [x] `DigestOfRawSpec` trùng `task_specs.digest` của `task-service` trên mẫu vàng chung (không còn bản canonical thứ ba).
 
 ## Rủi ro và lưu ý
 

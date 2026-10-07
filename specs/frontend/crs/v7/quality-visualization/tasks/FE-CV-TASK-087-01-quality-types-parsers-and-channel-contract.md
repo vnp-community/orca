@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/code-intel-quality-types.ts`, `code-intel-quality-wire-parsers.ts`, `code-intel-quality-errors.ts` (mới); mục quality trong `code-intel-rpc-methods.ts`, `code-intel-errors.ts`, `code-intel-wire-parsers.ts` (sửa; CR-050 sở hữu file) và `*.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (bridge, `classifyCodeIntelError`); không cần backend
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

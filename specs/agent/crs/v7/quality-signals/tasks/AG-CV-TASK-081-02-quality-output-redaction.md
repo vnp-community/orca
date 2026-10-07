@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-output-redaction.ts` (mới), `.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,8 +25,8 @@ Bảng ca: mỗi mẫu token, nhiều lần trong một dòng, giá trị env ng
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không còn token/đường dẫn tuyệt đối trong đầu ra ở mọi ca.
-- [ ] Regex không backtracking thảm hoạ (test chuỗi 1 MiB < 200 ms).
+- [x] Không còn token/đường dẫn tuyệt đối trong đầu ra ở mọi ca.
+- [x] Regex không backtracking thảm hoạ (test chuỗi 1 MiB < 200 ms).
 
 ## Rủi ro
 

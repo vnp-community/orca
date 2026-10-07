@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_stream.go` (mới), `.../channels_request_stream_test.go` (mới), `.../excluded_channels.yaml`
 **Depends on:** TASK-REQ-016-01, TASK-REQ-016-02; CR-REQ-003 (sự kiện `status_changed`) và outbox của `request-service`
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -37,10 +37,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] 14 sự kiện ánh xạ đúng `eventType`; whitelist trường.
-- [ ] Không rò tenant khác; bỏ sự kiện cũ.
-- [ ] Kênh không đăng ký khi NATS không có.
-- [ ] Parity xanh (loại trừ vĩnh viễn).
+- [x] 14 sự kiện ánh xạ đúng `eventType`; whitelist trường.
+- [x] Không rò tenant khác; bỏ sự kiện cũ.
+- [x] Kênh không đăng ký khi NATS không có.
+- [x] Parity xanh (loại trừ vĩnh viễn).
 
 ## Rủi ro và lưu ý
 

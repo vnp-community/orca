@@ -196,3 +196,23 @@ Edge-specific points:
   run green against a real dev stack); tier 2 Inspector (not implemented).
   `cmd/mcpconformance-devserver` is a test-only binary that serves the real
   `/mcp` handler with a static token so the Python tier can run without the stack.
+
+## Code intelligence channels (CR-CV-040)
+
+Bridges desktop and web client WebSocket requests to downstream `code-intel-service` over gRPC.
+
+- **Downstream service:** `code-intel-service` (gRPC port 9090).
+- **Environment variables:**
+  - `CODE_INTEL_SERVICE_ADDR`: Target gRPC address for `code-intel-service` (e.g. `localhost:9090` or `code-intel-service:9090`).
+  - `CODE_INTEL_MAX_RESPONSE_BYTES`: Maximum response size in bytes (default `8 MiB` / `8388608`).
+  - `CODE_INTEL_MAX_STREAMS`: Maximum concurrent active streaming subscriptions per gateway instance (default `128`).
+  - `CODEINTEL_INTERNAL_CALLER_TOKEN`: Shared bearer token for gateway-to-service gRPC metadata authentication (`x-internal-caller-token`).
+- **Channels:** 46 total channels registered under the `codeIntel.*` namespace:
+  - 45 unary request-response channels (invoked via `invoke`, never `send` per invariant U2).
+  - 1 server-push stream channel (`codeIntel.subscribe`).
+- **Invariants & limits:**
+  - `SetReadLimit(320 KiB)` (`327680` bytes): WebSocket frame read limit is capped at 320 KiB on `/ws` to accommodate payloads such as `reviewState.save` (up to 256 KiB plus envelope overhead). Larger frames cause WebSocket closure with status 1009 (`StatusMessageTooBig`).
+  - **Error handling:** Channel error messages maintain canonical code intelligence prefixes (`CODE: message`), serializing errors into JSON error envelopes with `code` and `message`.
+  - **Privacy & security:** Request arguments (which may include confidential file paths or source code snippets) are never logged in plaintext.
+
+

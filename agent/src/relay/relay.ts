@@ -68,6 +68,7 @@ import { shouldReadRemoteCliStdin } from './remote-cli-stdin'
 import { loadAgentConfig } from './agent-config'
 import type { AgentLogger } from './agent-logger'
 import { registerAuthStatusHandlers } from './relay-auth-status-handlers'
+import { registerCodeIntelHandlers } from './codeintel-relay-handlers'
 
 const DEFAULT_GRACE_MS = DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS * 1000
 const SOCK_NAME = 'relay.sock'
@@ -491,6 +492,7 @@ async function main(): Promise<void> {
     debug: (...a) => relayLogLine(`[relay] DEBUG ${a.join(' ')}`)
   }
   registerAuthStatusHandlers(dispatcher, authStatusConfig, authStatusLogger)
+  registerCodeIntelHandlers(dispatcher, authStatusConfig, authStatusLogger)
 
   const ptyHandler = new PtyHandler(dispatcher, graceTimeMs)
   const fsHandler = new FsHandler(dispatcher, context)

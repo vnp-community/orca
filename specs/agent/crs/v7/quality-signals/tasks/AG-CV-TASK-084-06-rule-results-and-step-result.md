@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-rule-results.ts` (mới), `.test.ts`; sửa `quality-results-store.ts` (081-07)
 **Depends on:** AG-CV-TASK-084-04, 084-05, AG-CV-TASK-081-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,7 +24,7 @@ Bảng: tổ hợp trạng thái luật → trạng thái bước; JSON `view=st
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không finding giả; `unknown` được suy ra được ở backend từ dữ liệu này.
+- [x] Không finding giả; `unknown` được suy ra được ở backend từ dữ liệu này.
 
 ## Rủi ro
 

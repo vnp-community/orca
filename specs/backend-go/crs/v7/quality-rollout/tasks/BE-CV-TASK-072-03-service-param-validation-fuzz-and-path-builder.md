@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpc/params_fuzz_test.go` (mới), `.../internal/usecase/repo_source_path_builder_test.go` (mới)
 **Depends on:** BE-CV-TASK-072-01, BE-CV-SOL-012, BE-CV-SOL-021, BE-CV-SOL-030
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -26,8 +26,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không có đường dẫn ngoài root trong mọi lời gọi ghi lại.
-- [ ] Fuzz không panic.
+- [x] Không có đường dẫn ngoài root trong mọi lời gọi ghi lại.
+- [x] Fuzz không panic.
 
 ## Rủi ro và lưu ý
 

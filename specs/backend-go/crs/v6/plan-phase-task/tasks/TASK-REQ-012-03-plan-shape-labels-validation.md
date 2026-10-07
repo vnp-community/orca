@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/plan_shape.go` (mới), `plan_labels.go` (mới), `plan_proposal.go` (mới), `plan_proposal_validation.go` (mới), `plan_shape_test.go`, `plan_proposal_validation_test.go` (mới)
 **Depends on:** CR-REQ-003 (registry `FlowFor`, `PhasesFor`, `Size`) đã có ở `request-service`
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -37,10 +37,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `change_request` size S vẫn cần ít nhất một Phase; `bug` size M có Phase bị `PHASES_NOT_ALLOWED`; `bug` size L thiếu Phase bị `PHASES_REQUIRED`.
-- [ ] Mọi mã lỗi ở bảng 2.5 của solution có test.
-- [ ] Không import ngoài stdlib và `common/apperrors` trong `domain`.
-- [ ] Không file tên `helpers`, `utils`, `common`, `misc`.
+- [x] `change_request` size S vẫn cần ít nhất một Phase; `bug` size M có Phase bị `PHASES_NOT_ALLOWED`; `bug` size L thiếu Phase bị `PHASES_REQUIRED`.
+- [x] Mọi mã lỗi ở bảng 2.5 của solution có test.
+- [x] Không import ngoài stdlib và `common/apperrors` trong `domain`.
+- [x] Không file tên `helpers`, `utils`, `common`, `misc`.
 
 ## Rủi ro và lưu ý
 

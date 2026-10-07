@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/update_task.go`, `internal/usecase/execute_task.go`, `internal/usecase/report_execution_result.go`, `internal/usecase/execution_lease.go`, `internal/usecase/reconcile_container_statuses.go` (mới), `internal/adapter/{postgres,mysql}/container_status.go`, `cmd/server/main.go`
 **Depends on:** TASK-REQ-011-05
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -36,11 +36,11 @@ Các nơi con đổi status (đã đọc, số dòng ngày 2026-10-06):
 
 ## Tiêu chí hoàn thành
 
-- [ ] Con đổi qua `ExecuteTask`, `ReportTaskExecutionResult`, `UpdateTask` thì phase và plan đổi theo.
-- [ ] Mỗi lần đổi container có đúng một dòng outbox `statuschanged`, `cause=derived`, có `task_type`.
-- [ ] Sau `ReleaseUnlinkedInProgress` đặt task lá về `open`, vòng đối soát đưa phase về đúng trạng thái trong một chu kỳ.
-- [ ] Constructor cũ vẫn biên dịch; test hiện có không đổi.
-- [ ] Lỗi `Sync` chỉ ghi log, không làm lệnh gốc thất bại.
+- [x] Con đổi qua `ExecuteTask`, `ReportTaskExecutionResult`, `UpdateTask` thì phase và plan đổi theo.
+- [x] Mỗi lần đổi container có đúng một dòng outbox `statuschanged`, `cause=derived`, có `task_type`.
+- [x] Sau `ReleaseUnlinkedInProgress` đặt task lá về `open`, vòng đối soát đưa phase về đúng trạng thái trong một chu kỳ.
+- [x] Constructor cũ vẫn biên dịch; test hiện có không đổi.
+- [x] Lỗi `Sync` chỉ ghi log, không làm lệnh gốc thất bại.
 
 ## Rủi ro và lưu ý
 

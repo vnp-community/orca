@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/testdata/storage/PROVENANCE.txt` (mới); `backend-go/services/code-intel-service/testdata/storage/{compose-dev.yml, compose-prod.yml, compose-old.yml, backend-go-compose.yml, init-databases.sh}` (mới, bản chụp đã che tay); kết quả đối chiếu ghi vào mô tả PR
 **Depends on:** BE-CV-SOL-030 (đã có chữ ký `RepoSourceReader`; nếu chưa, task này chỉ làm phần compose/config và ghi phần reader là "chưa kiểm chứng")
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,10 +29,10 @@ Solution 035 dựa vào số liệu do CR đọc ngày 2026-10-05 và vào một
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng đối chiếu số liệu trong PR; mọi chỗ lệch với CR được ghi.
-- [ ] Bốn khả năng của `RepoSourceReader` có nhãn rõ ràng.
-- [ ] Fixture không chứa giá trị thật nào; `PROVENANCE.txt` đủ để người khác tái tạo.
-- [ ] Danh sách service không theo mẫu config được ghi lại.
+- [x] Bảng đối chiếu số liệu trong PR; mọi chỗ lệch với CR được ghi.
+- [x] Bốn khả năng của `RepoSourceReader` có nhãn rõ ràng.
+- [x] Fixture không chứa giá trị thật nào; `PROVENANCE.txt` đủ để người khác tái tạo.
+- [x] Danh sách service không theo mẫu config được ghi lại.
 
 ## Rủi ro và lưu ý
 

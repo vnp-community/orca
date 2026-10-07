@@ -5,7 +5,7 @@
 **Area:** frontend / hooks
 **File:** `frontend/src/renderer/src/hooks/useCodeIntelSupport.ts` (mới), test `useCodeIntelSupport.test.tsx`
 **Depends on:** FE-CV-TASK-050-07, FE-CV-TASK-050-10
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/transition_request_contract.go` (mới), `internal/adapter/postgres/transition_request_integration_test.go`, `internal/adapter/mysql/transition_request_integration_test.go` (mới)
 **Depends on:** TASK-REQ-003-03, TASK-REQ-002-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,11 +28,11 @@ Bộ `contracttest` (TASK-REQ-002-06) cho kịch bản dùng chung hai dialect. 
 
 ## Tiêu chí hoàn thành
 
-- [ ] 10 lệnh đồng thời: đúng một thắng cho mỗi đích, số outbox đúng.
-- [ ] Giao lặp không thêm dòng outbox.
-- [ ] Lỗi outbox giữ nguyên `status`.
-- [ ] 11 loại đi hết `HappyPath` trên cả hai DB.
-- [ ] Không vi phạm CHECK `requests_backlog_stage` ở mọi chuyển.
+- [x] 10 lệnh đồng thời: đúng một thắng cho mỗi đích, số outbox đúng.
+- [x] Giao lặp không thêm dòng outbox.
+- [x] Lỗi outbox giữ nguyên `status`.
+- [x] 11 loại đi hết `HappyPath` trên cả hai DB.
+- [x] Không vi phạm CHECK `requests_backlog_stage` ở mọi chuyển.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / adapter grpcclient, usecase
 **File:** `internal/adapter/grpcclient/ai_completion_relay.go` (mới), `project_context_resolver.go` (mới), `connection_resolver.go` (mới, nếu chưa có từ CR khác), `internal/usecase/solution_prompt.go` (mới), và `_test.go`
 **Depends on:** TASK-REQ-007-02; CR-REQ-001 (dial client, `withTenantMetadata` bản của service)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -30,10 +30,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Adapter khớp hành vi `AICompleter` của task-service (so sánh test).
-- [ ] Prompt không chứa `credential_ref` hay bí mật.
-- [ ] Không có dev server: lỗi miền rõ ràng, không danh sách rỗng.
-- [ ] Cắt theo rune, không phá UTF-8.
+- [x] Adapter khớp hành vi `AICompleter` của task-service (so sánh test).
+- [x] Prompt không chứa `credential_ref` hay bí mật.
+- [x] Không có dev server: lỗi miền rõ ràng, không danh sách rỗng.
+- [x] Cắt theo rune, không phá UTF-8.
 
 ## Rủi ro và lưu ý
 

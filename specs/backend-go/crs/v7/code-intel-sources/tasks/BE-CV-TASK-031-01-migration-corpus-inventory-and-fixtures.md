@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/sqlmigration/testdata/corpus/` (mới, file `.up.sql` trích từ repo), `.../testdata/corpus/INVENTORY.md` (mới), `.../testdata/golden/` (mới)
 **Depends on:** BE-CV-TASK-030-02 (không bắt buộc; có thể làm song song)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,9 +27,9 @@ CR-CV-031 mục 1 có nhiều số `grep` thô gồm cả comment, và solution 
 
 ## Tiêu chí hoàn thành
 
-- [ ] `INVENTORY.md` ghi 151/143/294 (hoặc số đúng mới) và phân loại 7 khối `DO`.
-- [ ] Corpus có đủ trường hợp ở BE-CV-SOL-031 mục 6.
-- [ ] Biến thể `logical FK` đủ cả hai dialect.
+- [x] `INVENTORY.md` ghi 151/143/294 (hoặc số đúng mới) và phân loại 7 khối `DO`.
+- [x] Corpus có đủ trường hợp ở BE-CV-SOL-031 mục 6.
+- [x] Biến thể `logical FK` đủ cả hai dialect.
 
 ## Rủi ro và lưu ý
 

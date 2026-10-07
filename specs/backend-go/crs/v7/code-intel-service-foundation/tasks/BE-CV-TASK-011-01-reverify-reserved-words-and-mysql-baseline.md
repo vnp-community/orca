@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** không sửa file sản phẩm; kết quả ghi vào mô tả PR. Script DDL thử đặt ở scratchpad (ngoài repo)
 **Depends on:** BE-CV-TASK-010-05 (hạ tầng integration test hai dialect)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ CR-CV-011 mục 6 và SOL-011 C5 nêu ba điều chưa kiểm chứng sẽ làm 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Có bảng kết quả từng từ khoá × hai DB.
-- [ ] Có phiên bản MySQL đã kiểm và kết luận về `CHECK`.
-- [ ] Có mã/chuỗi lỗi vi phạm `active_key` cho hai dialect.
+- [x] Có bảng kết quả từng từ khoá × hai DB.
+- [x] Có phiên bản MySQL đã kiểm và kết luận về `CHECK`.
+- [x] Có mã/chuỗi lỗi vi phạm `active_key` cho hai dialect.
 
 ## Rủi ro và lưu ý
 

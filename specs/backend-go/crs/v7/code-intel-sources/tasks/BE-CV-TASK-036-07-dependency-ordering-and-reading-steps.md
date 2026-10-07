@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/readingorder/{layer_rank.go, dependency_ordering.go, reading_steps.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-036-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ Solution reading-order §2.B bước 3–8; PQ-31 (`stepKey` là khoá tiến đ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí thứ tự/`stepKey`/xác định của §9 đạt.
-- [ ] `reason` luôn thuộc tập hợp lệ; `overflow` đúng số lượng.
+- [x] Tiêu chí thứ tự/`stepKey`/xác định của §9 đạt.
+- [x] `reason` luôn thuộc tập hợp lệ; `overflow` đúng số lượng.
 
 ## Rủi ro và lưu ý
 

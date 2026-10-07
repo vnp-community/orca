@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/get_c4_overrides.go`, `save_c4_overrides.go` (mới), `.../usecase/ports.go` hoặc `c4_overrides_repository.go` (cổng, mới), `.../adapter/c4overrides/repo_seed_reader.go` (mới)
 **Depends on:** BE-CV-TASK-033-07, -08; bảng `c4_overrides` và repository của BE-CV-SOL-011; BE-CV-SOL-030
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ Solution mục 2.D.
 
 ## Tiêu chí hoàn thành
 
-- [ ] CAS đúng; seed không ghi đè DB.
-- [ ] Huỷ cache được kiểm.
+- [x] CAS đúng; seed không ghi đè DB.
+- [x] Huỷ cache được kiểm.
 
 ## Rủi ro và lưu ý
 

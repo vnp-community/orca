@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-coverage-collector.ts` (mới), điền profile trong `quality-profile-catalog.ts` qua `registerBuiltinProfiles`, `.test.ts`
 **Depends on:** AG-CV-TASK-083-02..04, AG-CV-TASK-081-12, 081-15, 081-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,8 +25,8 @@ Executor giả ghi tệp `.out` từ fixture; ca một module fail; scope change
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không có tệp mới trong worktree sau run.
-- [ ] Profile qua kiểm token cấm của catalog.
+- [x] Không có tệp mới trong worktree sau run.
+- [x] Profile qua kiểm token cấm của catalog.
 
 ## Rủi ro
 

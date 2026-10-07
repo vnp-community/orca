@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks
 **File:** `frontend/src/renderer/src/hooks/useReviewNotesPersistence.ts` (mới) + test; `store/slices/code-intel.ts` (khoá `reviewNotesState`, `reviewTurnsState`)
 **Depends on:** FE-CV-SOL-052-reading-order-and-progress (bộ ghi `reviewState.save`); FE-CV-SOL-050-store-and-query-hooks; FE-CV-TASK-060-04; fake backend G4 (073-02)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Service:** `deploy/dev`, `.github/workflows`, `request-service/deploy`
 **File:** `backend-go/services/request-service/deploy/Dockerfile` (mới), `deploy/dev/docker-compose.yml`, `deploy/dev/scripts/migrate.sh`, `deploy/dev/scripts/build-local.sh`, `.github/workflows/backend-go-request-service.yml` (mới)
 **Depends on:** TASK-REQ-001-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,10 +31,10 @@ Stack dev thật ở `/opt/repos/orca/deploy/dev/docker-compose.yml`: mỗi serv
 
 ## Tiêu chí hoàn thành
 
-- [ ] Image build được; service khởi động trong compose với Postgres, `/healthz` OK.
-- [ ] `migrate.sh request` chạy `0001` thành công trên DB `request`.
-- [ ] Workflow có job cho cả `postgres` và `mysql`, chạy `buf breaking`.
-- [ ] `build-local.sh` đóng gói `request-service` và migrations.
+- [x] Image build được; service khởi động trong compose với Postgres, `/healthz` OK.
+- [x] `migrate.sh request` chạy `0001` thành công trên DB `request`.
+- [x] Workflow có job cho cả `postgres` và `mysql`, chạy `buf breaking`.
+- [x] `build-local.sh` đóng gói `request-service` và migrations.
 
 ## Rủi ro và lưu ý
 

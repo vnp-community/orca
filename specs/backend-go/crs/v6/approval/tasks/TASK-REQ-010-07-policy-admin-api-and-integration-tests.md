@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase, grpc, test
 **File:** `internal/usecase/manage_approval_policies.go` (mới), `internal/adapter/grpc/approval_policy_admin_server.go` (mới, chỉ khi được chấp nhận), `proto/orca/request/v1/approval.proto` (sửa, chỉ khi được chấp nhận), `internal/adapter/{postgres,mysql}/approval_policy_flow_integration_test.go` (mới)
 **Depends on:** TASK-REQ-010-03, TASK-REQ-010-06
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -27,9 +27,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Test toàn luồng xanh trên Postgres và MySQL.
-- [ ] Chéo tenant không rò.
-- [ ] Phần API chỉ tồn tại nếu câu hỏi mở 2 được chấp nhận; trạng thái được ghi vào PR.
+- [x] Test toàn luồng xanh trên Postgres và MySQL.
+- [x] Chéo tenant không rò.
+- [x] Phần API chỉ tồn tại nếu câu hỏi mở 2 được chấp nhận; trạng thái được ghi vào PR.
 
 ## Rủi ro và lưu ý
 

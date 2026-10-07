@@ -100,6 +100,8 @@ type fakeSSHServer struct {
 	// creating its Unix socket, so a later `test -S <path>` (reattach's
 	// liveness probe) reports "alive" only after a real detach happened.
 	detachedStarted atomic.Bool
+	// handshakeParams is sent in agent.handshake if non-nil.
+	handshakeParams map[string]any
 }
 
 func startFakeSSHServer(t *testing.T, trustedCAPub ssh.PublicKey, expectPrincipal string, badChecksum bool) *fakeSSHServer {
@@ -305,7 +307,12 @@ func (s *fakeSSHServer) handleExec(t *testing.T, channel ssh.Channel, cmd string
 // behavior) and reads back Provisioner's {ok:true,...} reply, proving the
 // receiver-side handshake in provisioner.go actually completes end to end.
 func (s *fakeSSHServer) runFakeAgentHandshake(t *testing.T, channel ssh.Channel) {
-	params, _ := json.Marshal(map[string]any{"devServerId": "ds-1", "platform": "linux", "arch": "x64", "agentVersion": "2.1.0"})
+	var params []byte
+	if s.handshakeParams != nil {
+		params, _ = json.Marshal(s.handshakeParams)
+	} else {
+		params, _ = json.Marshal(map[string]any{"devServerId": "ds-1", "platform": "linux", "arch": "x64", "agentVersion": "2.1.0"})
+	}
 	req := devserveragent.JSONRPCRequest{JSONRPC: "2.0", ID: 1, Method: "agent.handshake", Params: params}
 	frame, err := devserveragent.EncodeJSONRPCFrame(req, 1, 0)
 	if err != nil {
@@ -592,5 +599,46 @@ func TestProvision_HandshakeTimeout_IncludesDiagnostics(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "relay process crashed before handshake") {
 		t.Errorf("expected the error to include the captured stderr, got: %v", err)
+	}
+}
+
+func TestProvisioner_HandshakeCarriesFeatures(t *testing.T) {
+	ca := newFakeCA(t)
+	server := startFakeSSHServer(t, ca.signer.PublicKey(), "deploy", false)
+	server.handshakeParams = map[string]any{
+		"devServerId":     "ds-features",
+		"platform":        "linux",
+		"arch":            "x64",
+		"agentVersion":    "2.1.0",
+		"capabilities":    []string{"cap1"},
+		"features":        []string{"feat1"},
+		"protocolVersion": 2,
+		"buildVersion":    "bld-1",
+	}
+
+	bundlePath := writeLocalBundle(t, "// fake agent bundle content\n")
+
+	target, _ := domain.NewSshTarget("ssht-features", "tenant-1", "127.0.0.1", server.port(t), "deploy", "role-1", "", "", "", nil)
+	resolver := &fakeSshTargetResolver{byID: map[string]domain.SshTarget{"ssht-features": target}}
+	connector := sshconn.NewConnector(&fakeIssuer{ca: ca, principal: "deploy"}, nil, sshconn.Config{DialTimeout: 5 * time.Second}, nil)
+	provisioner := sshrelay.NewProvisioner(connector, resolver, sshrelay.Config{
+		BundlePath: bundlePath, HandshakeTimeout: 5 * time.Second, OrcaVersion: "test",
+	})
+
+	devServer, _ := domain.NewDevServer("ds-features", "tenant-1", "unused", domain.ConnectionModeRelaySSH, "ssht-features", nil)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	transport, info, err := provisioner.Provision(ctx, devServer)
+	if err != nil {
+		t.Fatalf("Provision failed: %v", err)
+	}
+	t.Cleanup(func() { _ = transport.Close("test done") })
+
+	if info.ProtocolVersion != 2 || info.BuildVersion != "bld-1" {
+		t.Errorf("expected protocolVersion=2 buildVersion=bld-1, got %+v", info)
+	}
+	if len(info.Features) != 1 || info.Features[0] != "feat1" {
+		t.Errorf("expected features=[feat1], got %v", info.Features)
 	}
 }

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` (fixture) / đọc `agent/`
 **File:** `backend-go/services/code-intel-service/internal/adapter/agentrepofs/testdata/agent-rpc/*.json` (mới); `.../testdata/agent-rpc/README.md` (mới, ghi nguồn từng mẫu, ngày, commit)
 **Depends on:** — (chỉ cần thư mục service của BE-CV-TASK-010-*; nếu chưa có, tạo thư mục tạm và dời khi có)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,9 +26,9 @@ CR-CV-030 và hợp đồng đánh dấu "chưa kiểm chứng" ba điểm: hìn
 
 ## Tiêu chí hoàn thành
 
-- [ ] Có mẫu cho mọi method trong bảng SOL-030 mục 2.C, kèm cả hai dạng lỗi với `code` số.
-- [ ] README ghi rõ mẫu nào là "viết tay từ mã" và mẫu nào "ghi từ agent thật".
-- [ ] Không có đường dẫn tuyệt đối thật hay nội dung bí mật trong fixture.
+- [x] Có mẫu cho mọi method trong bảng SOL-030 mục 2.C, kèm cả hai dạng lỗi với `code` số.
+- [x] README ghi rõ mẫu nào là "viết tay từ mã" và mẫu nào "ghi từ agent thật".
+- [x] Không có đường dẫn tuyệt đối thật hay nội dung bí mật trong fixture.
 
 ## Rủi ro và lưu ý
 

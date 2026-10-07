@@ -170,6 +170,16 @@ var subjectRules = map[string]subjectRule{
 		Type: "mcp.approval", Title: "Approval needed", Body: "An AI agent is waiting for your approval.",
 		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
 	},
+	// BE-REQ-SOL-010: request-service approvals
+	"orca.request.approval.requested": {
+		Type: "request.approval_requested", Title: "Approval needed", Body: "Approval required.",
+		Severity: SeverityWarning, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+		DeepLink: "/?section=requests",
+	},
+	"orca.request.approval.decided": {
+		Type: "request.approval_decided", Title: "Approval decided", Body: "Approval decided.",
+		Severity: SeverityInfo, Channels: []DeliveryChannel{ChannelDeliveryWS, ChannelDeliveryPush},
+	},
 	// A terminal an AI client opened was stopped for being idle. Locked: the
 	// body names the client at most, never command text or output.
 	"orca.mcp.terminal.idlestopped": {

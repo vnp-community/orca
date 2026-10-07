@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / test; tài liệu giao diện
 **File:** `internal/adapter/{postgres,mysql}/agent_readonly_flow_integration_test.go` (mới), `testdata/analysis_documents/*.json` (mới, dùng chung task 01), `backend-go/services/request-service/README.md` (sửa: mục "Chế độ chỉ đọc và giới hạn đã biết")
 **Depends on:** TASK-REQ-008-03, TASK-REQ-008-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -28,9 +28,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí chấp nhận 7 (đồng thời), 9 (answer hoàn tất), 4 (hotfix) có test tích hợp xanh trên hai DB.
-- [ ] README ghi đủ giới hạn đã biết.
-- [ ] PR nêu rõ phần kiểm thử thủ công "chưa chạy".
+- [x] Tiêu chí chấp nhận 7 (đồng thời), 9 (answer hoàn tất), 4 (hotfix) có test tích hợp xanh trên hai DB.
+- [x] README ghi đủ giới hạn đã biết.
+- [x] PR nêu rõ phần kiểm thử thủ công "chưa chạy".
 
 ## Rủi ro và lưu ý
 

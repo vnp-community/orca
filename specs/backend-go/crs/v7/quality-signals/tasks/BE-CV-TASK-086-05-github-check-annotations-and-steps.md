@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/adapter/github/commit_check_details.go`, test (mới)
 **Depends on:** BE-CV-TASK-086-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 CR-086 2.1/2.6: chỉ check thất bại, ≤ 50 annotation/check, không `logTail`.
@@ -20,7 +20,7 @@ CR-086 2.1/2.6: chỉ check thất bại, ≤ 50 annotation/check, không `logTa
 - Check thành công không phát sinh lời gọi; thất bại 60 annotation → 50; lỗi 404 một check không làm hỏng cả danh sách.
 
 ## Tiêu chí hoàn thành
-- [ ] Canary token trong `message` bị che.
+- [x] Canary token trong `message` bị che.
 
 ## Rủi ro
 Mỗi check thất bại một lời gọi: ngân sách do caller.

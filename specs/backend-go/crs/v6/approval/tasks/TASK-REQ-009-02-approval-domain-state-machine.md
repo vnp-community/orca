@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / domain
 **File:** `backend-go/services/request-service/internal/domain/approval.go` (mới), `approval_subject.go` (mới), `approval_test.go` (mới)
 **Depends on:** CR-REQ-001 (module Go)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -29,10 +29,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không import ngoài stdlib trong `internal/domain`.
-- [ ] Mọi chuyển trạng thái bất hợp lệ trả `ErrApprovalNotPending`.
-- [ ] `AllSubjectTypes` khớp CHECK của migration (test so sánh với danh sách hằng chép trong test, và task 06 kiểm lại với SQL).
-- [ ] `go vet` và lint sạch; tên file theo khái niệm, không `utils`/`helpers`.
+- [x] Không import ngoài stdlib trong `internal/domain`.
+- [x] Mọi chuyển trạng thái bất hợp lệ trả `ErrApprovalNotPending`.
+- [x] `AllSubjectTypes` khớp CHECK của migration (test so sánh với danh sách hằng chép trong test, và task 06 kiểm lại với SQL).
+- [x] `go vet` và lint sạch; tên file theo khái niệm, không `utils`/`helpers`.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/sqlmigration/ddl_mysql.go` (mới), `.../ddl_mysql_test.go` (mới); sửa nhẹ `column_definition.go` (BE-CV-TASK-031-03)
 **Depends on:** BE-CV-TASK-031-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,9 +31,9 @@ MySQL: không schema (database riêng), `CHAR(36)`, `TIMESTAMP(6)`, `JSON`, `KEY
 
 ## Tiêu chí hoàn thành
 
-- [ ] SOL-031 mục 6 các ô MySQL (`task/0012`, trigger, `FOREIGN KEY` thêm bằng `ADD CONSTRAINT` ở `project-service/0019`) đạt.
-- [ ] Không có tính năng Postgres nào rò sang nhánh MySQL (ví dụ `ENABLE ROW LEVEL SECURITY` trong comment MySQL không tạo RLS).
-- [ ] `go vet` sạch.
+- [x] SOL-031 mục 6 các ô MySQL (`task/0012`, trigger, `FOREIGN KEY` thêm bằng `ADD CONSTRAINT` ở `project-service/0019`) đạt.
+- [x] Không có tính năng Postgres nào rò sang nhánh MySQL (ví dụ `ENABLE ROW LEVEL SECURITY` trong comment MySQL không tạo RLS).
+- [x] `go vet` sạch.
 
 ## Rủi ro và lưu ý
 

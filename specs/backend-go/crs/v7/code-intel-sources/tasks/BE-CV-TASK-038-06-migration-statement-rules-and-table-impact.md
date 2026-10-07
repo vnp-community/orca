@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/contractdiff/migration_statement_rules.go`, `table_impact.go` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-038-04; BE-CV-SOL-031-sql-migration-parser (câu lệnh đã tách), BE-CV-SOL-031-erd-model-and-access-scan (`accessedBy`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Solution 2.D (migration), 2.E. arch/05: `DROP COLUMN`, `NOT NULL` không backfil
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí migration và `TableImpact` của §9 đạt.
-- [ ] Finding `sql.*` có `finding_key` ổn định (dịch dòng không đổi).
+- [x] Tiêu chí migration và `TableImpact` của §9 đạt.
+- [x] Finding `sql.*` có `finding_key` ổn định (dịch dòng không đổi).
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-parser-go-vet.ts`, `quality-parser-go-test.ts` + test
 **Depends on:** AG-CV-TASK-082-01, 082-02, 082-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,7 +23,7 @@ Fixture task 01 + ca tổng hợp: 3 fail, 1 subtest, 1 panic, 1 build lỗi →
 
 ## Tiêu chí hoàn thành
 
-- [ ] 6 phát hiện đúng; bộ nhớ phẳng.
+- [x] 6 phát hiện đúng; bộ nhớ phẳng.
 
 ## Rủi ro
 

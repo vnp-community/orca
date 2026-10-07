@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/__fixtures__/quality-rules/` (mới), `agent/scripts/capture-rule-script-evidence.mjs` (mới), `agent/src/relay/quality-rule-fixture-contract.test.ts` (mới)
 **Depends on:** AG-CV-TASK-082-01 (khung MANIFEST)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Lệnh: `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/quality-rule
 
 ## Tiêu chí hoàn thành
 
-- [ ] Có fixture cho cả 6 script hoặc `BLOCKED` kèm lý do.
-- [ ] PR xác nhận không script nào ghi tệp ở chế độ mặc định.
+- [x] Có fixture cho cả 6 script hoặc `BLOCKED` kèm lý do.
+- [x] PR xác nhận không script nào ghi tệp ở chế độ mặc định.
 
 ## Rủi ro
 

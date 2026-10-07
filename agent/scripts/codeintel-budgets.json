@@ -1,0 +1,19 @@
+{
+  "provenance": "Assumed baseline limits from CR-CV-071 single-machine calibration (2026-10-06)",
+  "agent": {
+    "cold-start": {
+      "totalMsMax": 5000,
+      "rssPeakKbMax": 204800,
+      "payloadBytesMax": 102400
+    },
+    "warm-cache": {
+      "totalMsMax": 100,
+      "rssPeakKbMax": 102400,
+      "payloadBytesMax": 102400
+    },
+    "concurrency-mixed": {
+      "concurrencyMax": 3,
+      "rssPeakKbMax": 409600
+    }
+  }
+}

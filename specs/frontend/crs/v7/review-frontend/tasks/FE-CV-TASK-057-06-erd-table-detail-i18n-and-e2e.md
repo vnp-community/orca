@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + i18n + tests
 **File:** `frontend/src/renderer/src/components/review-map/erd/ErdTableDetail.tsx` (mới) + test; `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (sửa: thêm `KEYS`); `tests/e2e/code-intel-web/lenses.web.e2e.ts` (phần ERD; file do FE-CV-TASK-073-05 tạo)
 **Depends on:** FE-CV-TASK-057-05; FE-CV-SOL-053-impact-lens-and-symbol-detail (`SymbolDetailPanel`, mở symbol/diff); FE-CV-TASK-073-02/073-03 (fake backend + Playwright) cho e2e
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

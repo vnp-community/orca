@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / usecase port, adapter grpcclient. Cùng hợp đồng JSON được `task-service` dùng ở TASK-REQ-029-03.
 **File:** `internal/usecase/ports.go` (sửa `AgentPromptInput`, `AgentPromptResult` do TASK-REQ-008-02 tạo), `internal/adapter/grpcclient/agent_prompt_relay.go` (sửa), `internal/adapter/grpcclient/agent_prompt_params.go` (mới), `internal/adapter/grpcclient/agent_prompt_result.go` (mới), `internal/domain/agent_prompt_errors.go` (mới), và các `_test.go`
 **Depends on:** TASK-REQ-008-02 (tạo `AgentPromptRunner` và adapter), TASK-REQ-033-04 (chọn đường)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -73,11 +73,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Agent cũ nhận đúng JSON như trước khi có task này khi dùng tham số mặc định (golden so với `simple_executor.go` doc comment).
-- [ ] Không có đường mã nào đặt `trustPreset="full"` (test và `grep` trong review).
-- [ ] Route `agent_readonly` không gửi `accessMode` tới agent cũ (kiểm bằng `SelectReadonlyRoute`).
-- [ ] Mọi mã lỗi agent trong bảng được dịch sang lỗi có kiểu, không còn so chuỗi ở use case.
-- [ ] Nonce không xuất hiện trong log hay lỗi.
+- [x] Agent cũ nhận đúng JSON như trước khi có task này khi dùng tham số mặc định (golden so với `simple_executor.go` doc comment).
+- [x] Không có đường mã nào đặt `trustPreset="full"` (test và `grep` trong review).
+- [x] Route `agent_readonly` không gửi `accessMode` tới agent cũ (kiểm bằng `SelectReadonlyRoute`).
+- [x] Mọi mã lỗi agent trong bảng được dịch sang lỗi có kiểu, không còn so chuỗi ở use case.
+- [x] Nonce không xuất hiện trong log hay lỗi.
 
 ## Rủi ro và lưu ý
 

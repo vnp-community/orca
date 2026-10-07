@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_flow_registry.go`, `internal/domain/request_flow_registry_test.go`, `internal/domain/request_flow_errors.go` (mới)
 **Depends on:** TASK-REQ-002-02 (kiểu `RequestType`, `RequestSize`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ Lệnh: `go test ./services/request-service/internal/domain/... -run Flow`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] 11 định nghĩa khớp bảng CR mục 2.1, kiểm bằng test.
-- [ ] Loại lạ trả `REQUEST_FLOW_UNKNOWN_TYPE`.
-- [ ] `PhasesFor` đúng ba luật; size rỗng là không phải L.
-- [ ] Package `domain` vẫn không import adapter hay proto.
+- [x] 11 định nghĩa khớp bảng CR mục 2.1, kiểm bằng test.
+- [x] Loại lạ trả `REQUEST_FLOW_UNKNOWN_TYPE`.
+- [x] `PhasesFor` đúng ba luật; size rỗng là không phải L.
+- [x] Package `domain` vẫn không import adapter hay proto.
 
 ## Rủi ro và lưu ý
 

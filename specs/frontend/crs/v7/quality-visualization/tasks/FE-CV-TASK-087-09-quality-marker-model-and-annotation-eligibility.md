@@ -5,7 +5,7 @@
 **Area:** frontend / pure functions
 **File:** `frontend/src/renderer/src/components/editor/quality-annotations/quality-marker-model.ts`, `quality-annotation-eligibility.ts` (mới) và `*.test.ts`
 **Depends on:** 087-01 (kiểu `QualityFinding`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

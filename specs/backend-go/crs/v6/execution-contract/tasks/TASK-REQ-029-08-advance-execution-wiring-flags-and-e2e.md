@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / usecase (sửa của SOL-013), config, composition root; `task-service` chỉ test hợp đồng
 **File:** `internal/usecase/advance_execution.go` (sửa, tạo ở TASK-REQ-013-05), `internal/usecase/report_task_outcome.go` (sửa, tạo ở TASK-REQ-013-06), `internal/usecase/render_execution_packet.go` (mới), `internal/usecase/readiness_actions.go` (mới), `internal/adapter/secretscan/secretscan_adapter.go` (mới), `internal/config/config.go` (sửa), `cmd/server/main.go` (sửa), `internal/domain/outbox_subjects.go` (sửa), `backend-go/services/request-service/testdata/contract/{task_spec_v2.schema.json,execution_result.schema.json}` (mới), `backend-go/services/task-service/testdata/contract/` (bản sao), `internal/e2e/execution_contract_e2e_test.go` (mới), và các `_test.go`
 **Depends on:** TASK-REQ-029-03, 029-04, 029-05, 029-06, 029-07; TASK-REQ-013-04 (client `TaskService`), 013-05 (`AdvanceExecution`), 013-06 (`ReportTaskOutcome`); CR-REQ-028 (`RequestClarification`); TASK-REQ-006 (`ReturnToBacklog`); TASK-REQ-025-07 (agent giả)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -67,12 +67,12 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cờ tắt: luồng giống hệt SOL-013 gốc (test hồi quy so sánh chuỗi lệnh gọi `TaskClient`).
-- [ ] `needs_info`, `spec_defect`, `env_defect` không tăng số lần thử; `needs_info` sang `awaiting_information` qua `RequestClarification`, không tạo hai Clarification khi lặp.
-- [ ] Task có spec không sang `done` khi `VerifyExecution` `failed`; `request_checks` của task có spec mang `source=orca_verified`.
-- [ ] Không log hay payload sự kiện nào chứa nonce, giá trị biến môi trường, diff, hoặc giá trị bí mật (test quét).
-- [ ] Script so schema và vector digest xanh; `buf lint`/`buf breaking` xanh.
-- [ ] `gitnexus_impact` đã chạy cho `AdvanceExecution` và `ReportTaskOutcome` (do SOL-013 sở hữu) trước khi sửa, và `detect_changes` trước khi commit.
+- [x] Cờ tắt: luồng giống hệt SOL-013 gốc (test hồi quy so sánh chuỗi lệnh gọi `TaskClient`).
+- [x] `needs_info`, `spec_defect`, `env_defect` không tăng số lần thử; `needs_info` sang `awaiting_information` qua `RequestClarification`, không tạo hai Clarification khi lặp.
+- [x] Task có spec không sang `done` khi `VerifyExecution` `failed`; `request_checks` của task có spec mang `source=orca_verified`.
+- [x] Không log hay payload sự kiện nào chứa nonce, giá trị biến môi trường, diff, hoặc giá trị bí mật (test quét).
+- [x] Script so schema và vector digest xanh; `buf lint`/`buf breaking` xanh.
+- [x] `gitnexus_impact` đã chạy cho `AdvanceExecution` và `ReportTaskOutcome` (do SOL-013 sở hữu) trước khi sửa, và `detect_changes` trước khi commit.
 
 ## Rủi ro và lưu ý
 

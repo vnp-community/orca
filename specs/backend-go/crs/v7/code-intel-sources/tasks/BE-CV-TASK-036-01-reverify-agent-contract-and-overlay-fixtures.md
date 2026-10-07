@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/testdata/change-overlay/PROVENANCE.txt` (mới); `testdata/change-overlay/detect-changes-{clean,dirty,untracked,renamed,unborn,drifted,3000-files}.json` (mới); `testdata/change-overlay/impact-{low,high,ambiguous,timeout}.json` (mới)
 **Depends on:** `AG-CV-SOL-070-golden-fixtures-and-parsers` (tệp vàng G1 `testdata/agent-results/*.json`); nếu chưa có, dùng bản tay dựng theo `CONTRACT-codeintel-agent-rpc.md` §4.5, §4.8 và ghi "tự dựng"
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,9 +27,9 @@ Solution 036 dựa vào hình dạng `detectChanges`/`impact` do hợp đồng m
 
 ## Tiêu chí hoàn thành
 
-- [ ] 11 fixture + `PROVENANCE.txt` đủ ca của tiêu chí chấp nhận (§9 solution).
-- [ ] Ghi rõ fixture nào tự dựng.
-- [ ] Chữ ký `Log` đã ghi lại.
+- [x] 11 fixture + `PROVENANCE.txt` đủ ca của tiêu chí chấp nhận (§9 solution).
+- [x] Ghi rõ fixture nào tự dựng.
+- [x] Chữ ký `Log` đã ghi lại.
 
 ## Rủi ro và lưu ý
 

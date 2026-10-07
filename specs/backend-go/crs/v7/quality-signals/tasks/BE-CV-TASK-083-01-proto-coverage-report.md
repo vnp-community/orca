@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_coverage.proto` (mới); dòng `rpc GetCoverage` trong `codeintel_quality_gate.proto` (của SOL-085)
 **Depends on:** BE-CV-TASK-082-01; dòng `rpc` chờ BE-CV-SOL-085 tạo file
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 C-DM §2.1 #20, §3.2. Hình dạng PQ-33. Số field do chủ sở hữu CR gán theo thứ tự khai báo, không đổi. `pct`, `diff_coverage` là `optional double`. `GetCoverageResponse` thêm `reason` (C-UI cần; lệch C-DM).
@@ -19,7 +19,7 @@ C-DM §2.1 #20, §3.2. Hình dạng PQ-33. Số field do chủ sở hữu CR gá
 - `buf lint`/`buf breaking`; test phản chiếu: `estimated` không bắt buộc trường phần trăm (optional).
 
 ## Tiêu chí hoàn thành
-- [ ] Stub biên dịch; không trùng tên.
+- [x] Stub biên dịch; không trùng tên.
 
 ## Rủi ro
 Thứ tự với SOL-085 (SOL-083 Q3).

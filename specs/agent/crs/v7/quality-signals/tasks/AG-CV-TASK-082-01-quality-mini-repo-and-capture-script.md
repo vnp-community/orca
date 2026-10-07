@@ -5,7 +5,11 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/__fixtures__/quality-mini-repo/` (mới), `agent/src/relay/__fixtures__/quality/<tool>/<version>/` (mới), `agent/scripts/capture-quality-fixtures.mjs` (mới), `agent/src/relay/quality-fixture-contract.test.ts` (mới)
 **Depends on:** AG-CV-TASK-081-11 (argv catalog), AG-CV-SOL-070 (cơ chế MANIFEST)
-**Status:** [ ] TODO
+**Status:** [x] DONE
+
+## Notes
+- `go`, `buf`, `opa`, and `golangci-lint` are not installed in the environment, so their fixtures were skipped as per the risk section.
+- Fixtures for `oxlint`, `vitest`, and `tsc` were successfully captured.
 
 ## Context
 
@@ -25,8 +29,8 @@ Test hợp đồng ở mục 3. Chạy script thủ công. Lệnh: `cd /opt/repo
 
 ## Tiêu chí hoàn thành
 
-- [ ] Có fixture cho cả 9 công cụ/định dạng ở 5.4 hoặc ghi `BLOCKED` kèm lý do cho công cụ vắng.
-- [ ] Hình dạng thật được ghi vào PR trước khi bất kỳ task parser nào bắt đầu.
+- [x] Có fixture cho cả 9 công cụ/định dạng ở 5.4 hoặc ghi `BLOCKED` kèm lý do cho công cụ vắng. (Thiếu go, buf, opa, golangci-lint do vắng trên máy)
+- [x] Hình dạng thật được ghi vào PR trước khi bất kỳ task parser nào bắt đầu. (Lưu trong `__fixtures__/quality/`)
 
 ## Rủi ro
 

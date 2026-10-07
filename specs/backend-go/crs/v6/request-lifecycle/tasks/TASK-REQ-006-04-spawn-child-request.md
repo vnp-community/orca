@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/spawn_child_request.go`, `internal/usecase/spawn_child_request_test.go` (mới); `internal/usecase/create_request.go` (sửa: `Parent`); `internal/domain/request_child_rules.go`, `internal/domain/request_child_rules_test.go` (mới)
 **Depends on:** TASK-REQ-006-02, TASK-REQ-004-04 (`CreateWithinTx`), TASK-REQ-002-04/05 (`RequestLinkRepository`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -38,10 +38,10 @@ CR-REQ-006 mục 2.6. Quy tắc cha, con (bảng) nằm ở domain để test kh
 
 ## Tiêu chí hoàn thành
 
-- [ ] Quy tắc cha, con đúng bảng; con đi `classifying` như Request bình thường.
-- [ ] 12 lệnh đồng thời cùng khoá: một con, một link (kiểm tích hợp ở TASK-REQ-006-06).
-- [ ] Giới hạn 50 con và 5 cấp có test.
-- [ ] `CreateRequest` công khai vẫn bỏ qua `type_hint`.
+- [x] Quy tắc cha, con đúng bảng; con đi `classifying` như Request bình thường.
+- [x] 12 lệnh đồng thời cùng khoá: một con, một link (kiểm tích hợp ở TASK-REQ-006-06).
+- [x] Giới hạn 50 con và 5 cấp có test.
+- [x] `CreateRequest` công khai vẫn bỏ qua `type_hint`.
 
 ## Rủi ro và lưu ý
 

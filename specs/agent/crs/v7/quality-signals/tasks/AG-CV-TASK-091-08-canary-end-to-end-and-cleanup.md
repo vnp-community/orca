@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-secret-canary.test.ts` (mở rộng), `quality-run-manager` (kiểm dọn)
 **Depends on:** AG-CV-TASK-091-03, 091-07 (nếu có), AG-CV-TASK-081-06, 081-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,7 +23,7 @@ Lệnh: `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/quality-secr
 
 ## Tiêu chí hoàn thành
 
-- [ ] Canary vắng ở finding, `results` thô, log, payload thông báo, tệp tạm, thông điệp lỗi.
+- [x] Canary vắng ở finding, `results` thô, log, payload thông báo, tệp tạm, thông điệp lỗi.
 
 ## Rủi ro
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-print-mode-exec.ts` (sửa), `agent/src/relay/agent-print-mode-exec.test.ts` (sửa)
 **Depends on:** [04](./AG-REQ-TASK-033-04-wire-readonly-and-workspace-into-handlers.md), [05](./AG-REQ-TASK-033-05-bounded-output-buffer.md), [06](./AG-REQ-TASK-033-06-result-block-parser.md), [07](./AG-REQ-TASK-033-07-worktree-change-snapshot.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -48,11 +48,11 @@ Kiểm với `claude` thật (CHƯA CHẠY): trên dev server, gọi `agent.exec
 
 ## Tiêu chí hoàn thành
 
-- [ ] `parsed` có mặt đúng khi và chỉ khi có `resultBlock`; mã lỗi `RESULT_BLOCK_*` đúng.
-- [ ] `changes` đúng cho thêm, sửa, xoá, commit; `available:false` ngoài repo Git.
-- [ ] `READONLY_VIOLATION` xuất hiện đúng và không đổi `exitCode`.
-- [ ] Handler stream gửi đúng một `stream.end` mang các trường mới, kể cả khi hết giờ.
-- [ ] Kết quả khi không có tham số mới giống hệt trước (test hồi quy).
+- [x] `parsed` có mặt đúng khi và chỉ khi có `resultBlock`; mã lỗi `RESULT_BLOCK_*` đúng.
+- [x] `changes` đúng cho thêm, sửa, xoá, commit; `available:false` ngoài repo Git.
+- [x] `READONLY_VIOLATION` xuất hiện đúng và không đổi `exitCode`.
+- [x] Handler stream gửi đúng một `stream.end` mang các trường mới, kể cả khi hết giờ.
+- [x] Kết quả khi không có tham số mới giống hệt trước (test hồi quy).
 
 ## Rủi ro và lưu ý
 

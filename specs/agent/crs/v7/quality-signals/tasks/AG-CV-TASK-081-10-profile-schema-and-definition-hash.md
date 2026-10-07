@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-profile-schema.ts` (mới), `.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,8 +25,8 @@ Bảng ca hợp lệ/không hợp lệ; token lạ; `{files}` nằm trong chuỗ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca từ chối có thông điệp lỗi rõ; hash xác định.
-- [ ] `display` không lộ đường dẫn ngoài worktree.
+- [x] Mọi ca từ chối có thông điệp lỗi rõ; hash xác định.
+- [x] `display` không lộ đường dẫn ngoài worktree.
 
 ## Rủi ro
 

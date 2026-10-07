@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/usecase/agent_rpc_error_mapping.go` (mới), `.../usecase/relay_by_dev_server.go` (sửa dòng 59–62), `.../usecase/relay.go` (sửa nhánh `INFRA_AGENT_EXEC_FAILED`), `.../adapter/grpc/server.go` (sửa handler `RelayByDevServer` dòng ~660–680 và `Relay`), test cùng thư mục
 **Depends on:** TASK-023-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ PQ-02 chặng 2 và agent contract §3.4. `apperrors.ToGRPCStatus` chỉ gửi `
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hợp đồng agent §3.4 bảng ánh xạ đúng từng dòng.
-- [ ] Trailer ≤ 4 KiB và luôn JSON hợp lệ; thiếu `Data` thì không đặt trailer.
-- [ ] Hành vi method ngoài hai nhóm không đổi.
-- [ ] Không log `Data`/`Message` thô ở mức info.
+- [x] Hợp đồng agent §3.4 bảng ánh xạ đúng từng dòng.
+- [x] Trailer ≤ 4 KiB và luôn JSON hợp lệ; thiếu `Data` thì không đặt trailer.
+- [x] Hành vi method ngoài hai nhóm không đổi.
+- [x] Không log `Data`/`Message` thô ở mức info.
 
 ## Rủi ro và lưu ý
 

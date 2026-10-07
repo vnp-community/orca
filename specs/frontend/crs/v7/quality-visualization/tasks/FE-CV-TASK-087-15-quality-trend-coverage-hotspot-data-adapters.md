@@ -5,7 +5,7 @@
 **Area:** frontend / hooks + pure functions
 **File:** `frontend/src/renderer/src/hooks/useQualityTrend.ts`, `useQualityCoverage.ts`, `useQualityHotspots.ts`, `useQualityDependencyMatrix.ts`; `components/review-map/quality/coverage-percent-normalization.ts`, `quality-trend-series.ts`, `quality-coverage-treemap-items.ts`, `quality-hotspot-rows.ts`, `quality-dependency-graph-reduction.ts` (mới) và `*.test.ts(x)`
 **Depends on:** 087-01, 087-02, FE-CV-TASK-088-04, 088-05; FE-CV-SOL-050-store-and-query-hooks (`useCodeIntelQuery` cho `structure`/`findings`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

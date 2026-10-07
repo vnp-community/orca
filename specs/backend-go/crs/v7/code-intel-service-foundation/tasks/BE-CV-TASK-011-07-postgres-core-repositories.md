@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/postgres/{tenant_settings,repo_binding,review_state,finding_dismissal,c4_override,processed_event}_repository.go` (+ `_integration_test.go`) (mới)
 **Depends on:** BE-CV-TASK-011-02, 011-04, 011-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -32,9 +32,9 @@ Mẫu: `mcp-service/internal/adapter/postgres/repository.go` và `tenant_tx.go`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi phương thức qua `withTenantTx`, có `tenant_id` ở `WHERE`.
-- [ ] CAS và idempotency đúng (xem tiêu chí SOL mục 4).
-- [ ] Sự kiện outbox chỉ tồn tại khi commit.
+- [x] Mọi phương thức qua `withTenantTx`, có `tenant_id` ở `WHERE`.
+- [x] CAS và idempotency đúng (xem tiêu chí SOL mục 4).
+- [x] Sự kiện outbox chỉ tồn tại khi commit.
 
 ## Rủi ro và lưu ý
 

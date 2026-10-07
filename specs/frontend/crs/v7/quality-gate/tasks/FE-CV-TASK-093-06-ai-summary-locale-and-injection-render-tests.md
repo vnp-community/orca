@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/i18n/ai-summary-locale-coverage.test.ts` (mới), `frontend/src/renderer/src/i18n/locales/*.json`
 **Depends on:** FE-CV-TASK-093-03, 093-04
-**Status:** [ ] TODO
+**Status:** [x] DONE — locale và injection render test chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

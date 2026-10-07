@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/create_plan_tree.go` (mới), `internal/usecase/ports.go`, `proto/orca/task/v1/task.proto`, `internal/usecase/create_plan_tree_test.go` (mới), `internal/usecase/fakes_test.go`
 **Depends on:** TASK-REQ-011-01, TASK-REQ-011-03, TASK-REQ-011-07
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -42,11 +42,11 @@ Lệnh: `cd /opt/repos/orca/backend-go && go test ./services/task-service/intern
 
 ## Tiêu chí hoàn thành
 
-- [ ] Một transaction tạo đủ Plan, Phase, task, cạnh `parent_child` và `depends_on`; lỗi giữa chừng không để lại task nào.
-- [ ] Gọi lặp cho cùng `request_id` trả `AlreadyExists=true`, không Plan thứ hai.
-- [ ] Task phụ thuộc task chưa xong là `blocked`; Phase phụ thuộc Phase không `blocked`.
-- [ ] Supersede huỷ Plan cũ và con chưa `done`; có con `in_progress` thì bị từ chối.
-- [ ] Owner grant với `ApplyTree=true` gán sau commit.
+- [x] Một transaction tạo đủ Plan, Phase, task, cạnh `parent_child` và `depends_on`; lỗi giữa chừng không để lại task nào.
+- [x] Gọi lặp cho cùng `request_id` trả `AlreadyExists=true`, không Plan thứ hai.
+- [x] Task phụ thuộc task chưa xong là `blocked`; Phase phụ thuộc Phase không `blocked`.
+- [x] Supersede huỷ Plan cũ và con chưa `done`; có con `in_progress` thì bị từ chối.
+- [x] Owner grant với `ApplyTree=true` gán sau commit.
 
 ## Rủi ro và lưu ý
 

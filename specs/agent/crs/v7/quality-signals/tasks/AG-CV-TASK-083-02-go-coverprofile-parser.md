@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-coverage-go-profile.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-083-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -26,7 +26,7 @@ Fixture task 01 + ca tổng hợp: khối lồng, nhiều dòng, trùng giữa g
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không đường dẫn tuyệt đối trong kết quả; tệp loại trừ không vào mẫu số.
+- [x] Không đường dẫn tuyệt đối trong kết quả; tệp loại trừ không vào mẫu số.
 
 ## Rủi ro
 

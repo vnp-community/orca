@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/proto/orca/task/v1/task.proto`, `internal/usecase/list_execution_states.go` (mới), `internal/usecase/ports.go`, `internal/adapter/grpc/server_execution_states.go` (mới), `internal/usecase/list_execution_states_test.go` (mới), `internal/usecase/fakes_test.go`
 **Depends on:** không (độc lập SOL-011; chỉ đọc dữ liệu có sẵn)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -40,10 +40,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Proto biên dịch, `buf lint` xanh, `buf breaking` không phá.
-- [ ] Hơn 500 id bị `TASK_STATES_TOO_MANY_IDS`.
-- [ ] Use case trả phần tử cho mọi id hợp lệ, kể cả task chưa từng chạy.
-- [ ] Không file nào tên `helpers`, `utils`, `common`, `misc`.
+- [x] Proto biên dịch, `buf lint` xanh, `buf breaking` không phá.
+- [x] Hơn 500 id bị `TASK_STATES_TOO_MANY_IDS`.
+- [x] Use case trả phần tử cho mọi id hợp lệ, kể cả task chưa từng chạy.
+- [x] Không file nào tên `helpers`, `utils`, `common`, `misc`.
 
 ## Rủi ro và lưu ý
 

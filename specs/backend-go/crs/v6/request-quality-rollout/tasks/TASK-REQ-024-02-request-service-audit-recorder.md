@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/audit_action.go` (mới), `.../internal/usecase/audit_recorder.go` (mới), `.../internal/adapter/audit/auth_audit_recorder.go` (mới), các use case của CR-REQ-004 đến 010 (thêm lời gọi), `.../internal/usecase/audit_test.go` (mới)
 **Depends on:** TASK-REQ-024-01; CR-REQ-004, 005, 006, 007, 009, 010 đã có use case; BE-REQ-SOL-025 task cờ (cho `request.flow.set`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi action ở SOL-024 mục 2.8 (trừ `request.jira.sync`) tạo đúng một bản ghi.
-- [ ] Không bản ghi nào chứa `title`, `body`, nội dung Solution.
-- [ ] Lỗi gọi auth-service không làm hỏng use case.
+- [x] Mỗi action ở SOL-024 mục 2.8 (trừ `request.jira.sync`) tạo đúng một bản ghi.
+- [x] Không bản ghi nào chứa `title`, `body`, nội dung Solution.
+- [x] Lỗi gọi auth-service không làm hỏng use case.
 
 ## Rủi ro và lưu ý
 

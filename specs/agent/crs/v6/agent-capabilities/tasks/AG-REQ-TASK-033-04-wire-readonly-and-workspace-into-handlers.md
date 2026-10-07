@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-print-mode-exec.ts` (sửa), `agent/src/relay/agent-print-mode-exec.test.ts` (sửa), `agent/src/relay/agent-readonly-adversarial.e2e.test.ts` (mới, tắt mặc định)
 **Depends on:** [01](./AG-REQ-TASK-033-01-exec-prompt-options-parser.md), [02](./AG-REQ-TASK-033-02-readonly-tool-policy.md), [03](./AG-REQ-TASK-033-03-workspace-validation.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -41,11 +41,11 @@ Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/agent-pr
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tất cả `it` cũ trong `agent-print-mode-exec.test.ts` xanh không sửa.
-- [ ] `accessMode=readonly` luôn thêm đúng `--permission-mode plan` và `--tools Read,Glob,Grep` và không bao giờ cờ YOLO.
-- [ ] Mọi nhánh từ chối (`READONLY_MODE_UNSUPPORTED`, `REPO_ROOT_REQUIRES_READONLY`, `SCRATCH_OUTSIDE_ALLOWED_ROOTS`, `WORKSPACE_*`) không gọi `spawn` và cho một lỗi `InvalidParams` có `data.reason`.
-- [ ] Kết quả có `applied` đúng khi gửi tham số tường minh; vắng khi không gửi.
-- [ ] Test đối kháng thật có mặt, tắt mặc định, ghi rõ chưa chạy.
+- [x] Tất cả `it` cũ trong `agent-print-mode-exec.test.ts` xanh không sửa.
+- [x] `accessMode=readonly` luôn thêm đúng `--permission-mode plan` và `--tools Read,Glob,Grep` và không bao giờ cờ YOLO.
+- [x] Mọi nhánh từ chối (`READONLY_MODE_UNSUPPORTED`, `REPO_ROOT_REQUIRES_READONLY`, `SCRATCH_OUTSIDE_ALLOWED_ROOTS`, `WORKSPACE_*`) không gọi `spawn` và cho một lỗi `InvalidParams` có `data.reason`.
+- [x] Kết quả có `applied` đúng khi gửi tham số tường minh; vắng khi không gửi.
+- [x] Test đối kháng thật có mặt, tắt mặc định, ghi rõ chưa chạy.
 
 ## Rủi ro và lưu ý
 

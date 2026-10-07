@@ -5,7 +5,7 @@
 **Area:** frontend / renderer lib + hooks
 **File:** `frontend/src/renderer/src/components/review-map/entry/open-review-entry.ts`, `useReviewEntryAvailability.ts`, `ReviewEntryButton.tsx` (mới) + test
 **Depends on:** FE-CV-SOL-050-review-tab-wiring (`ensureReviewTab`); FE-CV-SOL-050-store-and-query-hooks (`useCodeIntelSupport`); FE-CV-SOL-051-review-workspace-shell (phạm vi mặc định O7, `setReviewLens`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

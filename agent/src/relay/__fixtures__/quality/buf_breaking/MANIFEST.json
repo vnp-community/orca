@@ -1,0 +1,14 @@
+{
+  "tool": "buf_breaking",
+  "toolVersion": "",
+  "argv": [
+    "breaking",
+    "--against",
+    ".git#branch=main",
+    "--error-format",
+    "json"
+  ],
+  "markers": {},
+  "capturedAt": "2026-10-07T06:14:34.076Z",
+  "sha256": "c3339969218588d122a7ad197552ba2ff50d5afc16ccf844acc1e497c3185475"
+}

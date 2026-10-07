@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / adapter, usecase
 **File:** `internal/adapter/{postgres,mysql}/approval_policy_repository.go` (mới), `approval_approver_repository.go` (mới), `internal/adapter/grpcclient/team_membership_resolver.go` (mới), `internal/usecase/resolve_approver_policy.go` (mới), `authorize_approval_decision.go` (mới), `internal/usecase/open_approval.go` (sửa), `list_pending_approvals_for_user.go` (sửa), `approver_policy_ports.go` (sửa: bỏ cài tạm)
 **Depends on:** TASK-REQ-010-01, TASK-REQ-010-02, TASK-REQ-009-04
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -32,10 +32,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chính sách đổi sau khi mở không đổi người duyệt của Approval `pending`.
-- [ ] `ListPendingForUser` giống nhau trên Postgres và MySQL.
-- [ ] `NO_ELIGIBLE_APPROVER` không tạo dòng `approvals`.
-- [ ] Không còn cài tạm trong đường chạy production.
+- [x] Chính sách đổi sau khi mở không đổi người duyệt của Approval `pending`.
+- [x] `ListPendingForUser` giống nhau trên Postgres và MySQL.
+- [x] `NO_ELIGIBLE_APPROVER` không tạo dòng `approvals`.
+- [x] Không còn cài tạm trong đường chạy production.
 
 ## Rủi ro và lưu ý
 

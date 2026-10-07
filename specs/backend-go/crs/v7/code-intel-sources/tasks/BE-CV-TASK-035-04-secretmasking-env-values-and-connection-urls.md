@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/secretmasking/sensitive_source_paths.go`, `environment_value_policy.go`, `connection_url_masking.go` và `_test.go` (mới)
 **Depends on:** BE-CV-SOL-010
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,10 +29,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca ở bảng và fuzz xanh.
-- [ ] `Decide` không có nhánh nào trả nguyên giá trị cho khoá không thuộc allowlist.
-- [ ] Hai literal thật của `backend-go/docker-compose.yml` (bản fixture CANARY ở TASK-035-01) cho `SecretRef`.
-- [ ] Không phụ thuộc ngoài stdlib.
+- [x] Mọi ca ở bảng và fuzz xanh.
+- [x] `Decide` không có nhánh nào trả nguyên giá trị cho khoá không thuộc allowlist.
+- [x] Hai literal thật của `backend-go/docker-compose.yml` (bản fixture CANARY ở TASK-035-01) cho `SecretRef`.
+- [x] Không phụ thuộc ngoài stdlib.
 
 ## Rủi ro và lưu ý
 

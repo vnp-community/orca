@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/create_request_contract.go` (mới), `internal/adapter/postgres/create_request_integration_test.go`, `internal/adapter/mysql/create_request_integration_test.go` (mới)
 **Depends on:** TASK-REQ-004-06, TASK-REQ-002-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -36,10 +36,10 @@ Các tiêu chí mục 4 của CR-REQ-004 chỉ chứng minh được trên DB th
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi kịch bản xanh với cả hai dialect.
-- [ ] Không có khoá mồ côi, không lỗ hổng số sau lỗi giữa chừng.
-- [ ] Thứ tự hai sự kiện đúng nhờ `seq`.
-- [ ] Tenant A và B không đụng khoá.
+- [x] Mọi kịch bản xanh với cả hai dialect.
+- [x] Không có khoá mồ côi, không lỗ hổng số sau lỗi giữa chừng.
+- [x] Thứ tự hai sự kiện đúng nhờ `seq`.
+- [x] Tenant A và B không đụng khoá.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend / store + review-map
 **File:** `store/slices/review-ui.ts` (mới), `components/review-map/review-scope-model.ts` (mới), `store/index.ts`, `store/types.ts`, `store-test-helpers.ts`, tests
 **Depends on:** FE-CV-TASK-050-10
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

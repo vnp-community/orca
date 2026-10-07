@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/adapter/postgres/tenant_tx.go` (mới/kiểm: do SOL-001 mục 2.D tạo), `.../internal/adapter/postgres/rls_audit_integration_test.go` (mới), `.../internal/adapter/postgres/tenant_isolation_integration_test.go` (mới), `.../internal/adapter/mysql/tenant_scope_test.go` (mới), `.../internal/adapter/mysql/tenant_isolation_integration_test.go` (mới), `.../migrations/postgres/NNNN_rls_hardening.{up,down}.sql` (chỉ khi meta-test phát hiện bảng thiếu `FORCE`/`WITH CHECK`; không có thì không tạo), `backend-go/services/request-service/deploy/` hoặc `deploy/dev` (vai trò `request_app`)
 **Depends on:** BE-REQ-SOL-001 (tx), BE-REQ-SOL-002 (bảng), nên chạy lại mỗi khi CR 004, 006, 007, 009, 010, 031, 034 thêm bảng
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -37,11 +37,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi bảng Postgres schema `request` có `ENABLE` + `FORCE RLS` và `tenant_isolation` với `WITH CHECK` (meta-test).
-- [ ] Test cách ly hai tenant đạt cho mọi bảng trên Postgres (có và không có `set_config`) và MySQL.
-- [ ] Test quét SQL của MySQL đỏ khi thêm câu SQL không có `tenant_id`.
-- [ ] Kết nối kiểm thử bằng vai trò không phải superuser, không `BYPASSRLS` (kiểm thử khẳng định).
-- [ ] Không còn `pool.Query` trực tiếp ngoài outbox.
+- [x] Mọi bảng Postgres schema `request` có `ENABLE` + `FORCE RLS` và `tenant_isolation` với `WITH CHECK` (meta-test).
+- [x] Test cách ly hai tenant đạt cho mọi bảng trên Postgres (có và không có `set_config`) và MySQL.
+- [x] Test quét SQL của MySQL đỏ khi thêm câu SQL không có `tenant_id`.
+- [x] Kết nối kiểm thử bằng vai trò không phải superuser, không `BYPASSRLS` (kiểm thử khẳng định).
+- [x] Không còn `pool.Query` trực tiếp ngoài outbox.
 
 ## Ví dụ tham khảo
 

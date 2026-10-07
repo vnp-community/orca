@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/index_overall.go`, `index_overall_test.go` (mới)
 **Depends on:** BE-CV-TASK-012-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,7 +28,7 @@ Bảng ưu tiên ở SOL-012-index-status mục 2.C (PQ-08: thêm `OVERLAY`; `sc
 
 ## Tiêu chí hoàn thành
 
-- [ ] Toàn bộ bảng có test; thứ tự ưu tiên khoá bằng test.
+- [x] Toàn bộ bảng có test; thứ tự ưu tiên khoá bằng test.
 
 ## Rủi ro và lưu ý
 

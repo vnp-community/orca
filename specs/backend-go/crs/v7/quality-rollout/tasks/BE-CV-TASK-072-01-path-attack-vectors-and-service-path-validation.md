@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/testdata/security/path-attack-vectors.json` (mới), `.../internal/usecase/path_attack_vectors_test.go` (mới), `.../internal/usecase/repo_path_symlink_test.go` (mới)
 **Depends on:** BE-CV-SOL-030 (`RepoSourceReader`, `NormalizeRepoPath`), BE-CV-SOL-012 (`workspace_root` trong `repo_bindings`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -27,8 +27,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi vector cho kết quả đúng; symlink thoát root bị từ chối.
-- [ ] Tệp vector không chứa đường dẫn thật hay secret.
+- [x] Mọi vector cho kết quả đúng; symlink thoát root bị từ chối.
+- [x] Tệp vector không chứa đường dẫn thật hay secret.
 
 ## Rủi ro và lưu ý
 

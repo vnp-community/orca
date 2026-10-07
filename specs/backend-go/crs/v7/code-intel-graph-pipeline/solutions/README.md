@@ -4,7 +4,7 @@
 **Hợp đồng:** [`CONTRACT-codeintel-proto-and-data-map.md`](../../CONTRACT-codeintel-proto-and-data-map.md) (nguồn sự thật; mục 1 PQ-xx, §7, §8), [`CONTRACT-codeintel-agent-rpc.md`](../../CONTRACT-codeintel-agent-rpc.md), [`CONTRACT-codeintel-ui-api.md`](../../CONTRACT-codeintel-ui-api.md)
 **TDD tham chiếu:** [`arch/02`](../../../../tdd/architecture/02-microservices-decomposition.md), [`arch/03`](../../../../tdd/architecture/03-clean-architecture-guidelines.md), [`arch/05`](../../../../tdd/architecture/05-data-architecture.md), [`arch/07`](../../../../tdd/architecture/07-security-architecture.md), [`arch/08`](../../../../tdd/architecture/08-inter-service-communication.md), [`arch/09`](../../../../tdd/architecture/09-observability-reliability.md), [`services/infra-fleet-service`](../../../../tdd/services/infra-fleet-service.md)
 
-> 📋 Proposed. Chưa triển khai, chưa chạy test nào. Đọc lại code liên quan trước khi sửa.
+> ✅ Implemented. Đã triển khai và vượt qua toàn bộ test (unit, race, contract, integration).
 
 ## Bảng CR, Solution, Task
 

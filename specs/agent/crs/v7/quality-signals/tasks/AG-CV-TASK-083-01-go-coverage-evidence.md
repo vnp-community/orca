@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/__fixtures__/coverage-go/` (mới), `agent/scripts/capture-go-coverage-fixtures.mjs` (mới), `agent/src/relay/quality-coverage-fixture-contract.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Lệnh: `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/quality-cove
 
 ## Tiêu chí hoàn thành
 
-- [ ] Fixture có `mode: set` thật và `-func` thật; PR trả lời (c).
-- [ ] Nếu (c) = không có khối cho package không test, cập nhật solution 5.3 và task 04 trước khi viết.
+- [x] Fixture có `mode: set` thật và `-func` thật; PR trả lời (c).
+- [x] Nếu (c) = không có khối cho package không test, cập nhật solution 5.3 và task 04 trước khi viết.
 
 ## Rủi ro
 

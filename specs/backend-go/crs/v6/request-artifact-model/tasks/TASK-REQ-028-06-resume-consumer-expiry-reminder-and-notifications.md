@@ -5,7 +5,7 @@
 **Service:** `request-service` · `notification-service`
 **File:** `request-service/internal/adapter/eventbus/clarification_resume_consumer.go`, `request-service/internal/usecase/resume_after_clarification.go`, `request-service/internal/usecase/expire_clarifications.go`, `request-service/internal/usecase/remind_clarifications.go`, `request-service/internal/usecase/clarification_recipients.go`, `request-service/cmd/server/main.go` (sửa), `notification-service/internal/adapter/eventbus/consumer.go` (sửa), `notification-service/internal/domain/notification_event.go` (sửa) và test
 **Depends on:** TASK-REQ-028-03, 028-05, TASK-REQ-007-05 (`GenerateSolution` với `feedback`), TASK-REQ-013-04 (`AdvanceExecution`), TASK-REQ-010-04, 010-05, 010-06 (mở rộng người nhận, hàng thông báo approval, vòng nhắc), TASK-REQ-006-xx (`ReturnToBacklog`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -72,11 +72,11 @@ CR-REQ-028 mục 2.4 bước 5, 2.7. Ba phần việc nền:
 
 ## Tiêu chí hoàn thành
 
-- [ ] `information_provided` về `analyzing` tạo đúng một run sinh Solution dù sự kiện giao lặp.
-- [ ] Quá hạn: Clarification `expired`, Request `request_backlog` (`missing_info`, stage đúng); `ReturnToBacklog` lỗi thì Clarification vẫn `open`.
-- [ ] Hai instance quét không xử lý trùng.
-- [ ] Thông báo tới đúng người nhận, không chứa nội dung câu hỏi; hai binding và hai luật có test.
-- [ ] Hồi quy: binding và luật approval của TASK-REQ-010-05 không đổi.
+- [x] `information_provided` về `analyzing` tạo đúng một run sinh Solution dù sự kiện giao lặp.
+- [x] Quá hạn: Clarification `expired`, Request `request_backlog` (`missing_info`, stage đúng); `ReturnToBacklog` lỗi thì Clarification vẫn `open`.
+- [x] Hai instance quét không xử lý trùng.
+- [x] Thông báo tới đúng người nhận, không chứa nội dung câu hỏi; hai binding và hai luật có test.
+- [x] Hồi quy: binding và luật approval của TASK-REQ-010-05 không đổi.
 
 ## Rủi ro và lưu ý
 

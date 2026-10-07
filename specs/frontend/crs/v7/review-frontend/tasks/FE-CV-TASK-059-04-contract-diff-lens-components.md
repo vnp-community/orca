@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/contract/{ContractDiffLens,ContractChangeTable,ContractSignatureCell,ContractCompatibilityBadge,ContractChangeDetail,ContractMigrationGroup}.tsx` (mới) + test; `review-lens-registry.ts` (SOL-051, thêm `id:'contract'`)
 **Depends on:** FE-CV-TASK-059-01, 059-03; FE-CV-SOL-051-review-workspace-shell; FE-CV-SOL-053-impact-lens-and-symbol-detail; FE-CV-SOL-057-erd-lens (action ERD)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

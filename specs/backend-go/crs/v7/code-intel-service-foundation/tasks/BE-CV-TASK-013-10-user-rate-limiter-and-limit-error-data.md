@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/user_rate_limiter.go`, `internal/domain/coded_data.go` (nếu 013-07 chưa tạo), `_test.go` (mới)
 **Depends on:** BE-CV-TASK-013-09
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,8 +29,8 @@ SOL-013-gate mục 2.D; PQ-02 (3) hậu tố `" | {json}"` ≤ 2 KiB; UI-API §2
 
 ## Tiêu chí hoàn thành
 
-- [ ] L1 hoạt động và cô lập theo `(tenant,user)`.
-- [ ] Lỗi mang `retryAfterSeconds` tới hậu tố JSON.
+- [x] L1 hoạt động và cô lập theo `(tenant,user)`.
+- [x] Lỗi mang `retryAfterSeconds` tới hậu tố JSON.
 
 ## Rủi ro và lưu ý
 

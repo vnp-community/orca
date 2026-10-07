@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/testdata/sqltenant/README.txt`, `testdata/sqltenant/golden/queries.yaml` (khung, mới); `testdata/sqltenant/go/*.go` (mẫu rút gọn, mới)
 **Depends on:** BE-CV-SOL-031-erd-model-and-access-scan (`tenantScoped`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ Số đo CR (1 214 chuỗi, 466 không có `tenant_id`, 116 trên bảng có c�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Kết luận về use case `folder_workspaces` và `webhook_delivery`.
-- [ ] Khung bộ vàng 100 mục, 20 mục đã gán nhãn.
-- [ ] 20 chuỗi mẫu phủ các dạng trích xuất.
+- [x] Kết luận về use case `folder_workspaces` và `webhook_delivery`.
+- [x] Khung bộ vàng 100 mục, 20 mục đã gán nhãn.
+- [x] 20 chuỗi mẫu phủ các dạng trích xuất.
 
 ## Rủi ro và lưu ý
 

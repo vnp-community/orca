@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/gopackagegraph/package_scan.go`, `import_graph.go`, `port_implementations.go`, `package_doc.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-033-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Solution mục 2.C. Dùng `go/parser` thư viện chuẩn (`ImportsOnly` cho `us
 
 ## Tiêu chí hoàn thành
 
-- [ ] Số `implements` bằng chứng mạnh = số dòng do `grep` độc lập.
-- [ ] Không panic với file hỏng.
+- [x] Số `implements` bằng chứng mạnh = số dòng do `grep` độc lập.
+- [x] Không panic với file hỏng.
 
 ## Rủi ro và lưu ý
 

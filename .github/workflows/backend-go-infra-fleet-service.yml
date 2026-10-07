@@ -21,6 +21,7 @@ on:
   pull_request:
     paths:
       - "backend-go/common/**"
+      - "backend-go/proto/orca/infrafleet/**"
       - "backend-go/services/infra-fleet-service/**"
       - "backend-go/go.work"
       - ".github/workflows/backend-go-infra-fleet-service.yml"
@@ -34,9 +35,23 @@ jobs:
         dialect: [postgres, mysql]
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-go@v5
         with:
           go-version: "1.25"
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.30.0"
+      - name: Buf Lint
+        working-directory: backend-go/proto
+        run: buf lint --path orca/infrafleet
+      - name: Buf Breaking
+        working-directory: backend-go/proto
+        run: |
+          if git cat-file -e origin/main:backend-go/proto/orca/infrafleet/v1/infrafleet.proto 2>/dev/null; then
+            buf breaking --path orca/infrafleet --against '../../.git#branch=origin/main,subdir=backend-go/proto'
+          fi
       - name: Install golang-migrate CLI (${{ matrix.dialect }} driver only)
         run: |
           go install -tags '${{ matrix.dialect }}' github.com/golang-migrate/migrate/v4/cmd/migrate@latest

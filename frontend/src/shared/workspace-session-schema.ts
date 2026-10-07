@@ -98,10 +98,12 @@ const tabContentTypeSchema = z.enum([
   'conflict-review',
   'check-details',
   'browser',
-  'simulator'
+  'simulator',
+  // CR-050: code-intelligence review tab (FE-CV-TASK-050-15)
+  'review'
 ])
 
-const workspaceVisibleTabTypeSchema = z.enum(['terminal', 'editor', 'browser', 'simulator'])
+const workspaceVisibleTabTypeSchema = z.enum(['terminal', 'editor', 'browser', 'simulator', 'review'])
 
 const tabSchema = z.object({
   id: z.string(),

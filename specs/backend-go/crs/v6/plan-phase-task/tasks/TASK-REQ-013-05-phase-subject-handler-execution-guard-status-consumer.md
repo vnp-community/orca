@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/phase_subject_handler.go` (mới), `internal/usecase/execution_guard.go` (mới), `internal/adapter/eventbus/request_status_consumer.go` (mới), `cmd/server/main.go`, `*_test.go` (mới)
 **Depends on:** TASK-REQ-013-04, CR-REQ-009 (`SubjectHandler`), CR-REQ-005 (`ExecutionGuard` port, mặc định `false`), CR-REQ-006 (`ReturnToBacklog`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -37,10 +37,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Phase bị từ chối đưa Request về backlog stage `phase`, `category=rejected`.
-- [ ] `task`, `docs`, `bug` S/M và `hotfix` tự chạy khi vào `executing` mà không cần `StartPhase`; `change_request` không tự chạy.
-- [ ] `ExecutionGuard` chặn khi còn task `in_progress` và chặn khi không hỏi được task-service.
-- [ ] Giao lặp sự kiện không chạy hai lần.
+- [x] Phase bị từ chối đưa Request về backlog stage `phase`, `category=rejected`.
+- [x] `task`, `docs`, `bug` S/M và `hotfix` tự chạy khi vào `executing` mà không cần `StartPhase`; `change_request` không tự chạy.
+- [x] `ExecutionGuard` chặn khi còn task `in_progress` và chặn khi không hỏi được task-service.
+- [x] Giao lặp sự kiện không chạy hai lần.
 
 ## Rủi ro và lưu ý
 

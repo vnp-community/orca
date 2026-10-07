@@ -63,10 +63,10 @@ C1–C5. Thêm: Q4 CR "ai duyệt c4.yaml": không có quy trình duyệt ở MV
 BE: `011-data-model-and-migrations` (bảng T6), `011-repositories-and-maintenance`, `012`, `013-authorization-flags-and-audit`, `030` (seed), `033-c4-component-view` (view cần merge), `040-codeintel-write-and-stream-channels` (`codeIntel.c4.get/save`), `072-security-tests-service-gateway`. FE: `FE-CV-SOL-055-architecture-c4-lens` (soạn/sửa YAML). AG: không.
 
 ## 6. Tiêu chí chấp nhận
-- [ ] `SaveC4Overrides` từ chối: alias, `version≠1`, vượt giới hạn, `container` sai, trường lạ; nhận mẫu CR 2.5; xung đột `expected_version` → `VERSION_CONFLICT`; chỉ owner/admin ghi.
-- [ ] Merge đúng cho `merge`, `paths`, `hide`, `externals`, `relations.add/remove`; id lạ → `C4_UNKNOWN_ID`, view vẫn dựng.
-- [ ] Hai tenant cùng `repo_id`/`container`: không đọc/ghi chéo (Postgres RLS role `NOBYPASSRLS`, MySQL `WHERE tenant_id`).
-- [ ] Test ma trận hai dialect cho CAS và UNIQUE; không secret trong log; không `max-lines` disable.
+- [x] `SaveC4Overrides` từ chối: alias, `version≠1`, vượt giới hạn, `container` sai, trường lạ; nhận mẫu CR 2.5; xung đột `expected_version` → `VERSION_CONFLICT`; chỉ owner/admin ghi.
+- [x] Merge đúng cho `merge`, `paths`, `hide`, `externals`, `relations.add/remove`; id lạ → `C4_UNKNOWN_ID`, view vẫn dựng.
+- [x] Hai tenant cùng `repo_id`/`container`: không đọc/ghi chéo (Postgres RLS role `NOBYPASSRLS`, MySQL `WHERE tenant_id`).
+- [x] Test ma trận hai dialect cho CAS và UNIQUE; không secret trong log; không `max-lines` disable.
 
 ## 7. Kiểm thử, rủi ro, câu hỏi mở
 **Kiểm thử.** Unit validator (YAML độc hại, giới hạn), merge bảng ca; integration `-tags=integration` hai dialect; cô lập tenant; cache miss khi đổi version; `go test ./services/code-intel-service/internal/{domain/c4,usecase,adapter/c4overrides}/...` (chưa chạy).

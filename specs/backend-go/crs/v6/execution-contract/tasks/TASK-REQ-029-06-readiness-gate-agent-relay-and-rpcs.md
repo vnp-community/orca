@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / usecase, adapter grpcclient, proto, grpc handler
 **File:** `internal/usecase/readiness_gate.go` (mới), `internal/usecase/readiness_gate_tiers.go` (mới), `internal/usecase/check_readiness.go` (mới), `internal/usecase/agent_relay_ports.go` (mới), `internal/adapter/grpcclient/agent_relay.go` (mới), `internal/adapter/grpcclient/worktree_resolver.go` (mới), `internal/adapter/grpc/server_readiness.go` (mới), `backend-go/proto/orca/request/v1/request.proto` (sửa), và các `_test.go`
 **Depends on:** TASK-REQ-029-04 (repository báo cáo), TASK-REQ-029-05 (`TaskSpecV2`, `ScopeMatcher`), TASK-REQ-033-04 (`DevServerCapabilityReader`), TASK-REQ-029-02 (`ListExecutionRecords` cho `inputs.from_task`), CR-REQ-028 (`RequestClarification`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -66,11 +66,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Thiếu Check: `spec_defect`; đường dẫn `scope` không tồn tại ngoài `create`: `spec_defect`; thiếu `go` trong hồ sơ: `env_defect`; input chưa có: `needs_info`; đủ điều kiện: `ready`.
-- [ ] Mỗi lần chạy một dòng `task_readiness_reports`; `AdvanceExecution` lặp không tạo hai Clarification (kiểm ở task 08).
-- [ ] Không finding nào chứa giá trị biến môi trường; không log `Env`.
-- [ ] Mọi lệnh qua `agent.exec` có `binary`/`args` tách; không chuỗi shell nối từ dữ liệu người dùng.
-- [ ] Cổng không thực hiện lệnh ghi (kiểm bằng fake chỉ cho danh sách lệnh đọc).
+- [x] Thiếu Check: `spec_defect`; đường dẫn `scope` không tồn tại ngoài `create`: `spec_defect`; thiếu `go` trong hồ sơ: `env_defect`; input chưa có: `needs_info`; đủ điều kiện: `ready`.
+- [x] Mỗi lần chạy một dòng `task_readiness_reports`; `AdvanceExecution` lặp không tạo hai Clarification (kiểm ở task 08).
+- [x] Không finding nào chứa giá trị biến môi trường; không log `Env`.
+- [x] Mọi lệnh qua `agent.exec` có `binary`/`args` tách; không chuỗi shell nối từ dữ liệu người dùng.
+- [x] Cổng không thực hiện lệnh ghi (kiểm bằng fake chỉ cho danh sách lệnh đọc).
 
 ## Rủi ro và lưu ý
 

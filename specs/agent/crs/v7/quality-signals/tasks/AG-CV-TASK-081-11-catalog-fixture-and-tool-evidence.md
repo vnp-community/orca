@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/__fixtures__/quality-catalog/` (mới), `agent/scripts/capture-quality-catalog-evidence.mjs` (mới), `agent/src/relay/quality-profile-catalog-evidence.test.ts` (mới)
 **Depends on:** không (làm trước task 12)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,8 +25,8 @@ Test đọc fixture (không chạy công cụ). Lệnh: `cd /opt/repos/orca/agen
 
 ## Tiêu chí hoàn thành
 
-- [ ] Fixture có phiên bản; mọi cờ catalog được chứng minh trong help hoặc chuyển sang `enabled:false` kèm lý do.
-- [ ] Không công cụ nào chạy ngoài `--help/--version`.
+- [x] Fixture có phiên bản; mọi cờ catalog được chứng minh trong help hoặc chuyển sang `enabled:false` kèm lý do.
+- [x] Không công cụ nào chạy ngoài `--help/--version`.
 
 ## Rủi ro
 

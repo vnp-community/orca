@@ -5,7 +5,7 @@
 **Area:** `agent/` (kiểm chứng; **ghi** vào bản sao, không vào Orca)
 **File:** cập nhật `codeintel-reindex-progress.ts`, fixture `agent/src/relay/codeintel/__fixtures__/reindex/*.txt` (mới)
 **Depends on:** [008](./AG-CV-TASK-004-08-reindex-methods-and-session-cleanup.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Chưa ai chạy `analyze`. Cần chốt: định dạng tiến độ/`%`, thời gian, RAM, `git status` sau analyze, hiệu ứng huỷ giữa chừng, đọc đồng thời.
@@ -21,7 +21,7 @@ Chưa ai chạy `analyze`. Cần chốt: định dạng tiến độ/`%`, thời
 Test progress với fixture thật: `pnpm exec vitest run src/relay/codeintel-reindex-progress.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Kết quả ghi vào PR; mẫu `percent` chốt hoặc ghi "luôn null".
+- [x] Kết quả ghi vào PR; mẫu `percent` chốt hoặc ghi "luôn null".
 
 ## Rủi ro
 - Không chạy trên `/opt/repos/orca` (làm bẩn chỉ mục dùng chung).

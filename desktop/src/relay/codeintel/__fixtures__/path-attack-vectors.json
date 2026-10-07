@@ -1,0 +1,107 @@
+[
+  {
+    "input": "../../etc",
+    "field": "workspaceRoot",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Relative path with dot-dot rejected before expansion"
+  },
+  {
+    "input": "~",
+    "field": "workspaceRoot",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Tilde shorthand rejected as non-absolute"
+  },
+  {
+    "input": "~/.ssh",
+    "field": "workspaceRoot",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Tilde path rejected as non-absolute"
+  },
+  {
+    "input": "/path/with/\u0000/null",
+    "field": "workspaceRoot",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Embedded NUL byte rejected"
+  },
+  {
+    "input": "..",
+    "field": "filePath",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Dot-dot in relative path"
+  },
+  {
+    "input": "../secret.txt",
+    "field": "filePath",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Parent directory traversal"
+  },
+  {
+    "input": "foo\\bar",
+    "field": "filePath",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Backslash in relative path"
+  },
+  {
+    "input": "C:\\Windows",
+    "field": "filePath",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Windows drive path"
+  },
+  {
+    "input": "\\\\server\\share",
+    "field": "filePath",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "UNC network share path"
+  },
+  {
+    "input": "%2e%2e/etc/passwd",
+    "field": "filePath",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "URL-encoded dot-dot traversal"
+  },
+  {
+    "input": "%252e%252e/etc/passwd",
+    "field": "filePath",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Double URL-encoded dot-dot traversal"
+  },
+  {
+    "input": "..%c0%afetc/passwd",
+    "field": "filePath",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Overlong UTF-8 slash traversal"
+  },
+  {
+    "input": "\uFF0E\uFF0E/etc/passwd",
+    "field": "filePath",
+    "expect": "deny",
+    "code": "CODEINTEL_INVALID_PARAMS",
+    "note": "Unicode fullwidth dot traversal"
+  },
+  {
+    "input": "src/index.ts",
+    "field": "filePath",
+    "expect": "allow",
+    "code": "OK",
+    "note": "Valid relative file path"
+  },
+  {
+    "input": "packages/core/src/model.ts",
+    "field": "filePath",
+    "expect": "allow",
+    "code": "OK",
+    "note": "Valid nested relative path"
+  }
+]

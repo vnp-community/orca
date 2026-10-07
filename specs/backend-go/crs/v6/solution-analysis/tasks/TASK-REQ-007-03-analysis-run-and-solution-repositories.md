@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / adapter
 **File:** `internal/adapter/{postgres,mysql}/analysis_run_repository.go` (mới), `solution_repository.go` (mới; hoặc mở rộng nếu CR-REQ-002 đã tạo), `internal/usecase/ports.go` (sửa), và `_integration_test.go`
 **Depends on:** TASK-REQ-007-01, TASK-REQ-007-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -29,10 +29,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Một bộ test chạy với cả hai adapter.
-- [ ] `SKIP LOCKED` hai worker không chiếm trùng ở cả hai DB.
-- [ ] Digest ổn định qua JSONB và JSON.
-- [ ] Không câu SQL nào thiếu `tenant_id`.
+- [x] Một bộ test chạy với cả hai adapter.
+- [x] `SKIP LOCKED` hai worker không chiếm trùng ở cả hai DB.
+- [x] Digest ổn định qua JSONB và JSON.
+- [x] Không câu SQL nào thiếu `tenant_id`.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/NNNN_clarifications_decisions.{up,down}.sql`, `migrations/mysql/NNNN_clarifications_decisions.{up,down}.sql`, `internal/adapter/postgres/schema_contract_test.go` và `internal/adapter/mysql/schema_contract_test.go` (sửa, của TASK-REQ-002-06)
 **Depends on:** TASK-REQ-002-01 (bảng `requests`), TASK-REQ-027-01 (số `NNNN` đi sau `NNNN_request_artifact_model`), TASK-REQ-009-01 (mẫu `pending_key`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -59,11 +59,11 @@ Chỗ khó: đổi CHECK `requests.status` cần **tên** ràng buộc thật. P
 
 ## Tiêu chí hoàn thành
 
-- [ ] `up`/`down`/`up` sạch ở hai dialect, `NNNN` và thứ tự ghi trong PR.
-- [ ] CHECK `status` có đúng 12 giá trị và khớp hằng Go.
-- [ ] Hai Clarification `open` cho một Request bị từ chối ở cả hai DB; Decision sống duy nhất mỗi chủ thể.
-- [ ] `down` chuyển Request `awaiting_information` về `request_backlog` trước khi khôi phục CHECK.
-- [ ] Postgres có RLS thật cho năm bảng.
+- [x] `up`/`down`/`up` sạch ở hai dialect, `NNNN` và thứ tự ghi trong PR.
+- [x] CHECK `status` có đúng 12 giá trị và khớp hằng Go.
+- [x] Hai Clarification `open` cho một Request bị từ chối ở cả hai DB; Decision sống duy nhất mỗi chủ thể.
+- [x] `down` chuyển Request `awaiting_information` về `request_backlog` trước khi khôi phục CHECK.
+- [x] Postgres có RLS thật cho năm bảng.
 
 ## Rủi ro và lưu ý
 

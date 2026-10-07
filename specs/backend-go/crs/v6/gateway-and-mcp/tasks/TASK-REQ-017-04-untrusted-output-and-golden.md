@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/redaction_test.go`, `.../catalog_test.go`, `.../testdata/tools_list.golden.json`, `.../executor_guards_test.go`
 **Depends on:** TASK-REQ-017-01, TASK-REQ-017-02
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bốn đến năm tool đọc mang cờ không tin cậy trong kết quả (test).
-- [ ] Golden khớp; không tool nào ngoài 17.
-- [ ] Lỗi `REQUEST_FLOW_DISABLED` đi qua nguyên mã.
+- [x] Bốn đến năm tool đọc mang cờ không tin cậy trong kết quả (test).
+- [x] Golden khớp; không tool nào ngoài 17.
+- [x] Lỗi `REQUEST_FLOW_DISABLED` đi qua nguyên mã.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/codeintel-bench-runner.ts` + `codeintel-bench-runner.smoke.test.ts` (mới), agent/scripts/bench-codeintel.mjs (mới)
 **Depends on:** 071-03, 071-04, 071-05; AG-CV-SOL-070 task 03 (bộ chạy entry TS)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,12 +25,14 @@ Mọi con số hiệu năng là giả định từ CR-CV-071 (một lần đo, m
 - `smoke`: báo cáo đúng schema, p95 là số, concurrency quan sát ≤ giới hạn
 - Thủ công trên máy bench (CHƯA CHẠY): chạy đủ kịch bản trên Orca; điền số đo đầu tiên vào PR để hiệu chỉnh ngân sách một lần.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Đã chạy:
+`pnpm exec vitest run src/relay/codeintel/codeintel-bench-runner.smoke.test.ts` (1 passed)
+`node scripts/bench-codeintel.mjs --commit test1234 --out /tmp/bench-test-dir` (thành công)
 
 ## Tiêu chí hoàn thành
 
-- [ ] Smoke xanh ở PR; bench chạy được bằng `node scripts/bench-codeintel.mjs`.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Smoke xanh ở PR; bench chạy được bằng `node scripts/bench-codeintel.mjs`.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

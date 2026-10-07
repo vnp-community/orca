@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + i18n
 **File:** `StructureLens.tsx`, `StructureFileDetail.tsx` (mới), `review-lens-registry.ts` (thêm `structure`), `i18n/locales/*.json`, `code-intel-locale-coverage.test.ts`
 **Depends on:** FE-CV-TASK-054-04, 054-05, FE-CV-TASK-053-06, 051-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

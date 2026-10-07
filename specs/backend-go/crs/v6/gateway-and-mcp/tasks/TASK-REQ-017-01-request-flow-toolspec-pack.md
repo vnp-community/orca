@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/pack_request_flow.go` (mới), `.../all_specs.go`, `.../excluded_channels.yaml`, `.../pack_request_flow_test.go` (mới)
 **Depends on:** BE-REQ-SOL-016 (các kênh đã đăng ký: TASK-REQ-016-03, 04, 05)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -38,9 +38,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] 17 tool liệt kê, 3 `Declared`; golden cập nhật có chủ đích trong cùng PR.
-- [ ] Không kênh Request nào vừa có spec vừa có dòng loại trừ.
-- [ ] Input schema không có field định danh (test ở TASK-REQ-017-02).
+- [x] 17 tool liệt kê, 3 `Declared`; golden cập nhật có chủ đích trong cùng PR.
+- [x] Không kênh Request nào vừa có spec vừa có dòng loại trừ.
+- [x] Input schema không có field định danh (test ở TASK-REQ-017-02).
 
 ## Rủi ro và lưu ý
 

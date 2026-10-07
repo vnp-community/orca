@@ -10152,6 +10152,33 @@
             "workspaceGone": "Couldn't open log — workspace is no longer available.",
             "notAuthorized": "Couldn't open log — path not authorized.",
             "alreadyEditable": "Log is already open for editing."
+          },
+          "qualityGateNotice": {
+            "title": {
+              "fail": "品質チェックが失敗しました",
+              "warn": "品質チェックに警告があります",
+              "unknown": "品質ステータスが利用できません"
+            },
+            "stale": "古い情報",
+            "timedOut": "タイムアウト",
+            "unavailable": "品質サービスが利用できません。後でもう一度お試しください。",
+            "reasons": "失敗の理由",
+            "openReason": "レビューで {{check}} の理由を開く",
+            "runChecks": "チェックを実行",
+            "moreReasons": "+{{count}} 件",
+            "reason": {
+              "coverage_below_threshold": "カバレッジ {{observed}}% がしきい値 {{threshold}}% を下回っています",
+              "complexity_exceeded": "{{check}} の複雑度がしきい値を超えています",
+              "duplication_exceeded": "{{check}} の重複率がしきい値を超えています",
+              "security_violations": "{{check}} にセキュリティ違反があります",
+              "reliability_violations": "{{check}} に信頼性の違反があります",
+              "maintainability_violations": "{{check}} に保守性の違反があります",
+              "tech_debt_exceeded": "{{check}} の技術的負債がしきい値を超えています",
+              "hotspot_count_exceeded": "{{check}} のホットスポット数が上限を超えています",
+              "new_violations_found": "{{check}} で新しい違反が見つかりました",
+              "dependency_vulnerabilities": "{{check}} に依存関係の脆弱性があります",
+              "unknown": "{{check}}"
+            }
           }
         }
       },
@@ -12988,6 +13015,39 @@
           "saved": "Jira マッピングを更新しました",
           "saveFailed": "Jira マッピングの更新に失敗しました。"
         }
+      },
+      "request": {
+        "RequestStatus": {
+          "submitted": "送信済み",
+          "classifying": "分類中",
+          "awaiting_type_confirmation": "種別確認待ち",
+          "analyzing": "分析中",
+          "awaiting_analysis_approval": "分析承認待ち",
+          "awaiting_information": "情報待ち",
+          "planning": "計画中",
+          "awaiting_plan_approval": "プラン承認待ち",
+          "executing": "実行中",
+          "completed": "完了",
+          "cancelled": "キャンセル",
+          "request_backlog": "バックログ",
+          "unknown": "不明"
+        },
+        "RequestPage": {
+          "title": "リクエスト",
+          "tab": {
+            "requests": "リクエスト",
+            "approvals": "承認",
+            "backlog": "バックログ"
+          }
+        },
+        "RequestUnsupportedNotice": {
+          "title": "リクエスト管理は非対応です",
+          "body": "接続されたランタイムはリクエストサービスをサポートしていません。"
+        },
+        "SidebarRequestNavButton": {
+          "label": "リクエスト",
+          "badge": "承認待ち"
+        }
       }
     },
     "i18n": {
@@ -13001,6 +13061,29 @@
           "b3d7e0f1a8": "MR",
           "a2c6d9e0f7": "MR",
           "91b5c8d7e6": "GitLab"
+        }
+      }
+    },
+    "features": {
+      "codeIntel": {
+        "indexStatus": {
+          "READY": "準備完了",
+          "INDEXING": "インデックス中",
+          "PARTIAL": "部分インデックス",
+          "ERROR": "インデックスエラー",
+          "UNKNOWN": "不明"
+        },
+        "reviewTab": {
+          "title": "レビュー",
+          "empty": "レビューデータなし",
+          "loading": "レビューを読み込み中...",
+          "error": "レビューの読み込みに失敗"
+        },
+        "settingsState": {
+          "unknown": "読み込み中...",
+          "enabled": "コードインテリジェンス有効",
+          "disabled": "コードインテリジェンス無効",
+          "unsupported": "この環境では非対応"
         }
       }
     }

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/build_contract_catalog.go` (mới), `.../usecase/contract_catalog_descriptor_crosscheck_test.go` (mới), `.../usecase/build_contract_catalog_test.go`
 **Depends on:** BE-CV-TASK-032-04, -05, -06; BE-CV-SOL-022 (snapshot)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,9 +26,9 @@ SOL-032 mục 2.D. Dùng nội bộ bởi 033/034/038.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Descriptor không lệch.
-- [ ] Cache cô lập tenant.
-- [ ] `headCommit`, `stale`, `truncated` có mặt.
+- [x] Descriptor không lệch.
+- [x] Cache cô lập tenant.
+- [x] `headCommit`, `stale`, `truncated` có mặt.
 
 ## Rủi ro và lưu ý
 

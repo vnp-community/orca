@@ -20,7 +20,7 @@ Chưa chạy lại: hình dạng `-j`, `files` phẳng, `affected --stdin`, `EXP
 Chạy lại các test task 01–07 trên fixture mới: `pnpm exec vitest run src/relay/codegraph-cli-output.test.ts src/relay/codeintel-codegraph-methods.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Mục "chưa kiểm chứng" ở solution 7 được cập nhật.
+- [x] Mục "chưa kiểm chứng" ở solution 7 được cập nhật.
 
 ## Rủi ro
 - Không chạy lệnh ghi (`index`, `sync`, `unlock`).

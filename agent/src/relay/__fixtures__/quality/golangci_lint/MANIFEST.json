@@ -1,0 +1,12 @@
+{
+  "tool": "golangci_lint",
+  "toolVersion": "",
+  "argv": [
+    "run",
+    "--out-format",
+    "json"
+  ],
+  "markers": {},
+  "capturedAt": "2026-10-07T06:14:34.062Z",
+  "sha256": "a87c0c6239002d7088fc5304de3c1e36a8b84e2e6846188d3fa44d36c190881e"
+}

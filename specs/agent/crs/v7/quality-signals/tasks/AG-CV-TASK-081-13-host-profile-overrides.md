@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-profile-host-overrides.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-081-10, 081-12
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Thư mục tạm làm `HOME`: tệp 0600 hợp lệ; 0644 bị bỏ qua; `add` t
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không ca nào cho phép đổi argv mà không `replace:true` + lý do.
-- [ ] Windows: bỏ kiểm quyền, ghi chú.
+- [x] Không ca nào cho phép đổi argv mà không `replace:true` + lý do.
+- [x] Windows: bỏ kiểm quyền, ghi chú.
 
 ## Rủi ro
 

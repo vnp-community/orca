@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/pathsafety/worktree_path.go` (mới), `internal/adapter/pathsafety/worktree_path_test.go` (mới), `internal/adapter/mcpserver/tools/sensitive_path_rules.go`, `internal/adapter/mcpserver/tools/sensitive_path_rules_test.go`
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `wscompat` import được `pathsafety`; `pathsafety` không import `tools`/`wscompat`.
-- [ ] Mọi test cũ của `tools` và `resources` xanh không sửa.
-- [ ] Vector độc hại của hợp đồng đều trả `ErrUnsafePath`.
+- [x] `wscompat` import được `pathsafety`; `pathsafety` không import `tools`/`wscompat`.
+- [x] Mọi test cũ của `tools` và `resources` xanh không sửa.
+- [x] Vector độc hại của hợp đồng đều trả `ErrUnsafePath`.
 
 ## Rủi ro và lưu ý
 

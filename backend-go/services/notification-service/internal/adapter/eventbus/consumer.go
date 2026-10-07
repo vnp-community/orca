@@ -72,6 +72,10 @@ var Subjects = []SubjectBinding{
 	// starNag.subscribe's cross-replica visibility push (TASK-014, SOL-005)
 	// — see tenant-service's internal/adapter/eventbus.StarNagVisibilitySubject.
 	{StreamName: "TENANT", Subject: "orca.tenant.star_nag.visibility_changed"},
+	// BE-REQ-SOL-010: request-service approvals
+	// approval.requested is Durable so we don't lose approval gates if notification-service is down.
+	{StreamName: "REQUEST", Subject: "orca.request.approval.requested", Durable: "notification-service-request-approval-requested"},
+	{StreamName: "REQUEST", Subject: "orca.request.approval.decided"},
 }
 
 // Consumer subscribes to every binding in Subjects and forwards each

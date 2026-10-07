@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_status.go` (sửa), `internal/domain/request_trigger.go` (sửa), `internal/domain/request_transition.go` (sửa), `internal/domain/clarification.go`, `internal/domain/clarification_question.go`, `internal/domain/readiness_policy.go`, `internal/domain/question_builder.go`, `internal/domain/decision.go`, `internal/domain/decision_risk.go`, `internal/domain/clarification_errors.go` và test (mới trừ các file sửa)
 **Depends on:** TASK-REQ-003-02 (trigger, `NextStatus`), TASK-REQ-027-05 (`ValidateRequestContent`, `RequiredFields`, `RequestContent`), TASK-REQ-002-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -85,11 +85,11 @@ Toàn bộ là mã thuần, không I/O, để bảng test bao phủ hết. Tên 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ma trận 12 nhân 18 xanh; chỉ các cặp ở bảng CR 2.1 hợp lệ.
-- [ ] `information_provided` chỉ tới `analyzing|planning|executing` qua `NextStatusWithResume`.
-- [ ] Test 003-02 cũ (11 nhân 16) vẫn xanh sau khi cập nhật số liệu, không đổi kỳ vọng của các cặp cũ.
-- [ ] `ApplyAnswers` không bao giờ đoán đường dẫn; `ValidateAnswer` phủ năm kiểu.
-- [ ] Domain không import gói ngoài stdlib, `x/text`, `common/apperrors`.
+- [x] Ma trận 12 nhân 18 xanh; chỉ các cặp ở bảng CR 2.1 hợp lệ.
+- [x] `information_provided` chỉ tới `analyzing|planning|executing` qua `NextStatusWithResume`.
+- [x] Test 003-02 cũ (11 nhân 16) vẫn xanh sau khi cập nhật số liệu, không đổi kỳ vọng của các cặp cũ.
+- [x] `ApplyAnswers` không bao giờ đoán đường dẫn; `ValidateAnswer` phủ năm kiểu.
+- [x] Domain không import gói ngoài stdlib, `x/text`, `common/apperrors`.
 
 ## Rủi ro và lưu ý
 

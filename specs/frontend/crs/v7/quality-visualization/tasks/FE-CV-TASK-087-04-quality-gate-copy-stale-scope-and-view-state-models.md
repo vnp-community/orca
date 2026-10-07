@@ -5,7 +5,7 @@
 **Area:** frontend / pure functions
 **File:** `frontend/src/renderer/src/components/review-map/quality/quality-gate-copy.ts`, `quality-stale-model.ts`, `quality-run-scope-model.ts`, `quality-view-state.ts`, `quality-profile-selection.ts` (mới) và `*.test.ts`
 **Depends on:** 087-01 (kiểu); không cần backend
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

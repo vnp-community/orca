@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase, adapter
 **File:** `internal/usecase/expire_approvals.go` (mới), `remind_pending_approvals.go` (mới), `internal/adapter/{postgres,mysql}/approval_repository.go` (sửa: `ClaimDue`, `ClaimDueForReminder`), `cmd/server/main.go` (sửa: khởi chạy vòng), và `_test.go`
 **Depends on:** TASK-REQ-010-03, TASK-REQ-010-04; CR-REQ-006 (`ReturnToBacklog`) hoặc `TransitionRequest` của CR-REQ-003
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -30,10 +30,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Approval quá hạn thành `expired` trong một chu kỳ quét; Request `request_backlog` với `return_reason="approval_expired"`.
-- [ ] Hai replica không xử lý trùng.
-- [ ] Nhắc gửi đúng một lần ở mốc 75%.
-- [ ] Mọi so sánh thời gian dùng giờ DB.
+- [x] Approval quá hạn thành `expired` trong một chu kỳ quét; Request `request_backlog` với `return_reason="approval_expired"`.
+- [x] Hai replica không xử lý trùng.
+- [x] Nhắc gửi đúng một lần ở mốc 75%.
+- [x] Mọi so sánh thời gian dùng giờ DB.
 
 ## Rủi ro và lưu ý
 

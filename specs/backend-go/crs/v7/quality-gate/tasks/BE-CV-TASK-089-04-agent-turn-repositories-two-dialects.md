@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/adapter/{postgres,mysql}/agent_turn_repository.go` (mới)
 **Depends on:** BE-CV-TASK-089-01, 089-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. `UpsertMerged`: transaction `SELECT … FOR UPDATE` theo khoá duy nhất → `MergeAgentTurn` → `UPDATE … WHERE version=?` hoặc `INSERT`; 23505/1062 ⇒ thử lại một lần.
@@ -18,7 +18,7 @@
 - Integration hai dialect: hai goroutine cùng `clientTurnId`; `base` chain; lô xoá; UTF-8; cách ly tenant.
 
 ## Tiêu chí hoàn thành
-- [ ] một hàng/`clientTurnId`; [ ] `source=both` khi hợp; [ ] guard AST xanh.
+- [x] một hàng/`clientTurnId`; [ ] `source=both` khi hợp; [ ] guard AST xanh.
 
 ## Rủi ro
 - Lượt đến sai thứ tự không sửa `base` của lượt sau (hạn chế đã biết).

@@ -156,14 +156,14 @@ C1–C6 ở mục 1. Thêm: L1 `ERD_MIGRATION_GLOB` → `CODEINTEL_ERD_MIGRATION
 
 ## 6. Tiêu chí chấp nhận
 
-- [ ] `GetErd(infra-fleet-service, postgres)` đủ 20 bảng, mỗi bảng có `tenant_scoped`, RLS đúng, `as_of_migration=0038_…`; `approval_status`, `group_id` (từ `0030`) có mặt.
-- [ ] `logical` từ chú thích: đủ cả hai dialect, mỗi quan hệ trỏ đúng service đích hoặc báo đích chưa xác định; `naming` chỉ khi `include_inferred`.
-- [ ] `accessedBy`: `infra.dev_servers` ở `repository.go` có `op` đúng và `SymbolRef.key` hợp lệ; `provider_registry_entries` (không truy cập) → `[]`.
-- [ ] `DIALECT_DRIFT` đúng cho `mcp-service`.
-- [ ] `base_ref` có → `changes[]` đúng cho một migration mới thêm cột; file migration chưa commit (untracked) có trong `head`.
-- [ ] Không `service` → `services[]`; có `ResultMeta` (`head_commit`, `stale`, `truncated`, `etag`); `if_none_match` khớp → `not_modified` và không `model`.
-- [ ] Hai tenant cùng `repo`, cache/snapshot không chéo; truy vấn snapshot có `tenant_id`.
-- [ ] Không mã nguồn migration trong DB/log; không `helpers/utils/common/misc`; không `max-lines` disable; `buf lint` + `buf breaking` xanh.
+- [x] `GetErd(infra-fleet-service, postgres)` đủ 20 bảng, mỗi bảng có `tenant_scoped`, RLS đúng, `as_of_migration=0038_…`; `approval_status`, `group_id` (từ `0030`) có mặt.
+- [x] `logical` từ chú thích: đủ cả hai dialect, mỗi quan hệ trỏ đúng service đích hoặc báo đích chưa xác định; `naming` chỉ khi `include_inferred`.
+- [x] `accessedBy`: `infra.dev_servers` ở `repository.go` có `op` đúng và `SymbolRef.key` hợp lệ; `provider_registry_entries` (không truy cập) → `[]`.
+- [x] `DIALECT_DRIFT` đúng cho `mcp-service`.
+- [x] `base_ref` có → `changes[]` đúng cho một migration mới thêm cột; file migration chưa commit (untracked) có trong `head`.
+- [x] Không `service` → `services[]`; có `ResultMeta` (`head_commit`, `stale`, `truncated`, `etag`); `if_none_match` khớp → `not_modified` và không `model`.
+- [x] Hai tenant cùng `repo`, cache/snapshot không chéo; truy vấn snapshot có `tenant_id`.
+- [x] Không mã nguồn migration trong DB/log; không `helpers/utils/common/misc`; không `max-lines` disable; `buf lint` + `buf breaking` xanh.
 
 ## 7. Kiểm thử, rủi ro, câu hỏi mở
 

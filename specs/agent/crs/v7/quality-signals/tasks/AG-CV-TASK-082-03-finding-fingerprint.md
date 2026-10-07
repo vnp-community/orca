@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-finding-fingerprint.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-082-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Bảng tính chất: chèn 5 dòng trống phía trên giữ; đổi thụt đ�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi tính chất ở bảng có test; xác định qua nhiều lần chạy.
+- [x] Mọi tính chất ở bảng có test; xác định qua nhiều lần chạy.
 
 ## Rủi ro
 

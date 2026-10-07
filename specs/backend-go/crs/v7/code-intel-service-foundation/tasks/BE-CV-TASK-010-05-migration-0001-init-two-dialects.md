@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/migrations/postgres/0001_init.up.sql`, `0001_init.down.sql` (mới); `migrations/mysql/0001_init.up.sql`, `0001_init.down.sql` (mới)
 **Depends on:** BE-CV-TASK-010-03 (thư mục service)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,9 +31,9 @@ Hợp đồng §4.2 T0 là nguồn cột (`outbox_events`, `processed_events`), 
 
 ## Tiêu chí hoàn thành
 
-- [ ] up/down/up sạch trên Postgres và MySQL.
-- [ ] RLS cách ly tenant bằng SQL trực tiếp (role không superuser).
-- [ ] Chỉ mục unpublished: Postgres từng phần, MySQL composite.
+- [x] up/down/up sạch trên Postgres và MySQL.
+- [x] RLS cách ly tenant bằng SQL trực tiếp (role không superuser).
+- [x] Chỉ mục unpublished: Postgres từng phần, MySQL composite.
 
 ## Rủi ro và lưu ý
 

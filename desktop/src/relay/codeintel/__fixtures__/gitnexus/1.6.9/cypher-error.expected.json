@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "CODEINTEL_TOOL_FAILED",
+    "message": "GitNexus error: syntax error near UNKNOWN"
+  }
+}

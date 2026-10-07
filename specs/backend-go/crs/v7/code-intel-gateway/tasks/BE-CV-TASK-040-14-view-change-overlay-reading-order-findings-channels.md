@@ -29,8 +29,8 @@ UI-API 3.1, 4.3, 4.5: `changeOverlay` `Env<ChangeOverlay>` (`detail:'summary'` c
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh đúng shape UI-API 4.3/4.5.
-- [ ] Mặc định (`scope`, `includeDismissed`) do service áp, gateway không điền.
+- [x] Ba kênh đúng shape UI-API 4.3/4.5.
+- [x] Mặc định (`scope`, `includeDismissed`) do service áp, gateway không điền.
 
 ## Rủi ro và lưu ý
 

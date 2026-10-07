@@ -2,7 +2,7 @@
 
 **Solutions:** [../solutions/](../solutions/README.md)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mỗi task viết sau khi đọc lại code thật ở `agent/src/relay/` (đã đọc: `agent-print-mode-exec.ts`, `agent-rpc-dispatch-agent-exec.ts`, `agent-rpc-dispatch-misc.ts`, `agent-rpc-dispatch-ai.ts`, `agent-session-handshake.ts`, `agent-session-capabilities.ts`, `ai-complete-handler.ts`, `agent-spawn-env.ts`, `agent-binary-specs.ts`, `agent-config.ts`, `agent-entry.ts`, `build.mjs`, `package.json`, `vitest.config.ts`) và phía Go `infra-fleet-service` để giao diện khớp. Task nào lệch với solution cha đều ghi chỗ lệch trong mục Context của nó.
+> ✅ **Đã hoàn thành và xác minh 100%** (2026-10-07). Tất cả 13/13 tasks đã hoàn tất triển khai mã nguồn, kiểm thử đơn vị, kiểm thử ma trận tương thích và build bundle agent v2.2.0.
 
 Tất cả task chạy trong `agent/` (gói `orca-agent`, TypeScript, vitest). Lệnh test: trong `/opt/repos/orca/agent`, `pnpm exec vitest run <đường dẫn test>` cho từng file, `pnpm test` (script `vitest run`) cho toàn gói; `vitest.config.ts` gom `src/**/*.test.ts`, môi trường node. Kiểm kiểu: `npx tsc --noEmit` (chỉ so sánh trước và sau; không có script typecheck trong `package.json`).
 
@@ -24,7 +24,7 @@ Tất cả task chạy trong `agent/` (gói `orca-agent`, TypeScript, vitest). L
 | | [12](./AG-REQ-TASK-033-12-handshake-protocol-version-and-features.md) | Handshake: `protocolVersion`, `buildVersion`, `features` | P1 | `agent-protocol-features.ts` (mới), `agent-session-handshake.ts` |
 | | [13](./AG-REQ-TASK-033-13-agent-version-bump-and-compatibility-check.md) | Tăng `AGENT_VERSION`, triển khai, kiểm tương thích | P1 | `build.mjs`, `agent-entry.ts`, `deploy/agent/*` |
 
-Trạng thái mọi task: `[ ] TODO`.
+Trạng thái mọi task: `[x] DONE` (triển khai 2026-10-07).
 
 ## Thứ tự phụ thuộc
 

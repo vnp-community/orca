@@ -94,16 +94,16 @@ Thứ tự: có check chưa `completed` ⇒ `PENDING`; có `failure|timed_out` �
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] GitHub PR: một lời gọi GraphQL trả ≤ 200 check và `head_sha`; GHE đi REST (httptest).
-- [ ] GitLab: `head_pipeline` + job, `truncated` khi > 200, không annotation.
-- [ ] Bitbucket/Azure DevOps/Gitea ⇒ `capability_unsupported=true`, không lỗi.
-- [ ] 403/429 ⇒ response `limited=true` + `reset_at`, không retry, không gọi thêm.
-- [ ] Check đã `completed` toàn bộ: `overall` đúng bảng F; rỗng ⇒ `UNKNOWN`.
-- [ ] `max_checks` ngoài 1..200, `commit_sha` sai, `repo_slug` có `..` ⇒ `INVALID_ARGUMENT`.
-- [ ] Không chuỗi token, `logTail`, URL có query nhạy cảm trong response/log (test canary).
-- [ ] `tenant_id` khác ctx ⇒ từ chối.
-- [ ] `window.api.gh.prChecks`/`ChecksPanel` không đổi (không file frontend nào bị sửa).
-- [ ] Không `max-lines` disable; tên file không `helpers/utils/common/misc`.
+- [x] GitHub PR: một lời gọi GraphQL trả ≤ 200 check và `head_sha`; GHE đi REST (httptest).
+- [x] GitLab: `head_pipeline` + job, `truncated` khi > 200, không annotation.
+- [x] Bitbucket/Azure DevOps/Gitea ⇒ `capability_unsupported=true`, không lỗi.
+- [x] 403/429 ⇒ response `limited=true` + `reset_at`, không retry, không gọi thêm.
+- [x] Check đã `completed` toàn bộ: `overall` đúng bảng F; rỗng ⇒ `UNKNOWN`.
+- [x] `max_checks` ngoài 1..200, `commit_sha` sai, `repo_slug` có `..` ⇒ `INVALID_ARGUMENT`.
+- [x] Không chuỗi token, `logTail`, URL có query nhạy cảm trong response/log (test canary).
+- [x] `tenant_id` khác ctx ⇒ từ chối.
+- [x] `window.api.gh.prChecks`/`ChecksPanel` không đổi (không file frontend nào bị sửa).
+- [x] Không `max-lines` disable; tên file không `helpers/utils/common/misc`.
 
 ## 5. Kiểm thử (chưa chạy test nào)
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/security-params-and-schema.test.ts` (mới)
 **Depends on:** 072-01; AG-CV-SOL-001, 081
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,12 +24,12 @@ Test viết theo hợp đồng; mã bị test thuộc AG-CV-SOL-001/002/003/004/
 
 - Như mục 2.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/security-params-and-schema.test.ts` (36 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Khoá cấm không xuất hiện trong schema nào; method lạ → đỏ.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Khoá cấm không xuất hiện trong schema nào; method lạ → đỏ.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

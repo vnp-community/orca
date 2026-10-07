@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-tool-resolution.ts`, `quality-environment-preflight.ts` (mới) + test
 **Depends on:** AG-CV-TASK-081-10, 081-12
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,8 +25,8 @@ Bin giả trong PATH tạm; `golangci-lint` giả in `golangci-lint has version 
 
 ## Tiêu chí hoàn thành
 
-- [ ] `missing[].reason` luôn thuộc enum hợp đồng.
-- [ ] Không ghi đĩa ngoài tệp tạm của test.
+- [x] `missing[].reason` luôn thuộc enum hợp đồng.
+- [x] Không ghi đĩa ngoài tệp tạm của test.
 
 ## Rủi ro
 

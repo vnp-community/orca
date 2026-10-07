@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_graph.proto` (sửa), `codeintel.proto` (sửa)
 **Depends on:** BE-CV-TASK-020-03, SOL-010
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,8 @@ Hợp đồng §2.1/§3.1; `selector` là trường 1; chỉ khai báo RPC có m
 
 ## Tiêu chí hoàn thành
 
-- [ ] buf xanh. - [ ] Mọi request có `selector=1`.
+- [x] buf xanh.
+- [x] Mọi request có `selector=1`.
 
 ## Rủi ro và lưu ý
 

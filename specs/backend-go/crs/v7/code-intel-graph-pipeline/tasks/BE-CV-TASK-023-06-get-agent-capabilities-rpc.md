@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` · `proto`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto` (sửa: thêm `rpc` cạnh `IsDevServerConnected`, dòng ~133, và message cạnh dòng ~900–905), stub sinh, `.../internal/usecase/get_agent_capabilities.go` (mới), `.../internal/adapter/grpc/server_code_intel.go` (mới, `WithCodeIntel`, handler), test
 **Depends on:** TASK-023-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ PQ-18: `GetAgentCapabilities` trả `capabilities[]`, `tools[]`, `platform`, `ar
 
 ## Tiêu chí hoàn thành
 
-- [ ] RPC cộng thêm thuần (không đổi message dùng chung `IsDevServerConnected`, `ResolveConnectionResponse`).
-- [ ] Cô lập tenant được test.
-- [ ] `buf breaking` xanh.
+- [x] RPC cộng thêm thuần (không đổi message dùng chung `IsDevServerConnected`, `ResolveConnectionResponse`).
+- [x] Cô lập tenant được test.
+- [x] `buf breaking` xanh.
 
 ## Rủi ro và lưu ý
 

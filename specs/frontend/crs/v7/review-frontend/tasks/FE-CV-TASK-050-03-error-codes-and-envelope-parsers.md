@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/code-intel-errors.ts` (mới), `frontend/src/shared/code-intel-wire-parsers.ts` (mới), tests cùng tên
 **Depends on:** FE-CV-TASK-050-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

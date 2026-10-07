@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/usecase/handle_agent_code_intel_event.go` (sửa), `.../usecase/binding_stream_targets.go` (`QualityRunEventSink`) và test
 **Depends on:** TASK-024-05, BE-CV-TASK-021-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,7 @@ SOL-024 bảng 2.C: tiến trình push trực tiếp; kết thúc job qua outbox
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các ca xanh hai dialect.
+- [x] Các ca xanh hai dialect.
 
 ## Rủi ro và lưu ý
 

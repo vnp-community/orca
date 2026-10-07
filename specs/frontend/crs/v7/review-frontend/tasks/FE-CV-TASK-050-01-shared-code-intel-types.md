@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/code-intel-types.ts` (mới), `frontend/src/shared/code-intel-quality-types.ts` (mới, chỉ khung và chú thích: kiểu §4.7 do FE-CV-SOL-085/087 điền), test `code-intel-types.test.ts`
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

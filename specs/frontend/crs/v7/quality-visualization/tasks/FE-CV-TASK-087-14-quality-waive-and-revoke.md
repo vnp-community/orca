@@ -5,7 +5,7 @@
 **Area:** frontend / components + hook
 **File:** `frontend/src/renderer/src/components/review-map/quality/findings/QualityWaivePopover.tsx`, `quality-waive-expiry-options.ts`; `hooks/useQualityWaive.ts` (mới) và `*.test.ts(x)`
 **Depends on:** 087-12, 087-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

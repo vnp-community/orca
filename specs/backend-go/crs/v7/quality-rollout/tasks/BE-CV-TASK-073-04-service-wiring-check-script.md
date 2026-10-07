@@ -5,7 +5,7 @@
 **Service:** `backend-go/ci`
 **File:** `backend-go/ci/check-code-intel-service-wiring.sh` (mới), `backend-go/ci/check-code-intel-service-wiring_test.sh` (mới), `.github/workflows/backend-go-code-intel-service.yml` (thêm bước)
 **Depends on:** BE-CV-SOL-010 (wiring service, workflow service)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,7 +29,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Script xanh trên cây đã đăng ký đủ; đỏ khi xoá `codeintel` khỏi `migrate.sh`.
+- [x] Script xanh trên cây đã đăng ký đủ; đỏ khi xoá `codeintel` khỏi `migrate.sh`.
 
 ## Rủi ro và lưu ý
 

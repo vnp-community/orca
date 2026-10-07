@@ -110,6 +110,20 @@ function extractTraceFields(method: string, params: Record<string, unknown>): Tr
     }
   }
 
+  if (method.startsWith('codeintel.')) {
+    return {
+      workspaceRoot: truncPath(p['workspaceRoot'])
+    }
+  }
+
+  if (method.startsWith('quality.')) {
+    return {
+      workspaceRoot: truncPath(p['workspaceRoot']),
+      method,
+      profile: str(p['profile'])
+    }
+  }
+
   if (method.startsWith('git.')) {
     return {
       repo: truncPath(p['repoPath'] ?? p['workDir']),
@@ -375,6 +389,18 @@ async function route(
   const fromHiddenTarget = await dispatchHiddenTargetRpc(rpc)
   if (fromHiddenTarget !== null) {
     return fromHiddenTarget
+  }
+
+  const { dispatchCodeIntelRpc } = await import('./agent-rpc-dispatch-codeintel')
+  const fromCodeIntel = await dispatchCodeIntelRpc(rpc, config, log, ws, state)
+  if (fromCodeIntel !== null) {
+    return fromCodeIntel
+  }
+
+  const { dispatchQualityRpc } = await import('./agent-rpc-dispatch-quality')
+  const fromQuality = await dispatchQualityRpc(rpc, config, log, ws, state)
+  if (fromQuality !== null) {
+    return fromQuality
   }
 
   // ── Unknown method ───────────────────────────────────────────────────────

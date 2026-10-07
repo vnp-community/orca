@@ -152,6 +152,7 @@ export async function dispatchAiRpc(
             format: typeof p['format'] === 'string' ? (p['format'] as 'json' | 'text') : 'text',
             taskId: typeof p['taskId'] === 'string' ? p['taskId'] : undefined,
             model: typeof p['model'] === 'string' ? p['model'] : undefined,
+            maxTokens: typeof p['maxTokens'] === 'number' ? p['maxTokens'] : undefined,
             accountId: typeof p['accountId'] === 'string' ? p['accountId'] : undefined,
             resolvedApiKey:
               typeof p['resolvedApiKey'] === 'string' ? p['resolvedApiKey'] : undefined
@@ -162,6 +163,16 @@ export async function dispatchAiRpc(
         return { jsonrpc: '2.0', id: rpc.id, result }
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err)
+        // AICompleteProviderError carries structured error.data for backend retry logic
+        const { AICompleteProviderError } = await import('./ai-complete-handler')
+        if (err instanceof AICompleteProviderError) {
+          return makeError(
+            rpc.id,
+            AgentErrorCode.ServerError,
+            `ai.complete failed: ${msg}`,
+            err.errorData
+          )
+        }
         return makeError(rpc.id, AgentErrorCode.ServerError, `ai.complete failed: ${msg}`)
       }
     }

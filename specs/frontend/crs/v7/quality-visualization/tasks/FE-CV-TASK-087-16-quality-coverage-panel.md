@@ -5,7 +5,7 @@
 **Area:** frontend / components (pha 2)
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityCoveragePanel.tsx` (mới) và `*.test.tsx`; đăng ký khối ở `quality-lens-blocks.ts`
 **Depends on:** 087-15, FE-CV-TASK-088-07, 088-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

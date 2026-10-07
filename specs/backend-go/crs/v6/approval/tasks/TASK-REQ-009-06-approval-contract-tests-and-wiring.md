@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / cmd, test hợp đồng
 **File:** `backend-go/services/request-service/cmd/server/main.go` (sửa), `internal/usecase/approval_subject_handler_contract_test.go` (mới), `internal/adapter/postgres/approval_flow_integration_test.go` (mới), `internal/adapter/mysql/approval_flow_integration_test.go` (mới)
 **Depends on:** TASK-REQ-009-05; CR-REQ-003
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -28,10 +28,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Service không khởi động khi thiếu handler hoặc có Noop mà chưa bật cờ.
-- [ ] `RunSubjectHandlerContract` được các handler của CR 005, 007, 008 gọi (ghi vào checklist của các solution đó).
-- [ ] Không khoá chết ở test đua trên cả hai DB (chạy 50 lần).
-- [ ] Golden payload không chứa `comment`.
+- [x] Service không khởi động khi thiếu handler hoặc có Noop mà chưa bật cờ.
+- [x] `RunSubjectHandlerContract` được các handler của CR 005, 007, 008 gọi (ghi vào checklist của các solution đó).
+- [x] Không khoá chết ở test đua trên cả hai DB (chạy 50 lần).
+- [x] Golden payload không chứa `comment`.
 
 ## Rủi ro và lưu ý
 

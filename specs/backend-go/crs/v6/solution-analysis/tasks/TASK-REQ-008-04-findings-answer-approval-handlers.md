@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase, cmd
 **File:** `internal/usecase/findings_approval_handler.go` (mới), `answer_approval_handler.go` (mới), `solution_approval_handler.go` (sửa: bộ kiểm hợp lệ cho `diagnosis`), `cmd/server/main.go` (sửa: đăng ký), và `_test.go`
 **Depends on:** TASK-REQ-008-03, TASK-REQ-007-06, TASK-REQ-009-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai `subject_type` mới có handler thật; `MustCoverAll` không còn Noop cho chúng.
-- [ ] Tiêu chí 9 và 10 của CR-REQ-008 có test.
-- [ ] Handler chỉ ghi DB của `request-service`.
+- [x] Hai `subject_type` mới có handler thật; `MustCoverAll` không còn Noop cho chúng.
+- [x] Tiêu chí 9 và 10 của CR-REQ-008 có test.
+- [x] Handler chỉ ghi DB của `request-service`.
 
 ## Rủi ro và lưu ý
 

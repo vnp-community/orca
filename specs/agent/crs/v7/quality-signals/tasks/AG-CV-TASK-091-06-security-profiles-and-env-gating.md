@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-security-profiles.ts` (mới), `.test.ts`; catalog qua `registerBuiltinProfiles`; preflight (081-16)
 **Depends on:** AG-CV-TASK-091-03, 091-04, AG-CV-TASK-081-12, 081-16
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Catalog test: 4 id có, qua kiểm token cấm, không `install|curl`; preflight
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không lệnh cài nào; `ENV_NOT_READY` có `missingTools[]`.
+- [x] Không lệnh cài nào; `ENV_NOT_READY` có `missingTools[]`.
 
 ## Rủi ro
 

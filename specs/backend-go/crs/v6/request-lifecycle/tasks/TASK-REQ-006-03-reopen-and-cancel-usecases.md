@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/reopen_request.go`, `internal/usecase/cancel_request.go` và `*_test.go` (mới)
 **Depends on:** TASK-REQ-006-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -34,10 +34,10 @@ CR-REQ-006 mục 2.4, 2.5. `reopen` chuyển `request_backlog` về `classifying
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mở lại: `classifying`, ba cột trả về NULL hoặc rỗng, lịch sử `reopened`, `attempts=0`.
-- [ ] Hủy từ backlog và từ `analyzing` thành công, hủy `completed` bị từ chối, hủy hai lần thành công.
-- [ ] Đang có Task chạy (guard giả `true`): hủy bị chặn.
-- [ ] Không có sự kiện nào ngoài `status_changed` (kiểm bằng danh sách subject trong outbox giả).
+- [x] Mở lại: `classifying`, ba cột trả về NULL hoặc rỗng, lịch sử `reopened`, `attempts=0`.
+- [x] Hủy từ backlog và từ `analyzing` thành công, hủy `completed` bị từ chối, hủy hai lần thành công.
+- [x] Đang có Task chạy (guard giả `true`): hủy bị chặn.
+- [x] Không có sự kiện nào ngoài `status_changed` (kiểm bằng danh sách subject trong outbox giả).
 
 ## Rủi ro và lưu ý
 

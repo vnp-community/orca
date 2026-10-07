@@ -5,7 +5,7 @@
 **Service:** `issue-status-sync`
 **File:** `backend-go/services/issue-status-sync/internal/adapter/grpcclient/request_client.go` (mới), `.../internal/usecase/ports.go`, `.../internal/usecase/sync_issue_status.go`, `.../internal/usecase/request_lookup_retry.go` (mới), `.../internal/usecase/sync_issue_status_test.go`, `.../cmd/server/main.go`
 **Depends on:** TASK-REQ-024-04, TASK-REQ-024-05
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Issue có Request chưa kết thúc: worktree created và PR merge không đổi Jira.
-- [ ] Lỗi tra cứu không gây giao lại vô hạn.
-- [ ] Không có Request: test hồi quy xanh.
+- [x] Issue có Request chưa kết thúc: worktree created và PR merge không đổi Jira.
+- [x] Lỗi tra cứu không gây giao lại vô hạn.
+- [x] Không có Request: test hồi quy xanh.
 
 ## Rủi ro và lưu ý
 

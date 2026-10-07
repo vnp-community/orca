@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/security-repo-resolution.test.ts` (mới)
 **Depends on:** 072-01, 072-05; AG-CV-SOL-001
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,12 +23,12 @@ Test viết theo hợp đồng; mã bị test thuộc AG-CV-SOL-001/002/003/004/
 
 - Như mục 2.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/security-repo-resolution.test.ts` (5 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không dữ liệu repo cha; cảnh báo trùng có mặt; stderr sạch.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Không dữ liệu repo cha; cảnh báo trùng có mặt; stderr sạch.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

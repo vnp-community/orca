@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/domain/{snapshot.go,snapshot_params_hash.go,snapshot_etag.go}` (mới) và test
 **Depends on:** BE-CV-TASK-020-07 (`ViewKind.CacheName`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,7 @@ Khoá, hash, ETag xác định và không rò dữ liệu (SOL-022 2.B).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Xác định và nhạy với đúng các đầu vào nêu. - [ ] Domain không import proto/DB.
+- [x] Xác định và nhạy với đúng các đầu vào nêu. - [x] Domain không import proto/DB.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-dependency-diff-lockfiles.ts` (mới), `.test.ts`
 **Depends on:** AG-CV-TASK-081-14 (base), AG-CV-TASK-082-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Fixture lockfile nhỏ (hai phiên bản nếu cần), `go.mod` mẫu; thêm/b�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Đúng cho mọi ca ở bảng; không gọi mạng/công cụ ngoài.
+- [x] Đúng cho mọi ca ở bảng; không gọi mạng/công cụ ngoài.
 
 ## Rủi ro
 

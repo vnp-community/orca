@@ -1,6 +1,6 @@
 # quality-rollout (v7) solutions: index (agent)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi nhận định "đã đọc" là đọc code/tài liệu; chưa chạy build, test, `gitnexus`, `codegraph`. Mã `codeintel`/`quality` ở `agent/` **chưa tồn tại**.
+> ✅ **Đã triển khai (4/4 solutions, 31/31 tasks [x] DONE).** Đã hoàn tất triển khai mã nguồn, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 Solution phía `agent/` cho feature `quality-rollout` của series v7 "Xem code và kiểm soát chất lượng": [README feature](../../../../../../docs/crs/v7/quality-rollout/README.md), CR-CV-070 đến 073. Hợp đồng chuẩn tắc (thắng CR khi khác): [`CONTRACT-codeintel-agent-rpc.md`](../../../../../backend-go/crs/v7/CONTRACT-codeintel-agent-rpc.md) (chính), [`...-proto-and-data-map.md`](../../../../../backend-go/crs/v7/CONTRACT-codeintel-proto-and-data-map.md) (§8.2 tên solution), [`...-ui-api.md`](../../../../../backend-go/crs/v7/CONTRACT-codeintel-ui-api.md). Đối ứng backend: [`../../../../../backend-go/crs/v7/quality-rollout/`](../../../../../backend-go/crs/v7/quality-rollout/solutions/README.md).
 

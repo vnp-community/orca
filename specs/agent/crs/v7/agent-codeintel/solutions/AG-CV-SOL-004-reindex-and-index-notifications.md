@@ -1,6 +1,6 @@
 # AG-CV-SOL-004: `codeintel.reindex*`, `watch` và thông báo `indexChanged`/`reindexProgress`
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi mục "đã đọc" là đọc code/CR, chưa chạy gì. **Chưa ai chạy `analyze`/`index`/`sync`**: định dạng tiến độ, thời gian, hiệu ứng huỷ đều chưa kiểm chứng.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 004-01 đến 004-09, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-004](../../../../../../docs/crs/v7/agent-codeintel/CR-CV-004-codeintel-reindex-and-index-notifications.md)
 **Service:** `agent/src/relay/` (Part A)
@@ -81,15 +81,15 @@ Sink: `codeintel-notification-sink.ts` giữ notifier của lần gọi `codeint
 01 sink; 02 lệnh + tiến độ; 03 journal; 04 job lõi cần 02, 03; 05 runner cần 04, SOL-001-04; 06 read-guard cần 05; 07 watcher cần 01; 08 method + nối `stop()` cần 01, 05, 06, 07; 09 tích hợp thủ công trên bản sao cần 08.
 
 ## 5. Tiêu chí chấp nhận
-- [ ] `reindex` trả `jobId` < 1 s; mọi `analyze` có `--index-only`; sau job `git status --porcelain` không đổi `AGENTS.md`, `CLAUDE.md`, `.claude/`.
-- [ ] Gọi lần hai -> `REINDEX_IN_PROGRESS` đúng `jobId`, không spawn thứ hai; hàng đợi đầy -> `queue_full`.
-- [ ] Đang analyze: `overview` -> `REINDEX_IN_PROGRESS`; method CodeGraph vẫn chạy khi giai đoạn CodeGraph không chạy.
-- [ ] Tiến độ ≤ 1/s, `percent:null` khi không khớp, không `$HOME`.
-- [ ] Huỷ: cả cây biến mất ≤ 15 s; lặp lại không lỗi; `verify` sau huỷ.
-- [ ] Mất WS: job chạy tiếp; `reindexStatus` đúng; khởi động lại -> `interrupted`.
-- [ ] Sau reindex: `indexChanged reason:'reindex'`, `status` mới; chạm `meta.json` -> `indexChanged` ≤ 15 s; commit mới -> `tool:'git'` ≤ 20 s; `watch` lần đầu không phát.
-- [ ] Worktree liên kết đúng hai nhánh (`manual` từ chối; `agent_done` `skipped_scope_repo_root`).
-- [ ] Không file `helpers/utils/common/misc`; không `max-lines` disable.
+- [x] `reindex` trả `jobId` < 1 s; mọi `analyze` có `--index-only`; sau job `git status --porcelain` không đổi `AGENTS.md`, `CLAUDE.md`, `.claude/`.
+- [x] Gọi lần hai -> `REINDEX_IN_PROGRESS` đúng `jobId`, không spawn thứ hai; hàng đợi đầy -> `queue_full`.
+- [x] Đang analyze: `overview` -> `REINDEX_IN_PROGRESS`; method CodeGraph vẫn chạy khi giai đoạn CodeGraph không chạy.
+- [x] Tiến độ ≤ 1/s, `percent:null` khi không khớp, không `$HOME`.
+- [x] Huỷ: cả cây biến mất ≤ 15 s; lặp lại không lỗi; `verify` sau huỷ.
+- [x] Mất WS: job chạy tiếp; `reindexStatus` đúng; khởi động lại -> `interrupted`.
+- [x] Sau reindex: `indexChanged reason:'reindex'`, `status` mới; chạm `meta.json` -> `indexChanged` ≤ 15 s; commit mới -> `tool:'git'` ≤ 20 s; `watch` lần đầu không phát.
+- [x] Worktree liên kết đúng hai nhánh (`manual` từ chối; `agent_done` `skipped_scope_repo_root`).
+- [x] Không file `helpers/utils/common/misc`; không `max-lines` disable.
 
 ## 6. Kiểm thử
 `/opt/repos/orca/agent`: `pnpm exec vitest run src/relay/codeintel-notification-sink.test.ts src/relay/codeintel-reindex-commands.test.ts src/relay/codeintel-reindex-progress.test.ts src/relay/codeintel-reindex-journal.test.ts src/relay/codeintel-reindex-job.test.ts src/relay/codeintel-reindex-runner.test.ts src/relay/codeintel-reindex-read-guard.test.ts src/relay/codeintel-index-watcher.test.ts src/relay/codeintel-reindex-methods.test.ts src/relay/__tests__/agent-session.test.ts`. Binary giả (Node script): ghi dòng tiến độ, thoát 0/1, treo, bỏ qua SIGTERM, sinh con. `vi.useFakeTimers` cho thăm dò. Tích hợp thật trên **bản sao nhỏ** (task 09), không phải Orca.

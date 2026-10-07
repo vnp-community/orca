@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/backlog_gate.go` (mới), `internal/domain/backlog_page_token.go` (mới), `internal/domain/backlog_gate_test.go`, `backlog_page_token_test.go` (mới)
 **Depends on:** CR-REQ-003 (`FlowFor`, `PhasesFor`, `Size`), CR-REQ-009 (kiểu `Approval`, `subject_type`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -42,10 +42,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi điều kiện README v6 3.8 và bảng solution 2.4 có test.
-- [ ] Hàm không import ngoài stdlib và `common/apperrors`.
-- [ ] `page_token` hỏng trả `ErrBadPageToken`, không panic.
-- [ ] Không file tên `helpers`/`utils`/`common`/`misc`.
+- [x] Mọi điều kiện README v6 3.8 và bảng solution 2.4 có test.
+- [x] Hàm không import ngoài stdlib và `common/apperrors`.
+- [x] `page_token` hỏng trả `ErrBadPageToken`, không panic.
+- [x] Không file tên `helpers`/`utils`/`common`/`misc`.
 
 ## Rủi ro và lưu ý
 

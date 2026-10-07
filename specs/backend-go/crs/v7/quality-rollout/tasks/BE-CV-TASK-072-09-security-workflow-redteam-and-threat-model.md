@@ -5,7 +5,7 @@
 **Service:** `.github/workflows`, `code-intel-service`, `docs`
 **File:** `.github/workflows/code-intel-security.yml` (mới), `backend-go/services/code-intel-service/internal/redteam/redteam_test.go` (mới, chỉ khi CR-041), `docs/guides/code-intel/code-intel-threat-model.md` (mới)
 **Depends on:** BE-CV-TASK-072-01..08, `AG-CV-SOL-072-security-tests-agent`, BE-CV-SOL-041 (P2, tuỳ chọn)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -27,8 +27,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tầng chặn chạy trên PR; tầng live không chặn.
-- [ ] Tài liệu có danh sách rủi ro còn lại.
+- [x] Tầng chặn chạy trên PR; tầng live không chặn.
+- [x] Tài liệu có danh sách rủi ro còn lại.
 
 ## Rủi ro và lưu ý
 

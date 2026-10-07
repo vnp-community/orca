@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/__fixtures__/mini-repo/**` (mới), `agent/src/relay/codeintel/mini-repo-shape.test.ts` (mới)
 **Depends on:** không (làm đầu tiên)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -27,8 +27,8 @@ Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn t
 
 ## Tiêu chí hoàn thành
 
-- [ ] Có đủ ca đối kháng; không đường dẫn tuyệt đối thật; kích thước trong ngân sách.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Có đủ ca đối kháng; không đường dẫn tuyệt đối thật; kích thước trong ngân sách.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

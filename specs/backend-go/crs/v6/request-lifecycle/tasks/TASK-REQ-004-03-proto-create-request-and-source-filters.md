@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `proto/orca/request/v1/request.proto` (sửa), `proto/gen/go/orca/request/v1/*` (sinh lại)
 **Depends on:** TASK-REQ-001-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ TASK-REQ-001-02 khai báo `Request` (trường 1 đến 23) và `ListRequestsReq
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf breaking` xanh.
-- [ ] Số trường đúng như bước 1 đến 4.
-- [ ] Mapper và test cập nhật.
+- [x] `buf breaking` xanh.
+- [x] Số trường đúng như bước 1 đến 4.
+- [x] Mapper và test cập nhật.
 
 ## Rủi ro và lưu ý
 

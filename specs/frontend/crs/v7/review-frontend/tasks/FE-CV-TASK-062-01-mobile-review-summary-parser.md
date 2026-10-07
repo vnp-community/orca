@@ -5,7 +5,7 @@
 **Area:** mobile / session (hàm thuần)
 **File:** `mobile/src/session/mobile-review-summary-rpc.ts` (mới) + `mobile-review-summary-rpc.test.ts`
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

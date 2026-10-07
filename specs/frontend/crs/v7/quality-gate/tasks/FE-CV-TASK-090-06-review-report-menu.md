@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/ReviewReportMenu.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-090-05; FE-CV-SOL-051-review-workspace-shell
-**Status:** [ ] TODO
+**Status:** [x] DONE — `ReviewReportMenu.tsx` chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

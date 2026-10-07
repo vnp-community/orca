@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/shared/review-telemetry-events.ts` (mới) + `.test.ts`; `frontend/src/shared/telemetry-events.ts` (sửa +2 dòng: import và `...reviewEventSchemas`)
 **Depends on:** —
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

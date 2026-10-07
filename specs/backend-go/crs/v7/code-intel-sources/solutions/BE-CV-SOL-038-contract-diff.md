@@ -139,15 +139,15 @@ Thứ tự hợp đồng §7.2: 037 → **038**.
 
 ## 9. Tiêu chí chấp nhận
 
-- [ ] Mỗi quy tắc ở 2.D có cặp fixture (base, head) cho đúng `ruleId`/`compatibility`; xoá field có `reserved` ⇒ `risky`; chỉ đổi comment ⇒ không liệt kê (trừ `FULL`).
-- [ ] `ws.*`: fixture từ `channels_git.go` (`json:"worktree"`→`worktreeId`, xoá `paths`) ⇒ `ws.arg-field-renamed`, `ws.arg-field-removed` `breaking`; `map[string]any` ⇒ `unknown`.
-- [ ] `sql.*` hai dialect; `ADD COLUMN … NOT NULL` không default ⇒ `breaking`, có default ⇒ `compatible`; sửa migration cũ ⇒ `migration.modified-applied`; trùng số ⇒ `number-conflict`; thiếu một dialect ⇒ `dialect-parity` (trừ `mcp-service`).
-- [ ] `TableImpact.accessors` của `DROP COLUMN` đúng hàm và `path:line`.
-- [ ] Không có lời gọi `git.*` trực tiếp; không ký tự bị chặn (cổng giả).
-- [ ] Tệp mới ⇒ `added`, xoá ⇒ `removed`, đổi tên so đúng.
-- [ ] Lỗi một tệp không làm hỏng phần còn lại; `summary` đếm trước cắt; payload ≤ 2 MiB.
-- [ ] Chéo tenant bị từ chối; không trả nguyên tệp.
-- [ ] `buf lint/breaking` xanh; hai dialect xanh; không `max-lines` disable.
+- [x] Mỗi quy tắc ở 2.D có cặp fixture (base, head) cho đúng `ruleId`/`compatibility`; xoá field có `reserved` ⇒ `risky`; chỉ đổi comment ⇒ không liệt kê (trừ `FULL`).
+- [x] `ws.*`: fixture từ `channels_git.go` (`json:"worktree"`→`worktreeId`, xoá `paths`) ⇒ `ws.arg-field-renamed`, `ws.arg-field-removed` `breaking`; `map[string]any` ⇒ `unknown`.
+- [x] `sql.*` hai dialect; `ADD COLUMN … NOT NULL` không default ⇒ `breaking`, có default ⇒ `compatible`; sửa migration cũ ⇒ `migration.modified-applied`; trùng số ⇒ `number-conflict`; thiếu một dialect ⇒ `dialect-parity` (trừ `mcp-service`).
+- [x] `TableImpact.accessors` của `DROP COLUMN` đúng hàm và `path:line`.
+- [x] Không có lời gọi `git.*` trực tiếp; không ký tự bị chặn (cổng giả).
+- [x] Tệp mới ⇒ `added`, xoá ⇒ `removed`, đổi tên so đúng.
+- [x] Lỗi một tệp không làm hỏng phần còn lại; `summary` đếm trước cắt; payload ≤ 2 MiB.
+- [x] Chéo tenant bị từ chối; không trả nguyên tệp.
+- [x] `buf lint/breaking` xanh; hai dialect xanh; không `max-lines` disable.
 
 ## 10. Tham chiếu
 

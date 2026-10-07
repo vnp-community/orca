@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/usecase/head_probe.go` (mới) và test
 **Depends on:** TASK-022-02, BE-CV-TASK-021-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -25,7 +25,7 @@ Hai nguồn độ cũ (SOL-022 2.B); ưu tiên `headCommit` của phong bì (C7)
 
 ## Tiêu chí hoàn thành
 
-- [ ] Nhánh A, B có test. - [ ] `stale` không tự kích hoạt thu thập lại.
+- [x] Nhánh A, B có test. - [x] `stale` không tự kích hoạt thu thập lại.
 
 ## Rủi ro và lưu ý
 

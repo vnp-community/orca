@@ -513,7 +513,9 @@ const TOP_LEVEL_VIEW_LOOKUP: Record<TopLevelView, true> = {
   space: true,
   skills: true,
   mobile: true,
-  workspace: true
+  workspace: true,
+  // CR-REQ-018-05: Request management view
+  requests: true
 }
 const KNOWN_TOP_LEVEL_VIEWS = new Set<string>(Object.keys(TOP_LEVEL_VIEW_LOOKUP))
 

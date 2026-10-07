@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/adapter/{postgres,mysql}/tenant_isolation_integration_test.go` (mới, tag `integration`), `.../internal/adapter/mysql/tenant_where_scan_test.go` (mới), `.../internal/usecase/tenant_isolation_test.go` (mới)
 **Depends on:** BE-CV-SOL-011-*, BE-CV-SOL-022 (cache), BE-CV-SOL-024 (stream), BE-CV-SOL-023, BE-CV-TASK-072-04
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,8 +29,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Xanh trên Postgres và MySQL.
-- [ ] Quét tĩnh bắt được truy vấn thiếu `tenant_id` (thử tay).
+- [x] Xanh trên Postgres và MySQL.
+- [x] Quét tĩnh bắt được truy vấn thiếu `tenant_id` (thử tay).
 
 ## Rủi ro và lưu ý
 

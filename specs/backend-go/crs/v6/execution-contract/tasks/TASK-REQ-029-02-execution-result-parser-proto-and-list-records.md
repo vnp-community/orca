@@ -5,7 +5,7 @@
 **Service/Area:** `task-service` / domain thuần, usecase, proto, adapter grpc
 **File:** `internal/domain/execution_result.go` (mới), `internal/domain/failure_class.go` (mới nếu TASK-REQ-029-01 chưa tạo), `internal/usecase/list_execution_records.go` (mới), `internal/adapter/grpc/server_execution_record.go` (mới), `internal/adapter/grpc/server.go` (sửa), `backend-go/proto/orca/task/v1/task.proto` (sửa), `cmd/server/main.go` (sửa wiring), và các `_test.go`
 **Depends on:** TASK-REQ-029-01 (`ExecutionRecord`, repository)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -81,11 +81,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Khối có nonce sai hoặc không có nonce không bao giờ được chấp nhận; chuỗi BEGIN giả trong nội dung bị bỏ qua.
-- [ ] Mọi giới hạn kích thước của CR mục 2.5 có test biên.
-- [ ] `buf lint` và `buf breaking` xanh với `result_nonce` và RPC mới.
-- [ ] Không import `common` hay adapter trong `internal/domain`.
-- [ ] Hàm phân tích không panic với `stdout` rỗng, nhị phân, hoặc 50 MB (chạy bằng `testing.B`/fuzz ngắn `FuzzFindResultBlock` ít nhất 30 giây cục bộ).
+- [x] Khối có nonce sai hoặc không có nonce không bao giờ được chấp nhận; chuỗi BEGIN giả trong nội dung bị bỏ qua.
+- [x] Mọi giới hạn kích thước của CR mục 2.5 có test biên.
+- [x] `buf lint` và `buf breaking` xanh với `result_nonce` và RPC mới.
+- [x] Không import `common` hay adapter trong `internal/domain`.
+- [x] Hàm phân tích không panic với `stdout` rỗng, nhị phân, hoặc 50 MB (chạy bằng `testing.B`/fuzz ngắn `FuzzFindResultBlock` ít nhất 30 giây cục bộ).
 
 ## Rủi ro và lưu ý
 

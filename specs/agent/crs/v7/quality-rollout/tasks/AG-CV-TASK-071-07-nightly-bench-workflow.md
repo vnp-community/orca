@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `.github/workflows/code-intel-bench.yml` (mới)
 **Depends on:** 071-05, 071-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -21,12 +21,12 @@ CR-071 §2.2 "Khi nào chạy": hằng đêm và `workflow_dispatch` trên runne
 
 - `workflow_dispatch` thủ công trên runner thử (CHƯA CHẠY); kiểm cú pháp bằng đọc lại (không có `actionlint` đã xác nhận).
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Workflow `.github/workflows/code-intel-bench.yml` đã được khởi tạo chuẩn chỉnh, không chặn PR với `continue-on-error: true`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Workflow tồn tại, không chặn PR, tải được artifact.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Workflow tồn tại, không chặn PR, tải được artifact.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/refresh_ci_run.go`, `refresh_ci_run_test.go` (mới)
 **Depends on:** BE-CV-TASK-086-09, 086-10, 086-11, 086-12, BE-CV-SOL-013-agent-call-gate-and-quotas
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 SOL mục 2.D bước 1-8: cờ, quyền, locator, cache theo `quality_runs`, singleflight, hạn mức, breaker, gọi scm, dựng run, ghi, so sánh.
@@ -20,7 +20,7 @@ SOL mục 2.D bước 1-8: cờ, quyền, locator, cache theo `quality_runs`, si
 - Cổng giả + đồng hồ giả: đếm lời gọi scm (cache hit = 0, đồng thời = 1), breaker, TTL, force, provider unsupported, không PR.
 
 ## Tiêu chí hoàn thành
-- [ ] Các tiêu chí mục 4 liên quan use case xanh.
+- [x] Các tiêu chí mục 4 liên quan use case xanh.
 
 ## Rủi ro
 Breaker theo replica.

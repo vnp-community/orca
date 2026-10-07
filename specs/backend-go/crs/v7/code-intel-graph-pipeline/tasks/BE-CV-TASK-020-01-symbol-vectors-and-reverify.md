@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` (test data) · `proto`
 **File:** `backend-go/services/code-intel-service/testdata/symbol-vectors/symbol-key-vectors.json` (mới), `.../testdata/symbol-vectors/README.md` (mới, chỉ mô tả schema vector)
 **Depends on:** BE-CV-SOL-010 (module `code-intel-service` tồn tại; nếu chưa, task này chỉ chuẩn bị file JSON và ghi vào PR)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ Hợp đồng PQ-20 buộc agent và backend dùng **cùng** quy tắc khoá và
 
 ## Tiêu chí hoàn thành
 
-- [ ] Kết quả re-verify (4 lệnh ở việc 1) ghi trong PR.
-- [ ] File vector có đủ ca ở việc 2–3, mỗi ca có `notes` nêu nguồn CR/mục.
-- [ ] Không chứa đường dẫn tuyệt đối thật của người dùng hay secret.
+- [x] Kết quả re-verify (4 lệnh ở việc 1) ghi trong PR.
+- [x] File vector có đủ ca ở việc 2–3, mỗi ca có `notes` nêu nguồn CR/mục.
+- [x] Không chứa đường dẫn tuyệt đối thật của người dùng hay secret.
 
 ## Rủi ro và lưu ý
 

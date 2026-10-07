@@ -1,0 +1,7 @@
+{
+  "ambiguous": true,
+  "candidates": [
+    { "id": "s1", "kind": "Function", "name": "User", "filePath": "internal/domain/user.go" },
+    { "id": "s2", "kind": "Interface", "name": "User", "filePath": "ui/User.ts" }
+  ]
+}

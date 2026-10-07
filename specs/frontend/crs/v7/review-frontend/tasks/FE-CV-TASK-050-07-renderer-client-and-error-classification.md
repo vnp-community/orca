@@ -5,7 +5,7 @@
 **Area:** frontend / renderer runtime
 **File:** `frontend/src/renderer/src/runtime/runtime-code-intel-client.ts` (mới), `runtime/code-intel-error-classification.ts` (mới), tests cùng tên
 **Depends on:** FE-CV-TASK-050-03, FE-CV-TASK-050-04, FE-CV-TASK-050-09
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

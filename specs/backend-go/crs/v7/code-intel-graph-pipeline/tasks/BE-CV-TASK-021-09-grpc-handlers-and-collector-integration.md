@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/adapter/grpc/{server_graph_views.go,server_reindex.go,reindex_proto_mapping.go}` (mới), `.../adapter/infrafleetclient/collector_integration_test.go` (`//go:build integration`)
 **Depends on:** TASK-021-06, 021-07, 021-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,7 +27,7 @@ Handler đi qua pipeline SOL-013; trả `ViewReader` (SOL-022 sẽ bọc).
 
 ## Tiêu chí hoàn thành
 
-- [ ] 8 RPC hoạt động với `ViewReader`. - [ ] Test tích hợp xanh sau SOL-023. - [ ] Không `max-lines` disable.
+- [x] 8 RPC hoạt động với `ViewReader`. - [x] Test tích hợp xanh sau SOL-023. - [x] Không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

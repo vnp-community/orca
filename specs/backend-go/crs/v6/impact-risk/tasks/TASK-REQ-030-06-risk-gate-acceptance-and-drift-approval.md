@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / usecase, tích hợp với Approval (SOL-009) và `AdvanceExecution` (SOL-013)
 **File:** `internal/usecase/risk_gate.go` (mới), `internal/usecase/accept_risk.go` (mới), `internal/usecase/override_risk_gate.go` (mới), `internal/usecase/drift_review_handler.go` (mới), `internal/usecase/plan_risk_preconditions.go` (mới), `internal/domain/risk_gate_rules.go` (mới), `internal/usecase/approval_guard_ports.go` (mới), `internal/domain/outbox_subjects.go` (sửa), và các `_test.go`
 **Depends on:** TASK-REQ-030-05 (bản đánh giá `ready`), TASK-REQ-009-04 (`DecideApproval`, `SubjectHandler`, `UpdatePendingDigest`), TASK-REQ-010-03 (`ApproverPolicy`, `team:<id>`), TASK-REQ-013-05 (`AdvanceExecution`), TASK-REQ-012-03 (`plan_labels.go`), TASK-REQ-014-04 (`pre_deploy`), CR-REQ-024 (`AppendDetailed`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -76,13 +76,13 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `enforce`: `Approve` thiếu `RiskAcceptance` cho phát hiện Cao bị `REQUEST_RISK_ACCEPTANCE_REQUIRED`; đánh giá đổi digest làm chấp nhận cũ mất hiệu lực; `collecting` thì `REQUEST_RISK_ASSESSMENT_PENDING`; người ngoài team thì `REQUEST_RISK_APPROVER_NOT_ALLOWED`.
-- [ ] `shadow`: không chặn gì, không đòi chấp nhận; nhãn "tham khảo" qua `mode` trong dữ liệu trả về.
-- [ ] Plan có Phase Nghiêm trọng bị `REQUEST_PLAN_RISK_TOO_HIGH`.
-- [ ] Lệch vượt `REQUEST_RISK_DRIFT_DELTA` mở Approval `stage=drift_review` và chặn `AdvanceExecution`; `OnRejected` về backlog `phase`.
-- [ ] Override ghi audit và `override_count`; không bỏ luật xác nhận từng phát hiện Cao nếu không nêu `finding_id`.
-- [ ] Sự kiện `risk.accepted` không chứa `rationale`.
-- [ ] `gitnexus_impact` đã chạy cho `DecideApproval`, `AdvanceExecution`, `PlanPreconditions` (thuộc solution khác) và cảnh báo rủi ro nếu HIGH/CRITICAL.
+- [x] `enforce`: `Approve` thiếu `RiskAcceptance` cho phát hiện Cao bị `REQUEST_RISK_ACCEPTANCE_REQUIRED`; đánh giá đổi digest làm chấp nhận cũ mất hiệu lực; `collecting` thì `REQUEST_RISK_ASSESSMENT_PENDING`; người ngoài team thì `REQUEST_RISK_APPROVER_NOT_ALLOWED`.
+- [x] `shadow`: không chặn gì, không đòi chấp nhận; nhãn "tham khảo" qua `mode` trong dữ liệu trả về.
+- [x] Plan có Phase Nghiêm trọng bị `REQUEST_PLAN_RISK_TOO_HIGH`.
+- [x] Lệch vượt `REQUEST_RISK_DRIFT_DELTA` mở Approval `stage=drift_review` và chặn `AdvanceExecution`; `OnRejected` về backlog `phase`.
+- [x] Override ghi audit và `override_count`; không bỏ luật xác nhận từng phát hiện Cao nếu không nêu `finding_id`.
+- [x] Sự kiện `risk.accepted` không chứa `rationale`.
+- [x] `gitnexus_impact` đã chạy cho `DecideApproval`, `AdvanceExecution`, `PlanPreconditions` (thuộc solution khác) và cảnh báo rủi ro nếu HIGH/CRITICAL.
 
 ## Rủi ro và lưu ý
 

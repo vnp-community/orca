@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`, `api-gateway`, `infra-fleet-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/otel/trace_chain_test.go` (mới), `.../internal/adapter/otel/span_attribute_guard.go` (mới, gói test-support đặt theo nội dung), `backend-go/services/code-intel-service/internal/adapter/grpc/otel_wiring.go` (mới), `.../cmd/server/main.go`
 **Depends on:** BE-CV-TASK-071-03, 071-04, 071-05; BE-CV-SOL-010 (dial tới infra-fleet)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,9 +29,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chuỗi trong tiến trình có một `trace_id` và đủ span bốn hop.
-- [ ] Rào thuộc tính chạy trên mọi span.
-- [ ] `main.go` có `StatsHandler` và client handler.
+- [x] Chuỗi trong tiến trình có một `trace_id` và đủ span bốn hop.
+- [x] Rào thuộc tính chạy trên mọi span.
+- [x] `main.go` có `StatsHandler` và client handler.
 
 ## Rủi ro và lưu ý
 

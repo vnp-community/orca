@@ -5,7 +5,7 @@
 **Service:** `docs`
 **File:** `docs/guides/request/README.md`, `creating-and-classifying-requests.md`, `approving-requests.md`, `request-and-task-backlogs.md`, `requests-from-agents-mcp.md`, `admin-enable-request-flow.md`, `runbook-request-flow.md` (đều mới); cập nhật `backend-go/README.md`, `backend-go/services/api-gateway/README.md`, `docs/guides/mcp/README.md`, `docs/guides/jira/jira-orca-mapping.md`, cột "Trạng thái" của các CR v6 khi triển khai
 **Depends on:** TASK-REQ-025-01..06; BE-REQ-SOL-024 (tên metric, alert); BE-REQ-SOL-016, 017
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -32,9 +32,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] 7 tài liệu có đủ, không mô tả tính năng chưa có như đã có.
-- [ ] README các service không ghi "Real" cho RPC `Unimplemented`.
-- [ ] Rollback được diễn tập một lần và ghi vào runbook (hoặc ghi rõ chưa).
+- [x] 7 tài liệu có đủ, không mô tả tính năng chưa có như đã có.
+- [x] README các service không ghi "Real" cho RPC `Unimplemented`.
+- [x] Rollback được diễn tập một lần và ghi vào runbook (hoặc ghi rõ chưa).
 
 ## Rủi ro và lưu ý
 

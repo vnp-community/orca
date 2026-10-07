@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/ports.go`, `internal/adapter/postgres/backlog_requests.go` (mới), `internal/adapter/mysql/backlog_requests.go` (mới), `internal/usecase/list_backlog_requests.go` (mới), `internal/adapter/postgres/backlog_requests_test.go`, `internal/adapter/mysql/backlog_requests_test.go` (mới, tag `integration`)
 **Depends on:** TASK-REQ-015-03 (page token), CR-REQ-002 (`requests`, `request_links`), CR-REQ-006 (`returned_category`, `request_return_history`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -48,10 +48,10 @@ Integration hai dialect, 1.000 Request với `updated_at` trùng nhau ở nhiề
 
 ## Tiêu chí hoàn thành
 
-- [ ] View REQUEST chỉ trả Request `request_backlog`, đúng `updated_at DESC, id DESC`, phân trang ổn định khi có hàng mới chen vào.
-- [ ] `parent_request_ids` đúng với `request_links`; `returned_at` lấy từ lịch sử trả.
-- [ ] Hai dialect cùng kết quả cho cùng dữ liệu.
-- [ ] Không gọi `task-service`.
+- [x] View REQUEST chỉ trả Request `request_backlog`, đúng `updated_at DESC, id DESC`, phân trang ổn định khi có hàng mới chen vào.
+- [x] `parent_request_ids` đúng với `request_links`; `returned_at` lấy từ lịch sử trả.
+- [x] Hai dialect cùng kết quả cho cùng dữ liệu.
+- [x] Không gọi `task-service`.
 
 ## Rủi ro và lưu ý
 

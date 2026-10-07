@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-process-tree-kill.ts` (mới), `.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ POSIX thật: script Node cha spawn 2 con (`sleep`-like Node), bỏ qua SIGTERM 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cây con cháu biến mất ≤ 15 s; hàm idempotent.
-- [ ] Không có `exec` chuỗi/shell.
+- [x] Cây con cháu biến mất ≤ 15 s; hàm idempotent.
+- [x] Không có `exec` chuỗi/shell.
 
 ## Rủi ro
 

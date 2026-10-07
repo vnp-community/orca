@@ -5,7 +5,7 @@
 **Service:** `.github/workflows`, `backend-go/ci`, `tests/code-intel`
 **File:** `.github/workflows/backend-go-code-intel-service.yml` (thêm bước e2e), `.github/workflows/code-intel-e2e.yml` (mới), `backend-go/ci/code-intel-e2e/run-code-intel-e2e.sh` (mới), `tests/code-intel/check_code_intel_flow.py`, `tests/code-intel/check_code_intel_flag.py` (mới)
 **Depends on:** BE-CV-TASK-073-05..07, BE-CV-SOL-010 (workflow service), FE `FE-CV-SOL-073` (T2 chặn PR phía frontend, ngoài task này)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -28,7 +28,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] T1 chặn PR hai dialect; T3 chạy qua `workflow_dispatch`.
+- [x] T1 chặn PR hai dialect; T3 chạy qua `workflow_dispatch`.
 
 ## Rủi ro và lưu ý
 

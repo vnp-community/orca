@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/proto/orca/request/v1/request_check.proto` (mới), `internal/usecase/record_request_check.go` (mới), `internal/domain/request_check_metrics.go` (mới), `internal/adapter/grpc/server_request_check.go` (mới), `internal/usecase/record_request_check_test.go`, `internal/domain/request_check_metrics_test.go` (mới)
 **Depends on:** TASK-REQ-014-01, CR-REQ-003 (trạng thái Request), CR-REQ-010 (quyền)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -40,10 +40,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `RecordRequestCheck` từ chối khi Request ở trạng thái hoặc loại không phù hợp.
-- [ ] Bản ghi mới nhất theo `(request_id, kind)` được đánh dấu có hiệu lực; không có đường sửa/xoá.
-- [ ] Metrics sai định dạng bị `REQUEST_CHECK_INVALID_METRICS`.
-- [ ] `make proto-lint` xanh.
+- [x] `RecordRequestCheck` từ chối khi Request ở trạng thái hoặc loại không phù hợp.
+- [x] Bản ghi mới nhất theo `(request_id, kind)` được đánh dấu có hiệu lực; không có đường sửa/xoá.
+- [x] Metrics sai định dạng bị `REQUEST_CHECK_INVALID_METRICS`.
+- [x] `make proto-lint` xanh.
 
 ## Rủi ro và lưu ý
 

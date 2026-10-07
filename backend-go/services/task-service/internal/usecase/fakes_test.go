@@ -16,6 +16,18 @@ import (
 // specs/backend-go/standards/testing-strategy.md's unit-test section
 // (mirrors usage-service/internal/usecase/record_usage_session_test.go).
 
+type FakeExecutionStateReader struct {
+	MockListExecutionStates func(ctx context.Context, tenantID string, taskIDs []string) ([]domain.ExecutionState, error)
+}
+
+func (f *FakeExecutionStateReader) ListExecutionStates(ctx context.Context, tenantID string, taskIDs []string) ([]domain.ExecutionState, error) {
+	if f.MockListExecutionStates != nil {
+		return f.MockListExecutionStates(ctx, tenantID, taskIDs)
+	}
+	return nil, nil
+}
+
+
 func withIdentity(ctx context.Context, tenantID, userID string) context.Context {
 	ctx = tenant.WithTenantID(ctx, tenantID)
 	return tenant.WithUserID(ctx, userID)

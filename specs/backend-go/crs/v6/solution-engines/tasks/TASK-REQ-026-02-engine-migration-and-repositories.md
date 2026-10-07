@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/NNNN_solution_engines.{up,down}.sql`, `migrations/mysql/NNNN_solution_engines.{up,down}.sql`, `internal/usecase/ports.go` (sửa), `internal/adapter/postgres/{project_engine_settings_repository,openspec_change_repository}.go`, `internal/adapter/mysql/{project_engine_settings_repository,openspec_change_repository}.go` và test (tất cả mới trừ `ports.go`)
 **Depends on:** TASK-REQ-026-01, TASK-REQ-007-01 (bảng `analysis_runs`), TASK-REQ-002-01 (bảng `requests`), TASK-REQ-001-04 (`TxRunner`, executor trong ctx)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -55,11 +55,11 @@ Chỗ khác solution: nếu migration `NNNN_analysis_runs` của TASK-REQ-007-01
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai dialect cùng số `NNNN`, `up` và `down` chạy sạch; PR ghi số đã chọn và lý do (gộp hoặc tách với `analysis_runs`).
-- [ ] CHECK `mode` nhận `agent_proposal` và từ chối giá trị khác ở cả hai DB.
-- [ ] Hai bảng mới có `tenant_id` trong mọi truy vấn; Postgres có RLS thật (test role không bypass).
-- [ ] Bộ test hợp đồng chạy xanh cho cả hai adapter bằng cùng một kịch bản.
-- [ ] `requests.solution_engine` đọc ghi qua `RequestRepository` và không đổi kết quả test cũ của TASK-REQ-002-06.
+- [x] Hai dialect cùng số `NNNN`, `up` và `down` chạy sạch; PR ghi số đã chọn và lý do (gộp hoặc tách với `analysis_runs`).
+- [x] CHECK `mode` nhận `agent_proposal` và từ chối giá trị khác ở cả hai DB.
+- [x] Hai bảng mới có `tenant_id` trong mọi truy vấn; Postgres có RLS thật (test role không bypass).
+- [x] Bộ test hợp đồng chạy xanh cho cả hai adapter bằng cùng một kịch bản.
+- [x] `requests.solution_engine` đọc ghi qua `RequestRepository` và không đổi kết quả test cũ của TASK-REQ-002-06.
 
 ## Rủi ro và lưu ý
 

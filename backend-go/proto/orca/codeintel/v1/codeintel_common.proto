@@ -1,0 +1,203 @@
+// Common types and enums for code intelligence - CR-CV-020 / BE-CV-TASK-020-02.
+// Owned by CR-CV-020, append-only. ViewKind 11+ covers graph_snapshots.view table.
+syntax = "proto3";
+
+package orca.codeintel.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/codeintel/v1;codeintelv1";
+
+import "google/protobuf/timestamp.proto";
+
+enum SymbolKind {
+  SYMBOL_KIND_UNSPECIFIED = 0;
+  SYMBOL_KIND_FUNCTION = 1;
+  SYMBOL_KIND_METHOD = 2;
+  SYMBOL_KIND_TYPE = 3;
+  SYMBOL_KIND_VALUE = 4;
+  SYMBOL_KIND_FILE = 5;
+  SYMBOL_KIND_FOLDER = 6;
+  SYMBOL_KIND_ROUTE = 7;
+  SYMBOL_KIND_COMPONENT = 8;
+  SYMBOL_KIND_NAMESPACE = 9;
+  SYMBOL_KIND_IMPORT = 10;
+  SYMBOL_KIND_CLUSTER = 11;
+  SYMBOL_KIND_FLOW = 12;
+  SYMBOL_KIND_DOC = 13;
+}
+
+enum EdgeKind {
+  EDGE_KIND_UNSPECIFIED = 0;
+  EDGE_KIND_CALLS = 1;
+  EDGE_KIND_IMPORTS = 2;
+  EDGE_KIND_ACCESSES = 3;
+  EDGE_KIND_EXTENDS = 4;
+  EDGE_KIND_IMPLEMENTS = 5;
+  EDGE_KIND_METHOD_OVERRIDES = 6;
+  EDGE_KIND_METHOD_IMPLEMENTS = 7;
+  EDGE_KIND_HAS_METHOD = 8;
+  EDGE_KIND_HAS_PROPERTY = 9;
+  EDGE_KIND_REFERENCES = 10;
+  EDGE_KIND_INSTANTIATES = 11;
+  EDGE_KIND_CONTAINS = 12;
+  EDGE_KIND_HANDLES_ROUTE = 13;
+  EDGE_KIND_FETCHES = 14;
+}
+
+enum ToolName {
+  TOOL_NAME_UNSPECIFIED = 0;
+  TOOL_NAME_GITNEXUS = 1;
+  TOOL_NAME_CODEGRAPH = 2;
+}
+
+enum IndexState {
+  INDEX_STATE_UNSPECIFIED = 0;
+  INDEX_STATE_MISSING = 1;
+  INDEX_STATE_BUILDING = 2;
+  INDEX_STATE_READY = 3;
+  INDEX_STATE_STALE = 4;
+  INDEX_STATE_UNKNOWN = 5;
+}
+
+enum IndexScope {
+  INDEX_SCOPE_UNSPECIFIED = 0;
+  INDEX_SCOPE_EXACT = 1;
+  INDEX_SCOPE_REPO_ROOT = 2;
+  INDEX_SCOPE_STALE = 3;
+  INDEX_SCOPE_NONE = 4;
+}
+
+enum Freshness {
+  FRESHNESS_UNSPECIFIED = 0;
+  FRESHNESS_FRESH = 1;
+  FRESHNESS_FRESH_BASE = 2;
+  FRESHNESS_STALE = 3;
+  FRESHNESS_UNKNOWN = 4;
+}
+
+enum Risk {
+  RISK_UNSPECIFIED = 0;
+  RISK_LOW = 1;
+  RISK_MEDIUM = 2;
+  RISK_HIGH = 3;
+  RISK_CRITICAL = 4;
+  RISK_UNKNOWN = 5;
+}
+
+enum ViewKind {
+  VIEW_KIND_UNSPECIFIED = 0;
+  VIEW_KIND_STRUCTURE = 1;
+  VIEW_KIND_ARCHITECTURE = 2;
+  VIEW_KIND_FLOWS = 3;
+  VIEW_KIND_FLOW = 4;
+  VIEW_KIND_SUBGRAPH = 5;
+  VIEW_KIND_IMPACT = 6;
+  VIEW_KIND_SYMBOL = 7;
+  VIEW_KIND_ROUTES = 8;
+  VIEW_KIND_CHANGE_OVERLAY = 9;
+  VIEW_KIND_STATUS = 10;
+  VIEW_KIND_CLUSTERS = 11;
+  VIEW_KIND_READING_ORDER = 12;
+  VIEW_KIND_ERD = 13;
+  VIEW_KIND_STORAGE = 14;
+  VIEW_KIND_DATAFLOWS = 15;
+  VIEW_KIND_DATAFLOW = 16;
+  VIEW_KIND_FINDINGS = 17;
+  VIEW_KIND_CONTRACT_DIFF = 18;
+  VIEW_KIND_CONTRACT_CATALOG = 19;
+  VIEW_KIND_REQUIREMENT_TRACE = 20;
+  VIEW_KIND_AI_SUMMARY = 21;
+}
+
+message WorktreeSelector {
+  string project_id = 1;
+  string worktree_ref = 2;
+}
+
+message SymbolRef {
+  string key = 1;
+  SymbolKind kind = 2;
+  string native_kind = 3;
+  string name = 4;
+  string qualified_name = 5;
+  string file_path = 6;
+  int32 start_line = 7;
+  int32 end_line = 8;
+  string gitnexus_id = 9;
+  string codegraph_id = 10;
+  string language = 11;
+}
+
+message SourceInfo {
+  ToolName tool = 1;
+  string version = 2;
+  string indexed_at = 3;
+  string commit = 4;
+  int32 line_base = 5;
+}
+
+message SourceRef {
+  string path = 1;
+  int32 line = 2;
+  string kind = 3;
+}
+
+message ServiceRef {
+  string name = 1;
+  string proto_service = 2;
+}
+
+message ClusterRef {
+  string id = 1;
+  string label = 2;
+}
+
+message ResultMeta {
+  string repo = 1;
+  string worktree_id = 2;
+  string dev_server_id = 3;
+  ViewKind view = 4;
+  repeated SourceInfo sources = 5;
+  string head_commit = 6;
+  bool stale = 7;
+  bool truncated = 8;
+  int64 total_count = 9;
+  string etag = 10;
+  google.protobuf.Timestamp generated_at = 11;
+  bool from_cache = 12;
+  bool not_modified = 13;
+}
+
+message IndexStats {
+  int32 files = 1;
+  int32 nodes = 2;
+  int32 edges = 3;
+  int32 communities = 4;
+  int32 processes = 5;
+}
+
+message PendingChanges {
+  int32 added = 1;
+  int32 modified = 2;
+  int32 removed = 3;
+}
+
+message ToolIndexStatus {
+  ToolName tool = 1;
+  string version = 2;
+  string repo = 3;
+  IndexState state = 4;
+  string indexed_commit = 5;
+  string head_commit = 6;
+  string indexed_at = 7;
+  IndexStats stats = 8;
+  PendingChanges pending_changes = 9;
+  repeated string languages = 10;
+  bool available = 11;
+  bool supported = 12;
+  string merge_base = 13;
+  IndexScope index_scope = 14;
+  Freshness freshness = 15;
+  bool dirty_since_index = 16;
+  int32 changed_files_not_in_index = 17;
+  repeated string indicators = 18;
+}

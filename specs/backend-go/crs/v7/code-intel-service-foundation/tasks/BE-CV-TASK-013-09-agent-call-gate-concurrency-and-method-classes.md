@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/agent_call_gate.go`, `internal/domain/agent_method_class.go`, `internal/adapter/callgate/token_bucket_gate.go` và `_test.go` (mới); `internal/config/config_limits.go` (mới)
 **Depends on:** BE-CV-TASK-010-02, 010-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ SOL-013-gate mục 2.A–2.B. Mẫu limiter: `api-gateway/internal/usecase/rate_
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không rò khe (test đếm); `-race` sạch.
-- [ ] Mọi method hợp đồng có lớp.
+- [x] Không rò khe (test đếm); `-race` sạch.
+- [x] Mọi method hợp đồng có lớp.
 
 ## Rủi ro và lưu ý
 

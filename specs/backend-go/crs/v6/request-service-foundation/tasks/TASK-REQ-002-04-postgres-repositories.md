@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/postgres/{request_repository.go,request_counter.go,request_type_history_repository.go,solution_repository.go,request_link_repository.go,request_idempotency_repository.go,request_scan.go}` (mới)
 **Depends on:** TASK-REQ-002-01, TASK-REQ-002-02, TASK-REQ-002-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -39,10 +39,10 @@ Lệnh: `go test -tags=integration ./services/request-service/internal/adapter/p
 
 ## Tiêu chí hoàn thành
 
-- [ ] Năm cổng được cài đặt, assert biên dịch.
-- [ ] Mọi truy vấn có `tenant_id` ở `WHERE`.
-- [ ] CAS phân biệt `NOT_FOUND` với `VERSION_CONFLICT`.
-- [ ] Bộ kịch bản dùng chung xanh với Postgres.
+- [x] Năm cổng được cài đặt, assert biên dịch.
+- [x] Mọi truy vấn có `tenant_id` ở `WHERE`.
+- [x] CAS phân biệt `NOT_FOUND` với `VERSION_CONFLICT`.
+- [x] Bộ kịch bản dùng chung xanh với Postgres.
 
 ## Rủi ro và lưu ý
 

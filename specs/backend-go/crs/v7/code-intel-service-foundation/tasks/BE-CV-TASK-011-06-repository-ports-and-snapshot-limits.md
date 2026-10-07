@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/ports.go` (mở rộng), `internal/usecase/retention_task.go` (mới), `internal/usecase/ports_test.go` (mới)
 **Depends on:** BE-CV-TASK-011-04, BE-CV-TASK-010-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,9 +27,9 @@ Cổng đặt ở `usecase` (arch/03), adapter hai dialect hiện thực. Chữ 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Đủ 9 cổng + khung `RetentionTask`; không import adapter.
-- [ ] Mọi phương thức danh sách có tham số `limit`.
-- [ ] Test registry xanh.
+- [x] Đủ 9 cổng + khung `RetentionTask`; không import adapter.
+- [x] Mọi phương thức danh sách có tham số `limit`.
+- [x] Test registry xanh.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/repotest/quality_repository_contract.go`, `internal/adapter/postgres/quality_repository_contract_test.go`, `internal/adapter/mysql/quality_repository_contract_test.go` (mới, `-tags=integration`)
 **Depends on:** BE-CV-TASK-082-04, 082-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Một bộ kịch bản chung cho hai dialect (khuôn `repository_contract_test.go` của SOL-011). Ma trận CI `dialect: [postgres, mysql]`.
@@ -19,7 +19,7 @@ Một bộ kịch bản chung cho hai dialect (khuôn `repository_contract_test.
 - `go test -tags=integration ./internal/adapter/... -v` mỗi dialect.
 
 ## Tiêu chí hoàn thành
-- [ ] Hai dialect xanh; tên package test không dùng `utils/helpers/common`.
+- [x] Hai dialect xanh; tên package test không dùng `utils/helpers/common`.
 
 ## Rủi ro
 Tên package chia sẻ test (`repotest`) cần đồng bộ với SOL-011.

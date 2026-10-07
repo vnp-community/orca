@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/gocallindex/type_table.go`, `method_calls.go`, `interface_table.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-034-01, BE-CV-TASK-030-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,7 +27,7 @@ Solution 2.B; CR 2.4. Chỉ mục nhỏ (tên, không nội dung), cache theo `(
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cả ba bảng có test; kích thước chỉ mục nhỏ (đo, ghi PR).
+- [x] Cả ba bảng có test; kích thước chỉ mục nhỏ (đo, ghi PR).
 
 ## Rủi ro và lưu ý
 

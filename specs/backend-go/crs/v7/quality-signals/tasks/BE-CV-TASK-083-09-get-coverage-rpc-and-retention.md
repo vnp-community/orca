@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/get_coverage.go`, `internal/adapter/grpc/` (handler), thêm vào job bảo trì của SOL-011
 **Depends on:** BE-CV-TASK-083-07, 083-08, 083-01, BE-CV-SOL-085-quality-gate-evaluator-and-profiles
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 C-DM §3 chuỗi bảo vệ (guard, cờ `quality_gate_enabled`, OPA `quality_read`, selector, quyền trước cache); phản hồi ≤ 2 MiB. Kênh `codeIntel.quality.coverage` ở SOL-040.
@@ -19,7 +19,7 @@ C-DM §3 chuỗi bảo vệ (guard, cờ `quality_gate_enabled`, OPA `quality_re
 - Bảng ca ba nhánh; tenant A/B; cờ tắt → `CODEINTEL_QUALITY_GATE_DISABLED`.
 
 ## Tiêu chí hoàn thành
-- [ ] `proto.Size` ≤ 2 MiB.
+- [x] `proto.Size` ≤ 2 MiB.
 
 ## Rủi ro
 Phụ thuộc file proto của SOL-085.

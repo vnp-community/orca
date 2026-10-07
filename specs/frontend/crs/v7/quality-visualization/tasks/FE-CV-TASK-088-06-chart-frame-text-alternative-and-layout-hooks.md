@@ -5,7 +5,7 @@
 **Area:** frontend / components + hooks
 **File:** `frontend/src/renderer/src/components/quality-charts/ChartFrame.tsx`, `ChartTextAlternative.tsx`, `ChartHoverCard.tsx`, `useChartSize.ts`, `useLazyChartMount.ts` (mới) và `__tests__/ChartFrame.test.tsx`, `ChartTextAlternative.test.tsx`, `useChartSize.test.tsx`, `useLazyChartMount.test.tsx`
 **Depends on:** FE-CV-TASK-088-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

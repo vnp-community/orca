@@ -5,7 +5,7 @@
 **Service:** `request-service`, `notification-service`, `proto`
 **File:** `backend-go/proto/orca/request/v1/ai_admin.proto` (mới), `backend-go/services/request-service/internal/usecase/manage_ai_budgets.go` (mới), `.../internal/adapter/grpc/server_ai_admin.go` (mới), `.../cmd/server/main.go` (sửa: đăng ký service), `backend-go/services/notification-service/internal/adapter/eventbus/consumer.go` (sửa), `.../internal/domain/notification_event.go` (sửa) và `_test.go` tương ứng
 **Depends on:** TASK-REQ-034-01, 034-02; TASK-REQ-024-02 (`AuditRecorder`); BE-REQ-SOL-035 task 04 (nhóm hành động `admin`; trong lúc chờ kiểm `tenant.Role`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -57,11 +57,11 @@ message AiTenantSettings { string ai_egress_mode=1; string ai_trace_level=2; str
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảy RPC admin chỉ chạy được bởi `role=admin`.
-- [ ] Mỗi thay đổi ngân sách, egress, trace ghi audit đúng một bản, không chứa nội dung.
-- [ ] `ai_gate_mode=enforce` bị từ chối ở v1.
-- [ ] Hai subject mới được `TranslateEvent` chấp nhận; test cũ của `notification-service` không đổi.
-- [ ] `buf breaking` xanh.
+- [x] Bảy RPC admin chỉ chạy được bởi `role=admin`.
+- [x] Mỗi thay đổi ngân sách, egress, trace ghi audit đúng một bản, không chứa nội dung.
+- [x] `ai_gate_mode=enforce` bị từ chối ở v1.
+- [x] Hai subject mới được `TranslateEvent` chấp nhận; test cũ của `notification-service` không đổi.
+- [x] `buf breaking` xanh.
 
 ## Rủi ro và lưu ý
 

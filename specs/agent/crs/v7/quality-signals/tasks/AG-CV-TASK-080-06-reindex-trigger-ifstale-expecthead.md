@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-reindex-job.ts` (sửa; AG-CV-SOL-004), `agent/src/relay/codeintel-reindex-job.test.ts` (sửa)
 **Depends on:** AG-CV-TASK-080-02, 080-03; AG-CV-SOL-004 (tạo file)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Mở rộng `codeintel-reindex-job.test.ts`: mỗi nhánh (a)(b)(c) khẳng đ�
 
 ## Tiêu chí hoàn thành
 
-- [ ] 3 nhánh sớm không spawn; thứ tự quyết định đúng như mục 2.
-- [ ] Không có `tiers` trong schema (test phản chiếu).
+- [x] 3 nhánh sớm không spawn; thứ tự quyết định đúng như mục 2.
+- [x] Không có `tiers` trong schema (test phản chiếu).
 
 ## Rủi ro
 

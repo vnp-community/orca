@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/openspec_plan_prompt.go`, `internal/usecase/engine_openspec.go` (sửa), `internal/usecase/tasks_md_sync.go`, `internal/usecase/openspec_archive_consumer.go`, `internal/adapter/eventbus/openspec_consumers.go`, `internal/usecase/commit_plan.go` (sửa, của SOL-012) và test (mới trừ các file sửa)
 **Depends on:** TASK-REQ-026-03 (parser, `TickTask`), 026-05, 026-06, TASK-REQ-012-05 (`GeneratePlan`, `CommitPlan`), TASK-REQ-013-06 (`task_run_outcomes`, consumer), TASK-REQ-001-04 (outbox, `processed_events`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -73,12 +73,12 @@ Mâu thuẫn cần xử lý: SOL-012 bước PROPOSE "không ghi gì", trong khi
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cờ `REQUEST_OPENSPEC_ENABLED=false`: không consumer nào được đăng ký (test wiring).
-- [ ] Task `succeeded` làm tick `[x]` đúng dòng sau tối đa một chu kỳ; không bao giờ bỏ tick.
-- [ ] Vùng Orca bị sửa tay: bị ghi đè và `request_engine_drift_total` tăng; văn bản ngoài vùng giữ nguyên byte.
-- [ ] `request.completed` giao lặp chỉ chạy `archive` một lần; lỗi archive không đổi trạng thái Request.
-- [ ] `CommitPlan` không thất bại vì lỗi bản chiếu.
-- [ ] `light` không tạo `design.md`.
+- [x] Cờ `REQUEST_OPENSPEC_ENABLED=false`: không consumer nào được đăng ký (test wiring).
+- [x] Task `succeeded` làm tick `[x]` đúng dòng sau tối đa một chu kỳ; không bao giờ bỏ tick.
+- [x] Vùng Orca bị sửa tay: bị ghi đè và `request_engine_drift_total` tăng; văn bản ngoài vùng giữ nguyên byte.
+- [x] `request.completed` giao lặp chỉ chạy `archive` một lần; lỗi archive không đổi trạng thái Request.
+- [x] `CommitPlan` không thất bại vì lỗi bản chiếu.
+- [x] `light` không tạo `design.md`.
 
 ## Rủi ro và lưu ý
 

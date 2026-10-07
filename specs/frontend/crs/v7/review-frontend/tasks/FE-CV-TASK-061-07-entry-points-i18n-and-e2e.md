@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + tests
 **File:** `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`); `tests/e2e/code-intel-web/review-summary.web.e2e.ts`
 **Depends on:** FE-CV-TASK-061-03..061-06; 073-02, 073-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/usecase/generate_review_summary.go`, `ai_review_ports.go`, `internal/adapter/grpcclient/ai_complete_relay.go` (mới)
 **Depends on:** BE-CV-TASK-093-01, 093-04; BE-CV-SOL-013-agent-call-gate-and-quotas; BE-CV-SOL-022-snapshot-cache; BE-CV-TASK-085-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. Chuỗi: cờ (`CODEINTEL_ENABLED ∧ tenant ∧ quality_gate ∧ ai_review_level≠off ∧ CODEINTEL_AI_REVIEW_ENABLED`) → `level ≤ tenant` → model ∈ allowlist → dựng + manifest → `dry_run` thoát sớm (không agent) → cache (**quyền trước cache**) → `AgentCallGate` → `RelayByDevServer("ai.complete", {prompt, format:"json", model?})` → validate (thử lại một lần) → ghi cache → audit.
@@ -18,7 +18,7 @@
 - `AiCompleter` giả đếm lời gọi (cờ tắt ⇒ 0; `dry_run` ⇒ 0); JSON hợp lệ/hỏng/độc; chậm > 24 s ⇒ `inProgress` rồi trúng cache; đổi 1 dòng diff ⇒ miss; `read_source` thiếu không đọc cache.
 
 ## Tiêu chí hoàn thành
-- [ ] khớp tiêu chí SOL-093 §4; [ ] cache theo tenant/binding.
+- [x] khớp tiêu chí SOL-093 §4; [ ] cache theo tenant/binding.
 
 ## Rủi ro
 - Cách xác nhận tệp untracked không ignore chưa chốt (Q3).

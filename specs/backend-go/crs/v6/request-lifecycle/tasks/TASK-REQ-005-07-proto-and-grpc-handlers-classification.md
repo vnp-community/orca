@@ -5,7 +5,7 @@
 **Service:** `proto`, `request-service`
 **File:** `proto/orca/request/v1/request.proto` (sửa), `proto/gen/go/orca/request/v1/*` (sinh lại), `internal/adapter/grpc/server.go`, `internal/adapter/grpc/request_mapper.go`, `internal/adapter/grpc/type_change_mapper.go`, `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-005-04, 005-05, 005-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -34,10 +34,10 @@ CR-REQ-005 mục 2.1 định nghĩa message. Proto hiện có `Request` (trườ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bốn RPC thật, không còn `Unimplemented`.
-- [ ] `buf lint` và `buf breaking` xanh.
-- [ ] README real vs stub cập nhật.
-- [ ] Danh tính người dùng lấy từ metadata, không từ body.
+- [x] Bốn RPC thật, không còn `Unimplemented`.
+- [x] `buf lint` và `buf breaking` xanh.
+- [x] README real vs stub cập nhật.
+- [x] Danh tính người dùng lấy từ metadata, không từ body.
 
 ## Rủi ro và lưu ý
 

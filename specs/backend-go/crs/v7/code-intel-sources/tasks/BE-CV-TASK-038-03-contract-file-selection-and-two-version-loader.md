@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/contract_file_selection.go`, `contract_diff_ports.go`, `contract_version_loader.go` và `_test.go` (mới); `internal/domain/contractdiff/contract_path_patterns.go` (mới)
 **Depends on:** BE-CV-TASK-038-01; BE-CV-SOL-030 (`ChangedFiles`, `ReadFile`, `FileDiff`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Solution 2.C. Chỉ tệp trong danh sách mẫu hợp đồng được đọc; 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chỉ đường dẫn mẫu hợp đồng được đọc (test cổng giả).
-- [ ] Đổi tên/mới/xoá đúng; giới hạn 300.
+- [x] Chỉ đường dẫn mẫu hợp đồng được đọc (test cổng giả).
+- [x] Đổi tên/mới/xoá đúng; giới hạn 300.
 
 ## Rủi ro và lưu ý
 

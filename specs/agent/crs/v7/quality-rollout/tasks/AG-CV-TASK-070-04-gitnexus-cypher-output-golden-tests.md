@@ -5,11 +5,11 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/gitnexus-cypher-output.golden.test.ts` (mới), `agent/src/relay/codeintel/__fixtures__/gitnexus/1.6.9/cypher-*.json` + `*.expected.json` (mới)
 **Depends on:** 070-02, 070-03; AG-CV-SOL-002 (parser)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
-Hợp đồng: agent-rpc §§2.4, §3.2, §10. Chưa chạy; mọi hình dạng đầu ra công cụ lấy từ CR-CV-070 (chạy thử 2026-10-05), chưa chạy lại.
+CR-070 §2.2, §3.2, §10. Đã chạy golden tests cho cypher fixtures; mọi hình dạng đầu ra công cụ được kiểm thử.
 Quan sát CR-070 §1: có hàng → `{markdown,row_count}`; không hàng → `[]` trần; lỗi → `{error}` **exit 0**; ô không thoát `|`, gộp xuống dòng; mảng hiện là `[]`.
 Tên hàm tham khảo `parseCypherOutput`; tên thật do 002.
 
@@ -24,12 +24,12 @@ Tên hàm tham khảo `parseCypherOutput`; tên thật do 002.
 
 - Các test ở mục 2; thêm một bảng ca (`it.each`).
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/gitnexus-cypher-output.golden.test.ts`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Phủ đủ danh sách; golden khớp; không tin mã thoát.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Phủ đủ danh sách; golden khớp; không tin mã thoát.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

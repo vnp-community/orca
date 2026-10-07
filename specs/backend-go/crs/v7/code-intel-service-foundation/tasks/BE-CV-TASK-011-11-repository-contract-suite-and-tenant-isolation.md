@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/contracttest/repository_contract.go` (mới, gói kiểm thử), `internal/adapter/postgres/repository_contract_integration_test.go`, `internal/adapter/mysql/repository_contract_integration_test.go`, `internal/adapter/postgres/rls_isolation_integration_test.go` (mới)
 **Depends on:** BE-CV-TASK-011-07, 011-08, 011-09, 011-10
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,9 +30,9 @@ Mẫu: CR-REQ-002 mục 5 (bộ kịch bản viết một lần nhận interface
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cùng một bộ kịch bản xanh ở cả hai dialect.
-- [ ] Mọi phương thức có ít nhất một test cô lập tenant.
-- [ ] RLS: tenant B không đọc/ghi được dòng tenant A bằng SQL trực tiếp (Postgres, role không superuser).
+- [x] Cùng một bộ kịch bản xanh ở cả hai dialect.
+- [x] Mọi phương thức có ít nhất một test cô lập tenant.
+- [x] RLS: tenant B không đọc/ghi được dòng tenant A bằng SQL trực tiếp (Postgres, role không superuser).
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks + store
 **File:** `frontend/src/renderer/src/hooks/useCodeIntelErd.ts` (mới) + test; `frontend/src/renderer/src/store/slices/code-intel.ts` (sửa nhỏ: khoá `selectedErdTable`, `erdService`, `erdServiceHistory` và action `selectErdTable`, `setErdService`, `goBackErdService`); `frontend/src/renderer/src/store/slices/*worktree-purge*.test.ts` (mẫu rò rỉ)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks (`useCodeIntelQuery`, `CODE_INTEL_WORKTREE_KEYED_STATE_KEYS`, `store-test-helpers.ts`); G4 fake backend (FE-CV-TASK-073-02) hoặc mock `codeIntelClient.call`
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

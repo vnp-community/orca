@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/dispatcher.ts` (sửa ≤ 5 dòng), test dispatcher hiện có (sửa)
 **Depends on:** [002](./AG-CV-TASK-006-02-relay-handlers-and-throwable-mapping.md); điều kiện: O-5, Q2
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `dispatcher.ts:485-491` gửi `{code, message}`; kiểu lỗi đã có `data?`. Contract §3.4: sửa ≤ 5 dòng ở cả hai cây. File có sẵn `eslint-disable max-lines` ở đầu: **không thêm** cái mới.
@@ -20,7 +20,7 @@ Thêm vào test dispatcher hiện có: lỗi có `data` -> khung có `data`; l�
 Lệnh: `ls src/relay | grep dispatcher` để lấy tên file test, rồi `pnpm exec vitest run src/relay/<tên>.test.ts`; `pnpm test`.
 
 ## Tiêu chí hoàn thành
-- [ ] Diff ≤ 5 dòng; hồi quy xanh.
+- [x] Diff ≤ 5 dòng; hồi quy xanh.
 
 ## Rủi ro
 - Phương án dự phòng (mã trong `message`) không khuyến nghị.

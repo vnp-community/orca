@@ -32,9 +32,9 @@ Mẫu: `registerWorkspacePortsStreamChannel` (`channels_push.go:81`) nhưng (1) 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Một subscribe/kết nối; lần hai thay lần đầu không rò.
-- [ ] Giới hạn luồng thi hành; bộ đếm luôn về 0.
-- [ ] Lỗi quyền/cờ thấy ở ack khi service gửi header sớm.
+- [x] Một subscribe/kết nối; lần hai thay lần đầu không rò.
+- [x] Giới hạn luồng thi hành; bộ đếm luôn về 0.
+- [x] Lỗi quyền/cờ thấy ở ack khi service gửi header sớm.
 
 ## Rủi ro và lưu ý
 

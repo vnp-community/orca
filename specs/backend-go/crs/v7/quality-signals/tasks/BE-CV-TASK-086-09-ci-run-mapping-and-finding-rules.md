@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/ci_check_mapping.go`, `ci_run_builder.go` + test (mới)
 **Depends on:** BE-CV-TASK-082-03, BE-CV-TASK-086-01 (stub scm)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Bảng SOL mục 2.C (từ `pr.yml`, `backend-go-*.yml`); PQ-25 ánh xạ trạng thái; PQ-26 `ruleId`; C6 fingerprint.
@@ -19,7 +19,7 @@ Bảng SOL mục 2.C (từ `pr.yml`, `backend-go-*.yml`); PQ-25 ánh xạ trạn
 - Bảng: tên check Unicode/dài/ký tự lạ, 5 giá trị `overall`, annotation trùng, URL có token trong query.
 
 ## Tiêu chí hoàn thành
-- [ ] Regex PQ-26 luôn thoả; không chuỗi nhạy cảm.
+- [x] Regex PQ-26 luôn thoả; không chuỗi nhạy cảm.
 
 ## Rủi ro
 Tên profile cục bộ là đề xuất (C-AG §5.1).

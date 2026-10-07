@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/e2e/harness_test.go` (mới, tag `e2e`), `.../e2e/fakes/replay_agent.go` (mới), `.../e2e/fakes/in_memory_infra_fleet.go` (mới), `.../e2e/index_status_test.go` (mới)
 **Depends on:** BE-CV-TASK-070-01, 070-02, BE-CV-TASK-073-03, BE-CV-SOL-012-index-status-aggregation, BE-CV-SOL-021, BE-CV-SOL-023, BE-CV-SOL-011-*
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,8 +29,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] E01 xanh hai dialect.
-- [ ] Fake dùng tệp vàng, không dữ liệu thứ hai.
+- [x] E01 xanh hai dialect.
+- [x] Fake dùng tệp vàng, không dữ liệu thứ hai.
 
 ## Rủi ro và lưu ý
 

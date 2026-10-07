@@ -1,0 +1,25 @@
+{
+  "affectedClusters": [],
+  "affectedFlows": [],
+  "changedFiles": [],
+  "changedSymbols": [],
+  "head": "HEAD",
+  "index": {
+    "commit": null,
+    "driftedFileCount": 0,
+    "mappingConfidence": "approximate",
+    "stale": false
+  },
+  "riskHint": null,
+  "totalCount": 0,
+  "truncated": false,
+  "unmapped": {
+    "filesBeyondCap": 0,
+    "filesNotIndexed": [],
+    "filesWithoutSymbols": [],
+    "symbolsBeyondCap": 0
+  },
+  "warnings": [
+    "index_missing"
+  ]
+}

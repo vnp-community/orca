@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/proto/orca/request/v1/request_backlog.proto` (mới), `internal/usecase/list_backlog.go` (mới), `internal/adapter/grpc/server_backlog.go` (mới), `internal/usecase/request_visibility.go` (mới), `cmd/server/main.go`, `internal/usecase/list_backlog_test.go`, `internal/adapter/grpc/server_backlog_test.go` (mới)
 **Depends on:** TASK-REQ-015-04, 05
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -35,11 +35,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba view hoạt động qua gRPC với đủ bộ lọc trong `ListBacklogRequest`.
-- [ ] Người dùng không có quyền xem Request không thấy dòng của Request đó ở cả ba view.
-- [ ] `task-service` không sẵn sàng: TASK/EXECUTE trả `REQUEST_BACKLOG_TASK_SERVICE_UNAVAILABLE`, REQUEST vẫn chạy.
-- [ ] `buf lint`/`buf breaking` xanh; số trường khớp CR.
-- [ ] Không file nào tên `helpers`/`utils`/`common`/`misc`.
+- [x] Ba view hoạt động qua gRPC với đủ bộ lọc trong `ListBacklogRequest`.
+- [x] Người dùng không có quyền xem Request không thấy dòng của Request đó ở cả ba view.
+- [x] `task-service` không sẵn sàng: TASK/EXECUTE trả `REQUEST_BACKLOG_TASK_SERVICE_UNAVAILABLE`, REQUEST vẫn chạy.
+- [x] `buf lint`/`buf breaking` xanh; số trường khớp CR.
+- [x] Không file nào tên `helpers`/`utils`/`common`/`misc`.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `issue-status-sync`
 **File:** `backend-go/services/issue-status-sync/migrations/postgres/0002_request_sync_state.up.sql`, `.down.sql` (mới), `backend-go/services/issue-status-sync/migrations/mysql/0002_request_sync_state.up.sql`, `.down.sql` (mới), `.../internal/adapter/postgres/request_sync_state.go`, `.../internal/adapter/mysql/request_sync_state.go` (mới), tests tích hợp, `.../internal/usecase/ports.go`
 **Depends on:** None
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -33,8 +33,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai migration up/down chạy; `go build ./...` xanh.
-- [ ] Test `Advance` xanh trên Postgres và MySQL.
+- [x] Hai migration up/down chạy; `go build ./...` xanh.
+- [x] Test `Advance` xanh trên Postgres và MySQL.
 
 ## Rủi ro và lưu ý
 

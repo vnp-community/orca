@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/c4/component.go`, `stable_ids.go` (mới), `backend-go/services/code-intel-service/internal/usecase/derive_c4_view.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-033-03, BE-CV-TASK-032-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Solution mục 2.C.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi component có `origin:"derived"`.
-- [ ] `main` ẩn mặc định.
+- [x] Mọi component có `origin:"derived"`.
+- [x] `main` ẩn mặc định.
 
 ## Rủi ro và lưu ý
 

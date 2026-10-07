@@ -53,5 +53,6 @@ func AttachIdentity(ctx context.Context, id usecase.Identity) context.Context {
 		grpcmw.MetadataUserID, id.UserID,
 		grpcmw.MetadataRole, id.Role,
 		grpcmw.MetadataClientIP, clientIP,
+		grpcmw.MetadataActorType, tenant.ActorType(ctx),
 	)
 }

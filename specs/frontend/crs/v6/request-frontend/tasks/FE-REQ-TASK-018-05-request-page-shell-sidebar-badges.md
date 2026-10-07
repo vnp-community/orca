@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `frontend/src/renderer/src/components/request/RequestPage.tsx`, `RequestPageHeader.tsx`, `RequestUnsupportedNotice.tsx`, `RequestStatusBadge.tsx`, `RequestTypeBadge.tsx`, `RequestSourceBadge.tsx`, `ApprovalStatusBadge.tsx`, `request-status-presentation.ts` (đều mới); `components/sidebar/SidebarRequestNavButton.tsx` (mới), `SidebarNav.tsx` (sửa, gần dòng 71); `App.tsx` (sửa: lazy `RequestPage`); `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/request-locale-coverage.test.ts` (mới); `docs/ui/pages/requests.md` (mới), `docs/ui/page-tree.md` (sửa)
 **Depends on:** FE-REQ-TASK-018-03, 018-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

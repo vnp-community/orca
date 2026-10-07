@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/hooks/useQualityFeatureFlags.ts` (mới), `useQualityFeatureFlags.test.ts` (mới)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks (slice settings, `useCodeIntelSupport`); fake backend G4
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

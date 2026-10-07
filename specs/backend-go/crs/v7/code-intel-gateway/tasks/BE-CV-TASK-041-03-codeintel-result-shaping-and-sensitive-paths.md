@@ -30,8 +30,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không đường dẫn nhạy cảm nào ra tool; mã nguồn ≤ 32 KiB có `truncated`.
-- [ ] Khoá tự do không bị camel hoá.
+- [x] Không đường dẫn nhạy cảm nào ra tool; mã nguồn ≤ 32 KiB có `truncated`.
+- [x] Khoá tự do không bị camel hoá.
 
 ## Rủi ro và lưu ý
 

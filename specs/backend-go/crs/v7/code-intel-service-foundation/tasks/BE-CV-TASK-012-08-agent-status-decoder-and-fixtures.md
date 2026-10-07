@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/agent_status.go`, `agent_status_test.go`, `backend-go/services/code-intel-service/testdata/agent-status/{full-ready,stale-repo-root,missing,not-installed,codegraph-root-mismatch,malformed}.json` (mới)
 **Depends on:** BE-CV-TASK-011-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ Hình dạng chuẩn: `CONTRACT-codeintel-agent-rpc.md` §4.1 (đã áp PQ-19: `
 
 ## Tiêu chí hoàn thành
 
-- [ ] Giải mã đúng §4.1 trên fixture đầy đủ.
-- [ ] Enum lạ rơi về `unknown`/`none`.
-- [ ] Không đường dẫn tuyệt đối trong kiểu public trả đi.
+- [x] Giải mã đúng §4.1 trên fixture đầy đủ.
+- [x] Enum lạ rơi về `unknown`/`none`.
+- [x] Không đường dẫn tuyệt đối trong kiểu public trả đi.
 
 ## Rủi ro và lưu ý
 

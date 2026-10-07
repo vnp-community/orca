@@ -39,6 +39,8 @@ const (
 	// without each one re-deriving it (or trusting its own gRPC peer info,
 	// which would just be api-gateway's IP, not the real client's).
 	MetadataClientIP = "x-orca-client-ip"
+	// MetadataActorType carries the caller's actor type. Giá trị `user|agent|system`; thiếu nghĩa là `user`.
+	MetadataActorType = "x-orca-actor-type"
 )
 
 // TenantExtractionInterceptor pulls MetadataTenantID/MetadataUserID out of

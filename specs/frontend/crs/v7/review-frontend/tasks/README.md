@@ -1,6 +1,6 @@
 # Tasks: review-frontend (frontend, v7)
 
-> 📋 Proposed. Chưa triển khai (mọi task `Status: [ ] TODO`). Soạn ngày 2026-10-06 từ các solution cùng feature. Phần A (CR-050..056, 61 task) do nhóm A soạn; phần B (CR-057..062, 39 task) do nhóm B soạn, README này chỉ liệt kê (đọc từ đĩa). `<NN>` tăng liên tục trong cùng CR (kể cả nhiều solution). Task chạm `desktop/` ghi "ngoài `frontend/`, cần chủ sở hữu desktop duyệt".
+> 🚧 **In Progress.** Rà soát 2026-10-07: SOL-050-types 6/8 done, SOL-050-store 5/6 done, SOL-050-tab 1/6 done, SOL-051 1/7 done, SOL-052 2/6 done. SOL-053..062 (lens UI) ❌ chưa bắt đầu. Tổng ~16/100 tasks (~16%). Fake backend (073-02) chưa tồn tại — blocker cho e2e. Soạn 2026-10-06. Task chạm `desktop/` ghi "ngoài `frontend/`, cần chủ sở hữu desktop duyệt".
 
 Bảng ánh xạ kênh/mô hình hợp đồng → solution: xem [solutions/README.md](../solutions/README.md).
 

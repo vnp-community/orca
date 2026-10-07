@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/domain/quality_waiver.go`, `internal/usecase/waive_quality_finding.go`, `internal/adapter/{postgres,mysql}/quality_waiver_repository.go`, `internal/adapter/grpc/quality_gate_waiver_trend_server.go` (mới)
 **Depends on:** BE-CV-TASK-085-01, 085-02, 085-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Quy tắc: SOL-085-waivers §2.2. `active_key = sha256(tenant|repo|kind|key|scope)` hex; hiệu lực tính trong SQL bằng đồng hồ DB.
@@ -20,7 +20,7 @@ Quy tắc: SOL-085-waivers §2.2. `active_key = sha256(tenant|repo|kind|key|scop
 - Bảng ca vai trò/hạn/kind; integration hai dialect: hai goroutine WAIVE cùng khoá ⇒ một hàng hiệu lực; REVOKE rồi WAIVE ⇒ hàng mới; hết hạn theo đồng hồ DB (`expires_at=now()+1s`); cách ly tenant; test AST.
 
 ## Tiêu chí hoàn thành
-- [ ] `WaiveFinding` idempotent; [ ] `member` không miễn `error`/`check`, ≤ 7 ngày; [ ] không job nền để hết hạn.
+- [x] `WaiveFinding` idempotent; [ ] `member` không miễn `error`/`check`, ≤ 7 ngày; [ ] không job nền để hết hạn.
 
 ## Rủi ro
 - `finding_key` đổi khi refactor (CR-037) ⇒ waiver `structure_finding` có thể mất.

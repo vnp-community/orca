@@ -53,6 +53,7 @@ import type { ConnectivitySlice } from './slices/connectivity-status'
 import type { McpSlice } from './slices/mcp-slice'
 import type { McpApprovalSlice } from './slices/mcp-approval-slice'
 import type { McpTerminalOriginSlice } from './slices/mcp-terminal-origin'
+import type { RequestSlice } from './slices/request'
 
 // ── Re-exports for cross-slice consumers (import from '@/store/types') ────────
 export type {
@@ -118,4 +119,5 @@ export type AppState = RepoSlice &
   ConnectivitySlice &
   McpSlice &
   McpApprovalSlice &
-  McpTerminalOriginSlice
+  McpTerminalOriginSlice &
+  RequestSlice

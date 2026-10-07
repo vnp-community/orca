@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/gocallgraph/server_registration.go`, `handler_detection.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-032-03, BE-CV-TASK-030-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ SOL-032 mục 2.C.2. 18/18 service có một chỗ đăng ký (CR); `infra-fleet
 
 ## Tiêu chí hoàn thành
 
-- [ ] 18/18 `ImplementedBy`.
-- [ ] Số `Unimplemented` của `infra-fleet-service` đúng số thực (CR: 7).
+- [x] 18/18 `ImplementedBy`.
+- [x] Số `Unimplemented` của `infra-fleet-service` đúng số thực (CR: 7).
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `frontend/src/renderer/src/components/quality-charts/severity-encoding.ts`, `SeverityGlyph.tsx`, `SeverityBadge.tsx`, `GateVerdictBadge.tsx`, `ChartLegend.tsx` (đều mới) và `__tests__/severity-encoding.test.ts`, `SeverityBadge.test.tsx`
 **Depends on:** FE-CV-TASK-088-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

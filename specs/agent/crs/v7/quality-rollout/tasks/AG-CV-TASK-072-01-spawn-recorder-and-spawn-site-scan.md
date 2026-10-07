@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/spawn-recorder.ts` + `.test.ts` (mới), `agent/src/relay/codeintel/security-spawn-sites.test.ts` (mới)
 **Depends on:** AG-CV-SOL-001
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,12 +25,12 @@ Test viết theo hợp đồng; mã bị test thuộc AG-CV-SOL-001/002/003/004/
 - `flags an unlisted file that imports child_process`
 - `no non-test file uses shell:true or exec(`
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/spawn-recorder.test.ts src/relay/codeintel/security-spawn-sites.test.ts` (5 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai tệp test xanh.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Hai tệp test xanh.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/agent_perf_observer.go` (mới), `.../internal/usecase/agent_perf_observer_test.go` (mới), `.../internal/adapter/otel/agent_perf_spans.go` (mới), `.../internal/adapter/otel/agent_perf_spans_test.go` (mới); sửa nhẹ collector của BE-CV-SOL-021
 **Depends on:** BE-CV-TASK-071-02, BE-CV-SOL-021 (collector), `AG-CV-SOL-071-perf-block-and-bench` (agent phát `perf`), BE-CV-TASK-070-02 (tệp vàng có `perf`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -32,9 +32,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `perf` không lọt vào snapshot hay phản hồi gateway (test).
-- [ ] Mọi metric nhóm agent có dữ liệu từ tệp vàng.
-- [ ] Không panic với `perf` sai hình.
+- [x] `perf` không lọt vào snapshot hay phản hồi gateway (test).
+- [x] Mọi metric nhóm agent có dữ liệu từ tệp vàng.
+- [x] Không panic với `perf` sai hình.
 
 ## Rủi ro và lưu ý
 

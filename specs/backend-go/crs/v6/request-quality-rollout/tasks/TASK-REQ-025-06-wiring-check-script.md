@@ -5,7 +5,7 @@
 **Service:** `backend-go/ci`
 **File:** `backend-go/ci/check-request-service-wiring.sh` (mới), `backend-go/ci/check-request-service-wiring_test.sh` (mới, hoặc bước test trong workflow), `.github/workflows/backend-go-request-service.yml`
 **Depends on:** CR-REQ-001 (đã đăng ký `request` ở mọi nơi)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,8 +29,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] 7 kiểm và 7 ca âm tính.
-- [ ] Chạy trong CI, đỏ khi thiếu.
+- [x] 7 kiểm và 7 ca âm tính.
+- [x] Chạy trong CI, đỏ khi thiếu.
 
 ## Rủi ro và lưu ý
 

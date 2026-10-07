@@ -1,0 +1,13 @@
+{
+  "tool": "opa_test",
+  "toolVersion": "",
+  "argv": [
+    "test",
+    "--format",
+    "json",
+    "."
+  ],
+  "markers": {},
+  "capturedAt": "2026-10-07T06:14:34.083Z",
+  "sha256": "77b9d0e4595cd0eebd9ded3b7fe1720e3795a82638125c52a16ebc5c019afbf5"
+}

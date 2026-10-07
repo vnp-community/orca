@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/domain/quality_gate_evaluator.go`, `quality_gate_run_selection.go` (mới)
 **Depends on:** BE-CV-TASK-085-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Thuật toán: CR-085 §2.3 + SOL-085-evaluator §2.3 (L4, L9, D3, D6). `fail > unknown > warn > pass` (F2). Không I/O, không import package `ai_review`, không import adapter.
@@ -21,7 +21,7 @@ Thuật toán: CR-085 §2.3 + SOL-085-evaluator §2.3 (L4, L9, D3, D6). `fail > 
 - ≥ 40 ca bảng (mỗi dòng bảng CR × có/không waiver); ca phủ định: không ca nào ra `pass` khi check `required` thiếu dữ liệu; run sai HEAD không dùng; `fail`+`unknown` giữ cả hai lý do; test cấu trúc `go/parser` cấm import `ai_review`.
 
 ## Tiêu chí hoàn thành
-- [ ] bảng ca xanh; [ ] `index_commit≠HEAD` ⇒ `structure unknown` + `stale=true`; [ ] coverage tắt ⇒ không có lý do coverage.
+- [x] bảng ca xanh; [ ] `index_commit≠HEAD` ⇒ `structure unknown` + `stale=true`; [ ] coverage tắt ⇒ không có lý do coverage.
 
 ## Rủi ro
 - Phụ thuộc `error_code`/`dirty` của T8 (BE-082); thiếu thì mọi `failed` không phân biệt, coi `unknown`.

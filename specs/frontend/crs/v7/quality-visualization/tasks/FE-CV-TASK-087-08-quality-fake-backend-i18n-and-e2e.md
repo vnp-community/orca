@@ -5,7 +5,7 @@
 **Area:** frontend / test-support + i18n
 **File:** `frontend/src/renderer/src/test-support/code-intel-fake-backend.ts` (CR-050; sửa: kịch bản quality), `i18n/code-intel-quality-locale-coverage.test.ts` (từ 088-09; thêm khoá), `i18n/locales/{en,es,ja,ko,zh}.json` (khoá `auto.components.reviewQuality.*`, `auto.hooks.codeIntelQuality.*`), `tests/e2e/quality-gate-scorecard.spec.ts` (mới, kế hoạch)
 **Depends on:** 087-01..087-07, 088-09
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

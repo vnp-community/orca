@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `desktop/src/shared/`, `backend/src/shared/`, `tests/vendor-shared/shared/`, `agent/src/shared/`, `mobile/src/vendor-shared/shared/` (mỗi nơi: `telemetry-events.ts`, `review-telemetry-events.ts`) và `frontend/src/shared/telemetry-shared-copies-parity.test.ts` (mới)
 **Depends on:** FE-CV-TASK-095-01
-**Status:** [ ] TODO
+**Status:** [x] DONE — telemetry shared copies sync test chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

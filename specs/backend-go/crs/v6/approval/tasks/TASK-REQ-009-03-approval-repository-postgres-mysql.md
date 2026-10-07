@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / adapter
 **File:** `backend-go/services/request-service/internal/adapter/postgres/approval_repository.go` (mới), `internal/adapter/mysql/approval_repository.go` (mới), `internal/usecase/ports.go` (sửa, thêm port), `internal/adapter/{postgres,mysql}/approval_repository_integration_test.go` (mới)
 **Depends on:** TASK-REQ-009-01, TASK-REQ-009-02
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -31,10 +31,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai adapter qua cùng một bộ test.
-- [ ] Lỗi trùng khoá được phân biệt đúng tên ràng buộc ở cả hai DB.
-- [ ] Không có `SELECT` thiếu `tenant_id`.
-- [ ] Không dùng toán tử riêng của một dialect trong tầng usecase.
+- [x] Hai adapter qua cùng một bộ test.
+- [x] Lỗi trùng khoá được phân biệt đúng tên ràng buộc ở cả hai DB.
+- [x] Không có `SELECT` thiếu `tenant_id`.
+- [x] Không dùng toán tử riêng của một dialect trong tầng usecase.
 
 ## Rủi ro và lưu ý
 

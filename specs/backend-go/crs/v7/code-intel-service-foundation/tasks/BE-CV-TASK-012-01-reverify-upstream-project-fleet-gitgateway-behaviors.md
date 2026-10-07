@@ -5,7 +5,7 @@
 **Service:** (chỉ đọc) `project-service`, `infra-fleet-service`, `git-gateway-service`, `api-gateway`
 **File:** không sửa file; kết quả ghi vào PR
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,7 +28,7 @@ SOL-012 mục 1 liệt kê các điểm chưa kiểm chứng: tiền tố `repo:
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi điểm chưa kiểm chứng ở SOL-012 mục 6 có kết luận hoặc ghi rõ còn chưa kiểm chứng.
+- [x] Mỗi điểm chưa kiểm chứng ở SOL-012 mục 6 có kết luận hoặc ghi rõ còn chưa kiểm chứng.
 
 ## Rủi ro và lưu ý
 

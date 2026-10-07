@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/flag_reader.go`, `flag_reader_test.go` (mới)
 **Depends on:** BE-CV-TASK-011-06, 011-07, 011-09, 010-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,8 +30,8 @@ PQ-01, PQ-24 và §6.1. Công thức: `CodeIntel = env ∧ tenant`; `QualityGate
 
 ## Tiêu chí hoàn thành
 
-- [ ] Công thức PQ-24 đúng cho mọi tổ hợp.
-- [ ] Lỗi đọc = tắt; hiệu lực ≤ 5 s.
+- [x] Công thức PQ-24 đúng cho mọi tổ hợp.
+- [x] Lỗi đọc = tắt; hiệu lực ≤ 5 s.
 
 ## Rủi ro và lưu ý
 

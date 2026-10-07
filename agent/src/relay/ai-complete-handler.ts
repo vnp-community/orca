@@ -33,14 +33,55 @@ export type AICompleteParams = {
   format?: 'json' | 'text'
   taskId?: string
   model?:  string
+  maxTokens?: number            // caller-specified token budget; clamped to 1–32768
   accountId?:      string  // credential-store account, mirrors AgentSpawnRequest.accountId
   resolvedApiKey?: string  // plaintext key forwarded by Orca Server, mirrors agent.spawn's resolvedApiKey
+}
+
+export type AICompleteUsage = {
+  promptTokens?: number
+  completionTokens?: number
+  totalTokens?: number
 }
 
 export type AICompleteResult = {
   content: string
   model?:  string
+  provider?: string
+  latencyMs?: number
+  usage?: AICompleteUsage
 }
+
+export type AICompleteErrorReason =
+  | 'PROVIDER_HTTP_ERROR'
+  | 'PROVIDER_TIMEOUT'
+  | 'PROVIDER_NETWORK'
+  | 'NO_API_KEY'
+  | 'UNKNOWN_MODEL_PROVIDER'
+
+export type AICompleteErrorData = {
+  provider: string
+  httpStatus: number | null
+  retryable: boolean
+  reason: AICompleteErrorReason
+}
+
+/** Structured error thrown by provider call functions — caught by dispatchAiRpc. */
+export class AICompleteProviderError extends Error {
+  constructor(
+    message: string,
+    public readonly errorData: AICompleteErrorData
+  ) {
+    super(message)
+    this.name = 'AICompleteProviderError'
+  }
+}
+
+/** HTTP status codes where a retry may succeed. */
+function isRetryableHttpStatus(status: number): boolean {
+  return status === 408 || status === 409 || status === 425 || status === 429 || status >= 500
+}
+
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
@@ -63,6 +104,12 @@ export async function handleAIComplete(
     span.fail('empty prompt', { taskId })
     throw new Error('ai.complete: prompt must not be empty')
   }
+
+  // Clamp maxTokens: 1–32768 (GPT-4 ceiling; Anthropic and Gemini caps are higher
+  // but this safe ceiling prevents accidental cost blowouts).
+  const maxTokens = typeof params.maxTokens === 'number'
+    ? Math.max(1, Math.min(Math.round(params.maxTokens), 32768))
+    : 4096
 
   // Resolve model: params > config > env > default
   const model = params.model
@@ -87,13 +134,16 @@ export async function handleAIComplete(
     )
   }
 
-  log.info(`ai.complete: model=${model} format=${format} promptLen=${prompt.length}`)
-  span.step('provider-call', { model, provider: providerNameFromModel(model) })
+  const provider = providerNameFromModel(model)
+  log.info(`ai.complete: model=${model} format=${format} promptLen=${prompt.length} maxTokens=${maxTokens}`)
+  span.step('provider-call', { model, provider })
 
+  const callStart = Date.now()
   try {
-    const text = await dispatch(model, apiKey, prompt, format, log)
-    span.ok({ model, contentLength: text.length })
-    return { content: text, model }
+    const { content, usage } = await dispatch(model, apiKey, prompt, format, maxTokens, log)
+    const latencyMs = Date.now() - callStart
+    span.ok({ model, contentLength: content.length })
+    return { content, model, provider, latencyMs, ...(usage ? { usage } : {}) }
   } catch (err: unknown) {
     span.fail(err, { model, taskId })
     throw err
@@ -169,37 +219,70 @@ async function resolveApiKey(
 
 // ── Provider dispatch ─────────────────────────────────────────────────────────
 
+type ProviderResult = { content: string; usage?: AICompleteUsage }
+
 async function dispatch(
-  model:  string,
-  apiKey: string,
-  prompt: string,
-  format: string,
-  log:    AgentLogger,
-): Promise<string> {
-  if (model.startsWith('claude')) {
-    return callAnthropic(model, apiKey, prompt, format, log)
+  model:     string,
+  apiKey:    string,
+  prompt:    string,
+  format:    string,
+  maxTokens: number,
+  log:       AgentLogger,
+): Promise<ProviderResult> {
+  const provider = providerNameFromModel(model)
+  try {
+    if (model.startsWith('claude')) {
+      return await callAnthropic(model, apiKey, prompt, format, maxTokens, log)
+    }
+    if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4')) {
+      return await callOpenAI(model, apiKey, prompt, maxTokens, log)
+    }
+    if (model.startsWith('gemini')) {
+      return await callGoogle(model, apiKey, prompt, maxTokens, log)
+    }
+    throw new AICompleteProviderError(
+      `ai.complete: Unknown model provider for model "${model}". Supported prefixes: claude, gpt, o1, o3, o4, gemini.`,
+      { provider, httpStatus: null, retryable: false, reason: 'UNKNOWN_MODEL_PROVIDER' }
+    )
+  } catch (err: unknown) {
+    // Re-throw AICompleteProviderError as-is
+    if (err instanceof AICompleteProviderError) { throw err }
+
+    // Classify fetch-level errors: timeout vs network failure
+    if (err instanceof Error) {
+      // DOMException 'TimeoutError' is thrown by AbortSignal.timeout() after 120 s
+      if (err.name === 'TimeoutError' || (err as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
+        throw new AICompleteProviderError(err.message, {
+          provider, httpStatus: null, retryable: true, reason: 'PROVIDER_TIMEOUT'
+        })
+      }
+      // TypeError 'fetch failed' (Node.js fetch), or connection refused, DNS failure, etc.
+      if (err.name === 'TypeError' || (err as NodeJS.ErrnoException).code === 'ECONNREFUSED' ||
+          (err as NodeJS.ErrnoException).code === 'ENOTFOUND') {
+        throw new AICompleteProviderError(err.message, {
+          provider, httpStatus: null, retryable: true, reason: 'PROVIDER_NETWORK'
+        })
+      }
+    }
+    // Unknown error — rethrow as-is (dispatchAiRpc will handle it without error.data)
+    throw err
   }
-  if (model.startsWith('gpt') || model.startsWith('o1') || model.startsWith('o3') || model.startsWith('o4')) {
-    return callOpenAI(model, apiKey, prompt, log)
-  }
-  if (model.startsWith('gemini')) {
-    return callGoogle(model, apiKey, prompt, log)
-  }
-  throw new Error(`ai.complete: Unknown model provider for model "${model}". Supported prefixes: claude, gpt, o1, o3, o4, gemini.`)
 }
+
 
 // ── Anthropic Claude ──────────────────────────────────────────────────────────
 
 async function callAnthropic(
-  model:  string,
-  apiKey: string,
-  prompt: string,
-  format: string,
-  log:    AgentLogger,
-): Promise<string> {
+  model:     string,
+  apiKey:    string,
+  prompt:    string,
+  format:    string,
+  maxTokens: number,
+  log:       AgentLogger,
+): Promise<ProviderResult> {
   const body: Record<string, unknown> = {
     model,
-    max_tokens: 4096,
+    max_tokens: maxTokens,
     messages: [{ role: 'user', content: prompt }],
   }
   if (format === 'json') {
@@ -220,21 +303,38 @@ async function callAnthropic(
   if (!res.ok) {
     const errBody = await res.text().catch(() => res.statusText)
     log.error(`ai.complete Anthropic ${res.status}: ${errBody}`)
-    throw new Error(`Anthropic API error ${res.status}: ${errBody}`)
+    throw new AICompleteProviderError(`Anthropic API error ${res.status}: ${errBody}`, {
+      provider: 'anthropic',
+      httpStatus: res.status,
+      retryable: isRetryableHttpStatus(res.status),
+      reason: 'PROVIDER_HTTP_ERROR'
+    })
   }
 
-  const data = await res.json() as { content: { type: string; text?: string }[] }
-  return data.content.find(c => c.type === 'text')?.text ?? ''
+  const data = await res.json() as {
+    content: { type: string; text?: string }[]
+    usage?: { input_tokens?: number; output_tokens?: number }
+  }
+  const content = data.content.find(c => c.type === 'text')?.text ?? ''
+  const usage: AICompleteUsage | undefined = data.usage
+    ? {
+        promptTokens: data.usage.input_tokens,
+        completionTokens: data.usage.output_tokens,
+        totalTokens: (data.usage.input_tokens ?? 0) + (data.usage.output_tokens ?? 0)
+      }
+    : undefined
+  return { content, ...(usage ? { usage } : {}) }
 }
 
 // ── OpenAI GPT / o-series ─────────────────────────────────────────────────────
 
 async function callOpenAI(
-  model:  string,
-  apiKey: string,
-  prompt: string,
-  log:    AgentLogger,
-): Promise<string> {
+  model:     string,
+  apiKey:    string,
+  prompt:    string,
+  maxTokens: number,
+  log:       AgentLogger,
+): Promise<ProviderResult> {
   const res = await fetch('https://api.openai.com/v1/chat/completions', {
     method:  'POST',
     headers: {
@@ -244,7 +344,7 @@ async function callOpenAI(
     body: JSON.stringify({
       model,
       messages:   [{ role: 'user', content: prompt }],
-      max_tokens: 4096,
+      max_tokens: maxTokens,
     }),
     signal: AbortSignal.timeout(120_000),
   })
@@ -252,27 +352,45 @@ async function callOpenAI(
   if (!res.ok) {
     const errBody = await res.text().catch(() => res.statusText)
     log.error(`ai.complete OpenAI ${res.status}: ${errBody}`)
-    throw new Error(`OpenAI API error ${res.status}: ${errBody}`)
+    throw new AICompleteProviderError(`OpenAI API error ${res.status}: ${errBody}`, {
+      provider: 'openai',
+      httpStatus: res.status,
+      retryable: isRetryableHttpStatus(res.status),
+      reason: 'PROVIDER_HTTP_ERROR'
+    })
   }
 
-  const data = await res.json() as { choices: { message: { content: string } }[] }
-  return data.choices[0]?.message.content ?? ''
+  const data = await res.json() as {
+    choices: { message: { content: string } }[]
+    usage?: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+  }
+  const content = data.choices[0]?.message.content ?? ''
+  const usage: AICompleteUsage | undefined = data.usage
+    ? {
+        promptTokens: data.usage.prompt_tokens,
+        completionTokens: data.usage.completion_tokens,
+        totalTokens: data.usage.total_tokens
+      }
+    : undefined
+  return { content, ...(usage ? { usage } : {}) }
 }
 
 // ── Google Gemini ─────────────────────────────────────────────────────────────
 
 async function callGoogle(
-  model:  string,
-  apiKey: string,
-  prompt: string,
-  log:    AgentLogger,
-): Promise<string> {
+  model:     string,
+  apiKey:    string,
+  prompt:    string,
+  maxTokens: number,
+  log:       AgentLogger,
+): Promise<ProviderResult> {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
   const res = await fetch(url, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: maxTokens },
     }),
     signal: AbortSignal.timeout(120_000),
   })
@@ -280,11 +398,25 @@ async function callGoogle(
   if (!res.ok) {
     const errBody = await res.text().catch(() => res.statusText)
     log.error(`ai.complete Google ${res.status}: ${errBody}`)
-    throw new Error(`Google AI API error ${res.status}: ${errBody}`)
+    throw new AICompleteProviderError(`Google AI API error ${res.status}: ${errBody}`, {
+      provider: 'google',
+      httpStatus: res.status,
+      retryable: isRetryableHttpStatus(res.status),
+      reason: 'PROVIDER_HTTP_ERROR'
+    })
   }
 
   const data = await res.json() as {
     candidates: { content: { parts: Array<{ text?: string }> } }[]
+    usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number }
   }
-  return data.candidates[0]?.content.parts[0]?.text ?? ''
+  const content = data.candidates[0]?.content.parts[0]?.text ?? ''
+  const usage: AICompleteUsage | undefined = data.usageMetadata
+    ? {
+        promptTokens: data.usageMetadata.promptTokenCount,
+        completionTokens: data.usageMetadata.candidatesTokenCount,
+        totalTokens: data.usageMetadata.totalTokenCount
+      }
+    : undefined
+  return { content, ...(usage ? { usage } : {}) }
 }

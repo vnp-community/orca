@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/secretmasking/token_shape_detection.go`, `storage_map_leak_scan.go` và `_test.go` (mới); `backend-go/services/code-intel-service/internal/domain/secretmasking/leak_blocked_error.go` (mới)
 **Depends on:** BE-CV-TASK-035-04; BE-CV-SOL-010 (`apperrors` Kind mới)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ Lớp phòng thủ thứ hai: dù parser đã che, mọi payload `StorageMap` **
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ca dương tính bị chặn, ca âm tính (toàn bộ tên thật nêu trên) không bị chặn.
-- [ ] `Finding` không mang nội dung khớp; log/metric không chứa giá trị.
-- [ ] Ngưỡng là hằng có tên, có comment "chưa hiệu chỉnh".
+- [x] Ca dương tính bị chặn, ca âm tính (toàn bộ tên thật nêu trên) không bị chặn.
+- [x] `Finding` không mang nội dung khớp; log/metric không chứa giá trị.
+- [x] Ngưỡng là hằng có tên, có comment "chưa hiệu chỉnh".
 
 ## Rủi ro và lưu ý
 

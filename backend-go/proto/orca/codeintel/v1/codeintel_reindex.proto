@@ -1,0 +1,43 @@
+// Reindex models and RPC messages - CR-CV-021 / BE-CV-TASK-021-08.
+syntax = "proto3";
+
+package orca.codeintel.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/codeintel/v1;codeintelv1";
+
+import "google/protobuf/timestamp.proto";
+import "orca/codeintel/v1/codeintel_common.proto";
+
+message ReindexJob {
+  string job_id = 1;
+  string repo_binding_id = 2;
+  string mode = 3; // incremental|full
+  string status = 4; // queued|running|succeeded|failed|cancelled
+  string trigger = 5;
+  string stage = 6;
+  optional int32 percent = 7;
+  string message = 8;
+  string outcome = 9;
+  string error_code = 10;
+  google.protobuf.Timestamp started_at = 11;
+  google.protobuf.Timestamp finished_at = 12;
+  google.protobuf.Timestamp created_at = 13;
+}
+
+message RequestReindexRequest {
+  WorktreeSelector selector = 1;
+  string mode = 2;
+}
+
+message RequestReindexResponse {
+  ReindexJob job = 1;
+}
+
+message GetReindexJobRequest {
+  WorktreeSelector selector = 1;
+  string job_id = 2;
+}
+
+message GetReindexJobResponse {
+  ReindexJob job = 1;
+}

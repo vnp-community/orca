@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/adapter/infrafleetclient/code_intel_event_stream.go`, `.../internal/usecase/{code_intel_stream_supervisor.go,binding_stream_targets.go}` (mới) và test
 **Depends on:** TASK-024-01, BE-CV-TASK-021-03, BE-CV-SOL-023
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,7 +27,7 @@ SOL-024 2.B. Mẫu backoff: lịch reconnect của agent (1,2,5,15,30 s).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các ca xanh. - [ ] Không rò goroutine.
+- [x] Các ca xanh. - [x] Không rò goroutine.
 
 ## Rủi ro và lưu ý
 

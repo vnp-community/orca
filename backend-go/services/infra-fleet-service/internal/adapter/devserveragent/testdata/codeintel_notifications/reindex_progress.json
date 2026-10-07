@@ -1,0 +1,14 @@
+{
+  "jsonrpc": "2.0",
+  "method": "codeintel.reindexProgress",
+  "params": {
+    "workspaceRoot": "/Users/developer/project",
+    "jobId": "reindex-job-42",
+    "tool": "codegraph",
+    "stage": "parsing_ast",
+    "percent": 85,
+    "message": "Parsing abstract syntax tree",
+    "outcome": "running",
+    "errorCode": ""
+  }
+}

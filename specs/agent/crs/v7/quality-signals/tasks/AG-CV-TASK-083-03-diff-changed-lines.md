@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-diff-changed-lines.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-081-14
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Repo git thật: thêm/sửa/xoá/đổi tên/nhị phân/CRLF/tên Unicode/tên
 
 ## Tiêu chí hoàn thành
 
-- [ ] Số dòng mới đúng cho mọi ca; không throw khi git lỗi (trả `warnings`).
+- [x] Số dòng mới đúng cho mọi ca; không throw khi git lỗi (trả `warnings`).
 
 ## Rủi ro
 

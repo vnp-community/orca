@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/engine_name.go`, `internal/domain/openspec_profile.go`, `internal/domain/engine_settings.go`, `internal/domain/openspec_change.go`, `internal/domain/engine_errors.go`, `internal/domain/request_flow_registry.go` (sửa, của SOL-003) và các `*_test.go` (mới)
 **Depends on:** TASK-REQ-003-01 (flow registry), TASK-REQ-002-02 (domain `RequestType`, `apperrors` constructor)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -56,12 +56,12 @@ Quy ước dự án: tên file theo khái niệm (`openspec_profile.go`, không 
 
 ## Tiêu chí hoàn thành
 
-- [ ] `go vet ./services/request-service/internal/domain/...` sạch; domain không import gói ngoài stdlib, `golang.org/x/text`, `common/apperrors`.
-- [ ] `OpenSpecProfileFor` phủ đủ 11 loại và có test chống thiếu.
-- [ ] `EffectiveEngine` có test 27 tổ hợp; `none` luôn trả `native`.
-- [ ] `NewChangeID` luôn thoả `ValidChangeID` (fuzz 20 giây không lỗi).
-- [ ] Mọi mã lỗi liệt kê ở bước 8 có constructor và kind đúng; không trùng mã với `request_flow_errors.go`.
-- [ ] Không có `max-lines` disable; tên file không chứa `helpers`, `utils`, `common`.
+- [x] `go vet ./services/request-service/internal/domain/...` sạch; domain không import gói ngoài stdlib, `golang.org/x/text`, `common/apperrors`.
+- [x] `OpenSpecProfileFor` phủ đủ 11 loại và có test chống thiếu.
+- [x] `EffectiveEngine` có test 27 tổ hợp; `none` luôn trả `native`.
+- [x] `NewChangeID` luôn thoả `ValidChangeID` (fuzz 20 giây không lỗi).
+- [x] Mọi mã lỗi liệt kê ở bước 8 có constructor và kind đúng; không trùng mã với `request_flow_errors.go`.
+- [x] Không có `max-lines` disable; tên file không chứa `helpers`, `utils`, `common`.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + hooks + shared types
 **File:** `frontend/src/shared/types.ts` (`RightSidebarTab`), `store/right-sidebar-route.ts` (+test), `components/right-sidebar/{index.tsx,activity-bar-buttons.tsx,right-sidebar-panel-content.tsx,right-sidebar-activity-visibility.ts(+test),activity-bar-overflow.ts}` (sửa); `components/right-sidebar/ReviewSummaryPanel.tsx`, `components/review-map/entry/useCodeIntelReviewSummary.ts` (mới) + test
 **Depends on:** FE-CV-TASK-061-01, 061-02; FE-CV-SOL-051-review-workspace-shell (`IndexFreshnessChip`, trạng thái chuẩn); FE-CV-SOL-052 (tiến độ); fake backend G4
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

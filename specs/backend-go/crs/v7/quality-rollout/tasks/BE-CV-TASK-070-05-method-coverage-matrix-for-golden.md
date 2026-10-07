@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/contracttest/agent_method_coverage_test.go` (mới), `.../internal/contracttest/agent_method_table.go` (mới, bảng dữ liệu, tên theo nội dung)
 **Depends on:** BE-CV-TASK-070-01, BE-CV-TASK-070-04, BE-CV-SOL-021 (bảng method của collector)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,8 +29,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] 22 method được liệt kê; mỗi dòng waived có lý do và trỏ hợp đồng.
-- [ ] Thêm method ở một phía mà quên phía kia thì CI đỏ.
+- [x] 22 method được liệt kê; mỗi dòng waived có lý do và trỏ hợp đồng.
+- [x] Thêm method ở một phía mà quên phía kia thì CI đỏ.
 
 ## Rủi ro và lưu ý
 

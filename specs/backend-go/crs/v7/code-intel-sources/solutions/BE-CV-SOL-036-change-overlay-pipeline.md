@@ -153,15 +153,15 @@ Thứ tự làm trong CR-036 (hợp đồng §7.2: cần 005 (AG), 020, 021, 030
 
 ## 9. Tiêu chí chấp nhận
 
-- [ ] Với tệp vàng `detectChanges` gồm tệp đã commit + tệp chưa commit + tệp `untracked`, `changedFiles` chứa mỗi tệp **một** lần, trạng thái và `mappingConfidence` đúng bảng 2.C.
-- [ ] `mode=committed` (hoặc `head_ref`) không gồm tệp chưa commit; `includesUncommitted=false`.
-- [ ] Backend chỉ gửi **một** `detectChanges` và ≤ 25 `impact`, tối đa 2 đồng thời; không gọi `git.*` trực tiếp.
-- [ ] Khi `impact` lỗi/quá hạn cho một phần symbol: `limits.truncated.impact=true`, `tested:"unknown"`, `risk.incomplete=true`, có `DATA_MISSING`; lần gọi sau (cùng khoá) trả đủ.
-- [ ] `IndexFreshness.state` đúng cho từng tổ hợp; tệp mới chưa index ⇒ `unindexedFiles` và `mappingConfidence:"none"`.
-- [ ] Nguồn mềm vắng (ERD, C4, contract diff, findings) ⇒ overlay vẫn trả, `risk.incomplete=true`, nhóm component theo đường dẫn "suy luận".
-- [ ] Fixture 3 000 tệp: `truncated.files=true`, `totalCounts` đúng, payload ≤ 2 MiB, rủi ro tính trên đủ 3 000.
-- [ ] Quyền sai ⇒ `CODEINTEL_NOT_AUTHORIZED` **không** chạm cache/agent; chéo tenant bị từ chối.
-- [ ] `buf lint`, `buf breaking` pass; không RPC thiếu message.
+- [x] Với tệp vàng `detectChanges` gồm tệp đã commit + tệp chưa commit + tệp `untracked`, `changedFiles` chứa mỗi tệp **một** lần, trạng thái và `mappingConfidence` đúng bảng 2.C.
+- [x] `mode=committed` (hoặc `head_ref`) không gồm tệp chưa commit; `includesUncommitted=false`.
+- [x] Backend chỉ gửi **một** `detectChanges` và ≤ 25 `impact`, tối đa 2 đồng thời; không gọi `git.*` trực tiếp.
+- [x] Khi `impact` lỗi/quá hạn cho một phần symbol: `limits.truncated.impact=true`, `tested:"unknown"`, `risk.incomplete=true`, có `DATA_MISSING`; lần gọi sau (cùng khoá) trả đủ.
+- [x] `IndexFreshness.state` đúng cho từng tổ hợp; tệp mới chưa index ⇒ `unindexedFiles` và `mappingConfidence:"none"`.
+- [x] Nguồn mềm vắng (ERD, C4, contract diff, findings) ⇒ overlay vẫn trả, `risk.incomplete=true`, nhóm component theo đường dẫn "suy luận".
+- [x] Fixture 3 000 tệp: `truncated.files=true`, `totalCounts` đúng, payload ≤ 2 MiB, rủi ro tính trên đủ 3 000.
+- [x] Quyền sai ⇒ `CODEINTEL_NOT_AUTHORIZED` **không** chạm cache/agent; chéo tenant bị từ chối.
+- [x] `buf lint`, `buf breaking` pass; không RPC thiếu message.
 
 ## 10. Tham chiếu
 

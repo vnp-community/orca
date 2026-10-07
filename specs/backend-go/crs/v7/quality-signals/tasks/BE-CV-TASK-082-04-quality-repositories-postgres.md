@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/quality_run_ports.go`, `internal/adapter/postgres/quality_run_repository.go`, `quality_finding_repository.go` (mới)
 **Depends on:** BE-CV-TASK-082-02, 082-03, BE-CV-SOL-010 (`TxRunner`, `OutboxWriter`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Cổng ở SOL-082 mục 2.E. `InTx` tham gia giao dịch của ctx; `set_config('app.tenant_id', $1, true)` mỗi giao dịch.
@@ -19,7 +19,7 @@ Cổng ở SOL-082 mục 2.E. `InTx` tham gia giao dịch của ctx; `set_config
 - Chạy bộ hợp đồng của 082-06 trên Postgres (role không superuser).
 
 ## Tiêu chí hoàn thành
-- [ ] Không câu SQL thiếu `tenant_id` (test AST/grep).
+- [x] Không câu SQL thiếu `tenant_id` (test AST/grep).
 
 ## Rủi ro
 Sự kiện outbox payload theo C-DM §5; sai khoá làm consumer SOL-085 hỏng.

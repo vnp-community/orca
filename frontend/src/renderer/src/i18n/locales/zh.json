@@ -10152,6 +10152,33 @@
             "workspaceGone": "Couldn't open log — workspace is no longer available.",
             "notAuthorized": "Couldn't open log — path not authorized.",
             "alreadyEditable": "Log is already open for editing."
+          },
+          "qualityGateNotice": {
+            "title": {
+              "fail": "质量检查失败",
+              "warn": "质量检查存在警告",
+              "unknown": "质量状态不可用"
+            },
+            "stale": "已过期",
+            "timedOut": "超时",
+            "unavailable": "质量服务不可用，请稍后再试。",
+            "reasons": "失败原因",
+            "openReason": "在审查中打开 {{check}} 原因",
+            "runChecks": "运行检查",
+            "moreReasons": "再显示 {{count}} 条",
+            "reason": {
+              "coverage_below_threshold": "覆盖率 {{observed}}% 低于阈值 {{threshold}}%",
+              "complexity_exceeded": "{{check}} 的复杂度超过阈值",
+              "duplication_exceeded": "{{check}} 的重复率超过阈值",
+              "security_violations": "{{check}} 存在安全违规",
+              "reliability_violations": "{{check}} 存在可靠性违规",
+              "maintainability_violations": "{{check}} 存在可维护性违规",
+              "tech_debt_exceeded": "{{check}} 的技术债务超过阈值",
+              "hotspot_count_exceeded": "{{check}} 的热点数量超过限制",
+              "new_violations_found": "{{check}} 发现新违规",
+              "dependency_vulnerabilities": "{{check}} 存在依赖漏洞",
+              "unknown": "{{check}}"
+            }
           }
         }
       },
@@ -12988,6 +13015,39 @@
           "saved": "Jira 映射已更新",
           "saveFailed": "更新 Jira 映射失败。"
         }
+      },
+      "request": {
+        "RequestStatus": {
+          "submitted": "已提交",
+          "classifying": "分类中",
+          "awaiting_type_confirmation": "等待类型确认",
+          "analyzing": "分析中",
+          "awaiting_analysis_approval": "等待分析审批",
+          "awaiting_information": "等待信息",
+          "planning": "规划中",
+          "awaiting_plan_approval": "等待计划审批",
+          "executing": "执行中",
+          "completed": "已完成",
+          "cancelled": "已取消",
+          "request_backlog": "待办",
+          "unknown": "未知"
+        },
+        "RequestPage": {
+          "title": "请求",
+          "tab": {
+            "requests": "请求",
+            "approvals": "审批",
+            "backlog": "待办"
+          }
+        },
+        "RequestUnsupportedNotice": {
+          "title": "不支持请求管理",
+          "body": "连接的运行时不支持请求服务。"
+        },
+        "SidebarRequestNavButton": {
+          "label": "请求",
+          "badge": "待审批"
+        }
       }
     },
     "i18n": {
@@ -13001,6 +13061,29 @@
           "b3d7e0f1a8": "合并请求",
           "a2c6d9e0f7": "合并请求",
           "91b5c8d7e6": "GitLab"
+        }
+      }
+    },
+    "features": {
+      "codeIntel": {
+        "indexStatus": {
+          "READY": "就绪",
+          "INDEXING": "索引中",
+          "PARTIAL": "部分索引",
+          "ERROR": "索引错误",
+          "UNKNOWN": "未知"
+        },
+        "reviewTab": {
+          "title": "审查",
+          "empty": "无审查数据",
+          "loading": "正在加载审查...",
+          "error": "加载审查失败"
+        },
+        "settingsState": {
+          "unknown": "加载中...",
+          "enabled": "代码智能已启用",
+          "disabled": "代码智能已禁用",
+          "unsupported": "此环境不支持"
         }
       }
     }

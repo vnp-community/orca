@@ -1,0 +1,14 @@
+{
+  "tool": "gitnexus",
+  "version": "1.6.9",
+  "capturedAt": "2026-10-06T00:00:00.000Z",
+  "captureEnv": {
+    "node": "v22.5.0",
+    "os": "darwin",
+    "gitnexusVersion": "1.6.9"
+  },
+  "markers": {
+    "schemaVersion": 5
+  },
+  "files": {}
+}

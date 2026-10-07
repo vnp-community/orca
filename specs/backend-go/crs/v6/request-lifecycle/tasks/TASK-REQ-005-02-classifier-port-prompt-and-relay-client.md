@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/ports.go` (sửa), `internal/adapter/grpcclient/{request_classifier.go,classification_prompt.go,ai_connection_resolver.go,dev_server_reachability.go,project_repo_lister.go}` và `*_test.go` (mới); `internal/config/config.go`, `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-005-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -32,10 +32,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Đầu ra ngoài tập enum bị loại; không bao giờ đưa vào lệnh.
-- [ ] Rơi về `RelayByDevServer` khi không có `infra.connections`.
-- [ ] Thử lại đúng một lần; timeout 60 giây.
-- [ ] Service khởi động được khi thiếu địa chỉ downstream.
+- [x] Đầu ra ngoài tập enum bị loại; không bao giờ đưa vào lệnh.
+- [x] Rơi về `RelayByDevServer` khi không có `infra.connections`.
+- [x] Thử lại đúng một lần; timeout 60 giây.
+- [x] Service khởi động được khi thiếu địa chỉ downstream.
 
 ## Rủi ro và lưu ý
 

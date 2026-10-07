@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/turns/turn-file-identity.ts`, `turn-compare-model.ts` (mới) + test
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (`ReviewTurnMarker`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

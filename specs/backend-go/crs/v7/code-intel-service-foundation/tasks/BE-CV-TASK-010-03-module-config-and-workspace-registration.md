@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` (mới)
 **File:** `backend-go/services/code-intel-service/go.mod` (mới), `internal/config/config.go` (mới), `internal/config/config_test.go` (mới), `backend-go/go.work`, `backend-go/Makefile`
 **Depends on:** BE-CV-TASK-010-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,9 +30,9 @@ Mẫu cấu hình: `services/mcp-service/internal/config/config.go` (có `boolEn
 
 ## Tiêu chí hoàn thành
 
-- [ ] `config.Load()` trả mặc định theo hợp đồng; giá trị sai trả lỗi.
-- [ ] `go.work`, `Makefile` có module mới; `make vet` chạy được trên module.
-- [ ] Không tên file `helpers|utils|common|misc`.
+- [x] `config.Load()` trả mặc định theo hợp đồng; giá trị sai trả lỗi.
+- [x] `go.work`, `Makefile` có module mới; `make vet` chạy được trên module.
+- [x] Không tên file `helpers|utils|common|misc`.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/executor.go`, `.../request_flow_origin.go` (mới), `.../executor_test.go`, `.../schema_no_identity_test.go` (mới)
 **Depends on:** TASK-REQ-017-01, TASK-REQ-016-02 (`resolveRequestSource`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `request_create` qua MCP tạo Request giả có `source_provider=mcp`, `source_site=<ClientName>`.
-- [ ] Tool không thuộc nhóm Request không bị đổi.
-- [ ] Test quét schema xanh.
+- [x] `request_create` qua MCP tạo Request giả có `source_provider=mcp`, `source_site=<ClientName>`.
+- [x] Tool không thuộc nhóm Request không bị đổi.
+- [x] Test quét schema xanh.
 
 ## Rủi ro và lưu ý
 

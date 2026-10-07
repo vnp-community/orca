@@ -5,7 +5,7 @@
 **Area:** frontend / test-support + i18n
 **File:** `test-support/code-intel-fake-backend.ts` (sửa), `i18n/code-intel-quality-locale-coverage.test.ts` + `i18n/locales/{en,es,ja,ko,zh}.json` (khoá `auto.components.reviewQuality.{coverage,trend,hotspot,dependency}.*`), `tests/e2e/quality-charts-blocks.spec.ts` (mới, kế hoạch)
 **Depends on:** 087-15..087-19, 087-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

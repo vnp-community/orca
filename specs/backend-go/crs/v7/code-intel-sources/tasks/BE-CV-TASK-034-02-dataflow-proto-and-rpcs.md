@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_dataflow.proto` (mới); `.../codeintel.proto` (thêm 2 rpc)
 **Depends on:** `codeintel_common.proto` (G0)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,7 @@ Solution 2.A; PQ-29 giữ `StoreAccess` riêng khỏi `TableAccess`; số field 
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf` xanh; không `repo_binding_id`; tên không trùng package.
+- [x] `buf` xanh; không `repo_binding_id`; tên không trùng package.
 
 ## Rủi ro và lưu ý
 

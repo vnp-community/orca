@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/estimate_coverage.go`, `estimate_coverage_test.go` (mới); cổng `ChangeOverlayReader` trong `coverage_ports.go`
 **Depends on:** BE-CV-SOL-036-change-overlay-pipeline, BE-CV-TASK-083-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 K5/H7: `estimated` không phần trăm, không cộng với `measured`; `estimatedNote` là khoá i18n. Chỉ lưu khi có run liên quan.
@@ -19,7 +19,7 @@ K5/H7: `estimated` không phần trăm, không cộng với `measured`; `estimat
 - Bảng ca; phản chiếu: không trường pct/stmts/covered.
 
 ## Tiêu chí hoàn thành
-- [ ] Cổng (SOL-085) nhận `source=estimated` phân biệt được.
+- [x] Cổng (SOL-085) nhận `source=estimated` phân biệt được.
 
 ## Rủi ro
 Báo nhầm kế thừa CR-036.

@@ -3,6 +3,7 @@ package agentwsserver
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http/httptest"
 	"strings"
 	"testing"
@@ -567,3 +568,121 @@ func TestServer_MalformedFirstFrame_ClosesConnection(t *testing.T) {
 		t.Errorf("close status = %v (err=%v), want %v", status, err, websocket.StatusPolicyViolation)
 	}
 }
+
+func TestInboundHandshake_AcceptsUnknownFields(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	registry.Register("tok-unknown", "ds-unknown", nil)
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version"}, nil)
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{
+		"agentToken":   "tok-unknown",
+		"unknownField": "should-be-ignored",
+		"features":     []string{"f1"},
+	})
+	defer conn.CloseNow()
+
+	select {
+	case call := <-attacher.attached:
+		if call.devServerID != "ds-unknown" {
+			t.Errorf("devServerID = %q, want ds-unknown", call.devServerID)
+		}
+		if len(call.info.Features) != 1 || call.info.Features[0] != "f1" {
+			t.Errorf("features = %v, want [f1]", call.info.Features)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("AttachInboundSession was never called")
+	}
+}
+
+func TestInboundHandshake_FeaturesCapped(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	registry.Register("tok-cap-features", "ds-cap-features", nil)
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version"}, nil)
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	var lotsOfFeatures []string
+	for i := 0; i < 100; i++ {
+		lotsOfFeatures = append(lotsOfFeatures, fmt.Sprintf("feat_%03d", i))
+	}
+
+	conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{
+		"agentToken": "tok-cap-features",
+		"features":   lotsOfFeatures,
+	})
+	defer conn.CloseNow()
+
+	select {
+	case call := <-attacher.attached:
+		if call.devServerID != "ds-cap-features" {
+			t.Errorf("devServerID = %q", call.devServerID)
+		}
+		if len(call.info.Features) != 64 {
+			t.Errorf("features len = %d, want 64", len(call.info.Features))
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("AttachInboundSession was never called")
+	}
+}
+
+func TestInboundHandshake_ToolsPreserved(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	registry.Register("tok-tools", "ds-tools", nil)
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version"}, nil)
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{
+		"agentToken":   "tok-tools",
+		"capabilities": []string{"pty", "fs", "git", "codeintel", "codeintel.gitnexus"},
+		"tools":        []string{"gitnexus", "codegraph", "git"},
+	})
+	defer conn.CloseNow()
+
+	select {
+	case call := <-attacher.attached:
+		if len(call.info.Tools) != 3 || call.info.Tools[0] != "gitnexus" || call.info.Tools[1] != "codegraph" || call.info.Tools[2] != "git" {
+			t.Errorf("tools = %v, want [gitnexus codegraph git]", call.info.Tools)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("AttachInboundSession was never called")
+	}
+}
+
+func TestInboundHandshake_ToolsOmittedNil(t *testing.T) {
+	registry := NewRegistry(time.Hour)
+	t.Cleanup(registry.Stop)
+	registry.Register("tok-no-tools", "ds-no-tools", nil)
+
+	attacher := newFakeAttacher()
+	srv := New(registry, attacher, Config{OrcaVersion: "test-version"}, nil)
+	ts := httptest.NewServer(srv)
+	t.Cleanup(ts.Close)
+
+	// handshake without "tools" field
+	conn := dialAndSendHandshake(t, wsURLFor(ts), map[string]any{
+		"agentToken": "tok-no-tools",
+	})
+	defer conn.CloseNow()
+
+	select {
+	case call := <-attacher.attached:
+		if call.info.Tools != nil {
+			t.Errorf("expected Tools == nil when omitted, got %v", call.info.Tools)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("AttachInboundSession was never called")
+	}
+}
+

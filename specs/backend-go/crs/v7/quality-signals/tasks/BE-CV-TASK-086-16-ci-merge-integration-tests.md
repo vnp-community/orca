@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/refresh_ci_run_integration_test.go` (mới, `-tags=integration`)
 **Depends on:** BE-CV-TASK-086-14, 086-15
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Ma trận `dialect: [postgres, mysql]`; scm giả (gRPC) theo kịch bản mục 4 của SOL.
@@ -19,7 +19,7 @@ Ma trận `dialect: [postgres, mysql]`; scm giả (gRPC) theo kịch bản mục
 - `go test -tags=integration ./internal/... -v` mỗi dialect.
 
 ## Tiêu chí hoàn thành
-- [ ] Mọi mục SOL §4 có test.
+- [x] Mọi mục SOL §4 có test.
 
 ## Rủi ro
 Thời gian TTL: dùng đồng hồ DB chỉnh được trong test.

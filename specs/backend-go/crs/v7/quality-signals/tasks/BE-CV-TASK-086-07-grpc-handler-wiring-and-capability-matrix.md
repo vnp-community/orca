@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/adapter/grpc/server_commit_checks.go`, `cmd/server/main.go` (sửa), `README.md` của service (mục Known gaps)
 **Depends on:** BE-CV-TASK-086-01, 086-03, 086-04, 086-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `grpc.New` có ~47 tham số vị trí: dùng `WithCommitChecks`.
@@ -19,7 +19,7 @@
 - `go build ./... && go vet ./... && go test ./...`; workflow `backend-go-scm-integration-service.yml` không cần đổi.
 
 ## Tiêu chí hoàn thành
-- [ ] RPC gọi được bằng `grpcurl` (reflection bật sẵn); không file frontend bị sửa.
+- [x] RPC gọi được bằng `grpcurl` (reflection bật sẵn); không file frontend bị sửa.
 
 ## Rủi ro
 Thứ tự đăng ký trong `main.go` dễ nhầm do danh sách dài.

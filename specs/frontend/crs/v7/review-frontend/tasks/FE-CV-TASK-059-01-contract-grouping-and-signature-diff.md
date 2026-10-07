@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/contract/contract-grouping.ts`, `contract-detail-rows.ts`, `contract-signature-diff.ts` (mới) + `*.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `ContractChange`, `ContractDiff`); FE-CV-TASK-057-01 (`maskSensitiveText`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

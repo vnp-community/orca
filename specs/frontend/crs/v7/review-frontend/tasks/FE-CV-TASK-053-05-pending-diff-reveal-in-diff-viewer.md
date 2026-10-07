@@ -5,7 +5,7 @@
 **Area:** frontend / editor
 **File:** `store/slices/editor.ts` (:740-741 mẫu), `components/editor/diff-viewer-props.ts`, `EditorContent.tsx` (:963-981 theo CR), `DiffViewer.tsx` (:166-245, :318-383), `components/editor/use-diff-line-reveal.ts` (mới), tests
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

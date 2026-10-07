@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/add_edge.go`, `internal/usecase/execute_task.go`, `internal/usecase/update_task.go`, `internal/adapter/{postgres,mysql}/execution_leases.go`, `internal/adapter/postgres/repository.go` (`HasActiveExecutions`), `internal/adapter/mysql/repository.go`, `internal/adapter/{postgres,mysql}/velocity.go`, `internal/usecase/create_task.go`
 **Depends on:** TASK-REQ-011-03, TASK-REQ-011-05
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -37,11 +37,11 @@ Các chỗ trong code hiện tại sẽ làm hỏng trạng thái suy ra hoặc 
 
 ## Tiêu chí hoàn thành
 
-- [ ] `ExecuteTask` trên plan/phase trả `TASK_EXECUTE_CONTAINER_NOT_EXECUTABLE`, không link, không đổi status.
-- [ ] `UpdateTask` `done`/`in_progress`/`open` trên container bị từ chối; `cancelled` được chấp nhận.
-- [ ] Container `in_progress` không có link không bị sweep đặt về `open` sau grace.
-- [ ] `depends_on` giữa hai phase không đặt phase `blocked`; giữa hai task làm việc vẫn `blocked` như cũ.
-- [ ] `HasActiveExecutions` và `RecentCompletedTasks` bỏ qua container.
+- [x] `ExecuteTask` trên plan/phase trả `TASK_EXECUTE_CONTAINER_NOT_EXECUTABLE`, không link, không đổi status.
+- [x] `UpdateTask` `done`/`in_progress`/`open` trên container bị từ chối; `cancelled` được chấp nhận.
+- [x] Container `in_progress` không có link không bị sweep đặt về `open` sau grace.
+- [x] `depends_on` giữa hai phase không đặt phase `blocked`; giữa hai task làm việc vẫn `blocked` như cũ.
+- [x] `HasActiveExecutions` và `RecentCompletedTasks` bỏ qua container.
 
 ## Rủi ro và lưu ý
 

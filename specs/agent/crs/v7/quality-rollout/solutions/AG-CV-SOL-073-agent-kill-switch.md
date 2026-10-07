@@ -1,6 +1,6 @@
 # AG-CV-SOL-073: Công tắc tắt cứng tại máy (`ORCA_CODEINTEL_DISABLED`) cho `agent/`
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi dòng "đã đọc" là đọc code/tài liệu thật; chưa chạy gì.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 073-01 đến 073-06, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-073](../../../../../../docs/crs/v7/quality-rollout/CR-CV-073-e2e-feature-flag-rollout-runbook.md) (P0) — chỉ dòng "Agent" của mục 2.1, bước 3 của mục 2.7 và runbook; phần còn lại thuộc BE/FE
 **Service:** `agent/`
@@ -101,12 +101,12 @@ Công tắc này tắt cả `quality.*` (ba mã `quality_disabled` vẫn dành c
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] Bảng 2.3 đúng cho mọi method trong `CODEINTEL_METHODS` và `QUALITY_METHODS` (test lặp theo hằng; thêm method mà quên cổng → đỏ).
-- [ ] Không có `spawn`/`fs`/`git` nào được gọi khi tắt (spy); `-32601` không bao giờ.
-- [ ] Handshake không có capability `codeintel*`/`quality`; có lại sau khi bỏ biến và dựng lại dispatcher.
-- [ ] Giá trị lạ → tắt + cảnh báo; không rò giá trị env khác.
-- [ ] Runbook trong `deploy/agent/` hướng dẫn đặt biến và restart; đã thử trên một dev server (hoặc ghi "chưa thử").
-- [ ] Không phụ thuộc mới; không `max-lines` disable.
+- [x] Bảng 2.3 đúng cho mọi method trong `CODEINTEL_METHODS` và `QUALITY_METHODS` (test lặp theo hằng; thêm method mà quên cổng → đỏ).
+- [x] Không có `spawn`/`fs`/`git` nào được gọi khi tắt (spy); `-32601` không bao giờ.
+- [x] Handshake không có capability `codeintel*`/`quality`; có lại sau khi bỏ biến và dựng lại dispatcher.
+- [x] Giá trị lạ → tắt + cảnh báo; không rò giá trị env khác.
+- [x] Runbook trong `deploy/agent/` hướng dẫn đặt biến và restart; đã thử trên một dev server (hoặc ghi "chưa thử").
+- [x] Không phụ thuộc mới; không `max-lines` disable.
 
 ## 5. Kiểm thử
 

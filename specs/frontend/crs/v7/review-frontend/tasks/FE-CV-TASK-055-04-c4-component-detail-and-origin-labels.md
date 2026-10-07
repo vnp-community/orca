@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `C4ComponentDetail.tsx`, `C4InferredNotice.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-055-03, FE-CV-TASK-053-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

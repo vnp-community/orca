@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/audit_recorder.go`, `internal/adapter/grpcclient/audit_recorder.go`, `_test.go` (mới); `cmd/server/main.go` (nối)
 **Depends on:** BE-CV-TASK-012-04 (`dial.go`), 013-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] RPC không chờ `auth-service`.
-- [ ] Mất bản ghi đo được qua bộ đếm.
+- [x] RPC không chờ `auth-service`.
+- [x] Mất bản ghi đo được qua bộ đếm.
 
 ## Rủi ro và lưu ý
 

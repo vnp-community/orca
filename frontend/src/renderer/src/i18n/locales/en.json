@@ -10152,6 +10152,33 @@
             "workspaceGone": "Couldn't open log — workspace is no longer available.",
             "notAuthorized": "Couldn't open log — path not authorized.",
             "alreadyEditable": "Log is already open for editing."
+          },
+          "qualityGateNotice": {
+            "title": {
+              "fail": "Quality checks failed",
+              "warn": "Quality checks have warnings",
+              "unknown": "Quality status unavailable"
+            },
+            "stale": "Outdated",
+            "timedOut": "Timed out",
+            "unavailable": "Quality service is unavailable. Try again later.",
+            "reasons": "Failure reasons",
+            "openReason": "Open reason {{check}} in Review",
+            "runChecks": "Run checks",
+            "moreReasons": "+{{count}} more",
+            "reason": {
+              "coverage_below_threshold": "Coverage {{observed}}% is below threshold {{threshold}}%",
+              "complexity_exceeded": "Complexity exceeds threshold for {{check}}",
+              "duplication_exceeded": "Duplication exceeds threshold for {{check}}",
+              "security_violations": "Security violations in {{check}}",
+              "reliability_violations": "Reliability violations in {{check}}",
+              "maintainability_violations": "Maintainability violations in {{check}}",
+              "tech_debt_exceeded": "Technical debt exceeds threshold for {{check}}",
+              "hotspot_count_exceeded": "Hotspot count exceeds limit for {{check}}",
+              "new_violations_found": "New violations found in {{check}}",
+              "dependency_vulnerabilities": "Dependency vulnerabilities in {{check}}",
+              "unknown": "{{check}}"
+            }
           }
         }
       },
@@ -12988,6 +13015,39 @@
           "saved": "Jira mapping updated",
           "saveFailed": "Failed to update the Jira mapping."
         }
+      },
+      "request": {
+        "RequestStatus": {
+          "submitted": "Submitted",
+          "classifying": "Classifying",
+          "awaiting_type_confirmation": "Awaiting Type Confirmation",
+          "analyzing": "Analyzing",
+          "awaiting_analysis_approval": "Awaiting Analysis Approval",
+          "awaiting_information": "Awaiting Information",
+          "planning": "Planning",
+          "awaiting_plan_approval": "Awaiting Plan Approval",
+          "executing": "Executing",
+          "completed": "Completed",
+          "cancelled": "Cancelled",
+          "request_backlog": "Backlog",
+          "unknown": "Unknown"
+        },
+        "RequestPage": {
+          "title": "Requests",
+          "tab": {
+            "requests": "Requests",
+            "approvals": "Approvals",
+            "backlog": "Backlog"
+          }
+        },
+        "RequestUnsupportedNotice": {
+          "title": "Request management not supported",
+          "body": "The connected runtime does not support the request-service."
+        },
+        "SidebarRequestNavButton": {
+          "label": "Requests",
+          "badge": "pending approvals"
+        }
       }
     },
     "i18n": {
@@ -13749,6 +13809,29 @@
         "empty": "No external MCP servers yet. Add a server so agents can use its tools once an admin approves it.",
         "noMatch": "No servers match.",
         "scopeField": "Scope"
+      }
+    },
+    "features": {
+      "codeIntel": {
+        "indexStatus": {
+          "READY": "Ready",
+          "INDEXING": "Indexing",
+          "PARTIAL": "Partial index",
+          "ERROR": "Index error",
+          "UNKNOWN": "Unknown status"
+        },
+        "reviewTab": {
+          "title": "Review",
+          "empty": "No review data available",
+          "loading": "Loading review...",
+          "error": "Failed to load review"
+        },
+        "settingsState": {
+          "unknown": "Loading...",
+          "enabled": "Code Intelligence enabled",
+          "disabled": "Code Intelligence disabled",
+          "unsupported": "Not supported in this environment"
+        }
       }
     }
   },

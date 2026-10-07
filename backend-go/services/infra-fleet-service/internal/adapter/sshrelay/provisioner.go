@@ -61,7 +61,10 @@ type inboundHandshakeParams struct {
 	Arch         string   `json:"arch"`
 	NodeVersion  string   `json:"nodeVersion"`
 	AgentVersion string   `json:"agentVersion"`
-	Capabilities []string `json:"capabilities"`
+	Capabilities    []string `json:"capabilities"`
+	Features        []string `json:"features"`
+	ProtocolVersion int      `json:"protocolVersion"`
+	BuildVersion    string   `json:"buildVersion"`
 }
 
 // Provisioner implements devserveragent.SshProvisioner.
@@ -247,12 +250,15 @@ func (p *Provisioner) receiveHandshake(ctx context.Context, t devserveragent.Tra
 	}
 
 	return devserveragent.HandshakeInfo{
-		Platform:     firstNonEmpty(params.Platform, "linux"),
-		Arch:         firstNonEmpty(params.Arch, "x64"),
-		NodeVersion:  firstNonEmpty(params.NodeVersion, "unknown"),
-		AgentVersion: firstNonEmpty(params.AgentVersion, "unknown"),
-		SessionID:    sessionID,
-		Capabilities: params.Capabilities,
+		Platform:        firstNonEmpty(params.Platform, "linux"),
+		Arch:            firstNonEmpty(params.Arch, "x64"),
+		NodeVersion:     firstNonEmpty(params.NodeVersion, "unknown"),
+		AgentVersion:    firstNonEmpty(params.AgentVersion, "unknown"),
+		SessionID:       sessionID,
+		Capabilities:    params.Capabilities,
+		Features:        domain.SanitizeAgentFeatures(params.Features),
+		ProtocolVersion: params.ProtocolVersion,
+		BuildVersion:    params.BuildVersion,
 	}, nil
 }
 

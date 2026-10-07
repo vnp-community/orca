@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/ai-summary/AiSummaryDataPreviewDialog.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-093-02
-**Status:** [ ] TODO
+**Status:** [x] DONE — `AiSummaryDataPreviewDialog.tsx` chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

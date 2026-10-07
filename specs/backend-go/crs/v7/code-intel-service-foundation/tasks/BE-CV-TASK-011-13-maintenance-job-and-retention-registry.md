@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/snapshot_maintenance.go`, `internal/usecase/snapshot_maintenance_test.go` (mới); `backend-go/services/code-intel-service/cmd/server/main.go` (sửa)
 **Depends on:** BE-CV-TASK-011-06, 011-12, 010-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Hợp đồng §4.3: mỗi `CODEINTEL_MAINTENANCE_INTERVAL` (10 phút), lô 500.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Job `running` quá hạn → `failed` + `CODEINTEL_REINDEX_ORPHANED`, `active_key = NULL`, có sự kiện.
-- [ ] Snapshot hết hạn/hạn mức/sai schema bị dọn; binding mồ côi dọn dữ liệu phụ thuộc sau hạn.
-- [ ] Lỗi cục bộ không dừng vòng; shutdown sạch.
+- [x] Job `running` quá hạn → `failed` + `CODEINTEL_REINDEX_ORPHANED`, `active_key = NULL`, có sự kiện.
+- [x] Snapshot hết hạn/hạn mức/sai schema bị dọn; binding mồ côi dọn dữ liệu phụ thuộc sau hạn.
+- [x] Lỗi cục bộ không dừng vòng; shutdown sạch.
 
 ## Rủi ro và lưu ý
 

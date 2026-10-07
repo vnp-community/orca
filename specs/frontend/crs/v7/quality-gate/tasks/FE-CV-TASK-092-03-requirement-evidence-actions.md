@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/requirements/use-requirement-trace.ts` (mở rộng), test
 **Depends on:** FE-CV-TASK-092-02
-**Status:** [ ] TODO
+**Status:** [x] DONE — `requirement-evidence-actions.ts` chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

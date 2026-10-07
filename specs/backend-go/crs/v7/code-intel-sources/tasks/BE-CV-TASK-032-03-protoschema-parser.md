@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/protoschema/tokenizer.go`, `parser.go`, `message_shape.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-032-01, BE-CV-TASK-032-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ SOL-032 mục 2.C.1. Phương án A (không dependency; O-7).
 
 ## Tiêu chí hoàn thành
 
-- [ ] 18 file, 548 RPC, cờ stream khớp.
-- [ ] Cú pháp lạ không panic.
+- [x] 18 file, 548 RPC, cờ stream khớp.
+- [x] Cú pháp lạ không panic.
 
 ## Rủi ro và lưu ý
 

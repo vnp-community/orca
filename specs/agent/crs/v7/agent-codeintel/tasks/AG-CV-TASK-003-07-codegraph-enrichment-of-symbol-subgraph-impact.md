@@ -21,7 +21,7 @@ Contract §4.4–4.6: `symbol` thêm `codegraphId`, `signature`, `docstring`, `i
 Lệnh: `pnpm exec vitest run src/relay/codeintel-codegraph-methods.test.ts src/relay/codeintel-gitnexus-methods.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] GitNexus-only vẫn chạy khi CodeGraph vắng.
+- [x] GitNexus-only vẫn chạy khi CodeGraph vắng.
 
 ## Rủi ro
 - Sửa handler SOL-002: chạy `gitnexus impact` cho các hàm handler trước khi sửa.

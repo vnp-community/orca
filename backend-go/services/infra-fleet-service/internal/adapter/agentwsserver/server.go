@@ -14,6 +14,7 @@ import (
 	"github.com/coder/websocket"
 
 	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/adapter/devserveragent"
+	"github.com/stablyai/orca-go/services/infra-fleet-service/internal/domain"
 )
 
 const (
@@ -77,7 +78,11 @@ type inboundHandshakeParams struct {
 	Arch         string   `json:"arch"`
 	NodeVersion  string   `json:"nodeVersion"`
 	AgentVersion string   `json:"agentVersion"`
-	Capabilities []string `json:"capabilities"`
+	Capabilities    []string `json:"capabilities"`
+	Tools           []string `json:"tools"`
+	Features        []string `json:"features"`
+	ProtocolVersion int      `json:"protocolVersion"`
+	BuildVersion    string   `json:"buildVersion"`
 }
 
 // handshakeOKResult mirrors AgentHandshakeResult — the result Orca returns
@@ -210,12 +215,16 @@ func (s *Server) handleConnection(ctx context.Context, conn *websocket.Conn) {
 	}
 
 	info := devserveragent.HandshakeInfo{
-		Platform:     firstNonEmpty(params.Platform, "linux"),
-		Arch:         firstNonEmpty(params.Arch, "x64"),
-		NodeVersion:  firstNonEmpty(params.NodeVersion, "unknown"),
-		AgentVersion: firstNonEmpty(params.AgentVersion, "unknown"),
-		SessionID:    sessionID,
-		Capabilities: params.Capabilities,
+		Platform:        firstNonEmpty(params.Platform, "linux"),
+		Arch:            firstNonEmpty(params.Arch, "x64"),
+		NodeVersion:     firstNonEmpty(params.NodeVersion, "unknown"),
+		AgentVersion:    firstNonEmpty(params.AgentVersion, "unknown"),
+		SessionID:       sessionID,
+		Capabilities:    params.Capabilities,
+		Tools:           params.Tools,
+		Features:        domain.SanitizeAgentFeatures(params.Features),
+		ProtocolVersion: params.ProtocolVersion,
+		BuildVersion:    params.BuildVersion,
 	}
 
 	// host is irrelevant for inbound sessions — devserveragent never dials

@@ -31,8 +31,8 @@ Bảng tool và tham số: SOL-041 2.2. Bẫy mã thật: `Field` chỉ có stri
 
 ## Tiêu chí hoàn thành
 
-- [ ] 9 spec đúng bảng; schema đóng, không khoá danh tính.
-- [ ] `impact`/`symbol` dựng đúng đối số kênh.
+- [x] 9 spec đúng bảng; schema đóng, không khoá danh tính.
+- [x] `impact`/`symbol` dựng đúng đối số kênh.
 
 ## Rủi ro và lưu ý
 

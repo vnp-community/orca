@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/domain/agent_claim_reconciler.go`, `internal/usecase/reconcile_agent_turn.go`, `internal/adapter/eventbus/agent_turn_reconcile_consumer.go` (mới)
 **Depends on:** BE-CV-TASK-089-05, BE-CV-TASK-085-05 (profile hiệu lực), BE-CV-SOL-082
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. Reconciler thuần theo bảng SOL-089 §2.4 (`consistent|contradicted|unverified|not_claimed`; `build_ok`/`all_done` ⇒ `unverified/no_equivalent_check`; cây bẩn ⇒ `unverified/tree_may_differ`).
@@ -17,7 +17,7 @@
 - Bảng 4 trạng thái × cây sạch/bẩn × run `succeeded|failed|env`; thứ tự sự kiện ngược; giao lặp.
 
 ## Tiêu chí hoàn thành
-- [ ] `contradicted` chỉ khi hai phía sạch; [ ] `GetQualityGate` không đổi khi có verification.
+- [x] `contradicted` chỉ khi hai phía sạch; [ ] `GetQualityGate` không đổi khi có verification.
 
 ## Rủi ro
 - Không có dấu vân tay cây ở lượt ⇒ lượt kết thúc khi cây bẩn không bao giờ `contradicted`.

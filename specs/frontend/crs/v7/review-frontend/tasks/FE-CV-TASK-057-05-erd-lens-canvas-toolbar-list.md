@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/erd/{ErdLens,ErdToolbar,ErdCanvas,ErdTableNode,ErdGhostTableNode,ErdSchemaGroupNode,ErdRelationEdge,ErdColumnRow,ErdTableList,ErdLegend,ErdWarningsStrip}.tsx` (mới) + test; `review-lens-registry.ts` (SOL-051, thêm một mục đăng ký `id:'erd'`)
 **Depends on:** FE-CV-TASK-057-02, 057-03, 057-04; FE-CV-SOL-051-review-workspace-shell (`ReviewLensProps`, `ReviewViewStateScreen`, `usePerceivedLoadingStage`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

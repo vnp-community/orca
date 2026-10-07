@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/get_storage_map.go`, `get_storage_map_test.go`; `internal/usecase/ports.go` (sửa: dùng `RepoSourceReader`, `SnapshotStore`, `TargetResolver`, `FeatureGate`, `Authorizer` của các solution khác); `internal/adapter/grpc/storage_map_handler.go`, `storage_map_handler_test.go`; `testdata/storage/golden/storage_map.json` (mới); `cmd/server/main.go` (sửa: đăng ký handler — một dòng, do `BE-CV-SOL-010` mở sẵn chỗ)
 **Depends on:** BE-CV-TASK-035-02, 035-03, 035-04, 035-05, 035-06, 035-07; BE-CV-SOL-012, 013, 022 (các port; nếu 022 chưa có thì chỉ cache bộ nhớ)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -33,10 +33,10 @@ Lắp ráp: kiểm cờ/quyền ⇒ đọc nguồn ⇒ parse độc lập ⇒ h�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Toàn bộ tiêu chí §9 của solution 035 đạt trên fixture.
-- [ ] Không có đường nào đọc `.env`; test cổng giả xanh.
-- [ ] Quyền kiểm trước cache; test cô lập tenant xanh.
-- [ ] `buf breaking` xanh; kênh `codeIntel.storage` còn **chưa** đăng ký ở gateway (việc của `BE-CV-SOL-040-codeintel-view-channels`).
+- [x] Toàn bộ tiêu chí §9 của solution 035 đạt trên fixture.
+- [x] Không có đường nào đọc `.env`; test cổng giả xanh.
+- [x] Quyền kiểm trước cache; test cô lập tenant xanh.
+- [x] `buf breaking` xanh; kênh `codeIntel.storage` còn **chưa** đăng ký ở gateway (việc của `BE-CV-SOL-040-codeintel-view-channels`).
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/adapter/sources/{request_origin.go,history.go,ownership.go,dev_server_profile.go}` (mới) và `_test.go`; `.../internal/adapter/grpcclient/{issue_context_client.go,ownership_client.go,dev_server_profile_client.go}` (mới); `.../internal/usecase/ports.go` (thêm cổng đọc); `.../internal/adapter/{postgres,mysql}/request_history_queries.go` (mới)
 **Depends on:** TASK-REQ-031-02; BE-REQ-SOL-002 (bảng `requests`, `solutions`); BE-REQ-SOL-013 (`task_run_outcomes`, nếu chưa có thì `history` bỏ phần kết quả thực thi)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -73,11 +73,11 @@ type DevServerProfile struct {
 
 ## Tiêu chí hoàn thành
 
-- [ ] `request_origin` không lấy thân Request, chỉ comment, liên kết; `Trust=low`.
-- [ ] `history` không đưa `body` của Request cũ vào pack.
-- [ ] `dev_server_profile` không bao giờ chứa giá trị biến môi trường (test quét).
-- [ ] Truy vấn lịch sử cách ly tenant và thoát ký tự đại diện, cả hai dialect.
-- [ ] Khi RPC `GetDevServerCapabilities` chưa có, Builder vẫn dựng pack với `missing{dev_server_profile, not_connected}`.
+- [x] `request_origin` không lấy thân Request, chỉ comment, liên kết; `Trust=low`.
+- [x] `history` không đưa `body` của Request cũ vào pack.
+- [x] `dev_server_profile` không bao giờ chứa giá trị biến môi trường (test quét).
+- [x] Truy vấn lịch sử cách ly tenant và thoát ký tự đại diện, cả hai dialect.
+- [x] Khi RPC `GetDevServerCapabilities` chưa có, Builder vẫn dựng pack với `missing{dev_server_profile, not_connected}`.
 
 ## Rủi ro và lưu ý
 

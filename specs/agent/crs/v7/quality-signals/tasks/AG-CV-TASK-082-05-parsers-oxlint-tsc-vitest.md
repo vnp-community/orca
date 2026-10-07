@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-parser-oxlint.ts`, `quality-parser-tsc.ts`, `quality-parser-vitest.ts` + test
 **Depends on:** AG-CV-TASK-082-01, 082-02, 082-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,7 +24,7 @@ Mỗi file test: hợp lệ (fixture), rỗng, nhiều phát hiện, Unicode, CR
 
 ## Tiêu chí hoàn thành
 
-- [ ] Khớp `*.expected.json`; drift được phát hiện; không ném.
+- [x] Khớp `*.expected.json`; drift được phát hiện; không ném.
 
 ## Rủi ro
 

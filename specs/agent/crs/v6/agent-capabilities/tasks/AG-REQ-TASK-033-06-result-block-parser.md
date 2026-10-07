@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-result-block-parser.ts` (mới), `agent/src/relay/agent-result-block-parser.test.ts` (mới)
 **Depends on:** không (hàm thuần; task 08 nối vào handler)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -70,11 +70,11 @@ Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/agent-re
 
 ## Tiêu chí hoàn thành
 
-- [ ] Nonce đúng thì phân tích; nonce sai, thiếu, đánh dấu giữa câu thì bị bỏ qua.
-- [ ] Bốn mã lỗi đúng theo bảng CR; `TOO_LARGE` kiểm trước `JSON.parse`.
-- [ ] Khối cuối thắng khi có nhiều khối.
-- [ ] `detail` không chứa nội dung khối (test khẳng định bằng chuỗi nhận diện).
-- [ ] Hàm thuần, không import `fs`/`os`/`process`; không log.
+- [x] Nonce đúng thì phân tích; nonce sai, thiếu, đánh dấu giữa câu thì bị bỏ qua.
+- [x] Bốn mã lỗi đúng theo bảng CR; `TOO_LARGE` kiểm trước `JSON.parse`.
+- [x] Khối cuối thắng khi có nhiều khối.
+- [x] `detail` không chứa nội dung khối (test khẳng định bằng chuỗi nhận diện).
+- [x] Hàm thuần, không import `fs`/`os`/`process`; không log.
 
 ## Rủi ro và lưu ý
 

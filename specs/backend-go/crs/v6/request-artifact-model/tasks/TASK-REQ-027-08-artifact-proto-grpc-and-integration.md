@@ -5,7 +5,7 @@
 **Service:** `request-service` · `proto`
 **File:** `backend-go/proto/orca/request/v1/artifact.proto`, `backend-go/proto/orca/request/v1/request.proto` (sửa: thêm trường vào `Request`, `Solution`, `CreateRequestRequest`), `internal/adapter/grpc/artifact_server.go`, `internal/adapter/grpc/request_mapper.go` (sửa, của TASK-REQ-002-07), `internal/usecase/artifact_integration_test.go`, `services/request-service/README.md` (sửa) và test (mới trừ file sửa)
 **Depends on:** TASK-REQ-027-04, 027-05, 027-06, 027-07, TASK-REQ-001-02 (proto khung), TASK-REQ-001-05 (gRPC server)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -59,12 +59,12 @@ Thêm trường vào message có sẵn là cộng thêm (additive), `buf breakin
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảy RPC hoạt động, mỗi RPC có test chéo tenant trả `NOT_FOUND`.
-- [ ] `ListRequestRevisions` không trả snapshot; `GetRequestRevision` trả đúng AC của revision cũ.
-- [ ] `buf lint` và `buf breaking` sạch; không dùng lại số trường.
-- [ ] Năm kịch bản tích hợp xanh trên Postgres và MySQL.
-- [ ] README ghi rõ quy tắc bất biến và phần chưa kiểm chứng.
-- [ ] Kiểm CI mẫu dùng chung giữa hai service có mặt.
+- [x] Bảy RPC hoạt động, mỗi RPC có test chéo tenant trả `NOT_FOUND`.
+- [x] `ListRequestRevisions` không trả snapshot; `GetRequestRevision` trả đúng AC của revision cũ.
+- [x] `buf lint` và `buf breaking` sạch; không dùng lại số trường.
+- [x] Năm kịch bản tích hợp xanh trên Postgres và MySQL.
+- [x] README ghi rõ quy tắc bất biến và phần chưa kiểm chứng.
+- [x] Kiểm CI mẫu dùng chung giữa hai service có mặt.
 
 ## Rủi ro và lưu ý
 

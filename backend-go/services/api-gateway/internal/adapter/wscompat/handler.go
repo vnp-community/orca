@@ -50,6 +50,10 @@ type SessionValidator interface {
 // (session expiry mid-use), not just first boot.
 const wsCloseAuthRequired websocket.StatusCode = 4401
 
+// wsReadLimitBytes limits the maximum size of a single WebSocket frame/message on /ws.
+// Set to 320 KiB per PQ-14 to accommodate reviewState.save (up to 256 KiB) and c4.save (96 KiB).
+const wsReadLimitBytes int64 = 320 << 10
+
 // Handler serves /ws: ALWAYS completes the WS handshake (matching
 // WsSessionRouter — see wsCloseAuthRequired's doc comment for why this is
 // load-bearing, not a relaxed security posture), resolves the session
@@ -116,6 +120,10 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer conn.CloseNow()
+
+	// Why: PQ-14 requires 320 KiB read limit for /ws so reviewState.save (<= 256 KiB)
+	// and c4.save (<= 96 KiB) payloads are not rejected before reaching channel handlers.
+	conn.SetReadLimit(wsReadLimitBytes)
 
 	identity, err := h.resolveIdentity(r)
 	if err != nil {

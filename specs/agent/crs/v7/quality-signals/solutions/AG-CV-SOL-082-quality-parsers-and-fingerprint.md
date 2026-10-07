@@ -1,6 +1,6 @@
 # AG-CV-SOL-082: Parser đầu ra công cụ, `fingerprint` v1, pipeline chuẩn hoá và phát hiện trôi định dạng
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. "Đã đọc" = đọc code/CR; định dạng đầu ra công cụ **suy từ tài liệu, chưa chạy thật** (task 01 thu fixture thật đầu tiên).
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 082-01 đến 082-09, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-082](../../../../../../docs/crs/v7/quality-signals/CR-CV-082-quality-finding-model-and-parsers.md) (phần agent: 2.2 đến 2.8). Phần proto/bảng/nạp (2.1, 2.9, 2.10) thuộc `BE-CV-SOL-082-quality-run-storage-and-ingest`.
 **Khu vực:** `agent/src/relay/`. **Feature:** `quality-signals`. Task AG-CV-TASK-082-01 đến 09.
@@ -116,15 +116,15 @@ Pipeline (task 04), thứ tự: ánh xạ đường dẫn → che `message`/`fix
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] Mỗi parser ở 5.4 có test trên fixture vàng đúng phiên bản; đầu ra khớp từng byte với `*.expected.json`.
-- [ ] Fingerprint: chèn 5 dòng phía trên giữ; đổi thụt đầu dòng giữ; sửa nội dung dòng đổi; hai phát hiện giống hệt khác nhau nhờ `occurrence`; đổi tên tệp đổi; nâng `toolVersion` giữ; khoá không chứa số dòng; cùng đầu vào hai lần → cùng danh sách và thứ tự.
-- [ ] `file` không bao giờ tuyệt đối hoặc chứa `..`; ngoài repo → `file:""` + `outsideRepoCount`.
-- [ ] `message`/`fixHint` không chứa đường dẫn tuyệt đối, `HOME`, giá trị env nhạy cảm, token; dòng nguồn không bao giờ ra khỏi tiến trình.
-- [ ] 6 000 phát hiện/bước → lưu 5 000, `truncated`, `totalCount=6000`, đếm đúng trước cắt; `message` 5 KiB cắt ở ranh giới UTF-8 ≤ 2 048 byte.
-- [ ] Đầu ra bị sửa (đổi khoá bắt buộc, JSON cụt) → `failed (format_drift)` ở mọi parser; oxlint thoát 1 với 0 phát hiện → `format_drift`; `detail` không chứa đầu ra thô.
-- [ ] golangci-lint 2.x → `env_not_ready (tool_incompatible)`; cùng major khác patch → `untested` vẫn chạy.
-- [ ] Mọi linter trong `backend-go/.golangci.yml` có dòng trong bảng severity (test đọc tệp).
-- [ ] `go test -json` 3 test fail, 1 subtest, 1 panic, 1 lỗi biên dịch → đúng 6 phát hiện.
+- [x] Mỗi parser ở 5.4 có test trên fixture vàng đúng phiên bản; đầu ra khớp từng byte với `*.expected.json`.
+- [x] Fingerprint: chèn 5 dòng phía trên giữ; đổi thụt đầu dòng giữ; sửa nội dung dòng đổi; hai phát hiện giống hệt khác nhau nhờ `occurrence`; đổi tên tệp đổi; nâng `toolVersion` giữ; khoá không chứa số dòng; cùng đầu vào hai lần → cùng danh sách và thứ tự.
+- [x] `file` không bao giờ tuyệt đối hoặc chứa `..`; ngoài repo → `file:""` + `outsideRepoCount`.
+- [x] `message`/`fixHint` không chứa đường dẫn tuyệt đối, `HOME`, giá trị env nhạy cảm, token; dòng nguồn không bao giờ ra khỏi tiến trình.
+- [x] 6 000 phát hiện/bước → lưu 5 000, `truncated`, `totalCount=6000`, đếm đúng trước cắt; `message` 5 KiB cắt ở ranh giới UTF-8 ≤ 2 048 byte.
+- [x] Đầu ra bị sửa (đổi khoá bắt buộc, JSON cụt) → `failed (format_drift)` ở mọi parser; oxlint thoát 1 với 0 phát hiện → `format_drift`; `detail` không chứa đầu ra thô.
+- [x] golangci-lint 2.x → `env_not_ready (tool_incompatible)`; cùng major khác patch → `untested` vẫn chạy.
+- [x] Mọi linter trong `backend-go/.golangci.yml` có dòng trong bảng severity (test đọc tệp).
+- [x] `go test -json` 3 test fail, 1 subtest, 1 panic, 1 lỗi biên dịch → đúng 6 phát hiện.
 
 ## 8. Kiểm thử
 

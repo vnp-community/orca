@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/cmd/server/main.go`, `cmd/server/mysql_driver_dsn.go`, `cmd/server/mysql_driver_dsn_test.go`, `internal/adapter/grpc/server.go`, `internal/adapter/grpc/tenant_stream_interceptor.go`, `internal/adapter/grpc/tenant_stream_interceptor_test.go`, `internal/adapter/eventbus/outbox_relay.go` (đều mới)
 **Depends on:** BE-CV-TASK-010-03, 010-04, 010-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -32,10 +32,10 @@ Mẫu: `notification-service/cmd/server/main.go` (dialect switch dòng 124, `toM
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai dialect khởi động được; DSN lạ thoát mã khác 0.
-- [ ] Stream không metadata tenant bị từ chối; có metadata đọc được tenant.
-- [ ] Relay publish được sự kiện lên NATS testcontainer; lỗi NATS không làm service thoát.
-- [ ] Không gRPC health; `reflection` bật kèm chú thích "sau mesh".
+- [x] Hai dialect khởi động được; DSN lạ thoát mã khác 0.
+- [x] Stream không metadata tenant bị từ chối; có metadata đọc được tenant.
+- [x] Relay publish được sự kiện lên NATS testcontainer; lỗi NATS không làm service thoát.
+- [x] Không gRPC health; `reflection` bật kèm chú thích "sau mesh".
 
 ## Rủi ro và lưu ý
 

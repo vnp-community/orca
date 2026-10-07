@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/record_decision.go`, `internal/usecase/confirm_decision.go`, `internal/usecase/decision_gate.go`, `internal/usecase/choose_solution_option.go` (sửa, của SOL-007), `internal/usecase/solution_approval_handler.go` (sửa), `internal/usecase/plan_subject_handler.go` (sửa, của SOL-012), `internal/usecase/ports.go` (sửa) và test
 **Depends on:** TASK-REQ-028-02, 028-03, TASK-REQ-007-06 (`ChooseSolutionOption`, handler), TASK-REQ-012-06 (handler `plan`/`task_list`), TASK-REQ-027-07 (`OpenQuestion`, `Assumption` có cấu trúc), TASK-REQ-010-02 (`ApprovalAuthorization.Decide`, nếu đã có)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -86,12 +86,12 @@ Quyền: người chọn phải qua `ApprovalAuthorizer.CanDecide` của Approva
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chọn phương án khác đề xuất mà thiếu `rationale` bị `REQUEST_DECISION_RATIONALE_REQUIRED`, không để lại thay đổi nào.
-- [ ] Phương án `breaking_change` ở `chosen` chặn `Approve` bằng `REQUEST_DECISION_NOT_EFFECTIVE` đến khi `ConfirmDecision` đúng tên phương án.
-- [ ] Chọn lại khi Approval `pending`: ghi `decision_history`, xoá xác nhận cũ, digest Approval cập nhật.
-- [ ] Solution `superseded` kéo theo Decision `superseded`.
-- [ ] `open_question.blocking` và `assumption.needs_confirmation` chưa có câu trả lời chặn duyệt với mã đúng.
-- [ ] `diagnosis`, `findings`, `answer` duyệt không cần Decision.
+- [x] Chọn phương án khác đề xuất mà thiếu `rationale` bị `REQUEST_DECISION_RATIONALE_REQUIRED`, không để lại thay đổi nào.
+- [x] Phương án `breaking_change` ở `chosen` chặn `Approve` bằng `REQUEST_DECISION_NOT_EFFECTIVE` đến khi `ConfirmDecision` đúng tên phương án.
+- [x] Chọn lại khi Approval `pending`: ghi `decision_history`, xoá xác nhận cũ, digest Approval cập nhật.
+- [x] Solution `superseded` kéo theo Decision `superseded`.
+- [x] `open_question.blocking` và `assumption.needs_confirmation` chưa có câu trả lời chặn duyệt với mã đúng.
+- [x] `diagnosis`, `findings`, `answer` duyệt không cần Decision.
 
 ## Rủi ro và lưu ý
 

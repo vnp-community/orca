@@ -301,6 +301,8 @@ function toVisibleTabType(contentType: string): WorkspaceVisibleTabType {
   if (contentType === 'browser' || contentType === 'terminal' || contentType === 'simulator') {
     return contentType
   }
+  // CR-050 (FE-CV-TASK-050-15): review tab is a first-class visible type
+  if (contentType === 'review') return 'review'
   return 'editor'
 }
 

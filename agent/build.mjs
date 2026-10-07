@@ -19,7 +19,7 @@ const ROOT = __dirname
 const AGENT_ENTRY = join(ROOT, 'src', 'relay', 'agent-entry.ts')
 const AGENT_OUT = join(ROOT, 'out', 'agent.js')
 const VERSION_OUT = join(ROOT, 'out', '.agent-version')
-const AGENT_VERSION = '2.1.0'
+const AGENT_VERSION = '2.2.0'
 
 const t0 = Date.now()
 

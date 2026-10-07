@@ -20,6 +20,13 @@ var (
 	roleKey      = &contextKey{"role"}
 	projectIDKey = &contextKey{"project_id"}
 	clientIPKey  = &contextKey{"client_ip"}
+	actorTypeKey = &contextKey{"actor_type"}
+)
+
+const (
+	ActorUser   = "user"
+	ActorAgent  = "agent"
+	ActorSystem = "system"
 )
 
 // ErrNoTenant is returned by RequireTenantID when the context carries no
@@ -107,6 +114,11 @@ func WithClientIP(ctx context.Context, ip string) context.Context {
 	return context.WithValue(ctx, clientIPKey, ip)
 }
 
+// WithActorType attaches the actor type ("user", "agent", or "system") to ctx.
+func WithActorType(ctx context.Context, actorType string) context.Context {
+	return context.WithValue(ctx, actorTypeKey, actorType)
+}
+
 // ClientIP returns the caller's real client IP and whether one was present.
 // Empty/ok==false for any request path with no HTTP edge in front of it
 // (e.g. a background job) — never an error, same fail-safe posture as Role.
@@ -126,4 +138,13 @@ func RequireTenantID(ctx context.Context) (string, error) {
 		return "", ErrNoTenant
 	}
 	return id, nil
+}
+
+// ActorType returns the actor type from ctx. Returns "user" if missing or unrecognized.
+func ActorType(ctx context.Context) string {
+	actor, _ := ctx.Value(actorTypeKey).(string)
+	if actor == ActorAgent || actor == ActorSystem {
+		return actor
+	}
+	return ActorUser
 }

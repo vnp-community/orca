@@ -29,8 +29,8 @@ UI-API 3.1: `reindex` (sel, `mode?`) => `{jobId, status, mode, trigger}`, quyề
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai kênh đúng shape; không trường ngoài hợp đồng.
-- [ ] Mã `REINDEX_*` giữ nguyên cho client.
+- [x] Hai kênh đúng shape; không trường ngoài hợp đồng.
+- [x] Mã `REINDEX_*` giữ nguyên cho client.
 
 ## Rủi ro và lưu ý
 

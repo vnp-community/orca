@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-coverage-handler.ts` (mới), dòng `quality.coverage` trong `quality-method-table.ts`, `.test.ts`
 **Depends on:** AG-CV-TASK-083-05, AG-CV-TASK-081-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,7 +23,7 @@ Bảng trạng thái run → đáp ứng; JSON khớp ví dụ hợp đồng; `r
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi nhánh lỗi có `data.code` đúng §3.2.
+- [x] Mọi nhánh lỗi có `data.code` đúng §3.2.
 
 ## Rủi ro
 

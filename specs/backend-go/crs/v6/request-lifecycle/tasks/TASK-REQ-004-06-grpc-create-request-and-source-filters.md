@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/grpc/server.go`, `internal/adapter/grpc/request_mapper.go` (sửa); `internal/adapter/postgres/request_repository.go`, `internal/adapter/mysql/request_repository.go` (sửa `List`); `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-004-03, TASK-REQ-004-04, TASK-REQ-004-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `CreateRequest` thật, trả `created` đúng.
-- [ ] Lọc nguồn đúng, đã chuẩn hoá.
-- [ ] `go vet` xanh; README cập nhật.
+- [x] `CreateRequest` thật, trả `created` đúng.
+- [x] Lọc nguồn đúng, đã chuẩn hoá.
+- [x] `go vet` xanh; README cập nhật.
 
 ## Rủi ro và lưu ý
 

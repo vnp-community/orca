@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/testdata/findings/PROVENANCE.txt` (mới); `testdata/findings/structuralFacts-{layerImports,cycles,importInDegree,fileSizes,unusedExports}.json` (mới); `testdata/findings/git-log-90d.txt`, `git-shortlog.txt`, `CODEOWNERS.sample` (mới)
 **Depends on:** `AG-CV-SOL-037-structural-facts` (tệp vàng G1 nếu có); BE-CV-SOL-030 (chữ ký `Log`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,8 +29,8 @@ Số liệu của CR-037 (6 tệp vi phạm lớp, 93 vòng, 13/1 231 hàm chế
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng đối chiếu đúng/lệch trong PR; `CODEOWNERS` vẫn vắng (hoặc cập nhật Q5).
-- [ ] Mọi fixture có `PROVENANCE`; không dữ liệu cá nhân.
+- [x] Bảng đối chiếu đúng/lệch trong PR; `CODEOWNERS` vẫn vắng (hoặc cập nhật Q5).
+- [x] Mọi fixture có `PROVENANCE`; không dữ liệu cá nhân.
 
 ## Rủi ro và lưu ý
 

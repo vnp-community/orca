@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/eventbus/worktree_deleted_consumer.go`, `internal/usecase/handle_worktree_deleted.go` (+ `_test.go`), `cmd/server/main.go` (sửa)
 **Depends on:** BE-CV-TASK-011-07, 011-09, 010-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Hợp đồng §5: consumer bền, stream `PROJECT`, durable `code-intel-service
 
 ## Tiêu chí hoàn thành
 
-- [ ] Idempotent theo `(tenant_id, event_id)`.
-- [ ] Consumer không làm service thoát khi bus lỗi.
+- [x] Idempotent theo `(tenant_id, event_id)`.
+- [x] Consumer không làm service thoát khi bus lỗi.
 
 ## Rủi ro và lưu ý
 

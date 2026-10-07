@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/0002_request_core.up.sql`, `0002_request_core.down.sql`, `migrations/mysql/0002_request_core.up.sql`, `0002_request_core.down.sql` (mới)
 **Depends on:** TASK-REQ-001-03 (đã có `0001_init`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -34,10 +34,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] up/down/up sạch trên Postgres và MySQL.
-- [ ] Mỗi `CHECK` từ chối giá trị sai.
-- [ ] `FORCE RLS` bật cho cả sáu bảng (kiểm `pg_class.relforcerowsecurity`).
-- [ ] Danh sách giá trị `CHECK` trùng hằng Go (kiểm ở TASK-REQ-002-06).
+- [x] up/down/up sạch trên Postgres và MySQL.
+- [x] Mỗi `CHECK` từ chối giá trị sai.
+- [x] `FORCE RLS` bật cho cả sáu bảng (kiểm `pg_class.relforcerowsecurity`).
+- [x] Danh sách giá trị `CHECK` trùng hằng Go (kiểm ở TASK-REQ-002-06).
 
 ## Rủi ro và lưu ý
 

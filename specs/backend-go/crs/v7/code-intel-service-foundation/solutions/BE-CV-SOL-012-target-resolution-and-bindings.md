@@ -130,15 +130,15 @@ Tuyệt đối (POSIX `/`; Windows `X:\`/`X:/`/UNC); từ chối NUL/điều khi
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] Ba RPC/message có trong `codeintel_binding.proto`; `buf lint` xanh; không trường đường dẫn/tên repo/dev server trong request.
-- [ ] Phân giải đúng 4 dạng id; `::workspace:` → `UNSUPPORTED`; path ngoài ba nguồn → `PATH_NOT_ALLOWED` và **không** gọi `RelayByDevServer` (fake đếm).
-- [ ] Repo cục bộ / dev server `pending_approval` / `MOBILE_EMULATOR` / mode ≠ direct-websocket → đúng mã, không gọi agent.
-- [ ] `RebindRepoDevServer` (giả lập đổi dev server) → binding cập nhật, `index_scope=unresolved`, snapshot bị xoá.
-- [ ] `worktree.deleted` hai lần cùng `event_id` → xoá một lần, không lỗi.
-- [ ] Chuẩn hoá đường dẫn qua bảng test (POSIX, Windows, UNC, tương đối, NUL, > 4096).
-- [ ] Mọi lời gọi ra mang đủ 4 khoá metadata (fake server).
-- [ ] Cô lập tenant: project/worktree/repo tenant khác → không rò sự tồn tại.
-- [ ] Không file tên chung chung; không `max-lines` disable.
+- [x] Ba RPC/message có trong `codeintel_binding.proto`; `buf lint` xanh; không trường đường dẫn/tên repo/dev server trong request.
+- [x] Phân giải đúng 4 dạng id; `::workspace:` → `UNSUPPORTED`; path ngoài ba nguồn → `PATH_NOT_ALLOWED` và **không** gọi `RelayByDevServer` (fake đếm).
+- [x] Repo cục bộ / dev server `pending_approval` / `MOBILE_EMULATOR` / mode ≠ direct-websocket → đúng mã, không gọi agent.
+- [x] `RebindRepoDevServer` (giả lập đổi dev server) → binding cập nhật, `index_scope=unresolved`, snapshot bị xoá.
+- [x] `worktree.deleted` hai lần cùng `event_id` → xoá một lần, không lỗi.
+- [x] Chuẩn hoá đường dẫn qua bảng test (POSIX, Windows, UNC, tương đối, NUL, > 4096).
+- [x] Mọi lời gọi ra mang đủ 4 khoá metadata (fake server).
+- [x] Cô lập tenant: project/worktree/repo tenant khác → không rò sự tồn tại.
+- [x] Không file tên chung chung; không `max-lines` disable.
 
 ## 5. Kiểm thử
 

@@ -149,15 +149,15 @@ Hàng đợi có giới hạn (256 mục, 2 worker, hạn chót 2 giây mỗi l�
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] Mọi method của `CodeIntelService_ServiceDesc` và `QualityGateService_ServiceDesc` (kể cả stream) bị `internalcaller` bảo vệ; thêm RPC thiếu dòng chính sách/guard làm test đỏ; token rỗng → mọi RPC `INTERNAL_CALLER_REQUIRED`.
-- [ ] Không phải thành viên / project của tenant khác / project không tồn tại: cùng `CODEINTEL_NOT_AUTHORIZED`, **không** có `RelayByDevServer` nào (fake đếm).
-- [ ] Bảng role × action đúng (test Rego và test Go dùng bó Rego thật); `member` không `c4_write`/`quality_profile_write`; admin toàn cục tenant khác vẫn bị `GetProject` từ chối.
-- [ ] `project-service`/OPA lỗi → `CODEINTEL_AUTHZ_UNAVAILABLE`, không cho qua; bó Rego thiếu → service không khởi động.
-- [ ] Cờ tắt hoặc lỗi đọc cờ → `CODEINTEL_DISABLED` **trước** mọi lời gọi `project-service`; `GetSettings`/`SetSettings`/`GetReindexJob` vẫn chạy khi tắt; quality tắt → `CODEINTEL_QUALITY_GATE_DISABLED`.
-- [ ] Gỡ thành viên: sau TTL 10 s bị từ chối (đồng hồ giả); cờ đổi hiệu lực ≤ 5 s.
-- [ ] Audit: mỗi dòng bảng một test; `Outcome` ngoài hai hằng không dựng được; hàng đợi đầy tăng bộ đếm, không chặn RPC; `auth-service` giả chậm 5 s không làm chậm RPC.
-- [ ] Cô lập tenant: ctx tenant A + id tenant B không đọc được gì (cache/DB/trạng thái).
-- [ ] `go vet`, `make lint`, `make opa-test` xanh; không `max-lines` disable.
+- [x] Mọi method của `CodeIntelService_ServiceDesc` và `QualityGateService_ServiceDesc` (kể cả stream) bị `internalcaller` bảo vệ; thêm RPC thiếu dòng chính sách/guard làm test đỏ; token rỗng → mọi RPC `INTERNAL_CALLER_REQUIRED`.
+- [x] Không phải thành viên / project của tenant khác / project không tồn tại: cùng `CODEINTEL_NOT_AUTHORIZED`, **không** có `RelayByDevServer` nào (fake đếm).
+- [x] Bảng role × action đúng (test Rego và test Go dùng bó Rego thật); `member` không `c4_write`/`quality_profile_write`; admin toàn cục tenant khác vẫn bị `GetProject` từ chối.
+- [x] `project-service`/OPA lỗi → `CODEINTEL_AUTHZ_UNAVAILABLE`, không cho qua; bó Rego thiếu → service không khởi động.
+- [x] Cờ tắt hoặc lỗi đọc cờ → `CODEINTEL_DISABLED` **trước** mọi lời gọi `project-service`; `GetSettings`/`SetSettings`/`GetReindexJob` vẫn chạy khi tắt; quality tắt → `CODEINTEL_QUALITY_GATE_DISABLED`.
+- [x] Gỡ thành viên: sau TTL 10 s bị từ chối (đồng hồ giả); cờ đổi hiệu lực ≤ 5 s.
+- [x] Audit: mỗi dòng bảng một test; `Outcome` ngoài hai hằng không dựng được; hàng đợi đầy tăng bộ đếm, không chặn RPC; `auth-service` giả chậm 5 s không làm chậm RPC.
+- [x] Cô lập tenant: ctx tenant A + id tenant B không đọc được gì (cache/DB/trạng thái).
+- [x] `go vet`, `make lint`, `make opa-test` xanh; không `max-lines` disable.
 
 ## 5. Kiểm thử
 

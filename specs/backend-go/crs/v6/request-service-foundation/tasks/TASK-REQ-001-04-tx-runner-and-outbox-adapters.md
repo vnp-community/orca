@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/outbox_event.go`, `internal/domain/outbox_subjects.go`, `internal/usecase/ports.go`, `internal/adapter/postgres/{repository.go,tx.go,outbox.go}`, `internal/adapter/mysql/{repository.go,tx.go,outbox.go}` (tất cả mới); test tích hợp cùng thư mục
 **Depends on:** TASK-REQ-001-01, TASK-REQ-001-03
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ---
 
@@ -36,10 +36,10 @@ Lệnh: `go test -tags=integration ./services/request-service/internal/adapter/p
 
 ## Tiêu chí hoàn thành
 
-- [ ] Giao dịch hủy thì không có dòng outbox; commit thì có (cả hai dialect).
-- [ ] `FetchUnpublished` đúng thứ tự; `MarkPublished` rỗng không lỗi.
-- [ ] Postgres: tenant A không đọc được dòng B bằng repository và bằng SQL trực tiếp.
-- [ ] Ba assert `var _` biên dịch.
+- [x] Giao dịch hủy thì không có dòng outbox; commit thì có (cả hai dialect).
+- [x] `FetchUnpublished` đúng thứ tự; `MarkPublished` rỗng không lỗi.
+- [x] Postgres: tenant A không đọc được dòng B bằng repository và bằng SQL trực tiếp.
+- [x] Ba assert `var _` biên dịch.
 
 ## Rủi ro và lưu ý
 

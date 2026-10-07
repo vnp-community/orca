@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/overlayrisk/risk_rules.go`, `risk_scoring.go` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-036-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Solution reading-order §2.C. Mọi điểm hiển thị được; không điể
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng test phủ mọi mã; hằng có tên; `ModelVersion` được test.
-- [ ] Không phụ thuộc ngoài stdlib.
+- [x] Bảng test phủ mọi mã; hằng có tên; `ModelVersion` được test.
+- [x] Không phụ thuộc ngoài stdlib.
 
 ## Rủi ro và lưu ý
 

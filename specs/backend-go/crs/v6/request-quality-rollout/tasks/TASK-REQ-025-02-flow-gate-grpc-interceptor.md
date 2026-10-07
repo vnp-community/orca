@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/adapter/grpc/flow_gate.go` (mới), `.../internal/adapter/grpc/flow_gate_test.go` (mới), `.../cmd/server/main.go`
 **Depends on:** TASK-REQ-025-01
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi RPC có phân loại (test quét proto).
-- [ ] `ReportTaskOutcome` và consumer outbox không bị chặn khi tắt.
-- [ ] Tenant A bật không ảnh hưởng tenant B (test với hai ngữ cảnh).
+- [x] Mọi RPC có phân loại (test quét proto).
+- [x] `ReportTaskOutcome` và consumer outbox không bị chặn khi tắt.
+- [x] Tenant A bật không ảnh hưởng tenant B (test với hai ngữ cảnh).
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `desktop/config/scripts/` và `agent/`
 **File:** `desktop/config/scripts/check-codeintel-relay-parity.mjs` + `.test.mjs` (mới), `agent/src/relay/codeintel-wire-parity.test.ts` (mới)
 **Depends on:** [005](./AG-CV-TASK-006-05-desktop-relay-tree-port.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Chưa có script đồng bộ (audit); khuôn các `check-*.mjs` + `*.test.mjs` ở `desktop/config/scripts/`. Contract §8: `JSON.stringify(result)` Part A == Part B trừ `perf`, `startedAt`.
@@ -19,7 +19,7 @@ Chưa có script đồng bộ (audit); khuôn các `check-*.mjs` + `*.test.mjs` 
 `node desktop/config/scripts/check-codeintel-relay-parity.mjs`; test của script; `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/codeintel-wire-parity.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Lệch cố ý một tệp làm script đỏ.
+- [x] Lệch cố ý một tệp làm script đỏ.
 
 ## Rủi ro
 - Vị trí script chưa chốt (Q3).

@@ -1,0 +1,55 @@
+# CodeIntel Nightly / Dedicated Benchmark Workflow
+# Lưu ý: Workflow này đo đạc hiệu năng agent (TS), chỉ chạy hằng đêm hoặc kích hoạt thủ công,
+# trên môi trường chuyên dụng đã có chỉ mục .gitnexus/ và .codegraph/ của commit Orca cố định.
+# Không chặn pull request (continue-on-error: true).
+
+name: CodeIntel Benchmark
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: 'Runner label to execute benchmark'
+        required: false
+        default: 'ubuntu-latest'
+
+jobs:
+  code-intel-bench:
+    name: CodeIntel Benchmark Run
+    runs-on: ${{ inputs.runner || 'ubuntu-latest' }}
+    continue-on-error: true
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter orca-agent...
+
+      - name: Run CodeIntel Benchmark
+        run: |
+          mkdir -p ./bench-results
+          node agent/scripts/bench-codeintel.mjs --commit ${{ github.sha }} --out ./bench-results
+
+      - name: Verify Performance Budgets
+        run: |
+          node agent/scripts/check-codeintel-bench-budgets.mjs ./bench-results/codeintel-agent-bench-${{ github.sha }}.json
+
+      - name: Upload Benchmark Artifact
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: codeintel-agent-bench-${{ github.sha }}
+          path: ./bench-results/codeintel-agent-bench-*.json
+          retention-days: 30

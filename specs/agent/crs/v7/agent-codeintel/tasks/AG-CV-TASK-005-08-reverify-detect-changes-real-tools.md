@@ -5,7 +5,7 @@
 **Area:** `agent/` (kiểm chứng; chỉ lệnh đọc)
 **File:** fixture `agent/src/relay/codeintel/__fixtures__/detect-changes/*` (mới)
 **Depends on:** [007](./AG-CV-TASK-005-07-detect-changes-method.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Chưa chạy: `FILE_SYMBOLS_BATCH` với `MATCH (n)` + `IN`; hiệu năng diff 446 tệp/1 508 symbol; Git 2.25.
@@ -20,7 +20,7 @@ Chưa chạy: `FILE_SYMBOLS_BATCH` với `MATCH (n)` + `IN`; hiệu năng diff 4
 `pnpm exec vitest run src/relay/codeintel-merge-base-resolution.test.ts src/relay/codeintel-diff-hunk-parser.test.ts src/relay/codeintel-detect-changes.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Thời gian thực đo < 55 s hoặc ghi rõ cần phân trang.
+- [x] Thời gian thực đo < 55 s hoặc ghi rõ cần phân trang.
 
 ## Rủi ro
 - Chạy trên repo thật chỉ đọc; không `analyze`.

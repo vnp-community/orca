@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_security_compliance.{up,down}.sql` (mới), `.../internal/domain/{audit_event.go,audit_metadata.go}` (mới/sửa: do TASK-REQ-024-02 có thể đã tạo `AuditEvent`), `.../internal/usecase/{audit_outbox.go,audit_recorder.go}` (sửa/mới), `.../internal/adapter/{postgres,mysql}/audit_outbox.go` (mới), `.../internal/adapter/auditdelivery/deliverer.go` (mới), `.../cmd/server/main.go` (sửa: chạy bộ giao), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-024-01 (`auditclient.AppendDetailed`, `Entry`), TASK-REQ-024-02 (`AuditRecorder`, `AuditEvent`), TASK-REQ-025-01 (`tenant_settings`), TASK-REQ-035-05 (RLS cho bảng mới)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -62,11 +62,11 @@ ALTER TABLE request.tenant_settings ADD COLUMN request_retention_days INT NOT NU
 
 ## Tiêu chí hoàn thành
 
-- [ ] `request.export` và `request.erase` không mất khi `auth-service` tạm sập (bản ghi nằm trong `request_audit_outbox` và được giao sau).
-- [ ] Mọi hành động ở CR-REQ-024 2.8 và CR 035 2.5 tạo đúng một bản ghi `AppendDetailed` với `actor_type` đúng; không có `title`/`body` trong `metadata_json` (test thuộc tính).
-- [ ] Giao lặp không làm hỏng (có `audit_id` trong metadata).
-- [ ] Migration up/down/up sạch hai dialect; RLS bật cho bảng mới.
-- [ ] Không đổi hành vi `Append`/`AppendDetailed` hiện có.
+- [x] `request.export` và `request.erase` không mất khi `auth-service` tạm sập (bản ghi nằm trong `request_audit_outbox` và được giao sau).
+- [x] Mọi hành động ở CR-REQ-024 2.8 và CR 035 2.5 tạo đúng một bản ghi `AppendDetailed` với `actor_type` đúng; không có `title`/`body` trong `metadata_json` (test thuộc tính).
+- [x] Giao lặp không làm hỏng (có `audit_id` trong metadata).
+- [x] Migration up/down/up sạch hai dialect; RLS bật cho bảng mới.
+- [x] Không đổi hành vi `Append`/`AppendDetailed` hiện có.
 
 ## Rủi ro và lưu ý
 

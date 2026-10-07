@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/e2e/reindex_test.go`, `e2e/permissions_test.go`, `e2e/feature_flag_test.go`, `e2e/review_state_test.go`, `e2e/dev_server_offline_test.go`, `e2e/stream_test.go`, `e2e/rpc_scenario_matrix_test.go` (mới, tag `e2e`)
 **Depends on:** BE-CV-TASK-073-05, 073-06, BE-CV-TASK-072-06, BE-CV-SOL-024, 013-*, 011-*
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,8 +31,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] E05, E11–E14, E18 xanh hai dialect; `TestEveryRPCHasScenario` xanh.
-- [ ] Mỗi waived có lý do và solution sở hữu.
+- [x] E05, E11–E14, E18 xanh hai dialect; `TestEveryRPCHasScenario` xanh.
+- [x] Mỗi waived có lý do và solution sở hữu.
 
 ## Rủi ro và lưu ý
 

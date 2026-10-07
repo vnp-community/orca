@@ -29,9 +29,9 @@ UI-API 3.1: `subgraph` `center` = đúng một `{symbol}|{file}|{cluster}`, `dep
 
 ## Tiêu chí hoàn thành
 
-- [ ] Union được kiểm "đúng một"; từ chối nêu tên trường.
-- [ ] `symbol` trần 320 KiB; đường dẫn xấu => `PATH_NOT_ALLOWED`.
-- [ ] Không cạnh trong `ImpactGraph`.
+- [x] Union được kiểm "đúng một"; từ chối nêu tên trường.
+- [x] `symbol` trần 320 KiB; đường dẫn xấu => `PATH_NOT_ALLOWED`.
+- [x] Không cạnh trong `ImpactGraph`.
 
 ## Rủi ro và lưu ý
 

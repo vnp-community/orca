@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-status.ts` (sửa; do AG-CV-SOL-001 tạo), `agent/src/relay/codeintel-status.test.ts` (sửa/mới), fixture `agent/src/relay/__fixtures__/index-basis/` (task 01)
 **Depends on:** AG-CV-TASK-080-02, 080-03, 080-04; AG-CV-SOL-001 (task tạo `codeintel-status.ts`), AG-CV-SOL-002/003 (probe chỉ mục)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -26,8 +26,8 @@ Hợp đồng §4.1 là hình dạng chuẩn trên dây (PQ-19). Task này nối
 
 ## Tiêu chí hoàn thành
 
-- [ ] Đủ trường theo hợp đồng §4.1; `stale` đúng; `host` có.
-- [ ] Đường dẫn tuyệt đối (`indexRoot`, `repoRoot`) chỉ ở `data`, không vào `warnings`/lỗi.
+- [x] Đủ trường theo hợp đồng §4.1; `stale` đúng; `host` có.
+- [x] Đường dẫn tuyệt đối (`indexRoot`, `repoRoot`) chỉ ở `data`, không vào `warnings`/lỗi.
 
 ## Rủi ro
 

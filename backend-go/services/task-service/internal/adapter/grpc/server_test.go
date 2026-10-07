@@ -1049,3 +1049,50 @@ func TestServer_GenerateShareLink_And_GetTaskByShareToken(t *testing.T) {
 		t.Errorf("unexpected task share view: %+v", viewResp.GetTask())
 	}
 }
+
+func TestServer_ListExecutionStates_MapsFields(t *testing.T) {
+	now := time.Now()
+	reader := &usecase.FakeExecutionStateReader{
+		MockListExecutionStates: func(ctx context.Context, tenantID string, taskIDs []string) ([]domain.ExecutionState, error) {
+			if tenantID != "tenant-1" {
+				t.Errorf("expected tenant-1, got %q", tenantID)
+			}
+			return []domain.ExecutionState{
+				{
+					TaskID:           "task-1",
+					BlockedByTaskIDs: []string{"task-2"},
+					LastEngine:       "orchestration",
+					LastLinkStatus:   "completed",
+					LastStartedAt:    now,
+					LastCompletedAt:  &now,
+					FailedAttempts:   2,
+				},
+			}, nil
+		},
+	}
+	uc := usecase.NewListExecutionStates(reader)
+	
+	s := newTestServer(newFakeTaskRepository(), &fakeEdgeRepository{}).WithListExecutionStates(uc)
+	ctx := tenant.WithTenantID(context.Background(), "tenant-1")
+	
+	req := &taskv1.ListExecutionStatesRequest{TaskIds: []string{"task-1"}}
+	resp, err := s.ListExecutionStates(ctx, req)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	
+	if len(resp.GetStates()) != 1 {
+		t.Fatalf("expected 1 state, got %d", len(resp.GetStates()))
+	}
+	
+	state := resp.GetStates()[0]
+	if state.GetTaskId() != "task-1" || len(state.GetBlockedByTaskIds()) != 1 || state.GetBlockedByTaskIds()[0] != "task-2" {
+		t.Errorf("mapped fields mismatch: %v", state)
+	}
+	if state.GetLastEngine() != "orchestration" || state.GetLastLinkStatus() != "completed" || state.GetFailedAttempts() != 2 {
+		t.Errorf("mapped fields mismatch: %v", state)
+	}
+	if state.GetLastStartedAt().AsTime().Unix() != now.Unix() || state.GetLastCompletedAt().AsTime().Unix() != now.Unix() {
+		t.Errorf("mapped time mismatch: %v", state)
+	}
+}

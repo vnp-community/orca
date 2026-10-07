@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/adapter/gitlab/commit_checks.go`, test, `testdata/` (mới)
 **Depends on:** BE-CV-TASK-086-02, 086-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Bảng ánh xạ job status ở SOL mục 2.E; `projectPath` escape sẵn; `baseURL` self-managed.
@@ -19,7 +19,7 @@ Bảng ánh xạ job status ở SOL mục 2.E; `projectPath` escape sẵn; `base
 - httptest: MR có/không `head_pipeline`, 250 job → truncated, status map đủ, self-managed baseURL.
 
 ## Tiêu chí hoàn thành
-- [ ] Không phụ thuộc gitlab.com.
+- [x] Không phụ thuộc gitlab.com.
 
 ## Rủi ro
 Pipeline kết quả gộp (chưa thử instance thật).

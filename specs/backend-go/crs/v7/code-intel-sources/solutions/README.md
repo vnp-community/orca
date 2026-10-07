@@ -17,12 +17,12 @@
 | CR-CV-033 | [BE-CV-SOL-033-c4-component-view](./BE-CV-SOL-033-c4-component-view.md) | A | P1 | `TASK-033-01…06` | có |
 | CR-CV-033 | [BE-CV-SOL-033-c4-overrides-yaml](./BE-CV-SOL-033-c4-overrides-yaml.md) | A | P1 | `TASK-033-07…11` | có |
 | CR-CV-034 | [BE-CV-SOL-034-data-flow-model](./BE-CV-SOL-034-data-flow-model.md) | A | P1 | `TASK-034-01…09` | có |
-| CR-CV-035 | BE-CV-SOL-035-storage-map | B | P2 | xem `../tasks/README.md` | [có](./BE-CV-SOL-035-storage-map.md) (do nhóm B soạn) |
-| CR-CV-036 | BE-CV-SOL-036-change-overlay-pipeline | B | P0 | xem `../tasks/README.md` | [có](./BE-CV-SOL-036-change-overlay-pipeline.md) (do nhóm B soạn) |
-| CR-CV-036 | BE-CV-SOL-036-reading-order-and-risk | B | P0 | xem `../tasks/README.md` | [có](./BE-CV-SOL-036-reading-order-and-risk.md) (do nhóm B soạn) |
-| CR-CV-037 | BE-CV-SOL-037-structure-findings-and-dismissals | B | P1 | xem `../tasks/README.md` | [có](./BE-CV-SOL-037-structure-findings-and-dismissals.md) (do nhóm B soạn; task đang soạn) |
-| CR-CV-038 | BE-CV-SOL-038-contract-diff | B | P2 | — | chưa có file lúc ghi README (do nhóm B soạn) |
-| CR-CV-038 | BE-CV-SOL-038-static-tenant-filter-rule | B | P2 | — | chưa có file lúc ghi README (do nhóm B soạn) |
+| CR-CV-035 | [BE-CV-SOL-035-storage-map](./BE-CV-SOL-035-storage-map.md) | B | P0 | `TASK-035-01…08` | có |
+| CR-CV-036 | [BE-CV-SOL-036-change-overlay-pipeline](./BE-CV-SOL-036-change-overlay-pipeline.md) | B | P0 | `TASK-036-01…05` | có |
+| CR-CV-036 | [BE-CV-SOL-036-reading-order-and-risk](./BE-CV-SOL-036-reading-order-and-risk.md) | B | P0 | `TASK-036-06…10` | có |
+| CR-CV-037 | [BE-CV-SOL-037-structure-findings-and-dismissals](./BE-CV-SOL-037-structure-findings-and-dismissals.md) | B | P0 | `TASK-037-01…08` | có |
+| CR-CV-038 | [BE-CV-SOL-038-contract-diff](./BE-CV-SOL-038-contract-diff.md) | B | P0 | `TASK-038-01…07` | có |
+| CR-CV-038 | [BE-CV-SOL-038-static-tenant-filter-rule](./BE-CV-SOL-038-static-tenant-filter-rule.md) | B | P0 | `TASK-038-08…12` | có |
 
 (Phần AG của CR-037: `AG-CV-SOL-037-structural-facts` ở `specs/agent/crs/v7`.)
 

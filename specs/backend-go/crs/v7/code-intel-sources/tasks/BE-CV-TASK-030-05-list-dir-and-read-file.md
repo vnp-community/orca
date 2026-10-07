@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/agentrepofs/list_dir.go` (mới), `.../read_file.go` (mới), `.../content_cache.go` (mới), `.../reader.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-030-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -34,8 +34,8 @@ SOL-030 mục 2.C, 2.D, 2.E. `fs.readDir` luôn `depth:1`; đệ quy ở backend
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các tiêu chí SOL-030 mục 6 về `ListDir`, ancestor, kích thước, nhị phân, cache đều có test.
-- [ ] Không log nội dung file; log chỉ `relPath`, `size`.
+- [x] Các tiêu chí SOL-030 mục 6 về `ListDir`, ancestor, kích thước, nhị phân, cache đều có test.
+- [x] Không log nội dung file; log chỉ `relPath`, `size`.
 
 ## Rủi ro và lưu ý
 

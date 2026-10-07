@@ -5,7 +5,7 @@
 **Area:** frontend / store
 **File:** `frontend/src/renderer/src/store/slices/code-intel-quality-state.ts` (mới), `store/slices/code-intel.ts` (sửa: trải đoạn state, thêm khoá vào `CODE_INTEL_WORKTREE_KEYED_STATE_KEYS`, mở rộng `applyCodeIntelEvent`), `store/slices/code-intel-quality-worktree-removal-leak.test.ts` (mới), `code-intel-quality-state.test.ts`
 **Depends on:** 087-01; FE-CV-SOL-050-store-and-query-hooks
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -1,0 +1,6 @@
+{
+  "error": {
+    "code": "CODEINTEL_TOOL_FAILED",
+    "reason": "write_blocked"
+  }
+}

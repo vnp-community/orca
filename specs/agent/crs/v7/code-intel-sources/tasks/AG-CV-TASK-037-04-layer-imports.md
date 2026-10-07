@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel-structural-layer-imports.ts`, `codeintel-structural-facts-queries.ts` (mới) + test
 **Depends on:** AG-CV-TASK-037-01, 037-02, AG-CV-SOL-002 (Cypher runner)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Fixture task 01 → 2 hàng `usecase->adapter` cho package có 3 tệp (khử tr
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi import package ra một hàng; kết quả xác định.
+- [x] Mỗi import package ra một hàng; kết quả xác định.
 
 ## Rủi ro
 

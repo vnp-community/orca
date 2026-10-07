@@ -1,0 +1,6 @@
+broken-import.test.ts(1,29): error TS2792: Cannot find module './does-not-exist'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?
+broken-import.test.ts(2,22): error TS2792: Cannot find module 'vitest'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?
+index.ts(2,7): error TS2322: Type 'string' is not assignable to type 'number'.
+lỗi unicode 🚀.ts(2,7): error TS2322: Type 'string' is not assignable to type 'number'.
+math.test.ts(1,30): error TS2792: Cannot find module 'vitest'. Did you mean to set the 'moduleResolution' option to 'nodenext', or to add aliases to the 'paths' option?
+\n

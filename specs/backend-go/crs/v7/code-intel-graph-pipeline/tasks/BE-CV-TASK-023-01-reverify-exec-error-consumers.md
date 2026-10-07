@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** (không sửa mã; kết quả ghi vào mô tả PR) `backend-go/services/infra-fleet-service/internal/**`
 **Depends on:** —
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ SOL-023 mục 6 ghi rõ chưa grep hết nơi dùng `errors.As(…, *JSONRPCErro
 
 ## Tiêu chí hoàn thành
 
-- [ ] Danh sách nơi dùng `JSONRPCError`/`ErrAgentMethodNotFound`/`Exec` được ghi vào PR.
-- [ ] Kết luận rõ: có/không nơi nào phải sửa ngoài `devserveragent` và `usecase/relay*.go`.
-- [ ] Baseline `go test ./... -race` ghi nhận.
+- [x] Danh sách nơi dùng `JSONRPCError`/`ErrAgentMethodNotFound`/`Exec` được ghi vào PR.
+- [x] Kết luận rõ: có/không nơi nào phải sửa ngoài `devserveragent` và `usecase/relay*.go`.
+- [x] Baseline `go test ./... -race` ghi nhận.
 
 ## Rủi ro và lưu ý
 

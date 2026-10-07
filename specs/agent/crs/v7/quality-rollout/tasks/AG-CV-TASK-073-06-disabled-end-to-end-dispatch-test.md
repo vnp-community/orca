@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/disabled-dispatch.integration.test.ts` (mới)
 **Depends on:** 073-02, 073-03, 073-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -22,12 +22,12 @@ Chưa chạy; mã dispatcher của AG-CV-SOL-001/081 chưa tồn tại: test imp
 
 - các kịch bản trên; lỗi đúng `error.code -32000`, `error.data.reason`
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/disabled-dispatch.integration.test.ts`. Kết quả: 9/9 tests PASS.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tắt/bật hoạt động trên dispatcher thật.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Tắt/bật hoạt động trên dispatcher thật.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

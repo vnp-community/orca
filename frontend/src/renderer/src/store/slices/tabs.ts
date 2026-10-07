@@ -412,6 +412,8 @@ function toVisibleTabType(contentType: TabContentType): WorkspaceVisibleTabType 
   if (contentType === 'browser' || contentType === 'terminal' || contentType === 'simulator') {
     return contentType
   }
+  // CR-050 (FE-CV-TASK-050-15): review tab maps to its own visible type
+  if (contentType === 'review') return 'review'
   return 'editor'
 }
 
@@ -1913,7 +1915,8 @@ export const createTabsSlice: StateCreator<AppState, [], [], TabsSlice> = (set, 
       if (tab.contentType === 'browser') {
         return liveBrowserIds.has(tab.entityId)
       }
-      if (tab.contentType === 'simulator') {
+      // simulator and review tabs have no backend entity to check
+      if (tab.contentType === 'simulator' || tab.contentType === 'review') {
         return true
       }
       return liveEditorIds.has(tab.entityId)

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpc/data_flow_handlers.go` (mới), `.../usecase/get_data_flow.go` (mới), `.../usecase/data_flow_golden_test.go`, `.../testdata/golden/dataflow/*.json`
 **Depends on:** BE-CV-TASK-034-05, -06, -08; BE-CV-SOL-022; BE-CV-SOL-013; BE-CV-SOL-012
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ Solution 2.E; chuỗi xử lý chuẩn §3.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí solution mục 6 đạt.
-- [ ] Golden ổn định; hai dialect; cô lập tenant.
+- [x] Tiêu chí solution mục 6 đạt.
+- [x] Golden ổn định; hai dialect; cô lập tenant.
 
 ## Rủi ro và lưu ý
 

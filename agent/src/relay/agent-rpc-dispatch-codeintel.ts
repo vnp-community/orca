@@ -9,6 +9,9 @@ import { toErrorPayload, CodeIntelError } from './codeintel-errors'
 import { PerfCollector } from './codeintel-result-envelope'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 
+import { gateDisabled } from './codeintel/disabled-gate'
+import { readRuntimeSwitches } from './codeintel/runtime-switches'
+
 export async function dispatchCodeIntelRpc(
   rpc: JsonRpcRequest,
   config: AgentConfig,
@@ -18,6 +21,12 @@ export async function dispatchCodeIntelRpc(
 ): Promise<JsonRpcResponse | null> {
   if (!rpc.method.startsWith('codeintel.')) {
     return null
+  }
+
+  const switches = readRuntimeSwitches(config?.toolEnv ?? process.env)
+  const gated = gateDisabled(rpc, switches)
+  if (gated) {
+    return gated
   }
 
   const methodDef = CODEINTEL_METHODS[rpc.method]

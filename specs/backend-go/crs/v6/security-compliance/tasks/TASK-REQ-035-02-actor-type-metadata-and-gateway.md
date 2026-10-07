@@ -5,7 +5,7 @@
 **Service:** `backend-go/common`, `api-gateway`
 **File:** `backend-go/common/grpcmw/grpcmw.go` (sửa: hằng), `backend-go/common/tenant/tenant.go` (sửa: `WithActorType`, `ActorType`), `backend-go/common/tenant/tenant_test.go` (sửa), `backend-go/services/api-gateway/internal/adapter/grpc/dial.go` (sửa: `AttachIdentity`), `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/executor.go` (sửa: `CallTool`), `backend-go/services/api-gateway/cmd/server/request_wiring.go` (sửa/mới: token và dial, do TASK-REQ-016-01 tạo), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-016-01 (dial `request-service` ở gateway)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -39,11 +39,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tool MCP luôn đi tới `request-service` với `x-orca-actor-type: agent`; WS/HTTP là `user`.
-- [ ] Không đổi chữ ký `AttachIdentity`, `usecase.Identity`, `TenantExtractionInterceptor`, `ChainUnary`.
-- [ ] Giá trị actor lạ hoặc thiếu ⇒ `user` (không bao giờ nâng quyền).
-- [ ] Gateway gắn `x-orca-internal-token` cho kết nối tới `request-service` khi có token.
-- [ ] `go build ./...` toàn workspace xanh.
+- [x] Tool MCP luôn đi tới `request-service` với `x-orca-actor-type: agent`; WS/HTTP là `user`.
+- [x] Không đổi chữ ký `AttachIdentity`, `usecase.Identity`, `TenantExtractionInterceptor`, `ChainUnary`.
+- [x] Giá trị actor lạ hoặc thiếu ⇒ `user` (không bao giờ nâng quyền).
+- [x] Gateway gắn `x-orca-internal-token` cho kết nối tới `request-service` khi có token.
+- [x] `go build ./...` toàn workspace xanh.
 
 ## Ví dụ tham khảo
 

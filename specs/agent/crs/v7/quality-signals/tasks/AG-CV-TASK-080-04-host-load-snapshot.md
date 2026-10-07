@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-host-snapshot.ts` (mới), `agent/src/relay/codeintel-host-snapshot.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,7 +23,7 @@ Hợp đồng §4.1 `data.host` và §5.1 `quality.listProfiles.host` dùng cùn
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hàm thuần theo `deps`; test xanh; file < 60 dòng.
+- [x] Hàm thuần theo `deps`; test xanh; file < 60 dòng.
 
 ## Rủi ro
 

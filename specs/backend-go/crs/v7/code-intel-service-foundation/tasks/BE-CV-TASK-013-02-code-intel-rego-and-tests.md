@@ -5,7 +5,7 @@
 **Service:** `policy/orca-authz`
 **File:** `backend-go/policy/orca-authz/code_intel.rego`, `backend-go/policy/orca-authz/code_intel_test.rego` (mới)
 **Depends on:** không (làm song song từ đầu)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -25,8 +25,8 @@ Hợp đồng §6.3: 8 action (`read`, `read_source`, `review_write`, `reindex`,
 
 ## Tiêu chí hoàn thành
 
-- [ ] Toàn bộ bảng role × action đúng; `member` bị từ chối `c4_write`, `quality_profile_write`.
-- [ ] Test Rego xanh; không phá test của bundle khác.
+- [x] Toàn bộ bảng role × action đúng; `member` bị từ chối `c4_write`, `quality_profile_write`.
+- [x] Test Rego xanh; không phá test của bundle khác.
 
 ## Rủi ro và lưu ý
 

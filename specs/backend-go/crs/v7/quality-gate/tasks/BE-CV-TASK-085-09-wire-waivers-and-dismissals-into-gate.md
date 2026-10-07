@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/usecase/evaluate_quality_gate.go` (sửa), `internal/adapter/{postgres,mysql}/quality_waiver_reader.go` (mới), adapter `DismissalReader` (dùng bảng T5 của SOL-011/037)
 **Depends on:** BE-CV-TASK-085-06, 085-08; BE-CV-SOL-037-structure-findings-and-dismissals
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Bảng ảnh hưởng: SOL-085-waivers §2.3 (PQ-05). `DismissFinding` không bao giờ miễn `error`/`blockingSeverities`.
@@ -20,7 +20,7 @@ Bảng ảnh hưởng: SOL-085-waivers §2.3 (PQ-05). `DismissFinding` không ba
 - Use case: dismiss `error` ⇒ vẫn `fail` + `dismissed_not_waived`; waive ⇒ `pass/warn` + `waived`/`waivedCount`; waiver scope `binding:X` không áp ở binding Y; waiver hết hạn không áp.
 
 ## Tiêu chí hoàn thành
-- [ ] bốn dòng bảng ảnh hưởng có test; [ ] không đọc waiver tenant khác.
+- [x] bốn dòng bảng ảnh hưởng có test; [ ] không đọc waiver tenant khác.
 
 ## Rủi ro
 - Adapter `DismissalReader` phụ thuộc bảng T5 chưa có hiện thực.

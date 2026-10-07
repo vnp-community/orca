@@ -1,0 +1,32 @@
+{
+  "data": [
+    {
+      "communities": [],
+      "entry": {
+        "endLine": null,
+        "filePath": "",
+        "key": "function::entry",
+        "kind": "function",
+        "name": "entry",
+        "qualifiedName": "entry",
+        "startLine": null,
+        "uid": "e1"
+      },
+      "id": "p1",
+      "terminal": null
+    }
+  ],
+  "headCommit": "abcdef",
+  "sources": [
+    {
+      "commit": "abcdef",
+      "indexedAt": 1600000000000,
+      "lineBase": 1,
+      "tool": "gitnexus",
+      "version": "1.6.9"
+    }
+  ],
+  "stale": false,
+  "totalCount": 1,
+  "truncated": false
+}

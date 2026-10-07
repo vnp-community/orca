@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/postgres/rls_nonowner_integration_test.go` (mới, tag `integration`), `.../postgres/tenant_scope_guard_test.go` (mới)
 **Depends on:** BE-CV-SOL-011-data-model-and-migrations, BE-CV-SOL-011-repositories-and-maintenance (`withTenantTx`, `withMaintenanceTx`, `withRelayTx`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,8 +29,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi bảng có kiểm 0 dòng khi thiếu `set_config`.
-- [ ] Bảng mới thêm mà không có RLS làm test đỏ (danh sách bảng đọc từ `information_schema`).
+- [x] Mọi bảng có kiểm 0 dòng khi thiếu `set_config`.
+- [x] Bảng mới thêm mà không có RLS làm test đỏ (danh sách bảng đọc từ `information_schema`).
 
 ## Rủi ro và lưu ý
 

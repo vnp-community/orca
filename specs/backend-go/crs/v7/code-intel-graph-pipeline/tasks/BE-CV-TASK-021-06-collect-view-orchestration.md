@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/usecase/{collect_view.go,collect_view_decoding.go,symbol_source_redaction.go}` (mới) và test
 **Depends on:** TASK-021-03, BE-CV-TASK-020-06, BE-CV-TASK-020-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Bảng 2.E: view ↔ method; `stale` không hạ; redactor fail-closed.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi view bảng 2.E có test.
-- [ ] Kết quả xác định.
+- [x] Mọi view bảng 2.E có test.
+- [x] Kết quả xác định.
 
 ## Rủi ro và lưu ý
 

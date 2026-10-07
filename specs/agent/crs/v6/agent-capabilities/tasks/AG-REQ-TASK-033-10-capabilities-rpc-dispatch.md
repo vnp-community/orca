@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-rpc-dispatch-misc.ts` (sửa), `agent/src/relay/agent-rpc-dispatch-misc.test.ts` (sửa), `agent/src/relay/__fixtures__/agent-capabilities-golden.json` (mới, mẫu hợp đồng dùng chung với backend)
 **Depends on:** [09](./AG-REQ-TASK-033-09-capability-report-core.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -52,11 +52,11 @@ Phía backend (ghi để phối hợp, KHÔNG làm ở đây): test Go decoder �
 
 ## Tiêu chí hoàn thành
 
-- [ ] Gọi `agent.capabilities` qua dispatcher thật cho kết quả đúng sơ đồ; không còn `MethodNotFound`.
-- [ ] Tham số sai trả `InvalidParams` kèm `data.reason`, không chạy lệnh nào.
-- [ ] Tệp golden có mặt và test so khoá khớp với báo cáo giả.
-- [ ] `capabilities`/`STATIC_CAPABILITIES_FALLBACK` không đổi.
-- [ ] Không log giá trị hay tên biến môi trường.
+- [x] Gọi `agent.capabilities` qua dispatcher thật cho kết quả đúng sơ đồ; không còn `MethodNotFound`.
+- [x] Tham số sai trả `InvalidParams` kèm `data.reason`, không chạy lệnh nào.
+- [x] Tệp golden có mặt và test so khoá khớp với báo cáo giả.
+- [x] `capabilities`/`STATIC_CAPABILITIES_FALLBACK` không đổi.
+- [x] Không log giá trị hay tên biến môi trường.
 
 ## Rủi ro và lưu ý
 

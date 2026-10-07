@@ -144,13 +144,13 @@ Tách câu lệnh: bỏ `-- …` và `/* … */` **trước** (có 76 dòng comm
 
 ## 6. Tiêu chí chấp nhận
 
-- [ ] Parser đọc **294 file** hiện có không panic; `UnsupportedStatement` DDL được liệt kê và duyệt (kỳ vọng 0; DML bỏ qua có chủ đích).
-- [ ] Thống kê tính năng (CR 1.2) tái tạo bằng parser và đối chiếu `grep` (lệch có giải thích).
-- [ ] `infra-fleet-service` Postgres: đủ 20 bảng còn lại, `AsOfMigration=0038_session_origin`, cột `ALTER` có mặt, `terminal_sessions_connection_id_fkey` bị gỡ sau `0034`.
-- [ ] `mcp-service`: RLS `tenant_settings`, `processed_events`, `outbox_events` = `forced` khai triển từ `DO`, kèm `relay_read`, `relay_mark_published`.
-- [ ] MySQL `task-service/0012`: cột sinh `project_key` + `UNIQUE KEY idx_task_sources_unique` + trigger `trg_task_edges_cascade_to`; Postgres `task/0014`: `DROP INDEX task.idx_task_sources_unique` rồi `CREATE UNIQUE INDEX` có `COALESCE`.
-- [ ] 7 file `DO` (C1): mỗi file được phân loại khớp mẫu hoặc `OPAQUE_DO_BLOCK`.
-- [ ] Không nội dung migration trong DB/log; không `helpers/utils/common/misc`; không `max-lines` disable.
+- [x] Parser đọc **294 file** hiện có không panic; `UnsupportedStatement` DDL được liệt kê và duyệt (kỳ vọng 0; DML bỏ qua có chủ đích).
+- [x] Thống kê tính năng (CR 1.2) tái tạo bằng parser và đối chiếu `grep` (lệch có giải thích).
+- [x] `infra-fleet-service` Postgres: đủ 20 bảng còn lại, `AsOfMigration=0038_session_origin`, cột `ALTER` có mặt, `terminal_sessions_connection_id_fkey` bị gỡ sau `0034`.
+- [x] `mcp-service`: RLS `tenant_settings`, `processed_events`, `outbox_events` = `forced` khai triển từ `DO`, kèm `relay_read`, `relay_mark_published`.
+- [x] MySQL `task-service/0012`: cột sinh `project_key` + `UNIQUE KEY idx_task_sources_unique` + trigger `trg_task_edges_cascade_to`; Postgres `task/0014`: `DROP INDEX task.idx_task_sources_unique` rồi `CREATE UNIQUE INDEX` có `COALESCE`.
+- [x] 7 file `DO` (C1): mỗi file được phân loại khớp mẫu hoặc `OPAQUE_DO_BLOCK`.
+- [x] Không nội dung migration trong DB/log; không `helpers/utils/common/misc`; không `max-lines` disable.
 
 ## 7. Kiểm thử, rủi ro, câu hỏi mở
 

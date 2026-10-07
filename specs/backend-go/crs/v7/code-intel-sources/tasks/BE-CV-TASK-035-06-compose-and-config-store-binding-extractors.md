@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/composesource/compose_document.go`, `init_databases_script.go`; `internal/adapter/gosourcescan/service_config_env_keys.go`, `adapter_directory_kinds.go`; các `_test.go`; `internal/usecase/ports.go` (sửa: thêm `ComposeDocumentParser`, `GoSourceScanner`); `go.mod` của `code-intel-service` (thêm `gopkg.in/yaml.v3 v3.0.1`) (mới/sửa)
 **Depends on:** BE-CV-TASK-035-03, BE-CV-TASK-035-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,9 +30,9 @@ Nguồn của Store/Binding. Mọi hàm nhận **`[]byte`/danh sách tên thư m
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng Store/Binding mong đợi (solution 035 §9) đạt trên fixture.
-- [ ] `command`, comment, giá trị khoá nhạy cảm không xuất hiện ở bất kỳ đầu ra nào.
-- [ ] `yaml.v3` là dependency duy nhất thêm; `go mod tidy` không kéo thứ khác (chưa chạy).
+- [x] Bảng Store/Binding mong đợi (solution 035 §9) đạt trên fixture.
+- [x] `command`, comment, giá trị khoá nhạy cảm không xuất hiện ở bất kỳ đầu ra nào.
+- [x] `yaml.v3` là dependency duy nhất thêm; `go mod tidy` không kéo thứ khác (chưa chạy).
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/shared/review-telemetry-privacy.test.ts`, `frontend/src/renderer/src/lib/review-telemetry.test.ts` (mới)
 **Depends on:** FE-CV-TASK-095-01..05
-**Status:** [ ] TODO
+**Status:** [x] DONE — privacy tests chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

@@ -112,6 +112,9 @@ service InfraFleetService {
   // AttachScreencast, there's no interactive input to send once watching
   // starts; the caller ends the subscription by canceling this call's ctx).
   rpc StreamFileChanges(StreamFileChangesRequest) returns (stream FileChangeEvent);
+  // StreamCodeIntelEvents streams index changed, reindex progress, and quality events
+  // from the dev server's agent session (BE-CV-SOL-023 §2.E).
+  rpc StreamCodeIntelEvents(StreamCodeIntelEventsRequest) returns (stream CodeIntelEvent);
   // StreamExecOutput is Relay's server-streaming counterpart for
   // agent.execPrompt.output (TASK-AG-FLOWTASK-002/003) — subscribes to an
   // in-flight agent.execPrompt run's stdout/stderr chunks, keyed by the
@@ -131,6 +134,9 @@ service InfraFleetService {
   // the hardcoded "disconnected" wscompat's devServer.list/listForUser used
   // to always report regardless of the agent's real state.
   rpc IsDevServerConnected(IsDevServerConnectedRequest) returns (IsDevServerConnectedResponse);
+  // GetAgentCapabilities returns handshake-derived agent capabilities and tools
+  // without dialing the remote host (in-memory lookup, BE-CV-SOL-023 §2.E).
+  rpc GetAgentCapabilities(GetAgentCapabilitiesRequest) returns (GetAgentCapabilitiesResponse);
   // ListSshTargets backs ssh.listTargets and ssh.getUserAccount (the
   // latter derives from this same read — see wscompat's registerSshChannels).
   rpc ListSshTargets(ListSshTargetsRequest) returns (ListSshTargetsResponse);
@@ -358,6 +364,26 @@ service InfraFleetService {
   // "result"-typed event carries VmProvisionResult; the "ssh" branch is
   // pass-through only here (no dial) — see BE-SOL-EVM-004 for that.
   rpc StreamVmProvision(StreamVmProvisionRequest) returns (stream VmProvisionEvent);
+
+  rpc GetDevServerCapabilities(GetDevServerCapabilitiesRequest) returns (DevServerCapabilityProfile);
+}
+
+message GetDevServerCapabilitiesRequest {
+  string connection_id = 1;
+  string dev_server_id = 2;
+  bool refresh = 3;
+}
+
+message DevServerCapabilityProfile {
+  string dev_server_id = 1;
+  string source = 2;
+  string agent_build_version = 3;
+  int32 protocol_version = 4;
+  repeated string features = 5;
+  string profile_json = 6;
+  bool degraded = 7;
+  google.protobuf.Timestamp probed_at = 8;
+  bool connected = 9;
 }
 
 enum ConnectionMode {
@@ -904,6 +930,49 @@ message IsDevServerConnectedRequest {
 message IsDevServerConnectedResponse {
   bool connected = 1;
 }
+
+message GetAgentCapabilitiesRequest {
+  string dev_server_id = 1;
+}
+
+message GetAgentCapabilitiesResponse {
+  bool connected = 1;
+  string platform = 2;
+  string arch = 3;
+  string node_version = 4;
+  string agent_version = 5;
+  repeated string capabilities = 6;
+  repeated string tools = 7;
+  string session_id = 8;
+}
+
+message StreamCodeIntelEventsRequest {
+  string dev_server_id = 1;
+}
+
+message CodeIntelEvent {
+  string kind = 1;        // index_changed | reindex_progress | quality_progress | quality_finished | resync | overflow
+  string workspace_root = 2;
+  string tool = 3;        // gitnexus | codegraph | git
+  string commit = 4;
+  string indexed_at = 5;
+  string job_id = 6;
+  string stage = 7;
+  optional int32 percent = 8;
+  string message = 9;
+  google.protobuf.Timestamp received_at = 10;
+  string reason = 11;
+  string head_commit = 12;
+  bool stale = 13;
+  string index_scope = 14;
+  string merge_base = 15;
+  string trigger = 16;
+  string outcome = 17;
+  string error_code = 18;
+  string run_id = 19;
+  string payload_json = 20; // params JSON-RPC goc <= 64 KiB
+}
+
 
 message CreateSshTargetRequest {
   string tenant_id = 1;

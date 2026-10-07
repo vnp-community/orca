@@ -455,6 +455,7 @@ import type {
   WorkspaceCleanupScanResult
 } from '../shared/workspace-cleanup'
 import type { KeybindingActionId, KeybindingFileSnapshot } from '../shared/keybindings'
+import type { CodeIntelBridgeApi } from '../../../frontend/src/shared/code-intel-bridge'
 
 type GitLabRepoSelectorArgs = {
   repoPath: string
@@ -901,6 +902,7 @@ export type AppApi = {
 
 export type PreloadApi = {
   app: AppApi
+  codeIntel: CodeIntelBridgeApi
   orcaProfiles: {
     list: () => Promise<OrcaProfileListResult>
     authStatus: () => Promise<OrcaProfileAuthStatus>

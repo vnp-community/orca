@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/NNNN_request_artifact_model.{up,down}.sql`, `migrations/mysql/NNNN_request_artifact_model.{up,down}.sql`, `internal/domain/request_revision.go`, `internal/domain/request.go` (sửa), `internal/domain/solution.go` (sửa) và test (mới trừ các file sửa)
 **Depends on:** TASK-REQ-002-01 (bảng `requests`, `solutions`), TASK-REQ-002-02 (domain)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -62,11 +62,11 @@ Quyết định gộp hay tách: nếu migration `0002_request_core` chưa merge
 
 ## Tiêu chí hoàn thành
 
-- [ ] `up`, `down`, `up` chạy sạch trên Postgres 14+ và MySQL 8.0.16+; `NNNN` ghi trong PR.
-- [ ] Backfill `seq` đúng thứ tự theo Request; UNIQUE `(tenant_id, request_id, seq)` hoạt động.
-- [ ] Bốn bảng mới có RLS thật ở Postgres và `tenant_id` trong khoá hoặc chỉ mục ở MySQL.
-- [ ] Bộ test hợp đồng cũ của TASK-REQ-002-06 vẫn xanh.
-- [ ] Domain mới không import gì ngoài stdlib.
+- [x] `up`, `down`, `up` chạy sạch trên Postgres 14+ và MySQL 8.0.16+; `NNNN` ghi trong PR.
+- [x] Backfill `seq` đúng thứ tự theo Request; UNIQUE `(tenant_id, request_id, seq)` hoạt động.
+- [x] Bốn bảng mới có RLS thật ở Postgres và `tenant_id` trong khoá hoặc chỉ mục ở MySQL.
+- [x] Bộ test hợp đồng cũ của TASK-REQ-002-06 vẫn xanh.
+- [x] Domain mới không import gì ngoài stdlib.
 
 ## Rủi ro và lưu ý
 

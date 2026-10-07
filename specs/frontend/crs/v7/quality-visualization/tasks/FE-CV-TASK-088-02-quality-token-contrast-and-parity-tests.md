@@ -5,7 +5,7 @@
 **Area:** frontend / tests
 **File:** `frontend/src/renderer/src/components/quality-charts/__tests__/quality-token-contrast.test.ts` (mới), `quality-token-parity.test.ts` (mới), `frontend/src/renderer/src/test-support/css-color-resolution.ts` (mới; hàm thuần giải `var()`, `color-mix` srgb, `oklch`, hex → sRGB và tính tỉ lệ WCAG)
 **Depends on:** FE-CV-TASK-088-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `ImpactLens.tsx`, `ImpactToolbar.tsx`, `ImpactGraphCanvas.tsx`, `ImpactSymbolNode.tsx`, `ImpactColumnsList.tsx`, `store/slices/review-ui.ts` (thêm `impactFocusKey`), tests
 **Depends on:** FE-CV-TASK-053-01, 053-02, 051-05, 052-04, FE-CV-TASK-050-13
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -29,7 +29,7 @@ UI-API 3.2: `trend` (sel, `from?`, `to?`, `limit ≤ 200`, `groupBy?` commit|tur
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh đúng shape UI-API 4.7; khoá vắng không thành `0`.
+- [x] Ba kênh đúng shape UI-API 4.7; khoá vắng không thành `0`.
 
 ## Rủi ro và lưu ý
 

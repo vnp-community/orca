@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/agentwsserver/server.go` (sửa `inboundHandshakeParams` dòng 73–81 và dựng `HandshakeInfo` dòng ~205–213), `.../adapter/devserveragent/session.go` (sửa `HandshakeInfo`, dòng 47–60), `.../adapter/devserveragent/client.go` (sửa `LastHandshakeInfo`, dòng ~481–493), `.../usecase/ports.go` (sửa `HandshakeInfo`, dòng 85–90), test
 **Depends on:** TASK-023-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Agent gửi `tools: tools.map(t => t.name)` trong `agent.handshake` (agent contr
 
 ## Tiêu chí hoàn thành
 
-- [ ] `tools`, `capabilities`, `sessionId` tới được `usecase.HandshakeInfo`.
-- [ ] Test hiện có không đổi kết quả; không migration.
-- [ ] Không đổi `AgentCapability` union ở agent (việc của AG-CV-SOL-001).
+- [x] `tools`, `capabilities`, `sessionId` tới được `usecase.HandshakeInfo`.
+- [x] Test hiện có không đổi kết quả; không migration.
+- [x] Không đổi `AgentCapability` union ở agent (việc của AG-CV-SOL-001).
 
 ## Rủi ro và lưu ý
 

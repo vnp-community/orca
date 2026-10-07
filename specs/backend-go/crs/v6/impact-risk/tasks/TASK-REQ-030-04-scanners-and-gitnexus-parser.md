@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / adapter thuần Go (không gọi mạng), domain `AreaResolver`
 **File:** `internal/adapter/migrationscan/{scan.go,sql_statements.go,scan_test.go}` (mới), `internal/adapter/contractscan/{scan.go,rules.go,scan_test.go}` (mới), `internal/adapter/gitnexusparse/{impact.go,detect_changes.go,status.go,parse_test.go}` (mới), `internal/domain/area_resolver.go` (mới), `internal/adapter/*/testdata/` (mới), và `internal/domain/area_resolver_test.go`
 **Depends on:** TASK-REQ-030-02 (kiểu `Signal`, `Finding`), TASK-REQ-001-01 (module)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -63,12 +63,12 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `MigrationScanner` phát hiện: thiếu down, một dialect, `DROP COLUMN`, `UPDATE` không `WHERE`, `NOT NULL` không default (mẫu dương và âm).
-- [ ] `GitNexusOutputParser` có golden từ mẫu thật; lỗi parse trả `ErrUnrecognizedFormat`, không panic.
-- [ ] `ContractScanner` không đưa nội dung dòng nguồn vào `Finding`.
-- [ ] Bộ quét không gọi mạng và không đọc đĩa (nhận nội dung qua tham số).
-- [ ] Mẫu GitNexus ghi rõ ngày và phiên bản công cụ.
-- [ ] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable.
+- [x] `MigrationScanner` phát hiện: thiếu down, một dialect, `DROP COLUMN`, `UPDATE` không `WHERE`, `NOT NULL` không default (mẫu dương và âm).
+- [x] `GitNexusOutputParser` có golden từ mẫu thật; lỗi parse trả `ErrUnrecognizedFormat`, không panic.
+- [x] `ContractScanner` không đưa nội dung dòng nguồn vào `Finding`.
+- [x] Bộ quét không gọi mạng và không đọc đĩa (nhận nội dung qua tham số).
+- [x] Mẫu GitNexus ghi rõ ngày và phiên bản công cụ.
+- [x] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

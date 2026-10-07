@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/{get_request.go,list_requests.go}`, `internal/adapter/grpc/{server.go,request_mapper.go}`, `internal/adapter/grpc/server_test.go`, `cmd/server/main.go`, `README.md` (sửa/mới)
 **Depends on:** TASK-REQ-002-04 hoặc 002-05 (một trong hai để chạy; cả hai để hoàn thành), TASK-REQ-001-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -32,10 +32,10 @@ TASK-REQ-001-05 để `GetRequest`, `ListRequests` trả `Unimplemented`. CR-REQ
 
 ## Tiêu chí hoàn thành
 
-- [ ] `GetRequest` id không tồn tại hoặc thuộc tenant khác trả `NotFound`, không phân biệt.
-- [ ] `ListRequests` phân trang keyset và lọc `project_id`, `status`, `type`.
-- [ ] README ghi đúng RPC thật và RPC còn `Unimplemented`.
-- [ ] Không còn `Unimplemented` ở hai RPC này.
+- [x] `GetRequest` id không tồn tại hoặc thuộc tenant khác trả `NotFound`, không phân biệt.
+- [x] `ListRequests` phân trang keyset và lọc `project_id`, `status`, `type`.
+- [x] README ghi đúng RPC thật và RPC còn `Unimplemented`.
+- [x] Không còn `Unimplemented` ở hai RPC này.
 
 ## Rủi ro và lưu ý
 

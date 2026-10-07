@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + hooks
 **File:** `structure-tree-model.ts`, `hooks/useStructureTree.ts` (mới), tests
 **Depends on:** FE-CV-TASK-050-13, FE-CV-TASK-050-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

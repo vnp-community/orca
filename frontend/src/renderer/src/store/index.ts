@@ -55,6 +55,7 @@ import { createConnectivitySlice } from './slices/connectivity-status'
 import { createMcpSlice } from './slices/mcp-slice'
 import { createMcpApprovalSlice } from './slices/mcp-approval-slice'
 import { createMcpTerminalOriginSlice } from './slices/mcp-terminal-origin'
+import { createRequestSlice } from './slices/request'
 import { e2eConfig } from '@/lib/e2e-config'
 import { registerHttpLinkStoreAccessor } from '@/lib/http-link-routing'
 import { registerClientStateSettingsAccessor } from '@/runtime/runtime-client-state-client'
@@ -123,7 +124,8 @@ export const useAppStore = create<AppState>()((...a) => ({
   ...createConnectivitySlice(...a),
   ...createMcpSlice(...a),
   ...createMcpApprovalSlice(...a),
-  ...createMcpTerminalOriginSlice(...a)
+  ...createMcpTerminalOriginSlice(...a),
+  ...createRequestSlice(...a)
 }))
 
 registerHttpLinkStoreAccessor(() => useAppStore.getState())

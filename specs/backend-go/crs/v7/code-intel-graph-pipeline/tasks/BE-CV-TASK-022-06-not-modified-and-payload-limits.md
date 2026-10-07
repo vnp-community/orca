@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/usecase/cached_view_reader.go` (sửa), `.../usecase/snapshot_quota.go` (mới) và test
 **Depends on:** TASK-022-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -25,7 +25,7 @@ PQ-12/14: không `data` khi khớp ETag; payload > cấu hình không lưu; 64 M
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các ca xanh.
+- [x] Các ca xanh.
 
 ## Rủi ro và lưu ý
 

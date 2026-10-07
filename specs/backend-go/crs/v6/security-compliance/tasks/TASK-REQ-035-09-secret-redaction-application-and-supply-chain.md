@@ -5,7 +5,7 @@
 **Service:** `request-service`, `backend-go/ci`, `.github/workflows`
 **File:** `backend-go/services/request-service/internal/usecase/{create_request.go (sửa), secret_ingress_guard.go (mới), prompt_redaction.go (mới)}`, `.../internal/domain/agent_env_allowlist.go` (mới), `.../internal/adapter/grpcclient/agent_prompt_relay.go` (sửa: dựng `env`), `.../internal/usecase/analysis_secret_redaction.go` (sửa: CR-008 chuyển sang `secretscan`), `.github/workflows/backend-go-request-service.yml` (sửa: `govulncheck`, Trivy), `backend-go/services/request-service/README.md` (sửa: bảng đối chiếu 2.11), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-035-01 (`secretscan`), 035-04 (interceptor), 035-06 (cột `contains_secret_suspected`, `redact_pii_in_prompts`), BE-REQ-SOL-004 (`CreateRequest`), 005, 007, 008, 012 (điểm dựng prompt và đầu ra), BE-REQ-SOL-034 task 04 (`AIGateway`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -42,11 +42,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `body` chứa khoá riêng PEM được lưu với `[REDACTED:private_key]` và `contains_secret_suspected=true`; prompt dựng ra không chứa chuỗi đó.
-- [ ] `env` của `execPrompt` không chứa khoá nào ngoài danh sách cho phép (test trên bộ dựng tham số); không bao giờ gửi `resolvedApiKey`.
-- [ ] Bộ mẫu che bí mật là **một** (`common/secretscan`); không còn bộ mẫu riêng ở `request-service`.
-- [ ] CI có `govulncheck` và quét ảnh; bảng đối chiếu 2.11 được điền trong PR đầu tiên.
-- [ ] Log, lỗi, sự kiện không chứa `title`/`body`.
+- [x] `body` chứa khoá riêng PEM được lưu với `[REDACTED:private_key]` và `contains_secret_suspected=true`; prompt dựng ra không chứa chuỗi đó.
+- [x] `env` của `execPrompt` không chứa khoá nào ngoài danh sách cho phép (test trên bộ dựng tham số); không bao giờ gửi `resolvedApiKey`.
+- [x] Bộ mẫu che bí mật là **một** (`common/secretscan`); không còn bộ mẫu riêng ở `request-service`.
+- [x] CI có `govulncheck` và quét ảnh; bảng đối chiếu 2.11 được điền trong PR đầu tiên.
+- [x] Log, lỗi, sự kiện không chứa `title`/`body`.
 
 ## Ví dụ tham khảo
 

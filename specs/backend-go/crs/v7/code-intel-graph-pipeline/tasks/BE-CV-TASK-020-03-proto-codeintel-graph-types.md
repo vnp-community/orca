@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_graph.proto` (mới); stub sinh (mới)
 **Depends on:** TASK-020-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Hợp đồng §2.1 hàng 3: CR-020 sở hữu **kiểu**; request/response củ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi message của solution 2.B có mặt, số field khớp.
-- [ ] `ImpactGraph` đủ `impacted_count`, `affected_clusters` kiểu `AffectedCluster`.
-- [ ] `buf lint`/`buf breaking` xanh; stub build.
+- [x] Mọi message của solution 2.B có mặt, số field khớp.
+- [x] `ImpactGraph` đủ `impacted_count`, `affected_clusters` kiểu `AffectedCluster`.
+- [x] `buf lint`/`buf breaking` xanh; stub build.
 
 ## Rủi ro và lưu ý
 

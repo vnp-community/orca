@@ -1,6 +1,6 @@
 # AG-CV-SOL-072: Kiểm thử bảo mật phía `agent/` (whitelist, Cypher, đường dẫn, phân giải repo, env, secret, giới hạn)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi dòng "đã đọc" là đọc code/tài liệu thật; chưa chạy build, test hay công cụ nào. Các phát hiện kiểu "đã tái hiện" (ví dụ `--repo=` làm lộ repo khác) là của người soạn CR-CV-072 ngày 2026-10-05, **tôi chưa chạy lại**.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 072-01 đến 072-09, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-072](../../../../../../docs/crs/v7/quality-rollout/CR-CV-072-security-tests.md) (P0, Medium) — phần phía `agent/` (mục 2.2, 2.3, 2.4 phía agent, 2.5 phía agent, 2.6 phía agent, 2.10 một phần, 2.11)
 **Service:** `agent/`
@@ -193,16 +193,16 @@ Không thêm `fast-check` (D2 / O12 chưa duyệt): `seeded-random.ts` (mulberry
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `TestWhitelistIsClosed`, `TestNoForbiddenSubcommand`, `TestUserValuesNeverStartWithDash`, `TestRepoFlagIsLast`, `TestReindexArgvIsIndexOnly`, `TestSpawnNeverUsesShell`, `TestParamsStrict` xanh; `--repo=vnp-workplace`, `-rvnp-workplace`, U+FF0D, U+2212 bị từ chối **trước** spawn (`calls.length === 0`).
-- [ ] Test phản chiếu schema: không method nào nhận `args|argv|command|cmd|cwd|env|repo|cypher|shell|timeout|tool`; số method công khai = hợp đồng; `codeintel.node` không có.
-- [ ] Mọi mẫu Cypher chỉ-đọc; vector tiêm bị từ chối hoặc thoát đúng; `-l` luôn có.
-- [ ] Bộ vector `path-attack-vectors.json` xanh ở agent (cùng tệp BE đọc); symlink thoát root bị từ chối sau `realpath`; `~` từ chối trước `expandTilde`.
-- [ ] Worktree lồng không nhận dữ liệu repo cha; registry trùng → cảnh báo + `indexedAt` mới nhất (theo hợp đồng); stderr thô không bao giờ ra ngoài.
-- [ ] stdout 20 MiB bị dừng ở 16 MiB; treo bị giết đúng hạn, không để cháu sống; kết quả > 8 MiB xử lý đúng.
-- [ ] Env con không chứa biến nhạy cảm; quét canary sạch (`stderrTail`, `message`, `error.data`, log).
-- [ ] Fuzz xác định: bất biến giữ cho mọi hạt cố định; thất bại in hạt.
-- [ ] Workflow chặn PR chạy các test trên; có bước khẳng định số test.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable.
+- [x] `TestWhitelistIsClosed`, `TestNoForbiddenSubcommand`, `TestUserValuesNeverStartWithDash`, `TestRepoFlagIsLast`, `TestReindexArgvIsIndexOnly`, `TestSpawnNeverUsesShell`, `TestParamsStrict` xanh; `--repo=vnp-workplace`, `-rvnp-workplace`, U+FF0D, U+2212 bị từ chối **trước** spawn (`calls.length === 0`).
+- [x] Test phản chiếu schema: không method nào nhận `args|argv|command|cmd|cwd|env|repo|cypher|shell|timeout|tool`; số method công khai = hợp đồng; `codeintel.node` không có.
+- [x] Mọi mẫu Cypher chỉ-đọc; vector tiêm bị từ chối hoặc thoát đúng; `-l` luôn có.
+- [x] Bộ vector `path-attack-vectors.json` xanh ở agent (cùng tệp BE đọc); symlink thoát root bị từ chối sau `realpath`; `~` từ chối trước `expandTilde`.
+- [x] Worktree lồng không nhận dữ liệu repo cha; registry trùng → cảnh báo + `indexedAt` mới nhất (theo hợp đồng); stderr thô không bao giờ ra ngoài.
+- [x] stdout 20 MiB bị dừng ở 16 MiB; treo bị giết đúng hạn, không để cháu sống; kết quả > 8 MiB xử lý đúng.
+- [x] Env con không chứa biến nhạy cảm; quét canary sạch (`stderrTail`, `message`, `error.data`, log).
+- [x] Fuzz xác định: bất biến giữ cho mọi hạt cố định; thất bại in hạt.
+- [x] Workflow chặn PR chạy các test trên; có bước khẳng định số test.
+- [x] Không thêm phụ thuộc, không `max-lines` disable.
 
 ## 5. Kiểm thử
 

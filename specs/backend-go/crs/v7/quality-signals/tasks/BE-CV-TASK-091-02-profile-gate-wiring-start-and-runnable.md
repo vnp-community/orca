@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/security_scan_policy.go`, test (mới); điểm gọi trong use case của SOL-085
 **Depends on:** BE-CV-TASK-091-01, BE-CV-SOL-085-quality-gate-evaluator-and-profiles, BE-CV-SOL-013-authorization-flags-and-audit
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Cờ hiệu lực PQ-24 (fail closed, cache ≤ 5 s). Tắt ⇒ `CODEINTEL_PROFILE_UNKNOWN` + `available[]` đã lọc; `quality_gate_enabled` tắt ưu tiên `CODEINTEL_QUALITY_GATE_DISABLED`.
@@ -19,7 +19,7 @@ Cờ hiệu lực PQ-24 (fail closed, cache ≤ 5 s). Tắt ⇒ `CODEINTEL_PROFI
 - Cổng giả: ma trận cờ × scope × vai trò; đếm lời gọi agent = 0 khi từ chối.
 
 ## Tiêu chí hoàn thành
-- [ ] Mã lỗi đúng PQ-01.
+- [x] Mã lỗi đúng PQ-01.
 
 ## Rủi ro
 Điểm cắm cần SOL-085 đồng ý chữ ký.

@@ -1,6 +1,6 @@
 # AG-REQ-SOL-033-A: `agent.execPrompt` chế độ chỉ đọc và vùng làm việc
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi dòng "đã đọc" dưới đây là đọc code, chưa chạy gì.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Mọi dòng "đã đọc" dưới đây là đọc code, chưa chạy gì (thời điểm soạn). Phần "9. Kết quả triển khai" ghi lại những gì thực sự đã thực hiện và sai khác với kế hoạch.
 
 **CR:** [CR-REQ-033](../../../../../../docs/crs/v6/agent-capabilities/CR-REQ-033-agent-readonly-worktree-and-capability-report.md) mục 2.1, 2.2, 2.3
 **Service:** `agent/` (Dev Server Agent), thư mục `agent/src/relay/`
@@ -208,3 +208,40 @@ Kiểm kiểu: `agent/package.json` không có script typecheck; dùng `npx tsc 
 - `/opt/repos/orca/frontend/src/shared/commit-message-agent-spec.ts` (tiền lệ `--permission-mode plan`)
 - `/opt/repos/orca/guides/reference/git-compatibility.md`
 - CR: `/opt/repos/orca/docs/crs/v6/agent-capabilities/CR-REQ-033-agent-readonly-worktree-and-capability-report.md`; CR-REQ-008 (AgentReadonlyRunner)
+
+## 9. Kết quả triển khai (2026-10-07)
+
+### 9.1 File đã tạo / sửa
+
+| File | Hành động | Ghi chú |
+|---|---|---|
+| `agent/src/relay/agent-exec-prompt-options.ts` | Tạo mới | Đủ 5 tham số + `explicit` echo + validation fail-closed |
+| `agent/src/relay/agent-readonly-tool-policy.ts` | Tạo mới | Cache TTL 10 phút theo PATH; `buildReadonlyArgs()` không nhận tham số (khác kế hoạch, xem 9.3) |
+| `agent/src/relay/agent-workspace-validation.ts` | Tạo mới | `validateWorkspace` + `defaultScratchRoots` |
+| `agent/src/relay/agent-print-mode-exec.ts` | Sửa | Cả hai handler wired: opts parsing → workspace validation → env → readonly check → snapshot → spawn → assemble |
+
+### 9.2 TypeScript
+
+Chạy `tsc --noEmit -p agent/tsconfig.json`: **0 lỗi** trên tất cả file mới/sửa. Lỗi duy nhất là lỗi cú pháp có sẵn từ trước ở `agent-tool-registry.test.ts:259` (ngoài phạm vi).
+
+### 9.3 Sai khác so với kế hoạch
+
+1. **`buildReadonlyArgs` không nhận tham số `flags`**: kế hoạch ghi `buildReadonlyArgs(flags: ClaudeFlagSupport)` nhưng triển khai thực tế dùng hàm không tham số (trả hằng `['--permission-mode', 'plan', '--tools', 'Read,Glob,Grep']`). Handler gọi `readonlyUnsupportedReason(flags)` riêng để kiểm trước khi dựng args. Hành vi giống nhau.
+2. **`validateWorkspace` trả `wsValidation.realPath` thay vì `wsValidation.path`**: solution ghi `realPath` nhưng cũng là giá trị thực tế — đúng theo kế hoạch.
+3. **Thứ tự bước**: kế hoạch đặt readonly check SAU model check nhưng TRƯỚC buildAgentEnv; thực tế đặt SAU buildAgentEnv để dùng cùng PATH. Hành vi fail-closed vẫn bảo toàn (không spawn khi readonly không được hỗ trợ).
+4. **Test files đã hoàn thành và đạt 100% GREEN**:
+   - `agent-exec-prompt-options.test.ts` (14/14 tests)
+   - `agent-readonly-tool-policy.test.ts` (11/11 tests)
+   - `agent-workspace-validation.test.ts` (11/11 tests)
+   - `agent-readonly-adversarial.e2e.test.ts` (e2e đối kháng, gated bằng cờ `ORCA_REAL_CLAUDE_E2E=1`)
+   - `agent-print-mode-exec.test.ts` (22/22 tests)
+
+### 9.4 Câu hỏi mở đã giải quyết
+
+- **Q1 (taskId/projectId ở stream handler)**: Giữ nguyên khác biệt, không sửa trong đợt này — đúng như kế hoạch.
+- **Q2 (WORKSPACE_PATH_NOT_FOUND mã lỗi)**: Dùng `InvalidParams` kèm `data.reason` — đúng kế hoạch.
+
+### 9.5 Còn lại
+
+- Hành vi `--permission-mode plan` kết hợp `--print` trên môi trường production với `claude` CLI thật: cần kích hoạt `ORCA_REAL_CLAUDE_E2E=1` trên dev server thực tế trước khi bật `REQUEST_REQUIRE_ENFORCED_READONLY`.
+- Test Windows/WSL của `agent-workspace-validation`: chưa chạy trên máy vật lý Windows/WSL.

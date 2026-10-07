@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request.go`, `.../channels_request_flow.go` (mới), `.../channels_request_test.go` (mới), `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/excluded_channels.yaml`
 **Depends on:** TASK-REQ-016-02; RPC của CR-REQ-004, 005, 006, 012, 013, 025 (thêm kênh nào khi RPC của nó đã có trong proto)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -34,10 +34,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Từng kênh trong CONTRACT 2.1 (trừ `subscribe`) có test.
-- [ ] Không kênh nào nhận `tenantId`, `userId`, `reporterId`.
-- [ ] `request.list` kẹp `pageSize`, trả `[]` khi rỗng.
-- [ ] Parity test xanh; không kênh nào thiếu dòng loại trừ.
+- [x] Từng kênh trong CONTRACT 2.1 (trừ `subscribe`) có test.
+- [x] Không kênh nào nhận `tenantId`, `userId`, `reporterId`.
+- [x] `request.list` kẹp `pageSize`, trả `[]` khi rỗng.
+- [x] Parity test xanh; không kênh nào thiếu dòng loại trừ.
 
 ## Rủi ro và lưu ý
 

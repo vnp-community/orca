@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/domain/outbox_record.go`, `internal/domain/outbox_subjects.go`, `internal/usecase/ports.go`, `internal/adapter/postgres/{repository.go,tenant_tx.go,outbox.go,tenant_scope_guard_test.go}`, `internal/adapter/mysql/{repository.go,outbox.go,tenant_scope_guard_test.go}` (đều mới, tiền tố `backend-go/services/code-intel-service/`)
 **Depends on:** BE-CV-TASK-010-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Sự kiện ghi cùng transaction; rollback không để lại dòng.
-- [ ] RLS: tenant A không thấy/ghi dòng tenant B; chỉ relay đọc chéo tenant, không `INSERT`.
-- [ ] Test AST bắt phương thức thiếu phạm vi, quét mọi file repository.
+- [x] Sự kiện ghi cùng transaction; rollback không để lại dòng.
+- [x] RLS: tenant A không thấy/ghi dòng tenant B; chỉ relay đọc chéo tenant, không `INSERT`.
+- [x] Test AST bắt phương thức thiếu phạm vi, quét mọi file repository.
 
 ## Rủi ro và lưu ý
 

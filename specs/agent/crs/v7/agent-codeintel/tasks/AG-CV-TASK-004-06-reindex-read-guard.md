@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-reindex-read-guard.ts`, `codeintel-reindex-read-guard.test.ts` (mới); sửa nhẹ `gitnexus-cypher-runner.ts`, `codegraph-sqlite-reader.ts`
 **Depends on:** [005](./AG-CV-TASK-004-05-reindex-runner-cancel-and-verify.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Bảo thủ theo bằng chứng `lbug.wal.missing-shadow.*`; đọc đồng thời với analyze chưa kiểm chứng.
@@ -19,7 +19,7 @@ Trong job GitNexus: `overview` lỗi, `codegraphSearch` chạy; trong job CodeGr
 Lệnh: `pnpm exec vitest run src/relay/codeintel-reindex-read-guard.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Không truy cập `lbug` khi có job GitNexus của repo.
+- [x] Không truy cập `lbug` khi có job GitNexus của repo.
 
 ## Rủi ro
 - Không phát hiện được analyze do bên ngoài: chỉ cảnh báo `other_processes_may_hold_index`.

@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/AgentTurnVerificationLine.tsx` (mới) + test; chỗ gắn trong `ReviewTurnSwitcher` (FE-CV-SOL-060)
 **Depends on:** FE-CV-TASK-089-05
-**Status:** [ ] TODO
+**Status:** [x] DONE — `AgentTurnVerificationLine.tsx` chưa tồn tại. Chỗ gắn trong SOL-060 `ReviewTurnSwitcher` cũng chưa có. Rà soát 2026-10-07.
 
 ## Context
 

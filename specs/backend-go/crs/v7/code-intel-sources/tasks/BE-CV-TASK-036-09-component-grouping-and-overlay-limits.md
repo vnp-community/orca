@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/changeoverlay/component_grouping.go`, `overlay_limits.go` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-036-07, BE-CV-TASK-036-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -25,8 +25,8 @@ Solution reading-order §2.D; hợp đồng PQ-14 (≤ 2 MiB). Mở khoá TASK-0
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí "giới hạn" và "nhóm component" của §9 đạt.
-- [ ] `risk` bất biến qua `ApplyLimits`.
+- [x] Tiêu chí "giới hạn" và "nhóm component" của §9 đạt.
+- [x] `risk` bất biến qua `ApplyLimits`.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `ReviewWorkspace.tsx`, `ReviewHeaderBar.tsx`, `ReviewScopePicker.tsx`, `ReviewLensTabs.tsx`, `ReviewDetailDrawer.tsx`, `review-lens-registry.ts`, `review-layout-storage.ts`, `ReviewTabHost.tsx` (sửa, nối `ReviewWorkspace`), tests
 **Depends on:** FE-CV-TASK-051-02, 051-03, 051-04, FE-CV-TASK-050-17
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

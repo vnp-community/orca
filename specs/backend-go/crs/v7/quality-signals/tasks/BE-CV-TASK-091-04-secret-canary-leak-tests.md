@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/security_canary_test.go`, `internal/adapter/*/security_canary_integration_test.go` (mới)
 **Depends on:** BE-CV-TASK-091-03, BE-CV-SOL-072-security-tests-service-gateway
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 CR-091 2.5: chuỗi canary không được xuất hiện ở bất kỳ đầu ra nào. Mở rộng CR-072 "che secret".
@@ -19,7 +19,7 @@ CR-091 2.5: chuỗi canary không được xuất hiện ở bất kỳ đầu r
 - `go test ./... && go test -tags=integration` hai dialect.
 
 ## Tiêu chí hoàn thành
-- [ ] Không chuỗi canary ở bất kỳ nơi nào.
+- [x] Không chuỗi canary ở bất kỳ nơi nào.
 
 ## Rủi ro
 Bắt log cần handler thử nghiệm đồng nhất với cấu hình thật.

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/security-seeded-fuzz.test.ts`, `agent/src/relay/codeintel/seeded-random.ts` (mới)
 **Depends on:** 072-02 đến 072-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,12 +23,12 @@ Test viết theo hợp đồng; mã bị test thuộc AG-CV-SOL-001/002/003/004/
 
 - Chạy với ba hạt cố định; thủ công tăng vòng (CHƯA CHẠY).
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/security-seeded-fuzz.test.ts` (9 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bất biến giữ; thời gian chạy mặc định thấp (chưa đo).
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Bất biến giữ; thời gian chạy mặc định thấp (chưa đo).
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

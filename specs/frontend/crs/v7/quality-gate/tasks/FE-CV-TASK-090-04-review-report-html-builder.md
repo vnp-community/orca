@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/review-report-html.ts`, `review-report-theme-tokens.ts` (mới) + test
 **Depends on:** FE-CV-TASK-090-01, 090-03
-**Status:** [ ] TODO
+**Status:** [x] DONE — `review-report-html-builder.ts` chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

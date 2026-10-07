@@ -1,0 +1,13 @@
+{
+  "tool": "vitest",
+  "toolVersion": "vitest_1.6.1_darwin-arm64_node",
+  "argv": [
+    "vitest",
+    "run",
+    "--reporter=json",
+    "--outputFile=vitest-out.json"
+  ],
+  "markers": {},
+  "capturedAt": "2026-10-07T06:14:33.145Z",
+  "sha256": "8578f6c5afb0c16450aacd814d83e2b90e54e099c674d6a9d149b1f84aeed9cb"
+}

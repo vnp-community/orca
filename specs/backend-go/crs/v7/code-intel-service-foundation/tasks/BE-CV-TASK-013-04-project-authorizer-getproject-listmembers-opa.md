@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/project_authorizer.go`, `internal/adapter/policyengine/opa.go`, `internal/usecase/project_authorizer_test.go` (mới); `cmd/server/main.go` (nạp OPA)
 **Depends on:** BE-CV-TASK-013-01, 013-02, BE-CV-TASK-012-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,8 +30,8 @@ SOL-013-authorization mục 2.B/2.E. Mẫu nạp OPA: `task-service/cmd/server/m
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các tiêu chí quyền ở SOL mục 4 đạt.
-- [ ] Bó thiếu → service không khởi động.
+- [x] Các tiêu chí quyền ở SOL mục 4 đạt.
+- [x] Bó thiếu → service không khởi động.
 
 ## Rủi ro và lưu ý
 

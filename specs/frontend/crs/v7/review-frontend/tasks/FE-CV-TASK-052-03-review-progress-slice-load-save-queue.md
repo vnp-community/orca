@@ -5,7 +5,7 @@
 **Area:** frontend / store
 **File:** `store/slices/review-progress.ts` (mới), `store/index.ts`, `types.ts`, `store-test-helpers.ts`, tests `review-progress.test.ts`, `review-progress-worktree-removal-leak.test.ts`, `review-progress-bulk-purge-leak.test.ts`
 **Depends on:** FE-CV-TASK-052-02, FE-CV-TASK-050-10, FE-CV-TASK-050-13, FE-CV-TASK-051-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

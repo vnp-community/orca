@@ -107,14 +107,14 @@ Bảng danh sách cho phép, giới hạn (≤ 60 tệp, 80 symbol, 20 lý do, 2
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `off`/cờ tắt → `CODEINTEL_AI_REVIEW_DISABLED`, **không** có lời gọi `ai.complete` (agent giả đếm).
-- [ ] `dry_run` không gọi agent và manifest khớp byte/tệp đầu vào thật.
-- [ ] Đầu vào không chứa các mục cấm (repo fixture); token giả (`ghp_…`, `AKIA…`, JWT, `PRIVATE KEY`, hex 64) bị che; tệp ≥ 3 lần che bị loại.
-- [ ] Bộ injection (≥ 20 mẫu): đầu ra không có `refs` ngoài tập, URL, HTML; không đổi `verdict`; văn bản tự do → `CODEINTEL_AI_BAD_OUTPUT`.
-- [ ] Cache: hit không gọi agent; đổi 1 dòng diff → miss; hết hạn 24 h theo đồng hồ DB; thiếu `read_source` không đọc được dù có cache.
-- [ ] `infra-fleet`: `execTimeoutForMethod("ai.complete")` = 120 s, `agent.execPrompt` = 15 phút, method khác = 0 (test bảng).
-- [ ] `CODEINTEL_TIMEOUT` có hậu tố `inProgress`; lần gọi sau trúng cache.
-- [ ] Hạn mức vượt → `CODEINTEL_RATE_LIMITED`; audit không chứa nội dung; tenant A không đọc cache tenant B.
+- [x] `off`/cờ tắt → `CODEINTEL_AI_REVIEW_DISABLED`, **không** có lời gọi `ai.complete` (agent giả đếm).
+- [x] `dry_run` không gọi agent và manifest khớp byte/tệp đầu vào thật.
+- [x] Đầu vào không chứa các mục cấm (repo fixture); token giả (`ghp_…`, `AKIA…`, JWT, `PRIVATE KEY`, hex 64) bị che; tệp ≥ 3 lần che bị loại.
+- [x] Bộ injection (≥ 20 mẫu): đầu ra không có `refs` ngoài tập, URL, HTML; không đổi `verdict`; văn bản tự do → `CODEINTEL_AI_BAD_OUTPUT`.
+- [x] Cache: hit không gọi agent; đổi 1 dòng diff → miss; hết hạn 24 h theo đồng hồ DB; thiếu `read_source` không đọc được dù có cache.
+- [x] `infra-fleet`: `execTimeoutForMethod("ai.complete")` = 120 s, `agent.execPrompt` = 15 phút, method khác = 0 (test bảng).
+- [x] `CODEINTEL_TIMEOUT` có hậu tố `inProgress`; lần gọi sau trúng cache.
+- [x] Hạn mức vượt → `CODEINTEL_RATE_LIMITED`; audit không chứa nội dung; tenant A không đọc cache tenant B.
 
 ## 5. Kiểm thử
 

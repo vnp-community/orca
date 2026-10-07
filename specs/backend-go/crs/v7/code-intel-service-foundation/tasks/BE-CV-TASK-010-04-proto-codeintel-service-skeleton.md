@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel.proto` (mới), `backend-go/proto/gen/go/orca/codeintel/v1/*.pb.go` (sinh, commit)
 **Depends on:** BE-CV-TASK-010-01 (kết luận `buf lint`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,8 +29,8 @@ Hợp đồng §2.1 #1: `codeintel.proto` do CR-010 tạo, chỉ chứa `service
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf lint` xanh; stub được commit; `go build` xanh.
-- [ ] Không có RPC hay message thừa.
+- [x] `buf lint` xanh; stub được commit; `go build` xanh.
+- [x] Không có RPC hay message thừa.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/readingorder/reading_graph.go`, `strongly_connected.go` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-036-03 (kiểu `ChangedSymbol`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -25,8 +25,8 @@ Solution reading-order C1: cạnh lấy từ `levels[0]` của `impact` upstream
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các ca trên xanh; thời gian 2 000 nút/10 000 cạnh < 100 ms (đo trong test benchmark, không là cổng chặn).
-- [ ] Không import ngoài stdlib.
+- [x] Các ca trên xanh; thời gian 2 000 nút/10 000 cạnh < 100 ms (đo trong test benchmark, không là cổng chặn).
+- [x] Không import ngoài stdlib.
 
 ## Rủi ro và lưu ý
 

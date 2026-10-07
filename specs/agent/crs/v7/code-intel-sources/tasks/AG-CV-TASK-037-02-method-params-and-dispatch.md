@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel-structural-facts.ts` (mới), `.test.ts`; sửa `codeintel-method-table.ts` (AG-CV-SOL-001)
 **Depends on:** AG-CV-SOL-001 (method table, errors, envelope, limits), AG-CV-TASK-037-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Bảng ca tham số (lạ, `pair` sai chỗ, `pathPrefixes` 21 phần tử, `..`
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi tham số lạ bị từ chối; method ở bảng `CODEINTEL_METHODS`.
+- [x] Mọi tham số lạ bị từ chối; method ở bảng `CODEINTEL_METHODS`.
 
 ## Rủi ro
 

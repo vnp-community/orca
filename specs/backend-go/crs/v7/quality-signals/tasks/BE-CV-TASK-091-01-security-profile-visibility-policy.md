@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/security_profile_visibility.go`, test (mới)
 **Depends on:** BE-CV-SOL-010
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 PQ-01(4); SOL mục 2.B, C3, C4. Lọc theo `kind∈{security,dependency}` hoặc tiền tố tên, và theo suite.
@@ -18,7 +18,7 @@ PQ-01(4); SOL mục 2.B, C3, C4. Lọc theo `kind∈{security,dependency}` hoặ
 - Bảng: kind, tên, suite lách cờ, cờ bật/tắt.
 
 ## Tiêu chí hoàn thành
-- [ ] Chỉ stdlib.
+- [x] Chỉ stdlib.
 
 ## Rủi ro
 Suite mặc định của agent chưa chốt.

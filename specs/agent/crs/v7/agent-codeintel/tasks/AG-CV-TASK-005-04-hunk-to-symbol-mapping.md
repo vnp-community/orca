@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-hunk-symbol-mapping.ts`, `codeintel-hunk-symbol-mapping.test.ts` (mới)
 **Depends on:** [003](./AG-CV-TASK-005-03-diff-collection-untracked-and-fallback.md), [AG-CV-TASK-002-04](./AG-CV-TASK-002-04-verify-cypher-templates-against-real-gitnexus.md), [AG-CV-TASK-002-05](./AG-CV-TASK-002-05-codeintel-symbol-ref.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `FILE_SYMBOLS_BATCH` (CR-002) nhóm 100 đường dẫn, song song ≤ 3 theo cổng; dòng +1; `File` không có dòng; số dòng chỉ mục là của lúc `analyze`.
@@ -20,7 +20,7 @@ Method trong class, hằng cấp tệp, `Section`, xoá thuần, tệp bẩn `ap
 Lệnh: `pnpm exec vitest run src/relay/codeintel-hunk-symbol-mapping.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Không bịa symbol cho mã mới chưa index.
+- [x] Không bịa symbol cho mã mới chưa index.
 
 ## Rủi ro
 - Giả định tệp bẩn luôn `approximate` (chưa biết `analyze` đọc working tree hay commit).

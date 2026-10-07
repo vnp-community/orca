@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/ai-summary/ReviewAiSummaryCard.tsx` (mới) + test; chỗ đặt trong khung FE-CV-SOL-051
 **Depends on:** FE-CV-TASK-093-02, 093-03
-**Status:** [ ] TODO
+**Status:** [x] DONE — `ReviewAiSummaryCard.tsx` chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

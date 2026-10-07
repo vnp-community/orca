@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/changeoverlay/impact_selection.go`, `impact_selection_test.go` (mới); `internal/usecase/change_overlay_ports.go` (mới); `internal/usecase/impact_fanout.go`, `impact_fanout_test.go` (mới)
 **Depends on:** BE-CV-TASK-036-03; BE-CV-SOL-021 (collector: typed client `Impact`, `DetectChanges`); BE-CV-SOL-030 (`RepoSourceReader.Log`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,9 +27,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Giới hạn đồng thời 2 được test.
-- [ ] Hết ngân sách không làm mất kết quả muộn.
-- [ ] Các port có hiện thực `Unavailable` để use case chạy khi nguồn mềm vắng.
+- [x] Giới hạn đồng thời 2 được test.
+- [x] Hết ngân sách không làm mất kết quả muộn.
+- [x] Các port có hiện thực `Unavailable` để use case chạy khi nguồn mềm vắng.
 
 ## Rủi ro và lưu ý
 

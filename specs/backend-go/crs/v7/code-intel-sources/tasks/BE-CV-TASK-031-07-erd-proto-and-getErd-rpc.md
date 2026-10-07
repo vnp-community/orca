@@ -5,7 +5,7 @@
 **Service:** `proto` / `code-intel-service`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_erd.proto` (mới); `backend-go/proto/orca/codeintel/v1/codeintel.proto` (thêm một dòng `rpc GetErd`); stub sinh vào `backend-go/proto/gen/go/orca/codeintel/v1/`
 **Depends on:** `codeintel_common.proto` (G0, BE-CV-SOL-020) và `codeintel.proto` có service rỗng-có-health (BE-CV-SOL-010)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ SOL-031-erd mục 2.A. `buf.yaml`: lint `STANDARD`, breaking `FILE`. Hợp đồ
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf lint` và `buf breaking` xanh.
-- [ ] Mọi message tiền tố `Erd*` (trừ `TableAccess`, `ParseWarning` theo PQ-29).
-- [ ] RPC `GetErd` có trong service duy nhất `CodeIntelService`.
-- [ ] Không có `repo_binding_id` trong request.
+- [x] `buf lint` và `buf breaking` xanh.
+- [x] Mọi message tiền tố `Erd*` (trừ `TableAccess`, `ParseWarning` theo PQ-29).
+- [x] RPC `GetErd` có trong service duy nhất `CodeIntelService`.
+- [x] Không có `repo_binding_id` trong request.
 
 ## Rủi ro và lưu ý
 

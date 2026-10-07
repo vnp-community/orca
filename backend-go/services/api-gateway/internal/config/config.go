@@ -75,6 +75,8 @@ type Config struct {
 	// MCP holds the MCP endpoint settings (config_mcp.go); zero value = disabled.
 	MCP MCPConfig
 
+	CodeIntel CodeIntelConfig
+
 	// RateLimitRPS/RateLimitBurst configure the per-tenant in-memory
 	// token-bucket rate limiter (internal/usecase/rate_limit.go).
 	RateLimitRPS   float64
@@ -133,9 +135,15 @@ func Load() (Config, error) {
 		return Config{}, err
 	}
 
+	codeIntelCfg, err := loadCodeIntel()
+	if err != nil {
+		return Config{}, err
+	}
+
 	return Config{
 		Base:                    base,
 		MCP:                     mcpCfg,
+		CodeIntel:               codeIntelCfg,
 		PublicPort:              publicPort,
 		UsageServiceAddr:        commonconfig.StringEnv("USAGE_SERVICE_ADDR", "localhost:9101"),
 		NotificationServiceAddr: commonconfig.StringEnv("NOTIFICATION_SERVICE_ADDR", "localhost:9102"),

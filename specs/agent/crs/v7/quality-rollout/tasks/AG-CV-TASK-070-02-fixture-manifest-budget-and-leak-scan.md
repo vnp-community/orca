@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/fixture-manifest.ts` (mới), `agent/src/relay/codeintel/fixture-manifest.test.ts` (mới)
 **Depends on:** 070-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -29,9 +29,9 @@ Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn t
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba test xanh; thêm tệp 21 KiB vào thư mục tạm làm đỏ.
-- [ ] Hàm quét tái dùng được bởi script chụp (task 03) và `mini-repo-shape`.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Ba test xanh; thêm tệp 21 KiB vào thư mục tạm làm đỏ.
+- [x] Hàm quét tái dùng được bởi script chụp (task 03) và `mini-repo-shape`.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

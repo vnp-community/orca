@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-index-watcher.ts`, `codeintel-index-watcher.test.ts` (mới)
 **Depends on:** [001](./AG-CV-TASK-004-01-codeintel-notification-sink.md), [AG-CV-TASK-001-08](./AG-CV-TASK-001-08-result-envelope-and-head-commit.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Contract §4.13, §6.1. Thăm dò, không `fs.watch` (giới hạn inotify `MAX_LINUX_WATCH_DIRS=4000`, `meta.json` 2,8 MB, NFS). `lastIndexed` của CodeGraph không là tín hiệu.
@@ -21,7 +21,7 @@ Contract §4.13, §6.1. Thăm dò, không `fs.watch` (giới hạn inotify `MAX_
 Lệnh: `pnpm exec vitest run src/relay/codeintel-index-watcher.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Không bão thông báo; không rò timer sau `cleanup`.
+- [x] Không bão thông báo; không rò timer sau `cleanup`.
 
 ## Rủi ro
 - Trễ phát hiện 10–15 s (chấp nhận).

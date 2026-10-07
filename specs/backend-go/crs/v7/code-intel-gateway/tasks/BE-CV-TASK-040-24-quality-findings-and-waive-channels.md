@@ -29,7 +29,7 @@ UI-API 3.2: `findings` (sel, `runId?`, `severities?`, `categories?`, `file?`, `i
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai kênh đúng shape; ràng buộc `reason` theo `subjectKind`.
+- [x] Hai kênh đúng shape; ràng buộc `reason` theo `subjectKind`.
 
 ## Rủi ro và lưu ý
 

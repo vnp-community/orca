@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` (chưa tạo) · `proto`
 **File:** không sửa file sản phẩm; kết quả ghi vào mô tả PR (bảng "đã kiểm / lệch")
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ CR-CV-010 mục 6 ghi hai điểm chưa kiểm chứng chặn thiết kế: (1) 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Có kết luận "xanh/đỏ" của `buf lint` cho service rỗng và quyết định tương ứng ghi vào PR.
-- [ ] Có kết luận về tên stream `CODEINTEL` (đã kiểm hoặc "chưa kiểm chứng").
-- [ ] Số dòng wiring trong SOL-010 còn khớp, hoặc ghi chỗ lệch.
+- [x] Có kết luận "xanh/đỏ" của `buf lint` cho service rỗng và quyết định tương ứng ghi vào PR.
+- [x] Có kết luận về tên stream `CODEINTEL` (đã kiểm hoặc "chưa kiểm chứng").
+- [x] Số dòng wiring trong SOL-010 còn khớp, hoặc ghi chỗ lệch.
 
 ## Rủi ro và lưu ý
 

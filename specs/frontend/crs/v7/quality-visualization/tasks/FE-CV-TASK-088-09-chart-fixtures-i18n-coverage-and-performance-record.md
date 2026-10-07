@@ -5,7 +5,7 @@
 **Area:** frontend / test-support + i18n
 **File:** `frontend/src/renderer/src/test-support/quality-chart-fixtures.ts` (mới), `frontend/src/renderer/src/i18n/code-intel-quality-locale-coverage.test.ts` (mới), `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa; khoá `auto.components.qualityCharts.*`), `frontend/src/renderer/src/components/quality-charts/__tests__/quality-chart-performance.test.ts` (mới)
 **Depends on:** FE-CV-TASK-088-03 đến 088-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

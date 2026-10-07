@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codegraph-sqlite-reader.ts`, `codegraph-sqlite-reader.test.ts` (mới)
 **Depends on:** [AG-CV-TASK-001-06](./AG-CV-TASK-001-06-gitnexus-registry-and-repo-resolution.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Tiền lệ: `external-automations-handler.ts:497-520` nạp `node:sqlite` qua `requireOptional`, truyền `readOnly`. Không thêm dependency. Schema nội bộ (`nodes`, `edges`, `files`, `schema_versions`, `project_metadata`).
@@ -21,7 +21,7 @@ DB tạm bằng `node:sqlite` schema thu gọn; ghi vào DB thất bại; schema
 Lệnh: `pnpm exec vitest run src/relay/codegraph-sqlite-reader.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Chỉ `SELECT` hằng; không SQL từ ngoài (test quét nguồn).
+- [x] Chỉ `SELECT` hằng; không SQL từ ngoài (test quét nguồn).
 
 ## Rủi ro
 - EXPLAIN QUERY PLAN chưa chạy (task 08); Node cũ không có `node:sqlite`.

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/request_repository_contract.go` (mới, package thường, không phải `_test.go`, để hai adapter import), `internal/adapter/postgres/request_repository_contract_test.go`, `internal/adapter/mysql/request_repository_contract_test.go`, `internal/adapter/postgres/schema_contract_test.go`, `internal/adapter/mysql/schema_contract_test.go` (mới)
 **Depends on:** TASK-REQ-002-04, TASK-REQ-002-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ CR-REQ-002 mục 5 yêu cầu một bộ kịch bản chạy cho cả hai dialec
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cùng một bộ kịch bản xanh với cả hai dialect.
-- [ ] Bảng cột mong đợi khớp `information_schema` cả hai DB.
-- [ ] Mọi hằng Go được DB chấp nhận.
-- [ ] Test cách ly tenant đỏ khi bỏ điều kiện `tenant_id` (đã thử đối chứng).
+- [x] Cùng một bộ kịch bản xanh với cả hai dialect.
+- [x] Bảng cột mong đợi khớp `information_schema` cả hai DB.
+- [x] Mọi hằng Go được DB chấp nhận.
+- [x] Test cách ly tenant đỏ khi bỏ điều kiện `tenant_id` (đã thử đối chứng).
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `c4-layer-layout.ts`, `c4-edge-style.ts`, `c4-overlay-model.ts` (mới), tests
 **Depends on:** FE-CV-TASK-050-01, FE-CV-TASK-053-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

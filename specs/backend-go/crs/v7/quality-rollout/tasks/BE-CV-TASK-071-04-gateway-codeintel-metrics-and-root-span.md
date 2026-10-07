@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/codeintelmetrics/metrics.go` (mới), `.../codeintelmetrics/instrument.go` (mới), `.../codeintelmetrics/metrics_test.go` (mới), `backend-go/services/api-gateway/cmd/server/mcp_metrics_wiring.go`, `backend-go/services/api-gateway/cmd/server/main.go`
 **Depends on:** BE-CV-SOL-040-codeintel-channel-foundation (đăng ký kênh, `codeIntelChannelError`, `SetReadLimit`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -33,9 +33,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `/metrics` gateway phục vụ cả hai họ metric.
-- [ ] Mọi kênh `codeIntel.*` có số đo và span mà không sửa từng handler.
-- [ ] Test conformance MCP vẫn xanh.
+- [x] `/metrics` gateway phục vụ cả hai họ metric.
+- [x] Mọi kênh `codeIntel.*` có số đo và span mà không sửa từng handler.
+- [x] Test conformance MCP vẫn xanh.
 
 ## Rủi ro và lưu ý
 

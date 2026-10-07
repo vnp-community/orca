@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/testdata/contract-diff/PROVENANCE.txt` (mới); `testdata/contract-diff/proto/{base,head}/*.proto`, `wscompat/{base,head}/*.go`, `migrations/{base,head}/{postgres,mysql}/*.sql` (mới)
 **Depends on:** BE-CV-SOL-031-sql-migration-parser, BE-CV-SOL-032-proto-and-wscompat-contract-catalog (chữ ký thật), BE-CV-SOL-030
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,9 +26,9 @@ Solution 038 phải gọi bộ phân tích do 031/032 cung cấp nhưng chưa đ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chữ ký ba bộ phân tích được ghi (hoặc đánh dấu "theo đặc tả").
-- [ ] Kết luận về route HTTP.
-- [ ] Fixture phủ mọi dòng bảng quy tắc.
+- [x] Chữ ký ba bộ phân tích được ghi (hoặc đánh dấu "theo đặc tả").
+- [x] Kết luận về route HTTP.
+- [x] Fixture phủ mọi dòng bảng quy tắc.
 
 ## Rủi ro và lưu ý
 

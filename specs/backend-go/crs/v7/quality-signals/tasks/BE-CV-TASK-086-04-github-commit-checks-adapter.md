@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/adapter/github/commit_checks.go`, test, `testdata/commit_checks_*.json` (mới)
 **Depends on:** BE-CV-TASK-086-02, 086-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `graphQLRequest` có sẵn (`client.go:609`); `graphQLURL` cố định nên GHE dùng REST. Truy vấn theo SOL mục 2.D (dựng từ `PR_CHECKS_ROLLUP_QUERY`, chưa chạy).
@@ -20,7 +20,7 @@
 - httptest: PR 3 check, StatusContext, > 200, GHE REST, 403 secondary, JSON lỗi GraphQL.
 
 ## Tiêu chí hoàn thành
-- [ ] Một lời gọi HTTP cho danh sách (đếm).
+- [x] Một lời gọi HTTP cho danh sách (đếm).
 
 ## Rủi ro
 Fixture dựng tay (chưa có mẫu thật).

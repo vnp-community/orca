@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/storage/storage-layout.ts` (mới) + `storage-layout.test.ts`
 **Depends on:** FE-CV-TASK-058-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

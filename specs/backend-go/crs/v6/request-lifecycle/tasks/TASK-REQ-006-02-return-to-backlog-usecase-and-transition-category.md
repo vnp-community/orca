@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/transition_request.go`, `internal/usecase/transition_request_events.go`, `internal/usecase/transition_request_test.go`, `internal/usecase/status_write_guard_test.go` (sửa); `internal/usecase/return_request_to_backlog.go`, `internal/usecase/return_request_to_backlog_test.go` (mới)
 **Depends on:** TASK-REQ-006-01, TASK-REQ-005-04 (`ApprovalCanceller`, `ExecutionGuard`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -37,10 +37,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi trạng thái nguồn trả về với `stage` hợp lệ; `stage` sai bị từ chối.
-- [ ] Sau trả về có đủ `status`, `returned_from_stage`, `returned_category`, `return_reason`, một dòng lịch sử, hai sự kiện.
-- [ ] Gọi lặp: không dòng lịch sử, không sự kiện.
-- [ ] Mọi test cũ của `TransitionRequest` vẫn xanh sau thay đổi chữ ký.
+- [x] Mỗi trạng thái nguồn trả về với `stage` hợp lệ; `stage` sai bị từ chối.
+- [x] Sau trả về có đủ `status`, `returned_from_stage`, `returned_category`, `return_reason`, một dòng lịch sử, hai sự kiện.
+- [x] Gọi lặp: không dòng lịch sử, không sự kiện.
+- [x] Mọi test cũ của `TransitionRequest` vẫn xanh sau thay đổi chữ ký.
 
 ## Rủi ro và lưu ý
 

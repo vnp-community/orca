@@ -5,7 +5,7 @@
 **Area:** mobile / session (hàm thuần + loader)
 **File:** `mobile/src/session/mobile-review-summary-loaders.ts`, `mobile-review-summary-model.ts` (mới) + test
 **Depends on:** FE-CV-TASK-062-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

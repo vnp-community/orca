@@ -28,8 +28,8 @@ Một kênh vừa có `ToolSpec` vừa bị loại trừ làm `TestChannelInvent
 
 ## Tiêu chí hoàn thành
 
-- [ ] 9 + 37 = 46 kênh phủ, không trùng.
-- [ ] Golden đổi đúng 9 mục.
+- [x] 9 + 37 = 46 kênh phủ, không trùng.
+- [x] Golden đổi đúng 9 mục.
 
 ## Rủi ro và lưu ý
 

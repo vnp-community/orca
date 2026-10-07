@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/list_backlog_tasks.go` (mới), `internal/usecase/ports.go`, `internal/adapter/grpcclient/task_client.go` (thêm `ListExecutionStates`, dùng chung với SOL-013), `internal/adapter/postgres/backlog_approvals.go`, `internal/adapter/mysql/backlog_approvals.go` (mới), `internal/usecase/list_backlog_tasks_test.go` (mới)
 **Depends on:** TASK-REQ-015-01, 02, 03, 04; SOL-011 task 04 (`ListTasks` lọc); SOL-013 task 03 (`task_run_outcomes.LatestFailed`); CR-REQ-009 (`approvals`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -48,11 +48,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Task `open` dưới Plan chưa duyệt ở TASK, không ở EXECUTE; duyệt xong thì chuyển.
-- [ ] `change_request`: task dưới Phase chưa duyệt vẫn ở TASK dù Plan đã duyệt.
-- [ ] Một lần `ListBacklog` TASK/EXECUTE cho 20 Request dùng đúng một `ListTasks` (cộng trang), một `ListExecutionStates` và một truy vấn `approvals`.
-- [ ] Task `blocked` ở EXECUTE có `blocked_by_task_ids` đúng; task link gần nhất `failed` kèm `failed_attempts`, `last_error`.
-- [ ] `task-service` không sẵn thì lỗi `REQUEST_BACKLOG_TASK_SERVICE_UNAVAILABLE`, không dữ liệu một phần.
+- [x] Task `open` dưới Plan chưa duyệt ở TASK, không ở EXECUTE; duyệt xong thì chuyển.
+- [x] `change_request`: task dưới Phase chưa duyệt vẫn ở TASK dù Plan đã duyệt.
+- [x] Một lần `ListBacklog` TASK/EXECUTE cho 20 Request dùng đúng một `ListTasks` (cộng trang), một `ListExecutionStates` và một truy vấn `approvals`.
+- [x] Task `blocked` ở EXECUTE có `blocked_by_task_ids` đúng; task link gần nhất `failed` kèm `failed_attempts`, `last_error`.
+- [x] `task-service` không sẵn thì lỗi `REQUEST_BACKLOG_TASK_SERVICE_UNAVAILABLE`, không dữ liệu một phần.
 
 ## Rủi ro và lưu ý
 

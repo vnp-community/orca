@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/domain/container_status.go` (mới), `internal/usecase/sync_container_status.go` (mới), `internal/usecase/ports.go`, `internal/adapter/postgres/container_status.go` (mới), `internal/adapter/mysql/container_status.go` (mới), `internal/usecase/update_task.go` (struct payload)
 **Depends on:** TASK-REQ-011-02
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -42,11 +42,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng suy ra đúng từng dòng (test table-driven xanh).
-- [ ] `UpdateContainerStatus` là CAS, một dòng outbox mỗi lần đổi, cùng transaction.
-- [ ] `SetStatus` không đổi; không đường nào đặt container `in_progress` qua `UpdateTask`.
-- [ ] Container `done` mở lại có log Warn; container `cancelled` không bị suy ra.
-- [ ] Payload cũ vẫn parse được bởi consumer cũ (trường mới `omitempty`).
+- [x] Bảng suy ra đúng từng dòng (test table-driven xanh).
+- [x] `UpdateContainerStatus` là CAS, một dòng outbox mỗi lần đổi, cùng transaction.
+- [x] `SetStatus` không đổi; không đường nào đặt container `in_progress` qua `UpdateTask`.
+- [x] Container `done` mở lại có log Warn; container `cancelled` không bị suy ra.
+- [x] Payload cũ vẫn parse được bởi consumer cũ (trường mới `omitempty`).
 
 ## Rủi ro và lưu ý
 

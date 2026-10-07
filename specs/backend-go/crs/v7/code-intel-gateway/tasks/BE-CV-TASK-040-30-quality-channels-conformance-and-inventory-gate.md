@@ -27,9 +27,9 @@ Cổng hoàn tất CR-CV-040: 46 kênh (UI-API §3) đều có handler thật; g
 
 ## Tiêu chí hoàn thành
 
-- [ ] 46/46 kênh có handler thật (hoặc `pendingRPC` có CR chặn được ghi).
-- [ ] Parity xanh; `TestCodeIntelChannelInventory` xanh.
-- [ ] Không `max-lines` disable; file mới < 400 dòng.
+- [x] 46/46 kênh có handler thật (hoặc `pendingRPC` có CR chặn được ghi).
+- [x] Parity xanh; `TestCodeIntelChannelInventory` xanh.
+- [x] Không `max-lines` disable; file mới < 400 dòng.
 
 ## Rủi ro và lưu ý
 

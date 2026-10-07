@@ -377,6 +377,7 @@ func run() error {
 	// for why this coexists with CreatePublicLink/ResolvePublicLink above.
 	generateShareLinkUC := usecase.NewGenerateShareLink(repo, resolvePermissionUC)
 	getTaskByShareTokenUC := usecase.NewGetTaskByShareToken(repo)
+	listExecutionStatesUC := usecase.NewListExecutionStates(repo)
 
 	// Execution-status mirror consumer (BE-SOL-003/TASK-FT-003-05) —
 	// subscribes orca.orchestration.task.statuschanged /
@@ -437,7 +438,8 @@ func run() error {
 		revokeGrantUC, listGrantsUC, createPublicLinkUC, revokePublicLinkUC, resolvePublicLinkUC,
 		getSubtreeUC, recalculateProgressUC, addCommentUC, listCommentsUC, reportExecutionResultUC, findTaskByNumberUC,
 		generateShareLinkUC, getTaskByShareTokenUC,
-	).WithTaskSources(usecase.NewCreateTaskFromSource(repo, repo, createTaskUC), repo))
+	).WithTaskSources(usecase.NewCreateTaskFromSource(repo, repo, createTaskUC), repo).
+	WithListExecutionStates(listExecutionStatesUC))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 
 	// healthSrv (constructed above, alongside the dialect switch that also

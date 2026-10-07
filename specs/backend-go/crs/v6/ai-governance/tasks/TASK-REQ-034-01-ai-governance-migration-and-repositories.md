@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_ai_governance.{up,down}.sql` (mới), `.../internal/usecase/ports.go` (sửa), `.../internal/adapter/{postgres,mysql}/{ai_ledger,ai_budget,ai_step_policy,ai_gate_decision}.go` (mới), `.../internal/adapter/{postgres,mysql}/ai_governance_integration_test.go` (mới)
 **Depends on:** BE-REQ-SOL-001, 002; TASK-REQ-025-01 (bảng `tenant_settings`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -67,11 +67,11 @@ type AIGateDecisionRepository interface { Insert(ctx context.Context, d domain.G
 
 ## Tiêu chí hoàn thành
 
-- [ ] Up/down/up sạch Postgres 14+ và MySQL 8.0.16+; hai thư mục cùng `NNNN`.
-- [ ] Câu so sánh-và-cộng từ chối vượt hạn, đúng một bên thắng khi đua, cả hai dialect.
-- [ ] RLS `FORCE` bật cho bảng mới; MySQL có `tenant_id` ở mọi `WHERE`.
-- [ ] `ai_trace_blobs` không bao giờ nhận dòng khi `ai_trace_level=digest_only` (kiểm ở task 04; ở đây chỉ cấu trúc).
-- [ ] Không file `helpers`, `utils`, `common`; không `max-lines` disable.
+- [x] Up/down/up sạch Postgres 14+ và MySQL 8.0.16+; hai thư mục cùng `NNNN`.
+- [x] Câu so sánh-và-cộng từ chối vượt hạn, đúng một bên thắng khi đua, cả hai dialect.
+- [x] RLS `FORCE` bật cho bảng mới; MySQL có `tenant_id` ở mọi `WHERE`.
+- [x] `ai_trace_blobs` không bao giờ nhận dòng khi `ai_trace_level=digest_only` (kiểm ở task 04; ở đây chỉ cấu trúc).
+- [x] Không file `helpers`, `utils`, `common`; không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

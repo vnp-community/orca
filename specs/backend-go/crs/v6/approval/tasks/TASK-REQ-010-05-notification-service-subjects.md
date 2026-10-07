@@ -5,7 +5,7 @@
 **Service/Area:** `notification-service` / eventbus, domain
 **File:** `backend-go/services/notification-service/internal/adapter/eventbus/consumer.go` (sửa, mảng `Subjects`), `backend-go/services/notification-service/internal/domain/notification_event.go` (sửa, `subjectRules`), `.../eventbus/consumer_test.go` (sửa), `.../domain/notification_event_test.go` (sửa)
 **Depends on:** TASK-REQ-010-04 (golden payload); độc lập về mã với các task còn lại
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -30,10 +30,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai subject nằm trong `Subjects` và `subjectRules`.
-- [ ] Test hợp đồng với golden payload xanh.
-- [ ] Không đổi hành vi các subject cũ (toàn bộ test cũ xanh).
-- [ ] Tên stream `REQUEST` được đối chiếu với `request-service` (ghi vào PR).
+- [x] Hai subject nằm trong `Subjects` và `subjectRules`.
+- [x] Test hợp đồng với golden payload xanh.
+- [x] Không đổi hành vi các subject cũ (toàn bộ test cũ xanh).
+- [x] Tên stream `REQUEST` được đối chiếu với `request-service` (ghi vào PR).
 
 ## Rủi ro và lưu ý
 

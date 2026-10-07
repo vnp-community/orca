@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/structurefinding/{git_log_parsing.go, hotspot_scoring.go}` và `_test.go` (mới); `internal/domain/structurefinding/git_quoted_path.go` (mới)
 **Depends on:** BE-CV-TASK-037-01, BE-CV-TASK-037-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ Chỉ dùng `git log` (≤ Git 2.25; `--since`, `--no-merges`, `--name-only`, `-
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí hotspot của §9 đạt.
-- [ ] Nhãn `complexity` là "độ dài hàm" ở `titleKey`/`params` (không gọi cyclomatic).
+- [x] Tiêu chí hotspot của §9 đạt.
+- [x] Nhãn `complexity` là "độ dài hàm" ở `titleKey`/`params` (không gọi cyclomatic).
 
 ## Rủi ro và lưu ý
 

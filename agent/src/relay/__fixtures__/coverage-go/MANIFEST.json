@@ -1,0 +1,24 @@
+{
+  "tool": "go",
+  "toolVersion": "go1.22.0",
+  "capturedAt": "2026-10-06T00:00:00Z",
+  "argv": [
+    "go",
+    "test",
+    "-covermode=set",
+    "-coverprofile=mod1.out",
+    "./..."
+  ],
+  "fixtures": [
+    {
+      "file": "mod1.out",
+      "sha256": "8f9cbfe1fa8fbc8c79971a6cca47f924d79ae29a9b470f30e6a7f30758d90bcd",
+      "bytes": 211
+    },
+    {
+      "file": "mod1-func.txt",
+      "sha256": "a8450a68bc61073fbeb7a0ca854a231ce51758ca1f94cd42bb01ba56ccec8947",
+      "bytes": 242
+    }
+  ]
+}

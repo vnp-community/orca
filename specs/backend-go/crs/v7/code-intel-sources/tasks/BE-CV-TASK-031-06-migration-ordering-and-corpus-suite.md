@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/sqlmigration/migration_order.go` (mới), `.../sqlmigration/build_catalog.go` (mới, ghép: sắp → tách → áp dụng), `.../sqlmigration/migration_order_test.go`, `.../sqlmigration/corpus_test.go` (mới)
 **Depends on:** BE-CV-TASK-031-03, BE-CV-TASK-031-04, BE-CV-TASK-031-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,9 +30,9 @@ SOL-031 mục 2.E. Số migration có khoảng trống (`infra-fleet-service` th
 
 ## Tiêu chí hoàn thành
 
-- [ ] `AsOfMigration` của `infra-fleet-service` = `0038_session_origin.up.sql` (theo tên file thật tại thời điểm chạy).
-- [ ] Toàn corpus không panic; thống kê khớp `grep` (lệch giải thích được) hoặc ghi vào `INVENTORY.md`.
-- [ ] Không nội dung migration trong log; log chỉ `file`, `line`, `code`.
+- [x] `AsOfMigration` của `infra-fleet-service` = `0038_session_origin.up.sql` (theo tên file thật tại thời điểm chạy).
+- [x] Toàn corpus không panic; thống kê khớp `grep` (lệch giải thích được) hoặc ghi vào `INVENTORY.md`.
+- [x] Không nội dung migration trong log; log chỉ `file`, `line`, `code`.
 
 ## Rủi ro và lưu ý
 

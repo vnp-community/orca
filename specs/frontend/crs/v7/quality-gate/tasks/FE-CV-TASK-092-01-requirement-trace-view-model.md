@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/requirements/requirement-trace-view-model.ts` (mới) + test
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `RequirementTrace`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

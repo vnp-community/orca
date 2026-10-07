@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/lib/review-telemetry.ts` (mới) + test
 **Depends on:** FE-CV-TASK-095-01
-**Status:** [ ] TODO
+**Status:** [x] DONE — `review-telemetry-wrappers.ts` và buckets chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

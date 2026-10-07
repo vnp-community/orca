@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpcclient/scmintegration/client.go`, `backend-go/services/code-intel-service/internal/domain/hosted_review_ref.go`, `backend-go/services/code-intel-service/internal/usecase/ci_ports.go`, config `SCM_INTEGRATION_SERVICE_ADDR`, `CODEINTEL_CI_PROVIDER_HOSTS` (mới)
 **Depends on:** BE-CV-TASK-086-01, BE-CV-SOL-012-target-resolution-and-bindings
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Cổng `ScmCommitChecksClient` (`ListCommitChecks`, `GetPullRequestForBranch`, `ListMergeRequests`, `GetRateLimitStatus`), `HostedReviewLocator`. `Repo.url` không có provider (đã đọc `project.proto`). Mọi lời gọi có deadline (arch/08: mặc định 5 s, ngoại lệ 15 s ghi lý do).
@@ -19,7 +19,7 @@ Cổng `ScmCommitChecksClient` (`ListCommitChecks`, `GetPullRequestForBranch`, `
 - Parse: github/gitlab.com/GHE/self-managed/URL lạ; client với server gRPC giả (deadline, lỗi).
 
 ## Tiêu chí hoàn thành
-- [ ] URL lạ ⇒ `provider_unknown`, không panic.
+- [x] URL lạ ⇒ `provider_unknown`, không panic.
 
 ## Rủi ro
 Self-managed không khai báo host ⇒ không nhận diện.

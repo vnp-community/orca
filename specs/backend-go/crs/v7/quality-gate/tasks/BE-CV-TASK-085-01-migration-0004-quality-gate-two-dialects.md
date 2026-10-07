@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/migrations/{postgres,mysql}/0004_quality_gate.{up,down}.sql` (mới)
 **Depends on:** BE-CV-SOL-011-data-model-and-migrations (`0002`), BE-CV-SOL-082 (`0003`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Cột và khoá lấy nguyên từ hợp đồng §4.2 T10, T11, T12 (không chép lại ở đây). Số migration có thể dịch: chạy `ls migrations/postgres` trước. Mẫu RLS: `mcp-service/migrations/postgres/0001_init.up.sql`. `tenant_settings` đã đủ cột ở `0002` (PQ-24): **không** ALTER.
@@ -22,7 +22,7 @@ Cột và khoá lấy nguyên từ hợp đồng §4.2 T10, T11, T12 (không ch�
 - UNIQUE: chèn trùng `active_key` bị từ chối (23505/1062); hai hàng `active_key IS NULL` được.
 
 ## Tiêu chí hoàn thành
-- [ ] up/down/up sạch hai dialect; [ ] RLS cách ly tenant bằng SQL trực tiếp; [ ] khoá UNIQUE đúng T10–T12.
+- [x] up/down/up sạch hai dialect; [ ] RLS cách ly tenant bằng SQL trực tiếp; [ ] khoá UNIQUE đúng T10–T12.
 
 ## Rủi ro
 - Dev compose dùng superuser nên RLS vô hiệu ở dev (hợp đồng §4.1); test phải tự tạo role. Chưa kiểm chứng `golang-migrate` MySQL với database `codeintel`.

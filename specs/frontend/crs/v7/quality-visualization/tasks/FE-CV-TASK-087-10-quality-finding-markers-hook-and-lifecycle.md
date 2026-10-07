@@ -5,7 +5,7 @@
 **Area:** frontend / editor hooks
 **File:** `frontend/src/renderer/src/components/editor/quality-annotations/useQualityFindingMarkers.ts`, `quality-annotation-notice.ts` (mới); `frontend/src/renderer/src/hooks/useQualityFindingsForFile.ts` (mới) và `*.test.ts(x)`
 **Depends on:** 087-09, 087-02, 087-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

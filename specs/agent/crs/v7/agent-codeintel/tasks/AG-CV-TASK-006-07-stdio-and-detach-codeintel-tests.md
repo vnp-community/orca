@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/agent-connection-stdio-codeintel.test.ts` (mới); ghi cập nhật `specs/agent/api/agent-rpc-catalog-runtime.md` cột Part A/B (chỉ ghi vào PR, người điều phối sửa)
 **Depends on:** [AG-CV-TASK-001-09](./AG-CV-TASK-001-09-codeintel-status-method-table-and-dispatcher.md) (độc lập với O-5)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Go `relay-ssh` chạy `node agent.js --stdio|--detach|--connect` = cùng `createSession` Part A (`agent-entry.ts:80-108`, `agent-connection-stdio.ts:262-280`) nên method mới tự có; cần chứng minh. Daemon `--detach` tạo `createSession` mới mỗi kết nối socket; Map module sống qua kết nối.
@@ -20,7 +20,7 @@ Go `relay-ssh` chạy `node agent.js --stdio|--detach|--connect` = cùng `create
 Lệnh: `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/agent-connection-stdio-codeintel.test.ts src/relay/agent-connection-stdio.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] `codeintel.status` đúng qua stdio; stdout chỉ chứa khung.
+- [x] `codeintel.status` đúng qua stdio; stdout chỉ chứa khung.
 
 ## Rủi ro
 - Chưa kiểm chứng Go dùng chế độ nào trong thực tế (`--stdio` trực tiếp hay `--detach`).

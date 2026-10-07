@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/repo_path.go` (mới), `repo_path_test.go` (mới)
 **Depends on:** TASK-020-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Dữ liệu đúng hợp đồng là đường dẫn **tương đối gốc repo
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca ở trên xanh.
-- [ ] Không panic với đầu vào ≥ 4096 ký tự (trả lỗi).
-- [ ] Domain không import thư viện ngoài `golang.org/x/text/unicode/norm` (nếu đã có trong `go.mod` workspace; nếu chưa, ghi nhận phụ thuộc mới vào PR).
+- [x] Mọi ca ở trên xanh.
+- [x] Không panic với đầu vào ≥ 4096 ký tự (trả lỗi).
+- [x] Domain không import thư viện ngoài `golang.org/x/text/unicode/norm` (nếu đã có trong `go.mod` workspace; nếu chưa, ghi nhận phụ thuộc mới vào PR).
 
 ## Rủi ro và lưu ý
 

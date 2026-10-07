@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/usecase/commit_check_provider.go`, `list_commit_checks.go`, `list_commit_checks_test.go` (mới)
 **Depends on:** BE-CV-TASK-086-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Khuôn `WorkItemProvider` (type-assert) và `GetPullRequestForBranch` (credential + registry). Không sửa interface `ScmProvider`.
@@ -20,7 +20,7 @@ Khuôn `WorkItemProvider` (type-assert) và `GetPullRequestForBranch` (credentia
 - Cổng giả: ma trận 5 provider; tenant lệch; max sai; rate limited.
 
 ## Tiêu chí hoàn thành
-- [ ] Không import adapter; không `max-lines` disable.
+- [x] Không import adapter; không `max-lines` disable.
 
 ## Rủi ro
 Credential dùng chung theo tenant (không theo user): ghi nhận như mọi RPC scm.

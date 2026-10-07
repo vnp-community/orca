@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/eventbus/agent_status_consumer.go`, `internal/config/auto_refresh.go`, `cmd/server/main.go` (sửa khi SOL-010 đã có)
 **Depends on:** BE-CV-TASK-080-02, 080-05, BE-CV-SOL-010
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `common/eventbus.Consumer.Subscribe(ctx, "INFRA", "code-intel-service-agent-status-changed", "orca.infra.agent.statusChanged", fn)` là consumer bền cạnh tranh (đã đọc `eventbus.go`). Idempotent bằng `processed_events (tenant_id, event_id)`.
@@ -20,7 +20,7 @@
 - Unit giải mã (payload cũ/mới/hỏng); giao lặp cùng `event_id`; cấu hình sai.
 
 ## Tiêu chí hoàn thành
-- [ ] Consumer không panic trên payload lạ; không cần NATS để unit test.
+- [x] Consumer không panic trên payload lạ; không cần NATS để unit test.
 
 ## Rủi ro
 Stream `INFRA` phải tồn tại (do infra-fleet tạo); consumer chờ stream (`awaitStream`).

@@ -5,7 +5,7 @@
 **Service:** `request-service`, `api-gateway`
 **File:** `backend-go/services/request-service/internal/domain/rate_limit_policy.go` (mới), `.../internal/usecase/rate_limit_policy.go` (mới), `.../internal/adapter/grpc/rate_limit.go` (mới), `.../internal/adapter/{postgres,mysql}/{concurrency_counts.go,webhook_nonces.go}` (mới), `.../internal/adapter/grpc/server_webhook_nonce.go` (mới: RPC nội bộ `RecordWebhookNonce`), `backend-go/proto/orca/request/v1/request.proto` (sửa), `backend-go/services/api-gateway/internal/adapter/httpgateway/request_webhook_routes.go` (sửa; do TASK-REQ-004-08 tạo), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-035-04 (`Catalog.RateClass`), TASK-REQ-035-06 (bảng `request_webhook_nonces`), TASK-REQ-004-08 (route webhook), BE-REQ-SOL-007 (`analysis_runs`), BE-REQ-SOL-008 (trần 2 run mỗi dự án)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -39,11 +39,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Vượt giới hạn lớp `ai` trả `REQUEST_RATE_LIMITED` kèm `retry-after`.
-- [ ] Thân webhook lệch thời gian 6 phút hoặc nonce lặp bị từ chối/không tạo trùng.
-- [ ] Trần đồng thời theo tenant và dự án được thi hành bằng DB (đúng cả khi nhiều bản sao).
-- [ ] Kích thước `title`, `body` vượt trần bị `InvalidArgument`.
-- [ ] Không log thân webhook hay chữ ký.
+- [x] Vượt giới hạn lớp `ai` trả `REQUEST_RATE_LIMITED` kèm `retry-after`.
+- [x] Thân webhook lệch thời gian 6 phút hoặc nonce lặp bị từ chối/không tạo trùng.
+- [x] Trần đồng thời theo tenant và dự án được thi hành bằng DB (đúng cả khi nhiều bản sao).
+- [x] Kích thước `title`, `body` vượt trần bị `InvalidArgument`.
+- [x] Không log thân webhook hay chữ ký.
 
 ## Ví dụ tham khảo
 

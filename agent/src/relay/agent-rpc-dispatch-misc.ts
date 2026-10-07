@@ -1,6 +1,6 @@
 // src/relay/agent-rpc-dispatch-misc.ts
-// tools/list, tools/call, preflight.*, host.capabilities, shell.eval,
-// shell.exec, notification.send, and connection.teardown RPC methods —
+// tools/list, tools/call, preflight.*, host.capabilities, agent.capabilities,
+// shell.eval, shell.exec, notification.send, and connection.teardown RPC methods —
 // split out of agent-rpc-dispatch.ts's giant switch to keep each file under
 // the oxlint max-lines budget. cli.*/accounts.*/vm.* live in their own
 // dispatch-cli.ts/-accounts.ts/-vm.ts siblings for the same reason.
@@ -161,7 +161,26 @@ export async function dispatchMiscRpc(
       }
     }
 
-    // cli.* moved to agent-rpc-dispatch-cli.ts (max-lines split).
+    // ── agent.capabilities ────────────────────────────────────────────────────
+    // CR-REQ-033 §2.6: returns tool installation status, claude auth state,
+    // env var presence (never values), and host resources.
+    // Goes through the normal RPC gate (behind successful handshake) — no extra
+    // gate needed because the dispatcher already enforces handshake ordering.
+    case 'agent.capabilities': {
+      try {
+        const { handleAgentCapabilities } = await import('./agent-capability-report')
+        return (await handleAgentCapabilities(rpc.id, rpc.params ?? {}, config, log)) as JsonRpcResponse
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err)
+        return makeError(
+          rpc.id,
+          AgentErrorCode.ServerError,
+          `agent.capabilities unavailable: ${msg}`
+        )
+      }
+    }
+
+
     // vm.exec / vm.provision / vm.cancelProvision moved to
     // agent-rpc-dispatch-vm.ts (max-lines split). See route() in
     // agent-rpc-dispatch.ts, which tries both dispatchers before this file.

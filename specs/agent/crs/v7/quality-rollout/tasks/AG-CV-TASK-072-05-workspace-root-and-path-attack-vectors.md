@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/security-workspace-root-and-paths.test.ts` (mới), `agent/src/relay/codeintel/__fixtures__/path-attack-vectors.json` (mới)
 **Depends on:** 072-01; AG-CV-SOL-001
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,12 +24,12 @@ Test viết theo hợp đồng; mã bị test thuộc AG-CV-SOL-001/002/003/004/
 
 - Như mục 2.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/security-workspace-root-and-paths.test.ts` (17 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi vector `deny` bị từ chối đúng mã; `allow` được nhận.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Mọi vector `deny` bị từ chối đúng mã; `allow` được nhận.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

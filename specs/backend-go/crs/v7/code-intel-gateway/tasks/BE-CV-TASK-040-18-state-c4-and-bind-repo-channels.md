@@ -29,7 +29,7 @@ UI-API 3.1: `c4.get` (sel, `container?`) => `{container, document, version, upda
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh đúng shape; trần 64/96 KiB; bindRepo không nhận đường dẫn.
+- [x] Ba kênh đúng shape; trần 64/96 KiB; bindRepo không nhận đường dẫn.
 
 ## Rủi ro và lưu ý
 

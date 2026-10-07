@@ -5,7 +5,7 @@
 **Service:** `scm-integration-service`
 **File:** `backend-go/services/scm-integration-service/internal/domain/commit_check.go`, `provider_rate_limited.go`, test (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `domain` chỉ stdlib (đã đọc `domain/scm.go`). Từ vựng status/conclusion như `PRCheckDetail`.
@@ -19,7 +19,7 @@
 - Bảng đủ nhánh `ComputeOverall`, rỗng, hỗn hợp.
 
 ## Tiêu chí hoàn thành
-- [ ] Không import ngoài stdlib.
+- [x] Không import ngoài stdlib.
 
 ## Rủi ro
 Chuẩn hoá status GitLab (task 06) phải dùng cùng từ vựng.

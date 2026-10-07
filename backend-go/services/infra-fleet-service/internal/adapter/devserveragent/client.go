@@ -104,6 +104,9 @@ type Client struct {
 	mu       sync.Mutex
 	sessions map[string]*session
 
+	codeIntelMu   sync.Mutex
+	codeIntelSubs map[string][]*codeIntelSub
+
 	// sshProvisioner is nil unless WithRelaySSH was passed to New —
 	// relay-ssh mode returns ErrConnectionModeNotImplemented until it is.
 	sshProvisioner SshProvisioner
@@ -169,7 +172,12 @@ func New(cfg Config, logger *slog.Logger, opts ...Option) *Client {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	c := &Client{cfg: cfg, logger: logger, sessions: make(map[string]*session)}
+	c := &Client{
+		cfg:           cfg,
+		logger:        logger,
+		sessions:      make(map[string]*session),
+		codeIntelSubs: make(map[string][]*codeIntelSub),
+	}
 	for _, opt := range opts {
 		opt(c)
 	}
@@ -210,6 +218,7 @@ func (c *Client) getOrDialSession(ctx context.Context, devServer domain.DevServe
 	if !ok {
 		sess = newSession(devServer.Host, c.cfg, c.logger)
 		sess.tokenSource = func(ctx context.Context) (string, error) { return c.tokens.TokenFor(ctx, devServer) }
+		c.initSession(sess, devServer.ID)
 		c.sessions[devServer.ID] = sess
 	}
 	c.mu.Unlock()
@@ -265,6 +274,7 @@ func (c *Client) getOrProvisionSession(ctx context.Context, devServer domain.Dev
 	sess, ok = c.sessions[devServer.ID]
 	if !ok {
 		sess = newSession(devServer.Host, c.cfg, c.logger)
+		c.initSession(sess, devServer.ID)
 		c.sessions[devServer.ID] = sess
 	}
 	c.mu.Unlock()
@@ -304,6 +314,7 @@ func (c *Client) AttachTransport(devServerID, host string, transport Transport, 
 	if !ok {
 		sess = newSession(host, c.cfg, c.logger)
 		sess.managedMode = managedModeInboundOnly // externally-supplied transport (ephemeral VM) — no auto-reconnect, see backgroundReconnect's doc comment
+		c.initSession(sess, devServerID)
 		c.sessions[devServerID] = sess
 	}
 	c.mu.Unlock()
@@ -325,6 +336,7 @@ func (c *Client) AttachInboundSession(devServerID, host string, conn *websocket.
 	sess, ok := c.sessions[devServerID]
 	if !ok {
 		sess = newSession(host, c.cfg, c.logger)
+		c.initSession(sess, devServerID)
 		c.sessions[devServerID] = sess
 	}
 	c.mu.Unlock()
@@ -396,25 +408,6 @@ func (c *Client) CancelReconnect(devServerID string) {
 	sess.cancelReconnect()
 }
 
-// execPromptTimeout matches agent-print-mode-exec.ts's own MAX_TIMEOUT_MS
-// (15 minutes) — see execTimeoutForMethod's doc comment for why Exec needs
-// this override at all.
-const execPromptTimeout = 15 * time.Minute
-
-// execTimeoutForMethod special-cases the one method known, by this
-// codebase's own documentation, to legitimately run far longer than
-// cfg.RequestTimeout's flat 30s default: "agent.execPrompt" blocks until
-// the Dev Server Agent's spawned CLI process exits. Every other method
-// Exec dispatches (ports.scan, preflight.check, shell.exec, ...) keeps
-// cfg.RequestTimeout's default (timeout<=0 signals callWithTimeout to fall
-// back to it) — not guessed at here, since nothing else in this codebase
-// documents a similarly long real duration.
-func execTimeoutForMethod(method string) time.Duration {
-	if method == "agent.execPrompt" {
-		return execPromptTimeout
-	}
-	return 0
-}
 
 // Exec dispatches one JSON-RPC method call (e.g. "ports.scan",
 // "preflight.check", "shell.exec") to the Dev Server Agent over devServer's
@@ -428,13 +421,18 @@ func (c *Client) Exec(ctx context.Context, devServer domain.DevServer, method st
 	}
 	result, err := sess.callWithTimeout(ctx, method, params, execTimeoutForMethod(method))
 	if err != nil {
-		// JSON-RPC standard "method not found" (-32601): the agent answered,
-		// it just doesn't implement method on this build — a permanent,
-		// typed condition callers must distinguish from a transport/timeout
-		// failure. See domain.ErrAgentMethodNotFound's doc comment.
 		var rpcErr *JSONRPCError
-		if errors.As(err, &rpcErr) && rpcErr.Code == jsonrpcMethodNotFoundCode {
-			return nil, fmt.Errorf("%w: %v", domain.ErrAgentMethodNotFound, err)
+		if errors.As(err, &rpcErr) {
+			if IsCodeIntelMethod(method) {
+				return nil, &domain.AgentRPCError{
+					Code:    rpcErr.Code,
+					Message: rpcErr.Message,
+					Data:    rpcErr.Data,
+				}
+			}
+			if rpcErr.Code == jsonrpcMethodNotFoundCode {
+				return nil, fmt.Errorf("%w: %v", domain.ErrAgentMethodNotFound, err)
+			}
 		}
 		return nil, err
 	}
@@ -487,7 +485,16 @@ func (c *Client) LastHandshakeInfo(devServerID string) (usecase.HandshakeInfo, b
 	// adapter package, which already imports usecase to implement
 	// DevServerAgentClient).
 	return usecase.HandshakeInfo{
-		Platform: info.Platform, Arch: info.Arch, NodeVersion: info.NodeVersion, AgentVersion: info.AgentVersion,
+		Platform:        info.Platform,
+		Arch:            info.Arch,
+		NodeVersion:     info.NodeVersion,
+		AgentVersion:    info.AgentVersion,
+		SessionID:       info.SessionID,
+		Capabilities:    append([]string(nil), info.Capabilities...),
+		Tools:           append([]string(nil), info.Tools...),
+		Features:        append([]string(nil), info.Features...),
+		ProtocolVersion: info.ProtocolVersion,
+		BuildVersion:    info.BuildVersion,
 	}, true
 }
 
@@ -1144,4 +1151,20 @@ func (c *Client) Close() {
 	for _, sess := range sessions {
 		sess.close()
 	}
+
+	c.codeIntelMu.Lock()
+	subs := c.codeIntelSubs
+	c.codeIntelSubs = make(map[string][]*codeIntelSub)
+	c.codeIntelMu.Unlock()
+	for _, devSubs := range subs {
+		for _, s := range devSubs {
+			s.close()
+		}
+	}
+}
+
+func (c *Client) initSession(sess *session, devServerID string) {
+	sess.devServerID = devServerID
+	sess.onCodeIntel = c.routeCodeIntelNotification
+	sess.onAttached = c.emitResync
 }

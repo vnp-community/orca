@@ -1,0 +1,11 @@
+{ "diagnostics": [{"message": "Variable 'unused' is declared but never used. Unused variables should start with a '_'.","code": "eslint(no-unused-vars)","severity": "warning","url": "https://oxc.rs/docs/guide/usage/linter/rules/eslint/no-unused-vars.html","help": "Consider removing this declaration.","filename": "lỗi unicode 🚀.ts","labels": [{"label": "'unused' is declared here","span": {"offset": 6,"length": 6,"line": 1,"column": 7}}]},
+{"message": "Variable 'a' is declared but never used. Unused variables should start with a '_'.","code": "eslint(no-unused-vars)","severity": "warning","url": "https://oxc.rs/docs/guide/usage/linter/rules/eslint/no-unused-vars.html","help": "Consider removing this declaration.","filename": "lỗi unicode 🚀.ts","labels": [{"label": "'a' is declared here","span": {"offset": 25,"length": 1,"line": 2,"column": 7}}]},
+{"message": "Variable 'unusedVar' is declared but never used. Unused variables should start with a '_'.","code": "eslint(no-unused-vars)","severity": "warning","url": "https://oxc.rs/docs/guide/usage/linter/rules/eslint/no-unused-vars.html","help": "Consider removing this declaration.","filename": "index.ts","labels": [{"label": "'unusedVar' is declared here","span": {"offset": 6,"length": 9,"line": 1,"column": 7}}]},
+{"message": "Variable 'a' is declared but never used. Unused variables should start with a '_'.","code": "eslint(no-unused-vars)","severity": "warning","url": "https://oxc.rs/docs/guide/usage/linter/rules/eslint/no-unused-vars.html","help": "Consider removing this declaration.","filename": "index.ts","labels": [{"label": "'a' is declared here","span": {"offset": 27,"length": 1,"line": 2,"column": 7}}]},
+{"message": "Identifier 'nonExistent' is imported but never used.","code": "eslint(no-unused-vars)","severity": "warning","url": "https://oxc.rs/docs/guide/usage/linter/rules/eslint/no-unused-vars.html","help": "Consider removing this import.","filename": "broken-import.test.ts","labels": [{"label": "'nonExistent' is imported here","span": {"offset": 9,"length": 11,"line": 1,"column": 10}}]}],
+              "number_of_files": 4,
+              "number_of_rules": 96,
+              "threads_count": 8,
+              "start_time": 0.008996458
+            }
+            \n

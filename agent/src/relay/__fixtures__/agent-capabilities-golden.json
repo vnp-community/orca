@@ -1,0 +1,77 @@
+{
+  "full": {
+    "schemaVersion": 1,
+    "probedAt": "2026-10-06T10:00:00.000Z",
+    "partial": false,
+    "agent": {
+      "buildVersion": "2.2.0",
+      "protocolVersion": 2
+    },
+    "host": {
+      "platform": "linux",
+      "arch": "x64",
+      "nodeVersion": "v22.3.0",
+      "cpuCount": 8,
+      "memTotalMb": 32000,
+      "memFreeMb": 20000,
+      "diskFreeMb": 120000,
+      "loadAvg1": 0.4
+    },
+    "tools": [
+      { "id": "go", "installed": true, "version": "1.22.3" },
+      { "id": "node", "installed": true, "version": "22.3.0" },
+      { "id": "pnpm", "installed": true, "version": "9.1.0" },
+      { "id": "npm", "installed": true, "version": "10.8.0" },
+      { "id": "git", "installed": true, "version": "2.43.0" },
+      { "id": "openspec", "installed": false }
+    ],
+    "claude": {
+      "installed": true,
+      "version": "2.1.289",
+      "auth": "logged_in",
+      "flags": {
+        "tools": true,
+        "permissionMode": true,
+        "disallowedTools": true
+      }
+    },
+    "env": [
+      { "name": "ANTHROPIC_API_KEY", "present": true },
+      { "name": "OPENAI_API_KEY", "present": false },
+      { "name": "GOOGLE_API_KEY", "present": false }
+    ],
+    "unknownTools": [],
+    "rejectedEnvNames": []
+  },
+  "partial": {
+    "schemaVersion": 1,
+    "probedAt": "2026-10-06T10:00:00.000Z",
+    "partial": true,
+    "agent": {
+      "buildVersion": "2.2.0",
+      "protocolVersion": 2
+    },
+    "host": {
+      "platform": "linux",
+      "arch": "x64",
+      "nodeVersion": "v22.3.0",
+      "cpuCount": 8,
+      "memTotalMb": 32000,
+      "memFreeMb": 20000,
+      "loadAvg1": 0.4
+    },
+    "tools": [
+      { "id": "go", "installed": null },
+      { "id": "node", "installed": true, "version": "22.3.0" }
+    ],
+    "claude": {
+      "installed": null,
+      "auth": "unknown"
+    },
+    "env": [
+      { "name": "ANTHROPIC_API_KEY", "present": true }
+    ],
+    "unknownTools": ["malicious_tool"],
+    "rejectedEnvNames": ["invalid_env"]
+  }
+}

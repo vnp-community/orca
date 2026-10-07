@@ -5,7 +5,7 @@
 **Area:** frontend / pure algorithms
 **File:** `frontend/src/renderer/src/components/quality-charts/treemap-squarified-layout.ts`, `dependency-matrix-ordering.ts` (mới) và `__tests__/treemap-squarified-layout.test.ts`, `dependency-matrix-ordering.test.ts`
 **Depends on:** không (làm được ngay)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

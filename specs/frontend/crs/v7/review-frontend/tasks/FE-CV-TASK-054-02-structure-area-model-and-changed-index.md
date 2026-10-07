@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `structure-area-model.ts`, `structure-changed-index.ts` (mới), tests
 **Depends on:** FE-CV-TASK-050-01, FE-CV-TASK-053-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

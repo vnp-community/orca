@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/SourceControl.tsx` (sửa vài dòng: sau `handleCommit` trả true; trong/sau `handlePullRequestCreated`), điểm gọi ở 060 và 052
 **Depends on:** FE-CV-TASK-095-04
-**Status:** [ ] TODO
+**Status:** [x] DONE — decision tracker wiring chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

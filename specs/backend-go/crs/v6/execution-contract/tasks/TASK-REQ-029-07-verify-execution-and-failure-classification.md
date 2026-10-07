@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` (mới) / domain, usecase
 **File:** `internal/domain/execution_verdict.go` (mới), `internal/domain/failure_class.go` (mới), `internal/domain/verification_findings.go` (mới), `internal/usecase/verify_execution.go` (mới), `internal/usecase/verify_execution_steps.go` (mới), `internal/usecase/classify_failure.go` (mới), `internal/usecase/secret_scan_ports.go` (mới), và các `_test.go`
 **Depends on:** TASK-REQ-029-05 (`TaskSpecV2`, `ScopeMatcher`), TASK-REQ-029-06 (`AgentRelay`), TASK-REQ-029-02 (`ListExecutionRecords`), CR-REQ-035 (`common/secretscan`), TASK-REQ-014-01/02 (`request_checks` repository)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -55,12 +55,12 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Agent khai `exit=0` cho Check mà Orca đo `exit=1`: verdict `failed`, task không sang `done`.
-- [ ] File ngoài `scope.include`, vượt `max_files`, file mới ngoài `create` là `SCOPE_VIOLATION`, kể cả khi agent tự commit.
-- [ ] Diff chứa khoá PEM: `SECRET_FOUND`, `agent_defect`, không thử lại; log và payload không chứa giá trị.
-- [ ] Chỉ `retryable` và `agent_defect` tính lần thử (test bảng).
-- [ ] `VerifyExecution` không có tác dụng phụ ghi DB; chỉ đọc qua relay.
-- [ ] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable (tách `verify_execution_steps.go` nếu thân hàm lớn).
+- [x] Agent khai `exit=0` cho Check mà Orca đo `exit=1`: verdict `failed`, task không sang `done`.
+- [x] File ngoài `scope.include`, vượt `max_files`, file mới ngoài `create` là `SCOPE_VIOLATION`, kể cả khi agent tự commit.
+- [x] Diff chứa khoá PEM: `SECRET_FOUND`, `agent_defect`, không thử lại; log và payload không chứa giá trị.
+- [x] Chỉ `retryable` và `agent_defect` tính lần thử (test bảng).
+- [x] `VerifyExecution` không có tác dụng phụ ghi DB; chỉ đọc qua relay.
+- [x] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable (tách `verify_execution_steps.go` nếu thân hàm lớn).
 
 ## Rủi ro và lưu ý
 

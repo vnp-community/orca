@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/{context_source.go,source_catalog.go,source_adapter.go,context_pack.go,evidence.go}` (mới) và `_test.go`; `.../internal/adapter/redaction/pii_patterns.go` (mới); `.../internal/usecase/ports.go` (thêm `Redactor`, `SourceAdapterRegistry`)
 **Depends on:** BE-REQ-SOL-002 (domain `Request`, `Stage` có thể đã có ở CR-003; nếu chưa, task này định nghĩa `Stage`); TASK-REQ-035-01 (`common/secretscan`) cho bản thật của `Redactor`
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -41,11 +41,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Domain không import gói ngoài stdlib (kiểm bằng `go list -deps` trong test hoặc lint kiến trúc hiện có).
-- [ ] Cùng đầu vào cho cùng `Digest`, thứ tự và điểm cắt xác định.
-- [ ] `UsedTokens <= BudgetTokens` trong mọi tổ hợp thử.
-- [ ] Nội dung chứa `</untrusted>` không thoát khỏi khối.
-- [ ] PII: không dương tính giả trên UUID, hash.
+- [x] Domain không import gói ngoài stdlib (kiểm bằng `go list -deps` trong test hoặc lint kiến trúc hiện có).
+- [x] Cùng đầu vào cho cùng `Digest`, thứ tự và điểm cắt xác định.
+- [x] `UsedTokens <= BudgetTokens` trong mọi tổ hợp thử.
+- [x] Nội dung chứa `</untrusted>` không thoát khỏi khối.
+- [x] PII: không dương tính giả trên UUID, hash.
 
 ## Ví dụ tham khảo
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/agent_code_intel_gateway.go`, `.../domain/agent_status.go` (mới) và test
 **Depends on:** TASK-021-01, BE-CV-TASK-020-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ H3/D5: không có đường truyền lệnh/`args` tự do. Tham số phải là
 
 ## Tiêu chí hoàn thành
 
-- [ ] 16 method có tham số kiểu hẹp và test biên.
-- [ ] `toParams()` luôn có `workspaceRoot`.
-- [ ] Không file tên `helpers/utils/common/misc`.
+- [x] 16 method có tham số kiểu hẹp và test biên.
+- [x] `toParams()` luôn có `workspaceRoot`.
+- [x] Không file tên `helpers/utils/common/misc`.
 
 ## Rủi ro và lưu ý
 

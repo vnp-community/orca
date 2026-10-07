@@ -1,0 +1,40 @@
+{
+  "data": {
+    "edges": [],
+    "flow": {
+      "communities": [],
+      "id": "p1",
+      "stepCount": 1
+    },
+    "steps": [
+      {
+        "cluster": "c1",
+        "startLine": null,
+        "step": 1,
+        "symbol": {
+          "endLine": null,
+          "filePath": "",
+          "key": "function::step1",
+          "kind": "function",
+          "name": "step1",
+          "qualifiedName": "step1",
+          "startLine": null,
+          "uid": "s1"
+        }
+      }
+    ]
+  },
+  "headCommit": "abcdef",
+  "sources": [
+    {
+      "commit": "abcdef",
+      "indexedAt": 1600000000000,
+      "lineBase": 1,
+      "tool": "gitnexus",
+      "version": "1.6.9"
+    }
+  ],
+  "stale": false,
+  "totalCount": null,
+  "truncated": false
+}

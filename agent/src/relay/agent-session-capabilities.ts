@@ -57,7 +57,8 @@ export async function checkPtyAvailable(): Promise<boolean> {
  */
 export async function buildCapabilities(
   config: AgentConfig,
-  log: AgentLogger
+  log: AgentLogger,
+  switches?: import('./codeintel/runtime-switches').RuntimeSwitches
 ): Promise<readonly string[]> {
   const caps: string[] = [
     'fs',
@@ -89,6 +90,39 @@ export async function buildCapabilities(
       'pty.stream',
       'pty.attach'
     )
+  }
+
+  const { readRuntimeSwitches } = await import('./codeintel/runtime-switches')
+  const activeSwitches = switches ?? readRuntimeSwitches(config.toolEnv ?? process.env)
+
+  if (!activeSwitches.codeintelDisabled) {
+    const { detectCodeIntelBinaries } = await import('./codeintel-tool-detection')
+    const intel = await detectCodeIntelBinaries(config)
+    if (intel.gitnexus || intel.codegraph) {
+      caps.push('codeintel')
+      if (intel.gitnexus) caps.push('codeintel.gitnexus')
+      if (intel.codegraph) caps.push('codeintel.codegraph')
+    }
+
+    if (process.platform !== 'win32' && !activeSwitches.qualityDisabled) {
+      const dirs = (config.toolPath ?? process.env['PATH'] ?? '').split(':').filter(Boolean)
+      const fsAccess = require('fs/promises').access
+      const join = require('path').join
+      let hasBin = false
+      for (const dir of dirs) {
+        try {
+          await fsAccess(join(dir, 'oxlint'), fs.constants.X_OK)
+          hasBin = true
+          break
+        } catch {}
+        try {
+          await fsAccess(join(dir, 'biome'), fs.constants.X_OK)
+          hasBin = true
+          break
+        } catch {}
+      }
+      if (hasBin) caps.push('quality')
+    }
   }
 
   log.info(`capabilities: [${caps.join(', ')}]`)

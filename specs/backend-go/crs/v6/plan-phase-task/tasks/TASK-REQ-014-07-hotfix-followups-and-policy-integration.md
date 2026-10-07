@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/hotfix_followups.go` (mới), `internal/domain/type_policy_hotfix.go` (sửa `OnCompleted`), `internal/usecase/type_policy_integration_test.go` (mới), `internal/usecase/hotfix_followups_test.go` (mới)
 **Depends on:** TASK-REQ-014-03 đến 06, CR-REQ-006 (`SpawnChildRequest`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -34,10 +34,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `hotfix` hoàn tất sinh đúng hai Request theo dõi (`bug`, `task`) có `request_links` `followup_hotfix`; chạy `OnCompleted` hai lần vẫn hai Request.
-- [ ] Loại khác chạy y như trước khi có CR này.
-- [ ] Mỗi kịch bản mục 4 của CR-REQ-014 có test.
-- [ ] Lỗi follow-up không làm Request `completed` bị thụt trạng thái.
+- [x] `hotfix` hoàn tất sinh đúng hai Request theo dõi (`bug`, `task`) có `request_links` `followup_hotfix`; chạy `OnCompleted` hai lần vẫn hai Request.
+- [x] Loại khác chạy y như trước khi có CR này.
+- [x] Mỗi kịch bản mục 4 của CR-REQ-014 có test.
+- [x] Lỗi follow-up không làm Request `completed` bị thụt trạng thái.
 
 ## Rủi ro và lưu ý
 

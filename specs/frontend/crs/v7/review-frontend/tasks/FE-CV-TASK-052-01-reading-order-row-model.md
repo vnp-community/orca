@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/reading-order-model.ts`, `reading-reason-labels.ts` (mới), tests
 **Depends on:** FE-CV-TASK-050-01, FE-CV-TASK-051-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

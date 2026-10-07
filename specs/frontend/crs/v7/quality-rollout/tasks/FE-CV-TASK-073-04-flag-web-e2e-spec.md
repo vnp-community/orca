@@ -5,7 +5,7 @@
 **Area:** tests / Playwright web
 **File:** `tests/e2e/code-intel-web/flag.web.e2e.ts` (mới)
 **Depends on:** FE-CV-TASK-073-02, 073-03; FE-CV-SOL-061 (lối vào); FE-CV-TASK-073-06 (ca admin)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -78,14 +78,14 @@ Với mỗi finding `category ∈ {security, dependency}`:
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] Cờ tắt: `runnable_profiles` không chứa profile/suite bảo mật; `StartQualityRun` ⇒ `CODEINTEL_PROFILE_UNKNOWN` (không agent call); lỗi đọc cờ ⇒ như tắt.
-- [ ] Cờ bật nhưng `quality_gate_enabled` tắt ⇒ `CODEINTEL_QUALITY_GATE_DISABLED` (thứ tự ưu tiên đúng).
-- [ ] `scope=worktree` + profile bảo mật bởi `member` ⇒ bị từ chối; `changed` ⇒ cho phép như `review_write`.
-- [ ] `SEC-SECRET/*`: message/fix cố định, `col=end_col=0`; canary trong **mọi** trường của đầu vào không xuất hiện ở DB, log, sự kiện outbox, lỗi, span.
-- [ ] `ruleId` ngoài tiền tố cho phép bị bỏ; regex PQ-26 được kiểm.
-- [ ] `ENV_NOT_READY (network_policy|go_modules_unavailable)` tới client với `missingTools[]`.
-- [ ] Mỗi lần chạy profile bảo mật có audit; tenant A không thấy run/finding của tenant B.
-- [ ] Không `max-lines` disable; tên file không `helpers/utils/common/misc`.
+- [x] Cờ tắt: `runnable_profiles` không chứa profile/suite bảo mật; `StartQualityRun` ⇒ `CODEINTEL_PROFILE_UNKNOWN` (không agent call); lỗi đọc cờ ⇒ như tắt.
+- [x] Cờ bật nhưng `quality_gate_enabled` tắt ⇒ `CODEINTEL_QUALITY_GATE_DISABLED` (thứ tự ưu tiên đúng).
+- [x] `scope=worktree` + profile bảo mật bởi `member` ⇒ bị từ chối; `changed` ⇒ cho phép như `review_write`.
+- [x] `SEC-SECRET/*`: message/fix cố định, `col=end_col=0`; canary trong **mọi** trường của đầu vào không xuất hiện ở DB, log, sự kiện outbox, lỗi, span.
+- [x] `ruleId` ngoài tiền tố cho phép bị bỏ; regex PQ-26 được kiểm.
+- [x] `ENV_NOT_READY (network_policy|go_modules_unavailable)` tới client với `missingTools[]`.
+- [x] Mỗi lần chạy profile bảo mật có audit; tenant A không thấy run/finding của tenant B.
+- [x] Không `max-lines` disable; tên file không `helpers/utils/common/misc`.
 
 ## 5. Kiểm thử (chưa chạy test nào)
 

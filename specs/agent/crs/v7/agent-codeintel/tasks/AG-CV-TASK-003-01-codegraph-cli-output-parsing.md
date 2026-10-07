@@ -19,7 +19,7 @@ Fixture thật: mảng rỗng, text ANSI, `initialized:false`, `affected` nhiề
 Lệnh: `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/codegraph-cli-output.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Ca text lỗi quy đúng `SYMBOL_NOT_FOUND`/`INDEX_MISSING`.
+- [x] Ca text lỗi quy đúng `SYMBOL_NOT_FOUND`/`INDEX_MISSING`.
 
 ## Rủi ro
 - Hình dạng JSON nội bộ 1.4.1, chưa chạy lại.

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/runtime-switches.ts` + `.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -27,12 +27,12 @@ Chưa chạy; mã dispatcher của AG-CV-SOL-001/081 chưa tồn tại: test imp
 - kết quả bị đóng băng; không đổi theo `process.env` sau khi đọc
 - Test xanh.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/runtime-switches.test.ts` (6 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Một bộ đọc duy nhất cho ba biến; 004/081 dùng nó.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Một bộ đọc duy nhất cho ba biến; 004/081 dùng nó.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

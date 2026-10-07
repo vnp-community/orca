@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/ai-complete-handler.ts` (sửa), `agent/src/relay/agent-rpc-dispatch-ai.ts` (sửa), `agent/src/relay/__tests__/ai-complete-handler.test.ts` (sửa), `agent/src/relay/agent-rpc-dispatch-ai.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -60,11 +60,11 @@ Kiểm với nhà cung cấp thật (CHƯA CHẠY): một lần tay với khoá 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Gọi `ai.complete` như cũ (không `maxTokens`) cho kết quả vẫn có `content`, `model`, và thêm `provider`, `latencyMs` (người gọi cũ bỏ qua trường thừa).
-- [ ] `usage` đúng ở ba nhà cung cấp hoặc vắng hẳn.
-- [ ] `maxTokens` hợp lệ đi tới nhà cung cấp; không hợp lệ cho `INVALID_MAX_TOKENS`.
-- [ ] Lỗi nhà cung cấp có `error.data` với `provider`, `httpStatus`, `retryable`, `reason`; `message` giữ định dạng cũ.
-- [ ] Không có khoá API trong `message`, `data`, log.
+- [x] Gọi `ai.complete` như cũ (không `maxTokens`) cho kết quả vẫn có `content`, `model`, và thêm `provider`, `latencyMs` (người gọi cũ bỏ qua trường thừa).
+- [x] `usage` đúng ở ba nhà cung cấp hoặc vắng hẳn.
+- [x] `maxTokens` hợp lệ đi tới nhà cung cấp; không hợp lệ cho `INVALID_MAX_TOKENS`.
+- [x] Lỗi nhà cung cấp có `error.data` với `provider`, `httpStatus`, `retryable`, `reason`; `message` giữ định dạng cũ.
+- [x] Không có khoá API trong `message`, `data`, log.
 
 ## Rủi ro và lưu ý
 

@@ -1,6 +1,6 @@
 # AG-CV-SOL-080: Phân loại `indexScope`/`freshness`, khối `host`, tham số `trigger|ifStale|expectHead` của `codeintel.reindex`
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi dòng "đã đọc" là đọc code/CR, chưa chạy gì. Phần "(mới)" là đề xuất của solution này.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 080-01 đến 080-07, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-080](../../../../../../docs/crs/v7/quality-signals/CR-CV-080-agent-worktree-index-strategy-and-auto-refresh.md) mục 2.3, 2.4, 2.5 (phía agent). Phần backend (consumer `statusChanged`, debounce, hạn mức, `reindex_jobs.trigger`) thuộc `BE-CV-SOL-080-auto-refresh-index`, không có ở đây.
 **Khu vực:** `agent/` (Dev Server Agent), thư mục `agent/src/relay/`.
@@ -168,14 +168,14 @@ Thêm vào `params` (tuỳ chọn): `indexScope`, `mergeBase`, `trigger`. Không
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] `classifyIndexBasis` có bảng test đủ 6 hàng của hợp đồng và các ca CodeGraph (5.3); không bao giờ trả `exact` khi `!rootMatches`.
-- [ ] Dữ liệu giống CR-080 1.1.2 (`worktreeMismatch` có, `pendingChanges` 0, worktree liên kết) cho `indexScope ∈ {repo_root, stale}`, không bao giờ `exact`.
-- [ ] `codeintel.status` trả `indexRoot`, `indexScope`, `freshness`, `headCommit`, `mergeBase`, `dirtySinceIndex`, `changedFilesNotInIndex`, `pendingChanges` (null khi `!rootMatches`), `rootMismatch` (PQ-19), `host`; `stale` ở phong bì = OR như §2.2.
-- [ ] `indexedCommit` đã bị gc → `changedFilesNotInIndex:null`, `freshness:"stale"`.
-- [ ] `codeintel.reindex {ifStale:true}` khi `fresh` không spawn tiến trình nào (test khẳng định `spawn` không được gọi); `expectHead` lệch → `superseded`.
-- [ ] `trigger:"agent_done"` ở worktree liên kết trả `skipped_scope_repo_root`, `skipped[]` đúng; `trigger:"manual"` trả `CODEINTEL_PATH_NOT_ALLOWED`.
-- [ ] `tiers` hoặc khoá lạ bị từ chối `CODEINTEL_INVALID_PARAMS`.
-- [ ] Không file mới nào vượt 300 dòng; không `max-lines` disable; không tên `helpers/utils/common/misc`.
+- [x] `classifyIndexBasis` có bảng test đủ 6 hàng của hợp đồng và các ca CodeGraph (5.3); không bao giờ trả `exact` khi `!rootMatches`.
+- [x] Dữ liệu giống CR-080 1.1.2 (`worktreeMismatch` có, `pendingChanges` 0, worktree liên kết) cho `indexScope ∈ {repo_root, stale}`, không bao giờ `exact`.
+- [x] `codeintel.status` trả `indexRoot`, `indexScope`, `freshness`, `headCommit`, `mergeBase`, `dirtySinceIndex`, `changedFilesNotInIndex`, `pendingChanges` (null khi `!rootMatches`), `rootMismatch` (PQ-19), `host`; `stale` ở phong bì = OR như §2.2.
+- [x] `indexedCommit` đã bị gc → `changedFilesNotInIndex:null`, `freshness:"stale"`.
+- [x] `codeintel.reindex {ifStale:true}` khi `fresh` không spawn tiến trình nào (test khẳng định `spawn` không được gọi); `expectHead` lệch → `superseded`.
+- [x] `trigger:"agent_done"` ở worktree liên kết trả `skipped_scope_repo_root`, `skipped[]` đúng; `trigger:"manual"` trả `CODEINTEL_PATH_NOT_ALLOWED`.
+- [x] `tiers` hoặc khoá lạ bị từ chối `CODEINTEL_INVALID_PARAMS`.
+- [x] Không file mới nào vượt 300 dòng; không `max-lines` disable; không tên `helpers/utils/common/misc`.
 
 ## 8. Kiểm thử
 

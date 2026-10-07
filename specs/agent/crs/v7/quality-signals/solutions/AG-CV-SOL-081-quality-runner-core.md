@@ -1,6 +1,6 @@
 # AG-CV-SOL-081-A: Lõi bộ chạy kiểm tra `quality.*` (spawn, huỷ cây, run manager, kết quả, RPC, thông báo)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi dòng "đã đọc" là đọc code/CR, chưa chạy gì. "(mới)" = đề xuất của solution này.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 081-01 đến 081-09, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-081](../../../../../../docs/crs/v7/quality-signals/CR-CV-081-quality-runner-on-agent.md) mục 2.6 đến 2.9, 2.11 (phần cơ chế). Nhóm A trong hai solution của CR-081; nhóm B (catalog, preflight, planning, `listProfiles`): [AG-CV-SOL-081-quality-profile-catalog-and-preflight](./AG-CV-SOL-081-quality-profile-catalog-and-preflight.md).
 **Khu vực:** `agent/` (Dev Server Agent), `agent/src/relay/`. **Feature:** `quality-signals`.
@@ -155,17 +155,17 @@ export type StepParser = (input: StepParserInput) => Promise<StepParseOutcome>  
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] Không có tham số `command|argv|args|env|cwd|timeout|tool|shell` nào được chấp nhận ở bất kỳ `quality.*` (test phản chiếu schema); khoá lạ → `CODEINTEL_INVALID_PARAMS` (`data.field`).
-- [ ] `quality.run` với `profile:"rm -rf /"` → `-32602 CODEINTEL_PROFILE_UNKNOWN` (`data.available[]`), **không spawn** tiến trình nào.
-- [ ] Env của `spawn` không chứa biến nào khớp `/(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE|DSN|AUTH|COOKIE|SESSION)/i`, `ORCA_*`, `AWS_*`, `GOOGLE_*`, `SSH_AUTH_SOCK`; test với `process.env` chứa `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `AGENT_TOKEN`, `FOO_SECRET`.
-- [ ] Huỷ giữa chừng một bước sinh 2 con cháu: sau ≤ 15 s cả nhóm biến mất (`process.kill(-pid, 0)` ném `ESRCH`), run `cancelled`, `quality.cancel` lặp lại không lỗi.
-- [ ] Đầu ra vượt `maxOutputBytes` → diệt cây, bước `failed` (`failureKind:"output_too_large"`), tệp tạm xoá khi hết TTL, thư mục `0700`.
-- [ ] Run thứ hai cùng worktree → `RUN_IN_PROGRESS` đúng `runId`; hàng đợi vượt 4 → `queue_full`.
-- [ ] Mất WS giữa chừng: run tiếp tục; sau nối lại `runStatus` đúng; khởi động lại agent đánh dấu `interrupted` (không tự chạy lại).
-- [ ] `quality.progress` ≤ 1/giây/run, `percent` số hoặc `null`, `message` đã che; `quality.finished` mang `workspaceRoot`.
-- [ ] Bước `heavy` và `codeintel.reindex` không chạy đồng thời khi `ORCA_HEAVY_JOBS=1`.
-- [ ] `ORCA_QUALITY_RUN=off` và `win32` → `CODEINTEL_TOOL_UNAVAILABLE` (`reason: quality_disabled|unsupported_platform`).
-- [ ] Không file nào > 300 dòng; không `max-lines` disable; không tên `helpers/utils/common/misc`.
+- [x] Không có tham số `command|argv|args|env|cwd|timeout|tool|shell` nào được chấp nhận ở bất kỳ `quality.*` (test phản chiếu schema); khoá lạ → `CODEINTEL_INVALID_PARAMS` (`data.field`).
+- [x] `quality.run` với `profile:"rm -rf /"` → `-32602 CODEINTEL_PROFILE_UNKNOWN` (`data.available[]`), **không spawn** tiến trình nào.
+- [x] Env của `spawn` không chứa biến nào khớp `/(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE|DSN|AUTH|COOKIE|SESSION)/i`, `ORCA_*`, `AWS_*`, `GOOGLE_*`, `SSH_AUTH_SOCK`; test với `process.env` chứa `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `AGENT_TOKEN`, `FOO_SECRET`.
+- [x] Huỷ giữa chừng một bước sinh 2 con cháu: sau ≤ 15 s cả nhóm biến mất (`process.kill(-pid, 0)` ném `ESRCH`), run `cancelled`, `quality.cancel` lặp lại không lỗi.
+- [x] Đầu ra vượt `maxOutputBytes` → diệt cây, bước `failed` (`failureKind:"output_too_large"`), tệp tạm xoá khi hết TTL, thư mục `0700`.
+- [x] Run thứ hai cùng worktree → `RUN_IN_PROGRESS` đúng `runId`; hàng đợi vượt 4 → `queue_full`.
+- [x] Mất WS giữa chừng: run tiếp tục; sau nối lại `runStatus` đúng; khởi động lại agent đánh dấu `interrupted` (không tự chạy lại).
+- [x] `quality.progress` ≤ 1/giây/run, `percent` số hoặc `null`, `message` đã che; `quality.finished` mang `workspaceRoot`.
+- [x] Bước `heavy` và `codeintel.reindex` không chạy đồng thời khi `ORCA_HEAVY_JOBS=1`.
+- [x] `ORCA_QUALITY_RUN=off` và `win32` → `CODEINTEL_TOOL_UNAVAILABLE` (`reason: quality_disabled|unsupported_platform`).
+- [x] Không file nào > 300 dòng; không `max-lines` disable; không tên `helpers/utils/common/misc`.
 
 ## 8. Kiểm thử
 

@@ -1,0 +1,88 @@
+// Quality run and finding models - CR-CV-082 / BE-CV-TASK-082-01.
+syntax = "proto3";
+
+package orca.codeintel.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/codeintel/v1;codeintelv1";
+
+import "google/protobuf/timestamp.proto";
+import "orca/codeintel/v1/codeintel_index_basis.proto";
+
+message QualityFinding {
+  string fingerprint = 1;
+  string rule_id = 2;
+  string severity = 3;
+  string category = 4;
+  string file = 5;
+  int32 line = 6;
+  int32 end_line = 7;
+  int32 column = 8;
+  int32 end_column = 9;
+  string message = 10;
+  string tool = 11;
+  string tool_version = 12;
+  string fix_hint = 13;
+  string step_id = 14;
+  bool in_scope = 15;
+  int32 fp_version = 16;
+}
+
+message QualityStepResult {
+  string id = 1;
+  string profile_id = 2;
+  string status = 3;
+  string failure_kind = 4;
+  string env_reason = 5;
+  int32 exit_code = 6;
+  int64 duration_ms = 7;
+  string tool = 8;
+  string tool_version = 9;
+  string definition_hash = 10;
+  int32 error_count = 11;
+  int32 warning_count = 12;
+  int32 info_count = 13;
+  int32 total_count = 14;
+  bool truncated = 15;
+  int32 outside_scope_count = 16;
+}
+
+message QualityRunSummary {
+  int32 error = 1;
+  int32 warning = 2;
+  int32 info = 3;
+  int32 steps_total = 4;
+  int32 steps_with_findings = 5;
+  int32 steps_failed = 6;
+  int32 steps_env_not_ready = 7;
+  int32 outside_scope = 8;
+  bool truncated = 9;
+}
+
+message QualityRun {
+  string id = 1;
+  string worktree_id = 2;
+  string head_commit = 3;
+  string index_commit = 4;
+  string scope = 5;
+  string base_commit = 6;
+  string profile = 7;
+  string status = 8;
+  string source = 9;
+  google.protobuf.Timestamp started_at = 10;
+  google.protobuf.Timestamp finished_at = 11;
+  QualityRunSummary summary = 12;
+  repeated QualityStepResult steps = 13;
+  repeated IndexBasis index_basis = 14;
+  string dirty_fingerprint = 15;
+  bool work_tree_changed_during_run = 16;
+  bool scope_widened = 17;
+  string agent_run_id = 18;
+  string error_code = 19;
+  string tree_fingerprint = 20;
+  string provider = 21;
+  string external_ref = 22;
+  string external_url = 23;
+  google.protobuf.Timestamp fetched_at = 24;
+  google.protobuf.Timestamp stale_after = 25;
+  bool dirty = 26;
+}

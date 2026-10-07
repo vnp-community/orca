@@ -1,0 +1,4 @@
+GitNexus status: stale
+Indexed commit: abc1234
+Current HEAD: def5678
+Storage path: .gitnexus

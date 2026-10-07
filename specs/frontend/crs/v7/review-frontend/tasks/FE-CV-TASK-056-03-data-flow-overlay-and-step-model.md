@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/data-flow-overlay.ts` (mới), test
 **Depends on:** FE-CV-TASK-053-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

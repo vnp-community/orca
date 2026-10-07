@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/agent-turn-privacy-guard.test.ts` (mới), `frontend/src/renderer/src/i18n/agent-turn-verification-locale-coverage.test.ts` (mới), `frontend/src/renderer/src/i18n/locales/*.json`
 **Depends on:** FE-CV-TASK-089-01..06
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — `agent-turn-privacy-guard.test.ts` ✅ đã có. `agent-turn-verification-locale-coverage.test.ts` ❌ chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

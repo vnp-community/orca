@@ -5,7 +5,7 @@
 **Area:** frontend / store
 **File:** `frontend/src/renderer/src/store/slices/code-intel.ts` (mới), `store/index.ts`, `store/types.ts`, `store/slices/store-test-helpers.ts`, `store/slices/worktrees.ts` (sửa), tests `code-intel.test.ts`, `code-intel-worktree-removal-leak.test.ts`, `code-intel-bulk-purge-leak.test.ts`
 **Depends on:** FE-CV-TASK-050-01, FE-CV-TASK-050-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

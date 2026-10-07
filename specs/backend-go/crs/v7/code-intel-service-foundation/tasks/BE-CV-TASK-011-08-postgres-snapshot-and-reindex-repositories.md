@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/postgres/{graph_snapshot,reindex_job}_repository.go` (+ `_integration_test.go`) (mới)
 **Depends on:** BE-CV-TASK-011-02, 011-04, 011-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,8 +30,8 @@ Hợp đồng T3, T7, PQ-14, PQ-15, PQ-16. `graph_snapshots.payload` là `jsonb`
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các tiêu chí snapshot/reindex ở SOL mục 4 đạt trên Postgres.
-- [ ] Phân biệt vi phạm `active_key` với PK bằng tên ràng buộc.
+- [x] Các tiêu chí snapshot/reindex ở SOL mục 4 đạt trên Postgres.
+- [x] Phân biệt vi phạm `active_key` với PK bằng tên ràng buộc.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` · `proto`
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto` (sửa: `rpc` cạnh `StreamFileChanges` dòng 114; `message` cạnh dòng ~879–898), stub sinh, `.../internal/usecase/stream_code_intel_events.go` (mới), `.../internal/usecase/code_intel_stream_limiter.go` (mới), `.../internal/adapter/grpc/server_code_intel.go` (sửa), `.../cmd/server/main.go` (sửa), test
 **Depends on:** TASK-023-07, TASK-023-06 (để có `WithCodeIntel`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,10 +31,10 @@ Mẫu `StreamFileChanges` (`infrafleet.proto:114`, handler `server.go:689–714`
 
 ## Tiêu chí hoàn thành
 
-- [ ] Handler gắn tenant từ metadata stream và có test chứng minh.
-- [ ] Giới hạn 16 luồng/(tenant, dev server) có test.
-- [ ] Không phụ thuộc agent đang online khi đăng ký.
-- [ ] `buf breaking` xanh.
+- [x] Handler gắn tenant từ metadata stream và có test chứng minh.
+- [x] Giới hạn 16 luồng/(tenant, dev server) có test.
+- [x] Không phụ thuộc agent đang online khi đăng ký.
+- [x] `buf breaking` xanh.
 
 ## Rủi ro và lưu ý
 

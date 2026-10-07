@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_solution.go` (mới), `.../channels_approval.go` (mới), `.../channels_solution_test.go`, `.../channels_approval_test.go` (mới), `.../excluded_channels.yaml`
 **Depends on:** TASK-REQ-016-02; RPC `ListSolutions`, `GenerateSolution`, `ChooseSolutionOption` (CR-REQ-007), `ApprovalService` (CR-REQ-009)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -33,9 +33,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] 9 kênh đăng ký và có test; parity xanh.
-- [ ] Duyệt không có `expectedDigest` bị chặn ở gateway.
-- [ ] Mọi view camelCase; lỗi qua `requestChannelError`.
+- [x] 9 kênh đăng ký và có test; parity xanh.
+- [x] Duyệt không có `expectedDigest` bị chặn ở gateway.
+- [x] Mọi view camelCase; lỗi qua `requestChannelError`.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/domain/quality_profile.go`, `quality_profile_builtin.go`, `quality_gate_errors.go` (mới)
 **Depends on:** BE-CV-TASK-085-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Schema v1 và ràng buộc: CR-085 §2.1, hợp đồng ui-api §4.7 (`QualityProfile`). `orca-default`: CR §2.5 — **giá trị khởi điểm chưa hiệu chỉnh**.
@@ -21,7 +21,7 @@ Schema v1 và ràng buộc: CR-085 §2.1, hợp đồng ui-api §4.7 (`QualityPr
 - Bảng ca hợp lệ/không hợp lệ (khoá lạ, ngưỡng âm, 33 checks, NUL, 65 KiB); fuzz ngắn `DecodeProfileDefinition`; digest ổn định khi đổi thứ tự khoá.
 
 ## Tiêu chí hoàn thành
-- [ ] mọi ràng buộc CR có test; [ ] builtin qua chính `Validate`; [ ] không import adapter/proto-gen vào domain nếu tránh được.
+- [x] mọi ràng buộc CR có test; [ ] builtin qua chính `Validate`; [ ] không import adapter/proto-gen vào domain nếu tránh được.
 
 ## Rủi ro
 - Tên `checks[].profile` phải khớp catalog của AG-CV-SOL-081 (chưa chốt); sai ⇒ `unknown` khi đánh giá.

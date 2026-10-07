@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/SourceControl.tsx` (sửa ~vài dòng gần :606, :5247, :5282), `frontend/src/renderer/src/components/right-sidebar/ChecksPanel.tsx` (sửa gần :3611)
 **Depends on:** FE-CV-TASK-085-03, 085-05
-**Status:** [ ] TODO
+**Status:** [~] PARTIAL — khe `qualityNotice` đã thêm vào Composer và CommitArea, nhưng `SourceControl.tsx` dùng `qualityNotice={null}` (placeholder); `ChecksPanel.tsx` chưa có wiring. Hook `useSourceControlQualityGate` chưa được kết nối. Rà soát 2026-10-07.
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `C4OverrideEditor.tsx` (mới), `hooks/useC4Override.ts` (mới), tests
 **Depends on:** FE-CV-TASK-055-05, 055-02, FE-CV-TASK-050-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

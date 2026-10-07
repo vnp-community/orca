@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** agent/scripts/codeintel-budgets.json (mới), `agent/src/relay/codeintel/bench-budget-comparison.ts` + `.test.ts` (mới), agent/scripts/check-codeintel-bench-budgets.mjs (mới)
 **Depends on:** 071-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -27,12 +27,12 @@ Mọi con số hiệu năng là giả định từ CR-CV-071 (một lần đo, m
 - ngân sách thiếu khoá → lỗi cấu hình
 - Chạy vỏ `.mjs` với báo cáo cố ý vượt → exit 1 (thủ công, chưa chạy)
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/bench-budget-comparison.test.ts`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Test xanh; script thoát đúng mã.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Test xanh; script thoát đúng mã.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

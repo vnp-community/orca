@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` · CI
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpc/graph_proto_mapping.go` (mới), `graph_proto_mapping_test.go` (mới); `.github/workflows/backend-go-code-intel-service.yml` (do BE-CV-SOL-010 tạo; sửa bước `buf`)
 **Depends on:** TASK-020-03, TASK-020-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Round-trip không mất field cho mọi kiểu đồ thị.
-- [ ] Workflow gọi `buf` trực tiếp và đỏ khi phá hợp đồng.
-- [ ] Không file tên `helpers/utils/common/misc`; không `max-lines` disable.
+- [x] Round-trip không mất field cho mọi kiểu đồ thị.
+- [x] Workflow gọi `buf` trực tiếp và đỏ khi phá hợp đồng.
+- [x] Không file tên `helpers/utils/common/misc`; không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

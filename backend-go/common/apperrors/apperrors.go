@@ -34,6 +34,8 @@ const (
 	// RunNow budget) — distinct from KindInternal so callers can tell a
 	// timeout apart from an ordinary failure.
 	KindDeadlineExceeded
+	KindUnavailable
+	KindResourceExhausted
 )
 
 // AppError is the typed error every domain/ package returns instead of a
@@ -124,6 +126,10 @@ func ToGRPCStatus(err error) error {
 		code = codes.Unauthenticated
 	case KindDeadlineExceeded:
 		code = codes.DeadlineExceeded
+	case KindUnavailable:
+		code = codes.Unavailable
+	case KindResourceExhausted:
+		code = codes.ResourceExhausted
 	case KindInternal, KindUnknown:
 		code = codes.Internal
 	}

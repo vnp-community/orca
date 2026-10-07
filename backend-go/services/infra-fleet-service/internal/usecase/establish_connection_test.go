@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"reflect"
 	"testing"
 
 	"google.golang.org/grpc"
@@ -102,7 +103,7 @@ func TestEstablishConnection_PersistsHandshakeInfoAfterSuccessfulConnect(t *test
 	if devServers.lastProvisionStatus != domain.DevServerHealthHealthy {
 		t.Errorf("expected status=healthy, got %q", devServers.lastProvisionStatus)
 	}
-	if devServers.lastProvisionInfo != fixture {
+	if !reflect.DeepEqual(devServers.lastProvisionInfo, fixture) {
 		t.Errorf("expected the handshake info to be persisted verbatim, got %+v", devServers.lastProvisionInfo)
 	}
 }

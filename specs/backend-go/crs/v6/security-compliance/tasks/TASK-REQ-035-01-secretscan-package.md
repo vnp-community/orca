@@ -5,7 +5,7 @@
 **Service:** `backend-go/common`
 **File:** `backend-go/common/secretscan/{scan.go,patterns.go,kinds.go,scan_test.go}` (mới), `backend-go/common/secretscan/testdata/vectors.json` (mới)
 **Depends on:** None
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -43,11 +43,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi vector dương được che, mọi vector âm giữ nguyên (gồm tiếng Việt có dấu).
-- [ ] `RedactKinds(..., high)` không che mức `medium`.
-- [ ] Không có giá trị bí mật trong `Finding`, lỗi, log.
-- [ ] Không regex backtracking; 2 MiB đầu vào xử lý dưới 1 giây.
-- [ ] `PatternsVersion` có và có test nhắc cập nhật khi đổi bảng mẫu (so băm bảng với hằng).
+- [x] Mọi vector dương được che, mọi vector âm giữ nguyên (gồm tiếng Việt có dấu).
+- [x] `RedactKinds(..., high)` không che mức `medium`.
+- [x] Không có giá trị bí mật trong `Finding`, lỗi, log.
+- [x] Không regex backtracking; 2 MiB đầu vào xử lý dưới 1 giây.
+- [x] `PatternsVersion` có và có test nhắc cập nhật khi đổi bảng mẫu (so băm bảng với hằng).
 
 ## Ví dụ tham khảo
 

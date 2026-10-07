@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-diff-collection.ts`, `codeintel-diff-collection.test.ts` (mới)
 **Depends on:** [001](./AG-CV-TASK-005-01-merge-base-resolution.md), [002](./AG-CV-TASK-005-02-diff-hunk-parser.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Không `head`: so `<mergeBase>` với cây làm việc (bỏ `<headOid>`); untracked ≤ 200, ≤ 2 MiB/tệp, NUL trong 8 KiB đầu -> `binary`; diff lớn -> chỉ `--raw`+`--numstat`.
@@ -20,7 +20,7 @@ Repo tạm: sửa, thêm, xoá, đổi tên, untracked, nhị phân, tên xuốn
 Lệnh: `pnpm exec vitest run src/relay/codeintel-diff-collection.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Tệp untracked `status:'A'`; `head` đặt thì không tính thay đổi chưa commit.
+- [x] Tệp untracked `status:'A'`; `head` đặt thì không tính thay đổi chưa commit.
 
 ## Rủi ro
 - `ls-files --others` chậm trên repo lớn (chưa đo).

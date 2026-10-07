@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/migrations/postgres/0002_code_intel_core.up.sql`, `0002_code_intel_core.down.sql` (mới)
 **Depends on:** BE-CV-TASK-010-05, BE-CV-TASK-011-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,9 +31,9 @@ Cột/khoá/chỉ mục lấy nguyên văn từ hợp đồng §4.2 T1–T7 (kh�
 
 ## Tiêu chí hoàn thành
 
-- [ ] up/down/up sạch; bảy bảng đủ cột T1–T7.
-- [ ] RLS cô lập tenant; chính sách bảo trì không cho `INSERT`.
-- [ ] CHECK/UNIQUE từ chối đúng.
+- [x] up/down/up sạch; bảy bảng đủ cột T1–T7.
+- [x] RLS cô lập tenant; chính sách bảo trì không cho `INSERT`.
+- [x] CHECK/UNIQUE từ chối đúng.
 
 ## Rủi ro và lưu ý
 

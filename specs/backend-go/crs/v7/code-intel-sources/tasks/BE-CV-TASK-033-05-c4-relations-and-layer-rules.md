@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/c4/relation.go`, `layer_rules.go` (mới), `backend-go/services/code-intel-service/internal/usecase/derive_c4_view.go` (sửa) và `_test.go`
 **Depends on:** BE-CV-TASK-033-04, BE-CV-TASK-031-09
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ Solution mục 2.C (quan hệ, luật lớp).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi cạnh có evidence/conf; vi phạm vẫn được trả (không lọc).
-- [ ] Khớp hợp đồng 031/032 trên cùng commit.
+- [x] Mọi cạnh có evidence/conf; vi phạm vẫn được trả (không lọc).
+- [x] Khớp hợp đồng 031/032 trên cùng commit.
 
 ## Rủi ro và lưu ý
 

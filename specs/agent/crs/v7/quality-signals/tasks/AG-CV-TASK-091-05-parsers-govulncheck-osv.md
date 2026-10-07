@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-parser-govulncheck.ts`, `quality-parser-osv-scanner.ts` (mới) + test
 **Depends on:** AG-CV-TASK-091-01 (fixture thật), AG-CV-TASK-082-02, 082-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,7 +24,7 @@ Fixture thật (khi có) + ca tổng hợp: called/import-only, 21 module cùng 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Import-only luôn `info`; gom module đúng.
+- [x] Import-only luôn `info`; gom module đúng.
 
 ## Rủi ro
 

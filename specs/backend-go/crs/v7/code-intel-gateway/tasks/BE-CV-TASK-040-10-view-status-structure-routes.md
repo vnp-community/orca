@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_codeintel_view_status.go` (mới), `channels_codeintel_view_graph.go` (mới), `channels_codeintel_view_status_test.go` (mới), `channels_codeintel_view_graph_test.go` (mới), `channels_codeintel_register.go`
 **Depends on:** TASK-040-07; stub `GetIndexStatus` (BE-CV-SOL-012-index-status-aggregation), `GetStructure`, `GetRouteMap` (BE-CV-SOL-020/021)
-**Status:** [ ] TODO
+**Status:** [x] COMPLETED
 
 ---
 
@@ -30,9 +30,9 @@ Kênh đầu tiên là mẫu cho 14 kênh còn lại (SOL-040-view-channels 2.1,
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh trả đúng shape UI-API 4.1/4.2; `status` không có `data`.
-- [ ] Tham số ngoài khoảng bị từ chối.
-- [ ] Placeholder của ba kênh được thay.
+- [x] Ba kênh trả đúng shape UI-API 4.1/4.2; `status` không có `data`.
+- [x] Tham số ngoài khoảng bị từ chối.
+- [x] Placeholder của ba kênh được thay.
 
 ## Rủi ro và lưu ý
 

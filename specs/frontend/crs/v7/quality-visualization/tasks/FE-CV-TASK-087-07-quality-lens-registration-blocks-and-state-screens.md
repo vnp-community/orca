@@ -5,7 +5,7 @@
 **Area:** frontend / review shell
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityLens.tsx`, `QualityStateScreen.tsx`, `quality-lens-blocks.ts` (mới); sửa nhỏ ở file CR-051: `ReviewLensId`, `REVIEW_LENS_DEFINITIONS`, khe `trailing` của `ReviewHeaderBar`
 **Depends on:** 087-03..087-06; FE-CV-SOL-051-review-workspace-shell
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`, `issue-status-sync`, `deploy`
 **File:** `backend-go/deploy/alerts/request.rules.yaml` (mới), `backend-go/services/request-service/internal/adapter/outbox/` (thêm `traceparent` vào payload), `backend-go/services/issue-status-sync/internal/usecase/sync_request_status.go`, `.../internal/usecase/ports.go` (`IssueCommenter`), `.../internal/adapter/grpcclient/issuetracking_client.go`
 **Depends on:** TASK-REQ-024-04, TASK-REQ-024-07
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `request.rules.yaml` hợp lệ cú pháp, metric tồn tại trong task 07.
-- [ ] Bình luận tắt mặc định; khi bật không rò nội dung.
-- [ ] `traceparent` không phá consumer cũ (trường lạ bị bỏ qua).
+- [x] `request.rules.yaml` hợp lệ cú pháp, metric tồn tại trong task 07.
+- [x] Bình luận tắt mặc định; khi bật không rò nội dung.
+- [x] `traceparent` không phá consumer cũ (trường lạ bị bỏ qua).
 
 ## Rủi ro và lưu ý
 

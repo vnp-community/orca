@@ -5,7 +5,7 @@
 **Area:** frontend / task
 **File:** `frontend/src/shared/task-hierarchy.ts` (mới), `frontend/src/renderer/src/hooks/useTasks.ts` (sửa: dòng 63, 78), `components/task/TaskGraph.tsx` (sửa), `components/task/TaskTreeView.tsx` (sửa), `components/task/TaskCard.tsx` (sửa); test `task-hierarchy.test.ts`, `hooks/useTasks.test.ts`, `components/task/__tests__/{TaskTreeView,TaskBoardView,TaskDAGView,TaskGraph,TaskCard}.test.tsx`
 **Depends on:** FE-REQ-TASK-018-06 (`TaskType` `plan|phase`, `OrcaTask.requestId`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

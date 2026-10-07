@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel-structural-cycles.ts` (mới), `.test.ts`; sửa `codeintel-command-whitelist.ts` (AG-CV-SOL-001) + `.test.ts`
 **Depends on:** AG-CV-TASK-037-01, 037-02, AG-CV-SOL-001 (runner, whitelist)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Fixture task 01 (`cycles_found`, `clean`); stdout cụt; `check` thoát ≠ 0; a
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chỉ `check --cycles --json -r` được spawn; `analyze|clean|check` còn lại bị cấm.
-- [ ] Đọc luôn từ tệp tạm.
+- [x] Chỉ `check --cycles --json -r` được spawn; `analyze|clean|check` còn lại bị cấm.
+- [x] Đọc luôn từ tệp tạm.
 
 ## Rủi ro
 

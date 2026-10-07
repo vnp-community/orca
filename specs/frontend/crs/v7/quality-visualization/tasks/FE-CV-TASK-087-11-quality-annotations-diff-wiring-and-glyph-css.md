@@ -5,7 +5,7 @@
 **Area:** frontend / editor
 **File:** `frontend/src/renderer/src/components/editor/DiffViewer.tsx`, `DiffSectionItem.tsx` (sửa: mỗi file một lời gọi hook), `frontend/src/renderer/src/assets/main.css` (lớp `.orca-quality-glyph-*`), công tắc "Chú thích kiểm tra" (nơi đặt: thanh công cụ diff hoặc lens; chốt khi đọc code)
 **Depends on:** 087-10, FE-CV-TASK-088-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

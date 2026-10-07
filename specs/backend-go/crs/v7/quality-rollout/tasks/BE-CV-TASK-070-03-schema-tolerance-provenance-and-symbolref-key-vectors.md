@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/testdata/symbolref-key-vectors.json` (mới, dùng chung với agent), `.../internal/usecase/agent_result_schema_test.go` (mới), `.../internal/domain/symbol_ref_key_vectors_test.go` (mới)
 **Depends on:** BE-CV-TASK-070-02, BE-CV-SOL-020
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,9 +29,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Vector chạy xanh ở Go; tệp vector được tham chiếu trong `MANIFEST.json`.
-- [ ] Ca `lineBase` thiếu và `lineBase:1` cùng có mặt.
-- [ ] Lỗi giải mã không bao giờ panic.
+- [x] Vector chạy xanh ở Go; tệp vector được tham chiếu trong `MANIFEST.json`.
+- [x] Ca `lineBase` thiếu và `lineBase:1` cùng có mặt.
+- [x] Lỗi giải mã không bao giờ panic.
 
 ## Rủi ro và lưu ý
 

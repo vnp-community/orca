@@ -1,0 +1,11 @@
+{
+  "jsonrpc": "2.0",
+  "method": "quality.progress",
+  "params": {
+    "workspaceRoot": "/Users/developer/project",
+    "runId": "qual-run-99",
+    "stage": "linting",
+    "percent": 45,
+    "message": "Running oxlint checks"
+  }
+}

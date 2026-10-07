@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/codeintel_args_security_test.go` (mới), `.../wscompat/codeintel_args_fuzz_test.go` (mới)
 **Depends on:** BE-CV-SOL-040-codeintel-channel-foundation (`decodeCodeIntelArgs`, `codeIntelChannelError`, `SetReadLimit`), BE-CV-TASK-072-01
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,8 +29,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi giới hạn nhóm kênh có test; không clamp ngầm.
-- [ ] Fuzz 10 s không panic.
+- [x] Mọi giới hạn nhóm kênh có test; không clamp ngầm.
+- [x] Fuzz 10 s không panic.
 
 ## Rủi ro và lưu ý
 

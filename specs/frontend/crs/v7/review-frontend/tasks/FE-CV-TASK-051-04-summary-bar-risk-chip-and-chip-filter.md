@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/ReviewSummaryBar.tsx`, `ReviewRiskChip.tsx`, `review-chip-filter.ts`, tests
 **Depends on:** FE-CV-TASK-051-01, FE-CV-TASK-050-13
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

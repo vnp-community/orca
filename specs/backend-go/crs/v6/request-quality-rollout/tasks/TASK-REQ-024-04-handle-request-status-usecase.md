@@ -5,7 +5,7 @@
 **Service:** `issue-status-sync`
 **File:** `backend-go/services/issue-status-sync/internal/domain/request_events.go` (mới), `.../internal/domain/events.go`, `.../internal/usecase/sync_request_status.go` (mới), `.../internal/usecase/sync_issue_status.go`, `.../internal/usecase/ports.go`, `.../internal/adapter/eventbus/subscriber.go`, `.../internal/config/config.go`, `.../cmd/server/main.go`
 **Depends on:** TASK-REQ-024-03; CR-REQ-003 (hai sự kiện, trường bổ sung)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -36,9 +36,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng 2.2 được kiểm đủ; sự kiện cũ, lặp không đổi Jira lần hai.
-- [ ] Hành vi worktree, PR cũ không đổi (test hồi quy xanh).
-- [ ] Hai subscription chạy cùng bốn cái cũ.
+- [x] Bảng 2.2 được kiểm đủ; sự kiện cũ, lặp không đổi Jira lần hai.
+- [x] Hành vi worktree, PR cũ không đổi (test hồi quy xanh).
+- [x] Hai subscription chạy cùng bốn cái cũ.
 
 ## Rủi ro và lưu ý
 

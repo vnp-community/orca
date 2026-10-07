@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `ReadingOrderList.tsx`, `ReadingOrderRow.tsx`, `ReadingOrderGroupHeader.tsx`, `ReadingProgressBar.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-052-01, 052-03, 052-04, FE-CV-TASK-051-05, FE-CV-TASK-053-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-tool-version-support.ts`, `quality-parser-registry.ts` (mới) + test
 **Depends on:** AG-CV-TASK-082-04..08, AG-CV-TASK-081-04/06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Bảng phiên bản (1.71.0 verified; 1.72.0 untested; 2.0.0 incompatible), regi
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mutation test phủ mọi parser; `incompatible` không spawn.
+- [x] Mutation test phủ mọi parser; `incompatible` không spawn.
 
 ## Rủi ro
 

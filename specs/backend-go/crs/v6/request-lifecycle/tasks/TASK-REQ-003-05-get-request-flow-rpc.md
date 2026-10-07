@@ -5,7 +5,7 @@
 **Service:** `request-service`, `proto`
 **File:** `proto/orca/request/v1/request.proto` (sửa), `proto/gen/go/orca/request/v1/*` (sinh lại), `internal/usecase/get_request_flow.go`, `internal/usecase/get_request_flow_test.go`, `internal/adapter/grpc/server.go` (sửa)
 **Depends on:** TASK-REQ-003-02, TASK-REQ-002-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ README v6 mục 8 điểm 12 liệt kê `GetRequestFlow` là RPC thiếu, giao c
 
 ## Tiêu chí hoàn thành
 
-- [ ] RPC trả đúng 11 loại, kể cả `status_path`.
-- [ ] `buf lint` và `buf breaking` xanh.
-- [ ] README service cập nhật.
-- [ ] Không đọc DB (test không cần container).
+- [x] RPC trả đúng 11 loại, kể cả `status_path`.
+- [x] `buf lint` và `buf breaking` xanh.
+- [x] README service cập nhật.
+- [x] Không đọc DB (test không cần container).
 
 ## Rủi ro và lưu ý
 

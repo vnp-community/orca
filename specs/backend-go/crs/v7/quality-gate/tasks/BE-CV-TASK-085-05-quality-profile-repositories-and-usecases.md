@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/adapter/{postgres,mysql}/quality_profile_repository.go`, `internal/usecase/{get,save}_quality_profile.go`, `quality_gate_ports.go` (mới)
 **Depends on:** BE-CV-TASK-085-01, 085-03; BE-CV-SOL-011-repositories-and-maintenance (`withTenantTx`, TxRunner)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Mẫu `withTenantTx`: `mcp-service/internal/adapter/postgres/tenant_tx.go`. MySQL: `WHERE tenant_id = ?`, không `RETURNING` (`dbcapability.SupportsReturning=false`).
@@ -20,7 +20,7 @@ Mẫu `withTenantTx`: `mcp-service/internal/adapter/postgres/tenant_tx.go`. MySQ
 - Integration hai dialect: CAS (hai goroutine), unique, UTF-8/`\u0000`, cách ly tenant; use case với port giả.
 
 ## Tiêu chí hoàn thành
-- [ ] lưu/đọc/CAS đúng hai dialect; [ ] `mode=block` bị từ chối; [ ] tenant B không thấy profile tenant A.
+- [x] lưu/đọc/CAS đúng hai dialect; [ ] `mode=block` bị từ chối; [ ] tenant B không thấy profile tenant A.
 
 ## Rủi ro
 - `RunnableProfileLister` chưa có chủ (Q4 SOL-085-evaluator): thiếu ⇒ `warnings[]` rỗng/không kiểm.

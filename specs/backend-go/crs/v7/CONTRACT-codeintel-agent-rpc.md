@@ -30,8 +30,8 @@ Chưa kiểm chứng (ghi trong CR): hành vi thật của `gitnexus 1.6.9` / `c
 
 ### 1.1 Chế độ và phạm vi
 - Chỉ `direct-websocket` (agent dial `wss://<gateway>/agent`) là phạm vi MVP (D2). `relay-ssh` do Go khởi tạo chạy **cùng mã Part A** qua `node agent.js --stdio|--detach|--connect` nên các method dưới đây có sẵn; việc kiểm thử là của CR-006. `relay-websocket` ngoài phạm vi.
-- **Part B** (`RelayDispatcher`, `desktop/src/relay/relay.ts`): đăng ký **cùng** bảng method (`CODEINTEL_METHODS`) và cùng tên/tham số/kết quả; khác biệt ở mục 8.
-- Windows: mọi method trả `CODEINTEL_TOOL_UNAVAILABLE` `reason:"unsupported_platform"` (chưa hỗ trợ).
+- **Part B** (`RelayDispatcher`, `desktop/src/relay/relay.ts`): **ngoài phạm vi v7 MVP**; để backlog rõ ràng với label `post-mvp`. Lý do: cần `AgentRelay` chưa có chủ port (C5). Khi Part B được phê duyệt (CR-006), đăng ký cùng bảng method `CODEINTEL_METHODS`; khác biệt ở mục 8. `quality.*` **không có** ở Part B ở v7.
+- Windows: `codeintel.status` trả `{compatibility: {status: "incompatible", reason: "unsupported_platform"}, ...}` — không crash, không "luôn thành công". Các method đọc khác trả `CODEINTEL_TOOL_UNAVAILABLE reason:"unsupported_platform"`.
 
 ### 1.2 Phiên bản giao thức
 Giao thức giữ nguyên `AGENT_PROTOCOL_VERSION = '1'`. Việc thêm method/capability là **additive**; backend phát hiện bằng `capabilities`, không bằng số phiên bản.
@@ -101,10 +101,19 @@ Kết quả **luôn là object JSON** (Go giải mã vào `map[string]any`):
 | Cache kết quả ngắn hạn | 60 s, ≤ 64 mục, ≤ 32 MiB (LRU, singleflight); khoá `(registryPath, indexedAt|lastCommit, method, hash(paramsChuẩnHoá))`; không cache lỗi và `symbol` có `source` |
 
 ### 2.4 Môi trường tiến trình con và an toàn thực thi
-- **GitNexus/CodeGraph** (CR-001 §2.3): chỉ `spawn(file, argv, {shell:false})`; mỗi lệnh là đối tượng có kiểu (`GitNexusCommand`, `CodeGraphCommand`), **không** có API argv tự do; GitNexus luôn `-r <registryPath tuyệt đối từ ~/.gitnexus/registry.json>`, CodeGraph luôn `-p <projectPath>`; stdout GitNexus đi qua **tệp tạm** `<os.tmpdir()>/orca-codeintel-<uid>/` (thư mục `0700`, tệp `0600`, cờ `wx`) vì pipe cắt cụt; env con `config.toolEnv` + `NO_COLOR=1`. Danh sách **cấm** trong đường đọc: `analyze, clean, remove, uninstall, publish, setup, index, init, uninit, sync, serve, mcp, wiki, group, daemon, unlock, install, upgrade, telemetry, eval-server, check` (`check --cycles` chỉ mở riêng cho `structuralFacts kind:"cycles"`); `analyze|sync|index` chỉ ở `codeintel-reindex-commands.ts`, và `analyze` luôn `--index-only` (không bao giờ ghi `AGENTS.md`/`CLAUDE.md`/skills).
+- **GitNexus/CodeGraph** (CR-001 §2.3): chỉ `spawn(file, argv, {shell:false})`; mỗi lệnh là đối tượng có kiểu (`GitNexusCommand`, `CodeGraphCommand`), **không** có API argv tự do; GitNexus luôn `-r <registryPath tuyệt đối từ ~/.gitnexus/registry.json>`, CodeGraph luôn `-p <projectPath>`; stdout GitNexus đi qua **tệp tạm** `<os.tmpdir()>/orca-codeintel-<uid>/` (thư mục `0700`, tệp `0600`, cờ `wx`) vì pipe cắt cụt.
+
+  **Env allowlist cho GitNexus/CodeGraph** — env con được xây từ rỗng (không `config.toolEnv`), chỉ bổ sung các biến trong allowlist cứng dưới đây. Lý do: `config.toolEnv` chứa toàn bộ `process.env` kể cả `ANTHROPIC_API_KEY`, `GITHUB_TOKEN` (README v7 §8 điểm 22); tiến trình con không cần LLM key hay SCM token.
+
+  Allowlist GitNexus/CodeGraph: `PATH`, `HOME`, `USER`, `LOGNAME`, `TMPDIR`, `TEMP`, `TMP`, `LANG`, `LC_ALL`, `LC_CTYPE`, `TZ`, `SHELL`, `NO_COLOR=1` (ghi đè cứng). Cho phép thêm `GIT_*` **chỉ** các biến an toàn: `GIT_EXEC_PATH`, `GIT_TEMPLATE_DIR`, `GIT_CONFIG_NOSYSTEM` — **không** `GIT_SSH*`, `GIT_ASKPASS`, `GIT_CREDENTIAL*`. **Loại** mọi biến khớp `/(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE|DSN|AUTH|COOKIE|SESSION|ORCA_|AWS_|GOOGLE_|AZURE_|GITHUB_|GH_|AGENT_|SSH_AUTH|ANTHROPIC)/i`. `ORCA_CODEINTEL_ALLOWED_ENV` (ngăn bởi `path.delimiter`) có thể mở rộng danh sách; giá trị lạ bị bỏ + log cảnh báo.
+
 - **Cypher**: mẫu hằng, khe `{{ten}}` thay bằng 4 bộ mã hoá (`cypherInt`, `cypherString`, `cypherStringList`, `cypherKindList`); `assertReadOnlyCypher` (≤ 16 KiB, một câu, bắt đầu `MATCH `, cấm `CREATE|MERGE|DELETE|SET|REMOVE|DROP|ALTER|COPY|DETACH|CALL|LOAD|INSTALL|ATTACH|EXPORT|IMPORT|FOREACH|UNWIND`). Công cụ **không** có tham số ràng buộc nên "tham số hoá" thực chất là thay chuỗi đã mã hoá (CR-002 §1.1). Mẫu chưa chạy là điều kiện tiên quyết merge (CR-002 §2.1).
-- **Quality** (CR-081 §2.8): env con **bắt đầu từ rỗng** (không `config.toolEnv`); cho phép `PATH` (`qualityToolPath` = `toolPath` + `~/go/bin` + `$(go env GOPATH)/bin` + `/usr/local/go/bin` + `~/.local/share/pnpm`), `HOME, USER, LOGNAME, LANG, LC_ALL, TZ, TMPDIR, SHELL`, cố định `CI=1, NO_COLOR=1, FORCE_COLOR=0, TERM=dumb`, Go (`GOFLAGS`, `GOTOOLCHAIN=local`, `GOMAXPROCS`, `GOMEMLIMIT`, và `GOCACHE/GOPATH/GOMODCACHE` chỉ khi đã đặt), Node (`NODE_OPTIONS` từ profile, `PNPM_HOME`, `npm_config_cache`). **Loại** mọi biến khớp `/(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE|DSN|AUTH|COOKIE|SESSION)/i` kể cả khi profile xin qua `env.allowExtra`; đặc biệt `ANTHROPIC_API_KEY, GITHUB_TOKEN, GH_TOKEN, AGENT_TOKEN, ORCA_*, SSH_AUTH_SOCK, AWS_*, GOOGLE_*`. (Hiện `toolEnv` của agent chứa toàn bộ `process.env`: README v7 mục 8 điểm 22.)
-- Tên biến cấu hình agent: `ORCA_CODEINTEL_ALLOWED_ROOTS`, `ORCA_CODEINTEL_*` (override giới hạn mục 2.3), `ORCA_CODEINTEL_SQLITE=auto|off`, `ORCA_CODEINTEL_ANALYZE_WORKERS`, `ORCA_CODEINTEL_MAX_REINDEX` (1, tối đa 2), `ORCA_CODEINTEL_REINDEX_TIMEOUT_MS` (45 phút), `ORCA_CODEINTEL_REINDEX=off`, `ORCA_CODEINTEL_DISABLED=1` (tắt cứng, CR-073), `ORCA_CODEINTEL_DETECT_TIMEOUT_MS`, `ORCA_QUALITY_RUN=off`, `ORCA_QUALITY_QUEUE_MAX` (4), `ORCA_QUALITY_RESULT_TTL_MS` (1 h), `ORCA_QUALITY_CGROUP`, `ORCA_QUALITY_ISOLATION`, `ORCA_HEAVY_JOBS` (1), `ORCA_HEAVY_QUEUE_WAIT_MS` (10 phút). Phía backend dùng tiền tố `CODEINTEL_` (PQ-23).
+- **Quality** (CR-081 §2.8): env con **bắt đầu từ rỗng** (không `config.toolEnv`); cho phép `PATH` (`qualityToolPath` = `toolPath` + `~/go/bin` + `$(go env GOPATH)/bin` + `/usr/local/go/bin` + `~/.local/share/pnpm`), `HOME, USER, LOGNAME, LANG, LC_ALL, TZ, TMPDIR, SHELL`, cố định `CI=1, NO_COLOR=1, FORCE_COLOR=0, TERM=dumb`, Go (`GOFLAGS`, `GOTOOLCHAIN=local`, `GOMAXPROCS`, `GOMEMLIMIT`, và `GOCACHE/GOPATH/GOMODCACHE` chỉ khi đã đặt), Node (`NODE_OPTIONS` từ profile, `PNPM_HOME`, `npm_config_cache`). **Loại** mọi biến khớp `/(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_?KEY|PRIVATE|DSN|AUTH|COOKIE|SESSION)/i` kể cả khi profile xin qua `env.allowExtra`; đặc biệt `ANTHROPIC_API_KEY, GITHUB_TOKEN, GH_TOKEN, AGENT_TOKEN, ORCA_*, SSH_AUTH_SOCK, AWS_*, GOOGLE_*`. Profile quality cần thêm biến phải khai báo qua `env.allowExtra` (agent kiểm từng tên, không đem cả `toolEnv`).
+  
+  **Chính sách mạng** cho quality runner: `ORCA_QUALITY_NETWORK=allow|block` (mặc định `block` ngoại trừ module từ registry đã cache); profile khai báo `network_policy: "allow"` thì runner kiểm `ORCA_QUALITY_NETWORK` server-side và bỏ qua yêu cầu nếu bị chặn (không lỗi — runner bỏ bước mạng, ghi warning). Giá trị `ORCA_QUALITY_NETWORK` không ra agent qua env (chỉ là policy agent đọc từ config file).
+- Tên biến cấu hình agent: `ORCA_CODEINTEL_ALLOWED_ROOTS`, `ORCA_CODEINTEL_ALLOWED_ENV`, `ORCA_CODEINTEL_*` (override giới hạn mục 2.3), `ORCA_CODEINTEL_SQLITE=auto|off`, `ORCA_CODEINTEL_ANALYZE_WORKERS`, `ORCA_CODEINTEL_MAX_REINDEX` (1, tối đa 2), `ORCA_CODEINTEL_REINDEX_TIMEOUT_MS` (45 phút), `ORCA_CODEINTEL_REINDEX=off`, `ORCA_CODEINTEL_DISABLED=1` (tắt **cả** `codeintel.*` **và** `quality.*`, CR-073), `ORCA_CODEINTEL_DETECT_TIMEOUT_MS`, `ORCA_QUALITY_RUN=off`, `ORCA_QUALITY_QUEUE_MAX` (4), `ORCA_QUALITY_RESULT_TTL_MS` (1 h), `ORCA_QUALITY_CGROUP`, `ORCA_QUALITY_ISOLATION`, `ORCA_QUALITY_NETWORK=allow|block`, `ORCA_HEAVY_JOBS` (1), `ORCA_HEAVY_QUEUE_WAIT_MS` (10 phút). Phía backend dùng tiền tố `CODEINTEL_` (PQ-23).
+
+  **Cờ tắt tập trung**: `ORCA_CODEINTEL_DISABLED=1` tắt **toàn bộ** `codeintel.*` và `quality.*` — mọi method trả `CODEINTEL_TOOL_UNAVAILABLE reason:"codeintel_disabled"`. Tên biến backend: `CODEINTEL_ENABLED` / `codeIntelEnabled` (theo hợp đồng PQ-23); không dùng `CODEINTEL_DISABLED` hay `CODE_INTEL_ENABLED`. `ExportReviewReport` (CR-090) thất bại với `CODEINTEL_DISABLED` khi cờ chất lượng tắt.
 
 ### 2.5 Timeout (agent so với Go) — bảng chuẩn (PQ-13)
 
@@ -176,8 +185,11 @@ JSON-RPC response lỗi: `error: { code: <số>, message: <chuỗi ≤ 300, khô
 | `CODEINTEL_RUN_IN_PROGRESS` | -32000 | worktree đang có run hoặc hàng đợi đầy | `runId`, `reason` (`worktree_busy|queue_full`) | có |
 | `CODEINTEL_RUN_NOT_FOUND` | -32602 | `runId` lạ hoặc không thuộc `workspaceRoot` | — | không |
 | `CODEINTEL_RUN_CANCELLED` | -32000 | thao tác trên run đã huỷ không có ý nghĩa (ví dụ lấy `coverage` của run huỷ) | `runId` | không |
+| `CODEINTEL_QUALITY_RUN_INTERRUPTED` | -32000 | agent khởi động lại khi run còn `running`; run không tự chạy lại | `runId`, `reason:"agent_restart"` | có (sau reconnect) |
 
 `reason` ở trên là **giá trị chuỗi ổn định** (test hợp đồng khẳng định). `stale`, `truncated` là cờ trong kết quả, không phải lỗi. Method không tồn tại: `-32601` `MethodNotFound`.
+
+**Hàng đợi method đầy**: trả `CODEINTEL_TIMEOUT data={reason:"queue_wait", queueSize:<n>}`; tên env timeout hàng đợi: `ORCA_CODEINTEL_QUEUE_WAIT_MS` (mặc định 10 000 ms). `ORCA_CODEINTEL_QUEUE_MAX` (mặc định 16, tối đa 32) kiểm soát kích thước hàng đợi.
 
 ### 3.3 Mã do **Go** sinh từ lỗi agent (agent KHÔNG bao giờ trả các mã này)
 `CODEINTEL_AGENT_UNSUPPORTED` (infra-fleet khi `-32601` với `codeintel.*`/`quality.*`), `CODEINTEL_DEV_SERVER_OFFLINE` (collector hết chờ 20 s), `CODEINTEL_RESULT_INVALID` (collector giải mã thất bại), `CODEINTEL_TIMEOUT` (khi Go cắt trước), `CODEINTEL_OUTPUT_TOO_LARGE` (`ResourceExhausted` > 12 MiB). Các mã tầng service/gateway (`DISABLED`, `NOT_AUTHORIZED`, `RATE_LIMITED`, `VERSION_CONFLICT`, `UNAVAILABLE`, `RESPONSE_TOO_LARGE`, …) ở `CONTRACT-codeintel-ui-api.md` §2.3.
@@ -204,6 +216,25 @@ Part B (`RelayDispatcher`) **làm rơi `err.data`** (`dispatcher.ts:485-491` g�
 
 ### 4.1 `codeintel.status` (CR-001 §2.2, mở rộng CR-003 §2.1, CR-080 §2.3)
 Tham số: `baseRef?` (string, 1..256, `[A-Za-z0-9._/@^~{}+-]`, không bắt đầu `-`; backend truyền nhánh gốc O7 để tính `mergeBase`; mặc định `origin/HEAD`). **Luôn thành công** khi agent chạy (thiếu công cụ/chỉ mục/repo chưa đăng ký không là lỗi).
+
+Field bổ sung (B1): `compatibility` và `warnings[]` ổn định ở cấp trên cùng của `result.data`:
+```jsonc
+// Bổ sung vào result.data (bên cạnh "binding", "tools", "indexes", ...)
+"compatibility": {
+  "status": "verified",          // verified | untested | incompatible
+  "reason": null,                // null khi verified; chuỗi mã ổn định khi không verified
+  "details": null                // chuỗi mô tả tuỳ chọn
+},
+"warnings": [                    // mảng chuỗi mã ổn định; có thể rỗng
+  // giá trị hợp lệ:
+  // "tool_version_untested"       — binary có mặt nhưng ngoài dải đã kiểm
+  // "index_built_with_old_extraction" — extractionVersion < hiện tại
+  // "codeintel_disabled"          — ORCA_CODEINTEL_DISABLED=1 được đặt
+  // "overlay_index"               — đang dùng OVERLAY (indexScope=repo_root)
+  // "commit_mismatch"             — indexedCommit !== headCommit
+]
+```
+`indexScope`/`freshness` được giao **theo thứ tự**: `indexScope` trả trước trong object JSON, `freshness` liền sau (`indexes.<tool>.indexScope`, `indexes.<tool>.freshness`) theo CR-080 §2.3 (B1).
 
 ```jsonc
 // result.data
@@ -359,7 +390,7 @@ Lệnh (chỉ ở `codeintel-reindex-commands.ts`, kiểu `ReindexCommand`): Git
 `{ jobId }` (bb). Idempotent: job đã kết thúc → trả trạng thái cuối, không lỗi. SIGTERM nhóm tiến trình (`detached:true`, `process.kill(-pid)`), sau 10 s SIGKILL; luôn `verify` sau huỷ; DB không rõ → `indexHealth:"unknown"` và `status` `state:"unknown"` tới khi reindex thành công. Kết quả `{ "job": {…như 4.11} }`. **Không có RPC/kênh backend gọi nó ở v7** (điểm mở O-17); chỉ dùng khi `CODEINTEL_AUTOANALYZE_CANCEL_ON_RESUME=true`.
 
 ### 4.13 `codeintel.watch` (mới, CR-004)
-`{ enabled: bool }` (bb). Idempotent; backend gọi lại sau **mỗi lần agent nối lại**; tối đa 8 repo đồng thời (vượt → `CODEINTEL_INVALID_PARAMS reason="watch_limit"`); lần đầu bật chỉ ghi nhớ, không phát. Kết quả `{ "enabled": true, "watching": 3 }`. Thăm dò (polling, không `fs.watch`): GitNexus `stat .gitnexus/meta.json` mỗi 10 s (debounce 2 s); CodeGraph `max(mtime)` của `codegraph.db` và `-wal` mỗi 10 s (≤ 1 thông báo/30 s/repo); HEAD `git rev-parse HEAD` mỗi 15 s.
+`{ enabled: bool }` (bb). Idempotent; **backend gọi lại sau mỗi lần agent nối lại** (B4: đây là trách nhiệm của backend collector, không phải agent — sau khi WS reconnect, backend phải gọi `codeintel.watch` + `codeintel.status` trước bất kỳ method nào khác để agent bắt đầu gửi thông báo); tối đa 8 repo đồng thời (vượt → `CODEINTEL_INVALID_PARAMS reason="watch_limit"`); lần đầu bật chỉ ghi nhớ, không phát. Kết quả `{ "enabled": true, "watching": 3 }`. Thăm dò (polling, không `fs.watch`): GitNexus `stat .gitnexus/meta.json` mỗi 10 s (debounce 2 s); CodeGraph `max(mtime)` của `codegraph.db` và `-wal` mỗi 10 s (≤ 1 thông báo/30 s/repo); HEAD `git rev-parse HEAD` mỗi 15 s.
 
 ### 4.14 `codeintel.codegraphSearch` và `codeintel.files` (mới, CR-003 §2.2)
 - `codegraphSearch`: `search` (bb, 1..256), `limit` (1..50, 10), `kind?` ∈ `function, method, class, interface, struct, enum, type_alias, constant, variable, property, field, route, component, namespace`. `data: { "results": [{ "symbol": SymbolRef, "score": n }] }` (bỏ `kind: import`).
@@ -389,6 +420,12 @@ Lệnh (chỉ ở `codeintel-reindex-commands.ts`, kiểu `ReindexCommand`): Git
 **Không lỗi** khi thiếu môi trường (`ready:false` + `missing[]`). `definitionHash` (đổi khi đổi `argv`) để backend ghim chính sách (CR-085). `display` chỉ để người đọc, không có biến môi trường/đường dẫn ngoài `workspaceRoot`. `kind ∈ lint|typecheck|test|proto|policy|repo-rules|coverage|security|dependency`. `missing[].reason ∈ binary_missing|node_modules_missing|native_runtime_unavailable|go_missing|go_too_old|go_modcache_empty|tool_too_old|tool_incompatible|base_ref_missing|tmp_space_low|home_missing|coverage_provider_missing|network_policy`. Preflight chỉ đọc (cache 60 s; không `pnpm install|rebuild`, `go mod download`, `ensure-native-runtime --runtime=…` — chỉ `--check-only`). **Lọc theo cờ tenant là việc của backend** (agent không biết cờ tenant): profile `security-*`/`dependency-diff` do agent liệt kê, backend ẩn khi `quality_security_scan_enabled` tắt (PQ-01).
 Catalog mặc định Orca (đề xuất, chưa chạy): `ts-lint`, `ts-typecheck-{desktop-node,desktop-web,desktop-cli,agent,frontend}`, `ts-unit-{desktop,frontend,agent,backend}`, `repo-check-{max-lines,styled-scrollbars,reliability-gates}`, `go-vet`, `go-test`, `go-lint`, `proto-lint`, `proto-breaking`, `opa-test`, `coverage-go`, `coverage-ts`, `repo-rules`, `repo-rules-scripts`, `security-go-vuln`, `security-deps-osv`, `security-secrets-diff`, `dependency-diff`; suite `fast`, `standard`, `full`. Tên cuối do `AG-CV-SOL-081-quality-profile-catalog-and-preflight` chốt (đề xuất của CR).
 
+**Argv mẫu bổ sung** (B6): `{gitCommonDir}` thay thế `<gitCommonDir>` trong argv profile cần truy cập `--git-dir` của worktree chính (ví dụ `buf breaking --against .git#{gitCommonDir}/..`). `scopeArgv` (B6): vitest related dùng `{relatedFiles}` (mảng đường dẫn tương đối, tối đa 300 tệp) thay vì đường dẫn tuyệt đối; nếu profile không khai báo `scopeArgv`, runner dùng `full-run-filter` theo mặc định.
+
+**`QualityProfileDefinition` bổ sung** (B9):
+- `whenChangedPaths: string[]` — glob tương đối gốc repo; nếu khai báo, profile chỉ chạy khi ≥ 1 tệp đổi khớp (CR-085). Cú pháp: `micromatch` standard, không `../`.
+- `ciMappings: { checkName: string; provider?: 'github'|'gitlab' }[]` — ánh xạ profile sang CI check name để `CiComparison` đối chiếu (CR-086). Thiếu → `relation: 'no_ci_data'`.
+
 ### 5.2 `quality.run` — trả ngay (<1 s), chạy nền
 Tham số: `profile` (bb, id profile **hoặc** suite), `scope` (bb, `worktree|changed|commitRange`), `base?` (bb với `changed|commitRange`; khớp `^[0-9a-f]{7,64}$` hoặc ref theo `git check-ref-format --branch`, không bắt đầu `-`). Kết quả:
 ```jsonc
@@ -403,12 +440,15 @@ Giới hạn run: `runTimeoutMs` 45 phút; `maxOutputBytes` 32 MiB/bước (64 M
 ```jsonc
 { "runId": "qr_…", "state": "queued|running|cancelling|succeeded|failed|cancelled|interrupted",
   "startedAt": "…", "finishedAt": null,
+  "skipReason": null,            // null | "scope_empty" | "all_steps_skipped" | "env_not_ready_all"
   "steps": [ { "id": "ts-lint", "status": "passed|findings|failed|timeout|cancelled|skipped|env_not_ready", "exitCode": 1, "durationMs": 21044,
-               "findings": { "error": 3, "warning": 12, "info": 0 }, "truncated": false, "envMissing": [] } ],
+               "findings": { "error": 3, "warning": 12, "info": 0 }, "truncated": false, "envMissing": [],
+               "skipReason": null   // null | "scope_empty" | "disabled_by_policy" | "gate_timeout" | "env_not_ready"
+             } ],
   "headCommit": "…", "dirtyFingerprint": "sha256:…", "workTreeChangedDuringRun": false, "scopeWidened": false,
   "summary": { "error": 3, "warning": 12, "info": 0, "stepsTotal": 6, "stepsWithFindings": 2, "stepsFailed": 0, "stepsEnvNotReady": 1, "outsideScope": 4, "truncated": false } }
 ```
-Idempotent, đọc từ bộ nhớ hoặc nhật ký `~/.orca/quality/runs/<runId>.json` (≥ 50 bản, thư mục `0700`). `interrupted` = agent khởi động lại khi run còn `running` (không tự chạy lại). Sau khi WS nối lại backend gọi `runStatus` cho mọi run chưa kết thúc. Trạng thái bước: có phát hiện **không** làm run `failed`; run `failed` khi có bước `failed|timeout|env_not_ready` (kết quả **không đầy đủ**, cổng coi `unknown`).
+Idempotent, đọc từ bộ nhớ hoặc nhật ký `~/.orca/quality/runs/<runId>.json` (≥ 50 bản, thư mục `0700`). `interrupted` = agent khởi động lại khi run còn `running` (không tự chạy lại); khi `state=interrupted`, `results` trả những phát hiện đã parse được trước khi ngắt, `coverage` trả `available:false reason:"run_interrupted"`. Sau khi WS nối lại backend gọi `runStatus` cho mọi run chưa kết thúc. Trạng thái bước: có phát hiện **không** làm run `failed`; run `failed` khi có bước `failed|timeout|env_not_ready` (kết quả **không đầy đủ**, cổng coi `unknown`).
 
 ### 5.4 `quality.cancel` `{runId}`
 Idempotent, trả `runStatus` hiện tại; chuyển `cancelling`, diệt cây tiến trình (POSIX `kill(-pid)`; Windows `taskkill /T /F` chưa hỗ trợ), kết thúc `cancelled`; giữ các phát hiện đã parse (đánh `partial`). Tiêu chí: sau ≤ 15 s cả nhóm tiến trình biến mất.
@@ -474,17 +514,20 @@ Run chưa xong → `RUN_IN_PROGRESS`; run không có bước coverage → `{ "ru
   "params": { "runId": "qr_01JA0X8E5T", "workspaceRoot": "/opt/repos/orca", "stage": "step:ts-lint",
               "stepIndex": 1, "stepCount": 6, "percent": 16, "message": "ts-lint running", "at": "2026-10-06T08:00:12.100Z" } }
 ```
-`percent` = `completedSteps/stepCount` (số thật, chỉ đổi khi một bước xong) hoặc `null`; ≤ 1/giây/run; `message` ≤ 200 ký tự đã che.
+`percent` = `floor(completedSteps / stepCount * 100)` (số nguyên 0..100, chỉ đổi khi một bước xong) hoặc `null` khi `stepCount=0` hoặc không xác định; ≤ 1/giây/run; `message` ≤ 200 ký tự đã che. (B5: `percent:16` trong ví dụ trước là giá trị ví dụ, không phải định nghĩa — nay đã chốt công thức.)
 
 ### 6.4 `quality.finished`
 ```jsonc
 { "jsonrpc": "2.0", "method": "quality.finished",
-  "params": { "runId": "qr_…", "workspaceRoot": "/opt/repos/orca", "status": "succeeded",   // succeeded|failed|cancelled|interrupted
+  "params": { "runId": "qr_…", "workspaceRoot": "/opt/repos/orca",
+              "status": "succeeded",   // succeeded | failed | cancelled | interrupted
               "summary": { "error": 3, "warning": 12, "info": 0, "stepsTotal": 6, "stepsWithFindings": 2, "stepsFailed": 0, "stepsEnvNotReady": 1, "outsideScope": 4, "truncated": false },
               "steps": [ { "id": "ts-lint", "status": "findings", "exitCode": 1, "durationMs": 21044, "truncated": false } ],
               "headCommit": "…", "dirtyFingerprint": "sha256:…", "workTreeChangedDuringRun": false,
               "startedAt": "…", "finishedAt": "…", "errorCode": null } }
 ```
+`status` bao gồm `interrupted` (B5): khi `interrupted`, `summary` chứa những gì đã đếm được, `truncated:true` ở summary. `QualityRun.status` trên backend **cũng** có giá trị `interrupted` (lưu trong DB, không phải chỉ ở agent). Kết quả (`results`, `coverage`) của run `interrupted` hoặc hết TTL: `results` trả `partial:true` + phát hiện đã parse; `coverage` trả `available:false reason:"run_interrupted"|"run_expired"`.
+
 Mất WS: run **tiếp tục** (chỉ bộ phát thông báo bị gỡ). Backend gọi `runStatus` + `results` (phân trang `limit 500` tới `nextOffset:null`) sau `finished` hoặc sau khi nối lại; **nạp findings trước, `Finish` run sau** (idempotent).
 
 ---

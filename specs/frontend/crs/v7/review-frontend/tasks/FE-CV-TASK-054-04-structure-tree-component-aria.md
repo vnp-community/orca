@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/StructureTree.tsx` (mới), test
 **Depends on:** FE-CV-TASK-054-02, 054-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

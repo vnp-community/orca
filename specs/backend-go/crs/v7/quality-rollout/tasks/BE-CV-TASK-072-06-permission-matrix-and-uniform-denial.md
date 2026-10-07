@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/adapter/grpc/rpc_permission_matrix.go` (mới, bảng dữ liệu), `.../internal/adapter/grpc/rpc_permission_matrix_test.go` (mới), `.../internal/usecase/uniform_denial_test.go` (mới), `.../internal/adapter/grpc/internal_caller_guard_test.go` (mới)
 **Depends on:** BE-CV-SOL-013-authorization-flags-and-audit (OPA `code_intel.rego`), BE-CV-SOL-085-* (QualityGateService), BE-CV-SOL-073 task 03 (interceptor cờ)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,8 +31,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Thêm RPC mà quên dòng quyền thì CI đỏ.
-- [ ] Mọi từ chối cùng mã và message.
+- [x] Thêm RPC mà quên dòng quyền thì CI đỏ.
+- [x] Mọi từ chối cùng mã và message.
 
 ## Rủi ro và lưu ý
 

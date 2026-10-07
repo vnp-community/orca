@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` (test collector), `infra-fleet-service` (test `AgentRPCError`)
 **File:** `backend-go/services/code-intel-service/testdata/agent-results/errors/*.json` (mới, do agent sinh), `.../internal/usecase/agent_error_golden_test.go` (mới), `backend-go/services/infra-fleet-service/internal/usecase/relay_agent_error_golden_test.go` (mới)
 **Depends on:** BE-CV-TASK-070-01, BE-CV-SOL-023 (`domain.AgentRPCError`, trailer), BE-CV-SOL-021
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -28,9 +28,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi `data.code` §3.2 có đúng một ánh xạ `Kind` được test.
-- [ ] Trailer luôn JSON hợp lệ ≤ 4 KiB.
-- [ ] Mã lạ không làm rò `error.data` thô.
+- [x] Mỗi `data.code` §3.2 có đúng một ánh xạ `Kind` được test.
+- [x] Trailer luôn JSON hợp lệ ≤ 4 KiB.
+- [x] Mã lạ không làm rò `error.data` thô.
 
 ## Rủi ro và lưu ý
 

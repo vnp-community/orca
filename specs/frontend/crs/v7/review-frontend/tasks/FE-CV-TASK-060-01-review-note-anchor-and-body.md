@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/notes/review-note-anchor.ts` (mới) + `review-note-anchor.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `ReviewNoteAnchor`); FE-CV-TASK-057-01 (`maskSensitiveText`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

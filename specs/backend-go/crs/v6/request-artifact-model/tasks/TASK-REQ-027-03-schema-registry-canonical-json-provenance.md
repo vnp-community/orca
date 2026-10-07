@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `schemas/v1/{request,solution,diagnosis,findings,answer,plan,phase,task}.schema.json`, `schemas/embed.go`, `internal/domain/artifact_kind.go`, `internal/domain/artifact_schema.go`, `internal/domain/canonical_json_digest.go`, `internal/domain/provenance.go`, `testdata/artifacts/{valid,invalid}/*.json` và test (mới)
 **Depends on:** TASK-REQ-001-01 (module `go.mod`), TASK-REQ-002-02 (domain khung)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -66,11 +66,11 @@ Schema của tám `kind` theo CR 2.5: Request (`acceptance_criteria[]`, `type_fi
 
 ## Tiêu chí hoàn thành
 
-- [ ] Spike có kết luận bằng văn bản; thư viện được chọn biên dịch được cả tám schema.
-- [ ] Mỗi `kind` có mẫu hợp lệ; mỗi luật schema có mẫu sai với `Path` đúng.
-- [ ] `CanonicalJSON` idempotent, ổn định theo thứ tự khoá và NFC; SOL-007 `DigestOptions` có thể gọi nó.
-- [ ] `Provenance` không thể mang `credential_ref`, khoá, `env`.
-- [ ] Không có truy cập mạng khi biên dịch schema (test chạy với `GOFLAGS=-mod=readonly`, không HTTP).
+- [x] Spike có kết luận bằng văn bản; thư viện được chọn biên dịch được cả tám schema.
+- [x] Mỗi `kind` có mẫu hợp lệ; mỗi luật schema có mẫu sai với `Path` đúng.
+- [x] `CanonicalJSON` idempotent, ổn định theo thứ tự khoá và NFC; SOL-007 `DigestOptions` có thể gọi nó.
+- [x] `Provenance` không thể mang `credential_ref`, khoá, `env`.
+- [x] Không có truy cập mạng khi biên dịch schema (test chạy với `GOFLAGS=-mod=readonly`, không HTTP).
 
 ## Rủi ro và lưu ý
 

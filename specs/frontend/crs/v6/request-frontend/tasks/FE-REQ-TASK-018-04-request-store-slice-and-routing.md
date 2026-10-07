@@ -5,7 +5,7 @@
 **Area:** frontend / store
 **File:** `frontend/src/renderer/src/store/slices/request.ts` (mới), `store/index.ts` (sửa, gần dòng 48 và 117), `store/types.ts` (sửa), `store/slices/ui.ts` (sửa: dòng 507, 632, 1336, 1348, 1540), `frontend/src/shared/types.ts` (sửa dòng 3360); test `store/slices/request.test.ts`, mở rộng test `ui` hiện có
 **Depends on:** FE-REQ-TASK-018-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

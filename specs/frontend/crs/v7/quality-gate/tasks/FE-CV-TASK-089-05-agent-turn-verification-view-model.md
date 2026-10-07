@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/agent-turn-verification-view-model.ts` (mới) + test
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

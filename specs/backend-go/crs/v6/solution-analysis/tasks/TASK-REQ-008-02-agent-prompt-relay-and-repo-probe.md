@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / adapter grpcclient, ports
 **File:** `internal/adapter/grpcclient/agent_prompt_relay.go` (mới), `repo_state_probe.go` (mới), `internal/usecase/ports.go` (sửa), và `_test.go`
 **Depends on:** TASK-REQ-007-04 (`connection_resolver.go`, `withTenantMetadata`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -29,10 +29,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không có đường mã nào đặt `trustPreset="full"` (test và `grep` trong review).
-- [ ] `env` không chứa token hay biến nhạy cảm.
-- [ ] Probe nêu rõ không kiểm được khi thiếu `worktree_id`.
-- [ ] Không thêm lệnh Git mới (`guides/reference/git-compatibility.md`).
+- [x] Không có đường mã nào đặt `trustPreset="full"` (test và `grep` trong review).
+- [x] `env` không chứa token hay biến nhạy cảm.
+- [x] Probe nêu rõ không kiểm được khi thiếu `worktree_id`.
+- [x] Không thêm lệnh Git mới (`guides/reference/git-compatibility.md`).
 
 ## Rủi ro và lưu ý
 

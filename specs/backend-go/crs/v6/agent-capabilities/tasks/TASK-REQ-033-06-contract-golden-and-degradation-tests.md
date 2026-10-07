@@ -5,7 +5,7 @@
 **Service/Area:** `infra-fleet-service`, `request-service` / test hợp đồng và tích hợp
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/testdata/agent_capabilities_v1.golden.json` (mới), `backend-go/services/request-service/internal/adapter/grpcclient/testdata/{agent_capabilities_v1.golden.json,execprompt_params.golden.json,execprompt_result_full.golden.json}` (mới), `internal/usecase/capability_degradation_test.go` (mới, infra-fleet), `internal/domain/dev_server_capability_contract_test.go` (mới, request-service), `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/capability_integration_test.go` (mới, `-tags=integration`)
 **Depends on:** TASK-REQ-033-03, TASK-REQ-033-04, TASK-REQ-033-05; bản agent (khu vực `agent`, `AG-REQ-SOL-033-*`) cung cấp file golden TypeScript tương ứng
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -39,11 +39,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba golden `agent_capabilities` giống hệt (hash) giữa agent, `request-service` và `infra-fleet-service`.
-- [ ] Bốn kịch bản suy giảm xanh; chuyển từ `handshake_only` sang `probe` phát đúng một sự kiện.
-- [ ] `execprompt_params.golden.json` khoá tên tham số khớp CR-REQ-033 mục 2.1 (`accessMode`, `workspaceKind`, `reportChanges`, `resultBlock`, `maxOutputBytes`).
-- [ ] Không test nào gọi mạng ngoài hoặc dev server thật.
-- [ ] Không file nào tên `helpers`, `utils`, `common`, `misc`.
+- [x] Ba golden `agent_capabilities` giống hệt (hash) giữa agent, `request-service` và `infra-fleet-service`.
+- [x] Bốn kịch bản suy giảm xanh; chuyển từ `handshake_only` sang `probe` phát đúng một sự kiện.
+- [x] `execprompt_params.golden.json` khoá tên tham số khớp CR-REQ-033 mục 2.1 (`accessMode`, `workspaceKind`, `reportChanges`, `resultBlock`, `maxOutputBytes`).
+- [x] Không test nào gọi mạng ngoài hoặc dev server thật.
+- [x] Không file nào tên `helpers`, `utils`, `common`, `misc`.
 
 ## Thứ tự thực hiện gợi ý
 

@@ -1,0 +1,39 @@
+{
+  "data": {
+    "flows": [],
+    "incoming": {
+      "calls": [
+        {
+          "filePath": "bar.ts",
+          "name": "sym2",
+          "uid": "s2"
+        }
+      ]
+    },
+    "outgoing": {},
+    "source": null,
+    "symbol": {
+      "endLine": null,
+      "filePath": "foo.ts",
+      "key": "function:foo.ts:sym",
+      "kind": "function",
+      "name": "sym",
+      "qualifiedName": "sym",
+      "startLine": null,
+      "uid": "s1"
+    }
+  },
+  "headCommit": "abcdef",
+  "sources": [
+    {
+      "commit": "abcdef",
+      "indexedAt": 1600000000000,
+      "lineBase": 1,
+      "tool": "gitnexus",
+      "version": "1.6.9"
+    }
+  ],
+  "stale": false,
+  "totalCount": null,
+  "truncated": false
+}

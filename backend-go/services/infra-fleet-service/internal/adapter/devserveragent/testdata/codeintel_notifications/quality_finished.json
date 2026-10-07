@@ -1,0 +1,10 @@
+{
+  "jsonrpc": "2.0",
+  "method": "quality.finished",
+  "params": {
+    "workspaceRoot": "/Users/developer/project",
+    "runId": "qual-run-99",
+    "headCommit": "f6e5d4c3b2a1",
+    "errorCode": ""
+  }
+}

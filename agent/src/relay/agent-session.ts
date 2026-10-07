@@ -251,6 +251,10 @@ export function createSession(
       // still clean up immediately.
       void notifyDaemonSessionClosed(log)
       cleanupAgentWatches()
+      try {
+        const { cleanupCodeIntelWatchers } = require('./codeintel-index-watcher')
+        cleanupCodeIntelWatchers()
+      } catch {}
     },
 
     onHandshakeOk(callback: () => void): void {

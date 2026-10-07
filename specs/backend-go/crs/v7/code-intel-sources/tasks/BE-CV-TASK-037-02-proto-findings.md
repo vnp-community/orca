@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` · `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_findings.proto` (mới); `backend-go/proto/orca/codeintel/v1/codeintel.proto` (sửa: hai dòng `rpc`)
 **Depends on:** BE-CV-SOL-010, BE-CV-SOL-020 (`SymbolRef`, `SourceInfo`, `ResultMeta`, `WorktreeSelector`), BE-CV-TASK-036-02 (`IndexFreshness`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ Hợp đồng §2.1 dòng 15, §3.1; PQ-05/06. `Finding` (cấu trúc/tĩnh) tá
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf` xanh; enum có `_UNSPECIFIED = 0`.
-- [ ] Mọi trường UI §4.5 có chỗ trong proto.
-- [ ] Không đặt `ChangeOverlay`/`Finding` hai nơi.
+- [x] `buf` xanh; enum có `_UNSPECIFIED = 0`.
+- [x] Mọi trường UI §4.5 có chỗ trong proto.
+- [x] Không đặt `ChangeOverlay`/`Finding` hai nơi.
 
 ## Rủi ro và lưu ý
 

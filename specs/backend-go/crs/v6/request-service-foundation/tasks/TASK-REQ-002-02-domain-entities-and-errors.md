@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/{request.go,request_type.go,request_status.go,request_size_urgency.go,request_source.go,request_type_change.go,solution.go,request_link.go,request_errors.go}` và `*_test.go` (mới)
 **Depends on:** TASK-REQ-001-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -37,10 +37,10 @@ Mẫu domain thuần stdlib: `task-service/internal/domain/task.go` (kiểu `Sta
 
 ## Tiêu chí hoàn thành
 
-- [ ] Domain chỉ import stdlib, `uuid`, `common/apperrors`, `common/tenant`.
-- [ ] 11 loại, 11 trạng thái đúng chính tả README v6.
-- [ ] Mọi mã lỗi ở SOL-002 mục B có constructor và test ánh xạ gRPC.
-- [ ] Không có tên file `helpers`, `utils`, `common`, `misc`.
+- [x] Domain chỉ import stdlib, `uuid`, `common/apperrors`, `common/tenant`.
+- [x] 11 loại, 11 trạng thái đúng chính tả README v6.
+- [x] Mọi mã lỗi ở SOL-002 mục B có constructor và test ánh xạ gRPC.
+- [x] Không có tên file `helpers`, `utils`, `common`, `misc`.
 
 ## Rủi ro và lưu ý
 

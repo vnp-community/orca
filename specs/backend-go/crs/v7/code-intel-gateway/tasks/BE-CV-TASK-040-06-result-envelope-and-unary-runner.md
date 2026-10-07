@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_codeintel_envelope.go` (mới), `channels_codeintel_runner.go` (mới), `channels_codeintel_envelope_test.go` (mới), `channels_codeintel_runner_test.go` (mới)
 **Depends on:** TASK-040-03 (args), TASK-040-04 (lỗi), TASK-040-05 (encoder); catalog (TASK-040-07) cung cấp `mustCatalogSpec` (hai task thống nhất kiểu `codeIntelChannelSpec`; làm 06 và 07 cùng PR hoặc 07 trước phần kiểu)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -42,9 +42,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Một runner phục vụ 45 kênh unary; không kênh nào tự lặp guard.
-- [ ] Trần phản hồi tính trên `proto.Size`, không cắt ngầm.
-- [ ] Không kênh nhận được danh tính từ `args`.
+- [x] Một runner phục vụ 45 kênh unary; không kênh nào tự lặp guard.
+- [x] Trần phản hồi tính trên `proto.Size`, không cắt ngầm.
+- [x] Không kênh nhận được danh tính từ `args`.
 
 ## Rủi ro và lưu ý
 

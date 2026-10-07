@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/postgres/{maintenance_tx.go,maintenance_repository.go}`, `internal/adapter/mysql/maintenance_repository.go` (+ `_integration_test.go`) (mới)
 **Depends on:** BE-CV-TASK-011-02, 011-03, 011-07, 011-08, 011-09, 011-10
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Hợp đồng §4.3; cờ `app.maintenance` là mới (chưa có ở mã hiện 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các việc bảo trì ở SOL mục 2.C chạy đúng ở hai dialect.
-- [ ] Chính sách Postgres chặn xoá ngoài điều kiện; không cho `INSERT`.
-- [ ] Không phương thức nào xoá bản snapshot mới nhất mỗi view.
+- [x] Các việc bảo trì ở SOL mục 2.C chạy đúng ở hai dialect.
+- [x] Chính sách Postgres chặn xoá ngoài điều kiện; không cho `INSERT`.
+- [x] Không phương thức nào xoá bản snapshot mới nhất mỗi view.
 
 ## Rủi ro và lưu ý
 

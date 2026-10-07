@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/mysql/{graph_snapshot,reindex_job}_repository.go` (+ `_integration_test.go`) (mới)
 **Depends on:** BE-CV-TASK-011-03, 011-04, 011-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Tương đương 011-08 trên MySQL. Khác biệt cú pháp: `LIMIT` không cho 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hành vi bằng bản Postgres qua bộ hợp đồng chung.
-- [ ] `trigger` có nháy ngược mọi nơi.
+- [x] Hành vi bằng bản Postgres qua bộ hợp đồng chung.
+- [x] `trigger` có nháy ngược mọi nơi.
 
 ## Rủi ro và lưu ý
 

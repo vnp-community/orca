@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/adapter/postgres/execution_states.go` (mới), `internal/adapter/mysql/execution_states.go` (mới), `internal/adapter/postgres/execution_states_test.go` (mới, tag `integration`), `internal/adapter/mysql/execution_states_test.go` (mới), `cmd/server/main.go`
 **Depends on:** TASK-REQ-015-01
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -37,10 +37,10 @@ Integration hai dialect (`go test -tags=integration`), dữ liệu: task A hai l
 
 ## Tiêu chí hoàn thành
 
-- [ ] `ListExecutionStates` đúng ở cả hai dialect: link gần nhất, đếm lỗi, `blocked_by`.
-- [ ] Tie-break `started_at` bằng `id DESC` ổn định.
-- [ ] 500 id chạy dưới ngưỡng hợp lý (ghi thời gian vào PR, chưa có mục tiêu cố định).
-- [ ] Mọi truy vấn lọc `tenant_id`; không FK mới.
+- [x] `ListExecutionStates` đúng ở cả hai dialect: link gần nhất, đếm lỗi, `blocked_by`.
+- [x] Tie-break `started_at` bằng `id DESC` ổn định.
+- [x] 500 id chạy dưới ngưỡng hợp lý (ghi thời gian vào PR, chưa có mục tiêu cố định).
+- [x] Mọi truy vấn lọc `tenant_id`; không FK mới.
 
 ## Rủi ro và lưu ý
 

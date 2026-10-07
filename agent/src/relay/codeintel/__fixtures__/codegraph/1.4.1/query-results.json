@@ -1,0 +1,11 @@
+[
+  {
+    "node": {
+      "id": "sym1",
+      "name": "GetUser",
+      "kind": "function",
+      "filePath": "internal/domain/user.go"
+    },
+    "score": 0.95
+  }
+]

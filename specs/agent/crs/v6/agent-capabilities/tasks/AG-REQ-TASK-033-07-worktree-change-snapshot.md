@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-worktree-change-snapshot.ts` (mới), `agent/src/relay/agent-worktree-change-snapshot.test.ts` (mới)
 **Depends on:** không (hàm độc lập; task 08 nối vào handler)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -53,11 +53,11 @@ Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/agent-wo
 
 ## Tiêu chí hoàn thành
 
-- [ ] `added/modified/deleted/untracked/renamed` đúng trên repo thật; `headMoved` đúng khi có commit.
-- [ ] Ngoài repo Git thì `available:false, reason:'NOT_A_GIT_REPO'`, không ném.
-- [ ] Chỉ ba lệnh Git đã nêu được gọi, `--no-optional-locks` đứng trước `status`.
-- [ ] Giới hạn 2000 đường dẫn và 5000 mục thư mục được thực thi và có `truncated`.
-- [ ] Không đọc nội dung file; không log đường dẫn ở mức info.
+- [x] `added/modified/deleted/untracked/renamed` đúng trên repo thật; `headMoved` đúng khi có commit.
+- [x] Ngoài repo Git thì `available:false, reason:'NOT_A_GIT_REPO'`, không ném.
+- [x] Chỉ ba lệnh Git đã nêu được gọi, `--no-optional-locks` đứng trước `status`.
+- [x] Giới hạn 2000 đường dẫn và 5000 mục thư mục được thực thi và có `truncated`.
+- [x] Không đọc nội dung file; không log đường dẫn ở mức info.
 
 ## Rủi ro và lưu ý
 

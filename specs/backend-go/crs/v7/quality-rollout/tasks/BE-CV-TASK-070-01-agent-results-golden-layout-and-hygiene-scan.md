@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/testdata/agent-results/**` (mới, do `AG-CV-SOL-070` sinh), `backend-go/services/code-intel-service/internal/contracttest/agent_results_manifest_test.go` (mới), `.../internal/contracttest/agent_results_hygiene_test.go` (mới)
 **Depends on:** BE-CV-SOL-010 (module `code-intel-service`, cổng G0); `AG-CV-SOL-070` (script chụp ghi tệp)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Manifest, ngân sách, vệ sinh xanh; không tệp mồ côi.
-- [ ] Không có tệp nào lấy từ repo Orca thật.
-- [ ] Không `max-lines` disable.
+- [x] Manifest, ngân sách, vệ sinh xanh; không tệp mồ côi.
+- [x] Không có tệp nào lấy từ repo Orca thật.
+- [x] Không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

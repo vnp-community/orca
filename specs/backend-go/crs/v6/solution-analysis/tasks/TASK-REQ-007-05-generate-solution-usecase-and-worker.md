@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase
 **File:** `internal/usecase/generate_solution.go` (mới), `run_solution_generation.go` (mới), `recover_interrupted_analysis_runs.go` (mới), `list_solutions.go` (mới), `internal/config/config.go` (sửa), `cmd/server/main.go` (sửa: khởi chạy vòng phục hồi), và `_test.go`
 **Depends on:** TASK-REQ-007-03, TASK-REQ-007-04; CR-REQ-003 (`FlowFor`, `TransitionRequest`); TASK-REQ-009-04 (`OpenApproval`, `CancelPendingApprovalsForRequest`; dùng cổng no-op nếu chưa có)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -32,10 +32,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí chấp nhận 2, 3, 4, 5, 6, 7, 8, 13 của CR-REQ-007 mục 4 có test tương ứng.
-- [ ] Phục hồi: chạy trên hai DB ở test tích hợp của task 03/06.
-- [ ] Worker không bị huỷ khi RPC kết thúc.
-- [ ] Không còn Solution `draft` sau lỗi.
+- [x] Tiêu chí chấp nhận 2, 3, 4, 5, 6, 7, 8, 13 của CR-REQ-007 mục 4 có test tương ứng.
+- [x] Phục hồi: chạy trên hai DB ở test tích hợp của task 03/06.
+- [x] Worker không bị huỷ khi RPC kết thúc.
+- [x] Không còn Solution `draft` sau lỗi.
 
 ## Rủi ro và lưu ý
 

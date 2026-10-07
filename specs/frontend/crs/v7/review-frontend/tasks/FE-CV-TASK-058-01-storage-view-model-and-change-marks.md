@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/storage/storage-view-model.ts`, `storage-change-marks.ts` (mới) + `*.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `StorageMap`, `Store`, `SourceRef`, `ChangedFile`); FE-CV-TASK-057-01 (`maskSensitiveText`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

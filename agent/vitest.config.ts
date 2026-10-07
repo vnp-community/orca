@@ -4,6 +4,7 @@ export default defineConfig({
   root: import.meta.dirname,
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts']
+    include: ['src/**/*.test.ts'],
+    exclude: ['**/node_modules/**', '**/__fixtures__/**']
   }
 })

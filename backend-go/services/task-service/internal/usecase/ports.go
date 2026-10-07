@@ -513,3 +513,8 @@ type OutboxWriter interface {
 	// not generate one); payload is already JSON-encoded.
 	InsertOutboxEvent(ctx context.Context, id, tenantID, subject string, payload []byte) error
 }
+
+// ExecutionStateReader reads task execution states (last engine, status, blocking tasks).
+type ExecutionStateReader interface {
+	ListExecutionStates(ctx context.Context, tenantID string, taskIDs []string) ([]domain.ExecutionState, error)
+}

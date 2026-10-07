@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/ports.go` (sửa: `ProcessedEventRepository`), `internal/adapter/postgres/processed_events.go`, `internal/adapter/mysql/processed_events.go`, `internal/adapter/eventbus/consumer.go`, `internal/adapter/eventbus/consumer_test.go` (mới); `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-001-04, TASK-REQ-001-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -32,10 +32,10 @@ Bảng `processed_events(tenant_id, event_id, subject, processed_at)` có từ `
 
 ## Tiêu chí hoàn thành
 
-- [ ] Consumer nhận `status_changed` `to=classifying` và gọi trigger với `eventID` của envelope.
-- [ ] `MarkProcessed` tham gia giao dịch của ctx và cách ly theo tenant.
-- [ ] Không có goroutine rò rỉ khi tắt service (`WaitGroup`).
-- [ ] Prune xoá bản ghi quá hạn.
+- [x] Consumer nhận `status_changed` `to=classifying` và gọi trigger với `eventID` của envelope.
+- [x] `MarkProcessed` tham gia giao dịch của ctx và cách ly theo tenant.
+- [x] Không có goroutine rò rỉ khi tắt service (`WaitGroup`).
+- [x] Prune xoá bản ghi quá hạn.
 
 ## Rủi ro và lưu ý
 

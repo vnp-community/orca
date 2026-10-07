@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_request_checks.{up,down}.sql` (mới), `internal/domain/request_check.go` (mới), `internal/usecase/ports.go`, `internal/adapter/postgres/request_checks.go`, `internal/adapter/mysql/request_checks.go` (mới), `*_integration_test.go` (mới)
 **Depends on:** CR-REQ-001, 002 (module, schema `request`, RLS mẫu); số migration lấy theo quy tắc ở TASK-REQ-013-03
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -46,10 +46,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Migration up/down/up sạch ở hai dialect, cùng số.
-- [ ] Mọi CHECK từ chối giá trị sai.
-- [ ] Bản mới nhất theo `(request_id, kind)` luôn là bản có hiệu lực; không có đường sửa/xoá.
-- [ ] Tenant A không đọc được dòng của tenant B.
+- [x] Migration up/down/up sạch ở hai dialect, cùng số.
+- [x] Mọi CHECK từ chối giá trị sai.
+- [x] Bản mới nhất theo `(request_id, kind)` luôn là bản có hiệu lực; không có đường sửa/xoá.
+- [x] Tenant A không đọc được dòng của tenant B.
 
 ## Rủi ro và lưu ý
 

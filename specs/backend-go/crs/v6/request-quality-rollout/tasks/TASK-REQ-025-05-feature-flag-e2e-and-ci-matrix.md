@@ -5,7 +5,7 @@
 **Service:** `request-service`, `.github`
 **File:** `backend-go/services/request-service/e2e/feature_flag_test.go` (mới), `.github/workflows/backend-go-request-service.yml` (sửa: thêm bước e2e; file do CR-REQ-001 tạo)
 **Depends on:** TASK-REQ-025-02, TASK-REQ-025-04
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] E20 xanh trên hai dialect.
-- [ ] Workflow chạy e2e hai dialect và chặn PR khi đỏ.
-- [ ] Chạy nhanh hơn ngân sách đặt (ghi thời gian thực đo).
+- [x] E20 xanh trên hai dialect.
+- [x] Workflow chạy e2e hai dialect và chặn PR khi đỏ.
+- [x] Chạy nhanh hơn ngân sách đặt (ghi thời gian thực đo).
 
 ## Rủi ro và lưu ý
 

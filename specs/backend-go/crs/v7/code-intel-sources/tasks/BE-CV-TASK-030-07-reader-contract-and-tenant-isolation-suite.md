@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/agentrepofs/reader_contract_test.go` (mới), `.../agentrepofs/fake_agent_relay_test.go` (mới), `.../agentrepofs/no_content_leak_test.go` (mới)
 **Depends on:** BE-CV-TASK-030-05, BE-CV-TASK-030-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Chốt các tiêu chí SOL-030 mục 6 bằng một suite chạy được trong 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi mục của SOL-030 mục 6 có ít nhất một test tương ứng.
-- [ ] `-race` sạch.
-- [ ] Không rò sentinel vào log/lỗi.
+- [x] Mọi mục của SOL-030 mục 6 có ít nhất một test tương ứng.
+- [x] `-race` sạch.
+- [x] Không rò sentinel vào log/lỗi.
 
 ## Rủi ro và lưu ý
 

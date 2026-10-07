@@ -33,6 +33,15 @@ export function invalidateRepoBindings(workspaceRoot?: string) {
   }
 }
 
+// Exported for agent-rpc-dispatch-quality and worktree verification
+export async function resolveWorktreeRoot(
+  workspaceRoot: string,
+  config?: any,
+  log?: any
+): Promise<CodeIntelRepoBinding> {
+  return resolveCodeIntelRepo(workspaceRoot, config ?? ({ workDir: workspaceRoot } as any), log)
+}
+
 export async function resolveCodeIntelRepo(workspaceRoot: string, config: AgentConfig, log?: any): Promise<CodeIntelRepoBinding> {
   if (!path.isAbsolute(workspaceRoot) || workspaceRoot.includes('\0')) {
     throw new CodeIntelError('CODEINTEL_PATH_NOT_ALLOWED', 'Invalid workspace root')

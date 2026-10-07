@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpc/{rpc_policy_table.go,policy_interceptor.go,status_mapping.go}` và `_test.go` (mới); `internal/domain/coded_data.go` (mới); `cmd/server/main.go` / `buildServerOptions` (sửa)
 **Depends on:** BE-CV-TASK-013-03, 013-04, 013-05, 013-06, 010-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,9 +30,9 @@ Hợp đồng §3 (chuỗi 9 bước), PQ-02 (3) (mã ở đầu `status.Message
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi RPC có dòng chính sách; thêm RPC thiếu dòng làm test đỏ.
-- [ ] Thứ tự guard → identity → cờ → quyền đúng.
-- [ ] Lỗi tới gateway đúng cú pháp PQ-02.
+- [x] Mọi RPC có dòng chính sách; thêm RPC thiếu dòng làm test đỏ.
+- [x] Thứ tự guard → identity → cờ → quyền đúng.
+- [x] Lỗi tới gateway đúng cú pháp PQ-02.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_codeintel_args.go` (mới), `channels_codeintel_args_selector.go` (mới), `channels_codeintel_args_test.go` (mới)
 **Depends on:** TASK-040-02 (`pathsafety`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -42,10 +42,10 @@ Bảng test (thêm vào `channels_codeintel_args_test.go`, kiểu args giả có
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi khoá cấm của U3 bị từ chối kèm tên trường, không kèm giá trị.
-- [ ] Ngoài khoảng bị từ chối, không kẹp.
-- [ ] Đường dẫn độc hại => `CODEINTEL_PATH_NOT_ALLOWED`.
-- [ ] Không dùng `decodeArg`/`json.Unmarshal` lỏng trong gói này.
+- [x] Mọi khoá cấm của U3 bị từ chối kèm tên trường, không kèm giá trị.
+- [x] Ngoài khoảng bị từ chối, không kẹp.
+- [x] Đường dẫn độc hại => `CODEINTEL_PATH_NOT_ALLOWED`.
+- [x] Không dùng `decodeArg`/`json.Unmarshal` lỏng trong gói này.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-parser-types.ts`, `quality-repo-path-mapping.ts` (mới) + `quality-repo-path-mapping.test.ts`
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,7 +23,7 @@ Bảng ca POSIX và Windows giả (`path.win32`): tương đối `internal/x.go`
 
 ## Tiêu chí hoàn thành
 
-- [ ] `file` không bao giờ tuyệt đối hay chứa `..`.
+- [x] `file` không bao giờ tuyệt đối hay chứa `..`.
 
 ## Rủi ro
 

@@ -4,10 +4,10 @@
 # dev commands are easiest as one shared entrypoint.
 
 SERVICES := ai-provider-service annotation-service api-gateway auth-service \
-            automation-service credential-broker-service git-gateway-service \
+            automation-service code-intel-service credential-broker-service git-gateway-service \
             infra-fleet-service issue-status-sync issue-tracking-service mcp-service \
             notification-service \
-            orchestration-service project-service scm-integration-service \
+            orchestration-service project-service request-service scm-integration-service \
             task-service tenant-service usage-service workflow-service
 
 .PHONY: dev-up dev-down build vet test test-integration lint fmt fmt-check \

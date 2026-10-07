@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/effective_flags.go` (mới), `.../internal/usecase/effective_flags_test.go` (mới), `.../internal/config/feature_switches.go` (mới), `.../cmd/server/main.go`
 **Depends on:** BE-CV-TASK-073-01, BE-CV-SOL-010 (`common/config`), BE-CV-SOL-011-repositories-and-maintenance
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,8 +31,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mặc định tất cả tắt; tắt có hiệu lực ≤ 5 s (giả đồng hồ).
-- [ ] Lỗi đọc không bật nhầm.
+- [x] Mặc định tất cả tắt; tắt có hiệu lực ≤ 5 s (giả đồng hồ).
+- [x] Lỗi đọc không bật nhầm.
 
 ## Rủi ro và lưu ý
 

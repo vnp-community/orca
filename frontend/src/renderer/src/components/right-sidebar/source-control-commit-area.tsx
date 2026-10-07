@@ -94,6 +94,8 @@ type CommitAreaProps = {
   pushRecovery: SourceControlPushRecovery | null
   remoteActionError: string | null
   createPrIntentNotice?: CreatePrIntentNotice | null
+  /** CR-085: quality gate notice slot; does not affect commit disabled state */
+  qualityNotice?: React.ReactNode
   isCommitting: boolean
   isFixingCommitFailureWithAI: boolean
   isFixingPushFailureWithAI: boolean
@@ -601,6 +603,8 @@ export function CommitArea({
           ) : null}
         </div>
       )}
+      {/* CR-085: quality gate notice — renders after createPrIntentNotice, does not affect commit disabled */}
+      {qualityNotice}
       {generateError && (
         <p
           id="commit-area-generate-error"

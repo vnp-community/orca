@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks
 **File:** `frontend/src/renderer/src/components/review-map/turns/useReviewTurnRecorder.ts` (mới) + test
 **Depends on:** FE-CV-TASK-061-01 (`AgentTurnCompletion`); FE-CV-TASK-060-05, 060-06; FE-CV-SOL-089-agent-turn-recorder (dùng chung khử trùng lặp)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

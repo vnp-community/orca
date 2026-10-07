@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/adapter/infrafleetclient/dev_server_reconnect_wait.go` (mới), `.../agent_rpc_caller.go` (sửa) và test
 **Depends on:** TASK-021-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các ca trên xanh.
-- [ ] `Reindex` offline lỗi ngay.
+- [x] Các ca trên xanh.
+- [x] `Reindex` offline lỗi ngay.
 
 ## Rủi ro và lưu ý
 

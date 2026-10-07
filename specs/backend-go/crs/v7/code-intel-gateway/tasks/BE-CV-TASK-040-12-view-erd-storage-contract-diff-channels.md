@@ -30,8 +30,8 @@ UI-API 3.1: `erd` => `Env<ErdModel>` hoặc (không `service`) `Env<{services: E
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh đúng shape UI-API 4.4, 4.5.
-- [ ] Gateway không tự điền mặc định (con trỏ), không tự phân loại `breaking`.
+- [x] Ba kênh đúng shape UI-API 4.4, 4.5.
+- [x] Gateway không tự điền mặc định (con trỏ), không tự phân loại `breaking`.
 
 ## Rủi ro và lưu ý
 

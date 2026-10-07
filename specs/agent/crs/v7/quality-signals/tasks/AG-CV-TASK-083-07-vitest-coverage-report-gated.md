@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-coverage-vitest-report.ts` (mới), `.test.ts`; profile `coverage-ts`
 **Depends on:** AG-CV-TASK-083-04; **duyệt `@vitest/coverage-v8` (O12) — cần duyệt, không thêm phụ thuộc trong task này**
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Fixture `coverage-final.json` nhỏ (tạo tay, ghi rõ đã tạo tay vì provi
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không thay đổi `package.json`/`pnpm-lock.yaml`.
-- [ ] Thiếu provider → lỗi rõ, không số 0.
+- [x] Không thay đổi `package.json`/`pnpm-lock.yaml`.
+- [x] Thiếu provider → lỗi rõ, không số 0.
 
 ## Rủi ro
 

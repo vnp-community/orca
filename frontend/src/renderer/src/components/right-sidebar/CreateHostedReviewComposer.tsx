@@ -76,6 +76,8 @@ export type CreateHostedReviewComposerProps = {
   onCancelGenerate: () => void
   onPrimaryAction: () => void
   onDropdownAction?: (kind: DropdownActionKind) => void
+  /** CR-085: quality gate notice slot; rendered above buttons, does not affect disabled state */
+  qualityNotice?: React.ReactNode
 }
 
 export function CreateHostedReviewComposer({
@@ -249,6 +251,9 @@ export function CreateHostedReviewComposer({
           strippedBranch={strippedBranch}
           baseSameAsBranch={baseSameAsBranch}
         />
+
+        {/* CR-085: quality gate notice slot — optional, does not affect createDisabled */}
+        {qualityNotice}
 
         <div className={cn(RIGHT_SIDEBAR_SPLIT_ACTION_ROW_CLASS, 'pt-0.5')}>
           <Button

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/coverage_ports.go`, `internal/adapter/postgres/coverage_repository.go` (mới)
 **Depends on:** BE-CV-TASK-083-02, 083-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Cổng `CoverageRepository`: `Upsert`, `GetByRun`, `LatestByHead(tenant, binding, head, dirty, treeHash)`, `Prune(before, perBindingCap, limit)`.
@@ -19,7 +19,7 @@ Cổng `CoverageRepository`: `Upsert`, `GetByRun`, `LatestByHead(tenant, binding
 - Bộ hợp đồng 083-06 trên Postgres.
 
 ## Tiêu chí hoàn thành
-- [ ] Idempotent: chạy lại cùng khoá không nhân đôi.
+- [x] Idempotent: chạy lại cùng khoá không nhân đôi.
 
 ## Rủi ro
 `payload` JSONB ≤ 1 MiB: kiểm `payload_bytes` trước ghi.

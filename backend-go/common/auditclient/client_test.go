@@ -60,7 +60,94 @@ func TestAppend_ForwardsAllFields(t *testing.T) {
 	}
 	got := fake.lastReq
 	if got.TenantId != want.TenantId || got.ActorId != want.ActorId || got.Action != want.Action ||
-		got.Target != want.Target || got.Outcome != want.Outcome || got.IpAddress != want.IpAddress {
+		got.Target != want.Target || got.Outcome != want.Outcome || got.IpAddress != want.IpAddress || got.ActorType != "" {
+		t.Fatalf("expected request %+v, got %+v", want, got)
+	}
+}
+
+func TestAppendDetailed_DropsInvalidActorType(t *testing.T) {
+	fake := &fakeAuthServiceClient{}
+	c := New(fake)
+
+	c.AppendDetailed(context.Background(), Entry{
+		TenantID:  "t1",
+		ActorID:   "u1",
+		ActorType: "invalid_type",
+		Action:    "test.action",
+	})
+
+	if fake.lastReq == nil {
+		t.Fatal("expected AppendAuditEntry to be called")
+	}
+	if fake.lastReq.ActorType != "" {
+		t.Errorf("expected ActorType to be dropped (empty string), got %q", fake.lastReq.ActorType)
+	}
+
+	// Valid types should be kept
+	for _, valid := range []string{"user", "agent", "system"} {
+		c.AppendDetailed(context.Background(), Entry{ActorType: valid})
+		if fake.lastReq.ActorType != valid {
+			t.Errorf("expected ActorType %q to be kept, got %q", valid, fake.lastReq.ActorType)
+		}
+	}
+}
+
+func TestAppendDetailed_TruncatesLargeMetadata(t *testing.T) {
+	fake := &fakeAuthServiceClient{}
+	c := New(fake)
+
+	largeMeta := string(make([]byte, 4097))
+	c.AppendDetailed(context.Background(), Entry{
+		MetadataJSON: largeMeta,
+	})
+
+	if fake.lastReq == nil {
+		t.Fatal("expected AppendAuditEntry to be called")
+	}
+	wantMeta := `{"truncated":true}`
+	if fake.lastReq.MetadataJson != wantMeta {
+		t.Errorf("expected MetadataJson to be truncated to %q, got %q", wantMeta, fake.lastReq.MetadataJson)
+	}
+}
+
+func TestAppendDetailed_ForwardsAllFields(t *testing.T) {
+	fake := &fakeAuthServiceClient{}
+	c := New(fake)
+
+	c.AppendDetailed(context.Background(), Entry{
+		TenantID:     "t1",
+		ActorID:      "a1",
+		ActorType:    "agent",
+		Action:       "request.sync",
+		Target:       "request:r1",
+		TargetType:   "request",
+		TargetID:     "r1",
+		Outcome:      "allowed",
+		IPAddress:    "127.0.0.1",
+		MetadataJSON: `{"foo":"bar"}`,
+	})
+
+	if fake.lastReq == nil {
+		t.Fatal("expected AppendAuditEntry to be called")
+	}
+	
+	want := &authv1.AppendAuditEntryRequest{
+		TenantId:     "t1",
+		ActorId:      "a1",
+		ActorType:    "agent",
+		Action:       "request.sync",
+		Target:       "request:r1",
+		TargetType:   "request",
+		TargetId:     "r1",
+		Outcome:      "allowed",
+		IpAddress:    "127.0.0.1",
+		MetadataJson: `{"foo":"bar"}`,
+	}
+	got := fake.lastReq
+	if got.TenantId != want.TenantId || got.ActorId != want.ActorId || got.ActorType != want.ActorType ||
+		got.Action != want.Action || got.Target != want.Target || got.TargetType != want.TargetType ||
+		got.TargetId != want.TargetId || got.Outcome != want.Outcome || got.IpAddress != want.IpAddress ||
+		got.MetadataJson != want.MetadataJson {
 		t.Fatalf("expected request %+v, got %+v", want, got)
 	}
 }

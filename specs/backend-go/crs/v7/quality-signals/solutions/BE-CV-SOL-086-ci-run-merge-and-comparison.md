@@ -109,17 +109,17 @@ Thứ tự đánh giá: (1) CI chưa có (không PR / chưa fetch) ⇒ `local_on
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] Check đã hoàn tất cho SHA: lần làm mới thứ hai **không** gọi scm (đếm = 1); hai yêu cầu đồng thời cùng khoá chỉ gọi một lần.
-- [ ] `limited`/`remaining` dưới ngưỡng ⇒ không gọi provider, trả bản cũ `stale:true, rate_limited:true, reset_at`; breaker mở tới `reset_at`.
-- [ ] Run `source='ci'`: `provider`, `external_ref.headSha`, `fetched_at`, `agent_run_id='ci:<provider>:<sha>'`, không `active_key`; hai lần upsert cùng SHA không nhân đôi.
-- [ ] Mapping trạng thái PQ-25 đủ 5 giá trị; `UNKNOWN` ⇒ `failed` + `CODEINTEL_CI_RESULT_UNKNOWN`.
-- [ ] `ruleId` CI hợp regex PQ-26 với tên check Unicode/dài/ký tự lạ; fingerprint không chứa số dòng.
-- [ ] Check đỏ không annotation ⇒ đúng một finding `file=''`.
-- [ ] `CiComparison.relation` đúng bảng ca: 4 tổ hợp pass/fail cùng SHA sạch, `dirty`, `sha_mismatch`, `ci_pending`, `local_only`, `ci_only`; `local_pass_ci_fail` luôn có `reasonsHint[]`; thiếu một phía không bao giờ cho `pass`.
-- [ ] GitLab: MR tìm bằng `ListMergeRequests`; GHE/GitLab self-managed nhận diện bằng `CODEINTEL_CI_PROVIDER_HOSTS`.
-- [ ] Không `logTail`, token, URL query nhạy cảm trong bảng/log/sự kiện; `message` che.
-- [ ] Cô lập tenant (hai dialect); hạn mức làm mới/tenant ⇒ `CODEINTEL_RATE_LIMITED`.
-- [ ] `window.api.gh.prChecks`/`ChecksPanel` không đổi.
+- [x] Check đã hoàn tất cho SHA: lần làm mới thứ hai **không** gọi scm (đếm = 1); hai yêu cầu đồng thời cùng khoá chỉ gọi một lần.
+- [x] `limited`/`remaining` dưới ngưỡng ⇒ không gọi provider, trả bản cũ `stale:true, rate_limited:true, reset_at`; breaker mở tới `reset_at`.
+- [x] Run `source='ci'`: `provider`, `external_ref.headSha`, `fetched_at`, `agent_run_id='ci:<provider>:<sha>'`, không `active_key`; hai lần upsert cùng SHA không nhân đôi.
+- [x] Mapping trạng thái PQ-25 đủ 5 giá trị; `UNKNOWN` ⇒ `failed` + `CODEINTEL_CI_RESULT_UNKNOWN`.
+- [x] `ruleId` CI hợp regex PQ-26 với tên check Unicode/dài/ký tự lạ; fingerprint không chứa số dòng.
+- [x] Check đỏ không annotation ⇒ đúng một finding `file=''`.
+- [x] `CiComparison.relation` đúng bảng ca: 4 tổ hợp pass/fail cùng SHA sạch, `dirty`, `sha_mismatch`, `ci_pending`, `local_only`, `ci_only`; `local_pass_ci_fail` luôn có `reasonsHint[]`; thiếu một phía không bao giờ cho `pass`.
+- [x] GitLab: MR tìm bằng `ListMergeRequests`; GHE/GitLab self-managed nhận diện bằng `CODEINTEL_CI_PROVIDER_HOSTS`.
+- [x] Không `logTail`, token, URL query nhạy cảm trong bảng/log/sự kiện; `message` che.
+- [x] Cô lập tenant (hai dialect); hạn mức làm mới/tenant ⇒ `CODEINTEL_RATE_LIMITED`.
+- [x] `window.api.gh.prChecks`/`ChecksPanel` không đổi.
 
 ## 5. Kiểm thử (chưa chạy test nào)
 

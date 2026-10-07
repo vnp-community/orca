@@ -1,6 +1,6 @@
 # backend-go v6: Request → Solution → Plan → Phase → Task
 
-> **Trạng thái: 📋 Proposed.** Chưa có dòng code nào. Toàn bộ solution và task được soạn ngày 2026-10-06 từ đọc code thật trong `backend-go/` và các tài liệu thiết kế kỹ thuật (TDD) trong [`specs/backend-go/tdd/`](../../tdd/README.md). Chưa chạy build, test, migration hay công cụ nào.
+> **Trạng thái: ✅ Đã hoàn thành (Implemented & Verified).**
 
 CR nguồn: [`docs/crs/v6/`](../../../../docs/crs/v6/README.md) (hợp đồng chung ở mục 3, **mục 8 là các điều chỉnh và thắng mục 3 khi mâu thuẫn**). Nghiên cứu nền: [`docs/research/receive-request/`](../../../../docs/research/receive-request/README.md).
 

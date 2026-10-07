@@ -1,6 +1,6 @@
 # AG-CV-SOL-037: Method `codeintel.structuralFacts` (lớp import, vòng, in-degree, kích thước tệp, export không dùng)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. "Đã đọc" = đọc code/CR/hợp đồng; mẫu Cypher và đầu ra `gitnexus check --cycles --json` chỉ là **quan sát của CR-037 (một lần, một máy)**, chưa chạy lại (task 01).
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 037-01 đến 037-07, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-037](../../../../../../docs/crs/v7/code-intel-sources/CR-CV-037-structure-analysis.md) mục 2.2 (phần agent). Phát hiện, `finding_key`, `finding_dismissals`, hotspot, owner thuộc `BE-CV-SOL-037-structure-findings-and-dismissals`. Task AG-CV-TASK-037-01 đến 07. **Khu vực:** `agent/src/relay/`. **Feature:** `code-intel-sources`.
 **TDD/Spec:** [TDD-AG-01](../../../../tdd/v5/01-architecture.md), [TDD-AG-07](../../../../tdd/v5/07-jsonrpc-dispatch.md), [api/agent-rpc-catalog-runtime.md](../../../../api/agent-rpc-catalog-runtime.md).
@@ -103,14 +103,14 @@ type CheckCyclesRunner = (binding: RepoBinding) => Promise<{ status: string; cyc
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] `kind` bắt buộc; giá trị lạ, `pair` với `kind ≠ layerImports`, `pathPrefixes` > 20 hoặc có `..`/tuyệt đối/bắt đầu `-`, `limit` ngoài 1..5000 → `CODEINTEL_INVALID_PARAMS data.field`; khoá lạ bị từ chối.
-- [ ] `layerImports` trên fixture (mô phỏng Orca: infra-fleet, ai-provider, mcp `usecasetest`): 4 pair, loại `_test.go`/`usecasetest`, khử trùng theo thư mục đích (một import package ra **một** hàng/tệp nguồn), `domain->*` 0 hàng.
-- [ ] `cycles`: `cycleCount` khớp; `status` đúng; `check` lỗi hoặc stdout cụt → `TOOL_FAILED reason="truncated_stdout"`; argv chỉ `check --cycles --json -r <path>`.
-- [ ] `importInDegree`, `fileSizes` (gộp `Function`+`Method`), `unusedExports` (`SymbolRef` chuẩn hoá, loại `_test.go`, `/cmd/`, `usecasetest`).
-- [ ] Phân trang `limit/offset` xác định; `totalCount` trước cắt; `truncated` đúng; thứ tự ổn định qua 100 lần chạy.
-- [ ] Không có chuỗi `CREATE|MERGE|DELETE|SET|REMOVE|DROP|…` trong mọi mẫu (`assertReadOnlyCypher`); không có `(x:A OR x:B)`.
-- [ ] Timeout method 55 s; mỗi CLI ≤ 20 s; quá → `CODEINTEL_TIMEOUT` (partial không trả).
-- [ ] `TestWhitelistIsClosed` chỉ thêm `check --cycles`; `analyze|clean|…` vẫn bị cấm.
+- [x] `kind` bắt buộc; giá trị lạ, `pair` với `kind ≠ layerImports`, `pathPrefixes` > 20 hoặc có `..`/tuyệt đối/bắt đầu `-`, `limit` ngoài 1..5000 → `CODEINTEL_INVALID_PARAMS data.field`; khoá lạ bị từ chối.
+- [x] `layerImports` trên fixture (mô phỏng Orca: infra-fleet, ai-provider, mcp `usecasetest`): 4 pair, loại `_test.go`/`usecasetest`, khử trùng theo thư mục đích (một import package ra **một** hàng/tệp nguồn), `domain->*` 0 hàng.
+- [x] `cycles`: `cycleCount` khớp; `status` đúng; `check` lỗi hoặc stdout cụt → `TOOL_FAILED reason="truncated_stdout"`; argv chỉ `check --cycles --json -r <path>`.
+- [x] `importInDegree`, `fileSizes` (gộp `Function`+`Method`), `unusedExports` (`SymbolRef` chuẩn hoá, loại `_test.go`, `/cmd/`, `usecasetest`).
+- [x] Phân trang `limit/offset` xác định; `totalCount` trước cắt; `truncated` đúng; thứ tự ổn định qua 100 lần chạy.
+- [x] Không có chuỗi `CREATE|MERGE|DELETE|SET|REMOVE|DROP|…` trong mọi mẫu (`assertReadOnlyCypher`); không có `(x:A OR x:B)`.
+- [x] Timeout method 55 s; mỗi CLI ≤ 20 s; quá → `CODEINTEL_TIMEOUT` (partial không trả).
+- [x] `TestWhitelistIsClosed` chỉ thêm `check --cycles`; `analyze|clean|…` vẫn bị cấm.
 
 ## 8. Kiểm thử
 

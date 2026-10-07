@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/get_change_overlay.go`, `get_change_overlay_test.go` (mới); `internal/adapter/grpc/change_overlay_handler.go`, `change_overlay_handler_test.go` (mới); `cmd/server/main.go` (sửa: đăng ký handler)
 **Depends on:** BE-CV-TASK-036-02, 036-03, 036-04, **036-09** (domain thứ tự đọc/rủi ro/giới hạn); BE-CV-SOL-012, 013, 022
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -33,9 +33,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Toàn bộ §9 của solution 036-change-overlay-pipeline đạt trên fixture.
-- [ ] Test ổn định 100 lần (byte-by-byte) ở đầu ra overlay.
-- [ ] `buf breaking` xanh; kênh `codeIntel.changeOverlay` chưa đăng ký ở gateway (việc của `BE-CV-SOL-040-codeintel-view-channels`).
+- [x] Toàn bộ §9 của solution 036-change-overlay-pipeline đạt trên fixture.
+- [x] Test ổn định 100 lần (byte-by-byte) ở đầu ra overlay.
+- [x] `buf breaking` xanh; kênh `codeIntel.changeOverlay` chưa đăng ký ở gateway (việc của `BE-CV-SOL-040-codeintel-view-channels`).
 
 ## Rủi ro và lưu ý
 

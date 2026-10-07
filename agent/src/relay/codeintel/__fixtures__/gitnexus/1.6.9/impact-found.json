@@ -1,0 +1,8 @@
+{
+  "target": { "id": "s1", "type": "Function", "name": "getUser" },
+  "direction": "upstream",
+  "risk": "HIGH",
+  "byDepth": [
+    { "depth": 1, "symbols": [{ "id": "s2", "name": "handleUser", "relationType": "CALLS" }] }
+  ]
+}

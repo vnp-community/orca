@@ -33,9 +33,9 @@ UI-API §5: khung native `{"type":"push","channel":<tên>,"args":[obj]}` với `
 
 ## Tiêu chí hoàn thành
 
-- [ ] 5 kênh push đúng tên/`event`; payload whitelist ≤ 1 KiB.
-- [ ] Đúng một `resync` khi service đứt.
-- [ ] Không rò dữ liệu/tenant/đường dẫn.
+- [x] 5 kênh push đúng tên/`event`; payload whitelist ≤ 1 KiB.
+- [x] Đúng một `resync` khi service đứt.
+- [x] Không rò dữ liệu/tenant/đường dẫn.
 
 ## Rủi ro và lưu ý
 

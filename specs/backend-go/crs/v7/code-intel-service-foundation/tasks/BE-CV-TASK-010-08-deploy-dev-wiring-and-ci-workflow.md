@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` · `deploy/dev` · `.github/workflows`
 **File:** `backend-go/services/code-intel-service/deploy/Dockerfile` (mới), `backend-go/services/code-intel-service/README.md` (mới), `backend-go/deploy/postgres-init-databases.sh`, `deploy/dev/docker/postgres/init-databases.sh`, `deploy/dev/docker-compose.yml`, `deploy/dev/scripts/migrate.sh`, `deploy/dev/scripts/build-local.sh`, `backend-go/ci/check-opa-bundle-in-images.sh`, `.github/workflows/backend-go-code-intel-service.yml` (mới)
 **Depends on:** BE-CV-TASK-010-05, 010-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,10 +31,10 @@ Hợp đồng §10 và §6.2 (container `orca-go-code-intel`, job `migrate-codei
 
 ## Tiêu chí hoàn thành
 
-- [ ] Compose dựng được `code-intel-service` và `migrate-codeintel` chạy xong; `/readyz` 200.
-- [ ] `codeintel` có ở cả hai file init DB và `migrate.sh`.
-- [ ] Workflow xanh hai dialect; `buf lint` chạy trực tiếp.
-- [ ] Ảnh Docker chứa `policy/orca-authz/*.rego`.
+- [x] Compose dựng được `code-intel-service` và `migrate-codeintel` chạy xong; `/readyz` 200.
+- [x] `codeintel` có ở cả hai file init DB và `migrate.sh`.
+- [x] Workflow xanh hai dialect; `buf lint` chạy trực tiếp.
+- [x] Ảnh Docker chứa `policy/orca-authz/*.rego`.
 
 ## Rủi ro và lưu ý
 

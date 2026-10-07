@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` · `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_storage.proto` (mới); `backend-go/proto/orca/codeintel/v1/codeintel.proto` (sửa: thêm một dòng `rpc`); `backend-go/proto/orca/codeintel/v1/codeintel_common.proto` (sửa nhỏ, chỉ khi `ViewKind` chưa có `VIEW_KIND_STORAGE`; thuộc `BE-CV-SOL-020`, cần chủ solution duyệt)
 **Depends on:** BE-CV-SOL-010 (có `codeintel.proto`), BE-CV-SOL-020 (có `codeintel_common.proto`: `SourceRef`, `ServiceRef`, `WorktreeSelector`, `ResultMeta`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ Hợp đồng §2.1 dòng 13 giao `codeintel_storage.proto` cho CR-035; PQ-07 c�
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf lint`, `buf breaking` xanh.
-- [ ] Không còn RPC nào khai báo mà thiếu message.
-- [ ] Số field khớp solution; tên file khớp PQ-07.
-- [ ] Hai field đề xuất (7, 9) có ghi chú chờ hợp đồng.
+- [x] `buf lint`, `buf breaking` xanh.
+- [x] Không còn RPC nào khai báo mà thiếu message.
+- [x] Số field khớp solution; tên file khớp PQ-07.
+- [x] Hai field đề xuất (7, 9) có ghi chú chờ hợp đồng.
 
 ## Rủi ro và lưu ý
 

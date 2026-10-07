@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-reindex-methods.ts`, `codeintel-method-table.ts` (sửa), `agent-session.ts` (sửa), `codeintel-reindex-methods.test.ts` (mới), `__tests__/agent-session.test.ts` (sửa)
 **Depends on:** [001](./AG-CV-TASK-004-01-codeintel-notification-sink.md), [005](./AG-CV-TASK-004-05-reindex-runner-cancel-and-verify.md), [006](./AG-CV-TASK-004-06-reindex-read-guard.md), [007](./AG-CV-TASK-004-07-index-watcher-polling.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Contract §4.10–4.13, timeout agent 25 s, Go 30 s. Kết quả **không có phong bì**. `reindexStatus {jobId?}` -> `{job|null}`; `reindexCancel {jobId}` idempotent; `watch {enabled}` -> `{enabled,watching}`.
@@ -20,7 +20,7 @@ Hình dạng khớp ví dụ contract §7.2; `reindexStatus` không job -> `{job
 Lệnh: `pnpm exec vitest run src/relay/codeintel-reindex-methods.test.ts src/relay/__tests__/agent-session.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Mất WS giữa chừng: job tiếp tục, `reindexStatus` đúng sau nối lại.
+- [x] Mất WS giữa chừng: job tiếp tục, `reindexStatus` đúng sau nối lại.
 
 ## Rủi ro
 - `reindexCancel` không có kênh backend (O-17); chỉ dùng khi `CODEINTEL_AUTOANALYZE_CANCEL_ON_RESUME=true`.

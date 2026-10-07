@@ -161,17 +161,17 @@ Giá trị sai bị bỏ và log cảnh báo (cùng khuôn agent, C-AG §2.3).
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `statusChanged` mang `worktree_id`, `dev_server_id` khi session có; test `agent_output_classifier_test.go` cập nhật; renderer không đổi hành vi (payload cũ vẫn hợp lệ).
-- [ ] `PlanRefresh` có test bảng phủ **cả 7 dòng** ở 2.C[6] và các ca: `indexedCommit` đã bị gc (`stale`), worktree liên kết `fresh_base`, hai công cụ lệch nhau.
-- [ ] 10 sự kiện `idle` cho cùng binding trong 20 s tạo **đúng một** dòng `reindex_jobs` và đúng một lời gọi `codeintel.reindex` (test hai dialect, hai replica giả).
-- [ ] Sự kiện trùng `event_id` (giao lặp) không tạo job thứ hai (`processed_events`).
-- [ ] Worktree liên kết không có index riêng: **không** lời gọi `codeintel.reindex` nào; job kết thúc `outcome=skipped_scope_repo_root`.
-- [ ] Tenant tắt `code_intel_enabled` hoặc `index_policy=off`: không dòng `reindex_jobs` nào; lỗi đọc cờ = tắt.
-- [ ] `→ running` trong lúc slot còn `queued`: slot `cancelled`; trong lúc `analyze` đang chạy: **không** gọi `reindexCancel`.
-- [ ] Vượt `CODEINTEL_AUTOREFRESH_PER_HOUR`: job `failed` `CODEINTEL_RATE_LIMITED`, không gọi agent; job `outcome` khác rỗng **không** tính vào hạn mức.
-- [ ] Tải cao hoặc `quality.run` đang chạy: hoãn đúng một lần rồi `cancelled(message=deferred)`.
-- [ ] Mọi truy vấn có `tenant_id`; tenant A không đụng slot/job của tenant B (cả hai dialect; Postgres với role `NOSUPERUSER NOBYPASSRLS`).
-- [ ] Không tên file `helpers/utils/common/misc`; không `max-lines` disable.
+- [x] `statusChanged` mang `worktree_id`, `dev_server_id` khi session có; test `agent_output_classifier_test.go` cập nhật; renderer không đổi hành vi (payload cũ vẫn hợp lệ).
+- [x] `PlanRefresh` có test bảng phủ **cả 7 dòng** ở 2.C[6] và các ca: `indexedCommit` đã bị gc (`stale`), worktree liên kết `fresh_base`, hai công cụ lệch nhau.
+- [x] 10 sự kiện `idle` cho cùng binding trong 20 s tạo **đúng một** dòng `reindex_jobs` và đúng một lời gọi `codeintel.reindex` (test hai dialect, hai replica giả).
+- [x] Sự kiện trùng `event_id` (giao lặp) không tạo job thứ hai (`processed_events`).
+- [x] Worktree liên kết không có index riêng: **không** lời gọi `codeintel.reindex` nào; job kết thúc `outcome=skipped_scope_repo_root`.
+- [x] Tenant tắt `code_intel_enabled` hoặc `index_policy=off`: không dòng `reindex_jobs` nào; lỗi đọc cờ = tắt.
+- [x] `→ running` trong lúc slot còn `queued`: slot `cancelled`; trong lúc `analyze` đang chạy: **không** gọi `reindexCancel`.
+- [x] Vượt `CODEINTEL_AUTOREFRESH_PER_HOUR`: job `failed` `CODEINTEL_RATE_LIMITED`, không gọi agent; job `outcome` khác rỗng **không** tính vào hạn mức.
+- [x] Tải cao hoặc `quality.run` đang chạy: hoãn đúng một lần rồi `cancelled(message=deferred)`.
+- [x] Mọi truy vấn có `tenant_id`; tenant A không đụng slot/job của tenant B (cả hai dialect; Postgres với role `NOSUPERUSER NOBYPASSRLS`).
+- [x] Không tên file `helpers/utils/common/misc`; không `max-lines` disable.
 
 ## 5. Kiểm thử (chưa chạy test nào)
 

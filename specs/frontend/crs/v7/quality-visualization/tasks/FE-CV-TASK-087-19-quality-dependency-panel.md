@@ -5,7 +5,7 @@
 **Area:** frontend / components (pha 3)
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityDependencyPanel.tsx` (mới) và `*.test.tsx`
 **Depends on:** 087-15, FE-CV-TASK-088-05, 088-08; FE-CV-SOL-054-structure-lens (chung cache `structure`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

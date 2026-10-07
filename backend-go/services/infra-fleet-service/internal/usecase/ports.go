@@ -83,10 +83,23 @@ type DevServerRepository interface {
 // adapter/sshrelay's provisioner both convert into this shape at the
 // usecase boundary.
 type HandshakeInfo struct {
-	Platform     string
-	Arch         string
-	NodeVersion  string
-	AgentVersion string
+	Platform        string
+	Arch            string
+	NodeVersion     string
+	AgentVersion    string
+	SessionID       string
+	Capabilities    []string
+	Tools           []string
+	Features        []string
+	ProtocolVersion int
+	BuildVersion    string
+}
+
+func (h HandshakeInfo) EffectiveProtocolVersion() int {
+	if h.ProtocolVersion <= 0 {
+		return 1
+	}
+	return h.ProtocolVersion
 }
 
 // Provisioner is BulkProvisionFleet's narrow port onto relay-ssh
@@ -613,6 +626,11 @@ type DevServerAgentClient interface {
 	// than starting one. unsubscribe MUST be called exactly once by the
 	// caller (typically via defer).
 	StreamExecOutput(ctx context.Context, devServer domain.DevServer, stepID string) (<-chan ExecOutputEvent, func(), error)
+}
+
+// CodeIntelEventSource supplies live CodeIntel notification streams for a dev server.
+type CodeIntelEventSource interface {
+	SubscribeCodeIntelEvents(devServerID string) (<-chan domain.CodeIntelEvent, func())
 }
 
 // SpawnAgentInput mirrors agent.spawn's real param set 1:1

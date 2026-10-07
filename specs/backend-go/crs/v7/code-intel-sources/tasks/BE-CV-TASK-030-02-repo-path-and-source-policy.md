@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/repo_relative_path.go` (mới), `.../internal/domain/repo_source_policy.go` (mới), `.../internal/domain/repo_relative_path_test.go` (mới), `.../internal/domain/repo_source_policy_test.go` (mới)
 **Depends on:** BE-CV-TASK-030-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Miền thuần (không I/O), nền của mọi chặn đường dẫn (SOL-030 m
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca xấu bị từ chối; ca tốt chuẩn hoá đúng.
-- [ ] Bảng `SkippedDirs` và deny-list có test khẳng định nguyên văn.
-- [ ] Không có tên `helpers/utils/common/misc`; không `max-lines` disable.
+- [x] Mọi ca xấu bị từ chối; ca tốt chuẩn hoá đúng.
+- [x] Bảng `SkippedDirs` và deny-list có test khẳng định nguyên văn.
+- [x] Không có tên `helpers/utils/common/misc`; không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

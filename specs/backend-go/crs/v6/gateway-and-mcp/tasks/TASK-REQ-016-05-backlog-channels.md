@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_backlog.go` (mới), `.../channels_request_backlog_test.go` (mới), `.../excluded_channels.yaml`
 **Depends on:** TASK-REQ-016-02; CR-REQ-015 (RPC `ListBacklog`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -32,8 +32,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh có test; parity xanh.
-- [ ] Không kênh nào nhận `tenantId`.
+- [x] Ba kênh có test; parity xanh.
+- [x] Không kênh nào nhận `tenantId`.
 
 ## Rủi ro và lưu ý
 

@@ -20,7 +20,7 @@ Fixture status thật; `initialized:false`; `worktreeMismatch`; pending>0; build
 Lệnh: `pnpm exec vitest run src/relay/codegraph-index-probe.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Worktree liên kết: `state:'stale'`, `rootMismatch` khác null, không kết luận `fresh`.
+- [x] Worktree liên kết: `state:'stale'`, `rootMismatch` khác null, không kết luận `fresh`.
 
 ## Rủi ro
 - `sync` ở worktree liên kết báo pending của checkout chính.

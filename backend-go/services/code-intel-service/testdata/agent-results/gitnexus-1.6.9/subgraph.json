@@ -1,0 +1,39 @@
+{
+  "data": {
+    "center": {
+      "file": "foo.ts"
+    },
+    "edges": [
+      {
+        "from": "s1",
+        "kind": "CALLS",
+        "to": "s2"
+      }
+    ],
+    "nodes": [
+      {
+        "endLine": null,
+        "filePath": "",
+        "key": "function::sym2",
+        "kind": "function",
+        "name": "sym2",
+        "qualifiedName": "sym2",
+        "startLine": null,
+        "uid": "s2"
+      }
+    ]
+  },
+  "headCommit": "abcdef",
+  "sources": [
+    {
+      "commit": "abcdef",
+      "indexedAt": 1600000000000,
+      "lineBase": 1,
+      "tool": "gitnexus",
+      "version": "1.6.9"
+    }
+  ],
+  "stale": false,
+  "totalCount": null,
+  "truncated": false
+}

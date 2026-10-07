@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/request_clarification.go`, `internal/usecase/waive_readiness.go`, `internal/usecase/get_request_readiness.go`, `internal/usecase/confirm_request_type.go` (sửa, của SOL-005), `internal/usecase/ports.go` (sửa) và test
 **Depends on:** TASK-REQ-028-02, 028-03, TASK-REQ-027-05 (`AppendWithinTx`), TASK-REQ-005-05 (`ConfirmRequestType`), TASK-REQ-009-04 (`CancelPendingForRequest`), TASK-REQ-010-03 (`ResolveApproverPolicy`, nếu đã có; nếu chưa, dùng cài tạm)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -76,11 +76,11 @@ CR-REQ-028 mục 2.1, 2.3, 2.5, 2.6. Trích từ TASK-REQ-005-05: `ConfirmReques
 
 ## Tiêu chí hoàn thành
 
-- [ ] `bug` thiếu `repro_steps` và AC: Request vào `awaiting_information`, không qua `analyzing`; đủ dữ liệu thì vào `analyzing` như cũ (hồi quy test 005-05).
-- [ ] Hai `RequestClarification` đồng thời cho một Request: đúng một thành công.
-- [ ] Approval `pending` bị hủy khi vào `awaiting_information` từ trạng thái duyệt.
-- [ ] Waive bị cấm cho ba loại an toàn và cho người không phải admin; thành công có dấu vết.
-- [ ] Payload sự kiện không chứa nội dung câu hỏi.
+- [x] `bug` thiếu `repro_steps` và AC: Request vào `awaiting_information`, không qua `analyzing`; đủ dữ liệu thì vào `analyzing` như cũ (hồi quy test 005-05).
+- [x] Hai `RequestClarification` đồng thời cho một Request: đúng một thành công.
+- [x] Approval `pending` bị hủy khi vào `awaiting_information` từ trạng thái duyệt.
+- [x] Waive bị cấm cho ba loại an toàn và cho người không phải admin; thành công có dấu vết.
+- [x] Payload sự kiện không chứa nội dung câu hỏi.
 
 ## Rủi ro và lưu ý
 

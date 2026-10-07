@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/agent_rpc_error.go` (mới), `.../adapter/devserveragent/client.go` (sửa `Exec`, dòng ~423–452), `.../adapter/devserveragent/client_test.go` hoặc `agent_rpc_error_test.go` (mới)
 **Depends on:** TASK-023-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ Hiện `Exec` chỉ nhận diện `-32601` (`client.go` ~431–439) và trả `*
 
 ## Tiêu chí hoàn thành
 
-- [ ] `AgentRPCError` giữ nguyên `Code`, `Message`, `Data`.
-- [ ] Hành vi mọi method ngoài hai nhóm không đổi (test hồi quy).
-- [ ] `go vet` và `go test ./internal/adapter/devserveragent/... -race` xanh.
+- [x] `AgentRPCError` giữ nguyên `Code`, `Message`, `Data`.
+- [x] Hành vi mọi method ngoài hai nhóm không đổi (test hồi quy).
+- [x] `go vet` và `go test ./internal/adapter/devserveragent/... -race` xanh.
 
 ## Rủi ro và lưu ý
 

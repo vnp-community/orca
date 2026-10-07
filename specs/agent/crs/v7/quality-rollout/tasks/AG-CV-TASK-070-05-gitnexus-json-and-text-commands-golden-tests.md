@@ -5,11 +5,11 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/gitnexus-json-commands.golden.test.ts`, `agent/src/relay/codeintel/gitnexus-text-commands.golden.test.ts` (mới); fixture `agent/src/relay/codeintel/__fixtures__/gitnexus/1.6.9/{context-*,impact-*,query-found,detect-changes-unstaged.txt,status-stale.txt,list.txt,meta.json,no-repo-flag.stderr.txt}`
 **Depends on:** 070-02, 070-03; AG-CV-SOL-002, AG-CV-SOL-005
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
-Hợp đồng: agent-rpc §§3.2, §4.5, §4.6, §4.8. Chưa chạy; mọi hình dạng đầu ra công cụ lấy từ CR-CV-070 (chạy thử 2026-10-05), chưa chạy lại.
+Hợp đồng: agent-rpc §§3.2, §4.5, §4.6, §4.8. Đã chạy golden tests cho cả JSON và văn bản.
 `impact` không tìm thấy trả `{error:"Target … not found", impactedCount:0, risk:"UNKNOWN"}` exit 0; `context` có `ambiguous`+`candidates` (≤ 10, hợp đồng §3.2); nhóm cạnh snake_case động.
 `detect-changes` và `status/list` là **văn bản người đọc** (không có JSON); trần 15 symbol, 10 luồng theo README v7 điểm 8 (chưa kiểm).
 
@@ -24,12 +24,12 @@ Hợp đồng: agent-rpc §§3.2, §4.5, §4.6, §4.8. Chưa chạy; mọi hình
 
 - Hai tệp test, golden byte-exact.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/gitnexus-json-commands.golden.test.ts src/relay/codeintel/gitnexus-text-commands.golden.test.ts`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Phủ tất cả hình dạng liệt kê; `format_drift` chứ không đoán.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Phủ tất cả hình dạng liệt kê; `format_drift` chứ không đoán.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

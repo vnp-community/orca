@@ -5,7 +5,7 @@
 **Service:** `mcp-service`, `proto`
 **File:** `backend-go/proto/orca/mcp/v1/external_server.proto` (sửa), `backend-go/services/mcp-service/internal/usecase/external_server_client.go` (mới), `.../internal/usecase/external_server_ports.go` (sửa: thêm `ToolCaller`), `.../internal/adapter/mcpprober/caller.go` (mới), `.../internal/adapter/grpc/registry_server.go` (sửa), `.../cmd/server/external_wiring.go` (sửa), `.../internal/domain/audit_event.go` (sửa: hằng audit), `.../internal/domain/external_server_errors.go` (sửa) và `_test.go` tương ứng
 **Depends on:** không (độc lập với phần `request-service`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -58,11 +58,11 @@ type ToolCaller interface {
 
 ## Tiêu chí hoàn thành
 
-- [ ] `CallExternalTool` từ chối khi server không `Usable()`, tool ngoài `ApprovedTools`, `transport=stdio`, vượt `max_bytes` (cắt, `truncated=true`) hoặc `arguments_json` chứa bí mật.
-- [ ] Mỗi lời gọi có bản ghi audit không chứa `arguments` hay nội dung.
-- [ ] Hai RPC chỉ gọi được bằng token nội bộ.
-- [ ] SSRF: IP nội bộ, redirect đều bị chặn (dùng lại test hiện có).
-- [ ] `buf breaking` xanh.
+- [x] `CallExternalTool` từ chối khi server không `Usable()`, tool ngoài `ApprovedTools`, `transport=stdio`, vượt `max_bytes` (cắt, `truncated=true`) hoặc `arguments_json` chứa bí mật.
+- [x] Mỗi lời gọi có bản ghi audit không chứa `arguments` hay nội dung.
+- [x] Hai RPC chỉ gọi được bằng token nội bộ.
+- [x] SSRF: IP nội bộ, redirect đều bị chặn (dùng lại test hiện có).
+- [x] `buf breaking` xanh.
 
 ## Rủi ro và lưu ý
 

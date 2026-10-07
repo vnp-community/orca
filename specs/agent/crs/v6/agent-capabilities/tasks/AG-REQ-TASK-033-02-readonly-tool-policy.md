@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-readonly-tool-policy.ts` (mới), `agent/src/relay/agent-readonly-tool-policy.test.ts` (mới)
 **Depends on:** không (độc lập với task 01; task 04 nối vào handler, task 09 dùng lại hàm dò)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -57,11 +57,11 @@ Kiểm với `claude` thật (đánh dấu CHƯA CHẠY): trên dev server có `
 
 ## Tiêu chí hoàn thành
 
-- [ ] `detectClaudeFlags` trả đúng cờ cho help mẫu có và không có `--tools`/`--permission-mode`.
-- [ ] Lỗi dò không bị cache; thành công cache đúng 10 phút theo PATH.
-- [ ] `buildReadonlyArgs` đúng bằng `['--permission-mode','plan','--tools','Read,Glob,Grep']` và test khẳng định không có cờ YOLO.
-- [ ] Không có tham chiếu cờ `claude` nào ngoài `--permission-mode`, `--tools` (và việc chỉ dò `--disallowedTools` để báo cáo).
-- [ ] Không có import vòng; không đụng `agent-print-mode-exec.ts`.
+- [x] `detectClaudeFlags` trả đúng cờ cho help mẫu có và không có `--tools`/`--permission-mode`.
+- [x] Lỗi dò không bị cache; thành công cache đúng 10 phút theo PATH.
+- [x] `buildReadonlyArgs` đúng bằng `['--permission-mode','plan','--tools','Read,Glob,Grep']` và test khẳng định không có cờ YOLO.
+- [x] Không có tham chiếu cờ `claude` nào ngoài `--permission-mode`, `--tools` (và việc chỉ dò `--disallowedTools` để báo cáo).
+- [x] Không có import vòng; không đụng `agent-print-mode-exec.ts`.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/metrics/quality_gate_metrics.go` (mới), `.../internal/adapter/metrics/quality_gate_metrics_test.go` (mới), `backend-go/services/code-intel-service/ops/quality-admin-queries/{postgres,mysql}/*.sql` (mới), `.../internal/adapter/postgres/quality_admin_queries_integration_test.go`, `.../internal/adapter/mysql/quality_admin_queries_integration_test.go` (mới, tag `integration`)
 **Depends on:** BE-CV-TASK-071-02, BE-CV-SOL-085-quality-gate-evaluator-and-profiles, BE-CV-SOL-085-waivers-and-trend (bảng T10–T12), BE-CV-SOL-037 (`finding_dismissals`), BE-CV-SOL-089 (`agent_turns`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba metric có mặt, nhãn đóng.
-- [ ] Bốn truy vấn chạy trên Postgres và MySQL, cô lập tenant.
-- [ ] Ghi rõ giới hạn "xấp xỉ" và "ngưỡng đề xuất".
+- [x] Ba metric có mặt, nhãn đóng.
+- [x] Bốn truy vấn chạy trên Postgres và MySQL, cô lập tenant.
+- [x] Ghi rõ giới hạn "xấp xỉ" và "ngưỡng đề xuất".
 
 ## Rủi ro và lưu ý
 

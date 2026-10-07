@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-rule-profiles.ts` (mới), `.test.ts`; điền catalog qua `registerBuiltinProfiles`; nối planner (081-15)
 **Depends on:** AG-CV-TASK-084-04, 084-05, 084-06, AG-CV-TASK-081-12, 081-15
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Planner với tệp đổi giả → chọn đúng script; `worktree` scope → 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không có đường client truyền pattern/đường dẫn.
-- [ ] Bước diff không spawn.
+- [x] Không có đường client truyền pattern/đường dẫn.
+- [x] Bước diff không spawn.
 
 ## Rủi ro
 

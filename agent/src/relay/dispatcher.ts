@@ -488,7 +488,8 @@ export class RelayDispatcher {
       }
       const message = err instanceof Error ? err.message : String(err)
       const code = (err as { code?: number }).code ?? -32000
-      this.sendResponse(client, req.id, undefined, { code, message })
+      const data = (err as { data?: unknown }).data
+      this.sendResponse(client, req.id, undefined, { code, message, ...(data !== undefined && { data }) })
     } finally {
       this.requestAborts.delete(abortKey)
     }

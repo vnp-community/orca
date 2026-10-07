@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/__fixtures__/index-basis/` (mới, gồm `MANIFEST.json` và các tệp thô), `agent/scripts/capture-index-basis-fixtures.mjs` (mới)
 **Depends on:** không (làm đầu tiên; cơ chế `MANIFEST.json` theo CR-CV-070 do AG-CV-SOL-070 sở hữu, nếu chưa có thì dùng đúng khung tối thiểu ghi trong "Việc cần làm")
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -28,9 +28,9 @@ Task này **chỉ thu dữ liệu**, không viết logic. Lệnh chỉ đọc; *
 
 ## Tiêu chí hoàn thành
 
-- [ ] Có fixture cho 4 tình huống: checkout chính sạch / bẩn, worktree liên kết sạch / bẩn.
-- [ ] PR ghi rõ điều quan sát được về `pendingChanges` ở worktree liên kết và về trường commit của CodeGraph; nếu **khác** CR-080 thì cập nhật mục 5.2/5.3 của solution trước khi làm task 02.
-- [ ] Không lệnh ghi nào chạy ngoài repo mẫu tạm.
+- [x] Có fixture cho 4 tình huống: checkout chính sạch / bẩn, worktree liên kết sạch / bẩn.
+- [x] PR ghi rõ điều quan sát được về `pendingChanges` ở worktree liên kết và về trường commit của CodeGraph; nếu **khác** CR-080 thì cập nhật mục 5.2/5.3 của solution trước khi làm task 02.
+- [x] Không lệnh ghi nào chạy ngoài repo mẫu tạm.
 
 ## Rủi ro
 

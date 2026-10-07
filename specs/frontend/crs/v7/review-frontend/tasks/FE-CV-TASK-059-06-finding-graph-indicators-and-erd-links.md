@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (selector + điều hướng lens)
 **File:** `frontend/src/renderer/src/components/review-map/findings/finding-graph-target.ts` (mới) + test; `frontend/src/renderer/src/store/slices/code-intel.ts` (selector đã có từ 059-03; chỉ nối)
 **Depends on:** FE-CV-TASK-059-03, 059-05; FE-CV-SOL-053-impact-lens-and-symbol-detail; FE-CV-SOL-054-structure-lens; FE-CV-SOL-057-erd-lens
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

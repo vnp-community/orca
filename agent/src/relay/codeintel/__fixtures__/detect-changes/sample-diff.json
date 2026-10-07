@@ -1,0 +1,19 @@
+{
+  "scenario": "detect-changes-baseline",
+  "base": "main",
+  "head": "HEAD",
+  "mockMetrics": {
+    "filesCount": 446,
+    "symbolsCount": 1508,
+    "processesCount": 12,
+    "riskLevel": "MEDIUM"
+  },
+  "verifiedGitVersions": ["2.25.x", "2.38.x", "2.49.x"],
+  "measuredPhaseDurationsMs": {
+    "mergeBaseResolution": 25,
+    "diffCollection": 150,
+    "symbolMapping": 320,
+    "flowAnalysis": 180,
+    "totalExecution": 675
+  }
+}

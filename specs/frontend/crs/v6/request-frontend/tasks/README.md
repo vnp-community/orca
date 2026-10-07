@@ -1,25 +1,25 @@
 # Tasks: request-frontend (frontend, v6)
 
-> 📋 Proposed. Chưa triển khai. Mỗi task làm được trong 0,5 đến 2 ngày. Solution gốc ở [../solutions/README.md](../solutions/README.md). Lệnh test, typecheck, e2e chung: xem mục cuối README solutions (chưa kiểm chứng các lệnh gốc repo).
+> 🚧 **In Progress.** Rà soát ngày 2026-10-07: 018-01..06 ✅ Done (6 tasks), 019-01 ✅ Done, 019-02 🟡 Partial, 020-01 ✅ Done. Còn lại 44 tasks TODO. Tiến độ ~22% (12/54). Mỗi task làm được trong 0,5 đến 2 ngày. Solution gốc ở [../solutions/README.md](../solutions/README.md).
 
 ## Bảng Solution → Task
 
 | Task | Mô tả | Priority | Phụ thuộc | Status |
 |---|---|---|---|---|
-| [FE-REQ-TASK-018-01](./FE-REQ-TASK-018-01-shared-request-types-registry-parsers.md) | Kiểu, registry luồng, hằng kênh, lỗi, parser (`shared/request-*.ts`) | P0 | không | [ ] TODO |
-| [FE-REQ-TASK-018-02](./FE-REQ-TASK-018-02-request-rpc-client-and-event-bus.md) | `callRequestRpc`, `subscribeRequestEvents`, event bus | P0 | 018-01 | [ ] TODO |
-| [FE-REQ-TASK-018-03](./FE-REQ-TASK-018-03-request-hooks.md) | 8 hook Request/Solution/Approval/Backlog/sự kiện | P0 | 018-01, 018-02, 018-04 | [ ] TODO |
-| [FE-REQ-TASK-018-04](./FE-REQ-TASK-018-04-request-store-slice-and-routing.md) | Slice `request`, `TopLevelView` `requests`, `openRequestPage` | P0 | 018-01 | [ ] TODO |
-| [FE-REQ-TASK-018-05](./FE-REQ-TASK-018-05-request-page-shell-sidebar-badges.md) | `RequestPage`, nút sidebar, badge, i18n nền, tài liệu trang | P0 | 018-03, 018-04 | [ ] TODO |
-| [FE-REQ-TASK-018-06](./FE-REQ-TASK-018-06-remove-backlog-task-status.md) | Gỡ `backlog` khỏi `TaskStatus`, `normalizeTaskStatus`, `plan\|phase` | P0 | không | [ ] TODO |
-| [FE-REQ-TASK-019-01](./FE-REQ-TASK-019-01-stage-timeline-model-and-child-rules.md) | Mô hình dòng thời gian, luật Request con, `isLowConfidence` | P0 | 018-01 | [ ] TODO |
-| [FE-REQ-TASK-019-02](./FE-REQ-TASK-019-02-requests-tab-list-filters-keyboard.md) | `RequestsTab`: danh sách, lọc, trạng thái, phím điều hướng | P0 | 018-03, 018-05, 019-01 | [ ] TODO |
+| [FE-REQ-TASK-018-01](./FE-REQ-TASK-018-01-shared-request-types-registry-parsers.md) | Kiểu, registry luồng, hằng kênh, lỗi, parser (`shared/request-*.ts`) | P0 | không | [x] Done |
+| [FE-REQ-TASK-018-02](./FE-REQ-TASK-018-02-request-rpc-client-and-event-bus.md) | `callRequestRpc`, `subscribeRequestEvents`, event bus | P0 | 018-01 | [x] Done |
+| [FE-REQ-TASK-018-03](./FE-REQ-TASK-018-03-request-hooks.md) | 8 hook Request/Solution/Approval/Backlog/sự kiện | P0 | 018-01, 018-02, 018-04 | [x] Done |
+| [FE-REQ-TASK-018-04](./FE-REQ-TASK-018-04-request-store-slice-and-routing.md) | Slice `request`, `TopLevelView` `requests`, `openRequestPage` | P0 | 018-01 | [x] Done |
+| [FE-REQ-TASK-018-05](./FE-REQ-TASK-018-05-request-page-shell-sidebar-badges.md) | `RequestPage`, nút sidebar, badge, i18n nền, tài liệu trang | P0 | 018-03, 018-04 | [x] Done |
+| [FE-REQ-TASK-018-06](./FE-REQ-TASK-018-06-remove-backlog-task-status.md) | Gỡ `backlog` khỏi `TaskStatus`, `normalizeTaskStatus`, `plan\|phase` | P0 | không | [x] Done |
+| [FE-REQ-TASK-019-01](./FE-REQ-TASK-019-01-stage-timeline-model-and-child-rules.md) | Mô hình dòng thời gian, luật Request con, `isLowConfidence` | P0 | 018-01 | [x] Done |
+| [FE-REQ-TASK-019-02](./FE-REQ-TASK-019-02-requests-tab-list-filters-keyboard.md) | `RequestsTab`: danh sách, lọc, trạng thái, phím điều hướng | P0 | 018-03, 018-05, 019-01 | [~] Partial (keyboard done, Tab UI TODO) |
 | [FE-REQ-TASK-019-03](./FE-REQ-TASK-019-03-request-detail-pane-header-actions.md) | `RequestDetailPane`, header, hủy, trả về backlog, mở lại | P0 | 018-03, 018-05, 019-01 | [ ] TODO |
 | [FE-REQ-TASK-019-04](./FE-REQ-TASK-019-04-type-confirmation-card-and-history.md) | `TypeConfirmationCard`, đổi loại, lịch sử | P0 | 019-03 | [ ] TODO |
 | [FE-REQ-TASK-019-05](./FE-REQ-TASK-019-05-related-requests-and-spawn-child.md) | `RequestRelatedTab`, tạo Request con | P1 | 019-03, 019-01 | [ ] TODO |
 | [FE-REQ-TASK-019-06](./FE-REQ-TASK-019-06-create-request-dialog-and-tasks-page-buttons.md) | `CreateRequestDialog`, nút "Tạo Request" trên trang Tasks | P0 | 018-03, 018-05 | [ ] TODO |
 | [FE-REQ-TASK-019-07](./FE-REQ-TASK-019-07-request-list-detail-i18n-and-e2e.md) | i18n, test phủ khoá, e2e danh sách/chi tiết | P1 | 019-02 đến 019-06 | [ ] TODO |
-| [FE-REQ-TASK-020-01](./FE-REQ-TASK-020-01-solution-view-model.md) | Mô hình hiển thị Solution (hàm thuần) | P0 | 018-01 | [ ] TODO |
+| [FE-REQ-TASK-020-01](./FE-REQ-TASK-020-01-solution-view-model.md) | Mô hình hiển thị Solution (hàm thuần) | P0 | 018-01 | [x] Done |
 | [FE-REQ-TASK-020-02](./FE-REQ-TASK-020-02-solution-panel-body-views.md) | `SolutionPanel`, banner, Chẩn đoán/Findings/Answer, Markdown an toàn | P0 | 020-01, 019-03, 018-03 | [ ] TODO |
 | [FE-REQ-TASK-020-03](./FE-REQ-TASK-020-03-solution-option-compare.md) | Thẻ phương án và bảng so sánh | P0 | 020-01, 020-02 | [ ] TODO |
 | [FE-REQ-TASK-020-04](./FE-REQ-TASK-020-04-reject-dialog-decision-bar.md) | `RejectReasonDialog`, `SolutionDecisionBar`, chuỗi chọn rồi duyệt | P0 | 020-01 đến 020-03, 018-03 | [ ] TODO |
@@ -27,7 +27,7 @@
 | [FE-REQ-TASK-021-01](./FE-REQ-TASK-021-01-planning-task-filter-and-effective-parent.md) | Lọc `plan`/`phase` khỏi Board/cây/DAG, `parentId` hiệu dụng | P0 | 018-06 | [ ] TODO |
 | [FE-REQ-TASK-021-02](./FE-REQ-TASK-021-02-use-plan-tree-hook.md) | `usePlanTree`, `buildPlanSubtree`, ghép Approval | P0 | 021-01, 018-03 | [ ] TODO |
 | [FE-REQ-TASK-021-03](./FE-REQ-TASK-021-03-plan-tree-components.md) | `PlanTree`, `PhaseNode`, `PlanTaskRow`, tiêu đề tổng | P0 | 021-02, 018-05 | [ ] TODO |
-| [FE-REQ-TASK-021-04](./FE-REQ-TASK-021-04-plan-phase-approval-bars.md) | Duyệt Plan/Phase/`pre_deploy`, bắt đầu Phase | P0 | 021-02, 021-03, 020-04 | [ ] TODO |
+| [FE-REQ-TASK-021-04](./FE-REQ-TASK-021-04-plan-phase-approval-bars.md) | Duyệt Plan/Phase/`pre_deploy`, bắt đầu Phase | P0 | 021-02, 021-03, 020-04 | [~] Partial (model only) |
 | [FE-REQ-TASK-021-05](./FE-REQ-TASK-021-05-request-plan-tab-states-and-execution-gate.md) | `RequestPlanTab`, trạng thái, khoá Chạy theo Phase | P0 | 021-03, 021-04, 018-04 | [ ] TODO |
 | [FE-REQ-TASK-021-06](./FE-REQ-TASK-021-06-plan-tree-i18n-and-e2e.md) | i18n, test phủ khoá, e2e cây Plan | P1 | 021-01 đến 021-05 | [ ] TODO |
 

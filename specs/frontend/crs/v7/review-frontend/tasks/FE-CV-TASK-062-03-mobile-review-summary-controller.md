@@ -5,7 +5,7 @@
 **Area:** mobile / session hook
 **File:** `mobile/src/session/use-mobile-review-summary-controller.ts` (mới) + test (nếu tách được hàm thuần)
 **Depends on:** FE-CV-TASK-062-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

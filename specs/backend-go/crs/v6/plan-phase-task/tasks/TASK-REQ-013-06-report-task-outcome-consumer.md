@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/report_task_outcome.go` (mới), `internal/domain/task_outcome_class.go` (mới), `internal/adapter/eventbus/task_outcome_consumer.go` (mới), `internal/adapter/grpc/server_task_outcome.go` (mới), `proto/orca/request/v1/request_execution.proto`, `internal/usecase/report_task_outcome_test.go` (mới), `internal/adapter/eventbus/testdata/statuschanged_*.json` (mới)
 **Depends on:** TASK-REQ-013-02 (payload thật), TASK-REQ-013-03, TASK-REQ-013-04, CR-REQ-006 (`ReturnToBacklog`), CR-REQ-003 (`execution_finished`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -40,11 +40,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Sự kiện giao hai lần (cùng `Event.ID`) cho cùng kết quả một lần.
-- [ ] Task lỗi lần 1 được chạy lại; hết `MaxTaskAttempts` thì Request vào `request_backlog` với `returned_from_stage=task`, lý do chứa `error_message`.
-- [ ] Task `review` được đặt `done` (cờ bật) và dependent chuyển `open` rồi được chạy.
-- [ ] Phase `done` phát `phase.completed`, Approval Phase kế tạo đúng một lần; hết Phase thì `completed` và có `request.completed`.
-- [ ] Payload từ task-service thật parse được (test hợp đồng trên `testdata`).
+- [x] Sự kiện giao hai lần (cùng `Event.ID`) cho cùng kết quả một lần.
+- [x] Task lỗi lần 1 được chạy lại; hết `MaxTaskAttempts` thì Request vào `request_backlog` với `returned_from_stage=task`, lý do chứa `error_message`.
+- [x] Task `review` được đặt `done` (cờ bật) và dependent chuyển `open` rồi được chạy.
+- [x] Phase `done` phát `phase.completed`, Approval Phase kế tạo đúng một lần; hết Phase thì `completed` và có `request.completed`.
+- [x] Payload từ task-service thật parse được (test hợp đồng trên `testdata`).
 
 ## Rủi ro và lưu ý
 

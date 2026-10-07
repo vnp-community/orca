@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/gosqlscan/{sql_string_extraction.go, enclosing_function.go, allow_comment_directive.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-038-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Solution 2.B. Đầu vào là `[]byte` nội dung tệp (do cổng 030 đọc) n
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi dạng ở bước 1 có test; mã động được đếm, không phát SQL.
-- [ ] `enclosingFunc` ổn định.
+- [x] Mọi dạng ở bước 1 có test; mã động được đếm, không phát SQL.
+- [x] `enclosingFunc` ổn định.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 # on first startup (docker-compose.yml).
 set -e
 
-DATABASES="auth tenant project infra scmintegration issuetracking aiprovider workflow task orchestration automation annotation notification usage credential mcp"
+DATABASES="auth tenant project infra scmintegration issuetracking aiprovider workflow task orchestration automation annotation notification usage credential mcp request"
 
 for db in $DATABASES; do
 	psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL

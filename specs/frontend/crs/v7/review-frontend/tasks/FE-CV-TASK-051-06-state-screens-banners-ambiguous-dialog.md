@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `ReviewViewStateScreen.tsx`, `ReviewStateBanners.tsx`, `AmbiguousSymbolDialog.tsx`, tests
 **Depends on:** FE-CV-TASK-051-02, 051-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

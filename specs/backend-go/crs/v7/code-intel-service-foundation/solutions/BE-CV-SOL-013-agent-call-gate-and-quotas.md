@@ -135,15 +135,15 @@ Bọc cổng `AgentRelay{Call(ctx, devServerID, method string, params map[string
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `AgentCallGate`: 5 lời gọi `heavy` đồng thời cùng dev server (giới hạn 2) → 2 chạy, còn lại chờ ≤ 2 s rồi `CODEINTEL_CONCURRENCY_LIMIT`; khe nhả khi lời gọi xong/ctx huỷ (test rò rỉ); tenant khác không ảnh hưởng nhau; cache trúng không gọi `Acquire`.
-- [ ] Hạn mức theo người dùng: vượt `heavy` 30/phút → `CODEINTEL_RATE_LIMITED` kèm `retryAfterSeconds`.
-- [ ] Reindex: lần hai cùng binding → `CODEINTEL_REINDEX_IN_PROGRESS` (kèm `jobId`); sau thành công trong 5 phút → `CODEINTEL_REINDEX_COOLDOWN`; vượt 1 job/dev server hoặc 2/tenant → chặn; user thứ 7 trong giờ → `CODEINTEL_RATE_LIMITED`; từng nhánh có audit đúng.
-- [ ] Lỗi hạn mức ra `codes.ResourceExhausted`, message `CODEINTEL_X: … | {"retryAfterSeconds":N,"scope":"…"}`.
-- [ ] Bộ che: bảng mẫu (GitHub, AWS, Bearer, JWT, khối khoá riêng, `password=…`) → `[REDACTED]`; chuỗi lỗi agent không lọt bí mật vào log/`reindex_jobs.message`.
-- [ ] `GetSymbol` file nhạy cảm (`.env`, `*.pem`, `secrets/x.yaml`, `.AWS/credentials`) → `content=""`, `contentWithheld="sensitive_path"`, không lỗi; `source` > 200 KiB → `CODEINTEL_OUTPUT_TOO_LARGE`.
-- [ ] Test AST: chỉ `gated_agent_relay.go` gọi `RelayByDevServer`.
-- [ ] Cô lập tenant: bucket/semaphore theo tenant, không chia sẻ.
-- [ ] `go vet`, `make lint` xanh; không `max-lines` disable.
+- [x] `AgentCallGate`: 5 lời gọi `heavy` đồng thời cùng dev server (giới hạn 2) → 2 chạy, còn lại chờ ≤ 2 s rồi `CODEINTEL_CONCURRENCY_LIMIT`; khe nhả khi lời gọi xong/ctx huỷ (test rò rỉ); tenant khác không ảnh hưởng nhau; cache trúng không gọi `Acquire`.
+- [x] Hạn mức theo người dùng: vượt `heavy` 30/phút → `CODEINTEL_RATE_LIMITED` kèm `retryAfterSeconds`.
+- [x] Reindex: lần hai cùng binding → `CODEINTEL_REINDEX_IN_PROGRESS` (kèm `jobId`); sau thành công trong 5 phút → `CODEINTEL_REINDEX_COOLDOWN`; vượt 1 job/dev server hoặc 2/tenant → chặn; user thứ 7 trong giờ → `CODEINTEL_RATE_LIMITED`; từng nhánh có audit đúng.
+- [x] Lỗi hạn mức ra `codes.ResourceExhausted`, message `CODEINTEL_X: … | {"retryAfterSeconds":N,"scope":"…"}`.
+- [x] Bộ che: bảng mẫu (GitHub, AWS, Bearer, JWT, khối khoá riêng, `password=…`) → `[REDACTED]`; chuỗi lỗi agent không lọt bí mật vào log/`reindex_jobs.message`.
+- [x] `GetSymbol` file nhạy cảm (`.env`, `*.pem`, `secrets/x.yaml`, `.AWS/credentials`) → `content=""`, `contentWithheld="sensitive_path"`, không lỗi; `source` > 200 KiB → `CODEINTEL_OUTPUT_TOO_LARGE`.
+- [x] Test AST: chỉ `gated_agent_relay.go` gọi `RelayByDevServer`.
+- [x] Cô lập tenant: bucket/semaphore theo tenant, không chia sẻ.
+- [x] `go vet`, `make lint` xanh; không `max-lines` disable.
 
 ## 5. Kiểm thử
 

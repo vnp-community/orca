@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/get_reading_order.go`, `get_reading_order_test.go`; `internal/adapter/grpc/reading_order_handler.go`, `reading_order_handler_test.go` (mới); `internal/domain/readingorder/determinism_test.go` (mới); `cmd/server/main.go` (sửa: đăng ký)
 **Depends on:** BE-CV-TASK-036-05, BE-CV-TASK-036-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] 100 lần giống byte; `GetReadingOrder` không tính lại khi overlay đã cache.
-- [ ] Cô lập tenant xanh; `buf breaking` xanh.
-- [ ] Kênh `codeIntel.readingOrder` chưa đăng ký ở gateway (việc của `BE-CV-SOL-040-codeintel-view-channels`).
+- [x] 100 lần giống byte; `GetReadingOrder` không tính lại khi overlay đã cache.
+- [x] Cô lập tenant xanh; `buf breaking` xanh.
+- [x] Kênh `codeIntel.readingOrder` chưa đăng ký ở gateway (việc của `BE-CV-SOL-040-codeintel-view-channels`).
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend / test-support (Vitest, happy-dom)
 **File:** `frontend/src/renderer/src/test-support/code-intel-integration/code-intel-flag-gating.integration.test.tsx` (mới)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks (`useCodeIntelSupport`); FE-CV-TASK-085-01 (`useQualityFeatureFlags`); FE-CV-TASK-073-02 (hoặc mock `codeIntelClient.call`); lối vào của FE-CV-SOL-061
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

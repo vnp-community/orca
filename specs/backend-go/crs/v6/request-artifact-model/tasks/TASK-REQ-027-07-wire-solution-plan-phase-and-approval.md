@@ -5,7 +5,7 @@
 **Service:** `request-service` · `task-service`
 **File:** `request-service/internal/domain/solution_options.go` (sửa, của SOL-007), `internal/usecase/run_solution_generation.go` (sửa), `internal/usecase/solution_approval_handler.go` (sửa), `internal/domain/plan_proposal.go` (sửa, của SOL-012), `internal/domain/plan_proposal_validation.go` (sửa), `internal/usecase/commit_plan.go` (sửa), `internal/usecase/plan_subject_handler.go` (sửa), `internal/usecase/start_phase.go` (sửa, của SOL-013), `internal/adapter/eventbus/approval_decided_consumer.go` (mới), `task-service/internal/usecase/create_plan_tree.go` (sửa), `task-service/internal/usecase/ports.go` (sửa), `proto/orca/task/v1/task.proto` (sửa) và test
 **Depends on:** TASK-REQ-027-02, 027-05, 027-06, TASK-REQ-007-05/-06, TASK-REQ-012-01/-05/-06, TASK-REQ-013-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -79,12 +79,12 @@ Task này **không sửa tài liệu CR hay solution khác**; nó chỉ sửa m�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Solution lưu `provenance`, `seq`, `input_request_revision`, `content_digest`; `provenance` không chứa `credential_ref`, khoá hay `env`.
-- [ ] `Approve` Solution bị `AC_UNCOVERED_BY_OPTION` khi phương án chọn chưa trả lời mọi AC `active`.
-- [ ] Solution `approved` không sửa `options` được.
-- [ ] Commit Plan thiếu `satisfies` hoặc `checks` bị `TASK_NO_AC` hoặc `TASK_NO_CHECK`; `request_coverage` thay nguyên khối cùng transaction.
-- [ ] Sau `approval.decided` của Plan, `SetTaskSpec` trả `TASK_SPEC_LOCKED` còn `UpdateTask` đổi `status` vẫn thành công.
-- [ ] `RunInTx` cũ không đổi chữ ký; test `AIApply` không đổi.
+- [x] Solution lưu `provenance`, `seq`, `input_request_revision`, `content_digest`; `provenance` không chứa `credential_ref`, khoá hay `env`.
+- [x] `Approve` Solution bị `AC_UNCOVERED_BY_OPTION` khi phương án chọn chưa trả lời mọi AC `active`.
+- [x] Solution `approved` không sửa `options` được.
+- [x] Commit Plan thiếu `satisfies` hoặc `checks` bị `TASK_NO_AC` hoặc `TASK_NO_CHECK`; `request_coverage` thay nguyên khối cùng transaction.
+- [x] Sau `approval.decided` của Plan, `SetTaskSpec` trả `TASK_SPEC_LOCKED` còn `UpdateTask` đổi `status` vẫn thành công.
+- [x] `RunInTx` cũ không đổi chữ ký; test `AIApply` không đổi.
 
 ## Rủi ro và lưu ý
 

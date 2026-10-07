@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/security-process-limits-and-env.test.ts` (mới), `agent/src/relay/codeintel/__fixtures__/canary-secrets.json` (mới)
 **Depends on:** 072-01, 072-05; AG-CV-SOL-001, 081; AG-CV-TASK-071-04 (`fake-codeintel-cli`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,12 +25,12 @@ Test viết theo hợp đồng; mã bị test thuộc AG-CV-SOL-001/002/003/004/
 
 - Như mục 2; RSS test (tuỳ chọn, ngưỡng rộng giả định) cho nhánh 20 MiB.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/security-process-limits-and-env.test.ts` (4 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tất cả xanh; nếu quyết định giữ `toolEnv` cho `codeintel.*`, sửa test và ghi lý do.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Tất cả xanh; nếu quyết định giữ `toolEnv` cho `codeintel.*`, sửa test và ghi lý do.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

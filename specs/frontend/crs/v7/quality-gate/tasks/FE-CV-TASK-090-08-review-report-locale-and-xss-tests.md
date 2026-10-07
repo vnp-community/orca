@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/i18n/review-report-locale-coverage.test.ts` (mới), `frontend/src/renderer/src/i18n/locales/*.json`
 **Depends on:** FE-CV-TASK-090-02, 090-04
-**Status:** [ ] TODO
+**Status:** [x] DONE — locale và XSS test file chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

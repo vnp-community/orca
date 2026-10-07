@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/excluded_channels.yaml`, `backend-go/services/api-gateway/README.md`, `deploy/dev/docker-compose.yml`
 **Depends on:** TASK-040-07 (kênh đã đăng ký); compose cần BE-CV-SOL-010 (tên service)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Parity xanh với một dòng `codeIntel.*`; bỏ dòng thì đỏ.
-- [ ] README ghi đủ biến và kênh.
-- [ ] Không thêm `max-lines` disable.
+- [x] Parity xanh với một dòng `codeIntel.*`; bỏ dòng thì đỏ.
+- [x] README ghi đủ biến và kênh.
+- [x] Không thêm `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

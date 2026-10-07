@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/source-control-quality-gate-notice.tsx` (mới) + `.test.tsx`
 **Depends on:** FE-CV-TASK-085-02, 085-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

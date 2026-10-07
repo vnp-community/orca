@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/execution_lease.go` (dòng 113, 238), `internal/usecase/ports.go` (dòng 60), `internal/adapter/postgres/execution_leases.go` (dòng 77, 163), `internal/adapter/postgres/repository.go` (dòng 347), `internal/adapter/mysql/execution_leases.go` (dòng 146, 164), `internal/adapter/mysql/repository.go` (dòng 360), `internal/usecase/fakes_test.go`, `internal/usecase/execution_lease_test.go`, `internal/adapter/grpc/server_test.go`
 **Depends on:** TASK-REQ-011-05 (payload `statuschanged` có `cause`, `request_id`, `task_type`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -41,11 +41,11 @@ Không cái nào ghi `task.outbox_events`. Mẫu transaction UPDATE + outbox: `R
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba cổng nhận `events`, hai dialect ghi outbox cùng transaction với UPDATE.
-- [ ] Mất CAS (claim thua, link cũ) không ghi dòng outbox nào.
-- [ ] Outbox lỗi thì status không đổi (hoặc UPDATE bị rollback).
-- [ ] Caller cũ truyền `nil` giữ nguyên hành vi; toàn bộ test hiện có xanh.
-- [ ] Không thêm `max-lines` disable.
+- [x] Ba cổng nhận `events`, hai dialect ghi outbox cùng transaction với UPDATE.
+- [x] Mất CAS (claim thua, link cũ) không ghi dòng outbox nào.
+- [x] Outbox lỗi thì status không đổi (hoặc UPDATE bị rollback).
+- [x] Caller cũ truyền `nil` giữ nguyên hành vi; toàn bộ test hiện có xanh.
+- [x] Không thêm `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

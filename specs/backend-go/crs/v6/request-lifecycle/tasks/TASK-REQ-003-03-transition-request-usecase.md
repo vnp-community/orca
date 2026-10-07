@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/transition_request.go`, `internal/usecase/transition_request_events.go`, `internal/usecase/transition_request_test.go`, `internal/usecase/ports.go` (sửa: thêm `InTransaction`), `internal/adapter/postgres/tx.go`, `internal/adapter/mysql/tx.go` (sửa)
 **Depends on:** TASK-REQ-003-02, TASK-REQ-002-04, TASK-REQ-002-05, TASK-REQ-001-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -38,10 +38,10 @@ Lệnh: `go test ./services/request-service/internal/usecase/... -run Transition
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi tiêu chí unit ở trên xanh.
-- [ ] `InTransaction` có ở hai adapter, test nhỏ xác nhận `false` ngoài `InTx`, `true` bên trong.
-- [ ] Ghi `status` và `outbox` cùng một `InTx`.
-- [ ] Không file nào khác `transition_request.go` gán `.Status` (xem TASK-REQ-003-06).
+- [x] Mọi tiêu chí unit ở trên xanh.
+- [x] `InTransaction` có ở hai adapter, test nhỏ xác nhận `false` ngoài `InTx`, `true` bên trong.
+- [x] Ghi `status` và `outbox` cùng một `InTx`.
+- [x] Không file nào khác `transition_request.go` gán `.Status` (xem TASK-REQ-003-06).
 
 ## Rủi ro và lưu ý
 

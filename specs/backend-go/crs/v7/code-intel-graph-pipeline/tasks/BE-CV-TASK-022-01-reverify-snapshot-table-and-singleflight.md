@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** (không sửa mã) `backend-go/services/code-intel-service/migrations/{postgres,mysql}/`, `go.mod`
 **Depends on:** SOL-011 (migration 0002)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,7 @@ Hợp đồng đánh dấu migration do CR-011 sở hữu và số có thể d�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng chênh lệch cột (nếu có) ghi vào PR. - [ ] `x/sync` có trong `go.mod`.
+- [x] Bảng chênh lệch cột (nếu có) ghi vào PR. - [x] `x/sync` có trong `go.mod`.
 
 ## Rủi ro và lưu ý
 

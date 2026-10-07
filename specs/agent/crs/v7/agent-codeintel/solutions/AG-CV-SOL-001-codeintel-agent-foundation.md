@@ -1,6 +1,6 @@
 # AG-CV-SOL-001: Nền `codeintel.*` trên agent (dispatcher, whitelist, phân giải repo, giới hạn, mã lỗi, capability)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi mục "đã đọc" là đọc code, chưa chạy gì. Không có dòng nào của solution này đã được thực thi.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các module nền tảng (001-01 đến 001-09), kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-001](../../../../../../docs/crs/v7/agent-codeintel/CR-CV-001-codeintel-agent-foundation.md)
 **Service:** `agent/`, thư mục `agent/src/relay/` (Part A, `agent-rpc-dispatch*.ts`); Part B ở [AG-CV-SOL-006](./AG-CV-SOL-006-relay-ssh-part-b-handlers.md)
@@ -231,18 +231,18 @@ Rút gọn: 01, 02, 03, 04 song song, làm đầu tiên; 05 cần 01–04; 06 v�
 
 (Dạng đo được; trích CR-001 mục 4 và hợp đồng.)
 
-- [ ] `codeintel.status` trả phong bì đúng §2.2 + `binding`, `tools`, `limits`; không có `args`/lệnh CLI trong vào/ra.
-- [ ] `codeintel.nope` ⇒ `-32601`; khoá lạ ⇒ `CODEINTEL_INVALID_PARAMS data.field`; test phản chiếu schema không có khoá cấm.
-- [ ] `workspaceRoot` tương đối/NUL/không tồn tại/thư mục con repo/ngoài allowed roots ⇒ `PATH_NOT_ALLOWED` (hoặc `INVALID_PARAMS` cho lỗi hình dạng), **không spawn** (đếm spawn = 0).
-- [ ] Registry giả 2 repo: repo kia không bao giờ bị chạm; worktree liên kết ⇒ `linkedWorktree:true`, `worktreeMismatch:true`, `stale:true`.
-- [ ] Mọi lần chạy GitNexus có `-r <registryPath>` ở cuối; CodeGraph có `-p` (trừ `status`); `--repo=x`/`-rx` bị từ chối trước spawn.
-- [ ] Test quét nguồn: ngoài `codeintel-reindex-*.ts` không có chuỗi `'analyze'|'clean'|'remove'|'sync'|'index'` sinh argv; `TestSpawnNeverUsesShell`.
-- [ ] GitNexus > 256 KB (3 000 hàng) không cụt; tệp tạm xoá ở mọi nhánh; thư mục `0700`, tệp `0600`.
-- [ ] stdout > 16 MiB ⇒ kill + `OUTPUT_TOO_LARGE`; quá 20 s ⇒ `SIGTERM` rồi `SIGKILL` sau 5 s ⇒ `TIMEOUT`; 4 lệnh đồng thời ⇒ ≤ 3 tiến trình, còn lại chờ hoặc `TIMEOUT reason="queue_wait"`.
-- [ ] `{"error":"…"}` exit 0 ⇒ `TOOL_FAILED`; handshake có `codeintel*` khi binary có, không có khi vắng; `STATIC_CAPABILITIES_FALLBACK` không đổi.
-- [ ] `tools/call name=gitnexus arguments={args:["analyze"]}` bị từ chối (nếu quyết định 6 chốt); tool khác không đổi hành vi (`agent-tool-registry.test.ts` xanh không sửa).
-- [ ] Trace của `codeintel.*` chỉ có `workspaceRoot`; con của codeintel không thấy `ANTHROPIC_API_KEY`/`GITHUB_TOKEN`/`GH_TOKEN`.
-- [ ] Không file `helpers/utils/common/misc`, không `max-lines` disable mới.
+- [x] `codeintel.status` trả phong bì đúng §2.2 + `binding`, `tools`, `limits`; không có `args`/lệnh CLI trong vào/ra.
+- [x] `codeintel.nope` ⇒ `-32601`; khoá lạ ⇒ `CODEINTEL_INVALID_PARAMS data.field`; test phản chiếu schema không có khoá cấm.
+- [x] `workspaceRoot` tương đối/NUL/không tồn tại/thư mục con repo/ngoài allowed roots ⇒ `PATH_NOT_ALLOWED` (hoặc `INVALID_PARAMS` cho lỗi hình dạng), **không spawn** (đếm spawn = 0).
+- [x] Registry giả 2 repo: repo kia không bao giờ bị chạm; worktree liên kết ⇒ `linkedWorktree:true`, `worktreeMismatch:true`, `stale:true`.
+- [x] Mọi lần chạy GitNexus có `-r <registryPath>` ở cuối; CodeGraph có `-p` (trừ `status`); `--repo=x`/`-rx` bị từ chối trước spawn.
+- [x] Test quét nguồn: ngoài `codeintel-reindex-*.ts` không có chuỗi `'analyze'|'clean'|'remove'|'sync'|'index'` sinh argv; `TestSpawnNeverUsesShell`.
+- [x] GitNexus > 256 KB (3 000 hàng) không cụt; tệp tạm xoá ở mọi nhánh; thư mục `0700`, tệp `0600`.
+- [x] stdout > 16 MiB ⇒ kill + `OUTPUT_TOO_LARGE`; quá 20 s ⇒ `SIGTERM` rồi `SIGKILL` sau 5 s ⇒ `TIMEOUT`; 4 lệnh đồng thời ⇒ ≤ 3 tiến trình, còn lại chờ hoặc `TIMEOUT reason="queue_wait"`.
+- [x] `{"error":"…"}` exit 0 ⇒ `TOOL_FAILED`; handshake có `codeintel*` khi binary có, không có khi vắng; `STATIC_CAPABILITIES_FALLBACK` không đổi.
+- [x] `tools/call name=gitnexus arguments={args:["analyze"]}` bị từ chối (nếu quyết định 6 chốt); tool khác không đổi hành vi (`agent-tool-registry.test.ts` xanh không sửa).
+- [x] Trace của `codeintel.*` chỉ có `workspaceRoot`; con của codeintel không thấy `ANTHROPIC_API_KEY`/`GITHUB_TOKEN`/`GH_TOKEN`.
+- [x] Không file `helpers/utils/common/misc`, không `max-lines` disable mới.
 
 ## 6. Kiểm thử
 

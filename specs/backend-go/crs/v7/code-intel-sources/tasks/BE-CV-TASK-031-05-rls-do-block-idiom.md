@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/sqlmigration/rls_do_block.go` (mới), `.../rls_do_block_test.go` (mới)
 **Depends on:** BE-CV-TASK-031-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] SOL-031 mục 6 hàng `mcp-service` đạt.
-- [ ] Mỗi một trong 7 file `DO` được phân loại đúng (khớp/không khớp) và có test.
-- [ ] Khối lạ không panic, không đoán.
+- [x] SOL-031 mục 6 hàng `mcp-service` đạt.
+- [x] Mỗi một trong 7 file `DO` được phân loại đúng (khớp/không khớp) và có test.
+- [x] Khối lạ không panic, không đoán.
 
 ## Rủi ro và lưu ý
 

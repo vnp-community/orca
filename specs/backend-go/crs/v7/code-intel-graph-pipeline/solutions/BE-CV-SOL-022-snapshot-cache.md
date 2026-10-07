@@ -1,6 +1,6 @@
 # BE-CV-SOL-022: Cache snapshot `(binding, view, HEAD, params)`: stale, singleflight, ETag, TTL/dung lượng, huỷ cache
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Bọc `ViewReader` của SOL-021; cần bảng `graph_snapshots` của BE-CV-SOL-011-data-model-and-migrations (PQ-15) và repository của BE-CV-SOL-011-repositories-and-maintenance.
+> **✅ Implemented.** Đã triển khai, vượt qua toàn bộ test (unit, race, contract, integration). Bọc `ViewReader` của SOL-021; cần bảng `graph_snapshots` của BE-CV-SOL-011-data-model-and-migrations (PQ-15) và repository của BE-CV-SOL-011-repositories-and-maintenance.
 
 **CR:** [CR-CV-022](../../../../../../docs/crs/v7/code-intel-graph-pipeline/CR-CV-022-snapshot-cache.md)
 **Service:** `code-intel-service` (`internal/domain`, `internal/usecase`, `internal/config`; SQL của `SnapshotStore` thuộc SOL-011)

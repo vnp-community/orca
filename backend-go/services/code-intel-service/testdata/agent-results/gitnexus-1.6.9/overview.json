@@ -1,0 +1,32 @@
+{
+  "data": {
+    "edges": [],
+    "nodes": [
+      {
+        "area": "foo.ts",
+        "cohesion": 0.5,
+        "dominantLanguage": "typescript",
+        "id": "c1",
+        "keywords": [],
+        "label": "C1",
+        "symbolCount": 10,
+        "topFiles": [
+          "foo.ts"
+        ]
+      }
+    ]
+  },
+  "headCommit": "abcdef",
+  "sources": [
+    {
+      "commit": "abcdef",
+      "indexedAt": 1600000000000,
+      "lineBase": 1,
+      "tool": "gitnexus",
+      "version": "1.6.9"
+    }
+  ],
+  "stale": false,
+  "totalCount": 1,
+  "truncated": false
+}

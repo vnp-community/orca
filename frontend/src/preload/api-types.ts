@@ -9,6 +9,7 @@ import type {
   HostedReviewProvider
 } from '../shared/hosted-review'
 import type { McpEvent, McpRpcArgs, McpRpcMethod, McpRpcResult } from '../shared/mcp-types'
+import type { CodeIntelBridgeApi } from '../shared/code-intel-bridge'
 import type { NativeFileDropPayload } from '../shared/native-file-drop'
 import type {
   LocalLogTailChangedPayload,
@@ -934,6 +935,8 @@ export type McpBridgeApi = {
 
 export type PreloadApi = {
   mcp: McpBridgeApi
+  // CR-050: code-intel bridge; wired by web-preload-api.ts (050-05) and desktop preload (050-06)
+  codeIntel: CodeIntelBridgeApi
   app: AppApi
   orcaProfiles: {
     list: () => Promise<OrcaProfileListResult>

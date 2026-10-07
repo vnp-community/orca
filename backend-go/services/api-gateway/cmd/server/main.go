@@ -366,6 +366,14 @@ func run() error {
 		defer func() { _ = closeNatsBus() }()
 	}
 	workspaceEventBus := wscompat.NewWorkspaceEventBus()
+	codeIntelClient, qualityGateClient, codeIntelConn, err := buildCodeIntelClients(cfg.CodeIntel, logger)
+	if err != nil {
+		return fmt.Errorf("dialing code-intel-service: %w", err)
+	}
+	if codeIntelConn != nil {
+		defer func() { _ = codeIntelConn.Close() }()
+	}
+
 	// One call registers every non-mcp channel (also used by the MCP parity
 	// test); clientState/push/mobile keep the order they had here.
 	wscompat.RegisterProductionChannels(wsCompatRegistry, wscompat.ChannelDeps{
@@ -378,6 +386,12 @@ func run() error {
 		WorkspaceEvents:     workspaceEventBus,
 		DeviceSecrets:       authclient.NewDeviceSecretResolver(authClient),
 		TaskActivityEnabled: natsErr == nil, TaskActivityBus: natsConsumer,
+		CodeIntel:           codeIntelClient,
+		QualityGate:         qualityGateClient,
+		CodeIntelLimits: wscompat.CodeIntelLimits{
+			MaxResponseBytes: cfg.CodeIntel.MaxResponseBytes,
+			MaxStreams:       cfg.CodeIntel.MaxStreams,
+		},
 	})
 
 	// MCP (CR-MCP-002/003): process flag MCP_ENABLED gates /mcp and mcp.*
@@ -568,6 +582,9 @@ func run() error {
 	healthSrv.Register("workflow-service", grpcConnHealthCheck(workflowConn))
 	if mcpConn != nil {
 		healthSrv.Register("mcp-service", grpcConnHealthCheck(mcpConn))
+	}
+	if codeIntelConn != nil {
+		healthSrv.Register("code-intel-service", grpcConnHealthCheck(codeIntelConn))
 	}
 
 	// otelhttp gives every /api/* request its trace's root span — health

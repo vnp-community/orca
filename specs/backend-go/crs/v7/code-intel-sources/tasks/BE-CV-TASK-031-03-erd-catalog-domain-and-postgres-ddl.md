@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/erd/catalog.go` (mới), `.../domain/erd/canonical_type.go` (mới), `.../domain/erd/parse_warning.go` (mới), `.../adapter/sqlmigration/ddl_postgres.go` (mới), `.../adapter/sqlmigration/column_definition.go` (mới), `.../adapter/sqlmigration/implicit_names.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-031-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,9 +31,9 @@ SOL-031 mục 2.B–2.D. Postgres trước vì có nhiều tính năng nhất (p
 
 ## Tiêu chí hoàn thành
 
-- [ ] `infra-fleet-service` Postgres cho đủ bảng/cột/ràng buộc kỳ vọng ở SOL-031 mục 6.
-- [ ] Mọi câu lệnh lạ không panic và không đổi trạng thái bảng.
-- [ ] Không phụ thuộc ngoài thư viện chuẩn.
+- [x] `infra-fleet-service` Postgres cho đủ bảng/cột/ràng buộc kỳ vọng ở SOL-031 mục 6.
+- [x] Mọi câu lệnh lạ không panic và không đổi trạng thái bảng.
+- [x] Không phụ thuộc ngoài thư viện chuẩn.
 
 ## Rủi ro và lưu ý
 

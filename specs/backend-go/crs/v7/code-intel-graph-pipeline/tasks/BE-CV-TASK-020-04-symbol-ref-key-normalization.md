@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/symbol_ref.go`, `symbol_key_normalization.go`, `symbol_kind_mapping.go`, `edge_kind_mapping.go` (mới) và các `_test.go` cùng thư mục
 **Depends on:** TASK-020-01 (vector), BE-CV-SOL-010 (module)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ PQ-20: agent chuẩn hoá; backend **kiểm lại** và chỉ cộng +1 khi `lin
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi vector dương/âm liên quan khoá và kind xanh.
-- [ ] `ValidateAgentSymbolRef` không từ chối khi `key` lệch, chỉ sửa và báo cờ.
-- [ ] Domain không import proto/DB.
-- [ ] Không file nào tên `helpers/utils/common/misc`.
+- [x] Mọi vector dương/âm liên quan khoá và kind xanh.
+- [x] `ValidateAgentSymbolRef` không từ chối khi `key` lệch, chỉ sửa và báo cờ.
+- [x] Domain không import proto/DB.
+- [x] Không file nào tên `helpers/utils/common/misc`.
 
 ## Rủi ro và lưu ý
 

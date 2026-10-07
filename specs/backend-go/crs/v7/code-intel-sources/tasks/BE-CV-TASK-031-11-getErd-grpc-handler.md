@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpc/get_erd_handler.go` (mới), `.../adapter/grpc/get_erd_handler_test.go` (mới); đăng ký trong `cmd/server/main.go` (sửa nhẹ)
 **Depends on:** BE-CV-TASK-031-07, BE-CV-TASK-031-10; BE-CV-SOL-013 (guard, cờ, OPA); BE-CV-SOL-012 (target resolution)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -33,9 +33,9 @@ Chuỗi xử lý của mọi RPC (hợp đồng §3 đầu mục): `internalcall
 
 ## Tiêu chí hoàn thành
 
-- [ ] `GetErd` gọi được qua `grpcurl`/client test trong suite.
-- [ ] Mọi lỗi có tiền tố `CODEINTEL_`; không mã nguồn/đường dẫn tuyệt đối trong message.
-- [ ] Không có đường bỏ qua kiểm quyền trước cache.
+- [x] `GetErd` gọi được qua `grpcurl`/client test trong suite.
+- [x] Mọi lỗi có tiền tố `CODEINTEL_`; không mã nguồn/đường dẫn tuyệt đối trong message.
+- [x] Không có đường bỏ qua kiểm quyền trước cache.
 
 ## Rủi ro và lưu ý
 

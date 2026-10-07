@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `migrations/{postgres,mysql}/0006_agent_turns.{up,down}.sql` (mới)
 **Depends on:** BE-CV-SOL-011-data-model-and-migrations
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Cột/khoá: hợp đồng §4.2 T14 (không chép lại). Chạy `ls migrations/postgres` trước (số có thể dịch).
@@ -20,7 +20,7 @@ Cột/khoá: hợp đồng §4.2 T14 (không chép lại). Chạy `ls migrations
 - up/down/up hai dialect; RLS với role `NOBYPASSRLS`; UNIQUE chặn trùng.
 
 ## Tiêu chí hoàn thành
-- [ ] cột đúng T14; [ ] RLS cách ly; [ ] không FK.
+- [x] cột đúng T14; [ ] RLS cách ly; [ ] không FK.
 
 ## Rủi ro
 - JSON ≤ 8 KiB kiểm ở ứng dụng (MySQL không CHECK tiện).

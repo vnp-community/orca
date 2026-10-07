@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-rule-diff-matcher.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-084-02, AG-CV-TASK-083-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Bảng ca regex/glob; chèn dòng cũ vi phạm vs dòng mới; dòng 5 000 ký 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không ca nào treo; chỉ dòng thêm bị báo.
+- [x] Không ca nào treo; chỉ dòng thêm bị báo.
 
 ## Rủi ro
 

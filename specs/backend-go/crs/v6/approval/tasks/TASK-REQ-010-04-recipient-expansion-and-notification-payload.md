@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase, adapter, outbox relay
 **File:** `internal/usecase/expand_approval_recipients.go` (mới), `publish_approval_notifications.go` (mới), `internal/adapter/grpcclient/admin_directory_resolver.go` (mới), `internal/config/config.go` (sửa), và `_test.go`
 **Depends on:** TASK-REQ-010-03; CR-REQ-001 (bộ phát outbox)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -30,10 +30,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Payload `approval.requested` chứa `user_ids` không rỗng khi có người duyệt.
-- [ ] Không có `comment` trong bất kỳ payload nào.
-- [ ] Mất `auth-service` không làm `OpenApproval` thất bại.
-- [ ] Trần người nhận cấu hình được.
+- [x] Payload `approval.requested` chứa `user_ids` không rỗng khi có người duyệt.
+- [x] Không có `comment` trong bất kỳ payload nào.
+- [x] Mất `auth-service` không làm `OpenApproval` thất bại.
+- [x] Trần người nhận cấu hình được.
 
 ## Rủi ro và lưu ý
 

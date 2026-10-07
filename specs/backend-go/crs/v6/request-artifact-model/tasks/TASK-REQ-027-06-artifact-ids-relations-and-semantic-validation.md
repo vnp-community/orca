@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/artifact_display_id.go`, `internal/domain/relation_rules.go`, `internal/domain/artifact_semantic_validation.go`, `internal/usecase/mint_artifact_ids.go`, `internal/usecase/replace_request_coverage.go`, `internal/usecase/get_artifact_graph.go`, `internal/usecase/resolve_artifact_ref.go`, `internal/usecase/ports.go` (sửa), `internal/adapter/{postgres,mysql}/{artifact_index,artifact_relation,request_coverage}_repository.go` và test
 **Depends on:** TASK-REQ-027-01 (bảng), TASK-REQ-027-03 (`Violation`, schema), TASK-REQ-027-05 (`AcceptanceCriteria`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -74,11 +74,11 @@ Kiểm ngữ nghĩa chạy ở server sau kiểm cấu trúc, mỗi lần sinh v
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mười mã ngữ nghĩa mỗi mã có đúng một test; hàm trả đủ mọi lỗi, thứ tự xác định.
-- [ ] Chỉ các bộ ba quan hệ ở bảng CR 2.3 được chấp nhận (test tích Descartes).
-- [ ] `request_coverage` thay nguyên khối, rollback cùng caller.
-- [ ] `GetArtifactGraph` gộp đúng ba nguồn và không thất bại khi `task-service` lỗi.
-- [ ] Hai Solution đồng thời của một Request nhận `seq` khác nhau.
+- [x] Mười mã ngữ nghĩa mỗi mã có đúng một test; hàm trả đủ mọi lỗi, thứ tự xác định.
+- [x] Chỉ các bộ ba quan hệ ở bảng CR 2.3 được chấp nhận (test tích Descartes).
+- [x] `request_coverage` thay nguyên khối, rollback cùng caller.
+- [x] `GetArtifactGraph` gộp đúng ba nguồn và không thất bại khi `task-service` lỗi.
+- [x] Hai Solution đồng thời của một Request nhận `seq` khác nhau.
 
 ## Rủi ro và lưu ý
 

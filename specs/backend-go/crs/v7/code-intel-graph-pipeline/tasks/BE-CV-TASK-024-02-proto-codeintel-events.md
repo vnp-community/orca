@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` · `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_events.proto` (mới), `codeintel.proto` (sửa)
 **Depends on:** BE-CV-TASK-020-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,7 @@ Hợp đồng §2.3: `StreamCodeIntelEventsRequest{selectors}`, `CodeIntelPush` 
 
 ## Tiêu chí hoàn thành
 
-- [ ] buf xanh. - [ ] Khớp §2.3.
+- [x] buf xanh. - [x] Khớp §2.3.
 
 ## Rủi ro và lưu ý
 

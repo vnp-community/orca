@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/use-source-control-quality-gate.ts` (mới) + `.test.tsx`
 **Depends on:** FE-CV-TASK-085-01, 085-02; FE-CV-SOL-050-store-and-query-hooks (bus sự kiện, `codeIntelClient`); FE-CV-SOL-061-review-entry-points (`openReviewFromEntryPoint`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/gosqlscan/scan_table_access.go` (mới), `.../gosqlscan/sql_literal_extraction.go` (mới), `.../gosqlscan/scan_table_access_test.go` (mới), `.../gosqlscan/testdata/*.go.txt` (mới)
 **Depends on:** BE-CV-TASK-030-05, BE-CV-TASK-031-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,9 +31,9 @@ SOL-031-erd mục 2.D. Dùng `go/parser` (thư viện chuẩn, không dependency
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không dương tính giả với chuỗi không phải SQL trong ca kiểm.
-- [ ] `accessedBy` rỗng với bảng không truy cập.
-- [ ] Không panic với file không parse được (trả cảnh báo `GO_PARSE_ERROR`).
+- [x] Không dương tính giả với chuỗi không phải SQL trong ca kiểm.
+- [x] `accessedBy` rỗng với bảng không truy cập.
+- [x] Không panic với file không parse được (trả cảnh báo `GO_PARSE_ERROR`).
 
 ## Rủi ro và lưu ý
 

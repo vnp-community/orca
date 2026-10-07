@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/lifecycle_exit_contract.go` (mới), `internal/adapter/postgres/lifecycle_exit_integration_test.go`, `internal/adapter/mysql/lifecycle_exit_integration_test.go` (mới)
 **Depends on:** TASK-REQ-006-05, TASK-REQ-002-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -39,10 +39,10 @@ Các tiêu chí mục 4 của CR-REQ-006 cần DB thật: CHECK ghép `status`/`
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi kịch bản xanh với cả hai dialect.
-- [ ] CHECK ghép giữ ở mọi chuyển; DB từ chối chèn vi phạm.
-- [ ] 12 `SpawnChildRequest` đồng thời: một con, một link.
-- [ ] Tenant B không đọc, không ghi `request_links`, `request_return_history` của tenant A.
+- [x] Mọi kịch bản xanh với cả hai dialect.
+- [x] CHECK ghép giữ ở mọi chuyển; DB từ chối chèn vi phạm.
+- [x] 12 `SpawnChildRequest` đồng thời: một con, một link.
+- [x] Tenant B không đọc, không ghi `request_links`, `request_return_history` của tenant A.
 
 ## Rủi ro và lưu ý
 

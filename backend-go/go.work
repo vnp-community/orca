@@ -1,14 +1,15 @@
 go 1.26.0
 
 use (
+	./cmd/orca-cli
 	./common
 	./proto
-	./cmd/orca-cli
 	./services/ai-provider-service
 	./services/annotation-service
 	./services/api-gateway
 	./services/auth-service
 	./services/automation-service
+	./services/code-intel-service
 	./services/credential-broker-service
 	./services/git-gateway-service
 	./services/infra-fleet-service
@@ -18,6 +19,7 @@ use (
 	./services/notification-service
 	./services/orchestration-service
 	./services/project-service
+	./services/request-service
 	./services/scm-integration-service
 	./services/task-service
 	./services/tenant-service

@@ -215,6 +215,8 @@ import {
   hasConfiguredSourceControlTextGenerationDefaults
 } from './source-control-text-generation-defaults'
 import { useSourceControlAi } from './use-source-control-ai'
+import { useSourceControlQualityGate } from './use-source-control-quality-gate'
+import { SourceControlQualityGateNotice } from './source-control-quality-gate-notice'
 import { translate } from '@/i18n/i18n'
 import {
   localizedHostedReviewCopy,
@@ -606,6 +608,23 @@ function SourceControlInner(): React.JSX.Element {
   const branchSummary = useAppStore((s) =>
     activeWorktreeId ? (s.gitBranchCompareSummaryByWorktree[activeWorktreeId] ?? null) : null
   )
+  // CR-085: quality gate notice — placed here so branchSummary is available
+  const qualityGate = useSourceControlQualityGate({
+    worktreeId: activeWorktreeId ?? '',
+    projectId: activeWorktree?.projectId ?? null,
+    headOid: branchSummary?.status === 'ready' ? (branchSummary.headOid ?? null) : null,
+    base: branchSummary?.status === 'ready' ? (branchSummary.baseRef ?? null) : null,
+  })
+  const qualityNoticeNode = qualityGate.viewModel.variant !== 'hidden' ? (
+    <SourceControlQualityGateNotice
+      viewModel={qualityGate.viewModel}
+      isLoading={qualityGate.isLoading}
+      timedOut={qualityGate.timedOut}
+      canRunChecks={Boolean(activeWorktree?.projectId)}
+      onRunChecks={qualityGate.runChecks}
+      onOpenReason={qualityGate.openReason}
+    />
+  ) : null
   const conflictOperation = useAppStore((s) =>
     activeWorktreeId ? (s.gitConflictOperationByWorktree[activeWorktreeId] ?? 'unknown') : 'unknown'
   )
@@ -5277,6 +5296,8 @@ function SourceControlInner(): React.JSX.Element {
                   void handleCreatePullRequest()
                 }}
                 onDropdownAction={handleActionInvoke}
+                // CR-085: quality notice — hook provides node; null when flags off or project unavailable
+                qualityNotice={qualityNoticeNode}
               />
             ) : (
               <CommitArea
@@ -5327,6 +5348,8 @@ function SourceControlInner(): React.JSX.Element {
                 onFixPushFailureWithAI={handleFixPushFailureWithAI}
                 onPrimaryAction={handlePrimaryClick}
                 onDropdownAction={handleActionInvoke}
+                // CR-085: quality notice — hook provides node; null when flags off or project unavailable
+                qualityNotice={qualityNoticeNode}
               />
             ))}
 

@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/agent-tool-use-command-summarizer.ts` (mới) + test
 **Depends on:** FE-CV-TASK-089-01 (kiểu `AgentTurnCommandsSummary`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

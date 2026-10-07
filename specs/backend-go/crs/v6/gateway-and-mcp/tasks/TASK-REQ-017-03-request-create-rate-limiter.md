@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/mcpserver/tools/request_create_limit.go` (mới), `.../request_create_limit_test.go` (mới), `.../config.go`, `.../executor.go`
 **Depends on:** TASK-REQ-017-02
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -32,9 +32,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Lần tạo thứ 21 trong một giờ bị từ chối với mã `REQUEST_RATE_LIMITED`.
-- [ ] `MCP_REQUEST_CREATE_PER_HOUR=0` tắt giới hạn.
-- [ ] Bộ nhớ chặn; có test.
+- [x] Lần tạo thứ 21 trong một giờ bị từ chối với mã `REQUEST_RATE_LIMITED`.
+- [x] `MCP_REQUEST_CREATE_PER_HOUR=0` tắt giới hạn.
+- [x] Bộ nhớ chặn; có test.
 
 ## Rủi ro và lưu ý
 

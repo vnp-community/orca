@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/c4/merge_overrides.go` (mới), `backend-go/proto/orca/codeintel/v1/codeintel_c4.proto` (sửa: thêm message), `codeintel.proto` (thêm 2 rpc)
 **Depends on:** BE-CV-TASK-033-07, BE-CV-TASK-033-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -25,8 +25,8 @@ Solution mục 2.C; proto thêm sau task 02 để tránh va chạm.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca CR 2.5 có test; idempotent.
-- [ ] `buf` xanh.
+- [x] Mọi ca CR 2.5 có test; idempotent.
+- [x] `buf` xanh.
 
 ## Rủi ro và lưu ý
 

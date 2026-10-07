@@ -18,7 +18,7 @@ Thư mục tạm làm HOME: ghi/đọc; job `running` -> `interrupted`; prune 50
 Lệnh: `pnpm exec vitest run src/relay/codeintel-reindex-journal.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Không tệp nào chứa `message`/đường dẫn ngoài `workspaceRoot`.
+- [x] Không tệp nào chứa `message`/đường dẫn ngoài `workspaceRoot`.
 
 ## Rủi ro
 - Windows chưa hỗ trợ (`0700`).

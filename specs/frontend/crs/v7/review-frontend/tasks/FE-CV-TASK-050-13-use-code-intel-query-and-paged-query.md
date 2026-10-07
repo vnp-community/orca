@@ -5,7 +5,7 @@
 **Area:** frontend / hooks
 **File:** `hooks/useCodeIntelQuery.ts`, `hooks/useCodeIntelPagedQuery.ts` (mới), tests `.test.tsx`
 **Depends on:** FE-CV-TASK-050-07, FE-CV-TASK-050-10, FE-CV-TASK-050-12
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

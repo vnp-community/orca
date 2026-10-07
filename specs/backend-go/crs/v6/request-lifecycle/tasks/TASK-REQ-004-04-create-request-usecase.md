@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/create_request.go`, `internal/usecase/create_request_test.go`, `internal/usecase/ports.go` (sửa: `IssueFetcher`) (mới/sửa)
 **Depends on:** TASK-REQ-003-03, TASK-REQ-004-01, TASK-REQ-004-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ Lệnh: `go test ./services/request-service/internal/usecase/... -run CreateRequ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Sau tạo, `status = classifying`, đúng hai sự kiện theo thứ tự `created`, `status_changed`.
-- [ ] `title` rỗng + `github` không gọi service ngoài.
-- [ ] Lỗi giữa chừng không để lại khoá hay đốt số (kiểm tích hợp ở TASK-REQ-004-07).
-- [ ] `CreateWithinTx` export, có test.
+- [x] Sau tạo, `status = classifying`, đúng hai sự kiện theo thứ tự `created`, `status_changed`.
+- [x] `title` rỗng + `github` không gọi service ngoài.
+- [x] Lỗi giữa chừng không để lại khoá hay đốt số (kiểm tích hợp ở TASK-REQ-004-07).
+- [x] `CreateWithinTx` export, có test.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/dashboard/DashboardAgentRow.tsx`, `DashboardAgentRowTrailingControls.tsx`, `components/sidebar/WorktreeCardAgents.tsx`, `worktree-card-compact-agent-row.tsx` (sửa nhỏ) + test
 **Depends on:** FE-CV-TASK-061-01, 061-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

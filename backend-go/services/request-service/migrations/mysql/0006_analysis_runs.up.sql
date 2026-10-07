@@ -1,0 +1,23 @@
+CREATE TABLE analysis_runs (
+    id VARCHAR(36) PRIMARY KEY,
+    tenant_id VARCHAR(36) NOT NULL,
+    request_id VARCHAR(36) NOT NULL,
+    kind ENUM('solution','diagnosis','findings','answer') NOT NULL,
+    mode ENUM('complete','agent_readonly','agent_proposal') NOT NULL,
+    status ENUM('running','succeeded','failed') NOT NULL,
+    idempotency_key VARCHAR(128) NULL,
+    attempt INT NOT NULL DEFAULT 1,
+    lease_owner VARCHAR(128) NULL,
+    lease_expires_at TIMESTAMP(6) NULL,
+    error_code VARCHAR(128) NULL,
+    error_message TEXT NULL,
+    raw_output MEDIUMTEXT NULL,
+    engine VARCHAR(32) NOT NULL DEFAULT 'native',
+    started_at TIMESTAMP(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
+    finished_at TIMESTAMP(6) NULL,
+    active_key VARCHAR(80) GENERATED ALWAYS AS (IF(status='running', CONCAT(request_id,':',kind), NULL)) STORED,
+    CONSTRAINT fk_analysis_runs_request FOREIGN KEY (request_id) REFERENCES requests(id),
+    UNIQUE KEY analysis_runs_one_running (tenant_id, active_key),
+    UNIQUE KEY analysis_runs_idem (tenant_id, request_id, idempotency_key),
+    INDEX analysis_runs_lease_scan (status, lease_expires_at)
+);

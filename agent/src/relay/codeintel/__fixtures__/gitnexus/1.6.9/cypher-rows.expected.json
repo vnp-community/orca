@@ -1,0 +1,21 @@
+{
+  "rowCount": 2,
+  "rows": [
+    {
+      "arr": [
+        "val1"
+      ],
+      "count": 42,
+      "id": "node1",
+      "score": 3.14
+    },
+    {
+      "arr": [],
+      "count": null,
+      "id": "node2",
+      "score": null
+    }
+  ],
+  "skippedRows": 0,
+  "warnings": []
+}

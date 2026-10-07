@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/findings/finding-view-model.ts`, `finding-filter.ts`, `finding-sort.ts` (mới) + `*.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `Finding`, `Owner`, `IndexFreshness`); FE-CV-TASK-057-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

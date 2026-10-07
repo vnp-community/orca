@@ -5,7 +5,7 @@
 **Service:** `tests/mcp`, `docs/guides/mcp`
 **File:** `tests/mcp/check_mcp_request_flow.py` (mới), `docs/guides/mcp/task-worktree-tools.md`, `docs/guides/mcp/README.md`
 **Depends on:** TASK-REQ-017-01..03; stack dev có `request-service` (CR-REQ-001) và gateway cấu hình `MCP_TOOL_PACKS_ENABLED=1,2`
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -28,8 +28,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Script chạy được trên stack dev khi cờ bật, thoát mã khác 0 khi sai hợp đồng.
-- [ ] Tài liệu có mục Request, danh sách việc agent không làm được.
+- [x] Script chạy được trên stack dev khi cờ bật, thoát mã khác 0 khi sai hợp đồng.
+- [x] Tài liệu có mục Request, danh sách việc agent không làm được.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `policy/orca-authz`, `code-intel-service`
 **File:** `backend-go/policy/orca-authz/code_intel.rego`, `code_intel_test.rego` (do BE-CV-SOL-013 tạo; task này **thêm**); `internal/adapter/grpc/quality_gate_guard.go` (mới)
 **Depends on:** BE-CV-SOL-013-authorization-flags-and-audit
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Bảng quyền: CR-085 §2.9, hợp đồng §6.3. Hiện `policy/orca-authz/` **không** có `code_intel.rego` (đã `ls`); không tạo file song song với SOL-013. Chuỗi: cờ → OPA → selector → … (hợp đồng §3).
@@ -19,7 +19,7 @@ Bảng quyền: CR-085 §2.9, hợp đồng §6.3. Hiện `policy/orca-authz/` *
 - `opa test policy/orca-authz/` (bảng vai trò); Go: cờ tắt từng tầng cho mỗi RPC; `member` gọi `SaveQualityProfile` bị từ chối.
 
 ## Tiêu chí hoàn thành
-- [ ] `opa test` xanh; [ ] mọi RPC quality qua guard (test phản chiếu danh sách method); [ ] cờ cache ≤ 5 s.
+- [x] `opa test` xanh; [ ] mọi RPC quality qua guard (test phản chiếu danh sách method); [ ] cờ cache ≤ 5 s.
 
 ## Rủi ro
 - Phụ thuộc cứng SOL-013; nếu chưa merge thì task chỉ viết được ở nhánh sau nó.

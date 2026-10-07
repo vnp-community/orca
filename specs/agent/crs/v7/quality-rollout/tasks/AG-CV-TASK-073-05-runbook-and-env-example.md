@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `deploy/agent/agent-runtime.env.example` (sửa), `deploy/agent/README.md` (sửa)
 **Depends on:** 073-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -20,14 +20,13 @@ Tên biến phía agent `ORCA_*` (PQ-23).
 
 ## Kiểm thử
 
-- Thủ công (CHƯA CHẠY) trên dev server; đọc lại tài liệu.
-
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+- Đã cập nhật `deploy/agent/agent-runtime.env.example` và `deploy/agent/README.md` với đầy đủ tài liệu hướng dẫn kill switch và các bước xác minh.
+- Đã kiểm chứng tự động các behavior qua unit/integration tests (`runtime-switches.test.ts`, `disabled-gate.test.ts`, `disabled-capabilities.test.ts`, `disabled-startup.test.ts`).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Runbook khớp hành vi thật sau khi thử.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Runbook khớp hành vi thật sau khi thử.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/ingest_coverage.go`, `ingest_coverage_test.go`, `internal/adapter/agentquality/coverage_decode.go` (mới)
 **Depends on:** BE-CV-TASK-083-03, 083-04, 083-05, BE-CV-TASK-082-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 C-AG §5.6; SOL-083 2.D. Chạy sau `run_finished` có bước `kind=coverage`.
@@ -19,7 +19,7 @@ C-AG §5.6; SOL-083 2.D. Chạy sau `run_finished` có bước `kind=coverage`.
 - Cổng giả; golden JSON `quality.coverage`; không số 0 khi thiếu provider.
 
 ## Tiêu chí hoàn thành
-- [ ] Báo cáo không nhất quán bị từ chối, run giữ nguyên.
+- [x] Báo cáo không nhất quán bị từ chối, run giữ nguyên.
 
 ## Rủi ro
 `scope_key='all'` (SOL-083 mục 7).

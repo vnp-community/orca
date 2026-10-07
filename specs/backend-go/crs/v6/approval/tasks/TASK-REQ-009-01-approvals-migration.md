@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / migrations
 **File:** `backend-go/services/request-service/migrations/postgres/NNNN_approvals.{up,down}.sql` (mới), `backend-go/services/request-service/migrations/mysql/NNNN_approvals.{up,down}.sql` (mới)
 **Depends on:** CR-REQ-001 và CR-REQ-002 đã merge (có thư mục migrations và bảng `requests`)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -31,10 +31,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai dialect cùng số migration, up/down/up chạy sạch.
-- [ ] CHECK từ chối `subject_type` và `status` lạ ở cả hai DB.
-- [ ] Chỉ mục `pending` duy nhất hoạt động ở cả hai DB (kể cả sau khi một dòng chuyển sang `approved`).
-- [ ] RLS bật ở Postgres; truy vấn không đặt `app.tenant_id` không thấy dòng nào.
+- [x] Hai dialect cùng số migration, up/down/up chạy sạch.
+- [x] CHECK từ chối `subject_type` và `status` lạ ở cả hai DB.
+- [x] Chỉ mục `pending` duy nhất hoạt động ở cả hai DB (kể cả sau khi một dòng chuyển sang `approved`).
+- [x] RLS bật ở Postgres; truy vấn không đặt `app.tenant_id` không thấy dòng nào.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/finding_detector.go`, `list_findings.go`, `list_findings_test.go`; `internal/usecase/structure_detectors.go` (mới: bốn bộ lớp/vòng/hotspot/mã chết bọc domain + collector)
 **Depends on:** BE-CV-TASK-037-02, 037-03, 037-04, 037-05; BE-CV-SOL-021 (collector `StructuralFacts`), BE-CV-SOL-030 (`Log`, `ReadFile`), BE-CV-SOL-012/013, BE-CV-SOL-022
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Solution §2.C, §2.E. Bộ `sql.*` của CR-038 cắm vào cùng giao diện (B
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí §9 mục "một bộ lỗi", "`scope=CHANGED`", "hạn mức" đạt.
-- [ ] Dismiss không nằm trong snapshot.
+- [x] Tiêu chí §9 mục "một bộ lỗi", "`scope=CHANGED`", "hạn mức" đạt.
+- [x] Dismiss không nằm trong snapshot.
 
 ## Rủi ro và lưu ý
 

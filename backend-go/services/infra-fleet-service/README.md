@@ -50,7 +50,14 @@ ops, port scans) reduces to the same call.
   for the full writeup, including `agent/`'s new third connection mode this
   depends on.
 - `internal/adapter/grpc/` — implements the generated
-  `infrafleetv1.InfraFleetServiceServer`, pure wire<->usecase translation.
+  `infrafleetv1.InfraFleetServiceServer`, pure wire<->usecase translation,
+  including `GetAgentCapabilities`, `StreamCodeIntelEvents`, and
+  error-enhanced `RelayByDevServer` with error trailer propagation.
+- CodeIntel Transport (BE-CV-SOL-023):
+  - Timeout table with method-specific bounds (`codeintel.reindex` 5m, `codeintel.symbol` 30s, etc.).
+  - Structured `AgentRPCError` mapping to gRPC status codes + trailer `x-orca-agent-error-data-bin` (capped at 4096 bytes).
+  - Agent JSON-RPC notification routing for `codeintel.indexChanged`, `codeintel.reindexProgress`, and `quality.*` with backpressure (queue cap 64), `overflow` detection, and `resync` on attach.
+  - Per-tenant concurrent stream limiting for `StreamCodeIntelEvents`.
 - `migrations/0001_init.{up,down}.sql` — real DDL: `infra.dev_servers`,
   `infra.ssh_targets`, `infra.fleet_health`, RLS policies on the two
   tenant-scoped tables.

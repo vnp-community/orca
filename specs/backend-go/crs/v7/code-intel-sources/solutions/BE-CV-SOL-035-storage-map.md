@@ -204,16 +204,16 @@ Thứ tự theo hợp đồng §7.2: 030 → 031 → 032 → 033 → 034 → **0
 
 ## 9. Tiêu chí chấp nhận
 
-- [ ] Trên fixture chụp từ repo: Store `postgres` dev có đủ 17 DB; `queue` NATS dev (JetStream `derived`); `vault` dev `external:true, deployed:false`; volume `orca-go-postgres-data`, `git-gateway-repos`; prod chỉ `volume orca-data` + `prod_topology_unknown`; `deploy/old` chỉ khi `include_legacy=true`.
-- [ ] `mysql` hiện với `supportedByCode=true, deployed=false`; không có Store `redis`.
-- [ ] Mọi service có `adapter/postgres` có Binding postgres với `config_key="DATABASE_DSN"` và `database` đúng; `mcp-service` không có Binding MySQL; `git-gateway-service`, `api-gateway` không có Binding DB; `git-gateway-service` có Binding tới volume.
-- [ ] Topic `orca.infrafleet.terminal.closed` có publisher `infra-fleet-service`; `orca.orchestration.task.statuschanged` có subscriber `task-service`; tên `orca.infra.*`/`orca.infrafleet.*` giữ nguyên; mỗi Topic có `confidence` và `evidence` (đường dẫn + dòng).
-- [ ] Payload chứa 0 lần `dev-root-token`, mật khẩu `orca`, giá trị `.env` canary, userinfo URL, IP Vault; `redacted_count > 0`.
-- [ ] `.env` không bao giờ bị hỏi qua cổng đọc (cổng giả).
-- [ ] Quét cuối chặn khi chèn secret; RPC trả `CODEINTEL_SECRET_LEAK_BLOCKED`; log không chứa giá trị.
-- [ ] Lỗi parse một compose chỉ thêm `warnings`; các nguồn khác vẫn trả.
-- [ ] Cùng đầu vào ⇒ cùng thứ tự `Store`/`Binding`/`Topic` qua 100 lần chạy; commit/`ContentID` đổi ⇒ khoá cache đổi.
-- [ ] `buf lint`, `buf breaking` pass; không khai báo RPC chưa có message.
+- [x] Trên fixture chụp từ repo: Store `postgres` dev có đủ 17 DB; `queue` NATS dev (JetStream `derived`); `vault` dev `external:true, deployed:false`; volume `orca-go-postgres-data`, `git-gateway-repos`; prod chỉ `volume orca-data` + `prod_topology_unknown`; `deploy/old` chỉ khi `include_legacy=true`.
+- [x] `mysql` hiện với `supportedByCode=true, deployed=false`; không có Store `redis`.
+- [x] Mọi service có `adapter/postgres` có Binding postgres với `config_key="DATABASE_DSN"` và `database` đúng; `mcp-service` không có Binding MySQL; `git-gateway-service`, `api-gateway` không có Binding DB; `git-gateway-service` có Binding tới volume.
+- [x] Topic `orca.infrafleet.terminal.closed` có publisher `infra-fleet-service`; `orca.orchestration.task.statuschanged` có subscriber `task-service`; tên `orca.infra.*`/`orca.infrafleet.*` giữ nguyên; mỗi Topic có `confidence` và `evidence` (đường dẫn + dòng).
+- [x] Payload chứa 0 lần `dev-root-token`, mật khẩu `orca`, giá trị `.env` canary, userinfo URL, IP Vault; `redacted_count > 0`.
+- [x] `.env` không bao giờ bị hỏi qua cổng đọc (cổng giả).
+- [x] Quét cuối chặn khi chèn secret; RPC trả `CODEINTEL_SECRET_LEAK_BLOCKED`; log không chứa giá trị.
+- [x] Lỗi parse một compose chỉ thêm `warnings`; các nguồn khác vẫn trả.
+- [x] Cùng đầu vào ⇒ cùng thứ tự `Store`/`Binding`/`Topic` qua 100 lần chạy; commit/`ContentID` đổi ⇒ khoá cache đổi.
+- [x] `buf lint`, `buf breaking` pass; không khai báo RPC chưa có message.
 
 ## 10. Tham chiếu
 

@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/relay.ts` (sửa 1 dòng + import)
 **Depends on:** [003](./AG-CV-TASK-006-03-dispatcher-forward-error-data-agent-tree.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `relay.ts:493` `registerAuthStatusHandlers(dispatcher, authStatusConfig, authStatusLogger)`; config và logger (`relayLogLine`) đã dựng ngay trên. `relay.ts` 1 114 dòng: không thêm `max-lines` disable.
@@ -20,7 +20,7 @@ Test hiện có của `relay.ts` (nếu có) không hồi quy; test tích hợp 
 Lệnh: `pnpm exec vitest run src/relay/codeintel-relay-handlers.test.ts`; `pnpm test`.
 
 ## Tiêu chí hoàn thành
-- [ ] Đúng một dòng gọi; `relay.status` không đổi.
+- [x] Đúng một dòng gọi; `relay.status` không đổi.
 
 ## Rủi ro
 - `loadAgentConfig()` ở chế độ socket của `relay.ts` chưa kiểm chứng.

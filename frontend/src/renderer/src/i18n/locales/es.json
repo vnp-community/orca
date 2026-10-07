@@ -10152,6 +10152,33 @@
             "workspaceGone": "Couldn't open log — workspace is no longer available.",
             "notAuthorized": "Couldn't open log — path not authorized.",
             "alreadyEditable": "Log is already open for editing."
+          },
+          "qualityGateNotice": {
+            "title": {
+              "fail": "Las comprobaciones de calidad fallaron",
+              "warn": "Las comprobaciones de calidad tienen advertencias",
+              "unknown": "Estado de calidad no disponible"
+            },
+            "stale": "Desactualizado",
+            "timedOut": "Tiempo de espera agotado",
+            "unavailable": "El servicio de calidad no está disponible. Inténtelo más tarde.",
+            "reasons": "Motivos de fallo",
+            "openReason": "Abrir motivo {{check}} en Revisión",
+            "runChecks": "Ejecutar comprobaciones",
+            "moreReasons": "+{{count}} más",
+            "reason": {
+              "coverage_below_threshold": "Cobertura {{observed}}% por debajo del umbral {{threshold}}%",
+              "complexity_exceeded": "Complejidad supera el umbral en {{check}}",
+              "duplication_exceeded": "Duplicación supera el umbral en {{check}}",
+              "security_violations": "Violaciones de seguridad en {{check}}",
+              "reliability_violations": "Violaciones de fiabilidad en {{check}}",
+              "maintainability_violations": "Violaciones de mantenibilidad en {{check}}",
+              "tech_debt_exceeded": "Deuda técnica supera el umbral en {{check}}",
+              "hotspot_count_exceeded": "Número de hotspot supera el límite en {{check}}",
+              "new_violations_found": "Nuevas violaciones en {{check}}",
+              "dependency_vulnerabilities": "Vulnerabilidades de dependencias en {{check}}",
+              "unknown": "{{check}}"
+            }
           }
         }
       },
@@ -12988,6 +13015,39 @@
           "saved": "Asignación de Jira actualizada",
           "saveFailed": "No se pudo actualizar la asignación de Jira."
         }
+      },
+      "request": {
+        "RequestStatus": {
+          "submitted": "Enviado",
+          "classifying": "Clasificando",
+          "awaiting_type_confirmation": "Esperando confirmación",
+          "analyzing": "Analizando",
+          "awaiting_analysis_approval": "Aprobación de análisis pendiente",
+          "awaiting_information": "Esperando información",
+          "planning": "Planificando",
+          "awaiting_plan_approval": "Aprobación del plan pendiente",
+          "executing": "Ejecutando",
+          "completed": "Completado",
+          "cancelled": "Cancelado",
+          "request_backlog": "Pendiente",
+          "unknown": "Desconocido"
+        },
+        "RequestPage": {
+          "title": "Solicitudes",
+          "tab": {
+            "requests": "Solicitudes",
+            "approvals": "Aprobaciones",
+            "backlog": "Pendiente"
+          }
+        },
+        "RequestUnsupportedNotice": {
+          "title": "Gestión de solicitudes no compatible",
+          "body": "El runtime conectado no admite el servicio de solicitudes."
+        },
+        "SidebarRequestNavButton": {
+          "label": "Solicitudes",
+          "badge": "aprobaciones pendientes"
+        }
       }
     },
     "i18n": {
@@ -13001,6 +13061,29 @@
           "b3d7e0f1a8": "solicitud de fusión",
           "a2c6d9e0f7": "Solicitud de fusión",
           "91b5c8d7e6": "GitLab"
+        }
+      }
+    },
+    "features": {
+      "codeIntel": {
+        "indexStatus": {
+          "READY": "Listo",
+          "INDEXING": "Indexando",
+          "PARTIAL": "Índice parcial",
+          "ERROR": "Error de índice",
+          "UNKNOWN": "Estado desconocido"
+        },
+        "reviewTab": {
+          "title": "Revisión",
+          "empty": "Sin datos de revisión",
+          "loading": "Cargando revisión...",
+          "error": "Error al cargar revisión"
+        },
+        "settingsState": {
+          "unknown": "Cargando...",
+          "enabled": "Inteligencia de código activada",
+          "disabled": "Inteligencia de código desactivada",
+          "unsupported": "No compatible con este entorno"
         }
       }
     }

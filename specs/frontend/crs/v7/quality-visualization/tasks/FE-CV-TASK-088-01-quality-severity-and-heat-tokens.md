@@ -5,7 +5,7 @@
 **Area:** frontend / theme tokens
 **File:** `frontend/src/renderer/src/assets/main.css` (sửa; chèn sau `--annotation-highlight` ở `:root` (:206) và `.dark` (:294) và khối `@theme inline` cạnh `--color-status-success*` (:101-103))
 **Depends on:** không (làm được ngay, không cần backend)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

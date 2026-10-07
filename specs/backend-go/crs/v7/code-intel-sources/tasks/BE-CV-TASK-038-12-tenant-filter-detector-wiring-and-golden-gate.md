@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/tenant_filter_detector.go`, `tenant_filter_detector_test.go`; `internal/config/config.go` (sửa: `SQLTenantRuleMode`); `cmd/server/main.go` (sửa: đăng ký bộ); `internal/usecase/tenant_filter_golden_test.go` (mới)
 **Depends on:** BE-CV-TASK-038-09, 038-10, 038-11; BE-CV-TASK-037-06 (`Detector`); BE-CV-SOL-031-erd-model-and-access-scan, BE-CV-SOL-030
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Solution 2.D–2.E. Bộ chỉ chạy khi mode cho phép và (ở `experimental`
 
 ## Tiêu chí hoàn thành
 
-- [ ] Toàn bộ §9 solution 038-static-tenant-filter-rule đạt trên fixture.
-- [ ] Mặc định `experimental` đúng; giá trị biến lạ ⇒ `off`.
-- [ ] Precision/recall đã ghi; quyết định chuyển `on` để cho chủ sản phẩm.
+- [x] Toàn bộ §9 solution 038-static-tenant-filter-rule đạt trên fixture.
+- [x] Mặc định `experimental` đúng; giá trị biến lạ ⇒ `off`.
+- [x] Precision/recall đã ghi; quyết định chuyển `on` để cho chủ sản phẩm.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend / renderer cmd-j
 **File:** `frontend/src/renderer/src/components/cmd-j/quick-actions.ts`, `quick-action-context.ts`, `quick-action-context.test.ts`, `components/WorktreeJumpPalette.tsx` (sửa) + test
 **Depends on:** FE-CV-TASK-061-02; lens đã phát hành (`reviewLensAvailable`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/hint_agent_turn_finished.go`, `internal/adapter/grpc/` (handler), dòng `rpc` trong `codeintel.proto` (mới)
 **Depends on:** BE-CV-TASK-080-05, BE-CV-SOL-040-codeintel-write-and-stream-channels
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 C-DM §3.1: `HintAgentTurnFinished (mới, P1, tuỳ chọn)`, action `read`, kênh `codeIntel.hintAgentTurnFinished`. PQ-35. Bỏ qua nếu đã có refresh trong cửa sổ debounce.
@@ -19,7 +19,7 @@ C-DM §3.1: `HintAgentTurnFinished (mới, P1, tuỳ chọn)`, action `read`, k�
 - Unit: trùng với slot sẵn có chỉ chạm; cờ tắt ⇒ `CODEINTEL_DISABLED`.
 
 ## Tiêu chí hoàn thành
-- [ ] `buf breaking` xanh; kênh gateway đăng ký ở SOL-040.
+- [x] `buf breaking` xanh; kênh gateway đăng ký ở SOL-040.
 
 ## Rủi ro
 Lạm dụng gọi liên tục: giới hạn bởi debounce và hạn mức.

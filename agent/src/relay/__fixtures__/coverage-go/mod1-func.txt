@@ -1,0 +1,5 @@
+github.com/example/mod1/pkg/calc.go:5:	Add		100.0%
+github.com/example/mod1/pkg/calc.go:9:	Sub		0.0%
+github.com/example/mod1/pkg/user.go:10:	NewUser		100.0%
+github.com/example/mod1/pkg/user.go:17:	DeleteUser	0.0%
+total:					(statements)	60.0%

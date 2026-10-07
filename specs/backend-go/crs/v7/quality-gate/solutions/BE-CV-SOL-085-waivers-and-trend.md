@@ -134,16 +134,16 @@ Subject `orca.codeintel.quality.gate_changed`; payload theo §5: `{repo_binding_
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `WaiveFinding` hai lần cùng đầu vào → đúng một hàng hiệu lực; gia hạn tăng `version`; hai dialect cùng kết quả.
-- [ ] `member`: miễn `error`, miễn `check`, hạn > 7 ngày → bị từ chối; `owner` miễn tối đa 30 ngày; `expires_at` quá khứ hoặc quá hạn → `CODEINTEL_WAIVER_EXPIRY_INVALID` kèm `maxDays`.
-- [ ] Waiver hết hạn mất hiệu lực khi đọc, không cần job; `REVOKE` và gia hạn đổi `GetQualityGate` ngay.
-- [ ] `DismissFinding` một `error` **không** làm `fail` thành `pass`; `WaiveFinding` thì có và lý do `waived`/`waivedCount` hiện ra.
-- [ ] `quality.run_finished` đến hai lần cùng `event_id` → đúng một điểm; `gate_changed` phát khi `verdict` đổi và **không** phát khi không đổi.
-- [ ] `local` và `ci` cùng commit/profile → hai điểm, không ghi đè.
-- [ ] `GetQualityTrend`: `limit>200` bị từ chối; `truncated/totalCount` đúng; điểm `unknown` không nội suy; `turn_key` khớp `agent_turns.client_turn_id`.
-- [ ] Bảo trì: xoá điểm >90 ngày/>200 điểm và waiver >365 ngày; chạy lặp không đổi kết quả.
-- [ ] Cờ tắt → `CODEINTEL_QUALITY_GATE_DISABLED`; consumer nội bộ vẫn chạy để không tắc outbox (CR §2.2).
-- [ ] Mọi truy vấn có `tenant_id`; test AST + test cách ly tenant hai dialect.
+- [x] `WaiveFinding` hai lần cùng đầu vào → đúng một hàng hiệu lực; gia hạn tăng `version`; hai dialect cùng kết quả.
+- [x] `member`: miễn `error`, miễn `check`, hạn > 7 ngày → bị từ chối; `owner` miễn tối đa 30 ngày; `expires_at` quá khứ hoặc quá hạn → `CODEINTEL_WAIVER_EXPIRY_INVALID` kèm `maxDays`.
+- [x] Waiver hết hạn mất hiệu lực khi đọc, không cần job; `REVOKE` và gia hạn đổi `GetQualityGate` ngay.
+- [x] `DismissFinding` một `error` **không** làm `fail` thành `pass`; `WaiveFinding` thì có và lý do `waived`/`waivedCount` hiện ra.
+- [x] `quality.run_finished` đến hai lần cùng `event_id` → đúng một điểm; `gate_changed` phát khi `verdict` đổi và **không** phát khi không đổi.
+- [x] `local` và `ci` cùng commit/profile → hai điểm, không ghi đè.
+- [x] `GetQualityTrend`: `limit>200` bị từ chối; `truncated/totalCount` đúng; điểm `unknown` không nội suy; `turn_key` khớp `agent_turns.client_turn_id`.
+- [x] Bảo trì: xoá điểm >90 ngày/>200 điểm và waiver >365 ngày; chạy lặp không đổi kết quả.
+- [x] Cờ tắt → `CODEINTEL_QUALITY_GATE_DISABLED`; consumer nội bộ vẫn chạy để không tắc outbox (CR §2.2).
+- [x] Mọi truy vấn có `tenant_id`; test AST + test cách ly tenant hai dialect.
 
 ## 5. Kiểm thử
 

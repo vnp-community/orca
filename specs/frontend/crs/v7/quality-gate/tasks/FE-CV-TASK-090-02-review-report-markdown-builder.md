@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/review-report-markdown.ts` (mới) + test
 **Depends on:** FE-CV-TASK-090-01, 090-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

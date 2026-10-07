@@ -192,17 +192,17 @@ Test AST (mẫu `tenant_scope_guard_test.go`): quét **mọi** `*_repository.go`
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `make build vet test lint` xanh với module mới trong `go.work`; `make tidy-all` không đổi gì thêm.
-- [ ] `common/apperrors`: hai Kind mới ánh xạ đúng `codes`; Kind cũ không đổi; test hiện có xanh.
-- [ ] `buf lint` xanh cho `orca.codeintel.v1`; stub sinh vào `proto/gen/go/orca/codeintel/v1`; `buf breaking` xanh so với `main` (bỏ qua khi file chưa có trên `main`).
-- [ ] Postgres và MySQL: service khởi động, `/healthz`, `/readyz` trả 200; `grpcurl` thấy `orca.codeintel.v1.CodeIntelService` qua reflection; DSN scheme lạ → thoát với lỗi `detecting database dialect`.
-- [ ] Migration `0001_init` up → down → up sạch ở hai dialect.
-- [ ] Ghi `outbox_events` cùng transaction rồi relay publish lên NATS; rollback → không có dòng; hai relay đồng thời không mất sự kiện.
-- [ ] Postgres role `NOSUPERUSER NOBYPASSRLS`: tenant A không đọc/ghi được dòng tenant B; chỉ `app.relay='on'` đọc chéo tenant (`SELECT`/`UPDATE`, không `INSERT`). MySQL: test chứng minh mọi truy vấn lọc `tenant_id`.
-- [ ] Test AST quét mọi file repository ở cả hai adapter.
-- [ ] Stream thử: có metadata tenant → đọc được; không → `RequireTenantID` lỗi.
-- [ ] `docker compose` dựng được `code-intel-service` và `migrate-codeintel` chạy xong; workflow CI chạy hai dialect.
-- [ ] Không file/thư mục tên `helpers|utils|common|misc`; không `max-lines` disable mới.
+- [x] `make build vet test lint` xanh với module mới trong `go.work`; `make tidy-all` không đổi gì thêm.
+- [x] `common/apperrors`: hai Kind mới ánh xạ đúng `codes`; Kind cũ không đổi; test hiện có xanh.
+- [x] `buf lint` xanh cho `orca.codeintel.v1`; stub sinh vào `proto/gen/go/orca/codeintel/v1`; `buf breaking` xanh so với `main` (bỏ qua khi file chưa có trên `main`).
+- [x] Postgres và MySQL: service khởi động, `/healthz`, `/readyz` trả 200; `grpcurl` thấy `orca.codeintel.v1.CodeIntelService` qua reflection; DSN scheme lạ → thoát với lỗi `detecting database dialect`.
+- [x] Migration `0001_init` up → down → up sạch ở hai dialect.
+- [x] Ghi `outbox_events` cùng transaction rồi relay publish lên NATS; rollback → không có dòng; hai relay đồng thời không mất sự kiện.
+- [x] Postgres role `NOSUPERUSER NOBYPASSRLS`: tenant A không đọc/ghi được dòng tenant B; chỉ `app.relay='on'` đọc chéo tenant (`SELECT`/`UPDATE`, không `INSERT`). MySQL: test chứng minh mọi truy vấn lọc `tenant_id`.
+- [x] Test AST quét mọi file repository ở cả hai adapter.
+- [x] Stream thử: có metadata tenant → đọc được; không → `RequireTenantID` lỗi.
+- [x] `docker compose` dựng được `code-intel-service` và `migrate-codeintel` chạy xong; workflow CI chạy hai dialect.
+- [x] Không file/thư mục tên `helpers|utils|common|misc`; không `max-lines` disable mới.
 
 ## 5. Kiểm thử
 

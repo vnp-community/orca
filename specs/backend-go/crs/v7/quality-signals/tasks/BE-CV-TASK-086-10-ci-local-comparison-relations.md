@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/ci_comparison.go`, `ci_comparison_test.go` (mới)
 **Depends on:** BE-CV-TASK-086-09
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 SOL mục 2.E; PQ-25: 9 relation; `local_pass_ci_fail` không bao giờ `pass`, luôn có hint.
@@ -19,7 +19,7 @@ SOL mục 2.E; PQ-25: 9 relation; `local_pass_ci_fail` không bao giờ `pass`, 
 - Bảng đủ 9 relation + ca thiếu một phía, `dirty`, `sha_mismatch`, cục bộ `env_not_ready`.
 
 ## Tiêu chí hoàn thành
-- [ ] Mỗi relation có ≥ 1 ca; `local_pass_ci_fail` luôn hint không rỗng.
+- [x] Mỗi relation có ≥ 1 ca; `local_pass_ci_fail` luôn hint không rỗng.
 
 ## Rủi ro
 Tập mã hint chưa có trong hợp đồng (SOL mục 7).

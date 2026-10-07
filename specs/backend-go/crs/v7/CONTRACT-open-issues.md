@@ -1,8 +1,15 @@
 # Điểm hợp đồng thiếu, lệch hoặc chưa chốt do các solution báo (series v7)
 
-> Trạng thái: tổng hợp 2026-10-06 từ báo cáo của 23 lượt soạn solution/task (backend, agent, frontend). **Chưa sửa hợp đồng.** Các solution đã chọn một cách xử lý tạm (ghi ở mục "Lệch giữa CR và hợp đồng" của từng solution); file này để chủ hợp đồng quyết định rồi sửa ba file `CONTRACT-codeintel-*` trong **một PR hợp đồng** trước khi triển khai. Mọi khẳng định là từ báo cáo của agent soạn, chưa được tôi kiểm chứng lại từng điểm.
+> **Trạng thái: cập nhật 2026-10-06 — P0 và P1 đã được áp dụng vào ba file `CONTRACT-codeintel-*` trong một PR hợp đồng.**
+>
+> Các vấn đề **đã giải quyết** (đã sửa hợp đồng): H1, H2, H4, H9 (§A); B1, B3, B4, B5, B6, B9 (§B); C1, C2, C6 (chỉ mục + outbox seq + retention), C8, C11 (cảnh báo bảo mật) (§C); D1, D2, D3, D4 (một phần), D5 (§D).
+>
+> Các vấn đề **còn mở** (chưa có quyết định thiết kế hoặc ngoài phạm vi hợp đồng): H3, H5, H6, H7, H8, H10, H11; B2, B7, B8, B10; C3, C4, C5, C7, C9, C10, C12; D2 (phần còn lại: `payload_json` key convention, `quality.waive` revoke fields); D5 (phần còn lại: `c4.yaml` schema, admin UI `aiReviewLevel`).
+>
+> Mọi khẳng định là từ báo cáo của agent soạn, chưa được kiểm chứng lại từng điểm.
 
 Cột "Báo bởi" dùng: BE-foundation, BE-graph, BE-sources A/B, BE-gateway, BE-signals, BE-gate, BE-rollout, AG-codeintel, AG-signals, AG-rollout, FE-reviewA/B, FE-gate, FE-vis. Các điểm được báo từ ≥2 nơi là chỗ hổng thật và nên ưu tiên.
+
 
 ## A. Cần quyết định của con người (ảnh hưởng thiết kế, không chỉ chữ nghĩa)
 

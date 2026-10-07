@@ -5,7 +5,7 @@
 **Area:** frontend / i18n
 **File:** `frontend/src/renderer/src/i18n/code-intel-locale-coverage.test.ts` (mới), `i18n/locales/{en,es,ja,ko,zh}.json` (sửa)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/agentrepofs/git_read_ops.go` (mới), `.../git_log_parser.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-030-04 (song song được với 030-05; gắn `ContentHash` vào 030-05 sau khi xong)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -33,10 +33,10 @@ SOL-030 mục 2.C. Chỉ dùng lệnh có từ git 2.25 trở về trước và 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi hàm có test với agent giả; oid từ `BlobIDs` khớp thứ tự đầu vào.
-- [ ] `DirtyPaths` thấy file chưa theo dõi (ví dụ migration mới).
-- [ ] Không tham số nào vi phạm `SHELL_METACHARACTERS`.
-- [ ] `Log` luôn có `-n` và `--since`.
+- [x] Mỗi hàm có test với agent giả; oid từ `BlobIDs` khớp thứ tự đầu vào.
+- [x] `DirtyPaths` thấy file chưa theo dõi (ví dụ migration mới).
+- [x] Không tham số nào vi phạm `SHELL_METACHARACTERS`.
+- [x] `Log` luôn có `-n` và `--since`.
 
 ## Rủi ro và lưu ý
 

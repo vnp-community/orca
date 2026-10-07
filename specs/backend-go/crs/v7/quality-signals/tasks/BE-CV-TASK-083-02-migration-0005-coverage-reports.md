@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/migrations/{postgres,mysql}/0005_coverage_reports.{up,down}.sql` (mới)
 **Depends on:** BE-CV-TASK-082-02 (số migration kế trước; đọc `ls` trước khi đặt số)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 C-DM §4.2 T13. UNIQUE `(tenant_id, repo_binding_id, head_commit, dirty, tree_hash, scope_key, source)` (~1 949 byte MySQL utf8mb4, tính tay).
@@ -19,7 +19,7 @@ C-DM §4.2 T13. UNIQUE `(tenant_id, repo_binding_id, head_commit, dirty, tree_ha
 - up/down/up hai dialect; `information_schema`; RLS bằng role không superuser.
 
 ## Tiêu chí hoàn thành
-- [ ] UNIQUE hoạt động với `dirty` bool cả hai dialect.
+- [x] UNIQUE hoạt động với `dirty` bool cả hai dialect.
 
 ## Rủi ro
 Độ dài khoá MySQL chưa chạy thật.

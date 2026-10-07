@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpcclient/gated_agent_relay.go`, `gated_agent_relay_test.go`, `no_relay_bypass_test.go` (mới); `internal/usecase/ports.go` (cổng `AgentRelay`)
 **Depends on:** BE-CV-TASK-013-09, BE-CV-TASK-012-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ SOL-013-gate mục 2.C. `RelayByDevServer{dev_server_id, method, params_json}` �
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi lời gọi agent đi qua cổng; test AST đỏ khi thêm đường tắt.
-- [ ] Không rò khe khi huỷ/lỗi.
-- [ ] Không khoá lệnh/`env`/`cwd`/`timeout` xuống agent.
+- [x] Mọi lời gọi agent đi qua cổng; test AST đỏ khi thêm đường tắt.
+- [x] Không rò khe khi huỷ/lỗi.
+- [x] Không khoá lệnh/`env`/`cwd`/`timeout` xuống agent.
 
 ## Rủi ro và lưu ý
 

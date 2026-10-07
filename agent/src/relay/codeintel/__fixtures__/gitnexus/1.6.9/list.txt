@@ -1,0 +1,2 @@
+Repositories:
+- /repo (indexed: true, commit: abc1234)

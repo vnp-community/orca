@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/{tenant_settings,repo_binding,graph_snapshot,review_state,finding_dismissal,c4_override,reindex_job,payload_limits,code_intel_errors}.go` và `*_test.go` (mới)
 **Depends on:** BE-CV-TASK-010-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -32,9 +32,9 @@ Domain không import adapter (arch/03). Lỗi dùng `common/apperrors` (`New(kin
 
 ## Tiêu chí hoàn thành
 
-- [ ] Toàn bộ mã lỗi theo PQ-03, không `INVALID_ARGUMENT`.
-- [ ] `CanTransition` và `MapAgentStatus` khớp PQ-16.
-- [ ] Domain không import `pgx`/`database/sql`/gRPC.
+- [x] Toàn bộ mã lỗi theo PQ-03, không `INVALID_ARGUMENT`.
+- [x] `CanTransition` và `MapAgentStatus` khớp PQ-16.
+- [x] Domain không import `pgx`/`database/sql`/gRPC.
 
 ## Rủi ro và lưu ý
 

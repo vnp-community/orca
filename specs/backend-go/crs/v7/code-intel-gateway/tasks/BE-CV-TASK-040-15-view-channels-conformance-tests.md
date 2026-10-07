@@ -29,8 +29,8 @@ Chốt chất lượng chung cho nhóm đọc: không khoá snake_case, mảng k
 
 ## Tiêu chí hoàn thành
 
-- [ ] 15 kênh pass cả sáu nhóm kiểm.
-- [ ] Golden được review (diff có chủ đích).
+- [x] 15 kênh pass cả sáu nhóm kiểm.
+- [x] Golden được review (diff có chủ đích).
 
 ## Rủi ro và lưu ý
 

@@ -103,7 +103,8 @@ const taskColumns = `
 	progress_percent, COALESCE(active_execution_id, ''), COALESCE(last_execution_output, ''),
 	COALESCE(task_number, 0), COALESCE(pr_url, ''), COALESCE(workflow_template_id::text, ''),
 	COALESCE(active_execution_link_id::text, ''),
-	labels, COALESCE(reporter_id::text, ''), workflow_exec_id, done_subtasks, total_subtasks, COALESCE(share_token, '')
+	labels, COALESCE(reporter_id::text, ''), workflow_exec_id, done_subtasks, total_subtasks, COALESCE(share_token, ''),
+	COALESCE(request_id::text, '')
 `
 
 // rowScanner abstracts over pgx.Row/pgx.Rows — both satisfy Scan(...any)
@@ -122,7 +123,7 @@ func scanTask(row rowScanner) (domain.Task, error) {
 		&t.DueDate, &t.EstimatedHours, &t.ActualHours, &t.PromptTemplate, &t.AIContext,
 		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent, &t.ActiveExecutionID, &t.LastExecutionOutput,
 		&t.TaskNumber, &t.PRURL, &t.WorkflowTemplateID, &t.ActiveExecutionLinkID,
-		&t.Labels, &t.ReporterID, &t.WorkflowExecID, &t.DoneSubtasks, &t.TotalSubtasks, &t.ShareToken)
+		&t.Labels, &t.ReporterID, &t.WorkflowExecID, &t.DoneSubtasks, &t.TotalSubtasks, &t.ShareToken, &t.RequestID)
 	return t, err
 }
 
@@ -137,7 +138,7 @@ func scanTaskAndTrailing(row rowScanner, extra ...any) (domain.Task, error) {
 		&t.DueDate, &t.EstimatedHours, &t.ActualHours, &t.PromptTemplate, &t.AIContext,
 		&t.AIPlanJSON, &t.Visibility, &t.WorktreeID, &t.AgentSessionID, &t.ProgressPercent, &t.ActiveExecutionID, &t.LastExecutionOutput,
 		&t.TaskNumber, &t.PRURL, &t.WorkflowTemplateID, &t.ActiveExecutionLinkID,
-		&t.Labels, &t.ReporterID, &t.WorkflowExecID, &t.DoneSubtasks, &t.TotalSubtasks, &t.ShareToken}
+		&t.Labels, &t.ReporterID, &t.WorkflowExecID, &t.DoneSubtasks, &t.TotalSubtasks, &t.ShareToken, &t.RequestID}
 	dest = append(dest, extra...)
 	err := row.Scan(dest...)
 	return t, err
@@ -173,30 +174,48 @@ func prefixedTaskColumns(alias string) string {
 // so they're deliberately not INSERT columns here.
 func (r *Repository) Create(ctx context.Context, task domain.Task) (domain.Task, error) {
 	if task.Labels == nil {
-		// labels is NOT NULL (migration 0011); a nil slice binds as SQL
-		// NULL, not the column's DEFAULT '{}' (DEFAULT only applies when
-		// a column is omitted from the INSERT list, not when NULL is
-		// bound explicitly) — defends every caller, not just domain.NewTask.
 		task.Labels = []string{}
 	}
+	
+	if domain.IsContainerType(task.Type) {
+		_, err := r.db.Exec(ctx, `
+			INSERT INTO task.tasks (
+				id, tenant_id, title, status, parent_id, project_id,
+				description, task_type, priority, assignee_id, owner_id, due_date,
+				estimated_hours, prompt_template, ai_context, visibility,
+				labels, reporter_id, workflow_exec_id, request_id
+			)
+			VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+		`, task.ID, task.TenantID, task.Title, task.Status, nullableUUID(task.ParentID), nullableUUID(task.ProjectID),
+			task.Description, orDefault(task.Type, "task"), orDefault(task.Priority, "medium"), nullableUUID(task.AssigneeID),
+			nullableUUID(task.OwnerID), task.DueDate, task.EstimatedHours, task.PromptTemplate, task.AIContext, orDefault(task.Visibility, "team"),
+			task.Labels, nullableUUID(task.ReporterID), task.WorkflowExecID, nullableUUID(task.RequestID))
+		if err != nil {
+			return domain.Task{}, fmt.Errorf("postgres: insert container: %w", err)
+		}
+		task.TaskNumber = 0
+		return task, nil
+	}
+
 	row := r.db.QueryRow(ctx, `
 		INSERT INTO task.tasks (
 			id, tenant_id, title, status, parent_id, project_id,
 			description, task_type, priority, assignee_id, owner_id, due_date,
 			estimated_hours, prompt_template, ai_context, visibility, task_number,
-			labels, reporter_id, workflow_exec_id
+			labels, reporter_id, workflow_exec_id, request_id
 		)
-		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,nextval('task.task_number_seq'),$17,$18,$19)
+		VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,nextval('task.task_number_seq'),$17,$18,$19,$20)
 		RETURNING task_number
 	`, task.ID, task.TenantID, task.Title, task.Status, nullableUUID(task.ParentID), nullableUUID(task.ProjectID),
 		task.Description, orDefault(task.Type, "task"), orDefault(task.Priority, "medium"), nullableUUID(task.AssigneeID),
 		nullableUUID(task.OwnerID), task.DueDate, task.EstimatedHours, task.PromptTemplate, task.AIContext, orDefault(task.Visibility, "team"),
-		task.Labels, nullableUUID(task.ReporterID), task.WorkflowExecID)
+		task.Labels, nullableUUID(task.ReporterID), task.WorkflowExecID, nullableUUID(task.RequestID))
 	if err := row.Scan(&task.TaskNumber); err != nil {
 		return domain.Task{}, fmt.Errorf("postgres: insert task: %w", err)
 	}
 	return task, nil
 }
+
 
 func (r *Repository) Get(ctx context.Context, tenantID, id string) (domain.Task, error) {
 	row := r.db.QueryRow(ctx, `

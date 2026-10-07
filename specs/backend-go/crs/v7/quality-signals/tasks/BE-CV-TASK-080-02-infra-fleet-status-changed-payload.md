@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/eventbus/agent_status_publisher.go`, `internal/usecase/ports.go` (~:712), `internal/usecase/agent_output_classifier.go`, `internal/usecase/agent_output_classifier_test.go` (sửa)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Đã đọc: `PublishStatusChanged(ctx, tenantID, sessionID, status)` chỉ truyền `session.ID`; `domain.AgentSession` đã có `WorktreeID`, `DevServerID`; classifier gọi ở 3 chỗ (`Run` khi exit, khi đổi status, `onStartupTimeout`) và bỏ lỗi (`_ =`). `api-gateway/.../channels_agent.go:291` đẩy nguyên payload tới renderer. C-DM §2.2: thêm hai trường, tương thích ngược.
@@ -21,8 +21,8 @@
 - `go build ./... && go test ./...` trong `infra-fleet-service`.
 
 ## Tiêu chí hoàn thành
-- [ ] Renderer/gateway không đổi hành vi.
-- [ ] Test classifier xanh.
+- [x] Renderer/gateway không đổi hành vi.
+- [x] Test classifier xanh.
 
 ## Rủi ro
 `worktree_id` của infra-fleet có khớp `repo_bindings.worktree_id` hay không chưa kiểm chứng (SOL-080 mục 6).

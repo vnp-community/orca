@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/structurefinding/{finding.go, finding_key.go, layer_import_rules.go, import_cycle_findings.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-037-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Hàm thuần stdlib. `rule`→`kind` theo bảng PQ-06 (backend điền). Đầu
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các ca trên xanh; không import ngoài stdlib.
-- [ ] Không có số dòng trong `canonicalSubject`.
+- [x] Các ca trên xanh; không import ngoài stdlib.
+- [x] Không có số dòng trong `canonicalSubject`.
 
 ## Rủi ro và lưu ý
 

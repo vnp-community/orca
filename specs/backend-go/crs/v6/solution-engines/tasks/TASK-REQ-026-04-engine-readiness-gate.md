@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/engine_readiness_gate.go`, `internal/usecase/ports.go` (sửa), `internal/adapter/grpcclient/dev_server_executor.go`, `internal/domain/semver_compare.go` và test (mới)
 **Depends on:** TASK-REQ-026-01, TASK-REQ-007-04 (`ProjectContextResolver`, adapter Relay), TASK-REQ-008-02 (adapter `agent.execPrompt`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -67,11 +67,11 @@ Adapter Relay của SOL-007 (`ai_completion_relay.go`) đã dựng khung gọi `
 
 ## Tiêu chí hoàn thành
 
-- [ ] Từng mã lỗi ở bảng CR 2.3 có test và `fix_hint` không rỗng.
-- [ ] Không có chuỗi shell nào được ghép; `Binary` và `Args` tách riêng.
-- [ ] Cache 10 phút đúng theo `Clock`; chỉ lưu báo cáo đạt; `-race` sạch.
-- [ ] `execPrompt` kiểm đăng nhập chỉ chạy khi các kiểm khác đạt.
-- [ ] `PreflightReport` không chứa bí mật (test với `Stderr` chứa `ghp_...`).
+- [x] Từng mã lỗi ở bảng CR 2.3 có test và `fix_hint` không rỗng.
+- [x] Không có chuỗi shell nào được ghép; `Binary` và `Args` tách riêng.
+- [x] Cache 10 phút đúng theo `Clock`; chỉ lưu báo cáo đạt; `-race` sạch.
+- [x] `execPrompt` kiểm đăng nhập chỉ chạy khi các kiểm khác đạt.
+- [x] `PreflightReport` không chứa bí mật (test với `Stderr` chứa `ghp_...`).
 
 ## Rủi ro và lưu ý
 

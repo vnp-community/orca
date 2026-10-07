@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-secret-scanner-diff.ts` (mới), `.test.ts`
 **Depends on:** AG-CV-TASK-091-02, AG-CV-TASK-083-03, AG-CV-TASK-082-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Bảng mẫu: mỗi loại 1 dương tính + 1 âm tính (dùng canary dựng l�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Finding không chứa độ dài/tiền tố/ngữ cảnh; canary vắng mọi nơi.
+- [x] Finding không chứa độ dài/tiền tố/ngữ cảnh; canary vắng mọi nơi.
 
 ## Rủi ro
 

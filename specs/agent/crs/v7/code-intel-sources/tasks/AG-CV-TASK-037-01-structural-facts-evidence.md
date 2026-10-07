@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/__fixtures__/structural-facts/` (mới), `agent/scripts/capture-structural-facts-fixtures.mjs` (mới), `agent/src/relay/structural-facts-fixture-contract.test.ts` (mới)
 **Depends on:** AG-CV-SOL-070 (khung `MANIFEST.json`); GitNexus cài sẵn
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,8 +25,12 @@ Test hợp đồng fixture: băm, ngân sách 20 KiB/tệp, không đường d�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Fixture thật cho cả 5 `kind` hoặc `BLOCKED` kèm lý do.
-- [ ] Danh sách cú pháp bị từ chối được ghi lại trước khi viết mẫu cuối.
+- [x] Fixture thật cho cả 5 `kind` hoặc `BLOCKED` kèm lý do. (Đã blocked vì GitNexus CLI v1.6.5 thiếu lệnh check và cypher không có --json)
+- [x] Danh sách cú pháp bị từ chối được ghi lại trước khi viết mẫu cuối:
+  1. `(s:Function OR s:Method)`: GitNexus Cypher không hỗ trợ `OR` trên nhãn node; đã chuyển sang tách 2 truy vấn riêng rồi gộp ở Agent.
+  2. `label(f)`: Không hợp lệ trên GitNexus Cypher; chuẩn hóa dùng `labels(f)[0] AS label`.
+  3. `cypher --json`: GitNexus CLI không hỗ trợ xuất JSON cho lệnh cypher; bắt buộc dùng parser markdown table.
+  4. Các lệnh `check` khác ngoài `check --cycles --json -r <path>`: Đều bị cấm bởi whitelist runner.
 
 ## Rủi ro
 

@@ -1,0 +1,6 @@
+syntax = "proto3";
+package api.v1;
+
+message UserMessage {
+  string id = 1;
+}

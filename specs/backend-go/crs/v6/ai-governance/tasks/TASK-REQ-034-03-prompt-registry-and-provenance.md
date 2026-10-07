@@ -5,7 +5,7 @@
 **Service:** `request-service`, `backend-go/ci`
 **File:** `backend-go/services/request-service/internal/prompts/registry.go` (mới), `.../internal/prompts/<step>/v1.0.0.tmpl` (mới, một file mỗi bước: `classify`, `solution`, `diagnosis`, `findings`, `answer`, `plan`, `taskspec`), `.../internal/prompts/registry_test.go` (mới), `.../internal/usecase/prompt_registry.go` (mới, cổng và bản cài mỏng), `backend-go/ci/check-prompt-version-bump.sh` (mới), `.github/workflows/backend-go-request-service.yml` (sửa, do TASK-REQ-001-06 tạo)
 **Depends on:** TASK-REQ-034-02 (`Provenance`, `AIStep`); BE-REQ-SOL-005, 007, 008, 012 (các prompt hiện có được chuyển vào đây khi những CR đó triển khai)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -54,11 +54,11 @@ type Rendered struct{ ID, Version, Text, Digest string } // Digest = sha256 hex 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi sản phẩm AI có `prompt_id`, `prompt_version`, `prompt_digest` (kiểm ở task 04).
-- [ ] Sửa file prompt đã phát hành mà không thêm phiên bản làm script và test hash thất bại.
-- [ ] Thiếu biến thì không có prompt nào được gửi.
-- [ ] Rollback bằng `REQUEST_AI_PROMPT_PIN` không cần build lại.
-- [ ] Không có chỗ nào gửi `resolvedApiKey` (test grep trong adapter ở task 04).
+- [x] Mọi sản phẩm AI có `prompt_id`, `prompt_version`, `prompt_digest` (kiểm ở task 04).
+- [x] Sửa file prompt đã phát hành mà không thêm phiên bản làm script và test hash thất bại.
+- [x] Thiếu biến thì không có prompt nào được gửi.
+- [x] Rollback bằng `REQUEST_AI_PROMPT_PIN` không cần build lại.
+- [x] Không có chỗ nào gửi `resolvedApiKey` (test grep trong adapter ở task 04).
 
 ## Ví dụ tham khảo
 

@@ -1,0 +1,5 @@
+mode: set
+github.com/example/mod1/pkg/calc.go:5.14,7.2 1 1
+github.com/example/mod1/pkg/calc.go:9.14,11.2 1 0
+github.com/example/mod1/pkg/user.go:10.15,15.2 2 1
+github.com/example/mod1/pkg/user.go:17.15,20.2 1 0

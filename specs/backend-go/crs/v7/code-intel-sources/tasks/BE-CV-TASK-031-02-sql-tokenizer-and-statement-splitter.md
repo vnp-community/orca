@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/sqlmigration/tokenizer.go` (mới), `.../statement_splitter.go` (mới), `.../tokenizer_test.go`, `.../statement_splitter_test.go` (mới)
 **Depends on:** BE-CV-TASK-031-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,9 +30,9 @@ SOL-031 mục 2.C (đoạn "Tách câu lệnh"). Nền cho mọi phần sau: n�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca bảng đạt; fuzz ngắn sạch.
-- [ ] Không panic/treo với đầu vào hỏng.
-- [ ] Số dòng của câu lệnh đúng (dùng cho `ParseWarning.Line`).
+- [x] Mọi ca bảng đạt; fuzz ngắn sạch.
+- [x] Không panic/treo với đầu vào hỏng.
+- [x] Số dòng của câu lệnh đúng (dùng cho `ParseWarning.Line`).
 
 ## Rủi ro và lưu ý
 

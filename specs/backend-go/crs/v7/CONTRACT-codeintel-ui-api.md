@@ -30,6 +30,7 @@
 | U7 | Cờ tắt → `CODEINTEL_DISABLED` ở mọi kênh ngoài `settings.get|set`; client coi là `kind:'disabled'` (ẩn tính năng, không toast) |
 | U8 | Phiên thiết bị (`DeviceID ≠ ""`) bị từ chối `CODEINTEL_NOT_AUTHORIZED` ở mọi kênh `codeIntel.*` trừ `settings.get` (mobile dùng đường host, PQ-36) |
 | U9 | Mọi chuỗi tự do từ backend (message phát hiện, tên) có thể chứa dữ liệu không tin cậy: render văn bản thuần, không HTML/markdown thô |
+| **U10** | **(D1) Quy tắc proto → JSON (api-gateway sử dụng encoder `protoreflect`/`protojson`):** (a) enum → **chữ thường snake_case** (ví dụ `INDEX_SCOPE_EXACT` → `"exact"`); (b) `int64`/`uint64` → **chuỗi JSON** (tránh mất độ chính xác JS); (c) `optional field` vắng mặt → không xuất hiện trong JSON (khác với `null`); (d) `oneof` → chỉ một trường có giá trị; (e) `bytes` → base64 URL-safe. Frontend không được dựa vào enum số (`0`, `1`, …) cho bất kỳ trường proto nào; luôn dùng chuỗi. Gateway **phải** có proto stub của `code-intel-service` (không gọi agent-only-forward); nếu chưa có stub (trước G0 `CONTRACT-codeintel-proto-and-data-map.md` §7.1): trả `CODEINTEL_UNAVAILABLE` với log rõ lý do. |
 
 ## 2. Quy ước chung
 
@@ -98,6 +99,9 @@ Dạng `^(CODEINTEL_[A-Z0-9_]+): (.*?)(?: \| (\{.*\}))?$`; phần mô tả 1 dò
 
 ### 2.4 Timeout và giới hạn (gateway)
 - Đọc view: 20 s; ghi/trạng thái/settings: 8 s (< `invokeTimeout` 25 s < `INVOKE_TIMEOUT_MS` 30 s của client). Service tôn trọng deadline; hết hạn → `CODEINTEL_TIMEOUT` + hậu tố `{"retryAfterMs":3000,"inProgress":true}` và hoàn tất nền (singleflight). Client tự thử lại tối đa 90 s tổng.
+- **`quality.summary` timeout (D2):** gateway WS ≤ **24 s** (không phải 120 s — 120 s chỉ là ngân sách service/infra-fleet nội bộ). Sau ≤ 24 s nếu service chưa xong, gateway trả `CODEINTEL_TIMEOUT {"inProgress":true,"retryAfterMs":3000}` và hoàn tất nền (cache 24 h); client thử lại.
+- **`subscribe` registry (D2):** gateway giữ một registry per-kết-nối WS (không per-user); subscribe lần hai thay lần đầu. Gateway gửi ack `null` ngay sau khi nhận `subscribe` rồi bắt đầu push; không cần header riêng biệt. **`resync` (D2):** khi gateway/stream đứt, gateway phát `changed{resync:true}` rồi đóng kết nối WS; client mở lại (backoff 1 s → 30 s) và tải lại view đang xem.
+- **Gateway proto stub (D2):** gateway **phải** có stub proto của `codeintel` được sinh từ `buf generate` trong cổng G0; không gọi agent-only-forward cho các kênh view. Nếu stub chưa có (trước G0): trả `CODEINTEL_UNAVAILABLE` với log rõ lý do.
 - `args[0]`: `reviewState.save` ≤ 256 KiB; `c4.save` ≤ 96 KiB (`document` ≤ 64 KiB); `quality.profile.save` ≤ 96 KiB; `quality.trace.confirm|link` ≤ 8 KiB; còn lại ≤ 16 KiB; chuỗi `reason`/`note` ≤ 500, `findingKey` ≤ 128, `key` ≤ 1024, `pageToken` ≤ 512, `kinds` ≤ 32 phần tử. Gateway phải `conn.SetReadLimit(320<<10)` (PQ-14, O-2).
 - Số: `depth` 1..3, `limit` trong ngân sách; **ngoài khoảng bị từ chối, không kẹp ngầm**.
 - Phản hồi ≤ 2 MiB (`proto.Size`), `symbol` ≤ 320 KiB.
@@ -166,7 +170,7 @@ Ghi chú: không kênh cho `ListRepoBindings` (`status` đã trả binding). `bi
 | `quality.turn.record` | (sel), `clientTurnId`, `agentType`, `model?`, `endedAt`, `startedAt?`, `interrupted?`, `endHeadCommit`, `treeDirtyEnd`, `filesChangedCount`, `filesDigest`, `promptDigest`, `promptExcerpt?`, `commandsSummary?`, `claims?` | `{turn: AgentTurn}` | review_write | 8 s |
 | `quality.turns` | (sel), `limit?` ≤ 50 (20), `before?` | `{turns: AgentTurn[]}` | quality_read | 8 s |
 | `quality.turn` | (sel), `turnId` | `{turn: AgentTurn}` | quality_read | 8 s |
-`quality.summary`: 20 s là trần WS của gateway **cộng** `invokeTimeout` 25 s ⇒ **không thể** vượt 25 s trên đường đồng bộ; vì vậy `quality.summary` với `dryRun:false` trả `CODEINTEL_TIMEOUT` có hậu tố `{"inProgress":true,"retryAfterMs":3000}` sau ≤ 24 s và hoàn tất nền (cache 24 h); client thử lại (PQ-13). Timeout ghi 120 s ở bảng nghĩa là ngân sách phía service/infra-fleet, không phía WS.
+`quality.summary`: 20 s là trần WS của gateway **cộng** `invokeTimeout` 25 s ⇒ **không thể** vượt 25 s trên đường đồng bộ; vì vậy `quality.summary` với `dryRun:false` trả `CODEINTEL_TIMEOUT` có hậu tố `{"inProgress":true,"retryAfterMs":3000}` sau ≤ **24 s** (D2: chốt giá trị này, không dùng giá trị 120 s) và hoàn tất nền (cache 24 h); client thử lại (PQ-13). Timeout ghi 120 s ở bảng nghĩa là ngân sách phía service/infra-fleet, không phía WS.
 Push thêm của nhóm này đi qua `subscribe` (mục 5). Tổng kênh: 26 + 20 = 46.
 
 ### 3.3 Kênh không có ở v7
@@ -225,7 +229,9 @@ type ImpactGraph = { target: SymbolRef; direction: 'upstream'|'downstream'; risk
   testsCovering: SymbolRef[] }                       // KHÔNG có cạnh ở v7 (hạn chế đã biết)
 type RouteMap = { routes: { id: string; path: string; method: string; filePath: string; side: 'server'|'client'; handler: SymbolRef|null; middleware?: string[]; responseKeys?: string[]; errorKeys?: string[] }[]
   edges: { route: string; handler: string; kind: 'handles_route'|'fetches' }[] }
-type SymbolDetail = { symbol: SymbolRef; incoming: Record<string, {uid?: string; name: string; filePath: string}[]>; outgoing: Record<string, {uid?: string; name: string; filePath: string}[]>
+type SymbolDetail = { symbol: SymbolRef
+  incoming: Record<string, {uid?: string; key?: string; name: string; filePath: string; line?: number}[]>   // D4: thêm `key` và `line` cho mỗi entry
+  outgoing: Record<string, {uid?: string; key?: string; name: string; filePath: string; line?: number}[]>   // giống incoming
   flows: { id: string; label: string; stepCount: number; step: number }[]
   source: { text: string; startLine: number; endLine: number; truncated: boolean } | null
   sourceOmitted: 'gitignored'|'binary'|'sensitive_path'|'not_requested'|null }
@@ -349,7 +355,9 @@ type QualityStep = { id: string; profileId: string; status: 'passed'|'findings'|
   failureKind: ''|'format_drift'|'output_too_large'|'exit_unexpected'|'parser_error'|'env'; envReason?: string; exitCode: number; durationMs: number
   tool: string; toolVersion: string; errorCount: number; warningCount: number; infoCount: number; totalCount: number; truncated: boolean; outsideScopeCount: number }
 type QualityRun = { id: string; worktreeId: string; headCommit: string; indexCommit: string; indexBasis: IndexBasis[]; scope: 'worktree'|'changed'|'commitRange'; baseCommit?: string
-  profile: string; status: 'queued'|'running'|'succeeded'|'failed'|'cancelled'; source: 'local'|'ci'; startedAt: string|null; finishedAt: string|null
+  profile: string
+  status: 'queued'|'running'|'succeeded'|'failed'|'cancelled'|'interrupted'   // D5: thêm 'interrupted'
+  source: 'local'|'ci'; startedAt: string|null; finishedAt: string|null
   summary: { error: number; warning: number; info: number; stepsTotal: number; stepsWithFindings: number; stepsFailed: number; stepsEnvNotReady: number; outsideScope: number; truncated: boolean }
   steps: QualityStep[]; errorCode?: string; treeFingerprint?: string; dirty?: boolean; workTreeChangedDuringRun: boolean; scopeWidened: boolean
   ci?: { provider: string; headSha: string; url?: string; fetchedAt: string; staleAfter?: string } }
@@ -378,6 +386,14 @@ type CoverageReport = { source: 'measured'|'estimated'; language: 'go'|'ts'|'mix
 type CiComparison = { profile: string; headCommit: string
   local: { runId?: string; status?: string; finishedAt?: string; dirty?: boolean }; ci: { runId?: string; status?: string; url?: string; fetchedAt?: string; sha?: string }
   relation: 'agree_pass'|'agree_fail'|'local_pass_ci_fail'|'local_fail_ci_pass'|'local_only'|'ci_only'|'ci_pending'|'sha_mismatch'|'not_comparable'; reasonsHint?: string[] }
+
+// D5 — các quy tắc được chốt:
+// - Đơn vị coverage: 0..1 (ví dụ 0.75 = 75%); không dùng 0..100. Frontend hiển thị nhân 100.
+// - `QualityFinding.column` và `QualityFinding.endColumn`: **1-based** (giống LSP); 0 = không có.
+// - `turnKey` format: `"${paneKey}:${doneAt}"` trong đó `doneAt` là Unix ms (số nguyên). Ví dụ: `"pane_abc123:1728205200000"`.
+// - `observed`/`threshold` trong `QualityGate.reasons`: chuỗi đã format theo ngữ cảnh (ví dụ `"0.72"`, `"0.80"` cho coverage; `"3"`, `"0"` cho counts).
+// - `RunnableProfile.id` là tên profile (ví dụ `"go-test"`), trùng với `QualityGate.profile` (phần trước `@`). Không phải UUID.
+// - `Id luồng GitNexus` (định dạng `proc_N_name`) khác `DataFlow.id` (ULID). Frontend không được trộn hai loại.
 type AgentTurn = { id: string; clientTurnId: string; agentType: string; model?: string; source: 'renderer'|'hook'|'both'; startedAt?: string; endedAt: string; interrupted: boolean
   baseHeadCommit?: string; endHeadCommit: string; treeDirtyEnd: boolean; filesChangedCount: number
   commandsSummary: { v: 1; totalToolUses: number; commands: { name: string; sub?: string; category: 'test'|'lint'|'typecheck'|'build'|'install'|'git'|'other'; count: number }[]; toolCounts: Record<string, number>; truncated: boolean }
@@ -455,7 +471,15 @@ type MobileReviewSummary = { available: boolean; reason?: 'flag_off'|'no_binding
 `bySeverity` dùng `error|warning|info` (PQ-06; `high|medium|low` của CR-062 bỏ). ≤ 50 mục; `title`/`summary` host dựng từ `titleKey`+`params`; không `evidence`, không ghi. Việc host tới gateway: điểm mở O-4; host cũ → `method_not_found`/`forbidden` → `unavailable`.
 
 ## 9. MCP (CR-041, P2, mặc định tắt)
-Mọi kênh `codeIntel.*` nằm trong `excluded_channels.yaml` bằng **một** dòng `codeIntel.*` (category `code-intel-v1`, reason ≥ 20 ký tự, cùng PR đăng ký kênh; `TestChannelInventory`/`TestToolParity`). Nếu O2 mở: 9 tool đọc `codeIntel_status|changeOverlay|readingOrder|impact|symbol|routes|dataFlows|erd|findings` (tên giữ chữ hoa, D7 v5), `Untrusted` cả 9, `MaxResultBytes` nhỏ hơn WS (8–48 KiB); không tool cho `reindex`, `reviewState.*`, `c4.*`, `bindRepo`, `settings.*`, `subscribe`, `quality.*`. Cờ tắt → `CODEINTEL_DISABLED` qua `toolErr`, tool vẫn hiện trong `tools/list`.
+Mọi kênh `codeIntel.*` nằm trong `excluded_channels.yaml` bằng **một** dòng `codeIntel.*` (category `code-intel-v1`, reason ≥ 20 ký tự, cùng PR đăng ký kênh; `TestChannelInventory`/`TestToolParity`). 
+
+**(D3) Các việc phải sửa trước khi mở MCP (O2):**
+- `project_id` **bắt buộc** trong mọi tool MCP (hiện §9 của hợp đồng thiếu; cần thêm vào schema của mọi `codeIntel_*` tool).
+- Cờ `MCP_CODEINTEL_TOOLS_ENABLED` (env của api-gateway) kiểm soát việc đăng ký 9 tool; mặc định `false` (pack 1 tắt cho tới khi được duyệt).
+- Tên tool đúng: `codeIntel_status`, `codeIntel_changeOverlay`, `codeIntel_readingOrder`, `codeIntel_impact`, `codeIntel_symbol`, `codeIntel_routes`, `codeIntel_dataFlows`, `codeIntel_erd`, `codeIntel_findings` (D3: dùng camelCase `codeIntel_*`, không phải `code_intel_*`).
+- Danh sách loại trừ CR-041 phải thêm `codeIntel.quality.*` (hiện chưa có).
+- `KeepKeys: true` bắt buộc để giữ field name trong response JSON.
+- 9 tool khi mở: `Untrusted` cả 9, `MaxResultBytes` nhỏ hơn WS (8–48 KiB); không tool cho `reindex`, `reviewState.*`, `c4.*`, `bindRepo`, `settings.*`, `subscribe`, `quality.*`. Cờ tắt → `CODEINTEL_DISABLED` qua `toolErr`, tool vẫn hiện trong `tools/list`.
 
 ## 10. Việc ở frontend (tóm tắt cho `FE-CV-SOL-*`)
 

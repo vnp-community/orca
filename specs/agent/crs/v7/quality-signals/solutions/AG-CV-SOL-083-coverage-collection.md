@@ -1,6 +1,6 @@
 # AG-CV-SOL-083: Thu thập coverage Go (giai đoạn A) và TS (giai đoạn B, cần duyệt), diff coverage, `quality.coverage`
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. "Đã đọc" = đọc code/CR. Mọi hành vi của `go test -coverprofile` và `go tool cover` **chưa chạy** (task 01).
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 083-01 đến 083-07, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-083](../../../../../../docs/crs/v7/quality-signals/CR-CV-083-coverage-and-diff-coverage.md) mục 2.2 đến 2.5, 2.8 (phía agent). `coverage_reports`, `GetCoverage`, fallback "ước lượng" (2.6, 2.7) thuộc `BE-CV-SOL-083-coverage-storage-and-diff`. Task AG-CV-TASK-083-01 đến 07. **Khu vực:** `agent/src/relay/`. **Feature:** `quality-signals`.
 **TDD/Spec:** [TDD-AG-01](../../../../tdd/v5/01-architecture.md), [api/agent-rpc-catalog-git-fs.md](../../../../api/agent-rpc-catalog-git-fs.md) (git Part A).
@@ -90,13 +90,13 @@ Dòng đã thêm/sửa `L` của tệp `F`: các khối có `start ≤ L ≤ end
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] `coverage-go` chỉ tồn tại dạng tên; `quality.run` với lệnh/args tự do bị từ chối.
-- [ ] Workspace Go mẫu 2 module (1 không test): `report` đủ `totals`, `files`, hàm; module không test nằm ở `diff.noTests`.
-- [ ] Import path → đường dẫn tương đối đúng; không đường dẫn tuyệt đối; khối ngoài module đếm `unmappedBlocks`; `*.pb.go`, `gen/`, `usecasetest/`, `testutil` ngoài mẫu số.
-- [ ] Diff: thêm hàm được test, thêm hàm không test, sửa chú thích → đúng; chỉ chú thích → `diffCoverage:null`; tệp untracked tính toàn bộ dòng thêm; tên Unicode không sai ánh xạ.
-- [ ] `scope=changed` chạy đúng module có tệp đổi, `diff.partial:true`; `git status` không đổi sau run.
-- [ ] Payload > 2 000 tệp/1 MiB cắt theo `pct` thấp, `truncated`, `totalCount` đúng.
-- [ ] Run chưa xong → `RUN_IN_PROGRESS`; không có bước coverage → `available:false`; run huỷ → `RUN_CANCELLED`; thiếu provider TS → `ENV_NOT_READY coverage_provider_missing`.
+- [x] `coverage-go` chỉ tồn tại dạng tên; `quality.run` với lệnh/args tự do bị từ chối.
+- [x] Workspace Go mẫu 2 module (1 không test): `report` đủ `totals`, `files`, hàm; module không test nằm ở `diff.noTests`.
+- [x] Import path → đường dẫn tương đối đúng; không đường dẫn tuyệt đối; khối ngoài module đếm `unmappedBlocks`; `*.pb.go`, `gen/`, `usecasetest/`, `testutil` ngoài mẫu số.
+- [x] Diff: thêm hàm được test, thêm hàm không test, sửa chú thích → đúng; chỉ chú thích → `diffCoverage:null`; tệp untracked tính toàn bộ dòng thêm; tên Unicode không sai ánh xạ.
+- [x] `scope=changed` chạy đúng module có tệp đổi, `diff.partial:true`; `git status` không đổi sau run.
+- [x] Payload > 2 000 tệp/1 MiB cắt theo `pct` thấp, `truncated`, `totalCount` đúng.
+- [x] Run chưa xong → `RUN_IN_PROGRESS`; không có bước coverage → `available:false`; run huỷ → `RUN_CANCELLED`; thiếu provider TS → `ENV_NOT_READY coverage_provider_missing`.
 
 ## 8. Kiểm thử
 

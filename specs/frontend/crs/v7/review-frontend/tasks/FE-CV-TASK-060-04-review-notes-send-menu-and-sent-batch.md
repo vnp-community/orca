@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + hàm thuần
 **File:** `frontend/src/renderer/src/components/review-map/notes/{ReviewNotesSendMenu,ReviewSendPreviewDialog,ReviewSentBatchList}.tsx`, `review-sent-batch.ts` (mới) + test
 **Depends on:** FE-CV-TASK-060-01, 060-02, 060-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

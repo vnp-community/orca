@@ -19,7 +19,7 @@ Mọi kind trong `nodesByKind` (17 loại, danh sách lấy từ `codegraph stat
 Lệnh: `pnpm exec vitest run src/relay/codeintel-symbol-ref-codegraph.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Không kind nào chưa ánh xạ hoặc bỏ không chủ ý.
+- [x] Không kind nào chưa ánh xạ hoặc bỏ không chủ ý.
 
 ## Rủi ro
 - `handler` vô danh: CodeGraph `handler` vs GitNexus `handler#n` (chưa đối chiếu).

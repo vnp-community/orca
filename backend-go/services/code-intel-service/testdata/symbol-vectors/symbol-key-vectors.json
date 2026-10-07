@@ -1,0 +1,270 @@
+[
+  {
+    "name": "gitnexus_method_strip_arity",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Method",
+      "filePath": "backend-go/services/infra-fleet-service/internal/usecase/relay.go",
+      "qualifiedName": "Relay.Execute#2",
+      "name": "Execute",
+      "lineBase": 0,
+      "startLine": 10
+    },
+    "expectKey": "method:backend-go/services/infra-fleet-service/internal/usecase/relay.go:Relay.Execute",
+    "expectStartLine": 11,
+    "notes": "CR-CV-020 §1 case 1: GitNexus method strips #2 arity and converts 0-based to 1-based"
+  },
+  {
+    "name": "codegraph_method_colon_colon",
+    "tool": "codegraph",
+    "input": {
+      "kind": "Method",
+      "filePath": "backend-go/services/infra-fleet-service/internal/usecase/relay.go",
+      "qualifiedName": "Relay::Execute",
+      "name": "Execute",
+      "lineBase": 1,
+      "startLine": 11
+    },
+    "expectKey": "method:backend-go/services/infra-fleet-service/internal/usecase/relay.go:Relay.Execute",
+    "expectStartLine": 11,
+    "notes": "CR-CV-020 §1 case 2: CodeGraph converts :: to . to match GitNexus key"
+  },
+  {
+    "name": "line_base_adjustment",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Function",
+      "filePath": "backend-go/services/infra-fleet-service/internal/usecase/relay.go",
+      "qualifiedName": "NewRelayByDevServer",
+      "name": "NewRelayByDevServer",
+      "lineBase": 0,
+      "startLine": 33
+    },
+    "expectKey": "function:backend-go/services/infra-fleet-service/internal/usecase/relay.go:NewRelayByDevServer",
+    "expectStartLine": 34,
+    "notes": "CR-CV-020 §1 case 3: GitNexus startLine 33 -> 34 (+1) when lineBase is 0"
+  },
+  {
+    "name": "method_arity_collision",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Method",
+      "filePath": "src/service.ts",
+      "qualifiedName": "Service.call#1",
+      "name": "call",
+      "lineBase": 1,
+      "startLine": 20
+    },
+    "expectKey": "method:src/service.ts:Service.call#1",
+    "expectStartLine": 20,
+    "notes": "CR-CV-020 §1 case 4: collision keeps #<arity>"
+  },
+  {
+    "name": "ts_property",
+    "tool": "codegraph",
+    "input": {
+      "kind": "Property",
+      "filePath": "src/types.ts",
+      "qualifiedName": "User::email",
+      "name": "email",
+      "lineBase": 1,
+      "startLine": 15
+    },
+    "expectKey": "value:src/types.ts:User.email",
+    "expectStartLine": 15,
+    "notes": "CR-CV-020 §1 case 5: Property maps to VALUE kind"
+  },
+  {
+    "name": "doc_section",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Doc",
+      "filePath": "docs/features.md",
+      "qualifiedName": "Features",
+      "name": "Features",
+      "lineBase": 1,
+      "startLine": 29
+    },
+    "expectKey": "doc:docs/features.md:L29:Features",
+    "expectStartLine": 29,
+    "notes": "CR-CV-020 §1 case 6: Doc section includes line number anchor"
+  },
+  {
+    "name": "route_gitnexus",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Route",
+      "filePath": "server/routes.go",
+      "qualifiedName": "/voice-settings",
+      "name": "/voice-settings",
+      "lineBase": 1,
+      "startLine": 50
+    },
+    "expectKey": "route:server/routes.go:/voice-settings",
+    "expectStartLine": 50,
+    "notes": "CR-CV-020 §1 case 7: Route preserves path"
+  },
+  {
+    "name": "route_codegraph_no_merge",
+    "tool": "codegraph",
+    "input": {
+      "kind": "Route",
+      "filePath": "server/api.go",
+      "qualifiedName": "api.go::POST:/local",
+      "name": "POST:/local",
+      "lineBase": 1,
+      "startLine": 75
+    },
+    "expectKey": "route:server/api.go:POST:/local",
+    "expectStartLine": 75,
+    "notes": "CR-CV-020 §1 case 8: CodeGraph route not merged across tools"
+  },
+  {
+    "name": "file_symbol",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "File",
+      "filePath": "Casks/orca.rb",
+      "qualifiedName": "orca.rb",
+      "name": "orca.rb",
+      "lineBase": 1,
+      "startLine": 1
+    },
+    "expectKey": "file:Casks/orca.rb:orca.rb",
+    "expectStartLine": 1,
+    "notes": "CR-CV-020 §1 case 9: File node"
+  },
+  {
+    "name": "folder_symbol",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Folder",
+      "filePath": "tests",
+      "qualifiedName": "tests",
+      "name": "tests",
+      "lineBase": 1,
+      "startLine": 1
+    },
+    "expectKey": "folder:tests:tests",
+    "expectStartLine": 1,
+    "notes": "CR-CV-020 §1 case 10: Folder node"
+  },
+  {
+    "name": "kotlin_field",
+    "tool": "codegraph",
+    "input": {
+      "kind": "Field",
+      "filePath": "android/AudioEngine.kt",
+      "qualifiedName": "expo.modules.twowayaudio::AudioEngine::SAMPLE_RATE",
+      "name": "SAMPLE_RATE",
+      "lineBase": 1,
+      "startLine": 42
+    },
+    "expectKey": "value:android/AudioEngine.kt:expo.modules.twowayaudio.AudioEngine.SAMPLE_RATE",
+    "expectStartLine": 42,
+    "notes": "CR-CV-020 §1 case 11: Kotlin field converted to value kind with dot notation"
+  },
+  {
+    "name": "cluster_symbol",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Cluster",
+      "filePath": "",
+      "qualifiedName": "comm_6117",
+      "name": "comm_6117",
+      "lineBase": 1,
+      "startLine": 0
+    },
+    "expectKey": "cluster::comm_6117",
+    "expectStartLine": 0,
+    "notes": "CR-CV-020 §1 case 12: Cluster node key"
+  },
+  {
+    "name": "flow_symbol",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Flow",
+      "filePath": "",
+      "qualifiedName": "proc_0_checkspanel",
+      "name": "proc_0_checkspanel",
+      "lineBase": 1,
+      "startLine": 0
+    },
+    "expectKey": "flow::proc_0_checkspanel",
+    "expectStartLine": 0,
+    "notes": "CR-CV-020 §1 case 13: Flow process key"
+  },
+  {
+    "name": "secondary_match_pair",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Method",
+      "filePath": "src/commands.ts",
+      "qualifiedName": "RuntimeWorktreeCreationCommands.prefetchManagedWorktreeCreateBase#1",
+      "name": "prefetchManagedWorktreeCreateBase",
+      "lineBase": 1,
+      "startLine": 1041
+    },
+    "expectKey": "method:src/commands.ts:RuntimeWorktreeCreationCommands.prefetchManagedWorktreeCreateBase",
+    "expectStartLine": 1041,
+    "notes": "CR-CV-020 §1 case 14: Secondary match candidate within delta 2 lines"
+  },
+  {
+    "name": "negative_unknown_native_kind",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "UnknownMacro",
+      "filePath": "src/macro.c",
+      "qualifiedName": "MY_MACRO",
+      "name": "MY_MACRO",
+      "lineBase": 1,
+      "startLine": 5
+    },
+    "expectKey": "value:src/macro.c:MY_MACRO",
+    "expectStartLine": 5,
+    "notes": "CR-CV-020 §2.4 negative case 1: unknown native kind falls back to VALUE kind"
+  },
+  {
+    "name": "negative_wsl_path_rejected",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Function",
+      "filePath": "\\\\wsl$\\Ubuntu\\home\\u\\a.ts",
+      "qualifiedName": "foo",
+      "name": "foo",
+      "lineBase": 1,
+      "startLine": 1
+    },
+    "expectError": "CODEINTEL_PATH_NOT_ALLOWED",
+    "notes": "CR-CV-020 §2.6 negative case 2: UNC WSL path rejected"
+  },
+  {
+    "name": "negative_path_traversal",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Function",
+      "filePath": "/home/u/repo/../x",
+      "qualifiedName": "bar",
+      "name": "bar",
+      "lineBase": 1,
+      "startLine": 1
+    },
+    "expectError": "CODEINTEL_PATH_NOT_ALLOWED",
+    "notes": "CR-CV-020 §2.6 negative case 3: path traversal rejected"
+  },
+  {
+    "name": "nfd_to_nfc_normalization",
+    "tool": "gitnexus",
+    "input": {
+      "kind": "Function",
+      "filePath": "src/ti\u0301nh.ts",
+      "qualifiedName": "ti\u0301nhToa\u0301n",
+      "name": "ti\u0301nhToa\u0301n",
+      "lineBase": 1,
+      "startLine": 12
+    },
+    "expectKey": "function:src/t\u00ednh.ts:t\u00ednhTo\u00e1n",
+    "expectStartLine": 12,
+    "notes": "CR-CV-020 §2.4 negative case 4: Unicode NFD normalized to NFC"
+  }
+]

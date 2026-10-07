@@ -62,3 +62,24 @@ func TestRole_DoesNotLeakBetweenIndependentContexts(t *testing.T) {
 		t.Errorf("expected ctx1 to still carry its own role, got (%q, %v)", v, ok)
 	}
 }
+
+func TestActorType_DefaultUser(t *testing.T) {
+	ctx := context.Background()
+	if ActorType(ctx) != "user" {
+		t.Errorf("expected default actor type to be user, got %s", ActorType(ctx))
+	}
+}
+
+func TestActorType_RejectsUnknown(t *testing.T) {
+	ctx := WithActorType(context.Background(), "root")
+	if ActorType(ctx) != "user" {
+		t.Errorf("expected unknown actor type to fallback to user, got %s", ActorType(ctx))
+	}
+}
+
+func TestWithActorType_Agent(t *testing.T) {
+	ctx := WithActorType(context.Background(), ActorAgent)
+	if ActorType(ctx) != ActorAgent {
+		t.Errorf("expected actor type agent, got %s", ActorType(ctx))
+	}
+}

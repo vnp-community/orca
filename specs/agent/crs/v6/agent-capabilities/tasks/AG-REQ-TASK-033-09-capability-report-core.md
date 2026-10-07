@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-capability-report.ts` (mới), `agent/src/relay/agent-capability-report.test.ts` (mới), `agent/src/relay/agent-build-version.ts` (mới)
 **Depends on:** [02](./AG-REQ-TASK-033-02-readonly-tool-policy.md) (`detectClaudeFlags`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -69,11 +69,11 @@ Kiểm với máy thật (CHƯA CHẠY): gọi `buildCapabilityReport` bằng m�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không có đường nào chạy lệnh ngoài `CAPABILITY_TOOL_ALLOWLIST` (test khẳng định bằng `run` giả).
-- [ ] Không có giá trị biến môi trường nào trong báo cáo, log hay trace.
-- [ ] `go` dùng `go version`; mọi dò dùng `PATH = config.toolPath`.
-- [ ] `partial` và `installed: null` hoạt động khi hết giờ; tổng không quá 8 giây.
-- [ ] Cache 60 giây và single flight đúng; `refresh` bỏ cache.
+- [x] Không có đường nào chạy lệnh ngoài `CAPABILITY_TOOL_ALLOWLIST` (test khẳng định bằng `run` giả).
+- [x] Không có giá trị biến môi trường nào trong báo cáo, log hay trace.
+- [x] `go` dùng `go version`; mọi dò dùng `PATH = config.toolPath`.
+- [x] `partial` và `installed: null` hoạt động khi hết giờ; tổng không quá 8 giây.
+- [x] Cache 60 giây và single flight đúng; `refresh` bỏ cache.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/tool-slot-limits.load.test.ts` (mới), `agent/src/relay/codeintel/fake-codeintel-cli.ts` (mới, test-only: tạo tệp thực thi tạm)
 **Depends on:** 071-03; AG-CV-SOL-001
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,12 +23,12 @@ Biến env cho thời gian chờ chưa có trong hợp đồng (solution mục 6
 
 - Như mục 2; mỗi test dùng thư mục tạm riêng để chạy song song trong vitest.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/tool-slot-limits.load.test.ts`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bất biến giữ khi 20 lời gọi hỗn hợp; lời gọi bị từ chối không spawn tiến trình.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Bất biến giữ khi 20 lời gọi hỗn hợp; lời gọi bị từ chối không spawn tiến trình.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

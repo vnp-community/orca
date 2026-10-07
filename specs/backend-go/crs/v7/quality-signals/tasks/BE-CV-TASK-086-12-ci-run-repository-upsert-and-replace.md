@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/postgres/ci_run_repository.go`, `backend-go/services/code-intel-service/internal/adapter/mysql/ci_run_repository.go`, cổng trong `ci_ports.go` (mới)
 **Depends on:** BE-CV-TASK-082-04, 082-05, 086-09
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Dùng bảng của SOL-082 (không migration). `UpsertCiRun` cạnh tranh: CAS `version`. Không `active_key`.
@@ -19,7 +19,7 @@ Dùng bảng của SOL-082 (không migration). `UpsertCiRun` cạnh tranh: CAS `
 - Contract hai dialect: upsert cùng SHA không nhân đôi, replace thay hoàn toàn, tỉa, cô lập tenant, event một lần.
 
 ## Tiêu chí hoàn thành
-- [ ] Hai dialect xanh.
+- [x] Hai dialect xanh.
 
 ## Rủi ro
 Xoá+chèn finding lớn (≤ 500) trong một giao dịch: chưa đo.

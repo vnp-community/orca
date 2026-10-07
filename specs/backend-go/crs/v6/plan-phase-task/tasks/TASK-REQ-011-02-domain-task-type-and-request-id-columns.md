@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/domain/task_type.go` (mới), `internal/domain/task.go`, `internal/adapter/postgres/repository.go`, `internal/adapter/mysql/repository.go`, `proto/orca/task/v1/task.proto`, `internal/adapter/grpc/server.go` (`toProtoTask`)
 **Depends on:** TASK-REQ-011-01
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -36,11 +36,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `Task.RequestID` ghi và đọc đúng qua `Get`, `List`, `GetAncestors` ở cả hai DB.
-- [ ] Plan/phase `task_number = 0` (cột NULL); task thường vẫn nhận số tăng dần, 20 tạo đồng thời không trùng.
-- [ ] `Update` không đổi `request_id` (test chứng minh).
-- [ ] `make proto-lint` xanh, không phá số trường cũ.
-- [ ] Mọi test cũ của `postgres`, `mysql`, `usecase`, `grpc` vẫn xanh.
+- [x] `Task.RequestID` ghi và đọc đúng qua `Get`, `List`, `GetAncestors` ở cả hai DB.
+- [x] Plan/phase `task_number = 0` (cột NULL); task thường vẫn nhận số tăng dần, 20 tạo đồng thời không trùng.
+- [x] `Update` không đổi `request_id` (test chứng minh).
+- [x] `make proto-lint` xanh, không phá số trường cũ.
+- [x] Mọi test cũ của `postgres`, `mysql`, `usecase`, `grpc` vẫn xanh.
 
 ## Rủi ro và lưu ý
 

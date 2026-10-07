@@ -1,6 +1,6 @@
 # AG-CV-SOL-084: Rule pack quy ước Orca (`ORCA-xxx`): luật diff, luật script, `ruleResults[]`
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. "Đã đọc" = đọc code/CR; định dạng đầu ra các script `check-*` trừ `check-max-lines-ratchet`, `check-styled-scrollbars`, `check-reliability-gates` **chưa kiểm chứng**.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 084-01 đến 084-07, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-084](../../../../../../docs/crs/v7/quality-signals/CR-CV-084-project-convention-rule-pack.md). Task AG-CV-TASK-084-01 đến 07. **Khu vực:** `agent/src/relay/`. **Feature:** `quality-signals`.
 **TDD/Spec:** [TDD-AG-01](../../../../tdd/v5/01-architecture.md), [api/agent-rpc-catalog-git-fs.md](../../../../api/agent-rpc-catalog-git-fs.md).
@@ -118,15 +118,15 @@ export type RulePack = { version: number; pack: 'orca-conventions'; rules: Rule[
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] Pack nạp được; `id` sai/trùng/rơi vào `008|009|016|017` làm nạp thất bại.
-- [ ] Mỗi luật có fixture vi phạm/không vi phạm; ORCA-010 bắt `eslint-disable max-lines` và `oxlint-disable-next-line max-lines`.
-- [ ] Diff có một dòng cũ vi phạm + một dòng mới vi phạm → đúng 1 finding.
-- [ ] ORCA-012 báo `frontend/src/lib/helpers.ts` mới, không báo tệp đã tồn tại (không phải `added`).
-- [ ] `fingerprint` không đổi khi chèn dòng phía trên; đổi khi nội dung vi phạm đổi.
-- [ ] Không tìm thấy script ở cả hai vị trí → `ruleResults[].status:"script_not_found"`, không finding; cổng nhận `unknown`.
-- [ ] Script chạy đúng `cwd`; argv không có `--init`/`--prune`; không có đường nào cho client truyền pattern/đường dẫn.
-- [ ] Pattern backtracking nặng bị cắt, agent không treo.
-- [ ] ORCA-004..006 chỉ chạy khi tệp liên quan đổi (`skipped_scope` còn lại).
+- [x] Pack nạp được; `id` sai/trùng/rơi vào `008|009|016|017` làm nạp thất bại.
+- [x] Mỗi luật có fixture vi phạm/không vi phạm; ORCA-010 bắt `eslint-disable max-lines` và `oxlint-disable-next-line max-lines`.
+- [x] Diff có một dòng cũ vi phạm + một dòng mới vi phạm → đúng 1 finding.
+- [x] ORCA-012 báo `frontend/src/lib/helpers.ts` mới, không báo tệp đã tồn tại (không phải `added`).
+- [x] `fingerprint` không đổi khi chèn dòng phía trên; đổi khi nội dung vi phạm đổi.
+- [x] Không tìm thấy script ở cả hai vị trí → `ruleResults[].status:"script_not_found"`, không finding; cổng nhận `unknown`.
+- [x] Script chạy đúng `cwd`; argv không có `--init`/`--prune`; không có đường nào cho client truyền pattern/đường dẫn.
+- [x] Pattern backtracking nặng bị cắt, agent không treo.
+- [x] ORCA-004..006 chỉ chạy khi tệp liên quan đổi (`skipped_scope` còn lại).
 
 ## 8. Kiểm thử
 

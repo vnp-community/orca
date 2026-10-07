@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `frontend/src/renderer/src/components/review-map/quality/findings/QualityFindingsList.tsx`, `QualityFindingRow.tsx`, `QualityFindingsToolbar.tsx`, `quality-finding-filter.ts`, `quality-finding-sort.ts`; `hooks/useQualityFindings.ts` (mới) và `*.test.ts(x)`
 **Depends on:** 087-02, 087-03, FE-CV-TASK-088-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

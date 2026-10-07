@@ -7,8 +7,9 @@
  * @module shared/task-types
  */
 
-/** Task classification */
-export type TaskType = 'epic' | 'story' | 'task' | 'subtask' | 'bug' | 'spike'
+/** Task classification
+ * CR-REQ-018-06: added 'plan' | 'phase' for plan/phase nodes in the Request flow. */
+export type TaskType = 'epic' | 'story' | 'task' | 'subtask' | 'bug' | 'spike' | 'plan' | 'phase'
 
 /** Task lifecycle status
  * BUG-023 follow-up: 'open' added — task-service's domain.Status default
@@ -21,7 +22,8 @@ export type TaskType = 'epic' | 'story' | 'task' | 'subtask' | 'bug' | 'spike'
  * here recognized the value. */
 export type TaskStatus =
   | 'open'
-  | 'backlog'
+  // CR-REQ-018-06: 'backlog' removed — backend never had this value; use
+  // normalizeTaskStatus() to coerce legacy wire data to 'open'.
   | 'todo'
   | 'in_progress'
   | 'review'
@@ -79,6 +81,8 @@ export type OrcaTask = {
   worktreeId?: string
   /** Set by the PR-creation write-back saga; empty until a PR referencing this task exists. */
   prUrl?: string
+  /** CR-REQ-021: id of the Request this plan/phase task belongs to. */
+  requestId?: string
   dueDate?: Date
   createdAt: Date
   updatedAt: Date
@@ -148,7 +152,7 @@ export const TASK_PERMISSION_ORDER: Readonly<Record<TaskPermission, number>> = {
 /** Progress weights by status (leaf node calculation) */
 export const TASK_STATUS_PROGRESS: Readonly<Record<TaskStatus, number>> = {
   open: 0,
-  backlog: 0,
+  // CR-REQ-018-06: 'backlog' key removed to keep Record exhaustive after type change.
   todo: 0,
   in_progress: 40,
   review: 80,

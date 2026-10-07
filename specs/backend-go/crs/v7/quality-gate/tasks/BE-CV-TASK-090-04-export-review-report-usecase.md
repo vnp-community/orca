@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/usecase/export_review_report.go`, `review_report_ports.go` (mới)
 **Depends on:** BE-CV-TASK-090-02, 090-03, BE-CV-TASK-085-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. Port: `Overlay`, `Gate` (`EvaluateQualityGate`), `QualityFindings`, `StructureFindings`, `ContractDiff`, `Architecture`, `Erd`, `RepoProviderResolver` (từ `Repo.url`, L6).
@@ -17,7 +17,7 @@
 - Port giả: từng nguồn lỗi/timeout; thiếu run ⇒ `gate.unknown`; `provider` GitHub/GitLab/self-hosted; kết quả ≤ 2 MiB.
 
 ## Tiêu chí hoàn thành
-- [ ] RPC chỉ lỗi cờ/quyền/tham số; [ ] không điền giá trị giả; [ ] `sections` hoạt động.
+- [x] RPC chỉ lỗi cờ/quyền/tham số; [ ] không điền giá trị giả; [ ] `sections` hoạt động.
 
 ## Rủi ro
 - Nguồn chưa tồn tại (036/037/038/031) ⇒ chỉ test bằng fake tới khi merge.

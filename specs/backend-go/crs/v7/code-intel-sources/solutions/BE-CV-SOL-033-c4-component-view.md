@@ -76,12 +76,12 @@ C1–C5; PQ-10 giải Q5 (GetArchitecture = C4); `erd.proto`→`codeintel_c4.pro
 BE: `030`, `032` (RpcEdge, `Unimplemented`, kind `grpc-server|client`), `031-erd-model` (accessedBy), `033-c4-overrides-yaml` (merge, bảng `c4_overrides` ở `011`), `011`, `012`, `013`, `020`, `022`; tiêu thụ bởi `034`, `037`, `040-codeintel-view-channels` (`codeIntel.architecture`). FE: `FE-CV-SOL-055-architecture-c4-lens`. AG: không.
 
 ## 6. Tiêu chí chấp nhận
-- [ ] `GetArchitecture(infra-fleet-service)`: `domain`, `usecase`, `config`, mọi `adapter-*` (15 thư mục), `main` ẩn; `symbolCount` > 0; `description` từ package doc khi có.
-- [ ] `implements` từ adapter MySQL tới `usecase` có evidence = số dòng `_ usecase.` do `grep` độc lập; cổng chỉ khớp tên có conf 0,6 + nhãn.
-- [ ] `calls-rpc` tới `ext-svc-ai-provider-service`, `ext-svc-credential-broker-service`; `ext-nats|postgres|mysql` từ import.
-- [ ] `violatesLayering` bắt `usecase→adapter`, `domain→usecase` (cây mẫu có vi phạm).
-- [ ] `has_overrides`/`overrides_version` đúng; đổi override làm miss cache.
-- [ ] Không nội dung file nguồn; cô lập tenant (cache); không `helpers/utils/common/misc`; không `max-lines` disable; `buf` xanh.
+- [x] `GetArchitecture(infra-fleet-service)`: `domain`, `usecase`, `config`, mọi `adapter-*` (15 thư mục), `main` ẩn; `symbolCount` > 0; `description` từ package doc khi có.
+- [x] `implements` từ adapter MySQL tới `usecase` có evidence = số dòng `_ usecase.` do `grep` độc lập; cổng chỉ khớp tên có conf 0,6 + nhãn.
+- [x] `calls-rpc` tới `ext-svc-ai-provider-service`, `ext-svc-credential-broker-service`; `ext-nats|postgres|mysql` từ import.
+- [x] `violatesLayering` bắt `usecase→adapter`, `domain→usecase` (cây mẫu có vi phạm).
+- [x] `has_overrides`/`overrides_version` đúng; đổi override làm miss cache.
+- [x] Không nội dung file nguồn; cô lập tenant (cache); không `helpers/utils/common/misc`; không `max-lines` disable; `buf` xanh.
 
 ## 7. Kiểm thử, rủi ro, câu hỏi mở
 **Kiểm thử.** Unit phân loại kind/id/techHint/layer rules, khớp tập phương thức (thiếu một → không khớp); golden `infra-fleet-service` + `usage-service` (CR-070); hợp đồng với 031/032 trên cùng commit; cô lập tenant; lệnh `go test ./services/code-intel-service/internal/{domain/c4,adapter/gopackagegraph,usecase}/...` (chưa chạy).

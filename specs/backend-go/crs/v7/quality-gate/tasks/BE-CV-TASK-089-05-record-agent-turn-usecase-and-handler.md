@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/usecase/record_agent_turn.go`, `internal/adapter/grpc/agent_turn_server.go` (mới)
 **Depends on:** BE-CV-TASK-089-04, BE-CV-TASK-085-07 (guard cờ/OPA), BE-CV-SOL-013 (`TextRedactor`, hạn mức)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. Chuỗi: cờ → OPA `review_write` → `selector → binding` → kiểm đầu vào (bảng SOL-089 §2.2) → hợp nhất → outbox → trả.
@@ -17,7 +17,7 @@
 - Cờ tắt từng tầng; thiếu `review_write`; `endedAt` tương lai > 5 phút bị từ chối; rollback ⇒ không event; `TextRedactor` giả; tenant khác ⇒ `NOT_AUTHORIZED`.
 
 ## Tiêu chí hoàn thành
-- [ ] hai lần cùng `clientTurnId` ⇒ một hàng; [ ] `stated` không sinh khi cờ tắt; [ ] event chỉ chứa id.
+- [x] hai lần cùng `clientTurnId` ⇒ một hàng; [ ] `stated` không sinh khi cờ tắt; [ ] event chỉ chứa id.
 
 ## Rủi ro
 - Chưa có bộ che bí mật dùng chung (O-16).

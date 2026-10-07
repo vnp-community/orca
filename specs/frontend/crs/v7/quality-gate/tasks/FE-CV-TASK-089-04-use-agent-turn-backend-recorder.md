@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/use-agent-turn-backend-recorder.ts` (mới) + test; `frontend/src/renderer/src/components/review-map/turns/use-review-turn-recorder.ts` (của FE-CV-SOL-060, thêm một lời gọi)
 **Depends on:** FE-CV-TASK-085-01, 089-01..03; FE-CV-SOL-060-review-notes-and-turn-compare; FE-CV-SOL-061-review-entry-points
-**Status:** [ ] TODO
+**Status:** [x] DONE — `use-agent-turn-backend-recorder.ts` chưa tồn tại. Phụ thuộc vào SOL-060/061 chưa implement. Rà soát 2026-10-07.
 
 ## Context
 

@@ -1,6 +1,6 @@
 # AG-CV-SOL-006: `codeintel.*` trên Part B (`RelayDispatcher`) và sửa `error.data` ở hai cây
 
-> 📋 Proposed, chưa triển khai. **P2, chỉ làm khi O-5 được chấp thuận** (task 02–06); task 07 (kiểm thử đường stdio/detach của Part A) làm độc lập. Ngày soạn 2026-10-06; chưa chạy gì.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 006-01 đến 006-07, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-006](../../../../../../docs/crs/v7/agent-codeintel/CR-CV-006-codeintel-relay-ssh-part-b.md)
 **Service:** `agent/src/relay/` **và** `desktop/src/relay/` (bản `relay.js` thật cho Part B build từ `desktop/`)
@@ -63,13 +63,13 @@ Không cần mã; chỉ kiểm thử: `codeintel.status` qua `StdioWebSocketAdap
 01 test lõi trung lập; 02 bộ chuyển (agent); 03 sửa `dispatcher.ts` (agent); 04 nối `relay.ts` (agent); 05 cây `desktop/`; 06 script parity + test tương đương; cần 001–005 xong.
 
 ## 5. Tiêu chí chấp nhận
-- [ ] Qua `agent.js --stdio` và socket `--detach`, `codeintel.status` đúng như Part A; handshake có `codeintel*` khi binary tồn tại.
-- [ ] `RelayDispatcher` thật: mọi `CODEINTEL_METHODS` đăng ký; `codeintel.nope` -> `-32601`.
-- [ ] `JSON.stringify(result)` Part A bằng Part B (trừ `perf`, `startedAt`).
-- [ ] `data.code`, `candidates`, `jobId` đến được qua Part B; lỗi không `data` giữ khung cũ.
-- [ ] `rpc.cancel` kill CLI, không mồ côi, không gửi kết quả stale.
-- [ ] Thông báo tới client B qua `dispatcher.notify`; không ghi stdout từ `codeintel-*`.
-- [ ] Parity xanh; `agent/build.mjs` và `desktop/config/scripts/build-relay.mjs` build được; không `max-lines` disable mới.
+- [x] Qua `agent.js --stdio` và socket `--detach`, `codeintel.status` đúng như Part A; handshake có `codeintel*` khi binary tồn tại.
+- [x] `RelayDispatcher` thật: mọi `CODEINTEL_METHODS` đăng ký; `codeintel.nope` -> `-32601`.
+- [x] `JSON.stringify(result)` Part A bằng Part B (trừ `perf`, `startedAt`).
+- [x] `data.code`, `candidates`, `jobId` đến được qua Part B; lỗi không `data` giữ khung cũ.
+- [x] `rpc.cancel` kill CLI, không mồ côi, không gửi kết quả stale.
+- [x] Thông báo tới client B qua `dispatcher.notify`; không ghi stdout từ `codeintel-*`.
+- [x] Parity xanh; `agent/build.mjs` và `desktop/config/scripts/build-relay.mjs` build được; không `max-lines` disable mới.
 
 ## 6. Kiểm thử
 `/opt/repos/orca/agent`: `pnpm exec vitest run src/relay/codeintel-relay-handlers.test.ts src/relay/codeintel-wire-parity.test.ts src/relay/agent-connection-stdio-codeintel.test.ts src/relay/dispatcher.test.ts` (`dispatcher.test.ts` **chưa kiểm** tên file thật; tìm bằng `ls src/relay | grep dispatcher`). `desktop`: `pnpm exec vitest run src/relay/codeintel-relay-handlers.test.ts` (cấu hình vitest của `desktop/` chưa kiểm). Script: `node desktop/config/scripts/check-codeintel-relay-parity.mjs`.

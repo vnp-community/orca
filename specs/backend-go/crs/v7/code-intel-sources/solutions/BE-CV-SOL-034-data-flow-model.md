@@ -78,13 +78,13 @@ C1–C7; `dataflow.proto`→`codeintel_dataflow.proto`; `repo_binding_id`→`sel
 BE: `030`, `031-erd-model` (`accessedBy`), `032` (catalog, `RpcEdge`, `Unimplemented`), `033-c4-component-view` (`implements`, `ComponentRef`), `035` (subject, tuỳ chọn), `021` (collector `codeintel.processes`), `022`, `012/013`; tiêu thụ `036` (luồng bị ảnh hưởng, tuỳ chọn), `040-codeintel-view-channels`. FE: `FE-CV-SOL-056-dataflow-lens`. AG: `AG-CV-SOL-002-gitnexus-extraction` (processes, tuỳ chọn).
 
 ## 6. Tiêu chí chấp nhận
-- [ ] `ListDataFlows` trả ứng viên kênh + RPC theo catalog (số khớp đếm độc lập), phân trang, lọc, không dựng chi tiết.
-- [ ] `GetDataFlow("ws:accounts.selectClaude")`: chuỗi UI→wscompat→`RelayByDevServer`→usecase→`DevServerRepository.Get` (`StoreAccess dev_servers read`)→`ext-agent method=accounts.selectClaude`; `complete`; `dialect=mysql` đổi adapter sang MySQL.
-- [ ] RPC `Unimplemented` → `partial`, `RPC_UNIMPLEMENTED`, `unimplemented:true`.
-- [ ] Luồng ≥ 2 service dừng đúng `max_service_hops`; vòng → `CYCLE`.
-- [ ] Mọi bước có `confidence`, `origin`, `evidence`; `static-name` nhãn suy luận.
-- [ ] Sequence/DFD đúng ở hai `detail`; `data` DFD là tên message/bảng thật.
-- [ ] Không `Process` → trường rỗng không lỗi; kết quả `headCommit`, `stale`, `truncated`; cô lập tenant; không `max-lines` disable.
+- [x] `ListDataFlows` trả ứng viên kênh + RPC theo catalog (số khớp đếm độc lập), phân trang, lọc, không dựng chi tiết.
+- [x] `GetDataFlow("ws:accounts.selectClaude")`: chuỗi UI→wscompat→`RelayByDevServer`→usecase→`DevServerRepository.Get` (`StoreAccess dev_servers read`)→`ext-agent method=accounts.selectClaude`; `complete`; `dialect=mysql` đổi adapter sang MySQL.
+- [x] RPC `Unimplemented` → `partial`, `RPC_UNIMPLEMENTED`, `unimplemented:true`.
+- [x] Luồng ≥ 2 service dừng đúng `max_service_hops`; vòng → `CYCLE`.
+- [x] Mọi bước có `confidence`, `origin`, `evidence`; `static-name` nhãn suy luận.
+- [x] Sequence/DFD đúng ở hai `detail`; `data` DFD là tên message/bảng thật.
+- [x] Không `Process` → trường rỗng không lỗi; kết quả `headCommit`, `stale`, `truncated`; cô lập tenant; không `max-lines` disable.
 
 ## 7. Kiểm thử, rủi ro, câu hỏi mở
 **Kiểm thử.** Unit duyệt kiểu trường, chọn adapter theo dialect (hai dialect), chống vòng, giới hạn, mã gap, xuất mô hình; golden (CR-070) cho ba luồng cố định (`accounts.selectClaude`, hai service, `Unimplemented`); hiệu năng 10 luồng nóng < 1 s (mục tiêu, chưa đo); `go test ./services/code-intel-service/internal/{domain/dataflow,adapter/gocallindex,usecase}/...` (chưa chạy).

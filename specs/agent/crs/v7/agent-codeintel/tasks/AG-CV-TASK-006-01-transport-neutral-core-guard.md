@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-transport-neutrality.test.ts` (mới)
 **Depends on:** [AG-CV-TASK-001-09](./AG-CV-TASK-001-09-codeintel-status-method-table-and-dispatcher.md) (và các CR 002–005 khi chúng xong)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Part B không có `ws`/`WireState`/`makeError`/`makeNotifier`; sao lõi sang `desktop/` không được kéo phụ thuộc vòng (CR-006 2.1).
@@ -18,7 +18,7 @@ Part B không có `ws`/`WireState`/`makeError`/`makeNotifier`; sao lõi sang `de
 Lệnh: `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/codeintel-transport-neutrality.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Test xanh trên 001–005; vi phạm cố ý làm test đỏ.
+- [x] Test xanh trên 001–005; vi phạm cố ý làm test đỏ.
 
 ## Rủi ro
 - Quét nguồn bằng regex có thể bỏ sót import động; thêm kiểm `import(`.

@@ -5,7 +5,7 @@
 **Service:** `proto`, `request-service`
 **File:** `proto/orca/request/v1/request.proto` (sửa), `proto/gen/go/orca/request/v1/*` (sinh lại), `internal/usecase/list_request_links.go`, `internal/adapter/grpc/server.go`, `internal/adapter/grpc/request_mapper.go`, `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-006-02, 006-03, 006-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,10 +31,10 @@ CR-REQ-006 mục 2.2 định nghĩa message; `ListRequestLinks` do README mục 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Năm RPC thật, `buf breaking` xanh.
-- [ ] `returned_category` hiện trong `Request`.
-- [ ] README real vs stub cập nhật.
-- [ ] Danh tính từ metadata, không từ body.
+- [x] Năm RPC thật, `buf breaking` xanh.
+- [x] `returned_category` hiện trong `Request`.
+- [x] README real vs stub cập nhật.
+- [x] Danh tính từ metadata, không từ body.
 
 ## Rủi ro và lưu ý
 

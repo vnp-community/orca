@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `.github/workflows/code-intel-contract.yml` (mới hoặc sửa nếu BE đã tạo), `agent/vitest.code-intel-contract.config.ts` (mới)
 **Depends on:** 070-02 đến 070-08; BE-CV-TASK-070-06 (cùng tệp)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -28,8 +28,8 @@ Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn t
 
 ## Tiêu chí hoàn thành
 
-- [ ] Job chặn PR hoạt động; bước khẳng định có mặt; live chạy tay được.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Job chặn PR hoạt động; bước khẳng định có mặt; live chạy tay được.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

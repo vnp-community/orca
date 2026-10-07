@@ -5,7 +5,7 @@
 **Service:** `tests/request`, `backend-go/ci`, `.github`
 **File:** `tests/request/check_request_flow_types.py` (mới), `tests/request/check_request_jira_sync.py` (mới), `tests/request/request_env_config.py` (mới), `tests/request/stubs/` (mới: stub dev server agent và Jira), `backend-go/ci/request-e2e/run-request-e2e.sh` (mới), `.github/workflows/request-e2e.yml` (mới)
 **Depends on:** BE-REQ-SOL-016 (kênh WS), BE-REQ-SOL-024 (Jira sync), TASK-REQ-025-01; kịch bản MCP: TASK-REQ-017-05
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Script chạy được cục bộ, thoát mã khác 0 khi sai.
-- [ ] Workflow chạy qua `workflow_dispatch`.
-- [ ] E18 xanh với Jira giả.
+- [x] Script chạy được cục bộ, thoát mã khác 0 khi sai.
+- [x] Workflow chạy qua `workflow_dispatch`.
+- [x] E18 xanh với Jira giả.
 
 ## Rủi ro và lưu ý
 

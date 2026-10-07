@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`, `api-gateway`
 **File:** `.../code-intel-service/e2e/secret_canary_test.go` (mới, tag `e2e`), `.../code-intel-service/testdata/security/canary-config-files/` (mới), `.../internal/domain/secret_masking_parity_test.go` (mới)
 **Depends on:** BE-CV-SOL-073 task 05 (harness e2e T1), BE-CV-SOL-035 (StorageMap, P2: phần này có điều kiện), BE-CV-SOL-030, `AG-CV-SOL-070` (repo mẫu)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -28,8 +28,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không canary ở mọi điểm quét.
-- [ ] Giới hạn che theo regex được ghi trong tài liệu threat model.
+- [x] Không canary ở mọi điểm quét.
+- [x] Giới hạn che theo regex được ghi trong tài liệu threat model.
 
 ## Rủi ro và lưu ý
 

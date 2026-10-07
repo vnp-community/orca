@@ -20,6 +20,12 @@ import { resolveAgentSpec, buildAgentEnv } from './agent-spawner'
 import { YOLO_TUI_AGENT_ARGS } from '../shared/tui-agent-permissions'
 import { AgentErrorCode } from '../shared/agent-wire-protocol'
 import { Tracers } from '../shared/trace/tracers'
+import { parseExecPromptOptions, toExecPromptErrorResponse } from './agent-exec-prompt-options'
+import { detectClaudeFlags, readonlyUnsupportedReason, readonlyUnsupportedError, buildReadonlyArgs } from './agent-readonly-tool-policy'
+import { validateWorkspace, defaultScratchRoots } from './agent-workspace-validation'
+import { BoundedOutputBuffer, splitOutputBudget, fitResultToFrame } from './agent-bounded-output-buffer'
+import { parseResultBlock } from './agent-result-block-parser'
+import { captureSnapshot, diffSnapshots } from './agent-worktree-change-snapshot'
 
 const DEFAULT_TIMEOUT_MS = 5 * 60_000
 const MAX_TIMEOUT_MS = 15 * 60_000
@@ -87,6 +93,36 @@ export async function handleAgentExecPrompt(
     }
   }
 
+  // Parse CR-REQ-033 options (accessMode, workspaceKind, reportChanges, resultBlock, maxOutputBytes)
+  const optsParsed = parseExecPromptOptions(params)
+  if (!optsParsed.ok) {
+    span.fail(optsParsed.error.code)
+    return toExecPromptErrorResponse('agent.execPrompt', id, optsParsed.error)
+  }
+  const options = optsParsed.value
+
+  // Validate workspace path against the declared kind
+  const wsValidation = await validateWorkspace({
+    kind: options.workspaceKind,
+    path: worktreePath,
+    accessMode: options.accessMode,
+    scratchRoots: defaultScratchRoots(config.workDir)
+  })
+  if (!wsValidation.ok) {
+    span.fail(wsValidation.code)
+    return {
+      jsonrpc: '2.0',
+      id,
+      error: {
+        code: AgentErrorCode.InvalidParams,
+        message: `agent.execPrompt: ${wsValidation.message} (${wsValidation.code})`,
+        data: { reason: wsValidation.code }
+      }
+    }
+  }
+  // Use realPath as cwd when not worktree (worktree preserves exact caller string)
+  const spawnCwd = options.workspaceKind !== 'worktree' ? wsValidation.realPath : worktreePath
+
   const spec = resolveAgentSpec(modelId)
   // Only claude's non-interactive `--print <prompt>` flag is a validated
   // precedent in this codebase (agent-tool-registry.ts's claude_code tool).
@@ -108,10 +144,11 @@ export async function handleAgentExecPrompt(
     }
   }
 
-  const args = ['--print', initFile ? `${initFile}\n${prompt}` : prompt]
-  if (trustPresetFull && YOLO_TUI_AGENT_ARGS.claude) {
-    args.push(YOLO_TUI_AGENT_ARGS.claude)
-  }
+  // If readonly, check that claude supports required flags before spawning
+  const warnings: string[] = []
+  let readonlyArgs: string[] = []
+  // Note: readonly check INTENTIONALLY placed after buildAgentEnv so we
+  // can merge env with process.env to get the same PATH that execPrompt uses.
 
   let env: Record<string, string>
   try {
@@ -127,7 +164,7 @@ export async function handleAgentExecPrompt(
         userId: '',
         taskId: taskId || (stepId ?? ''),
         projectId,
-        cwd: worktreePath,
+        cwd: spawnCwd,
         model: modelId,
         extraEnv
       },
@@ -143,14 +180,48 @@ export async function handleAgentExecPrompt(
     return { jsonrpc: '2.0', id, error: { code: AgentErrorCode.PermissionDenied, message: msg } }
   }
 
-  span.step('subprocess-spawn', { binary: spec.binary, cwd: worktreePath })
+  // If readonly: probe claude flags with the same PATH that spawn will use
+  if (options.accessMode === 'readonly') {
+    const mergedEnv = { ...process.env, ...env }
+    const flags = await detectClaudeFlags(mergedEnv)
+    const reason = readonlyUnsupportedReason(flags)
+    if (reason) {
+      span.fail(reason)
+      return readonlyUnsupportedError(id, 'agent.execPrompt', reason) as object
+    }
+    readonlyArgs = buildReadonlyArgs()
+  }
+
+  const args = ['--print', initFile ? `${initFile}\n${prompt}` : prompt]
+  if (options.accessMode === 'write' && trustPresetFull && YOLO_TUI_AGENT_ARGS.claude) {
+    args.push(YOLO_TUI_AGENT_ARGS.claude)
+  } else if (options.accessMode === 'readonly') {
+    args.push(...readonlyArgs)
+    // YOLO flags override tool restrictions — discard them to keep readonly enforced
+    if (trustPresetFull) {
+      log.warn('agent.execPrompt: trustPreset=full ignored in readonly mode (TRUST_PRESET_IGNORED_READONLY)')
+      warnings.push('TRUST_PRESET_IGNORED_READONLY')
+    }
+  }
+
+  // Snapshot before spawn (task 08)
+  const snapshotMode = options.workspaceKind === 'scratch' ? 'directory' : 'git'
+  const beforeSnapshot = options.reportChanges
+    ? await captureSnapshot(spawnCwd, snapshotMode)
+    : undefined
+
+  // Output buffers with per-budget allocation (task 05)
+  const { stdoutBytes, stderrBytes } = splitOutputBudget(options.maxOutputBytes)
+  const stdoutBuf = new BoundedOutputBuffer(stdoutBytes)
+  const stderrBuf = new BoundedOutputBuffer(stderrBytes)
+
+
+  span.step('subprocess-spawn', { binary: spec.binary, cwd: spawnCwd })
   const result = await new Promise<PrintModeExecResult>((resolve) => {
-    let stdout = ''
-    let stderr = ''
     let timedOut = false
     let settled = false
     const child = spawn(spec.binary, args, {
-      cwd: worktreePath,
+      cwd: spawnCwd,
       env: { ...process.env, ...env },
       stdio: ['ignore', 'pipe', 'pipe']
     })
@@ -170,24 +241,22 @@ export async function handleAgentExecPrompt(
       } catch {
         /* ignore */
       }
-      finish({ stdout, stderr, exitCode: null, timedOut })
+      finish({ stdout: stdoutBuf.toString(), stderr: stderrBuf.toString(), exitCode: null, timedOut })
     }, timeoutMs)
 
     child.stdout?.on('data', (d: Buffer) => {
-      const chunk = d.toString('utf8')
-      stdout += chunk
-      notify?.('agent.execPrompt.output', { stepId, stream: 'stdout', data: chunk })
+      stdoutBuf.append(d)
+      notify?.('agent.execPrompt.output', { stepId, stream: 'stdout', data: d.toString('utf8') })
     })
     child.stderr?.on('data', (d: Buffer) => {
-      const chunk = d.toString('utf8')
-      stderr += chunk
-      notify?.('agent.execPrompt.output', { stepId, stream: 'stderr', data: chunk })
+      stderrBuf.append(d)
+      notify?.('agent.execPrompt.output', { stepId, stream: 'stderr', data: d.toString('utf8') })
     })
     child.on('error', (err) => {
-      finish({ stdout, stderr: err.message, exitCode: null, timedOut })
+      finish({ stdout: stdoutBuf.toString(), stderr: err.message, exitCode: null, timedOut })
     })
     child.on('close', (code) => {
-      finish({ stdout, stderr, exitCode: code, timedOut })
+      finish({ stdout: stdoutBuf.toString(), stderr: stderrBuf.toString(), exitCode: code, timedOut })
     })
   })
 
@@ -203,7 +272,51 @@ export async function handleAgentExecPrompt(
     span.ok({ exitCode: result.exitCode ?? 0 })
   }
 
-  return { jsonrpc: '2.0', id, result: { ...result, stepId } }
+  // Capture after-snapshot (even on timeout — agent may have partially written files)
+  let changes = undefined
+  if (options.reportChanges && beforeSnapshot !== undefined) {
+    const afterSnapshot = await captureSnapshot(spawnCwd, snapshotMode)
+    const changeReport = diffSnapshots(beforeSnapshot, afterSnapshot)
+    changes = changeReport
+    // Warn if readonly but files changed (does not roll back or alter exitCode)
+    if (
+      options.accessMode === 'readonly' &&
+      changeReport.available &&
+      (changeReport.changedFiles.length > 0 || changeReport.headMoved)
+    ) {
+      warnings.push('READONLY_VIOLATION')
+    }
+  }
+
+  // Parse result block if requested (task 08)
+  const parsed = options.resultBlockNonce
+    ? parseResultBlock(result.stdout, options.resultBlockNonce)
+    : undefined
+
+  // Build truncation info (task 05)
+  const truncated = (stdoutBuf.truncated || stderrBuf.truncated)
+    ? { stdout: stdoutBuf.truncated, stderr: stderrBuf.truncated }
+    : undefined
+
+  // applied echo: only when caller sent explicit options (task 04)
+  const applied = (options.explicit.accessMode || options.explicit.workspaceKind)
+    ? { accessMode: options.accessMode, workspaceKind: options.workspaceKind }
+    : undefined
+
+  let finalResult: Record<string, unknown> = {
+    ...result,
+    stepId,
+    ...(applied !== undefined ? { applied } : {}),
+    ...(changes !== undefined ? { changes } : {}),
+    ...(parsed !== undefined ? { parsed } : {}),
+    ...(truncated !== undefined ? { truncated } : {}),
+    ...(warnings.length > 0 ? { warnings } : {})
+  }
+
+  // Ensure the JSON frame stays within websocket limit (task 05)
+  finalResult = fitResultToFrame(finalResult)
+
+  return { jsonrpc: '2.0', id, result: finalResult }
 }
 
 // ─── agent.execPromptStream ─────────────────────────────────────────────────
@@ -276,6 +389,37 @@ export async function handleAgentExecPromptStream(
     return
   }
 
+  // Parse CR-REQ-033 options
+  const optsParsed = parseExecPromptOptions(params)
+  if (!optsParsed.ok) {
+    span.fail(optsParsed.error.code)
+    sendFrame(ws, wireState, toExecPromptErrorResponse('agent.execPromptStream', id, optsParsed.error))
+    return
+  }
+  const options = optsParsed.value
+
+  // Validate workspace path
+  const wsValidation = await validateWorkspace({
+    kind: options.workspaceKind,
+    path: worktreePath,
+    accessMode: options.accessMode,
+    scratchRoots: defaultScratchRoots(config.workDir)
+  })
+  if (!wsValidation.ok) {
+    span.fail(wsValidation.code)
+    sendFrame(ws, wireState, {
+      jsonrpc: '2.0',
+      id,
+      error: {
+        code: AgentErrorCode.InvalidParams,
+        message: `agent.execPromptStream: ${wsValidation.message} (${wsValidation.code})`,
+        data: { reason: wsValidation.code }
+      }
+    })
+    return
+  }
+  const spawnCwd = options.workspaceKind !== 'worktree' ? wsValidation.realPath : worktreePath
+
   const spec = resolveAgentSpec(modelId)
   if (!spec || spec.binary !== 'claude') {
     span.fail('unsupported model for one-shot exec', { modelId })
@@ -292,15 +436,10 @@ export async function handleAgentExecPromptStream(
     return
   }
 
-  const args = ['--print', initFile ? `${initFile}\n${prompt}` : prompt]
-  if (trustPresetFull && YOLO_TUI_AGENT_ARGS.claude) {
-    args.push(YOLO_TUI_AGENT_ARGS.claude)
-  }
-
   let env: Record<string, string>
   try {
     env = await buildAgentEnv(
-      { accountId, userId: '', taskId: stepId ?? '', cwd: worktreePath, model: modelId, extraEnv },
+      { accountId, userId: '', taskId: stepId ?? '', cwd: spawnCwd, model: modelId, extraEnv },
       spec,
       config,
       null,
@@ -318,14 +457,93 @@ export async function handleAgentExecPromptStream(
     return
   }
 
-  span.step('subprocess-spawn', { binary: spec.binary, cwd: worktreePath })
+  // Readonly flag check (after env, needs the same PATH)
+  const warnings: string[] = []
+  let readonlyArgs: string[] = []
+  if (options.accessMode === 'readonly') {
+    const mergedEnv = { ...process.env, ...env }
+    const flags = await detectClaudeFlags(mergedEnv)
+    const reason = readonlyUnsupportedReason(flags)
+    if (reason) {
+      span.fail(reason)
+      sendFrame(ws, wireState, readonlyUnsupportedError(id, 'agent.execPromptStream', reason))
+      return
+    }
+    readonlyArgs = buildReadonlyArgs()
+  }
+
+  const args = ['--print', initFile ? `${initFile}\n${prompt}` : prompt]
+  if (options.accessMode === 'write' && trustPresetFull && YOLO_TUI_AGENT_ARGS.claude) {
+    args.push(YOLO_TUI_AGENT_ARGS.claude)
+  } else if (options.accessMode === 'readonly') {
+    args.push(...readonlyArgs)
+    // YOLO flags override tool restrictions — discard them to keep readonly enforced
+    if (trustPresetFull) {
+      log.warn('agent.execPromptStream: trustPreset=full ignored in readonly mode (TRUST_PRESET_IGNORED_READONLY)')
+      warnings.push('TRUST_PRESET_IGNORED_READONLY')
+    }
+  }
+
+  // applied echo (only when explicit params sent)
+  const applied = (options.explicit.accessMode || options.explicit.workspaceKind)
+    ? { accessMode: options.accessMode, workspaceKind: options.workspaceKind }
+    : undefined
+
+  // Snapshot before spawn
+  const snapshotMode = options.workspaceKind === 'scratch' ? 'directory' : 'git'
+  const beforeSnapshot = options.reportChanges
+    ? await captureSnapshot(spawnCwd, snapshotMode)
+    : undefined
+
+  // Buffer for result block analysis only — chunks are sent fully, not truncated
+  // truncated here means the analysis buffer was too small, not that chunks were cut
+  const analysisBuf = options.resultBlockNonce
+    ? new BoundedOutputBuffer(4 * 1024 * 1024)
+    : undefined
+
+  span.step('subprocess-spawn', { binary: spec.binary, cwd: spawnCwd })
   const child = spawn(spec.binary, args, {
-    cwd: worktreePath,
+    cwd: spawnCwd,
     env: { ...process.env, ...env },
     stdio: ['ignore', 'pipe', 'pipe']
   })
 
   let settled = false
+
+  async function finalizeAndSendEnd(exitCode: number): Promise<void> {
+    // Capture after-snapshot (even on timeout)
+    let changes = undefined
+    if (options.reportChanges && beforeSnapshot !== undefined) {
+      const afterSnapshot = await captureSnapshot(spawnCwd, snapshotMode)
+      const changeReport = diffSnapshots(beforeSnapshot, afterSnapshot)
+      changes = changeReport
+      if (
+        options.accessMode === 'readonly' &&
+        changeReport.available &&
+        (changeReport.changedFiles.length > 0 || changeReport.headMoved)
+      ) {
+        warnings.push('READONLY_VIOLATION')
+      }
+    }
+
+    const parsed = options.resultBlockNonce && analysisBuf
+      ? parseResultBlock(analysisBuf.toString(), options.resultBlockNonce)
+      : undefined
+
+    sendFrame(ws, wireState, {
+      jsonrpc: '2.0',
+      id,
+      result: {
+        type: 'stream.end',
+        exitCode,
+        ...(applied !== undefined ? { applied } : {}),
+        ...(changes !== undefined ? { changes } : {}),
+        ...(parsed !== undefined ? { parsed } : {}),
+        ...(warnings.length > 0 ? { warnings } : {})
+      }
+    })
+  }
+
   const timer = setTimeout(() => {
     settled = true
     try {
@@ -334,7 +552,8 @@ export async function handleAgentExecPromptStream(
       /* ignore */
     }
     span.fail(`timeout after ${timeoutMs}ms`)
-    sendFrame(ws, wireState, { jsonrpc: '2.0', id, result: { type: 'stream.end', exitCode: -1 } })
+    // Run async finalize but don't block the timeout path
+    void finalizeAndSendEnd(-1)
   }, timeoutMs)
 
   function sendChunk(text: string, source?: 'stderr'): void {
@@ -345,7 +564,10 @@ export async function handleAgentExecPromptStream(
     })
   }
 
-  child.stdout?.on('data', (d: Buffer) => sendChunk(d.toString('utf8')))
+  child.stdout?.on('data', (d: Buffer) => {
+    analysisBuf?.append(d)
+    sendChunk(d.toString('utf8'))
+  })
   child.stderr?.on('data', (d: Buffer) => sendChunk(d.toString('utf8'), 'stderr'))
   child.on('close', (code) => {
     if (settled) {
@@ -358,7 +580,7 @@ export async function handleAgentExecPromptStream(
       `agent.execPromptStream: stepId=${stepId ?? '(none)'} model=${modelId} exitCode=${exitCode}`
     )
     span.ok({ exitCode })
-    sendFrame(ws, wireState, { jsonrpc: '2.0', id, result: { type: 'stream.end', exitCode } })
+    void finalizeAndSendEnd(exitCode)
   })
   child.on('error', (err) => {
     if (settled) {

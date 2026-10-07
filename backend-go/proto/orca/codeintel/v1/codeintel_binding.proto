@@ -1,0 +1,66 @@
+// CodeIntel binding models and RPC messages - CR-CV-012 / BE-CV-TASK-012-02.
+syntax = "proto3";
+
+package orca.codeintel.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/codeintel/v1;codeintelv1";
+
+import "google/protobuf/timestamp.proto";
+import "orca/codeintel/v1/codeintel_common.proto";
+import "orca/codeintel/v1/codeintel_index_basis.proto";
+
+message ActiveReindexJob {
+  string id = 1;
+  string stage = 2;
+  optional int32 percent = 3;
+}
+
+message RepoBinding {
+  string id = 1;
+  string project_id = 2;
+  string worktree_ref = 3;
+  string repo_name = 4;
+  string dev_server_id = 5;
+  string absolute_path = 6;
+  IndexScope index_scope = 7;
+  google.protobuf.Timestamp created_at = 8;
+  google.protobuf.Timestamp updated_at = 9;
+}
+
+message IndexStatus {
+  string overall = 1;
+  repeated ToolIndexStatus tools = 2;
+  bool scope_mismatch = 3;
+  ActiveReindexJob active_job = 4;
+  repeated IndexBasis index_basis = 5;
+  google.protobuf.Timestamp last_status_at = 6;
+  string error_code = 7;
+  RepoBinding binding = 8;
+}
+
+message BindRepoRequest {
+  WorktreeSelector selector = 1;
+}
+
+message BindRepoResponse {
+  RepoBinding binding = 1;
+  IndexStatus status = 2;
+}
+
+message ListRepoBindingsRequest {
+  string project_id = 1;
+  int32 limit = 2;
+}
+
+message ListRepoBindingsResponse {
+  repeated RepoBinding bindings = 1;
+}
+
+message GetIndexStatusRequest {
+  WorktreeSelector selector = 1;
+  bool refresh = 2;
+}
+
+message GetIndexStatusResponse {
+  IndexStatus status = 1;
+}

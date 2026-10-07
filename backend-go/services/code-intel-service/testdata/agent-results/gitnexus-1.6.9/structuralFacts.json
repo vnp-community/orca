@@ -1,0 +1,29 @@
+{
+  "data": {
+    "cycleCount": 1,
+    "cycles": [
+      {
+        "files": [
+          "a.ts",
+          "b.ts",
+          "a.ts"
+        ]
+      }
+    ],
+    "kind": "cycles",
+    "status": "cycles_found"
+  },
+  "headCommit": "abcdef",
+  "sources": [
+    {
+      "commit": null,
+      "indexedAt": 1600000000000,
+      "lineBase": 1,
+      "tool": "gitnexus",
+      "version": "1.6.9"
+    }
+  ],
+  "stale": true,
+  "totalCount": 1,
+  "truncated": false
+}

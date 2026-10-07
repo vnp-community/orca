@@ -96,6 +96,10 @@ service TaskService {
   // added. Implemented for real as of TASK-FT-002-04 (this was previously a
   // compile-only stub returning codes.Unimplemented).
   rpc ReportTaskExecutionResult(ReportTaskExecutionResultRequest) returns (google.protobuf.Empty);
+  
+  // ListExecutionStates returns execution status (last engine, link status,
+  // blocking tasks) for a list of task IDs.
+  rpc ListExecutionStates(ListExecutionStatesRequest) returns (ListExecutionStatesResponse);
 }
 
 message GenerateShareLinkRequest {
@@ -498,4 +502,22 @@ message ReportTaskExecutionResultRequest {
   double actual_hours = 4;
   string error_message = 5; // set when success = false
   string engine = 6; // "orchestration" | "workflow" (NEW, BE-SOL-002) — picks which execution_links row to validate staleness against
+}
+
+message ListExecutionStatesRequest {
+  repeated string task_ids = 1;
+}
+
+message ExecutionState {
+  string task_id = 1;
+  repeated string blocked_by_task_ids = 2;
+  string last_engine = 3;
+  string last_link_status = 4;
+  google.protobuf.Timestamp last_started_at = 5;
+  google.protobuf.Timestamp last_completed_at = 6;
+  int32 failed_attempts = 7;
+}
+
+message ListExecutionStatesResponse {
+  repeated ExecutionState states = 1;
 }

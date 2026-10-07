@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_ci.proto` (mới); dòng `rpc RefreshCiRun` trong `codeintel_quality_gate.proto` (SOL-085)
 **Depends on:** BE-CV-TASK-082-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 C-DM §2.1 #25, §3.2; hình dạng C-UI §4.7. `relation` là `string` (9 giá trị PQ-25).
@@ -18,7 +18,7 @@ C-DM §2.1 #25, §3.2; hình dạng C-UI §4.7. `relation` là `string` (9 giá 
 - `buf lint`, `buf breaking` gọi trực tiếp.
 
 ## Tiêu chí hoàn thành
-- [ ] Không file nào import `codeintel.proto`; không trùng tên.
+- [x] Không file nào import `codeintel.proto`; không trùng tên.
 
 ## Rủi ro
 Thứ tự với SOL-085.

@@ -1,0 +1,7 @@
+[
+  "internal/domain/user.go",
+  "internal/domain/constants.go",
+  "internal/adapter/handler.go",
+  "ui/User.ts",
+  "migrations/001_init.sql"
+]

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/tool-compatibility.test.ts` (mới); hàm phân loại thêm vào module `SUPPORTED_*` của AG-CV-SOL-001 (không tạo module thứ hai)
 **Depends on:** 070-02, 070-04, 070-06; AG-CV-SOL-001
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,12 +23,12 @@ Hợp đồng không có `compatibility` tri-state (BE-CV-SOL-070 cũng báo): g
 
 - Như mục 3; thêm test `incompatible` làm method đọc trả `CODEINTEL_TOOL_UNAVAILABLE` với `reason` đúng và `data` có `seen`/`supported` (nếu 001 đã có dispatcher; nếu chưa, test ở mức hàm).
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/tool-compatibility.test.ts`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng phân loại đúng; test fixture-per-version đỏ khi thiếu; `format_drift` không rò đầu ra.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Bảng phân loại đúng; test fixture-per-version đỏ khi thiếu; `format_drift` không rò đầu ra.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

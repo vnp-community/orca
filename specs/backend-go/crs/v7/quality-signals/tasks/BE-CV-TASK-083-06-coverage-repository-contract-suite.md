@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/repotest/coverage_repository_contract.go`, `postgres|mysql/coverage_repository_contract_test.go` (mới, `-tags=integration`)
 **Depends on:** BE-CV-TASK-083-04, 083-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Khuôn như BE-CV-TASK-082-06; ma trận `dialect: [postgres, mysql]`.
@@ -19,7 +19,7 @@ Khuôn như BE-CV-TASK-082-06; ma trận `dialect: [postgres, mysql]`.
 - `go test -tags=integration ./internal/adapter/... -v`.
 
 ## Tiêu chí hoàn thành
-- [ ] Hai dialect xanh.
+- [x] Hai dialect xanh.
 
 ## Rủi ro
 Đồng bộ package test dùng chung với SOL-011/082.

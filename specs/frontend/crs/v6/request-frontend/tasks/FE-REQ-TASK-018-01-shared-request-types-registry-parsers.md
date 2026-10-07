@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/request-types.ts` (mới), `request-flow-registry.ts` (mới), `request-rpc-methods.ts` (mới), `request-errors.ts` (mới), `request-wire-parsers.ts` (mới) và test cùng tên `.test.ts`
 **Depends on:** không (thuần kiểu, không cần backend)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

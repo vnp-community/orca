@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/plan_subject_handler.go` (mới), `plan_subject_handler_test.go` (mới), `internal/usecase/commit_single_task.go` (mới), `cmd/server/main.go` (đăng ký handler)
 **Depends on:** TASK-REQ-012-05, CR-REQ-009 (`SubjectHandler`, `ApprovalRegistry`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -35,10 +35,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Duyệt Plan chuyển Request sang `executing`; từ chối ghi `plan_rejected`.
-- [ ] Sửa Plan sau khi xem làm `Approve` với digest cũ bị từ chối.
-- [ ] `task_list` trỏ vào task `plan` vỏ và duyệt được như `plan`.
-- [ ] `hotfix` có đúng một task không `parent_id`, `plan_task_id` NULL.
+- [x] Duyệt Plan chuyển Request sang `executing`; từ chối ghi `plan_rejected`.
+- [x] Sửa Plan sau khi xem làm `Approve` với digest cũ bị từ chối.
+- [x] `task_list` trỏ vào task `plan` vỏ và duyệt được như `plan`.
+- [x] `hotfix` có đúng một task không `parent_id`, `plan_task_id` NULL.
 
 ## Rủi ro và lưu ý
 

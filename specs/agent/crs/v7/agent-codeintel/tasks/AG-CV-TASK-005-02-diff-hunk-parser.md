@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-diff-hunk-parser.ts`, `codeintel-diff-hunk-parser.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 CR-005 1.8: `@@ -83 +83 @@` (số dòng 1 bị bỏ), xoá thuần `+c,0`; `--raw -z`: `:modes sha sha Status\0path\0[path2\0]`, sha mới `0000…` với working tree; nhị phân `numstat -\t-`.
@@ -20,7 +20,7 @@ Các dạng `@@`, `R100`/`C`, tên có khoảng trắng/Unicode/dấu nháy, nh�
 Lệnh: `pnpm exec vitest run src/relay/codeintel-diff-hunk-parser.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Mọi ca xanh; hàm thuần, không I/O.
+- [x] Mọi ca xanh; hàm thuần, không I/O.
 
 ## Rủi ro
 - Định dạng Git đa phiên bản: bổ sung chế độ integration với `git` thật trong ma trận.

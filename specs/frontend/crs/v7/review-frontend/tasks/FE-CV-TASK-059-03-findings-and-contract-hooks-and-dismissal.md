@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks + store
 **File:** `frontend/src/renderer/src/hooks/useCodeIntelFindings.ts`, `useCodeIntelContractDiff.ts`, `useFindingDismissal.ts` (mới) + test; `frontend/src/renderer/src/store/slices/code-intel.ts` (sửa nhỏ: `findingFilters`, `contractFilters`, `selectOpenFindingsBySymbolKey`)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks; FE-CV-TASK-059-02; G4 fake backend (FE-CV-TASK-073-02)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

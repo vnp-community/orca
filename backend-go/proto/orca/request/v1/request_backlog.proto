@@ -1,0 +1,74 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/wrappers.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+enum BacklogView {
+  BACKLOG_VIEW_UNSPECIFIED = 0;
+  BACKLOG_VIEW_REQUEST = 1;
+  BACKLOG_VIEW_TASK = 2;
+  BACKLOG_VIEW_EXECUTE = 3;
+}
+
+message ListBacklogRequest {
+  string tenant_id = 1;
+  BacklogView view = 2;
+  string project_id = 3;
+  repeated string request_types = 4;
+  repeated string categories = 5;
+  string request_id = 6;
+  string page_token = 7;
+  int32 page_size = 8;
+  string user_id = 9;
+  string sort_by = 10;
+}
+
+message ListBacklogResponse {
+  repeated BacklogRequestRow request_rows = 1;
+  repeated BacklogGroup task_groups = 2;
+  repeated BacklogGroup execute_groups = 3;
+  string next_page_token = 4;
+}
+
+message BacklogRequestRow {
+  string id = 1;
+  string project_id = 2;
+  string type = 3;
+  string reporter_id = 4;
+  string stage = 5;
+  string status = 6;
+  string returned_category = 7;
+  google.protobuf.Timestamp updated_at = 8;
+  string returned_by = 9;
+  google.protobuf.Timestamp returned_at = 10;
+  repeated string parent_request_ids = 11;
+  string title = 12;
+  string priority = 13;
+}
+
+message BacklogGroup {
+  string request_id = 1;
+  string plan_id = 2;
+  string phase_id = 3;
+  repeated BacklogTaskRow tasks = 4;
+  string group_status = 5;
+  string group_title = 6;
+  int32 total_tasks = 7;
+}
+
+message BacklogTaskRow {
+  string id = 1;
+  string type = 2;
+  string status = 3;
+  string title = 4;
+  string assignee_id = 5;
+  google.protobuf.DoubleValue estimated_hours = 6;
+  string last_engine = 7;
+  string last_link_status = 8;
+  int32 failed_attempts = 9;
+  string last_error = 10;
+}

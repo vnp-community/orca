@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/auto_refresh_index.go`, `auto_refresh_index_test.go`, `internal/adapter/eventbus/auto_refresh_ticker.go` (mới)
 **Depends on:** BE-CV-TASK-080-03, 080-04, BE-CV-SOL-012-target-resolution-and-bindings, BE-CV-SOL-013-authorization-flags-and-audit, BE-CV-SOL-021-agent-collector
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Luồng [1]-[7] của SOL-080 2.C. Cổng tiêu thụ: `FlagReader`, `AgentStatusReader` (`codeintel.status`), `AgentReindexer` (`codeintel.reindex` với `trigger:"agent_done"`, `ifStale:true`, `expectHead`; không có `tiers`, PQ-16), `AutoRefreshBudget`, `AuditWriter`.
@@ -21,7 +21,7 @@ Luồng [1]-[7] của SOL-080 2.C. Cổng tiêu thụ: `FlagReader`, `AgentStatu
 - Unit đồng hồ giả + cổng giả: 10 sự kiện/20 s → 1 slot; worktree liên kết → 0 lời gọi reindex; đang `running` không kill; deferral; hạn mức.
 
 ## Tiêu chí hoàn thành
-- [ ] Các tiêu chí mục 4 của SOL-080 liên quan use case xanh.
+- [x] Các tiêu chí mục 4 của SOL-080 liên quan use case xanh.
 
 ## Rủi ro
 Thứ tự sự kiện giữa replica không bảo đảm; thiết kế dựa trạng thái nên chịu được.

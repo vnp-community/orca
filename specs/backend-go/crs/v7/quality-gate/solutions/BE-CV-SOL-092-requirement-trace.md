@@ -102,7 +102,7 @@ Với mọi `task_id` tìm được: `ResolvePermission(task_id, caller_user_id,
 
 ### 2.3 Rút tiêu chí từ `Task.Description` (nhánh độc lập, suy luận)
 
-Theo CR §2.3 nguyên văn (tiêu đề Markdown khớp song ngữ → danh sách; nếu không có thì `- [ ]/- [x]`; nếu vẫn không có → một yêu cầu `title_only`); `key = "task:<task_id>#<hash 8 hex của văn bản chuẩn hoá>"`; ≤ 20 mục, mỗi mục ≤ 300 ký tự đã qua `TextRedactor`; `[x]` không là bằng chứng; **không** đọc `AIContext`/`AIPlanJSON`. Hash: sha256 của chuỗi chuẩn hoá (NFKC, thường, bỏ dấu, gộp khoảng trắng) lấy 8 hex đầu (quyết định của solution; CR chỉ nói "hash 8 hex").
+Theo CR §2.3 nguyên văn (tiêu đề Markdown khớp song ngữ → danh sách; nếu không có thì `- [x]/- [x]`; nếu vẫn không có → một yêu cầu `title_only`); `key = "task:<task_id>#<hash 8 hex của văn bản chuẩn hoá>"`; ≤ 20 mục, mỗi mục ≤ 300 ký tự đã qua `TextRedactor`; `[x]` không là bằng chứng; **không** đọc `AIContext`/`AIPlanJSON`. Hash: sha256 của chuỗi chuẩn hoá (NFKC, thường, bỏ dấu, gộp khoảng trắng) lấy 8 hex đầu (quyết định của solution; CR chỉ nói "hash 8 hex").
 
 ### 2.4 Ghép bằng chứng và `state`
 
@@ -137,17 +137,17 @@ Migration `0007_requirement_trace_links` (hai dialect, RLS Postgres, `WHERE tena
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] Binding có `worktree_id` khớp worktree có `task_id` → `linkConfidence=explicit`; binding không có `worktree_id` và chưa liên kết tay → `none` + không lộ task nào.
-- [ ] Người không có grant đọc task → `reason=task_not_readable`, response **không** chứa title/mô tả/tiêu chí; người có grant thấy đủ (test hai người dùng với `ResolvePermission` giả).
-- [ ] `ai_context`/`AIPlanJSON` không xuất hiện ở bất kỳ đầu ra nào.
-- [ ] Mô tả có mục "Acceptance criteria" 3 dòng → đúng 3 yêu cầu `checklist_heuristic`; không có → một `title_only` + `warnings=[no_structured_criteria]`; `[x]` không tạo bằng chứng.
-- [ ] Yêu cầu chỉ có bằng chứng `inferred` → `no_evidence`, nằm trong gợi ý, không tăng `summary.hasEvidence`.
-- [ ] Index cũ/thiếu overlay → `unknown` + `warnings`, không `no_evidence`.
-- [ ] change `derived` không test/check → `partial`; có cả hai → `has_evidence`; `verifyHint=manual` → `manual_pending` đến khi có `manual_confirmation`.
-- [ ] `CONFIRM`/`REJECT`/`LinkWorktreeTask` đổi trace tức thì; `REJECT` không hiện lại; xoá worktree không xoá xác nhận mức `repo`; `CONFIRM` sau `REJECT` chỉ để lại một dòng.
-- [ ] Nhánh Request tắt hoặc lỗi → rơi về nhánh Task kèm `request_service_unavailable`; fake `GetRequestCoverage` cho AC có `id` ổn định.
-- [ ] Mọi danh sách có giới hạn; ≤ 8 KiB cho confirm/link; `task_id` khác project → `CODEINTEL_INVALID_PARAMS`.
-- [ ] Hai dialect; mọi truy vấn lọc `tenant_id`; tenant khác không đọc/ghi link; `selector` tenant khác → `CODEINTEL_NOT_AUTHORIZED`.
+- [x] Binding có `worktree_id` khớp worktree có `task_id` → `linkConfidence=explicit`; binding không có `worktree_id` và chưa liên kết tay → `none` + không lộ task nào.
+- [x] Người không có grant đọc task → `reason=task_not_readable`, response **không** chứa title/mô tả/tiêu chí; người có grant thấy đủ (test hai người dùng với `ResolvePermission` giả).
+- [x] `ai_context`/`AIPlanJSON` không xuất hiện ở bất kỳ đầu ra nào.
+- [x] Mô tả có mục "Acceptance criteria" 3 dòng → đúng 3 yêu cầu `checklist_heuristic`; không có → một `title_only` + `warnings=[no_structured_criteria]`; `[x]` không tạo bằng chứng.
+- [x] Yêu cầu chỉ có bằng chứng `inferred` → `no_evidence`, nằm trong gợi ý, không tăng `summary.hasEvidence`.
+- [x] Index cũ/thiếu overlay → `unknown` + `warnings`, không `no_evidence`.
+- [x] change `derived` không test/check → `partial`; có cả hai → `has_evidence`; `verifyHint=manual` → `manual_pending` đến khi có `manual_confirmation`.
+- [x] `CONFIRM`/`REJECT`/`LinkWorktreeTask` đổi trace tức thì; `REJECT` không hiện lại; xoá worktree không xoá xác nhận mức `repo`; `CONFIRM` sau `REJECT` chỉ để lại một dòng.
+- [x] Nhánh Request tắt hoặc lỗi → rơi về nhánh Task kèm `request_service_unavailable`; fake `GetRequestCoverage` cho AC có `id` ổn định.
+- [x] Mọi danh sách có giới hạn; ≤ 8 KiB cho confirm/link; `task_id` khác project → `CODEINTEL_INVALID_PARAMS`.
+- [x] Hai dialect; mọi truy vấn lọc `tenant_id`; tenant khác không đọc/ghi link; `selector` tenant khác → `CODEINTEL_NOT_AUTHORIZED`.
 
 ## 5. Kiểm thử
 

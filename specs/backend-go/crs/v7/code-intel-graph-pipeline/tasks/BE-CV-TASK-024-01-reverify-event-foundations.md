@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** (không sửa mã) `backend-go/services/code-intel-service/{migrations,internal}`, `backend-go/common/{eventbus,outbox}`
 **Depends on:** —
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,7 +27,7 @@ Hợp đồng đánh dấu nhiều điểm chưa kiểm: tên stream `CODEINTEL`
 
 ## Tiêu chí hoàn thành
 
-- [ ] Danh sách phụ thuộc chưa sẵn ghi vào PR. - [ ] Cách đếm hàng MySQL chốt.
+- [x] Danh sách phụ thuộc chưa sẵn ghi vào PR. - [x] Cách đếm hàng MySQL chốt.
 
 ## Rủi ro và lưu ý
 

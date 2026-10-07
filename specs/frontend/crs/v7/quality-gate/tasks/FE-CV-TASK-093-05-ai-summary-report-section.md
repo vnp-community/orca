@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/ai-summary/ai-summary-report-section.ts` (mới) + test
 **Depends on:** FE-CV-TASK-093-01; FE-CV-SOL-090-review-report-export (`extraSections`)
-**Status:** [ ] TODO
+**Status:** [x] DONE — `ai-summary-report-section.ts` chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

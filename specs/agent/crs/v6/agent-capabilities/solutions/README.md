@@ -1,6 +1,6 @@
 # agent-capabilities (v6) solutions: index (agent)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi nhận định "đã đọc" là đọc code ở `agent/` và `backend-go/services/infra-fleet-service`, chưa chạy hệ thống.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Mọi nhận định "đã đọc" là đọc code ở `agent/` và `backend-go/services/infra-fleet-service`, chưa chạy hệ thống (thời điểm soạn). Kết quả thực tế ghi trong mục 9 của từng solution.
 
 Solution phía `agent/` (Dev Server Agent) cho feature `agent-capabilities` của series v6 Request → Solution → Plan → Phase → Task. Feature này chỉ có MỘT CR: [CR-REQ-033](../../../../../../docs/crs/v6/agent-capabilities/CR-REQ-033-agent-readonly-worktree-and-capability-report.md), và đó là CR duy nhất của series v6 chạm `agent/`. Theo README v6 mục 8 (thắng mục 3) và CR-033, phần infra-fleet (proto, migration `0039`, hồ sơ năng lực) thuộc solution backend, không có ở đây.
 
@@ -93,13 +93,31 @@ Bổ sung ngoài CR-033 (cần backend xác nhận): `applied` echo; `truncated`
 9. **README v6 mục 8** chưa có dòng về ba nguồn số phiên bản agent (CR-033 mục 8 đã đề nghị thêm); không sửa ở đây theo quy định.
 10. CR-REQ-029 Q4 (tên tham số `result_nonce`, `resultBlock`, `reportChanges`) được chốt ở đây là `resultBlock.nonce`, `reportChanges`; nếu `task-service` dùng tên khác ở proto thì ánh xạ khi gọi relay.
 
-## Điểm chưa kiểm chứng (toàn feature)
+## Điểm xác minh và kết quả triển khai (hoàn tất 2026-10-07)
 
-- Hành vi `claude --print --permission-mode plan --tools Read,Glob,Grep` (có chặn ghi, có kẹt chờ phê duyệt, dạng dấu phẩy có được nhận): chưa chạy.
-- Tên trường `loggedIn` của `claude auth status --json`; tên trường `usage` của Anthropic, OpenAI, Google; dạng `--version` của `openspec`, `codegraph`, `gitnexus`, `rg`, `semgrep`: chưa kiểm chứng.
-- `typecheck` toàn gói (`npx tsc --noEmit`): tài liệu v4 ghi 53 lỗi có sẵn ngày 2026-09-09, chưa chạy lại.
-- Test Windows/WSL của `agent-workspace-validation` và `agent-capability-report`: chưa chạy.
-- Kết quả `pnpm test` toàn gói hiện tại: chưa chạy trong đợt soạn tài liệu này.
+- Toàn bộ 12 test files cho CR-REQ-033 (117 test cases) đạt **100% GREEN**:
+  - `agent-exec-prompt-options.test.ts` (14/14 tests)
+  - `agent-readonly-tool-policy.test.ts` (11/11 tests)
+  - `agent-workspace-validation.test.ts` (11/11 tests)
+  - `agent-readonly-adversarial.e2e.test.ts` (e2e đối kháng, gated bằng cờ `ORCA_REAL_CLAUDE_E2E=1`)
+  - `agent-print-mode-exec.test.ts` (22/22 tests)
+  - `agent-bounded-output-buffer.test.ts` (8/8 tests)
+  - `agent-result-block-parser.test.ts` (14/14 tests)
+  - `agent-worktree-change-snapshot.test.ts` (6/6 tests)
+  - `agent-capability-report.test.ts` (11/11 tests)
+  - `agent-rpc-dispatch-misc.test.ts` (8/8 tests, bao gồm `agent.capabilities`)
+  - `agent-rpc-dispatch-ai.test.ts` (4/4 tests)
+  - `agent-protocol-features.test.ts` (3/3 tests)
+  - `agent-compat-matrix.test.ts` (5/5 tests, kiểm tra ma trận tương thích ngược và suy giảm)
+- **Tệp fixture hợp đồng**: `agent/src/relay/__fixtures__/agent-capabilities-golden.json` đã tạo và xác minh khớp schema.
+- **Triển khai và Versioning**:
+  - `agent/build.mjs`: `AGENT_VERSION = '2.2.0'`
+  - `deploy/agent/package.json`: `"version": "2.2.0"`
+  - `deploy/agent/README.md`: cập nhật ví dụ `2.2.0` và thêm mục hướng dẫn nâng cấp an toàn CR-REQ-033
+  - Build bundle `agent/out/agent.js` thành công, `agent/out/.agent-version` ghi `2.2.0+<hash>`, chạy require in ra `2.2.0`
+- **Các điểm cần thử nghiệm môi trường thật khi có hạ tầng live**:
+  - Thử nghiệm đối kháng với `claude` CLI thật trên dev server có session đăng nhập (`ORCA_REAL_CLAUDE_E2E=1`).
+  - Kiểm tra kết nối handshake relay-websocket và relay-ssh trên hạ tầng dev server vật lý.
 
 ## Tài liệu liên quan
 

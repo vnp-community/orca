@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-parser-golangci.ts` (+ `-severity.ts`), `quality-parser-buf.ts`, `quality-parser-opa.ts` + test
 **Depends on:** AG-CV-TASK-082-01, 082-02, 082-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,7 +24,7 @@ Test đọc `backend-go/.golangci.yml` thật và khẳng định mọi linter �
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng severity phủ cấu hình; không có `SourceLines`.
+- [x] Bảng severity phủ cấu hình; không có `SourceLines`.
 
 ## Rủi ro
 

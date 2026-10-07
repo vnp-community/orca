@@ -25,7 +25,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Suite chạy hoặc SKIP rõ lý do; tài liệu mô tả đủ 9 tool và cảnh báo.
+- [x] Suite chạy hoặc SKIP rõ lý do; tài liệu mô tả đủ 9 tool và cảnh báo.
 
 ## Rủi ro và lưu ý
 

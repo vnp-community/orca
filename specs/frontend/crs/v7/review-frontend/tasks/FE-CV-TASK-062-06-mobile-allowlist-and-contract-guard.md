@@ -5,7 +5,7 @@
 **Area:** desktop / main runtime (**ngoài `frontend/`, cần chủ sở hữu desktop duyệt**)
 **File:** `desktop/src/main/runtime/runtime-rpc.ts` (sửa: thêm vào `MOBILE_RPC_METHOD_ALLOWLIST`, dòng ~155); test allowlist (cạnh test hiện có của runtime-rpc; vị trí xác nhận khi làm); `specs/frontend/api/mobile-rpc-catalog.md` (cập nhật tài liệu)
 **Depends on:** FE-CV-TASK-062-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

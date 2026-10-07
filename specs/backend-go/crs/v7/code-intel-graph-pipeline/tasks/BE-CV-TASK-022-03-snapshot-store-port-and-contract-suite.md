@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/usecase/snapshot_store.go` (mới), `.../internal/adapter/snapshotstorecontract/snapshot_store_contract.go` (mới), `.../internal/adapter/memorystore/snapshot_store_memory.go` (mới, chỉ cho test)
 **Depends on:** TASK-022-02, SOL-011 (cài SQL)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,7 +27,7 @@ SOL-011-repositories cài SQL; solution này đặc tả cổng và bộ test đ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Suite bao phủ cô lập tenant và upsert. - [ ] Bản bộ nhớ xanh.
+- [x] Suite bao phủ cô lập tenant và upsert. - [x] Bản bộ nhớ xanh.
 
 ## Rủi ro và lưu ý
 

@@ -28,9 +28,9 @@ Chốt chất lượng nhóm ghi + stream theo CR-040 mục 4: khoá cấm, tena
 
 ## Tiêu chí hoàn thành
 
-- [ ] 10 kênh + stream qua đủ sáu nhóm kiểm.
-- [ ] Không rò goroutine sau đóng/thay thế.
-- [ ] Hai dialect cùng hoạt động.
+- [x] 10 kênh + stream qua đủ sáu nhóm kiểm.
+- [x] Không rò goroutine sau đóng/thay thế.
+- [x] Hai dialect cùng hoạt động.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** (không sửa mã) `backend-go/services/{code-intel-service,git-gateway-service,infra-fleet-service}`, `backend-go/common/apperrors`
 **Depends on:** —
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Hợp đồng đánh dấu chưa kiểm chứng: `grpc.Trailer` qua `otelgrpc`, 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Có kết luận rõ về trailer qua `otelgrpc` (có/không).
-- [ ] Danh sách phụ thuộc chưa sẵn (010/012/013/023) ghi trong PR.
+- [x] Có kết luận rõ về trailer qua `otelgrpc` (có/không): Có, gRPC trailer qua được bình thường.
+- [x] Danh sách phụ thuộc chưa sẵn (010/012/013/023) ghi trong PR (SOL-010 KindUnavailable/KindResourceExhausted đã thêm vào apperrors; SOL-012 AgentTarget định nghĩa tại usecase; SOL-023 hoàn tất).
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/agent-turn-record-params.ts`, `frontend/src/renderer/src/lib/agent-turn-digest.ts` (đều mới) + test
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu `AgentTurn`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

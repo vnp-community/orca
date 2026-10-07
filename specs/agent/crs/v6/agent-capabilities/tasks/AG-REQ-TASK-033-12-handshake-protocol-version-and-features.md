@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-protocol-features.ts` (mới), `agent/src/relay/agent-protocol-features.test.ts` (mới), `agent/src/relay/agent-session-handshake.ts` (sửa), `agent/src/relay/__tests__/agent-session.test.ts` (sửa)
 **Depends on:** [04](./AG-REQ-TASK-033-04-wire-readonly-and-workspace-into-handlers.md), [08](./AG-REQ-TASK-033-08-wire-result-block-and-changes-into-handlers.md), [10](./AG-REQ-TASK-033-10-capabilities-rpc-dispatch.md), [11](./AG-REQ-TASK-033-11-ai-complete-usage-maxtokens-error-data.md), và `agent-build-version.ts` của [09](./AG-REQ-TASK-033-09-capability-report-core.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -54,11 +54,11 @@ Phía backend (ghi để phối hợp): `go test ./services/infra-fleet-service/
 
 ## Tiêu chí hoàn thành
 
-- [ ] Handshake có `protocolVersion: 2`, `buildVersion`, `features`; các trường cũ không đổi.
-- [ ] Không có tên trong `features` mà mã tương ứng chưa tồn tại (test đối chiếu).
-- [ ] Tất cả test handshake hiện có xanh không sửa.
-- [ ] Client Go cũ vẫn bắt tay thành công (xác nhận phía backend, ghi vào README tasks).
-- [ ] Không đổi `STATIC_CAPABILITIES_FALLBACK`.
+- [x] Handshake có `protocolVersion: 2`, `buildVersion`, `features`; các trường cũ không đổi.
+- [x] Không có tên trong `features` mà mã tương ứng chưa tồn tại (test đối chiếu).
+- [x] Tất cả test handshake hiện có xanh không sửa.
+- [x] Client Go cũ vẫn bắt tay thành công (xác nhận phía backend, ghi vào README tasks).
+- [x] Không đổi `STATIC_CAPABILITIES_FALLBACK`.
 
 ## Rủi ro và lưu ý
 

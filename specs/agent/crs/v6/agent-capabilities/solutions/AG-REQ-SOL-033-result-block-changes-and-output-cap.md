@@ -1,6 +1,6 @@
 # AG-REQ-SOL-033-B: khối kết quả `ORCA_RESULT`, danh sách file thay đổi và giới hạn đầu ra
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi mục "đã đọc" là đọc code, chưa chạy gì.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Mọi mục "đã đọc" là đọc code, chưa chạy gì (thời điểm soạn). Phần "9. Kết quả triển khai" ghi lại những gì thực sự đã thực hiện và sai khác với kế hoạch.
 
 **CR:** [CR-REQ-033](../../../../../../docs/crs/v6/agent-capabilities/CR-REQ-033-agent-readonly-worktree-and-capability-report.md) mục 2.1 (tham số `reportChanges`, `resultBlock`, `maxOutputBytes`), 2.4, 2.5; liên quan CR-REQ-029 (nơi định nghĩa nội dung khối), CR-REQ-008 (dùng `changes` để loại kết quả vi phạm chỉ đọc), CR-REQ-013 (đọc kết quả có cấu trúc)
 **Service:** `agent/`, thư mục `agent/src/relay/`
@@ -227,3 +227,39 @@ Kiểm với `claude` thật: không bắt buộc cho nhóm B; kiểm tay: promp
 - `/opt/repos/orca/agent/src/relay/agent-print-mode-exec.ts`, `agent-print-mode-exec.test.ts`, `agent-rpc-dispatch-agent-exec.ts`, `agent-rpc-dispatch.ts`, `agent-git-handler.ts`, `agent/src/shared/agent-wire-protocol.ts`
 - `/opt/repos/orca/guides/reference/git-compatibility.md`, `AGENTS.md` (mục Git Binary Compatibility)
 - CR: `docs/crs/v6/agent-capabilities/CR-REQ-033-agent-readonly-worktree-and-capability-report.md`, `docs/crs/v6/execution-contract/CR-REQ-029-execution-contract-and-readiness-gate.md` (mục 2.5, Q4), `docs/crs/v6/solution-analysis/CR-REQ-008-diagnosis-findings-answer-analysis.md`
+
+## 9. Kết quả triển khai (2026-10-07)
+
+### 9.1 File đã tạo / sửa
+
+| File | Hành động | Ghi chú |
+|---|---|---|
+| `agent/src/relay/agent-bounded-output-buffer.ts` | Tạo mới | `BoundedOutputBuffer`, `splitOutputBudget` (3/4 stdout, 1/4 stderr), `fitResultToFrame` |
+| `agent/src/relay/agent-result-block-parser.ts` | Tạo mới | `parseResultBlock` thuần hàm, `RESULT_BLOCK_MAX_BYTES = 256 KiB` |
+| `agent/src/relay/agent-worktree-change-snapshot.ts` | Tạo mới | `captureSnapshot` (git/directory), `diffSnapshots`, `ChangeReport` |
+| `agent/src/relay/agent-print-mode-exec.ts` | Sửa | Cả hai handler: snapshot trước/sau, `BoundedOutputBuffer`, `parseResultBlock`, `fitResultToFrame`, `changes`, `parsed`, `truncated`, `warnings` |
+
+### 9.2 TypeScript
+
+**0 lỗi** trên tất cả file mới/sửa. Pre-existing error ở `agent-tool-registry.test.ts:259` ngoài phạm vi.
+
+### 9.3 Sai khác so với kế hoạch
+
+1. **`fitResultToFrame` được thêm vào `agent-bounded-output-buffer.ts`** (không phải file riêng) để tránh tích thêm file. Loại bỏ `stdout`/`stderr` khỏi JSON khi frame quá lớn (giữ toàn bộ mế ta dữ liệu khác).
+2. **`analysisBuf` trong stream handler**: buffer phân tích riêng (4 MiB) được tạo khi `resultBlockNonce` hiện diện; chunk gửi đầy đủ như cũ (không cắt stream). Đúng theo lý do của giải pháp (mục 2.6).
+3. **`diffSnapshots` trả `ChangeReport` trực tiếp** (không bao gói thêm); `changes` trong kết quả là `ChangeReport` gốc.
+4. **Test files đã hoàn thành và đạt 100% GREEN**:
+   - `agent-bounded-output-buffer.test.ts` (8/8 tests)
+   - `agent-result-block-parser.test.ts` (14/14 tests)
+   - `agent-worktree-change-snapshot.test.ts` (6/6 tests)
+5. **Mặc định `maxOutputBytes = 4 MiB`**: người gọi cũ không gửi tham số được giới hạn 4 MiB lần đầu; chấp nhận như kế hoạch (khung 16 MiB vốn đã làm lớn hơn không đi qua được).
+
+### 9.4 Câu hỏi mở đã chốt
+
+- **Q1 (kiểu `truncated`)**: Dùng `{ stdout: boolean, stderr: boolean }`, chỉ có khi cắt — đúng kế hoạch.
+- **Q3 (`stream.end` mang `parsed`)**: Agent phân tích và đưa vào `stream.end` — đúng kế hoạch.
+
+### 9.5 Còn lại
+
+- Kiểm chứng `stream.end` trường mới với Go decoder phía backend.
+- Thử nghiệm giới hạn 12 MiB sau JSON encode trên payload lớn trong môi trường staging.

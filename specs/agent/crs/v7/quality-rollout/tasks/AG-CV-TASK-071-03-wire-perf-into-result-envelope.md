@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/perf-envelope-integration.test.ts` (mới); sửa nhỏ runner/`buildCodeIntelResult` của AG-CV-SOL-001
 **Depends on:** 071-01, 071-02; AG-CV-SOL-001
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -28,12 +28,12 @@ Quy tắc đề xuất (hợp đồng thiếu): cache hit → `cliCalls:0`; lỗ
 - `error responses carry no perf`
 - `perf.cli commands are all in the closed set across all methods`
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/perf-envelope-integration.test.ts`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Test xanh; tệp vàng C2 không có `perf`.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Test xanh; tệp vàng C2 không có `perf`.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

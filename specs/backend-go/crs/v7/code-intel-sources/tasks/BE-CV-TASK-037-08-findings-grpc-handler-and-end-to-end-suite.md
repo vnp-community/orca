@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpc/findings_handler.go`, `findings_handler_test.go`; `cmd/server/main.go` (sửa: đăng ký, nối bốn bộ phát hiện); `testdata/findings/golden/list_findings.json` (mới)
 **Depends on:** BE-CV-TASK-037-06, BE-CV-TASK-037-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Toàn bộ §9 solution 037 đạt trên fixture.
-- [ ] Kênh `codeIntel.findings`/`codeIntel.dismissFinding` chưa đăng ký ở gateway (việc của `BE-CV-SOL-040-*`).
+- [x] Toàn bộ §9 solution 037 đạt trên fixture.
+- [x] Kênh `codeIntel.findings`/`codeIntel.dismissFinding` chưa đăng ký ở gateway (việc của `BE-CV-SOL-040-*`).
 
 ## Rủi ro và lưu ý
 

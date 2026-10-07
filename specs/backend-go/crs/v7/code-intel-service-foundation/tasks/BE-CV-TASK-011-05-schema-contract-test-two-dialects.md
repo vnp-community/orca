@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/postgres/schema_contract_integration_test.go`, `internal/adapter/mysql/schema_contract_integration_test.go` (mới); bảng mong đợi dùng chung: `backend-go/services/code-intel-service/internal/schemaexpect/core_tables.go` (mới, chỉ dùng trong test)
 **Depends on:** BE-CV-TASK-011-02, BE-CV-TASK-011-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Ngăn lệch giữa bản Postgres, bản MySQL và hợp đồng §4.2. Một n
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cả hai dialect khớp bảng mong đợi (9 bảng).
-- [ ] Thêm/bớt cột mà không sửa bảng mong đợi làm test đỏ.
-- [ ] Bảng mong đợi chỉ import từ test.
+- [x] Cả hai dialect khớp bảng mong đợi (9 bảng).
+- [x] Thêm/bớt cột mà không sửa bảng mong đợi làm test đỏ.
+- [x] Bảng mong đợi chỉ import từ test.
 
 ## Rủi ro và lưu ý
 

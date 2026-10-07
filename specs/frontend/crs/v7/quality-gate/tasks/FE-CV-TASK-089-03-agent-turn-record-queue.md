@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/turns/agent-turn-record-queue.ts` (mới) + test
 **Depends on:** FE-CV-TASK-089-01; bộ phân loại lỗi của 050
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/adapter/grpc/server_code_intel_events.go`, `.../internal/usecase/push_authorization.go` (mới) và test
 **Depends on:** TASK-024-02, TASK-024-07, BE-CV-SOL-013-authorization-flags-and-audit
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,7 @@ PQ-11: selectors 0..50, quyền `read` từng worktree/sự kiện (cache 10 s);
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các ca xanh. - [ ] Lỗi tra cứu quyền = từ chối.
+- [x] Các ca xanh. - [x] Lỗi tra cứu quyền = từ chối.
 
 ## Rủi ro và lưu ý
 

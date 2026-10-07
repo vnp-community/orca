@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/devserveragent/exec_timeouts.go` (mới), `.../devserveragent/client.go` (xoá thân `execTimeoutForMethod` cũ, dòng ~412–418), `.../devserveragent/exec_timeouts_test.go` (mới), `client_test.go` (mở rộng)
 **Depends on:** TASK-023-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ Hiện `execTimeoutForMethod` chỉ có `agent.execPrompt` = 15 phút; mọi met
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng 12 ca xanh.
-- [ ] Test hiện có của `agent.execPrompt` xanh không sửa.
-- [ ] Không còn hằng timeout rải rác ở `client.go` (grep `15 \* time.Minute` chỉ còn ở bảng).
+- [x] Bảng 12 ca xanh.
+- [x] Test hiện có của `agent.execPrompt` xanh không sửa.
+- [x] Không còn hằng timeout rải rác ở `client.go` (grep `15 \* time.Minute` chỉ còn ở bảng).
 
 ## Rủi ro và lưu ý
 

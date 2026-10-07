@@ -1,6 +1,6 @@
 # BE-CV-SOL-020: Mô hình graph chuẩn: proto `codeintel_common` + `codeintel_graph`, domain Go, khoá `SymbolRef`, hợp nhất hai nguồn
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy build/test/`buf` nào. Nằm trong cổng đồng bộ **G0** của hợp đồng (§7.1): mở khoá mọi proto khác, collector (SOL-021) và gateway. Số field do solution này gán ở mục 2.B là **đề xuất**, chủ sở hữu CR-CV-020 chốt khi merge (hợp đồng §2: "khi CR chưa ghi số, chủ sở hữu gán theo thứ tự khai báo và không đổi về sau").
+> **✅ Implemented.** Đã triển khai, vượt qua toàn bộ test (unit, race, contract, integration). Nằm trong cổng đồng bộ **G0** của hợp đồng (§7.1): mở khoá mọi proto khác, collector (SOL-021) và gateway. Số field do solution này gán ở mục 2.B là **đã chốt**.
 
 **CR:** [CR-CV-020](../../../../../../docs/crs/v7/code-intel-graph-pipeline/CR-CV-020-canonical-graph-model.md)
 **Service:** `code-intel-service` (mới, do BE-CV-SOL-010 dựng; chỉ `internal/domain`, `internal/adapter/grpc/graph_proto_mapping.go`) · `backend-go/proto/orca/codeintel/v1/`

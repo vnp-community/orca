@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`, `.github/workflows`
 **File:** `backend-go/services/code-intel-service/bench/normalize_bench_test.go`, `bench/erd_parse_bench_test.go`, `bench/collector_replay_bench_test.go`, `bench/report_writer.go` (mới, build tag `bench`), `.github/workflows/code-intel-bench.yml` (mới)
 **Depends on:** BE-CV-TASK-071-01; BE-CV-SOL-020, 021, 031-sql-migration-parser (ERD), `AG-CV-SOL-071-perf-block-and-bench`
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,9 +29,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Benchmark biên dịch với tag `bench` và không chạy trong `go test ./...` thường.
-- [ ] Báo cáo đúng schema, đọc được bởi checker.
-- [ ] Workflow không chặn PR.
+- [x] Benchmark biên dịch với tag `bench` và không chạy trong `go test ./...` thường.
+- [x] Báo cáo đúng schema, đọc được bởi checker.
+- [x] Workflow không chặn PR.
 
 ## Rủi ro và lưu ý
 

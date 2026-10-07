@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/postgres/0001_init.up.sql`, `0001_init.down.sql` (mới); `migrations/mysql/0001_init.up.sql`, `0001_init.down.sql` (mới)
 **Depends on:** TASK-REQ-001-01 (thư mục service)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,10 +31,10 @@ Số migration: `services/request-service/migrations/` chưa tồn tại, nên `
 
 ## Tiêu chí hoàn thành
 
-- [ ] up/down/up sạch trên Postgres và MySQL.
-- [ ] RLS cách ly tenant bằng SQL trực tiếp (Postgres, role không superuser).
-- [ ] Chỉ mục unpublished: Postgres partial, MySQL composite.
-- [ ] Không còn dòng `outbox_events` khác tên ở tài liệu.
+- [x] up/down/up sạch trên Postgres và MySQL.
+- [x] RLS cách ly tenant bằng SQL trực tiếp (Postgres, role không superuser).
+- [x] Chỉ mục unpublished: Postgres partial, MySQL composite.
+- [x] Không còn dòng `outbox_events` khác tên ở tài liệu.
 
 ## Rủi ro và lưu ý
 

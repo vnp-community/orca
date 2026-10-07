@@ -28,8 +28,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mặc định không lộ tool codeIntel; bật bằng env.
-- [ ] Parity/golden không phụ thuộc cổng (duyệt `AllSpecs()`).
+- [x] Mặc định không lộ tool codeIntel; bật bằng env.
+- [x] Parity/golden không phụ thuộc cổng (duyệt `AllSpecs()`).
 
 ## Rủi ro và lưu ý
 

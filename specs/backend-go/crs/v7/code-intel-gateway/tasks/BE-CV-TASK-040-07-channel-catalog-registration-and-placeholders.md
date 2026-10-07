@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_codeintel_catalog.go` (mới), `channels_codeintel_register.go` (mới, thay bản rỗng của 040-01), `channels_codeintel_catalog_test.go` (mới), `channels_codeintel_register_test.go` (mới)
 **Depends on:** TASK-040-01 (ChannelDeps), TASK-040-06 (runner dùng kiểu spec)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ UI-API §3 liệt kê 46 kênh (26 `codeIntel.*` + 20 `codeIntel.quality.*`; 45 
 
 ## Tiêu chí hoàn thành
 
-- [ ] 46 tên đúng hợp đồng, test cứng chống lệch.
-- [ ] `ChannelDeps{}` rỗng đăng ký đủ (G3).
-- [ ] Timeout/cỡ theo bảng UI-API 2.4.
+- [x] 46 tên đúng hợp đồng, test cứng chống lệch.
+- [x] `ChannelDeps{}` rỗng đăng ký đủ (G3).
+- [x] Timeout/cỡ theo bảng UI-API 2.4.
 
 ## Rủi ro và lưu ý
 

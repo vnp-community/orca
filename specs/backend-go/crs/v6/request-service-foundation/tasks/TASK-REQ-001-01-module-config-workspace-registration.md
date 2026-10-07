@@ -5,7 +5,7 @@
 **Service:** `request-service` (mới), `go.work`, `Makefile`
 **File:** `backend-go/services/request-service/go.mod` (mới), `internal/config/config.go` (mới), `internal/config/config_test.go` (mới), `README.md` (mới), `backend-go/go.work`, `backend-go/Makefile`, `backend-go/deploy/postgres-init-databases.sh`
 **Depends on:** Không (task đầu tiên của toàn series)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,11 +30,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `go build ./services/request-service/...` và `go vet` xanh trong workspace.
-- [ ] `go.work`, `Makefile`, `postgres-init-databases.sh` có `request-service` / `request` đúng thứ tự.
-- [ ] `config_test.go` xanh.
-- [ ] README có bảng real vs stub.
-- [ ] `grep -ri "helpers\|utils\|misc" services/request-service` không có tên file hay thư mục vi phạm.
+- [x] `go build ./services/request-service/...` và `go vet` xanh trong workspace.
+- [x] `go.work`, `Makefile`, `postgres-init-databases.sh` có `request-service` / `request` đúng thứ tự.
+- [x] `config_test.go` xanh.
+- [x] README có bảng real vs stub.
+- [x] `grep -ri "helpers\|utils\|misc" services/request-service` không có tên file hay thư mục vi phạm.
 
 ## Rủi ro và lưu ý
 

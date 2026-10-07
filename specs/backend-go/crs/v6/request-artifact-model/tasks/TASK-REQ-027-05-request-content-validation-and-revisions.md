@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/acceptance_criteria.go`, `internal/domain/request_content.go`, `internal/domain/request_content_validation.go`, `internal/usecase/append_request_revision.go`, `internal/usecase/edit_request_content.go`, `internal/usecase/request_content_write_guard_test.go`, `internal/usecase/ports.go` (sửa), `internal/adapter/{postgres,mysql}/request_revision_repository.go`, `internal/usecase/create_request.go` (sửa, của SOL-004) và test
 **Depends on:** TASK-REQ-027-01 (cột, bảng), TASK-REQ-027-03 (`CanonicalJSON`, `Violation`), TASK-REQ-003-03 (`TransitionRequest`, mẫu CAS và `InTx`), TASK-REQ-004-04 (`CreateRequest`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -78,12 +78,12 @@ Bẫy: AC không được tái dùng số khi bị gỡ (đánh dấu `retired`)
 
 ## Tiêu chí hoàn thành
 
-- [ ] `ready` trả đúng danh sách khoá thiếu cho cả 11 loại; `draft` chấp nhận Request chỉ có `title`, `body`.
-- [ ] `AC-n` không tái dùng; revision cũ vẫn đọc được AC cũ.
-- [ ] Hai `AppendRequestRevision` đồng thời: đúng một thắng, một sự kiện `revised`.
-- [ ] Chỉ ba file được gán cột nội dung (test kiến trúc xanh).
-- [ ] `CreateRequest` tạo revision 1 trong cùng transaction.
-- [ ] Payload sự kiện không chứa nội dung Request.
+- [x] `ready` trả đúng danh sách khoá thiếu cho cả 11 loại; `draft` chấp nhận Request chỉ có `title`, `body`.
+- [x] `AC-n` không tái dùng; revision cũ vẫn đọc được AC cũ.
+- [x] Hai `AppendRequestRevision` đồng thời: đúng một thắng, một sự kiện `revised`.
+- [x] Chỉ ba file được gán cột nội dung (test kiến trúc xanh).
+- [x] `CreateRequest` tạo revision 1 trong cùng transaction.
+- [x] Payload sự kiện không chứa nội dung Request.
 
 ## Rủi ro và lưu ý
 

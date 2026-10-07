@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_index_basis.proto` (mới); stub sinh bằng `buf generate`
 **Depends on:** BE-CV-SOL-010 (cổng G0: thư mục `proto/orca/codeintel/v1`, `codeintel_common.proto`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 C-DM §2.1 #5: file do CR-080 sở hữu, 13 trường theo CR-080 §2.3 (`tool, index_scope, freshness, indexed_commit, head_commit, merge_base, indexed_at, dirty_since_index, changed_files_not_in_index, refresh_state, trigger, tool_version, index_policy`). PQ-08: `index_scope ∈ exact|repo_root|stale|none`, `freshness ∈ fresh|fresh_base|stale|unknown`. Đã kiểm: `proto/orca/codeintel/` chưa tồn tại; chạy `ls` trước khi viết.
@@ -21,8 +21,8 @@ C-DM §2.1 #5: file do CR-080 sở hữu, 13 trường theo CR-080 §2.3 (`tool,
 - Test phản chiếu: đủ 13 trường, tên và số đúng.
 
 ## Tiêu chí hoàn thành
-- [ ] lint/breaking xanh; stub biên dịch.
-- [ ] `QualityRun.index_basis` (SOL-082) import được.
+- [x] lint/breaking xanh; stub biên dịch.
+- [x] `QualityRun.index_basis` (SOL-082) import được.
 
 ## Rủi ro
 Số field phải chốt trước khi SOL-012/082 dùng; đổi sau là phá `buf breaking`.

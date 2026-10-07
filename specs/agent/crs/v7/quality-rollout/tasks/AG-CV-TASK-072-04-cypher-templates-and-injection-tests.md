@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/security-cypher.test.ts` (mới), `agent/src/relay/codeintel/__fixtures__/cypher-injection-vectors.json` (mới)
 **Depends on:** 072-01; AG-CV-SOL-002
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,12 +23,12 @@ Test viết theo hợp đồng; mã bị test thuộc AG-CV-SOL-001/002/003/004/
 
 - Như mục 2; live (không chạy PR): gửi vector tới `gitnexus cypher` thật trên `mini-repo` → `{error}`/`[]`.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/security-cypher.test.ts` (7 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi vector bị chặn; không mẫu nào có từ cấm ngoài literal.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Mọi vector bị chặn; không mẫu nào có từ cấm ngoài literal.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

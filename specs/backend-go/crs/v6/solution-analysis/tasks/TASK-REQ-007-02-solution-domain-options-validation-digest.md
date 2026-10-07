@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / domain, usecase (hàm thuần)
 **File:** `internal/domain/solution.go` (mới), `solution_options.go` (mới), `canonical_json_digest.go` (mới), `internal/usecase/solution_output_extraction.go` (mới), và `_test.go`
 **Depends on:** TASK-REQ-007-01 (hằng `AnalysisMode`); CR-REQ-002 (kiểu `Solution` nếu đã định nghĩa, nếu có thì mở rộng thay vì tạo lại)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `Validate` bao phủ mọi luật 2.3 của CR, mỗi luật có ít nhất một test sai.
-- [ ] Digest bằng nhau trước và sau khi đi qua Postgres `JSONB` và MySQL `JSON` (kiểm ở task 03).
-- [ ] Domain chỉ stdlib.
+- [x] `Validate` bao phủ mọi luật 2.3 của CR, mỗi luật có ít nhất một test sai.
+- [x] Digest bằng nhau trước và sau khi đi qua Postgres `JSONB` và MySQL `JSON` (kiểm ở task 03).
+- [x] Domain chỉ stdlib.
 
 ## Rủi ro và lưu ý
 

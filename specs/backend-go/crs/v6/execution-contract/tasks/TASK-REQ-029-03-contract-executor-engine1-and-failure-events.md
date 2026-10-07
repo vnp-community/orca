@@ -5,7 +5,7 @@
 **Service/Area:** `task-service` / usecase `ExecuteTask`, adapter `grpcclient.SimpleExecutor`, grpc server, wiring
 **File:** `internal/usecase/contract_executor.go` (mới), `internal/usecase/execute_task.go` (sửa), `internal/usecase/task_run_events.go` (sửa, tạo ở TASK-REQ-013-01/02), `internal/adapter/grpcclient/simple_executor.go` (sửa), `internal/adapter/grpcclient/simple_executor_contract.go` (mới), `internal/adapter/grpc/server.go` (sửa dòng 280), `cmd/server/main.go` (sửa), và các `_test.go`
 **Depends on:** TASK-REQ-029-01, TASK-REQ-029-02, TASK-REQ-011-02 (`domain.Task.RequestID`), TASK-REQ-013-01/02 (cổng sự kiện `statuschanged`), SOL-033 mục 2.I (hợp đồng tham số `agent.execPrompt`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -69,12 +69,12 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Task thuộc Request có spec và có `depends_on` chạy Engine 1, nhận đúng `prompt` và `result_nonce`.
-- [ ] Task không spec: golden `buildExecutePrompt` và hành vi `UpdateLastExecutionOutput` không đổi.
-- [ ] Mỗi lần chạy hợp đồng có đúng một `task_execution_records` (kể cả thất bại).
-- [ ] Thiếu hoặc sai khối kết quả: `parse_status` đúng, `failure_class=agent_defect`, task không ở `review`.
-- [ ] `trustPreset` không bao giờ `"full"` trên đường hợp đồng khi `request_id` không có tiền tố `req:`.
-- [ ] `gitnexus_impact` đã chạy cho `selectEngine`, `dispatchDirectAgentAsync`, `ExecuteTaskInput`, `SimpleExecutor.Execute` và báo cáo trong PR (quy ước repo).
+- [x] Task thuộc Request có spec và có `depends_on` chạy Engine 1, nhận đúng `prompt` và `result_nonce`.
+- [x] Task không spec: golden `buildExecutePrompt` và hành vi `UpdateLastExecutionOutput` không đổi.
+- [x] Mỗi lần chạy hợp đồng có đúng một `task_execution_records` (kể cả thất bại).
+- [x] Thiếu hoặc sai khối kết quả: `parse_status` đúng, `failure_class=agent_defect`, task không ở `review`.
+- [x] `trustPreset` không bao giờ `"full"` trên đường hợp đồng khi `request_id` không có tiền tố `req:`.
+- [x] `gitnexus_impact` đã chạy cho `selectEngine`, `dispatchDirectAgentAsync`, `ExecuteTaskInput`, `SimpleExecutor.Execute` và báo cáo trong PR (quy ước repo).
 
 ## Rủi ro và lưu ý
 

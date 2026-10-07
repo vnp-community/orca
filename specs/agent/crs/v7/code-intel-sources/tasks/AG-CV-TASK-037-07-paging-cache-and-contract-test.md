@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel-structural-facts.ts` (hoàn thiện), `codeintel-structural-facts-contract.test.ts` (mới)
 **Depends on:** AG-CV-TASK-037-03..06, AG-CV-SOL-002 (`codeintel-short-lived-cache.ts`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,8 +25,8 @@ Kịch bản cache hit/miss/huỷ; phân trang 3 trang cuối; JSON quá lớn (
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi `kind` khớp ví dụ hợp đồng; thứ tự và `totalCount` xác định.
-- [ ] Không cache lỗi; huỷ cache khi `indexChanged`.
+- [x] Mọi `kind` khớp ví dụ hợp đồng; thứ tự và `totalCount` xác định.
+- [x] Không cache lỗi; huỷ cache khi `indexChanged`.
 
 ## Rủi ro
 

@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / migrations, domain
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_analysis_runs.{up,down}.sql` (mới), `internal/domain/analysis_run.go` (mới), `internal/domain/analysis_run_test.go` (mới)
 **Depends on:** CR-REQ-002 (`requests`, `solutions` đã có)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -29,9 +29,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chỉ mục "một run `running`" từ chối bản ghi thứ hai ở cả hai DB.
-- [ ] up/down/up sạch; cùng số hai dialect.
-- [ ] `TruncateRaw` không tạo UTF-8 hỏng.
+- [x] Chỉ mục "một run `running`" từ chối bản ghi thứ hai ở cả hai DB.
+- [x] up/down/up sạch; cùng số hai dialect.
+- [x] `TruncateRaw` không tạo UTF-8 hỏng.
 
 ## Rủi ro và lưu ý
 

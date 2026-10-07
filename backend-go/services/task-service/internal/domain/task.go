@@ -62,6 +62,13 @@ var (
 	// task done early or fake a dispatch it never made — see TASK-223's
 	// Context note.
 	ErrCannotSetInProgress = errors.New("domain: cannot set status to in_progress via UpdateTask — only ExecuteTask may transition a task into in_progress")
+
+	// Plan & phase related errors
+	ErrInvalidTaskType         = errors.New("domain: invalid task type")
+	ErrPlanCannotHaveParent    = errors.New("domain: plan cannot have parent task")
+	ErrPhaseRequiresPlanParent = errors.New("domain: phase requires a plan parent task")
+	ErrContainerUnderWorkTask  = errors.New("domain: container cannot be under a work task")
+	ErrContainerStatusDerived  = errors.New("domain: container status is derived and cannot be updated directly")
 )
 
 // Task is task-service's central entity — see
@@ -89,7 +96,7 @@ type Task struct {
 	ProjectID string
 
 	Description    string
-	Type           string // task|bug|feature|epic
+	Type           string // task|bug|feature|epic|plan|phase
 	Priority       string
 	AssigneeID     string
 	OwnerID        string // see SOL-TG-03 — intrinsic-owner short-circuit
@@ -174,6 +181,8 @@ type Task struct {
 	// narrower TaskShareView) — only via authenticated reads of the full
 	// Task (GetTask/ListTasks), so an admin can retrieve/share it.
 	ShareToken string
+	// Integration
+	RequestID string // id Request ở request-service, không FK, bất biến
 }
 
 func validStatus(s Status) bool {

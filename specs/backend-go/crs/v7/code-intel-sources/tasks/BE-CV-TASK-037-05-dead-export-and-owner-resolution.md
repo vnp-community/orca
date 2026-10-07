@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/structurefinding/{dead_export_findings.go, owner_resolution.go, codeowners_matching.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-037-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ CR §2.3 (mã chết, owner). `scm-integration-service/internal/usecase/codeowne
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí mã chết và owner của §9 đạt.
-- [ ] `ParseCodeowners` chạy giống nhau khi đường dẫn có `\` (Windows) — dùng `path`.
+- [x] Tiêu chí mã chết và owner của §9 đạt.
+- [x] `ParseCodeowners` chạy giống nhau khi đường dẫn có `\` (Windows) — dùng `path`.
 
 ## Rủi ro và lưu ý
 

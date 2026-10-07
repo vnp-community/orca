@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks
 **File:** `frontend/src/renderer/src/hooks/useRequestFlowSupport.ts`, `useRequests.ts`, `useRequest.ts`, `useRequestActions.ts`, `useSolutions.ts`, `useApprovals.ts`, `useBacklog.ts`, `useRequestEvents.ts` (đều mới) và `*.test.ts(x)`; `frontend/src/renderer/src/App.tsx` (sửa, gắn `useRequestEvents`)
 **Depends on:** FE-REQ-TASK-018-01, 018-02; store slice (018-04) cho `setRequestFlowSupport`, `setPendingApprovalCount`, `upsertRequests`
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

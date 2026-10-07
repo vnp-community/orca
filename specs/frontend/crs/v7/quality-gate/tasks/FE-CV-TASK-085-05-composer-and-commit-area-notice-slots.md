@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/CreateHostedReviewComposer.tsx` (sửa), `frontend/src/renderer/src/components/right-sidebar/source-control-commit-area.tsx` (sửa, không thêm max-lines disable mới)
 **Depends on:** FE-CV-TASK-085-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

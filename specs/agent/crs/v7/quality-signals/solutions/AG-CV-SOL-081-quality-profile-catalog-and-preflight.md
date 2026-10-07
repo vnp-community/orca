@@ -1,6 +1,6 @@
 # AG-CV-SOL-081-B: Catalog profile có tên, ghi đè theo host, lập kế hoạch run, preflight môi trường, `quality.listProfiles`
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. "Đã đọc" = đọc code/CR, chưa chạy. "(mới)" = đề xuất của solution.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 081-10 đến 081-18, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-081](../../../../../../docs/crs/v7/quality-signals/CR-CV-081-quality-runner-on-agent.md) mục 2.2 đến 2.5, 2.8 (`qualityToolPath`), 2.10. Nhóm B; nhóm A (lõi chạy): [AG-CV-SOL-081-quality-runner-core](./AG-CV-SOL-081-quality-runner-core.md). Task AG-CV-TASK-081-10 đến 18.
 **Khu vực:** `agent/src/relay/`. **Feature:** `quality-signals`.
@@ -145,13 +145,13 @@ Suite: `fast` = `ts-lint`, `repo-check-max-lines`, `go-vet`; `standard` = `fast`
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] `listProfiles` trả đúng catalog 5.3 với `ready`/`missing[]` (reason thuộc enum §5.1), không `searched[]`, không đường dẫn ngoài `workspaceRoot`, không argv/env; **không lỗi** khi thiếu môi trường; `definitionHash` đổi khi đổi `argv`.
-- [ ] Test quét mọi argv của catalog: không có token cấm (5.3), `argv[0]` là `{bin:}` hoặc `node`, chỉ mẫu hợp lệ.
-- [ ] `quality.run` tên lạ → `PROFILE_UNKNOWN` không spawn; `ENV_NOT_READY` chỉ khi mọi bước thiếu; thiếu một phần → bước `env_not_ready`.
-- [ ] Tên tệp bắt đầu `-`, chứa NUL, symlink thoát worktree, `base` lạ bị từ chối; `cwd` symlink ra ngoài bị từ chối.
-- [ ] `scope=changed`: 4 tệp TS → `ts-lint` đúng 4 tệp; > 300 tệp → chạy đủ + `scopeWidened`; đổi `backend-go/common/**` → mọi module + `scopeWidened`.
-- [ ] Preflight: thiếu `golangci-lint`, `built with` cũ hơn `go.work`, thiếu `node_modules`, `tmp_space_low`; native chỉ dùng `--check-only`.
-- [ ] L2 không đổi được `argv` nếu không `replace:true` + lý do; tệp quyền `0600`.
+- [x] `listProfiles` trả đúng catalog 5.3 với `ready`/`missing[]` (reason thuộc enum §5.1), không `searched[]`, không đường dẫn ngoài `workspaceRoot`, không argv/env; **không lỗi** khi thiếu môi trường; `definitionHash` đổi khi đổi `argv`.
+- [x] Test quét mọi argv của catalog: không có token cấm (5.3), `argv[0]` là `{bin:}` hoặc `node`, chỉ mẫu hợp lệ.
+- [x] `quality.run` tên lạ → `PROFILE_UNKNOWN` không spawn; `ENV_NOT_READY` chỉ khi mọi bước thiếu; thiếu một phần → bước `env_not_ready`.
+- [x] Tên tệp bắt đầu `-`, chứa NUL, symlink thoát worktree, `base` lạ bị từ chối; `cwd` symlink ra ngoài bị từ chối.
+- [x] `scope=changed`: 4 tệp TS → `ts-lint` đúng 4 tệp; > 300 tệp → chạy đủ + `scopeWidened`; đổi `backend-go/common/**` → mọi module + `scopeWidened`.
+- [x] Preflight: thiếu `golangci-lint`, `built with` cũ hơn `go.work`, thiếu `node_modules`, `tmp_space_low`; native chỉ dùng `--check-only`.
+- [x] L2 không đổi được `argv` nếu không `replace:true` + lý do; tệp quyền `0600`.
 
 ## 8. Kiểm thử
 

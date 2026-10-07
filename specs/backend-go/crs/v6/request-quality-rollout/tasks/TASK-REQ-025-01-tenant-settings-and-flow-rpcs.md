@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/postgres/00NN_tenant_settings.up.sql`, `.down.sql` (mới), `.../migrations/mysql/00NN_tenant_settings.up.sql`, `.down.sql` (mới), `.../internal/domain/flow_settings.go` (mới), `.../internal/usecase/flow_settings.go` (mới), `.../internal/adapter/{postgres,mysql}/tenant_settings.go` (mới), `.../internal/adapter/grpc/server.go`, `backend-go/proto/orca/request/v1/request.proto`
 **Depends on:** CR-REQ-001, CR-REQ-002 (số migration tiếp theo, mẫu RLS)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -33,9 +33,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai RPC hoạt động; mặc định `enabled=false`.
-- [ ] Biến tổng tắt thì `Get` trả `false` dù tenant bật.
-- [ ] Postgres và MySQL xanh.
+- [x] Hai RPC hoạt động; mặc định `enabled=false`.
+- [x] Biến tổng tắt thì `Get` trả `false` dù tenant bật.
+- [x] Postgres và MySQL xanh.
 
 ## Rủi ro và lưu ý
 

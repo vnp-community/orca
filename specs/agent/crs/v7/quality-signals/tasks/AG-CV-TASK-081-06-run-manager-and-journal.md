@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-run-manager.ts`, `quality-run-id.ts`, `quality-run-journal.ts`, `quality-limits.ts` (mới) và test tương ứng
 **Depends on:** AG-CV-TASK-081-04, 081-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -29,8 +29,8 @@ Test dùng executor giả: tuần tự, khoá worktree, hàng đợi 4+1 → `qu
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi chuyển trạng thái hợp lệ có test; hai run cùng worktree không bao giờ chạy song song.
-- [ ] Journal không chứa phát hiện/log.
+- [x] Mọi chuyển trạng thái hợp lệ có test; hai run cùng worktree không bao giờ chạy song song.
+- [x] Journal không chứa phát hiện/log.
 
 ## Rủi ro
 

@@ -387,6 +387,9 @@ func run() error {
 	// relayUC/relayByDevServerUC each use separately.
 	streamFileChangesUC := usecase.NewStreamFileChanges(repo, repo, agentClient)
 	isDevServerConnectedUC := usecase.NewIsDevServerConnected(repo, agentClient)
+	getAgentCapabilitiesUC := usecase.NewGetAgentCapabilities(repo, agentClient)
+	codeIntelLimiter := usecase.NewCodeIntelStreamLimiter(16)
+	streamCodeIntelEventsUC := usecase.NewStreamCodeIntelEvents(repo, agentClient, codeIntelLimiter)
 	// streamAgentExecOutputUC backs the StreamExecOutput RPC
 	// (TASK-AG-FLOWTASK-002/003) — task-service's SimpleExecutor consumes
 	// it alongside its own Relay('agent.execPrompt') call.
@@ -755,6 +758,7 @@ func run() error {
 		streamFileChangesUC,
 		pickByTagUC,
 	)
+	infraServer.WithCodeIntel(streamCodeIntelEventsUC, getAgentCapabilitiesUC)
 	infrafleetv1.RegisterInfraFleetServiceServer(grpcServer, withAgentSessionList(infraServer, agentSessionStore))
 	reflection.Register(grpcServer) // convenient for grpcurl during local dev; keep enabled behind the mesh, not the public internet
 

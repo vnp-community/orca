@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/storagemap/storage_map.go`, `store_identity.go`, `canonical_order.go` và các `_test.go` (mới)
 **Depends on:** BE-CV-SOL-010 (module `code-intel-service`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `go test` xanh, không import ngoài stdlib trong `domain/storagemap`.
-- [ ] Id ổn định theo bảng ví dụ; ghi quy tắc id vào comment đầu `store_identity.go` (một dòng lý do: `BE-CV-SOL-034` tham chiếu).
-- [ ] Thông báo cho chủ `BE-CV-SOL-034-data-flow-model` (comment PR) về quy tắc id.
+- [x] `go test` xanh, không import ngoài stdlib trong `domain/storagemap`.
+- [x] Id ổn định theo bảng ví dụ; ghi quy tắc id vào comment đầu `store_identity.go` (một dòng lý do: `BE-CV-SOL-034` tham chiếu).
+- [x] Thông báo cho chủ `BE-CV-SOL-034-data-flow-model` (comment PR) về quy tắc id.
 
 ## Rủi ro và lưu ý
 

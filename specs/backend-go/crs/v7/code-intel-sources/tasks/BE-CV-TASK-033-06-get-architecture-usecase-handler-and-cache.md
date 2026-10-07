@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/get_architecture.go`, `backend-go/services/code-intel-service/internal/adapter/grpc/get_architecture_handler.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-033-02, -05; BE-CV-TASK-033-08 (merge); BE-CV-SOL-022; BE-CV-SOL-013
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Solution mục 2.D. Chuỗi xử lý chuẩn §3 đầu mục.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí solution mục 6 về `has_overrides`, cache, quyền.
-- [ ] `TestChannelInventory` thuộc 040 (không làm ở đây).
+- [x] Tiêu chí solution mục 6 về `has_overrides`, cache, quyền.
+- [x] `TestChannelInventory` thuộc 040 (không làm ở đây).
 
 ## Rủi ro và lưu ý
 

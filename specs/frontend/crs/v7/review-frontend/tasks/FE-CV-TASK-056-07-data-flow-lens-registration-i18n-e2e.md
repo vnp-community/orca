@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + i18n
 **File:** `review-lens-registry.ts` (thêm `dataflow`), `i18n/locales/*.json`, `code-intel-locale-coverage.test.ts`, `tests/e2e/review-dataflow.spec.ts` (mới)
 **Depends on:** FE-CV-TASK-056-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** agent/scripts/capture-codeintel-fixtures.mjs (mới), agent/scripts/esbuild-run-typescript-entry.mjs (mới), `agent/src/relay/codeintel/fixture-capture-plan.ts` (mới), `agent/src/relay/codeintel/fixture-capture-plan.test.ts` (mới)
 **Depends on:** 070-01, 070-02; AG-CV-SOL-001/002/003 (hằng argv whitelist)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -29,8 +29,8 @@ Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn t
 
 ## Tiêu chí hoàn thành
 
-- [ ] Plan dựng từ hằng whitelist; script từ chối phiên bản lệch; chỉ mục chỉ trong tmp, HOME cô lập; fixture đầu tiên của hai công cụ được commit (đủ danh sách solution 2.3).
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Plan dựng từ hằng whitelist; script từ chối phiên bản lệch; chỉ mục chỉ trong tmp, HOME cô lập; fixture đầu tiên của hai công cụ được commit (đủ danh sách solution 2.3).
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

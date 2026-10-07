@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-progress-emitter.ts` (mới) + test; sửa `agent-session-capabilities.ts`, `agent/src/shared/agent-wire-protocol.ts`
 **Depends on:** AG-CV-TASK-081-06, 081-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Test: đồng hồ giả throttle; đổi stage luôn phát; `finished` một l�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Payload khớp ví dụ hợp đồng §6.3/6.4 (có `workspaceRoot`).
-- [ ] Capability `quality` đúng điều kiện; test `agent-session` cũ vẫn xanh.
+- [x] Payload khớp ví dụ hợp đồng §6.3/6.4 (có `workspaceRoot`).
+- [x] Capability `quality` đúng điều kiện; test `agent-session` cũ vẫn xanh.
 
 ## Rủi ro
 

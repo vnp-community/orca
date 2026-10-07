@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpc/c4_overrides_handlers.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-033-09; BE-CV-SOL-013
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ Solution mục 2.D, hợp đồng §6.3.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chỉ owner/admin ghi.
-- [ ] Không rò `document` vào log.
+- [x] Chỉ owner/admin ghi.
+- [x] Không rò `document` vào log.
 
 ## Rủi ro và lưu ý
 

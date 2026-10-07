@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/request_routes.go` (mới), `.../request_routes_test.go` (mới), `.../router.go`, `backend-go/services/api-gateway/README.md`, `backend-go/services/api-gateway/internal/usecase/requestsource.go` (mới)
 **Depends on:** TASK-REQ-016-02, TASK-REQ-016-03, TASK-REQ-016-04
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Năm route chạy, có test.
-- [ ] `tenant_id` không đọc từ body.
-- [ ] README gateway cập nhật; không còn mô tả "request-service không tồn tại".
+- [x] Năm route chạy, có test.
+- [x] `tenant_id` không đọc từ body.
+- [x] README gateway cập nhật; không còn mô tả "request-service không tồn tại".
 
 ## Rủi ro và lưu ý
 

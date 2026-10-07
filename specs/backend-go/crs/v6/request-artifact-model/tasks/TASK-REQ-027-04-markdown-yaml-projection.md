@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/artifact_projection.go`, `internal/domain/projection_frontmatter.go`, `internal/domain/projection_regions.go`, `internal/usecase/export_artifact_projection.go`, `testdata/projection/*.md` và test (mới)
 **Depends on:** TASK-REQ-027-03 (`Violation`, `CanonicalJSON`, `ValidateArtifact`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -60,12 +60,12 @@ CR-REQ-027 mục 2.7: bản chiếu là tệp văn bản sinh từ mô hình chu
 
 ## Tiêu chí hoàn thành
 
-- [ ] `Parse(Render(x)) == x` cho mọi mẫu; `Render` xác định.
-- [ ] Văn bản ngoài vùng Orca không bao giờ đổi dữ liệu parse được.
-- [ ] YAML có anchor, alias, tag bị từ chối với số dòng.
-- [ ] `ReplaceRegion` giữ nguyên byte ngoài vùng (test băm).
-- [ ] Đầu vào từ repo bị chặn kích thước và ký tự điều khiển.
-- [ ] Hàm xuất bản chiếu có test chéo tenant.
+- [x] `Parse(Render(x)) == x` cho mọi mẫu; `Render` xác định.
+- [x] Văn bản ngoài vùng Orca không bao giờ đổi dữ liệu parse được.
+- [x] YAML có anchor, alias, tag bị từ chối với số dòng.
+- [x] `ReplaceRegion` giữ nguyên byte ngoài vùng (test băm).
+- [x] Đầu vào từ repo bị chặn kích thước và ký tự điều khiển.
+- [x] Hàm xuất bản chiếu có test chéo tenant.
 
 ## Rủi ro và lưu ý
 

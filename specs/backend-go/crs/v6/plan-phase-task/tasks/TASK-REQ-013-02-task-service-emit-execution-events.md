@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/task_run_events.go` (mới), `internal/usecase/execute_task.go`, `internal/usecase/report_execution_result.go`, `internal/usecase/execution_lease.go`, `internal/usecase/update_task.go` (payload), `internal/usecase/task_run_events_test.go` (mới)
 **Depends on:** TASK-REQ-013-01, TASK-REQ-011-06
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -43,11 +43,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Task có `request_id` phát đúng một `statuschanged` cho mỗi chuyển trạng thái ở bốn `cause`, cùng transaction với ghi status.
-- [ ] Task không có `request_id` không phát thêm gì (so số dòng outbox trước/sau).
-- [ ] `error_message` có mặt ở `execution_failed` và bị cắt đúng 1 KB.
-- [ ] Payload cũ vẫn parse được bởi `api-gateway` (`workspace_events.go`) và `notification-service` (trường mới `omitempty`).
-- [ ] Không mất hành vi hoàn tác về `previous_status` (CR-TG-008).
+- [x] Task có `request_id` phát đúng một `statuschanged` cho mỗi chuyển trạng thái ở bốn `cause`, cùng transaction với ghi status.
+- [x] Task không có `request_id` không phát thêm gì (so số dòng outbox trước/sau).
+- [x] `error_message` có mặt ở `execution_failed` và bị cắt đúng 1 KB.
+- [x] Payload cũ vẫn parse được bởi `api-gateway` (`workspace_events.go`) và `notification-service` (trường mới `omitempty`).
+- [x] Không mất hành vi hoàn tác về `previous_status` (CR-TG-008).
 
 ## Rủi ro và lưu ý
 

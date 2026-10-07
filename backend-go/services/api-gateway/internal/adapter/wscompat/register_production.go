@@ -18,6 +18,7 @@ import (
 	tenantv1 "github.com/stablyai/orca-go/proto/gen/go/orca/tenant/v1"
 	workflowv1 "github.com/stablyai/orca-go/proto/gen/go/orca/workflow/v1"
 
+	codeintelv1 "github.com/stablyai/orca-go/proto/gen/go/orca/codeintel/v1"
 	commoneventbus "github.com/stablyai/orca-go/common/eventbus"
 )
 
@@ -52,6 +53,10 @@ type ChannelDeps struct {
 	// only when NATS connected (the consumer itself is then non-nil).
 	TaskActivityEnabled bool
 	TaskActivityBus     *commoneventbus.Consumer
+
+	CodeIntel       codeintelv1.CodeIntelServiceClient
+	QualityGate     codeintelv1.QualityGateServiceClient
+	CodeIntelLimits CodeIntelLimits
 }
 
 // RegisterProductionChannels registers every non-mcp.* channel in the order
@@ -76,4 +81,5 @@ func RegisterProductionChannels(r *Registry, d ChannelDeps) {
 	}
 	RegisterWorkspaceSubscribeChannel(r, workspaceEvents)
 	RegisterMobileChannels(r, d.InfraFleet, d.Project, d.DeviceSecrets)
+	registerCodeIntelChannels(r, d)
 }

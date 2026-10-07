@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/migrations/mysql/0002_code_intel_core.up.sql`, `0002_code_intel_core.down.sql` (mới)
 **Depends on:** BE-CV-TASK-010-05, BE-CV-TASK-011-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,9 +31,9 @@ Cùng cột như bản Postgres (hợp đồng §4.1 bảng kiểu: `uuid`=`CHAR
 
 ## Tiêu chí hoàn thành
 
-- [ ] up/down/up sạch; tên cột và tính NULL khớp bản Postgres.
-- [ ] `active_key` NULL lặp được; trùng bị `1062`.
-- [ ] Mọi câu SQL tham chiếu `trigger` có nháy ngược.
+- [x] up/down/up sạch; tên cột và tính NULL khớp bản Postgres.
+- [x] `active_key` NULL lặp được; trùng bị `1062`.
+- [x] Mọi câu SQL tham chiếu `trigger` có nháy ngược.
 
 ## Rủi ro và lưu ý
 

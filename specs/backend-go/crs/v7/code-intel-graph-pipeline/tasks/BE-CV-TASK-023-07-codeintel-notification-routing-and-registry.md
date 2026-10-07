@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/domain/codeintel_event.go` (mới), `.../adapter/devserveragent/codeintel_events.go` (mới), `.../adapter/devserveragent/codeintel_notification_decoding.go` (mới), `.../adapter/devserveragent/session.go` (sửa `routeNotification` dòng 434–466, `newSession` dòng 198, `attachTransport` dòng 245, struct `session`), `.../adapter/devserveragent/client.go` (4 chỗ gọi `newSession`), `.../usecase/ports.go` (cổng `CodeIntelEventSource`), test
 **Depends on:** TASK-023-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -33,10 +33,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bốn thông báo được giải mã và định tuyến theo `dev_server_id` của phiên.
-- [ ] `resync` khi agent nối lại; `overflow` khi đầy; không chặn `readLoop`.
-- [ ] Không log `params` ở mức info.
-- [ ] Không file `helpers/utils/common/misc`; `session.go` không thêm `max-lines` disable (đưa logic mới vào file riêng).
+- [x] Bốn thông báo được giải mã và định tuyến theo `dev_server_id` của phiên.
+- [x] `resync` khi agent nối lại; `overflow` khi đầy; không chặn `readLoop`.
+- [x] Không log `params` ở mức info.
+- [x] Không file `helpers/utils/common/misc`; `session.go` không thêm `max-lines` disable (đưa logic mới vào file riêng).
 
 ## Rủi ro và lưu ý
 

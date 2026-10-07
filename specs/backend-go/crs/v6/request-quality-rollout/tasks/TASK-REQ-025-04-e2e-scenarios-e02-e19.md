@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/e2e/request_flow_test.go`, `.../e2e/scenarios_flows.go` (mới), `.../e2e/scenarios_cross_cutting.go` (mới), `.../e2e/type_matrix_test.go` (mới)
 **Depends on:** TASK-REQ-025-03; CR-REQ-006 (backlog, đổi loại), 010 (quyền), 014 (loại đặc thù), BE-REQ-SOL-024 task 02 (audit)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] E02 đến E16 và E19 xanh trên hai dialect.
-- [ ] `TestEveryRequestTypeHasScenario` xanh và đỏ khi giả lập thêm loại.
-- [ ] Mỗi nhóm luồng có kịch bản xanh.
+- [x] E02 đến E16 và E19 xanh trên hai dialect.
+- [x] `TestEveryRequestTypeHasScenario` xanh và đỏ khi giả lập thêm loại.
+- [x] Mỗi nhóm luồng có kịch bản xanh.
 
 ## Rủi ro và lưu ý
 

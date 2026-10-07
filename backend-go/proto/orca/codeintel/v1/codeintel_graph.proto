@@ -1,0 +1,293 @@
+// Graph types for code intelligence - CR-CV-020 / BE-CV-TASK-020-03.
+syntax = "proto3";
+
+package orca.codeintel.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/codeintel/v1;codeintelv1";
+
+import "orca/codeintel/v1/codeintel_common.proto";
+
+message ClusterNode {
+  string id = 1;
+  string label = 2;
+  int32 symbol_count = 3;
+  double cohesion = 4;
+  repeated string keywords = 5;
+  repeated string top_files = 6;
+  string dominant_language = 7;
+  string area = 8;
+}
+
+message ClusterEdge {
+  string from = 1;
+  string to = 2;
+  int32 weight = 3;
+  map<string, int32> kind_counts = 4;
+}
+
+message ArchitectureGraph {
+  repeated ClusterNode nodes = 1;
+  repeated ClusterEdge edges = 2;
+}
+
+message ModuleNode {
+  string id = 1;
+  SymbolKind kind = 2;
+  string language = 3;
+  int32 symbol_count = 4;
+  int32 loc = 5;
+  string cluster = 6;
+  string area = 7;
+}
+
+message ModuleEdge {
+  string from = 1;
+  string to = 2;
+  EdgeKind kind = 3;
+  int32 count = 4;
+}
+
+message ModuleGraph {
+  repeated ModuleNode nodes = 1;
+  repeated ModuleEdge edges = 2;
+}
+
+message SymbolNode {
+  SymbolRef ref = 1;
+  bool is_exported = 2;
+  string signature = 3;
+  string cluster = 4;
+}
+
+message SymbolEdge {
+  string from_key = 1;
+  string to_key = 2;
+  EdgeKind kind = 3;
+  float confidence = 4;
+  string reason = 5;
+  int32 line = 6;
+  repeated ToolName sources = 7;
+}
+
+message SymbolGraph {
+  SymbolRef center = 1;
+  repeated SymbolNode nodes = 2;
+  repeated SymbolEdge edges = 3;
+  int32 depth = 4;
+}
+
+message FlowSummary {
+  string id = 1;
+  string label = 2;
+  string process_type = 3;
+  int32 step_count = 4;
+  repeated string communities = 5;
+  SymbolRef entry = 6;
+  SymbolRef terminal = 7;
+}
+
+message FlowStep {
+  int32 step = 1;
+  SymbolRef symbol = 2;
+  string cluster = 3;
+  string file_path = 4;
+  int32 start_line = 5;
+}
+
+message FlowGraph {
+  FlowSummary flow = 1;
+  repeated FlowStep steps = 2;
+  repeated SymbolEdge edges = 3;
+}
+
+message ImpactSymbol {
+  SymbolRef symbol = 1;
+  EdgeKind via = 2;
+  bool direct = 3;
+  float confidence = 4;
+}
+
+message ImpactLevel {
+  int32 depth = 1;
+  repeated ImpactSymbol symbols = 2;
+}
+
+message AffectedFlow {
+  string flow_id = 1;
+  string label = 2;
+  int32 step_count = 3;
+  optional int32 changed_step = 4;
+}
+
+message AffectedCluster {
+  optional string id = 1;
+  string label = 2;
+  int32 hits = 3;
+  string impact = 4;
+}
+
+message ImpactGraph {
+  SymbolRef target = 1;
+  string direction = 2;
+  Risk risk = 3;
+  repeated ImpactLevel levels = 4;
+  repeated AffectedFlow affected_flows = 5;
+  repeated AffectedCluster affected_clusters = 6;
+  repeated string tests_covering = 7;
+  int32 impacted_count = 8;
+}
+
+message RouteNode {
+  string id = 1;
+  string path = 2;
+  string method = 3;
+  string file_path = 4;
+  repeated string middleware = 5;
+  repeated string response_keys = 6;
+  repeated string error_keys = 7;
+  string side = 8;
+}
+
+message RouteEdge {
+  string route_id = 1;
+  string handler = 2;
+  string kind = 3;
+}
+
+message RouteMap {
+  repeated RouteNode routes = 1;
+  repeated RouteEdge edges = 2;
+}
+
+message SymbolSource {
+  string text = 1;
+  int32 start_line = 2;
+  int32 end_line = 3;
+  bool truncated = 4;
+}
+
+message RelatedSymbol {
+  SymbolRef ref = 1;
+  EdgeKind kind = 2;
+}
+
+message RelatedSymbolList {
+  repeated RelatedSymbol symbols = 1;
+}
+
+message SymbolFlowRef {
+  string flow_id = 1;
+  string flow_label = 2;
+  int32 step = 3;
+}
+
+message SymbolDetail {
+  SymbolRef symbol = 1;
+  map<string, RelatedSymbolList> incoming = 2;
+  map<string, RelatedSymbolList> outgoing = 3;
+  repeated SymbolFlowRef flows = 4;
+  SymbolSource source = 5;
+  string source_omitted = 6;
+}
+
+// --- Graph RPC Requests & Responses ---
+
+message GetStructureRequest {
+  WorktreeSelector selector = 1;
+  string path = 2;
+  int32 depth = 3;
+  int32 limit = 4;
+  string page_token = 5;
+  string if_none_match = 6;
+}
+
+message GetStructureResponse {
+  ResultMeta meta = 1;
+  ModuleGraph data = 2;
+  string next_page_token = 3;
+}
+
+message GetClusterOverviewRequest {
+  WorktreeSelector selector = 1;
+  int32 top_n = 2;
+  string if_none_match = 3;
+}
+
+message GetClusterOverviewResponse {
+  ResultMeta meta = 1;
+  ArchitectureGraph data = 2;
+}
+
+message GetSubgraphRequest {
+  WorktreeSelector selector = 1;
+  oneof center {
+    string symbol = 2;
+    string file = 3;
+    string cluster = 4;
+  }
+  int32 depth = 5;
+  repeated string kinds = 6;
+  int32 limit = 7;
+  string if_none_match = 8;
+}
+
+message GetSubgraphResponse {
+  ResultMeta meta = 1;
+  SymbolGraph data = 2;
+}
+
+message ImpactTargetNamed {
+  string name = 1;
+  string file = 2;
+  string kind = 3;
+}
+
+message GetImpactRequest {
+  WorktreeSelector selector = 1;
+  oneof target {
+    string key = 2;
+    ImpactTargetNamed named = 3;
+  }
+  string direction = 4;
+  int32 depth = 5;
+  bool include_tests = 6;
+  string if_none_match = 7;
+}
+
+message GetImpactResponse {
+  ResultMeta meta = 1;
+  ImpactGraph data = 2;
+}
+
+message SymbolTargetNamed {
+  string name = 1;
+  string file = 2;
+}
+
+message GetSymbolRequest {
+  WorktreeSelector selector = 1;
+  oneof target {
+    string key = 2;
+    SymbolTargetNamed named = 3;
+  }
+  bool include_source = 4;
+}
+
+message GetSymbolResponse {
+  ResultMeta meta = 1;
+  SymbolDetail data = 2;
+}
+
+message GetRouteMapRequest {
+  WorktreeSelector selector = 1;
+  int32 limit = 2;
+  string page_token = 3;
+  string if_none_match = 4;
+}
+
+message GetRouteMapResponse {
+  ResultMeta meta = 1;
+  RouteMap data = 2;
+  string next_page_token = 3;
+}
+

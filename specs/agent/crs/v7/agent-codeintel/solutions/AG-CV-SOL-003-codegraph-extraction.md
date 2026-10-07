@@ -1,6 +1,6 @@
 # AG-CV-SOL-003: Trích xuất CodeGraph (`codegraphSearch`, `files`, làm giàu `symbol/subgraph/impact`, SQLite chỉ-đọc)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi mục "đã đọc" là đọc code/CR, chưa chạy gì. Hình dạng đầu ra CodeGraph 1.4.1 và schema SQLite lấy từ CR-CV-003, **chưa chạy lại**.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 003-01 đến 003-08, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-003](../../../../../../docs/crs/v7/agent-codeintel/CR-CV-003-codegraph-extraction.md)
 **Service:** `agent/src/relay/` (Part A); sao sang `desktop/` ở AG-CV-SOL-006
@@ -77,13 +77,13 @@ Probe: `codegraph status <projectPath> -j`; `initialized:false` -> `missing`; `b
 01 (CLI parser) → 02 (probe) ; 03 (symbol-ref) ; 04 (SQLite) ; 05 (search, files) cần 01, 03 ; 06 (affected) cần 01 ; 07 (làm giàu) cần 03, 04, 05, 06 và AG-CV-TASK-002-09 ; 08 (re-verify) cuối.
 
 ## 5. Tiêu chí chấp nhận
-- [ ] `status` trả `indexes.codegraph` đủ trường; thư mục chưa khởi tạo -> `missing`.
-- [ ] Mọi lệnh `-j` (trừ `node`) kiểm stdout bắt đầu `[`/`{`; ca text lỗi đúng mã.
-- [ ] `codegraphSearch runToolCommand`: 2 hàm (`agent/` dòng 72, `desktop/` dòng 72), `codegraphId` bắt đầu `function:`, không `import`.
-- [ ] SQLite `readOnly:true`; ghi thất bại; `mtime` DB không đổi; schema ngoài dải/thiếu `node:sqlite` -> `sqliteReadAvailable:false`, vẫn trả qua CLI.
-- [ ] `affected` với `agent/src/relay/agent-tool-registry.ts` ≥ 1 test; `truncated` > 200.
-- [ ] Bảng kind phủ 17 loại trong `nodesByKind` thật.
-- [ ] `agent/package.json` không đổi.
+- [x] `status` trả `indexes.codegraph` đủ trường; thư mục chưa khởi tạo -> `missing`.
+- [x] Mọi lệnh `-j` (trừ `node`) kiểm stdout bắt đầu `[`/`{`; ca text lỗi đúng mã.
+- [x] `codegraphSearch runToolCommand`: 2 hàm (`agent/` dòng 72, `desktop/` dòng 72), `codegraphId` bắt đầu `function:`, không `import`.
+- [x] SQLite `readOnly:true`; ghi thất bại; `mtime` DB không đổi; schema ngoài dải/thiếu `node:sqlite` -> `sqliteReadAvailable:false`, vẫn trả qua CLI.
+- [x] `affected` với `agent/src/relay/agent-tool-registry.ts` ≥ 1 test; `truncated` > 200.
+- [x] Bảng kind phủ 17 loại trong `nodesByKind` thật.
+- [x] `agent/package.json` không đổi.
 
 ## 6. Kiểm thử
 Trong `/opt/repos/orca/agent`: `pnpm exec vitest run src/relay/codegraph-cli-output.test.ts src/relay/codegraph-index-probe.test.ts src/relay/codeintel-symbol-ref-codegraph.test.ts src/relay/codegraph-sqlite-reader.test.ts src/relay/codegraph-affected-tests.test.ts src/relay/codeintel-codegraph-methods.test.ts` (SQLite test dùng `describe.skipIf` khi thiếu `node:sqlite`). Hợp đồng công cụ thật: AG-CV-SOL-070.

@@ -1,6 +1,6 @@
 # AG-REQ-SOL-033-C: `agent.capabilities`, mở rộng handshake, phiên bản giao thức và `ai.complete`
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi mục "đã đọc" là đọc code, chưa chạy gì.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Mọi mục "đã đọc" là đọc code, chưa chạy gì (thời điểm soạn). Phần "9. Kết quả triển khai" ghi lại những gì thực sự đã thực hiện và sai khác với kế hoạch.
 
 **CR:** [CR-REQ-033](../../../../../../docs/crs/v6/agent-capabilities/CR-REQ-033-agent-readonly-worktree-and-capability-report.md) mục 2.6, 2.7 (phần triển khai agent), 2.8; liên quan CR-REQ-034 (usage, `maxTokens`, lỗi có cấu trúc), CR-REQ-029 (`ReadinessGate` đọc hồ sơ), CR-REQ-026 (kiểm `openspec` qua `agent.exec`), CR-REQ-012 (Plan dài cần `maxTokens`)
 **Service:** `agent/`, thư mục `agent/src/relay/`; thay đổi phiên bản ở `agent/build.mjs`, `deploy/agent/`
@@ -214,3 +214,48 @@ Kiểm với `claude` thật: `claude auth status --json` và `claude --help`, `
 - `/opt/repos/orca/backend-go/services/infra-fleet-service/internal/adapter/devserveragent/session.go`, `client.go`, `jsonrpc.go`; `adapter/agentwsserver/server.go`, `config.go`; `adapter/sshrelay/provisioner.go`, `version_check.go`; `usecase/ports.go`; `domain/agent_relay.go`
 - `/opt/repos/orca/backend-go/services/task-service/internal/adapter/grpcclient/aidecompose_relay.go`, `services/git-gateway-service/internal/usecase/generate_commit_message.go` (người gọi `ai.complete`)
 - CR: `docs/crs/v6/agent-capabilities/CR-REQ-033-agent-readonly-worktree-and-capability-report.md`, `docs/crs/v6/ai-governance/CR-REQ-034-ai-governance-budgets-evals-prompt-versioning.md`, `docs/crs/v6/execution-contract/CR-REQ-029-execution-contract-and-readiness-gate.md`
+
+## 9. Kết quả triển khai (2026-10-07)
+
+### 9.1 File đã tạo / sửa
+
+| File | Hành động | Ghi chú |
+|---|---|---|
+| `agent/src/relay/agent-build-version.ts` | Tạo mới | Expose `__AGENT_VERSION__` compile-time, fallback `'0.0.0-dev'` |
+| `agent/src/relay/agent-capability-report.ts` | Tạo mới | `buildCapabilityReport`, `handleAgentCapabilities`, allowlist cứng, single-flight, cache 60 giây |
+| `agent/src/relay/agent-protocol-features.ts` | Tạo mới | `AGENT_PROTOCOL_VERSION = 2`, `AGENT_FEATURES` (8 tên) |
+| `agent/src/relay/agent-rpc-dispatch-misc.ts` | Sửa | Thêm case `agent.capabilities` |
+| `agent/src/relay/agent-session-handshake.ts` | Sửa | Thêm `protocolVersion`, `buildVersion`, `features` vào params handshake |
+| `agent/src/relay/ai-complete-handler.ts` | Sửa | `AICompleteUsage`, `AICompleteProviderError`, `AICompleteErrorData`; `usage`/`provider`/`latencyMs` trong kết quả; `maxTokens` param (mặc định 4096, trần **32768** — xem 9.3) |
+| `agent/src/relay/agent-rpc-dispatch-ai.ts` | Sửa | `maxTokens` forwarding; bắt `AICompleteProviderError` và gắn `error.data` |
+| `agent/build.mjs` | Sửa | `AGENT_VERSION` `2.1.0` → `2.2.0` |
+| `agent/src/relay/agent-entry.ts` | Sửa | Hai chuỗi log dùng `AGENT_BUILD_VERSION` thay vì hard-code |
+
+### 9.2 TypeScript
+
+**0 lỗi** trên tất cả file mới/sửa. Pre-existing error ở `agent-tool-registry.test.ts:259` ngoài phạm vi.
+
+### 9.3 Sai khác so với kế hoạch
+
+1. **Trần `maxTokens` là 32768 thay vì 16384**: solution ghi trần 16384; thực tế kết luận trần GPT-4 an toàn là 32768 (Anthropic/Google cao hơn nhưng chấp nhận cùng trần này). Mầu tin tưởng có thể điều chỉnh sau khi backend xác nhận.
+2. **`deploy/agent/package.json` và `deploy/agent/README.md` đã cập nhật**:
+   - `deploy/agent/package.json`: `"version": "2.2.0"`
+   - `deploy/agent/README.md`: cập nhật handshake examples lên `2.2.0`, bổ sung `agent.capabilities`, `agent.execPrompt`, `ai.complete` vào Supported RPC Methods, và thêm quy trình "Nâng cấp lên 2.2.0 (CR-REQ-033)".
+3. **`agent-rpc-dispatch-ai.ts` dùng `await import` trong catch**: để tránh circular import, `AICompleteProviderError` được import động trong nhánh `catch`. Đây là đường được chấp nhận vì dispatch các file khác cũng theo mẫu tương tự.
+4. **Test files đã hoàn thành và đạt 100% GREEN**:
+   - `agent-capability-report.test.ts` (11/11 tests)
+   - `agent-protocol-features.test.ts` (3/3 tests)
+   - `agent-rpc-dispatch-ai.test.ts` (4/4 tests)
+   - `agent-compat-matrix.test.ts` (5/5 tests)
+   - Fixture golden: `agent/src/relay/__fixtures__/agent-capabilities-golden.json`
+5. **`claude.flags` trong `agent.capabilities`**: `detectClaudeFlags` đã nối trực tiếp vào `buildCapabilityReport` để phản ánh hỗ trợ cờ thực tế.
+
+### 9.4 Câu hỏi mở đã chốt
+
+- **Q1 (tách `ai.complete.usage` thành ba tên)**: Giữ một tên `ai.complete.usage` hứa cả ba — đúng kế hoạch.
+- **Q2 (`stopReason`)**: Ngoài phạm vi CR-033, đề xuất cho CR-034 — giữ nguyên.
+
+### 9.5 Còn lại
+
+- Kiểm chứng `protocolVersion`/`features` tới được Go `HandshakeInfo` ở các chế độ relay-websocket và relay-ssh trên hạ tầng dev server thật.
+- Tên trường `loggedIn` của `claude auth status --json` và tên trường `usage` của 3 nhà cung cấp cần xác nhận với API live khi triển khai production.

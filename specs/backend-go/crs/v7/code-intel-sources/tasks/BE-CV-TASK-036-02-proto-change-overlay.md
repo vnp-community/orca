@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` · `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_change_overlay.proto` (mới); `backend-go/proto/orca/codeintel/v1/codeintel.proto` (sửa: hai dòng `rpc`)
 **Depends on:** BE-CV-SOL-010, BE-CV-SOL-020 (`SymbolRef`, `FlowSummary`, `ClusterRef`, `ResultMeta`, `WorktreeSelector`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Hợp đồng §2.1 dòng 14 giao toàn bộ message cho CR-036 (PQ-09). Hình d
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf lint/breaking` xanh; mọi RPC khai báo có message.
-- [ ] Tên file đúng PQ-07; không `ChangeOverlay` ở `codeintel_graph.proto` (PQ-09).
-- [ ] Đối chiếu UI §4.3: mọi trường UI có trường proto tương ứng.
+- [x] `buf lint/breaking` xanh; mọi RPC khai báo có message.
+- [x] Tên file đúng PQ-07; không `ChangeOverlay` ở `codeintel_graph.proto` (PQ-09).
+- [x] Đối chiếu UI §4.3: mọi trường UI có trường proto tương ứng.
 
 ## Rủi ro và lưu ý
 

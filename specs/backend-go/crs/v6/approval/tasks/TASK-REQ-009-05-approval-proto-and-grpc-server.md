@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / proto, adapter grpc
 **File:** `backend-go/proto/orca/request/v1/approval.proto` (mới), `backend-go/proto/gen/go/orca/request/v1/` (sinh), `backend-go/services/request-service/internal/adapter/grpc/approval_server.go` (mới), `approval_server_test.go` (mới)
 **Depends on:** TASK-REQ-009-04; CR-REQ-001 (buf, generate)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -29,10 +29,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf lint` và `buf breaking` xanh.
-- [ ] Bảy RPC khớp tên trong README v6 mục 3.6.
-- [ ] Không RPC nào tin `tenant_id` từ thân request.
-- [ ] Mã sinh biên dịch; server đăng ký được trong `main.go` (task 06).
+- [x] `buf lint` và `buf breaking` xanh.
+- [x] Bảy RPC khớp tên trong README v6 mục 3.6.
+- [x] Không RPC nào tin `tenant_id` từ thân request.
+- [x] Mã sinh biên dịch; server đăng ký được trong `main.go` (task 06).
 
 ## Rủi ro và lưu ý
 

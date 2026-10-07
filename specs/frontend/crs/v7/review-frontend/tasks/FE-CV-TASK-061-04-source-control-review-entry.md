@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/right-sidebar/source-control-review-entry.tsx` (mới) + test; `source-control-header-toolbar.tsx`, `source-control-header-overflow-menu.tsx`, `source-control-branch-context-row.tsx`, `SourceControl.tsx` (sửa nhỏ)
 **Depends on:** FE-CV-TASK-061-01, 061-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

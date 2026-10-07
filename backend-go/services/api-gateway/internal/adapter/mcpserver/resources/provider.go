@@ -12,6 +12,7 @@ import (
 	"github.com/modelcontextprotocol/go-sdk/jsonrpc"
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcppolicy"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpserver"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpserver/tools"
@@ -152,6 +153,7 @@ func (r *Provider) fetch(ctx context.Context, p mcpserver.Principal, ref Ref, pl
 	for _, c := range pl.calls {
 		raw, _ := json.Marshal(c.args)
 		cctx, cancel := context.WithTimeout(ctx, r.cfg.CallTimeout)
+		cctx = tenant.WithActorType(cctx, tenant.ActorAgent)
 		res, err := r.disp.Dispatch(cctx, id, c.channel, []json.RawMessage{raw})
 		cancel()
 		if err != nil {

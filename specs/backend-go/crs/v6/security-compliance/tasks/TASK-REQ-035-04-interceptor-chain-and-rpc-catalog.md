@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/{rpc_catalog.go,request_access.go}` (mới), `.../internal/usecase/authorize_request_action.go` (mới), `.../internal/adapter/grpc/{interceptors.go,actor_type.go,request_access.go,stream_interceptors.go}` (mới), `.../internal/adapter/grpcclient/project_role_resolver.go` (mới), `.../cmd/server/main.go` (sửa), `.../internal/config/config.go` (sửa: `GATEWAY_INTERNAL_TOKEN`, `SERVICE_INTERNAL_TOKEN`) và `_test.go` tương ứng
 **Depends on:** TASK-REQ-035-02 (`tenant.ActorType`), TASK-REQ-035-03 (`RequestPolicy`), BE-REQ-SOL-001, 002 (`RequestRepository`), TASK-REQ-025-02 (`flow_gate`, cùng danh mục), BE-REQ-SOL-009 (`ApprovalRepository` để định vị theo `approval_id`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -41,11 +41,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Gọi RPC công khai không có token gateway đúng bị từ chối; token cấu hình rỗng từ chối tất cả.
-- [ ] Khởi động thất bại nếu có RPC chưa có trong `Catalog`.
-- [ ] Mỗi RPC có test phân quyền đủ `admin|owner|member|reporter|stranger|agent`.
-- [ ] `agent` gọi `Approve`, `StartPhase`, `SetRequestFlowSettings` nhận `PermissionDenied`.
-- [ ] "Không có" và "tenant khác" đều trả `REQUEST_NOT_FOUND`.
+- [x] Gọi RPC công khai không có token gateway đúng bị từ chối; token cấu hình rỗng từ chối tất cả.
+- [x] Khởi động thất bại nếu có RPC chưa có trong `Catalog`.
+- [x] Mỗi RPC có test phân quyền đủ `admin|owner|member|reporter|stranger|agent`.
+- [x] `agent` gọi `Approve`, `StartPhase`, `SetRequestFlowSettings` nhận `PermissionDenied`.
+- [x] "Không có" và "tenant khác" đều trả `REQUEST_NOT_FOUND`.
 
 ## Ví dụ tham khảo
 

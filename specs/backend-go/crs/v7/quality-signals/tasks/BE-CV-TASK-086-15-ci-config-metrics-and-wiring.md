@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/config/ci_refresh.go`, `cmd/server/main.go` (sửa), `deploy/dev/docker-compose.yml` (biến môi trường, khi SOL-010 đã thêm service)
 **Depends on:** BE-CV-TASK-086-13, BE-CV-SOL-071-metrics-tracing-and-budgets
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Biến: `SCM_INTEGRATION_SERVICE_ADDR`, `CODEINTEL_CI_REFRESH_PER_MINUTE`=30, `CODEINTEL_CI_RATE_BUDGET_PERCENT`=10, `CODEINTEL_CI_PROVIDER_HOSTS`. Giá trị là ước lượng CR.
@@ -19,7 +19,7 @@ Biến: `SCM_INTEGRATION_SERVICE_ADDR`, `CODEINTEL_CI_REFRESH_PER_MINUTE`=30, `C
 - Unit cấu hình; test khởi động không có địa chỉ scm.
 
 ## Tiêu chí hoàn thành
-- [ ] Service khởi động được khi scm vắng.
+- [x] Service khởi động được khi scm vắng.
 
 ## Rủi ro
 Biến chưa có trong C-DM §6.2.

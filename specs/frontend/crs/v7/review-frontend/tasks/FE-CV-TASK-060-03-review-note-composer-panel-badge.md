@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/notes/{ReviewNoteButton,ReviewNoteComposerPopover,ReviewNodeNoteBadge,ReviewNotesPanel}.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-060-01; FE-CV-SOL-051-review-workspace-shell; FE-CV-SOL-053-impact-lens-and-symbol-detail (panel chi tiết, nhảy tới neo)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

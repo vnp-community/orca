@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_classification_proposal.go`, `internal/domain/request_confirmation_rules.go`, `internal/domain/request_type_change_paths.go`, `internal/domain/request_classification_errors.go` và `*_test.go`; `migrations/postgres/0004_request_classification_attempts.{up,down}.sql`, `migrations/mysql/0004_request_classification_attempts.{up,down}.sql` (mới); `internal/domain/request.go`, repository hai dialect (sửa thêm cột)
 **Depends on:** TASK-REQ-003-01, TASK-REQ-004-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -32,10 +32,10 @@ CR-REQ-005 mục 2.2 đến 2.4. `FlowFor(type).PhaseRule` có từ TASK-REQ-003
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ma trận đường đổi loại đúng bảng README mục 3.4 và CR mục 2.4.
-- [ ] Proposal chặt: mọi trường lạ hoặc ngoài tập bị loại.
-- [ ] Migration up/down/up sạch hai dialect.
-- [ ] Số migration xác nhận bằng `ls`.
+- [x] Ma trận đường đổi loại đúng bảng README mục 3.4 và CR mục 2.4.
+- [x] Proposal chặt: mọi trường lạ hoặc ngoài tập bị loại.
+- [x] Migration up/down/up sạch hai dialect.
+- [x] Số migration xác nhận bằng `ls`.
 
 ## Rủi ro và lưu ý
 

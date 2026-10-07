@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/gocallgraph/client_type_table.go`, `client_call_edges.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-032-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ SOL-032 mục 2.C.3. Client gRPC nằm ở `adapter/grpcclient`, `scmstarcheck`,
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi T3 có nhãn suy luận.
-- [ ] Hai cạnh mẫu có file:dòng.
+- [x] Mọi T3 có nhãn suy luận.
+- [x] Hai cạnh mẫu có file:dòng.
 
 ## Rủi ro và lưu ý
 

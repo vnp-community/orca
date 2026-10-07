@@ -20,7 +20,7 @@ Notifier đổi theo lần gọi; ws đóng -> không ném; thiếu `workspaceRo
 Lệnh: `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/codeintel-notification-sink.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Lõi sink không import transport.
+- [x] Lõi sink không import transport.
 
 ## Rủi ro
 - Nhiều phiên đồng thời: thông báo chỉ tới phiên gần nhất (chấp nhận MVP).

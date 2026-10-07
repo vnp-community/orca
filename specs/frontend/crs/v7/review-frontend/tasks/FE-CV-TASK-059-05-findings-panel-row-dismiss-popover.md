@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/findings/{FindingsPanel,FindingsToolbar,FindingsList,FindingRow,FindingDismissPopover}.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-059-02, 059-03; FE-CV-SOL-051-review-workspace-shell (dock đáy, `react-resizable-panels`); `lib/screen-submit-shortcut.ts`, `components/ShortcutKeyCombo.tsx` (đã có)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

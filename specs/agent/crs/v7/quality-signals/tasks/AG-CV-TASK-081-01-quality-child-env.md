@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-child-env.ts` (mới), `agent/src/relay/quality-child-env.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,8 +25,8 @@ Test với `sourceEnv` chứa `ANTHROPIC_API_KEY`, `GITHUB_TOKEN`, `GH_TOKEN`, `
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không biến nào khớp pattern/danh sách cấm lọt vào `env`.
-- [ ] Hàm thuần, không đọc `process.env` trực tiếp; file < 300 dòng.
+- [x] Không biến nào khớp pattern/danh sách cấm lọt vào `env`.
+- [x] Hàm thuần, không đọc `process.env` trực tiếp; file < 300 dòng.
 
 ## Rủi ro
 

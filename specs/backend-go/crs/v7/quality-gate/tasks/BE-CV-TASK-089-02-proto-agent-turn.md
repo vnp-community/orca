@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_agent_turn.proto` (mới); `codeintel_quality_gate.proto` (thêm `RecordAgentTurn`, `ListAgentTurns`, `GetAgentTurn`)
 **Depends on:** BE-CV-TASK-085-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. Message `AgentTurn`, `CommandSummary`, `AgentClaim`, `ClaimVerification` theo ui-api §4.7; `RecordAgentTurnRequest` theo §3.2 (`selector` field 1; **không** có `prompt`, `base_head_commit`).
@@ -13,7 +13,7 @@
 3. `buf lint`, `buf breaking` trực tiếp; sinh stub.
 
 ## Kiểm thử / Tiêu chí hoàn thành
-- [ ] lint+breaking xanh; [ ] `before` là `string` (L5 chờ duyệt).
+- [x] lint+breaking xanh; [ ] `before` là `string` (L5 chờ duyệt).
 
 ## Rủi ro
 - Xung đột merge dòng `rpc` với solution khác.

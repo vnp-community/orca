@@ -5,7 +5,7 @@
 **Area:** desktop / main runtime (**ngoài `frontend/`, cần chủ sở hữu desktop duyệt**)
 **File:** `desktop/src/main/runtime/rpc/methods/code-intel.ts` (mới) + `code-intel.test.ts`; `desktop/src/main/runtime/rpc/methods/index.ts` (sửa: đăng ký `CODE_INTEL_METHODS`)
 **Depends on:** FE-CV-TASK-062-01 (shape); O-4 cho port thật; hợp đồng UI-API §8
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

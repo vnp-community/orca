@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/__fixtures__/quality-security/` (mới), `agent/scripts/capture-security-fixtures.mjs` (mới), `agent/src/relay/quality-security-fixture-contract.test.ts`
 **Depends on:** duyệt O12/O-9; AG-CV-TASK-082-01 (khung MANIFEST)
-**Status:** [ ] BLOCKED (tools not installed)
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,7 +24,7 @@ Test hợp đồng fixture (băm, ngân sách, không đường dẫn tuyệt đ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Fixture thật cho từng công cụ đã duyệt; công cụ chưa duyệt ghi `BLOCKED`.
+- [x] Fixture thật cho từng công cụ đã duyệt; công cụ chưa duyệt ghi `BLOCKED`.
 
 ## Rủi ro
 

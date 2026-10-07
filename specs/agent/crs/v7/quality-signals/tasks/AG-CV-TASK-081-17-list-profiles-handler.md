@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-list-profiles.ts` (mới), `.test.ts` (mới); điền dòng trong `quality-method-table.ts`
 **Depends on:** AG-CV-TASK-081-08, 081-13, 081-16; AG-CV-TASK-080-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Repo mẫu giả; bin thiếu → `ready:false` có `missing`; JSON không chứ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Đúng hình dạng §5.1; không lỗi khi thiếu môi trường.
-- [ ] Không rò đường dẫn/argv.
+- [x] Đúng hình dạng §5.1; không lỗi khi thiếu môi trường.
+- [x] Không rò đường dẫn/argv.
 
 ## Rủi ro
 

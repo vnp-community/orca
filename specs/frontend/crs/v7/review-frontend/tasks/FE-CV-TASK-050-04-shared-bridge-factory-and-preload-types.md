@@ -5,7 +5,7 @@
 **Area:** frontend / shared + preload types
 **File:** `frontend/src/shared/code-intel-bridge.ts` (mới), `frontend/src/preload/api-types.ts` (sửa, cạnh `mcp` :936), test `code-intel-bridge.test.ts`
 **Depends on:** FE-CV-TASK-050-02, FE-CV-TASK-050-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

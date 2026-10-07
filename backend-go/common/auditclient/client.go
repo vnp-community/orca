@@ -9,6 +9,7 @@ package auditclient
 
 import (
 	"context"
+	"log/slog"
 
 	authv1 "github.com/stablyai/orca-go/proto/gen/go/orca/auth/v1"
 )
@@ -23,6 +24,20 @@ func New(auth authv1.AuthServiceClient) *Client {
 	return &Client{auth: auth}
 }
 
+// Entry holds the full set of fields for an audit log entry.
+type Entry struct {
+	TenantID     string
+	ActorID      string
+	ActorType    string
+	Action       string
+	Target       string
+	TargetType   string
+	TargetID     string
+	Outcome      string
+	IPAddress    string
+	MetadataJSON string
+}
+
 // Append records one audit entry — synchronous but best-effort: the RPC
 // error (if any) is deliberately swallowed, never returned, so a slow or
 // unreachable auth-service can never turn a real authorization decision
@@ -32,13 +47,41 @@ func New(auth authv1.AuthServiceClient) *Client {
 // observably happened by the time this call returns). action/target follow
 // auth.audit_log's existing convention (e.g. "annotation.delete",
 // "annotation:ann-123"); outcome is "allowed" | "denied".
+//
+// This is a wrapper around AppendDetailed to avoid breaking existing callers.
 func (c *Client) Append(ctx context.Context, tenantID, actorID, action, target, outcome, ip string) {
-	_, _ = c.auth.AppendAuditEntry(ctx, &authv1.AppendAuditEntryRequest{
-		TenantId:  tenantID,
-		ActorId:   actorID,
+	c.AppendDetailed(ctx, Entry{
+		TenantID:  tenantID,
+		ActorID:   actorID,
 		Action:    action,
 		Target:    target,
 		Outcome:   outcome,
-		IpAddress: ip,
+		IPAddress: ip,
 	})
 }
+
+// AppendDetailed records an audit entry with all available fields (including
+// actor_type, target_type, target_id, and metadata_json). Like Append, it
+// swallows RPC errors.
+func (c *Client) AppendDetailed(ctx context.Context, e Entry) {
+	if e.ActorType != "" && e.ActorType != "user" && e.ActorType != "agent" && e.ActorType != "system" {
+		slog.Debug("auditclient: invalid ActorType dropped", "actor_type", e.ActorType)
+		e.ActorType = ""
+	}
+	if len(e.MetadataJSON) > 4096 {
+		e.MetadataJSON = `{"truncated":true}`
+	}
+	_, _ = c.auth.AppendAuditEntry(ctx, &authv1.AppendAuditEntryRequest{
+		TenantId:     e.TenantID,
+		ActorId:      e.ActorID,
+		ActorType:    e.ActorType,
+		Action:       e.Action,
+		Target:       e.Target,
+		TargetType:   e.TargetType,
+		TargetId:     e.TargetID,
+		Outcome:      e.Outcome,
+		IpAddress:    e.IPAddress,
+		MetadataJson: e.MetadataJSON,
+	})
+}
+

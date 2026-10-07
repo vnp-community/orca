@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** sửa `agent/src/relay/agent-session-capabilities.ts` (`buildCapabilities`) hoặc điểm AG-CV-SOL-001 thêm capability; `agent/src/relay/codeintel/disabled-capabilities.test.ts` (mới)
 **Depends on:** 073-01; AG-CV-SOL-001, 081
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,12 +25,12 @@ Chưa chạy; mã dispatcher của AG-CV-SOL-001/081 chưa tồn tại: test imp
 - STATIC fallback không thêm gì
 - Test xanh; các test `buildCapabilities` hiện có xanh không sửa.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/disabled-capabilities.test.ts src/relay/agent-session-capabilities-codeintel.test.ts` (7 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Backend không thấy capability khi tắt.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Backend không thấy capability khi tắt.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

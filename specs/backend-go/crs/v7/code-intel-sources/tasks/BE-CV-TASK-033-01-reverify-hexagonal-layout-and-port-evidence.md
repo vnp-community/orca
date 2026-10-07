@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/gopackagegraph/testdata/INVENTORY.md` (mới), `.../testdata/mini-service/` (mới)
 **Depends on:** BE-CV-TASK-030-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ Không test mã; review. `find` kiểm kích thước fixture.
 
 ## Tiêu chí hoàn thành
 
-- [ ] INVENTORY có số thật và kết luận về Vault.
-- [ ] Fixture đủ các ca ở solution mục 6.
+- [x] INVENTORY có số thật và kết luận về Vault.
+- [x] Fixture đủ các ca ở solution mục 6.
 
 ## Rủi ro và lưu ý
 

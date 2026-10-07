@@ -1,0 +1,38 @@
+[
+  {
+    "name": "github_pat_in_vietnamese_text",
+    "input": "Token của tôi là ghp_abcdefghijklmnopqrstuvwx rồi nhé",
+    "want_redacted": "Token của tôi là [REDACTED] rồi nhé",
+    "kinds": ["github_token"],
+    "confidence": "high"
+  },
+  {
+    "name": "uuid_not_secret",
+    "input": "id=3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+    "want_redacted": "id=3f2504e0-4f89-11d3-9a0c-0305e82c3301",
+    "kinds": [],
+    "confidence": "high",
+    "is_negative": true
+  },
+  {
+    "name": "connection_string_with_password",
+    "input": "Connecting to postgres://user:SuperSecretPassword123@db.example.com",
+    "want_redacted": "Connecting to postgres://user:[REDACTED]@db.example.com",
+    "kinds": ["connection_string"],
+    "confidence": "high"
+  },
+  {
+    "name": "dotenv_secret",
+    "input": "export AWS_SECRET_ACCESS_KEY=abcd1234efgh5678ijkl9012",
+    "want_redacted": "export AWS_SECRET_ACCESS_KEY=[REDACTED]",
+    "kinds": ["dotenv_secret"],
+    "confidence": "medium"
+  },
+  {
+    "name": "secret_assignment",
+    "input": "const apiKey = \"AABBCCDDEEFF\"",
+    "want_redacted": "const apiKey = \"[REDACTED]\"",
+    "kinds": ["secret_assignment"],
+    "confidence": "medium"
+  }
+]

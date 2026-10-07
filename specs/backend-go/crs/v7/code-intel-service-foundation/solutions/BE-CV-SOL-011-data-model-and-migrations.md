@@ -159,13 +159,13 @@ Các bảng còn lại theo hợp đồng nguyên văn: `repo_bindings` (UNIQUE 
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `0002_code_intel_core` up/down/up sạch trên Postgres và MySQL; `0002` cũng thêm chính sách bảo trì cho `outbox_events`/`processed_events` của `0001`, và `down` gỡ chúng.
-- [ ] Mỗi CHECK từ chối giá trị sai (chèn trực tiếp từng giá trị lỗi); MySQL < 8.0.16 bị bỏ qua CHECK nên domain là hàng rào thật (ghi trong README service).
-- [ ] Hai `INSERT` job cùng `active_key` → vi phạm duy nhất; `active_key` NULL nhiều dòng được phép (cả hai dialect).
-- [ ] Postgres role `NOSUPERUSER NOBYPASSRLS`: mỗi bảng cô lập tenant bằng SQL trực tiếp; `app.maintenance='on'` đọc chéo tenant nhưng không `INSERT`, `DELETE` chỉ khớp điều kiện hàng đã nêu.
-- [ ] Domain: JSON hỏng, UTF-8 hỏng, vượt giới hạn, ngoài tập → `CODEINTEL_INVALID_PARAMS`/`CODEINTEL_PAYLOAD_TOO_LARGE`; `CanonicalParamsHash` ổn định khi đổi thứ tự khoá.
-- [ ] Hợp đồng schema: tên bảng, cột, kiểu, tính NULL khớp bảng mong đợi ở cả hai DB (đọc `information_schema`).
-- [ ] `go vet`, `make lint` xanh; không `max-lines` disable; không file tên chung chung.
+- [x] `0002_code_intel_core` up/down/up sạch trên Postgres và MySQL; `0002` cũng thêm chính sách bảo trì cho `outbox_events`/`processed_events` của `0001`, và `down` gỡ chúng.
+- [x] Mỗi CHECK từ chối giá trị sai (chèn trực tiếp từng giá trị lỗi); MySQL < 8.0.16 bị bỏ qua CHECK nên domain là hàng rào thật (ghi trong README service).
+- [x] Hai `INSERT` job cùng `active_key` → vi phạm duy nhất; `active_key` NULL nhiều dòng được phép (cả hai dialect).
+- [x] Postgres role `NOSUPERUSER NOBYPASSRLS`: mỗi bảng cô lập tenant bằng SQL trực tiếp; `app.maintenance='on'` đọc chéo tenant nhưng không `INSERT`, `DELETE` chỉ khớp điều kiện hàng đã nêu.
+- [x] Domain: JSON hỏng, UTF-8 hỏng, vượt giới hạn, ngoài tập → `CODEINTEL_INVALID_PARAMS`/`CODEINTEL_PAYLOAD_TOO_LARGE`; `CanonicalParamsHash` ổn định khi đổi thứ tự khoá.
+- [x] Hợp đồng schema: tên bảng, cột, kiểu, tính NULL khớp bảng mong đợi ở cả hai DB (đọc `information_schema`).
+- [x] `go vet`, `make lint` xanh; không `max-lines` disable; không file tên chung chung.
 
 ## 5. Kiểm thử
 

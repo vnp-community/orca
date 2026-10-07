@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase, proto, adapter grpc, cmd
 **File:** `internal/usecase/choose_solution_option.go` (mới), `solution_approval_handler.go` (mới), `internal/adapter/grpc/solution_server.go` (mới), `proto/orca/request/v1/request.proto` (sửa), `cmd/server/main.go` (sửa), và `_test.go`, `_integration_test.go`
 **Depends on:** TASK-REQ-007-05, TASK-REQ-009-04 (`SubjectHandler`, `UpdatePendingDigest`), TASK-REQ-009-06 (bộ test hợp đồng handler)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -31,10 +31,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí chấp nhận 9 đến 14 của CR-REQ-007 mục 4 có test.
-- [ ] `buf breaking` xanh.
-- [ ] Handler qua bộ test hợp đồng.
-- [ ] Payload outbox không chứa `options`.
+- [x] Tiêu chí chấp nhận 9 đến 14 của CR-REQ-007 mục 4 có test.
+- [x] `buf breaking` xanh.
+- [x] Handler qua bộ test hợp đồng.
+- [x] Payload outbox không chứa `options`.
 
 ## Rủi ro và lưu ý
 

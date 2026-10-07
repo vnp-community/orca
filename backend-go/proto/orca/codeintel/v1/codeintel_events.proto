@@ -1,0 +1,41 @@
+// CodeIntel events and push streaming proto definition - CR-CV-024 / BE-CV-TASK-024-02.
+syntax = "proto3";
+
+package orca.codeintel.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/codeintel/v1;codeintelv1";
+
+import "google/protobuf/timestamp.proto";
+import "orca/codeintel/v1/codeintel_common.proto";
+
+// StreamCodeIntelEventsRequest subscribes to code intelligence pushes for worktree selectors (PQ-11).
+// Empty selectors means subscribe to all worktrees accessible to the caller.
+message StreamCodeIntelEventsRequest {
+  repeated WorktreeSelector selectors = 1; // 0..50
+}
+
+// CodeIntelPush is the unified event pushed from CodeIntelService to api-gateway and UI.
+// Conforms to CONTRACT-codeintel-proto-and-data-map.md §2.3.
+message CodeIntelPush {
+  string kind = 1;                    // changed | reindex_progress | quality_progress | quality_finished | quality_gate_changed
+  string event_id = 2;
+  string worktree_id = 3;
+  string repo_binding_id = 4;
+  string reason = 5;                  // index_changed | reindex_finished | head_changed | resync | overflow
+  repeated string tools = 6;
+  string commit = 7;
+  string indexed_at = 8;
+  string job_id = 9;
+  string stage = 10;
+  optional int32 percent = 11;
+  string message = 12;
+  google.protobuf.Timestamp occurred_at = 13;
+  string project_id = 14;
+  string head_commit = 15;
+  bool stale = 16;
+  string index_scope = 17;
+  string freshness = 18;
+  bool resync = 19;
+  string payload_json = 20;           // quality_*: params JSON-RPC gốc ≤ 8 KiB
+  string state = 21;                  // queued | running | succeeded | failed | cancelled (reindexProgress)
+}

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/usecase/get_requirement_trace.go` (mới)
 **Depends on:** BE-CV-TASK-092-04, 092-05, 092-06, BE-CV-SOL-036, BE-CV-SOL-082
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. Ghép: resolver → provider (Task; Request nếu bật) → overlay + runs + trailer → matcher → `TraceLink` ghép lúc đọc.
@@ -17,7 +17,7 @@
 - Use case với port giả cho mọi tiêu chí chấp nhận SOL-092 §4 (worktree không liên kết; không quyền; `inferred`-only; index cũ; có change không test).
 
 ## Tiêu chí hoàn thành
-- [ ] `ai_context` không xuất hiện đầu ra nào; [ ] `unknown` ≠ `no_evidence`; [ ] ≤ 1 `ListWorktrees`, 1 `ResolvePermission`, 1 `GetTask` mỗi lần gọi.
+- [x] `ai_context` không xuất hiện đầu ra nào; [ ] `unknown` ≠ `no_evidence`; [ ] ≤ 1 `ListWorktrees`, 1 `ResolvePermission`, 1 `GetTask` mỗi lần gọi.
 
 ## Rủi ro
 - Thiếu overlay (CR-036 chưa có) ⇒ phần lớn `unknown` tới khi merge.

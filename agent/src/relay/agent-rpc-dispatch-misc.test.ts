@@ -157,3 +157,115 @@ describe('dispatchMiscRpc — shell.execStream', () => {
     vi.doUnmock('./shell-agent-extensions')
   })
 })
+
+// ─── agent.capabilities (CR-REQ-033 §2.6) ──────────────────────────────────
+describe('dispatchMiscRpc — agent.capabilities', () => {
+  it('routes agent.capabilities to the report builder and returns its result under the same id', async () => {
+    const { dispatchMiscRpc } = await import('./agent-rpc-dispatch-misc')
+    const rpc: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      id: 10,
+      method: 'agent.capabilities',
+      params: { tools: ['node'], refresh: true }
+    }
+
+    const response = (await dispatchMiscRpc(
+      rpc,
+      [],
+      { toolPath: '/bin', workDir: '/tmp' } as AgentConfig,
+      LOG,
+      new MockWs() as never,
+      createWireState()
+    )) as any
+
+    expect(response.jsonrpc).toBe('2.0')
+    expect(response.id).toBe(10)
+    expect(response.result).toBeDefined()
+    expect(response.result.schemaVersion).toBe(1)
+    expect(response.result.agent.protocolVersion).toBe(2)
+  })
+
+  it('returns InvalidParams with data.reason INVALID_CAPABILITY_PARAMS for tools given as a string', async () => {
+    const { dispatchMiscRpc } = await import('./agent-rpc-dispatch-misc')
+    const rpc: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      id: 11,
+      method: 'agent.capabilities',
+      params: { tools: 'invalid' }
+    }
+
+    const response = (await dispatchMiscRpc(
+      rpc,
+      [],
+      {} as AgentConfig,
+      LOG,
+      new MockWs() as never,
+      createWireState()
+    )) as any
+
+    expect(response.jsonrpc).toBe('2.0')
+    expect(response.id).toBe(11)
+    expect(response.error.code).toBe(-32602)
+    expect(response.error.data.reason).toBe('INVALID_CAPABILITY_PARAMS')
+  })
+
+  it('returns InvalidParams TOO_MANY_ENV_NAMES for 65 envNames', async () => {
+    const { dispatchMiscRpc } = await import('./agent-rpc-dispatch-misc')
+    const rpc: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      id: 12,
+      method: 'agent.capabilities',
+      params: { envNames: Array.from({ length: 65 }, (_, i) => `ENV_${i}`) }
+    }
+
+    const response = (await dispatchMiscRpc(
+      rpc,
+      [],
+      {} as AgentConfig,
+      LOG,
+      new MockWs() as never,
+      createWireState()
+    )) as any
+
+    expect(response.jsonrpc).toBe('2.0')
+    expect(response.id).toBe(12)
+    expect(response.error.code).toBe(-32602)
+    expect(response.error.data.reason).toBe('TOO_MANY_ENV_NAMES')
+  })
+
+  it('result matches the golden contract keys', async () => {
+    const fs = await import('node:fs')
+    const path = await import('node:path')
+    const goldenPath = path.join(import.meta.dirname, '__fixtures__', 'agent-capabilities-golden.json')
+    const golden = JSON.parse(fs.readFileSync(goldenPath, 'utf8'))
+
+    const { dispatchMiscRpc } = await import('./agent-rpc-dispatch-misc')
+    const rpc: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      id: 13,
+      method: 'agent.capabilities',
+      params: { refresh: true }
+    }
+
+    const response = (await dispatchMiscRpc(
+      rpc,
+      [],
+      { toolPath: '/bin', workDir: '/tmp' } as AgentConfig,
+      LOG,
+      new MockWs() as never,
+      createWireState()
+    )) as any
+
+    const actual = response.result
+    const expected = golden.full
+
+    // Compare top-level core keys
+    const coreKeys = ['schemaVersion', 'probedAt', 'partial', 'agent', 'tools', 'claude', 'host', 'env']
+    expect(Object.keys(actual)).toEqual(expect.arrayContaining(coreKeys))
+    // Compare nested sections
+    expect(Object.keys(actual.agent).sort()).toEqual(Object.keys(expected.agent).sort())
+    expect(Object.keys(actual.claude).sort()).toEqual(expect.arrayContaining(['auth', 'installed']))
+    expect(Object.keys(actual.host).sort()).toEqual(expect.arrayContaining(['platform', 'arch', 'nodeVersion', 'cpuCount']))
+  })
+})
+

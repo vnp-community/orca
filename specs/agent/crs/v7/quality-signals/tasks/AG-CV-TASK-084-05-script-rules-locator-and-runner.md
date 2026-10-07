@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-rule-script-locator.ts`, `quality-rule-script-runner.ts` (mới) + test
 **Depends on:** AG-CV-TASK-084-01, 084-02, AG-CV-TASK-081-04, 082-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,7 +24,7 @@ Cây giả có hai vị trí; script giả mã thoát 0/1/timeout/`Cannot find m
 
 ## Tiêu chí hoàn thành
 
-- [ ] `script_not_found` không bao giờ thành pass; cwd đúng.
+- [x] `script_not_found` không bao giờ thành pass; cwd đúng.
 
 ## Rủi ro
 

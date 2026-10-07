@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpc/feature_gate.go` (mới), `.../internal/adapter/grpc/feature_gate_test.go` (mới), `.../cmd/server/main.go`
 **Depends on:** BE-CV-TASK-073-02, BE-CV-SOL-010 (chuỗi interceptor, `internalcaller.Guard`), BE-CV-SOL-071 task 02 (bộ đếm từ chối)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -32,8 +32,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi RPC có phân loại.
-- [ ] Ba RPC ngoại lệ chạy khi tắt; consumer sự kiện/outbox (không qua gRPC) không bị chặn.
+- [x] Mọi RPC có phân loại.
+- [x] Ba RPC ngoại lệ chạy khi tắt; consumer sự kiện/outbox (không qua gRPC) không bị chặn.
 
 ## Rủi ro và lưu ý
 

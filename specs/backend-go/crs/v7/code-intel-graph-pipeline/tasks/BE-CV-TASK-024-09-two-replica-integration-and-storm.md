@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/adapter/eventbus/event_distribution_integration_test.go` (`//go:build integration`), `.../cmd/server/main.go` (sửa)
 **Depends on:** TASK-024-03 … TASK-024-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,7 @@ Tiêu chí chấp nhận của CR-024 mục 4; ma trận CI `dialect: [postgres,
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi tiêu chí CR-024 mục 4 có test. - [ ] Hai dialect xanh. - [ ] Không `max-lines` disable.
+- [x] Mọi tiêu chí CR-024 mục 4 có test. - [x] Hai dialect xanh. - [x] Không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

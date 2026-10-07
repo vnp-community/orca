@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/config/config_codeintel.go` (mới), `internal/config/config_codeintel_test.go` (mới), `internal/config/config.go`, `cmd/server/codeintel_wiring.go` (mới), `cmd/server/codeintel_wiring_test.go` (mới), `cmd/server/main.go`, `internal/adapter/wscompat/register_production.go`
 **Depends on:** cổng G0 (stub `codeintelv1` của BE-CV-SOL-010/020 đã sinh). Nếu chưa có stub: làm phần config trước, phần dial sau.
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -34,11 +34,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Gateway khởi động với `CODE_INTEL_SERVICE_ADDR` rỗng; không dial, không panic; log cảnh báo.
-- [ ] Có địa chỉ: dial, health `code-intel-service` xuất hiện ở `/readyz`.
-- [ ] `MaxCallRecvMsgSize` 4 MiB và token nội bộ có test.
-- [ ] `ChannelDeps` rỗng hợp lệ.
-- [ ] Không thêm `max-lines` disable.
+- [x] Gateway khởi động với `CODE_INTEL_SERVICE_ADDR` rỗng; không dial, không panic; log cảnh báo.
+- [x] Có địa chỉ: dial, health `code-intel-service` xuất hiện ở `/readyz`.
+- [x] `MaxCallRecvMsgSize` 4 MiB và token nội bộ có test.
+- [x] `ChannelDeps` rỗng hợp lệ.
+- [x] Không thêm `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

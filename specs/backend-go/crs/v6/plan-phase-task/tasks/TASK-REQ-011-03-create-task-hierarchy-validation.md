@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/usecase/create_task.go`, `internal/adapter/grpc/server.go` (dòng 134 đến 147), `internal/adapter/grpc/server_create_task.go` (mới), `internal/usecase/ai_apply.go`, `proto/orca/task/v1/task.proto`
 **Depends on:** TASK-REQ-011-02
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -36,11 +36,11 @@ Thêm vào `usecase/create_task_test.go` (fake ở `fakes_test.go`): `TestCreate
 
 ## Tiêu chí hoàn thành
 
-- [ ] gRPC `CreateTask` với `task_type=bug`, `description`, `priority` lưu đúng, `GetTask` trả lại.
-- [ ] Ba lỗi phân cấp trả đúng mã; type lạ `TASK_INVALID_TYPE`; priority sai `TASK_INVALID`.
-- [ ] Task con kế thừa `request_id` từ parent khi không truyền.
-- [ ] `AIApply` với `type=plan` tạo task `type=task`.
-- [ ] Test cũ `create_task_test.go`, `ai_apply_test.go` xanh (không đổi chữ ký `NewTask`).
+- [x] gRPC `CreateTask` với `task_type=bug`, `description`, `priority` lưu đúng, `GetTask` trả lại.
+- [x] Ba lỗi phân cấp trả đúng mã; type lạ `TASK_INVALID_TYPE`; priority sai `TASK_INVALID`.
+- [x] Task con kế thừa `request_id` từ parent khi không truyền.
+- [x] `AIApply` với `type=plan` tạo task `type=task`.
+- [x] Test cũ `create_task_test.go`, `ai_apply_test.go` xanh (không đổi chữ ký `NewTask`).
 
 ## Rủi ro và lưu ý
 

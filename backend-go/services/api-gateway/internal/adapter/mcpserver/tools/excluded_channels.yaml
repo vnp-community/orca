@@ -579,3 +579,8 @@
 - pattern: "git.cancelGeneratePullRequestFields"
   category: backlog
   reason: "Valid agent use case whose arguments are not reviewed yet (or that needs a safer shape); tracked for a later pack revision."
+
+- pattern: "codeIntel.*"
+  category: code-intel-v1
+  reason: "Code intelligence views carry repository source text, reindex runs analyzers on a dev server and quality runs execute checks; not MCP tools in v1 (README v7 O2, CR-CV-041 may replace this line)."
+

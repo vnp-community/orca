@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-finding-pipeline.ts`, `quality-finding-limits.ts` (mới) + test
 **Depends on:** AG-CV-TASK-082-02, 082-03, AG-CV-TASK-081-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Bảng ca: 6 000 phát hiện; thứ tự cắt; `inScope`; message 5 KiB nhiề
 
 ## Tiêu chí hoàn thành
 
-- [ ] Số đếm là trước cắt; thứ tự ổn định; không đường dẫn tuyệt đối trong `file`/`message`.
+- [x] Số đếm là trước cắt; thứ tự ổn định; không đường dẫn tuyệt đối trong `file`/`message`.
 
 ## Rủi ro
 

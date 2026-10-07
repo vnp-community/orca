@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/usecase/agent_turn_queries.go`, `agent_turn_maintenance.go`; handler trong `agent_turn_server.go`; `testdata/agent-turn/*.json` (mới)
 **Depends on:** BE-CV-TASK-089-05, 089-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. `List`: `limit ≤ 50` (ngoài khoảng bị từ chối), `ended_at DESC, id DESC`, `before` (L5), gắn `gate?` bằng **một** truy vấn.
@@ -14,7 +14,7 @@
 4. Golden `AgentTurn` (ui-api §4.7) dùng chung FE; test cô lập tenant hai dialect.
 
 ## Kiểm thử / Tiêu chí hoàn thành
-- [ ] không N+1 (đếm truy vấn); [ ] bảo trì chạy lặp ổn định; [ ] tenant B không thấy lượt tenant A; [ ] `agentType/model` không vào nhãn metric.
+- [x] không N+1 (đếm truy vấn); [ ] bảo trì chạy lặp ổn định; [ ] tenant B không thấy lượt tenant A; [ ] `agentType/model` không vào nhãn metric.
 
 ## Rủi ro
 - Kiểu `before` chưa chốt (L5).

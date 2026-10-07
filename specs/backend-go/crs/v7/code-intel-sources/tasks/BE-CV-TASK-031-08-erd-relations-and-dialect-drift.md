@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/erd/erd_model.go` (mới), `.../domain/erd/relation_inference.go` (mới), `.../domain/erd/dialect_drift.go` (mới), `.../adapter/erdlinks/declared_links.go` (mới); sửa `.../adapter/sqlmigration/statement_splitter.go` (giữ chú thích cùng dòng); các `_test.go`
 **Depends on:** BE-CV-TASK-031-06 (Catalog hoàn chỉnh), BE-CV-TASK-030-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -37,9 +37,9 @@ SOL-031-erd mục 2.C. Nguồn E7 rẻ nhất là chú thích `logical FK` (16 f
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi chú thích `logical FK` trong corpus sinh quan hệ `source=comment` hoặc cảnh báo "đích chưa xác định".
-- [ ] `naming` không xuất hiện khi `includeInferred=false`.
-- [ ] YAML độc hại bị từ chối.
+- [x] Mỗi chú thích `logical FK` trong corpus sinh quan hệ `source=comment` hoặc cảnh báo "đích chưa xác định".
+- [x] `naming` không xuất hiện khi `includeInferred=false`.
+- [x] YAML độc hại bị từ chối.
 
 ## Rủi ro và lưu ý
 

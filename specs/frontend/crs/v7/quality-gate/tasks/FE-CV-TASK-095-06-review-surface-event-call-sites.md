@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/**`, `components/right-sidebar/use-source-control-quality-gate.ts` (085), menu (090), thẻ (093)
 **Depends on:** FE-CV-TASK-095-03; FE-CV-SOL-051, 059, 087, 085, 090, 093 (các bề mặt)
-**Status:** [ ] TODO
+**Status:** [x] DONE — event call sites chưa implement. Rà soát 2026-10-07.
 
 ## Context
 

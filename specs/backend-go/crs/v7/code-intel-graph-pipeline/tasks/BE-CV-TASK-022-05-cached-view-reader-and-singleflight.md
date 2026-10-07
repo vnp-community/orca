@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/usecase/cached_view_reader.go` (mới) và test
 **Depends on:** TASK-022-03, TASK-022-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,7 @@ Luồng C của solution; PQ-13 (20 s + hoàn tất nền).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các ca trên xanh. - [ ] Không ghi `graph_snapshots` cho STATUS/SYMBOL.
+- [x] Các ca trên xanh. - [x] Không ghi `graph_snapshots` cho STATUS/SYMBOL.
 
 ## Rủi ro và lưu ý
 

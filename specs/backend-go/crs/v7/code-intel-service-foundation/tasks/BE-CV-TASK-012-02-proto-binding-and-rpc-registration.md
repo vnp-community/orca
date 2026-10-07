@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_binding.proto` (mới), `backend-go/proto/orca/codeintel/v1/codeintel.proto` (thêm `rpc`), stub sinh vào `backend-go/proto/gen/go/orca/codeintel/v1/`
 **Depends on:** BE-CV-TASK-010-04; cổng G0 (`codeintel_common.proto` của SOL-020 có `WorktreeSelector`, `ToolIndexStatus`, `IndexScope`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Hợp đồng §2.1 #4 và §2.3 (`IndexStatus` nguyên văn), PQ-04, PQ-08 (`In
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf lint`/`breaking` xanh; stub commit; test phản chiếu xanh.
-- [ ] `IndexStatus` khớp §2.3 (trừ field 5 hoãn).
+- [x] `buf lint`/`breaking` xanh; stub commit; test phản chiếu xanh.
+- [x] `IndexStatus` khớp §2.3 (trừ field 5 hoãn).
 
 ## Rủi ro và lưu ý
 

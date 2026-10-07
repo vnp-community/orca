@@ -5,7 +5,7 @@
 **Service:** `common`
 **File:** `backend-go/common/auditclient/client.go`, `backend-go/common/auditclient/client_test.go`
 **Depends on:** None
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -32,8 +32,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `AppendDetailed` có test; `Append` không đổi hành vi.
-- [ ] Tất cả module trong `go.work` biên dịch.
+- [x] `AppendDetailed` có test; `Append` không đổi hành vi.
+- [x] Tất cả module trong `go.work` biên dịch.
 
 ## Rủi ro và lưu ý
 

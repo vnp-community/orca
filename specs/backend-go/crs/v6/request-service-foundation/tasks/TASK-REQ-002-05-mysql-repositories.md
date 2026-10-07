@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/mysql/{request_repository.go,request_counter.go,request_type_history_repository.go,solution_repository.go,request_link_repository.go,request_idempotency_repository.go,request_scan.go}` (mới)
 **Depends on:** TASK-REQ-002-01, TASK-REQ-002-02, TASK-REQ-002-03 (song song được với TASK-REQ-002-04)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -34,10 +34,10 @@ Lệnh: `go test -tags=integration ./services/request-service/internal/adapter/m
 
 ## Tiêu chí hoàn thành
 
-- [ ] Năm cổng được cài đặt, assert biên dịch.
-- [ ] 20 `Create` đồng thời cho 20 số liên tiếp.
-- [ ] Hai `Claim` đồng thời: đúng một bên `claimed=true`.
-- [ ] Bộ kịch bản dùng chung xanh với MySQL.
+- [x] Năm cổng được cài đặt, assert biên dịch.
+- [x] 20 `Create` đồng thời cho 20 số liên tiếp.
+- [x] Hai `Claim` đồng thời: đúng một bên `claimed=true`.
+- [x] Bộ kịch bản dùng chung xanh với MySQL.
 
 ## Rủi ro và lưu ý
 

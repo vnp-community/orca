@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/index_refresh_plan.go`, `index_refresh_state.go`, `index_dedupe_key.go` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-080-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Bảng quyết định ở SOL-080 mục 2.C[6]. `domain` chỉ import stdlib (arch/03). Phân loại `indexScope/freshness` do agent tính (C-AG §4.1); backend chỉ đọc.
@@ -21,7 +21,7 @@ Bảng quyết định ở SOL-080 mục 2.C[6]. `domain` chỉ import stdlib (a
 - Hàm xác định (cùng đầu vào, cùng kết quả).
 
 ## Tiêu chí hoàn thành
-- [ ] Không import ngoài stdlib/domain; không `max-lines` disable.
+- [x] Không import ngoài stdlib/domain; không `max-lines` disable.
 
 ## Rủi ro
 Ngưỡng mặc định là giả định CR-080 (chưa đo); để tham số hoá.

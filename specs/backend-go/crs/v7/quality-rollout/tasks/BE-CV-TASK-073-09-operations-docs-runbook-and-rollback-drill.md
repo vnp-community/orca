@@ -5,7 +5,7 @@
 **Service:** `docs`, `code-intel-service`
 **File:** `docs/guides/code-intel/README.md`, `install-gitnexus-codegraph-on-dev-server.md`, `enable-code-intel-for-tenant.md`, `using-review-view.md`, `runbook-code-intel.md`, `code-intel-performance-and-metrics.md` (task 071-08), `code-intel-threat-model.md` (task 072-09) (mới), `backend-go/services/code-intel-service/README.md`, `backend-go/README.md`
 **Depends on:** BE-CV-TASK-073-01..04, BE-CV-SOL-071, 072, `AG-CV-SOL-073-agent-kill-switch`, `FE-CV-SOL-073`
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,8 +30,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Đủ 7 tệp; ghi rõ `--index-only` và `PATH` systemd.
-- [ ] Diễn tập quay lui ghi nhận.
+- [x] Đủ 7 tệp; ghi rõ `--index-only` và `PATH` systemd.
+- [x] Diễn tập quay lui ghi nhận.
 
 ## Rủi ro và lưu ý
 

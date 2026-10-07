@@ -30,9 +30,9 @@ UI-API 3.1, 4.6; PQ-05 (dismiss: `findingKey ≤ 128`, `action` dismiss|restore,
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh đúng shape; xung đột phiên bản đến client nguyên vẹn.
-- [ ] Không trường cấm; cỡ chặn trước giải mã.
-- [ ] Nội dung ghi chú không xuất hiện ở lỗi/log.
+- [x] Ba kênh đúng shape; xung đột phiên bản đến client nguyên vẹn.
+- [x] Không trường cấm; cỡ chặn trước giải mã.
+- [x] Nội dung ghi chú không xuất hiện ở lỗi/log.
 
 ## Rủi ro và lưu ý
 

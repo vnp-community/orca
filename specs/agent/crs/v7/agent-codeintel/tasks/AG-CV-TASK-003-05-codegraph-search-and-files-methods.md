@@ -20,7 +20,7 @@ Binary giả fixture: 2 hàm `runToolCommand`; khoá lạ bị từ chối; `fil
 Lệnh: `pnpm exec vitest run src/relay/codeintel-codegraph-methods.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Kết quả đúng hình dạng §4.14; không nút `import`.
+- [x] Kết quả đúng hình dạng §4.14; không nút `import`.
 
 ## Rủi ro
 - Hình dạng `query -j` chưa chạy lại.

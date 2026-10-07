@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/{secret_redactor.go,sensitive_path.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-010-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Mẫu `mcp-service/internal/domain/secret_redactor.go` (9 regex, `[REDACTED]`, `
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tất cả mẫu bị che; không dương tính giả trên chuỗi sạch của bảng.
-- [ ] Đường dẫn nhạy cảm cho `content=""` không lỗi; quá 200 KiB bị từ chối.
+- [x] Tất cả mẫu bị che; không dương tính giả trên chuỗi sạch của bảng.
+- [x] Đường dẫn nhạy cảm cho `content=""` không lỗi; quá 200 KiB bị từ chối.
 
 ## Rủi ro và lưu ý
 

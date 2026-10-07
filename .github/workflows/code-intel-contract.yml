@@ -73,3 +73,39 @@ jobs:
         run: |
           cd agent
           pnpm exec vitest run src/relay/codeintel/fixture-manifest.test.ts
+          pnpm exec vitest run src/relay/codeintel/security-cypher.test.ts
+
+  code-intel-security:
+    name: CodeIntel Security Invariant Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --filter orca-agent...
+
+      - name: Verify required security test count
+        run: |
+          cd agent
+          SEC_COUNT=$(pnpm exec vitest list --config vitest.code-intel-contract.config.ts | grep -c "security-" || true)
+          echo "Found $SEC_COUNT security tests"
+          if [ "$SEC_COUNT" -lt 80 ]; then
+            echo "Expected at least 80 security tests, found $SEC_COUNT"
+            exit 1
+          fi
+
+      - name: Run CodeIntel Security Invariant Tests
+        run: |
+          cd agent
+          pnpm exec vitest run src/relay/codeintel/security-*.test.ts src/relay/codeintel/spawn-recorder.test.ts

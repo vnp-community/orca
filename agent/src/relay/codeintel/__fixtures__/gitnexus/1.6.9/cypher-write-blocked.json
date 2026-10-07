@@ -1,0 +1,3 @@
+{
+  "stdout": "{\"error\": \"Write operations are not allowed in read-only mode\"}"
+}

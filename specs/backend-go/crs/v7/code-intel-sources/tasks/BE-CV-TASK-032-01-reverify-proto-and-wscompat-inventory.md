@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/gocallgraph/testdata/INVENTORY.md` (mới), `.../protoschema/testdata/*.proto` (mới, bản sao rút gọn)
 **Depends on:** BE-CV-TASK-030-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ Không có test mã; review `INVENTORY.md`. `find` kiểm kích thước fixture
 
 ## Tiêu chí hoàn thành
 
-- [ ] Số liệu thật thay các con số CR trong tiêu chí.
-- [ ] Fixture đủ `stream`, `oneof`, lồng, import nội bộ `orca/workflow/v1/workflow.proto`.
+- [x] Số liệu thật thay các con số CR trong tiêu chí.
+- [x] Fixture đủ `stream`, `oneof`, lồng, import nội bộ `orca/workflow/v1/workflow.proto`.
 
 ## Rủi ro và lưu ý
 

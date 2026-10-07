@@ -5,7 +5,7 @@
 **Service:** `.github/workflows`, `agent/` (chỉ để gọi test), `code-intel-service`
 **File:** `.github/workflows/code-intel-contract.yml` (mới)
 **Depends on:** BE-CV-TASK-070-01..05; `AG-CV-SOL-070` (test vitest, script chụp); BE-CV-SOL-010 (module service)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tầng chặn chạy trên PR đúng đường dẫn, có bước khẳng định `agent/` được test.
-- [ ] Tầng live chạy được qua `workflow_dispatch` và không chặn.
-- [ ] Không thêm `max-lines` disable; không dùng `config/vitest.config.ts`.
+- [x] Tầng chặn chạy trên PR đúng đường dẫn, có bước khẳng định `agent/` được test.
+- [x] Tầng live chạy được qua `workflow_dispatch` và không chặn.
+- [x] Không thêm `max-lines` disable; không dùng `config/vitest.config.ts`.
 
 ## Rủi ro và lưu ý
 

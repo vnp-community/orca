@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/answer_clarification.go`, `internal/usecase/cancel_clarification.go`, `internal/usecase/clarification_side_effects.go`, `internal/usecase/change_request_type.go` (sửa, của SOL-005), `internal/usecase/cancel_request.go` (sửa, của CR-REQ-006), `internal/usecase/return_to_backlog.go` (sửa, của CR-REQ-006), `internal/usecase/ports.go` (sửa) và test
 **Depends on:** TASK-REQ-028-03, 028-04, TASK-REQ-027-05 (`AppendWithinTx`, `ApplyAnswers` dùng `AcceptanceCriteria`), TASK-REQ-007-05 (Solution `superseded`), TASK-REQ-012-05 (Plan thay thế), TASK-REQ-005-06 (`ChangeRequestType`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -77,12 +77,12 @@ Người trả lời phải thuộc `clarification_assignees` hoặc `role=admin
 
 ## Tiêu chí hoàn thành
 
-- [ ] Trả lời đủ: Clarification `answered`, `content_revision` tăng đúng một, Request vào `resume_status`, `request_revisions` có dòng `clarification_answered`.
-- [ ] Solution `proposed` cũ thành `superseded`, Solution `approved` giữ nguyên; Decision tương ứng `superseded`.
-- [ ] Giao lặp không tạo revision hay sự kiện thứ hai.
-- [ ] `type_change`, `cancel`, `return_to_backlog` từ `awaiting_information` hủy Clarification `open` cùng transaction.
-- [ ] Vượt vòng tối đa về `request_backlog` với `missing_info`.
-- [ ] Không có lỗi thứ tự khoá trong test đua.
+- [x] Trả lời đủ: Clarification `answered`, `content_revision` tăng đúng một, Request vào `resume_status`, `request_revisions` có dòng `clarification_answered`.
+- [x] Solution `proposed` cũ thành `superseded`, Solution `approved` giữ nguyên; Decision tương ứng `superseded`.
+- [x] Giao lặp không tạo revision hay sự kiện thứ hai.
+- [x] `type_change`, `cancel`, `return_to_backlog` từ `awaiting_information` hủy Clarification `open` cùng transaction.
+- [x] Vượt vòng tối đa về `request_backlog` với `missing_info`.
+- [x] Không có lỗi thứ tự khoá trong test đua.
 
 ## Rủi ro và lưu ý
 

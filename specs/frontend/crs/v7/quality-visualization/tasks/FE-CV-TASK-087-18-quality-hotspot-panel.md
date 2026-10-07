@@ -5,7 +5,7 @@
 **Area:** frontend / components (pha 3)
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityHotspotPanel.tsx` (mới) và `*.test.tsx`
 **Depends on:** 087-15, FE-CV-TASK-088-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `components/tab-group/TabGroupPanel.tsx`, `useTabGroupWorkspaceModel.ts`, `useTabDragSplit.ts`, `tab-drag-preview-activation.ts`, `components/tab-bar/TabBar.tsx`, `group-tab-order.ts`, `reconcile-order.ts` (đọc), `components/review-map/ReviewTabHost.tsx`, `ReviewTabUnavailableNotice.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-050-16, FE-CV-TASK-050-12, FE-CV-TASK-050-20
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

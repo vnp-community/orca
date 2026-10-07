@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` · `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_contract_diff.proto` (mới); `backend-go/proto/orca/codeintel/v1/codeintel.proto` (sửa: một dòng `rpc`)
 **Depends on:** BE-CV-TASK-037-02 (`Finding`), BE-CV-SOL-020 (`SourceRef`, `SymbolRef`, `ResultMeta`), BE-CV-TASK-036-02 (`IndexFreshness`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Hợp đồng §2.1 dòng 16; PQ-30. `ContractWarning` thuộc `codeintel_contra
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf` xanh; mọi trường UI §4.5 có chỗ trong proto.
-- [ ] Số field ghi trong comment; không RPC thiếu message.
+- [x] `buf` xanh; mọi trường UI §4.5 có chỗ trong proto.
+- [x] Số field ghi trong comment; không RPC thiếu message.
 
 ## Rủi ro và lưu ý
 

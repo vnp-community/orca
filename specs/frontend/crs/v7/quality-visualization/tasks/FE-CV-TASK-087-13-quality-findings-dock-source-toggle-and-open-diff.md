@@ -5,7 +5,7 @@
 **Area:** frontend / review shell
 **File:** sửa nhỏ `FindingsToolbar`/dock của FE-CV-SOL-059; `frontend/src/renderer/src/components/review-map/quality/findings/QualityFindingsDockSource.tsx` (mới); liên kết từ lens ("Xem {n} phát hiện") và từ `QualityGateReasonRow`
 **Depends on:** 087-12, 087-07; FE-CV-SOL-059, FE-CV-SOL-053
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

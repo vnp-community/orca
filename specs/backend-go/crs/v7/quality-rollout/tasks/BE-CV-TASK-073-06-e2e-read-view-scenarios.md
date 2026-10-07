@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/e2e/change_overlay_test.go`, `e2e/impact_symbol_test.go`, `e2e/erd_test.go`, `e2e/cache_singleflight_test.go`, `e2e/tool_missing_test.go`, `e2e/repo_resolution_test.go`, `e2e/timeout_test.go`, `e2e/truncation_test.go` (mới, tag `e2e`)
 **Depends on:** BE-CV-TASK-073-05, BE-CV-SOL-022, 031, 036, 040 (không bắt buộc ở T1), BE-CV-TASK-070-04
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,7 +29,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] E02–E10 (phần T1) xanh hai dialect.
+- [x] E02–E10 (phần T1) xanh hai dialect.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** frontend / assets
 **File:** `frontend/src/renderer/src/assets/main.css` (sửa: `:root` :126, `.dark` :216, `@theme inline` :43), test `assets/review-tokens.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

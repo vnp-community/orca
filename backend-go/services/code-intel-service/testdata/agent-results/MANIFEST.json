@@ -1,0 +1,51 @@
+{
+  "tool": "agent-results",
+  "version": "v7",
+  "commit": "mini-repo-c2",
+  "files": {
+    "gitnexus-1.6.9/overview.json": {
+      "bytes": 561,
+      "sha256": "410eafafbd7d5d43d2ec531e13e646a755fd0d412cc59ad8b692d5643a5d65e8"
+    },
+    "gitnexus-1.6.9/processes.json": {
+      "bytes": 590,
+      "sha256": "2a4a3985a40fc604fced8c795d82cf756ea09fa93aad5998627b0778d6255af1"
+    },
+    "gitnexus-1.6.9/process.json": {
+      "bytes": 745,
+      "sha256": "cda1121882d3aba0bb0d2f39556183e599115ba5dbc185b2e7bedb403aa919a2"
+    },
+    "gitnexus-1.6.9/routes.json": {
+      "bytes": 824,
+      "sha256": "a26b5f01a3fe126af93f821dcc41eac1ba88d1b46905e8ba93e455de976b321b"
+    },
+    "gitnexus-1.6.9/subgraph.json": {
+      "bytes": 673,
+      "sha256": "c959e2d0a02589fa6dd669098690cac4e8f45d79c53df14f1de88511f810b213"
+    },
+    "gitnexus-1.6.9/impact-found.json": {
+      "bytes": 1185,
+      "sha256": "6565f194268573ca08c27c4984f72fa332662d994c8d4fb1ae0037efc3cb3522"
+    },
+    "gitnexus-1.6.9/symbol-found.json": {
+      "bytes": 708,
+      "sha256": "e637bd632b550d3312c6d75336c0302d90cf63b1ac1cb354a30eaf9500bc8936"
+    },
+    "gitnexus-1.6.9/detectChanges.json": {
+      "bytes": 472,
+      "sha256": "8591df9a6016e2960b04ce3385cb9f3ef7e77b1684abbe3c9ce53ac0d3dd39e6"
+    },
+    "gitnexus-1.6.9/structuralFacts.json": {
+      "bytes": 457,
+      "sha256": "a3ec1fae5069015dbc308e9e2b1dd5b228afaba4487ca4575868edac370b981d"
+    },
+    "codegraph-1.4.1/codegraphSearch.json": {
+      "bytes": 376,
+      "sha256": "de6f2fbe83b73c9a69eae9e807a8ea5ca0970db9e099edf9ab65458f6ad0ce3a"
+    },
+    "codegraph-1.4.1/files.json": {
+      "bytes": 205,
+      "sha256": "1167a4c821cef214d33d0aef8afe9d603fddc659da767ac53581c3cebf1f5596"
+    }
+  }
+}

@@ -163,14 +163,14 @@ Thêm `quality_read`, `quality_waive`, `quality_profile_write` vào `code_intel.
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `EvaluateGate` có bảng ca phủ: thiếu run → `unknown`; run sai HEAD không dùng; `running` → `unknown`; `fail`+`unknown` → `fail` kèm cả hai lý do; chỉ `warn` → `warn`; đủ → `pass`; **không** ca nào cho `pass` khi check `required` thiếu dữ liệu.
-- [ ] `index_commit ≠ HEAD` (`freshness.indexMustMatchHead`) → check `structure` `unknown`, `basedOn.stale=true`; lint/typecheck/test không đổi.
-- [ ] Coverage tắt → không có lý do coverage; bật mà thiếu → `unknown`/`no_coverage`.
-- [ ] `SaveQualityProfile` từ chối `mode=block`, khoá lạ, ngưỡng ngoài khoảng, version lệch; hai dialect cùng kết quả.
-- [ ] `member` gọi `SaveQualityProfile` → `CODEINTEL_NOT_AUTHORIZED`; cờ tắt → `CODEINTEL_QUALITY_GATE_DISABLED`; cờ tổng tắt → `CODEINTEL_DISABLED`.
-- [ ] Mọi truy vấn có `tenant_id`; test AST kiểu `tenant_scope_guard_test.go` phủ repository mới; tenant A không đọc/ghi profile tenant B ở cả hai dialect.
-- [ ] Fixture JSON `QualityGate` (có/không trường tuỳ chọn) khớp `CONTRACT-codeintel-ui-api.md` §4.7.
-- [ ] `go test` hai dialect (`-tags=integration`), `opa test policy/orca-authz/`, `buf lint` + `buf breaking` (gọi trực tiếp, không qua `make proto-lint` có `|| true`) xanh; không `max-lines` disable.
+- [x] `EvaluateGate` có bảng ca phủ: thiếu run → `unknown`; run sai HEAD không dùng; `running` → `unknown`; `fail`+`unknown` → `fail` kèm cả hai lý do; chỉ `warn` → `warn`; đủ → `pass`; **không** ca nào cho `pass` khi check `required` thiếu dữ liệu.
+- [x] `index_commit ≠ HEAD` (`freshness.indexMustMatchHead`) → check `structure` `unknown`, `basedOn.stale=true`; lint/typecheck/test không đổi.
+- [x] Coverage tắt → không có lý do coverage; bật mà thiếu → `unknown`/`no_coverage`.
+- [x] `SaveQualityProfile` từ chối `mode=block`, khoá lạ, ngưỡng ngoài khoảng, version lệch; hai dialect cùng kết quả.
+- [x] `member` gọi `SaveQualityProfile` → `CODEINTEL_NOT_AUTHORIZED`; cờ tắt → `CODEINTEL_QUALITY_GATE_DISABLED`; cờ tổng tắt → `CODEINTEL_DISABLED`.
+- [x] Mọi truy vấn có `tenant_id`; test AST kiểu `tenant_scope_guard_test.go` phủ repository mới; tenant A không đọc/ghi profile tenant B ở cả hai dialect.
+- [x] Fixture JSON `QualityGate` (có/không trường tuỳ chọn) khớp `CONTRACT-codeintel-ui-api.md` §4.7.
+- [x] `go test` hai dialect (`-tags=integration`), `opa test policy/orca-authz/`, `buf lint` + `buf breaking` (gọi trực tiếp, không qua `make proto-lint` có `|| true`) xanh; không `max-lines` disable.
 
 ## 5. Kiểm thử
 

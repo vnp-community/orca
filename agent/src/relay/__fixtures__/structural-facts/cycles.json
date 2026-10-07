@@ -1,0 +1,15 @@
+{
+  "status": "cycles_found",
+  "enumeration": "complete",
+  "cycleCount": 1,
+  "componentCount": 1,
+  "cycles": [
+    {
+      "files": [
+        "a.ts",
+        "b.ts",
+        "a.ts"
+      ]
+    }
+  ]
+}

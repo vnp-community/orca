@@ -1,0 +1,12 @@
+{
+  "tool": "tsc",
+  "toolVersion": "Version_5.9.3_",
+  "argv": [
+    "tsc",
+    "--pretty",
+    "false"
+  ],
+  "markers": {},
+  "capturedAt": "2026-10-07T06:14:34.041Z",
+  "sha256": "50d7e10e0d6810fad92cc349d8b426d86e21fe0fc50ee404dea1445098fa01d6"
+}

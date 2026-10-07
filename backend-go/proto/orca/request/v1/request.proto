@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+import "google/protobuf/timestamp.proto";
+import "orca/request/v1/request_backlog.proto";
+
+message Request {
+  string id = 1;
+  string project_id = 2;
+  int64 number = 3;
+  string title = 4;
+  string body = 5;
+  string source_provider = 6;
+  string source_ref = 7;
+  string source_url = 8;
+  string source_site = 9;
+  string type = 10;
+  string type_source = 11;
+  string size = 12;
+  string urgency = 13;
+  optional double confidence = 14;
+  string classification_reason = 15;
+  string status = 16;
+  string returned_from_stage = 17;
+  string return_reason = 18;
+  string plan_task_id = 19;
+  string reporter_id = 20;
+  google.protobuf.Timestamp created_at = 21;
+  google.protobuf.Timestamp updated_at = 22;
+  int64 version = 23;
+  // 24 onwards reserved for source_hints (CR-REQ-004) and returned_category (CR-REQ-006).
+}
+
+message GetRequestRequest {
+  string id = 1;
+}
+
+message GetRequestResponse {
+  Request request = 1;
+}
+
+message ListRequestsRequest {
+  string project_id = 1;
+  repeated string status = 2;
+  repeated string type = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+  // 6 to 8 reserved for CR-REQ-004
+}
+
+message ListRequestsResponse {
+  repeated Request requests = 1;
+  string next_page_token = 2;
+}
+
+service RequestService {
+  rpc GetRequest(GetRequestRequest) returns (GetRequestResponse);
+  rpc ListRequests(ListRequestsRequest) returns (ListRequestsResponse);
+  rpc ListBacklog(ListBacklogRequest) returns (ListBacklogResponse);
+}

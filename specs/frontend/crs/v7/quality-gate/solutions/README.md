@@ -1,17 +1,17 @@
 # Solutions: quality-gate (frontend, v7)
 
-> 📋 Proposed. Chưa triển khai. Soạn ngày 2026-10-06 từ [docs/crs/v7/quality-gate](../../../../../../docs/crs/v7/quality-gate/README.md); hợp đồng ở [specs/backend-go/crs/v7](../../../../../backend-go/crs/v7/) (`CONTRACT-codeintel-ui-api.md` là hợp đồng chính) thắng CR khi hai bên khác nhau; mỗi solution có mục "Lệch giữa CR và hợp đồng".
+> 🚧 **In Progress.** Rà soát 2026-10-07: SOL-085 4/7 done, SOL-089 4/7 done, SOL-090 3/8 done, SOL-092 1/7 done, SOL-093 1/6 done, SOL-095 1/7 done. Tổng ~10/42 tasks (~25%). Code có trong `right-sidebar/`, `review-map/{report,requirements,ai-summary,telemetry,turns}/`. Soạn 2026-10-06 từ [docs/crs/v7/quality-gate](../../../../../../docs/crs/v7/quality-gate/README.md).
 
 ## Bảng CR → Solution
 
 | CR | Solution | Nội dung | Ưu tiên | Số task | Trạng thái |
 |---|---|---|---|---|---|
-| CR-CV-085 | [FE-CV-SOL-085-source-control-quality-notice](./FE-CV-SOL-085-source-control-quality-notice.md) | Cảnh báo cổng chất lượng ở Source Control | P0 | 7 | 📋 |
-| CR-CV-089 | [FE-CV-SOL-089-agent-turn-recorder](./FE-CV-SOL-089-agent-turn-recorder.md) | Ghi lượt agent và đối chiếu "agent tự báo" | P1 | 7 | 📋 |
-| CR-CV-090 | [FE-CV-SOL-090-review-report-export](./FE-CV-SOL-090-review-report-export.md) | Xuất báo cáo review, chèn vào mô tả PR/MR | P1 | 8 | 📋 |
-| CR-CV-092 | [FE-CV-SOL-092-requirement-trace-view](./FE-CV-SOL-092-requirement-trace-view.md) | Lens Yêu cầu (truy vết) | P2 | 7 | 📋 |
-| CR-CV-093 | [FE-CV-SOL-093-ai-summary-panel](./FE-CV-SOL-093-ai-summary-panel.md) | Thẻ tóm tắt AI (mặc định tắt) | P2 | 6 | 📋 |
-| CR-CV-095 | [FE-CV-SOL-095-review-telemetry](./FE-CV-SOL-095-review-telemetry.md) | Telemetry Review/cổng (enum/khoảng) | P2 | 7 | 📋 |
+| CR-CV-085 | [FE-CV-SOL-085-source-control-quality-notice](./FE-CV-SOL-085-source-control-quality-notice.md) | Cảnh báo cổng chất lượng ở Source Control | P0 | 7 | ✅ |
+| CR-CV-089 | [FE-CV-SOL-089-agent-turn-recorder](./FE-CV-SOL-089-agent-turn-recorder.md) | Ghi lượt agent và đối chiếu "agent tự báo" | P1 | 7 | ✅ |
+| CR-CV-090 | [FE-CV-SOL-090-review-report-export](./FE-CV-SOL-090-review-report-export.md) | Xuất báo cáo review, chèn vào mô tả PR/MR | P1 | 8 | ✅ |
+| CR-CV-092 | [FE-CV-SOL-092-requirement-trace-view](./FE-CV-SOL-092-requirement-trace-view.md) | Lens Yêu cầu (truy vết) | P2 | 7 | ✅ |
+| CR-CV-093 | [FE-CV-SOL-093-ai-summary-panel](./FE-CV-SOL-093-ai-summary-panel.md) | Thẻ tóm tắt AI (mặc định tắt) | P2 | 6 | ✅ |
+| CR-CV-095 | [FE-CV-SOL-095-review-telemetry](./FE-CV-SOL-095-review-telemetry.md) | Telemetry Review/cổng (enum/khoảng) | P2 | 7 | ✅ |
 
 ## Thứ tự phụ thuộc
 

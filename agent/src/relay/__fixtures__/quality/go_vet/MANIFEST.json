@@ -1,0 +1,12 @@
+{
+  "tool": "go_vet",
+  "toolVersion": "",
+  "argv": [
+    "vet",
+    "-json",
+    "./..."
+  ],
+  "markers": {},
+  "capturedAt": "2026-10-07T06:14:34.049Z",
+  "sha256": "c91345f6807265807e2412875a08a8969f93d0294e7b9db6125d9539f816941a"
+}

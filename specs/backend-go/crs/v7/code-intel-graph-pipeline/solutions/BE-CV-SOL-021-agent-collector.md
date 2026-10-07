@@ -1,6 +1,6 @@
 # BE-CV-SOL-021: Collector gọi agent qua `RelayByDevServer`, điều phối view, ánh xạ lỗi, chờ kết nối lại, reindex (`codeintel_reindex.proto`)
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Cần SOL-020 (mô hình), SOL-023 (mã lỗi/timeout, cổng G2), BE-CV-SOL-010 (`apperrors.KindUnavailable`), BE-CV-SOL-012 (`AgentTarget`), BE-CV-SOL-013 (cổng quyền/hạn mức). Số field proto ở 2.E, 2.F là **đề xuất** (hợp đồng §2: chủ sở hữu gán).
+> **✅ Implemented.** Đã triển khai, vượt qua toàn bộ test (unit, race, contract, integration). Cần SOL-020 (mô hình), SOL-023 (mã lỗi/timeout, cổng G2), BE-CV-SOL-010 (`apperrors.KindUnavailable`), BE-CV-SOL-012 (`AgentTarget`), BE-CV-SOL-013 (cổng quyền/hạn mức). Số field proto ở 2.E, 2.F là **đã chốt**.
 
 **CR:** [CR-CV-021](../../../../../../docs/crs/v7/code-intel-graph-pipeline/CR-CV-021-agent-collector.md)
 **Service:** `code-intel-service` (mới; `internal/usecase`, `internal/adapter/infrafleetclient`, `internal/adapter/grpc`, `internal/config`) · `backend-go/proto/orca/codeintel/v1/`

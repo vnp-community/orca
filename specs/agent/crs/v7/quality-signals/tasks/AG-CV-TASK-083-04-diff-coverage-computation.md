@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-diff-coverage.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-083-02, 083-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,7 +24,7 @@ Bảng ca: thêm hàm có test/không test/sửa chú thích/chỉ xoá; khối 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca khớp bảng K3/K4; không `100%` giả.
+- [x] Mọi ca khớp bảng K3/K4; không `100%` giả.
 
 ## Rủi ro
 

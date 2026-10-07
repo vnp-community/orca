@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-run-planning.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-081-10, 081-12, 081-14, AG-CV-TASK-081-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -26,8 +26,8 @@ Bảng ca: `fast`/`standard` mở đúng; `append-files` 4 và 301 tệp; module
 
 ## Tiêu chí hoàn thành
 
-- [ ] Test quét mọi `PlannedStep.argv` của catalog: không token cấm.
-- [ ] `quality.run` tên lạ ném trước khi tạo bất kỳ `PlannedStep`.
+- [x] Test quét mọi `PlannedStep.argv` của catalog: không token cấm.
+- [x] `quality.run` tên lạ ném trước khi tạo bất kỳ `PlannedStep`.
 
 ## Rủi ro
 

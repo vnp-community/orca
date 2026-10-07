@@ -1,0 +1,41 @@
+{
+  "createdAt": "2026-10-07T02:05:04.337Z",
+  "tools": {
+    "gitnexus": "1.6.13-rc.85",
+    "codegraph": "1.5.0"
+  },
+  "files": {
+    "gitnexus-status-main-clean.txt": {
+      "sha256": "5cc8e548314691c535f777bee178011227483a17b3afd56068e2d9174ec10186",
+      "bytes": 2342
+    },
+    "codegraph-status-main-clean.json": {
+      "sha256": "d35ec8689a6a6c894b8b64cf731838ad093da46ae6d8e7e8c3c0bc9e7a952801",
+      "bytes": 554
+    },
+    "gitnexus-status-main-dirty.txt": {
+      "sha256": "dc931cfc9a137c5120a549687b3b02b232504968d48b2d5d9c26c1fe3b95b948",
+      "bytes": 2385
+    },
+    "codegraph-status-main-dirty.json": {
+      "sha256": "5e64e1d4a7bafdd08b2ce90ab69bf9b2d9c56d50e5438afe62083263fa11c674",
+      "bytes": 554
+    },
+    "gitnexus-status-wt-clean.txt": {
+      "sha256": "aa27fde91cd19b72b24bd6fdcff860506e489980ce2975557f6b2d63a019b07f",
+      "bytes": 46
+    },
+    "codegraph-status-wt-clean.json": {
+      "sha256": "531626ea274026688d82298d227256293aeba0434651750a09077cf803aecb99",
+      "bytes": 138
+    },
+    "gitnexus-status-wt-dirty.txt": {
+      "sha256": "aa27fde91cd19b72b24bd6fdcff860506e489980ce2975557f6b2d63a019b07f",
+      "bytes": 46
+    },
+    "codegraph-status-wt-dirty.json": {
+      "sha256": "531626ea274026688d82298d227256293aeba0434651750a09077cf803aecb99",
+      "bytes": 138
+    }
+  }
+}

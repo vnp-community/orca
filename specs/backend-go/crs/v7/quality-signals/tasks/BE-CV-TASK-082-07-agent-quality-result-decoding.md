@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/agentquality/decode.go`, `client.go`, `backend-go/services/code-intel-service/internal/usecase/quality_run_ports.go` (`AgentQualityClient`, `FindingSanitizer`), test (mới)
 **Depends on:** BE-CV-SOL-021-agent-collector, BE-CV-SOL-023-infra-fleet-codeintel-transport, BE-CV-TASK-082-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 C-AG §5.3, §5.5, §6.4. Golden `testdata/agent-results/*.json` (cổng G1). Lỗi giải mã → `CODEINTEL_RESULT_INVALID` (mã Go sinh, C-AG §3.3). Owner gói che secret chưa chốt (O-16).
@@ -21,7 +21,7 @@ C-AG §5.3, §5.5, §6.4. Golden `testdata/agent-results/*.json` (cổng G1). L�
 - Test phản chiếu: không có tham số `command|argv|args|env|cwd|timeout` (§8.3 mục 5).
 
 ## Tiêu chí hoàn thành
-- [ ] Không lưu/ghi log nội dung thô của agent.
+- [x] Không lưu/ghi log nội dung thô của agent.
 
 ## Rủi ro
 Hình dạng JSON chưa chạy thật.

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpc/internal_caller_guard.go`, `internal_caller_guard_test.go` (mới); `cmd/server/main.go` / hàm `buildServerOptions` (sửa)
 **Depends on:** BE-CV-TASK-010-07, 010-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không method nào (unary hoặc stream) lọt khi không token.
-- [ ] Token rỗng = chặn hết; WARN được log.
+- [x] Không method nào (unary hoặc stream) lọt khi không token.
+- [x] Token rỗng = chặn hết; WARN được log.
 
 ## Rủi ro và lưu ý
 

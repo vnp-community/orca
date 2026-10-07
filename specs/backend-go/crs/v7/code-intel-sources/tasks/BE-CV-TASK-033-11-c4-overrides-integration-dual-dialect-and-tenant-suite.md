@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/postgres/c4_overrides_integration_test.go`, `backend-go/services/code-intel-service/internal/adapter/mysql/c4_overrides_integration_test.go` (mới, `//go:build integration`); `backend-go/services/code-intel-service/internal/usecase/get_architecture_golden_test.go` (mới); `.../testdata/golden/c4/*.json`
 **Depends on:** BE-CV-TASK-033-06, -10; repository SOL-011
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ Chốt §8.3-3/4 cho cả hai nửa CR-033.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai dialect xanh; cô lập tenant có test.
-- [ ] Golden ổn định.
+- [x] Hai dialect xanh; cô lập tenant có test.
+- [x] Golden ổn định.
 
 ## Rủi ro và lưu ý
 

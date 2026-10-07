@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/reindex_admission.go`, `reindex_admission_test.go` (mới)
 **Depends on:** BE-CV-TASK-011-08, 011-10, 013-09, 013-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,8 +29,8 @@ SOL-013-gate mục 2.E; `ReindexJobRepository` (`Create`, `CountActiveByDevServe
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các tiêu chí reindex ở SOL mục 4 đạt ở hai dialect.
-- [ ] Không có cách tạo hai job `queued/running` cho một binding.
+- [x] Các tiêu chí reindex ở SOL mục 4 đạt ở hai dialect.
+- [x] Không có cách tạo hai job `queued/running` cho một binding.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel-structural-unused-exports.ts` (mới), mẫu trong `codeintel-structural-facts-queries.ts`, `.test.ts`
 **Depends on:** AG-CV-TASK-037-01, 037-02, AG-CV-SOL-002 (`codeintel-symbol-ref.ts`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Fixture: hàm không ai gọi xuất hiện, hàm được gọi vắng, `_test.
 
 ## Tiêu chí hoàn thành
 
-- [ ] `rows[].symbol` là `SymbolRef` đầy đủ trường bắt buộc; không chứa nội dung mã.
+- [x] `rows[].symbol` là `SymbolRef` đầy đủ trường bắt buộc; không chứa nội dung mã.
 
 ## Rủi ro
 

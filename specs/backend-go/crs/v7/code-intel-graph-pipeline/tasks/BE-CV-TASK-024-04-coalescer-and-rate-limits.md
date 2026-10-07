@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/usecase/{index_event_coalescer.go,index_event_identity.go}` (mới) và test
 **Depends on:** TASK-024-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,7 @@ Chống bão (2.D): gộp 2/10 s, 20 sự kiện/s/dev server, ≤ 2 tin/s/job, 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Xác định. - [ ] Giới hạn đúng.
+- [x] Xác định. - [x] Giới hạn đúng.
 
 ## Rủi ro và lưu ý
 

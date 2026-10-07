@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-reindex-runner.ts`, `codeintel-reindex-runner.test.ts` (mới)
 **Depends on:** [004](./AG-CV-TASK-004-04-reindex-job-core.md), [AG-CV-TASK-001-04](./AG-CV-TASK-001-04-run-tool-command-options-and-legacy-tool-guard.md) (`detached`, `signal`, `killGraceMs`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Thành công = exit 0 và `verify`; huỷ SIGTERM nhóm rồi SIGKILL sau 10 s rồi verify; timeout 45 phút/công cụ; không xoá tệp chỉ mục.
@@ -20,7 +20,7 @@ Binary giả: tiến độ, 0/1, treo (huỷ, timeout giả), bỏ qua SIGTERM (
 Lệnh: `pnpm exec vitest run src/relay/codeintel-reindex-runner.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Cả cây tiến trình biến mất ≤ 15 s sau huỷ.
+- [x] Cả cây tiến trình biến mất ≤ 15 s sau huỷ.
 
 ## Rủi ro
 - Huỷ giữa analyze có thể để DB dở dang: chưa kiểm chứng (task 09).

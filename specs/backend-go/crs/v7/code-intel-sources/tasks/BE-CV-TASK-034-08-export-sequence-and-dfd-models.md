@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/export_flow_models.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-034-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Solution 2.D.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai mức `detail` đúng.
-- [ ] Không chuỗi Mermaid.
+- [x] Hai mức `detail` đúng.
+- [x] Không chuỗi Mermaid.
 
 ## Rủi ro và lưu ý
 

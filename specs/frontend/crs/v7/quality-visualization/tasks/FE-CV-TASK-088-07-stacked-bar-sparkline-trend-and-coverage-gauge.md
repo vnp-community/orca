@@ -5,7 +5,7 @@
 **Area:** frontend / components (hình không tương tác từng điểm)
 **File:** `frontend/src/renderer/src/components/quality-charts/StackedSeverityBar.tsx`, `SparklineChart.tsx`, `TrendLineChart.tsx`, `DiffCoverageGauge.tsx` (mới) và `__tests__/*.test.tsx`
 **Depends on:** FE-CV-TASK-088-03, 088-04, 088-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

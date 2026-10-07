@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/0003_request_source_hints.up.sql`, `.down.sql`; `migrations/mysql/0003_request_source_hints.up.sql`, `.down.sql` (mới); `internal/domain/request.go`, `internal/domain/request_source_hints.go` (mới); `internal/adapter/postgres/{request_repository.go,request_scan.go}`, `internal/adapter/mysql/{request_repository.go,request_scan.go}` (sửa)
 **Depends on:** TASK-REQ-002-04, TASK-REQ-002-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ CR-REQ-004 mục 2.4 thêm cột `requests.source_hints` (JSONB/JSON, NULL đư�
 
 ## Tiêu chí hoàn thành
 
-- [ ] up/down/up sạch trên Postgres và MySQL.
-- [ ] `SourceHints` ghi, đọc đúng; NULL tương ứng zero.
-- [ ] Test schema hợp đồng cập nhật và xanh.
-- [ ] Số migration đã xác nhận bằng `ls` và ghi trong PR.
+- [x] up/down/up sạch trên Postgres và MySQL.
+- [x] `SourceHints` ghi, đọc đúng; NULL tương ứng zero.
+- [x] Test schema hợp đồng cập nhật và xanh.
+- [x] Số migration đã xác nhận bằng `ls` và ghi trong PR.
 
 ## Rủi ro và lưu ý
 

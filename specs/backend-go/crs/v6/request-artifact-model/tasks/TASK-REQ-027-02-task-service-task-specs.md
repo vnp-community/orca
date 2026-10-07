@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/migrations/{postgres,mysql}/00NN_task_specs.{up,down}.sql`, `internal/domain/task_spec.go`, `internal/usecase/{set_task_spec,get_task_specs,lock_task_specs}.go`, `internal/usecase/ports.go` (sửa), `internal/usecase/update_task.go` (sửa), `internal/adapter/{postgres,mysql}/task_specs.go`, `internal/adapter/grpc/server_task_spec.go`, `backend-go/proto/orca/task/v1/task.proto` (sửa) và test
 **Depends on:** TASK-REQ-011-01 (migrations `0015`, `0016`), TASK-REQ-011-02 (`Task.RequestID`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -63,11 +63,11 @@ Quyết định giữ: `task_specs` là bảng riêng (không cột JSON trên `
 
 ## Tiêu chí hoàn thành
 
-- [ ] `up`/`down` sạch ở cả hai dialect; `00NN` ghi trong PR.
-- [ ] Sau `LockTaskSpecs`, `SetTaskSpec` trả `TASK_SPEC_LOCKED`; `UpdateTask` đổi `status` vẫn thành công, đổi `title` bị chặn.
-- [ ] `LockTaskSpecs` gọi hai lần: lần hai `locked=0`, không lỗi.
-- [ ] Mọi truy vấn có `tenant_id`; test chéo tenant xanh.
-- [ ] Bộ test hiện có của `task-service` không đổi kỳ vọng.
+- [x] `up`/`down` sạch ở cả hai dialect; `00NN` ghi trong PR.
+- [x] Sau `LockTaskSpecs`, `SetTaskSpec` trả `TASK_SPEC_LOCKED`; `UpdateTask` đổi `status` vẫn thành công, đổi `title` bị chặn.
+- [x] `LockTaskSpecs` gọi hai lần: lần hai `locked=0`, không lỗi.
+- [x] Mọi truy vấn có `tenant_id`; test chéo tenant xanh.
+- [x] Bộ test hiện có của `task-service` không đổi kỳ vọng.
 
 ## Rủi ro và lưu ý
 

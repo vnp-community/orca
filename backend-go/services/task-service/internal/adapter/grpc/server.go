@@ -61,6 +61,8 @@ type Server struct {
 	// wired through WithTaskSources so New's positional signature stays stable.
 	createTaskFromSource *usecase.CreateTaskFromSource
 	taskSources          usecase.TaskSourceRepository
+
+	listExecutionStates *usecase.ListExecutionStates
 }
 
 func New(

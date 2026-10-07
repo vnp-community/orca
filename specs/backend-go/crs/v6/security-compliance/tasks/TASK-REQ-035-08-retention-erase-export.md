@@ -5,7 +5,7 @@
 **Service:** `request-service`, `proto`
 **File:** `backend-go/services/request-service/internal/domain/{erasable_columns.go,retention_policy.go}` (mới), `.../internal/usecase/{run_request_retention.go,erase_request.go,export_request.go}` (mới), `.../internal/adapter/{postgres,mysql}/retention.go` (mới), `.../internal/adapter/grpcclient/task_content_eraser.go` (mới, bản `NotSupported`), `.../internal/adapter/grpc/server_compliance.go` (mới), `.../cmd/server/main.go` (sửa: job hằng ngày), `.../internal/config/config.go` (sửa: `REQUEST_ERASE_HMAC_KEY`), `backend-go/proto/orca/request/v1/compliance.proto` (mới), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-035-01 (`Redact` cho xuất), 035-04 (nhóm `admin`, stream), 035-06 (bảng, `RecordDurable`, cột `erased_at`), BE-REQ-SOL-002 (`requests`), BE-REQ-SOL-007 (`solutions`, `analysis_runs`), 009 (`approvals`), CR 031 (`context_packs`, `evidence`), CR 034 (`ai_trace_blobs`, `ai_usage_ledger`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -46,11 +46,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `RunRetention` ẩn danh hoá đúng Request quá hạn, không chạm Request chưa kết thúc; chạy hai bản sao không xử lý trùng.
-- [ ] `EraseRequest` ẩn danh hoá ngay (không khi `executing`), có audit không-được-mất, báo bản sao ngoài hệ thống.
-- [ ] `ExportRequest` không chứa chuỗi bí mật mẫu; vượt 5 MB trả lỗi rõ.
-- [ ] Mọi cột văn bản tự do của schema `request` nằm trong `ErasableColumns` hoặc danh sách miễn trừ (test quét).
-- [ ] Khoá HMAC thiếu ⇒ từ chối (fail closed).
+- [x] `RunRetention` ẩn danh hoá đúng Request quá hạn, không chạm Request chưa kết thúc; chạy hai bản sao không xử lý trùng.
+- [x] `EraseRequest` ẩn danh hoá ngay (không khi `executing`), có audit không-được-mất, báo bản sao ngoài hệ thống.
+- [x] `ExportRequest` không chứa chuỗi bí mật mẫu; vượt 5 MB trả lỗi rõ.
+- [x] Mọi cột văn bản tự do của schema `request` nằm trong `ErasableColumns` hoặc danh sách miễn trừ (test quét).
+- [x] Khoá HMAC thiếu ⇒ từ chối (fail closed).
 
 ## Ví dụ tham khảo
 

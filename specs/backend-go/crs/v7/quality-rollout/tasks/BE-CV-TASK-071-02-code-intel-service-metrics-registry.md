@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/metrics/metrics.go` (mới), `.../internal/adapter/metrics/label_sets.go` (mới), `.../internal/adapter/metrics/metrics_test.go` (mới), `.../internal/adapter/grpc/metrics_interceptor.go` (mới), `.../cmd/server/main.go`
 **Depends on:** BE-CV-SOL-010 (khung, cổng health 8080), BE-CV-SOL-020/021 (proto sinh ra `ServiceDesc`), BE-CV-SOL-022 (cache), BE-CV-SOL-013-agent-call-gate-and-quotas (hạn mức)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -32,9 +32,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `/metrics` trả đủ metric nhóm CR-071 §2.3 (đã sửa theo SOL-071).
-- [ ] Ba test trên xanh.
-- [ ] Không nhãn tenant/user/worktree.
+- [x] `/metrics` trả đủ metric nhóm CR-071 §2.3 (đã sửa theo SOL-071).
+- [x] Ba test trên xanh.
+- [x] Không nhãn tenant/user/worktree.
 
 ## Rủi ro và lưu ý
 

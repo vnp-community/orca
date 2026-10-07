@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components
 **File:** `frontend/src/renderer/src/components/review-map/storage/{StorageLens,StorageToolbar,StorageCanvas,StorageLegend,StorageInferenceNotice,StorageSecretNode}.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-058-01, 058-02, 058-03; FE-CV-SOL-051-review-workspace-shell
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

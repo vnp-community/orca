@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/usecase/{snapshot_invalidator.go,snapshot_janitor.go}` (mới) và test
 **Depends on:** TASK-022-03, TASK-022-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -24,7 +24,7 @@ SOL-024 gọi `InvalidateBinding`/`InvalidateProbe`; bảo trì §4.3 (10 phút,
 
 ## Tiêu chí hoàn thành
 
-- [ ] Idempotent. - [ ] Không xoá snapshot mới nhất mỗi view.
+- [x] Idempotent. - [x] Không xoá snapshot mới nhất mỗi view.
 
 ## Rủi ro và lưu ý
 

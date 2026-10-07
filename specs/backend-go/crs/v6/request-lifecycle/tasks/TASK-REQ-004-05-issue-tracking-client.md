@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/grpcclient/issue_tracking_client.go`, `internal/adapter/grpcclient/identity_forwarding.go`, `internal/adapter/grpcclient/issue_tracking_client_test.go` (mới); `internal/config/config.go`, `cmd/server/main.go` (sửa)
 **Depends on:** TASK-REQ-004-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ Tiền lệ: `git-gateway-service/internal/adapter/grpcclient/issuetracking_clie
 
 ## Tiêu chí hoàn thành
 
-- [ ] Metadata tenant và user tới được server giả.
-- [ ] `NotFound` thành `REQUEST_SOURCE_NOT_FOUND` qua use case.
-- [ ] Không có provider ngoài `jira`, `linear` được gọi.
-- [ ] Service khởi động được khi không cấu hình địa chỉ.
+- [x] Metadata tenant và user tới được server giả.
+- [x] `NotFound` thành `REQUEST_SOURCE_NOT_FOUND` qua use case.
+- [x] Không có provider ngoài `jira`, `linear` được gọi.
+- [x] Service khởi động được khi không cấu hình địa chỉ.
 
 ## Rủi ro và lưu ý
 

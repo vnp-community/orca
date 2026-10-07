@@ -1,0 +1,39 @@
+name: backend-go / code-intel-service
+
+on:
+  pull_request:
+    paths:
+      - "backend-go/common/**"
+      - "backend-go/proto/orca/codeintel/**"
+      - "backend-go/services/code-intel-service/**"
+      - "backend-go/go.work"
+      - ".github/workflows/backend-go-code-intel-service.yml"
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.25"
+      - uses: bufbuild/buf-setup-action@v1
+        with:
+          version: "1.30.0"
+      - name: Buf Lint
+        working-directory: backend-go/proto
+        run: buf lint --path orca/codeintel
+      - name: Buf Breaking
+        working-directory: backend-go/proto
+        run: buf breaking --path orca/codeintel --against '.git#branch=main,subdir=backend-go/proto'
+      - name: go build
+        working-directory: backend-go/services/code-intel-service
+        run: go build ./...
+      - name: go vet
+        working-directory: backend-go/services/code-intel-service
+        run: go vet ./...
+      - name: Unit tests
+        working-directory: backend-go/services/code-intel-service
+        run: go test ./... -race

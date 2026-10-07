@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_source_normalization.go`, `internal/domain/request_source_normalization_test.go`, `internal/domain/request_intake_errors.go` (mới)
 **Depends on:** TASK-REQ-002-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -33,10 +33,10 @@ Lệnh: `go test ./services/request-service/internal/domain/... -run "Normaliz|I
 
 ## Tiêu chí hoàn thành
 
-- [ ] `eng-1` và `ENG-1` cho cùng khoá; hai site Jira khác nhau cho hai khoá.
-- [ ] Giới hạn title 500 và body 100000 tính theo rune.
-- [ ] `manual`/`mcp` không có `client_request_id` thì `ok=false`.
-- [ ] Mọi mã lỗi ở bước 4 có constructor và test ánh xạ gRPC.
+- [x] `eng-1` và `ENG-1` cho cùng khoá; hai site Jira khác nhau cho hai khoá.
+- [x] Giới hạn title 500 và body 100000 tính theo rune.
+- [x] `manual`/`mcp` không có `client_request_id` thì `ok=false`.
+- [x] Mọi mã lỗi ở bước 4 có constructor và test ánh xạ gRPC.
 
 ## Rủi ro và lưu ý
 

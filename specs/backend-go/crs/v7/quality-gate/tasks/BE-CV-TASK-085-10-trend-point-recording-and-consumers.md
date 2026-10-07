@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/usecase/record_quality_trend_point.go`, `internal/adapter/{postgres,mysql}/quality_trend_repository.go`, `internal/adapter/eventbus/quality_trend_consumers.go` (mới)
 **Depends on:** BE-CV-TASK-085-06, 085-09; BE-CV-SOL-082 (`run_finished`), BE-CV-SOL-010 (`processed_events`, stream `CODEINTEL`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `eventbus.Consumer.Subscribe` durable = competing consumer (đã đọc `eventbus.go:128`): đúng cho ghi DB một lần. Consumer phải lọc subject (stream `CODEINTEL` chứa cả `review.saved`). Khoá T12 có `source`.
@@ -19,7 +19,7 @@
 - Giao lặp cùng `event_id` ⇒ một điểm; thứ tự sự kiện ngược; `local`/`ci` hai điểm; stream chưa tồn tại (`awaitStream`); integration hai dialect.
 
 ## Tiêu chí hoàn thành
-- [ ] idempotent; [ ] `turn_key` đúng; [ ] cờ tắt vẫn tiêu thụ để không tắc outbox.
+- [x] idempotent; [ ] `turn_key` đúng; [ ] cờ tắt vẫn tiêu thụ để không tắc outbox.
 
 ## Rủi ro
 - `agent_turn.recorded` đến trước khi `quality_runs` có ⇒ điểm `unknown`; chấp nhận, điểm thay thế khi `run_finished` đến.

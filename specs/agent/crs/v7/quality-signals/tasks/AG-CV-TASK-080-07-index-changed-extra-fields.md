@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-index-watcher.ts`, `agent/src/relay/codeintel-reindex-job.ts` (sửa; AG-CV-SOL-004), test tương ứng
 **Depends on:** AG-CV-TASK-080-02, 080-06; AG-CV-SOL-004
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Mở rộng `codeintel-index-watcher.test.ts`/`codeintel-notification-sink.test.
 
 ## Tiêu chí hoàn thành
 
-- [ ] `JSON.stringify(params)` khớp ví dụ §6.1 (3 trường cuối tuỳ chọn).
-- [ ] Không gửi thông báo khi WS đóng (hành vi SOL-004 giữ nguyên).
+- [x] `JSON.stringify(params)` khớp ví dụ §6.1 (3 trường cuối tuỳ chọn).
+- [x] Không gửi thông báo khi WS đóng (hành vi SOL-004 giữ nguyên).
 
 ## Rủi ro
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/mysql/{tenant_settings,repo_binding,review_state,finding_dismissal,c4_override,processed_event}_repository.go` (+ `_integration_test.go`) (mới)
 **Depends on:** BE-CV-TASK-011-03, 011-04, 011-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,8 +30,8 @@ MySQL không RLS: **mọi** truy vấn có `tenant_id = ?` và lấy tenant bằ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hành vi trùng khớp bản Postgres qua bộ hợp đồng chung.
-- [ ] Mọi truy vấn có `tenant_id`; test AST xanh.
+- [x] Hành vi trùng khớp bản Postgres qua bộ hợp đồng chung.
+- [x] Mọi truy vấn có `tenant_id`; test AST xanh.
 
 ## Rủi ro và lưu ý
 

@@ -1,6 +1,6 @@
 # BE-CV-SOL-024: Phân phối sự kiện: ingest từ infra-fleet, huỷ cache, outbox, NATS giữa replica, gRPC stream tới gateway
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Cần SOL-023 (`StreamCodeIntelEvents`), SOL-022 (`InvalidateBinding/Probe`), SOL-021 (`Watch`, `ReindexStatus`, `reindex_jobs`), BE-CV-SOL-011 (outbox, `processed_events`), BE-CV-SOL-012 (binding), BE-CV-SOL-013 (quyền theo selector). Số field proto ngoài hợp đồng là đề xuất.
+> **✅ Implemented.** Đã triển khai, vượt qua toàn bộ test (unit, race, contract, integration). Cần SOL-023 (`StreamCodeIntelEvents`), SOL-022 (`InvalidateBinding/Probe`), SOL-021 (`Watch`, `ReindexStatus`, `reindex_jobs`), BE-CV-SOL-011 (outbox, `processed_events`), BE-CV-SOL-012 (binding), BE-CV-SOL-013 (quyền theo selector). Số field proto ngoài hợp đồng là **đã chốt**.
 
 **CR:** [CR-CV-024](../../../../../../docs/crs/v7/code-intel-graph-pipeline/CR-CV-024-event-distribution.md)
 **Service:** `code-intel-service` (`internal/usecase`, `internal/adapter/{infrafleetclient,eventbus,broadcaster,grpc}`, `cmd/server/main.go`) · `backend-go/proto/orca/codeintel/v1/codeintel_events.proto`

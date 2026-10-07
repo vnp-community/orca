@@ -5,7 +5,7 @@
 **Area:** frontend / lib
 **File:** `lib/review-diff-navigation.ts` (mới), test
 **Depends on:** FE-CV-TASK-053-05, FE-CV-TASK-051-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

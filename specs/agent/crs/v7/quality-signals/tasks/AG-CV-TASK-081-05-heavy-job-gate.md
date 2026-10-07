@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-heavy-job-gate.ts` (mới), `.test.ts` (mới); sửa 1 chỗ `agent/src/relay/codeintel-reindex-job.ts` (AG-CV-SOL-004)
 **Depends on:** AG-CV-TASK-081-04 (kiểu `acquire`); phần nối reindex chặn bởi AG-CV-SOL-004
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Test: max=1 hai bên tranh nhau, thứ tự FIFO, `waitMs` hết hạn, abort kh
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không hai bước nặng chạy đồng thời khi max=1, kể cả reindex và quality.
-- [ ] Không có timer treo sau khi test kết thúc.
+- [x] Không hai bước nặng chạy đồng thời khi max=1, kể cả reindex và quality.
+- [x] Không có timer treo sau khi test kết thúc.
 
 ## Rủi ro
 

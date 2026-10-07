@@ -65,6 +65,7 @@ import { pickRemoteCliEnv } from './remote-cli-env'
 import { relayLogLine } from './relay-diagnostic-log'
 import { remoteCliRequestTimeoutMs } from './remote-cli-timeout'
 import { shouldReadRemoteCliStdin } from './remote-cli-stdin'
+import { registerCodeIntelHandlers } from './codeintel-relay-handlers'
 
 const DEFAULT_GRACE_MS = DEFAULT_SSH_RELAY_GRACE_PERIOD_SECONDS * 1000
 const SOCK_NAME = 'relay.sock'
@@ -490,6 +491,15 @@ async function main(): Promise<void> {
 
   const _workspaceSessionHandler = new WorkspaceSessionHandler(dispatcher)
   void _workspaceSessionHandler
+
+  const authStatusConfig = loadAgentConfig()
+  const authStatusLogger = {
+    info: (...a: any[]) => relayLogLine(`[relay] ${a.join(' ')}`),
+    warn: (...a: any[]) => relayLogLine(`[relay] WARN ${a.join(' ')}`),
+    error: (...a: any[]) => relayLogLine(`[relay] ERROR ${a.join(' ')}`),
+    debug: (...a: any[]) => relayLogLine(`[relay] DEBUG ${a.join(' ')}`)
+  }
+  registerCodeIntelHandlers(dispatcher, authStatusConfig, authStatusLogger)
 
   dispatcher.onRequest('orca.cli', async (params, context) => {
     return await dispatcher.requestAnyClient('orca.cli', params, {

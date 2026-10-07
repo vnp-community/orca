@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/adapter/eventbus/code_intel_consumer.go`, `.../adapter/broadcaster/code_intel_push_broadcaster.go` (mới), `.../cmd/server/main.go` (sửa) và test
 **Depends on:** TASK-024-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,7 +26,7 @@ Mỗi replica nhận bản sao riêng (`SubscribeEphemeral`, `eventbus.go:196`);
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các ca xanh. - [ ] Không rò goroutine.
+- [x] Các ca xanh. - [x] Không rò goroutine.
 
 ## Rủi ro và lưu ý
 

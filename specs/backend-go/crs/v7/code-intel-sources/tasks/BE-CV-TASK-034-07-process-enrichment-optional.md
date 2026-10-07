@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/enrich_flow_with_processes.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-034-05; BE-CV-SOL-021 (collector `codeintel.processes/process`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ CR 2.3.5; README v7 mục 8 điểm 9. Agent contract §4.3 có `codeintel.proce
 
 ## Tiêu chí hoàn thành
 
-- [ ] Lookup lỗi không làm hỏng luồng.
-- [ ] Không thêm bước.
+- [x] Lookup lỗi không làm hỏng luồng.
+- [x] Không thêm bước.
 
 ## Rủi ro và lưu ý
 

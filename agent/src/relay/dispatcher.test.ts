@@ -115,7 +115,43 @@ describe('RelayDispatcher', () => {
 
     const resp = JSON.parse(decodeFirstFrame(errors[0]).payload.toString('utf-8'))
     expect(resp.error.message).toBe('boom')
+    expect(resp.error.data).toBeUndefined()
     expect(resp.id).toBe(5)
+  })
+
+  it('forwards error.data when handler throws error with data property', async () => {
+    dispatcher.onRequest('custom.fail', async () => {
+      const err = Object.assign(new Error('validation failed'), {
+        code: -32602,
+        data: { reason: 'base_required', field: 'base' }
+      })
+      throw err
+    })
+
+    const req: JsonRpcRequest = {
+      jsonrpc: '2.0',
+      id: 7,
+      method: 'custom.fail'
+    }
+    dispatcher.feed(encodeJsonRpcFrame(req, 1, 0))
+    await vi.advanceTimersByTimeAsync(0)
+
+    const errors = written.filter((buf) => {
+      const f = decodeFirstFrame(buf)
+      if (f.type !== MessageType.Regular) return false
+      try {
+        const msg = JSON.parse(f.payload.toString('utf-8'))
+        return msg.id === 7 && 'error' in msg
+      } catch {
+        return false
+      }
+    })
+    expect(errors.length).toBe(1)
+
+    const resp = JSON.parse(decodeFirstFrame(errors[0]).payload.toString('utf-8'))
+    expect(resp.error.code).toBe(-32602)
+    expect(resp.error.message).toBe('validation failed')
+    expect(resp.error.data).toEqual({ reason: 'base_required', field: 'base' })
   })
 
   it('sends method-not-found for unknown methods', async () => {

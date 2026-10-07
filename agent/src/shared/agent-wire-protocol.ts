@@ -55,7 +55,7 @@ export type AgentErrorCodeValue = typeof AgentErrorCode[keyof typeof AgentErrorC
 
 // ─── Capabilities ────────────────────────────────────────────────────────────
 
-export type AgentCapability = 'pty' | 'fs' | 'git' | 'preflight'
+export type AgentCapability = string
 
 // ─── Handshake Types ─────────────────────────────────────────────────────────
 

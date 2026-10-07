@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `backend-go/services/task-service/migrations/{postgres,mysql}/0015_task_type_plan_phase.{up,down}.sql` (mới), `.../0016_task_request_id.{up,down}.sql` (mới)
 **Depends on:** không (task đầu của feature)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -45,11 +45,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bốn cặp file up/down tồn tại, số 0015 và 0016 ở cả hai thư mục.
-- [ ] Up/down/up sạch trên Postgres và MySQL ≥ 8.0.16.
-- [ ] Chèn `plan`, `phase` thành công; `'xyz'` bị từ chối.
-- [ ] Hai plan chưa huỷ cùng `(tenant_id, request_id)` bị chỉ mục duy nhất từ chối ở cả hai DB.
-- [ ] Không file nào tên `helpers`, `utils`, `common`, `misc`.
+- [x] Bốn cặp file up/down tồn tại, số 0015 và 0016 ở cả hai thư mục.
+- [x] Up/down/up sạch trên Postgres và MySQL ≥ 8.0.16.
+- [x] Chèn `plan`, `phase` thành công; `'xyz'` bị từ chối.
+- [x] Hai plan chưa huỷ cùng `(tenant_id, request_id)` bị chỉ mục duy nhất từ chối ở cả hai DB.
+- [x] Không file nào tên `helpers`, `utils`, `common`, `misc`.
 
 ## Rủi ro và lưu ý
 

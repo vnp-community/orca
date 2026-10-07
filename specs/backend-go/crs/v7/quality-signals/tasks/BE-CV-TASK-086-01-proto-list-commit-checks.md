@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/scmintegration/v1/scmintegration.proto` (sửa); stub sinh lại
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 C-DM §2.4; SOL mục 2.B. Request thêm `tenant_id=1`, `include_steps`; `RateLimitInfo.limited` (additive, lệch hợp đồng, ghi PR).
@@ -18,7 +18,7 @@ C-DM §2.4; SOL mục 2.B. Request thêm `tenant_id=1`, `include_steps`; `RateLi
 - `buf breaking --against '.git#branch=main,subdir=backend-go/proto'` gọi trực tiếp; `buf lint` cho phần mới.
 
 ## Tiêu chí hoàn thành
-- [ ] Chỉ thêm, không đổi số field cũ; stub biên dịch cho mọi service dùng module `proto`.
+- [x] Chỉ thêm, không đổi số field cũ; stub biên dịch cho mọi service dùng module `proto`.
 
 ## Rủi ro
 `make proto-lint` có `|| true`: không tin vào nó.

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/{resolve_target.go,target_cache.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-011-06, 012-03, 012-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,8 +30,8 @@ SOL-012 mục 2.B. Kiểm quyền (`GetProject`) do SOL-013 gọi **trước** u
 
 ## Tiêu chí hoàn thành
 
-- [ ] Các tiêu chí phân giải ở SOL mục 4 đạt.
-- [ ] Binding đổi chỗ làm mất snapshot.
+- [x] Các tiêu chí phân giải ở SOL mục 4 đạt.
+- [x] Binding đổi chỗ làm mất snapshot.
 
 ## Rủi ro và lưu ý
 

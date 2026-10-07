@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/status_write_guard_test.go`, `internal/domain/readme_contract_test.go` (mới)
 **Depends on:** TASK-REQ-003-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,9 +27,9 @@ CR-REQ-003 mục 2.3 và Q3 đề nghị kiểm tra tự động cấm ghi `stat
 
 ## Tiêu chí hoàn thành
 
-- [ ] Test xanh trên cây hiện tại, đỏ khi thêm file gán `Status` trong `usecase`.
-- [ ] Test README xanh, đỏ nếu đổi tên một trạng thái trong `domain`.
-- [ ] Không phụ thuộc mạng.
+- [x] Test xanh trên cây hiện tại, đỏ khi thêm file gán `Status` trong `usecase`.
+- [x] Test README xanh, đỏ nếu đổi tên một trạng thái trong `domain`.
+- [x] Không phụ thuộc mạng.
 
 ## Rủi ro và lưu ý
 

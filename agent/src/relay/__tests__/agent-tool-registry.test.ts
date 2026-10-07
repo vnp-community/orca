@@ -197,3 +197,63 @@ describe('shell timeout cap', () => {
     expect(Math.min(huge, 600_000)).toBe(600_000)
   })
 })
+
+describe('runToolCommand options', () => {
+  const nodeBin = process.execPath
+  
+  it('behaves like legacy without new options', async () => {
+    const res = await runToolCommand(nodeBin, ['-e', 'console.log("hello")'], { cwd: process.cwd(), timeout: 5000, env: process.env })
+    expect(res.stdout).toBe('hello\n')
+    expect(res.exitCode).toBe(0)
+    expect(res.meta).toBeUndefined()
+  })
+
+  it('maxOutputBytes truncates', async () => {
+    const res = await runToolCommand(nodeBin, ['-e', 'console.log("a".repeat(100))'], { cwd: process.cwd(), timeout: 5000, env: process.env, maxOutputBytes: 10 })
+    expect(res.stdout.length).toBe(10)
+    expect(res.meta?.truncated).toBe(true)
+  })
+
+  it('stdoutFile redirects output', async () => {
+    const { mkdtempSync, readFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const dir = mkdtempSync(`${tmpdir()}/agent-stdout-`)
+    const file = join(dir, 'out.txt')
+    const res = await runToolCommand(nodeBin, ['-e', 'console.log("file")'], { cwd: process.cwd(), timeout: 5000, env: process.env, stdoutFile: file })
+    expect(res.stdout).toBe('')
+    expect(readFileSync(file, 'utf8')).toBe('file\n')
+  })
+
+  const isWin = process.platform === 'win32'
+  it.skipIf(isWin)('detached and killGraceMs kills child', async () => {
+    const res = await runToolCommand(nodeBin, ['-e', 'setTimeout(()=>{}, 10000)'], { cwd: process.cwd(), timeout: 100, env: process.env, detached: true, killGraceMs: 50 })
+    expect(res.exitCode).toBe(124)
+    expect(res.meta?.timedOut).toBe(true)
+  })
+
+  it('aborts on signal', async () => {
+    const ac = new AbortController()
+    const p = runToolCommand(nodeBin, ['-e', 'setTimeout(()=>{}, 10000)'], { cwd: process.cwd(), timeout: 5000, env: process.env, signal: ac.signal })
+    ac.abort()
+    const res = await p
+    expect(res.exitCode).toBe(124)
+    expect(res.meta?.timedOut).toBe(false)
+  })
+
+  it('sends stdinText', async () => {
+    const res = await runToolCommand(nodeBin, ['-e', 'process.stdin.pipe(process.stdout)'], { cwd: process.cwd(), timeout: 5000, env: process.env, stdinText: 'hello stdin' })
+    expect(res.stdout).toBe('hello stdin')
+  })
+
+  it('gitnexus blocks forbidden verbs', async () => {
+    const t = ALL_TOOL_DEFINITIONS.find(x => x.name === 'gitnexus')!
+    const r1 = await t.handler({ args: ['analyze'] }, mockConfig)
+    expect(r1.exitCode).toBe(2)
+    expect(r1.stderr).toMatch(/tool verb not allowed/)
+
+    vi.mocked(accessSync).mockReturnValue(undefined)
+    const r2 = await t.handler({ args: ['status'] }, mockConfig)
+    expect(r2.exitCode).not.toBe(2)
+  })
+})

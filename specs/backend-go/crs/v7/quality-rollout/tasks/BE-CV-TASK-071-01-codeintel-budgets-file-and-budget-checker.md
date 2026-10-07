@@ -5,7 +5,7 @@
 **Service:** `backend-go/ci`
 **File:** `backend-go/ci/code-intel-bench/codeintel-budgets.json` (mới), `backend-go/ci/code-intel-bench/check-codeintel-bench-budgets.mjs` (mới), `backend-go/ci/code-intel-bench/check-codeintel-bench-budgets.test.mjs` (mới), `backend-go/ci/code-intel-bench/testdata/report-within-budget.json`, `report-over-budget.json` (mới)
 **Depends on:** BE-CV-SOL-010 (cấu trúc service); không cần code sản phẩm
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,9 +29,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ngân sách là dữ liệu; đổi số chỉ qua sửa JSON.
-- [ ] Báo cáo cố ý vượt làm checker thoát khác 0.
-- [ ] RPC mới không có trong JSON làm checker đỏ.
+- [x] Ngân sách là dữ liệu; đổi số chỉ qua sửa JSON.
+- [x] Báo cáo cố ý vượt làm checker thoát khác 0.
+- [x] RPC mới không có trong JSON làm checker đỏ.
 
 ## Rủi ro và lưu ý
 

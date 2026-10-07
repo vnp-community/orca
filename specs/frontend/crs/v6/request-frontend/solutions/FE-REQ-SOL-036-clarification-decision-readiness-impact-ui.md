@@ -1,6 +1,6 @@
 # FE-REQ-SOL-036: UI Clarification, Decision, Readiness, thẻ rủi ro, RiskAcceptance, lệch kế hoạch, kết quả thực thi
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ CR-REQ-036 và đối chiếu CR-REQ-028, 029, 030, CONTRACT backend; chưa chạy test hay ứng dụng. Ba CR backend vẫn đang ở dạng đề xuất, nên mọi tên kênh và trường ngoài CONTRACT là "(tạm)".
+> 🔴 **Not Started.** Rà soát 2026-10-07: chưa có `ClarificationPanel`, `useClarifications`, `RiskSummaryCard`, `ReadinessBadge`, `ExecutionResultPanel`. Viết ngày 2026-10-06 từ CR-REQ-036 và đối chiếu CR-REQ-028, 029, 030, CONTRACT backend; chưa chạy test hay ứng dụng.
 
 **CR:** [CR-REQ-036](../../../../../../docs/crs/v6/request-frontend/CR-REQ-036-clarification-decision-readiness-impact-ui.md), [ADDENDUM-2026-10-06](../../../../../../docs/crs/v6/request-frontend/ADDENDUM-2026-10-06.md)
 **Area:** frontend (`frontend/src/shared`, `components/request/{clarification,decision,readiness,impact,execution}/`, `hooks/`)

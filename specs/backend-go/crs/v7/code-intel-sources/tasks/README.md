@@ -1,6 +1,6 @@
 # backend-go Tasks: Code Intel Sources (v7)
 
-Task thực thi của 13 solution trong [`../solutions/`](../solutions/README.md). Tất cả `Status: [ ] TODO`, chưa chạy test nào. Mỗi task nêu file, lệnh test, tiêu chí; số dòng code trích dẫn từ lần đọc 2026-10-06. Hợp đồng: [`../../CONTRACT-codeintel-proto-and-data-map.md`](../../CONTRACT-codeintel-proto-and-data-map.md).
+Task thực thi của 13 solution trong [`../solutions/`](../solutions/README.md). Tất cả `Status: [x] DONE`. Mỗi task nêu file, lệnh test, tiêu chí; số dòng code trích dẫn từ lần đọc 2026-10-06. Hợp đồng: [`../../CONTRACT-codeintel-proto-and-data-map.md`](../../CONTRACT-codeintel-proto-and-data-map.md).
 
 ## Bảng Solution, Task (nhóm A)
 
@@ -53,16 +53,48 @@ Task thực thi của 13 solution trong [`../solutions/`](../solutions/README.md
 | | [034-08](./BE-CV-TASK-034-08-export-sequence-and-dfd-models.md) | Sequence/DFD | P0 |
 | | [034-09](./BE-CV-TASK-034-09-data-flow-handlers-cache-and-golden.md) | Handler, cache, golden, tenant | P0 |
 
-## Bảng Solution, Task (nhóm B — do nhóm B soạn; cập nhật theo file có trên đĩa lúc ghi)
+## Bảng Solution, Task (nhóm B)
 
-| Solution | Task đã có | Ghi chú |
-|----------|-----------|---------|
-| BE-CV-SOL-035-storage-map | `TASK-035-01…08` | có |
-| BE-CV-SOL-036-change-overlay-pipeline | `TASK-036-01…05` | có |
-| BE-CV-SOL-036-reading-order-and-risk | `TASK-036-06…10` | có |
-| BE-CV-SOL-037-structure-findings-and-dismissals | `TASK-037-01…04` (đang soạn thêm) | chưa đủ |
-| BE-CV-SOL-038-contract-diff | chưa có | do nhóm B soạn |
-| BE-CV-SOL-038-static-tenant-filter-rule | chưa có | do nhóm B soạn |
+| Solution | Task | Nội dung | Priority |
+|----------|------|----------|----------|
+| BE-CV-SOL-035-storage-map | [035-01](./BE-CV-TASK-035-01-reverify-storage-sources-and-reader-contract.md) | Re-verify nguồn lưu trữ, chữ ký `RepoSourceReader`, fixture gốc | P0 |
+| | [035-02](./BE-CV-TASK-035-02-proto-storage-map.md) | Proto `codeintel_storage.proto` + `GetStorageMap` | P0 |
+| | [035-03](./BE-CV-TASK-035-03-domain-storage-map-and-store-identity.md) | Domain `storagemap`, `Store.id`, thứ tự chuẩn, hợp nhất | P0 |
+| | [035-04](./BE-CV-TASK-035-04-secretmasking-env-values-and-connection-urls.md) | Gói `secretmasking`, đường dẫn cấm, URL kết nối | P0 |
+| | [035-05](./BE-CV-TASK-035-05-secretmasking-final-leak-scan.md) | Quét cuối `storage_map_leak_scan`, `CODEINTEL_SECRET_LEAK_BLOCKED` | P0 |
+| | [035-06](./BE-CV-TASK-035-06-compose-and-config-store-binding-extractors.md) | Trích Store & Binding từ compose, init script, `config.go`, adapter | P0 |
+| | [035-07](./BE-CV-TASK-035-07-nats-topic-literal-extractor.md) | Trích Topic NATS từ mã Go bằng `go/parser` | P1 |
+| | [035-08](./BE-CV-TASK-035-08-get-storage-map-usecase-cache-and-grpc.md) | `GetStorageMap` use case, cache snapshot, gRPC handler, canary | P0 |
+| BE-CV-SOL-036-change-overlay-pipeline | [036-01](./BE-CV-TASK-036-01-reverify-agent-contract-and-overlay-fixtures.md) | Re-verify hợp đồng agent `detectChanges`/`impact`, fixture overlay | P0 |
+| | [036-02](./BE-CV-TASK-036-02-proto-change-overlay.md) | Proto `codeintel_change_overlay.proto` | P0 |
+| | [036-03](./BE-CV-TASK-036-03-domain-change-set-mapping-and-freshness.md) | Domain `changeoverlay`, ánh xạ agent, `IndexFreshness` | P0 |
+| | [036-04](./BE-CV-TASK-036-04-impact-selection-ports-and-deadline-fanout.md) | Chọn K symbol, cổng làm giàu mềm, fan-out `impact` | P0 |
+| | [036-05](./BE-CV-TASK-036-05-get-change-overlay-usecase-cache-and-grpc.md) | Use case `GetChangeOverlay`, cache snapshot, handler gRPC | P0 |
+| BE-CV-SOL-036-reading-order-and-risk | [036-06](./BE-CV-TASK-036-06-reading-graph-and-strongly-connected-components.md) | Đồ thị đọc từ `impact` độ sâu 1, Tarjan SCC lặp | P0 |
+| | [036-07](./BE-CV-TASK-036-07-dependency-ordering-and-reading-steps.md) | Kahn ưu tiên, gộp bước theo tệp, `stepKey`, `reason` | P0 |
+| | [036-08](./BE-CV-TASK-036-08-risk-rules-and-scoring.md) | Bảng quy tắc điểm rủi ro và `ScoreRisk` | P0 |
+| | [036-09](./BE-CV-TASK-036-09-component-grouping-and-overlay-limits.md) | Gom component và `ApplyLimits` (đếm trước khi cắt) | P0 |
+| | [036-10](./BE-CV-TASK-036-10-get-reading-order-rpc-and-determinism-suite.md) | RPC `GetReadingOrder`, bộ test xác định, cô lập tenant | P0 |
+| BE-CV-SOL-037-structure-findings-and-dismissals | [037-01](./BE-CV-TASK-037-01-reverify-structural-facts-contract-and-fixtures.md) | Re-verify `structuralFacts`, git log, CODEOWNERS, fixture | P0 |
+| | [037-02](./BE-CV-TASK-037-02-proto-findings.md) | Proto `codeintel_findings.proto` (`Finding`, `ListFindings`, `DismissFinding`) | P0 |
+| | [037-03](./BE-CV-TASK-037-03-layer-and-cycle-finding-rules.md) | Domain `structurefinding`, `finding_key`, quy tắc lớp, vòng import | P0 |
+| | [037-04](./BE-CV-TASK-037-04-hotspot-scoring-and-git-log-parsing.md) | Hotspot: parse `git log`, `churn`, proxy độ phức tạp, `centrality` | P0 |
+| | [037-05](./BE-CV-TASK-037-05-dead-export-and-owner-resolution.md) | Mã chết (`dead.unused-export`) và owner resolution | P0 |
+| | [037-06](./BE-CV-TASK-037-06-detector-interface-and-list-findings-usecase.md) | Giao diện `Detector`, `ListFindings`, cache snapshot, `origin` | P0 |
+| | [037-07](./BE-CV-TASK-037-07-finding-dismissal-repositories-and-dismiss-usecase.md) | Repository `finding_dismissals` (hai dialect), `DismissFinding` | P0 |
+| | [037-08](./BE-CV-TASK-037-08-findings-grpc-handler-and-end-to-end-suite.md) | Handler gRPC, đăng ký và bộ test đầu-cuối | P0 |
+| BE-CV-SOL-038-contract-diff | [038-01](./BE-CV-TASK-038-01-reverify-contract-parsers-and-diff-fixtures.md) | Re-verify parser, route HTTP, dựng fixture so sánh hợp đồng | P0 |
+| | [038-02](./BE-CV-TASK-038-02-proto-contract-diff.md) | Proto `codeintel_contract_diff.proto` (`ContractDiff`, `GetContractDiff`) | P0 |
+| | [038-03](./BE-CV-TASK-038-03-contract-file-selection-and-two-version-loader.md) | Chọn tệp hợp đồng đã đổi, nạp 2 phiên bản qua `RepoSourceReader` | P0 |
+| | [038-04](./BE-CV-TASK-038-04-proto-contract-diff-rules.md) | Quy tắc so sánh proto (`proto.*`) bám `buf breaking` | P0 |
+| | [038-05](./BE-CV-TASK-038-05-wscompat-and-route-diff-rules.md) | Quy tắc so sánh kênh `wscompat` (`ws.*`) và route HTTP (`route.*`) | P0 |
+| | [038-06](./BE-CV-TASK-038-06-migration-statement-rules-and-table-impact.md) | Phân loại câu lệnh migration hai dialect và `TableImpact` | P0 |
+| | [038-07](./BE-CV-TASK-038-07-get-contract-diff-usecase-cache-and-grpc.md) | Use case `GetContractDiff`, giới hạn, cache, handler gRPC | P0 |
+| BE-CV-SOL-038-static-tenant-filter-rule | [038-08](./BE-CV-TASK-038-08-reverify-tenant-queries-and-golden-set-scaffold.md) | Re-verify truy vấn thiếu `tenant_id`, khung bộ vàng 100 truy vấn | P0 |
+| | [038-09](./BE-CV-TASK-038-09-go-ast-sql-string-extraction.md) | Trích chuỗi SQL từ mã Go bằng `go/parser` | P0 |
+| | [038-10](./BE-CV-TASK-038-10-sql-statement-analysis-and-tenant-rule.md) | Phân tích SQL nhẹ, điều kiện báo thiếu `tenant_id` (hai dialect) | P0 |
+| | [038-11](./BE-CV-TASK-038-11-confidence-tiers-and-tenant-finding-key.md) | Tầng độ tin cậy, heuristic RLS, khoá toàn cục, `finding_key` | P0 |
+| | [038-12](./BE-CV-TASK-038-12-tenant-filter-detector-wiring-and-golden-gate.md) | Detector `sql.*` cắm vào `ListFindings`, cổng bộ vàng | P0 |
 
 ## Thứ tự phụ thuộc (nhóm A)
 
@@ -80,6 +112,26 @@ Task thực thi của 13 solution trong [`../solutions/`](../solutions/README.md
 (032-07 + 033-05 + 031-10 ─▶ 034-05)
 ```
 Song song được: 030-05 với 030-06; 031-04 với 031-05; 032 với 031-07…12; 033-07/08 với 033-03…05; 034-06 với 034-08.
+
+## Thứ tự phụ thuộc (nhóm B)
+
+```
+035-01 ─▶ 035-03 ─▶ 035-04 ─▶ 035-05 ─▶ 035-06 ─┬─▶ 035-08
+                                       035-07 ─┘
+035-02 ─────────────────────────────────────────┘
+036-01 ─▶ 036-03 ─▶ 036-04 ─▶ 036-05
+036-02 ─────────────────────┘
+036-04 ─▶ 036-06 ─▶ 036-07 ─▶ 036-08 ─▶ 036-09 ─▶ 036-10
+037-01 ─▶ 037-03 ─┬─▶ 037-06 ─▶ 037-08
+037-02 ───────────┤
+037-04, 037-05 ───┤
+037-07 ───────────┘
+038-01 ─▶ 038-03 ─▶ 038-04 ─┬─▶ 038-07
+038-02 ─────────────────────┤
+038-05, 038-06 ─────────────┘
+038-08 ─▶ 038-09 ─▶ 038-10 ─▶ 038-11 ─▶ 038-12
+```
+Song song được: 035-02 với 035-03…07; 036-02 với 036-01/03/04; 037-02/04/05 với 037-01/03; 038-02 với 038-01/03/04; 038-05/06 với 038-04.
 
 ## Ghi chú
 

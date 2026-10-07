@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/build_erd.go` (mới), `.../usecase/erd_service_discovery.go` (mới), `.../domain/erd/catalog_diff.go` (mới), các `_test.go`
 **Depends on:** BE-CV-TASK-031-08, BE-CV-TASK-031-09; BE-CV-SOL-022 (`SnapshotStore` port); BE-CV-SOL-012 (phân giải selector)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -33,9 +33,9 @@ SOL-031-erd mục 2.E, 2.F. Kết hợp mọi phần thành `BuildErd(ctx, Build
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi tiêu chí SOL-031-erd mục 6 liên quan đến use case (đủ bảng, `changes`, `services[]`, `not_modified`, `truncated`).
-- [ ] Không gọi DB hay đọc file ngoài cổng; không log nội dung.
-- [ ] Không tên `helpers/utils/common/misc`.
+- [x] Mọi tiêu chí SOL-031-erd mục 6 liên quan đến use case (đủ bảng, `changes`, `services[]`, `not_modified`, `truncated`).
+- [x] Không gọi DB hay đọc file ngoài cổng; không log nội dung.
+- [x] Không tên `helpers/utils/common/misc`.
 
 ## Rủi ro và lưu ý
 

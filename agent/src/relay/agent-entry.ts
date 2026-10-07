@@ -18,6 +18,7 @@ import { discoverTools } from './agent-tool-registry'
 import { connectDirect } from './agent-connection-direct'
 import { listenRelay } from './agent-connection-relay'
 import { connectStdio } from './agent-connection-stdio'
+import { AGENT_BUILD_VERSION } from './agent-build-version'
 
 // TEMP DIAG BUG-FE-PTY-001: the agent's own outbound WS to Orca sends a raw
 // TCP FIN (code 1005, no close frame) within ~6ms of processing 2 concurrent
@@ -80,7 +81,7 @@ async function main(): Promise<void> {
   if (process.argv.includes('--stdio')) {
     const config = loadAgentConfig({ stdio: true })
     const log = createAgentLogger(config.logLevel)
-    log.info('Orca Dev Agent v2.1.0 (stdio mode)')
+    log.info(`Orca Dev Agent v${AGENT_BUILD_VERSION} (stdio mode)`)
     log.info(`DevServerId: ${config.devServerId}  |  WorkDir: ${config.workDir}`)
     log.info('Discovering tools...')
     const tools = await discoverTools(config)
@@ -112,7 +113,7 @@ async function main(): Promise<void> {
   const config = loadAgentConfig()
   const log = createAgentLogger(config.logLevel)
 
-  log.info('Orca Dev Agent v2.1.0')
+  log.info(`Orca Dev Agent v${AGENT_BUILD_VERSION}`)
   log.info(
     `Mode: ${config.mode}  |  DevServerId: ${config.devServerId}  |  WorkDir: ${config.workDir}`
   )

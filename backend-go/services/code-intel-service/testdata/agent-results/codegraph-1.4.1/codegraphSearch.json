@@ -1,0 +1,23 @@
+{
+  "results": [
+    {
+      "endLine": null,
+      "filePath": "",
+      "key": "value::",
+      "kind": "value",
+      "name": "",
+      "qualifiedName": "",
+      "rawKind": "unknown",
+      "startLine": null,
+      "uid": ""
+    }
+  ],
+  "sources": [
+    {
+      "commit": null,
+      "indexedAt": 1600000000000,
+      "lineBase": 1,
+      "tool": "codegraph"
+    }
+  ]
+}

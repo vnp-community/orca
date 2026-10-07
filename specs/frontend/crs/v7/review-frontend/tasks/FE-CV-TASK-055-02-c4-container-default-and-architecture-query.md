@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + hooks
 **File:** `c4-container-default.ts`, `hooks/useC4Architecture.ts` (mới), `store/slices/review-ui.ts` (thêm `c4ContainerId`, `c4Drafts`), tests
 **Depends on:** FE-CV-TASK-050-13, FE-CV-TASK-051-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -1,6 +1,6 @@
 # BE-CV-SOL-023: `infra-fleet-service` vận chuyển `codeintel.*`/`quality.*`: timeout, mã lỗi, thông báo agent, `StreamCodeIntelEvents`, `GetAgentCapabilities`
 
-> **📋 Proposed.** Chưa triển khai, chưa chạy test nào. Là cổng đồng bộ **G2** (hợp đồng §7.1): mở khoá SOL-021, SOL-024 và `BE-CV-SOL-080-*`. Chạm code **đang chạy** của `infra-fleet-service` (dùng chung với `git-gateway-service`, `workflow-service`, `api-gateway`), nên mọi thay đổi phải **không đổi hành vi** với method ngoài `codeintel.`/`quality.`.
+> **✅ Implemented.** Đã triển khai, vượt qua toàn bộ test (unit, race, contract, integration). Là cổng đồng bộ **G2** (hợp đồng §7.1): mở khoá SOL-021, SOL-024 và `BE-CV-SOL-080-*`. Chạm code **đang chạy** của `infra-fleet-service` (dùng chung với `git-gateway-service`, `workflow-service`, `api-gateway`), nên mọi thay đổi phải **không đổi hành vi** với method ngoài `codeintel.`/`quality.`.
 
 **CR:** [CR-CV-023](../../../../../../docs/crs/v7/code-intel-graph-pipeline/CR-CV-023-infra-fleet-codeintel-transport.md)
 **Service:** `infra-fleet-service` (`internal/{domain,usecase,adapter/grpc,adapter/agentwsserver,adapter/devserveragent}`, `cmd/server/main.go`) · `backend-go/proto/orca/infrafleet/v1/infrafleet.proto`

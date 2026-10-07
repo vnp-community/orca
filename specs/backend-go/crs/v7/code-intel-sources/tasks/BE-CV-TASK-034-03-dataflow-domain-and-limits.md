@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/dataflow/flow.go`, `gap_codes.go`, `limits.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-034-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Solution 2.B/2.C.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ngoài khoảng → lỗi `INVALID_PARAMS`.
-- [ ] `flow_id` hợp lệ/không đều có test.
+- [x] Ngoài khoảng → lỗi `INVALID_PARAMS`.
+- [x] `flow_id` hợp lệ/không đều có test.
 
 ## Rủi ro và lưu ý
 

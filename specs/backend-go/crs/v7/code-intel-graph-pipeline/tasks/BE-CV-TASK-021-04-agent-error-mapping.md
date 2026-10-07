@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/adapter/infrafleetclient/agent_error_mapping.go` (mới) và test
 **Depends on:** TASK-021-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Bảng 2.C của solution (PQ-02, PQ-03). Cần `apperrors.KindUnavailable` (SOL
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi dòng bảng có test.
-- [ ] Không còn mã `INVALID_ARGUMENT`.
+- [x] Mọi dòng bảng có test.
+- [x] Không còn mã `INVALID_ARGUMENT`.
 
 ## Rủi ro và lưu ý
 

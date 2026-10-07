@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần + hook)
 **File:** `frontend/src/renderer/src/components/review-map/entry/agent-turn-completion.ts`, `useAgentTurnCompletions.ts` (mới) + test
 **Depends on:** không (đọc `agent-status` slice có sẵn)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

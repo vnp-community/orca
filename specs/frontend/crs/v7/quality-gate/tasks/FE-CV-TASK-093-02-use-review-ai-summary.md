@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/ai-summary/use-review-ai-summary.ts`, `ai-summary-consent-state.ts` (mới) + test
 **Depends on:** FE-CV-TASK-085-01, 093-01; FE-CV-SOL-050-store-and-query-hooks
-**Status:** [ ] TODO
+**Status:** [x] DONE — `useReviewAiSummary.ts` hook chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

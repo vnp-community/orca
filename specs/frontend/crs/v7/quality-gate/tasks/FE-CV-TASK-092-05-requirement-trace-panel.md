@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/requirements/RequirementTracePanel.tsx`, `RequirementRow.tsx`, `RequirementEvidenceList.tsx`, `UnlinkedChangesList.tsx` (mới) + test
 **Depends on:** FE-CV-TASK-092-01..04; FE-CV-SOL-053-impact-lens-and-symbol-detail
-**Status:** [ ] TODO
+**Status:** [x] DONE — `RequirementTracePanel.tsx` chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

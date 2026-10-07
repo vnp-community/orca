@@ -127,16 +127,16 @@ Thất bại **từng phần** không làm thất bại cả RPC; chỉ lỗi c�
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] Cùng đầu vào → cùng `modelDigest` (hai lần gọi, hai dialect, hai tiến trình); đổi `runIds` hoặc `indexCommit` → digest đổi.
-- [ ] Mô hình không chứa: đường dẫn tuyệt đối, `workspace_root`, email, tên người, lý do miễn trừ, mã nguồn, chuỗi khớp mẫu secret (token giả trong `message` → `[REDACTED]`).
-- [ ] Phát hiện thuộc tệp bị chặn nội dung không kèm `message`.
-- [ ] Thiếu run bắt buộc → `gate.verdict=unknown` (không `pass`); lỗi nguồn → `warnings[]` tương ứng; RPC vẫn thành công.
-- [ ] `risk.level` chữ HOA; `UNKNOWN` khi overlay không có.
-- [ ] `max_findings=51` hoặc `max_reading_steps=0/51` → `CODEINTEL_INVALID_PARAMS` (không kẹp ngầm); mặc định 10/15.
-- [ ] Sơ đồ Mermaid: nhãn có `"`, `]`, `;`, xuống dòng, backtick, `%%` không làm vỡ cú pháp (test thoát); > 6 KiB hoặc > 30 nút → `truncated=true`, sơ đồ bị bỏ.
-- [ ] Cờ chất lượng tắt → `CODEINTEL_QUALITY_GATE_DISABLED`; người không có `quality_read` hoặc `read` → `CODEINTEL_NOT_AUTHORIZED`; audit được ghi.
-- [ ] Tenant khác không dùng được `selector` của tenant này (test cách ly).
-- [ ] Không file nào dùng `max-lines` disable; không file `helpers/utils`.
+- [x] Cùng đầu vào → cùng `modelDigest` (hai lần gọi, hai dialect, hai tiến trình); đổi `runIds` hoặc `indexCommit` → digest đổi.
+- [x] Mô hình không chứa: đường dẫn tuyệt đối, `workspace_root`, email, tên người, lý do miễn trừ, mã nguồn, chuỗi khớp mẫu secret (token giả trong `message` → `[REDACTED]`).
+- [x] Phát hiện thuộc tệp bị chặn nội dung không kèm `message`.
+- [x] Thiếu run bắt buộc → `gate.verdict=unknown` (không `pass`); lỗi nguồn → `warnings[]` tương ứng; RPC vẫn thành công.
+- [x] `risk.level` chữ HOA; `UNKNOWN` khi overlay không có.
+- [x] `max_findings=51` hoặc `max_reading_steps=0/51` → `CODEINTEL_INVALID_PARAMS` (không kẹp ngầm); mặc định 10/15.
+- [x] Sơ đồ Mermaid: nhãn có `"`, `]`, `;`, xuống dòng, backtick, `%%` không làm vỡ cú pháp (test thoát); > 6 KiB hoặc > 30 nút → `truncated=true`, sơ đồ bị bỏ.
+- [x] Cờ chất lượng tắt → `CODEINTEL_QUALITY_GATE_DISABLED`; người không có `quality_read` hoặc `read` → `CODEINTEL_NOT_AUTHORIZED`; audit được ghi.
+- [x] Tenant khác không dùng được `selector` của tenant này (test cách ly).
+- [x] Không file nào dùng `max-lines` disable; không file `helpers/utils`.
 
 ## 5. Kiểm thử
 

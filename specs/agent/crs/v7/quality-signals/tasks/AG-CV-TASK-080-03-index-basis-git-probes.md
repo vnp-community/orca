@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-index-basis-probe.ts` (mới), `agent/src/relay/codeintel-index-basis-probe.test.ts` (mới)
 **Depends on:** AG-CV-TASK-080-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -28,9 +28,9 @@ Lệnh: `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/codeintel-in
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca trên xanh; không ném khi git thiếu/lỗi.
-- [ ] Không có `git` nào dùng `--path-format`, `merge-tree`, `--merge-base` (test quét).
-- [ ] `dirtySinceIndex` là `true` với sửa chưa commit sau thời điểm index.
+- [x] Mọi ca trên xanh; không ném khi git thiếu/lỗi.
+- [x] Không có `git` nào dùng `--path-format`, `merge-tree`, `--merge-base` (test quét).
+- [x] `dirtySinceIndex` là `true` với sửa chưa commit sau thời điểm index.
 
 ## Rủi ro
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/list_data_flows.go` (mới), `.../usecase/list_data_flows_test.go` (mới)
 **Depends on:** BE-CV-TASK-034-03, BE-CV-TASK-032-07
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -25,8 +25,8 @@ Solution 2.B; chỉ cần catalog; rẻ.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Số ứng viên = kênh + RPC của catalog.
-- [ ] Không dựng chi tiết.
+- [x] Số ứng viên = kênh + RPC của catalog.
+- [x] Không dựng chi tiết.
 
 ## Rủi ro và lưu ý
 

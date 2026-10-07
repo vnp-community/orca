@@ -20,7 +20,7 @@ Hai job cùng repo; repo khác vào hàng đợi; hàng đầy; `manual` vs `age
 Lệnh: `pnpm exec vitest run src/relay/codeintel-reindex-job.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Không spawn trong ca ngắn mạch.
+- [x] Không spawn trong ca ngắn mạch.
 
 ## Rủi ro
 - `freshness` chỉ đúng khi AG-CV-SOL-080 xong; trước đó `ifStale` dùng `indexedCommit===headCommit`.

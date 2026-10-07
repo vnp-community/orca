@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-relay-handlers.ts`, `codeintel-relay-handlers.test.ts` (mới)
 **Depends on:** [001](./AG-CV-TASK-006-01-transport-neutral-core-guard.md); điều kiện: O-5 chấp thuận
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Mẫu `relay-auth-status-handlers.ts` (`registerAuthStatusHandlers`, `throw Object.assign(new Error, {code})`). Part B: id số, thông báo `dispatcher.notify` tới mọi client, `rpc.cancel` -> `context.signal`, không `capabilities`.
@@ -20,7 +20,7 @@ Mẫu `relay-auth-status-handlers.ts` (`registerAuthStatusHandlers`, `throw Obje
 Lệnh: `pnpm exec vitest run src/relay/codeintel-relay-handlers.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Mọi method trong bảng đăng ký ở Part B; cancel kill CLI con.
+- [x] Mọi method trong bảng đăng ký ở Part B; cancel kill CLI con.
 
 ## Rủi ro
 - `RelayDispatcher.onRequest` trùng chỉ cảnh báo rồi ghi đè (`dispatcher.ts:154-168`): đừng đăng ký hai lần.

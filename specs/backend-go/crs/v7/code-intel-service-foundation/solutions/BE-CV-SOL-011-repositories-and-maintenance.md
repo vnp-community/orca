@@ -191,16 +191,16 @@ internal/adapter/contracttest/repository_contract.go   # bộ kịch bản dùng
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `Upsert` binding hai lần cùng `(project_id, scope_key)` giữ `id`, tăng `version`; hai đường dẫn khác nhau cùng repo → hai `scope_key`.
-- [ ] Hai `Create` job đồng thời cùng binding: đúng một thành công, bên kia `CODEINTEL_REINDEX_IN_PROGRESS`; sau `Finish` tạo được job mới.
-- [ ] `Put` snapshot cùng khoá thay thế; `Get` không trả dòng hết hạn/sai `schema_version`; vượt trần `CODEINTEL_PAYLOAD_TOO_LARGE`, không ghi dòng nào; cắt tỉa giữ 3 commit và bản mới nhất; payload có `\u0000` ghi được (Postgres).
-- [ ] `Save` review state: `version` cũ → `VERSION_CONFLICT`; id lạ → `NOT_FOUND`; 20 `Save` đồng thời cùng `version`: đúng một thành công; sự kiện `review.saved` chỉ có khi commit.
-- [ ] `Dismiss` idempotent; `Restore` xoá dòng; `Save` C4 CAS.
-- [ ] Xoá binding rồi bảo trì: `c4_overrides`, `finding_dismissals` còn; `graph_snapshots`, `review_states`, `reindex_jobs` bị xoá sau hạn (test rút ngắn).
-- [ ] Bảo trì: snapshot hết hạn theo lô; vượt hạn mức → xoá cũ nhất; job `running` quá hạn → `failed` + `CODEINTEL_REINDEX_ORPHANED`, `active_key = NULL`, có sự kiện `reindex.finished`.
-- [ ] Mọi phương thức: tenant A không đọc/ghi được dòng tenant B (hai dialect + SQL trực tiếp Postgres với role `NOBYPASSRLS`).
-- [ ] Test AST bắt phương thức thiếu phạm vi tenant, quét mọi `*_repository.go`.
-- [ ] `go vet`, `make lint` xanh.
+- [x] `Upsert` binding hai lần cùng `(project_id, scope_key)` giữ `id`, tăng `version`; hai đường dẫn khác nhau cùng repo → hai `scope_key`.
+- [x] Hai `Create` job đồng thời cùng binding: đúng một thành công, bên kia `CODEINTEL_REINDEX_IN_PROGRESS`; sau `Finish` tạo được job mới.
+- [x] `Put` snapshot cùng khoá thay thế; `Get` không trả dòng hết hạn/sai `schema_version`; vượt trần `CODEINTEL_PAYLOAD_TOO_LARGE`, không ghi dòng nào; cắt tỉa giữ 3 commit và bản mới nhất; payload có `\u0000` ghi được (Postgres).
+- [x] `Save` review state: `version` cũ → `VERSION_CONFLICT`; id lạ → `NOT_FOUND`; 20 `Save` đồng thời cùng `version`: đúng một thành công; sự kiện `review.saved` chỉ có khi commit.
+- [x] `Dismiss` idempotent; `Restore` xoá dòng; `Save` C4 CAS.
+- [x] Xoá binding rồi bảo trì: `c4_overrides`, `finding_dismissals` còn; `graph_snapshots`, `review_states`, `reindex_jobs` bị xoá sau hạn (test rút ngắn).
+- [x] Bảo trì: snapshot hết hạn theo lô; vượt hạn mức → xoá cũ nhất; job `running` quá hạn → `failed` + `CODEINTEL_REINDEX_ORPHANED`, `active_key = NULL`, có sự kiện `reindex.finished`.
+- [x] Mọi phương thức: tenant A không đọc/ghi được dòng tenant B (hai dialect + SQL trực tiếp Postgres với role `NOBYPASSRLS`).
+- [x] Test AST bắt phương thức thiếu phạm vi tenant, quét mọi `*_repository.go`.
+- [x] `go vet`, `make lint` xanh.
 
 ## 5. Kiểm thử
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/usecase/handle_agent_code_intel_event.go` (mới), `.../adapter/{postgres,mysql}` (cài `MarkProcessed` nếu SOL-011 chưa có) và test
 **Depends on:** TASK-024-03, TASK-024-04, BE-CV-SOL-022
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,7 +27,7 @@ SOL-024 2.C; payload `orca.codeintel.index.changed` theo hợp đồng §5.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Một dòng outbox/`event_id`. - [ ] Hai dialect xanh. - [ ] Cô lập tenant.
+- [x] Một dòng outbox/`event_id`. - [x] Hai dialect xanh. - [x] Cô lập tenant.
 
 ## Rủi ro và lưu ý
 

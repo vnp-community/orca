@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/right-sidebar/source-control-quality-gate-view-model.ts` (mới) + `.test.ts`
 **Depends on:** FE-CV-TASK-085-01; kiểu `QualityGate` từ FE-CV-SOL-050-types-and-runtime-bridge
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

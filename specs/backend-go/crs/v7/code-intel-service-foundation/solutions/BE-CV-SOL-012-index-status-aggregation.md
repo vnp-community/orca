@@ -127,14 +127,14 @@ testdata/agent-status/*.json                              # fixture theo §4.1 (
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `GetIndexStatus` trả đúng 9 `overall` (mỗi dòng bảng 2.C một test), đúng ưu tiên khi nhiều điều kiện đúng (offline + job → `OFFLINE`).
-- [ ] `OVERLAY` khi `repo_root` + `fresh_base`; `scope_mismatch` đặt đúng.
-- [ ] Dev server offline: `OFFLINE` + `last_status` đã lưu, không lỗi; RPC khác (ví dụ `RequestReindex`/view) trả `CODEINTEL_DEV_SERVER_OFFLINE` (`Unavailable`).
-- [ ] 20 lời gọi đồng thời cùng binding → đúng một `RelayByDevServer`; `refresh=true` bỏ qua cache; cache hết hạn sau 15 s (đồng hồ giả).
-- [ ] Mỗi thăm dò thành công ghi `last_status`/`last_status_at`; trạng thái lưu ≤ 64 KiB.
-- [ ] `percent` không biết ra `null`; không đường dẫn tuyệt đối trong `IndexStatus`.
-- [ ] Cô lập tenant: binding/cache tenant khác không đọc được.
-- [ ] Hai dialect: `SaveStatusCache` đúng ở cả hai.
+- [x] `GetIndexStatus` trả đúng 9 `overall` (mỗi dòng bảng 2.C một test), đúng ưu tiên khi nhiều điều kiện đúng (offline + job → `OFFLINE`).
+- [x] `OVERLAY` khi `repo_root` + `fresh_base`; `scope_mismatch` đặt đúng.
+- [x] Dev server offline: `OFFLINE` + `last_status` đã lưu, không lỗi; RPC khác (ví dụ `RequestReindex`/view) trả `CODEINTEL_DEV_SERVER_OFFLINE` (`Unavailable`).
+- [x] 20 lời gọi đồng thời cùng binding → đúng một `RelayByDevServer`; `refresh=true` bỏ qua cache; cache hết hạn sau 15 s (đồng hồ giả).
+- [x] Mỗi thăm dò thành công ghi `last_status`/`last_status_at`; trạng thái lưu ≤ 64 KiB.
+- [x] `percent` không biết ra `null`; không đường dẫn tuyệt đối trong `IndexStatus`.
+- [x] Cô lập tenant: binding/cache tenant khác không đọc được.
+- [x] Hai dialect: `SaveStatusCache` đúng ở cả hai.
 
 ## 5. Kiểm thử
 

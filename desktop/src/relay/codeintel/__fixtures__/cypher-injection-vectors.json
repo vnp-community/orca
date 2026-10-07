@@ -1,0 +1,57 @@
+[
+  {
+    "name": "classic_or_tautology",
+    "vector": "' OR 1=1 //",
+    "type": "string_injection"
+  },
+  {
+    "name": "detach_delete",
+    "vector": "'}) MATCH (x) DETACH DELETE x //",
+    "type": "write_injection"
+  },
+  {
+    "name": "call_procedure",
+    "vector": "CALL show_tables()",
+    "type": "forbidden_keyword"
+  },
+  {
+    "name": "semicolon_chained",
+    "vector": "MATCH (n) RETURN n; DROP TABLE foo;",
+    "type": "multi_statement"
+  },
+  {
+    "name": "block_comment",
+    "vector": "/* block comment */ MATCH (n) RETURN n",
+    "type": "comment_injection"
+  },
+  {
+    "name": "nul_byte",
+    "vector": "foo\u0000bar",
+    "type": "control_char"
+  },
+  {
+    "name": "newline_injection",
+    "vector": "foo\nbar",
+    "type": "control_char"
+  },
+  {
+    "name": "create_node",
+    "vector": "MATCH (n) CREATE (m:Evil) RETURN m",
+    "type": "forbidden_keyword"
+  },
+  {
+    "name": "drop_schema",
+    "vector": "DROP INDEX ON :Community(id)",
+    "type": "forbidden_keyword"
+  },
+  {
+    "name": "load_csv",
+    "vector": "LOAD CSV FROM 'file:///etc/passwd' AS row RETURN row",
+    "type": "forbidden_keyword"
+  },
+  {
+    "name": "unwind_write",
+    "vector": "MATCH (n) UNWIND [1] AS x SET n.p = x RETURN n",
+    "type": "forbidden_keyword"
+  }
+]

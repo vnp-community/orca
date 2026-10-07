@@ -31,8 +31,8 @@ UI-API 3.2: `summary` (sel, `base?`, `profileName?`, `level` metadata|diff, `dry
 
 ## Tiêu chí hoàn thành
 
-- [ ] `summary` 24 s, hậu tố `inProgress`; không retry.
-- [ ] `report` đúng trần; mặc định riêng tư (`includePeople`) không bị gateway thay đổi.
+- [x] `summary` 24 s, hậu tố `inProgress`; không retry.
+- [x] `report` đúng trần; mặc định riêng tư (`includePeople`) không bị gateway thay đổi.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/propose_request_classification.go`, `internal/usecase/propose_request_classification_test.go`, `internal/usecase/approval_noop.go`, `internal/usecase/execution_guard_noop.go`, `internal/usecase/ports.go` (sửa: `ApprovalRecorder`, `ApprovalCanceller`, `ExecutionGuard`)
 **Depends on:** TASK-REQ-005-01, 005-02, 005-03, TASK-REQ-003-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -39,11 +39,11 @@ Lệnh: `go test ./services/request-service/internal/usecase/... -run Propose`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Đề xuất hợp lệ ghi đủ trường, một lịch sử `ai`, một sự kiện `classified`.
-- [ ] AI thất bại hai lần: `awaiting_type_confirmation`, `type` rỗng, `failed=true`.
-- [ ] Giao lặp: chỉ một đề xuất.
-- [ ] Lần AI thứ 6 bị chặn kể cả khi thất bại liên tiếp.
-- [ ] Không gán `.Status` ngoài `transition_request.go` (test kiến trúc TASK-REQ-003-06 vẫn xanh).
+- [x] Đề xuất hợp lệ ghi đủ trường, một lịch sử `ai`, một sự kiện `classified`.
+- [x] AI thất bại hai lần: `awaiting_type_confirmation`, `type` rỗng, `failed=true`.
+- [x] Giao lặp: chỉ một đề xuất.
+- [x] Lần AI thứ 6 bị chặn kể cả khi thất bại liên tiếp.
+- [x] Không gán `.Status` ngoài `transition_request.go` (test kiến trúc TASK-REQ-003-06 vẫn xanh).
 
 ## Rủi ro và lưu ý
 

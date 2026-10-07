@@ -1,6 +1,6 @@
 # AG-CV-SOL-005: `codeintel.detectChanges` (diff theo merge-base → symbol → luồng)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi mục "đã đọc" là đọc code/CR, chưa chạy gì. Cypher `FILE_SYMBOLS_BATCH` (`MATCH (n)` + `IN`) **chưa chạy**; hình dạng `git diff` lấy từ CR (Git 2.43.0), chưa chạy lại.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 005-01 đến 005-08, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-005](../../../../../../docs/crs/v7/agent-codeintel/CR-CV-005-codeintel-detect-changes.md)
 **Service:** `agent/src/relay/` (Part A)
@@ -71,13 +71,13 @@ Hunk `-U0`: `@@ -a[,b] +c[,d] @@`, `d=0` xoá thuần -> `[c,c]` `pureDeletion` 
 01 merge-base; 02 parser (thuần); 03 thu thập diff cần 01, 02; 04 ánh xạ cần 03 và AG-CV-TASK-002-04/08; 05 luồng/cụm; 06 crossCheck header; 07 handler cần 04, 05, 06; 08 re-verify.
 
 ## 5. Tiêu chí chấp nhận
-- [ ] Sửa một hàm TS đã index -> đúng symbol trong cùng (innermost), dòng 1-based; `exact` khi chỉ mục khớp HEAD, tệp bẩn -> `approximate`.
-- [ ] `base=HEAD~30` (CLI báo 1 508 symbol) trả đến 2 000, không cắt ở 15; mỗi luồng một lần.
-- [ ] Tệp untracked `status:'A'`, `untracked:true`; nhị phân/tên có xuống dòng không vỡ phản hồi; `R` có `oldPath`; `D` đúng quy tắc.
-- [ ] `base` xấu/`-x`/không merge-base -> `INVALID_PARAMS` đúng `reason`, không spawn công cụ.
-- [ ] `index_commit_differs_from_head`, `index_commit_unreachable`; `mappingConfidence ≠ exact` khi cũ.
-- [ ] Không lệnh Git > 2.24, không mạng; diff vượt `maxBuffer` không lỗi; `crossCheck` chỉ thêm `riskHint`.
-- [ ] Hết giờ -> `truncated:true`, `deadline_partial`.
+- [x] Sửa một hàm TS đã index -> đúng symbol trong cùng (innermost), dòng 1-based; `exact` khi chỉ mục khớp HEAD, tệp bẩn -> `approximate`.
+- [x] `base=HEAD~30` (CLI báo 1 508 symbol) trả đến 2 000, không cắt ở 15; mỗi luồng một lần.
+- [x] Tệp untracked `status:'A'`, `untracked:true`; nhị phân/tên có xuống dòng không vỡ phản hồi; `R` có `oldPath`; `D` đúng quy tắc.
+- [x] `base` xấu/`-x`/không merge-base -> `INVALID_PARAMS` đúng `reason`, không spawn công cụ.
+- [x] `index_commit_differs_from_head`, `index_commit_unreachable`; `mappingConfidence ≠ exact` khi cũ.
+- [x] Không lệnh Git > 2.24, không mạng; diff vượt `maxBuffer` không lỗi; `crossCheck` chỉ thêm `riskHint`.
+- [x] Hết giờ -> `truncated:true`, `deadline_partial`.
 
 ## 6. Kiểm thử
 `/opt/repos/orca/agent`: `pnpm exec vitest run src/relay/codeintel-merge-base-resolution.test.ts src/relay/codeintel-diff-hunk-parser.test.ts src/relay/codeintel-diff-collection.test.ts src/relay/codeintel-hunk-symbol-mapping.test.ts src/relay/codeintel-detect-changes-flows.test.ts src/relay/gitnexus-detect-changes-header.test.ts src/relay/codeintel-detect-changes.test.ts`. Repo git thật trong thư mục tạm; `gitnexus` giả phát lại fixture. Ma trận Git (2.25.5 / 2.38.1 / 2.49.1 theo `git-compatibility.md`, tên job CI chưa kiểm chứng) cho hai test parser/merge-base.

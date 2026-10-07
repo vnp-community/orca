@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_errors.go` (mới), `.../channels_request_views.go` (mới), `.../channels_request_source.go` (mới), cùng các `*_test.go`
 **Depends on:** TASK-REQ-016-01
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -33,9 +33,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba file và test có, xanh.
-- [ ] Không view nào để lộ khoá snake_case; `body` chỉ có khi `withBody`.
-- [ ] Giả mạo nguồn bị từ chối đúng mã.
+- [x] Ba file và test có, xanh.
+- [x] Không view nào để lộ khoá snake_case; `body` chỉ có khi `withBody`.
+- [x] Giả mạo nguồn bị từ chối đúng mã.
 
 ## Rủi ro và lưu ý
 

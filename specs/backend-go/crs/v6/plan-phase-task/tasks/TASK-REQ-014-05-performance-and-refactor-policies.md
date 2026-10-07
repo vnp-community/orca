@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/type_policy_performance.go` (mới), `internal/domain/type_policy_refactor.go` (mới), `internal/domain/perf_metrics.go` (mới), `internal/domain/type_policy_performance_test.go`, `type_policy_refactor_test.go` (mới)
 **Depends on:** TASK-REQ-014-03, TASK-REQ-014-02 (schema metrics)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -41,9 +41,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `performance`: thiếu `perf_baseline` thì không `GeneratePlan`; `perf_after` đạt thì hoàn tất; một metric chưa đạt thì Request vào backlog với lý do nêu tên metric; baseline 0 không chia cho 0.
-- [ ] `refactor`: `tests_after.failed > 0`, `total` giảm hoặc `tests_modified=true` đều không hoàn tất; đạt cả ba thì hoàn tất.
-- [ ] Hai policy là hàm thuần, test không cần DB.
+- [x] `performance`: thiếu `perf_baseline` thì không `GeneratePlan`; `perf_after` đạt thì hoàn tất; một metric chưa đạt thì Request vào backlog với lý do nêu tên metric; baseline 0 không chia cho 0.
+- [x] `refactor`: `tests_after.failed > 0`, `total` giảm hoặc `tests_modified=true` đều không hoàn tất; đạt cả ba thì hoàn tất.
+- [x] Hai policy là hàm thuần, test không cần DB.
 
 ## Rủi ro và lưu ý
 

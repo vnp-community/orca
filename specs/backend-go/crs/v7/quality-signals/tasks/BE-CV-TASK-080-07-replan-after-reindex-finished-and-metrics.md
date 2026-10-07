@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/auto_refresh_index.go` (thêm `OnReindexFinished`), `internal/adapter/eventbus/reindex_finished_consumer.go` (mới)
 **Depends on:** BE-CV-TASK-080-05, BE-CV-SOL-024-event-distribution, BE-CV-SOL-071-metrics-tracing-and-budgets
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 SOL-080 2.D: không có cờ `pendingRefresh`; suy lại từ `codeintel.status`. Metric theo CR-080 2.6: `orca_codeintel_auto_refresh_total{outcome}`, `orca_codeintel_auto_refresh_seconds{tier}`, `orca_codeintel_index_basis_total{scope}`; không nhãn đường dẫn/repo. Stream `CODEINTEL` bắt `orca.codeintel.>`, phải lọc subject (C-DM §5).
@@ -19,7 +19,7 @@ SOL-080 2.D: không có cờ `pendingRefresh`; suy lại từ `codeintel.status`
 - Unit: lệch → một slot mới; không lệch → không; cùng dedupe_key → không.
 
 ## Tiêu chí hoàn thành
-- [ ] Không vòng lặp vô hạn (test: hai lượt liên tiếp cùng head/dirty chỉ một slot).
+- [x] Không vòng lặp vô hạn (test: hai lượt liên tiếp cùng head/dirty chỉ một slot).
 
 ## Rủi ro
 Nếu agent vẫn `running`, re-plan bị huỷ bởi sự kiện `running`; chấp nhận.

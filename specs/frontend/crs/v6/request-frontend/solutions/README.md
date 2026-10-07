@@ -1,19 +1,19 @@
 # Solutions: request-frontend (frontend, v6)
 
-> 📋 Proposed. Chưa triển khai. Soạn ngày 2026-10-06 từ [docs/crs/v6/request-frontend](../../../../../../docs/crs/v6/request-frontend/README.md); mục 8 của [README v6](../../../../../../docs/crs/v6/README.md) thắng mục 3, và hợp đồng kênh WS theo [CR-REQ-016](../../../../../../docs/crs/v6/gateway-and-mcp/CR-REQ-016-api-gateway-request-channels.md) thắng tên kênh trong CR-REQ-018 đến 021 khi hai bên khác nhau.
+> 🚧 **In Progress.** Rà soát ngày 2026-10-07: SOL-018 ✅ Done, SOL-019 và 020 🚧 In Progress, SOL-021–036 🔴 Not Started. Tiến độ ~22% (12/54 tasks). Soạn ngày 2026-10-06 từ [docs/crs/v6/request-frontend](../../../../../../docs/crs/v6/request-frontend/README.md).
 
 ## Bảng CR → Solution
 
 | CR | Solution | Nội dung | Trạng thái |
 |---|---|---|---|
-| CR-REQ-018 | [FE-REQ-SOL-018](./FE-REQ-SOL-018-request-frontend-foundation.md) | Kiểu, registry luồng, RPC client, hook, store, định tuyến `requests`, badge, sidebar; gỡ `backlog` khỏi `TaskStatus` | 📋 |
-| CR-REQ-019 | [FE-REQ-SOL-019](./FE-REQ-SOL-019-request-list-detail-classification-ui.md) | Danh sách, chi tiết, xác nhận phân loại, lịch sử, Request con, "Tạo Request" từ Tasks | 📋 |
-| CR-REQ-020 | [FE-REQ-SOL-020](./FE-REQ-SOL-020-solution-review-ui.md) | Xem, so sánh, chọn, duyệt, từ chối Solution (Chẩn đoán, Findings, Answer) | 📋 |
-| CR-REQ-021 | [FE-REQ-SOL-021](./FE-REQ-SOL-021-plan-phase-tree-and-approval-ui.md) | Cây Plan → Phase → Task, duyệt Plan/Phase/`pre_deploy`, lọc khỏi Board | 📋 |
-| CR-REQ-022 | [FE-REQ-SOL-022](./FE-REQ-SOL-022-approval-inbox.md) | Hộp duyệt chờ xử lý | 📋 |
-| CR-REQ-023 | [FE-REQ-SOL-023](./FE-REQ-SOL-023-backlog-screens.md) | Màn Backlog ba view | 📋 |
-| CR-REQ-032 | [FE-REQ-SOL-032](./FE-REQ-SOL-032-graph-canvas-and-lenses.md) | Canvas đồ thị và các lens | 📋 |
-| CR-REQ-036 | [FE-REQ-SOL-036](./FE-REQ-SOL-036-clarification-decision-readiness-impact-ui.md) | Giao diện hỏi lại, quyết định, sẵn sàng, tác động | 📋 |
+| CR-REQ-018 | [FE-REQ-SOL-018](./FE-REQ-SOL-018-request-frontend-foundation.md) | Kiểu, registry luồng, RPC client, hook, store, định tuyến `requests`, badge, sidebar; gỡ `backlog` khỏi `TaskStatus` | ✅ Done |
+| CR-REQ-019 | [FE-REQ-SOL-019](./FE-REQ-SOL-019-request-list-detail-classification-ui.md) | Danh sách, chi tiết, xác nhận phân loại, lịch sử, Request con, "Tạo Request" từ Tasks | 🚧 In Progress (01 done, 02 partial) |
+| CR-REQ-020 | [FE-REQ-SOL-020](./FE-REQ-SOL-020-solution-review-ui.md) | Xem, so sánh, chọn, duyệt, từ chối Solution (Chẩn đoán, Findings, Answer) | 🚧 In Progress (01/05 done) |
+| CR-REQ-021 | [FE-REQ-SOL-021](./FE-REQ-SOL-021-plan-phase-tree-and-approval-ui.md) | Cây Plan → Phase → Task, duyệt Plan/Phase/`pre_deploy`, lọc khỏi Board | 🔴 Not Started |
+| CR-REQ-022 | [FE-REQ-SOL-022](./FE-REQ-SOL-022-approval-inbox.md) | Hộp duyệt chờ xử lý | 🔴 Not Started |
+| CR-REQ-023 | [FE-REQ-SOL-023](./FE-REQ-SOL-023-backlog-screens.md) | Màn Backlog ba view | 🔴 Not Started |
+| CR-REQ-032 | [FE-REQ-SOL-032](./FE-REQ-SOL-032-graph-canvas-and-lenses.md) | Canvas đồ thị và các lens | 🔴 Not Started |
+| CR-REQ-036 | [FE-REQ-SOL-036](./FE-REQ-SOL-036-clarification-decision-readiness-impact-ui.md) | Giao diện hỏi lại, quyết định, sẵn sàng, tác động | 🔴 Not Started |
 
 Các solution 018 đến 021 để chỗ cắm cho 022 và 023 (`ApprovalInboxTab`, `BacklogTab` trong `RequestPage`, `RejectReasonDialog`, `useApprovals`, `useBacklog` với `backlog.requests|tasks|execute`).
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-profile-catalog.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-081-10, 081-11
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Test: mọi profile hợp lệ theo schema; id duy nhất; mỗi `requires.file`
 
 ## Tiêu chí hoàn thành
 
-- [ ] Catalog khớp hợp đồng §5.1; test cấm token pass.
-- [ ] Thêm profile mới không cần sửa file này.
+- [x] Catalog khớp hợp đồng §5.1; test cấm token pass.
+- [x] Thêm profile mới không cần sửa file này.
 
 ## Rủi ro
 

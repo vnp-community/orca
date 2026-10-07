@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_codeintel_view_sources.go` (mới), `channels_codeintel_view_sources_test.go` (mới)
 **Depends on:** TASK-040-10 (mẫu); stub `GetArchitecture` (BE-CV-SOL-033-c4-component-view), `ListDataFlows`, `GetDataFlow` (BE-CV-SOL-034-data-flow-model)
-**Status:** [ ] TODO
+**Status:** [x] COMPLETED
 
 ---
 
@@ -29,8 +29,8 @@ UI-API 3.1: `architecture` => `Env<{containers: ContainerRef[]; view: C4Componen
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh đúng shape UI-API 4.4; `architecture` không trả đồ thị cụm.
-- [ ] Giới hạn bị từ chối, không kẹp.
+- [x] Ba kênh đúng shape UI-API 4.4; `architecture` không trả đồ thị cụm.
+- [x] Giới hạn bị từ chối, không kẹp.
 
 ## Rủi ro và lưu ý
 

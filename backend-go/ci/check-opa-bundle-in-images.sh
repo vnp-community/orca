@@ -3,7 +3,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."  # backend-go/
 
-svcs=(auth-service task-service annotation-service project-service mcp-service)
+svcs=(auth-service task-service annotation-service project-service mcp-service request-service)
 for svc in "${svcs[@]}"; do
   echo "Building $svc..."
   docker build -q -f "services/$svc/deploy/Dockerfile" -t "orca-go/$svc:ci-opa-check" .

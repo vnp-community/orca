@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-secret-redaction.ts` (mới), `agent/src/relay/quality-secret-canary.test.ts` (mới)
 **Depends on:** AG-CV-TASK-081-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,7 +23,7 @@ Test harness tự kiểm: canary có mặt trong dữ liệu mẫu thì `scanTre
 
 ## Tiêu chí hoàn thành
 
-- [ ] Harness tái dùng được ở task 03, 07, 08 và bởi AG-CV-SOL-072.
+- [x] Harness tái dùng được ở task 03, 07, 08 và bởi AG-CV-SOL-072.
 
 ## Rủi ro
 

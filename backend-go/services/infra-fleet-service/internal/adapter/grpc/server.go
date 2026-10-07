@@ -8,9 +8,11 @@ package grpc
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"sync"
 	"time"
 
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/protobuf/types/known/emptypb"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -152,6 +154,10 @@ type Server struct {
 	// pickByTag backs TASK-WF-002-04 — closes workflow-service's
 	// TargetKindFleetTag gap. See usecase.PickByTag's doc comment.
 	pickByTag *usecase.PickByTag
+
+	// BE-CV-SOL-023: CodeIntel streaming & capabilities
+	streamCodeIntelEvents *usecase.StreamCodeIntelEvents
+	getAgentCapabilities *usecase.GetAgentCapabilities
 }
 
 func New(
@@ -620,6 +626,11 @@ func (s *Server) Relay(ctx context.Context, req *infrafleetv1.RelayRequest) (*in
 		Params:       params,
 	})
 	if err != nil {
+		var rpcErr *domain.AgentRPCError
+		if errors.As(err, &rpcErr) && len(rpcErr.Data) > 0 {
+			trailerBytes := usecase.AgentErrorDataForTrailer(rpcErr.Data, 4096)
+			_ = grpc.SetTrailer(ctx, metadata.Pairs("x-orca-agent-error-data-bin", string(trailerBytes)))
+		}
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 
@@ -671,6 +682,11 @@ func (s *Server) RelayByDevServer(ctx context.Context, req *infrafleetv1.RelayBy
 		Params:      params,
 	})
 	if err != nil {
+		var rpcErr *domain.AgentRPCError
+		if errors.As(err, &rpcErr) && len(rpcErr.Data) > 0 {
+			trailerBytes := usecase.AgentErrorDataForTrailer(rpcErr.Data, 4096)
+			_ = grpc.SetTrailer(ctx, metadata.Pairs("x-orca-agent-error-data-bin", string(trailerBytes)))
+		}
 		return nil, apperrors.ToGRPCStatus(err)
 	}
 

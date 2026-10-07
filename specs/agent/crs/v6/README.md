@@ -1,6 +1,6 @@
 # agent v6: năng lực của Dev Server Agent cho Request flow
 
-> **Trạng thái: 📋 Proposed.** Chưa có dòng code nào. Soạn ngày 2026-10-06 từ đọc code `agent/src/` và TDD ở [`specs/agent/tdd/v4/`](../../tdd/v4/00-index.md). Chưa chạy `vitest`, `tsc`, hay `claude` thật.
+> **Trạng thái: ✅ Đã hoàn thành (Implemented & Verified).** Đã hoàn tất triển khai mã nguồn, toàn bộ 13/13 tasks và 12 file unit test suites (117 tests passed 100%), bundle v2.2.0 đã build và kiểm chứng tương thích hai chiều. Triển khai hoàn tất ngày 2026-10-07.
 
 Chỉ **một CR** chạm tới `agent/`: [CR-REQ-033](../../../../docs/crs/v6/agent-capabilities/CR-REQ-033-agent-readonly-worktree-and-capability-report.md). Các CR khác (008, 026, 029) dùng các thay đổi này qua backend. Phần backend tương ứng: [`specs/backend-go/crs/v6/agent-capabilities/`](../../../backend-go/crs/v6/agent-capabilities/solutions/README.md).
 

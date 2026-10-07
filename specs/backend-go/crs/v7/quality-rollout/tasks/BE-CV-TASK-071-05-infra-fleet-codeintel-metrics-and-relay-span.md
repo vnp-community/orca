@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service`
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/metrics/codeintel_collector.go` (mới), `.../internal/adapter/metrics/codeintel_collector_test.go` (mới), `.../internal/adapter/devserveragent/call_span.go` (mới), `.../cmd/server/main.go`
 **Depends on:** BE-CV-SOL-023-infra-fleet-codeintel-transport (`StreamCodeIntelEvents`, bảng timeout theo method, `AgentRPCError`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `/health/metrics` có bốn họ metric mới.
-- [ ] Không đổi hành vi timeout.
-- [ ] Không rò `error.data` vào span/log.
+- [x] `/health/metrics` có bốn họ metric mới.
+- [x] Không đổi hành vi timeout.
+- [x] Không rò `error.data` vào span/log.
 
 ## Rủi ro và lưu ý
 

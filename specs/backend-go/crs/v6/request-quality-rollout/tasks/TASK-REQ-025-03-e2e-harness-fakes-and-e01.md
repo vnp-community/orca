@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/e2e/harness_test.go` (mới), `.../e2e/fakes/` (mới: `classifier.go`, `solution_generator.go`, `plan_generator.go`, `agent_readonly.go`, `task_service.go`), `.../e2e/scenario_table_test.go` (mới), `.../e2e/request_flow_test.go` (mới, E01)
 **Depends on:** CR-REQ-003 đến 013 ở mức chạy được; TASK-REQ-025-01
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] E01 xanh trên Postgres và MySQL.
-- [ ] Fake thay được mọi cổng AI và `task-service`; không còn lời gọi mạng ra ngoài.
-- [ ] Không `Sleep` cố định.
+- [x] E01 xanh trên Postgres và MySQL.
+- [x] Fake thay được mọi cổng AI và `task-service`; không còn lời gọi mạng ra ngoài.
+- [x] Không `Sleep` cố định.
 
 ## Rủi ro và lưu ý
 

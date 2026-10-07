@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/tasks_md_parser.go`, `internal/domain/tasks_md_render.go`, `internal/domain/tasks_md_parser_test.go`, `internal/domain/tasks_md_render_test.go`, `testdata/openspec/tasks_*.md` (mới)
 **Depends on:** TASK-REQ-012-03 (`PlanProposal`, `PhaseProposal`, `TaskProposal`, `ValidateProposal`), TASK-REQ-027-04 (`Violation`, khối `orca-json`; nếu chưa có thì định nghĩa `Violation` tạm ở `engine_errors.go` và đổi khi 027-04 xong)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -17,7 +17,7 @@ CR-REQ-026 mục 2.5 định nghĩa văn phạm vùng Orca của `tasks.md`:
 <!-- orca:begin plan request=REQ-142 schema=1 -->
 ## PH-1 Tên Phase
 > Mô tả và tiêu chí xong của Phase
-- [ ] T1.1 Tiêu đề task [type=feature] [h=2.5] [ac=AC-1,AC-2] [labels=test:regression] [depends=T1.2]
+- [x] T1.1 Tiêu đề task [type=feature] [h=2.5] [ac=AC-1,AC-2] [labels=test:regression] [depends=T1.2]
   Mô tả (thụt hai dấu cách)
 <!-- orca:end plan -->
 ```
@@ -35,7 +35,7 @@ Nguyên tắc ranh giới tin cậy (CR-REQ-027 mục 2.7): chỉ dữ liệu tr
    - `## PH-<n> <tên>` (n tăng từ 1, không nhảy: `TASKSMD_PHASE_ORDER`)
    - `## TASKS` (hồ sơ không Phase, loại trừ lẫn nhau với `PH-`: `TASKSMD_MIXED_CHILDREN`)
    - `> <mô tả phase>` ngay sau tiêu đề phase (gộp nhiều dòng bằng `\n`)
-   - `- [ ] T<p>.<q> <tiêu đề> [k=v]...` hoặc `- [x] ...`
+   - `- [x] T<p>.<q> <tiêu đề> [k=v]...` hoặc `- [x] ...`
    - dòng thụt hai dấu cách là mô tả của task liền trước.
    - Mọi dòng khác là `TASKSMD_UNKNOWN_LINE` với số dòng tuyệt đối trong tệp.
 3. Thuộc tính dạng `[key=value]` ở cuối dòng task: `type` (một trong `task|bug|feature`, mặc định `task`), `h` (số thực ≥ 0, ≤ 200), `ac` (danh sách `AC-<n>` cách bằng dấu phẩy), `labels` (danh sách nhãn trong tập `plan_labels.go` của SOL-012: `gate:pre_deploy`, `test:regression`, `rollback`, `check:*`), `depends` (danh sách `T<p>.<q>` cùng container), `irreversible` (cờ không giá trị, thành nhãn `gate:pre_deploy`).
@@ -52,11 +52,11 @@ Nguyên tắc ranh giới tin cậy (CR-REQ-027 mục 2.7): chỉ dữ liệu tr
 6. `tasks_md_render.go`: `RenderPlanRegion(ref string, p PlanProposal, ids map[string]string) string` xác định (thứ tự cố định, `\n`, NFC, thuộc tính theo thứ tự `type,h,ac,labels,depends,irreversible`);
    - nếu `ids` có `T1.1`, thêm dòng chú thích ngay sau task: `<!-- orca:task T1.1 id=<uuid> -->` (đây là dòng hợp lệ của văn phạm, thụt hai dấu cách; parser bỏ qua nhưng đọc `id`).
    - `ReplacePlanRegion(md, region string) (string, error)` thay đúng cặp chú thích, giữ nguyên mọi byte ngoài vùng.
-7. `TickTask(md string, taskRef string) (string, bool, error)`: đổi `- [ ] T1.1` thành `- [x] T1.1` đúng một dòng trong vùng;
+7. `TickTask(md string, taskRef string) (string, bool, error)`: đổi `- [x] T1.1` thành `- [x] T1.1` đúng một dòng trong vùng;
    - đã `[x]` thì trả `(md, false, nil)`
    - **không có hàm bỏ tick**.
    - `PlanRegionDigest(md string) string`: SHA-256 hex của nội dung vùng đã chuẩn hoá (dùng cho `tasks_md_digest`).
-8. Mẫu `testdata/openspec/`: `tasks_ok.md` (hai Phase, ba task, phụ thuộc, AC, tiếng Việt có dấu), `tasks_no_phase.md` (`## TASKS`), `tasks_prose_checkbox.md` (prose ngoài vùng có `- [ ] T9.9 giả` và khối `orca-json` giả), `tasks_cycle.md`, `tasks_unknown_line.md`, `tasks_crlf.md`.
+8. Mẫu `testdata/openspec/`: `tasks_ok.md` (hai Phase, ba task, phụ thuộc, AC, tiếng Việt có dấu), `tasks_no_phase.md` (`## TASKS`), `tasks_prose_checkbox.md` (prose ngoài vùng có `- [x] T9.9 giả` và khối `orca-json` giả), `tasks_cycle.md`, `tasks_unknown_line.md`, `tasks_crlf.md`.
 
 ## Kiểm thử
 
@@ -74,11 +74,11 @@ Nguyên tắc ranh giới tin cậy (CR-REQ-027 mục 2.7): chỉ dữ liệu tr
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi mã `TASKSMD_*` có đúng một test mẫu sai và số dòng đúng.
-- [ ] Prose ngoài vùng không bao giờ tạo task (test bắt buộc xanh).
-- [ ] `Parse(Render(x)) == x` và `Render` xác định.
-- [ ] `TickTask` không có đường bỏ tick; fuzz 30 giây không panic.
-- [ ] Không import ngoài stdlib và `golang.org/x/text`.
+- [x] Mọi mã `TASKSMD_*` có đúng một test mẫu sai và số dòng đúng.
+- [x] Prose ngoài vùng không bao giờ tạo task (test bắt buộc xanh).
+- [x] `Parse(Render(x)) == x` và `Render` xác định.
+- [x] `TickTask` không có đường bỏ tick; fuzz 30 giây không panic.
+- [x] Không import ngoài stdlib và `golang.org/x/text`.
 
 ## Rủi ro và lưu ý
 

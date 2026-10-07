@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/repo_source_reader.go` (mới), `.../internal/usecase/agent_relay.go` (mới), `.../internal/config/repofs_limits.go` (mới), `.../internal/config/repofs_limits_test.go` (mới)
 **Depends on:** BE-CV-TASK-030-02, và `internal/config` của BE-CV-SOL-010 (nếu chưa có, đồng bộ trước khi merge)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cổng khớp SOL-030 2.B, không có `repo_binding_id` (PQ-04).
-- [ ] Mọi biến có tiền tố `CODEINTEL_REPOFS_` (PQ-23).
-- [ ] Test cấu hình xanh; không `max-lines` disable.
+- [x] Cổng khớp SOL-030 2.B, không có `repo_binding_id` (PQ-04).
+- [x] Mọi biến có tiền tố `CODEINTEL_REPOFS_` (PQ-23).
+- [x] Test cấu hình xanh; không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

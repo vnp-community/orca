@@ -5,7 +5,7 @@
 **Area:** frontend / components (hình có ô tương tác)
 **File:** `frontend/src/renderer/src/components/quality-charts/useChartKeyboardNavigation.ts`, `MetricTreemap.tsx`, `HotspotHeatmap.tsx`, `DependencyMatrix.tsx` (mới) và `__tests__/useChartKeyboardNavigation.test.tsx`, `MetricTreemap.test.tsx`, `HotspotHeatmap.test.tsx`, `DependencyMatrix.test.tsx`
 **Depends on:** FE-CV-TASK-088-04, 088-05, 088-06 (và 088-03 cho glyph)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

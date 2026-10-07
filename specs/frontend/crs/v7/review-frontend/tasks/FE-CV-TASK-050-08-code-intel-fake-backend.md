@@ -5,7 +5,7 @@
 **Area:** frontend / test-support
 **File:** `frontend/src/renderer/src/test-support/code-intel-fixtures.ts` (mở rộng; tệp do [FE-CV-TASK-073-02](../../quality-rollout/tasks/FE-CV-TASK-073-02-code-intel-fake-backend.md) sở hữu), test `code-intel-fixtures-review.test.ts` (mới)
 **Depends on:** FE-CV-TASK-073-02, FE-CV-TASK-050-01, FE-CV-TASK-050-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

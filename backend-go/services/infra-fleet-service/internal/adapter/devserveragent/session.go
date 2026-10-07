@@ -45,18 +45,29 @@ type handshakeParams struct {
 // exchange and pass it to Client.AttachInboundSession /
 // Client.SshProvisioner.Provision's return value respectively.
 type HandshakeInfo struct {
-	Platform     string   `json:"platform"`
-	Arch         string   `json:"arch"`
-	NodeVersion  string   `json:"nodeVersion"`
-	AgentVersion string   `json:"agentVersion"`
-	SessionID    string   `json:"sessionId"`
-	Capabilities []string `json:"capabilities"`
+	Platform        string   `json:"platform"`
+	Arch            string   `json:"arch"`
+	NodeVersion     string   `json:"nodeVersion"`
+	AgentVersion    string   `json:"agentVersion"`
+	SessionID       string   `json:"sessionId"`
+	Capabilities    []string `json:"capabilities"`
+	Tools           []string `json:"tools"`
+	Features        []string `json:"features"`
+	ProtocolVersion int      `json:"protocolVersion"`
+	BuildVersion    string   `json:"buildVersion"`
 	// SockPath is relay-ssh mode's Unix socket path for the detached agent
 	// process (see adapter/sshrelay's launch/reattach — SOL-SSH-03), cached
 	// on *session so relaySSHReconnect can call reattach() again without
 	// re-resolving the SshTarget or re-deploying. Empty for
 	// relay-websocket/direct-websocket, which have no detached process.
 	SockPath string `json:"-"`
+}
+
+func (h HandshakeInfo) EffectiveProtocolVersion() int {
+	if h.ProtocolVersion <= 0 {
+		return 1
+	}
+	return h.ProtocolVersion
 }
 
 // pendingCall is one in-flight JSON-RPC request awaiting its response.
@@ -184,9 +195,11 @@ type session struct {
 	// token, re-invoked on every (re)connect so a token rotated between
 	// attempts is picked up with no process restart — set by Client at
 	// newSession time for relay-websocket only; nil for
-	// direct-websocket/relay-ssh, which never call connect(). See
-	// TASK-AWS-01-03/SOL-AWS-01.
 	tokenSource func(ctx context.Context) (string, error)
+
+	devServerID string
+	onCodeIntel func(devServerID string, n JSONRPCNotification)
+	onAttached  func(devServerID string)
 }
 
 // wsURL builds ws://host:port/orca-relay — the fixed path
@@ -254,6 +267,9 @@ func (s *session) attachTransport(t Transport, info HandshakeInfo) {
 
 	go s.readLoop(t)
 	go s.keepAliveLoop(t)
+	if s.onAttached != nil {
+		s.onAttached(s.devServerID)
+	}
 }
 
 // runInitiatorHandshake sends agent.handshake (frame id=1, ack=0, exactly
@@ -306,6 +322,7 @@ func (s *session) runInitiatorHandshake(ctx context.Context, conn *websocket.Con
 		if len(resp.Result) > 0 {
 			_ = json.Unmarshal(resp.Result, &info) // best-effort, matching the TS side's per-field `?? default` fallbacks
 		}
+		info.Features = domain.SanitizeAgentFeatures(info.Features)
 		if info.Platform == "" {
 			info.Platform = "linux"
 		}
@@ -453,6 +470,10 @@ func (s *session) routeNotification(n JSONRPCNotification) {
 		// shell.exec.output has no consumer wired yet and is intentionally
 		// left to the silent default below, not a false demux.
 		s.routeExecOutputNotification(n)
+	case "codeintel.indexChanged", "codeintel.reindexProgress", "quality.progress", "quality.finished":
+		if s.onCodeIntel != nil {
+			s.onCodeIntel(s.devServerID, n)
+		}
 	default:
 		return // not a notification this client demuxes, see package doc comment's "Two RPC surfaces" note
 	}
@@ -1411,7 +1432,9 @@ func (s *session) close() {
 	s.closed = true
 	t := s.transport
 	s.mu.Unlock()
-	close(s.closeCh)
+	if s.closeCh != nil {
+		close(s.closeCh)
+	}
 	if t != nil {
 		_ = t.Close("session closed")
 	}

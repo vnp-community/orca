@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-exec-prompt-options.ts` (mới), `agent/src/relay/agent-exec-prompt-options.test.ts` (mới), `agent/src/relay/agent-print-mode-exec.ts` (sửa, chỉ thêm lời gọi ở đầu hai handler)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -65,11 +65,11 @@ Rồi `pnpm test` để chắc không hỏng test khác. Kiểm kiểu: `npx tsc
 
 ## Tiêu chí hoàn thành
 
-- [ ] Gọi `agent.execPrompt` và `agent.execPromptStream` không tham số mới cho kết quả và frame y hệt trước (mọi `it` cũ của `agent-print-mode-exec.test.ts` xanh, không sửa).
-- [ ] Mọi giá trị sai ở bảng bước 2 trả `InvalidParams -32602` với `error.data.reason` đúng mã và không gọi `spawn`.
-- [ ] Không có import từ `agent-rpc-dispatch.ts` trong `agent-exec-prompt-options.ts` (tránh vòng).
-- [ ] File mới không dùng tên `helpers`, `utils`, `common`; không thêm `max-lines` disable.
-- [ ] `agent-print-mode-exec.ts` chỉ tăng vài chục dòng.
+- [x] Gọi `agent.execPrompt` và `agent.execPromptStream` không tham số mới cho kết quả và frame y hệt trước (mọi `it` cũ của `agent-print-mode-exec.test.ts` xanh, không sửa).
+- [x] Mọi giá trị sai ở bảng bước 2 trả `InvalidParams -32602` với `error.data.reason` đúng mã và không gọi `spawn`.
+- [x] Không có import từ `agent-rpc-dispatch.ts` trong `agent-exec-prompt-options.ts` (tránh vòng).
+- [x] File mới không dùng tên `helpers`, `utils`, `common`; không thêm `max-lines` disable.
+- [x] `agent-print-mode-exec.ts` chỉ tăng vài chục dòng.
 
 ## Rủi ro và lưu ý
 

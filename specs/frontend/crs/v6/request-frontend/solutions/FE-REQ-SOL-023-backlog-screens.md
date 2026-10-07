@@ -1,6 +1,6 @@
 # FE-REQ-SOL-023: Màn hình Backlog ba phân đoạn (Request, Task, Execute)
 
-> 📋 Proposed. Chưa triển khai, chưa chạy test nào. Ngày soạn 2026-10-06.
+> 🔴 **Not Started.** Rà soát 2026-10-07: chưa có `BacklogTab`, `RequestBacklogTable`, `TaskBacklogTable`. `useBacklog.ts` (2.2 KB) tồn tại nhưng chỉ là skeleton từ SOL-018. Ngày soạn 2026-10-06.
 
 **CR:** [CR-REQ-023](../../../../../../docs/crs/v6/request-frontend/CR-REQ-023-backlog-screens.md)
 **Backend liên quan:** CR-REQ-015 (`ListBacklog`, `ListExecutionStates`), CR-REQ-006 (`ReopenRequest`, `CancelRequest`, `returned_category`), CR-REQ-013 (`task_run_outcomes`), CR-REQ-016 (kênh WS)

@@ -5,7 +5,7 @@
 **Service:** `request-service` · `proto`
 **File:** `backend-go/proto/orca/request/v1/clarification.proto`, `backend-go/proto/orca/request/v1/decision.proto`, `internal/adapter/grpc/clarification_server.go`, `internal/adapter/grpc/decision_server.go`, `internal/adapter/grpc/clarification_mapper.go`, `internal/usecase/list_pending_clarifications.go`, `internal/usecase/clarification_flow_integration_test.go`, `services/request-service/README.md` (sửa) và test
 **Depends on:** TASK-REQ-028-04, 028-05, 028-06, 028-07, TASK-REQ-001-02 (proto khung), TASK-REQ-001-05 (gRPC server), TASK-REQ-010-03 (`ApprovalAuthorization`, tập principal)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -61,12 +61,12 @@ Proto theo CR 2.9: `ClarificationStatus` (`CLARIFICATION_STATUS_UNSPECIFIED=0`, 
 
 ## Tiêu chí hoàn thành
 
-- [ ] 11 RPC mới hoạt động, mỗi RPC có test chéo tenant trả `NOT_FOUND`.
-- [ ] Bảy kịch bản tích hợp (a) đến (g) xanh trên Postgres và MySQL.
-- [ ] `RequestClarification` qua RPC công khai không tạo được nguồn `readiness`/`task_blocked`.
-- [ ] `answer_json` không lộ cho người không thuộc `assignees`/người hỏi/admin.
-- [ ] `buf lint`, `buf breaking` sạch.
-- [ ] README ghi biến môi trường và phần chưa kiểm chứng; mâu thuẫn "README v6 liệt kê 11 trạng thái" được ghi lại.
+- [x] 11 RPC mới hoạt động, mỗi RPC có test chéo tenant trả `NOT_FOUND`.
+- [x] Bảy kịch bản tích hợp (a) đến (g) xanh trên Postgres và MySQL.
+- [x] `RequestClarification` qua RPC công khai không tạo được nguồn `readiness`/`task_blocked`.
+- [x] `answer_json` không lộ cho người không thuộc `assignees`/người hỏi/admin.
+- [x] `buf lint`, `buf breaking` sạch.
+- [x] README ghi biến môi trường và phần chưa kiểm chứng; mâu thuẫn "README v6 liệt kê 11 trạng thái" được ghi lại.
 
 ## Rủi ro và lưu ý
 

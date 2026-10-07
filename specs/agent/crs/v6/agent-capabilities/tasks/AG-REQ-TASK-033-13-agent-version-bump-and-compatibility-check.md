@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent) và `deploy/agent/`
 **File:** `agent/build.mjs` (sửa), `agent/src/relay/agent-entry.ts` (sửa, hai chuỗi log), `deploy/agent/package.json` (sửa), `deploy/agent/README.md` (sửa), `agent/src/relay/agent-compat-matrix.test.ts` (mới)
 **Depends on:** [12](./AG-REQ-TASK-033-12-handshake-protocol-version-and-features.md) (và gián tiếp 01 đến 11)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -44,11 +44,11 @@ Tay (CHƯA CHẠY, bắt buộc trước khi bật cờ `request_flow_enabled` �
 
 ## Tiêu chí hoàn thành
 
-- [ ] `AGENT_VERSION` là `2.2.0` ở `build.mjs`, `deploy/agent/package.json`, hai chuỗi log và hai ví dụ README; `agent/package.json` không đổi.
-- [ ] `node -e "require('./out/agent.js').AGENT_VERSION"` sau build in `2.2.0`.
-- [ ] README triển khai nêu thứ tự agent trước backend sau, lệnh thủ công, cảnh báo `provisioner.go:141`, và cách xác nhận.
-- [ ] `agent-compat-matrix.test.ts` xanh; toàn gói `pnpm test` xanh.
-- [ ] Kết quả thử trên dev server thật (hoặc ghi rõ "chưa chạy") được ghi lại.
+- [x] `AGENT_VERSION` là `2.2.0` ở `build.mjs`, `deploy/agent/package.json`, hai chuỗi log và hai ví dụ README; `agent/package.json` không đổi.
+- [x] `node -e "require('./out/agent.js').AGENT_VERSION"` sau build in `2.2.0`.
+- [x] README triển khai nêu thứ tự agent trước backend sau, lệnh thủ công, cảnh báo `provisioner.go:141`, và cách xác nhận.
+- [x] `agent-compat-matrix.test.ts` xanh; toàn gói `pnpm test` xanh.
+- [x] Kết quả thử trên dev server thật (hoặc ghi rõ "chưa chạy") được ghi lại.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `migrations/postgres/0005_request_return_history.{up,down}.sql`, `migrations/mysql/0005_request_return_history.{up,down}.sql` (mới); `internal/domain/{request_return_category.go,request_return_history.go,request_return_stage.go,request_return_errors.go}` và `*_test.go` (mới); `internal/domain/request.go` (sửa); `internal/usecase/ports.go` (sửa: `ReturnHistoryRepository`); `internal/adapter/{postgres,mysql}/{return_history_repository.go,request_repository.go,request_scan.go}` (mới/sửa)
 **Depends on:** TASK-REQ-005-01 (migration `0004`), TASK-REQ-002-04, TASK-REQ-002-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -32,10 +32,10 @@ CR-REQ-006 mục 2.1 ghi `0004_request_return_history`, nhưng SOL-005 đã dùn
 
 ## Tiêu chí hoàn thành
 
-- [ ] up/down/up sạch hai dialect, có backfill.
-- [ ] CHECK ghép cặp giữ ở mọi trường hợp.
-- [ ] `StageForStatus` đúng bảng, `phase` chỉ khi loại có Phase.
-- [ ] Số migration xác nhận bằng `ls` và ghi trong PR.
+- [x] up/down/up sạch hai dialect, có backfill.
+- [x] CHECK ghép cặp giữ ở mọi trường hợp.
+- [x] `StageForStatus` đúng bảng, `phase` chỉ khi loại có Phase.
+- [x] Số migration xác nhận bằng `ls` và ghi trong PR.
 
 ## Rủi ro và lưu ý
 

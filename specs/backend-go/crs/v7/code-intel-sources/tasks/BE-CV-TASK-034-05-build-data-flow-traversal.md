@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/build_data_flow.go` (mới), `.../usecase/component_ref_assignment.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-034-03, -04; BE-CV-TASK-032-07; BE-CV-TASK-033-05; BE-CV-TASK-031-10
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,8 +28,8 @@ Solution 2.C.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ca `accounts.selectClaude` trên fixture đúng 5 bước + `StoreAccess dev_servers read`.
-- [ ] Ma trận hai dialect.
+- [x] Ca `accounts.selectClaude` trên fixture đúng 5 bước + `StoreAccess dev_servers read`.
+- [x] Ma trận hai dialect.
 
 ## Rủi ro và lưu ý
 

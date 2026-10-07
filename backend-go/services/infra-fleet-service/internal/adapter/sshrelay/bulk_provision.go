@@ -41,9 +41,13 @@ func (b *BulkProvisioner) Provision(ctx context.Context, devServer domain.DevSer
 	}
 	prereq, _ := b.inner.LastPrereqResult(devServer.ID)
 	return usecase.HandshakeInfo{
-		Platform:     info.Platform,
-		Arch:         info.Arch,
-		NodeVersion:  info.NodeVersion,
-		AgentVersion: info.AgentVersion,
+		Platform:        info.Platform,
+		Arch:            info.Arch,
+		NodeVersion:     info.NodeVersion,
+		AgentVersion:    info.AgentVersion,
+		Capabilities:    append([]string(nil), info.Capabilities...),
+		Features:        append([]string(nil), info.Features...),
+		ProtocolVersion: info.ProtocolVersion,
+		BuildVersion:    info.BuildVersion,
 	}, prereq.Met(), nil
 }

@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/merge-review-report-into-body.ts` (mới); `frontend/src/renderer/src/components/right-sidebar/CreateHostedReviewComposer.tsx`, `CreateHostedReviewComposerFields.tsx`, `SourceControl.tsx`, `ChecksPanel.tsx` (sửa)
 **Depends on:** FE-CV-TASK-090-05
-**Status:** [ ] TODO
+**Status:** [x] DONE — insert button vào PR/MR body chưa implement. Rà soát 2026-10-07.
 
 ## Context
 

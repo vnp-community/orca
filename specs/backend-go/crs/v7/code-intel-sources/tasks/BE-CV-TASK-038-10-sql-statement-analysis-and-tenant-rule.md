@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/tenantfilter/{sql_statement_analysis.go, tenant_filter_rule.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-038-09; BE-CV-SOL-031-sql-migration-parser (tokenizer dùng lại nếu xuất được)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -25,8 +25,8 @@ Solution 2.C. Hàm thuần. Mục tiêu là **không** làm parser SQL đầy đ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai dialect đều có test; kết quả khớp bảng điều kiện solution 2.C.
-- [ ] Giới hạn "toàn văn có `tenant_id` thì không báo" có test và ghi trong comment (nguồn bỏ sót đã biết).
+- [x] Hai dialect đều có test; kết quả khớp bảng điều kiện solution 2.C.
+- [x] Giới hạn "toàn văn có `tenant_id` thì không báo" có test và ghi trong comment (nguồn bỏ sót đã biết).
 
 ## Rủi ro và lưu ý
 

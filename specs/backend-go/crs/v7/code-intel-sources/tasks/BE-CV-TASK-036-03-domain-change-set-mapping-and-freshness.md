@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/changeoverlay/{change_overlay.go, changed_file.go, changed_symbol.go, index_freshness.go, path_classification.go, change_set_mapping.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-036-01; BE-CV-SOL-020 (kiểu `SymbolRef` bản domain)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ Hàm thuần, stdlib, không I/O (arch/03). Chuyển `detectChanges` thô của 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi dòng bảng 2.C có test.
-- [ ] Không import ngoài stdlib; không `time.Now()`.
-- [ ] Giá trị lạ không panic.
+- [x] Mọi dòng bảng 2.C có test.
+- [x] Không import ngoài stdlib; không `time.Now()`.
+- [x] Giá trị lạ không panic.
 
 ## Rủi ro và lưu ý
 

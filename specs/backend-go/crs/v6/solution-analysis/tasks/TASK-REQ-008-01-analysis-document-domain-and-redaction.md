@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / domain, usecase (hàm thuần)
 **File:** `internal/domain/diagnosis_document.go` (mới), `findings_document.go` (mới), `answer_document.go` (mới), `internal/usecase/analysis_document_validation.go` (mới), `analysis_secret_redaction.go` (mới), và `_test.go`; `testdata/analysis_documents/*.json` (mới)
 **Depends on:** TASK-REQ-007-02 (`ExtractJSONObject`, `MaxOptionsBytes`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -31,9 +31,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi luật schema có ít nhất một test sai.
-- [ ] `[REDACTED]` xuất hiện ở `excerpt` và `raw_output` khi có khoá PEM hoặc `ghp_...` (tiêu chí 8 của CR).
-- [ ] Không import ngoài stdlib trong domain.
+- [x] Mỗi luật schema có ít nhất một test sai.
+- [x] `[REDACTED]` xuất hiện ở `excerpt` và `raw_output` khi có khoá PEM hoặc `ghp_...` (tiêu chí 8 của CR).
+- [x] Không import ngoài stdlib trong domain.
 
 ## Rủi ro và lưu ý
 

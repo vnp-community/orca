@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/handler.go`, `channels_codeintel_limits_test.go` (mới), `handler_read_limit_test.go` (mới)
 **Depends on:** TASK-040-07 (hằng timeout); quyết định O-2 (duyệt chạm toàn `/ws`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,9 +27,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `SetReadLimit` đặt đúng một chỗ.
-- [ ] Khung 300 KiB qua, 400 KiB đóng (đo thật).
-- [ ] Bất biến timeout có test.
+- [x] `SetReadLimit` đặt đúng một chỗ.
+- [x] Khung 300 KiB qua, 400 KiB đóng (đo thật).
+- [x] Bất biến timeout có test.
 
 ## Rủi ro và lưu ý
 

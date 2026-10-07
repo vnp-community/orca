@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityScorecard.tsx`, `QualityGateVerdictHeader.tsx`, `QualityGateReasonRow.tsx`, `QualityStepList.tsx`, `QualityProvenanceLine.tsx`, `QualityCiComparisonRow.tsx`, `QualityGateChip.tsx` (mới) và `*.test.tsx`
 **Depends on:** FE-CV-TASK-088-03, 088-07; 087-03, 087-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

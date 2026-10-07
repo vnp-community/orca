@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/httpgateway/request_webhook_routes.go`, `request_webhook_routes_test.go` (mới); `router.go`, `backend-go/services/api-gateway/cmd/server/main.go`, `backend-go/services/api-gateway/internal/config/config.go` (sửa)
 **Depends on:** TASK-REQ-004-06 (`CreateRequest` thật); CR-REQ-016 chưa cần (route HTTP riêng, không đi qua `wscompat`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -35,10 +35,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chữ ký sai trả 401, đúng giao hai lần trả một Request.
-- [ ] Thân vượt 256 KiB bị từ chối.
-- [ ] Không lộ lý do 401 (thông báo cố định).
-- [ ] Route nằm ngoài nhóm JWT và chỉ bật khi có đủ client.
+- [x] Chữ ký sai trả 401, đúng giao hai lần trả một Request.
+- [x] Thân vượt 256 KiB bị từ chối.
+- [x] Không lộ lý do 401 (thông báo cố định).
+- [x] Route nằm ngoài nhóm JWT và chỉ bật khi có đủ client.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `common` (thay đổi duy nhất được phép, PQ-03 (8))
 **File:** `backend-go/common/apperrors/apperrors.go`, `backend-go/common/apperrors/apperrors_test.go` (sửa/tạo nếu chưa có)
 **Depends on:** BE-CV-TASK-010-01 (không bắt buộc; có thể song song)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai Kind mới ánh xạ đúng `codes`; Kind cũ không đổi giá trị/ánh xạ.
-- [ ] Test bảng xanh; `make build`/`make lint` xanh trên toàn workspace.
-- [ ] Mô tả PR có kết quả `gitnexus_impact`.
+- [x] Hai Kind mới ánh xạ đúng `codes`; Kind cũ không đổi giá trị/ánh xạ.
+- [x] Test bảng xanh; `make build`/`make lint` xanh trên toàn workspace.
+- [x] Mô tả PR có kết quả `gitnexus_impact`.
 
 ## Rủi ro và lưu ý
 

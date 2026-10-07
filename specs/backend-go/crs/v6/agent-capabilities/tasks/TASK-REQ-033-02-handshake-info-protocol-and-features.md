@@ -5,7 +5,7 @@
 **Service/Area:** `infra-fleet-service` / usecase port, adapter `devserveragent`, `agentwsserver`, `sshrelay`
 **File:** `internal/usecase/ports.go` (sửa), `internal/adapter/devserveragent/session.go` (sửa), `internal/adapter/devserveragent/client.go` (sửa), `internal/adapter/agentwsserver/server.go` (sửa), `internal/adapter/sshrelay/provisioner.go` (sửa), và các `_test.go` cạnh chúng
 **Depends on:** không (độc lập với 01; làm song song được)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -45,11 +45,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Trường mới có mặt ở cả ba đường kết nối và ở `LastHandshakeInfo`.
-- [ ] Backend bắt tay thành công với agent cũ (không có trường mới) và với agent gửi trường lạ.
-- [ ] `AgentVersion` và `Capabilities` giữ nguyên giá trị như trước.
-- [ ] Không có `DisallowUnknownFields` được thêm vào đâu.
-- [ ] `gitnexus_impact` đã chạy cho `HandshakeInfo` và `LastHandshakeInfo` trước khi sửa (quy ước repo) và kết quả ghi vào PR.
+- [x] Trường mới có mặt ở cả ba đường kết nối và ở `LastHandshakeInfo`.
+- [x] Backend bắt tay thành công với agent cũ (không có trường mới) và với agent gửi trường lạ.
+- [x] `AgentVersion` và `Capabilities` giữ nguyên giá trị như trước.
+- [x] Không có `DisallowUnknownFields` được thêm vào đâu.
+- [x] `gitnexus_impact` đã chạy cho `HandshakeInfo` và `LastHandshakeInfo` trước khi sửa (quy ước repo) và kết quả ghi vào PR.
 
 ## Thứ tự thực hiện gợi ý
 

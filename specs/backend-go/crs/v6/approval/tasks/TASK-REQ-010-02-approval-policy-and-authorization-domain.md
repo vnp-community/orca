@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / domain
 **File:** `backend-go/services/request-service/internal/domain/approval_policy.go` (mới), `approval_authorization.go` (mới), và `_test.go` tương ứng (mới)
 **Depends on:** TASK-REQ-009-02
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -29,9 +29,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] 8 `subject_type` đều có mặc định; test so khớp bảng 2.5.
-- [ ] `Decide` không gọi mạng, không import ngoài stdlib.
-- [ ] `hotfix` và `security` mặc định `AllowRequesterApprove=false` ở `request_type`.
+- [x] 8 `subject_type` đều có mặc định; test so khớp bảng 2.5.
+- [x] `Decide` không gọi mạng, không import ngoài stdlib.
+- [x] `hotfix` và `security` mặc định `AllowRequesterApprove=false` ở `request_type`.
 
 ## Rủi ro và lưu ý
 

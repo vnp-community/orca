@@ -10,7 +10,7 @@
 //   - All tools return ToolResult { stdout, stderr, exitCode, meta? }
 
 import { spawn } from 'node:child_process'
-import { accessSync, constants } from 'node:fs'
+import { accessSync, constants, openSync, closeSync } from 'node:fs'
 import { readFile, readdir, stat } from 'node:fs/promises'
 import { join, isAbsolute } from 'node:path'
 import type { AgentConfig } from './agent-config'
@@ -21,7 +21,7 @@ export type ToolResult = {
   stdout: string
   stderr: string
   exitCode: number
-  meta?: Record<string, unknown>
+  meta?: Record<string, unknown> & { truncated?: boolean; timedOut?: boolean; durationMs?: number }
 }
 
 export type ToolInputSchema = {
@@ -72,42 +72,156 @@ function resolveToolBinary(binary: string, toolPath: string): string {
 export function runToolCommand(
   binary: string,
   args: string[],
-  opts: { cwd: string; timeout: number; env: NodeJS.ProcessEnv }
+  opts: {
+    cwd: string
+    timeout: number
+    env: NodeJS.ProcessEnv
+    maxOutputBytes?: number
+    stdoutFile?: string
+    killGraceMs?: number
+    signal?: AbortSignal
+    detached?: boolean
+    stdinText?: string
+    onStdout?: (chunk: Buffer) => void
+    onStderr?: (chunk: Buffer) => void
+  }
 ): Promise<ToolResult> {
   return new Promise((resolve) => {
+    const startTime = Date.now()
     const resolved = resolveToolBinary(binary, opts.env.PATH ?? '')
+
+    let fd: number | undefined
+    if (opts.stdoutFile) {
+      fd = openSync(opts.stdoutFile, 'wx', 0o600)
+    }
+
+    const detached = opts.detached && process.platform !== 'win32'
+
     const child = spawn(resolved, args, {
       cwd:   opts.cwd,
       env:   opts.env,
-      stdio: ['pipe', 'pipe', 'pipe'],
+      stdio: fd !== undefined ? ['pipe', fd, 'pipe'] : ['pipe', 'pipe', 'pipe'],
       shell: false,   // CRITICAL: no shell — prevents injection attacks
+      detached,
     })
 
-    const stdout: string[] = []
-    const stderr: string[] = []
+    const stdout: Buffer[] = []
+    const stderr: Buffer[] = []
+    let totalBytes = 0
+    let truncated = false
+    let isDone = false
 
-    const timer = setTimeout(() => {
-      child.kill('SIGTERM')
-      resolve({
-        stdout: stdout.join(''),
-        stderr: `${stderr.join('')}\n[TIMEOUT: command exceeded ${opts.timeout}ms limit]`,
+    const isNewApi = opts.maxOutputBytes !== undefined || opts.stdoutFile || opts.signal || opts.detached || opts.stdinText !== undefined
+    const killGraceMs = opts.killGraceMs ?? 5000
+
+    const doKill = () => {
+      if (detached && child.pid) {
+        try { process.kill(-child.pid, 'SIGTERM') } catch {}
+        setTimeout(() => {
+          if (!isDone) {
+            try { process.kill(-child.pid!, 'SIGKILL') } catch {}
+          }
+        }, killGraceMs).unref()
+      } else {
+        child.kill('SIGTERM')
+      }
+    }
+
+    let timer: NodeJS.Timeout | undefined
+    if (opts.timeout) {
+      timer = setTimeout(() => {
+        doKill()
+        const res: ToolResult = {
+          stdout: fd !== undefined ? '' : Buffer.concat(stdout).toString(),
+          stderr: `${Buffer.concat(stderr).toString()}\n[TIMEOUT: command exceeded ${opts.timeout}ms limit]`,
+          exitCode: 124,
+        }
+        if (isNewApi) res.meta = { timedOut: true, truncated, durationMs: Date.now() - startTime }
+        cleanup()
+        resolve(res)
+      }, opts.timeout)
+    }
+
+    const onAbort = () => {
+      doKill()
+      const res: ToolResult = {
+        stdout: fd !== undefined ? '' : Buffer.concat(stdout).toString(),
+        stderr: Buffer.concat(stderr).toString(),
         exitCode: 124,
-      })
-    }, opts.timeout)
+      }
+      if (isNewApi) res.meta = { timedOut: false, truncated, durationMs: Date.now() - startTime }
+      cleanup()
+      resolve(res)
+    }
 
-    child.stdout?.on('data', (chunk: Buffer) => stdout.push(chunk.toString()))
-    child.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk.toString()))
+    if (opts.signal) {
+      opts.signal.addEventListener('abort', onAbort)
+    }
+
+    const cleanup = () => {
+      isDone = true
+      if (timer) clearTimeout(timer)
+      if (opts.signal) opts.signal.removeEventListener('abort', onAbort)
+      if (fd !== undefined) {
+        try { closeSync(fd) } catch {}
+      }
+    }
+
+    if (fd === undefined) {
+      child.stdout?.on('data', (chunk: Buffer) => {
+        if (opts.maxOutputBytes && totalBytes + chunk.length > opts.maxOutputBytes) {
+          const allowed = opts.maxOutputBytes - totalBytes
+          if (allowed > 0) stdout.push(chunk.slice(0, allowed))
+          truncated = true
+          doKill()
+          const res: ToolResult = {
+            stdout: Buffer.concat(stdout).toString(),
+            stderr: Buffer.concat(stderr).toString(),
+            exitCode: child.exitCode ?? 1,
+          }
+          if (isNewApi) res.meta = { timedOut: false, truncated: true, durationMs: Date.now() - startTime }
+          cleanup()
+          resolve(res)
+          return
+        }
+        if (opts.onStdout) opts.onStdout(chunk)
+        stdout.push(chunk)
+        totalBytes += chunk.length
+      })
+    }
+
+    child.stderr?.on('data', (chunk: Buffer) => {
+      if (opts.onStderr) opts.onStderr(chunk)
+      stderr.push(chunk)
+    })
 
     child.on('close', (code) => {
-      clearTimeout(timer)
-      resolve({ stdout: stdout.join(''), stderr: stderr.join(''), exitCode: code ?? 0 })
+      if (isDone) return
+      cleanup()
+      const res: ToolResult = {
+        stdout: fd !== undefined ? '' : Buffer.concat(stdout).toString(),
+        stderr: Buffer.concat(stderr).toString(),
+        exitCode: code ?? 0,
+      }
+      if (isNewApi) res.meta = { timedOut: false, truncated, durationMs: Date.now() - startTime }
+      resolve(res)
     })
 
     child.on('error', (err) => {
-      clearTimeout(timer)
-      resolve({ stdout: '', stderr: err.message, exitCode: 1 })
+      if (isDone) return
+      cleanup()
+      const res: ToolResult = {
+        stdout: fd !== undefined ? '' : Buffer.concat(stdout).toString(),
+        stderr: err.message,
+        exitCode: 1,
+      }
+      if (isNewApi) res.meta = { timedOut: false, truncated, durationMs: Date.now() - startTime }
+      resolve(res)
     })
 
+    if (opts.stdinText) {
+      child.stdin?.write(opts.stdinText)
+    }
     child.stdin?.end()
   })
 }

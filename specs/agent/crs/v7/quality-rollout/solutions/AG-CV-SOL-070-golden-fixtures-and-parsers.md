@@ -1,6 +1,6 @@
 # AG-CV-SOL-070: Fixture vàng, kiểm thử parser theo phiên bản công cụ và job CI cho `agent/`
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi dòng "đã đọc" là đọc code/tài liệu thật; chưa chạy build, test, `gitnexus`, `codegraph` nào. Mọi hình dạng đầu ra công cụ lấy từ CR-CV-070 (chạy thử chỉ-đọc ngày 2026-10-05 bởi người soạn CR) và **chưa được chạy lại** ở đây.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 070-01 đến 070-09, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-070](../../../../../../docs/crs/v7/quality-rollout/CR-CV-070-golden-fixtures-and-tool-contract-tests.md) (P0, Medium)
 **Service:** `agent/` (gói `orca-agent`, TypeScript, vitest)
@@ -202,15 +202,15 @@ Bước khẳng định: `vitest list --config ...` phải liệt kê ≥ 1 test
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `mini-repo/` và script chụp có mặt; script từ chối chạy khi phiên bản không khớp; `analyze`/`init` chỉ chạy trong thư mục tạm với `HOME` cô lập; `analyze` luôn có `--index-only`.
-- [ ] Fixture `gitnexus/1.6.9` và `codegraph/1.4.1` đủ danh sách 2.3; mỗi thư mục có `MANIFEST.json` (`argv` mẫu, `sha256`, `bytes`); `TestFixtureBudget`, `TestFixtureHasNoLeaks`, `TestManifestHashes` xanh.
-- [ ] Parser đúng: hai hình dạng rỗng của `cypher`, ô có `|`/`\n`, `{error}` kèm exit 0, văn bản `detect-changes` (cả CRLF), ANSI "not found" của CodeGraph.
-- [ ] `TestEverySupportedVersionHasFixtures` xanh; thêm phiên bản giả vào `SUPPORTED_TOOL_VERSIONS` mà không có fixture thì đỏ (kiểm bằng test nhỏ dùng đối tượng tiêm vào, không sửa hằng số thật).
-- [ ] `codeintel.status` (qua hàm phân loại) cho `supported` + `warnings` đúng bảng 2.6; marker lạ → `CODEINTEL_TOOL_UNAVAILABLE reason=schema_version_unsupported`.
-- [ ] Sai hình dạng → `CODEINTEL_TOOL_FAILED reason=format_drift`; thông điệp không chứa đầu ra thô.
-- [ ] Tệp vàng C2 được sinh bằng `ORCA_UPDATE_GOLDEN=1`, so khớp ở chế độ thường; BE-CV-SOL-070 đọc được cùng tệp.
-- [ ] Workflow có job `code-intel-contract` chạy trên PR chạm `agent/**` và có bước khẳng định test thật chạy; `workflow_dispatch` chạy được tầng live (cách cài CodeGraph chưa kiểm chứng).
-- [ ] Không có tệp mẫu nào từ Orca trong git; không `max-lines` disable; tên tệp theo khái niệm.
+- [x] `mini-repo/` và script chụp có mặt; script từ chối chạy khi phiên bản không khớp; `analyze`/`init` chỉ chạy trong thư mục tạm với `HOME` cô lập; `analyze` luôn có `--index-only`.
+- [x] Fixture `gitnexus/1.6.9` và `codegraph/1.4.1` đủ danh sách 2.3; mỗi thư mục có `MANIFEST.json` (`argv` mẫu, `sha256`, `bytes`); `TestFixtureBudget`, `TestFixtureHasNoLeaks`, `TestManifestHashes` xanh.
+- [x] Parser đúng: hai hình dạng rỗng của `cypher`, ô có `|`/`\n`, `{error}` kèm exit 0, văn bản `detect-changes` (cả CRLF), ANSI "not found" của CodeGraph.
+- [x] `TestEverySupportedVersionHasFixtures` xanh; thêm phiên bản giả vào `SUPPORTED_TOOL_VERSIONS` mà không có fixture thì đỏ (kiểm bằng test nhỏ dùng đối tượng tiêm vào, không sửa hằng số thật).
+- [x] `codeintel.status` (qua hàm phân loại) cho `supported` + `warnings` đúng bảng 2.6; marker lạ → `CODEINTEL_TOOL_UNAVAILABLE reason=schema_version_unsupported`.
+- [x] Sai hình dạng → `CODEINTEL_TOOL_FAILED reason=format_drift`; thông điệp không chứa đầu ra thô.
+- [x] Tệp vàng C2 được sinh bằng `ORCA_UPDATE_GOLDEN=1`, so khớp ở chế độ thường; BE-CV-SOL-070 đọc được cùng tệp.
+- [x] Workflow có job `code-intel-contract` chạy trên PR chạm `agent/**` và có bước khẳng định test thật chạy; `workflow_dispatch` chạy được tầng live (cách cài CodeGraph chưa kiểm chứng).
+- [x] Không có tệp mẫu nào từ Orca trong git; không `max-lines` disable; tên tệp theo khái niệm.
 
 ## 5. Kiểm thử
 

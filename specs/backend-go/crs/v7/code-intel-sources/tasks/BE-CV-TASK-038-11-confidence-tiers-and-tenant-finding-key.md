@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/tenantfilter/{confidence_tiers.go, global_key_columns.go, tenant_finding_key.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-038-10; BE-CV-TASK-037-03 (`NewKey`, `Finding`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Solution 2.C (bảng tầng) và 2.D (`finding_key`). Chống ồn là yêu cầ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tầng và `severity` đúng bảng 2.C; `finding_key` thoả PQ-06 (≤ 128 ký tự, khớp `ValidKey`).
-- [ ] Không SQL thô dài trong finding.
+- [x] Tầng và `severity` đúng bảng 2.C; `finding_key` thoả PQ-06 (≤ 128 ký tự, khớp `ValidKey`).
+- [x] Không SQL thô dài trong finding.
 
 ## Rủi ro và lưu ý
 

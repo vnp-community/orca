@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/child-process-rss-sampler.ts` (mới), `agent/src/relay/codeintel/child-process-rss-sampler.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -27,12 +27,12 @@ Mọi con số hiệu năng là giả định từ CR-CV-071 (một lần đo, m
 - `macOS reader invokes ps without a shell`
 - `does not sample on win32`
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/child-process-rss-sampler.test.ts`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Test xanh bằng reader tiêm; thử thật (chưa chạy): spawn `node -e` cấp phát 100 MiB và so sánh.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Test xanh bằng reader tiêm; thử thật (chưa chạy): spawn `node -e` cấp phát 100 MiB và so sánh.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

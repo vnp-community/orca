@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/auto_refresh_ports.go`, `internal/adapter/postgres/reindex_job_auto_refresh.go`, `internal/adapter/mysql/reindex_job_auto_refresh.go` (mới); thêm `GetByWorktreeID` cho `repo_bindings` nếu SOL-011 chưa có
 **Depends on:** BE-CV-SOL-011 (bảng `reindex_jobs`, `repo_bindings` migration `0002`), BE-CV-TASK-080-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 C-DM T7: `active_key` UNIQUE, `trigger`, `trigger_event_id`, `requested_by NULL`. Slot = dòng `queued`, `trigger='agent_done'`. Không file của SOL-011 bị sửa; thêm file riêng. Điểm hợp đồng thiếu: chỉ mục `(tenant_id, worktree_id)` và `(tenant_id, created_at)` (SOL-080 mục 7).
@@ -20,7 +20,7 @@ C-DM T7: `active_key` UNIQUE, `trigger`, `trigger_event_id`, `requested_by NULL`
 - Integration `-tags=integration`, `dialect: [postgres, mysql]`: upsert đồng thời, hai replica claim (một thắng), cô lập tenant (role `NOSUPERUSER NOBYPASSRLS`), dùng đồng hồ DB.
 
 ## Tiêu chí hoàn thành
-- [ ] Bộ kịch bản chung chạy xanh cả hai dialect.
+- [x] Bộ kịch bản chung chạy xanh cả hai dialect.
 
 ## Rủi ro
 Quét `ClaimDueSlots` nhiều tenant chưa đo; thiếu chỉ mục hợp đồng thì chậm.

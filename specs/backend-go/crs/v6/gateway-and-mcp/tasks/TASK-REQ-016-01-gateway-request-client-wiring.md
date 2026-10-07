@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/config/config.go`, `backend-go/services/api-gateway/cmd/server/main.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/register_production.go`, `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_unavailable.go` (mới), `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request.go` (mới, khung)
 **Depends on:** CR-REQ-001 (proto `orca.request.v1` đã sinh vào `proto/gen/go/orca/request/v1`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -34,9 +34,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Gateway khởi động được khi `REQUEST_SERVICE_ADDR` rỗng; `/health` không báo `request-service` lỗi giả.
-- [ ] Có địa chỉ: client được dial và đăng ký health.
-- [ ] `go vet`, `go build`, test `wscompat` xanh; parity test chưa đổi kết quả (chưa có kênh mới).
+- [x] Gateway khởi động được khi `REQUEST_SERVICE_ADDR` rỗng; `/health` không báo `request-service` lỗi giả.
+- [x] Có địa chỉ: client được dial và đăng ký health.
+- [x] `go vet`, `go build`, test `wscompat` xanh; parity test chưa đổi kết quả (chưa có kênh mới).
 
 ## Rủi ro và lưu ý
 

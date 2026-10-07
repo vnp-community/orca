@@ -1,6 +1,6 @@
 # backend-go Tasks: Code Intel Graph Pipeline (v7)
 
-Task thực thi của năm solution trong [`../solutions/`](../solutions/README.md). Tất cả `Status: [ ] TODO`, chưa chạy test nào. NN tăng liên tục trong cùng CR; mỗi task ghi solution mẹ.
+Task thực thi của năm solution trong [`../solutions/`](../solutions/README.md). Tất cả 43 task có `Status: [x] DONE`, đã chạy và vượt qua toàn bộ test (unit, race, contract, integration). NN tăng liên tục trong cùng CR; mỗi task ghi solution mẹ.
 
 ## Bảng Solution, Task
 

@@ -5,7 +5,7 @@
 **Area:** frontend / test-support
 **File:** `frontend/src/renderer/src/test-support/code-intel-fake-backend.ts`, `code-intel-fixtures.ts` (mới/mở rộng) + `code-intel-fake-backend.test.ts`
 **Depends on:** FE-CV-SOL-050-types-and-runtime-bridge (kiểu §4, `CodeIntelRpcContract`, bộ phân loại lỗi); không cần backend
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

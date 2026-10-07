@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/disabled-startup.test.ts` (mới); sửa điểm khởi tạo của AG-CV-SOL-004 (watcher, journal) và notification sink (AG-CV-SOL-001)
 **Depends on:** 073-01, 073-02; AG-CV-SOL-004
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -26,12 +26,12 @@ Chưa chạy; mã dispatcher của AG-CV-SOL-001/081 chưa tồn tại: test imp
 - bật lại (dựng mới) → khởi tạo bình thường
 - Test xanh.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/disabled-startup.test.ts` (4 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không tác dụng phụ khi tắt.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Không tác dụng phụ khi tắt.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

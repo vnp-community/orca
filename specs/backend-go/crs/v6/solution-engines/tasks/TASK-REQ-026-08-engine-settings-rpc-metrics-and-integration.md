@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `proto/orca/request/v1/request_engine.proto`, `internal/usecase/manage_project_engine_settings.go`, `internal/adapter/grpc/engine_settings_server.go`, `internal/adapter/metrics/engine_metrics.go`, `services/request-service/README.md` (sửa phần cấu hình), `internal/usecase/engine_flow_integration_test.go` (mới)
 **Depends on:** TASK-REQ-026-02, 026-05, 026-06, 026-07, TASK-REQ-001-05 (gRPC server, health), TASK-REQ-024-01 (`AppendDetailed`, nếu chưa có thì dùng `auditclient.Append`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -58,12 +58,12 @@ Cờ cấp project `solution_engine` cần RPC để admin đặt và đọc (CR
 
 ## Tiêu chí hoàn thành
 
-- [ ] `SetProjectEngineSettings` từ người không phải admin bị từ chối; admin thành công có dòng audit.
-- [ ] Không có dòng cờ: `GetProjectEngineSettings` trả `native`, và không ghi DB.
-- [ ] Bốn metric có mặt, nhãn là tập đóng.
-- [ ] Năm kịch bản tích hợp xanh trên cả Postgres và MySQL.
-- [ ] README service liệt kê đủ biến môi trường và chỉ rõ phần chưa kiểm chứng.
-- [ ] `buf lint` và `buf breaking` sạch.
+- [x] `SetProjectEngineSettings` từ người không phải admin bị từ chối; admin thành công có dòng audit.
+- [x] Không có dòng cờ: `GetProjectEngineSettings` trả `native`, và không ghi DB.
+- [x] Bốn metric có mặt, nhãn là tập đóng.
+- [x] Năm kịch bản tích hợp xanh trên cả Postgres và MySQL.
+- [x] README service liệt kê đủ biến môi trường và chỉ rõ phần chưa kiểm chứng.
+- [x] `buf lint` và `buf breaking` sạch.
 
 ## Rủi ro và lưu ý
 

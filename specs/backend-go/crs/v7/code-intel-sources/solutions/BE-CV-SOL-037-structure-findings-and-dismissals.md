@@ -150,17 +150,17 @@ Thứ tự theo hợp đồng §7.2: 036 → **037** → 038.
 
 ## 9. Tiêu chí chấp nhận
 
-- [ ] Trên fixture Orca: `layer.usecase-imports-adapter` = 2 finding (infra-fleet, ai-provider; khử trùng, không `usecasetest`), `layer.domain-imports-outer` = 0.
-- [ ] `finding_key` ổn định 100 lần; không chứa số dòng.
-- [ ] `cycle.import`: số finding = `cycleCount` sau khử trùng; xác định.
-- [ ] Hotspot: bỏ commit > 100 tệp và tệp nhiễu; `metrics` đủ 3 thành phần + `churn`; ≤ 50; giảm dần.
-- [ ] Mã chết: không trả `_test.go`, `/cmd/`, `usecasetest`; `NewFleetDefinitionStore` (hai bản) có mặt; `confidence:"medium"`.
-- [ ] Owner: không CODEOWNERS ⇒ `history`, không email, `HEAD` rõ ràng; có CODEOWNERS ⇒ luật cuối thắng.
-- [ ] `DismissFinding` idempotent, `RESTORE` không lỗi khi vắng; `ListFindings` ẩn/hiện đúng; `dismissed_count` đúng; quyền/tenant/audit.
-- [ ] Một bộ lỗi không làm mất bộ khác; `detectors` nêu trạng thái.
-- [ ] `scope=CHANGED` gắn `origin` đúng (`introduced`, `touched`, `unknown`, `preexisting`).
-- [ ] Hai dialect xanh; mọi truy vấn có `tenant_id`; không `max-lines` disable.
-- [ ] Mọi lệnh git thuộc whitelist Part A, không ký tự bị chặn, không `-c` trước subcommand.
+- [x] Trên fixture Orca: `layer.usecase-imports-adapter` = 2 finding (infra-fleet, ai-provider; khử trùng, không `usecasetest`), `layer.domain-imports-outer` = 0.
+- [x] `finding_key` ổn định 100 lần; không chứa số dòng.
+- [x] `cycle.import`: số finding = `cycleCount` sau khử trùng; xác định.
+- [x] Hotspot: bỏ commit > 100 tệp và tệp nhiễu; `metrics` đủ 3 thành phần + `churn`; ≤ 50; giảm dần.
+- [x] Mã chết: không trả `_test.go`, `/cmd/`, `usecasetest`; `NewFleetDefinitionStore` (hai bản) có mặt; `confidence:"medium"`.
+- [x] Owner: không CODEOWNERS ⇒ `history`, không email, `HEAD` rõ ràng; có CODEOWNERS ⇒ luật cuối thắng.
+- [x] `DismissFinding` idempotent, `RESTORE` không lỗi khi vắng; `ListFindings` ẩn/hiện đúng; `dismissed_count` đúng; quyền/tenant/audit.
+- [x] Một bộ lỗi không làm mất bộ khác; `detectors` nêu trạng thái.
+- [x] `scope=CHANGED` gắn `origin` đúng (`introduced`, `touched`, `unknown`, `preexisting`).
+- [x] Hai dialect xanh; mọi truy vấn có `tenant_id`; không `max-lines` disable.
+- [x] Mọi lệnh git thuộc whitelist Part A, không ký tự bị chặn, không `-c` trước subcommand.
 
 ## 10. Tham chiếu
 

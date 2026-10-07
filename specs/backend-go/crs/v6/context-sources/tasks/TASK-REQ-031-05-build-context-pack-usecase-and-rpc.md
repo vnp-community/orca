@@ -5,7 +5,7 @@
 **Service:** `request-service`, `proto`
 **File:** `backend-go/services/request-service/internal/usecase/{build_context_pack.go,manage_context_sources.go,context_stage_map.go}` (mới) và `_test.go`; `.../internal/domain/outbox_subjects.go` (sửa); `.../internal/adapter/grpc/server_context_sources.go` (mới); `.../internal/config/config.go` (sửa); `backend-go/proto/orca/request/v1/request.proto` (sửa)
 **Depends on:** TASK-REQ-031-01, 031-02, 031-03, 031-04; BE-REQ-SOL-001 (`OutboxWriter`, `main.go`); TASK-REQ-035-04 (nhóm hành động `admin` và interceptor) cho phân quyền thật
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -55,12 +55,12 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cùng đầu vào cho cùng `digest`; `used_tokens <= budget_tokens`.
-- [ ] Mọi nguồn thiếu có mặt trong `missing[]` với lý do đúng, pack vẫn dựng.
-- [ ] Không bí mật mẫu nào xuất hiện trong prompt body, `evidence.excerpt`, log, outbox.
-- [ ] Hai Request đồng thời không cấp trùng `seq`.
-- [ ] `PreviewContextPack` không ghi DB, chỉ admin gọi được.
-- [ ] `buf lint`, `buf breaking` xanh.
+- [x] Cùng đầu vào cho cùng `digest`; `used_tokens <= budget_tokens`.
+- [x] Mọi nguồn thiếu có mặt trong `missing[]` với lý do đúng, pack vẫn dựng.
+- [x] Không bí mật mẫu nào xuất hiện trong prompt body, `evidence.excerpt`, log, outbox.
+- [x] Hai Request đồng thời không cấp trùng `seq`.
+- [x] `PreviewContextPack` không ghi DB, chỉ admin gọi được.
+- [x] `buf lint`, `buf breaking` xanh.
 
 ## Ví dụ tham khảo
 

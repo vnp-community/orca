@@ -1,6 +1,6 @@
 # FE-REQ-SOL-018: Nền frontend Request (kiểu, RPC, hook, store, định tuyến; gỡ `backlog`)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ khảo sát code `frontend/src`; chưa chạy test hay ứng dụng.
+> ✅ **Done.** Rà soát ngày 2026-10-07: tất cả 6 tasks đã implement. Files: `shared/request-types.ts`, `request-flow-registry.ts`, `request-rpc-methods.ts`, `request-errors.ts`, `request-wire-parsers.ts`, `task-status-normalization.ts`; `runtime/request-rpc-client.ts`; `lib/request-event-bus.ts`; hooks `useRequests`, `useRequest`, `useRequestActions`, `useSolutions`, `useApprovals`, `useBacklog`, `useRequestFlowSupport`, `useRequestSubscription`; `store/slices/request.ts`; components `RequestPage`, badges, `RequestUnsupportedNotice`, `SidebarRequestNavButton`. `task-types.ts` và `types.ts` đã sửa.
 
 **CR:** [CR-REQ-018](../../../../../../docs/crs/v6/request-frontend/CR-REQ-018-request-frontend-foundation.md)
 **Area:** frontend (`frontend/src/shared`, `frontend/src/renderer/src`)

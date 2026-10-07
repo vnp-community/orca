@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-detect-changes-flows.ts`, `codeintel-detect-changes-flows.test.ts` (mới)
 **Depends on:** [AG-CV-TASK-002-03](./AG-CV-TASK-002-03-gitnexus-cypher-templates-and-runner.md), [AG-CV-TASK-002-04](./AG-CV-TASK-002-04-verify-cypher-templates-against-real-gitnexus.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `SYMBOL_FLOWS` (đã chạy), `MEMBER_CLUSTER` (chưa chạy). CLI lặp luồng và chỉ 10 dòng; ta gom mỗi luồng một lần.
@@ -19,7 +19,7 @@ Nhiều symbol cùng luồng, nhiều nhóm, cắt 200, cụm; binary giả phá
 Lệnh: `pnpm exec vitest run src/relay/codeintel-detect-changes-flows.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Mỗi luồng xuất hiện một lần.
+- [x] Mỗi luồng xuất hiện một lần.
 
 ## Rủi ro
 - 7 nhóm song song 3 ≈ 5–6 s (ước tính).

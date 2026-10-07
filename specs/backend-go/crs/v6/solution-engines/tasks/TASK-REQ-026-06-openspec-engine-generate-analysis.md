@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/engine_openspec.go`, `internal/usecase/openspec_solution_prompt.go`, `internal/usecase/proposal_scope_check.go`, `internal/adapter/grpcclient/proposal_workspace.go`, `internal/usecase/ports.go` (sửa) và test (mới)
 **Depends on:** TASK-REQ-026-01, 026-02, 026-03 (không bắt buộc cho task này), 026-04, 026-05, TASK-REQ-008-01 (`RedactSecrets`), TASK-REQ-027-04 (parser khối `orca-json`, `RenderArtifact`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -77,12 +77,12 @@ CR-REQ-026 mục 2.5 (Solution). Điểm bẫy: `agent.execPrompt` chỉ trả `
 
 ## Tiêu chí hoàn thành
 
-- [ ] Thay đổi ngoài `openspec/changes/<change_id>/` luôn bị phát hiện và hủy (test bảng đủ biến thể đường dẫn).
-- [ ] Không có commit khi kiểm tra chưa đạt (test: `Commit` không được gọi ở nhánh lỗi).
-- [ ] Thử lại đúng một lần, `attempt` tăng; run `failed` có mã đúng và Solution `draft` bị xoá (do `RunSolutionGeneration`).
-- [ ] `provenance.generator.kind=openspec`, `model` rỗng, `model_source=unknown`.
-- [ ] Prompt không chứa bí mật; nội dung Request luôn nằm trong khối rào.
-- [ ] Gọi lặp `Ensure` không tạo worktree thứ hai.
+- [x] Thay đổi ngoài `openspec/changes/<change_id>/` luôn bị phát hiện và hủy (test bảng đủ biến thể đường dẫn).
+- [x] Không có commit khi kiểm tra chưa đạt (test: `Commit` không được gọi ở nhánh lỗi).
+- [x] Thử lại đúng một lần, `attempt` tăng; run `failed` có mã đúng và Solution `draft` bị xoá (do `RunSolutionGeneration`).
+- [x] `provenance.generator.kind=openspec`, `model` rỗng, `model_source=unknown`.
+- [x] Prompt không chứa bí mật; nội dung Request luôn nằm trong khối rào.
+- [x] Gọi lặp `Ensure` không tạo worktree thứ hai.
 
 ## Rủi ro và lưu ý
 

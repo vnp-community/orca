@@ -1,0 +1,116 @@
+syntax = "proto3";
+
+package orca.request.v1;
+
+import "google/protobuf/timestamp.proto";
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/request/v1;requestv1";
+
+enum ApprovalSubjectType {
+  APPROVAL_SUBJECT_TYPE_UNSPECIFIED = 0;
+  APPROVAL_SUBJECT_TYPE_REQUEST_TYPE = 1;
+  APPROVAL_SUBJECT_TYPE_SOLUTION = 2;
+  APPROVAL_SUBJECT_TYPE_FINDINGS = 3;
+  APPROVAL_SUBJECT_TYPE_ANSWER = 4;
+  APPROVAL_SUBJECT_TYPE_PLAN = 5;
+  APPROVAL_SUBJECT_TYPE_PHASE = 6;
+  APPROVAL_SUBJECT_TYPE_TASK_LIST = 7;
+  APPROVAL_SUBJECT_TYPE_PRE_DEPLOY = 8;
+}
+
+enum ApprovalStatus {
+  APPROVAL_STATUS_UNSPECIFIED = 0;
+  APPROVAL_STATUS_PENDING = 1;
+  APPROVAL_STATUS_APPROVED = 2;
+  APPROVAL_STATUS_REJECTED = 3;
+  APPROVAL_STATUS_CANCELLED = 4;
+  APPROVAL_STATUS_EXPIRED = 5;
+}
+
+message Approval {
+  string id = 1;
+  string tenant_id = 2;
+  string request_id = 3;
+  ApprovalSubjectType subject_type = 4;
+  string subject_id = 5;
+  string stage = 6;
+  ApprovalStatus status = 7;
+  string requested_by = 8;
+  string decided_by = 9;
+  google.protobuf.Timestamp decided_at = 10;
+  string comment = 11;
+  google.protobuf.Timestamp due_at = 12;
+  int64 version = 13;
+  string subject_digest = 14;
+  bool self_approval_allowed = 15;
+  string idempotency_key = 16;
+  google.protobuf.Timestamp reminded_at = 17;
+  google.protobuf.Timestamp created_at = 18;
+  google.protobuf.Timestamp updated_at = 19;
+}
+
+message RequestApprovalRequest {
+  string request_id = 1;
+  ApprovalSubjectType subject_type = 2;
+  string idempotency_key = 3;
+}
+
+message ApproveRequest {
+  string id = 1;
+  string comment = 2;
+  string expected_digest = 3;
+}
+
+message RejectRequest {
+  string id = 1;
+  string comment = 2;
+  string expected_digest = 3;
+}
+
+message CancelApprovalRequest {
+  string id = 1;
+  string reason = 2;
+}
+
+message GetApprovalRequest {
+  string id = 1;
+}
+
+message ListApprovalsRequest {
+  string request_id = 1;
+  ApprovalSubjectType subject_type = 2;
+  ApprovalStatus status = 3;
+  int32 page_size = 4;
+  string page_token = 5;
+}
+
+message ListApprovalsResponse {
+  repeated Approval approvals = 1;
+  string next_page_token = 2;
+}
+
+message ListPendingForUserRequest {
+  ApprovalSubjectType subject_type = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListPendingForUserResponse {
+  repeated Approval approvals = 1;
+  string next_page_token = 2;
+}
+
+message DecideApprovalResponse {
+  Approval approval = 1;
+  string request_status = 2;
+}
+
+service ApprovalService {
+  rpc RequestApproval(RequestApprovalRequest) returns (Approval);
+  rpc Approve(ApproveRequest) returns (DecideApprovalResponse);
+  rpc Reject(RejectRequest) returns (DecideApprovalResponse);
+  rpc Cancel(CancelApprovalRequest) returns (Approval);
+  rpc GetApproval(GetApprovalRequest) returns (Approval);
+  rpc ListApprovals(ListApprovalsRequest) returns (ListApprovalsResponse);
+  rpc ListPendingForUser(ListPendingForUserRequest) returns (ListPendingForUserResponse);
+}

@@ -5,7 +5,7 @@
 **Area:** frontend / pure functions
 **File:** `frontend/src/renderer/src/components/quality-charts/chart-linear-scale.ts`, `heat-intensity-scale.ts`, `chart-text-summary.ts` (mới) và `__tests__/*.test.ts`
 **Depends on:** FE-CV-TASK-088-03 (nhãn mức dùng trong mô tả)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

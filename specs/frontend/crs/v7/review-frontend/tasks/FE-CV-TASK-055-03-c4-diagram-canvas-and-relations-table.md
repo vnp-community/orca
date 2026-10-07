@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `ArchitectureLens.tsx`, `ArchitectureToolbar.tsx`, `C4ContainerPicker.tsx`, `C4DiagramCanvas.tsx`, `C4ComponentNode.tsx`, `C4ExternalNode.tsx`, `C4LayerBand.tsx`, `C4RelationsTable.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-055-01, 055-02, FE-CV-TASK-053-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

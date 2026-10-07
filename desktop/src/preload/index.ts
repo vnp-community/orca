@@ -213,6 +213,7 @@ import type {
   LocalhostWorktreeLabelResult,
   LocalhostWorktreeLabelRoute
 } from '../shared/localhost-worktree-labels'
+import { createCodeIntelBridge } from '../../../frontend/src/shared/code-intel-bridge'
 import type {
   CrashReportBreadcrumbData,
   CrashReportCopyDiagnosticsArgs,
@@ -787,6 +788,13 @@ const api = {
     hasKillableLocalProcesses: (args) =>
       ipcRenderer.invoke('workspaceCleanup:hasKillableLocalProcesses', args)
   } satisfies PreloadApi['workspaceCleanup'],
+
+  codeIntel: createCodeIntelBridge({
+    callLocal: () => Promise.resolve({ ok: false, error: { code: 'method_not_found', message: 'Not supported' } }),
+    callEnvironment: (environmentId, method, params) =>
+      ipcRenderer.invoke('runtimeEnvironments:call', { environmentId, method, params }),
+    subscribeEnvironment: subscribeRuntimeEnvironmentFromPreload
+  }) satisfies PreloadApi['codeIntel'],
 
   workspaceSpace: {
     analyze: () => ipcRenderer.invoke('workspaceSpace:analyze'),

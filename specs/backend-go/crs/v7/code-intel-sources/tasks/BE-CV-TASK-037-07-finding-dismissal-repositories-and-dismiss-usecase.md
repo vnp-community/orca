@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/dismiss_finding.go`, `dismiss_finding_test.go`; `internal/usecase/ports.go` (sửa: `FindingDismissalRepository`); `internal/adapter/postgres/finding_dismissal_repository.go`, `internal/adapter/mysql/finding_dismissal_repository.go` và `*_integration_test.go` (mới)
 **Depends on:** BE-CV-SOL-011-data-model-and-migrations (bảng `finding_dismissals` trong `0002_code_intel_core`); BE-CV-SOL-013 (audit, quyền); BE-CV-TASK-037-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Bảng đã do 011 tạo (hợp đồng §4.2 T5; **không** thêm migration ở
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai dialect xanh; `id` giữ nguyên khi upsert lần hai.
-- [ ] Mọi câu SQL có `tenant_id`; test cô lập tenant xanh.
-- [ ] Audit có; không PII ngoài `user id`.
+- [x] Hai dialect xanh; `id` giữ nguyên khi upsert lần hai.
+- [x] Mọi câu SQL có `tenant_id`; test cô lập tenant xanh.
+- [x] Audit có; không PII ngoài `user id`.
 
 ## Rủi ro và lưu ý
 

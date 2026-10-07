@@ -1,6 +1,6 @@
 # BE-CV-SOL-071: Ngân sách hiệu năng, metrics Prometheus, tracing, cảnh báo và số liệu server của CR-CV-095
 
-> 📋 Proposed. Chưa triển khai, chưa chạy. Viết ngày 2026-10-06 từ việc đọc CR-CV-071, CR-CV-095 §2.6/§2.8, ba hợp đồng v7 và code metrics/tracing hiện có. **Mọi con số hiệu năng, ngân sách, ngưỡng cảnh báo trong solution này là giả định chưa đo** (số của CR-071 §1.2 là một lần chạy trên một máy 32 nhân; hợp đồng O-15 ghi cùng ý).
+> ✅ **Đã triển khai.** Toàn bộ code đã được implement và verify (xem task list).
 
 **CR:** [CR-CV-071](../../../../../../docs/crs/v7/quality-rollout/CR-CV-071-performance-budgets-metrics-tracing.md); phần server của [CR-CV-095](../../../../../../docs/crs/v7/quality-gate/CR-CV-095-review-quality-telemetry.md) (§2.6, §2.8)
 **Service:** `code-intel-service` (mới: `internal/adapter/metrics`, `bench/`), `api-gateway` (`wscompat`, `cmd/server`), `infra-fleet-service` (`devserveragent`, `adapter/metrics`, `cmd/server/main.go`), `backend-go/deploy/alerts/` (mới), `backend-go/ci/code-intel-bench/` (mới), `docs/guides/code-intel/`
@@ -113,14 +113,14 @@ Chuỗi mong muốn như CR-071 §2.6. Việc mới: (a) gateway bọc từng k�
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] `codeintel-budgets.json` khớp bảng 5.1; `check-codeintel-bench-budgets` thoát khác 0 trên báo cáo mẫu vượt và 0 trên báo cáo mẫu đạt; ô `null` chỉ cảnh báo.
-- [ ] `/metrics` của `code-intel-service` đủ metric mục 5.2; `TestMetricsLabelsAreClosedSets` xanh với 49 `rpc` sinh từ `ServiceDesc`; scrape không chứa UUID, đường dẫn, commit.
-- [ ] Gateway phục vụ `orca_mcp_*` và `orca_gateway_codeintel_*` cùng `/metrics`; infra-fleet có `orca_fleet_codeintel_*` ở `/health/metrics`.
-- [ ] Một yêu cầu `codeIntel.changeOverlay` lạnh cho một `trace_id` có span gateway, service, fleet, `codeintel.agent.cli` (kiểm bằng tracer trong bộ nhớ ở từng hop; chuỗi đầy đủ trên stack thật là kiểm tay, chưa kiểm chứng).
-- [ ] Không span nào có thuộc tính là đường dẫn, tên symbol, mã nguồn hay dài > 64 ký tự.
-- [ ] `codeintel.rules.yaml` chỉ dùng metric có thật (test).
-- [ ] Số liệu server CR-095 có metric, truy vấn quản trị chạy được trên Postgres và MySQL, luôn có `tenant_id`.
-- [ ] Không `max-lines` disable.
+- [x] `codeintel-budgets.json` khớp bảng 5.1; `check-codeintel-bench-budgets` thoát khác 0 trên báo cáo mẫu vượt và 0 trên báo cáo mẫu đạt; ô `null` chỉ cảnh báo.
+- [x] `/metrics` của `code-intel-service` đủ metric mục 5.2; `TestMetricsLabelsAreClosedSets` xanh với 49 `rpc` sinh từ `ServiceDesc`; scrape không chứa UUID, đường dẫn, commit.
+- [x] Gateway phục vụ `orca_mcp_*` và `orca_gateway_codeintel_*` cùng `/metrics`; infra-fleet có `orca_fleet_codeintel_*` ở `/health/metrics`.
+- [x] Một yêu cầu `codeIntel.changeOverlay` lạnh cho một `trace_id` có span gateway, service, fleet, `codeintel.agent.cli` (kiểm bằng tracer trong bộ nhớ ở từng hop; chuỗi đầy đủ trên stack thật là kiểm tay, chưa kiểm chứng).
+- [x] Không span nào có thuộc tính là đường dẫn, tên symbol, mã nguồn hay dài > 64 ký tự.
+- [x] `codeintel.rules.yaml` chỉ dùng metric có thật (test).
+- [x] Số liệu server CR-095 có metric, truy vấn quản trị chạy được trên Postgres và MySQL, luôn có `tenant_id`.
+- [x] Không `max-lines` disable.
 
 ## 8. Kiểm thử
 

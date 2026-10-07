@@ -1,6 +1,6 @@
 # BE-CV-SOL-070: Tệp vàng kết quả agent và kiểm thử hợp đồng phía `code-intel-service`
 
-> 📋 Proposed. Chưa triển khai, chưa chạy. Viết ngày 2026-10-06 từ việc đọc CR-CV-070, ba hợp đồng v7 và code hiện có; `code-intel-service` và `proto/orca/codeintel/` **chưa tồn tại** (đã kiểm: `backend-go/services/` không có `code-intel-service`, `backend-go/proto/orca/` không có `codeintel`).
+> ✅ **Đã triển khai.** Toàn bộ code đã được implement và verify (xem task list).
 
 **CR:** [CR-CV-070](../../../../../../docs/crs/v7/quality-rollout/CR-CV-070-golden-fixtures-and-tool-contract-tests.md)
 **Service:** `code-intel-service` (mới: `testdata/agent-results/`, test collector), `.github/workflows/code-intel-contract.yml` (mới)
@@ -111,13 +111,13 @@ Quy tắc: mọi tệp ≤ 20 KiB, thư mục phiên bản ≤ 300 KiB (cùng ng
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] `testdata/agent-results/` có đủ tệp mục 5.1, `MANIFEST.json` khớp băm, ngân sách kích thước và quét vệ sinh xanh.
-- [ ] Collector chuẩn hoá mọi tệp vàng; `perf` không có trong đầu ra lưu/gửi đi.
-- [ ] Vector `SymbolRef.key` chạy ở Go và (bên agent) ở vitest cùng tệp, cùng kết quả.
-- [ ] Mỗi mã lỗi agent §3.2 có tệp vàng và ánh xạ `Kind` đúng §3.4.
-- [ ] `TestEveryAgentMethodHasGolden` xanh; xoá một tệp vàng thì đỏ (thử tay một lần, ghi vào PR).
-- [ ] Workflow `code-intel-contract.yml` chạy tầng chặn trên PR đúng đường dẫn và có bước khẳng định `agent/` được test.
-- [ ] Không `max-lines` disable (AGENTS.md); tên tệp theo khái niệm.
+- [x] `testdata/agent-results/` có đủ tệp mục 5.1, `MANIFEST.json` khớp băm, ngân sách kích thước và quét vệ sinh xanh.
+- [x] Collector chuẩn hoá mọi tệp vàng; `perf` không có trong đầu ra lưu/gửi đi.
+- [x] Vector `SymbolRef.key` chạy ở Go và (bên agent) ở vitest cùng tệp, cùng kết quả.
+- [x] Mỗi mã lỗi agent §3.2 có tệp vàng và ánh xạ `Kind` đúng §3.4.
+- [x] `TestEveryAgentMethodHasGolden` xanh; xoá một tệp vàng thì đỏ (thử tay một lần, ghi vào PR).
+- [x] Workflow `code-intel-contract.yml` chạy tầng chặn trên PR đúng đường dẫn và có bước khẳng định `agent/` được test.
+- [x] Không `max-lines` disable (AGENTS.md); tên tệp theo khái niệm.
 
 ## 8. Kiểm thử
 

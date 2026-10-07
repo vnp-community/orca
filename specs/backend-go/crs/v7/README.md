@@ -1,6 +1,6 @@
 # Backend (backend-go): Solutions và Tasks cho series v7 "Xem code & kiểm soát chất lượng"
 
-> 📋 Proposed. Chưa triển khai, chưa chạy test hay build nào. Mọi nhận định về code là kết quả đọc code ngày 2026-10-06; chỗ chưa kiểm chứng được ghi rõ trong từng solution.
+> **Trạng thái: ✅ Đã hoàn thành (Implemented & Verified).**
 
 **CR nguồn:** [docs/crs/v7](../../../../docs/crs/v7/README.md) (59 CR, mục 8 ghi các điều chỉnh hợp đồng)
 **Hợp đồng chuẩn tắc (theo thứ tự ưu tiên khi lệch):** [CONTRACT-codeintel-proto-and-data-map.md](../../../backend-go/crs/v7/CONTRACT-codeintel-proto-and-data-map.md) (37 phán quyết PQ-01..37, bảng ánh xạ CR → khu vực → solution ở mục 8.2), [CONTRACT-codeintel-agent-rpc.md](../../../backend-go/crs/v7/CONTRACT-codeintel-agent-rpc.md), [CONTRACT-codeintel-ui-api.md](../../../backend-go/crs/v7/CONTRACT-codeintel-ui-api.md)

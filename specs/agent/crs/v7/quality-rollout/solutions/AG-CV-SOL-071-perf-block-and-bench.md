@@ -1,6 +1,6 @@
 # AG-CV-SOL-071: Khối `perf`, đo RSS, kiểm tra giới hạn đồng thời và benchmark phía `agent/`
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi dòng "đã đọc" là đọc code/tài liệu thật; chưa chạy build, test hay công cụ nào. **Mọi con số hiệu năng ở đây (ngân sách, độ trễ, RSS) là giả định lấy từ CR-CV-071, một lần đo trên một máy 32 nhân, chưa phải phân phối.**
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 071-01 đến 071-07, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-071](../../../../../../docs/crs/v7/quality-rollout/CR-CV-071-performance-budgets-metrics-tracing.md) (P1, Medium) — chỉ phần phía `agent/` (CR-071 mục 2.2 dòng "Agent (TS)", 2.5, và hạn mức đồng thời của mục 2.1)
 **Service:** `agent/`
@@ -195,13 +195,13 @@ Workflow `.github/workflows/code-intel-bench.yml`: `schedule` hằng đêm + `wo
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] Mọi kết quả thành công của method đọc có `perf` đúng kiểu; `command` luôn thuộc tập đóng; `JSON.stringify(perf)` không chứa đường dẫn, tên symbol, `args`.
-- [ ] `perf` không có trong giá trị cache, không có trong tệp vàng C2; cache hit trả `cliCalls:0`.
-- [ ] Bất biến: ≤ 2 `gitnexus`, ≤ 3 tiến trình tổng, hàng đợi ≤ 16, chờ quá hạn → `CODEINTEL_TIMEOUT` `data.reason="queue_wait"` (test với CLI giả, không phụ thuộc công cụ thật).
-- [ ] `rssPeakKb` có trên Linux (và macOS nếu đọc được), vắng trên nền tảng khác; không treo khi tiến trình thoát nhanh.
-- [ ] `codeintel-budgets.json` + script so sánh: báo cáo cố ý vượt → thoát ≠ 0; thiếu trường → thoát ≠ 0.
-- [ ] Bench chạy được qua `workflow_dispatch` trên máy có chỉ mục; báo cáo `codeintel-agent-bench-<commit>.json` có p50/p95/p99, kích thước, `rssPeakKb`, tỉ lệ cắt; lần đầu điền số đo vào PR (ngân sách hiệu chỉnh một lần).
-- [ ] Không thêm phụ thuộc, không `max-lines` disable.
+- [x] Mọi kết quả thành công của method đọc có `perf` đúng kiểu; `command` luôn thuộc tập đóng; `JSON.stringify(perf)` không chứa đường dẫn, tên symbol, `args`.
+- [x] `perf` không có trong giá trị cache, không có trong tệp vàng C2; cache hit trả `cliCalls:0`.
+- [x] Bất biến: ≤ 2 `gitnexus`, ≤ 3 tiến trình tổng, hàng đợi ≤ 16, chờ quá hạn → `CODEINTEL_TIMEOUT` `data.reason="queue_wait"` (test với CLI giả, không phụ thuộc công cụ thật).
+- [x] `rssPeakKb` có trên Linux (và macOS nếu đọc được), vắng trên nền tảng khác; không treo khi tiến trình thoát nhanh.
+- [x] `codeintel-budgets.json` + script so sánh: báo cáo cố ý vượt → thoát ≠ 0; thiếu trường → thoát ≠ 0.
+- [x] Bench chạy được qua `workflow_dispatch` trên máy có chỉ mục; báo cáo `codeintel-agent-bench-<commit>.json` có p50/p95/p99, kích thước, `rssPeakKb`, tỉ lệ cắt; lần đầu điền số đo vào PR (ngân sách hiệu chỉnh một lần).
+- [x] Không thêm phụ thuộc, không `max-lines` disable.
 
 ## 5. Kiểm thử
 

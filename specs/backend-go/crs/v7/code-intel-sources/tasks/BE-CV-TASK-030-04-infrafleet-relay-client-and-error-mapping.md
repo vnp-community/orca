@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/infrafleetrelay/relay_client.go` (mới), `.../internal/adapter/agentrepofs/agent_envelope_errors.go` (mới), `.../internal/adapter/agentrepofs/method_whitelist.go` (mới) và các `_test.go` kèm theo
 **Depends on:** BE-CV-TASK-030-01, BE-CV-TASK-030-03; `apperrors.KindUnavailable` của BE-CV-SOL-010 (nếu chưa có, chặn task này)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ Mẫu gọi: `api-gateway/.../wscompat/channels_accounts.go:136–160` (`client.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Metadata tenant luôn được gắn; thiếu tenant trong ctx → lỗi, không gọi.
-- [ ] Phong bì lỗi số được phát hiện; không có đường "lỗi agent thành kết quả thành công".
-- [ ] Whitelist có test khẳng định; thêm method lạ làm test đỏ.
-- [ ] Message lỗi không chứa đường dẫn tuyệt đối hay nội dung file.
+- [x] Metadata tenant luôn được gắn; thiếu tenant trong ctx → lỗi, không gọi.
+- [x] Phong bì lỗi số được phát hiện; không có đường "lỗi agent thành kết quả thành công".
+- [x] Whitelist có test khẳng định; thêm method lạ làm test đỏ.
+- [x] Message lỗi không chứa đường dẫn tuyệt đối hay nội dung file.
 
 ## Rủi ro và lưu ý
 

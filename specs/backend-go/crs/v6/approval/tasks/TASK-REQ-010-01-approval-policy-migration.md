@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / migrations
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_approval_policies.{up,down}.sql` (mới)
 **Depends on:** TASK-REQ-009-01 (bảng `approvals`)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -29,9 +29,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai dialect cùng số, up/down/up sạch.
-- [ ] CHECK từ chối giá trị lạ ở cả hai DB.
-- [ ] Truy vấn `WHERE project_id IS NULL OR project_id=?` cùng kết quả ở hai DB trên dữ liệu mẫu.
+- [x] Hai dialect cùng số, up/down/up sạch.
+- [x] CHECK từ chối giá trị lạ ở cả hai DB.
+- [x] Truy vấn `WHERE project_id IS NULL OR project_id=?` cùng kết quả ở hai DB trên dữ liệu mẫu.
 
 ## Rủi ro và lưu ý
 

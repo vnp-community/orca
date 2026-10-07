@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/security_finding_rules.go`, `backend-go/services/code-intel-service/internal/usecase/security_finding_sanitizer.go`, test (mới)
 **Depends on:** BE-CV-TASK-082-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 SOL mục 2.C, C6; PQ-26 regex; H8.
@@ -19,7 +19,7 @@ SOL mục 2.C, C6; PQ-26 regex; H8.
 - Bảng loại bí mật; loại lạ ⇒ `unknown`; `GOVULN`/`OSV` giữ message đã che.
 
 ## Tiêu chí hoàn thành
-- [ ] Không còn văn bản gốc agent cho `SEC-SECRET` sau bước này.
+- [x] Không còn văn bản gốc agent cho `SEC-SECRET` sau bước này.
 
 ## Rủi ro
 Bảng loại bí mật phải khớp parser agent.

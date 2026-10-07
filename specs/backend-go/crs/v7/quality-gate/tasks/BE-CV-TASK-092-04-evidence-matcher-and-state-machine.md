@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/domain/requirement_evidence_matcher.go`, `requirement_trace.go` (mới)
 **Depends on:** BE-CV-TASK-092-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. Nguồn bằng chứng: `satisfies` (derived), `commit_trailer`, `test_edge`, `check_profile`, `name_overlap` (inferred), `user_confirmed`; `reject` loại.
@@ -17,7 +17,7 @@
 - Bảng đủ tổ hợp (change/test/check × explicit/derived/inferred × verifyHint × stale); `CONFIRM` nâng gợi ý; `REJECT` loại.
 
 ## Tiêu chí hoàn thành
-- [ ] `inferred`-only ⇒ `no_evidence`; [ ] index cũ ⇒ `unknown`; [ ] `manual` ⇒ `manual_pending`.
+- [x] `inferred`-only ⇒ `no_evidence`; [ ] index cũ ⇒ `unknown`; [ ] `manual` ⇒ `manual_pending`.
 
 ## Rủi ro
 - Phụ thuộc `changedSymbols[].tested`/`readingOrder[].tests` của CR-036 (đề xuất).

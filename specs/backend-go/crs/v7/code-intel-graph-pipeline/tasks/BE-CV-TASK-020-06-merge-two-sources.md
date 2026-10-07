@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/symbol_merge.go` (mới), `symbol_merge_test.go` (mới)
 **Depends on:** TASK-020-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,9 +30,9 @@ CR mục 2.4 "Khớp hai nguồn". Agent trả tối đa hai nguồn trong `sour
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca ở trên xanh và xác định (`-count=2`).
-- [ ] `MergeReport` đủ để SOL-021 đẩy metric `codeintel_symbol_merge_total{kind=primary|secondary|unmatched}`.
-- [ ] Không import proto/DB.
+- [x] Mọi ca ở trên xanh và xác định (`-count=2`).
+- [x] `MergeReport` đủ để SOL-021 đẩy metric `codeintel_symbol_merge_total{kind=primary|secondary|unmatched}`.
+- [x] Không import proto/DB.
 
 ## Rủi ro và lưu ý
 

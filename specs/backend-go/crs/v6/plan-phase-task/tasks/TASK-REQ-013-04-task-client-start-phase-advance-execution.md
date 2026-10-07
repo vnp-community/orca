@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/adapter/grpcclient/task_client.go` (mới), `internal/usecase/start_phase.go` (mới), `internal/usecase/advance_execution.go` (mới), `internal/usecase/start_execution.go` (mới), `internal/usecase/ports.go`, `internal/adapter/grpc/server_phase.go` (mới), `internal/usecase/start_phase_test.go`, `advance_execution_test.go` (mới), `proto/orca/request/v1/request_execution.proto` (mới)
 **Depends on:** TASK-REQ-013-03, SOL-011 (task 04 `ListTasks` lọc), SOL-012 (cây Plan), CR-REQ-003 (`FlowFor`), CR-REQ-009 (`OpenApproval`, đọc Approval `phase`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -36,11 +36,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `StartPhase` sai điều kiện trả đúng mã; gọi hai lần trả `already_started=true`, không `Execute` trùng và chỉ một `phase.started`.
-- [ ] Task `open` được `Execute` đúng `MaxParallelTasks`; task `blocked` không bị chạy.
-- [ ] Task thứ hai của Plan dùng cùng `worktree_id` với task đầu (kiểm qua fake).
-- [ ] Không gọi `Execute` trên `plan`/`phase`.
-- [ ] `AdvanceExecution` chạy lặp không sinh lời gọi `Execute` thừa cho task đang chạy.
+- [x] `StartPhase` sai điều kiện trả đúng mã; gọi hai lần trả `already_started=true`, không `Execute` trùng và chỉ một `phase.started`.
+- [x] Task `open` được `Execute` đúng `MaxParallelTasks`; task `blocked` không bị chạy.
+- [x] Task thứ hai của Plan dùng cùng `worktree_id` với task đầu (kiểm qua fake).
+- [x] Không gọi `Execute` trên `plan`/`phase`.
+- [x] `AdvanceExecution` chạy lặp không sinh lời gọi `Execute` thừa cho task đang chạy.
 
 ## Rủi ro và lưu ý
 

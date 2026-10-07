@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/contractdiff/{contract_diff.go, compatibility.go, proto_diff_rules.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-038-01, BE-CV-TASK-038-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Solution 2.D (proto). Hàm thuần `DiffProto(base, head ProtoSchema) []Contract
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi dòng bảng quy tắc có test.
-- [ ] `Summary` đếm đúng; `id` ổn định.
+- [x] Mọi dòng bảng quy tắc có test.
+- [x] `Summary` đếm đúng; `id` ổn định.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/{worktree_ref.go,workspace_path.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-011-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ PQ-04 (ba dạng ref + dạng bị từ chối), SOL-012 mục 2.B bước 1, 6 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng test đủ; hàm thuần không import `path/filepath`.
-- [ ] `scope_key` ≤ 128 ký tự mọi đầu vào hợp lệ.
+- [x] Bảng test đủ; hàm thuần không import `path/filepath`.
+- [x] `scope_key` ≤ 128 ký tự mọi đầu vào hợp lệ.
 
 ## Rủi ro và lưu ý
 

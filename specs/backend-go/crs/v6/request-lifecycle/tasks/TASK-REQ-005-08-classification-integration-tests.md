@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/adapter/contracttest/classification_contract.go` (mới), `internal/adapter/postgres/classification_integration_test.go`, `internal/adapter/mysql/classification_integration_test.go` (mới)
 **Depends on:** TASK-REQ-005-07, TASK-REQ-002-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,10 +28,10 @@ Các tiêu chí mục 4 của CR-REQ-005 cần DB thật cho: Confirm đồng th
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi kịch bản xanh với cả hai dialect.
-- [ ] Giao lặp cùng `EventID`: một đề xuất.
-- [ ] Giới hạn 5 lần AI tính cả lần thất bại.
-- [ ] Đổi loại giữ nguyên `solutions`.
+- [x] Mọi kịch bản xanh với cả hai dialect.
+- [x] Giao lặp cùng `EventID`: một đề xuất.
+- [x] Giới hạn 5 lần AI tính cả lần thất bại.
+- [x] Đổi loại giữ nguyên `solutions`.
 
 ## Rủi ro và lưu ý
 

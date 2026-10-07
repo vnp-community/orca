@@ -1,0 +1,34 @@
+// CodeIntelService proto definition - CR-CV-010 / BE-CV-TASK-010-04.
+// Skeleton service declaration. RPCs are added as their request/response messages are introduced.
+syntax = "proto3";
+
+package orca.codeintel.v1;
+
+option go_package = "github.com/stablyai/orca-go/proto/gen/go/orca/codeintel/v1;codeintelv1";
+
+// CodeIntelService is the primary service for code intelligence capabilities.
+// See CONTRACT-codeintel-proto-and-data-map.md §3.1.
+// RPCs are added incrementally as their request/response messages are introduced.
+
+import "orca/codeintel/v1/codeintel_binding.proto";
+import "orca/codeintel/v1/codeintel_events.proto";
+import "orca/codeintel/v1/codeintel_graph.proto";
+import "orca/codeintel/v1/codeintel_reindex.proto";
+
+service CodeIntelService {
+  rpc GetIndexStatus(GetIndexStatusRequest) returns (GetIndexStatusResponse);
+  rpc BindRepo(BindRepoRequest) returns (BindRepoResponse);
+  rpc ListRepoBindings(ListRepoBindingsRequest) returns (ListRepoBindingsResponse);
+  rpc RequestReindex(RequestReindexRequest) returns (RequestReindexResponse);
+  rpc GetReindexJob(GetReindexJobRequest) returns (GetReindexJobResponse);
+  rpc GetStructure(GetStructureRequest) returns (GetStructureResponse);
+  rpc GetClusterOverview(GetClusterOverviewRequest) returns (GetClusterOverviewResponse);
+  rpc GetSubgraph(GetSubgraphRequest) returns (GetSubgraphResponse);
+  rpc GetImpact(GetImpactRequest) returns (GetImpactResponse);
+  rpc GetSymbol(GetSymbolRequest) returns (GetSymbolResponse);
+  rpc GetRouteMap(GetRouteMapRequest) returns (GetRouteMapResponse);
+  rpc StreamCodeIntelEvents(StreamCodeIntelEventsRequest) returns (stream CodeIntelPush);
+}
+
+
+

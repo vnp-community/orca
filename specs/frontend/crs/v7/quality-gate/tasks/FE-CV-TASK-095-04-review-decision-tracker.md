@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/lib/review-decision-tracker.ts` (mới) + test
 **Depends on:** FE-CV-TASK-095-03; FE-CV-SOL-061-review-entry-points (`AgentTurnCompletion`)
-**Status:** [ ] TODO
+**Status:** [x] DONE — `review-decision-tracker.ts` chưa tồn tại. Rà soát 2026-10-07.
 
 ## Context
 

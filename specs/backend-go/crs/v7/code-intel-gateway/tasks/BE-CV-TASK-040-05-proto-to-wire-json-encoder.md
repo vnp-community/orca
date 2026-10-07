@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_codeintel_wire_encoder.go` (mới), `channels_codeintel_wire_enums.go` (mới), `channels_codeintel_wire_encoder_test.go` (mới)
 **Depends on:** cổng G0 cho test với message thật; làm trước được bằng `dynamicpb`/message trong `testdata`
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -39,10 +39,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Một hàm duy nhất dùng cho mọi view; không có struct view viết tay cho proto lớn.
-- [ ] Mảng không bao giờ `null`; enum lạ => `"unknown"`.
-- [ ] Bảng nullable/enum có test đối chiếu proto thật khi có (cổng G0).
-- [ ] `devServerId` không xuất hiện ở bất kỳ đầu ra nào (test).
+- [x] Một hàm duy nhất dùng cho mọi view; không có struct view viết tay cho proto lớn.
+- [x] Mảng không bao giờ `null`; enum lạ => `"unknown"`.
+- [x] Bảng nullable/enum có test đối chiếu proto thật khi có (cổng G0).
+- [x] `devServerId` không xuất hiện ở bất kỳ đầu ra nào (test).
 
 ## Rủi ro và lưu ý
 

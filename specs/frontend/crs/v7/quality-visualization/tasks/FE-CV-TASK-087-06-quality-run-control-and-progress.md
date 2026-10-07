@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `frontend/src/renderer/src/components/review-map/quality/QualityRunControl.tsx`, `QualityRunProgress.tsx`, `QualityLensToolbar.tsx` (mới) và `*.test.tsx`
 **Depends on:** 087-03, 087-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

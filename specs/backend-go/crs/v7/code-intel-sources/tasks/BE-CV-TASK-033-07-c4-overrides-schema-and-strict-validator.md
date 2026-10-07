@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/c4/overrides_schema.go` (mới), `.../overrides_validator.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-033-04 (id, kind)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Solution mục 2.A, 2.B. `yaml.v3` chỉ xác nhận trong `infra-fleet-service`
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca độc hại bị từ chối; mẫu hợp lệ qua.
-- [ ] Không alias nào lọt.
+- [x] Mọi ca độc hại bị từ chối; mẫu hợp lệ qua.
+- [x] Không alias nào lọt.
 
 ## Rủi ro và lưu ý
 

@@ -1,6 +1,6 @@
 # FE-REQ-SOL-032: `GraphCanvas`, bảy lens, token rủi ro và chuyển `TaskDAGView` sang token
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06 từ khảo sát code `frontend/src` và các CR backend 028, 029, 030; chưa chạy test, chưa chạy ứng dụng, chưa đo bundle hay hiệu năng.
+> 🔴 **Not Started.** Rà soát 2026-10-07: chưa có `GraphCanvas`, `RiskBadge`, `useGraphLens`, token `--risk-*` trong CSS. Viết ngày 2026-10-06 từ khảo sát code `frontend/src` và các CR backend 028, 029, 030; chưa chạy test, chưa chạy ứng dụng, chưa đo bundle hay hiệu năng.
 
 **CR:** [CR-REQ-032](../../../../../../docs/crs/v6/request-frontend/CR-REQ-032-graph-canvas-and-lenses.md), [ADDENDUM-2026-10-06](../../../../../../docs/crs/v6/request-frontend/ADDENDUM-2026-10-06.md)
 **Area:** frontend (`frontend/src/shared`, `frontend/src/renderer/src/components/graph`, `assets/main.css`, `guides/STYLEGUIDE.md`)

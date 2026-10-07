@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/usecase/agent_forgery_test.go` (mới), `.../internal/usecase/dos_limits_test.go` (mới)
 **Depends on:** BE-CV-SOL-021, 022, 013-agent-call-gate-and-quotas, 024, BE-CV-TASK-070-04
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -27,7 +27,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca trả mã đúng, không panic, không cache dữ liệu không hợp lệ.
+- [x] Mọi ca trả mã đúng, không panic, không cache dữ liệu không hợp lệ.
 
 ## Rủi ro và lưu ý
 

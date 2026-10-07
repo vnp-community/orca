@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + i18n
 **File:** `frontend/src/renderer/src/components/settings/code-intel/CodeIntelSettingsCard.tsx` (mới) + test; `components/settings/Settings.tsx` hoặc registry pane (sửa nhỏ, vị trí chưa kiểm chứng); `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks (`settings.get`, làm mới); FE-CV-TASK-073-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

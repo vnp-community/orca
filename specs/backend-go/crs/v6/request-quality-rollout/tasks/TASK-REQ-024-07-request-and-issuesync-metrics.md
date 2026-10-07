@@ -5,7 +5,7 @@
 **Service:** `request-service`, `issue-status-sync`
 **File:** `backend-go/services/request-service/internal/adapter/metrics/request_metrics.go` (mới), `.../cmd/server/main.go`; `backend-go/services/issue-status-sync/internal/adapter/metrics/issuesync_metrics.go` (mới), `.../cmd/server/main.go`, `.../internal/usecase/ports.go`; các `_test.go`
 **Depends on:** TASK-REQ-024-04; CR-REQ-003, 007, 009, 013 (nơi gọi `Observe*`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -33,9 +33,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `/metrics` của hai service trả các series 2.9.
-- [ ] Không nhãn có id hay tiêu đề.
-- [ ] Goroutine lấy mẫu dừng sạch khi tắt.
+- [x] `/metrics` của hai service trả các series 2.9.
+- [x] Không nhãn có id hay tiêu đề.
+- [x] Goroutine lấy mẫu dừng sạch khi tắt.
 
 ## Rủi ro và lưu ý
 

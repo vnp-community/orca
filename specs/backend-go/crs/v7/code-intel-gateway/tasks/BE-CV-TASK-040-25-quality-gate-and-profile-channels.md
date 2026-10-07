@@ -29,7 +29,7 @@ UI-API 3.2: `gate` (sel, `base?`, `profileName?`, `turnKey?`, `record?`, `includ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh đúng shape UI-API 4.7; `definition` chỉ object hợp lệ.
+- [x] Ba kênh đúng shape UI-API 4.7; `definition` chỉ object hợp lệ.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_request_extras.go` (mới), `.../channels_request_extras_test.go` (mới), `.../excluded_channels.yaml`
 **Depends on:** TASK-REQ-016-03; CONTRACT mục 9 Q1 đã chốt; RPC `ListRequestLinks` (CR-REQ-006), `GetRequestFlow` (CR-REQ-003), `ListRequestChecks` (CR-REQ-014)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -29,7 +29,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh có test; parity xanh; CONTRACT cập nhật.
+- [x] Ba kênh có test; parity xanh; CONTRACT cập nhật.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/change_request_type.go`, `internal/usecase/list_request_type_history.go` và `*_test.go` (mới)
 **Depends on:** TASK-REQ-005-05, TASK-REQ-005-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -34,10 +34,10 @@ CR-REQ-005 mục 2.4; bảng đường đổi ở `domain.ChangeTypeAllowed`. T�
 
 ## Tiêu chí hoàn thành
 
-- [ ] `bug` sang `change_request` từ `analyzing`: status `awaiting_type_confirmation`, Solution và Task cũ còn nguyên, có dòng lịch sử và `type_changed`.
-- [ ] `spike` sang `change_request` trả `REQUEST_TYPE_CHANGE_USE_CHILD`; `bug` sang `docs` trả `REQUEST_TYPE_CHANGE_NOT_ALLOWED`.
-- [ ] Approval `pending` bị huỷ qua cổng.
-- [ ] `ListRequestTypeHistory` đúng thứ tự.
+- [x] `bug` sang `change_request` từ `analyzing`: status `awaiting_type_confirmation`, Solution và Task cũ còn nguyên, có dòng lịch sử và `type_changed`.
+- [x] `spike` sang `change_request` trả `REQUEST_TYPE_CHANGE_USE_CHILD`; `bug` sang `docs` trả `REQUEST_TYPE_CHANGE_NOT_ALLOWED`.
+- [x] Approval `pending` bị huỷ qua cổng.
+- [x] `ListRequestTypeHistory` đúng thứ tự.
 
 ## Rủi ro và lưu ý
 

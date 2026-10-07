@@ -29,8 +29,8 @@ CR-041 2.5, 2.6, mục 4. `Executor.CallTool` bọc `WrapUntrusted` chỉ khối
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi kịch bản 2.5 có test hoặc ghi chú chưa kiểm chứng.
-- [ ] Kết luận về taint và `write_reversible` được ghi.
+- [x] Mọi kịch bản 2.5 có test hoặc ghi chú chưa kiểm chứng.
+- [x] Kết luận về taint và `write_reversible` được ghi.
 
 ## Rủi ro và lưu ý
 

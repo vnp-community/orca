@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `proto/orca/task/v1/task.proto`, `internal/usecase/ports.go` (dòng 67), `internal/usecase/list_tasks.go`, `internal/adapter/postgres/task_list_query.go` (mới), `internal/adapter/mysql/task_list_query.go` (mới), `internal/adapter/{postgres,mysql}/repository.go` (xoá `List` cũ), `internal/adapter/grpc/server.go` (dòng 299), `internal/usecase/fakes_test.go`
 **Depends on:** TASK-REQ-011-02
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -34,11 +34,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không truyền `task_types` thì không trả plan/phase; `task_types=[plan]` kèm `request_ids=[X]` trả đúng Plan của X.
-- [ ] 101 `request_ids` bị `TASK_LIST_TOO_MANY_REQUEST_IDS`.
-- [ ] Hành vi gọi cũ (chỉ `project_id`, `page_token`, `page_size`) cho kết quả y như trước trên dữ liệu không có plan/phase.
-- [ ] `EXPLAIN` truy vấn theo `request_ids` dùng `idx_tasks_request` (ghi nhận kế hoạch trong PR, không bắt buộc test).
-- [ ] Không còn nơi nào gọi chữ ký `List` cũ.
+- [x] Không truyền `task_types` thì không trả plan/phase; `task_types=[plan]` kèm `request_ids=[X]` trả đúng Plan của X.
+- [x] 101 `request_ids` bị `TASK_LIST_TOO_MANY_REQUEST_IDS`.
+- [x] Hành vi gọi cũ (chỉ `project_id`, `page_token`, `page_size`) cho kết quả y như trước trên dữ liệu không có plan/phase.
+- [x] `EXPLAIN` truy vấn theo `request_ids` dùng `idx_tasks_request` (ghi nhận kế hoạch trong PR, không bắt buộc test).
+- [x] Không còn nơi nào gọi chữ ký `List` cũ.
 
 ## Rủi ro và lưu ý
 

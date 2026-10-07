@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/contractdiff/{ws_channel_diff_rules.go, route_diff_rules.go}` và `_test.go` (mới)
 **Depends on:** BE-CV-TASK-038-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ Kênh `wscompat` là hợp đồng giữa UI và gateway; tham số nằm trong 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi dòng bảng `ws.*` có test; `route.*` có test hoặc được đánh dấu "chờ extractor" trong PR.
-- [ ] `ws.args-opaque` không bao giờ ra `breaking`/`compatible`.
+- [x] Mọi dòng bảng `ws.*` có test; `route.*` có test hoặc được đánh dấu "chờ extractor" trong PR.
+- [x] `ws.args-opaque` không bao giờ ra `breaking`/`compatible`.
 
 ## Rủi ro và lưu ý
 

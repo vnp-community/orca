@@ -1,6 +1,6 @@
 # FE-REQ-SOL-020: Xem, so sánh, chọn và duyệt Solution (Chẩn đoán, Findings, Answer)
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress.** Rà soát 2026-10-07: 020-01 ✅ (`solution-view-model.ts` + test tồn tại), 020-02..05 ❌ TODO.
 
 **CR:** [CR-REQ-020](../../../../../../docs/crs/v6/request-frontend/CR-REQ-020-solution-review-ui.md)
 **Area:** frontend (`components/request/solution/`)

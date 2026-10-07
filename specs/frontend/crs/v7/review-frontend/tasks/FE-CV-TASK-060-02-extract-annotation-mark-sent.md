@@ -5,7 +5,7 @@
 **Area:** frontend / renderer lib
 **File:** `frontend/src/renderer/src/lib/annotation-mark-sent-best-effort.ts` (mới) + test; `frontend/src/renderer/src/components/editor/DiffNotesSendMenu.tsx` (sửa: chỉ import lại)
 **Depends on:** không (độc lập; làm trước 060-04)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/disabled-gate.ts` + `.test.ts` (mới); sửa `dispatchCodeIntelRpc`, `dispatchQualityRpc` (AG-CV-SOL-001/081) thêm một lời gọi
 **Depends on:** 073-01; AG-CV-SOL-001, 081
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -29,12 +29,12 @@ Chưa chạy; mã dispatcher của AG-CV-SOL-001/081 chưa tồn tại: test imp
 - `reindexDisabled` chỉ chặn `reindex`; `qualityDisabled` chỉ chặn `quality.run`
 - Test xanh.
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/disabled-gate.test.ts` (5 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng 2.3 đúng cho mọi method.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Bảng 2.3 đúng cho mọi method.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

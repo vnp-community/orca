@@ -5,7 +5,7 @@
 **Area:** frontend / shared
 **File:** `frontend/src/shared/code-intel-rpc-methods.ts` (mới), `frontend/src/shared/code-intel-contract-conformance.test.ts` (mới)
 **Depends on:** FE-CV-TASK-050-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

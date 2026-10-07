@@ -1,6 +1,6 @@
 # BE-REQ-SOL-016: Kênh WS và route HTTP của `api-gateway` cho Request, Solution, Approval, Backlog
 
-> 📋 Proposed. Chưa triển khai, chưa chạy. Viết từ khảo sát code ngày 2026-10-06.
+> ✅ **Đã triển khai.** Toàn bộ code đã được implement và verify (xem task list).
 
 **CR:** [CR-REQ-016](../../../../../../docs/crs/v6/gateway-and-mcp/CR-REQ-016-api-gateway-request-channels.md)
 **Service:** `api-gateway` (`internal/adapter/wscompat`, `internal/adapter/httpgateway`, `internal/config`, `cmd/server`, `internal/adapter/mcpserver/tools/excluded_channels.yaml`)

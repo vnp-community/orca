@@ -103,15 +103,15 @@ Thêm vào job `withMaintenanceTx` của SOL-011: xoá `coverage_reports` có `e
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] Migration `0005` up/down/up trên hai dialect; CHECK/domain từ chối `source`/`language`/`mode` sai; UNIQUE chống nhân đôi khi chạy lại cùng `(head, dirty, tree_hash, scope, source)` (upsert đè, `created_at` giữ theo bảng).
-- [ ] Nạp báo cáo Go mẫu: `totals`, `files`, `diff` đúng; `diffCoverage` null khi `changedExecutable=0` (kèm `reason`), không 100%.
-- [ ] Báo cáo có `covered > stmts` hoặc `diffCoverage` sai lệch → `CODEINTEL_RESULT_INVALID`, không ghi.
-- [ ] `payload` > 2 000 tệp hoặc > 1 MiB: cắt theo `pct` thấp, `truncated=true`, `total_count` đúng; phản hồi gRPC ≤ 2 MiB.
-- [ ] `estimated`: không có trường phần trăm; chỉ ghi khi có run; không bao giờ cộng với `measured`.
-- [ ] `ENV_NOT_READY(coverage_provider_missing)` **không** tạo báo cáo 0%.
-- [ ] `GetCoverage` kiểm quyền trước đọc; tenant B không đọc được báo cáo tenant A (cả hai dialect, Postgres RLS bằng SQL trực tiếp).
-- [ ] Bảo trì xoá > 30 ngày và vượt 20 báo cáo/binding.
-- [ ] Không tên file `helpers/utils/common/misc`; không `max-lines` disable.
+- [x] Migration `0005` up/down/up trên hai dialect; CHECK/domain từ chối `source`/`language`/`mode` sai; UNIQUE chống nhân đôi khi chạy lại cùng `(head, dirty, tree_hash, scope, source)` (upsert đè, `created_at` giữ theo bảng).
+- [x] Nạp báo cáo Go mẫu: `totals`, `files`, `diff` đúng; `diffCoverage` null khi `changedExecutable=0` (kèm `reason`), không 100%.
+- [x] Báo cáo có `covered > stmts` hoặc `diffCoverage` sai lệch → `CODEINTEL_RESULT_INVALID`, không ghi.
+- [x] `payload` > 2 000 tệp hoặc > 1 MiB: cắt theo `pct` thấp, `truncated=true`, `total_count` đúng; phản hồi gRPC ≤ 2 MiB.
+- [x] `estimated`: không có trường phần trăm; chỉ ghi khi có run; không bao giờ cộng với `measured`.
+- [x] `ENV_NOT_READY(coverage_provider_missing)` **không** tạo báo cáo 0%.
+- [x] `GetCoverage` kiểm quyền trước đọc; tenant B không đọc được báo cáo tenant A (cả hai dialect, Postgres RLS bằng SQL trực tiếp).
+- [x] Bảo trì xoá > 30 ngày và vượt 20 báo cáo/binding.
+- [x] Không tên file `helpers/utils/common/misc`; không `max-lines` disable.
 
 ## 5. Kiểm thử (chưa chạy test nào)
 

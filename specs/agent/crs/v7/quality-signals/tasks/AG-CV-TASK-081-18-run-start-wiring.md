@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-run-start.ts` (mới), `.test.ts` (mới); điền dòng `quality.run` trong `quality-method-table.ts`
 **Depends on:** AG-CV-TASK-081-06, 081-08, 081-15, 081-16
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,8 +24,8 @@ Kịch bản: tên lạ (spy `executeStep` không gọi), mọi bước thiếu 
 
 ## Tiêu chí hoàn thành
 
-- [ ] `quality.run` trả < 1 s trong mọi kịch bản; tên lạ không spawn.
-- [ ] `ENV_NOT_READY` đúng điều kiện (mọi bước).
+- [x] `quality.run` trả < 1 s trong mọi kịch bản; tên lạ không spawn.
+- [x] `ENV_NOT_READY` đúng điều kiện (mọi bước).
 
 ## Rủi ro
 

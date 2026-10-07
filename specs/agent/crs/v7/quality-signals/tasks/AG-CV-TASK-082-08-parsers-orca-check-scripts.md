@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-parser-orca-check.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-082-02, 082-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,7 +24,7 @@ Chuỗi đầu ra mẫu dựng theo mã script (đã đọc) + fixture thật t�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không bao giờ tạo phát hiện từ dòng khung; thoát 1 mà 0 phát hiện → drift.
+- [x] Không bao giờ tạo phát hiện từ dòng khung; thoát 1 mà 0 phát hiện → drift.
 
 ## Rủi ro
 

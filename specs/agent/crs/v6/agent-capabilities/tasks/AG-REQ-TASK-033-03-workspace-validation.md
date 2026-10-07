@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-workspace-validation.ts` (mới), `agent/src/relay/agent-workspace-validation.test.ts` (mới)
 **Depends on:** không (kiểu `accessMode`/`workspaceKind` có thể khai báo cục bộ; nếu task 01 đã xong thì import kiểu từ `agent-exec-prompt-options.ts`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -58,11 +58,11 @@ Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/agent-wo
 
 ## Tiêu chí hoàn thành
 
-- [ ] `repo_root` + `write` luôn là `REPO_ROOT_REQUIRES_READONLY` và không đọc hệ tệp.
-- [ ] `scratch` thoát được bằng symlink hoặc `..` đều bị `SCRATCH_OUTSIDE_ALLOWED_ROOTS`.
-- [ ] `worktree` không thay đổi hành vi (không gọi `fs`, không gọi Git).
-- [ ] Chỉ lệnh Git là `rev-parse --show-toplevel`, gọi bằng `execFile` không qua shell.
-- [ ] Mọi hàm tuân thứ tự kiểm ở bước 2; không ném lỗi ra ngoài.
+- [x] `repo_root` + `write` luôn là `REPO_ROOT_REQUIRES_READONLY` và không đọc hệ tệp.
+- [x] `scratch` thoát được bằng symlink hoặc `..` đều bị `SCRATCH_OUTSIDE_ALLOWED_ROOTS`.
+- [x] `worktree` không thay đổi hành vi (không gọi `fs`, không gọi Git).
+- [x] Chỉ lệnh Git là `rev-parse --show-toplevel`, gọi bằng `execFile` không qua shell.
+- [x] Mọi hàm tuân thứ tự kiểm ở bước 2; không ném lỗi ra ngoài.
 
 ## Rủi ro và lưu ý
 

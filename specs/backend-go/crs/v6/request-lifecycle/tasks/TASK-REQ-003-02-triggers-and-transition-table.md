@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/domain/request_trigger.go`, `internal/domain/request_transition.go`, `internal/domain/request_flow_path.go` và `*_test.go` (mới)
 **Depends on:** TASK-REQ-003-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -43,10 +43,10 @@ Lệnh: `go test ./services/request-service/internal/domain/...`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi cặp ngoài bảng bị từ chối (ma trận đầy đủ).
-- [ ] `completed`, `cancelled` không nhận trigger.
-- [ ] `HappyPath` đúng cho 11 loại.
-- [ ] Không có I/O, không import ngoài stdlib và `common/apperrors`.
+- [x] Mọi cặp ngoài bảng bị từ chối (ma trận đầy đủ).
+- [x] `completed`, `cancelled` không nhận trigger.
+- [x] `HappyPath` đúng cho 11 loại.
+- [x] Không có I/O, không import ngoài stdlib và `common/apperrors`.
 
 ## Rủi ro và lưu ý
 

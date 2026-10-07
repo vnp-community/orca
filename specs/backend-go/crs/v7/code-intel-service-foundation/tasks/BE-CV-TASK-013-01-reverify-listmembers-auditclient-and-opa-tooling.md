@@ -5,7 +5,7 @@
 **Service:** (chỉ đọc) `project-service`, `auth-service`, `api-gateway`, `common`
 **File:** không sửa file; kết quả ghi vào PR
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,7 +28,7 @@ SOL-013-authorization mục 1 và 6 liệt kê điểm chưa kiểm chứng ản
 
 ## Tiêu chí hoàn thành
 
-- [ ] Kết luận cho bốn điểm (ListMembers, role, audit, opa) hoặc ghi "chưa kiểm chứng".
+- [x] Kết luận cho bốn điểm (ListMembers, role, audit, opa) hoặc ghi "chưa kiểm chứng".
 
 ## Rủi ro và lưu ý
 

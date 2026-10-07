@@ -1,0 +1,43 @@
+{
+  "data": {
+    "edges": [
+      {
+        "handler": {
+          "endLine": null,
+          "filePath": "foo.ts",
+          "key": "file:foo.ts:foo",
+          "kind": "file",
+          "name": "foo",
+          "qualifiedName": "foo",
+          "startLine": null,
+          "uid": "File:foo.ts:foo"
+        },
+        "kind": "HANDLES_ROUTE",
+        "route": "r1",
+        "side": "server"
+      }
+    ],
+    "routes": [
+      {
+        "errorKeys": [],
+        "id": "r1",
+        "middleware": [],
+        "path": "/api",
+        "responseKeys": []
+      }
+    ]
+  },
+  "headCommit": "abcdef",
+  "sources": [
+    {
+      "commit": "abcdef",
+      "indexedAt": 1600000000000,
+      "lineBase": 1,
+      "tool": "gitnexus",
+      "version": "1.6.9"
+    }
+  ],
+  "stale": false,
+  "totalCount": 1,
+  "truncated": false
+}

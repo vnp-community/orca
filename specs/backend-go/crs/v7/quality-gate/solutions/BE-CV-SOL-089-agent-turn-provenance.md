@@ -151,17 +151,17 @@ Công việc nền (`CODEINTEL_MAINTENANCE_INTERVAL`, lô 500, `withMaintenanceT
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] Hai lần `RecordAgentTurn` cùng `clientTurnId` → một hàng; trường đã có không bị ghi đè bằng rỗng; hai dialect cùng kết quả.
-- [ ] `base_head_commit` lượt N = `end_head_commit` lượt N−1; lượt đầu NULL.
-- [ ] Bảng ca chuẩn hoá lệnh (`pnpm test --filter x`, `cd /tmp && rm -rf …`, URL, `FOO=bar cmd`, `curl -H "Authorization: …"`) không để lọt đối số/đường dẫn/secret; ≤ 20 mục; không panic với chuỗi cắt giữa rune.
-- [ ] `promptExcerpt` không lưu khi cờ tắt; bật thì ≤ 160 ký tự và đã che; `promptDigest` không đảo ngược được.
-- [ ] Claim `ran_command` không bao giờ `confidence` > `medium`; `stated` không sinh khi cờ tắt; claim do client gửi mà `commandsSummary` không hậu thuẫn bị bỏ.
-- [ ] Bốn trạng thái `agreement` có test; cây bẩn → `unverified/tree_may_differ`; run `env_not_ready` → `unverified`.
-- [ ] `verification` không đổi `verdict` của `GetQualityGate`.
-- [ ] Bảo trì xoá >90 ngày và >200/binding, xoá văn bản >30 ngày; chạy lặp không đổi kết quả.
-- [ ] Người không có `review_write` không ghi được; người không thuộc project → `CODEINTEL_NOT_AUTHORIZED`; cờ tắt → `CODEINTEL_QUALITY_GATE_DISABLED`.
-- [ ] Mọi truy vấn có `tenant_id`; tenant A không thấy/ghi lượt tenant B (hai dialect); `GetAgentTurn` id tenant khác → `CODEINTEL_NOT_FOUND`.
-- [ ] Không có `agentType`/`model`/id lượt trong nhãn metric hoặc log mức INFO (H8; CR-095 telemetry cũng không nhận).
+- [x] Hai lần `RecordAgentTurn` cùng `clientTurnId` → một hàng; trường đã có không bị ghi đè bằng rỗng; hai dialect cùng kết quả.
+- [x] `base_head_commit` lượt N = `end_head_commit` lượt N−1; lượt đầu NULL.
+- [x] Bảng ca chuẩn hoá lệnh (`pnpm test --filter x`, `cd /tmp && rm -rf …`, URL, `FOO=bar cmd`, `curl -H "Authorization: …"`) không để lọt đối số/đường dẫn/secret; ≤ 20 mục; không panic với chuỗi cắt giữa rune.
+- [x] `promptExcerpt` không lưu khi cờ tắt; bật thì ≤ 160 ký tự và đã che; `promptDigest` không đảo ngược được.
+- [x] Claim `ran_command` không bao giờ `confidence` > `medium`; `stated` không sinh khi cờ tắt; claim do client gửi mà `commandsSummary` không hậu thuẫn bị bỏ.
+- [x] Bốn trạng thái `agreement` có test; cây bẩn → `unverified/tree_may_differ`; run `env_not_ready` → `unverified`.
+- [x] `verification` không đổi `verdict` của `GetQualityGate`.
+- [x] Bảo trì xoá >90 ngày và >200/binding, xoá văn bản >30 ngày; chạy lặp không đổi kết quả.
+- [x] Người không có `review_write` không ghi được; người không thuộc project → `CODEINTEL_NOT_AUTHORIZED`; cờ tắt → `CODEINTEL_QUALITY_GATE_DISABLED`.
+- [x] Mọi truy vấn có `tenant_id`; tenant A không thấy/ghi lượt tenant B (hai dialect); `GetAgentTurn` id tenant khác → `CODEINTEL_NOT_FOUND`.
+- [x] Không có `agentType`/`model`/id lượt trong nhãn metric hoặc log mức INFO (H8; CR-095 telemetry cũng không nhận).
 
 ## 5. Kiểm thử
 

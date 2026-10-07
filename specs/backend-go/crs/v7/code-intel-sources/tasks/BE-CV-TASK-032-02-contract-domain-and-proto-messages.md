@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_contract.proto` (mới), `backend-go/services/code-intel-service/internal/domain/contract/catalog.go` (mới), `.../catalog_test.go`
 **Depends on:** BE-CV-TASK-032-01; `codeintel_common.proto` (BE-CV-SOL-020)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -26,8 +26,8 @@ PQ-07/PQ-29: message nội bộ, không RPC; số field do chủ sở hữu CR-0
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf` xanh; không RPC trong file.
-- [ ] `Merge` có test.
+- [x] `buf` xanh; không RPC trong file.
+- [x] `Merge` có test.
 
 ## Rủi ro và lưu ý
 

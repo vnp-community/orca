@@ -5,7 +5,7 @@
 **Area:** frontend / renderer lib
 **File:** `frontend/src/renderer/src/lib/code-intel-worktree-selector.ts` (mới), test `code-intel-worktree-selector.test.ts`
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

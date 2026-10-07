@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `cmd/server/main.go`, `cmd/server/mysql_dsn.go`, `cmd/server/mysql_dsn_test.go`, `internal/adapter/grpc/server.go`, `internal/adapter/grpc/server_test.go` (tất cả mới)
 **Depends on:** TASK-REQ-001-02 (stub proto), TASK-REQ-001-04 (repository, relay store)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ---
 
@@ -34,11 +34,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Service khởi động với Postgres và với MySQL; `/healthz`, `/readyz`, gRPC health đều OK.
-- [ ] DSN scheme lạ thoát với lỗi nêu dialect không hỗ trợ.
-- [ ] RPC chưa viết trả `Unimplemented`, không panic.
-- [ ] Ghi một dòng outbox rồi relay publish lên NATS (kiểm bằng subscriber thử trong test tích hợp, `NATS_URL` trỏ container NATS).
-- [ ] Không có `helpers`, `utils`, `common`, `misc`.
+- [x] Service khởi động với Postgres và với MySQL; `/healthz`, `/readyz`, gRPC health đều OK.
+- [x] DSN scheme lạ thoát với lỗi nêu dialect không hỗ trợ.
+- [x] RPC chưa viết trả `Unimplemented`, không panic.
+- [x] Ghi một dòng outbox rồi relay publish lên NATS (kiểm bằng subscriber thử trong test tích hợp, `NATS_URL` trỏ container NATS).
+- [x] Không có `helpers`, `utils`, `common`, `misc`.
 
 ## Rủi ro và lưu ý
 

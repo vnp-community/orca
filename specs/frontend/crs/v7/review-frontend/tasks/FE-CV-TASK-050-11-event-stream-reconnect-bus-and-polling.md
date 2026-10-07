@@ -5,7 +5,7 @@
 **Area:** frontend / store + lib + hooks
 **File:** `store/slices/code-intel.ts` (thêm), `store/slices/code-intel-stream-reconnect.ts` (mới), `lib/code-intel-event-bus.ts` (mới), `hooks/useCodeIntelEvents.ts` (mới), `App.tsx` (sửa một dòng), tests
 **Depends on:** FE-CV-TASK-050-10, FE-CV-TASK-050-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

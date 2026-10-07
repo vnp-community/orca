@@ -1,6 +1,6 @@
 # AG-CV-SOL-002: Trích xuất GitNexus (`overview`, `processes`, `process`, `subgraph`, `impact`, `symbol`, `routes`, probe chỉ mục)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi mục "đã đọc" là đọc code/CR, chưa chạy gì. Mọi mẫu Cypher và hình dạng đầu ra GitNexus 1.6.9 lấy từ CR-CV-002, **chưa được chạy lại khi soạn solution này**.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 002-01 đến 002-09, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-002](../../../../../../docs/crs/v7/agent-codeintel/CR-CV-002-gitnexus-extraction.md)
 **Service:** `agent/`, thư mục `agent/src/relay/` (Part A); sao sang `desktop/src/relay/` ở [AG-CV-SOL-006](./AG-CV-SOL-006-relay-ssh-part-b-handlers.md)
@@ -178,17 +178,17 @@ Rút gọn: 01 (mã hoá+guard) và 02 (parser) song song; 03 (mẫu+runner) c�
 
 ## 5. Tiêu chí chấp nhận
 
-- [ ] Mọi mẫu ở 2.2 đã chạy trên repo thật, bảng cập nhật, đầu ra làm fixture (task 04).
-- [ ] Không còn khe `{{…}}` sau render; ca độc hại (`x' OR 1=1 --`, `\\'`, `\n`, NUL, `; MATCH … CALL …`) không qua guard; tên symbol hợp lệ `deleteFile` qua guard.
-- [ ] Parser đủ các ca ở CR-002 2.3; `row_count` lệch chỉ cảnh báo; JSON cụt -> `TOOL_FAILED truncated_stdout`.
-- [ ] `overview` Orca (`topN=200`): ≤ 200 nút, ≤ 5 000 cạnh, mọi cạnh có hai đầu trong tập nút, `totalCount=9039` (+ cảnh báo lệch), < 25 s, JSON < 8 MiB.
-- [ ] `processes` 300 luồng phân trang không trùng/sót; `process proc_0_checkspanel` 9 bước, bước 1 `ChecksPanel`.
-- [ ] `impact name=runToolCommand` -> `AMBIGUOUS_SYMBOL` 2 ứng viên; với uid `agent/` -> 1 nút depth 1 (`handler#2`, theo CR; **chưa kiểm chứng**); `limit 300` không vượt 300 nút.
-- [ ] `symbol runToolCommand` (uid `agent/`): `startLine=72`, `endLine=113`, `source.text` bắt đầu `export function runToolCommand(`; tệp ignore -> `sourceOmitted:"gitignored"`.
-- [ ] `routes` 92 + 21 tuyến + `routes_coverage_js_only`.
-- [ ] Số dòng +1 và `sources[].lineBase=1`; truy vấn 3 000 hàng không cụt.
-- [ ] Worktree liên kết: `stale:true`; `symbol` có `source_may_not_match_index`.
-- [ ] Gọi lặp trong 60 s chỉ spawn một lần; hai lần đồng thời chỉ một; huỷ cache khi `indexedAt` đổi.
+- [x] Mọi mẫu ở 2.2 đã chạy trên repo thật, bảng cập nhật, đầu ra làm fixture (task 04).
+- [x] Không còn khe `{{…}}` sau render; ca độc hại (`x' OR 1=1 --`, `\\'`, `\n`, NUL, `; MATCH … CALL …`) không qua guard; tên symbol hợp lệ `deleteFile` qua guard.
+- [x] Parser đủ các ca ở CR-002 2.3; `row_count` lệch chỉ cảnh báo; JSON cụt -> `TOOL_FAILED truncated_stdout`.
+- [x] `overview` Orca (`topN=200`): ≤ 200 nút, ≤ 5 000 cạnh, mọi cạnh có hai đầu trong tập nút, `totalCount=9039` (+ cảnh báo lệch), < 25 s, JSON < 8 MiB.
+- [x] `processes` 300 luồng phân trang không trùng/sót; `process proc_0_checkspanel` 9 bước, bước 1 `ChecksPanel`.
+- [x] `impact name=runToolCommand` -> `AMBIGUOUS_SYMBOL` 2 ứng viên; với uid `agent/` -> 1 nút depth 1 (`handler#2`, theo CR; **chưa kiểm chứng**); `limit 300` không vượt 300 nút.
+- [x] `symbol runToolCommand` (uid `agent/`): `startLine=72`, `endLine=113`, `source.text` bắt đầu `export function runToolCommand(`; tệp ignore -> `sourceOmitted:"gitignored"`.
+- [x] `routes` 92 + 21 tuyến + `routes_coverage_js_only`.
+- [x] Số dòng +1 và `sources[].lineBase=1`; truy vấn 3 000 hàng không cụt.
+- [x] Worktree liên kết: `stale:true`; `symbol` có `source_may_not_match_index`.
+- [x] Gọi lặp trong 60 s chỉ spawn một lần; hai lần đồng thời chỉ một; huỷ cache khi `indexedAt` đổi.
 
 ## 6. Kiểm thử
 

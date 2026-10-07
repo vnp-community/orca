@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/adapter/{postgres,mysql}/requirement_trace_link_repository.go`, `internal/usecase/{confirm_requirement_evidence,link_worktree_task}.go` (mới)
 **Depends on:** BE-CV-TASK-092-01, 092-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. Repo: `Upsert` (PG `ON CONFLICT … DO UPDATE`; MySQL `ON DUPLICATE KEY UPDATE`), `Delete`, `ListByScope`; `evidence_ref` > 255 ⇒ `sha256:<hex>`.
@@ -18,7 +18,7 @@
 - Integration hai dialect: upsert, thay `reject`↔`confirm`, cách ly tenant; kích thước body > 8 KiB bị gateway chặn (kiểm ở 040, không ở đây).
 
 ## Tiêu chí hoàn thành
-- [ ] một khoá một trạng thái; [ ] xoá worktree không xoá xác nhận mức `repo`.
+- [x] một khoá một trạng thái; [ ] xoá worktree không xoá xác nhận mức `repo`.
 
 ## Rủi ro
 - Quyền `review_write` cho `LinkWorktreeTask` chưa phân biệt người sở hữu task.

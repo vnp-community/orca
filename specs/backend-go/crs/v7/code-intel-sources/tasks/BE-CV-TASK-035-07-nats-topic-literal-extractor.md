@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/gosourcescan/nats_subject_literals.go` và `nats_subject_literals_test.go` (mới); `internal/adapter/gosourcescan/subject_role_rules.go` (mới)
 **Depends on:** BE-CV-TASK-035-03, BE-CV-TASK-035-06 (khai báo `GoSourceScanner`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ CR-035 §2.4. Hiện trạng đọc được: `common/eventbus/eventbus.go` có 
 
 ## Tiêu chí hoàn thành
 
-- [ ] `orca.infrafleet.terminal.closed` có publisher `infra-fleet-service` (fixture), `orca.orchestration.task.statuschanged` có subscriber `task-service`.
-- [ ] Vai trò không chắc ⇒ `unknown`/`inferred`, không đoán.
-- [ ] Số lần parse mỗi tệp = 1; kết quả xác định.
+- [x] `orca.infrafleet.terminal.closed` có publisher `infra-fleet-service` (fixture), `orca.orchestration.task.statuschanged` có subscriber `task-service`.
+- [x] Vai trò không chắc ⇒ `unknown`/`inferred`, không đoán.
+- [x] Số lần parse mỗi tệp = 1; kết quả xác định.
 
 ## Rủi ro và lưu ý
 

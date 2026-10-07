@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-rule-diff-runner.ts` (mới), `.test.ts`, bổ sung dữ liệu `quality-rule-pack-orca.ts`
 **Depends on:** AG-CV-TASK-084-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -26,7 +26,7 @@ Mỗi luật 2 fixture (vi phạm / không) + ca biên đã nêu; diff nhiều t
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mỗi luật có test hai chiều; ORCA-008/009/016/017 không xuất hiện.
+- [x] Mỗi luật có test hai chiều; ORCA-008/009/016/017 không xuất hiện.
 
 ## Rủi ro
 

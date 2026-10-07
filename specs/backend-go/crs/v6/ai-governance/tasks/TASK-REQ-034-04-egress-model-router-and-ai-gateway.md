@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/usecase/{ai_gateway.go,egress_guard.go,model_router.go,ai_relay_errors.go}` (mới), `.../internal/adapter/grpcclient/ai_completion_relay.go` (sửa, do SOL-007 task 04 tạo), `.../internal/adapter/grpcclient/agent_prompt_relay.go` (sửa, SOL-008 task 02), `.../internal/domain/errors.go` (sửa), `.../internal/usecase/ports.go` (sửa), và `_test.go` tương ứng
 **Depends on:** TASK-REQ-034-01, 034-02, 034-03; BE-REQ-SOL-005 (`AIConnectionResolver`), BE-REQ-SOL-007 task 04 (`AICompleter`), BE-REQ-SOL-008 task 02 (`AgentPromptRunner`); CR-REQ-033 cho `usage` và `error.data` (không chặn: có đường dự phòng)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -60,11 +60,11 @@ type EgressSettings interface{ Mode(ctx context.Context) (domain.EgressMode, err
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tenant `disabled`: không lời gọi Relay nào, lỗi `REQUEST_AI_EGRESS_BLOCKED`; `internal_only` không có phần tử nội bộ cũng vậy.
-- [ ] Mỗi lời gọi AI (kể cả lần thử, lần chuyển model) có đúng một dòng ledger.
-- [ ] 429 ở model đầu chuyển model hai; JSON sai schema không chuyển.
-- [ ] `digest_only` không lưu nội dung prompt ở bảng nào.
-- [ ] `resolvedApiKey` không bao giờ xuất hiện trong tham số Relay.
+- [x] Tenant `disabled`: không lời gọi Relay nào, lỗi `REQUEST_AI_EGRESS_BLOCKED`; `internal_only` không có phần tử nội bộ cũng vậy.
+- [x] Mỗi lời gọi AI (kể cả lần thử, lần chuyển model) có đúng một dòng ledger.
+- [x] 429 ở model đầu chuyển model hai; JSON sai schema không chuyển.
+- [x] `digest_only` không lưu nội dung prompt ở bảng nào.
+- [x] `resolvedApiKey` không bao giờ xuất hiện trong tham số Relay.
 
 ## Rủi ro và lưu ý
 

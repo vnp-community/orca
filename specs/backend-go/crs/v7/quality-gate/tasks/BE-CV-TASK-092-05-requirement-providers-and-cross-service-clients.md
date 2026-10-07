@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/usecase/requirement_trace_ports.go`, `internal/adapter/grpcclient/task_requirement_provider.go`, `request_requirement_provider.go` (khung + fake) (mới)
 **Depends on:** BE-CV-TASK-092-03, BE-CV-SOL-012-target-resolution-and-bindings
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Dữ liệu thật/chưa có: SOL-092 §1. `GetTask` **không** kiểm grant (`get_task.go`); `GetWorktree` **không** lọc tenant (L1).
@@ -22,7 +22,7 @@ Dữ liệu thật/chưa có: SOL-092 §1. `GetTask` **không** kiểm grant (`g
 - Fake hai người dùng (có/không grant); `ResolvePermission` lỗi; worktree không `worktree_id`; `task_id` khác project.
 
 ## Tiêu chí hoàn thành
-- [ ] không rò title khi không có grant; [ ] không gọi `GetWorktree`; [ ] nhánh Request tắt không phát RPC nào.
+- [x] không rò title khi không có grant; [ ] không gọi `GetWorktree`; [ ] nhánh Request tắt không phát RPC nào.
 
 ## Rủi ro
 - `request-service` chưa tồn tại; mã lỗi `errNoGrant` cụ thể chưa đọc hết.

@@ -5,7 +5,7 @@
 **Service/Area:** `infra-fleet-service` / migration, domain, adapter postgres và mysql
 **File:** `backend-go/services/infra-fleet-service/migrations/postgres/0039_dev_server_capability_profiles.{up,down}.sql` (mới), `migrations/mysql/0039_dev_server_capability_profiles.{up,down}.sql` (mới), `internal/domain/capability_profile.go` (mới), `internal/domain/agent_features.go` (mới), `internal/usecase/capability_ports.go` (mới), `internal/adapter/postgres/capability_profile_repository.go` (mới), `internal/adapter/mysql/capability_profile_repository.go` (mới), và các `_test.go`
 **Depends on:** không (task đầu của solution)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -43,12 +43,12 @@ Khác với CR gốc: CR viết `features JSON/JSONB` và `profile JSON/JSONB` k
 
 ## Tiêu chí hoàn thành
 
-- [ ] Migration lên, xuống, lên sạch trên Postgres 14+ và MySQL 8.0.16+.
-- [ ] `CHECK` từ chối `source` lạ ở cả hai dialect.
-- [ ] Xoá dev server xoá hồ sơ (cascade).
-- [ ] `Upsert` trả `previousFingerprint` đúng; hai `Upsert` đồng thời không làm mất sự khác biệt (một trong hai thấy `existed=true`).
-- [ ] Không file nào tên `helpers`, `utils`, `common`, `misc`; không thêm `max-lines` disable.
-- [ ] `buf` không liên quan (task này không đổi proto).
+- [x] Migration lên, xuống, lên sạch trên Postgres 14+ và MySQL 8.0.16+.
+- [x] `CHECK` từ chối `source` lạ ở cả hai dialect.
+- [x] Xoá dev server xoá hồ sơ (cascade).
+- [x] `Upsert` trả `previousFingerprint` đúng; hai `Upsert` đồng thời không làm mất sự khác biệt (một trong hai thấy `existed=true`).
+- [x] Không file nào tên `helpers`, `utils`, `common`, `misc`; không thêm `max-lines` disable.
+- [x] `buf` không liên quan (task này không đổi proto).
 
 ## Thứ tự thực hiện gợi ý
 

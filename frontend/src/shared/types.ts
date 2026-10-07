@@ -804,8 +804,10 @@ export type TabContentType =
   | 'check-details'
   | 'browser'
   | 'simulator'
+  // CR-050 (FE-CV-TASK-050-15): code-intelligence review tab
+  | 'review'
 
-export type WorkspaceVisibleTabType = 'terminal' | 'editor' | 'browser' | 'simulator'
+export type WorkspaceVisibleTabType = 'terminal' | 'editor' | 'browser' | 'simulator' | 'review'
 export type CtrlTabOrderMode = 'mru' | 'sequential'
 
 export type Tab = {
@@ -3372,6 +3374,9 @@ export type TopLevelView =
   // previousViewBeforeX return-tracking; it does not replace the existing
   // Project/Repo sidebar flow.
   | 'workspace'
+  // CR-REQ-018-05: Request management page (analogous to 'tasks').
+  | 'requests'
+
 
 export type PersistedUIState = {
   lastActiveRepoId: string | null

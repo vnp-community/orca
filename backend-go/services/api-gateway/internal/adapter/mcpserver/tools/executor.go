@@ -17,6 +17,7 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	"github.com/stablyai/orca-go/common/tenant"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/mcpserver"
 	"github.com/stablyai/orca-go/services/api-gateway/internal/adapter/wscompat"
 )
@@ -135,6 +136,8 @@ func (e *Executor) CallTool(ctx context.Context, p mcpserver.Principal, name str
 	if !hasScope(p, spec.RequiredScope()) {
 		return nil, toolErr("MCP_SCOPE_NOT_ALLOWED", "the token lacks the scope required by this tool")
 	}
+
+	ctx = tenant.WithActorType(ctx, tenant.ActorAgent)
 	id := wscompat.Identity{TenantID: p.TenantID, UserID: p.UserID, Role: p.Role}
 	chanArgs, err := spec.buildArgs(input, id, e.cfg)
 	if err != nil {

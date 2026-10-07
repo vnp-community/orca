@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/report/review-report-diagram-guard.ts` (mới) + test
 **Depends on:** FE-CV-TASK-090-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

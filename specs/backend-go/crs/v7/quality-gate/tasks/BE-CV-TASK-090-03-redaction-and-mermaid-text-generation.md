@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/domain/review_report_redaction.go`, `review_report_diagram.go` (mới)
 **Depends on:** BE-CV-TASK-090-02; BE-CV-SOL-013 (`TextRedactor`, `PathPolicy`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. `message` ≤ 160, một dòng, qua `TextRedactor`; tệp khớp `PathPolicy` ⇒ giữ tên, bỏ `message` (+ `contentWithheld` nếu Q6 duyệt).
@@ -17,7 +17,7 @@
 - Token giả (`ghp_…`, `AKIA…`, JWT) ⇒ `[REDACTED]`; nhãn `"`, `]`, `;`, `\n` không vỡ cú pháp (so khớp golden); tên chứa `<script>`.
 
 ## Tiêu chí hoàn thành
-- [ ] mô hình không chứa đường dẫn tuyệt đối/secret; [ ] sơ đồ vượt ngưỡng bị bỏ; [ ] `alt` đồng bộ với nút.
+- [x] mô hình không chứa đường dẫn tuyệt đối/secret; [ ] sơ đồ vượt ngưỡng bị bỏ; [ ] `alt` đồng bộ với nút.
 
 ## Rủi ro
 - Chủ dựng Mermaid cần FE-CV-SOL-090 đồng ý (L4).

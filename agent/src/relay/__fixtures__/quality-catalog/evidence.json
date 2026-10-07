@@ -1,0 +1,11 @@
+{
+  "tools": {
+    "npx --no-install oxlint": "Version__1.71.0__",
+    "pnpm exec vitest": "vitest_4.1.5_darwin-arm64_node",
+    "pnpm exec tsc": "Version_7.0.2_"
+  },
+  "files": {
+    "tsconfig.json": true,
+    "vitest.config.ts": true
+  }
+}

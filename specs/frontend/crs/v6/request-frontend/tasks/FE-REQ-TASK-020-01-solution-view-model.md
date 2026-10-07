@@ -5,7 +5,7 @@
 **Area:** frontend / request / solution
 **File:** `frontend/src/renderer/src/components/request/solution/solution-view-model.ts` (mới), test `solution-view-model.test.ts`
 **Depends on:** FE-REQ-TASK-018-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

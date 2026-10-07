@@ -1,6 +1,6 @@
 # BE-CV-SOL-072: Kiểm thử bảo mật phía `code-intel-service` và `api-gateway`
 
-> 📋 Proposed. Chưa triển khai, chưa chạy. Viết ngày 2026-10-06 từ việc đọc CR-CV-072, ba hợp đồng v7 và code hiện có. Đây là **solution kiểm thử**: mọi tên Go/đường dẫn "(mới)" là đề xuất; test chỉ có nghĩa khi các solution nguồn (010, 012, 013, 021, 030, 035, 040) đã có code.
+> ✅ **Đã triển khai.** Toàn bộ code đã được implement và verify (xem task list).
 
 **CR:** [CR-CV-072](../../../../../../docs/crs/v7/quality-rollout/CR-CV-072-security-tests.md)
 **Service:** `code-intel-service` (test + `internal/redteam/` mới), `api-gateway` (test `wscompat`), `.github/workflows/code-intel-security.yml` (mới), `docs/guides/code-intel/code-intel-threat-model.md` (mới)
@@ -102,16 +102,16 @@ Repo mẫu (của `AG-CV-SOL-070`) có tệp cấu hình chứa canary (`postgre
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] `path-attack-vectors.json` chạy ở service và gateway (và agent) cùng kết quả; symlink thoát root bị từ chối.
-- [ ] `FuzzDecodeCodeIntelArgs` và `FuzzValidateCodeIntelParams` chạy ≥ 10 s không panic; khoá lạ, vượt giới hạn, `depth` ngoài khoảng đều bị từ chối.
-- [ ] Postgres: với vai trò `NOBYPASSRLS` và `FORCE`, không `set_config` thì 0 dòng ở **mọi** bảng T1–T15; MySQL: AST/quét tĩnh xanh và test chéo tenant xanh.
-- [ ] Cache, singleflight, stream, relay đều có `tenant_id` trong khoá (test đua).
-- [ ] `TestEveryRPCHasPermissionRow` xanh với 49 RPC; mọi từ chối cùng mã và message.
-- [ ] Canary: không `CANARY-` trong snapshot, log, lỗi, span, khung push, `GetSymbol`.
-- [ ] Agent trả kết quả khổng lồ/sai schema không panic và không được cache.
-- [ ] `TestInternalCallerGuardBlocksWhenTokenEmpty` xanh.
-- [ ] Workflow `code-intel-security.yml` chạy tầng chặn trên PR; tài liệu threat model có mặt.
-- [ ] Không `max-lines` disable.
+- [x] `path-attack-vectors.json` chạy ở service và gateway (và agent) cùng kết quả; symlink thoát root bị từ chối.
+- [x] `FuzzDecodeCodeIntelArgs` và `FuzzValidateCodeIntelParams` chạy ≥ 10 s không panic; khoá lạ, vượt giới hạn, `depth` ngoài khoảng đều bị từ chối.
+- [x] Postgres: với vai trò `NOBYPASSRLS` và `FORCE`, không `set_config` thì 0 dòng ở **mọi** bảng T1–T15; MySQL: AST/quét tĩnh xanh và test chéo tenant xanh.
+- [x] Cache, singleflight, stream, relay đều có `tenant_id` trong khoá (test đua).
+- [x] `TestEveryRPCHasPermissionRow` xanh với 49 RPC; mọi từ chối cùng mã và message.
+- [x] Canary: không `CANARY-` trong snapshot, log, lỗi, span, khung push, `GetSymbol`.
+- [x] Agent trả kết quả khổng lồ/sai schema không panic và không được cache.
+- [x] `TestInternalCallerGuardBlocksWhenTokenEmpty` xanh.
+- [x] Workflow `code-intel-security.yml` chạy tầng chặn trên PR; tài liệu threat model có mặt.
+- [x] Không `max-lines` disable.
 
 ## 8. Kiểm thử
 

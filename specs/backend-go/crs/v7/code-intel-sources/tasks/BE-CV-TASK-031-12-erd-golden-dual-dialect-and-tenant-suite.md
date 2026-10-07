@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` / CI
 **File:** `backend-go/services/code-intel-service/internal/usecase/build_erd_golden_test.go` (mới), `.../usecase/testdata/golden/erd/*.json` (mới), `.../adapter/sqlmigration/live_database_crosscheck_test.go` (mới, `//go:build integration`), `.github/workflows/backend-go-code-intel-service.yml` (sửa: thêm ca; file do BE-CV-SOL-010 tạo)
 **Depends on:** BE-CV-TASK-031-10
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Chốt tiêu chí chấp nhận cuối của CR-031: golden theo CR-CV-070, ma t
 
 ## Tiêu chí hoàn thành
 
-- [ ] Golden ba service, hai dialect, ổn định giữa hai lần chạy.
-- [ ] Ma trận CI hai dialect xanh; job crosscheck chạy được thủ công.
-- [ ] Test cô lập tenant có cả hai dialect.
+- [x] Golden ba service, hai dialect, ổn định giữa hai lần chạy.
+- [x] Ma trận CI hai dialect xanh; job crosscheck chạy được thủ công.
+- [x] Test cô lập tenant có cả hai dialect.
 
 ## Rủi ro và lưu ý
 

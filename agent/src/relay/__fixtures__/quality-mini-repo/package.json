@@ -1,0 +1,9 @@
+{
+  "name": "quality-mini-repo",
+  "private": true,
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "vitest": "^1.0.0",
+    "oxlint": "latest"
+  }
+}

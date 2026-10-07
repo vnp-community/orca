@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/perf-block.ts` (mới), `agent/src/relay/codeintel/perf-block.test.ts` (mới)
 **Depends on:** không (AG-CV-SOL-001 cắm ở task 03)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -27,12 +27,12 @@ Mọi con số hiệu năng là giả định từ CR-CV-071 (một lần đo, m
 - `JSON.stringify(perf) contains no path-like or symbol-like strings` (chỉ hằng + số)
 - `build is idempotent and does not alias internal arrays`
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/perf-block.test.ts`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Test xanh; không phụ thuộc runner.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Test xanh; không phụ thuộc runner.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `.github/workflows/code-intel-security.yml` (mới) hoặc job trong `code-intel-contract.yml`; sửa `agent/vitest.code-intel-contract.config.ts` (include `security-*.test.ts`)
 **Depends on:** 072-02 đến 072-08; AG-CV-TASK-070-09
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -22,12 +22,12 @@ CR-072 §2.11: job chặn PR; tầng live đêm cho ca Cypher độc trên công
 
 - PR thử cố ý làm đỏ một vector → job đỏ (CHƯA CHẠY).
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/security-*.test.ts src/relay/codeintel/spawn-recorder.test.ts` (9 test files, 97 passed).
 
 ## Tiêu chí hoàn thành
 
-- [ ] Job chặn PR chạy; số test được khẳng định.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Job chặn PR chạy; số test được khẳng định.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

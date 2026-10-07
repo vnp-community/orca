@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-rule-pack-schema.ts`, `quality-rule-pack-orca.ts` (mới), `quality-rule-pack-schema.test.ts`
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,7 +23,7 @@ Bảng ca: id xấu/trùng/đã dành riêng; pattern ReDoS (`(a+)+$`) bị từ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Pack Orca hợp lệ, test cấm ID dành riêng.
+- [x] Pack Orca hợp lệ, test cấm ID dành riêng.
 
 ## Rủi ro
 

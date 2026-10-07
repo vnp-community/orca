@@ -5,7 +5,7 @@
 **Service:** `backend-go/policy/orca-authz`, `request-service`, `backend-go/ci`
 **File:** `backend-go/policy/orca-authz/request.rego` (mới), `backend-go/policy/orca-authz/request_test.rego` (mới), `backend-go/services/request-service/internal/adapter/opaclient/request_policy.go` (mới), `.../internal/adapter/opaclient/request_policy_test.go` (mới), `backend-go/services/request-service/deploy/Dockerfile` (sửa/mới: `COPY policy`), `backend-go/ci/check-opa-bundle-in-images.sh` (sửa: thêm `request-service`)
 **Depends on:** BE-REQ-SOL-001 (module, Dockerfile)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -43,11 +43,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ma trận Rego khớp bảng nhóm ở solution (có test đối chiếu tự động với `rpc_catalog.go` ở task 04).
-- [ ] `agent` luôn bị từ chối ở `decide`, `execute`, `admin`, `lifecycle`, `plan`, kể cả với admin.
-- [ ] Ảnh `request-service` chứa `policy/orca-authz/*.rego` (script CI xanh).
-- [ ] Lỗi đánh giá hoặc thiếu bundle làm dịch vụ không khởi động hoặc từ chối (fail closed).
-- [ ] `opa test` xanh.
+- [x] Ma trận Rego khớp bảng nhóm ở solution (có test đối chiếu tự động với `rpc_catalog.go` ở task 04).
+- [x] `agent` luôn bị từ chối ở `decide`, `execute`, `admin`, `lifecycle`, `plan`, kể cả với admin.
+- [x] Ảnh `request-service` chứa `policy/orca-authz/*.rego` (script CI xanh).
+- [x] Lỗi đánh giá hoặc thiếu bundle làm dịch vụ không khởi động hoặc từ chối (fail closed).
+- [x] `opa test` xanh.
 
 ## Ví dụ tham khảo
 

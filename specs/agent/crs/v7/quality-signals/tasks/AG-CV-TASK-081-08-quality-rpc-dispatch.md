@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-rpc-dispatch-quality.ts`, `quality-method-table.ts` (mới); sửa `agent-rpc-dispatch.ts`, `codeintel-errors.ts` (AG-CV-SOL-001); test `agent-rpc-dispatch-quality.test.ts`
 **Depends on:** AG-CV-TASK-081-06, 081-07; AG-CV-SOL-001 (`codeintel-errors.ts`, `codeintel-repo-resolution.ts`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -28,8 +28,8 @@ Test phản chiếu: duyệt schema của mọi `validate` khẳng định khôn
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không method nào chấp nhận khoá cấm; `route()` vẫn trả `MethodNotFound` cho method lạ.
-- [ ] Không `quality.*` nào tự do spawn; `quality.run` tên lạ không gọi `executeStep` (test spy).
+- [x] Không method nào chấp nhận khoá cấm; `route()` vẫn trả `MethodNotFound` cho method lạ.
+- [x] Không `quality.*` nào tự do spawn; `quality.run` tên lạ không gọi `executeStep` (test spy).
 
 ## Rủi ro
 

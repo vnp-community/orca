@@ -19,7 +19,7 @@ Snapshot argv; không `analyze` nào thiếu `--index-only`; không `--embedding
 Lệnh: `pnpm exec vitest run src/relay/codeintel-reindex-commands.test.ts src/relay/codeintel-reindex-progress.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] `TestReindexArgvIsIndexOnly` xanh.
+- [x] `TestReindexArgvIsIndexOnly` xanh.
 
 ## Rủi ro
 - Mẫu `%` là giả định; chốt ở task 09.

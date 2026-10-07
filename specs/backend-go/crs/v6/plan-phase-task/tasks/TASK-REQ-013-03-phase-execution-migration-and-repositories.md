@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/migrations/{postgres,mysql}/NNNN_phase_execution.{up,down}.sql` (mới), `internal/domain/phase_start.go` (mới), `internal/domain/task_run_outcome.go` (mới), `internal/usecase/ports.go`, `internal/adapter/postgres/phase_starts.go`, `internal/adapter/postgres/task_run_outcomes.go`, `internal/adapter/mysql/phase_starts.go`, `internal/adapter/mysql/task_run_outcomes.go` (mới), `*_integration_test.go` (mới)
 **Depends on:** CR-REQ-001, CR-REQ-002 (module, `0002_request_core`, `TxRunner`, outbox, `processed_events`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -50,11 +50,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Migration up/down/up sạch, cùng số ở hai thư mục.
-- [ ] `TryStart` đua 8 goroutine chỉ một lần chèn thành công.
-- [ ] Mọi truy vấn lọc `tenant_id`; RLS Postgres chặn chéo tenant.
-- [ ] Không FK sang `task-service`.
-- [ ] Không tên file `helpers`/`utils`/`common`/`misc`.
+- [x] Migration up/down/up sạch, cùng số ở hai thư mục.
+- [x] `TryStart` đua 8 goroutine chỉ một lần chèn thành công.
+- [x] Mọi truy vấn lọc `tenant_id`; RLS Postgres chặn chéo tenant.
+- [x] Không FK sang `task-service`.
+- [x] Không tên file `helpers`/`utils`/`common`/`misc`.
 
 ## Rủi ro và lưu ý
 

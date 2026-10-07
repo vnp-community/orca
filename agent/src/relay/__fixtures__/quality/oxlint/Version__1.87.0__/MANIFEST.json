@@ -1,0 +1,13 @@
+{
+  "tool": "oxlint",
+  "toolVersion": "Version__1.87.0__",
+  "argv": [
+    "--no-install",
+    "oxlint",
+    "--format",
+    "json"
+  ],
+  "markers": {},
+  "capturedAt": "2026-10-07T06:14:31.809Z",
+  "sha256": "72cb634ae6b3d469b9e4b4b5d95f22f961bb4d588095883f701af1751fd4ce37"
+}

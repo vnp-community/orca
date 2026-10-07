@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-parser-gitleaks.ts` (mới), `.test.ts`
 **Depends on:** duyệt `gitleaks`; AG-CV-TASK-091-01, 091-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,7 +23,7 @@ Fixture giả có `Secret` chưa che → parser ném lỗi rõ và bước `fail
 
 ## Tiêu chí hoàn thành
 
-- [ ] Canary vắng; tệp tạm biến mất mọi đường thoát.
+- [x] Canary vắng; tệp tạm biến mất mọi đường thoát.
 
 ## Rủi ro
 

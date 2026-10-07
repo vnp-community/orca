@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `StructureTreemap.tsx`, `StructureToolbar.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-054-01, 054-02, 054-03, FE-CV-TASK-053-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

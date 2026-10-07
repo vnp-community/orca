@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/ports.go` (bổ sung), `internal/usecase/page_token.go`, `internal/usecase/page_token_test.go` (mới)
 **Depends on:** TASK-REQ-002-02, TASK-REQ-001-04 (`TxRunner`, `OutboxWriter`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,10 +31,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cổng khớp SOL-002 mục C, chữ ký đúng tên.
-- [ ] `ListFilter.Normalize` và token có test.
-- [ ] Không có `fakes.go` hay `mocks.go` chung chung.
-- [ ] `go vet` xanh.
+- [x] Cổng khớp SOL-002 mục C, chữ ký đúng tên.
+- [x] `ListFilter.Normalize` và token có test.
+- [x] Không có `fakes.go` hay `mocks.go` chung chung.
+- [x] `go vet` xanh.
 
 ## Rủi ro và lưu ý
 

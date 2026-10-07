@@ -30,7 +30,7 @@ UI-API 3.2: `start` (sel, `profile`, `scope`, `base?`) => `{run}` quyền `revie
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bốn kênh đúng shape UI-API 4.7; không trường thực thi tuỳ ý.
+- [x] Bốn kênh đúng shape UI-API 4.7; không trường thực thi tuỳ ý.
 
 ## Rủi ro và lưu ý
 

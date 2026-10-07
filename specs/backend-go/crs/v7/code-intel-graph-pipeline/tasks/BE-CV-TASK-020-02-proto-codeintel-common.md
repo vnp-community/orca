@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_common.proto` (mới); stub sinh `backend-go/proto/gen/go/orca/codeintel/v1/codeintel_common.pb.go` (mới, sinh)
 **Depends on:** TASK-020-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -32,10 +32,10 @@ Hợp đồng §2.1 hàng 2 và §2.3 liệt kê nội dung và số field. Solu
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf lint` và `buf breaking` xanh khi gọi trực tiếp.
-- [ ] Mọi số field khớp bảng solution 2.B; `ResultMeta` khớp hợp đồng §2.3 từng dòng.
-- [ ] Không có `IndexStatus`/`ChangeOverlay`/service trong file.
-- [ ] Stub sinh được và build.
+- [x] `buf lint` và `buf breaking` xanh khi gọi trực tiếp.
+- [x] Mọi số field khớp bảng solution 2.B; `ResultMeta` khớp hợp đồng §2.3 từng dòng.
+- [x] Không có `IndexStatus`/`ChangeOverlay`/service trong file.
+- [x] Stub sinh được và build.
 
 ## Rủi ro và lưu ý
 

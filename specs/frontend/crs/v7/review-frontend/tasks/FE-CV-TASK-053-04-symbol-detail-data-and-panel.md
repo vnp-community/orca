@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `SymbolDetailPanel.tsx`, `SymbolRelationList.tsx`, `SymbolCoveringTests.tsx`, `SymbolRelatedFlows.tsx`, `SymbolSourcePreview.tsx`, `hooks/useSymbolDetail.ts` (mới), tests
 **Depends on:** FE-CV-TASK-050-13, 053-01, 051-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

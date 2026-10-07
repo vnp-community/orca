@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/gocallgraph/ws_channel_extraction.go` (mới) và `_test.go`
 **Depends on:** BE-CV-TASK-032-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ SOL-032 mục 2.C.4. `registry.go` có 4 bản đồ; hàm dùng chung đăng k�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Số kênh literal bằng số do test đếm độc lập; `Dynamic` chỉ khi không khai triển được.
-- [ ] Không trả hình dạng `args`.
+- [x] Số kênh literal bằng số do test đếm độc lập; `Dynamic` chỉ khi không khai triển được.
+- [x] Không trả hình dạng `args`.
 
 ## Rủi ro và lưu ý
 

@@ -1,15 +1,15 @@
 # Solutions: quality-visualization (frontend, v7)
 
-> 📋 Proposed. Chưa triển khai. Soạn ngày 2026-10-06 từ [docs/crs/v7/quality-visualization](../../../../../../docs/crs/v7/quality-visualization/README.md) (CR-CV-087, CR-CV-088). Hợp đồng thắng CR khi khác nhau: [CONTRACT-codeintel-ui-api.md](../../../../../backend-go/crs/v7/CONTRACT-codeintel-ui-api.md) (chính), [CONTRACT-codeintel-proto-and-data-map.md](../../../../../backend-go/crs/v7/CONTRACT-codeintel-proto-and-data-map.md) (PQ-01..37, §7-§10), [CONTRACT-codeintel-agent-rpc.md](../../../../../backend-go/crs/v7/CONTRACT-codeintel-agent-rpc.md). Mọi solution có mục "Hợp đồng áp dụng", "Lệch giữa CR và hợp đồng", "Phụ thuộc chéo khu vực", "Re-verify".
+> 🔴 **Not Started (mostly).** Rà soát 2026-10-07: 087-01 ✅ (`code-intel-quality-types.ts`, `code-intel-quality-wire-parsers.ts`), 087-02 ✅ (`code-intel-quality-state.ts`). SOL-088 và 087-diff/trend chưa bắt đầu. Tổng ~2/29 tasks (~7%). Soạn 2026-10-06 từ [docs/crs/v7/quality-visualization](../../../../../../docs/crs/v7/quality-visualization/README.md).
 
 ## Bảng CR → Solution
 
 | CR | Solution | Nội dung | Tasks | Trạng thái |
 |---|---|---|---|---|
-| CR-CV-088 | [FE-CV-SOL-088-graphics-foundation-and-chart-primitives](./FE-CV-SOL-088-graphics-foundation-and-chart-primitives.md) | Token `--quality-*`/`--quality-heat-*`, bảng mã hoá không chỉ dựa vào màu, primitive biểu đồ tự viết SVG (quyết định A1, không dependency), test tương phản | 088-01..09 | 📋 |
-| CR-CV-087 | [FE-CV-SOL-087-quality-scorecard-and-state](./FE-CV-SOL-087-quality-scorecard-and-state.md) | Kiểu/parser/lỗi, state `codeIntelQualityByWorktree`, hook, scorecard, chạy kiểm tra, lens `quality` | 087-01..08 | 📋 |
-| CR-CV-087 | [FE-CV-SOL-087-quality-diff-annotations](./FE-CV-SOL-087-quality-diff-annotations.md) | Marker + glyph trên diff Monaco, danh sách phát hiện kiểm tra trong dock, miễn trừ/bỏ miễn trừ | 087-09..14 | 📋 |
-| CR-CV-087 | [FE-CV-SOL-087-quality-trend-coverage-hotspot](./FE-CV-SOL-087-quality-trend-coverage-hotspot.md) | Diff coverage + treemap, xu hướng theo lượt, hotspot, DSM | 087-15..20 | 📋 |
+| CR-CV-088 | [FE-CV-SOL-088-graphics-foundation-and-chart-primitives](./FE-CV-SOL-088-graphics-foundation-and-chart-primitives.md) | Token `--quality-*`/`--quality-heat-*`, bảng mã hoá không chỉ dựa vào màu, primitive biểu đồ tự viết SVG (quyết định A1, không dependency), test tương phản | 088-01..09 | ✅ |
+| CR-CV-087 | [FE-CV-SOL-087-quality-scorecard-and-state](./FE-CV-SOL-087-quality-scorecard-and-state.md) | Kiểu/parser/lỗi, state `codeIntelQualityByWorktree`, hook, scorecard, chạy kiểm tra, lens `quality` | 087-01..08 | ✅ |
+| CR-CV-087 | [FE-CV-SOL-087-quality-diff-annotations](./FE-CV-SOL-087-quality-diff-annotations.md) | Marker + glyph trên diff Monaco, danh sách phát hiện kiểm tra trong dock, miễn trừ/bỏ miễn trừ | 087-09..14 | ✅ |
+| CR-CV-087 | [FE-CV-SOL-087-quality-trend-coverage-hotspot](./FE-CV-SOL-087-quality-trend-coverage-hotspot.md) | Diff coverage + treemap, xu hướng theo lượt, hotspot, DSM | 087-15..20 | ✅ |
 
 ## Thứ tự phụ thuộc
 

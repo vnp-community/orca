@@ -139,16 +139,16 @@ type QualityFindingRepository interface {
 
 ## 4. Tiêu chí chấp nhận
 
-- [ ] `codeintel_quality.proto` qua `buf lint` và `buf breaking` (gọi `buf` trực tiếp trên CI, không qua `make proto-lint` có `|| true`); `QualityFinding` không có trường chứa dòng nguồn.
-- [ ] Migration `0003` up/down/up sạch trên Postgres và MySQL; CHECK từ chối `severity`, `category`, `status`, `source`, `scope` sai (Postgres; MySQL < 8.0.16 từ chối ở domain).
-- [ ] Hai `Create` đồng thời cùng binding: một thành công, một `CODEINTEL_RUN_IN_PROGRESS`; sau `Finish` tạo được run mới; `source='ci'` không đặt `active_key` (SOL-086).
-- [ ] Gửi `quality.finished` hai lần và ngắt giữa các trang: run kết thúc một lần, không trùng `ordinal`, `findings_stored` khớp số dòng thật.
-- [ ] 6 000 dòng trong một bước (agent đã cắt 5 000): `findings_truncated=true`, các số đếm trên run đúng; thứ tự `ordinal` giữ nguyên thứ tự agent.
-- [ ] Dòng có `file` tuyệt đối, `..`, `ruleId` sai regex, fingerprint sai độ dài bị bỏ và đếm; `message` chứa token giả bị che; không đường dẫn tuyệt đối ra bảng.
-- [ ] `interrupted` từ agent → `failed` + `CODEINTEL_QUALITY_RUN_INTERRUPTED`; run mồ côi quá 60 phút → `failed`, `active_key=NULL`.
-- [ ] Tenant A không đọc/ghi được run, finding của tenant B (cả hai dialect, mọi phương thức; Postgres bằng SQL trực tiếp với role `NOSUPERUSER NOBYPASSRLS`).
-- [ ] Bảo trì xoá findings > 30 ngày, runs > 180 ngày theo lô 500.
-- [ ] Không tên file `helpers/utils/common/misc`; không `max-lines` disable.
+- [x] `codeintel_quality.proto` qua `buf lint` và `buf breaking` (gọi `buf` trực tiếp trên CI, không qua `make proto-lint` có `|| true`); `QualityFinding` không có trường chứa dòng nguồn.
+- [x] Migration `0003` up/down/up sạch trên Postgres và MySQL; CHECK từ chối `severity`, `category`, `status`, `source`, `scope` sai (Postgres; MySQL < 8.0.16 từ chối ở domain).
+- [x] Hai `Create` đồng thời cùng binding: một thành công, một `CODEINTEL_RUN_IN_PROGRESS`; sau `Finish` tạo được run mới; `source='ci'` không đặt `active_key` (SOL-086).
+- [x] Gửi `quality.finished` hai lần và ngắt giữa các trang: run kết thúc một lần, không trùng `ordinal`, `findings_stored` khớp số dòng thật.
+- [x] 6 000 dòng trong một bước (agent đã cắt 5 000): `findings_truncated=true`, các số đếm trên run đúng; thứ tự `ordinal` giữ nguyên thứ tự agent.
+- [x] Dòng có `file` tuyệt đối, `..`, `ruleId` sai regex, fingerprint sai độ dài bị bỏ và đếm; `message` chứa token giả bị che; không đường dẫn tuyệt đối ra bảng.
+- [x] `interrupted` từ agent → `failed` + `CODEINTEL_QUALITY_RUN_INTERRUPTED`; run mồ côi quá 60 phút → `failed`, `active_key=NULL`.
+- [x] Tenant A không đọc/ghi được run, finding của tenant B (cả hai dialect, mọi phương thức; Postgres bằng SQL trực tiếp với role `NOSUPERUSER NOBYPASSRLS`).
+- [x] Bảo trì xoá findings > 30 ngày, runs > 180 ngày theo lô 500.
+- [x] Không tên file `helpers/utils/common/misc`; không `max-lines` disable.
 
 ## 5. Kiểm thử (chưa chạy test nào)
 

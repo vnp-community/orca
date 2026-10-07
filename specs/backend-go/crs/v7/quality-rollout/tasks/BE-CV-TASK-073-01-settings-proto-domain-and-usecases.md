@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_settings.proto` (mới), `backend-go/proto/orca/codeintel/v1/codeintel.proto` (thêm 2 RPC), `.../internal/domain/tenant_settings.go` (mới), `.../internal/usecase/settings.go` (mới), `.../internal/usecase/settings_test.go` (mới), `.../internal/adapter/grpc/settings_server.go` (mới)
 **Depends on:** BE-CV-SOL-010 (G0: `codeintel.proto`), BE-CV-SOL-011-data-model-and-migrations (bảng T1, repo), BE-CV-SOL-013-authorization-flags-and-audit (cổng audit)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,8 +30,8 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai RPC hoạt động với dữ liệu hợp đồng.
-- [ ] Non-admin bị từ chối; giá trị ngoài phạm vi bị từ chối.
+- [x] Hai RPC hoạt động với dữ liệu hợp đồng.
+- [x] Non-admin bị từ chối; giá trị ngoài phạm vi bị từ chối.
 
 ## Rủi ro và lưu ý
 

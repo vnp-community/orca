@@ -1,6 +1,6 @@
 # FE-REQ-SOL-019: Danh sách, chi tiết Request, xác nhận phân loại, "Tạo Request" từ Tasks
 
-> 📋 Proposed. Chưa triển khai. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
+> 🚧 **In Progress.** Rà soát 2026-10-07: 019-01 ✅ (`request-stage-timeline-model.ts`), 019-02 🟡 partial (`request-list-keyboard.ts` done, `RequestsTab` UI chưa), 019-03..07 ❌ TODO. Viết ngày 2026-10-06; chưa chạy test hay ứng dụng.
 
 **CR:** [CR-REQ-019](../../../../../../docs/crs/v6/request-frontend/CR-REQ-019-request-list-detail-classification-ui.md)
 **Area:** frontend (`components/request/`, `components/TaskPage.tsx` qua component riêng)

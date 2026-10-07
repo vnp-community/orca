@@ -1,6 +1,6 @@
 # agent-codeintel (v7) solutions: index (agent)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Mọi nhận định "đã đọc" là đọc code ở `agent/`, `desktop/src/relay/` và hợp đồng; chưa chạy hệ thống, chưa chạy `gitnexus`/`codegraph`.
+> ✅ **Đã triển khai (6/6 solutions, 50/50 tasks [x] DONE).** Đã hoàn tất triển khai mã nguồn, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 Solution phía `agent/` cho feature `agent-codeintel` của series v7 "Xem code và kiểm soát chất lượng". Nguồn: sáu CR [CR-CV-001..006](../../../../../../docs/crs/v7/agent-codeintel/README.md) và hợp đồng chuẩn `specs/backend-go/crs/v7/CONTRACT-codeintel-agent-rpc.md` (+ `CONTRACT-codeintel-proto-and-data-map.md` PQ-xx). Khi CR và hợp đồng khác nhau thì theo hợp đồng; mỗi solution có mục "Lệch giữa CR và hợp đồng". Mỗi CR một solution (tên chốt ở hợp đồng §8.2).
 

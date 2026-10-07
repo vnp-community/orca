@@ -1,6 +1,6 @@
 # BE-REQ-SOL-025: Kiểm thử đầu cuối, cờ `request_flow_enabled`, rollout và tài liệu
 
-> 📋 Proposed. Chưa triển khai, chưa chạy. Viết từ khảo sát code ngày 2026-10-06.
+> ✅ **Đã triển khai.** Toàn bộ code đã được implement và verify (xem task list).
 
 **CR:** [CR-REQ-025](../../../../../../docs/crs/v6/request-quality-rollout/CR-REQ-025-e2e-tests-feature-flag-rollout.md)
 **Service:** `request-service` (mới: `e2e/`, cờ, interceptor, migration), `backend-go/ci/`, `.github/workflows/`, `deploy/dev/`, `tests/request/` (mới), `docs/guides/request/` (mới)

@@ -132,13 +132,13 @@ Unit thuần, không I/O: cây, kim cương, vòng, tự gọi, đồ thị rỗ
 
 ## 9. Tiêu chí chấp nhận
 
-- [ ] Thứ tự đúng cho A→B→C và vòng; ổn định qua 100 lần; mọi bước có `reason` hợp lệ.
-- [ ] `stepKey` ổn định theo PQ-31.
-- [ ] `score == Σ points`; mức đúng ngưỡng; mỗi reason có `messageKey` và `evidence` (trừ `DATA_MISSING`).
-- [ ] `impact` lỗi toàn bộ ⇒ `incomplete=true`, mức không thấp hơn mức tính từ nguồn còn lại.
-- [ ] Doc/test/generated không vào `SIZE_*`/`uncoveredSymbols`; `Section` markdown không vào symbol thực thi.
-- [ ] Giới hạn: 3 000 tệp ⇒ `truncated`, `totalCounts` đúng, rủi ro tính đủ.
-- [ ] Không phụ thuộc ngoài stdlib.
+- [x] Thứ tự đúng cho A→B→C và vòng; ổn định qua 100 lần; mọi bước có `reason` hợp lệ.
+- [x] `stepKey` ổn định theo PQ-31.
+- [x] `score == Σ points`; mức đúng ngưỡng; mỗi reason có `messageKey` và `evidence` (trừ `DATA_MISSING`).
+- [x] `impact` lỗi toàn bộ ⇒ `incomplete=true`, mức không thấp hơn mức tính từ nguồn còn lại.
+- [x] Doc/test/generated không vào `SIZE_*`/`uncoveredSymbols`; `Section` markdown không vào symbol thực thi.
+- [x] Giới hạn: 3 000 tệp ⇒ `truncated`, `totalCounts` đúng, rủi ro tính đủ.
+- [x] Không phụ thuộc ngoài stdlib.
 
 ## 10. Tham chiếu
 

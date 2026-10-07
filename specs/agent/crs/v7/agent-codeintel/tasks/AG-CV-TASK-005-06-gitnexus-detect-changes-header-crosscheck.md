@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/gitnexus-detect-changes-header.ts`, `gitnexus-detect-changes-header.test.ts` (mới)
 **Depends on:** [AG-CV-TASK-001-05](./AG-CV-TASK-001-05-run-codeintel-tool-with-tempfile-and-output-classification.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 CLI chỉ in text, cắt 15 symbol/10 luồng; chỉ dùng cho `crossCheck`. Verb `detect-changes` đã ở whitelist. Phạm vi `-s compare` chưa kiểm chứng.
@@ -19,7 +19,7 @@ CLI chỉ in text, cắt 15 symbol/10 luồng; chỉ dùng cho `crossCheck`. Ver
 Lệnh: `pnpm exec vitest run src/relay/gitnexus-detect-changes-header.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] Không parse danh sách symbol/luồng của CLI.
+- [x] Không parse danh sách symbol/luồng của CLI.
 
 ## Rủi ro
 - Định dạng văn bản có thể đổi: chỉ làm `riskHint=null`.

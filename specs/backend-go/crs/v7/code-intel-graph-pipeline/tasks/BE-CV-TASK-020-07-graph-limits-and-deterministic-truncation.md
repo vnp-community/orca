@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/domain/graph_limits.go`, `architecture_graph.go`, `module_graph.go`, `symbol_graph.go`, `flow_graph.go`, `impact_graph.go`, `route_map.go`, `symbol_detail.go`, `result_meta.go`, `tool_index_status.go` (mới) và test
 **Depends on:** TASK-020-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Trần mỗi response ≤ 2 MiB, `GetSymbol` ≤ 320 KiB (PQ-14, khác 3 MiB c�
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi `Limit*` trả đúng số lượng, `truncated`, `totalBefore`, xác định.
-- [ ] `ViewKind.CacheName()` khớp 21 chuỗi hợp đồng §4 (`status` và `symbol` có tên nhưng SOL-022 không lưu).
-- [ ] Không có import proto/DB.
+- [x] Mọi `Limit*` trả đúng số lượng, `truncated`, `totalBefore`, xác định.
+- [x] `ViewKind.CacheName()` khớp 21 chuỗi hợp đồng §4 (`status` và `symbol` có tên nhưng SOL-022 không lưu).
+- [x] Không có import proto/DB.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `proto`
 **File:** `backend-go/proto/orca/request/v1/request.proto` (mới), `backend-go/proto/orca/request/v1/approval.proto` (mới), `backend-go/proto/gen/go/orca/request/v1/*.pb.go` (sinh)
 **Depends on:** Không (song song được với TASK-REQ-001-01, 001-03)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,10 +30,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `buf lint` xanh; `buf breaking` xanh (lần đầu thêm package, không có gì để phá).
-- [ ] Stub sinh vào `proto/gen/go/orca/request/v1/` và commit cùng PR (kiểm tra repo có commit thư mục `gen` như service khác).
-- [ ] Số trường `Request` khớp danh sách ở bước 2.
-- [ ] Không có RPC nào không có message thật.
+- [x] `buf lint` xanh; `buf breaking` xanh (lần đầu thêm package, không có gì để phá).
+- [x] Stub sinh vào `proto/gen/go/orca/request/v1/` và commit cùng PR (kiểm tra repo có commit thư mục `gen` như service khác).
+- [x] Số trường `Request` khớp danh sách ở bước 2.
+- [x] Không có RPC nào không có message thật.
 
 ## Rủi ro và lưu ý
 

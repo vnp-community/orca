@@ -5,7 +5,7 @@
 **Area:** desktop (ngoài `frontend/`, cần chủ sở hữu desktop duyệt)
 **File:** `desktop/src/preload/index.ts` (sửa), `desktop/src/preload/api-types.ts` (sửa)
 **Depends on:** FE-CV-TASK-050-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -24,7 +24,7 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hoặc có `window.api.codeIntel` ở Electron, hoặc có ghi chú chặn rõ ràng; không phá build desktop.
+- [x] Hoặc có `window.api.codeIntel` ở Electron, hoặc có ghi chú chặn rõ ràng; không phá build desktop.
 
 ## Rủi ro
 

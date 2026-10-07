@@ -1,0 +1,58 @@
+{
+  "data": {
+    "affectedClusters": [],
+    "affectedFlows": [],
+    "direction": "upstream",
+    "levels": [
+      {
+        "depth": 1,
+        "symbols": [
+          {
+            "direct": true,
+            "symbol": {
+              "endLine": null,
+              "filePath": "",
+              "key": "value::sym2",
+              "kind": "value",
+              "name": "sym2",
+              "qualifiedName": "sym2",
+              "rawKind": "Unknown",
+              "startLine": null,
+              "uid": "s2"
+            },
+            "via": "CALLS"
+          }
+        ]
+      }
+    ],
+    "risk": "HIGH",
+    "target": {
+      "endLine": null,
+      "filePath": "",
+      "key": "function::sym",
+      "kind": "function",
+      "name": "sym",
+      "qualifiedName": "sym",
+      "startLine": null,
+      "uid": "s1"
+    },
+    "testsCovering": []
+  },
+  "headCommit": "abcdef",
+  "sources": [
+    {
+      "commit": "abcdef",
+      "indexedAt": 1600000000000,
+      "lineBase": 1,
+      "tool": "gitnexus",
+      "version": "1.6.9"
+    }
+  ],
+  "stale": false,
+  "totalCount": null,
+  "truncated": false,
+  "warnings": [
+    "tests_excluded",
+    "unknown_native_kind"
+  ]
+}

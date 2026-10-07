@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/collector_golden_test.go` (mới); có thể thêm hàm giải mã nhỏ ở `.../internal/usecase/agent_result_decode.go` nếu CR-021 chưa có (mới, tên đề xuất)
 **Depends on:** BE-CV-TASK-070-01, BE-CV-SOL-021 (collector), BE-CV-SOL-020 (`SymbolRef` domain)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -30,9 +30,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi tệp vàng thành công trong `gitnexus-*/`, `codegraph-*/`, `merged/` đi qua collector.
-- [ ] `perf` không còn trong đầu ra chuẩn hoá.
-- [ ] Thêm tệp vàng mới tự được test bao phủ (bảng sinh từ thư mục).
+- [x] Mọi tệp vàng thành công trong `gitnexus-*/`, `codegraph-*/`, `merged/` đi qua collector.
+- [x] `perf` không còn trong đầu ra chuẩn hoá.
+- [x] Thêm tệp vàng mới tự được test bao phủ (bảng sinh từ thư mục).
 
 ## Rủi ro và lưu ý
 

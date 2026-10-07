@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/type_policy.go` (mới), `type_policy_registry.go` (mới), `type_policy_noop.go` (mới), `internal/usecase/generate_plan.go`, `commit_plan.go`, `advance_execution.go`, `report_task_outcome.go` (sửa), `internal/domain/type_policy_registry_test.go` (mới)
 **Depends on:** TASK-REQ-012-05, TASK-REQ-013-04, TASK-REQ-013-06
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -43,10 +43,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Loại khác (`bug`, `task`, `docs`, `change_request`) chạy y như trước (test hồi quy với `noopPolicy`).
-- [ ] Mỗi điểm hook gọi đúng hàm chính sách của loại.
-- [ ] Registry chứa đủ loại chính sách (sau tasks 04 đến 07) và test chống thiếu.
-- [ ] Không có `switch req.Type` trong use case chung.
+- [x] Loại khác (`bug`, `task`, `docs`, `change_request`) chạy y như trước (test hồi quy với `noopPolicy`).
+- [x] Mỗi điểm hook gọi đúng hàm chính sách của loại.
+- [x] Registry chứa đủ loại chính sách (sau tasks 04 đến 07) và test chống thiếu.
+- [x] Không có `switch req.Type` trong use case chung.
 
 ## Rủi ro và lưu ý
 

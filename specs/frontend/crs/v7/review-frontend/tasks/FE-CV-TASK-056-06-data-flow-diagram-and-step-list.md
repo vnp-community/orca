@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `DataFlowLens.tsx`, `DataFlowDetailPane.tsx`, `DataFlowToolbar.tsx`, `DataFlowDiagram.tsx`, `DataFlowStepList.tsx`, `DataFlowStepDetail.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-056-01, 056-02, 056-03, 056-04, 056-05, FE-CV-TASK-052-04, FE-CV-TASK-053-04
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

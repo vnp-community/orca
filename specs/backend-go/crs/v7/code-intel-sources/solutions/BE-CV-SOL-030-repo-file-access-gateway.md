@@ -171,17 +171,17 @@ Thử lại: tối đa 1 lần với lỗi mạng (`Unavailable` không phải O
 
 ## 6. Tiêu chí chấp nhận
 
-- [ ] `RepoSourceReader` và `agentrepofs` biên dịch; `go vet`, `golangci-lint` sạch; không tên `helpers/utils/common/misc`; không `max-lines` disable.
-- [ ] `ListDir` không trả symlink (file không `size`) và thư mục bỏ qua; cắt ở `MAX_DIR_ENTRIES` và `Truncated=true`.
-- [ ] `CleanRel`/ancestor rule: từ chối tuyệt đối, `..`, NUL, tiền tố `-`, `\`, tổ tiên chưa liệt kê; test bằng agent giả mà `fs.readFile` **không bao giờ** được gọi.
-- [ ] File > `MAX_FILE_BYTES` không bị gọi `fs.readFile`; `isBinary:true` chỉ đếm trong `ReadReport`.
-- [ ] `git show <oid>:<path>` đọc được file commit cũ; `BlobIDs` khớp `git ls-tree` (kiểm bằng git thật ở CI).
-- [ ] `DirtyPaths` có cả file `untracked`; file sạch trúng cache theo oid, file bẩn luôn đọc lại với `sha256:`.
-- [ ] Mọi `{error:{code,message}}` nhúng trong `result_json` được phát hiện (cả `code` số) và ánh xạ theo F.
-- [ ] Offline trả `CODEINTEL_DEV_SERVER_OFFLINE`; không treo quá `CALL_TIMEOUT`.
-- [ ] Bảng whitelist method khớp test; thêm method lạ làm test thất bại.
-- [ ] Không có nội dung file trong DB/log/lỗi; log chỉ đường dẫn tương đối + kích thước.
-- [ ] Cache nội dung cô lập tenant (hai tenant, cùng `contentHash`, không trúng chéo).
+- [x] `RepoSourceReader` và `agentrepofs` biên dịch; `go vet`, `golangci-lint` sạch; không tên `helpers/utils/common/misc`; không `max-lines` disable.
+- [x] `ListDir` không trả symlink (file không `size`) và thư mục bỏ qua; cắt ở `MAX_DIR_ENTRIES` và `Truncated=true`.
+- [x] `CleanRel`/ancestor rule: từ chối tuyệt đối, `..`, NUL, tiền tố `-`, `\`, tổ tiên chưa liệt kê; test bằng agent giả mà `fs.readFile` **không bao giờ** được gọi.
+- [x] File > `MAX_FILE_BYTES` không bị gọi `fs.readFile`; `isBinary:true` chỉ đếm trong `ReadReport`.
+- [x] `git show <oid>:<path>` đọc được file commit cũ; `BlobIDs` khớp `git ls-tree` (kiểm bằng git thật ở CI).
+- [x] `DirtyPaths` có cả file `untracked`; file sạch trúng cache theo oid, file bẩn luôn đọc lại với `sha256:`.
+- [x] Mọi `{error:{code,message}}` nhúng trong `result_json` được phát hiện (cả `code` số) và ánh xạ theo F.
+- [x] Offline trả `CODEINTEL_DEV_SERVER_OFFLINE`; không treo quá `CALL_TIMEOUT`.
+- [x] Bảng whitelist method khớp test; thêm method lạ làm test thất bại.
+- [x] Không có nội dung file trong DB/log/lỗi; log chỉ đường dẫn tương đối + kích thước.
+- [x] Cache nội dung cô lập tenant (hai tenant, cùng `contentHash`, không trúng chéo).
 
 ## 7. Kiểm thử, rủi ro, câu hỏi mở
 

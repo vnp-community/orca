@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `internal/domain/agent_turn.go`, `agent_turn_merge.go`, `agent_command_summary.go`, `agent_claim_extractor.go` (mới)
 **Depends on:** BE-CV-TASK-089-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Việc cần làm
 1. `NormalizeCommandPreview`: chương trình + tối đa một tiểu lệnh; bỏ đối số, đường dẫn, env, chuyển hướng, URL; cắt theo rune.
@@ -17,7 +17,7 @@
 - Bảng ca lệnh (`pnpm test --filter x`, `cd /tmp && rm -rf …`, URL, `FOO=bar cmd`, `curl -H "Authorization: …"`); fuzz ngắn không panic với chuỗi cắt giữa rune; bảng merge.
 
 ## Tiêu chí hoàn thành
-- [ ] đầu ra không chứa đối số/đường dẫn/secret; [ ] `ran_command` không bao giờ > `medium`; [ ] merge không xoá dữ liệu.
+- [x] đầu ra không chứa đối số/đường dẫn/secret; [ ] `ran_command` không bao giờ > `medium`; [ ] merge không xoá dữ liệu.
 
 ## Rủi ro
 - Bảng mẫu theo CLI của từng agent (tên tool khác nhau) chưa kiểm chứng với dữ liệu hook thật.

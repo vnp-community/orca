@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase
 **File:** `internal/usecase/run_agent_readonly_analysis.go` (mới), `solution_prompt.go` (sửa, nhánh theo `kind`), `generate_solution.go` (sửa, rẽ nhánh theo registry và `analysis_mode`), `internal/config/config.go` (sửa), và `_test.go`
 **Depends on:** TASK-REQ-008-01, TASK-REQ-008-02, TASK-REQ-007-05
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -30,10 +30,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí chấp nhận 1, 2, 3, 4, 5, 6, 7 của CR-REQ-008 mục 4 có test.
-- [ ] `BUSY` không để lại dòng run.
-- [ ] Mọi use case gọi `tenant.RequireTenantID`.
-- [ ] Không có đường tự hạ xuống `ai.complete` khi agent lỗi.
+- [x] Tiêu chí chấp nhận 1, 2, 3, 4, 5, 6, 7 của CR-REQ-008 mục 4 có test.
+- [x] `BUSY` không để lại dòng run.
+- [x] Mọi use case gọi `tenant.RequireTenantID`.
+- [x] Không có đường tự hạ xuống `ai.complete` khi agent lỗi.
 
 ## Rủi ro và lưu ý
 

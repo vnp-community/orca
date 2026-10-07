@@ -1,0 +1,15 @@
+{
+  "files": [
+    "foo.ts",
+    "bar.ts"
+  ],
+  "sources": [
+    {
+      "commit": null,
+      "indexedAt": 1600000000000,
+      "lineBase": 1,
+      "tool": "codegraph"
+    }
+  ],
+  "truncated": false
+}

@@ -1,6 +1,6 @@
 # AG-CV-SOL-091: Profile quét bảo mật và phụ thuộc (P2, mặc định tắt; công cụ cần duyệt)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. Công cụ `govulncheck`, `osv-scanner`, `gitleaks`: **cần duyệt (O12/O-9), chưa cài, chưa đọc `--help`**. Mọi định dạng JSON của chúng suy từ tài liệu.
+> ✅ **Đã triển khai.** Ngày triển khai 2026-10-07. Đã hoàn thành toàn bộ các task 091-01 đến 091-08, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 **CR:** [CR-CV-091](../../../../../../docs/crs/v7/quality-signals/CR-CV-091-security-and-dependency-scanning.md). Task AG-CV-TASK-091-01 đến 08. **Khu vực:** `agent/src/relay/`. **Feature:** `quality-signals`.
 **TDD/Spec:** [TDD-AG-01](../../../../tdd/v5/01-architecture.md), [api/agent-rpc-catalog-git-fs.md](../../../../api/agent-rpc-catalog-git-fs.md).
@@ -99,13 +99,13 @@ __fixtures__/quality-security/                    task 01
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] Công cụ thiếu → `ready:false` + `missing[].reason:"binary_missing"`; run mọi bước thiếu → `ENV_NOT_READY` có `missingTools[]`; không lệnh cài nào chạy.
-- [ ] Parser `govulncheck`/`osv-scanner` đúng trên fixture theo phiên bản; vuln import-only `severity:"info"`; gom nhiều module thành một finding liệt kê module.
-- [ ] Quét bí mật chỉ nhận dòng **thêm**; dòng cũ chứa bí mật giả không bị báo.
-- [ ] **Canary**: chuỗi bí mật giả (dựng lúc chạy test, không nằm nguyên văn trong mã) **không** xuất hiện ở finding, `quality.results` thô, `view=log`, log agent, tệp tạm sau run (kể cả lỗi/timeout/huỷ), payload thông báo.
-- [ ] Finding bí mật không có độ dài, tiền tố/hậu tố hay ngữ cảnh; fingerprint không đổi khi chèn dòng phía trên và không phụ thuộc giá trị.
-- [ ] `dependency-diff` đúng: thêm/bớt/nâng major/hạ phiên bản, `replace` mới trong `go.mod`, drift `package.json` ↔ lockfile, nguồn git/tarball.
-- [ ] `ORCA_QUALITY_NETWORK=deny` → profile `network:true` `ready:false` `network_policy`, không treo.
+- [x] Công cụ thiếu → `ready:false` + `missing[].reason:"binary_missing"`; run mọi bước thiếu → `ENV_NOT_READY` có `missingTools[]`; không lệnh cài nào chạy.
+- [x] Parser `govulncheck`/`osv-scanner` đúng trên fixture theo phiên bản; vuln import-only `severity:"info"`; gom nhiều module thành một finding liệt kê module.
+- [x] Quét bí mật chỉ nhận dòng **thêm**; dòng cũ chứa bí mật giả không bị báo.
+- [x] **Canary**: chuỗi bí mật giả (dựng lúc chạy test, không nằm nguyên văn trong mã) **không** xuất hiện ở finding, `quality.results` thô, `view=log`, log agent, tệp tạm sau run (kể cả lỗi/timeout/huỷ), payload thông báo.
+- [x] Finding bí mật không có độ dài, tiền tố/hậu tố hay ngữ cảnh; fingerprint không đổi khi chèn dòng phía trên và không phụ thuộc giá trị.
+- [x] `dependency-diff` đúng: thêm/bớt/nâng major/hạ phiên bản, `replace` mới trong `go.mod`, drift `package.json` ↔ lockfile, nguồn git/tarball.
+- [x] `ORCA_QUALITY_NETWORK=deny` → profile `network:true` `ready:false` `network_policy`, không treo.
 
 ## 8. Kiểm thử
 

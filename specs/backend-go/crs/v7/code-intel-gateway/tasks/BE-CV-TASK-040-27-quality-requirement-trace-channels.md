@@ -29,7 +29,7 @@ UI-API 3.2: `trace` (sel, `base?`, `includeInferred?` mặc định true, `taskI
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh đúng shape; phân biệt `taskId` vắng với rỗng.
+- [x] Ba kênh đúng shape; phân biệt `taskId` vắng với rỗng.
 
 ## Rủi ro và lưu ý
 

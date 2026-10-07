@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-index-basis.ts` (mới), `agent/src/relay/codeintel-index-basis.test.ts` (mới)
 **Depends on:** AG-CV-TASK-080-01 (dữ liệu thật để chốt ca CodeGraph)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -26,8 +26,8 @@ Lệnh: `cd /opt/repos/orca/agent && pnpm exec vitest run src/relay/codeintel-in
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng test phủ 6 hàng + ca CodeGraph; thuộc tính "`!rootMatches` không bao giờ `exact`" có test.
-- [ ] Không có I/O trong module; không `max-lines` disable.
+- [x] Bảng test phủ 6 hàng + ca CodeGraph; thuộc tính "`!rootMatches` không bao giờ `exact`" có test.
+- [x] Không có I/O trong module; không `max-lines` disable.
 
 ## Rủi ro
 

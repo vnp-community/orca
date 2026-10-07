@@ -5,7 +5,7 @@
 **Service:** `request-service` (kèm kiểm thử `task-service`)
 **File:** `backend-go/services/request-service/internal/usecase/reconcile_executing_requests.go` (mới), `internal/adapter/postgres/executing_requests.go`, `internal/adapter/mysql/executing_requests.go` (mới), `cmd/server/main.go`, `internal/config/config.go`, `internal/usecase/execution_flow_integration_test.go` (mới)
 **Depends on:** TASK-REQ-013-04, 05, 06
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -35,11 +35,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Sau khi mất sự kiện, đối soát đưa Request về trạng thái đúng trong một chu kỳ (`REQUEST_RECONCILE_INTERVAL`).
-- [ ] Hai replica không xử lý trùng một Request.
-- [ ] Toàn bộ tiêu chí mục 4 của CR-REQ-013 có test tương ứng.
-- [ ] Hai dialect cùng kết quả; cấu hình mới có mặc định và kiểm hợp lệ.
-- [ ] Task thứ hai của Plan chạy trong cùng `worktree_id` (kiểm trên `GetTask`).
+- [x] Sau khi mất sự kiện, đối soát đưa Request về trạng thái đúng trong một chu kỳ (`REQUEST_RECONCILE_INTERVAL`).
+- [x] Hai replica không xử lý trùng một Request.
+- [x] Toàn bộ tiêu chí mục 4 của CR-REQ-013 có test tương ứng.
+- [x] Hai dialect cùng kết quả; cấu hình mới có mặc định và kiểm hợp lệ.
+- [x] Task thứ hai của Plan chạy trong cùng `worktree_id` (kiểm trên `GetTask`).
 
 ## Rủi ro và lưu ý
 

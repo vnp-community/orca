@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `.../internal/adapter/infrafleetclient/{agent_codeintel_gateway.go,agent_rpc_caller.go,tenant_forwarding.go,agent_result_decoding.go}` (mới), `.../internal/config/config.go` (sửa) và test
 **Depends on:** TASK-021-02, BE-CV-SOL-023
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,9 +29,9 @@ Mẫu: `git-gateway-service/.../grpcclient/resolver.go` (`Dial`), `tenant_forwar
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi lời gọi mang metadata tenant.
-- [ ] Log sạch dữ liệu.
-- [ ] 8 MiB qua được.
+- [x] Mọi lời gọi mang metadata tenant.
+- [x] Log sạch dữ liệu.
+- [x] 8 MiB qua được.
 
 ## Rủi ro và lưu ý
 

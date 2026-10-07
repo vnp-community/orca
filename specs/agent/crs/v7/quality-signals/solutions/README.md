@@ -1,6 +1,6 @@
 # quality-signals (v7) solutions: index (agent)
 
-> 📋 Proposed, chưa triển khai. Ngày soạn 2026-10-06. "Đã đọc" = đọc code/CR/hợp đồng, chưa chạy hệ thống.
+> ✅ **Đã triển khai (7/7 solutions, 56/56 tasks [x] DONE).** Đã hoàn tất triển khai mã nguồn, kiểm thử tự động xác nhận qua vitest, đạt 100% tiêu chí chấp nhận.
 
 Solution phía `agent/` (TypeScript, `agent/src/relay/`) cho feature `quality-signals` của series v7 "Xem code và kiểm soát chất lượng". Hợp đồng chuẩn tắc: [`CONTRACT-codeintel-agent-rpc.md`](../../../../../backend-go/crs/v7/CONTRACT-codeintel-agent-rpc.md) (§2, §3, §5, §6, §9), [`CONTRACT-codeintel-proto-and-data-map.md`](../../../../../backend-go/crs/v7/CONTRACT-codeintel-proto-and-data-map.md) (PQ-01, 16, 17, 21, 26, 33; §7, §8.2, §8.3), [`CONTRACT-codeintel-ui-api.md`](../../../../../backend-go/crs/v7/CONTRACT-codeintel-ui-api.md). Khi CR và hợp đồng khác nhau, theo hợp đồng (mỗi solution có mục "Lệch giữa CR và hợp đồng"). CR nguồn: [`docs/crs/v7/quality-signals/`](../../../../../../docs/crs/v7/quality-signals/README.md). CR-CV-094 là spike tài liệu, **không có solution**. CR-CV-086 không có việc ở agent.
 

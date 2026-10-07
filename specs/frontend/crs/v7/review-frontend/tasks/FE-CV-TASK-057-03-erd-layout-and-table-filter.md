@@ -5,7 +5,7 @@
 **Area:** frontend / renderer (hàm thuần)
 **File:** `frontend/src/renderer/src/components/review-map/erd/erd-layout.ts`, `erd-table-filter.ts`, `erd-repository-links.ts` (mới) + `*.test.ts`
 **Depends on:** FE-CV-TASK-057-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Service:** `task-service`
 **File:** `internal/adapter/grpc/server_plan_tree.go` (mới), `internal/adapter/grpc/server.go` (đăng ký dependency), `internal/adapter/postgres/unique_violation.go` (mới), `internal/adapter/mysql/unique_violation.go` (mới), `internal/adapter/postgres/create_plan_tree_integration_test.go` (mới), `internal/adapter/mysql/create_plan_tree_integration_test.go` (mới), `cmd/server/main.go`
 **Depends on:** TASK-REQ-012-01
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -36,11 +36,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] RPC `CreatePlanTree` gọi được qua gRPC với dữ liệu mẫu và trả đủ `plan`, `phases`, `tasks`.
-- [ ] Hai dialect cùng kết quả; đua 8 goroutine chỉ một Plan hoạt động.
-- [ ] Rollback không để lại task mồ côi.
-- [ ] Task thuộc cây có quyền đọc và `execute` cho `creator_id` qua `ResolvePermission` (test grant kế thừa ba cấp).
-- [ ] `server.go` không phình thêm quá vài dòng đăng ký.
+- [x] RPC `CreatePlanTree` gọi được qua gRPC với dữ liệu mẫu và trả đủ `plan`, `phases`, `tasks`.
+- [x] Hai dialect cùng kết quả; đua 8 goroutine chỉ một Plan hoạt động.
+- [x] Rollback không để lại task mồ côi.
+- [x] Task thuộc cây có quyền đọc và `execute` cho `creator_id` qua `ResolvePermission` (test grant kế thừa ba cấp).
+- [x] `server.go` không phình thêm quá vài dòng đăng ký.
 
 ## Rủi ro và lưu ý
 

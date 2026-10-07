@@ -5,7 +5,7 @@
 **Service:** `backend-go/deploy/alerts`, `docs`
 **File:** `backend-go/deploy/alerts/codeintel.rules.yaml` (mới), `backend-go/deploy/alerts/codeintel_rules_test.go` (mới, hoặc test trong module phù hợp), `docs/guides/code-intel/code-intel-performance-and-metrics.md` (mới), `backend-go/services/code-intel-service/README.md`
 **Depends on:** BE-CV-TASK-071-02, 071-04, 071-05
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -28,9 +28,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi metric trong rule tồn tại (test đỏ khi đổi tên metric).
-- [ ] Tài liệu nêu rõ ngưỡng là giả định.
-- [ ] Ghi chú "chưa được nạp" có mặt.
+- [x] Mọi metric trong rule tồn tại (test đỏ khi đổi tên metric).
+- [x] Tài liệu nêu rõ ngưỡng là giả định.
+- [x] Ghi chú "chưa được nạp" có mặt.
 
 ## Rủi ro và lưu ý
 

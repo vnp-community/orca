@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/index_status_cache.go`, `internal/adapter/grpcclient/agent_status_prober.go` (+ `_test.go`) (mới)
 **Depends on:** BE-CV-TASK-012-04, 012-08, 011-07, 011-09
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,8 +29,8 @@ SOL-012-index-status mục 2.D. `RelayByDevServerRequest{dev_server_id, method, 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Đúng một `RelayByDevServer` cho 20 lời gọi đồng thời.
-- [ ] `last_status` lưu và đọc lại được ở hai dialect.
+- [x] Đúng một `RelayByDevServer` cho 20 lời gọi đồng thời.
+- [x] `last_status` lưu và đọc lại được ở hai dialect.
 
 ## Rủi ro và lưu ý
 

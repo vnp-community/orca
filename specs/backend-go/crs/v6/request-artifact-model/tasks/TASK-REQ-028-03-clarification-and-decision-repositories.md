@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/ports.go` (sửa), `internal/adapter/postgres/clarification_repository.go`, `internal/adapter/postgres/decision_repository.go`, `internal/adapter/mysql/clarification_repository.go`, `internal/adapter/mysql/decision_repository.go`, `internal/usecase/transition_request.go` (sửa), `internal/usecase/status_write_guard_test.go` (sửa) và test
 **Depends on:** TASK-REQ-028-01, TASK-REQ-028-02, TASK-REQ-003-03 (`TransitionRequest`), TASK-REQ-001-04 (executor trong ctx), TASK-REQ-002-04/-05 (mẫu repository)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -60,11 +60,11 @@ Hợp đồng hai repository dùng chung một bộ test chạy cho cả hai ada
 
 ## Tiêu chí hoàn thành
 
-- [ ] Cùng bộ kịch bản chạy xanh trên Postgres và MySQL cho cả hai repository.
-- [ ] Đua hai `Insert` Clarification `open`: đúng một thành công (cả hai DB).
-- [ ] `ClaimExpired` hai worker không xử lý trùng.
-- [ ] `ListPendingForUser` cho cùng kết quả hai DB, không dùng toán tử JSON.
-- [ ] `TransitionRequest` nhận `ResumeStatus`; test kiến trúc ghi `status` vẫn xanh.
+- [x] Cùng bộ kịch bản chạy xanh trên Postgres và MySQL cho cả hai repository.
+- [x] Đua hai `Insert` Clarification `open`: đúng một thành công (cả hai DB).
+- [x] `ClaimExpired` hai worker không xử lý trùng.
+- [x] `ListPendingForUser` cho cùng kết quả hai DB, không dùng toán tử JSON.
+- [x] `TransitionRequest` nhận `ResumeStatus`; test kiến trúc ghi `status` vẫn xanh.
 
 ## Rủi ro và lưu ý
 

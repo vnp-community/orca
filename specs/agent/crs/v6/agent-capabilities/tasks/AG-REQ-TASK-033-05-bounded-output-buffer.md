@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/agent-bounded-output-buffer.ts` (mới), `agent/src/relay/agent-bounded-output-buffer.test.ts` (mới), `agent/src/relay/agent-print-mode-exec.ts` (sửa, chỉ `handleAgentExecPrompt`)
 **Depends on:** [01](./AG-REQ-TASK-033-01-exec-prompt-options-parser.md) (đã đọc và kiểm `maxOutputBytes`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -55,11 +55,11 @@ Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/agent-bo
 
 ## Tiêu chí hoàn thành
 
-- [ ] `stdout` vượt `maxOutputBytes` bị cắt, `truncated.stdout === true`, phản hồi JSON dưới 16 MiB (test `fitResultToFrame`).
-- [ ] Không có `truncated` khi không cắt; kết quả cũ không đổi (test hồi quy xanh).
-- [ ] `notify` vẫn nhận mọi chunk đầy đủ.
-- [ ] Ký tự UTF-8 nhiều byte ở ranh giới chunk và ranh giới cắt không bị hỏng.
-- [ ] Không có chuỗi cộng dồn không giới hạn nào còn lại trong `handleAgentExecPrompt`.
+- [x] `stdout` vượt `maxOutputBytes` bị cắt, `truncated.stdout === true`, phản hồi JSON dưới 16 MiB (test `fitResultToFrame`).
+- [x] Không có `truncated` khi không cắt; kết quả cũ không đổi (test hồi quy xanh).
+- [x] `notify` vẫn nhận mọi chunk đầy đủ.
+- [x] Ký tự UTF-8 nhiều byte ở ranh giới chunk và ranh giới cắt không bị hỏng.
+- [x] Không có chuỗi cộng dồn không giới hạn nào còn lại trong `handleAgentExecPrompt`.
 
 ## Rủi ro và lưu ý
 

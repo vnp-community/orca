@@ -19,6 +19,8 @@ import {
 } from '../shared/agent-wire-protocol'
 import { startRemoteRuntimeSocketLiveness } from '../shared/remote-runtime-socket-liveness'
 import { buildCapabilities, STATIC_CAPABILITIES_FALLBACK } from './agent-session-capabilities'
+import { AGENT_BUILD_VERSION } from './agent-build-version'
+import { AGENT_PROTOCOL_VERSION, AGENT_FEATURES } from './agent-protocol-features'
 
 export async function sendHandshake(
   ws: WebSocket,
@@ -51,6 +53,8 @@ export async function sendHandshake(
     }
   }
 
+  // features is static (no async probes) so it adds zero latency.
+  // Kept separate from capabilities so existing pty/git gate checks are unaffected.
   const rpc = {
     jsonrpc: '2.0' as const,
     id: 1,
@@ -67,7 +71,11 @@ export async function sendHandshake(
         ? { agentToken: tokenOverride ?? config.agentToken }
         : {}),
       devServerId: config.devServerId,
-      tools: tools.map((t) => t.name)
+      tools: tools.map((t) => t.name),
+      // CR-REQ-033: new handshake fields (backend ignores unknown fields gracefully)
+      protocolVersion: AGENT_PROTOCOL_VERSION,
+      buildVersion: AGENT_BUILD_VERSION,
+      features: [...AGENT_FEATURES]
     }
   }
   ws.send(encodeDataFrame(wireState, JSON.stringify(rpc)))
@@ -75,6 +83,7 @@ export async function sendHandshake(
     `Handshake sent: devServerId=${config.devServerId} tools=[${tools.map((t) => t.name).join(',')}]`
   )
 }
+
 
 export function startKeepalive(
   ws: WebSocket,

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-results-store.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-081-02, 081-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -26,8 +26,8 @@ Test 1200 phát hiện phân trang 500+500+200; mục lớn làm trang chạm 1 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không trang nào vượt 1 MiB; phân trang không mất/trùng mục.
-- [ ] Log luôn đi qua bộ che.
+- [x] Không trang nào vượt 1 MiB; phân trang không mất/trùng mục.
+- [x] Log luôn đi qua bộ che.
 
 ## Rủi ro
 

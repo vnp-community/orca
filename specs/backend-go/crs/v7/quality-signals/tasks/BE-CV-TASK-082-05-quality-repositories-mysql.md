@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/mysql/quality_run_repository.go`, `quality_finding_repository.go` (mới)
 **Depends on:** BE-CV-TASK-082-02, 082-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 MySQL không RLS (`SupportsRLS=false`): `WHERE tenant_id = ?` ở mọi câu. Vi phạm duy nhất `1062`. Không `RETURNING`.
@@ -20,7 +20,7 @@ MySQL không RLS (`SupportsRLS=false`): `WHERE tenant_id = ?` ở mọi câu. Vi
 - Bộ hợp đồng 082-06 trên MySQL; test AST bắt phương thức thiếu `tenant_id`.
 
 ## Tiêu chí hoàn thành
-- [ ] Cùng kết quả như Postgres trên bộ kịch bản chung.
+- [x] Cùng kết quả như Postgres trên bộ kịch bản chung.
 
 ## Rủi ro
 TiDB chưa kiểm; `ON DUPLICATE KEY` chưa chạy.

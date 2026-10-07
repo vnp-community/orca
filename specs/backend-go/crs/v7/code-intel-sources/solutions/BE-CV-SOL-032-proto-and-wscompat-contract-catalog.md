@@ -74,12 +74,12 @@ C1, C2 (mục 1); `ContractWarning` giữ riêng (PQ-29); không RPC mới (S8).
 BE: `030` (đọc file), `020` (`SymbolRef`, `ServiceRef`), `012`, `022`; tiêu thụ bởi `033-c4-component-view` (`calls-rpc`), `034-data-flow-model`, `038-contract-diff` (`MessageShape`), `035` (tuỳ chọn), `070`. FE: không (không có kênh; `FE-CV-SOL-059` thấy qua 038). AG: không.
 
 ## 6. Tiêu chí chấp nhận
-- [ ] 18 service, 548 RPC (đếm độc lập bằng `grep` trong test), cờ streaming khớp (CR: 15 server-stream, 2 hai chiều — chưa kiểm).
-- [ ] `ImplementedBy` đúng 18/18 (`McpService`, `McpRegistryService` cùng `mcp-service`).
-- [ ] `infra-fleet-service`: 7 RPC `Unimplemented` như CR (hoặc số mới có giải thích); `ListAgentSessions` có handler.
-- [ ] Cạnh `workflow-service→automation-service` và `tenant-service→scm-integration-service` có `evidence` file:dòng; T3 có nhãn suy luận.
-- [ ] Kênh `accounts.*` → `agent-method` đúng; `host.wsl.isAvailable` → `local`; `CHANNEL_DUPLICATE` khi trùng; kênh `browser.*` khai triển.
-- [ ] Kết quả có `headCommit`, `stale`, `truncated`; không thân hàm; cache cô lập tenant; kiểm chéo descriptor không lệch; không `max-lines` disable.
+- [x] 18 service, 548 RPC (đếm độc lập bằng `grep` trong test), cờ streaming khớp (CR: 15 server-stream, 2 hai chiều — chưa kiểm).
+- [x] `ImplementedBy` đúng 18/18 (`McpService`, `McpRegistryService` cùng `mcp-service`).
+- [x] `infra-fleet-service`: 7 RPC `Unimplemented` như CR (hoặc số mới có giải thích); `ListAgentSessions` có handler.
+- [x] Cạnh `workflow-service→automation-service` và `tenant-service→scm-integration-service` có `evidence` file:dòng; T3 có nhãn suy luận.
+- [x] Kênh `accounts.*` → `agent-method` đúng; `host.wsl.isAvailable` → `local`; `CHANNEL_DUPLICATE` khi trùng; kênh `browser.*` khai triển.
+- [x] Kết quả có `headCommit`, `stale`, `truncated`; không thân hàm; cache cô lập tenant; kiểm chéo descriptor không lệch; không `max-lines` disable.
 
 ## 7. Kiểm thử, rủi ro, câu hỏi mở
 **Kiểm thử.** Unit parser proto, alias `Register`, `Unimplemented`, phân giải client, khai triển tên kênh; golden cho `usage-service`, `annotation-service`, `notification-service`, `infra-fleet-service` (CR-070); cô lập tenant ở cache; lệnh `go test ./services/code-intel-service/internal/adapter/{protoschema,gocallgraph}/... ./services/code-intel-service/internal/usecase/... -run Contract` (chưa chạy).

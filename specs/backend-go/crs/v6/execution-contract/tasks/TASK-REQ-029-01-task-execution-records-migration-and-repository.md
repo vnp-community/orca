@@ -5,7 +5,7 @@
 **Service/Area:** `task-service` / migration, domain, port, adapter postgres và mysql
 **File:** `backend-go/services/task-service/migrations/postgres/NNNN_task_execution_records.{up,down}.sql` (mới), `migrations/mysql/NNNN_task_execution_records.{up,down}.sql` (mới), `internal/domain/execution_record.go` (mới), `internal/usecase/task_execution_record_ports.go` (mới), `internal/adapter/postgres/task_execution_record_repository.go` (mới), `internal/adapter/mysql/task_execution_record_repository.go` (mới), và các `_test.go`
 **Depends on:** TASK-REQ-011-01 (migration `0015`/`0016`), migration `task_specs` của CR-REQ-027 (chỉ để chốt số `NNNN`; bảng này không FK sang `task_specs`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -64,11 +64,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Migration lên, xuống, lên sạch trên Postgres 14+ và MySQL 8.0.16+; CHECK từ chối `parse_status` và `failure_class` lạ.
-- [ ] Xoá task xoá mọi bản ghi của nó (cascade).
-- [ ] Không có truy vấn nào thiếu `tenant_id`.
-- [ ] `TailUTF8` không bao giờ trả chuỗi không hợp lệ UTF-8.
-- [ ] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable.
+- [x] Migration lên, xuống, lên sạch trên Postgres 14+ và MySQL 8.0.16+; CHECK từ chối `parse_status` và `failure_class` lạ.
+- [x] Xoá task xoá mọi bản ghi của nó (cascade).
+- [x] Không có truy vấn nào thiếu `tenant_id`.
+- [x] `TailUTF8` không bao giờ trả chuỗi không hợp lệ UTF-8.
+- [x] Không file nào tên `helpers`/`utils`/`common`/`misc`; không `max-lines` disable.
 
 ## Rủi ro và lưu ý
 

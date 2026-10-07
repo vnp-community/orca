@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + i18n
 **File:** `review-lens-registry.ts` (thêm mục `impact`, mặc định), `ReviewDetailDrawer` (mặc định `SymbolDetailPanel`), `i18n/locales/*.json`, `code-intel-locale-coverage.test.ts`, `tests/e2e/review-impact.spec.ts` (mới)
 **Depends on:** FE-CV-TASK-053-03, 053-04, 053-06
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

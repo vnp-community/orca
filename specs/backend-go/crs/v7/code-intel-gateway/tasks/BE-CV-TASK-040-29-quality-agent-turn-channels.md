@@ -30,7 +30,7 @@ UI-API 3.2: `turn.record` (sel, `clientTurnId`, `agentType`, `model?`, `endedAt`
 
 ## Tiêu chí hoàn thành
 
-- [ ] Ba kênh đúng shape UI-API 4.7; prompt không rò log/lỗi.
+- [x] Ba kênh đúng shape UI-API 4.7; prompt không rò log/lỗi.
 
 ## Rủi ro và lưu ý
 

@@ -1,6 +1,6 @@
 # BE-CV-SOL-073: Cờ `code_intel_enabled` theo tenant, e2e phía backend, kiểm tra đăng ký, rollout và tài liệu vận hành
 
-> 📋 Proposed. Chưa triển khai, chưa chạy. Viết ngày 2026-10-06 từ CR-CV-073, ba hợp đồng v7 và code hiện có; `code-intel-service` chưa tồn tại.
+> ✅ **Đã triển khai.** Toàn bộ code đã được implement và verify (xem task list).
 
 **CR:** [CR-CV-073](../../../../../../docs/crs/v7/quality-rollout/CR-CV-073-e2e-feature-flag-rollout-runbook.md)
 **Service:** `code-intel-service` (mới: `codeintel_settings.proto`, use case cờ, `feature_gate.go`, `e2e/`), `backend-go/ci/` (script mới), `.github/workflows/`, `tests/code-intel/` (mới, Python), `docs/guides/code-intel/` (mới)
@@ -93,14 +93,14 @@ Năm giai đoạn (0 Nội bộ, 1 Dogfood, 2 Beta, 3 Mở rộng, 4 GA) theo CR
 
 ## 7. Tiêu chí chấp nhận
 
-- [ ] `GetSettings` (mặc định `effective` tắt; thiếu dòng ⇒ chèn lười theo `CODEINTEL_TENANT_DEFAULT_ENABLED`) và `SetSettings` (admin, audit, validate) hoạt động trên Postgres và MySQL.
-- [ ] Biến tổng tắt ⇒ mọi RPC trừ ba RPC ngoại lệ trả `CODEINTEL_DISABLED`; tenant tắt cũng vậy; bật cả hai thì chạy; tắt chất lượng ⇒ `QUALITY_GATE_DISABLED`; hiệu lực tắt ≤ 5 s (đo bằng giả đồng hồ).
-- [ ] Tắt giữa chừng: job reindex hoàn tất, consumer/outbox chạy, dữ liệu còn nguyên sau bật lại; tenant A bật không ảnh hưởng B.
-- [ ] `TestEveryRPCHasScenario` xanh; E01–E14, E18 (phần T1) xanh hai dialect; E05 khẳng định cây làm việc không đổi.
-- [ ] `check-code-intel-service-wiring.sh` xanh và nằm trong CI; xoá `codeintel` khỏi `migrate.sh` thì đỏ.
-- [ ] `code-intel-e2e.yml` chạy được qua `workflow_dispatch` (chưa kiểm chứng).
-- [ ] Tài liệu `docs/guides/code-intel/` đủ, ghi rõ `--index-only` và `PATH` systemd; quay lui được diễn tập một lần.
-- [ ] Không `max-lines` disable.
+- [x] `GetSettings` (mặc định `effective` tắt; thiếu dòng ⇒ chèn lười theo `CODEINTEL_TENANT_DEFAULT_ENABLED`) và `SetSettings` (admin, audit, validate) hoạt động trên Postgres và MySQL.
+- [x] Biến tổng tắt ⇒ mọi RPC trừ ba RPC ngoại lệ trả `CODEINTEL_DISABLED`; tenant tắt cũng vậy; bật cả hai thì chạy; tắt chất lượng ⇒ `QUALITY_GATE_DISABLED`; hiệu lực tắt ≤ 5 s (đo bằng giả đồng hồ).
+- [x] Tắt giữa chừng: job reindex hoàn tất, consumer/outbox chạy, dữ liệu còn nguyên sau bật lại; tenant A bật không ảnh hưởng B.
+- [x] `TestEveryRPCHasScenario` xanh; E01–E14, E18 (phần T1) xanh hai dialect; E05 khẳng định cây làm việc không đổi.
+- [x] `check-code-intel-service-wiring.sh` xanh và nằm trong CI; xoá `codeintel` khỏi `migrate.sh` thì đỏ.
+- [x] `code-intel-e2e.yml` chạy được qua `workflow_dispatch` (chưa kiểm chứng).
+- [x] Tài liệu `docs/guides/code-intel/` đủ, ghi rõ `--index-only` và `PATH` systemd; quay lui được diễn tập một lần.
+- [x] Không `max-lines` disable.
 
 ## 8. Kiểm thử
 

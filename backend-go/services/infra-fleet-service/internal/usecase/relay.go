@@ -56,7 +56,7 @@ func (uc *Relay) Execute(ctx context.Context, in RelayInput) (map[string]any, er
 
 	result, err := uc.agent.Exec(ctx, devServer, in.Method, in.Params)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindInternal, "INFRA_AGENT_EXEC_FAILED", "failed to relay to dev server agent", err)
+		return nil, MapAgentExecError(in.Method, err)
 	}
 	return result, nil
 }

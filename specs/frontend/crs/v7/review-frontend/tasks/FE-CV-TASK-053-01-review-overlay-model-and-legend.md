@@ -5,7 +5,7 @@
 **Area:** frontend / review-map
 **File:** `components/review-map/review-overlay-model.ts`, `ReviewOverlayLegend.tsx` (mới), tests
 **Depends on:** FE-CV-TASK-050-19, FE-CV-TASK-050-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** frontend / hooks
 **File:** `frontend/src/renderer/src/hooks/useQualitySupport.ts`, `useQualityGate.ts`, `useQualityRun.ts`, `useQualityProfiles.ts` (mới) và `*.test.tsx`
 **Depends on:** 087-01, 087-02; FE-CV-SOL-050-store-and-query-hooks (`useCodeIntelSupport`, settings)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

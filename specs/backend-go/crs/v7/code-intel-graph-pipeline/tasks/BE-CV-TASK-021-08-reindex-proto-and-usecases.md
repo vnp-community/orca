@@ -5,7 +5,7 @@
 **Service:** `code-intel-service` · `proto`
 **File:** `backend-go/proto/orca/codeintel/v1/codeintel_reindex.proto` (mới), `.../usecase/{request_reindex.go,get_reindex_job.go,reindex_job_refresh.go,reindex_job_store.go}` (mới)
 **Depends on:** TASK-021-04, SOL-011 (`reindex_jobs`, outbox), SOL-013 (`ReindexAdmission`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,7 +29,8 @@ PQ-16, §4 T7, §5. Job có `active_key` UNIQUE; sự kiện `reindex.started` c
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi ca trên xanh hai dialect. - [ ] Outbox `reindex.started` đúng một dòng.
+- [x] Mọi ca trên xanh hai dialect.
+- [x] Outbox `reindex.started` đúng một dòng.
 
 ## Rủi ro và lưu ý
 

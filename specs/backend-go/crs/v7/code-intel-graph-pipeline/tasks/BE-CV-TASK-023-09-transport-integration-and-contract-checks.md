@@ -5,7 +5,7 @@
 **Service:** `infra-fleet-service` · `proto` · CI
 **File:** `backend-go/services/infra-fleet-service/internal/adapter/grpc/codeintel_transport_integration_test.go` (mới, `//go:build integration`), `.../internal/adapter/devserveragent/codeintel_golden_notifications_test.go` (mới), workflow infra-fleet hiện có trong `.github/workflows/` (sửa bước `buf`, nếu chưa gọi `buf` trực tiếp)
 **Depends on:** TASK-023-02 … TASK-023-08
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -30,10 +30,10 @@ CR-021 mục 5 yêu cầu một test tích hợp: infra-fleet thật in-process 
 
 ## Tiêu chí hoàn thành
 
-- [ ] Test tích hợp xanh; ca mã lỗi đỏ trên `main` và xanh sau thay đổi (ghi vào PR).
-- [ ] Số test đỏ so với baseline không tăng.
-- [ ] CI gọi `buf` trực tiếp.
-- [ ] Không có `max-lines` disable mới.
+- [x] Test tích hợp xanh; ca mã lỗi đỏ trên `main` và xanh sau thay đổi (ghi vào PR).
+- [x] Số test đỏ so với baseline không tăng.
+- [x] CI gọi `buf` trực tiếp.
+- [x] Không có `max-lines` disable mới.
 
 ## Rủi ro và lưu ý
 

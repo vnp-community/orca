@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/get_index_status.go`, `internal/adapter/grpc/index_status_server.go` (+ `_test.go`) (mới)
 **Depends on:** BE-CV-TASK-012-05, 012-09, 012-10, 012-02
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -29,8 +29,8 @@ Hợp đồng §3.1 (`GetIndexStatus`: `refresh`, quyền `read`, kênh `codeInt
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tiêu chí SOL-012-index-status mục 4 đạt.
-- [ ] Không đường dẫn tuyệt đối/`dev_server_id` trong phản hồi.
+- [x] Tiêu chí SOL-012-index-status mục 4 đạt.
+- [x] Không đường dẫn tuyệt đối/`dev_server_id` trong phản hồi.
 
 ## Rủi ro và lưu ý
 

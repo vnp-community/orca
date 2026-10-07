@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/proto/orca/request/v1/request.proto`, `backend-go/services/request-service/internal/usecase/lookup_request_by_source.go` (mới), `.../internal/adapter/grpc/server.go`, `.../internal/adapter/{postgres,mysql}/request_repository.go` (thêm truy vấn), `.../cmd/server/main.go` (guard)
 **Depends on:** CR-REQ-002 (bảng `requests`, chỉ mục nguồn), CR-REQ-004; BE-REQ-SOL-025 task 01 (đọc cờ)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -33,9 +33,9 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] RPC trả đúng, chỉ cho caller nội bộ.
-- [ ] Cờ tắt thì `found=false`.
-- [ ] `buf breaking` xanh.
+- [x] RPC trả đúng, chỉ cho caller nội bộ.
+- [x] Cờ tắt thì `found=false`.
+- [x] `buf breaking` xanh.
 
 ## Rủi ro và lưu ý
 

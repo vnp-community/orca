@@ -1,4 +1,4 @@
-# Orca Dev Server Agent v2.1
+# Orca Dev Server Agent v2.2
 
 Agent Node.js chạy trên **dev server** để kết nối với Orca server qua WebSocket.
 
@@ -58,7 +58,7 @@ Agent gửi request TRƯỚC:
   "jsonrpc": "2.0", "id": 1, "method": "agent.handshake",
   "params": {
     "agentToken": "agt-dev-local-xxx",
-    "agentVersion": "2.1.0",
+    "agentVersion": "2.2.0",
     "platform": "linux",
     "arch": "x64",
     "nodeVersion": "v22.0.0",
@@ -81,7 +81,7 @@ Agent reply:
 {
   "jsonrpc":"2.0", "id":1, "result": {
     "ok":true, "platform":"linux", "arch":"x64",
-    "nodeVersion":"v22.0.0", "agentVersion":"2.1.0", "sessionId":"sess-xxx"
+    "nodeVersion":"v22.0.0", "agentVersion":"2.2.0", "sessionId":"sess-xxx"
   }
 }
 ```
@@ -151,10 +151,34 @@ ssh ubuntu@<devserver> "sudo systemctl restart orca-agent"
 
 ---
 
+## Nâng cấp lên 2.2.0 (CR-REQ-033)
+
+Khi triển khai phiên bản 2.2.0 hỗ trợ `agent.capabilities`, `agent.execPrompt` (với chế độ readonly), và `ai.complete`:
+
+1. **Thứ tự triển khai (BẮT BUỘC):** Agent trước, backend sau.
+   - Backend mới chỉ gọi các RPC method mới khi handshake chứa `features` tương ứng từ agent mới. Triển khai agent trước loại bỏ hoàn toàn cửa sổ lỗi tương thích ngược.
+2. **Triển khai thủ công:**
+   ```bash
+   node agent/build.mjs
+   scp agent/out/agent.js ubuntu@<devserver>:~/orca-agent/agent.js
+   ssh ubuntu@<devserver> "sudo systemctl restart orca-agent"
+   ```
+3. **Lưu ý với relay-ssh:**
+   - Cảnh báo: `sshrelay/provisioner.go:141` so sánh `version == p.cfg.OrcaVersion` (với `OrcaVersion` là biến `ORCA_VERSION` của backend) để quyết định bỏ qua việc đẩy bundle. Nếu `ORCA_VERSION` trùng với chuỗi `AGENT_VERSION` cũ trên máy xa, bundle mới sẽ không tự động được đẩy.
+   - Người vận hành cần kiểm tra biến `ORCA_VERSION` của backend; nếu muốn buộc sshrelay đẩy lại bundle mới, hãy cấu hình `ORCA_VERSION` khớp phiên bản mới (`2.2.0`) hoặc xoá file bundle cũ trên máy xa.
+4. **Cách xác nhận sau nâng cấp:**
+   - Kết nối lại và gọi RPC `agent.capabilities`: kỳ vọng `agent.buildVersion == "2.2.0"`, `agent.protocolVersion == 2`.
+   - Kiểm tra log handshake trên server: ghi nhận các tính năng `features: ["agent.capabilities", "agent.execPrompt", "ai.complete"]`.
+
+---
+
 ## Supported RPC Methods
 
 | Method | Mô tả |
 |--------|-------|
+| `agent.capabilities` | Trả về báo cáo khả năng agent (tools, envs, platform, protocolVersion) |
+| `agent.execPrompt` | Thực thi AI prompt với tuỳ chọn readonly/print mode, timeout, env, workDir |
+| `ai.complete` | Trực tiếp hoàn thành prompt thông qua Anthropic API relay |
 | `tools/list` | Trả về danh sách tools đã discover |
 | `tools/call` | Gọi tool theo tên (claude_code, gh, git, shell, read_file, ...) |
 | `agent.ping` | Health check |
@@ -166,3 +190,35 @@ ssh ubuntu@<devserver> "sudo systemctl restart orca-agent"
 | `fs.stat` | Stat a path |
 | `fs.listWorkspaces` | List git repos trong một directory |
 | `git.clone` | Clone git repo (async) |
+
+---
+
+## Kill Switch / Tắt Tính Năng Tại Máy (CR-073)
+
+Quản trị viên có thể tắt các phân hệ Code Intelligence hoặc Quality Gate tại Dev Server khi cần giảm tải hoặc xử lý sự cố.
+
+### Biến môi trường (`.env` trên Dev Server)
+
+| Biến | Giá trị | Ý nghĩa |
+|---|---|---|
+| `ORCA_CODEINTEL_DISABLED` | `1` (hoặc `true`/`on`) | **Tắt toàn bộ Code Intelligence** (fail-closed: mọi giá trị lạ ngoài 0/false/off đều bị coi là tắt). |
+| `ORCA_CODEINTEL_REINDEX` | `off` (hoặc `0`/`false`) | Tắt tính năng reindex (mặc định bật). |
+| `ORCA_QUALITY_RUN` | `off` (hoặc `0`/`false`) | Tắt tính năng quality gate runner (mặc định bật). |
+
+### Các bước áp dụng
+1. Thêm hoặc cập nhật biến trong file `.env` tại thư mục cài agent (hoặc `~/.env`):
+   ```bash
+   echo "ORCA_CODEINTEL_DISABLED=1" >> ~/orca-agent/.env
+   ```
+2. Restart dịch vụ agent:
+   ```bash
+   sudo systemctl restart orca-agent
+   ```
+3. Xác minh trạng thái:
+   - **Qua RPC `codeintel.status`**: Trả về `ok: true` nhưng kèm `warnings: ["codeintel_disabled"]`.
+   - **Qua handshake `capabilities`**: Không còn xuất hiện `codeintel`, `codeintel:reindex`, hoặc `quality`.
+   - **Lưu ý quan trọng**:
+     - **KHÔNG** kiểm tra qua danh sách `tools[]` của `tools/list` vì `tools[]` dành cho tool discovery chung.
+     - Các lệnh gọi trực tiếp tool CLI legacy `gitnexus` / `codegraph` qua `tools/call` vẫn chạy độc lập và không chịu ảnh hưởng bởi switch này.
+     - Trong chế độ `--stdio` hoặc chạy qua SSH session, các biến môi trường được kế thừa trực tiếp từ session env.
+   - *Ghi chú môi trường kiểm thử*: Đã kiểm chứng tự động qua bộ kiểm thử tự động của agent (`runtime-switches.test.ts`, `disabled-gate.test.ts`, `disabled-capabilities.test.ts`, `disabled-startup.test.ts`); chưa thử trên dev server vật lý trong môi trường local này.

@@ -19,7 +19,7 @@ Chia nhóm, giới hạn, stdin vs đối số, giá trị `-x` bị từ chối
 Lệnh: `pnpm exec vitest run src/relay/codegraph-affected-tests.test.ts`
 
 ## Tiêu chí hoàn thành
-- [ ] `agent/src/relay/agent-tool-registry.ts` -> ≥ 1 test (fixture).
+- [x] `agent/src/relay/agent-tool-registry.ts` -> ≥ 1 test (fixture).
 
 ## Rủi ro
 - Hỗ trợ `--stdin` của `affected` suy ra từ CR, chưa chạy.

@@ -12,6 +12,7 @@ import type {
 import type { CliInstallStatus } from '../../../shared/cli-install-types'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import { createMcpApi } from './web-mcp-api'
+import { createCodeIntelApi } from './web-code-intel-api'
 import type { AiVaultListArgs, AiVaultListResult } from '../../../shared/ai-vault-types'
 import { buildNativeChatUnsubscribe } from '../../../shared/native-chat-stream-unsubscribe'
 import type {
@@ -797,6 +798,19 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     mcp: createMcpApi({
       callRuntimeResult,
       openStream: (method, params, h) => {
+        const environment = requireActiveEnvironmentOrNull()
+        return environment
+          ? getClientForEnvironment(environment).subscribe(method, params, {
+              onResponse: h.onResponse,
+              onClose: h.onClose
+            })
+          : null
+      }
+    }),
+    // CR-050: code-intel routes through the same environment transport as MCP
+    codeIntel: createCodeIntelApi({
+      callEnvironmentEnvelope,
+      subscribe: (method, params, h) => {
         const environment = requireActiveEnvironmentOrNull()
         return environment
           ? getClientForEnvironment(environment).subscribe(method, params, {

@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-workspace-root.ts`, `quality-changed-files.ts`, `quality-dirty-fingerprint.ts` (mới) + test
 **Depends on:** AG-CV-SOL-001 (`codeintel-repo-resolution.ts`)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,8 +25,8 @@ Repo git thật trong thư mục tạm: commit, sửa chưa commit, tệp mới,
 
 ## Tiêu chí hoàn thành
 
-- [ ] Không lệnh git nào dùng cờ mới hơn 2.25 (test quét argv).
-- [ ] `base` lạ không bao giờ tới `git` (kiểm trước khi spawn).
+- [x] Không lệnh git nào dùng cờ mới hơn 2.25 (test quét argv).
+- [x] `base` lạ không bao giờ tới `git` (kiểm trước khi spawn).
 
 ## Rủi ro
 

@@ -135,13 +135,13 @@ Thứ tự: 037 → `BE-CV-SOL-038-contract-diff` (song song được) → solut
 
 ## 9. Tiêu chí chấp nhận
 
-- [ ] Bộ vàng chứa ≥ 1 ca mỗi tầng; `outbox_events` không báo; `codeintel:allow` có lý do ≥ 10 ký tự bị bỏ; không lý do thì vô hiệu + `info`.
-- [ ] `INSERT` thiếu cột `tenant_id` báo `sql.insert-missing-tenant`.
-- [ ] Trên Orca: `folder_workspace_repository.go` `Update/Delete` `high`; `mcp-service` `medium`; `token_hash` `low`.
-- [ ] `finding_key` ổn định khi dịch dòng, đổi khi đổi SQL; dismiss ẩn finding.
-- [ ] Precision `high` trên bộ vàng ghi lại; chưa đạt ⇒ vẫn `experimental` (không chạy khi `rules[]` rỗng).
-- [ ] Mã động bị bỏ và được đếm; không có mã nguồn thô trong finding.
-- [ ] Hai dialect của phân tích xanh; chéo tenant bị từ chối; không `max-lines` disable.
+- [x] Bộ vàng chứa ≥ 1 ca mỗi tầng; `outbox_events` không báo; `codeintel:allow` có lý do ≥ 10 ký tự bị bỏ; không lý do thì vô hiệu + `info`.
+- [x] `INSERT` thiếu cột `tenant_id` báo `sql.insert-missing-tenant`.
+- [x] Trên Orca: `folder_workspace_repository.go` `Update/Delete` `high`; `mcp-service` `medium`; `token_hash` `low`.
+- [x] `finding_key` ổn định khi dịch dòng, đổi khi đổi SQL; dismiss ẩn finding.
+- [x] Precision `high` trên bộ vàng ghi lại; chưa đạt ⇒ vẫn `experimental` (không chạy khi `rules[]` rỗng).
+- [x] Mã động bị bỏ và được đếm; không có mã nguồn thô trong finding.
+- [x] Hai dialect của phân tích xanh; chéo tenant bị từ chối; không `max-lines` disable.
 
 ## 10. Tham chiếu
 

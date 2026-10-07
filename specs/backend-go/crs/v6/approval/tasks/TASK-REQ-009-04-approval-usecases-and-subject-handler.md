@@ -5,7 +5,7 @@
 **Service/Area:** `request-service` / usecase
 **File:** `backend-go/services/request-service/internal/usecase/approval_subject_handler.go` (mới), `approver_policy_ports.go` (mới), `open_approval.go` (mới), `decide_approval.go` (mới), `cancel_approval.go` (mới), `cancel_pending_approvals_for_request.go` (mới), `list_approvals.go` (mới), `list_pending_approvals_for_user.go` (mới) và các `_test.go`
 **Depends on:** TASK-REQ-009-03; CR-REQ-003 (`TransitionRequest`, `FlowFor`, đọc Request có khoá)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ## Context
 
@@ -31,10 +31,10 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tám `SubjectType` đều có thể đăng ký; thiếu một thì `MustCoverAll` lỗi.
-- [ ] `Approve` và chuyển trạng thái Request nằm trong một transaction (kiểm bằng fake `Tx` thấy một commit).
-- [ ] Mọi use case gọi `tenant.RequireTenantID`; chéo tenant trả `REQUEST_APPROVAL_NOT_FOUND`.
-- [ ] Không có gRPC outbound trong transaction.
+- [x] Tám `SubjectType` đều có thể đăng ký; thiếu một thì `MustCoverAll` lỗi.
+- [x] `Approve` và chuyển trạng thái Request nằm trong một transaction (kiểm bằng fake `Tx` thấy một commit).
+- [x] Mọi use case gọi `tenant.RequireTenantID`; chéo tenant trả `REQUEST_APPROVAL_NOT_FOUND`.
+- [x] Không có gRPC outbound trong transaction.
 
 ## Rủi ro và lưu ý
 

@@ -1,0 +1,7 @@
+[
+  {
+    "symbol": "GetUser",
+    "caller": "HandleUser",
+    "file": "internal/adapter/handler.go"
+  }
+]

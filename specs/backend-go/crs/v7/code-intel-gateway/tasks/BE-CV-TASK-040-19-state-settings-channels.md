@@ -29,8 +29,8 @@ UI-API 3.1, 4.1, §6: `settings.get` `{}` => `Settings{effective{codeIntelEnable
 
 ## Tiêu chí hoàn thành
 
-- [ ] `settings.get` cho phép phiên thiết bị; `settings.set` thì không.
-- [ ] Cập nhật từng phần đúng ngữ nghĩa trường vắng.
+- [x] `settings.get` cho phép phiên thiết bị; `settings.set` thì không.
+- [x] Cập nhật từng phần đúng ngữ nghĩa trường vắng.
 
 ## Rủi ro và lưu ý
 

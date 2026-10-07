@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel-structural-file-metrics.ts` (mới), mẫu bổ sung trong `codeintel-structural-facts-queries.ts`, `.test.ts`
 **Depends on:** AG-CV-TASK-037-01, 037-02, 037-04 (file queries)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -25,7 +25,7 @@ Fixture: tệp có cả hàm và method (gộp đúng); một nhãn rỗng; sắ
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tổng hàm/dòng đúng khi gộp hai nhãn; không `OR` nhãn.
+- [x] Tổng hàm/dòng đúng khi gộp hai nhãn; không `OR` nhãn.
 
 ## Rủi ro
 

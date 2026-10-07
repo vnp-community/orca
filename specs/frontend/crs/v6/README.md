@@ -1,6 +1,6 @@
 # frontend v6: giao diện Request → Solution → Plan → Phase → Task
 
-> **Trạng thái: 📋 Proposed.** Chưa có dòng code nào. Soạn ngày 2026-10-06 từ đọc code `frontend/src` và TDD ở [`specs/frontend/tdd/`](../../tdd/v5/00-index.md) (v4 và v5). Chưa chạy ứng dụng, test, typecheck hay lint.
+> **Trạng thái: 🚧 In Progress.** Rà soát ngày 2026-10-07. SOL-018 ✅ Done (6/6 tasks); SOL-019 🚧 In Progress (2/7 done hoặc partial); SOL-020 🚧 In Progress (1/5 done); SOL-021–023, 032, 036 🔴 Not Started. Tiến độ tổng: ~22% (12/54 tasks). Chưa chạy typecheck/lint/e2e toàn bộ.
 
 CR nguồn: [`docs/crs/v6/request-frontend/`](../../../../docs/crs/v6/request-frontend/README.md) (cùng [`ADDENDUM-2026-10-06.md`](../../../../docs/crs/v6/request-frontend/ADDENDUM-2026-10-06.md)). Hợp đồng backend: [`CONTRACT-request-ui-api.md`](../../../backend-go/crs/v6/gateway-and-mcp/CONTRACT-request-ui-api.md). Thiết kế giao diện: [`docs/research/receive-request/frontend-visualization-and-ux.md`](../../../../docs/research/receive-request/frontend-visualization-and-ux.md).
 
@@ -12,15 +12,15 @@ Một feature duy nhất [`request-frontend/`](./request-frontend/solutions/READ
 
 | CR | Solution | Task | Nội dung |
 |---|---|---|---|
-| 018 | FE-REQ-SOL-018 | 6 | Nền: kiểu, registry luồng, RPC client, hook, store, định tuyến, khung `RequestPage`; **gỡ `backlog` khỏi `TaskStatus`** |
-| 019 | FE-REQ-SOL-019 | 7 | Danh sách, chi tiết, xác nhận phân loại, Request con, "Tạo Request" từ trang Tasks |
-| 020 | FE-REQ-SOL-020 | 5 | Xem, so sánh, chọn, duyệt, từ chối Solution |
-| 021 | FE-REQ-SOL-021 | 6 | Cây Plan → Phase → Task, duyệt, khoá nút Chạy; lọc Plan/Phase khỏi Board |
-| 022 | FE-REQ-SOL-022 | 7 | Hộp duyệt chờ xử lý |
-| 023 | FE-REQ-SOL-023 | 7 | Màn Backlog ba view |
-| 032 | FE-REQ-SOL-032 | 8 | Canvas đồ thị và các lens (task 07 là tuỳ chọn, bị chặn bởi duyệt phụ thuộc) |
-| 036 | FE-REQ-SOL-036 | 8 | Giao diện hỏi lại, quyết định, sẵn sàng, tác động rủi ro, kết quả thực thi |
-| **Tổng** | **8** | **54** | |
+| 018 | FE-REQ-SOL-018 ✅ | 6/6 ✅ | Nền: kiểu, registry luồng, RPC client, hook, store, định tuyến, khung `RequestPage`; **gỡ `backlog` khỏi `TaskStatus`** |
+| 019 | FE-REQ-SOL-019 🚧 | 2/7 | Danh sách, chi tiết, xác nhận phân loại, Request con, "Tạo Request" từ trang Tasks |
+| 020 | FE-REQ-SOL-020 🚧 | 1/5 | Xem, so sánh, chọn, duyệt, từ chối Solution |
+| 021 | FE-REQ-SOL-021 🔴 | 0/6 (model partial) | Cây Plan → Phase → Task, duyệt, khoá nút Chạy; lọc Plan/Phase khỏi Board |
+| 022 | FE-REQ-SOL-022 🔴 | 0/7 | Hộp duyệt chờ xử lý |
+| 023 | FE-REQ-SOL-023 🔴 | 0/7 | Màn Backlog ba view |
+| 032 | FE-REQ-SOL-032 🔴 | 0/8 | Canvas đồ thị và các lens (task 07 là tuỳ chọn, bị chặn bởi duyệt phụ thuộc) |
+| 036 | FE-REQ-SOL-036 🔴 | 0/8 | Giao diện hỏi lại, quyết định, sẵn sàng, tác động rủi ro, kết quả thực thi |
+| **Tổng** | **8** | **~12/54 (~22%)** | |
 
 Chỉ mục bổ sung: [`PARTIAL-INDEX-022-023.md`](./request-frontend/solutions/PARTIAL-INDEX-022-023.md) và [`PARTIAL-INDEX-032-036.md`](./request-frontend/solutions/PARTIAL-INDEX-032-036.md) (cùng bản ở `tasks/`).
 

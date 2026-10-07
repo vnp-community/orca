@@ -1,0 +1,5 @@
+{
+  "target": { "id": "s1", "type": "Function", "name": "getUser", "filePath": "internal/domain/user.go" },
+  "incoming": { "calls": [{ "id": "s2", "name": "handleUser", "filePath": "internal/adapter/handler.go" }] },
+  "outgoing": { "calls": [] }
+}

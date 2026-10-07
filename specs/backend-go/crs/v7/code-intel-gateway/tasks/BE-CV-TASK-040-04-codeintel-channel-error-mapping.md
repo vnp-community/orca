@@ -5,7 +5,7 @@
 **Service:** `api-gateway`
 **File:** `backend-go/services/api-gateway/internal/adapter/wscompat/channels_codeintel_errors.go` (mới), `channels_codeintel_errors_test.go` (mới)
 **Depends on:** không (độc lập; TASK-040-03 dùng cùng định dạng thông điệp)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -45,10 +45,10 @@ Bảng (`channels_codeintel_errors_test.go`):
 
 ## Tiêu chí hoàn thành
 
-- [ ] Bảng 2.3 UI-API được phủ từng dòng ánh xạ.
-- [ ] Không thông điệp nào chứa mã nguồn, đường dẫn tuyệt đối từ 3 phân đoạn, hay tham số.
-- [ ] `NotFound|PermissionDenied` => `NOT_AUTHORIZED` (lệch L3 với CR).
-- [ ] Hậu tố `inProgress` chỉ do gateway thêm khi **chính nó** hết hạn.
+- [x] Bảng 2.3 UI-API được phủ từng dòng ánh xạ.
+- [x] Không thông điệp nào chứa mã nguồn, đường dẫn tuyệt đối từ 3 phân đoạn, hay tham số.
+- [x] `NotFound|PermissionDenied` => `NOT_AUTHORIZED` (lệch L3 với CR).
+- [x] Hậu tố `inProgress` chỉ do gateway thêm khi **chính nó** hết hạn.
 
 ## Rủi ro và lưu ý
 

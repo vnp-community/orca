@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/quality-run-types.ts` (mới), `quality-run-step-executor.ts` (mới), `.test.ts` (mới)
 **Depends on:** AG-CV-TASK-081-01, 081-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -26,8 +26,8 @@ Công cụ giả = script Node qua `file: process.execPath` + argv: in nhiều M
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi giá trị `kind` có test; không rò tiến trình/fd.
-- [ ] Đầu ra không qua pipe; env chỉ là `step.env`.
+- [x] Mọi giá trị `kind` có test; không rò tiến trình/fd.
+- [x] Đầu ra không qua pipe; env chỉ là `step.env`.
 
 ## Rủi ro
 

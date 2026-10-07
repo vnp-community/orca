@@ -5,7 +5,7 @@
 **Area:** mobile / UI
 **File:** `mobile/app/h/[hostId]/review-summary/[worktreeId].tsx`, `mobile/src/components/{MobileReviewSummaryScreenView,MobileReviewSummaryHeader,MobileReviewMetricGrid,MobileReviewFindingRow}.tsx`, `mobile-review-summary-styles.ts` (mới); `MobileDiffReviewDrawers.tsx`, `source-control/MobileSourceControlBranchCard.tsx` (sửa nhỏ)
 **Depends on:** FE-CV-TASK-062-03
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 

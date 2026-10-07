@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/testdata/dataflow/CHAIN_NOTES.md` (mới), `.../testdata/dataflow/mini-flow/` (mới)
 **Depends on:** BE-CV-TASK-032-07, BE-CV-TASK-033-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Không test mã; review `CHAIN_NOTES.md`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Chuỗi 5 bước có file:dòng thật cho cả hai dialect.
-- [ ] 3 luồng golden đã chọn, có lý do.
+- [x] Chuỗi 5 bước có file:dòng thật cho cả hai dialect.
+- [x] 3 luồng golden đã chọn, có lý do.
 
 ## Rủi ro và lưu ý
 

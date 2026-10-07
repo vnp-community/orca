@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/get_contract_diff.go`, `get_contract_diff_test.go`; `internal/adapter/grpc/contract_diff_handler.go`, `contract_diff_handler_test.go`; `testdata/contract-diff/golden/*.json` (mới); `cmd/server/main.go` (sửa: đăng ký)
 **Depends on:** BE-CV-TASK-038-03, 038-04, 038-05, 038-06; BE-CV-SOL-012/013/022
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -31,8 +31,8 @@ Solution 2.F. Quyền kiểm trước cache. Đầu ra làm giàu cho `BE-CV-SOL
 
 ## Tiêu chí hoàn thành
 
-- [ ] Toàn bộ §9 solution 038-contract-diff đạt trên fixture.
-- [ ] `buf breaking` xanh; kênh `codeIntel.contractDiff` chưa đăng ký ở gateway (việc của `BE-CV-SOL-040-codeintel-view-channels`).
+- [x] Toàn bộ §9 solution 038-contract-diff đạt trên fixture.
+- [x] `buf breaking` xanh; kênh `codeIntel.contractDiff` chưa đăng ký ở gateway (việc của `BE-CV-SOL-040-codeintel-view-channels`).
 
 ## Rủi ro và lưu ý
 

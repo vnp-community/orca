@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `internal/usecase/confirm_request_type.go`, `internal/usecase/confirm_request_type_test.go` (mới)
 **Depends on:** TASK-REQ-005-04 (cổng no-op), TASK-REQ-005-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -36,10 +36,10 @@ Lệnh: `go test ./services/request-service/internal/usecase/... -run Confirm`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Confirm hợp lệ vào `analyzing`/`planning` đúng loại.
-- [ ] Thiếu `size` với `bug`, `refactor` và `hotfix` + `normal` bị từ chối.
-- [ ] Hai lần cùng nội dung: lần hai thành công, không dòng lịch sử, không sự kiện.
-- [ ] Chấp nhận đề xuất AI không ghi lịch sử.
+- [x] Confirm hợp lệ vào `analyzing`/`planning` đúng loại.
+- [x] Thiếu `size` với `bug`, `refactor` và `hotfix` + `normal` bị từ chối.
+- [x] Hai lần cùng nội dung: lần hai thành công, không dòng lịch sử, không sự kiện.
+- [x] Chấp nhận đề xuất AI không ghi lịch sử.
 
 ## Rủi ro và lưu ý
 

@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/adapter/grpcclient/{dial.go,identity_forwarding.go,project_client.go,infra_fleet_client.go,git_gateway_client.go}` và `_test.go` (mới); `internal/usecase/ports.go` (thêm cổng `ProjectDirectory`, `DevServerDirectory`, `OnDiskWorktreeDetector`)
 **Depends on:** BE-CV-TASK-010-07, BE-CV-TASK-012-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -28,9 +28,9 @@ Mẫu dial: `task-service/cmd/server/main.go` (`grpc.NewClient` + insecure + `ot
 
 ## Tiêu chí hoàn thành
 
-- [ ] Mọi lời gọi mang đủ 4 khoá.
-- [ ] Cổng không có `GetRepo`/`GetWorktree`.
-- [ ] Ánh xạ lỗi theo PQ-03.
+- [x] Mọi lời gọi mang đủ 4 khoá.
+- [x] Cổng không có `GetRepo`/`GetWorktree`.
+- [x] Ánh xạ lỗi theo PQ-03.
 
 ## Rủi ro và lưu ý
 

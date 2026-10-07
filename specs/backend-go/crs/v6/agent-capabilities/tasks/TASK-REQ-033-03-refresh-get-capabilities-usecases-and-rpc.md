@@ -5,7 +5,7 @@
 **Service/Area:** `infra-fleet-service` / proto, usecase, adapter grpc, config, wiring
 **File:** `backend-go/proto/orca/infrafleet/v1/infrafleet.proto` (sửa), `internal/usecase/refresh_dev_server_capabilities.go` (mới), `internal/usecase/get_dev_server_capabilities.go` (mới), `internal/adapter/grpc/server_capability.go` (mới), `internal/adapter/grpc/server.go` (sửa), `internal/adapter/devserveragent/client.go` (sửa, option `WithOnSessionAttached`), `internal/config/config.go` (sửa), `cmd/server/main.go` (sửa), và `_test.go`
 **Depends on:** TASK-REQ-033-01 (store, domain), TASK-REQ-033-02 (`HandshakeInfo` mới)
-**Status:** [ ] TODO
+**Status:** `[x] DONE`
 
 ---
 
@@ -49,12 +49,12 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] `GetDevServerCapabilities` trả `source=probe` với agent mới và `source=handshake_only`, `degraded=true` với agent cũ (agent giả trả -32601).
-- [ ] Sự kiện `capabilities_changed` chỉ phát khi fingerprint đổi hoặc hồ sơ mới.
-- [ ] Không có Refresh nào chặn handshake; tám cuộc gọi đồng thời tạo đúng một `Exec`.
-- [ ] `buf lint` và `buf breaking` xanh.
-- [ ] `grpc.New` và mọi test gọi nó biên dịch; `go vet ./services/infra-fleet-service/...` sạch.
-- [ ] Không biến môi trường hay giá trị bí mật nào xuất hiện trong log hay sự kiện (test quét chuỗi mẫu).
+- [x] `GetDevServerCapabilities` trả `source=probe` với agent mới và `source=handshake_only`, `degraded=true` với agent cũ (agent giả trả -32601).
+- [x] Sự kiện `capabilities_changed` chỉ phát khi fingerprint đổi hoặc hồ sơ mới.
+- [x] Không có Refresh nào chặn handshake; tám cuộc gọi đồng thời tạo đúng một `Exec`.
+- [x] `buf lint` và `buf breaking` xanh.
+- [x] `grpc.New` và mọi test gọi nó biên dịch; `go vet ./services/infra-fleet-service/...` sạch.
+- [x] Không biến môi trường hay giá trị bí mật nào xuất hiện trong log hay sự kiện (test quét chuỗi mẫu).
 
 ## Thứ tự thực hiện gợi ý
 

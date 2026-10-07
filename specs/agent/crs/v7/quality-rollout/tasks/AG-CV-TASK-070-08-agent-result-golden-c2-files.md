@@ -5,7 +5,7 @@
 **Area:** `agent/` (Dev Server Agent)
 **File:** `agent/src/relay/codeintel/agent-result-golden.test.ts` (mới); `backend-go/services/code-intel-service/testdata/agent-results/**` (mới, ghi bởi test)
 **Depends on:** 070-04, 070-05, 070-06, 070-07; AG-CV-SOL-001 (`buildCodeIntelResult`), 002, 003, 005; BE-CV-TASK-070-01
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 
@@ -23,12 +23,12 @@ Agent-rpc §8: so sánh bỏ `perf`, `startedAt`. `indexedAt`, `headCommit` cố
 
 - Chạy thường (so sánh) xanh; chạy `ORCA_UPDATE_GOLDEN=1` hai lần cho cùng kết quả (idempotent).
 
-Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run <đường dẫn test>`. Chưa chạy.
+Lệnh (trong `/opt/repos/orca/agent`): `pnpm exec vitest run src/relay/codeintel/agent-result-golden.test.ts`.
 
 ## Tiêu chí hoàn thành
 
-- [ ] Tệp vàng do agent sinh, BE đọc được; thay đổi hình dạng làm đỏ cả hai phía.
-- [ ] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
+- [x] Tệp vàng do agent sinh, BE đọc được; thay đổi hình dạng làm đỏ cả hai phía.
+- [x] Không thêm phụ thuộc, không `max-lines` disable, tên tệp theo khái niệm.
 
 ## Rủi ro và lưu ý
 

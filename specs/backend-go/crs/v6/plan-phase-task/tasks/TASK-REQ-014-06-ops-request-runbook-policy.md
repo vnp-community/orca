@@ -5,7 +5,7 @@
 **Service:** `request-service`
 **File:** `backend-go/services/request-service/internal/domain/type_policy_ops_request.go` (mới), `internal/domain/runbook_rollback.go` (mới), `internal/domain/type_policy_ops_request_test.go` (mới), `internal/usecase/advance_execution.go` (kiểm thử nối cổng)
 **Depends on:** TASK-REQ-014-03, TASK-REQ-014-04 (handler `pre_deploy`), TASK-REQ-013-04 (`AdvanceExecution`)
-**Status:** `[ ] TODO`
+**Status:** `[x] DONE`
 
 ---
 
@@ -42,11 +42,11 @@
 
 ## Tiêu chí hoàn thành
 
-- [ ] Task nhãn `gate:pre_deploy` không `Execute` cho đến khi có Approval `approved`; task không nhãn chạy bình thường.
-- [ ] Approval được tạo đúng một lần dù `AdvanceExecution` chạy lặp.
-- [ ] Đề xuất thiếu rollback hoặc bước không đảo ngược thiếu cổng bị đúng mã lỗi.
-- [ ] `ops_result` thiếu thì không hoàn tất.
-- [ ] Bước lỗi không tự rollback; lý do backlog nêu task `rollback` liên quan.
+- [x] Task nhãn `gate:pre_deploy` không `Execute` cho đến khi có Approval `approved`; task không nhãn chạy bình thường.
+- [x] Approval được tạo đúng một lần dù `AdvanceExecution` chạy lặp.
+- [x] Đề xuất thiếu rollback hoặc bước không đảo ngược thiếu cổng bị đúng mã lỗi.
+- [x] `ops_result` thiếu thì không hoàn tất.
+- [x] Bước lỗi không tự rollback; lý do backlog nêu task `rollback` liên quan.
 
 ## Rủi ro và lưu ý
 

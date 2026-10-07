@@ -5,7 +5,7 @@
 **Service:** `code-intel-service`
 **File:** `backend-go/services/code-intel-service/internal/usecase/{bind_repo.go,list_repo_bindings.go}`, `internal/adapter/grpc/binding_server.go` (+ `_test.go`) (mới)
 **Depends on:** BE-CV-TASK-012-02, 012-05; `GetIndexStatus` usecase (012-11) cho phần `status`
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ---
 
@@ -27,8 +27,8 @@ Hợp đồng §3.1: `BindRepo` (`read`; trả `{binding, status}`), `ListRepoBi
 
 ## Tiêu chí hoàn thành
 
-- [ ] Hai RPC hoạt động với fake; không gọi agent từ `ListRepoBindings`.
-- [ ] Không rò đường dẫn tuyệt đối vào log.
+- [x] Hai RPC hoạt động với fake; không gọi agent từ `ListRepoBindings`.
+- [x] Không rò đường dẫn tuyệt đối vào log.
 
 ## Rủi ro và lưu ý
 
