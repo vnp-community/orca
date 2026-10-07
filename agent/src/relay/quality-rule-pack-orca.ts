@@ -107,7 +107,7 @@ export const ORCA_RULE_PACK: RulePack = {
       scope: { include: ['**/{preload,shared}/**/*.d.ts'], exclude: [], fileStatus: ['added'] },
       match: {
         type: 'added-file-name',
-        pattern: '\\\\.d\\\\.ts$',
+        pattern: '\\.d\\.ts$',
         maxLineLength: 200
       },
       message: 'New .d.ts files are not allowed here',
@@ -124,7 +124,7 @@ export const ORCA_RULE_PACK: RulePack = {
       scope: { include: ['**/*'], exclude: ['**/*.test.*', '**/*.md'], fileStatus: ['added', 'modified', 'renamed'] },
       match: {
         type: 'added-line-regex',
-        pattern: '(eslint-disable|oxlint-disable-next-line)\\\\s+max-lines',
+        pattern: '(eslint-disable|oxlint-disable-next-line)\\s+max-lines',
         maxLineLength: 2000
       },
       message: 'Adding new max-lines disable comments is prohibited',
@@ -141,7 +141,7 @@ export const ORCA_RULE_PACK: RulePack = {
       scope: { include: ['mobile/.oxlintrc.json'], exclude: [], fileStatus: ['added', 'modified'] },
       match: {
         type: 'file-content-regex',
-        pattern: '"max-lines"\\\\s*:',
+        pattern: '"max-lines"\\s*:',
         maxLineLength: 2000
       },
       message: 'Mobile config max-lines was raised',
@@ -158,7 +158,7 @@ export const ORCA_RULE_PACK: RulePack = {
       scope: { include: ['**/*'], exclude: [], fileStatus: ['added'] },
       match: {
         type: 'added-file-name',
-        pattern: '(helpers|utils|common|misc|shared-stuff|\\\\w+-helpers\\\\.ts|\\\\w+-utils\\\\.ts)',
+        pattern: '(helpers|utils|common|misc|shared-stuff|\\w+-helpers\\.ts|\\w+-utils\\.ts)',
         maxLineLength: 200
       },
       message: 'Ambiguous naming detected',
@@ -192,7 +192,7 @@ export const ORCA_RULE_PACK: RulePack = {
       scope: { include: ['desktop/src/renderer/**/*.tsx', 'desktop/src/renderer/**/*.ts'], exclude: [], fileStatus: ['added', 'modified', 'renamed'] },
       match: {
         type: 'added-line-regex',
-        pattern: '\\\\.metaKey\\\\b',
+        pattern: '\\.metaKey\\b',
         maxLineLength: 500
       },
       message: 'Hardcoded metaKey detected',
@@ -209,7 +209,7 @@ export const ORCA_RULE_PACK: RulePack = {
       scope: { include: ['desktop/src/main/git/**/*.ts', 'backend/**/*.go'], exclude: [], fileStatus: ['added', 'modified', 'renamed'] },
       match: {
         type: 'added-line-regex',
-        pattern: 'git\\\\s+(?!status|log|add|commit|push|pull|fetch)',
+        pattern: 'git\\s+(?!status|log|add|commit|push|pull|fetch)',
         maxLineLength: 2000
       },
       message: 'Ensure new Git flags are compatible with older clients',
