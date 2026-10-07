@@ -8,6 +8,8 @@ export interface PlannedStep {
   maxOutputBytes: number
   heavy: boolean
   parser: string
+  inProcess?: boolean
+  skipReason?: string
 }
 
 export interface StepExecResult {
