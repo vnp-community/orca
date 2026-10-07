@@ -52,7 +52,7 @@ function matchGlob(pattern: string, filePath: string): boolean {
   }
 }
 
-function matchesScope(rule: Rule, file: ChangedFileDiff): boolean {
+export function matchesScope(rule: Rule, file: ChangedFileDiff): boolean {
   if (rule.scope.fileStatus && rule.scope.fileStatus.length > 0) {
     const statusMap = { A: 'added', M: 'modified', R: 'renamed', C: 'added', T: 'modified' }
     const st = statusMap[file.status] || 'modified'
