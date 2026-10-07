@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-reindex-commands.ts`, `codeintel-reindex-progress.ts` và test cùng tên (mới)
 **Depends on:** [AG-CV-TASK-001-03](./AG-CV-TASK-001-03-codeintel-command-whitelist-and-child-env.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `analyze` không `--index-only` làm bẩn `AGENTS.md`/`CLAUDE.md`, cài skill (CR-004 1.2). Định dạng tiến độ chưa kiểm chứng.

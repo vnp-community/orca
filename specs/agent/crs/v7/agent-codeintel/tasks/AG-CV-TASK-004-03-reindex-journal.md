@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-reindex-journal.ts`, `codeintel-reindex-journal.test.ts` (mới)
 **Depends on:** không
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Để biết job `interrupted` sau khi agent khởi động lại; `~/.orca/codeintel/jobs/<jobId>.json`, thư mục `0700`, giữ 50, không ghi `message`.

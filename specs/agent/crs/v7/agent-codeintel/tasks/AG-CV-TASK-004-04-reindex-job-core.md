@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-reindex-job.ts`, `codeintel-reindex-job.test.ts` (mới)
 **Depends on:** [002](./AG-CV-TASK-004-02-reindex-commands-and-progress-parser.md), [003](./AG-CV-TASK-004-03-reindex-journal.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 Contract §4.10: params `mode,tools,trigger,ifStale,expectHead`; trạng thái và `outcome ∈ already_up_to_date|superseded|skipped_scope_repo_root|""`; mỗi repo một job; `MAX_REINDEX` 1 (≤ 2); hàng đợi ≤ 4.

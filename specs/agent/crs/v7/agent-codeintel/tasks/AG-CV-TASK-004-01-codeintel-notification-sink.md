@@ -5,7 +5,7 @@
 **Area:** `agent/`
 **File:** `agent/src/relay/codeintel-notification-sink.ts`, `codeintel-notification-sink.test.ts` (mới); sửa nhỏ `agent-rpc-dispatch-codeintel.ts`
 **Depends on:** [AG-CV-TASK-001-09](./AG-CV-TASK-001-09-codeintel-status-method-table-and-dispatcher.md)
-**Status:** [ ] TODO
+**Status:** [x] DONE
 
 ## Context
 `makeNotifier(ws,state)` (`agent-rpc-dispatch.ts:280`) gắn với `WireState` từng kết nối, bỏ khi ws không mở. Contract §6: notifier hiện hành = của lần gọi `codeintel.*`/`quality.*` gần nhất; mọi thông báo mang `workspaceRoot` (PQ-17); ws chưa mở -> bỏ.
