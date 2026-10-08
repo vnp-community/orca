@@ -5,7 +5,7 @@
 **Area:** frontend / graph (layout) / dependencies
 **File:** `frontend/package.json` (sửa, chỉ sau duyệt); `frontend/src/renderer/src/components/graph/elk-layout-engine.ts`, `elk-layout.worker.ts`, `graph-layout-selector.ts` (mới); test cùng tên; `guides/STYLEGUIDE.md` không đổi
 **Depends on:** FE-REQ-TASK-032-05 (`LayoutEngine`); **quyết định duyệt** (người có thẩm quyền phụ thuộc; pháp chế cho EPL-2.0)
-**Status:** [!] BLOCKED — chặn bởi quyết định duyệt phụ thuộc `elkjs` (README v7 O5 cấm thêm ở MVP); `package.json` không đổi
+**Status:** [!] BLOCKED — chặn bởi quyết định duyệt phụ thuộc `elkjs` (README v7 O5 cấm thêm ở MVP); `package.json` không đổi. Điểm cắm đã khoá bằng test (2026-10-08): vitest graph-layout-engine-contract (11) + GraphCanvas `layout` prop pass
 
 ## Context
 
@@ -73,3 +73,8 @@
 ## Ghi chú triển khai (2026-10-07)
 
 Đóng bằng ghi chú theo spec: `LayoutEngine` cắm được đã có (032-05) nên có thể thêm `elk-layout-engine.ts` sau khi duyệt mà không đổi `GraphCanvas`. Mọi lens chạy bằng `waveLayoutEngine`.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Vẫn **BLOCKED**: `elkjs`/`dagre` chưa được duyệt (README v7 O5); `frontend/package.json` không đổi.
+- Quyết định tạm (phương án C của task): giữ `waveLayoutEngine` cho mọi lens. Điểm cắm đã được khoá bằng test: `graph-layout-engine-contract.test.ts` chạy cùng một bộ hợp đồng (đủ vị trí hữu hạn cho mọi node và không thừa, xác định, không sửa đầu vào, dừng khi có chu trình, bỏ cạnh tới node lạ, vị trí phân biệt, đồ thị rỗng) cho `waveLayoutEngine` và một engine bất đồng bộ giả lập Worker; `GraphCanvas.test.tsx` kiểm `layout` prop: node ở gốc trong lúc chờ, nhận vị trí của engine khi xong, cache theo khoá (không gọi lại khi đổi chọn). Khi được duyệt: thêm `elk-layout-engine.ts` (Worker), cho chạy qua `layoutEngineContract(...)`, truyền vào `GraphCanvas` qua `layout`; không cần sửa `GraphCanvas`.
