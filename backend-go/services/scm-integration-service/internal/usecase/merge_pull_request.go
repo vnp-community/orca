@@ -63,7 +63,7 @@ func (uc *MergePullRequest) Execute(ctx context.Context, in MergePullRequestPara
 
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, in.Provider)
 	if err != nil {
-		return MergePullRequestResult{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return MergePullRequestResult{}, err
 	}
 	provider, err := uc.providers.Resolve(in.Provider)
 	if err != nil {

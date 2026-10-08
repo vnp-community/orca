@@ -41,7 +41,7 @@ func (uc *SubmitReview) Execute(ctx context.Context, in SubmitReviewParams) (dom
 
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, in.Provider)
 	if err != nil {
-		return domain.Review{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return domain.Review{}, err
 	}
 	provider, err := uc.providers.Resolve(in.Provider)
 	if err != nil {

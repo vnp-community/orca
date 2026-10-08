@@ -32,7 +32,7 @@ func (uc *GetWorkItemDetails) Execute(ctx context.Context, in GetWorkItemDetails
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, domain.ScmProviderGitLab)
 	if err != nil {
-		return domain.WorkItemDetailsGitLab{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return domain.WorkItemDetailsGitLab{}, err
 	}
 	details, err := uc.gitlabMRs.GetWorkItemDetails(ctx, cred, in.Repo, in.IID, in.ItemType)
 	if err != nil {

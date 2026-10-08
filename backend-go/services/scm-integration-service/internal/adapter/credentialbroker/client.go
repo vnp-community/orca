@@ -21,7 +21,10 @@ import (
 	"fmt"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
+	"github.com/stablyai/orca-go/common/apperrors"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/domain"
 	"github.com/stablyai/orca-go/services/scm-integration-service/internal/usecase"
 
@@ -60,7 +63,10 @@ func (r *Resolver) Resolve(ctx context.Context, tenantID string, provider domain
 		OwnerId:  string(provider),
 	})
 	if err != nil {
-		return usecase.Credential{}, fmt.Errorf("credentialbroker: resolving %s credential: %w", provider, err)
+		if status.Code(err) == codes.NotFound {
+			return usecase.Credential{}, apperrors.New(apperrors.KindNotFound, "SCM_CREDENTIAL_NOT_FOUND", "no OAuth credential configured for "+string(provider), err)
+		}
+		return usecase.Credential{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", fmt.Sprintf("failed to resolve provider credential (code=%v): %v", status.Code(err), err), err)
 	}
 	return usecase.Credential{Token: string(resp.GetValue())}, nil
 }

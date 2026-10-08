@@ -34,7 +34,7 @@ func (uc *ListProjectViews) Execute(ctx context.Context, in ListProjectViewsPara
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, domain.ScmProviderGitHub)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return nil, err
 	}
 	views, err := uc.githubProjects.ListProjectViews(ctx, cred, in.ProjectSlug)
 	if err != nil {

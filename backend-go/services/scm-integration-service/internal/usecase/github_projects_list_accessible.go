@@ -30,7 +30,7 @@ func (uc *ListAccessibleProjects) Execute(ctx context.Context, in ListAccessible
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, domain.ScmProviderGitHub)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return nil, err
 	}
 	projects, err := uc.githubProjects.ListAccessibleProjects(ctx, cred)
 	if err != nil {

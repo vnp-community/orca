@@ -37,7 +37,7 @@ func (uc *ResolveRepoSlug) Execute(ctx context.Context, in ResolveRepoSlugParams
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, in.Provider)
 	if err != nil {
-		return ResolveRepoSlugResult{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return ResolveRepoSlugResult{}, err
 	}
 	provider, err := uc.providers.Resolve(in.Provider)
 	if err != nil {

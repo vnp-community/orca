@@ -39,7 +39,7 @@ func (uc *UpdateProjectItemField) Execute(ctx context.Context, in UpdateProjectI
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, domain.ScmProviderGitHub)
 	if err != nil {
-		return ProjectItem{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return ProjectItem{}, err
 	}
 	item, err := uc.githubProjects.UpdateProjectItemField(ctx, cred, in.ProjectSlug, in.ItemID, in.Field)
 	if err != nil {

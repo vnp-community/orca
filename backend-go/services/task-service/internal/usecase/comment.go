@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/google/uuid"
 
@@ -26,6 +27,9 @@ func (uc *AddComment) Execute(ctx context.Context, taskID, content string) (doma
 	}
 	out, err := uc.comments.AddComment(ctx, tenantID, c)
 	if err != nil {
+		if errors.Is(err, domain.ErrTaskNotFound) {
+			return domain.TaskComment{}, apperrors.New(apperrors.KindNotFound, "TASK_NOT_FOUND", "task not found", err)
+		}
 		return domain.TaskComment{}, apperrors.New(apperrors.KindInternal, "TASK_COMMENT_ADD_FAILED", "failed to persist comment", err)
 	}
 	return out, nil

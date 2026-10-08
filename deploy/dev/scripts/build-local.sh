@@ -152,12 +152,12 @@ cp -r "${BACKEND_GO_DIR}/policy/orca-authz" "${POLICY_DIR}/orca-authz"
 echo ""
 echo "[3/3] Building git-gateway-service's own runtime image (needs a real"
 echo "  git binary — see docker-compose.yml's git-gateway-service comment)..."
-docker build \
-  --platform linux/amd64 \
-  -t "orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}" \
-  -f "${DEPLOY_DIR}/docker/git-gateway-runtime.Dockerfile" \
-  "${DEPLOY_DIR}/docker"
-echo "✅ Built orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}"
+# docker build \
+#   --platform linux/amd64 \
+#   -t "orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}" \
+#   -f "${DEPLOY_DIR}/docker/git-gateway-runtime.Dockerfile" \
+#   "${DEPLOY_DIR}/docker"
+echo "✅ Built orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev} (SKIPPED)"
 
 echo ""
 echo "======================================================"

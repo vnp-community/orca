@@ -35,7 +35,7 @@ func (uc *ListPullRequests) Execute(ctx context.Context, in ListPullRequestsInpu
 
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, in.Provider)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return nil, err
 	}
 
 	provider, err := uc.providers.Resolve(in.Provider)

@@ -31,7 +31,7 @@ func (uc *StarRepository) Execute(ctx context.Context, in StarRepositoryParams) 
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, in.Provider)
 	if err != nil {
-		return false, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return false, err
 	}
 	provider, err := uc.providers.Resolve(in.Provider)
 	if err != nil {

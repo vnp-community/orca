@@ -32,7 +32,7 @@ func (uc *ListMergeRequests) Execute(ctx context.Context, in ListMergeRequestsPa
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, domain.ScmProviderGitLab)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return nil, err
 	}
 	mrs, err := uc.gitlabMRs.ListMergeRequests(ctx, cred, in.Repo, MRFilter{State: in.State, SourceBranch: in.SourceBranch})
 	if err != nil {

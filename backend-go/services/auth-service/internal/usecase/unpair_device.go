@@ -2,8 +2,10 @@ package usecase
 
 import (
 	"context"
+	"errors"
 
 	"github.com/stablyai/orca-go/common/apperrors"
+	"github.com/stablyai/orca-go/services/auth-service/internal/domain"
 )
 
 // UnpairDevice — BR-MB-04: wipes the shared secret (not just a status
@@ -19,6 +21,9 @@ func NewUnpairDevice(devices PairedDeviceRepository) *UnpairDevice {
 
 func (uc *UnpairDevice) Execute(ctx context.Context, deviceID string) error {
 	if err := uc.devices.RevokeAndWipeSecret(ctx, deviceID); err != nil {
+		if errors.Is(err, domain.ErrDeviceNotFound) {
+			return apperrors.New(apperrors.KindNotFound, "AUTH_DEVICE_NOT_FOUND", "device not found", err)
+		}
 		return apperrors.New(apperrors.KindInternal, "AUTH_UNPAIR_FAILED", "failed to revoke paired device", err)
 	}
 	return nil

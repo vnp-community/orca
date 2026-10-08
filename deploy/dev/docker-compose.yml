@@ -197,6 +197,8 @@ services:
   auth-service:
     <<: *go-defaults
     container_name: orca-go-auth
+    tmpfs:
+      - /tmp
     volumes:
       - ./bin/auth-service/orca:/app/bin/orca:ro
       # OPA bundle for requireAdminActor's embedded evaluator — see
@@ -212,7 +214,7 @@ services:
       # for a missing host path instead of erroring) — live-verified
       # 2026-08-29. build-local.sh now copies backend-go/policy/orca-authz/
       # into deploy/dev/policy/ on every build so this path is always real.
-      - ./policy/orca-authz:/policy/orca-authz:ro
+      - ./policy/orca-authz:/policy/orca-authz:rw
     environment:
       <<: *go-common-env
       DATABASE_DSN: postgresql://orca:${POSTGRES_PASSWORD}@postgres:5432/auth?sslmode=disable

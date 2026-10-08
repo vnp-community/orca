@@ -35,7 +35,7 @@ func (uc *ResolveProjectRef) Execute(ctx context.Context, in ResolveProjectRefPa
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, domain.ScmProviderGitHub)
 	if err != nil {
-		return Project{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return Project{}, err
 	}
 	project, err := uc.githubProjects.ResolveProjectRef(ctx, cred, in.Owner, in.Number)
 	if err != nil {

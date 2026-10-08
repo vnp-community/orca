@@ -35,7 +35,7 @@ func (uc *UpdateIssueTypeBySlug) Execute(ctx context.Context, in UpdateIssueType
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, domain.ScmProviderGitHub)
 	if err != nil {
-		return WorkItemDetails{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return WorkItemDetails{}, err
 	}
 	details, err := uc.githubProjects.UpdateIssueTypeBySlug(ctx, cred, in.ItemSlug, in.IssueType)
 	if err != nil {

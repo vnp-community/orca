@@ -182,6 +182,7 @@ func NewRouter(deps Deps) http.Handler {
 			mountAuthAdminRoutes(authed, deps.AuthClient)
 			mountAdminRoutes(authed, deps.AuthClient)
 			mountPairingRoutes(authed, deps.AuthClient)
+			mountCliTokenRoutes(authed, deps.AuthClient)
 		}
 		if deps.McpTokens != nil {
 			deps.McpTokens.mount(authed)

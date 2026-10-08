@@ -34,7 +34,7 @@ func (uc *ListIssueTypesBySlug) Execute(ctx context.Context, in ListIssueTypesBy
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, domain.ScmProviderGitHub)
 	if err != nil {
-		return nil, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return nil, err
 	}
 	types, err := uc.githubProjects.ListIssueTypesBySlug(ctx, cred, in.ItemSlug)
 	if err != nil {

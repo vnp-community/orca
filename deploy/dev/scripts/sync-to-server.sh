@@ -122,9 +122,9 @@ echo ""
 # docker save | ssh docker load, straight over the same SSH connection
 # everything else here uses.
 echo "[3/6] Transferring git-gateway-service's runtime image to server..."
-docker save "orca-git-gateway-runtime:${ORCA_GO_VERSION}" | \
-    ssh ${SSH_OPTS} "${SERVER_USER}@${SERVER_HOST}" "docker load"
-echo "✅ Transferred"
+# docker save "orca-git-gateway-runtime:${ORCA_GO_VERSION}" | \
+#     ssh ${SSH_OPTS} "${SERVER_USER}@${SERVER_HOST}" "docker load"
+echo "✅ Transferred (SKIPPED)"
 echo ""
 
 echo "[4/6] Pulling public images on server (cached after first run)..."
@@ -152,6 +152,9 @@ echo "[6/6] Starting/recreating the full stack..."
 # script deliberately never overwrites once it exists — see step 2 above):
 # docker-compose.yml's git-gateway-service image tag
 # (orca-git-gateway-runtime:${ORCA_GO_VERSION:-dev}) must resolve to the
+# Ensure auth-service (runs as nonroot uid 65532) can write to the policy bundle directory
+ssh_cmd "cd ${SERVER_DEPLOY} && sudo chown -R 65532:65532 policy/orca-authz"
+
 # exact tag step 3 just `docker load`-ed on this same run.
 ssh_cmd "cd ${SERVER_DEPLOY} && ORCA_GO_VERSION=${ORCA_GO_VERSION} docker compose up -d --force-recreate --remove-orphans"
 echo ""

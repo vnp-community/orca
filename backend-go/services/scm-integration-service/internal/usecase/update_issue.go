@@ -33,7 +33,7 @@ func (uc *UpdateIssue) Execute(ctx context.Context, in UpdateIssueParams) (domai
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, in.Provider)
 	if err != nil {
-		return domain.Issue{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return domain.Issue{}, err
 	}
 	provider, err := uc.providers.Resolve(in.Provider)
 	if err != nil {

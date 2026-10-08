@@ -36,7 +36,7 @@ func (uc *ResolveMergeRequestDiscussion) Execute(ctx context.Context, in Resolve
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, domain.ScmProviderGitLab)
 	if err != nil {
-		return domain.MergeRequestDiscussion{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return domain.MergeRequestDiscussion{}, err
 	}
 	disc, err := uc.gitlabMRs.ResolveDiscussion(ctx, cred, in.Repo, in.MergeRequestIID, in.DiscussionID, in.Resolved)
 	if err != nil {

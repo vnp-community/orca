@@ -1,0 +1,3 @@
+requests>=2.31
+# Chỉ cần cho api_websocket_channels.py (tự bỏ qua nếu thiếu).
+websocket-client>=1.7

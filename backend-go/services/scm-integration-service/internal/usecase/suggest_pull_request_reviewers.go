@@ -43,7 +43,7 @@ func (uc *SuggestPullRequestReviewers) Execute(ctx context.Context, in SuggestPu
 
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, in.Provider)
 	if err != nil {
-		return SuggestedReviewers{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return SuggestedReviewers{}, err
 	}
 	provider, err := uc.providers.Resolve(in.Provider)
 	if err != nil {

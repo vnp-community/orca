@@ -72,7 +72,7 @@ func (uc *ListIssues) Execute(ctx context.Context, in ListIssuesInput) (ListIssu
 
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, in.Provider)
 	if err != nil {
-		return ListIssuesOutput{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return ListIssuesOutput{}, err
 	}
 
 	provider, err := uc.providers.Resolve(in.Provider)

@@ -36,7 +36,7 @@ func (uc *UpdateIssueCommentBySlug) Execute(ctx context.Context, in UpdateIssueC
 	}
 	cred, err := uc.credentials.Resolve(ctx, in.TenantID, domain.ScmProviderGitHub)
 	if err != nil {
-		return ProjectComment{}, apperrors.New(apperrors.KindInternal, "SCM_CREDENTIAL_RESOLVE_FAILED", "failed to resolve provider credential", err)
+		return ProjectComment{}, err
 	}
 	comment, err := uc.githubProjects.UpdateIssueCommentBySlug(ctx, cred, in.ItemSlug, in.CommentID, in.Body)
 	if err != nil {
