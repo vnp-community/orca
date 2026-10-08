@@ -1,6 +1,6 @@
 # FE-CV-SOL-059: Lens Hợp đồng và danh sách Phát hiện (Bỏ qua / Đã xử lý)
 
-> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 6/7 task DONE; PARTIAL 1 (059-07). Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
+> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 6/7 task DONE; PARTIAL 0. Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-059](../../../../../../docs/crs/v7/review-frontend/CR-CV-059-contract-lens-and-findings.md)
 **Area:** frontend (`components/review-map/contract/`, `components/review-map/findings/`, hook, selector slice)

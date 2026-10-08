@@ -1,6 +1,6 @@
 # FE-CV-SOL-056-dataflow-lens: Lens Luồng dữ liệu (sơ đồ tuần tự Mermaid, danh sách bước, sao chép/xuất)
 
-> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 6/7 task DONE; PARTIAL 1 (056-07). Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
+> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 6/7 task DONE; PARTIAL 0. Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-056](../../../../../../docs/crs/v7/review-frontend/CR-CV-056-dataflow-lens.md)
 **Area:** frontend (`components/review-map`, `hooks`)

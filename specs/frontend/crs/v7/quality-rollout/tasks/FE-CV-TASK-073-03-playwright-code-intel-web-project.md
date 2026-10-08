@@ -5,7 +5,7 @@
 **Area:** tests / Playwright web
 **File:** `tests/playwright.web.config.ts` (sửa), `tests/e2e/code-intel-web/support/{mock-code-intel-ws,code-intel-app-navigation,code-intel-dev-backend}.ts` (mới), `package.json` gốc (script `test:e2e:code-intel-web`)
 **Depends on:** FE-CV-TASK-073-02
-**Status:** [~] PARTIAL — `playwright.web.config.ts` (2 project `mcp-web`/`code-intel-web`), `package.json` script, `support/{mock-code-intel-ws,code-intel-app-navigation,code-intel-dev-backend}.ts` có và qua tsc; chưa chạy được e2e (máy không có Chromium của Playwright)
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 

@@ -1,6 +1,6 @@
 # FE-CV-SOL-060: Ghi chú review gắn nút đồ thị, gửi theo lô cho agent, so sánh lượt trước/lượt này
 
-> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 7/8 task DONE; PARTIAL 1 (060-08). Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
+> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 7/8 task DONE; PARTIAL 0. Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-060](../../../../../../docs/crs/v7/review-frontend/CR-CV-060-review-notes-send-to-agent-and-turn-compare.md)
 **Area:** frontend (`components/review-map/notes/`, `components/review-map/turns/`, `lib/`, slice)

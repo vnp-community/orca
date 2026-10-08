@@ -5,7 +5,7 @@
 **Area:** mobile / UI
 **File:** `mobile/app/h/[hostId]/review-summary/[worktreeId].tsx`, `mobile/src/components/{MobileReviewSummaryScreenView,MobileReviewSummaryHeader,MobileReviewMetricGrid,MobileReviewFindingRow}.tsx`, `mobile-review-summary-styles.ts` (mới); `MobileDiffReviewDrawers.tsx`, `source-control/MobileSourceControlBranchCard.tsx` (sửa nhỏ)
 **Depends on:** FE-CV-TASK-062-03
-**Status:** [~] PARTIAL — thiếu: chạy trên thiết bị/giả lập và typecheck `mobile/` đầy đủ với phụ thuộc thật (chưa cài, không được cài). Đã xong + test PASS 2026-10-08: chip thẻ nhánh Source Control, handler giả `codeIntel.reviewSummary` trong mock-server mobile, render test màn hình (mobile-review-summary-chip 4, use-mobile-review-summary-chip 3, mock-scenarios 4, MobileReviewSummaryScreenView.render 8, BranchCard.review-chip 2 — cùng nhóm source-control/review-summary 31 file / 220 test PASS); oxlint sạch; typecheck tạm (stub `declare module '*'` cho gói RN/expo/lucide chưa cài) 0 lỗi thật ở file review-summary (chỉ lỗi `any` ngầm do stub)
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 

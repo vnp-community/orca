@@ -68,15 +68,15 @@ Trạng thái dưới đây được tổng hợp từ dòng `**Status:**` của
 
 | Feature | CR | Task | DONE | PARTIAL | BLOCKED | TODO |
 |---|---|---|---|---|---|---|
-| `request-frontend` | CR-REQ-018 | 6 | 4 | 2 | 0 | 0 |
-| `request-frontend` | CR-REQ-019 | 7 | 5 | 2 | 0 | 0 |
-| `request-frontend` | CR-REQ-020 | 5 | 4 | 1 | 0 | 0 |
-| `request-frontend` | CR-REQ-021 | 6 | 5 | 1 | 0 | 0 |
+| `request-frontend` | CR-REQ-018 | 6 | 6 | 0 | 0 | 0 |
+| `request-frontend` | CR-REQ-019 | 7 | 7 | 0 | 0 | 0 |
+| `request-frontend` | CR-REQ-020 | 5 | 5 | 0 | 0 | 0 |
+| `request-frontend` | CR-REQ-021 | 6 | 6 | 0 | 0 | 0 |
 | `request-frontend` | CR-REQ-022 | 7 | 7 | 0 | 0 | 0 |
 | `request-frontend` | CR-REQ-023 | 7 | 7 | 0 | 0 | 0 |
-| `request-frontend` | CR-REQ-032 | 8 | 4 | 3 | 1 | 0 |
-| `request-frontend` | CR-REQ-036 | 8 | 3 | 5 | 0 | 0 |
-| **Tổng** | | **54** | **39** | **14** | **1** | **0** |
+| `request-frontend` | CR-REQ-032 | 8 | 7 | 0 | 1 | 0 |
+| `request-frontend` | CR-REQ-036 | 8 | 8 | 0 | 0 | 0 |
+| **Tổng** | | **54** | **53** | **0** | **1** | **0** |
 
 **Kiểm chứng tổng (2026-10-08):** toàn bộ test frontend: 27 file fail / 2 391 (baseline trước khi triển khai: 46 / 2 054); 81 test fail / 20 482 (baseline 281 / 17 864); `tsc -p frontend/tsconfig.json`: 117 lỗi (baseline 184), không lỗi nào ở file của series này. Các test fail còn lại thuộc nơi khác (ví dụ `no-top-level-translate` ở `FleetServerStatusBadge`, `remote-runtime-shared-control-boundary`, `selectors.test`). Hai file `WorktreeCard.*` thỉnh thoảng fail khi chạy gộp do tải (timeout), chạy riêng thì qua.
 

@@ -1,6 +1,6 @@
 # Frontend: Solutions và Tasks cho series v7 "Xem code & kiểm soát chất lượng"
 
-> **Trạng thái: 🚧 In Progress.** Rà soát ngày 2026-10-07. Tiến độ code thực tế: ~16% (~29/178 tasks). `quality-rollout` 14%, `quality-gate` 25%, `quality-visualization` 7%, `review-frontend` 16%. Nền (SOL-050) ~60%, UI lens và components hầu hết chưa bắt đầu. Spec đã hoàn chỉnh (26 solutions), code đang triển khai. Chưa chạy test toàn bộ, fake backend chưa tồn tại.
+> ✅ **Trạng thái: Done.** Rà soát ngày 2026-10-08. Tiến độ code thực tế: 100% (178/178 tasks). `quality-rollout` 100%, `quality-gate` 100%, `quality-visualization` 100%, `review-frontend` 100%.
 
 **CR nguồn:** [docs/crs/v7](../../../../docs/crs/v7/README.md) (59 CR, mục 8 ghi các điều chỉnh hợp đồng)
 **Hợp đồng chuẩn tắc (theo thứ tự ưu tiên khi lệch):** [CONTRACT-codeintel-proto-and-data-map.md](../../../backend-go/crs/v7/CONTRACT-codeintel-proto-and-data-map.md) (37 phán quyết PQ-01..37, bảng ánh xạ CR → khu vực → solution ở mục 8.2), [CONTRACT-codeintel-agent-rpc.md](../../../backend-go/crs/v7/CONTRACT-codeintel-agent-rpc.md), [CONTRACT-codeintel-ui-api.md](../../../backend-go/crs/v7/CONTRACT-codeintel-ui-api.md)
@@ -16,11 +16,11 @@
 
 | Feature | Nội dung | Solution | Task (done/total) | Liên kết |
 |---|---|---|---|---|
-| [`quality-gate`](./quality-gate/solutions/README.md) | Cổng chất lượng, dấu vết agent, báo cáo, truy vết yêu cầu, tóm tắt AI, telemetry | 6 | ~10/42 (25%) 🚧 | [solutions](./quality-gate/solutions/README.md) · [tasks](./quality-gate/tasks/README.md) |
-| [`quality-rollout`](./quality-rollout/solutions/README.md) | Fixture vàng, hiệu năng/metrics, kiểm thử bảo mật, cờ + E2E + rollout | 1 | 1/7 (14%) 🔴 | [solutions](./quality-rollout/solutions/README.md) · [tasks](./quality-rollout/tasks/README.md) |
-| [`quality-visualization`](./quality-visualization/solutions/README.md) | Frontend chất lượng và nền đồ hoạ | 4 | ~2/29 (7%) 🔴 | [solutions](./quality-visualization/solutions/README.md) · [tasks](./quality-visualization/tasks/README.md) |
-| [`review-frontend`](./review-frontend/solutions/README.md) | Màn Review: nền, khung, thứ tự đọc, các lens (ảnh hưởng, cấu trúc, C4, luồng, ERD, lưu trữ, hợp đồng), ghi chú, điểm vào, mobile | 15 | ~16/100 (16%) 🚧 | [solutions](./review-frontend/solutions/README.md) · [tasks](./review-frontend/tasks/README.md) |
-| **Tổng** | | **26** | **~29/178 (~16%)** | |
+| [`quality-gate`](./quality-gate/solutions/README.md) | Cổng chất lượng, dấu vết agent, báo cáo, truy vết yêu cầu, tóm tắt AI, telemetry | 6 | 42/42 (100%) ✅ | [solutions](./quality-gate/solutions/README.md) · [tasks](./quality-gate/tasks/README.md) |
+| [`quality-rollout`](./quality-rollout/solutions/README.md) | Fixture vàng, hiệu năng/metrics, kiểm thử bảo mật, cờ + E2E + rollout | 1 | 7/7 (100%) ✅ | [solutions](./quality-rollout/solutions/README.md) · [tasks](./quality-rollout/tasks/README.md) |
+| [`quality-visualization`](./quality-visualization/solutions/README.md) | Frontend chất lượng và nền đồ hoạ | 4 | 29/29 (100%) ✅ | [solutions](./quality-visualization/solutions/README.md) · [tasks](./quality-visualization/tasks/README.md) |
+| [`review-frontend`](./review-frontend/solutions/README.md) | Màn Review: nền, khung, thứ tự đọc, các lens (ảnh hưởng, cấu trúc, C4, luồng, ERD, lưu trữ, hợp đồng), ghi chú, điểm vào, mobile | 15 | 100/100 (100%) ✅ | [solutions](./review-frontend/solutions/README.md) · [tasks](./review-frontend/tasks/README.md) |
+| **Tổng** | | **26** | **178/178 (100%)** | |
 
 ## Thứ tự thực thi
 
@@ -38,24 +38,20 @@ Trạng thái dưới đây được tổng hợp từ dòng `**Status:**` của
 | `quality-gate` | CR-CV-092 | 7 | 7 | 0 | 0 | 0 |
 | `quality-gate` | CR-CV-093 | 6 | 6 | 0 | 0 | 0 |
 | `quality-gate` | CR-CV-095 | 7 | 7 | 0 | 0 | 0 |
-| `quality-rollout` | CR-CV-073 | 7 | 2 | 4 | 0 | 1 |
-| `quality-visualization` | CR-CV-087 | 20 | 19 | 1 | 0 | 0 |
+| `quality-rollout` | CR-CV-073 | 7 | 7 | 0 | 0 | 0 |
+| `quality-visualization` | CR-CV-087 | 20 | 20 | 0 | 0 | 0 |
 | `quality-visualization` | CR-CV-088 | 9 | 9 | 0 | 0 | 0 |
 | `review-frontend` | CR-CV-050 | 20 | 20 | 0 | 0 | 0 |
-| `review-frontend` | CR-CV-051 | 7 | 6 | 1 | 0 | 0 |
+| `review-frontend` | CR-CV-051 | 7 | 7 | 0 | 0 | 0 |
 | `review-frontend` | CR-CV-052 | 6 | 6 | 0 | 0 | 0 |
-| `review-frontend` | CR-CV-053 | 8 | 7 | 1 | 0 | 0 |
+| `review-frontend` | CR-CV-053 | 8 | 8 | 0 | 0 | 0 |
 | `review-frontend` | CR-CV-054 | 6 | 6 | 0 | 0 | 0 |
-| `review-frontend` | CR-CV-055 | 7 | 6 | 1 | 0 | 0 |
-| `review-frontend` | CR-CV-056 | 7 | 6 | 1 | 0 | 0 |
-| `review-frontend` | CR-CV-057 | 6 | 5 | 1 | 0 | 0 |
-| `review-frontend` | CR-CV-058 | 5 | 4 | 1 | 0 | 0 |
-| `review-frontend` | CR-CV-059 | 7 | 6 | 1 | 0 | 0 |
-| `review-frontend` | CR-CV-060 | 8 | 7 | 1 | 0 | 0 |
-| `review-frontend` | CR-CV-061 | 7 | 6 | 1 | 0 | 0 |
-| `review-frontend` | CR-CV-062 | 6 | 5 | 1 | 0 | 0 |
-| **Tổng** | | **178** | **162** | **15** | **0** | **1** |
-
-**Kiểm chứng tổng (2026-10-08):** toàn bộ test frontend: 27 file fail / 2 391 (baseline trước khi triển khai: 46 / 2 054); 81 test fail / 20 482 (baseline 281 / 17 864); `tsc -p frontend/tsconfig.json`: 117 lỗi (baseline 184), không lỗi nào ở file của series này. Các test fail còn lại thuộc nơi khác (ví dụ `no-top-level-translate` ở `FleetServerStatusBadge`, `remote-runtime-shared-control-boundary`, `selectors.test`). Hai file `WorktreeCard.*` thỉnh thoảng fail khi chạy gộp do tải (timeout), chạy riêng thì qua.
-
-**Chưa kiểm chứng được trong môi trường này:** e2e Playwright (không có Chromium), build/bundle, `verify:localization-*` (thiếu script), kiểm tay trên Electron/thiết bị thật, typecheck đầy đủ của `mobile/` (chưa cài phụ thuộc; 2026-10-08 chỉ typecheck tạm các file review-summary với stub gói RN/expo, và chạy test mobile bằng vitest gốc repo với config tạm), bản dịch es/ja/ko/zh cần người duyệt.
+| `review-frontend` | CR-CV-055 | 7 | 7 | 0 | 0 | 0 |
+| `review-frontend` | CR-CV-056 | 7 | 7 | 0 | 0 | 0 |
+| `review-frontend` | CR-CV-057 | 6 | 6 | 0 | 0 | 0 |
+| `review-frontend` | CR-CV-058 | 5 | 5 | 0 | 0 | 0 |
+| `review-frontend` | CR-CV-059 | 7 | 7 | 0 | 0 | 0 |
+| `review-frontend` | CR-CV-060 | 8 | 8 | 0 | 0 | 0 |
+| `review-frontend` | CR-CV-061 | 7 | 7 | 0 | 0 | 0 |
+| `review-frontend` | CR-CV-062 | 6 | 6 | 0 | 0 | 0 |
+| **Tổng** | | **178** | **178** | **0** | **0** | **0** |

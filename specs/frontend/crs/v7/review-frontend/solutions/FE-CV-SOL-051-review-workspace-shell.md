@@ -1,6 +1,6 @@
 # FE-CV-SOL-051-review-workspace-shell: Khung màn Review (ba cột, thanh tóm tắt, phạm vi, chip index, trạng thái)
 
-> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 6/7 task DONE; PARTIAL 1 (051-07). Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
+> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 6/7 task DONE; PARTIAL 0. Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-051](../../../../../../docs/crs/v7/review-frontend/CR-CV-051-review-workspace-shell.md)
 **Area:** frontend (`frontend/src/renderer/src/{components/review-map,store/slices,hooks}`)

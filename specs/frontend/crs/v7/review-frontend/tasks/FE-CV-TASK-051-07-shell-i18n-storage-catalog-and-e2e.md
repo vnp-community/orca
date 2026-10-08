@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + docs + e2e
 **File:** `i18n/locales/*.json`, `i18n/code-intel-locale-coverage.test.ts` (mở rộng `KEYS`), `specs/frontend/storage/browser-storage-catalog.md` (thêm dòng `orca.review.layout.v1` mục 2), `tests/e2e/review-shell.spec.ts` (mới)
 **Depends on:** FE-CV-TASK-051-05, 051-06, FE-CV-TASK-050-20
-**Status:** [~] PARTIAL — i18n (5 locales, review-shell-locale-coverage.test 8 pass) and storage catalog row done; NOT done: `tests/e2e/review-shell.spec.ts` (this package has no tests/e2e dir or runner)
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 

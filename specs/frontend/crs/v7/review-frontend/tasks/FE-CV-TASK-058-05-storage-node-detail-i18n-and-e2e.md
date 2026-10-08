@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + i18n + tests
 **File:** `frontend/src/renderer/src/components/review-map/storage/StorageNodeDetail.tsx` (mới) + test; `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`); `tests/e2e/code-intel-web/lenses.web.e2e.ts` (phần Storage)
 **Depends on:** FE-CV-TASK-058-04; FE-CV-TASK-057-04 (`setErdService`); FE-CV-SOL-053-impact-lens-and-symbol-detail; FE-CV-TASK-073-02, 073-03
-**Status:** [~] PARTIAL — thiếu e2e Playwright (không có `tests/e2e/code-intel-web`). Phần còn lại đã xác minh 2026-10-07: StorageLens.test.tsx 10/10 + review-erd-storage-locale-coverage.test.ts PASS
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 

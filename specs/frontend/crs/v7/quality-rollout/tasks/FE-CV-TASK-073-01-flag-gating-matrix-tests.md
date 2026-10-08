@@ -5,7 +5,7 @@
 **Area:** frontend / test-support (Vitest, happy-dom)
 **File:** `frontend/src/renderer/src/test-support/code-intel-integration/code-intel-flag-gating.integration.test.tsx` (mới)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks (`useCodeIntelSupport`); FE-CV-TASK-085-01 (`useQualityFeatureFlags`); FE-CV-TASK-073-02 (hoặc mock `codeIntelClient.call`); lối vào của FE-CV-SOL-061
-**Status:** [~] PARTIAL — ma trận cờ + fake backend: vitest PASS (hook × settings.get, DISABLED/QUALITY_GATE_DISABLED); còn 6 `it.todo` lối vào UI (Agent toolbar, Source Control, Cmd+K, sidebar tab, Review tab, quality notice) vì thành phần chưa được nối
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 

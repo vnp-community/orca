@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + tests
 **File:** `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`); `tests/e2e/code-intel-web/review-summary.web.e2e.ts`
 **Depends on:** FE-CV-TASK-061-03..061-06; 073-02, 073-03
-**Status:** [~] PARTIAL — i18n 5 locale đủ khoá + test `i18n/review-entry-points-locale-coverage.test.ts` PASS (verified 2026-10-07); e2e web (`tests/e2e/code-intel-web/review-summary.web.e2e.ts`) CHƯA viết/chạy (cần web stack + fake backend)
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 

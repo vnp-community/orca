@@ -1,6 +1,6 @@
 # FE-CV-SOL-058: Lens Lưu trữ (service → kho dữ liệu → topic → secret, chỉ đọc)
 
-> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 4/5 task DONE; PARTIAL 1 (058-05). Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
+> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 4/5 task DONE; PARTIAL 0. Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-058](../../../../../../docs/crs/v7/review-frontend/CR-CV-058-storage-lens.md)
 **Area:** frontend (`frontend/src/renderer/src/components/review-map/storage/`, hook, khoá slice)

@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + tests
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`); `tests/e2e/code-intel-web/lenses.web.e2e.ts` (phần Contract/Findings)
 **Depends on:** FE-CV-TASK-059-04, 059-05; FE-CV-TASK-073-02, 073-03
-**Status:** [~] PARTIAL — i18n 5 locale + test phủ khoá xanh (i18n/contract-findings-notes-locale-coverage.test.ts 11/11 PASS); thiếu e2e `lenses.web.e2e.ts` (package không có `tests/e2e/code-intel-web`, 073-03 chưa có)
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 

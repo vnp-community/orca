@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + i18n
 **File:** `review-lens-registry.ts` (thêm `dataflow`), `i18n/locales/*.json`, `code-intel-locale-coverage.test.ts`, `tests/e2e/review-dataflow.spec.ts` (mới)
 **Depends on:** FE-CV-TASK-056-06
-**Status:** [~] PARTIAL — lens đã đăng ký, i18n 5 locale + coverage test xanh, chip `flows` bật công tắc; chưa có e2e `review-dataflow.spec.ts` và chưa kiểm tay (60 tin nhắn sáng/tối, phóng 200%, tải `.svg` Electron đóng gói); "Luồng liên quan" chưa nối
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 

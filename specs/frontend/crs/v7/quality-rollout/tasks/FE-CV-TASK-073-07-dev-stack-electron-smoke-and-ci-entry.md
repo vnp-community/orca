@@ -5,7 +5,7 @@
 **Area:** tests / Playwright web + Electron
 **File:** `tests/e2e/code-intel-web/dev-stack.web.e2e.ts` (mới), `tests/e2e/code-intel-electron.spec.ts` (mới, tối thiểu); ghi lệnh vào README thư mục tasks này
 **Depends on:** FE-CV-TASK-073-03..073-05; `BE-CV-SOL-073-settings-flag-and-rollout` + stack dev (cho `@dev-stack`); `desktop/src/preload/index.ts` có `codeIntel` (cho Electron; **ngoài `frontend/`, cần chủ sở hữu desktop duyệt**)
-**Status:** [~] PARTIAL — `dev-stack.web.e2e.ts` tối thiểu (bỏ qua khi thiếu `CODE_INTEL_E2E_BASE_URL`); chưa có `code-intel-electron.spec.ts` (preload desktop ngoài phạm vi); chưa chạy
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 

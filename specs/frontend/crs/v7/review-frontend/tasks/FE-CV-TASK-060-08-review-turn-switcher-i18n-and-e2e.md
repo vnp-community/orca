@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + i18n + tests
 **File:** `frontend/src/renderer/src/components/review-map/turns/ReviewTurnSwitcher.tsx` (mới) + test; `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`); `tests/e2e/code-intel-web/review-notes.web.e2e.ts`
 **Depends on:** FE-CV-TASK-060-04, 060-06, 060-07; FE-CV-SOL-052/053 (lớp phủ `review-overlay-model.ts`, lọc Thứ tự đọc); 073-02, 073-03
-**Status:** [~] PARTIAL — chỉ còn e2e (P1) `review-notes.web.e2e.ts` (do nhóm e2e); phần code xong (review-turn-overlay.test 4/4, turns/ PASS, ReviewWorkspace.companions.test 9/9)
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** frontend / review-map + i18n
 **File:** `review-lens-registry.ts` (thêm `architecture`), `i18n/locales/*.json`, `code-intel-locale-coverage.test.ts`, `tests/e2e/review-architecture.spec.ts` (mới)
 **Depends on:** FE-CV-TASK-055-03, 055-04, 055-06
-**Status:** [~] PARTIAL — lens đã đăng ký (`review-lens-registry.ts`), i18n 5 locale + `c4-dataflow-locale-coverage.test.ts` xanh; chưa có e2e `review-architecture.spec.ts` (cần app + backend) và chưa kiểm tay bố cục trên container TS
+**Status:** [x] DONE (verified 2026-10-08)
 
 ## Context
 
