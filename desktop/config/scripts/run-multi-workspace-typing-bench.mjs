@@ -1,6 +1,6 @@
 /**
  * Entry point for the multi-workspace typing-latency bench
- * (tests/e2e/terminal-multi-workspace-typing-latency.spec.ts).
+ * (tests/stages/e2e/legacy/terminal-multi-workspace-typing-latency.spec.ts).
  *
  * Usage:
  *   pnpm bench:multi-workspace-typing [-- --panes 8 --rate-kbps 512 \
@@ -43,9 +43,9 @@ const child = spawn(
   [
     'playwright',
     'test',
-    'tests/e2e/terminal-multi-workspace-typing-latency.spec.ts',
+    'tests/stages/e2e/legacy/terminal-multi-workspace-typing-latency.spec.ts',
     '--config',
-    'tests/playwright.config.ts',
+    'tests/configs/playwright.config.ts',
     '--project',
     'electron-headless',
     '--workers=1',

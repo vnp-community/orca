@@ -547,8 +547,8 @@ describe('Electron runtime package contract', () => {
     for (const runStep of goldenRunSteps) {
       expect(runStep?.run).toContain('pnpm run test:e2e:terminal-rendering-golden')
     }
-    expect(pullRequestPaths).toContain('tests/e2e/terminal-raw-emoji-table-scroll-restore.spec.ts')
-    expect(pullRequestPaths).toContain('tests/e2e/fixtures/terminal-emoji-table.md')
+    expect(pullRequestPaths).toContain('tests/stages/e2e/legacy/terminal-raw-emoji-table-scroll-restore.spec.ts')
+    expect(pullRequestPaths).toContain('tests/stages/e2e/legacy/fixtures/terminal-emoji-table.md')
     expect(pullRequestPaths).toContain('src/renderer/src/lib/pane-manager/**')
     expect(releaseBuildNeeds).not.toContain('terminal-rendering-golden')
     expect(releaseBuildNeeds).not.toContain('terminal-rendering-release-evidence')

@@ -23,9 +23,9 @@ const child = spawn(
   [
     'playwright',
     'test',
-    'tests/e2e/artificial-opencode-terminal-load.spec.ts',
+    'tests/stages/e2e/legacy/artificial-opencode-terminal-load.spec.ts',
     '--config',
-    'tests/playwright.config.ts',
+    'tests/configs/playwright.config.ts',
     '--project',
     'electron-headless',
     '--workers=1',

@@ -7,19 +7,19 @@ const projectDir = resolve(import.meta.dirname, '../..')
 
 describe('computer-use e2e workflow', () => {
   it('runs computer-use e2e files serially because they share desktop focus', () => {
-    const config = readFileSync(join(projectDir, 'tests/e2e/vitest.config.ts'), 'utf8')
+    const config = readFileSync(join(projectDir, 'tests/stages/e2e/legacy/vitest.config.ts'), 'utf8')
 
     expect(config).toContain('fileParallelism: false')
   })
 
   it('guards e2e source against fragile fixed waits and stale element indexes', () => {
-    const driver = readFileSync(join(projectDir, 'tests/e2e/helpers/computer-driver.ts'), 'utf8')
+    const driver = readFileSync(join(projectDir, 'tests/stages/e2e/legacy/helpers/computer-driver.ts'), 'utf8')
     const cliDriver = readFileSync(
-      join(projectDir, 'tests/e2e/helpers/computer-cli-driver.ts'),
+      join(projectDir, 'tests/stages/e2e/legacy/helpers/computer-cli-driver.ts'),
       'utf8'
     )
     const windowsStoreE2e = readFileSync(
-      join(projectDir, 'tests/e2e/computer-windows-store.e2e.ts'),
+      join(projectDir, 'tests/stages/e2e/legacy/computer-windows-store.e2e.ts'),
       'utf8'
     )
 
@@ -56,7 +56,7 @@ describe('computer-use e2e workflow', () => {
         'src/main/runtime/rpc/errors.ts',
         'src/main/runtime/rpc/methods/computer*.ts',
         'src/shared/computer-use-*.ts',
-        'tests/e2e/vitest.config.ts'
+        'tests/stages/e2e/legacy/vitest.config.ts'
       ])
     )
     expect(triggerPaths).not.toContain('src/shared/runtime-types.ts')
@@ -173,7 +173,7 @@ describe('computer-use e2e workflow', () => {
     expect(installRun).toContain('gedit')
     expect(installRun).toContain('xvfb')
     expect(nativeSmokeRuns).toContain(
-      'xvfb-run --auto-servernum dbus-run-session -- pnpm test:e2e:computer --reporter=verbose tests/e2e/computer-linux.e2e.ts'
+      'xvfb-run --auto-servernum dbus-run-session -- pnpm test:e2e:computer --reporter=verbose tests/stages/e2e/legacy/computer-linux.e2e.ts'
     )
   })
 
@@ -220,7 +220,7 @@ describe('computer-use e2e workflow', () => {
     ]
 
     expect(nativeSmokeRuns).toContain(
-      'pnpm test:e2e:computer --reporter=verbose tests/e2e/computer-windows.e2e.ts'
+      'pnpm test:e2e:computer --reporter=verbose tests/stages/e2e/legacy/computer-windows.e2e.ts'
     )
     expect(allRuns.join('\n')).not.toContain('test:e2e:computer -- --reporter')
   })
@@ -239,18 +239,18 @@ describe('computer-use e2e workflow', () => {
 
     expect(triggerPaths).toEqual(
       expect.arrayContaining([
-        'tests/e2e/computer-mac.e2e.ts',
-        'tests/e2e/computer-mac-safari.e2e.ts',
-        'tests/e2e/computer-linux.e2e.ts',
-        'tests/e2e/helpers/computer-cli-driver.ts',
-        'tests/e2e/helpers/computer-driver.ts'
+        'tests/stages/e2e/legacy/computer-mac.e2e.ts',
+        'tests/stages/e2e/legacy/computer-mac-safari.e2e.ts',
+        'tests/stages/e2e/legacy/computer-linux.e2e.ts',
+        'tests/stages/e2e/legacy/helpers/computer-cli-driver.ts',
+        'tests/stages/e2e/legacy/helpers/computer-driver.ts'
       ])
     )
     expect(macRuns).toContain(
-      'pnpm test:e2e:computer --reporter=verbose tests/e2e/computer-mac.e2e.ts tests/e2e/computer-mac-safari.e2e.ts'
+      'pnpm test:e2e:computer --reporter=verbose tests/stages/e2e/legacy/computer-mac.e2e.ts tests/stages/e2e/legacy/computer-mac-safari.e2e.ts'
     )
     expect(linuxRuns).toContain(
-      'xvfb-run --auto-servernum dbus-run-session -- pnpm test:e2e:computer --reporter=verbose tests/e2e/computer-linux.e2e.ts'
+      'xvfb-run --auto-servernum dbus-run-session -- pnpm test:e2e:computer --reporter=verbose tests/stages/e2e/legacy/computer-linux.e2e.ts'
     )
   })
 
@@ -265,12 +265,12 @@ describe('computer-use e2e workflow', () => {
 
     expect(triggerPaths).toEqual(
       expect.arrayContaining([
-        'tests/e2e/computer-windows.e2e.ts',
-        'tests/e2e/computer-windows-store.e2e.ts'
+        'tests/stages/e2e/legacy/computer-windows.e2e.ts',
+        'tests/stages/e2e/legacy/computer-windows-store.e2e.ts'
       ])
     )
     expect(windowsRuns).toContain(
-      'pnpm test:e2e:computer --reporter=verbose tests/e2e/computer-windows.e2e.ts tests/e2e/computer-windows-store.e2e.ts'
+      'pnpm test:e2e:computer --reporter=verbose tests/stages/e2e/legacy/computer-windows.e2e.ts tests/stages/e2e/legacy/computer-windows-store.e2e.ts'
     )
   })
 })
