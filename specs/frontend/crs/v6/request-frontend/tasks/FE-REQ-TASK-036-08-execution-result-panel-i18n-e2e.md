@@ -5,7 +5,7 @@
 **Area:** frontend / request / execution / i18n / tests
 **File:** `frontend/src/renderer/src/components/request/execution/{ExecutionResultPanel,ExecutionChecksTable}.tsx`, `execution-result-comparison.ts` (mới); `components/task/TaskDetail.tsx` (sửa: tab "Kết quả"); `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa); `frontend/src/renderer/src/i18n/request-artifact-locale-coverage.test.ts` (mới); `tests/e2e/request-clarification-risk.spec.ts` (mới); `docs/ui/pages/requests.md` (sửa); test cùng tên
 **Depends on:** FE-REQ-TASK-036-02 (`useExecutionResult`), 036-03 đến 036-07 (nguồn khoá i18n), FE-REQ-TASK-019-07 (`request-locale-coverage.test.ts`, mẫu)
-**Status:** [~] PARTIAL — vitest execution/execution-result-comparison (5), execution-components (6), i18n/request-artifact-locale-coverage (13) pass — thiếu: e2e chạy thật, `verify:localization-*`, test TaskDetail tab Kết quả
+**Status:** [x] DONE (verified 2026-10-08: e2e tests/e2e/request-web/request-clarification-risk.web.e2e.ts 3/3 pass; vitest execution-components (6), execution-result-comparison (5), TaskDetail-request-artifacts (tab Kết quả, 2), request-artifact-locale-coverage (13) pass)
 
 ## Context
 
@@ -74,3 +74,9 @@
 ## Ghi chú triển khai (2026-10-07)
 
 `ExecutionResultPanel` + `ExecutionChecksTable` + tab "Kết quả" trong `TaskDetail` (ẩn khi `unsupported` hoặc task không thuộc Request). `legacy` hiện `legacyOutput` nếu truyền (TaskDetail chưa truyền vì `OrcaTask` không có trường stdout). `tests/e2e/request-clarification-risk.spec.ts` chưa tạo; docs đã cập nhật. Bản dịch es/ja/ko/zh là bản dịch thật nhưng chưa qua người dịch duyệt.
+
+## Ghi chú triển khai (2026-10-08)
+
+- E2E chạy thật (SPA web + WS giả): `tests/e2e/request-web/request-clarification-risk.web.e2e.ts`: (1) chip "Chờ bổ sung" → `request.list {status:['awaiting_information']}`, nút "Trả lời" focus panel, timeline ở bước Plan theo `resumeStatus`, gửi một lần `clarification.answer {clarificationId, complete:true, expectedVersion, answers}`; (2) cổng rủi ro Plan: Duyệt khoá tới khi `impact.accept`, `approval.approve` mang `acceptedFindingIds`; (3) mở task từ cây Plan → tab "Kết quả" hiện kết quả có cấu trúc từ `execution.get {taskId, latestOnly:true}`, văn bản agent hiển thị dạng chữ (không HTML). Lệnh: `MCP_E2E_BASE_URL=http://127.0.0.1:5174 npx playwright test -c tests/playwright.web.config.ts --project=mcp-web tests/e2e/request-web/request-clarification-risk.web.e2e.ts`.
+- `verify:localization-*`: script không tồn tại trong repo (xem 032-08); phủ khoá bằng vitest `request-artifact-locale-coverage`.
+- `legacyOutput` vẫn không truyền từ `TaskDetail` (`OrcaTask` không có stdout). Kênh `execution.get`, `impact.*`, `readiness.*` vẫn "tạm" theo CONTRACT.

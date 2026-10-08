@@ -5,7 +5,7 @@
 **Area:** frontend / components
 **File:** `frontend/src/renderer/src/components/request/RequestPage.tsx`, `RequestPageHeader.tsx`, `RequestUnsupportedNotice.tsx`, `RequestStatusBadge.tsx`, `RequestTypeBadge.tsx`, `RequestSourceBadge.tsx`, `ApprovalStatusBadge.tsx`, `request-status-presentation.ts` (đều mới); `components/sidebar/SidebarRequestNavButton.tsx` (mới), `SidebarNav.tsx` (sửa, gần dòng 71); `App.tsx` (sửa: lazy `RequestPage`); `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/request-locale-coverage.test.ts` (mới); `docs/ui/pages/requests.md` (mới), `docs/ui/page-tree.md` (sửa)
 **Depends on:** FE-REQ-TASK-018-03, 018-04
-**Status:** [~] PARTIAL — components, badges, RequestPageHeader, 5-locale keys, request-locale-coverage.test, RequestPage/badge/sidebar tests and docs/ui/pages/requests.md pass; e2e tests/e2e/request-page.spec.ts not written/run
+**Status:** [x] DONE (verified 2026-10-08: web e2e tests/e2e/request-web/request-list-detail.web.e2e.ts 6/6 pass (mocked gateway WS; replaces Electron request-page.spec.ts): sidebar entry hidden when request.flowStatus is unsupported, pending badge, tab switch, Escape close; fixed sidebar badge aria-label losing the count and RequestSourceBadge hard-coded "(opens in new tab)" (now translate(), 5 locales); request-badges, SidebarRequestNavButton, request-locale-coverage vitest pass)
 
 ## Context
 

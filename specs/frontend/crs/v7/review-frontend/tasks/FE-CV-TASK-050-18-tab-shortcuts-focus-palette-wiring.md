@@ -5,7 +5,7 @@
 **Area:** frontend / lib + hooks + components
 **File:** `lib/tab-number-shortcuts.ts`, `components/terminal/tab-type-cycle.ts`, `components/Terminal.tsx`, `hooks/ipc-tab-switch.ts`, `hooks/resolve-zoom-target.ts`, `hooks/modal-return-focus-action.ts`, `hooks/useModalReturnFocus.ts`, `lib/workspace-tab-palette-search.ts`, `components/WorktreeJumpPalette.tsx`, `components/floating-terminal/FloatingTerminalPanel.tsx` (đọc/xác nhận), `runtime/sync-runtime-graph.ts` (đọc), tests
 **Depends on:** FE-CV-TASK-050-17
-**Status:** [~] PARTIAL — tab cycle, number shortcut, zoom (ui), modal focus return, Terminal.tsx hide, mobile sync exclusion (read-only check) done; palette search for the Review tab (workspace-tab-palette-search results) NOT implemented, only types widened; no per-file test cases for tab-number-shortcuts/ipc-tab-switch
+**Status:** [x] DONE (verified 2026-10-08: workspace-tab-palette-search.test + activation.test 19/19, review-tab-navigation.test 5/5, ipc-tab-switch.test PASS; tsc không thêm lỗi)
 
 ## Context
 
@@ -29,3 +29,9 @@
 ## Rủi ro
 
 - `Terminal.tsx` (:2020-2128 theo CR) chưa đọc kỹ.
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- Palette: `lib/workspace-tab-palette-search.ts` nhận `contentType: 'review'` (nhãn `customLabel`/`label`/`translate('auto.lib.ensure.review.tab.title')`, dòng phụ `auto.lib.workspaceTabPalette.reviewTab`, tìm được bằng "review" ở mọi locale; "đang mở" khi loại active là `review`); `lib/workspace-tab-palette-activation.ts` mở tab review không cần file (`setActiveTabType('review')`); icon `ScanSearch` trong `WorktreeJumpPalette`.
+- Test từng module cho loại review: `hooks/review-tab-navigation.test.ts` (`activateCyclableTab`, `getNextTabAcrossAllTypes`, `activateTabNumberShortcut`, `resolveZoomTarget`='ui', `resolveModalReturnFocusAction`='surface').
+- `lint:switch-exhaustiveness`: config `oxlint-switch-exhaustiveness.json` không có trong `frontend/config` ở môi trường này nên chưa chạy; `oxlint` thường sạch ở các file đã sửa.

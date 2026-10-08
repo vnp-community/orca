@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks
 **File:** `frontend/src/renderer/src/components/review-map/turns/useReviewTurnRecorder.ts` (mới) + test
 **Depends on:** FE-CV-TASK-061-01 (`AgentTurnCompletion`); FE-CV-TASK-060-05, 060-06; FE-CV-SOL-089-agent-turn-recorder (dùng chung khử trùng lặp)
-**Status:** [~] PARTIAL — hook đã mount trong `ReviewWorkspace` qua `shell/use-review-companions.ts` (đọc lại danh sách đã lưu bằng `use-review-turn-markers.ts`, `onSaved` mới của hook; useReviewTurnRecorder.test 6/6 + ReviewWorkspace.companions.test 8/8 PASS); thiếu: chỉ ghi khi tab Review đang mount (spec muốn mức App/workspace để lượt kết thúc lúc tab đóng vẫn được ghi); chưa có test khẳng định bản ghi mới từ workspace
+**Status:** [x] DONE (verified 2026-10-08: use-app-agent-turn-recorders.test 1/1, turns/ 12 file 89/89, ReviewWorkspace.companions.test 9/9 PASS)
 
 ## Context
 
@@ -40,3 +40,9 @@
 ## Ghi chú tích hợp (W6, 2026-10-07)
 
 Mount tại `shell/use-review-companions.ts`. Sai lệch so với "mount ở mức App": App.tsx thuộc agent khác nên chưa đụng; cần một component headless ở App nếu muốn ghi khi tab đóng. Thêm tuỳ chọn `onSaved(worktreeId, markers)` vào hook để switcher cập nhật không cần đọc lại.
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- Recorder chạy ở mức App: `turns/use-app-agent-turn-recorders.ts` được gọi trong `App.tsx` (`useAppAgentTurnRecorders()`), nên lượt kết thúc khi tab Review đóng vẫn được ghi.
+- Workspace không còn mount recorder (tránh ghi đôi); nó chỉ cấp symbol keys và nhận marker mới qua `turns/review-turn-recorder-bus.ts` + `turns/use-review-turn-recorder-channel.ts`.
+- Test: `use-app-agent-turn-recorders.test.tsx` (ghi đúng một marker + một lượt backend khi không có tab Review, không có prompt), `ReviewWorkspace.companions.test` ("shows markers the App-level recorder saves while the workspace is mounted").

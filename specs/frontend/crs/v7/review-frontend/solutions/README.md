@@ -1,7 +1,7 @@
 # Solutions: review-frontend (frontend, v7)
 
 
-> CR-050 xác minh 2026-10-07: SOL-050-types 6 DONE/2 PARTIAL, SOL-050-store 6 DONE, SOL-050-tab 4 DONE/2 PARTIAL.
+> CR-050 xác minh 2026-10-08: SOL-050-types 8/8 DONE, SOL-050-store 6/6 DONE, SOL-050-tab 6/6 DONE.
 
 > 🚧 **In Progress.** Rà soát 2026-10-07: SOL-050-types 6/8 done, SOL-050-store 5/6 done, SOL-050-tab 1/6 done, SOL-051 5/7 done (+2 partial), SOL-052 5/6 done (+1 partial). SOL-053..062 (tất cả lens UI) ❌ chưa bắt đầu. Tổng ~16/100 tasks (~16%). Soạn 2026-10-06 từ [docs/crs/v7/review-frontend](../../../../../../docs/crs/v7/review-frontend/README.md). Fake backend (073-02) chưa tồn tại, blocker cho e2e.
 
@@ -12,18 +12,18 @@
 | CR-CV-050 | [FE-CV-SOL-050-types-and-runtime-bridge](./FE-CV-SOL-050-types-and-runtime-bridge.md) | Kiểu mirror, 46 kênh, mã lỗi, bridge `window.api.codeIntel`, client, dùng fake backend 073-02 | 8 (050-01..08) | ✅ |
 | CR-CV-050 | [FE-CV-SOL-050-store-and-query-hooks](./FE-CV-SOL-050-store-and-query-hooks.md) | Selector `{projectId, worktreeId}` (O-1), slice, push, hook cờ/truy vấn/index/reindex | 6 (050-09..14) | ✅ |
 | CR-CV-050 | [FE-CV-SOL-050-review-tab-wiring](./FE-CV-SOL-050-review-tab-wiring.md) | Loại tab `review`, `ensureReviewTab`, token `--review-*`, i18n | 6 (050-15..20) | ✅ |
-| CR-CV-051 | [FE-CV-SOL-051-review-workspace-shell](./FE-CV-SOL-051-review-workspace-shell.md) | Khung ba cột, phạm vi, chip index (9 `overall`), tóm tắt, 13 trạng thái | 7 | 🚧 5/7 DONE, 2 PARTIAL (2026-10-07) |
+| CR-CV-051 | [FE-CV-SOL-051-review-workspace-shell](./FE-CV-SOL-051-review-workspace-shell.md) | Khung ba cột, phạm vi, chip index (9 `overall`), tóm tắt, 13 trạng thái | 7 | 🚧 6/7 DONE, 1 PARTIAL — 051-07 chỉ còn e2e (2026-10-08) |
 | CR-CV-052 | [FE-CV-SOL-052-reading-order-and-progress](./FE-CV-SOL-052-reading-order-and-progress.md) | Thứ tự đọc theo `ReadingStep`, tiến độ theo `stepKey`, lưu `reviewState` | 6 | 🚧 5/6 DONE, 1 PARTIAL (2026-10-07) |
 | CR-CV-053 | [FE-CV-SOL-053-impact-lens-and-symbol-detail](./FE-CV-SOL-053-impact-lens-and-symbol-detail.md) | Lens Ảnh hưởng (không cạnh), chi tiết symbol, liên kết diff, mã hoá lớp phủ | 8 | 🚧 6 DONE, 2 PARTIAL |
 | CR-CV-054 | [FE-CV-SOL-054-structure-lens](./FE-CV-SOL-054-structure-lens.md) | Treemap squarified + cây ảo hoá | 6 | ✅ 6 DONE |
 | CR-CV-055 | [FE-CV-SOL-055-architecture-c4-lens](./FE-CV-SOL-055-architecture-c4-lens.md) | Lens C4 + chỉnh `c4.yaml` | 7 | 🚧 |
-| CR-CV-056 | [FE-CV-SOL-056-dataflow-lens](./FE-CV-SOL-056-dataflow-lens.md) | Lens Luồng (Mermaid từ `SequenceModel`) | 7 | 🚧 |
+| CR-CV-056 | [FE-CV-SOL-056-dataflow-lens](./FE-CV-SOL-056-dataflow-lens.md) | Lens Luồng (Mermaid từ `SequenceModel`) | 7 | 🚧 6/7 DONE, 1 PARTIAL — 056-07 (2026-10-08) |
 | CR-CV-057 | [FE-CV-SOL-057-erd-lens](./FE-CV-SOL-057-erd-lens.md) | Lens ERD; tạo `maskSensitiveText` (057-01) | 6 (do nhóm B soạn) | 🚧 5/6 DONE, 1 PARTIAL (2026-10-07) |
-| CR-CV-058 | [FE-CV-SOL-058-storage-lens](./FE-CV-SOL-058-storage-lens.md) | Lens Lưu trữ | 5 (do nhóm B soạn) | 🚧 3/5 DONE, 2 PARTIAL (2026-10-07) |
-| CR-CV-059 | [FE-CV-SOL-059-contract-lens-and-findings](./FE-CV-SOL-059-contract-lens-and-findings.md) | Lens Hợp đồng và Phát hiện | 7 (do nhóm B soạn) | 🚧 5/7 DONE, 2 PARTIAL (2026-10-07) |
-| CR-CV-060 | [FE-CV-SOL-060-review-notes-and-turn-compare](./FE-CV-SOL-060-review-notes-and-turn-compare.md) | Ghi chú, gửi agent, so sánh lượt | 8 (do nhóm B soạn) | 🚧 5/8 DONE, 3 PARTIAL (2026-10-07) |
+| CR-CV-058 | [FE-CV-SOL-058-storage-lens](./FE-CV-SOL-058-storage-lens.md) | Lens Lưu trữ | 5 (do nhóm B soạn) | 🚧 4/5 DONE, 1 PARTIAL — 058-05 (2026-10-08) |
+| CR-CV-059 | [FE-CV-SOL-059-contract-lens-and-findings](./FE-CV-SOL-059-contract-lens-and-findings.md) | Lens Hợp đồng và Phát hiện | 7 (do nhóm B soạn) | 🚧 6/7 DONE, 1 PARTIAL — 059-07 (2026-10-08) |
+| CR-CV-060 | [FE-CV-SOL-060-review-notes-and-turn-compare](./FE-CV-SOL-060-review-notes-and-turn-compare.md) | Ghi chú, gửi agent, so sánh lượt | 8 (do nhóm B soạn) | 🚧 7/8 DONE, 1 PARTIAL — 060-08 chỉ còn e2e (2026-10-08) |
 | CR-CV-061 | [FE-CV-SOL-061-review-entry-points](./FE-CV-SOL-061-review-entry-points.md) | Điểm vào | 7 (do nhóm B soạn) | ~ PARTIAL 2026-10-07: 6/7 DONE, 061-07 thiếu e2e |
-| CR-CV-062 | [FE-CV-SOL-062-mobile-review-summary](./FE-CV-SOL-062-mobile-review-summary.md) | Mobile + host method desktop | 6 (do nhóm B soạn) | ✅ (2026-10-07: 4/6 DONE, 2 PARTIAL) |
+| CR-CV-062 | [FE-CV-SOL-062-mobile-review-summary](./FE-CV-SOL-062-mobile-review-summary.md) | Mobile + host method desktop | 6 (do nhóm B soạn) | ✅ (2026-10-08: 5/6 DONE, 1 PARTIAL — 062-04 chờ thiết bị/typecheck mobile) |
 
 Tổng: 61 task phần A + 39 task phần B = 100 task (đếm từ đĩa lúc soạn).
 

@@ -1,6 +1,6 @@
 # FE-REQ-SOL-018: Nền frontend Request (kiểu, RPC, hook, store, định tuyến; gỡ `backlog`)
 
-> 🚧 **Mostly done.** Verified 2026-10-07: 018-01/02/04/06 DONE, 018-03 and 018-05 PARTIAL (useBacklog test/pagination -> 023-02; e2e request-page.spec.ts missing). Deviation: wire parsers/hooks accept both CR-016-draft and CONTRACT-request-ui-api shapes (`new` status, flat `sourceProvider`, `{request}`, `changes`/`at`, approval `id`, spawnChild `linkReason`/`typeHint`); useRequestSubscription now only listens to the bus, the single stream is owned by useRequestEvents.
+> ✅ **Done.** Verified 2026-10-08: 018-01..06 DONE (018-03 hooks 29 tests incl. useBacklog; 018-05 web e2e tests/e2e/request-web/request-list-detail.web.e2e.ts). Deviation: wire parsers/hooks accept both CR-016-draft and CONTRACT-request-ui-api shapes (`new` status, flat `sourceProvider`, `{request}`, `changes`/`at`, approval `id`, spawnChild `linkReason`/`typeHint`); useRequestSubscription only listens to the bus, the single stream is owned by useRequestEvents. E2E run in the web SPA with a mocked gateway WebSocket (Electron has no request-service).
 
 **CR:** [CR-REQ-018](../../../../../../docs/crs/v6/request-frontend/CR-REQ-018-request-frontend-foundation.md)
 **Area:** frontend (`frontend/src/shared`, `frontend/src/renderer/src`)

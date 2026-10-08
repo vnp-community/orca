@@ -5,7 +5,7 @@
 **Area:** frontend / graph (canvas)
 **File:** `frontend/src/renderer/src/components/graph/{GraphCanvas,GraphNodeCard,GraphGroupNode,GraphEdgeLine,GraphMini}.tsx`, `graph-layout-engine.ts` (mới); test cùng tên
 **Depends on:** FE-REQ-TASK-032-01 (`RiskBadge`, `riskPresentation`), 032-03 (kiểu), 032-04 (hàm thuần); FE-REQ-TASK-032-02 khuyến nghị (dùng `useDocumentColorMode`)
-**Status:** [~] PARTIAL — vitest GraphCanvas (7), GraphNodeCard, GraphEdgeLine (2), GraphMini (3), graph-layout-engine (5) pass — thiếu: mức thu phóng ngữ nghĩa chưa áp vào hiển thị
+**Status:** [x] DONE (verified 2026-10-08: vitest GraphCanvas (10), GraphNodeCard (10), GraphEdgeLine (2), GraphMini (3), graph-zoom-levels (9), graph-layout-engine (5), graph-layout-engine-contract (11) pass; e2e request-graph.web.e2e.ts a/c vẽ node thật bằng xyflow)
 
 ## Context
 
@@ -79,3 +79,10 @@
 ## Ghi chú triển khai (2026-10-07)
 
 `levelForZoom` chạy (ref + debounce 100 ms, `data-zoom-level`) nhưng `collapseToLevel` chưa được dùng để vẽ lại nút theo cấp service/module; chưa đo hiệu năng 50/500/2000 node và bundle. `GraphMini` vẽ SVG thuần (không xyflow) và dùng `computeWaveLayout` đồng bộ. Nhóm đóng/mở bằng cách đưa thành viên vào `visible` (không lồng node).
+
+## Ghi chú triển khai (2026-10-08)
+
+- Thu phóng ngữ nghĩa đã áp vào hiển thị: `levelForZoom` → `zoomPresentation` (`service`: node `minimal` 120 px chỉ nhãn + viền rủi ro, cạnh không dấu "+/−", độ mờ 0,5; `module`: `compact`; `leaf`: `full` có chip trạng thái). Rủi ro không bao giờ bị bỏ (viền + `aria-label`). `collapseToLevel` (gộp node đại diện) vẫn là hàm thuần chưa dùng để vẽ: gộp node khi thu nhỏ sẽ đổi tập node của xyflow mỗi lần cuộn chuột, chọn cách giảm chi tiết thay vì gộp.
+- Lỗi thật phát hiện khi chạy e2e: xyflow (controlled) giữ node `visibility: hidden` nếu kích thước đo được không được đưa lại; mỗi lần dựng lại node (đổi mức thu phóng) canvas trắng. Sửa: `onNodesChange` lưu `dimensions` vào `measured` và truyền lại; `fitView` chỉ chạy khi mọi node đã đo (tránh zoom tối đa trên khung rỗng).
+- Đo `waveLayoutEngine` (test hợp đồng, máy dev): 50 node 0,3 ms, 500 node 1,3 ms, 2.000 node 2,9 ms. FPS khi kéo bản đồ chưa đo tay.
+- `GraphCanvas` nằm ngoài chunk chính: xem phân tích bundle ở 032-08.

@@ -5,7 +5,7 @@
 **Area:** frontend / renderer components + i18n + tests
 **File:** `frontend/src/renderer/src/components/review-map/turns/ReviewTurnSwitcher.tsx` (mới) + test; `i18n/locales/{en,es,ja,ko,zh}.json`; `i18n/code-intel-locale-coverage.test.ts` (thêm `KEYS`); `tests/e2e/code-intel-web/review-notes.web.e2e.ts`
 **Depends on:** FE-CV-TASK-060-04, 060-06, 060-07; FE-CV-SOL-052/053 (lớp phủ `review-overlay-model.ts`, lọc Thứ tự đọc); 073-02, 073-03
-**Status:** [~] PARTIAL — switcher đã mount (`shell/ReviewCompanionStrip.tsx`), `onCompare` nối vào Thứ tự đọc (chế độ "Từ lượt trước" lọc theo tệp new/changed; ReviewTurnSwitcher.test 9/9 + ReviewWorkspace.companions.test 8/8 PASS); thiếu: nhãn lượt chưa vào `review-overlay-model.ts` (chưa gắn nhãn trên đồ thị lens), chưa có e2e `review-notes.web.e2e.ts`
+**Status:** [~] PARTIAL — chỉ còn e2e (P1) `review-notes.web.e2e.ts` (do nhóm e2e); phần code xong (review-turn-overlay.test 4/4, turns/ PASS, ReviewWorkspace.companions.test 9/9)
 
 ## Context
 
@@ -39,3 +39,10 @@
 ## Ghi chú tích hợp (W6, 2026-10-07)
 
 Phạm vi "lớp phủ" hiện chỉ là bộ lọc Thứ tự đọc (giao với bộ lọc chip). Chế độ "Xem lượt trước" vẫn chỉ hiện thông báo chỉ đọc.
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- Nhãn lượt vào lớp phủ: `review-overlay-model.ts` thêm `turnOverlayLabel` (symbol trước, rồi tệp) và `turnOverlayDimmed` (`unchanged_since` làm mờ, không ẩn).
+- `turns/review-turn-overlay-store.ts`: workspace (`use-review-companions.ts`) công bố so sánh "Từ lượt trước" theo worktree, dọn khi đổi chế độ/đóng tab; `ImpactGraphCanvas` đọc và gắn nhãn (`turnChangeLabel`) + `data-turn-label` lên `ImpactSymbolNode`.
+- Chú giải: nhãn dùng cùng chuỗi `turnChangeLabel` với bộ đếm trong `ReviewTurnSwitcher`.
+- Còn lại: e2e trên fake backend.

@@ -5,7 +5,7 @@
 **Area:** frontend / request / i18n / tests
 **File:** `frontend/src/renderer/src/components/request/RequestDetailHeader.tsx` (sửa, FE-REQ-TASK-019-03); `components/request/plan/PlanSummaryHeader.tsx` (sửa, 021-03); `components/request/RequestGraphSheet.tsx` (mới); `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa); `frontend/src/renderer/src/i18n/graph-locale-coverage.test.ts` (mới); `tests/e2e/request-graph.spec.ts` (mới); `docs/ui/pages/requests.md` (sửa, tạo ở 018-05)
 **Depends on:** FE-REQ-TASK-032-01, 032-05, 032-06; FE-REQ-TASK-019-03 (header), 021-03 (tab Plan), 021-05
-**Status:** [~] PARTIAL — vitest graph-locale-coverage (12) pass; điểm vào + docs xong — thiếu: e2e chạy thật, phân tích bundle, `verify:localization-*`
+**Status:** [x] DONE (verified 2026-10-08: e2e tests/e2e/request-web/request-graph.web.e2e.ts 3/3 pass; vitest graph-locale-coverage (12) pass; phân tích bundle bằng manifest Vite: xyflow/GraphCanvas/GraphPanel ngoài chunk chính)
 
 ## Context
 
@@ -75,3 +75,9 @@
 ## Ghi chú triển khai (2026-10-07)
 
 Đã làm: `RequestGraphSheet` (lazy), nút "Xem đồ thị" ở `RequestDetailHeader`, công tắc Cây|Đồ thị ở `PlanSummaryHeader`/`RequestPlanTab`, 77+ khoá i18n 5 locale, `docs/ui/pages/requests.md`, `tests/e2e/request-graph.spec.ts` (khung, skip như request-plan-tree). Chưa: chạy build/phân tích chunk, `pnpm run verify:localization-catalog` (script `audit-localization-coverage.mjs` không tồn tại trong repo này). Nút "Xem đồ thị" hiện khi luồng Request `supported`; subject mặc định `plan` nếu có `planTaskId`, ngược lại `solution_option` với id Request (chưa lấy Solution mới nhất).
+
+## Ghi chú triển khai (2026-10-08)
+
+- E2E chạy thật trên SPA web với WS giả (không cần request-service): `tests/e2e/request-web/request-graph.web.e2e.ts` (a: runtime không có `impact.*` vẫn mở "Xem đồ thị", lens backend bị khoá, lens Luồng vẽ node; b: `impact.graph` 120/300 node → danh sách, "/" mở tìm, Enter chọn node; c: Plan tab Cây | Đồ thị). Dùng hạ tầng `tests/e2e/request-web/support/mock-request-ws.ts` (agent khác dựng), project `mcp-web` của `tests/playwright.web.config.ts` (không sửa config). Lệnh: `MCP_E2E_BASE_URL=http://127.0.0.1:5174 npx playwright test -c tests/playwright.web.config.ts --project=mcp-web tests/e2e/request-web/request-graph.web.e2e.ts`. Khung Electron cũ `tests/e2e/request-graph.spec.ts` vẫn skip, trỏ sang bản web.
+- Phân tích bundle (không thêm phụ thuộc): `npx vite build --outDir <scratch> --manifest`, đọc `.vite/manifest.json`: closure import tĩnh của `web-index.html` (4 chunk, 2,06 MB) không chứa xyflow; xyflow ở chunk dùng chung `_style-*.js` (139 KB) chỉ được import bởi `GraphCanvas` (dynamic, 13 KB) và các lens lazy khác (review-map, `TaskDAGView`, `DAGPreview`); `GraphPanel` là dynamic chunk 22 KB, nạp từ `RequestPage` (dynamic).
+- `verify:localization-catalog`/`verify:localization-coverage`: script `config/scripts/verify-localization-catalog.mjs` và `audit-localization-coverage.mjs` không tồn tại trong repo này nên không chạy được; phủ khoá bằng vitest `graph-locale-coverage` (5 locale).

@@ -1,14 +1,14 @@
 # Solutions: quality-visualization (frontend, v7)
 
-> Cập nhật 2026-10-07: CR-087 gồm 20 task — 18 DONE, 2 PARTIAL (087-08 thiếu e2e Playwright; 087-11 chưa gắn `MonacoEditor` thường). SOL-088 verified (088-01..09).
+> Cập nhật 2026-10-08: CR-087 gồm 20 task — 19 DONE, 1 PARTIAL (087-08 chỉ còn e2e Playwright, P1). SOL-088 verified (088-01..09).
 
 ## Bảng CR → Solution
 
 | CR | Solution | Nội dung | Tasks | Trạng thái |
 |---|---|---|---|---|
 | CR-CV-088 | [FE-CV-SOL-088-graphics-foundation-and-chart-primitives](./FE-CV-SOL-088-graphics-foundation-and-chart-primitives.md) | Token `--quality-*`/`--quality-heat-*`, bảng mã hoá không chỉ dựa vào màu, primitive biểu đồ tự viết SVG (quyết định A1, không dependency), test tương phản | 088-01..09 | ✅ verified 2026-10-07 |
-| CR-CV-087 | [FE-CV-SOL-087-quality-scorecard-and-state](./FE-CV-SOL-087-quality-scorecard-and-state.md) | Kiểu/parser/lỗi, state `codeIntelQualityByWorktree`, hook, scorecard, chạy kiểm tra, lens `quality` | 087-01..08 | ✅ verified 2026-10-07 (08 PARTIAL: e2e) |
-| CR-CV-087 | [FE-CV-SOL-087-quality-diff-annotations](./FE-CV-SOL-087-quality-diff-annotations.md) | Marker + glyph trên diff Monaco, danh sách phát hiện kiểm tra trong dock, miễn trừ/bỏ miễn trừ | 087-09..14 | ✅ verified 2026-10-07 (11 PARTIAL: MonacoEditor) |
+| CR-CV-087 | [FE-CV-SOL-087-quality-scorecard-and-state](./FE-CV-SOL-087-quality-scorecard-and-state.md) | Kiểu/parser/lỗi, state `codeIntelQualityByWorktree`, hook, scorecard, chạy kiểm tra, lens `quality` | 087-01..08 | ✅ verified 2026-10-07, re-verified 2026-10-08 (08 PARTIAL: chỉ còn e2e) |
+| CR-CV-087 | [FE-CV-SOL-087-quality-diff-annotations](./FE-CV-SOL-087-quality-diff-annotations.md) | Marker + glyph trên diff Monaco, danh sách phát hiện kiểm tra trong dock, miễn trừ/bỏ miễn trừ | 087-09..14 | ✅ verified 2026-10-08 (087-09..14 DONE; 11 gồm cả `MonacoEditor` thường) |
 | CR-CV-087 | [FE-CV-SOL-087-quality-trend-coverage-hotspot](./FE-CV-SOL-087-quality-trend-coverage-hotspot.md) | Diff coverage + treemap, xu hướng theo lượt, hotspot, DSM | 087-15..20 | ✅ verified 2026-10-07 |
 
 ## Thứ tự phụ thuộc

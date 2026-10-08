@@ -1,6 +1,6 @@
 # FE-REQ-SOL-021: Cây Plan → Phase → Task, duyệt Plan/Phase, lọc khỏi Board
 
-> 🚧 **In Progress (5/6 tasks DONE, 021-06 PARTIAL).** Rà soát 2026-10-07: lọc Plan/Phase, `usePlanTree`, cây, thanh duyệt, `RequestPlanTab` + khoá Chạy, i18n đã có test xanh. Còn: e2e (skip, cần backend), docs `ui/pages`, UI duyệt đề xuất `generatePlan` mode propose/commit.
+> ✅ **Done (6/6).** 2026-10-08: web e2e request-plan-tree.web.e2e.ts pass ((b) Board toggle covered by TaskGraph-planning-toggle.test.tsx); fixed approve/reject to send contract `id`; `generatePlan` propose -> commit, `startPhase {id, phaseTaskId}`. Still open: UI to edit a plan proposal before commit (not in CR-021 scope).
 
 **CR:** [CR-REQ-021](../../../../../../docs/crs/v6/request-frontend/CR-REQ-021-plan-phase-tree-and-approval-ui.md)
 **Area:** frontend (`components/request/plan/`, `components/task/*`, `hooks/useTasks.ts`)

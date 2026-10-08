@@ -10,26 +10,26 @@
 | [FE-REQ-TASK-018-02](./FE-REQ-TASK-018-02-request-rpc-client-and-event-bus.md) | `callRequestRpc`, `subscribeRequestEvents`, event bus | P0 | 018-01 | [x] Done |
 | [FE-REQ-TASK-018-03](./FE-REQ-TASK-018-03-request-hooks.md) | 8 hook Request/Solution/Approval/Backlog/sự kiện | P0 | 018-01, 018-02, 018-04 | [x] DONE (useBacklog test + pagination fixed in 023-02, 2026-10-07) |
 | [FE-REQ-TASK-018-04](./FE-REQ-TASK-018-04-request-store-slice-and-routing.md) | Slice `request`, `TopLevelView` `requests`, `openRequestPage` | P0 | 018-01 | [x] Done |
-| [FE-REQ-TASK-018-05](./FE-REQ-TASK-018-05-request-page-shell-sidebar-badges.md) | `RequestPage`, nút sidebar, badge, i18n nền, tài liệu trang | P0 | 018-03, 018-04 | [~] Partial (e2e missing) |
+| [FE-REQ-TASK-018-05](./FE-REQ-TASK-018-05-request-page-shell-sidebar-badges.md) | `RequestPage`, nút sidebar, badge, i18n nền, tài liệu trang | P0 | 018-03, 018-04 | [x] DONE (web e2e, 2026-10-08) |
 | [FE-REQ-TASK-018-06](./FE-REQ-TASK-018-06-remove-backlog-task-status.md) | Gỡ `backlog` khỏi `TaskStatus`, `normalizeTaskStatus`, `plan\|phase` | P0 | không | [x] Done |
 | [FE-REQ-TASK-019-01](./FE-REQ-TASK-019-01-stage-timeline-model-and-child-rules.md) | Mô hình dòng thời gian, luật Request con, `isLowConfidence` | P0 | 018-01 | [x] Done |
 | [FE-REQ-TASK-019-02](./FE-REQ-TASK-019-02-requests-tab-list-filters-keyboard.md) | `RequestsTab`: danh sách, lọc, trạng thái, phím điều hướng | P0 | 018-03, 018-05, 019-01 | [x] Done |
 | [FE-REQ-TASK-019-03](./FE-REQ-TASK-019-03-request-detail-pane-header-actions.md) | `RequestDetailPane`, header, hủy, trả về backlog, mở lại | P0 | 018-03, 018-05, 019-01 | [x] Done |
 | [FE-REQ-TASK-019-04](./FE-REQ-TASK-019-04-type-confirmation-card-and-history.md) | `TypeConfirmationCard`, đổi loại, lịch sử | P0 | 019-03 | [x] Done |
 | [FE-REQ-TASK-019-05](./FE-REQ-TASK-019-05-related-requests-and-spawn-child.md) | `RequestRelatedTab`, tạo Request con | P1 | 019-03, 019-01 | [x] Done |
-| [FE-REQ-TASK-019-06](./FE-REQ-TASK-019-06-create-request-dialog-and-tasks-page-buttons.md) | `CreateRequestDialog`, nút "Tạo Request" trên trang Tasks | P0 | 018-03, 018-05 | [~] Partial (e2e missing) |
-| [FE-REQ-TASK-019-07](./FE-REQ-TASK-019-07-request-list-detail-i18n-and-e2e.md) | i18n, test phủ khoá, e2e danh sách/chi tiết | P1 | 019-02 đến 019-06 | [~] Partial (e2e missing) |
+| [FE-REQ-TASK-019-06](./FE-REQ-TASK-019-06-create-request-dialog-and-tasks-page-buttons.md) | `CreateRequestDialog`, nút "Tạo Request" trên trang Tasks | P0 | 018-03, 018-05 | [x] DONE (row test + web e2e create, 2026-10-08) |
+| [FE-REQ-TASK-019-07](./FE-REQ-TASK-019-07-request-list-detail-i18n-and-e2e.md) | i18n, test phủ khoá, e2e danh sách/chi tiết | P1 | 019-02 đến 019-06 | [x] DONE (web e2e (a)-(d), 2026-10-08) |
 | [FE-REQ-TASK-020-01](./FE-REQ-TASK-020-01-solution-view-model.md) | Mô hình hiển thị Solution (hàm thuần) | P0 | 018-01 | [x] Done |
 | [FE-REQ-TASK-020-02](./FE-REQ-TASK-020-02-solution-panel-body-views.md) | `SolutionPanel`, banner, Chẩn đoán/Findings/Answer, Markdown an toàn | P0 | 020-01, 019-03, 018-03 | [x] Done |
 | [FE-REQ-TASK-020-03](./FE-REQ-TASK-020-03-solution-option-compare.md) | Thẻ phương án và bảng so sánh | P0 | 020-01, 020-02 | [x] Done |
 | [FE-REQ-TASK-020-04](./FE-REQ-TASK-020-04-reject-dialog-decision-bar.md) | `RejectReasonDialog`, `SolutionDecisionBar`, chuỗi chọn rồi duyệt | P0 | 020-01 đến 020-03, 018-03 | [x] Done |
-| [FE-REQ-TASK-020-05](./FE-REQ-TASK-020-05-solution-review-i18n-and-e2e.md) | i18n, test phủ khoá, e2e duyệt Solution | P1 | 020-02 đến 020-04 | [~] Partial (e2e chưa chạy) |
+| [FE-REQ-TASK-020-05](./FE-REQ-TASK-020-05-solution-review-i18n-and-e2e.md) | i18n, test phủ khoá, e2e duyệt Solution | P1 | 020-02 đến 020-04 | [x] DONE (web e2e (a)-(e), 2026-10-08) |
 | [FE-REQ-TASK-021-01](./FE-REQ-TASK-021-01-planning-task-filter-and-effective-parent.md) | Lọc `plan`/`phase` khỏi Board/cây/DAG, `parentId` hiệu dụng | P0 | 018-06 | [x] DONE |
 | [FE-REQ-TASK-021-02](./FE-REQ-TASK-021-02-use-plan-tree-hook.md) | `usePlanTree`, `buildPlanSubtree`, ghép Approval | P0 | 021-01, 018-03 | [x] DONE |
 | [FE-REQ-TASK-021-03](./FE-REQ-TASK-021-03-plan-tree-components.md) | `PlanTree`, `PhaseNode`, `PlanTaskRow`, tiêu đề tổng | P0 | 021-02, 018-05 | [x] DONE |
 | [FE-REQ-TASK-021-04](./FE-REQ-TASK-021-04-plan-phase-approval-bars.md) | Duyệt Plan/Phase/`pre_deploy`, bắt đầu Phase | P0 | 021-02, 021-03, 020-04 | [x] DONE |
 | [FE-REQ-TASK-021-05](./FE-REQ-TASK-021-05-request-plan-tab-states-and-execution-gate.md) | `RequestPlanTab`, trạng thái, khoá Chạy theo Phase | P0 | 021-03, 021-04, 018-04 | [x] DONE |
-| [FE-REQ-TASK-021-06](./FE-REQ-TASK-021-06-plan-tree-i18n-and-e2e.md) | i18n, test phủ khoá, e2e cây Plan | P1 | 021-01 đến 021-05 | [~] Partial (e2e skip, docs) |
+| [FE-REQ-TASK-021-06](./FE-REQ-TASK-021-06-plan-tree-i18n-and-e2e.md) | i18n, test phủ khoá, e2e cây Plan | P1 | 021-01 đến 021-05 | [x] DONE (web e2e, (b) vitest, docs, 2026-10-08) |
 
 CR-REQ-022, 023, 032, 036: xem [PARTIAL-INDEX-022-023.md](./PARTIAL-INDEX-022-023.md) và [PARTIAL-INDEX-032-036.md](./PARTIAL-INDEX-032-036.md) (bảng Solution → Task và thứ tự phụ thuộc).
 
@@ -75,15 +75,15 @@ Làm được ngay, không cần backend: 018-01, 018-04, 018-06, 019-01, 020-01
 | [FE-REQ-TASK-032-02-task-dag-view-token-migration](./FE-REQ-TASK-032-02-task-dag-view-token-migration.md) | [x] DONE (2026-10-07) |
 | [FE-REQ-TASK-032-03-graph-wire-types-parser-lens-registry-hook](./FE-REQ-TASK-032-03-graph-wire-types-parser-lens-registry-hook.md) | [x] DONE (2026-10-07) |
 | [FE-REQ-TASK-032-04-graph-grouping-zoom-focus-and-client-lens-adapters](./FE-REQ-TASK-032-04-graph-grouping-zoom-focus-and-client-lens-adapters.md) | [x] DONE (2026-10-07) |
-| [FE-REQ-TASK-032-05-graph-canvas-nodes-edges-mini-layout-engine](./FE-REQ-TASK-032-05-graph-canvas-nodes-edges-mini-layout-engine.md) | [~] PARTIAL (2026-10-07) |
-| [FE-REQ-TASK-032-06-graph-panel-toolbar-list-search-sheet](./FE-REQ-TASK-032-06-graph-panel-toolbar-list-search-sheet.md) | [~] PARTIAL (2026-10-07) |
-| [FE-REQ-TASK-032-07-elk-layout-engine-gated](./FE-REQ-TASK-032-07-elk-layout-engine-gated.md) | [!] BLOCKED (2026-10-07) |
-| [FE-REQ-TASK-032-08-graph-entry-points-i18n-e2e](./FE-REQ-TASK-032-08-graph-entry-points-i18n-e2e.md) | [~] PARTIAL (2026-10-07) |
+| [FE-REQ-TASK-032-05-graph-canvas-nodes-edges-mini-layout-engine](./FE-REQ-TASK-032-05-graph-canvas-nodes-edges-mini-layout-engine.md) | [x] DONE (2026-10-08) |
+| [FE-REQ-TASK-032-06-graph-panel-toolbar-list-search-sheet](./FE-REQ-TASK-032-06-graph-panel-toolbar-list-search-sheet.md) | [x] DONE (2026-10-08) |
+| [FE-REQ-TASK-032-07-elk-layout-engine-gated](./FE-REQ-TASK-032-07-elk-layout-engine-gated.md) | [!] BLOCKED (2026-10-08, chờ duyệt `elkjs`; test hợp đồng có) |
+| [FE-REQ-TASK-032-08-graph-entry-points-i18n-e2e](./FE-REQ-TASK-032-08-graph-entry-points-i18n-e2e.md) | [x] DONE (2026-10-08) |
 | [FE-REQ-TASK-036-01-request-artifact-types-parsers-rpc-constants](./FE-REQ-TASK-036-01-request-artifact-types-parsers-rpc-constants.md) | [x] DONE (2026-10-07) |
 | [FE-REQ-TASK-036-02-clarification-decision-impact-readiness-hooks](./FE-REQ-TASK-036-02-clarification-decision-impact-readiness-hooks.md) | [x] DONE (2026-10-07) |
-| [FE-REQ-TASK-036-03-clarification-panel](./FE-REQ-TASK-036-03-clarification-panel.md) | [~] PARTIAL (2026-10-07) |
+| [FE-REQ-TASK-036-03-clarification-panel](./FE-REQ-TASK-036-03-clarification-panel.md) | [x] DONE (2026-10-08) |
 | [FE-REQ-TASK-036-04-decision-bar-rationale-high-risk-confirm](./FE-REQ-TASK-036-04-decision-bar-rationale-high-risk-confirm.md) | [x] DONE (2026-10-07) |
-| [FE-REQ-TASK-036-05-risk-summary-dimension-table-findings](./FE-REQ-TASK-036-05-risk-summary-dimension-table-findings.md) | [~] PARTIAL (2026-10-07) |
-| [FE-REQ-TASK-036-06-risk-acceptance-and-approval-gating](./FE-REQ-TASK-036-06-risk-acceptance-and-approval-gating.md) | [~] PARTIAL (2026-10-07) |
-| [FE-REQ-TASK-036-07-readiness-badge-report-plan-drift](./FE-REQ-TASK-036-07-readiness-badge-report-plan-drift.md) | [~] PARTIAL (2026-10-07) |
-| [FE-REQ-TASK-036-08-execution-result-panel-i18n-e2e](./FE-REQ-TASK-036-08-execution-result-panel-i18n-e2e.md) | [~] PARTIAL (2026-10-07) |
+| [FE-REQ-TASK-036-05-risk-summary-dimension-table-findings](./FE-REQ-TASK-036-05-risk-summary-dimension-table-findings.md) | [x] DONE (2026-10-08) |
+| [FE-REQ-TASK-036-06-risk-acceptance-and-approval-gating](./FE-REQ-TASK-036-06-risk-acceptance-and-approval-gating.md) | [x] DONE (2026-10-08) |
+| [FE-REQ-TASK-036-07-readiness-badge-report-plan-drift](./FE-REQ-TASK-036-07-readiness-badge-report-plan-drift.md) | [x] DONE (2026-10-08) |
+| [FE-REQ-TASK-036-08-execution-result-panel-i18n-e2e](./FE-REQ-TASK-036-08-execution-result-panel-i18n-e2e.md) | [x] DONE (2026-10-08) |

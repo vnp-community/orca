@@ -5,7 +5,7 @@
 **Area:** frontend / request / impact
 **File:** `frontend/src/renderer/src/components/request/impact/{RiskSummaryCard,SolutionDimensionTable,ImpactFindingList,ImpactEvidenceSheet}.tsx`, `impact-dimension-model.ts` (mới); `components/request/solution/SolutionOptionCard.tsx`, `SolutionComparisonTable.tsx` (sửa, FE-REQ-TASK-020-02/020-03); test cùng tên
 **Depends on:** FE-REQ-TASK-032-01 (`RiskBadge`), 032-05 (`GraphMini`), 032-06 (`GraphPanel`), FE-REQ-TASK-036-01, 036-02; FE-REQ-TASK-020-02, 020-03
-**Status:** [~] PARTIAL — vitest impact/impact-dimension-model (6), impact-components (10), SolutionImpactSection (3) pass — thiếu: nút "Xem đồ thị" trên thẻ, gộp hàng Effort/Quay lui, GraphPanel cho finding
+**Status:** [x] DONE (verified 2026-10-08: vitest impact-components (11), impact-dimension-model (7), SolutionImpactSection (4), RiskOverrideMenu (3) pass)
 
 ## Context
 
@@ -72,3 +72,10 @@
 ## Ghi chú triển khai (2026-10-07)
 
 `RiskSummaryCard`, `SolutionDimensionTable`, `ImpactFindingList`, `ImpactEvidenceSheet` xong; `SolutionImpactSection` gắn dưới `SolutionOptionCompare` (cho option đang chọn) thay vì trong từng `SolutionOptionCard` (thẻ là `button role=radio`, không lồng điều khiển). `ImpactFindingList.onViewOnGraph` có nhưng chưa nối với `GraphPanel`. `SolutionDimensionTable` chỉ hiện 9 chiều tác động (Effort/Quay lui vẫn ở `SolutionComparisonTable`). Nút kết nối dev server chỉ hiện khi truyền `onConnectDevServer`.
+
+## Ghi chú triển khai (2026-10-08)
+
+- "Xem đồ thị": nút trong `SolutionImpactSection` mở `RequestGraphSheet` (lens `architecture`, subject `solution_option`); chỉ hiện khi có Request đầy đủ trong store (`requestsById`) vì `GraphPanel` cần nó cho lens Luồng/Kế hoạch.
+- "Xem trên đồ thị" của `ImpactFindingList` mở `GraphPanel` lens `impact` với `initialSelectedId = nodeIds[0]`.
+- Hàng Effort và Quay lui (SOL-020) dưới 9 chiều: `buildSol020Rows` (thuần) + `SolutionDimensionTable` (`effort` từ `estimatedEffort`, quay lui từ `raw.rollback|rollbackPlan|rollback_plan` vì chưa có trường kiểu; hàng không ai điền thì ẩn; đánh dấu khác biệt).
+- Nút kết nối dev server của `RiskSummaryCard` nối `useOpenDevServerSettings`.

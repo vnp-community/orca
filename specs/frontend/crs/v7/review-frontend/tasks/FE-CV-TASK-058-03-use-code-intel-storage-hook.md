@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks + store
 **File:** `frontend/src/renderer/src/hooks/useCodeIntelStorage.ts` (mới) + test; `frontend/src/renderer/src/store/slices/code-intel.ts` (sửa nhỏ: `storageEnv`, `selectedStorageNodeId` + vào `CODE_INTEL_WORKTREE_KEYED_STATE_KEYS`); `review-lens-registry.ts` (SOL-051; điều kiện hiện)
 **Depends on:** FE-CV-SOL-050-store-and-query-hooks; FE-CV-TASK-058-01; G4 fake backend (FE-CV-TASK-073-02)
-**Status:** [~] PARTIAL — tab Lưu trữ ẩn khi backend trả `unsupported`/`disabled` (StorageLens báo qua `shell/review-lens-availability.ts`, workspace lọc tab; ReviewWorkspace.companions.test 8/8 PASS); thiếu: chỉ ẩn sau lần đầu lens được mở (chưa có thăm dò trước khi mở)
+**Status:** [x] DONE (verified 2026-10-08: use-storage-lens-probe.test 3/3, storage/ PASS, ReviewWorkspace.companions.test 9/9 + ReviewWorkspace.test 13/13 PASS)
 
 ## Context
 
@@ -42,3 +42,8 @@
 ## Ghi chú tích hợp (W6, 2026-10-07)
 
 Không thêm RPC `storage` ở lúc mở workspace (nặng). Registry `review-lens-registry.ts` không đổi; lọc nằm ở `useReviewWorkspaceModel`.
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- Thăm dò trước khi mở: `shell/use-storage-lens-probe.ts` (gọi từ `use-review-companions.ts` sau khi overlay đã tải, chỉ khi tab Lưu trữ có trong danh sách và chưa đang mở) gọi `useCodeIntelStorage` với đúng tham số lần tải đầu của `StorageLens` (cùng `storageEnv`) → câu trả lời được lens dùng lại từ cache, không thêm request về sau.
+- `unsupported`/`disabled` ⇒ `setReviewLensUnavailable(..., true)` nên tab ẩn ngay, trước khi người dùng bấm; probe không bao giờ tự hiện lại tab (lens làm việc đó khi tải thành công).

@@ -1,6 +1,6 @@
 # FE-CV-SOL-051-review-workspace-shell: Khung màn Review (ba cột, thanh tóm tắt, phạm vi, chip index, trạng thái)
 
-> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 5/7 task DONE (051-02..06), 2 PARTIAL (051-01 thiếu tự gọi `git.branchCompare`; 051-07 thiếu e2e vì package không có `tests/e2e`). Viết ngày 2026-10-06.
+> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 6/7 task DONE; PARTIAL 1 (051-07). Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-051](../../../../../../docs/crs/v7/review-frontend/CR-CV-051-review-workspace-shell.md)
 **Area:** frontend (`frontend/src/renderer/src/{components/review-map,store/slices,hooks}`)

@@ -5,7 +5,7 @@
 **Area:** frontend / renderer hooks
 **File:** `frontend/src/renderer/src/hooks/useRequestFlowSupport.ts`, `useRequests.ts`, `useRequest.ts`, `useRequestActions.ts`, `useSolutions.ts`, `useApprovals.ts`, `useBacklog.ts`, `useRequestEvents.ts` (đều mới) và `*.test.ts(x)`; `frontend/src/renderer/src/App.tsx` (sửa, gắn `useRequestEvents`)
 **Depends on:** FE-REQ-TASK-018-01, 018-02; store slice (018-04) cho `setRequestFlowSupport`, `setPendingApprovalCount`, `upsertRequests`
-**Status:** [~] PARTIAL — hooks + tests for useRequests/useRequest*/useRequestActions/useRequestFlowSupport/useSolutions/useApprovals/useRequestEvents pass and useRequestEvents is mounted in App.tsx; no test for useBacklog, and its nextPage() does not send pageToken (belongs to 023-02)
+**Status:** [x] DONE (verified 2026-10-08: vitest useBacklog (9 tests, loadMore sends pageToken via 023-02) + useRequests/useRequestActions/useRequestEvents/useRequestFlowSupport/useSolutions/useApprovals: 7 files, 29 tests pass; useRequestActions.test covers generatePlan propose->commit and startPhase {id, phaseTaskId})
 
 ## Context
 

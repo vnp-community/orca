@@ -1,6 +1,6 @@
 # Tasks: quality-gate (frontend, v7)
 
-> ✅ Đã xác minh 2026-10-07 (W1-B): SOL-085 7/7 DONE, 0 PARTIAL, SOL-089 6/7 DONE, 1 PARTIAL, SOL-090 8/8 DONE, 0 PARTIAL, SOL-092 7/7 DONE, 0 PARTIAL, SOL-093 5/6 DONE, 1 PARTIAL, SOL-095 5/7 DONE, 2 PARTIAL. Tổng 38 DONE, 4 PARTIAL, 0 BLOCKED, 0 TODO / 42 (W6 2026-10-07: 089-06 và 090-06 đã gắn vào khung Review; 089-04, 093-04, 095-05, 095-06 vẫn PARTIAL, xem Status từng task). 431 test mục tiêu pass. PARTIAL = thiếu điểm mount/nối ở bề mặt thuộc agent khác (shell Review, SOL-051/052/059/060/061/087).
+> ✅ Đã xác minh 2026-10-07 (W1-B): SOL-085 7/7 DONE, 0 PARTIAL, SOL-089 6/7 DONE, 1 PARTIAL, SOL-090 8/8 DONE, 0 PARTIAL, SOL-092 7/7 DONE, 0 PARTIAL, SOL-093 5/6 DONE, 1 PARTIAL, SOL-095 5/7 DONE, 2 PARTIAL. Tổng 38 DONE, 4 PARTIAL, 0 BLOCKED, 0 TODO / 42 (W6 2026-10-07: 089-06 và 090-06 đã gắn vào khung Review; 089-04, 093-04, 095-05, 095-06 vẫn PARTIAL, xem Status từng task). 431 test mục tiêu pass. **Cập nhật 2026-10-08 (P4):** 089-04, 093-04, 095-05, 095-06 → DONE (recorder mức App, phản hồi AI, `open_findings` từ cổng, `quality_finding_triaged`, `setReviewOpenSource`). PARTIAL = thiếu điểm mount/nối ở bề mặt thuộc agent khác (shell Review, SOL-051/052/059/060/061/087).
 
 Mỗi task: dòng `**Status:**` ghi `[x] DONE (verified …)` hoặc `[~] PARTIAL — <thiếu gì>`, nhỏ, kiểm thử độc lập (Vitest). NN tăng liên tục theo CR.
 
@@ -23,7 +23,7 @@ Mỗi task: dòng `**Status:**` ghi `[x] DONE (verified …)` hoặc `[~] PARTIA
 | [FE-CV-TASK-089-01-agent-turn-record-params-builder](./FE-CV-TASK-089-01-agent-turn-record-params-builder.md) | Hàm dựng tham số `quality.turn.record` và digest | P0 | ✅ Done |
 | [FE-CV-TASK-089-02-agent-tool-use-command-summarizer](./FE-CV-TASK-089-02-agent-tool-use-command-summarizer.md) | Bộ chuẩn hoá lệnh và thu thập công cụ theo pane | P0 | ✅ Done |
 | [FE-CV-TASK-089-03-agent-turn-record-queue](./FE-CV-TASK-089-03-agent-turn-record-queue.md) | Hàng đợi gửi, thử lại, khử trùng lặp | P1 | ✅ Done |
-| [FE-CV-TASK-089-04-use-agent-turn-backend-recorder](./FE-CV-TASK-089-04-use-agent-turn-backend-recorder.md) | Hook ghi lượt lên backend | P0 | 🟡 Partial |
+| [FE-CV-TASK-089-04-use-agent-turn-backend-recorder](./FE-CV-TASK-089-04-use-agent-turn-backend-recorder.md) | Hook ghi lượt lên backend | P0 | ✅ Done |
 | [FE-CV-TASK-089-05-agent-turn-verification-view-model](./FE-CV-TASK-089-05-agent-turn-verification-view-model.md) | View-model đối chiếu lượt agent | P1 | ✅ Done |
 | [FE-CV-TASK-089-06-agent-turn-claims-line-component](./FE-CV-TASK-089-06-agent-turn-claims-line-component.md) | Component `AgentTurnVerificationLine` | P2 | ✅ Done |
 | [FE-CV-TASK-089-07-agent-turn-privacy-guard-and-locale-tests](./FE-CV-TASK-089-07-agent-turn-privacy-guard-and-locale-tests.md) | Test riêng tư và khoá i18n | P1 | ✅ Done |
@@ -60,7 +60,7 @@ Mỗi task: dòng `**Status:**` ghi `[x] DONE (verified …)` hoặc `[~] PARTIA
 | [FE-CV-TASK-093-01-ai-summary-wire-parser-and-text-guard](./FE-CV-TASK-093-01-ai-summary-wire-parser-and-text-guard.md) | Parser phản hồi và bảo vệ văn bản | P0 | ✅ Done |
 | [FE-CV-TASK-093-02-use-review-ai-summary](./FE-CV-TASK-093-02-use-review-ai-summary.md) | Hook `useReviewAiSummary` | P0 | ✅ Done |
 | [FE-CV-TASK-093-03-ai-summary-data-preview-dialog](./FE-CV-TASK-093-03-ai-summary-data-preview-dialog.md) | Dialog xem trước dữ liệu gửi và xác nhận | P0 | ✅ Done |
-| [FE-CV-TASK-093-04-review-ai-summary-card](./FE-CV-TASK-093-04-review-ai-summary-card.md) | Thẻ tóm tắt AI | P1 | 🟡 Partial |
+| [FE-CV-TASK-093-04-review-ai-summary-card](./FE-CV-TASK-093-04-review-ai-summary-card.md) | Thẻ tóm tắt AI | P1 | ✅ Done |
 | [FE-CV-TASK-093-05-ai-summary-report-section](./FE-CV-TASK-093-05-ai-summary-report-section.md) | Mục Markdown có nhãn cho báo cáo (090) | P2 | ✅ Done |
 | [FE-CV-TASK-093-06-ai-summary-locale-and-injection-render-tests](./FE-CV-TASK-093-06-ai-summary-locale-and-injection-render-tests.md) | Khoá i18n và test hiển thị injection | P1 | ✅ Done |
 
@@ -72,8 +72,8 @@ Mỗi task: dòng `**Status:**` ghi `[x] DONE (verified …)` hoặc `[~] PARTIA
 | [FE-CV-TASK-095-02-telemetry-shared-copies-sync-and-parity-test](./FE-CV-TASK-095-02-telemetry-shared-copies-sync-and-parity-test.md) | Đồng bộ sáu bản sao `shared/` và test parity | P0 | ✅ Done |
 | [FE-CV-TASK-095-03-review-telemetry-wrappers-and-buckets](./FE-CV-TASK-095-03-review-telemetry-wrappers-and-buckets.md) | Hàm bọc và hàm chia khoảng | P0 | ✅ Done |
 | [FE-CV-TASK-095-04-review-decision-tracker](./FE-CV-TASK-095-04-review-decision-tracker.md) | Bộ theo dõi "agent xong → quyết định" | P1 | ✅ Done |
-| [FE-CV-TASK-095-05-decision-tracker-wiring](./FE-CV-TASK-095-05-decision-tracker-wiring.md) | Nối tracker vào commit, tạo review, gửi ghi chú, đánh dấu đã xem | P1 | 🟡 Partial |
-| [FE-CV-TASK-095-06-review-surface-event-call-sites](./FE-CV-TASK-095-06-review-surface-event-call-sites.md) | Nối các sự kiện còn lại ở bề mặt Review | P2 | 🟡 Partial |
+| [FE-CV-TASK-095-05-decision-tracker-wiring](./FE-CV-TASK-095-05-decision-tracker-wiring.md) | Nối tracker vào commit, tạo review, gửi ghi chú, đánh dấu đã xem | P1 | ✅ Done |
+| [FE-CV-TASK-095-06-review-surface-event-call-sites](./FE-CV-TASK-095-06-review-surface-event-call-sites.md) | Nối các sự kiện còn lại ở bề mặt Review | P2 | ✅ Done |
 | [FE-CV-TASK-095-07-review-telemetry-privacy-tests](./FE-CV-TASK-095-07-review-telemetry-privacy-tests.md) | Test quyền riêng tư và consent | P1 | ✅ Done |
 
 ## Sơ đồ phụ thuộc giữa các task

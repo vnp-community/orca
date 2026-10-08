@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + e2e
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa), `frontend/src/renderer/src/i18n/request-locale-coverage.test.ts` (sửa), `tests/e2e/request-plan-tree.spec.ts` (mới), `docs/ui/pages/requests.md` và `docs/ui/pages/tasks.md` (sửa: công tắc Plan/Phase)
 **Depends on:** FE-REQ-TASK-021-01 đến 021-05
-**Status:** [~] PARTIAL — i18n 47 khoá x 5 locale + `plan-locale-coverage.test.ts` pass; e2e `tests/e2e/request-plan-tree.spec.ts` viết nhưng `test.skip` (cần backend/mock WS, chưa chạy); chưa cập nhật `docs/ui/pages/{requests,tasks}.md` (file chưa tồn tại); bản dịch cần người bản ngữ review
+**Status:** [x] DONE (verified 2026-10-08: web e2e tests/e2e/request-web/request-plan-tree.web.e2e.ts (a),(c),(d),(e) pass, (b) skipped with reason and covered by components/task/__tests__/TaskGraph-planning-toggle.test.tsx (2 pass); e2e found usePlanDecision approve/reject sending only `approvalId`, fixed to send contract `id` (plan-approval-bars.test 47 plan tests pass); startPhase sends {id, phaseTaskId}; docs/ui/pages/requests.md and tasks.md updated. Translations still need native review)
 
 ## Context
 

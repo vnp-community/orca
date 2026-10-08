@@ -7,11 +7,11 @@
 | CR | Solution | Nội dung | Ưu tiên | Số task | Trạng thái |
 |---|---|---|---|---|---|
 | CR-CV-085 | [FE-CV-SOL-085-source-control-quality-notice](./FE-CV-SOL-085-source-control-quality-notice.md) | Cảnh báo cổng chất lượng ở Source Control | P0 | 7 | 7 DONE / 0 PARTIAL |
-| CR-CV-089 | [FE-CV-SOL-089-agent-turn-recorder](./FE-CV-SOL-089-agent-turn-recorder.md) | Ghi lượt agent và đối chiếu "agent tự báo" | P1 | 7 | 6 DONE / 1 PARTIAL |
+| CR-CV-089 | [FE-CV-SOL-089-agent-turn-recorder](./FE-CV-SOL-089-agent-turn-recorder.md) | Ghi lượt agent và đối chiếu "agent tự báo" | P1 | 7 | 7 DONE (2026-10-08) |
 | CR-CV-090 | [FE-CV-SOL-090-review-report-export](./FE-CV-SOL-090-review-report-export.md) | Xuất báo cáo review, chèn vào mô tả PR/MR | P1 | 8 | 8 DONE / 0 PARTIAL |
 | CR-CV-092 | [FE-CV-SOL-092-requirement-trace-view](./FE-CV-SOL-092-requirement-trace-view.md) | Lens Yêu cầu (truy vết) | P2 | 7 | 7 DONE / 0 PARTIAL |
-| CR-CV-093 | [FE-CV-SOL-093-ai-summary-panel](./FE-CV-SOL-093-ai-summary-panel.md) | Thẻ tóm tắt AI (mặc định tắt) | P2 | 6 | 5 DONE / 1 PARTIAL |
-| CR-CV-095 | [FE-CV-SOL-095-review-telemetry](./FE-CV-SOL-095-review-telemetry.md) | Telemetry Review/cổng (enum/khoảng) | P2 | 7 | 5 DONE / 2 PARTIAL |
+| CR-CV-093 | [FE-CV-SOL-093-ai-summary-panel](./FE-CV-SOL-093-ai-summary-panel.md) | Thẻ tóm tắt AI (mặc định tắt) | P2 | 6 | 6 DONE (2026-10-08) |
+| CR-CV-095 | [FE-CV-SOL-095-review-telemetry](./FE-CV-SOL-095-review-telemetry.md) | Telemetry Review/cổng (enum/khoảng) | P2 | 7 | 7 DONE (2026-10-08) |
 
 ## Thứ tự phụ thuộc
 

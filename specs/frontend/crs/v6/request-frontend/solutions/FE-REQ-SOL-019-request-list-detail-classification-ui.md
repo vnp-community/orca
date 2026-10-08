@@ -1,6 +1,6 @@
 # FE-REQ-SOL-019: Danh sách, chi tiết Request, xác nhận phân loại, "Tạo Request" từ Tasks
 
-> 🚧 **Mostly done.** Verified 2026-10-07: 019-01..05 DONE; 019-06 and 019-07 PARTIAL (e2e specs not written/run). Notes: contract has no `request.links` yet so Related tab reads `links` from request.get; CreateRequestDialog sends the type hint as `hints.issueType`.
+> ✅ **Done.** Verified 2026-10-08: 019-01..07 DONE; web e2e request-list-detail.web.e2e.ts 6/6 pass, Jira row test for Create request vs Start workspace. Notes: contract has no `request.links` yet so Related tab reads `links` from request.get; CreateRequestDialog sends the type hint as `hints.issueType`.
 
 **CR:** [CR-REQ-019](../../../../../../docs/crs/v6/request-frontend/CR-REQ-019-request-list-detail-classification-ui.md)
 **Area:** frontend (`components/request/`, `components/TaskPage.tsx` qua component riêng)

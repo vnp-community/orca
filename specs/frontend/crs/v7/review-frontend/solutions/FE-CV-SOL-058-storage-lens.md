@@ -1,6 +1,6 @@
 # FE-CV-SOL-058: Lens Lưu trữ (service → kho dữ liệu → topic → secret, chỉ đọc)
 
-> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 3/5 task DONE (058-01, 02, 04), 2 PARTIAL (058-03 ẩn tab khi `unsupported` nhưng chỉ sau lần mở lens đầu (W6); 058-05 thiếu e2e). Priority P2 (đợt 6). Viết ngày 2026-10-06.
+> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 4/5 task DONE; PARTIAL 1 (058-05). Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-058](../../../../../../docs/crs/v7/review-frontend/CR-CV-058-storage-lens.md)
 **Area:** frontend (`frontend/src/renderer/src/components/review-map/storage/`, hook, khoá slice)

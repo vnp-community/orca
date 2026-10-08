@@ -1,6 +1,6 @@
 # FE-CV-SOL-050-store-and-query-hooks: Phân giải selector, slice `code-intel`, luồng push, hook hỗ trợ/truy vấn/index/reindex
 
-> Trạng thái (2026-10-07): 09-14: 6 DONE. Lệch: hằng kênh/kiểu/mã lỗi ban đầu không khớp CONTRACT-codeintel-ui-api và đã được viết lại theo hợp đồng.
+> ✅ **Done.** Trạng thái (cập nhật 2026-10-08): 6/6 task DONE. Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-050](../../../../../../docs/crs/v7/review-frontend/CR-CV-050-review-frontend-foundation.md) (phần 2.4, 2.5, 2.6, 2.7)
 **Area:** frontend (`frontend/src/renderer/src/{store/slices,hooks,lib}`)

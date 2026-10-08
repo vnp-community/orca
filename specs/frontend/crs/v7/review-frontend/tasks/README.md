@@ -2,7 +2,7 @@
 
 
 > CR-050 xác minh 2026-10-07: 16 DONE, 4 PARTIAL (06, 08, 17, 18), 0 BLOCKED. Trạng thái từng task nằm ở dòng `**Status:**` trong file task.
-> CR-057/058 xác minh 2026-10-07: 8 DONE (057-01..05, 058-01, 02, 04), 3 PARTIAL (057-06 và 058-05 thiếu e2e; 058-03 chưa ẩn tab khi `unsupported`), 0 BLOCKED.
+> CR-057/058 xác minh 2026-10-07: 8 DONE (057-01..05, 058-01, 02, 04), 3 PARTIAL (057-06 và 058-05 thiếu e2e; 058-03 chưa ẩn tab khi `unsupported`), 0 BLOCKED. Cập nhật 2026-10-08: 058-03 DONE (thăm dò `storage` trước khi mở tab).
 
 > 🚧 **In Progress.** Rà soát 2026-10-07: SOL-050-types 6/8 done, SOL-050-store 5/6 done, SOL-050-tab 1/6 done, SOL-051 5/7 done (+2 partial), SOL-052 5/6 done (+1 partial). SOL-053..062 (lens UI) ❌ chưa bắt đầu. Tổng ~16/100 tasks (~16%). Fake backend (073-02) chưa tồn tại — blocker cho e2e. Soạn 2026-10-06. Task chạm `desktop/` ghi "ngoài `frontend/`, cần chủ sở hữu desktop duyệt".
 
@@ -145,7 +145,7 @@ Bảng ánh xạ kênh/mô hình hợp đồng → solution: xem [solutions/READ
 | [FE-CV-TASK-058-04](./FE-CV-TASK-058-04-storage-lens-canvas-and-secret-node.md) | `StorageLens`, canvas chỉ đọc, nút secret không lộ giá trị | FE-CV-SOL-058 | P2 | 058-01, 058-02, 058-03; FE-CV-SOL-051-review-workspace-shell |
 | [FE-CV-TASK-058-05](./FE-CV-TASK-058-05-storage-node-detail-i18n-and-e2e.md) | Chi tiết nút Lưu trữ, liên kết ERD, i18n và e2e web | FE-CV-SOL-058 | P2 | 058-04; 057-04 (`setErdService`); FE-CV-SOL-053-impact-lens-and-symbol-detail; 073-02, 073 |
 
-### CR-CV-059 (nhóm B) (7 task) — 2026-10-07: 059-01/02/03/04/06 DONE, 059-05/07 PARTIAL (xem Status từng task)
+### CR-CV-059 (nhóm B) (7 task) — 2026-10-08: 059-01..06 DONE, 059-07 PARTIAL (xem Status từng task)
 
 | Task | Tên | Solution mẹ | P | Depends on |
 |---|---|---|---|---|
@@ -157,7 +157,7 @@ Bảng ánh xạ kênh/mô hình hợp đồng → solution: xem [solutions/READ
 | [FE-CV-TASK-059-06](./FE-CV-TASK-059-06-finding-graph-indicators-and-erd-links.md) | Chỉ báo phát hiện trên đồ thị và liên kết "Xem trong đồ thị"/ERD | FE-CV-SOL-059 | P2 | 059-03, 059-05; FE-CV-SOL-053-impact-lens-and-symbol-detail; FE-CV-SOL-054-structure-lens; |
 | [FE-CV-TASK-059-07](./FE-CV-TASK-059-07-contract-findings-i18n-and-e2e.md) | i18n 5 locale, test phủ khoá và e2e web Hợp đồng + Phát hiện | FE-CV-SOL-059 | P1 | 059-04, 059-05; 073-02, 073-03 |
 
-### CR-CV-060 (nhóm B) (8 task) — 2026-10-07: 060-01/02/04/05/06 DONE, 060-03/07/08 PARTIAL (xem Status từng task)
+### CR-CV-060 (nhóm B) (8 task) — 2026-10-08: 060-01..07 DONE, 060-08 PARTIAL chỉ còn e2e (xem Status từng task)
 
 | Task | Tên | Solution mẹ | P | Depends on |
 |---|---|---|---|---|
@@ -184,7 +184,7 @@ Bảng ánh xạ kênh/mô hình hợp đồng → solution: xem [solutions/READ
 | [FE-CV-TASK-061-06](./FE-CV-TASK-061-06-right-sidebar-review-tab-and-summary-panel.md) | Tab Review ở right sidebar và `ReviewSummaryPanel` | FE-CV-SOL-061 | P1 | 061-01, 061-02; FE-CV-SOL-051-review-workspace-shell (`IndexFreshnessChip`, trạng thái chu |
 | [FE-CV-TASK-061-07](./FE-CV-TASK-061-07-entry-points-i18n-and-e2e.md) | i18n 5 locale và e2e web cho điểm vào Review | FE-CV-SOL-061 | P1 | 061-03..061-06; 073-02, 073-03 |
 
-### CR-CV-062 (nhóm B) (6 task) — 2026-10-07: 062-01/02/05/06 DONE, 062-03/04 PARTIAL (xem Status từng task)
+### CR-CV-062 (nhóm B) (6 task) — 2026-10-08: 062-01/02/03/05/06 DONE, 062-04 PARTIAL (thiết bị + typecheck mobile đầy đủ; xem Status từng task)
 
 | Task | Tên | Solution mẹ | P | Depends on |
 |---|---|---|---|---|

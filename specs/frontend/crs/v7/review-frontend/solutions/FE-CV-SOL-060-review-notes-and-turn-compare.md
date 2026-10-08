@@ -1,6 +1,6 @@
 # FE-CV-SOL-060: Ghi chú review gắn nút đồ thị, gửi theo lô cho agent, so sánh lượt trước/lượt này
 
-> 🚧 **In Progress.** Triển khai và kiểm chứng 2026-10-07: 5/8 task DONE (060-01, 02, 04, 05, 06), 3 PARTIAL (W6 2026-10-07: dock, nút ghi chú (symbol/ERD), recorder và switcher đã mount; còn lại 060-03 thiếu huy hiệu xyflow, 060-07 chỉ ghi khi tab mount; 060-08 chưa nối lớp phủ và thiếu e2e). Viết ngày 2026-10-06.
+> 🚧 **In Progress.** Trạng thái (cập nhật 2026-10-08): 7/8 task DONE; PARTIAL 1 (060-08). Chi tiết ở dòng `**Status:**` và "Ghi chú hoàn thiện" của từng task.
 
 **CR:** [CR-CV-060](../../../../../../docs/crs/v7/review-frontend/CR-CV-060-review-notes-send-to-agent-and-turn-compare.md)
 **Area:** frontend (`components/review-map/notes/`, `components/review-map/turns/`, `lib/`, slice)

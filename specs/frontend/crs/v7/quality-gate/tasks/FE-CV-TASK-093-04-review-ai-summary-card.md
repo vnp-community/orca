@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/ai-summary/ReviewAiSummaryCard.tsx` (mới) + test; chỗ đặt trong khung FE-CV-SOL-051
 **Depends on:** FE-CV-TASK-093-02, 093-03
-**Status:** [~] PARTIAL — thẻ đã mount trong `ReviewCompanionStrip` và chỉ hiện khi cờ AI bật (mặc định tắt; ReviewWorkspace.companions.test 8/8 PASS); thiếu: nút phản hồi vẫn chỉ render khi có `onFeedback` — chưa có sự kiện telemetry phản hồi nối
+**Status:** [x] DONE (verified 2026-10-08: ai-summary-feedback.test 3/3, ai-summary/ 55/55, ReviewWorkspace.companions.test 9/9 PASS)
 
 ## Context
 
@@ -37,3 +37,7 @@ Thẻ hoàn chỉnh + test (injection hiển thị dạng chữ, ref ngoài tậ
 ## Ghi chú tích hợp (W6, 2026-10-07)
 
 Hook `useReviewAiSummary` được gọi ở `use-review-companions.ts`: cờ tắt ⇒ `hidden`, không RPC. `onFeedback` chưa truyền.
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- `onFeedback` đã nối trong `shell/ReviewCompanionStrip.tsx` → `ai-summary/ai-summary-feedback.ts` (`trackAiSummaryFeedback`): sự kiện `review_ai_summary` chỉ enum (`feedback: useful|wrong`, `level`, `cache_hit`), không gửi nội dung; một phản hồi mỗi bản tóm tắt (WeakSet theo view). Test kiểm schema zod.

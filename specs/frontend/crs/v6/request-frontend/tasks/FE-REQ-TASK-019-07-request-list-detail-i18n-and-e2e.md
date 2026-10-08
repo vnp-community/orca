@@ -5,7 +5,7 @@
 **Area:** frontend / i18n + e2e
 **File:** `frontend/src/renderer/src/i18n/locales/{en,es,ja,ko,zh}.json` (sửa), `frontend/src/renderer/src/i18n/request-locale-coverage.test.ts` (sửa từ 018-05), `tests/e2e/request-list-detail.spec.ts` (mới), `docs/ui/pages/requests.md` (sửa)
 **Depends on:** FE-REQ-TASK-019-02 đến 019-06
-**Status:** [~] PARTIAL — 5-locale keys + request-locale-coverage.test + docs done and green; e2e request-list-detail.spec.ts not written; verify:localization-* scripts not run
+**Status:** [x] DONE (verified 2026-10-08: web e2e tests/e2e/request-web/request-list-detail.web.e2e.ts (a)-(d) pass; request-locale-coverage pass; desktop/config/scripts/verify-localization-catalog.mjs run on the frontend tree (temp root with src/renderer symlink): no missing request.* keys, exit 1 only for 168 pre-existing keys outside request/; audit-localization-coverage.mjs --check: request findings left are test fixtures and the `#TG-` prefix, exit 1 from pre-existing strings elsewhere)
 
 ## Context
 

@@ -5,7 +5,7 @@
 **Area:** frontend / request / impact (duyệt)
 **File:** `frontend/src/renderer/src/components/request/impact/{RiskAcceptanceChecklist,RiskOverrideMenu}.tsx`, `risk-approval-rules.ts` (mới); `components/request/solution/SolutionDecisionBar.tsx`, `components/request/plan/PlanApprovalBar.tsx`, `PhaseApprovalBar.tsx` (sửa); `hooks/useApprovals.ts` (sửa, FE-REQ-TASK-018-03: thêm tham số duyệt); test cùng tên
 **Depends on:** FE-REQ-TASK-036-04 (`SolutionDecisionBar` đã tích hợp Decision), 036-05 (`RiskSummaryCard`, `ImpactFindingList`), 036-02 (`useImpactAssessment`)
-**Status:** [~] PARTIAL — vitest impact/risk-approval-rules (5), RiskOverrideMenu (3), SolutionDecisionBar.decision (11) pass — thiếu: nối cổng vào PlanApprovalBar/PhaseApprovalBar
+**Status:** [x] DONE (verified 2026-10-08: vitest plan-approval-bars (19, +4 cổng rủi ro), risk-approval-rules (5), RiskOverrideMenu (3), SolutionDecisionBar.decision pass; e2e request-clarification-risk.web.e2e.ts "risk gate on plan approval" pass)
 
 ## Context
 
@@ -77,3 +77,8 @@
 ## Ghi chú triển khai (2026-10-07)
 
 Cổng theo mức chỉ nối vào `SolutionDecisionBar` (`useRiskApprovalGate`, `RiskAcceptanceChecklist`, Collapsible "Xem tác động", `RiskOverrideMenu` chỉ khi `canOverride`). `approval.approve` mang `viewedImpactDigest`/`acceptedFindingIds` (tên tạm) qua `useApprovals.approve` và `useSolutionDecision`. `PlanApprovalBar`/`PhaseApprovalBar` chưa có cổng rủi ro; "Duyệt nhanh" ở hộp duyệt (SOL-022) chưa sửa (ngoài phạm vi).
+
+## Ghi chú triển khai (2026-10-08)
+
+- Cổng rủi ro ở `PlanApprovalBar`/`PhaseApprovalBar`: `impact/ApprovalRiskGate.tsx` (`useApprovalRiskGate(approval, failure)` + `ApprovalRiskGateSection`): đọc `impact.get {subjectType: approval.subjectType, subjectId: approval.subjectId}` khi Approval `pending`; mức Trung bình khoá Duyệt tới khi mở "Xem tác động"; Cao/Nghiêm trọng cần `RiskAcceptanceChecklist`; `PlanDecisionButtons.approveExtras` → `usePlanDecision.approve(approval, comment, {viewedImpactDigest, acceptedFindingIds})` (tên trường tạm, bỏ khi rỗng); lỗi `REQUEST_RISK_ACCEPTANCE_REQUIRED|ASSESSMENT_STALE|ASSESSMENT_PENDING` thì nạp lại đánh giá; `REQUEST_RISK_APPROVER_NOT_ALLOWED` ẩn Duyệt (giữ Từ chối); `RiskOverrideMenu` gate `plan`/`phase`. Runtime không có `impact.*` giữ hành vi SOL-021.
+- "Duyệt nhanh" ở hộp duyệt (SOL-022) vẫn ngoài phạm vi.

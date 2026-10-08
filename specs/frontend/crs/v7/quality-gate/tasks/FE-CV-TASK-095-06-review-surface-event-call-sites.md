@@ -5,7 +5,7 @@
 **Area:** frontend
 **File:** `frontend/src/renderer/src/components/review-map/**`, `components/right-sidebar/use-source-control-quality-gate.ts` (085), menu (090), thẻ (093)
 **Depends on:** FE-CV-TASK-095-03; FE-CV-SOL-051, 059, 087, 085, 090, 093 (các bề mặt)
-**Status:** [~] PARTIAL — `review_opened` (nguồn qua `lib/review-open-source.ts`, mặc định `restore`), `review_lens_viewed` (≥ 2 s, một lần/lens/lần mở) và `review_findings_summary` đã nối (use-review-surface-telemetry.test, FindingsPanel.test, ReviewWorkspace.companions.test PASS); thiếu: `quality_finding_triaged` (chưa có UI triage cho QualityFinding — lens quality của W5-A) và các điểm vào chưa gọi `setReviewOpenSource` (W5-B)
+**Status:** [x] DONE (verified 2026-10-08: useQualityWaive.telemetry.test 2/2, open-review-entry.test 12/12, quality/findings PASS, use-review-surface-telemetry.test PASS)
 
 ## Context
 
@@ -38,3 +38,8 @@
 ## Ghi chú tích hợp (W6, 2026-10-07)
 
 Điểm vào (agent row, Source Control, Cmd+K, right sidebar, notification) cần gọi `setReviewOpenSource(worktreeId, {source, afterAgentTurn})` ngay trước khi mở tab; chưa gọi thì sự kiện tính là `restore`.
+
+## Ghi chú hoàn thiện (2026-10-08, P4)
+
+- `quality_finding_triaged`: phát trong `hooks/useQualityWaive.ts` sau khi waive/revoke thành công ở dock "Kiểm tra" (`QualityWaivePopover`); `reason` luôn `other` (lý do waiver là chữ tự do, không gửi), `severity` lạ ⇒ `info`, `blocking` = `error` trong phạm vi; lỗi ⇒ không phát. Finding cấu trúc (`FindingsPanel`) không phát sự kiện này (khác nguồn, PQ-05/06).
+- `setReviewOpenSource`: gọi trong `entry/open-review-entry.ts` (một điểm cho agent row, Source Control, Cmd+K, right sidebar, notification; `afterAgentTurn` = có lượt agent chưa xem; huỷ nếu tab không mở được) và nút lý do cổng ở Source Control (`use-source-control-quality-gate.ts`).

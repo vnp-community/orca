@@ -1,6 +1,6 @@
 # FE-CV-SOL-087-quality-diff-annotations: Chú thích phát hiện trên diff Monaco, danh sách phát hiện kiểm tra, miễn trừ
 
-> Đã triển khai và xác minh 2026-10-07 (tasks 087-09, 10, 12, 13, 14 DONE; 087-11 PARTIAL: `MonacoEditor` thường chưa gắn). Marker `orca-quality` + glyph trên DiffViewer/DiffSectionItem, panel dock "Checks" riêng (không trộn nguồn với Finding cấu trúc), miễn trừ/bỏ miễn trừ. Test pass: 16+18+4+20+4+14 + locale 22.
+> Đã triển khai và xác minh 2026-10-07; cập nhật 2026-10-08: tasks 087-09..14 đều DONE (087-11 đã gắn cả `MonacoEditor` thường qua `useEditorQualityAnnotations` — lệch sai lệch #5 có chủ đích; kiểm Monaco 0.55.1 thật trong Chromium: glyph 3 hình ở glyph margin của editor thường và `DiffEditor`, F8 mở marker widget, click glyph trả `GUTTER_GLYPH_MARGIN`). Marker `orca-quality` + glyph trên DiffViewer/DiffSectionItem, panel dock "Checks" riêng (không trộn nguồn với Finding cấu trúc), miễn trừ/bỏ miễn trừ. Test pass: 16+18+4+20+4+14 + locale 22.
 
 **CR:** [CR-CV-087](../../../../../../docs/crs/v7/quality-visualization/CR-CV-087-quality-frontend-scorecard-and-annotations.md) mục 1.1, 2.6, 2.7
 **Area:** frontend (`components/editor/`, `components/editor/quality-annotations/`, `components/review-map/quality/findings/`)

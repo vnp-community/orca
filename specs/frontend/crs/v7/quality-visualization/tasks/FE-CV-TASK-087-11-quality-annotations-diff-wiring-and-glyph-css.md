@@ -5,7 +5,7 @@
 **Area:** frontend / editor
 **File:** `frontend/src/renderer/src/components/editor/DiffViewer.tsx`, `DiffSectionItem.tsx` (sửa: mỗi file một lời gọi hook), `frontend/src/renderer/src/assets/main.css` (lớp `.orca-quality-glyph-*`), công tắc "Chú thích kiểm tra" (nơi đặt: thanh công cụ diff hoặc lens; chốt khi đọc code)
 **Depends on:** 087-10, FE-CV-TASK-088-01
-**Status:** [~] PARTIAL — DiffViewer và DiffSectionItem đã gắn (QualityAnnotationStrip.test + ChangesModeView.test + toàn bộ test thư mục editor pass, trừ 1 test MarkdownPreview có sẵn lỗi); `MonacoEditor` (soạn thảo thường) CHƯA gắn theo đúng sai lệch #5 của solution (MVP)
+**Status:** [x] DONE (verified 2026-10-08: quality-annotations/* + MonacoEditor.* + DiffViewer/DiffSectionItem/ChangesModeView 9 file / 42 test PASS; Monaco 0.55.1 thật trong Chromium headless: glyph 3 hình đúng clip-path ở glyph margin cả editor thường lẫn DiffEditor, F8 mở marker widget, click glyph trả GUTTER_GLYPH_MARGIN đúng dòng; tsc frontend 117 lỗi = baseline, oxlint sạch)
 
 ## Context
 
@@ -38,3 +38,10 @@ Test `DiffViewer`/`DiffSectionItem` hiện có phải xanh; test mới: hook đ�
 - Mỗi file chỉ thêm một lời gọi hook + prop `diffSource`/`compareHeadOid` + `QualityAnnotationStrip` (công tắc `annotationsOn` và ghi chú ẩn/lệch). Để `DiffSectionItem.tsx` không vượt 400 dòng, tách logic dọn model Monaco có sẵn sang `useDiffSectionModelDisposal.ts` (nguyên văn, không đổi hành vi).
 - CSS `.orca-quality-glyph-*` trong `main.css`. GitNexus impact: DiffViewer/DiffSectionItem/MonacoEditor đều LOW.
 - Chưa làm: gắn `MonacoEditor` (plain editor); kiểm tay sáng/tối.
+
+## Ghi chú triển khai (2026-10-08)
+
+- `MonacoEditor` (soạn thảo thường) gắn qua `quality-annotations/useEditorQualityAnnotations.ts`: coi là phía `worktree` chỉ khi tab mở lúc không có bản nháp/`isDirty` (chốt một lần lúc mount; sửa sau đó do hook marker dọn + ghi chú "nội dung đã đổi"), bỏ qua tab `readOnly` và tệp không `worktreeId`. Sai lệch có chủ đích so với "không gắn MonacoEditor ở MVP" (sai lệch #5 của solution).
+- `QualityAnnotationStrip` thêm prop `className`; ở editor thường strip nổi góc dưới-phải (không lấy chiều cao của Monaco). MonacoEditor chỉ thêm 1 lời gọi hook + 1 strip (+19 dòng; file đã có trong baseline max-lines từ trước). GitNexus impact `MonacoEditor`: LOW.
+- Test mới: `useEditorQualityAnnotations.test.tsx` (5), `MonacoEditor.quality-annotations.test.tsx` (3).
+- Kiểm Monaco thật: harness tạm (esbuild bundle `monaco-editor` + `quality-marker-model` + `quality-glyph-decorations` thật, CSS glyph trích từ `main.css`) chạy Playwright/Chromium headless, ngoài repo. Ảnh chụp token sáng/tối: 3 hình (bát giác/tam giác/vòng) phân biệt rõ.

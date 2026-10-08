@@ -5,7 +5,7 @@
 **Area:** frontend / request / clarification
 **File:** `frontend/src/renderer/src/components/request/clarification/{ClarificationPanel,ClarificationQuestionList,ClarificationQuestionField,ClarificationDeadlineNote}.tsx`, `clarification-answer-validation.ts` (mới); `components/request/RequestDetailPane.tsx`, `RequestStageTimeline.tsx`, `RequestDetailHeader.tsx` (sửa, FE-REQ-TASK-019-03); test cùng tên
 **Depends on:** FE-REQ-TASK-036-01, 036-02; FE-REQ-TASK-019-01 (`RequestStageTimeline`), 019-03 (`RequestDetailPane`)
-**Status:** [~] PARTIAL — vitest clarification/ClarificationPanel (9), clarification-answer-validation (8) pass — thiếu: nút "Trả lời" ở header, bộ lọc "Chờ bổ sung", định vị bước theo `resumeStatus`
+**Status:** [x] DONE (verified 2026-10-08: vitest ClarificationPanel (9), clarification-answer-validation (8), RequestDetailPane (13, +2 mới), request-list-filters (2), request-stage-timeline-model (24) pass; e2e request-clarification-risk.web.e2e.ts "clarification" pass)
 
 ## Context
 
@@ -79,3 +79,10 @@
 ## Ghi chú triển khai (2026-10-07)
 
 `ClarificationPanel` gắn vào `RequestDetailPane`; `RequestStageTimeline` chỉ thêm dòng "Đang chờ bổ sung thông tin" (bước hiện tại vẫn là `analysis` theo `STATUS_TO_CURRENT_STEP`, chưa dùng `resumeStatus`). Chưa thêm nút "Trả lời" vào `RequestDetailHeader` và bộ lọc nhanh vào `RequestListToolbar`. Tên người được chỉ định chưa có (chỉ id) nên dùng dòng chung.
+
+## Ghi chú triển khai (2026-10-08)
+
+- Nút "Trả lời" ở `RequestDetailHeader` (`onAnswerClarification`) chỉ hiện khi `ClarificationPanel` báo `answerable` (đúng người được chỉ định hoặc admin, chưa quá hạn) qua `onStateChange`; bấm thì cuộn và đặt focus vào panel (`CLARIFICATION_PANEL_DOM_ID`).
+- Bộ lọc nhanh "Chờ bổ sung" (`QuickFilterId 'awaitingInfo'` → `awaiting_information`) trong `RequestFilterBar`.
+- Định vị bước theo `resumeStatus`: `buildStageTimeline({..., resumeStatus})` đặt bước hiện tại theo bước sẽ chạy lại (vd. `planning` → Plan); `RequestStageTimeline` nhận `resumeStatus` từ Clarification đang mở.
+- Chip `source` đã có từ trước. Tên người được chỉ định vẫn chỉ có id (dòng chung).

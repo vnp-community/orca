@@ -5,7 +5,7 @@
 **Area:** frontend / request + Tasks page
 **File:** `frontend/src/renderer/src/components/request/CreateRequestDialog.tsx`, `CreateRequestButton.tsx`, `CreateRequestIssueButton.tsx`, `create-request-from-issue.ts` (mới); `components/task-page-jira-issue-list.tsx` (sửa, quanh dòng 225-245), `components/JiraIssueWorkspace.tsx` (sửa, dòng 437 và 774), `components/GitHubItemDialog.tsx` (sửa); test `create-request-from-issue.test.ts`, `CreateRequestDialog.test.tsx`, bổ sung vào test hiện có của danh sách Jira
 **Depends on:** FE-REQ-TASK-018-03, 018-05
-**Status:** [~] PARTIAL — CreateRequestDialog/IssueButton, create-request-from-issue + tests pass and buttons mounted in Jira list/workspace and GitHubItemDialog; e2e not written, no row-level test that Start workspace is untouched
+**Status:** [x] DONE (verified 2026-10-08: task-page-jira-issue-list-request-button.test.tsx 3 pass (Create request sits beside Start workspace, click never calls onStartWorkspace/onOpenIssue, hidden when unsupported); web e2e request-list-detail.web.e2e.ts "create" pass (request.create without `source`, opens the new request); CreateRequest*/create-request-from-issue vitest pass. From-issue path verified at component level, no separate e2e)
 
 ## Context
 
